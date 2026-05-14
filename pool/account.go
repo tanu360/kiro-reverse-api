@@ -10,15 +10,16 @@ import (
 )
 
 const overageFrequencyScale = 10
+const tokenRefreshSkewSeconds int64 = 30
 
 // AccountPool 账号池
 type AccountPool struct {
-	mu           sync.RWMutex
-	accounts     []config.Account
+	mu            sync.RWMutex
+	accounts      []config.Account
 	totalAccounts int
-	currentIndex uint64
-	cooldowns    map[string]time.Time // 账号冷却时间
-	errorCounts  map[string]int       // 连续错误计数
+	currentIndex  uint64
+	cooldowns     map[string]time.Time // 账号冷却时间
+	errorCounts   map[string]int       // 连续错误计数
 }
 
 var (
@@ -90,7 +91,7 @@ func (p *AccountPool) GetNext() *config.Account {
 		}
 
 		// 跳过即将过期的 Token
-		if acc.ExpiresAt > 0 && time.Now().Unix() > acc.ExpiresAt-300 {
+		if acc.ExpiresAt > 0 && time.Now().Unix() > acc.ExpiresAt-tokenRefreshSkewSeconds {
 			seen[acc.ID] = true
 			continue
 		}

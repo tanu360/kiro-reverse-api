@@ -1,8 +1,9 @@
 package pool
 
 import (
-	"kiro-api-proxy/config"
+	"kiro-go/config"
 	"testing"
+	"time"
 )
 
 func TestOverageAccountsAreSkippedByDefault(t *testing.T) {
@@ -50,5 +51,24 @@ func TestOverageWeightIsLowerThanNormalWeight(t *testing.T) {
 
 	if overageWeight >= normalWeight {
 		t.Fatalf("expected overage weight %d to be lower than normal weight %d", overageWeight, normalWeight)
+	}
+}
+
+func TestGetNextKeepsFiveMinuteTokenAvailable(t *testing.T) {
+	p := &AccountPool{}
+	account := config.Account{
+		ID:          "acct-1",
+		AccessToken: "access-token",
+		ExpiresAt:   time.Now().Unix() + 300,
+	}
+
+	p.accounts = []config.Account{account}
+
+	got := p.GetNext()
+	if got == nil {
+		t.Fatalf("expected five-minute token to be available")
+	}
+	if got.ID != account.ID {
+		t.Fatalf("expected account %q, got %q", account.ID, got.ID)
 	}
 }
