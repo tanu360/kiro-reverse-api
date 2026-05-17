@@ -711,69 +711,91 @@ func convertClaudeTools(tools []ClaudeTool) ([]KiroToolWrapper, map[string]strin
 		}
 		w := KiroToolWrapper{}
 		w.ToolSpecification.Name = sanitized
-		w.ToolSpecification.Description = desc
+		w.ToolSpecification.Description = normalizeToolDesc(desc, sanitized)
 		w.ToolSpecification.InputSchema = InputSchema{JSON: ensureObjectSchema(tool.InputSchema)}
 		result = append(result, w)
 	}
 	return result, nameMap
 }
 
-// ensureObjectSchema ensures the JSON schema has "type": "object" at the top level
-// and removes invalid null values from "required" fields (recursively).
-// Kiro API rejects tool schemas with "required": null.
+// ensureObjectSchema 确保工具 schema 顶层是 object，并清理 Kiro 不接受的字段。
 func ensureObjectSchema(schema interface{}) interface{} {
 	m, ok := schema.(map[string]interface{})
 	if !ok {
 		return map[string]interface{}{"type": "object"}
 	}
-	cleanSchema(m)
-	if _, hasType := m["type"]; !hasType {
-		m["type"] = "object"
+	cleaned := cloneSchemaMap(m)
+	cleanSchema(cleaned)
+	if _, hasType := cleaned["type"]; !hasType {
+		cleaned["type"] = "object"
 	}
-	return m
+	return cleaned
 }
 
-// cleanSchema recursively removes or fixes invalid "required": null entries
-// in a JSON Schema tree.
+func cloneSchemaMap(m map[string]interface{}) map[string]interface{} {
+	cloned := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		cloned[k] = cloneSchemaValue(v)
+	}
+	return cloned
+}
+
+func cloneSchemaValue(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		return cloneSchemaMap(val)
+	case []interface{}:
+		cloned := make([]interface{}, 0, len(val))
+		for _, item := range val {
+			cloned = append(cloned, cloneSchemaValue(item))
+		}
+		return cloned
+	default:
+		return v
+	}
+}
+
+// cleanSchema 递归清理会导致 Kiro 400 的 schema 字段。
 func cleanSchema(m map[string]interface{}) {
-	// Fix "required" field: must be array or absent
+	delete(m, "additionalProperties")
+
+	// required 必须是非空数组，否则 Kiro 会报 Improperly formed request。
 	if req, exists := m["required"]; exists {
-		if req == nil {
+		switch arr := req.(type) {
+		case nil:
 			delete(m, "required")
-		} else if arr, ok := req.([]interface{}); ok && len(arr) == 0 {
-			delete(m, "required")
-		}
-	}
-
-	// Recurse into "properties"
-	if props, ok := m["properties"].(map[string]interface{}); ok {
-		for _, v := range props {
-			if sub, ok := v.(map[string]interface{}); ok {
-				cleanSchema(sub)
+		case []interface{}:
+			if len(arr) == 0 {
+				delete(m, "required")
 			}
+		case []string:
+			if len(arr) == 0 {
+				delete(m, "required")
+			}
+		default:
+			delete(m, "required")
 		}
 	}
 
-	// Recurse into "items"
-	if items, ok := m["items"].(map[string]interface{}); ok {
-		cleanSchema(items)
-	}
-
-	// Recurse into nested object schemas (e.g., additionalProperties, allOf, oneOf, anyOf)
-	for _, key := range []string{"additionalProperties"} {
-		if sub, ok := m[key].(map[string]interface{}); ok {
-			cleanSchema(sub)
-		}
-	}
-	for _, key := range []string{"allOf", "oneOf", "anyOf"} {
-		if arr, ok := m[key].([]interface{}); ok {
-			for _, item := range arr {
+	for _, v := range m {
+		switch val := v.(type) {
+		case map[string]interface{}:
+			cleanSchema(val)
+		case []interface{}:
+			for _, item := range val {
 				if sub, ok := item.(map[string]interface{}); ok {
 					cleanSchema(sub)
 				}
 			}
 		}
 	}
+}
+
+func normalizeToolDesc(desc, name string) string {
+	if strings.TrimSpace(desc) != "" {
+		return desc
+	}
+	return "Tool: " + name
 }
 
 // sanitizeToolName normalizes a tool name to characters the Kiro API accepts.
@@ -1442,8 +1464,8 @@ func convertOpenAITools(tools []OpenAITool) []KiroToolWrapper {
 		}
 		wrapper := KiroToolWrapper{}
 		wrapper.ToolSpecification.Name = shortenToolName(tool.Function.Name)
-		wrapper.ToolSpecification.Description = desc
-		wrapper.ToolSpecification.InputSchema = InputSchema{JSON: tool.Function.Parameters}
+		wrapper.ToolSpecification.Description = normalizeToolDesc(desc, wrapper.ToolSpecification.Name)
+		wrapper.ToolSpecification.InputSchema = InputSchema{JSON: ensureObjectSchema(tool.Function.Parameters)}
 		result = append(result, wrapper)
 	}
 	return result

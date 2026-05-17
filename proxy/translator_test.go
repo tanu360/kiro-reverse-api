@@ -277,3 +277,90 @@ func TestToolResultsContinuationIncludesInstructionPrefix(t *testing.T) {
 		t.Fatalf("expected tool result text in continuation content, got %q", content)
 	}
 }
+
+func TestEnsureObjectSchemaRemovesKiroRejectedFieldsRecursively(t *testing.T) {
+	input := map[string]interface{}{
+		"type":                 "object",
+		"required":             []interface{}{},
+		"additionalProperties": false,
+		"properties": map[string]interface{}{
+			"path": map[string]interface{}{
+				"type":                 "string",
+				"required":             nil,
+				"additionalProperties": map[string]interface{}{"type": "string"},
+			},
+			"options": map[string]interface{}{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]interface{}{
+					"force": map[string]interface{}{"type": "boolean"},
+				},
+			},
+		},
+		"anyOf": []interface{}{
+			map[string]interface{}{
+				"type":                 "object",
+				"required":             []interface{}{},
+				"additionalProperties": false,
+			},
+		},
+	}
+
+	got := ensureObjectSchema(input).(map[string]interface{})
+	if schemaContainsKey(got, "additionalProperties") {
+		t.Fatalf("expected additionalProperties to be removed recursively, got %#v", got)
+	}
+	if schemaContainsKey(got, "required") {
+		t.Fatalf("expected empty/nil required fields to be removed recursively, got %#v", got)
+	}
+	if _, stillPresent := input["additionalProperties"]; !stillPresent {
+		t.Fatalf("expected sanitizer not to mutate caller schema")
+	}
+}
+
+func TestConvertOpenAIToolsSanitizesSchemaAndDescription(t *testing.T) {
+	var tool OpenAITool
+	tool.Type = "function"
+	tool.Function.Name = "read_file"
+	tool.Function.Parameters = map[string]interface{}{
+		"type":                 "object",
+		"required":             []string{},
+		"additionalProperties": false,
+	}
+
+	tools := convertOpenAITools([]OpenAITool{tool})
+	if len(tools) != 1 {
+		t.Fatalf("expected one converted tool, got %d", len(tools))
+	}
+	if strings.TrimSpace(tools[0].ToolSpecification.Description) == "" {
+		t.Fatalf("expected fallback tool description")
+	}
+	schema := tools[0].ToolSpecification.InputSchema.JSON.(map[string]interface{})
+	if schemaContainsKey(schema, "additionalProperties") {
+		t.Fatalf("expected OpenAI tool schema to be sanitized, got %#v", schema)
+	}
+	if schemaContainsKey(schema, "required") {
+		t.Fatalf("expected empty required field to be removed, got %#v", schema)
+	}
+}
+
+func schemaContainsKey(value interface{}, key string) bool {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		if _, ok := v[key]; ok {
+			return true
+		}
+		for _, child := range v {
+			if schemaContainsKey(child, key) {
+				return true
+			}
+		}
+	case []interface{}:
+		for _, child := range v {
+			if schemaContainsKey(child, key) {
+				return true
+			}
+		}
+	}
+	return false
+}
