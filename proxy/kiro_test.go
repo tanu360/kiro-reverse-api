@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"kiro-go/config"
 	"net/http"
 	"net/url"
 	"testing"
@@ -79,6 +80,20 @@ func TestInitKiroHttpClientKeepsShortRestTimeout(t *testing.T) {
 	}
 	if restClient.Timeout != 30*time.Second {
 		t.Fatalf("expected REST timeout to stay 30s, got %s", restClient.Timeout)
+	}
+}
+
+func TestSetPayloadProfileArnForAccountClearsStaleArn(t *testing.T) {
+	payload := &KiroPayload{ProfileArn: "arn:aws:codewhisperer:profile/stale"}
+
+	setPayloadProfileArnForAccount(payload, &config.Account{ProfileArn: " arn:aws:codewhisperer:profile/current "})
+	if payload.ProfileArn != "arn:aws:codewhisperer:profile/current" {
+		t.Fatalf("expected current account profile ARN, got %q", payload.ProfileArn)
+	}
+
+	setPayloadProfileArnForAccount(payload, &config.Account{})
+	if payload.ProfileArn != "" {
+		t.Fatalf("expected stale profile ARN to be cleared, got %q", payload.ProfileArn)
 	}
 }
 

@@ -14,6 +14,11 @@ func isQuotaErrorMessage(msg string) bool {
 	return strings.Contains(msg, "429") || strings.Contains(msg, "quota")
 }
 
+func isOverageErrorMessage(msg string) bool {
+	msg = strings.ToLower(msg)
+	return strings.Contains(msg, "402") && strings.Contains(msg, "overage")
+}
+
 func isSuspensionErrorMessage(msg string) bool {
 	msg = strings.ToLower(msg)
 	return strings.Contains(msg, "temporarily_suspended") ||
@@ -64,6 +69,20 @@ func (h *Handler) disableAccount(account *config.Account, banStatus, banReason s
 	h.pool.Reload()
 }
 
+func (h *Handler) disableAccountOverage(account *config.Account) {
+	if account == nil {
+		return
+	}
+
+	if err := config.DisableAccountOverage(account.ID); err != nil {
+		logger.Warnf("[AccountFailover] Failed to disable overage for %s: %v", account.Email, err)
+		return
+	}
+
+	logger.Warnf("[AccountFailover] Disabled overage for %s after upstream overage limit error", account.Email)
+	h.pool.Reload()
+}
+
 func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 	if account == nil || err == nil {
 		return
@@ -71,6 +90,9 @@ func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 
 	errMsg := err.Error()
 	switch {
+	case isOverageErrorMessage(errMsg):
+		h.disableAccountOverage(account)
+		h.pool.RecordError(account.ID, false)
 	case isQuotaErrorMessage(errMsg):
 		h.pool.RecordError(account.ID, true)
 	case isSuspensionErrorMessage(errMsg):
