@@ -242,6 +242,17 @@ type KiroStreamCallback struct {
 
 // ==================== API Call ====================
 
+func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Account) {
+	if payload == nil {
+		return
+	}
+
+	payload.ProfileArn = ""
+	if account != nil {
+		payload.ProfileArn = strings.TrimSpace(account.ProfileArn)
+	}
+}
+
 // getSortedEndpoints returns endpoints ordered by user preference, with optional fallback.
 func getSortedEndpoints(preferred string) []kiroEndpoint {
 	fallback := config.GetEndpointFallback()
@@ -276,6 +287,8 @@ func getSortedEndpoints(preferred string) []kiroEndpoint {
 
 // CallKiroAPI calls the Kiro streaming API, trying each configured endpoint with automatic fallback.
 func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
+	setPayloadProfileArnForAccount(payload, account)
+
 	if _, err := json.Marshal(payload); err != nil {
 		return err
 	}
