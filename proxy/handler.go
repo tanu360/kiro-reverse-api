@@ -2827,10 +2827,10 @@ func (h *Handler) apiUpdatePromptFilter(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ApiKey         string `json:"apiKey"`
-		RequireApiKey  bool   `json:"requireApiKey"`
-		Password       string `json:"password"`
-		AllowOverUsage *bool  `json:"allowOverUsage,omitempty"`
+		ApiKey         *string `json:"apiKey,omitempty"`
+		RequireApiKey  *bool   `json:"requireApiKey,omitempty"`
+		Password       string  `json:"password,omitempty"`
+		AllowOverUsage *bool   `json:"allowOverUsage,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -2838,7 +2838,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := config.UpdateSettings(req.ApiKey, req.RequireApiKey, req.Password); err != nil {
+	if err := config.UpdateSettingsPatch(req.ApiKey, req.RequireApiKey, req.Password); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return

@@ -478,11 +478,17 @@ func parseEventStream(body io.Reader, callback *KiroStreamCallback) error {
 		}
 	}
 
+	if currentToolUse != nil {
+		finishToolUse(currentToolUse, callback)
+	}
+
 	if callback.OnCredits != nil && totalCredits > 0 {
 		callback.OnCredits(totalCredits)
 	}
 
-	callback.OnComplete(inputTokens, outputTokens)
+	if callback.OnComplete != nil {
+		callback.OnComplete(inputTokens, outputTokens)
+	}
 	return nil
 }
 
@@ -649,20 +655,31 @@ type toolUseState struct {
 	ToolUseID   string
 	Name        string
 	InputBuffer strings.Builder
+	GeneratedID bool
 }
 
 func handleToolUseEvent(event map[string]interface{}, current *toolUseState, callback *KiroStreamCallback) *toolUseState {
-	toolUseID, _ := event["toolUseId"].(string)
-	name, _ := event["name"].(string)
-	isStop, _ := event["stop"].(bool)
+	toolUseID := firstStringField(event, "toolUseId", "toolUseID", "tool_use_id", "id")
+	name := firstStringField(event, "name", "toolName", "tool_name")
+	isStop := firstBoolField(event, "stop", "isStop", "done")
 
 	if toolUseID != "" && name != "" {
 		if current == nil {
 			current = &toolUseState{ToolUseID: toolUseID, Name: name}
 		} else if current.ToolUseID != toolUseID {
-			finishToolUse(current, callback)
-			current = &toolUseState{ToolUseID: toolUseID, Name: name}
+			if current.GeneratedID && current.Name == name {
+				current.ToolUseID = toolUseID
+				current.GeneratedID = false
+			} else {
+				finishToolUse(current, callback)
+				current = &toolUseState{ToolUseID: toolUseID, Name: name}
+			}
 		}
+	} else if name != "" && current == nil {
+		current = &toolUseState{ToolUseID: "toolu_" + uuid.New().String(), Name: name, GeneratedID: true}
+	} else if name != "" && current != nil && current.Name != name {
+		finishToolUse(current, callback)
+		current = &toolUseState{ToolUseID: "toolu_" + uuid.New().String(), Name: name, GeneratedID: true}
 	}
 
 	if current != nil {
@@ -684,6 +701,12 @@ func handleToolUseEvent(event map[string]interface{}, current *toolUseState, cal
 }
 
 func finishToolUse(state *toolUseState, callback *KiroStreamCallback) {
+	if state == nil || state.Name == "" || callback == nil || callback.OnToolUse == nil {
+		return
+	}
+	if state.ToolUseID == "" {
+		state.ToolUseID = "toolu_" + uuid.New().String()
+	}
 	var input map[string]interface{}
 	if state.InputBuffer.Len() > 0 {
 		json.Unmarshal([]byte(state.InputBuffer.String()), &input)
@@ -696,6 +719,24 @@ func finishToolUse(state *toolUseState, callback *KiroStreamCallback) {
 		Name:      state.Name,
 		Input:     input,
 	})
+}
+
+func firstStringField(m map[string]interface{}, keys ...string) string {
+	for _, key := range keys {
+		if v, ok := m[key].(string); ok && v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func firstBoolField(m map[string]interface{}, keys ...string) bool {
+	for _, key := range keys {
+		if v, ok := m[key].(bool); ok {
+			return v
+		}
+	}
+	return false
 }
 
 // extractEventType extracts the event type string from AWS Event Stream message headers.
