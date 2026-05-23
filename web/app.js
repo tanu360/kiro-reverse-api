@@ -426,6 +426,7 @@
   const toast = function (msg, variant, opts) {
     if (typeof window.toast === 'function') return window.toast(msg, variant, opts);
     try { console.warn('[toast missing]', variant, msg); } catch (_) { }
+    return function () {};
   };
   const toastPrimary = (msg, opts) => toast(msg, 'primary', opts);
   const toastWarning = (msg, opts) => toast(msg, 'warning', opts);

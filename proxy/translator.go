@@ -229,19 +229,35 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 
 	history = trimLeadingAssistantHistory(history)
 
+	// Keep system instructions in history instead of user content.
+	if systemPrompt != "" {
+		priming := []KiroHistoryMessage{
+			{
+				UserInputMessage: &KiroUserInputMessage{
+					Content: systemPrompt,
+					ModelID: modelID,
+					Origin:  origin,
+				},
+			},
+			{
+				AssistantResponseMessage: &KiroAssistantResponseMessage{
+					Content: "I will follow these instructions.",
+				},
+			},
+		}
+		history = append(priming, history...)
+	}
+
 	// 构建最终内容
 	finalContent := ""
-	if systemPrompt != "" {
-		finalContent = "--- SYSTEM PROMPT ---\n" + systemPrompt + "\n--- END SYSTEM PROMPT ---\n\n"
-	}
 	if currentContent != "" {
-		finalContent += currentContent
+		finalContent = currentContent
 	} else if len(currentImages) > 0 {
-		finalContent += normalizeUserContent("", true)
+		finalContent = normalizeUserContent("", true)
 	} else if len(currentToolResults) > 0 {
-		finalContent += buildToolResultsContinuation(currentToolResults)
+		finalContent = buildToolResultsContinuation(currentToolResults)
 	} else {
-		finalContent += minimalFallbackUserContent
+		finalContent = minimalFallbackUserContent
 	}
 
 	// 转换工具
@@ -980,7 +996,6 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 	var currentContent string
 	var currentImages []KiroImage
 	var currentToolResults []KiroToolResult
-	systemMerged := false
 
 	for i, msg := range nonSystemMessages {
 		isLast := i == len(nonSystemMessages)-1
@@ -989,12 +1004,6 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		case "user":
 			content, images := extractOpenAIUserContent(msg.Content)
 			content = normalizeUserContent(content, len(images) > 0)
-
-			// 第一条 user 消息合并 system prompt
-			if !systemMerged && systemPrompt != "" {
-				content = systemPrompt + "\n" + content
-				systemMerged = true
-			}
 
 			if isLast {
 				currentContent = content
@@ -1062,6 +1071,25 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		}
 	}
 
+	// Keep system instructions in history instead of user content.
+	if systemPrompt != "" {
+		priming := []KiroHistoryMessage{
+			{
+				UserInputMessage: &KiroUserInputMessage{
+					Content: strings.TrimSpace(systemPrompt),
+					ModelID: modelID,
+					Origin:  origin,
+				},
+			},
+			{
+				AssistantResponseMessage: &KiroAssistantResponseMessage{
+					Content: "I will follow these instructions.",
+				},
+			},
+		}
+		history = append(priming, history...)
+	}
+
 	// 构建最终内容
 	finalContent := currentContent
 	if finalContent == "" {
@@ -1072,9 +1100,6 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		} else {
 			finalContent = minimalFallbackUserContent
 		}
-	}
-	if !systemMerged && systemPrompt != "" {
-		finalContent = systemPrompt + "\n" + finalContent
 	}
 
 	// 转换工具
