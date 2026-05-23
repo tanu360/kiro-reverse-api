@@ -232,6 +232,75 @@ func (p *AccountPool) GetNextForModel(model string) *config.Account {
 	return best
 }
 
+// GetNextForModelExcluding is like GetNextForModel but skips any account whose
+// ID is in the excluded set. Returns nil when no further candidates are available,
+// so the caller can break immediately instead of spinning through empty attempts.
+func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string]bool) *config.Account {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if len(p.accounts) == 0 {
+		return nil
+	}
+
+	allowOverUsage := config.GetAllowOverUsage()
+	now := time.Now()
+	n := len(p.accounts)
+	seen := make(map[string]bool)
+
+	for i := 0; i < n; i++ {
+		idx := atomic.AddUint64(&p.currentIndex, 1) % uint64(n)
+		acc := &p.accounts[idx]
+
+		if seen[acc.ID] || excluded[acc.ID] {
+			seen[acc.ID] = true
+			continue
+		}
+		if !p.accountHasModel(acc.ID, model) {
+			seen[acc.ID] = true
+			continue
+		}
+		if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
+			seen[acc.ID] = true
+			continue
+		}
+		if acc.ExpiresAt > 0 && time.Now().Unix() > acc.ExpiresAt-tokenRefreshSkewSeconds {
+			seen[acc.ID] = true
+			continue
+		}
+		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
+			seen[acc.ID] = true
+			continue
+		}
+		return acc
+	}
+
+	// No fresh candidate — return the non-excluded account with the shortest cooldown.
+	var best *config.Account
+	var earliest time.Time
+	for i := range p.accounts {
+		acc := &p.accounts[i]
+		if excluded[acc.ID] {
+			continue
+		}
+		if !p.accountHasModel(acc.ID, model) {
+			continue
+		}
+		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
+			continue
+		}
+		if cooldown, ok := p.cooldowns[acc.ID]; ok {
+			if best == nil || cooldown.Before(earliest) {
+				best = acc
+				earliest = cooldown
+			}
+		} else {
+			return acc
+		}
+	}
+	return best
+}
+
 // GetByID 根据 ID 获取账号
 func (p *AccountPool) GetByID(id string) *config.Account {
 	p.mu.RLock()
@@ -316,6 +385,20 @@ func hasStatusToken(s, status string) bool {
 
 func isDigit(b byte) bool {
 	return b >= '0' && b <= '9'
+}
+
+// IsSuspensionError reports whether the error indicates the account has been
+// temporarily suspended by upstream or has no available Kiro profile.
+// Unlike auth failures (revoked credentials), these may be transient, but
+// the account should be disabled until an operator re-enables it.
+func IsSuspensionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "temporarily_suspended") ||
+		strings.Contains(lower, "temporarily suspended") ||
+		strings.Contains(lower, "no available kiro profile")
 }
 
 // DisableAccount marks an account as disabled (auth revoked / unrecoverable),

@@ -776,17 +776,12 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Debug: dump raw inbound request body so we can verify exactly what the
-	// client sent us (vs. what we forward upstream). Useful when diagnosing
-	// missing-history / compaction issues where the upstream payload looks
-	// suspicious. Only emitted at DEBUG level.
-	logger.Debugf("[Inbound] /v1/messages raw body (%d bytes): %s", len(body), string(body))
-
 	var req ClaudeRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		h.sendClaudeError(w, 400, "invalid_request_error", "Invalid JSON: "+err.Error())
 		return
 	}
+
 	if msg := validateClaudeRequestShape(&req); msg != "" {
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
@@ -799,14 +794,11 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	const maxAccountAttempts = 5
 	triedIDs := make(map[string]bool)
 	for attempt := 0; attempt < maxAccountAttempts; attempt++ {
-		candidate := h.pool.GetNextForModel(actualModel)
+		// GetNextForModelExcluding skips already-tried accounts and returns nil
+		// immediately when no further candidates exist, avoiding empty spins.
+		candidate := h.pool.GetNextForModelExcluding(actualModel, triedIDs)
 		if candidate == nil {
 			break
-		}
-		if triedIDs[candidate.ID] {
-			// Same candidate already tried this round; let the loop pick another.
-			// If only one account is reachable, the attempt budget will exit the loop.
-			continue
 		}
 		triedIDs[candidate.ID] = true
 
@@ -1354,6 +1346,9 @@ func (h *Handler) handleAccountError(accountID string, err error) {
 	if pool.IsAuthFailure(err) {
 		logger.Warnf("[Auth] Upstream rejected credentials for account %s (%v) — disabling", accountID, err)
 		h.pool.DisableAccount(accountID, "upstream auth failure: "+errMsg)
+	} else if pool.IsSuspensionError(err) {
+		logger.Warnf("[Auth] Account %s suspended or has no available profile (%v) — disabling", accountID, err)
+		h.pool.DisableAccount(accountID, "account suspended: "+errMsg)
 	}
 }
 
