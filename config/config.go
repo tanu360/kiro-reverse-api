@@ -441,6 +441,21 @@ func UpdateSettings(apiKey string, requireApiKey bool, password string) error {
 	return Save()
 }
 
+func UpdateSettingsPatch(apiKey *string, requireApiKey *bool, password string) error {
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	if apiKey != nil {
+		cfg.ApiKey = *apiKey
+	}
+	if requireApiKey != nil {
+		cfg.RequireApiKey = *requireApiKey
+	}
+	if password != "" {
+		cfg.Password = password
+	}
+	return Save()
+}
+
 func UpdateStats(totalReq, successReq, failedReq, totalTokens int, totalCredits float64) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
