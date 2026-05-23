@@ -247,9 +247,11 @@ func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Accoun
 		return
 	}
 
-	payload.ProfileArn = ""
+	payload.ProfileArn = strings.TrimSpace(payload.ProfileArn)
 	if account != nil {
-		payload.ProfileArn = strings.TrimSpace(account.ProfileArn)
+		if profileArn := strings.TrimSpace(account.ProfileArn); profileArn != "" {
+			payload.ProfileArn = profileArn
+		}
 	}
 }
 
@@ -287,6 +289,13 @@ func getSortedEndpoints(preferred string) []kiroEndpoint {
 
 // CallKiroAPI calls the Kiro streaming API, trying each configured endpoint with automatic fallback.
 func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
+	originalProfileArn := ""
+	if payload != nil {
+		originalProfileArn = payload.ProfileArn
+		defer func() {
+			payload.ProfileArn = originalProfileArn
+		}()
+	}
 	setPayloadProfileArnForAccount(payload, account)
 
 	if _, err := json.Marshal(payload); err != nil {
@@ -397,6 +406,10 @@ func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroSt
 
 // parseEventStream decodes an AWS binary Event Stream response body.
 func parseEventStream(body io.Reader, callback *KiroStreamCallback) error {
+	if callback == nil {
+		callback = &KiroStreamCallback{}
+	}
+
 	// Read directly without bufio to avoid buffering latency in streaming responses.
 	var inputTokens, outputTokens int
 	var totalCredits float64
@@ -452,14 +465,14 @@ func parseEventStream(body io.Reader, callback *KiroStreamCallback) error {
 		case "assistantResponseEvent":
 			if content, ok := event["content"].(string); ok && content != "" {
 				normalized := normalizeChunk(content, &lastAssistantContent)
-				if normalized != "" {
+				if normalized != "" && callback.OnText != nil {
 					callback.OnText(normalized, false)
 				}
 			}
 		case "reasoningContentEvent":
 			if text, ok := event["text"].(string); ok && text != "" {
 				normalized := normalizeChunk(text, &lastReasoningContent)
-				if normalized != "" {
+				if normalized != "" && callback.OnText != nil {
 					callback.OnText(normalized, true)
 				}
 			}

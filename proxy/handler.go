@@ -1307,18 +1307,6 @@ func (h *Handler) recordFailure() {
 	atomic.AddInt64(&h.failedRequests, 1)
 }
 
-// checkOverageError 检测 402 超额错误，自动关闭对应账号的超额使用
-func (h *Handler) checkOverageError(err error, accountID string) {
-	if err == nil {
-		return
-	}
-	errMsg := err.Error()
-	if strings.Contains(errMsg, "402") && strings.Contains(errMsg, "OVERAGE") {
-		logger.Warnf("[Overage] Detected overage limit error for account %s, disabling AllowOverage", accountID)
-		config.DisableAccountOverage(accountID)
-	}
-}
-
 // handleClaudeNonStream Claude 非流式响应
 func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
 	excluded := make(map[string]bool)

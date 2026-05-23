@@ -79,6 +79,34 @@ func TestParseEventStreamFinishesPendingToolUseOnEOF(t *testing.T) {
 	}
 }
 
+func TestParseEventStreamNilCallbackIsNoOp(t *testing.T) {
+	stream := bytes.NewReader(bytes.Join([][]byte{
+		awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "hello"}),
+		awsEventStreamFrame(t, "reasoningContentEvent", map[string]interface{}{"text": "thinking"}),
+		awsEventStreamFrame(t, "contextUsageEvent", map[string]interface{}{"contextUsagePercentage": 12.5}),
+		awsEventStreamFrame(t, "meteringEvent", map[string]interface{}{"usage": 1.25}),
+		awsEventStreamFrame(t, "toolUseEvent", map[string]interface{}{
+			"name":  "mcpIdaProMcpStatus",
+			"input": `{"server":"ida-pro-mcp"}`,
+			"stop":  true,
+		}),
+	}, nil))
+
+	if err := parseEventStream(stream, nil); err != nil {
+		t.Fatalf("expected nil callback to be a no-op, got %v", err)
+	}
+}
+
+func TestParseEventStreamNilCallbackFieldsAreNoOp(t *testing.T) {
+	stream := bytes.NewReader(awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{
+		"content": "hello",
+	}))
+
+	if err := parseEventStream(stream, &KiroStreamCallback{}); err != nil {
+		t.Fatalf("expected empty callback to be a no-op, got %v", err)
+	}
+}
+
 func TestHandleToolUseEventGeneratesMissingToolUseID(t *testing.T) {
 	var toolUses []KiroToolUse
 	current := handleToolUseEvent(map[string]interface{}{
@@ -179,17 +207,21 @@ func TestInitKiroHttpClientKeepsShortRestTimeout(t *testing.T) {
 	}
 }
 
-func TestSetPayloadProfileArnForAccountClearsStaleArn(t *testing.T) {
+func TestSetPayloadProfileArnForAccountUsesAccountArn(t *testing.T) {
 	payload := &KiroPayload{ProfileArn: "arn:aws:codewhisperer:profile/stale"}
 
 	setPayloadProfileArnForAccount(payload, &config.Account{ProfileArn: " arn:aws:codewhisperer:profile/current "})
 	if payload.ProfileArn != "arn:aws:codewhisperer:profile/current" {
 		t.Fatalf("expected current account profile ARN, got %q", payload.ProfileArn)
 	}
+}
+
+func TestSetPayloadProfileArnForAccountPreservesExplicitPayloadArn(t *testing.T) {
+	payload := &KiroPayload{ProfileArn: " arn:aws:codewhisperer:profile/explicit "}
 
 	setPayloadProfileArnForAccount(payload, &config.Account{})
-	if payload.ProfileArn != "" {
-		t.Fatalf("expected stale profile ARN to be cleared, got %q", payload.ProfileArn)
+	if payload.ProfileArn != "arn:aws:codewhisperer:profile/explicit" {
+		t.Fatalf("expected explicit payload profile ARN to be preserved, got %q", payload.ProfileArn)
 	}
 }
 
