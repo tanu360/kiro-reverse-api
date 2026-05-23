@@ -67,6 +67,11 @@ func (p *AccountPool) Reload() {
 
 // GetNext 获取下一个可用账号（加权轮询）
 func (p *AccountPool) GetNext() *config.Account {
+	return p.GetNextExcluding(nil)
+}
+
+// GetNextExcluding 获取下一个可用账号（加权轮询），并跳过指定账号。
+func (p *AccountPool) GetNextExcluding(excluded map[string]bool) *config.Account {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -84,6 +89,10 @@ func (p *AccountPool) GetNext() *config.Account {
 		idx := atomic.AddUint64(&p.currentIndex, 1) % uint64(n)
 		acc := &p.accounts[idx]
 
+		if excluded != nil && excluded[acc.ID] {
+			seen[acc.ID] = true
+			continue
+		}
 		if seen[acc.ID] {
 			continue
 		}
@@ -114,6 +123,9 @@ func (p *AccountPool) GetNext() *config.Account {
 	var earliest time.Time
 	for i := range p.accounts {
 		acc := &p.accounts[i]
+		if excluded != nil && excluded[acc.ID] {
+			continue
+		}
 		// 额度用尽的账号不作为 fallback（除非账号级或全局允许超额）
 		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
 			continue
@@ -171,6 +183,11 @@ func (p *AccountPool) accountHasModel(accountID, model string) bool {
 // model 应为去掉 thinking 后缀的实际模型名。
 // 若无账号有该模型列表数据，行为与 GetNext 相同（乐观路由）。
 func (p *AccountPool) GetNextForModel(model string) *config.Account {
+	return p.GetNextForModelExcluding(model, nil)
+}
+
+// GetNextForModelExcluding 获取下一个支持指定模型的可用账号，并跳过指定账号。
+func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string]bool) *config.Account {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -187,6 +204,10 @@ func (p *AccountPool) GetNextForModel(model string) *config.Account {
 		idx := atomic.AddUint64(&p.currentIndex, 1) % uint64(n)
 		acc := &p.accounts[idx]
 
+		if excluded != nil && excluded[acc.ID] {
+			seen[acc.ID] = true
+			continue
+		}
 		if seen[acc.ID] {
 			continue
 		}
@@ -214,73 +235,7 @@ func (p *AccountPool) GetNextForModel(model string) *config.Account {
 	var earliest time.Time
 	for i := range p.accounts {
 		acc := &p.accounts[i]
-		if !p.accountHasModel(acc.ID, model) {
-			continue
-		}
-		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
-			continue
-		}
-		if cooldown, ok := p.cooldowns[acc.ID]; ok {
-			if best == nil || cooldown.Before(earliest) {
-				best = acc
-				earliest = cooldown
-			}
-		} else {
-			return acc
-		}
-	}
-	return best
-}
-
-// GetNextForModelExcluding is like GetNextForModel but skips any account whose
-// ID is in the excluded set. Returns nil when no further candidates are available,
-// so the caller can break immediately instead of spinning through empty attempts.
-func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string]bool) *config.Account {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	if len(p.accounts) == 0 {
-		return nil
-	}
-
-	allowOverUsage := config.GetAllowOverUsage()
-	now := time.Now()
-	n := len(p.accounts)
-	seen := make(map[string]bool)
-
-	for i := 0; i < n; i++ {
-		idx := atomic.AddUint64(&p.currentIndex, 1) % uint64(n)
-		acc := &p.accounts[idx]
-
-		if seen[acc.ID] || excluded[acc.ID] {
-			seen[acc.ID] = true
-			continue
-		}
-		if !p.accountHasModel(acc.ID, model) {
-			seen[acc.ID] = true
-			continue
-		}
-		if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
-			seen[acc.ID] = true
-			continue
-		}
-		if acc.ExpiresAt > 0 && time.Now().Unix() > acc.ExpiresAt-tokenRefreshSkewSeconds {
-			seen[acc.ID] = true
-			continue
-		}
-		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
-			seen[acc.ID] = true
-			continue
-		}
-		return acc
-	}
-
-	// No fresh candidate — return the non-excluded account with the shortest cooldown.
-	var best *config.Account
-	var earliest time.Time
-	for i := range p.accounts {
-		acc := &p.accounts[i]
-		if excluded[acc.ID] {
+		if excluded != nil && excluded[acc.ID] {
 			continue
 		}
 		if !p.accountHasModel(acc.ID, model) {
