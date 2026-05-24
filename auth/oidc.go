@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"kiro-go/config"
+	"kiro-proxy/config"
 	"net/http"
 	"time"
 )

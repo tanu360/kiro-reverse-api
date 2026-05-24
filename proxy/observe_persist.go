@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"kiro-go/config"
-	"kiro-go/logger"
+	"kiro-proxy/config"
+	"kiro-proxy/logger"
 
 	_ "modernc.org/sqlite"
 )

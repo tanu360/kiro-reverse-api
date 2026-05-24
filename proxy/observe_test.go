@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"kiro-go/config"
+	"kiro-proxy/config"
 )
 
 func resetObservePersistenceForTest(t *testing.T) {

@@ -2,7 +2,7 @@ package pool
 
 import (
 	"errors"
-	"kiro-go/config"
+	"kiro-proxy/config"
 	"path/filepath"
 	"testing"
 	"time"

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"kiro-go/config"
+	"kiro-proxy/config"
 
 	_ "modernc.org/sqlite"
 )

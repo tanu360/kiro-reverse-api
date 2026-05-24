@@ -3,7 +3,7 @@ package pool
 
 import (
 	"fmt"
-	"kiro-go/config"
+	"kiro-proxy/config"
 	"time"
 )
 

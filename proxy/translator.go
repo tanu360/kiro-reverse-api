@@ -3,7 +3,7 @@ package proxy
 import (
 	"encoding/base64"
 	"encoding/json"
-	"kiro-go/config"
+	"kiro-proxy/config"
 	"regexp"
 	"strings"
 	"time"

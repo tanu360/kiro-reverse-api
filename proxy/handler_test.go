@@ -2,8 +2,8 @@ package proxy
 
 import (
 	"encoding/json"
-	"kiro-go/config"
-	accountpool "kiro-go/pool"
+	"kiro-proxy/config"
+	accountpool "kiro-proxy/pool"
 	"net/http"
 	"net/http/httptest"
 	"strings"

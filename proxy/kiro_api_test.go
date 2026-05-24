@@ -2,7 +2,7 @@ package proxy
 
 import (
 	"io"
-	"kiro-go/config"
+	"kiro-proxy/config"
 	"net/http"
 	"path/filepath"
 	"strings"

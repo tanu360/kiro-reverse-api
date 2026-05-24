@@ -1,5 +1,5 @@
 /*
- * Kiro-Go admin UI logic.
+ * Kiro Proxy admin UI logic.
  */
 (() => {
   'use strict';
@@ -2482,7 +2482,7 @@
       if (!currentVersion) await loadVersion();
       const current = currentVersion.replace(/^v/i, '');
       if (!current) throw new Error('Current version missing');
-      const res = await fetch('https://raw.githubusercontent.com/Quorinex/Kiro-Go/main/version.json?t=' + Date.now());
+      const res = await fetch('https://raw.githubusercontent.com/tanu360/kiro-reverse-api/main/version.json?t=' + Date.now());
       if (!res.ok) throw new Error('Fetch failed');
       const d = await res.json();
       const latest = (d.version || '').replace(/^v/i, '');

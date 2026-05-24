@@ -1,0 +1,47 @@
+# Coolify copy-paste deployment for the prebuilt public image.
+#
+# Prerequisites before using this file:
+# 1. Make sure the image has already been built and pushed to Docker Hub.
+# 2. Keep the build step limited to image creation only:
+#    docker build -t bbn2025/kirogo:latest .
+# 3. Push the image separately after the build step succeeds:
+#    docker push bbn2025/kirogo:latest
+
+services:
+  kirogo:
+    image: ${KIROGO_IMAGE:-bbn2025/kirogo:x1}
+    pull_policy: always
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      # App runtime defaults
+      CONFIG_PATH: ${CONFIG_PATH:-/app/data/config.json}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # Seed the admin password from Coolify's generated password.
+      # Outside Coolify, this falls back to the app's existing default.
+      ADMIN_PASSWORD: ${SERVICE_PASSWORD_KIROGO:-changeme}
+
+      # Coolify public routing for this service on container port 8080.
+      SERVICE_URL_KIROGO_8080: /
+      KIROGO_PUBLIC_URL: ${SERVICE_URL_KIROGO_8080:-}
+      KIROGO_PUBLIC_FQDN: ${SERVICE_FQDN_KIROGO:-}
+
+      # Optional generated values exposed for operators in Coolify.
+      # The current app does not consume these directly.
+      KIROGO_ADMIN_USER: ${SERVICE_USER_KIROGO:-admin}
+      KIROGO_INSTANCE_SECRET: ${SERVICE_BASE64_KIROGO:-not-used-outside-coolify}
+    volumes:
+      - kirogo-data:/app/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  kirogo-data:

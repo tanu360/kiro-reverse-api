@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"kiro-go/config"
+	"kiro-proxy/config"
 )
 
 // apiObserveOverview GET /admin/api/observe/overview

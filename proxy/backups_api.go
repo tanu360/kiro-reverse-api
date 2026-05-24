@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"kiro-go/config"
+	"kiro-proxy/config"
 )
 
 // apiBackupsList GET /admin/api/backups?autoInclude=true
