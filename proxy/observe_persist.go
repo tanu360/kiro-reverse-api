@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"kiro-go/config"
@@ -19,11 +20,16 @@ import (
 
 const observeDataFileName = "observe.json"
 const observeRequestsDBFileName = "requests.sqlite"
+const observeRequestPersistQueueSize = 4096
 
 var (
-	observeDBOnce sync.Once
-	observeDB     *sql.DB
-	observeDBErr  error
+	observeDBOnce               sync.Once
+	observeDB                   *sql.DB
+	observeDBErr                error
+	observeRequestPersistOnce   sync.Once
+	observeRequestPersistQueue  chan requestRecord
+	observePersistWriterActive  atomic.Bool
+	observePersistWriterStarted atomic.Bool
 )
 
 // observePersistData 持久化数据结构
@@ -43,6 +49,13 @@ func observeDataPath() string {
 
 func observeRequestsDBPath() string {
 	return filepath.Join(observeDir(), observeRequestsDBFileName)
+}
+
+func getObserveRequestPersistQueue() chan requestRecord {
+	observeRequestPersistOnce.Do(func() {
+		observeRequestPersistQueue = make(chan requestRecord, observeRequestPersistQueueSize)
+	})
+	return observeRequestPersistQueue
 }
 
 func getObserveDB() (*sql.DB, error) {
@@ -91,6 +104,15 @@ CREATE INDEX IF NOT EXISTS idx_requests_lookup ON requests(email, account_id, mo
 	return observeDB, nil
 }
 
+func closeObserveDB() {
+	if observeDB != nil {
+		_ = observeDB.Close()
+		observeDB = nil
+	}
+	observeDBOnce = sync.Once{}
+	observeDBErr = nil
+}
+
 func persistRequestRecord(rec requestRecord) error {
 	db, err := getObserveDB()
 	if err != nil {
@@ -108,6 +130,33 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	return err
 }
 
+func enqueuePersistRequestRecord(rec requestRecord) {
+	if !observePersistWriterActive.Load() {
+		if err := persistRequestRecord(rec); err != nil {
+			logger.Warnf("[Observe] Persist request failed: %v", err)
+		}
+		return
+	}
+	getObserveRequestPersistQueue() <- rec
+}
+
+func persistQueuedRequestRecord(rec requestRecord) {
+	if err := persistRequestRecord(rec); err != nil {
+		logger.Warnf("[Observe] Persist request failed: %v", err)
+	}
+}
+
+func escapeSQLLike(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r == '%' || r == '_' || r == '\\' {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	q = normalizeRequestQuery(q)
 	db, err := getObserveDB()
@@ -123,8 +172,8 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 		where = append(where, "success = 0")
 	}
 	if q.Search != "" {
-		like := "%" + q.Search + "%"
-		where = append(where, "(email LIKE ? OR account_id LIKE ? OR model LIKE ? OR message LIKE ?)")
+		like := "%" + escapeSQLLike(q.Search) + "%"
+		where = append(where, "(email LIKE ? ESCAPE '\\' OR account_id LIKE ? ESCAPE '\\' OR model LIKE ? ESCAPE '\\' OR message LIKE ? ESCAPE '\\')")
 		args = append(args, like, like, like, like)
 	}
 	whereSQL := ""
@@ -140,7 +189,7 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	orderBy := map[string]string{
 		"time":    "ts",
 		"status":  "success",
-		"account": "email",
+		"account": "LOWER(email || account_id)",
 		"model":   "model",
 		"tokens":  "total_tokens",
 		"credits": "credits",
@@ -185,6 +234,35 @@ FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? O
 		Order:      q.Order,
 		Persistent: true,
 	}, nil
+}
+
+func (h *Handler) backgroundObserveRequestWriter() {
+	if !observePersistWriterStarted.CompareAndSwap(false, true) {
+		return
+	}
+	observePersistWriterActive.Store(true)
+	defer func() {
+		observePersistWriterActive.Store(false)
+		observePersistWriterStarted.Store(false)
+	}()
+
+	queue := getObserveRequestPersistQueue()
+	for {
+		select {
+		case rec := <-queue:
+			persistQueuedRequestRecord(rec)
+		case <-h.stopStatsSaver:
+			for {
+				select {
+				case rec := <-queue:
+					persistQueuedRequestRecord(rec)
+				default:
+					closeObserveDB()
+					return
+				}
+			}
+		}
+	}
 }
 
 // Save 保存观测数据到磁盘

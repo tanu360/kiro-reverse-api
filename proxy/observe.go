@@ -283,9 +283,7 @@ func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, o
 	s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
 	s.mu.Unlock()
 
-	if err := persistRequestRecord(rec); err != nil {
-		logger.Warnf("[Observe] Persist request failed: %v", err)
-	}
+	enqueuePersistRequestRecord(rec)
 }
 
 // ==================== 读出快照 ====================
@@ -555,9 +553,7 @@ func normalizeRequestQuery(q requestQuery) requestQuery {
 func (s *observeStore) RequestPage(q requestQuery) requestPage {
 	q = normalizeRequestQuery(q)
 	if page, err := queryPersistedRequests(q); err == nil && page.Persistent {
-		if page.Total > 0 || len(s.RecentRequests(1)) == 0 {
-			return page
-		}
+		return page
 	} else if err != nil {
 		logger.Warnf("[Observe] Query persisted requests failed: %v", err)
 	}

@@ -430,9 +430,16 @@
     }
     return maskedLocal + '@' + domain;
   }
+  function maskEmailsInText(text) {
+    if (!privacyModeEnabled || !text) return text;
+    return String(text).replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, email => maskEmail(email));
+  }
   function getDisplayEmail(email, id) {
     const raw = email || (id ? id.substring(0, 12) + '...' : '-');
     return maskEmail(raw);
+  }
+  function getDisplayAccount(email, id) {
+    return getDisplayEmail(email, id);
   }
 
   // Toast bridge
@@ -1597,7 +1604,7 @@
       return score(b) - score(a);
     });
     const visibleAccounts = accounts.slice(0, 2);
-    visibleAccounts.forEach(a => rows.push({ label: a.email || a.accountId, cells: a.cells || [] }));
+    visibleAccounts.forEach(a => rows.push({ label: getDisplayAccount(a.email, a.accountId), cells: a.cells || [] }));
     const hasMoreAccounts = accounts.length > visibleAccounts.length;
     el.classList.toggle('heatmap-single', rows.length === 1);
     el.classList.toggle('heatmap-table', rows.length > 1);
@@ -1635,8 +1642,8 @@
 
     const allErrors = ((observeCache.errors || {}).errors || []).slice(0, 10);
     const errors = allErrors.map(e => '<tr><td>' + escapeHtml(formatTime(e.ts)) +
-      '</td><td>' + escapeHtml(e.email || e.accountId || '-') + '</td><td>' + escapeHtml(e.model || '-') +
-      '</td><td>' + escapeHtml(e.message || '-') + '</td></tr>');
+      '</td><td>' + escapeHtml(getDisplayAccount(e.email, e.accountId)) + '</td><td>' + escapeHtml(e.model || '-') +
+      '</td><td>' + escapeHtml(maskEmailsInText(e.message || '-')) + '</td></tr>');
     renderTable('observeErrors', [t('requests.time'), t('requests.account'), t('requests.model'), t('requests.message')], errors, 'observe.noErrors');
     const errorsEl = $('observeErrors');
     if (errorsEl && errors.length) {
@@ -1685,7 +1692,7 @@
       '<th>' + escapeHtml(t('requests.error')) + '</th>'
     ].join('');
     const rows = (requestsCache || []).map(r => '<tr><td>' + escapeHtml(formatTime(r.ts)) + '</td><td>' +
-      formatRequestStatus(r) + '</td><td>' + escapeHtml(r.email || r.accountId || '-') + '</td><td>' + escapeHtml(r.model || '-') +
+      formatRequestStatus(r) + '</td><td>' + escapeHtml(getDisplayAccount(r.email, r.accountId)) + '</td><td>' + escapeHtml(r.model || '-') +
       '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + (r.credits || 0).toFixed(2) + '</td><td>' + formatRequestError(r) + '</td></tr>');
     if (!rows.length) {
       el.innerHTML = '<div class="empty-state">' + escapeHtml(t('requests.empty')) + '</div>';
@@ -1710,7 +1717,7 @@
   }
   function formatRequestError(r) {
     if (r.success) return '<span class="muted-text">-</span>';
-    const msg = r.message || t('requests.noErrorMessage');
+    const msg = maskEmailsInText(r.message || t('requests.noErrorMessage'));
     return '<span class="request-error-cell" title="' + escapeAttr(msg) + '">' + escapeHtml(msg) + '</span>';
   }
   function renderRequestsPagination() {
@@ -1788,12 +1795,12 @@
     const note = backup && backup.note ? backup.note : '';
     if (!note) return '-';
     if (backup.kind === 'pre-restore' && note.startsWith('upload ')) {
-      return t('backups.noteBeforeUpload', note.slice(7));
+      return t('backups.noteBeforeUpload', maskEmailsInText(note.slice(7)));
     }
     if (backup.kind === 'pre-restore' && note.startsWith('auto before restore ')) {
-      return t('backups.noteBeforeRestore', note.slice(20));
+      return t('backups.noteBeforeRestore', maskEmailsInText(note.slice(20)));
     }
-    return note;
+    return maskEmailsInText(note);
   }
   function formatBackupAccountCell(backup) {
     if (backup && backup.kind === 'pre-restore' && typeof backup.restoredAccountCnt === 'number') {
@@ -2620,6 +2627,9 @@
       privacyModeEnabled = e.target.checked;
       localStorage.setItem('privacyMode', privacyModeEnabled);
       renderAccounts();
+      renderObserveCached();
+      renderRequestsCached();
+      renderBackupsCached();
     });
 
     $('exportBtn').addEventListener('click', showExportModal);

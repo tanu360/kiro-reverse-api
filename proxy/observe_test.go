@@ -9,6 +9,26 @@ import (
 	"kiro-go/config"
 )
 
+func resetObservePersistenceForTest(t *testing.T) {
+	t.Helper()
+	closeObserveDB()
+	observeRequestPersistOnce = sync.Once{}
+	observeRequestPersistQueue = nil
+	observePersistWriterActive.Store(false)
+	observePersistWriterStarted.Store(false)
+	observeStoreOnce = sync.Once{}
+	observeStoreInst = nil
+	t.Cleanup(func() {
+		closeObserveDB()
+		observeRequestPersistOnce = sync.Once{}
+		observeRequestPersistQueue = nil
+		observePersistWriterActive.Store(false)
+		observePersistWriterStarted.Store(false)
+		observeStoreOnce = sync.Once{}
+		observeStoreInst = nil
+	})
+}
+
 func TestObserveStore_RecordAndOverview(t *testing.T) {
 	// 重置全局实例以隔离测试（不共享状态）
 	observeStoreOnce = sync.Once{}
@@ -104,16 +124,10 @@ func TestObserveStore_ModelMixSortedByCredits(t *testing.T) {
 }
 
 func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
-	if observeDB != nil {
-		_ = observeDB.Close()
-	}
-	observeDBOnce = sync.Once{}
-	observeDB = nil
-	observeDBErr = nil
-	observeStoreOnce = sync.Once{}
-	observeStoreInst = nil
+	dir := t.TempDir()
+	resetObservePersistenceForTest(t)
 
-	if err := config.Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+	if err := config.Init(filepath.Join(dir, "config.json")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	s := getObserveStore()
@@ -121,6 +135,10 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 
 	s.RecordRequest("acc-ok", "ok@example.com", "claude-sonnet", 10, 20, 0.03, true, 200, "")
 	s.RecordRequest("acc-fail", "fail@example.com", "claude-opus", 0, 0, 0, false, 429, "rate limit exceeded")
+	s.RecordRequest("acc-percent", "percent@example.com", "literal%model", 1, 1, 0.01, true, 200, "")
+	s.RecordRequest("acc-wild", "wild@example.com", "literalXmodel", 1, 1, 0.01, true, 200, "")
+	s.RecordRequest("b-id", "same@example.com", "sort-model", 1, 1, 0.01, true, 200, "")
+	s.RecordRequest("a-id", "same@example.com", "sort-model", 1, 1, 0.01, true, 200, "")
 
 	page := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "rate", Status: "failed", Sort: "time", Order: "desc"})
 	if !page.Persistent {
@@ -131,5 +149,15 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 	}
 	if page.Requests[0].Message != "rate limit exceeded" || page.Requests[0].Status != 429 {
 		t.Fatalf("unexpected persisted error request: %#v", page.Requests[0])
+	}
+
+	literalPage := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "literal%", Sort: "time", Order: "desc"})
+	if literalPage.Total != 1 || literalPage.Requests[0].Model != "literal%model" {
+		t.Fatalf("expected LIKE wildcard to be escaped, got total=%d rows=%#v", literalPage.Total, literalPage.Requests)
+	}
+
+	accountPage := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "same@example.com", Sort: "account", Order: "asc"})
+	if accountPage.Total != 2 || accountPage.Requests[0].AccountID != "a-id" {
+		t.Fatalf("expected account sort to use email+accountID, got total=%d rows=%#v", accountPage.Total, accountPage.Requests)
 	}
 }

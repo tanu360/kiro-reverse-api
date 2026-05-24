@@ -234,6 +234,8 @@ func NewHandler() *Handler {
 	go h.backgroundObserveTick()
 	// 启动后台 observe 数据保存 (每 5min 保存一次)
 	go h.backgroundObserveSaver()
+	// 启动后台 request 持久化写入器，避免请求热路径等待 SQLite 磁盘 I/O
+	go h.backgroundObserveRequestWriter()
 	if err := getObserveStore().Load(); err != nil {
 		logger.Warnf("[Observe] Failed to load: %v", err)
 	}
