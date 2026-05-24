@@ -10,7 +10,7 @@ import (
 )
 
 // apiObserveOverview GET /admin/api/observe/overview
-func (h *Handler) apiObserveOverview(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiObserveOverview(w http.ResponseWriter, _ *http.Request) {
 	snap := getObserveStore().Overview()
 	json.NewEncoder(w).Encode(snap)
 }
@@ -56,7 +56,7 @@ func (h *Handler) apiObserveHeatmap(w http.ResponseWriter, r *http.Request) {
 }
 
 // apiObserveModelMix GET /admin/api/observe/model-mix
-func (h *Handler) apiObserveModelMix(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiObserveModelMix(w http.ResponseWriter, _ *http.Request) {
 	mix := getObserveStore().ModelMix()
 	json.NewEncoder(w).Encode(map[string]interface{}{"models": mix})
 }
