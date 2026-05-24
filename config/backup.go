@@ -670,8 +670,10 @@ func GetBackupSchedule() BackupSchedule {
 
 func UpdateBackupSchedule(s BackupSchedule) error {
 	cfgLock.Lock()
-	cfg.Backup.Schedule = s
 	defer cfgLock.Unlock()
+	cfg.Backup.Schedule.Enabled = s.Enabled
+	cfg.Backup.Schedule.Cadence = s.Cadence
+	cfg.Backup.Schedule.Keep = s.Keep
 	return Save()
 }
 
