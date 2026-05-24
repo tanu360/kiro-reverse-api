@@ -38,6 +38,9 @@ func GetPool() *AccountPool {
 			modelLists:  make(map[string]map[string]bool),
 		}
 		pool.Reload()
+		if err := pool.loadCooldowns(); err != nil {
+			_ = err
+		}
 	})
 	return pool
 }
@@ -277,19 +280,46 @@ func (p *AccountPool) RecordSuccess(id string) {
 }
 
 // RecordError 记录请求错误，设置冷却
-func (p *AccountPool) RecordError(id string, isQuotaError bool) {
+func (p *AccountPool) RecordError(id string, isQuotaError bool) int {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.errorCounts[id]++
+	count := p.errorCounts[id]
 
 	if isQuotaError {
-		// 配额错误，冷却 1 小时
-		p.cooldowns[id] = time.Now().Add(time.Hour)
-	} else if p.errorCounts[id] >= 3 {
+		p.cooldowns[id] = p.calculateQuotaCooldown(id)
+	} else if count >= 3 {
 		// 连续 3 次错误，冷却 1 分钟
 		p.cooldowns[id] = time.Now().Add(time.Minute)
 	}
+	p.mu.Unlock()
+
+	go func() {
+		_ = p.SaveCooldowns()
+	}()
+
+	return count
+}
+
+// calculateQuotaCooldown 计算配额耗尽的冷却时间（至重置日期）。
+func (p *AccountPool) calculateQuotaCooldown(accountID string) time.Time {
+	var resetDate string
+	for _, acc := range p.accounts {
+		if acc.ID == accountID {
+			resetDate = acc.NextResetDate
+			break
+		}
+	}
+
+	if resetDate != "" {
+		if t, err := time.Parse("2006-01-02", resetDate); err == nil {
+			resetTime := t.Add(24 * time.Hour)
+			if resetTime.After(time.Now()) {
+				return resetTime
+			}
+		}
+	}
+
+	return time.Now().Add(24 * time.Hour)
 }
 
 // IsAuthFailure reports whether an error indicates the refresh token / credentials
@@ -368,6 +398,7 @@ func (p *AccountPool) DisableAccount(id, reason string) {
 	// Long cooldown as a safety net in case Reload races
 	p.cooldowns[id] = time.Now().Add(24 * time.Hour)
 	p.mu.Unlock()
+	_ = p.SaveCooldowns()
 	p.Reload()
 }
 
@@ -376,8 +407,9 @@ func (p *AccountPool) DisableAccount(id, reason string) {
 func (p *AccountPool) MarkOverLimit(id string) {
 	_ = config.DisableAccountOverage(id)
 	p.mu.Lock()
-	p.cooldowns[id] = time.Now().Add(time.Hour)
+	p.cooldowns[id] = p.calculateQuotaCooldown(id)
 	p.mu.Unlock()
+	_ = p.SaveCooldowns()
 	p.Reload()
 }
 
@@ -463,7 +495,7 @@ func (p *AccountPool) UpdateStats(id string, tokens int, credits float64) {
 		}
 	}
 	if updated {
-		go config.UpdateAccountStats(id, requestCount, errorCount, totalTokens, totalCredits, lastUsed)
+		_ = config.UpdateAccountStats(id, requestCount, errorCount, totalTokens, totalCredits, lastUsed)
 	}
 }
 

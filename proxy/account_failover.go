@@ -3,11 +3,69 @@ package proxy
 import (
 	"kiro-go/config"
 	"kiro-go/logger"
+	"kiro-go/pool"
 	"strings"
 	"time"
 )
 
-const maxAccountRetryAttempts = 3
+type requestRetryPlan struct {
+	maxPerAccount int
+	maxPerRequest int
+	backoff       pool.RetryConfig
+}
+
+func newRequestRetryPlan() requestRetryPlan {
+	maxPerAccount, maxPerRequest, baseDelayMs, maxDelayMs := config.GetRetryConfig()
+	if maxPerAccount < 1 {
+		maxPerAccount = 1
+	}
+	if maxPerRequest < 1 {
+		maxPerRequest = 1
+	}
+	return requestRetryPlan{
+		maxPerAccount: maxPerAccount,
+		maxPerRequest: maxPerRequest,
+		backoff: pool.RetryConfig{
+			MaxPerAccount: maxPerAccount,
+			MaxPerRequest: maxPerRequest,
+			BaseDelay:     time.Duration(baseDelayMs) * time.Millisecond,
+			MaxDelay:      time.Duration(maxDelayMs) * time.Millisecond,
+		},
+	}
+}
+
+func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalAttempts int) bool {
+	if err == nil || accountAttempt+1 >= rp.maxPerAccount || totalAttempts >= rp.maxPerRequest {
+		return false
+	}
+	msg := err.Error()
+	if isTerminalAccountErrorMessage(msg) {
+		return false
+	}
+	return true
+}
+
+func (rp requestRetryPlan) shouldBackoffBeforeNextAccount(err error, totalAttempts int) bool {
+	if err == nil || totalAttempts >= rp.maxPerRequest {
+		return false
+	}
+	return !isTerminalAccountErrorMessage(err.Error())
+}
+
+func isTerminalAccountErrorMessage(msg string) bool {
+	return isQuotaErrorMessage(msg) ||
+		isOverageErrorMessage(msg) ||
+		isSuspensionErrorMessage(msg) ||
+		isProfileUnavailableErrorMessage(msg) ||
+		isAuthErrorMessage(msg)
+}
+
+func (rp requestRetryPlan) waitBeforeRetry(totalAttempts int) {
+	delay := rp.backoff.CalculateBackoff(totalAttempts - 1)
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+}
 
 func isQuotaErrorMessage(msg string) bool {
 	msg = strings.ToLower(msg)

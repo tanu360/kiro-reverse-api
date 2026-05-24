@@ -33,6 +33,13 @@
   let customSelectUid = 0;
   let customSelectObserver = null;
   let customSelectRefreshQueued = false;
+  let currentTab = 'accounts';
+  let adminEventSource = null;
+  let observeRefreshTimer = null;
+  let observeCache = null;
+  let requestsCache = [];
+  let backupsCache = [];
+  let backupScheduleCache = null;
 
   // DOM helpers
   const $ = (id) => document.getElementById(id);
@@ -114,6 +121,9 @@
     renderVersionBadge();
     renderAccounts();
     renderPromptRules();
+    renderObserveCached();
+    renderRequestsCached();
+    renderBackupsCached();
   }
   function updateLangButtons() {
     qsa('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.lang === currentLang));
@@ -563,7 +573,7 @@
   function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'X-Admin-Password': password }, opts.headers || {});
-    if (opts.body && !opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
+    if (opts.body && !(opts.body instanceof FormData) && !opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
     return fetch('/admin/api' + path, opts);
   }
 
@@ -573,7 +583,17 @@
     sessionStorage.removeItem('admin_login_time');
     localStorage.removeItem('admin_password');
     localStorage.removeItem('admin_login_time');
+    clearAdminEventCookie();
     password = '';
+  }
+  function adminEventCookieSecureAttr() {
+    return location.protocol === 'https:' ? '; Secure' : '';
+  }
+  function setAdminEventCookie(nextPassword) {
+    document.cookie = 'admin_password=' + encodeURIComponent(nextPassword) + '; Path=/admin/api/events; SameSite=Strict' + adminEventCookieSecureAttr();
+  }
+  function clearAdminEventCookie() {
+    document.cookie = 'admin_password=; Max-Age=0; Path=/admin/api/events; SameSite=Strict' + adminEventCookieSecureAttr();
   }
   function getActiveLoginTime() {
     const storage = sessionStorage.getItem('admin_password') ? sessionStorage : localStorage;
@@ -582,6 +602,7 @@
   function setActivePassword(nextPassword, remember) {
     const now = Date.now().toString();
     password = nextPassword;
+    setAdminEventCookie(nextPassword);
     sessionStorage.setItem('admin_password', nextPassword);
     sessionStorage.setItem('admin_login_time', now);
     if (remember) {
@@ -634,12 +655,14 @@
     }
   }
   function logout() {
+    stopAdminEvents();
     clearActivePassword();
     location.reload();
   }
   function showMain() {
     $('loginPage').classList.add('hidden');
     $('mainPage').classList.remove('hidden');
+    startAdminEvents();
   }
 
   // Data loaders
@@ -650,6 +673,40 @@
     renderEndpointCode('modelsEndpoint', baseUrl + '/v1/models');
     renderEndpointCode('statsEndpoint', baseUrl + '/v1/stats');
     setTimeout(checkUpdate, 2000);
+  }
+
+  function startAdminEvents() {
+    if (adminEventSource || !password || !window.EventSource) return;
+    setAdminEventCookie(password);
+    adminEventSource = new EventSource('/admin/api/events');
+    adminEventSource.addEventListener('observe_tick', scheduleObserveRefresh);
+    adminEventSource.addEventListener('account_updated', () => { loadAccounts(); loadStats(); });
+    adminEventSource.addEventListener('accounts_refreshed', () => { loadAccounts(); loadStats(); });
+    adminEventSource.addEventListener('backup_created', () => {
+      if (currentTab === 'backups') loadBackups();
+    });
+    adminEventSource.addEventListener('backup_restored', () => {
+      loadAccounts();
+      loadSettings();
+      if (currentTab === 'backups') loadBackups();
+    });
+    adminEventSource.onerror = () => {
+      stopAdminEvents();
+      if (!$('mainPage').classList.contains('hidden')) setTimeout(startAdminEvents, 5000);
+    };
+  }
+  function stopAdminEvents() {
+    if (!adminEventSource) return;
+    adminEventSource.close();
+    adminEventSource = null;
+  }
+  function scheduleObserveRefresh() {
+    if (currentTab !== 'observe') return;
+    if (observeRefreshTimer) return;
+    observeRefreshTimer = setTimeout(() => {
+      observeRefreshTimer = null;
+      loadObserve();
+    }, 1200);
   }
   async function loadStats() {
     const res = await api('/status');
@@ -1449,12 +1506,16 @@
     }
   }
   function generateApiKey() {
+    $('apiKeyInput').value = makeApiKey();
+  }
+
+  function makeApiKey() {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let k = 'sk-';
     const cryptoApi = window.crypto || window.msCrypto;
     if (!cryptoApi || !cryptoApi.getRandomValues) {
       toast(t('common.failed'), 'error');
-      return;
+      return '';
     }
     const bytes = new Uint8Array(32);
     const limit = Math.floor(256 / chars.length) * chars.length;
@@ -1466,7 +1527,237 @@
         if (k.length >= 35) break;
       }
     }
-    $('apiKeyInput').value = k;
+    return k;
+  }
+
+  function formatTime(ts) {
+    return ts ? new Date(ts * 1000).toLocaleString() : '-';
+  }
+  function renderTable(id, headers, rows, emptyKey) {
+    const el = $(id);
+    if (!el) return;
+    if (!rows || !rows.length) {
+      el.innerHTML = '<div class="empty-state">' + escapeHtml(t(emptyKey || 'common.empty')) + '</div>';
+      return;
+    }
+    el.innerHTML = '<table class="data-table"><thead><tr>' +
+      headers.map(h => '<th>' + escapeHtml(h) + '</th>').join('') +
+      '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+  }
+
+  // Observability
+  async function loadObserve() {
+    try {
+      const [overviewRes, heatmapRes, mixRes, errorsRes] = await Promise.all([
+        api('/observe/overview'),
+        api('/observe/account-heatmap?windowMin=60'),
+        api('/observe/model-mix'),
+        api('/observe/recent-errors?limit=40')
+      ]);
+      observeCache = {
+        overview: await overviewRes.json(),
+        heatmap: await heatmapRes.json(),
+        mix: await mixRes.json(),
+        errors: await errorsRes.json()
+      };
+      renderObserveCached();
+    } catch (e) {
+      toast(t('common.failed'), 'error');
+    }
+  }
+  function renderObserveCached() {
+    if (!observeCache) return;
+    const o = observeCache.overview || {};
+    const summary = $('observeSummary');
+    if (summary) {
+      summary.innerHTML = [
+        ['observe.rpm', o.rpm1 || 0],
+        ['observe.errRate', (((o.errRate5 || 0) * 100).toFixed(1) + '%')],
+        ['observe.inTpm', formatNum(Math.round(o.inTpm5 || 0))],
+        ['observe.outTpm', formatNum(Math.round(o.outTpm5 || 0))],
+        ['observe.credits60', (o.credits60 || 0).toFixed(2)],
+        ['observe.activeAccounts', (o.activeAccts || 0) + ' / ' + (o.totalAccts || 0)]
+      ].map(item => '<div class="feature-stat"><div class="feature-stat-label">' + escapeHtml(t(item[0])) +
+        '</div><div class="feature-stat-value">' + escapeHtml(item[1]) + '</div></div>').join('');
+    }
+    renderHeatmap();
+    renderObserveTables();
+  }
+  function renderHeatmap() {
+    const el = $('observeHeatmap');
+    if (!el || !observeCache) return;
+    const heatmap = observeCache.heatmap || {};
+    const rows = [];
+    if (heatmap.global) rows.push({ label: t('observe.global'), cells: heatmap.global.cells || [] });
+    (heatmap.accounts || []).slice(0, 8).forEach(a => rows.push({ label: a.email || a.accountId, cells: a.cells || [] }));
+    if (!rows.length) {
+      el.innerHTML = '<div class="empty-state">' + escapeHtml(t('observe.noTraffic')) + '</div>';
+      return;
+    }
+    let maxReq = 1;
+    rows.forEach(r => (r.cells || []).forEach(c => { if ((c.reqs || 0) > maxReq) maxReq = c.reqs; }));
+    el.innerHTML = rows.map(r => {
+      const cells = (r.cells || []).slice().reverse().map(c => {
+        const pct = Math.min(1, (c.reqs || 0) / maxReq);
+        const cls = c.failures ? ' heat-cell-fail' : '';
+        return '<span class="heat-cell' + cls + '" style="opacity:' + (0.18 + pct * 0.82).toFixed(2) + '" title="' +
+          escapeAttr((c.reqs || 0) + ' req / ' + (c.failures || 0) + ' err') + '"></span>';
+      }).join('');
+      return '<div class="heat-row"><div class="heat-label">' + escapeHtml(r.label) + '</div><div class="heat-cells">' + cells + '</div></div>';
+    }).join('');
+  }
+  function renderObserveTables() {
+    const models = ((observeCache.mix || {}).models || []).map(m => '<tr><td>' + escapeHtml(m.model || '-') +
+      '</td><td>' + (m.reqs || 0) + '</td><td>' + formatNum((m.inTokens || 0) + (m.outTokens || 0)) +
+      '</td><td>' + (m.credits || 0).toFixed(2) + '</td></tr>');
+    renderTable('observeModelMix', [t('requests.model'), t('accounts.requests'), t('stats.tokens'), t('stats.credits')], models, 'observe.noTraffic');
+
+    const errors = ((observeCache.errors || {}).errors || []).map(e => '<tr><td>' + escapeHtml(formatTime(e.ts)) +
+      '</td><td>' + escapeHtml(e.email || e.accountId || '-') + '</td><td>' + escapeHtml(e.model || '-') +
+      '</td><td>' + escapeHtml(e.message || '-') + '</td></tr>');
+    renderTable('observeErrors', [t('requests.time'), t('requests.account'), t('requests.model'), t('requests.message')], errors, 'observe.noErrors');
+  }
+
+  // Request log
+  async function loadRequests() {
+    try {
+      const res = await api('/observe/recent-requests?limit=200');
+      requestsCache = (await res.json()).requests || [];
+      renderRequestsCached();
+    } catch (e) {
+      toast(t('common.failed'), 'error');
+    }
+  }
+  function renderRequestsCached() {
+    const rows = (requestsCache || []).map(r => '<tr><td>' + escapeHtml(formatTime(r.ts)) + '</td><td>' +
+      (r.success ? '<span class="badge badge-success">' + escapeHtml(t('requests.ok')) + '</span>' : '<span class="badge badge-error">' + escapeHtml(t('requests.fail')) + '</span>') +
+      '</td><td>' + escapeHtml(r.email || r.accountId || '-') + '</td><td>' + escapeHtml(r.model || '-') +
+      '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + (r.credits || 0).toFixed(2) + '</td></tr>');
+    renderTable('requestsTable', [t('requests.time'), t('requests.status'), t('requests.account'), t('requests.model'), t('stats.tokens'), t('stats.credits')], rows, 'requests.empty');
+  }
+
+  // Backups
+  async function loadBackups() {
+    try {
+      const [listRes, schedRes] = await Promise.all([api('/backups?autoInclude=true'), api('/backups/schedule')]);
+      backupsCache = (await listRes.json()).backups || [];
+      backupScheduleCache = (await schedRes.json()).schedule || {};
+      renderBackupsCached();
+    } catch (e) {
+      toast(t('common.failed'), 'error');
+    }
+  }
+  function renderBackupsCached() {
+    if ($('backupScheduleEnabled') && backupScheduleCache) {
+      $('backupScheduleEnabled').checked = !!backupScheduleCache.enabled;
+      $('backupCadence').value = backupScheduleCache.cadence || 'daily';
+      $('backupKeep').value = backupScheduleCache.keep || 20;
+      refreshCustomSelects($('tabBackups'));
+    }
+    const rows = (backupsCache || []).map(b => '<tr><td>' + escapeHtml(formatTime(b.createdAt)) + '</td><td>' +
+      '<span class="badge ' + backupKindBadgeClass(b.kind) + '">' + escapeHtml(formatBackupKind(b.kind)) + '</span></td><td>' + escapeHtml(formatBackupNote(b)) +
+      '</td><td>' + formatBackupAccountCell(b) + '</td><td>' +
+      '<button class="btn btn-outline btn-xs" data-backup-download="' + escapeAttr(b.id) + '">' + escapeHtml(t('backups.download')) + '</button> ' +
+      '<button class="btn btn-secondary btn-xs" data-backup-restore="' + escapeAttr(b.id) + '">' + escapeHtml(t('backups.restore')) + '</button> ' +
+      '<button class="btn btn-danger btn-xs" data-backup-delete="' + escapeAttr(b.id) + '">' + escapeHtml(t('common.delete')) + '</button></td></tr>');
+    renderTable('backupsTable', [t('requests.time'), t('backups.kind'), t('backups.note'), t('backups.accountsInBackup'), t('common.actions')], rows, 'backups.empty');
+  }
+  function formatBackupKind(kind) {
+    const key = {
+      manual: 'backups.kindManual',
+      scheduled: 'backups.kindScheduled',
+      auto: 'backups.kindAuto',
+      'pre-restore': 'backups.kindPreRestore'
+    }[kind];
+    return key ? t(key) : (kind || '-');
+  }
+  function backupKindBadgeClass(kind) {
+    return kind === 'pre-restore' ? 'badge-warning' : 'badge-info';
+  }
+  function formatBackupNote(backup) {
+    const note = backup && backup.note ? backup.note : '';
+    if (!note) return '-';
+    if (backup.kind === 'pre-restore' && note.startsWith('upload ')) {
+      return t('backups.noteBeforeUpload', note.slice(7));
+    }
+    if (backup.kind === 'pre-restore' && note.startsWith('auto before restore ')) {
+      return t('backups.noteBeforeRestore', note.slice(20));
+    }
+    return note;
+  }
+  function formatBackupAccountCell(backup) {
+    if (backup && backup.kind === 'pre-restore' && typeof backup.restoredAccountCnt === 'number') {
+      return '<span title="' + escapeAttr(t('backups.preRestoreSavedHint', backup.accountCnt || 0)) + '">' +
+        escapeHtml(t('backups.restoredAccountCount', backup.restoredAccountCnt)) + '</span>';
+    }
+    return escapeHtml(String((backup && backup.accountCnt) || 0));
+  }
+  async function createBackup() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const note = 'manual backup ' + now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) +
+      ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    const res = await api('/backups', { method: 'POST', body: JSON.stringify({ kind: 'manual', note }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.error) return toast((d && d.error) || t('common.failed'), 'error');
+    toast(t('backups.created'), 'success');
+    loadBackups();
+  }
+  async function saveBackupSchedule() {
+    const schedule = {
+      enabled: $('backupScheduleEnabled').checked,
+      cadence: $('backupCadence').value,
+      keep: parseInt($('backupKeep').value, 10) || 20
+    };
+    const res = await api('/backups/schedule', { method: 'POST', body: JSON.stringify(schedule) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.success === false) return toast((d && d.error) || t('common.saveFailed'), 'error');
+    toast(t('backups.scheduleSaved'), 'success');
+    loadBackups();
+  }
+  async function downloadBackup(id) {
+    const res = await api('/backups/' + encodeURIComponent(id) + '/download');
+    if (!res.ok) return toast(t('common.failed'), 'error');
+    const blob = await res.blob();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'kiro-backup-' + id + '.json';
+    document.body.appendChild(link);
+    link.click();
+    URL.revokeObjectURL(link.href);
+    link.remove();
+  }
+  async function restoreBackup(id) {
+    const ok = await confirmAction(t('backups.confirmRestore'), { title: t('backups.restore'), confirmText: t('backups.restore'), variant: 'danger' });
+    if (!ok) return;
+    const res = await api('/backups/' + encodeURIComponent(id) + '/restore', { method: 'POST' });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.success === false) return toast((d && d.error) || t('common.failed'), 'error');
+    toast(t('backups.restored'), 'success');
+    loadData();
+    loadBackups();
+  }
+  async function deleteBackup(id) {
+    const ok = await confirmAction(t('backups.confirmDelete'), { title: t('common.delete'), confirmText: t('common.delete'), variant: 'danger' });
+    if (!ok) return;
+    const res = await api('/backups/' + encodeURIComponent(id), { method: 'DELETE' });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.success === false) return toast((d && d.error) || t('common.failed'), 'error');
+    toast(t('backups.deleted'), 'success');
+    loadBackups();
+  }
+  async function uploadBackupFile(file) {
+    if (!file) return;
+    const ok = await confirmAction(t('backups.confirmUpload'), { title: t('backups.upload'), confirmText: t('backups.restore'), variant: 'danger' });
+    if (!ok) return;
+    const body = new FormData();
+    body.append('file', file);
+    const res = await api('/backups/restore', { method: 'POST', body, headers: { 'X-Admin-Password': password } });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.success === false) return toast((d && d.error) || t('common.failed'), 'error');
+    toast(t('backups.restored'), 'success');
+    loadData();
+    loadBackups();
   }
 
   // Prompt filter rules
@@ -2152,9 +2443,13 @@
 
   // Tabs
   function switchTab(tab) {
+    currentTab = tab;
     qsa('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
     qsa('.tab-content').forEach(c => c.classList.add('hidden'));
     $('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden');
+    if (tab === 'observe') loadObserve();
+    else if (tab === 'requests') loadRequests();
+    else if (tab === 'backups') loadBackups();
   }
 
   // Event wiring
@@ -2264,6 +2559,28 @@
     $('resetStatsBtn').addEventListener('click', resetStats);
   }
 
+  function bindFeatureEvents() {
+    $('refreshObserveBtn').addEventListener('click', loadObserve);
+    $('refreshRequestsBtn').addEventListener('click', loadRequests);
+    $('refreshBackupsBtn').addEventListener('click', loadBackups);
+    $('createBackupBtn').addEventListener('click', createBackup);
+    $('saveBackupScheduleBtn').addEventListener('click', saveBackupSchedule);
+    $('uploadBackupBtn').addEventListener('click', () => $('backupUploadInput').click());
+    $('backupUploadInput').addEventListener('change', e => {
+      uploadBackupFile(e.target.files && e.target.files[0]);
+      e.target.value = '';
+    });
+    $('backupsTable').addEventListener('click', e => {
+      const dl = e.target.closest('[data-backup-download]');
+      const restore = e.target.closest('[data-backup-restore]');
+      const del = e.target.closest('[data-backup-delete]');
+      if (dl) downloadBackup(dl.dataset.backupDownload);
+      else if (restore) restoreBackup(restore.dataset.backupRestore);
+      else if (del) deleteBackup(del.dataset.backupDelete);
+    });
+
+  }
+
   function bindPromptFilterEvents() {
     $('savePromptFilterBtn').addEventListener('click', savePromptFilter);
     $('addRuleRegexBtn').addEventListener('click', () => addPromptRule('regex'));
@@ -2348,6 +2665,7 @@
     bindShellEvents();
     bindAccountEvents();
     bindSettingsEvents();
+    bindFeatureEvents();
     bindPromptFilterEvents();
     bindModalEvents();
     bindDetailEvents();

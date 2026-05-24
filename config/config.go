@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
@@ -64,10 +65,13 @@ type Account struct {
 	OverageWeight int  `json:"overageWeight,omitempty"` // 1-10, lower values reduce overage request frequency
 
 	// Account status
-	Enabled   bool   `json:"enabled"`             // Whether account is active in the pool
-	BanStatus string `json:"banStatus,omitempty"` // Ban status: "ACTIVE", "BANNED", "SUSPENDED"
-	BanReason string `json:"banReason,omitempty"` // Reason for ban/suspension
-	BanTime   int64  `json:"banTime,omitempty"`   // Timestamp when ban was detected
+	Enabled      bool   `json:"enabled"`                // Whether account is active in the pool
+	Silent       bool   `json:"silent,omitempty"`       // Silent mode: account is disabled but not banned
+	SilentReason string `json:"silentReason,omitempty"` // Reason for silent mode
+	SilentTime   int64  `json:"silentTime,omitempty"`   // Timestamp when silent mode was set
+	BanStatus    string `json:"banStatus,omitempty"`    // Ban status: "ACTIVE", "BANNED", "SUSPENDED"
+	BanReason    string `json:"banReason,omitempty"`    // Reason for ban/suspension
+	BanTime      int64  `json:"banTime,omitempty"`      // Timestamp when ban was detected
 
 	// Subscription information
 	SubscriptionType  string `json:"subscriptionType,omitempty"`  // Tier: FREE, PRO, PRO_PLUS, or POWER
@@ -167,12 +171,21 @@ type Config struct {
 	// Can be overridden by the LOG_LEVEL environment variable.
 	LogLevel string `json:"logLevel,omitempty"`
 
+	// Retry configuration for request-level fault tolerance
+	MaxRetriesPerAccount int `json:"maxRetriesPerAccount,omitempty"` // Max retries per single account (default: 3)
+	MaxRetriesPerRequest int `json:"maxRetriesPerRequest,omitempty"` // Max retries across all accounts (default: 9)
+	RetryBaseDelayMs     int `json:"retryBaseDelayMs,omitempty"`     // Base delay in milliseconds (default: 100)
+	RetryMaxDelayMs      int `json:"retryMaxDelayMs,omitempty"`      // Max delay in milliseconds (default: 5000)
+
 	// Global statistics (persisted across restarts)
 	TotalRequests   int     `json:"totalRequests,omitempty"`   // Total API requests received
 	SuccessRequests int     `json:"successRequests,omitempty"` // Successful requests count
 	FailedRequests  int     `json:"failedRequests,omitempty"`  // Failed requests count
 	TotalTokens     int     `json:"totalTokens,omitempty"`     // Total tokens processed
 	TotalCredits    float64 `json:"totalCredits,omitempty"`    // Total credits consumed
+
+	// Backup configuration
+	Backup BackupConfig `json:"backup,omitempty"`
 }
 
 // AccountInfo contains account metadata retrieved from Kiro API.
@@ -199,23 +212,50 @@ type AccountInfo struct {
 const Version = "1.0.8"
 
 var (
-	cfg     *Config
-	cfgLock sync.RWMutex
-	cfgPath string
+	cfg         *Config
+	cfgLock     sync.RWMutex
+	cfgPath     string
+	cfgPathLock sync.RWMutex
 )
+
+func setConfigPath(path string) {
+	cfgPathLock.Lock()
+	cfgPath = path
+	cfgPathLock.Unlock()
+}
+
+func getConfigPath() string {
+	cfgPathLock.RLock()
+	defer cfgPathLock.RUnlock()
+	return cfgPath
+}
 
 // Init initializes the configuration system with the specified file path.
 // If the file doesn't exist, a default configuration is created.
 func Init(path string) error {
-	cfgPath = path
-	return Load()
+	setConfigPath(path)
+	if err := Load(); err != nil {
+		return err
+	}
+
+	// Initialize credentials system
+	configDir := filepath.Dir(getConfigPath())
+	InitCredentials(configDir)
+
+	// Load credentials from credentials.json (optional, not an error if missing)
+	if err := LoadCredentials(); err != nil {
+		return fmt.Errorf("load credentials: %w", err)
+	}
+
+	return nil
 }
 
 func Load() error {
+	path := getConfigPath()
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 
-	data, err := os.ReadFile(cfgPath)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Create default configuration.
@@ -243,11 +283,16 @@ func Load() error {
 // Save persists the current configuration to the JSON file.
 // Uses indented formatting for human readability.
 func Save() error {
+	AutoSnapshotBeforeSave()
+	return saveConfigFile()
+}
+
+func saveConfigFile() error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(cfgPath, data, 0600)
+	return os.WriteFile(getConfigPath(), data, 0600)
 }
 
 // SetPassword updates the admin password.
@@ -261,7 +306,17 @@ func SetPassword(password string) {
 func Get() *Config {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
-	return cfg
+	if cfg == nil {
+		return nil
+	}
+	copyCfg := *cfg
+	if cfg.Accounts != nil {
+		copyCfg.Accounts = append([]Account(nil), cfg.Accounts...)
+	}
+	if cfg.PromptFilterRules != nil {
+		copyCfg.PromptFilterRules = append([]PromptFilterRule(nil), cfg.PromptFilterRules...)
+	}
+	return &copyCfg
 }
 
 func GetPassword() string {
@@ -288,7 +343,16 @@ func GetHost() string {
 	return cfg.Host
 }
 
+func GetDataDir() string {
+	return filepath.Dir(getConfigPath())
+}
+
 func GetAccounts() []Account {
+	// Priority: credentials.json > config.json (backward compatibility)
+	if CredentialsLoaded() {
+		return GetCredentials()
+	}
+	// Fallback to config.json
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	accounts := make([]Account, len(cfg.Accounts))
@@ -297,11 +361,11 @@ func GetAccounts() []Account {
 }
 
 func GetEnabledAccounts() []Account {
-	cfgLock.RLock()
-	defer cfgLock.RUnlock()
+	// Priority: credentials.json > config.json (backward compatibility)
+	all := GetAccounts()
 	var accounts []Account
-	for _, a := range cfg.Accounts {
-		if a.Enabled {
+	for _, a := range all {
+		if a.Enabled && !a.Silent && (a.BanStatus == "" || a.BanStatus == "ACTIVE") {
 			accounts = append(accounts, a)
 		}
 	}
@@ -309,6 +373,11 @@ func GetEnabledAccounts() []Account {
 }
 
 func AddAccount(account Account) error {
+	// Priority: credentials.json > config.json
+	if CredentialsLoaded() {
+		return AddCredential(account)
+	}
+	// Fallback to config.json
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	cfg.Accounts = append(cfg.Accounts, account)
@@ -316,6 +385,11 @@ func AddAccount(account Account) error {
 }
 
 func UpdateAccount(id string, account Account) error {
+	// Priority: credentials.json > config.json
+	if CredentialsLoaded() {
+		return UpdateCredential(account)
+	}
+	// Fallback to config.json
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -329,6 +403,16 @@ func UpdateAccount(id string, account Account) error {
 
 // DisableAccountOverage turns off AllowOverage for a specific account.
 func DisableAccountOverage(id string) error {
+	// Priority: credentials.json > config.json
+	if CredentialsLoaded() {
+		acc := GetCredentialByID(id)
+		if acc == nil {
+			return nil
+		}
+		acc.AllowOverage = false
+		return UpdateCredential(*acc)
+	}
+	// Fallback to config.json
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -340,14 +424,25 @@ func DisableAccountOverage(id string) error {
 	return nil
 }
 
-// SetAccountEnabled toggles the enabled state of an account and persists the change.
-// Used to disable accounts whose refresh token has been revoked (401 Bad credentials)
-// so subsequent requests skip them automatically.
+// SetAccountEnabled toggles an account and persists the change.
 func SetAccountEnabled(id string, enabled bool) error {
+	if CredentialsLoaded() {
+		acc := GetCredentialByID(id)
+		if acc == nil {
+			return nil
+		}
+		acc.Enabled = enabled
+		if !enabled {
+			acc.BanStatus = "DISABLED"
+			acc.BanTime = time.Now().Unix()
+		}
+		return UpdateCredential(*acc)
+	}
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
-	for i, a := range cfg.Accounts {
-		if a.ID == id {
+	for i := range cfg.Accounts {
+		if cfg.Accounts[i].ID == id {
 			cfg.Accounts[i].Enabled = enabled
 			if !enabled {
 				cfg.Accounts[i].BanStatus = "DISABLED"
@@ -359,13 +454,26 @@ func SetAccountEnabled(id string, enabled bool) error {
 	return nil
 }
 
-// SetAccountBanStatus marks an account as banned/disabled with a reason.
-// Reason is recorded so operators can see why the account was auto-disabled.
+// SetAccountBanStatus marks an account as banned/disabled with a visible reason.
 func SetAccountBanStatus(id, status, reason string) error {
+	if CredentialsLoaded() {
+		acc := GetCredentialByID(id)
+		if acc == nil {
+			return nil
+		}
+		acc.BanStatus = status
+		acc.BanReason = reason
+		acc.BanTime = time.Now().Unix()
+		if status == "BANNED" || status == "DISABLED" {
+			acc.Enabled = false
+		}
+		return UpdateCredential(*acc)
+	}
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
-	for i, a := range cfg.Accounts {
-		if a.ID == id {
+	for i := range cfg.Accounts {
+		if cfg.Accounts[i].ID == id {
 			cfg.Accounts[i].BanStatus = status
 			cfg.Accounts[i].BanReason = reason
 			cfg.Accounts[i].BanTime = time.Now().Unix()
@@ -379,6 +487,11 @@ func SetAccountBanStatus(id, status, reason string) error {
 }
 
 func UpdateAccountProfileArn(id, profileArn string) error {
+	// Priority: credentials.json > config.json
+	if CredentialsLoaded() {
+		return UpdateCredentialProfileArn(id, profileArn)
+	}
+	// Fallback to config.json
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -391,6 +504,11 @@ func UpdateAccountProfileArn(id, profileArn string) error {
 }
 
 func DeleteAccount(id string) error {
+	// Priority: credentials.json > config.json
+	if CredentialsLoaded() {
+		return RemoveCredential(id)
+	}
+	// Fallback to config.json
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -403,6 +521,11 @@ func DeleteAccount(id string) error {
 }
 
 func UpdateAccountToken(id, accessToken, refreshToken string, expiresAt int64) error {
+	// Priority: credentials.json > config.json (writeback)
+	if CredentialsLoaded() {
+		return UpdateCredentialToken(id, accessToken, refreshToken, expiresAt)
+	}
+	// Fallback to config.json
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -474,6 +597,11 @@ func GetStats() (int, int, int, int, float64) {
 }
 
 func UpdateAccountStats(id string, requestCount, errorCount, totalTokens int, totalCredits float64, lastUsed int64) error {
+	// Priority: credentials.json > config.json
+	if CredentialsLoaded() {
+		return UpdateCredentialStats(id, requestCount, errorCount, totalTokens, totalCredits, lastUsed)
+	}
+	// Fallback to config.json
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -492,6 +620,26 @@ func UpdateAccountStats(id string, requestCount, errorCount, totalTokens int, to
 // UpdateAccountInfo updates an account's subscription and usage information.
 // Called after refreshing account data from Kiro API.
 func UpdateAccountInfo(id string, info AccountInfo) error {
+	// Priority: credentials.json > config.json
+	if CredentialsLoaded() {
+		// Update Email/UserId if provided
+		acc := GetCredentialByID(id)
+		if acc != nil {
+			if info.Email != "" {
+				acc.Email = info.Email
+			}
+			if info.UserId != "" {
+				acc.UserId = info.UserId
+			}
+			if info.Email != "" || info.UserId != "" {
+				if err := UpdateCredential(*acc); err != nil {
+					return err
+				}
+			}
+		}
+		return UpdateCredentialInfo(id, info)
+	}
+	// Fallback to config.json
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -720,10 +868,41 @@ func UpdateAllowOverUsage(allow bool) error {
 func GetLogLevel() string {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
-	if cfg == nil || cfg.LogLevel == "" {
+	if cfg == nil {
+		return "info"
+	}
+	if cfg.LogLevel == "" {
 		return "info"
 	}
 	return cfg.LogLevel
+}
+
+// GetRetryConfig returns retry configuration with defaults applied.
+func GetRetryConfig() (maxPerAccount, maxPerRequest, baseDelayMs, maxDelayMs int) {
+	cfgLock.RLock()
+	defer cfgLock.RUnlock()
+
+	maxPerAccount = 3
+	maxPerRequest = 9
+	baseDelayMs = 100
+	maxDelayMs = 5000
+
+	if cfg != nil {
+		if cfg.MaxRetriesPerAccount > 0 {
+			maxPerAccount = cfg.MaxRetriesPerAccount
+		}
+		if cfg.MaxRetriesPerRequest > 0 {
+			maxPerRequest = cfg.MaxRetriesPerRequest
+		}
+		if cfg.RetryBaseDelayMs > 0 {
+			baseDelayMs = cfg.RetryBaseDelayMs
+		}
+		if cfg.RetryMaxDelayMs > 0 {
+			maxDelayMs = cfg.RetryMaxDelayMs
+		}
+	}
+
+	return
 }
 
 // UpdateLogLevel updates the log level setting and persists the change.

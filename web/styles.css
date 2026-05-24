@@ -2926,6 +2926,178 @@ img.brand-icon {
   white-space: nowrap;
 }
 
+/* Feature panels */
+.feature-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.feature-stat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  background: var(--background);
+  min-width: 0;
+}
+.feature-stat-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+}
+.feature-stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
+  font-feature-settings: "tnum";
+  overflow-wrap: anywhere;
+}
+.panel-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.panel-section-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  margin: 1rem 0 0.625rem;
+}
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.data-table th,
+.data-table td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.data-table th {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--muted);
+}
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+.heatmap-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.heat-row {
+  display: grid;
+  grid-template-columns: 10rem minmax(18rem, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+.heat-row + .heat-row {
+  margin-top: 0.375rem;
+}
+.heat-label {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.heat-cells {
+  display: grid;
+  grid-template-columns: repeat(60, minmax(0.25rem, 1fr));
+  gap: 0.125rem;
+}
+.heat-cell {
+  height: 0.75rem;
+  border-radius: 0.125rem;
+  background: var(--success);
+}
+.heat-cell-fail {
+  background: var(--destructive);
+}
+.settings-inline-grid {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 12rem) minmax(12rem, 14rem) auto;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.875rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.backup-schedule-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  align-self: end;
+  gap: 0.625rem;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 2.25rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.backup-schedule-field {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.backup-field-label {
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.backup-keep-control {
+  display: flex;
+  align-items: center;
+  height: 2.25rem;
+  overflow: hidden;
+  background: var(--background);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+}
+.backup-keep-control:focus-within {
+  border-color: var(--border-focus);
+}
+.backup-keep-control input {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.backup-keep-control input:focus {
+  border-color: transparent;
+}
+.backup-keep-unit {
+  flex: none;
+  padding: 0 0.75rem 0 0.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mt-4 {
+  margin-top: 1rem;
+}
+
 /* Accounts mobile layout */
 @media (max-width: 720px) {
   .card-header {
@@ -2998,6 +3170,29 @@ img.brand-icon {
   #filterStatusSelect.custom-select-native + .custom-select {
     flex: 1 1 100%;
     width: 100%;
+  }
+  .feature-stats-grid,
+  .panel-split,
+  .settings-inline-grid {
+    grid-template-columns: 1fr;
+  }
+  .heat-row {
+    grid-template-columns: 8rem minmax(16rem, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
+  .feature-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .panel-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .feature-stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 
