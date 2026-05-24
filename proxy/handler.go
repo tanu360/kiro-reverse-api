@@ -3316,11 +3316,17 @@ func (h *Handler) apiGetAccountModelsCached(w http.ResponseWriter, _ *http.Reque
 }
 
 func (h *Handler) serveAdminPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, "web/index.html")
 }
 
 func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/admin/")
+	if strings.HasPrefix(path, "vendor/") || path == "favicon.ico" {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
 	http.ServeFile(w, r, "web/"+path)
 }
 

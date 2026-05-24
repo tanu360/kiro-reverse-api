@@ -4,22 +4,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kiro GO Proxy</title>
+  <title>Kiro Reverse Proxy</title>
   <link rel="icon" type="image/x-icon" href="/admin/favicon.ico" />
-  <script src="/admin/vendor/tailwindcss-browser/index.global.js"></script>
-  <link rel="stylesheet" href="/admin/vendor/fontawesome/css/all.min.css" />
-  <link rel="stylesheet" href="/admin/styles.css" id="__cssAsset" />
-  <link rel="stylesheet" href="/admin/toast.css" id="__toastCss" />
   <script>
     (function () {
-      var v = Date.now();
-      window.__v = v;
-      var css = document.getElementById('__cssAsset');
-      if (css) css.href = '/admin/styles.css?v=' + v;
-      var tcss = document.getElementById('__toastCss');
-      if (tcss) tcss.href = '/admin/toast.css?v=' + v;
+      try {
+        var pref = localStorage.getItem('kiro_theme') || 'system';
+        var dark = pref === 'dark' || (pref !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.dataset.themePref = pref;
+      } catch (e) { }
+      window.__adminStylesReady = function () {
+        document.documentElement.classList.add('admin-css-ready');
+      };
+      setTimeout(window.__adminStylesReady, 1800);
     })();
   </script>
+  <style>
+    :root {
+      --background: #fcfcfc;
+      --foreground: #000000;
+      color-scheme: light;
+    }
+
+    .dark {
+      --background: #000000;
+      --foreground: #ffffff;
+      color-scheme: dark;
+    }
+
+    html,
+    body {
+      background: var(--background);
+      color: var(--foreground);
+      margin: 0;
+      min-height: 100%;
+    }
+
+    html:not(.admin-css-ready) body {
+      visibility: hidden;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Geist:wght@100;200;300;400;500;600;700;800;900&family=Geist+Mono:wght@100;200;300;400;500;600;700;800;900&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@100;200;300;400;500;600;700;800;900&family=Geist+Mono:wght@100;200;300;400;500;600;700;800;900&display=swap" />
+  </noscript>
+  <link rel="stylesheet" href="/admin/vendor/fontawesome/css/all.min.css" />
+  <link rel="stylesheet" href="/admin/styles.css" onload="window.__adminStylesReady && window.__adminStylesReady()"
+    onerror="window.__adminStylesReady && window.__adminStylesReady()" />
+  <link rel="stylesheet" href="/admin/toast.css" />
+  <script src="/admin/vendor/tailwindcss-browser/index.global.js"></script>
 </head>
 
 <body>
@@ -40,9 +83,9 @@
     </div>
     <header class="login-topbar">
       <div class="login-topbar-inner">
-        <div class="brand" aria-label="Kiro GO Proxy" data-i18n-aria-label="app.title">
+        <div class="brand" aria-label="Kiro Reverse Proxy" data-i18n-aria-label="app.title">
           <img class="brand-icon" src="/admin/favicon.ico" alt="" />
-          <span class="brand-text">Kiro GO Proxy</span>
+          <span class="brand-text">Kiro Reverse Proxy</span>
         </div>
         <div class="topbar-actions">
           <button class="icon-btn lang-toggle" id="loginLangSwitch" type="button" aria-label=""
@@ -100,17 +143,17 @@
         <div class="brand-wrap">
           <div class="brand">
             <img class="brand-icon" src="/admin/favicon.ico" alt="" />
-            <span class="brand-text">Kiro GO Proxy</span>
+            <span class="brand-text">Kiro Reverse Proxy</span>
           </div>
         </div>
         <nav class="header-nav" aria-label="" data-i18n-aria-label="aria.sections">
           <div class="tabs" id="tabBar">
             <button type="button" class="tab active" data-tab="accounts"><i class="fa-solid fa-users tab-icon"></i><span
                 data-i18n="tabs.accounts"></span></button>
-            <button type="button" class="tab" data-tab="observe"><i
-                class="fa-solid fa-chart-line tab-icon"></i><span data-i18n="tabs.observe"></span></button>
-            <button type="button" class="tab" data-tab="requests"><i
-                class="fa-solid fa-list-check tab-icon"></i><span data-i18n="tabs.requests"></span></button>
+            <button type="button" class="tab" data-tab="observe"><i class="fa-solid fa-chart-line tab-icon"></i><span
+                data-i18n="tabs.observe"></span></button>
+            <button type="button" class="tab" data-tab="requests"><i class="fa-solid fa-list-check tab-icon"></i><span
+                data-i18n="tabs.requests"></span></button>
             <button type="button" class="tab" data-tab="backups"><i class="fa-solid fa-box-archive tab-icon"></i><span
                 data-i18n="tabs.backups"></span></button>
             <button type="button" class="tab" data-tab="settings"><i class="fa-solid fa-sliders tab-icon"></i><span
@@ -246,7 +289,8 @@
             <div class="card-actions">
               <span class="badge badge-info" id="observeLiveBadge" data-i18n="observe.live"></span>
               <button class="btn btn-outline btn-sm" id="refreshObserveBtn" type="button"><i
-                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text" data-i18n="common.refresh"></span></button>
+                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text"
+                  data-i18n="common.refresh"></span></button>
             </div>
           </div>
           <div class="feature-stats-grid" id="observeSummary"></div>
@@ -277,7 +321,8 @@
             <span class="card-title" data-i18n="requests.title"></span>
             <div class="card-actions">
               <button class="btn btn-outline btn-sm" id="refreshRequestsBtn" type="button"><i
-                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text" data-i18n="common.refresh"></span></button>
+                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text"
+                  data-i18n="common.refresh"></span></button>
             </div>
           </div>
           <div class="requests-toolbar">
@@ -301,8 +346,10 @@
           <div class="table-pagination">
             <span id="requestsPageInfo" class="table-page-info"></span>
             <div class="table-page-actions">
-              <button class="btn btn-outline btn-sm" id="requestsPrevBtn" type="button" data-i18n="requests.prev"></button>
-              <button class="btn btn-outline btn-sm" id="requestsNextBtn" type="button" data-i18n="requests.next"></button>
+              <button class="btn btn-outline btn-sm" id="requestsPrevBtn" type="button"
+                data-i18n="requests.prev"></button>
+              <button class="btn btn-outline btn-sm" id="requestsNextBtn" type="button"
+                data-i18n="requests.next"></button>
             </div>
           </div>
         </div>
@@ -558,7 +605,8 @@
               <button class="btn btn-outline btn-sm" id="uploadBackupBtn" type="button"><i
                   class="fa-solid fa-file-import"></i><span class="btn-text" data-i18n="backups.upload"></span></button>
               <button class="btn btn-outline btn-sm" id="refreshBackupsBtn" type="button"><i
-                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text" data-i18n="common.refresh"></span></button>
+                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text"
+                  data-i18n="common.refresh"></span></button>
               <button class="btn btn-primary btn-sm" id="createBackupBtn" type="button"><i
                   class="fa-solid fa-plus"></i><span class="btn-text" data-i18n="backups.create"></span></button>
             </div>
@@ -601,7 +649,7 @@
             <img class="footer-icon" src="/admin/favicon.ico" alt="" />
             <div class="footer-copy">
               <div class="footer-title-row">
-                <span class="footer-title">Kiro GO Proxy</span>
+                <span class="footer-title">Kiro Reverse Proxy</span>
                 <span class="footer-version" id="versionBadge" aria-label=""
                   data-i18n-aria-label="aria.currentVersion"></span>
                 <span class="footer-version-status" id="statusBadge" data-i18n-title="status.running" title="">
@@ -625,7 +673,7 @@
           </div>
         </div>
         <div class="footer-meta">
-          <span>© <span id="footerYear"></span> Kiro GO Proxy</span>
+          <span>© <span id="footerYear"></span> Kiro Reverse Proxy</span>
           <span data-i18n="footer.builtFor"></span>
         </div>
       </div>
@@ -682,18 +730,8 @@
     </div>
   </div>
 
-  <script>
-    (function () {
-      var v = window.__v || Date.now();
-      var t = document.createElement('script');
-      t.src = '/admin/toast.js?v=' + v;
-      document.body.appendChild(t);
-      var s = document.createElement('script');
-      s.src = '/admin/app.js?v=' + v;
-      s.defer = true;
-      document.body.appendChild(s);
-    })();
-  </script>
+  <script defer src="/admin/toast.js"></script>
+  <script defer src="/admin/app.js"></script>
 </body>
 
 </html>
