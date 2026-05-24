@@ -17,7 +17,6 @@ const (
 	kiroRestAPIBase = "https://codewhisperer.us-east-1.amazonaws.com"
 )
 
-// GetUsageLimits 获取账户使用量和订阅信息
 func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
 	url := fmt.Sprintf("%s/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST&isEmailRequired=true", kiroRestAPIBase)
 	url = withProfileArnQuery(url, account)
@@ -47,7 +46,6 @@ func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
 	return &result, nil
 }
 
-// GetUserInfo 获取用户信息
 func GetUserInfo(account *config.Account) (*UserInfoResponse, error) {
 	url := fmt.Sprintf("%s/GetUserInfo", kiroRestAPIBase)
 
@@ -78,7 +76,6 @@ func GetUserInfo(account *config.Account) (*UserInfoResponse, error) {
 	return &result, nil
 }
 
-// ListAvailableModels 获取可用模型列表
 func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 	url := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&maxResults=50", kiroRestAPIBase)
 	url = withProfileArnQuery(url, account)
@@ -110,9 +107,6 @@ func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 	return result.Models, nil
 }
 
-// ResolveProfileArn returns the account profile ARN, fetching and caching it
-// when it is missing. First tries ListAvailableProfiles; if that returns empty,
-// falls back to refreshing the token (which returns profileArn in the response).
 func ResolveProfileArn(account *config.Account) (string, error) {
 	if account == nil {
 		return "", fmt.Errorf("account is nil")
@@ -121,7 +115,6 @@ func ResolveProfileArn(account *config.Account) (string, error) {
 		return profileArn, nil
 	}
 
-	// Try ListAvailableProfiles first
 	profileArn, err := listAvailableProfiles(account)
 	if err == nil && profileArn != "" {
 		if updateErr := config.UpdateAccountProfileArn(account.ID, profileArn); updateErr != nil {
@@ -131,7 +124,6 @@ func ResolveProfileArn(account *config.Account) (string, error) {
 		return profileArn, nil
 	}
 
-	// Fallback: refresh token to get profileArn from auth response
 	if account.RefreshToken != "" {
 		_, _, _, refreshedArn, refreshErr := auth.RefreshToken(account)
 		if refreshErr == nil && refreshedArn != "" {
@@ -203,29 +195,25 @@ func setKiroHeaders(req *http.Request, account *config.Account) {
 	applyKiroBaseHeaders(req, account, headerValues)
 }
 
-// RefreshAccountInfo 刷新账户信息（使用量、订阅等）
 func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 	info := &config.AccountInfo{
 		LastRefresh: time.Now().Unix(),
 	}
 
-	// 获取使用量和订阅信息
 	usage, err := GetUsageLimits(account)
 	if err != nil {
-		// 检测封禁状态
+
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "TEMPORARILY_SUSPENDED") {
-			// 账户被暂时封禁，自动禁用并标记封禁状态
+
 			logger.Warnf("[RefreshAccountInfo] Account %s is temporarily suspended: %v", account.Email, err)
 
-			// 更新账户封禁状态并自动禁用
 			updatedAccount := *account
 			updatedAccount.Enabled = false
 			updatedAccount.BanStatus = "BANNED"
 			updatedAccount.BanReason = "AWS temporarily suspended - unusual user activity detected"
 			updatedAccount.BanTime = time.Now().Unix()
 
-			// 保存更新后的账户状态
 			if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
 				logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
 			}
@@ -233,17 +221,15 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 			return nil, fmt.Errorf("Account suspended: %w", err)
 		} else if strings.Contains(errMsg, "403") || strings.Contains(errMsg, "401") ||
 			strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "expired") {
-			// Token 相关错误，可能需要重新认证
+
 			logger.Warnf("[RefreshAccountInfo] Authentication error for %s: %v", account.Email, err)
 
-			// 更新账户封禁状态为认证失败并自动禁用
 			updatedAccount := *account
 			updatedAccount.Enabled = false
 			updatedAccount.BanStatus = "BANNED"
 			updatedAccount.BanReason = "Authentication failed - token invalid or expired"
 			updatedAccount.BanTime = time.Now().Unix()
 
-			// 保存更新后的账户状态
 			if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
 				logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
 			}
@@ -252,7 +238,6 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 		return nil, fmt.Errorf("GetUsageLimits: %w", err)
 	}
 
-	// 如果成功获取信息，清除封禁状态（如果之前被标记）
 	if account.BanStatus != "" && account.BanStatus != "ACTIVE" {
 		logger.Infof("[RefreshAccountInfo] Account %s is now active, clearing ban status", account.Email)
 
@@ -261,21 +246,18 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 		updatedAccount.BanReason = ""
 		updatedAccount.BanTime = 0
 
-		// 保存更新后的账户状态
 		if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
 			logger.Errorf("[RefreshAccountInfo] Failed to clear account ban status: %v", updateErr)
 		}
 	}
 
-	// 解析用户信息
 	if usage.UserInfo != nil {
 		info.Email = usage.UserInfo.Email
 		info.UserId = usage.UserInfo.UserId
 	}
 
-	// 解析订阅信息
 	if usage.SubscriptionInfo != nil {
-		// 优先从 SubscriptionTitle 或 SubscriptionName 解析类型
+
 		titleOrName := usage.SubscriptionInfo.SubscriptionTitle
 		if titleOrName == "" {
 			titleOrName = usage.SubscriptionInfo.SubscriptionName
@@ -295,7 +277,6 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 			info.SubscriptionType)
 	}
 
-	// 解析使用量
 	if len(usage.UsageBreakdownList) > 0 {
 		breakdown := usage.UsageBreakdownList[0]
 		info.UsageCurrent = breakdown.CurrentUsage
@@ -305,7 +286,6 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 		}
 	}
 
-	// 解析重置日期
 	if usage.NextDateReset != "" {
 		if ts, err := usage.NextDateReset.Int64(); err == nil && ts > 0 {
 			info.NextResetDate = time.Unix(ts, 0).Format("2006-01-02")
@@ -314,7 +294,6 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 		}
 	}
 
-	// 解析试用配额信息
 	if len(usage.UsageBreakdownList) > 0 {
 		breakdown := usage.UsageBreakdownList[0]
 		if breakdown.FreeTrialInfo != nil {
@@ -325,7 +304,6 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 			}
 			info.TrialStatus = breakdown.FreeTrialInfo.FreeTrialStatus
 
-			// 解析试用到期时间
 			if breakdown.FreeTrialInfo.FreeTrialExpiry != "" {
 				if ts, err := breakdown.FreeTrialInfo.FreeTrialExpiry.Int64(); err == nil && ts > 0 {
 					info.TrialExpiresAt = ts
@@ -353,7 +331,6 @@ func parseSubscriptionType(raw string) string {
 	return "FREE"
 }
 
-// 响应结构体
 type UsageLimitsResponse struct {
 	UsageBreakdownList []UsageBreakdown  `json:"usageBreakdownList"`
 	NextDateReset      json.Number       `json:"nextDateReset"`

@@ -1,4 +1,3 @@
-// Package proxy: OpenAI Responses API compatibility types and conversion.
 package proxy
 
 import (

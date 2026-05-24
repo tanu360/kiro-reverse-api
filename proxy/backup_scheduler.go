@@ -1,4 +1,3 @@
-// Package proxy: background backup scheduler.
 package proxy
 
 import (
@@ -8,11 +7,8 @@ import (
 	"kiro-proxy/logger"
 )
 
-// backgroundBackupScheduler 定时快照后台任务。
-// 按 BackupSchedule.Cadence（hourly/daily/weekly）周期触发 scheduled 类快照。
-// 停机信号复用 stopStatsSaver（同生命周期）。
 func (h *Handler) backgroundBackupScheduler() {
-	ticker := time.NewTicker(5 * time.Minute) // 每 5 分钟检查一次
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {

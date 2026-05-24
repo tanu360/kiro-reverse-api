@@ -1,6 +1,3 @@
-// Package proxy: in-memory observability store.
-// 维护 24h 分钟环形桶 + 账号级环形桶 + 模型聚合 + 最近错误流。
-// 全部内存实现，进程重启即清零；不污染 config.json。
 package proxy
 
 import (
@@ -13,14 +10,13 @@ import (
 )
 
 const (
-	observeMinuteSlots = 1440 // 24h × 60min
-	observeRecentErrs  = 100  // 最近错误流容量
-	observeRecentReqs  = 200  // 最近请求流容量
+	observeMinuteSlots = 1440
+	observeRecentErrs  = 100
+	observeRecentReqs  = 200
 )
 
-// minuteBucket 一分钟内的聚合数据
 type minuteBucket struct {
-	WindowMin int64 // unix minute (用于校验是否过期/被回收)
+	WindowMin int64
 	Reqs      int
 	Successes int
 	Failures  int
@@ -29,7 +25,6 @@ type minuteBucket struct {
 	Credits   float64
 }
 
-// modelStat 模型级聚合（生命周期内累计）
 type modelStat struct {
 	Reqs      int64
 	InTokens  int64
@@ -38,7 +33,6 @@ type modelStat struct {
 	LastUsed  int64
 }
 
-// errorRecord 最近错误流条目
 type errorRecord struct {
 	TS        int64  `json:"ts"`
 	AccountID string `json:"accountId"`
@@ -48,7 +42,6 @@ type errorRecord struct {
 	Message   string `json:"message,omitempty"`
 }
 
-// requestRecord 请求记录条目
 type requestRecord struct {
 	ID          int64   `json:"id,omitempty"`
 	TS          int64   `json:"ts"`
@@ -83,18 +76,17 @@ type requestPage struct {
 	Persistent bool            `json:"persistent"`
 }
 
-// observeStore 全局只读单例，写入加锁。
 type observeStore struct {
 	mu             sync.RWMutex
 	startedAt      int64
 	globalRing     [observeMinuteSlots]minuteBucket
 	accountRings   map[string]*[observeMinuteSlots]minuteBucket
 	modelStats     map[string]*modelStat
-	recentErrors   []errorRecord // 循环写入
+	recentErrors   []errorRecord
 	recentErrIdx   int
-	recentRequests []requestRecord // 循环写入
+	recentRequests []requestRecord
 	recentReqIdx   int
-	maxAccountRing int // 上限保护，超过则不再新建账号桶（按 LRU 淘汰）
+	maxAccountRing int
 	accountTouched map[string]int64
 }
 
@@ -118,13 +110,11 @@ func getObserveStore() *observeStore {
 	return observeStoreInst
 }
 
-// curSlot 当前分钟在环中的下标
 func curSlot(nowUnix int64) (int, int64) {
 	curMin := nowUnix / 60
 	return int(curMin % observeMinuteSlots), curMin
 }
 
-// touchBucket 取/重置该分钟桶（窗口跳变即清零）
 func touchBucket(ring *[observeMinuteSlots]minuteBucket, slot int, curMin int64) *minuteBucket {
 	b := &ring[slot]
 	if b.WindowMin != curMin {
@@ -133,7 +123,6 @@ func touchBucket(ring *[observeMinuteSlots]minuteBucket, slot int, curMin int64)
 	return b
 }
 
-// getOrCreateAccountRing 受 maxAccountRing 保护，必要时淘汰最久未访问的账号桶
 func (s *observeStore) getOrCreateAccountRing(accountID string) *[observeMinuteSlots]minuteBucket {
 	if accountID == "" {
 		return nil
@@ -144,7 +133,7 @@ func (s *observeStore) getOrCreateAccountRing(accountID string) *[observeMinuteS
 		return ring
 	}
 	if len(s.accountRings) >= s.maxAccountRing {
-		// LRU 淘汰
+
 		var victim string
 		var oldest int64 = 1<<63 - 1
 		for id, t := range s.accountTouched {
@@ -164,7 +153,6 @@ func (s *observeStore) getOrCreateAccountRing(accountID string) *[observeMinuteS
 	return ring
 }
 
-// RecordSuccess 一次成功请求落账
 func (s *observeStore) RecordSuccess(accountID, model string, inTokens, outTokens int, credits float64) {
 	if s == nil {
 		return
@@ -204,7 +192,6 @@ func (s *observeStore) RecordSuccess(accountID, model string, inTokens, outToken
 	}
 }
 
-// RecordFailure 一次失败请求落账（不记 tokens）
 func (s *observeStore) RecordFailure(accountID, model string) {
 	if s == nil {
 		return
@@ -235,7 +222,6 @@ func (s *observeStore) RecordFailure(accountID, model string) {
 	}
 }
 
-// RecordError 记录一条错误流（错误窗外，仅供 admin 查看）
 func (s *observeStore) RecordError(accountID, email, model string, status int, message string) {
 	if s == nil {
 		return
@@ -257,7 +243,6 @@ func (s *observeStore) RecordError(accountID, email, model string, status int, m
 	s.recentErrIdx = (s.recentErrIdx + 1) % observeRecentErrs
 }
 
-// RecordRequest 记录一次请求（成功或失败）
 func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
 	if s == nil {
 		return
@@ -286,24 +271,21 @@ func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, o
 	enqueuePersistRequestRecord(rec)
 }
 
-// ==================== 读出快照 ====================
-
-// OverviewSnapshot 全局总览（最近 1 分钟与最近 5 分钟均值）
 type OverviewSnapshot struct {
 	StartedAt   int64   `json:"startedAt"`
 	NowUnix     int64   `json:"nowUnix"`
-	RPM1        int     `json:"rpm1"`        // 最近 1min 请求数
-	RPM5Avg     float64 `json:"rpm5Avg"`     // 最近 5min 平均
-	ErrRate5    float64 `json:"errRate5"`    // 最近 5min 错误率 (0-1)
-	InTPM5      float64 `json:"inTpm5"`      // 5min 入 tokens / min
-	OutTPM5     float64 `json:"outTpm5"`     // 5min 出 tokens / min
-	Credits5    float64 `json:"credits5"`    // 5min credits 之和
-	Credits60   float64 `json:"credits60"`   // 60min credits 之和
-	Errors60    int     `json:"errors60"`    // 最近 60min 失败数
-	Successes60 int     `json:"successes60"` // 最近 60min 成功数
-	ActiveAccts int     `json:"activeAccts"` // 最近 5min 有流量的账号数
-	TotalAccts  int     `json:"totalAccts"`  // 累计被记录过的账号数
-	TotalModels int     `json:"totalModels"` // 累计模型数
+	RPM1        int     `json:"rpm1"`
+	RPM5Avg     float64 `json:"rpm5Avg"`
+	ErrRate5    float64 `json:"errRate5"`
+	InTPM5      float64 `json:"inTpm5"`
+	OutTPM5     float64 `json:"outTpm5"`
+	Credits5    float64 `json:"credits5"`
+	Credits60   float64 `json:"credits60"`
+	Errors60    int     `json:"errors60"`
+	Successes60 int     `json:"successes60"`
+	ActiveAccts int     `json:"activeAccts"`
+	TotalAccts  int     `json:"totalAccts"`
+	TotalModels int     `json:"totalModels"`
 }
 
 func (s *observeStore) Overview() OverviewSnapshot {
@@ -375,23 +357,20 @@ func (s *observeStore) Overview() OverviewSnapshot {
 	}
 }
 
-// HeatmapCell 单格数据
 type HeatmapCell struct {
-	Offset   int     `json:"offset"` // 距当前分钟的负偏移 (0..windowMin-1)
+	Offset   int     `json:"offset"`
 	Reqs     int     `json:"reqs"`
 	Failures int     `json:"failures"`
 	Credits  float64 `json:"credits,omitempty"`
 }
 
-// AccountHeatmap 单账号热图
 type AccountHeatmap struct {
 	AccountID string        `json:"accountId"`
 	Cells     []HeatmapCell `json:"cells"`
 }
 
-// HeatmapResponse 全部账号 + global 的热图
 type HeatmapResponse struct {
-	WindowMin int              `json:"windowMin"` // 取几分钟（默认 60，最大 1440）
+	WindowMin int              `json:"windowMin"`
 	NowUnix   int64            `json:"nowUnix"`
 	Global    AccountHeatmap   `json:"global"`
 	Accounts  []AccountHeatmap `json:"accounts"`
@@ -437,14 +416,13 @@ func (s *observeStore) Heatmap(windowMin int) HeatmapResponse {
 	for id, ring := range s.accountRings {
 		resp.Accounts = append(resp.Accounts, AccountHeatmap{AccountID: id, Cells: collect(ring)})
 	}
-	// 排序，按账号 ID 稳定
+
 	sort.Slice(resp.Accounts, func(i, j int) bool {
 		return resp.Accounts[i].AccountID < resp.Accounts[j].AccountID
 	})
 	return resp
 }
 
-// ModelMixEntry 模型聚合
 type ModelMixEntry struct {
 	Model     string  `json:"model"`
 	Reqs      int64   `json:"reqs"`
@@ -477,7 +455,6 @@ func (s *observeStore) ModelMix() []ModelMixEntry {
 	return out
 }
 
-// RecentErrors 倒序返回最近错误（最新在前）
 func (s *observeStore) RecentErrors(limit int) []errorRecord {
 	if s == nil {
 		return nil
@@ -488,7 +465,7 @@ func (s *observeStore) RecentErrors(limit int) []errorRecord {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make([]errorRecord, 0, limit)
-	// 从 recentErrIdx-1 开始往前遍历
+
 	for i := 0; i < observeRecentErrs && len(out) < limit; i++ {
 		idx := (s.recentErrIdx - 1 - i + observeRecentErrs) % observeRecentErrs
 		rec := s.recentErrors[idx]
@@ -500,7 +477,6 @@ func (s *observeStore) RecentErrors(limit int) []errorRecord {
 	return out
 }
 
-// RecentRequests 返回最近的请求记录（最新的在前）
 func (s *observeStore) RecentRequests(limit int) []requestRecord {
 	if s == nil {
 		return nil
@@ -643,7 +619,6 @@ func boolInt(v bool) int {
 	return 0
 }
 
-// Reset 清空（用于 admin /stats/reset 触发的同步重置）
 func (s *observeStore) Reset() {
 	if s == nil {
 		return
@@ -663,8 +638,6 @@ func (s *observeStore) Reset() {
 	s.startedAt = time.Now().Unix()
 }
 
-// backgroundObserveTick 5s 周期通过 broadcaster 推送 observe_tick 事件，
-// 前端收到后拉最新数据。停机信号复用 stopStatsSaver（同生命周期）。
 func (h *Handler) backgroundObserveTick() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()

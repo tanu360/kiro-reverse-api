@@ -74,10 +74,6 @@ func TestBuildClaudeUsageMapIncludesCacheFields(t *testing.T) {
 	}
 }
 
-// TestPromptCacheStableAcrossBillingHeaderDrift verifies that Claude Code's
-// per-request "x-anthropic-billing-header: cc_version=...; cch=...;" system
-// block (whose content drifts on every request) does not break cache hits.
-// The tracker should ignore that metadata when fingerprinting cached prefixes.
 func TestPromptCacheStableAcrossBillingHeaderDrift(t *testing.T) {
 	tracker := newPromptCacheTracker(time.Hour)
 	mainSystem := strings.Repeat("You are a helpful coding assistant with deep knowledge of Go, Rust, Python, and TypeScript. ", 80)
@@ -210,11 +206,6 @@ func TestCanonicalCacheValuePreservesSemanticPositionKeys(t *testing.T) {
 	}
 }
 
-// TestPromptCacheImplicitBreakpointAtMessageEnd verifies that once any
-// explicit cache_control breakpoint has been seen, subsequent message-end
-// boundaries act as implicit breakpoints. This allows multi-turn conversations
-// to hit earlier stored prefix fingerprints even when the newest messages
-// lack explicit cache_control.
 func TestPromptCacheImplicitBreakpointAtMessageEnd(t *testing.T) {
 	tracker := newPromptCacheTracker(time.Hour)
 	systemText := strings.Repeat("You are a helpful coding assistant with deep knowledge of Go, Rust, Python, and TypeScript. ", 80)
@@ -229,7 +220,6 @@ func TestPromptCacheImplicitBreakpointAtMessageEnd(t *testing.T) {
 		},
 	}
 
-	// Round 1: single user message.
 	req1 := &ClaudeRequest{
 		Model:    "claude-sonnet-4.5",
 		System:   baseSystem,
@@ -241,9 +231,6 @@ func TestPromptCacheImplicitBreakpointAtMessageEnd(t *testing.T) {
 	}
 	tracker.Update("acct-1", profile1)
 
-	// Round 2: conversation continues with new messages. The latest user
-	// message has no explicit cache_control; it should still hit the stored
-	// prefix via the implicit message-end breakpoint.
 	req2 := &ClaudeRequest{
 		Model:  "claude-sonnet-4.5",
 		System: baseSystem,

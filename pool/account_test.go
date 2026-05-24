@@ -75,10 +75,6 @@ func TestGetNextKeepsFiveMinuteTokenAvailable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// IsAuthFailure
-// ---------------------------------------------------------------------------
-
 func TestIsAuthFailureRecognizes401And403(t *testing.T) {
 	positives := []string{
 		"HTTP 401 from server",
@@ -98,11 +94,10 @@ func TestIsAuthFailureRecognizes401And403(t *testing.T) {
 }
 
 func TestIsAuthFailureIgnoresFalsePositives(t *testing.T) {
-	// hasStatusToken only excludes digit boundaries; e.g. "4011" contains "401"
-	// but the trailing '1' is a digit so it does NOT match.
+
 	negatives := []string{
-		"status code 4011 found", // digit immediately after 401 → not a standalone token
-		"error 14013 exceeded",   // digit before and after 401
+		"status code 4011 found",
+		"error 14013 exceeded",
 		"some random error",
 		"status 200 OK",
 	}
@@ -119,16 +114,12 @@ func TestIsAuthFailureNilError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// IsSuspensionError
-// ---------------------------------------------------------------------------
-
 func TestIsSuspensionErrorDetectsKnownMessages(t *testing.T) {
 	positives := []string{
 		"account temporarily_suspended",
 		"account temporarily suspended",
 		"no available kiro profile",
-		"No Available Kiro Profile", // case-insensitive
+		"No Available Kiro Profile",
 	}
 	for _, msg := range positives {
 		if !IsSuspensionError(errors.New(msg)) {
@@ -155,10 +146,6 @@ func TestIsSuspensionErrorNilError(t *testing.T) {
 		t.Fatal("IsSuspensionError(nil) = true, want false")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// GetNextForModelExcluding
-// ---------------------------------------------------------------------------
 
 func newTestPool(accounts ...config.Account) *AccountPool {
 	p := &AccountPool{
@@ -203,12 +190,8 @@ func TestGetNextForModelExcludingReturnsNilOnEmptyPool(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// DisableAccount
-// ---------------------------------------------------------------------------
-
 func TestDisableAccountSetsCooldown(t *testing.T) {
-	// Initialize a temporary config so SetAccountBanStatus can persist safely.
+
 	cfgFile := filepath.Join(t.TempDir(), "config.json")
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
@@ -224,7 +207,7 @@ func TestDisableAccountSetsCooldown(t *testing.T) {
 	if !ok {
 		t.Fatal("expected cooldown to be set after DisableAccount")
 	}
-	// Safety-net cooldown must be at least 23 hours from now.
+
 	minExpected := time.Now().Add(23 * time.Hour)
 	if cooldown.Before(minExpected) {
 		t.Fatalf("expected cooldown >= 23h in future, got %v", cooldown)

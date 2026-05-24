@@ -1,7 +1,3 @@
-/*
- * Toast notification module.
- * Public API: window.toast(message, variant, opts), variant helpers, dismissAll().
- */
 (function (global) {
   'use strict';
 

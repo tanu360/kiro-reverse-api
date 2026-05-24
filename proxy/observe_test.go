@@ -30,10 +30,10 @@ func resetObservePersistenceForTest(t *testing.T) {
 }
 
 func TestObserveStore_RecordAndOverview(t *testing.T) {
-	// 重置全局实例以隔离测试（不共享状态）
+
 	observeStoreOnce = sync.Once{}
 	observeStoreInst = nil
-	_ = time.Now() // satisfy import if pruned
+	_ = time.Now()
 	s := getObserveStore()
 	defer s.Reset()
 
@@ -95,7 +95,7 @@ func TestObserveStore_RecentErrorsOrdering(t *testing.T) {
 	if len(got) != 3 {
 		t.Fatalf("expected 3 errors, got %d", len(got))
 	}
-	// 最新在前
+
 	if got[0].Message != "err-e" {
 		t.Fatalf("expected newest first 'err-e', got %q", got[0].Message)
 	}

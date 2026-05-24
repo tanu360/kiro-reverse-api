@@ -40,7 +40,6 @@ var scopes = []string{
 	"codewhisperer:taskassist",
 }
 
-// StartIamSsoLogin 发起 IAM SSO 登录
 func StartIamSsoLogin(startUrl, region string) (sessionID, authorizeUrl string, expiresIn int, err error) {
 	if region == "" {
 		region = "us-east-1"
@@ -49,18 +48,15 @@ func StartIamSsoLogin(startUrl, region string) (sessionID, authorizeUrl string, 
 	oidcBase := fmt.Sprintf("https://oidc.%s.amazonaws.com", region)
 	redirectUri := "http://127.0.0.1/oauth/callback"
 
-	// 1. 注册 OIDC 客户端
 	clientID, clientSecret, err := registerOIDCClient(oidcBase, startUrl, redirectUri)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("注册客户端失败: %w", err)
 	}
 
-	// 2. 生成 PKCE
 	codeVerifier := generateCodeVerifier()
 	codeChallenge := generateCodeChallenge(codeVerifier)
 	state := uuid.New().String()
 
-	// 3. 构建授权 URL
 	params := url.Values{}
 	params.Set("response_type", "code")
 	params.Set("client_id", clientID)
@@ -72,7 +68,6 @@ func StartIamSsoLogin(startUrl, region string) (sessionID, authorizeUrl string, 
 
 	authorizeUrl = fmt.Sprintf("%s/authorize?%s", oidcBase, params.Encode())
 
-	// 4. 保存会话
 	sessionID = uuid.New().String()
 	session := &IamSsoSession{
 		ClientID:     clientID,
@@ -89,13 +84,11 @@ func StartIamSsoLogin(startUrl, region string) (sessionID, authorizeUrl string, 
 	sessions[sessionID] = session
 	sessionsMu.Unlock()
 
-	// 清理过期会话
 	go cleanupExpiredSessions()
 
 	return sessionID, authorizeUrl, 600, nil
 }
 
-// CompleteIamSsoLogin 完成 IAM SSO 登录
 func CompleteIamSsoLogin(sessionID, callbackUrl string) (accessToken, refreshToken, clientID, clientSecret, region string, expiresIn int, err error) {
 	sessionsMu.RLock()
 	session, ok := sessions[sessionID]
@@ -112,7 +105,6 @@ func CompleteIamSsoLogin(sessionID, callbackUrl string) (accessToken, refreshTok
 		return "", "", "", "", "", 0, fmt.Errorf("会话已过期")
 	}
 
-	// 解析回调 URL
 	parsedUrl, err := url.Parse(callbackUrl)
 	if err != nil {
 		return "", "", "", "", "", 0, fmt.Errorf("无效的回调 URL")
@@ -134,7 +126,6 @@ func CompleteIamSsoLogin(sessionID, callbackUrl string) (accessToken, refreshTok
 		return "", "", "", "", "", 0, fmt.Errorf("未收到授权码")
 	}
 
-	// 用 code 换取 token
 	oidcBase := fmt.Sprintf("https://oidc.%s.amazonaws.com", session.Region)
 	accessToken, refreshToken, expiresIn, err = exchangeToken(
 		oidcBase,
@@ -148,7 +139,6 @@ func CompleteIamSsoLogin(sessionID, callbackUrl string) (accessToken, refreshTok
 		return "", "", "", "", "", 0, err
 	}
 
-	// 清理会话
 	sessionsMu.Lock()
 	delete(sessions, sessionID)
 	sessionsMu.Unlock()

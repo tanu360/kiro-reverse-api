@@ -19,20 +19,19 @@ import (
 
 const tokenRefreshSkewSeconds int64 = 120
 
-// Handler HTTP 处理器
 type Handler struct {
 	pool *pool.AccountPool
-	// 运行时统计 (使用原子操作)
+
 	totalRequests   int64
 	successRequests int64
 	failedRequests  int64
 	totalTokens     int64
-	totalCredits    float64 // float64 需要用锁保护
+	totalCredits    float64
 	creditsMu       sync.RWMutex
 	startTime       int64
 	stopRefresh     chan struct{}
 	stopStatsSaver  chan struct{}
-	// 模型缓存
+
 	cachedModels    []ModelInfo
 	modelsCacheMu   sync.RWMutex
 	modelsCacheTime int64
@@ -210,7 +209,7 @@ func validateOpenAIRequestShape(req *OpenAIRequest) string {
 }
 
 func NewHandler() *Handler {
-	// 启动时应用代理配置
+
 	applyProxyConfig(config.GetProxyURL())
 
 	totalReq, successReq, failedReq, totalTokens, totalCredits := config.GetStats()
@@ -226,31 +225,29 @@ func NewHandler() *Handler {
 		stopStatsSaver:  make(chan struct{}),
 		promptCache:     newPromptCacheTracker(defaultPromptCacheTTL),
 	}
-	// 启动后台刷新
+
 	go h.backgroundRefresh()
-	// 启动后台统计保存 (每30秒保存一次)
+
 	go h.backgroundStatsSaver()
-	// 启动后台 observe tick (每 5s 推一次)
+
 	go h.backgroundObserveTick()
-	// 启动后台 observe 数据保存 (每 5min 保存一次)
+
 	go h.backgroundObserveSaver()
-	// 启动后台 request 持久化写入器，避免请求热路径等待 SQLite 磁盘 I/O
+
 	go h.backgroundObserveRequestWriter()
 	if err := getObserveStore().Load(); err != nil {
 		logger.Warnf("[Observe] Failed to load: %v", err)
 	}
-	// 启动后台定时快照和冷却状态保存
+
 	go h.backgroundBackupScheduler()
 	go h.backgroundCooldownSaver()
 	return h
 }
 
-// backgroundRefresh 后台定时刷新账户信息
 func (h *Handler) backgroundRefresh() {
-	ticker := time.NewTicker(30 * time.Minute) // 每 30 分钟刷新一次
+	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 
-	// 启动时延迟 10 秒后执行一次
 	time.Sleep(10 * time.Second)
 	h.refreshModelsCache()
 	h.refreshAllAccounts()
@@ -266,7 +263,6 @@ func (h *Handler) backgroundRefresh() {
 	}
 }
 
-// refreshAllAccounts 刷新所有账户信息
 func (h *Handler) refreshAllAccounts() {
 	accounts := config.GetAccounts()
 	now := time.Now().Unix()
@@ -281,7 +277,6 @@ func (h *Handler) refreshAllAccounts() {
 			continue
 		}
 
-		// 检查 token 是否需要刷新
 		if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {
 			newAccessToken, newRefreshToken, newExpiresAt, profileArn, err := auth.RefreshToken(account)
 			if err != nil {
@@ -305,7 +300,6 @@ func (h *Handler) refreshAllAccounts() {
 			continue
 		}
 
-		// 刷新账户信息
 		info, err := RefreshAccountInfo(account)
 		if err != nil {
 			logger.Warnf("[BackgroundRefresh] Failed to refresh %s: %v", account.Email, err)
@@ -318,7 +312,6 @@ func (h *Handler) refreshAllAccounts() {
 	h.pool.Reload()
 }
 
-// validateApiKey 验证 API Key
 func (h *Handler) validateApiKey(r *http.Request) bool {
 	if !config.IsApiKeyRequired() {
 		return true
@@ -342,14 +335,11 @@ func (h *Handler) validateApiKey(r *http.Request) bool {
 	return providedKey == expectedKey
 }
 
-// ServeHTTP 路由分发
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
-	// Debug-level request trace for fine-grained visibility
 	logger.Debugf("[HTTP] %s %s from %s", r.Method, path, r.RemoteAddr)
 
-	// CORS - 完整的头部支持
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key, anthropic-version, anthropic-beta, x-api-key, x-stainless-os, x-stainless-lang, x-stainless-package-version, x-stainless-runtime, x-stainless-runtime-version, x-stainless-arch")
@@ -360,9 +350,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 路由
 	switch {
-	// API 端点（需要验证 API Key）
+
 	case path == "/v1/messages" || path == "/messages" || path == "/anthropic/v1/messages":
 		if !h.validateApiKey(r) {
 			h.sendClaudeError(w, 401, "authentication_error", "Invalid or missing API key")
@@ -404,11 +393,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case path == "/v1/models" || path == "/models":
 		h.handleModels(w, r)
 	case path == "/api/event_logging/batch":
-		// Claude Code 遥测端点 - 直接返回 200 OK
+
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write([]byte(`{"status":"ok"}`))
 
-	// 管理端点
 	case path == "/admin" || path == "/admin/":
 		h.serveAdminPage(w, r)
 	case strings.HasPrefix(path, "/admin/api/"):
@@ -416,11 +404,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/admin/"):
 		h.serveStaticFile(w, r)
 
-	// 健康检查
 	case path == "/health" || path == "/":
 		h.handleHealth(w, r)
 
-	// 统计端点（需要 API Key 鉴权）
 	case path == "/v1/stats":
 		if !h.validateApiKey(r) {
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -435,7 +421,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleHealth 健康检查（不暴露统计数据）
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -445,7 +430,6 @@ func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// handleStats 统计数据（需要 API Key 鉴权）
 func (h *Handler) handleStats(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -462,9 +446,8 @@ func (h *Handler) handleStats(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// handleModels 模型列表
 func (h *Handler) handleModels(w http.ResponseWriter, _ *http.Request) {
-	// 尝试用缓存的真实模型列表
+
 	h.modelsCacheMu.RLock()
 	cached := h.cachedModels
 	h.modelsCacheMu.RUnlock()
@@ -482,7 +465,6 @@ func (h *Handler) handleModels(w http.ResponseWriter, _ *http.Request) {
 		models = fallbackAnthropicModels(thinkingSuffix)
 	}
 
-	// 添加别名模型
 	models = append(models,
 		buildModelInfo("auto", "kiro-proxy", true),
 		buildModelInfo("gpt-4o", "kiro-proxy", true),
@@ -506,7 +488,7 @@ func buildAnthropicModelsResponse(cached []ModelInfo, thinkingSuffix string) []m
 		for _, m := range cached {
 			supportsImage := modelSupportsImage(m.InputTypes)
 			models = append(models, buildModelInfo(m.ModelId, "anthropic", supportsImage))
-			// 自动生成 thinking 变体
+
 			models = append(models, buildModelInfo(m.ModelId+thinkingSuffix, "anthropic", supportsImage))
 		}
 	}
@@ -575,7 +557,6 @@ func buildModelInfo(id, ownedBy string, supportsImage bool) map[string]interface
 	}
 }
 
-// refreshModelsCache 从 Kiro API 拉取模型列表并缓存
 func (h *Handler) refreshModelsCache() {
 	accounts := config.GetEnabledAccounts()
 	if len(accounts) == 0 {
@@ -597,7 +578,7 @@ func (h *Handler) refreshModelsCache() {
 			h.handleAccountFailure(account, err)
 			continue
 		}
-		// 缓存每账号可用模型，用于路由时过滤
+
 		modelIDs := make([]string, 0, len(models))
 		for _, m := range models {
 			modelIDs = append(modelIDs, m.ModelId)
@@ -615,8 +596,6 @@ func (h *Handler) refreshModelsCache() {
 	}
 }
 
-// fetchAndCacheAccountModels 为单个账号拉取并写入模型缓存。
-// 同时更新 pool 的路由缓存与全局聚合模型列表。
 func (h *Handler) fetchAndCacheAccountModels(account *config.Account) error {
 	if err := h.ensureValidToken(account); err != nil {
 		return fmt.Errorf("token refresh failed: %w", err)
@@ -631,7 +610,6 @@ func (h *Handler) fetchAndCacheAccountModels(account *config.Account) error {
 	}
 	h.pool.SetModelList(account.ID, modelIDs)
 
-	// 合并到聚合缓存
 	h.modelsCacheMu.Lock()
 	h.cachedModels = mergeUniqueModels(h.cachedModels, models)
 	h.modelsCacheTime = time.Now().Unix()
@@ -641,8 +619,6 @@ func (h *Handler) fetchAndCacheAccountModels(account *config.Account) error {
 	return nil
 }
 
-// apiRefreshAccountModels POST /admin/api/accounts/{id}/models/refresh
-// 立即为指定账号拉取并更新模型路由缓存。
 func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, _ *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
@@ -657,7 +633,7 @@ func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, _ *http.Request
 		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
 		return
 	}
-	// 从 pool 取运行时最新 token（与 refreshModelsCache 逻辑一致）
+
 	if latest := h.pool.GetByID(id); latest != nil {
 		account.AccessToken = latest.AccessToken
 		account.RefreshToken = latest.RefreshToken
@@ -675,8 +651,6 @@ func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, _ *http.Request
 	})
 }
 
-// apiRefreshAllAccountsModels POST /admin/api/accounts/models/refresh
-// 直接复用 refreshModelsCache，为所有已启用账号刷新模型路由缓存。
 func (h *Handler) apiRefreshAllAccountsModels(w http.ResponseWriter, _ *http.Request) {
 	h.refreshModelsCache()
 	h.modelsCacheMu.RLock()
@@ -759,7 +733,6 @@ func mergeStringLists(base []string, extra []string) []string {
 	return merged
 }
 
-// handleCountTokens Token 计数（Claude Code 会调用）
 func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method Not Allowed", 405)
@@ -796,7 +769,6 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]int{"input_tokens": estimatedTokens})
 }
 
-// handleClaudeMessages Claude API 处理
 func (h *Handler) handleClaudeMessages(w http.ResponseWriter, r *http.Request) {
 	h.handleClaudeMessagesInternal(w, r)
 }
@@ -807,7 +779,6 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// 读取请求
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.sendClaudeError(w, 400, "invalid_request_error", "Failed to read request body")
@@ -824,7 +795,6 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// 解析模型和 thinking 模式
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := resolveClaudeThinkingMode(req.Model, req.Thinking, thinkingCfg.Suffix)
 	req.Model = actualModel
@@ -833,10 +803,8 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	estimatedInputTokens := estimateClaudeRequestInputTokens(effectiveReq)
 	cacheProfile := h.promptCache.BuildClaudeProfile(effectiveReq, estimatedInputTokens)
 
-	// 转换请求
 	kiroPayload := ClaudeToKiro(&req, thinking)
 
-	// Stream or non-stream
 	if req.Stream {
 		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile)
 	} else {
@@ -844,7 +812,6 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// handleClaudeStream Claude 流式响应
 func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -856,7 +823,6 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 		return
 	}
 
-	// 获取 thinking 输出格式配置
 	thinkingFormat := thinkingOpts.Format
 
 	msgID := "msg_" + uuid.New().String()
@@ -1315,7 +1281,6 @@ func (h *Handler) sendSSE(w http.ResponseWriter, flusher http.Flusher, event str
 	flusher.Flush()
 }
 
-// backgroundStatsSaver 后台定时保存统计数据
 func (h *Handler) backgroundStatsSaver() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -1325,13 +1290,12 @@ func (h *Handler) backgroundStatsSaver() {
 		case <-ticker.C:
 			h.saveStats()
 		case <-h.stopStatsSaver:
-			h.saveStats() // 退出前保存一次
+			h.saveStats()
 			return
 		}
 	}
 }
 
-// saveStats 保存统计到配置文件
 func (h *Handler) saveStats() {
 	config.UpdateStats(
 		int(atomic.LoadInt64(&h.totalRequests)),
@@ -1342,21 +1306,18 @@ func (h *Handler) saveStats() {
 	)
 }
 
-// getCredits 线程安全获取 credits
 func (h *Handler) getCredits() float64 {
 	h.creditsMu.RLock()
 	defer h.creditsMu.RUnlock()
 	return h.totalCredits
 }
 
-// addCredits 线程安全增加 credits
 func (h *Handler) addCredits(credits float64) {
 	h.creditsMu.Lock()
 	h.totalCredits += credits
 	h.creditsMu.Unlock()
 }
 
-// 统计记录 (使用原子操作)
 func (h *Handler) recordSuccess(inputTokens, outputTokens int, credits float64) {
 	atomic.AddInt64(&h.totalRequests, 1)
 	atomic.AddInt64(&h.successRequests, 1)
@@ -1369,7 +1330,6 @@ func (h *Handler) recordFailure() {
 	atomic.AddInt64(&h.failedRequests, 1)
 }
 
-// handleClaudeNonStream Claude 非流式响应
 func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
 	excluded := make(map[string]bool)
 	var lastErr error
@@ -1524,7 +1484,6 @@ func (h *Handler) sendClaudeError(w http.ResponseWriter, status int, errType, me
 	})
 }
 
-// handleOpenAIChat OpenAI API 处理
 func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method Not Allowed", 405)
@@ -1547,7 +1506,6 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 解析模型和 thinking 模式
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(req.Model, thinkingCfg.Suffix)
 	req.Model = actualModel
@@ -1562,7 +1520,6 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleOpenAIStream OpenAI 流式响应
 func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -1574,7 +1531,6 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 		return
 	}
 
-	// 获取 thinking 输出格式配置
 	thinkingFormat := config.GetThinkingConfig().OpenAIFormat
 
 	chatID := "chatcmpl-" + uuid.New().String()
@@ -1974,7 +1930,6 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 	h.sendOpenAIError(w, 500, "server_error", lastErr.Error())
 }
 
-// handleOpenAINonStream OpenAI 非流式响应
 func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
 	excluded := make(map[string]bool)
 	var lastErr error
@@ -2090,7 +2045,6 @@ func (h *Handler) sendOpenAIError(w http.ResponseWriter, status int, errType, me
 	})
 }
 
-// ensureValidToken 确保 token 有效
 func (h *Handler) ensureValidToken(account *config.Account) error {
 	if account.ExpiresAt == 0 || time.Now().Unix() < account.ExpiresAt-tokenRefreshSkewSeconds {
 		return nil
@@ -2099,7 +2053,7 @@ func (h *Handler) ensureValidToken(account *config.Account) error {
 	h.tokenRefreshMu.Lock()
 	defer h.tokenRefreshMu.Unlock()
 
-	// Another concurrent request may have refreshed this account while we waited.
+	//! Another request may have refreshed the same account while this one waited.
 	if latest := h.pool.GetByID(account.ID); latest != nil {
 		account.AccessToken = latest.AccessToken
 		account.RefreshToken = latest.RefreshToken
@@ -2115,7 +2069,6 @@ func (h *Handler) ensureValidToken(account *config.Account) error {
 		return err
 	}
 
-	// 更新内存
 	h.pool.UpdateToken(account.ID, accessToken, refreshToken, expiresAt)
 	account.AccessToken = accessToken
 	if refreshToken != "" {
@@ -2127,13 +2080,10 @@ func (h *Handler) ensureValidToken(account *config.Account) error {
 		config.UpdateAccountProfileArn(account.ID, profileArn)
 	}
 
-	// 持久化
 	config.UpdateAccountToken(account.ID, accessToken, refreshToken, expiresAt)
 
 	return nil
 }
-
-// ==================== 管理 API ====================
 
 func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/admin/api/events" && r.Method == "GET" {
@@ -2141,7 +2091,6 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 验证密码
 	password := r.Header.Get("X-Admin-Password")
 	if password == "" {
 		cookie, _ := r.Cookie("admin_password")
@@ -2166,7 +2115,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiAddAccount(w, r)
 	case path == "/accounts/batch" && r.Method == "POST":
 		h.apiBatchAccounts(w, r)
-	// models/refresh 必须在通用 /refresh 前匹配，否则会被误拦截
+
+	//! Match models/refresh before the generic /refresh route.
 	case path == "/accounts/models/refresh" && r.Method == "POST":
 		h.apiRefreshAllAccountsModels(w, r)
 	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/models/refresh") && r.Method == "POST":
@@ -2276,16 +2226,14 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 	accounts := config.GetAccounts()
 	poolAccounts := h.pool.GetAllAccounts()
 
-	// 合并运行时统计
 	statsMap := make(map[string]config.Account)
 	for _, a := range poolAccounts {
 		statsMap[a.ID] = a
 	}
 
-	// 隐藏敏感信息
 	result := make([]map[string]interface{}, len(accounts))
 	for i, a := range accounts {
-		// 获取运行时统计
+
 		stats := statsMap[a.ID]
 
 		result[i] = map[string]interface{}{
@@ -2355,7 +2303,7 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.pool.Reload()
-	// 新账号若已启用且有 token，立即拉取并缓存模型列表
+
 	if account.Enabled && account.AccessToken != "" {
 		go func(acc config.Account) {
 			if err := h.fetchAndCacheAccountModels(&acc); err != nil {
@@ -2384,7 +2332,6 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 
-	// 获取现有账号
 	accounts := config.GetAccounts()
 	var existing *config.Account
 	for i := range accounts {
@@ -2399,7 +2346,6 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 
-	// 只更新传入的字段
 	oldEnabled := existing.Enabled
 	if v, ok := updates["enabled"].(bool); ok {
 		existing.Enabled = v
@@ -2454,7 +2400,7 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	}
 
 	h.pool.Reload()
-	// 账号从禁用→启用时，自动拉取并缓存模型列表
+
 	if !oldEnabled && existing.Enabled && existing.AccessToken != "" {
 		go func(acc config.Account) {
 			if err := h.fetchAndCacheAccountModels(&acc); err != nil {
@@ -2465,11 +2411,10 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// apiBatchAccounts 批量操作账号（启用/禁用/刷新）
 func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IDs    []string `json:"ids"`
-		Action string   `json:"action"` // "enable", "disable", "refresh"
+		Action string   `json:"action"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -2493,7 +2438,7 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 		var toRefreshModels []config.Account
 		for _, a := range accounts {
 			if idSet[a.ID] {
-				// 记录本次从禁用→启用、且有 token 的账号
+
 				if enabled && !a.Enabled && a.AccessToken != "" {
 					toRefreshModels = append(toRefreshModels, a)
 				}
@@ -2512,7 +2457,7 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		h.pool.Reload()
-		// 为本次新启用的账号异步拉取模型缓存
+
 		for _, acc := range toRefreshModels {
 			go func(a config.Account) {
 				a.Enabled = true
@@ -2539,7 +2484,7 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 				failCount++
 				continue
 			}
-			// 刷新 token
+
 			if account.RefreshToken != "" {
 				if newAccess, newRefresh, newExpires, profileArn, err := auth.RefreshToken(account); err == nil {
 					account.AccessToken = newAccess
@@ -2555,7 +2500,7 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 					h.pool.UpdateToken(id, newAccess, newRefresh, newExpires)
 				}
 			}
-			// 刷新账户信息
+
 			info, err := RefreshAccountInfo(account)
 			if err != nil {
 				failCount++
@@ -2626,10 +2571,8 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 获取用户信息
 	email, _, _ := auth.GetUserInfo(accessToken)
 
-	// 创建账号
 	account := config.Account{
 		ID:           auth.GenerateAccountID(),
 		Email:        email,
@@ -2702,7 +2645,7 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if status == "pending" || status == "slow_down" {
-		// 获取当前间隔
+
 		interval := 5
 		if session := auth.GetBuilderIdSession(req.SessionID); session != nil {
 			interval = session.Interval
@@ -2716,10 +2659,8 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 授权完成，获取用户信息
 	email, _, _ := auth.GetUserInfo(accessToken)
 
-	// 创建账号
 	account := config.Account{
 		ID:           auth.GenerateAccountID(),
 		Email:        email,
@@ -2769,7 +2710,6 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 支持批量导入，按行分割
 	tokens := strings.Split(strings.TrimSpace(req.BearerToken), "\n")
 	var imported []map[string]interface{}
 	var errors []string
@@ -2786,10 +2726,8 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// 获取用户信息
 		email, _, _ := auth.GetUserInfo(accessToken)
 
-		// 创建账号
 		account := config.Account{
 			ID:           auth.GenerateAccountID(),
 			Email:        email,
@@ -2855,7 +2793,6 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 设置默认值
 	if req.Region == "" {
 		req.Region = "us-east-1"
 	}
@@ -2866,7 +2803,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 			req.AuthMethod = "social"
 		}
 	}
-	// 标准化 authMethod
+
 	switch strings.ToLower(req.AuthMethod) {
 	case "idc", "builderid", "enterprise":
 		req.AuthMethod = "idc"
@@ -2880,7 +2817,6 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 始终尝试用 refreshToken 刷新获取新的 accessToken
 	var accessToken string
 	var expiresAt int64
 	tempAccount := &config.Account{
@@ -2892,10 +2828,10 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	newAccessToken, newRefreshToken, newExpiresAt, newProfileArn, err := auth.RefreshToken(tempAccount)
 	if err != nil {
-		// 刷新失败，如果有传入的 accessToken 则尝试使用
+
 		if req.AccessToken != "" {
 			accessToken = req.AccessToken
-			expiresAt = time.Now().Unix() + 300 // 可能已过期，设短一点
+			expiresAt = time.Now().Unix() + 300
 		} else {
 			w.WriteHeader(400)
 			json.NewEncoder(w).Encode(map[string]string{"error": "Token refresh failed: " + err.Error()})
@@ -2909,10 +2845,8 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		expiresAt = newExpiresAt
 	}
 
-	// 获取用户信息
 	email, _, _ := auth.GetUserInfo(accessToken)
 
-	// 创建账号
 	account := config.Account{
 		ID:           auth.GenerateAccountID(),
 		Email:        email,
@@ -3004,7 +2938,6 @@ func (h *Handler) apiUpdatePromptFilter(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Read current config to fill in any fields not provided in the request.
 	current := config.GetPromptFilterConfig()
 	fcc := current.FilterClaudeCode
 	fen := current.FilterEnvNoise
@@ -3049,7 +2982,6 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 更新超额使用设置
 	if req.AllowOverUsage != nil {
 		if err := config.UpdateAllowOverUsage(*req.AllowOverUsage); err != nil {
 			w.WriteHeader(500)
@@ -3088,13 +3020,11 @@ func (h *Handler) apiResetStats(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// apiGenerateMachineId 生成新的机器码
 func (h *Handler) apiGenerateMachineId(w http.ResponseWriter, _ *http.Request) {
 	machineId := config.GenerateMachineId()
 	json.NewEncoder(w).Encode(map[string]string{"machineId": machineId})
 }
 
-// apiTestAccount tests a specific account by sending a real model request through its proxy.
 func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
@@ -3116,7 +3046,6 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 		return
 	}
 
-	// Parse test model from request body (optional)
 	var req struct {
 		Model string `json:"model"`
 	}
@@ -3125,7 +3054,6 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 		req.Model = "claude-sonnet-4"
 	}
 
-	// Build a minimal chat payload
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(req.Model, thinkingCfg.Suffix)
 
@@ -3161,7 +3089,6 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 	})
 }
 
-// apiRefreshAccount 刷新账户信息（使用量、订阅等）
 func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
@@ -3178,7 +3105,6 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 		return
 	}
 
-	// 先尝试刷新 token（不管是否过期，确保 token 有效）
 	refreshTokenIfNeeded := func() error {
 		if account.RefreshToken == "" {
 			return nil
@@ -3201,7 +3127,6 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 		return nil
 	}
 
-	// 检查 token 是否快过期，先刷新
 	if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {
 		if err := refreshTokenIfNeeded(); err != nil {
 			w.WriteHeader(500)
@@ -3210,13 +3135,12 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 		}
 	}
 
-	// 获取账户信息
 	info, err := RefreshAccountInfo(account)
 	if err != nil {
-		// 检查是否为封禁相关错误
+
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "TEMPORARILY_SUSPENDED") || strings.Contains(errMsg, "Account suspended") {
-			// 封禁状态已在 RefreshAccountInfo 中处理，静默返回成功
+
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": true,
 				"message": "Account status updated",
@@ -3224,13 +3148,12 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 			return
 		}
 
-		// 如果是 403/401，说明 token 无效，尝试刷新后重试
 		if strings.Contains(errMsg, "403") || strings.Contains(errMsg, "401") || strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "expired") {
 			if refreshErr := refreshTokenIfNeeded(); refreshErr == nil {
-				// 重试
+
 				info, err = RefreshAccountInfo(account)
 				if err != nil {
-					// 重试后仍然失败，检查是否为封禁状态
+
 					if strings.Contains(err.Error(), "TEMPORARILY_SUSPENDED") || strings.Contains(err.Error(), "Account suspended") {
 						json.NewEncoder(w).Encode(map[string]interface{}{
 							"success": true,
@@ -3242,7 +3165,6 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 			}
 		}
 
-		// 其他错误才显示错误信息
 		if err != nil {
 			w.WriteHeader(500)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -3250,7 +3172,6 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 		}
 	}
 
-	// 保存到配置
 	if err := config.UpdateAccountInfo(id, *info); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -3263,12 +3184,10 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 	})
 }
 
-// apiGetAccountFull 获取单个账号的完整信息（包含敏感字段）
 func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id string) {
 	accounts := config.GetAccounts()
 	poolAccounts := h.pool.GetAllAccounts()
 
-	// 查找指定账号
 	var account *config.Account
 	for i := range accounts {
 		if accounts[i].ID == id {
@@ -3283,7 +3202,6 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		return
 	}
 
-	// 获取运行时统计
 	var stats config.Account
 	for _, a := range poolAccounts {
 		if a.ID == id {
@@ -3292,7 +3210,6 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		}
 	}
 
-	// 返回完整账号信息（包含敏感字段）
 	result := map[string]interface{}{
 		"id":                account.ID,
 		"email":             account.Email,
@@ -3341,7 +3258,6 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 	json.NewEncoder(w).Encode(result)
 }
 
-// apiGetAccountModels 获取账户可用模型
 func (h *Handler) apiGetAccountModels(w http.ResponseWriter, _ *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
@@ -3365,7 +3281,6 @@ func (h *Handler) apiGetAccountModels(w http.ResponseWriter, _ *http.Request, id
 		return
 	}
 
-	// 同步更新路由缓存
 	modelIDs := make([]string, 0, len(models))
 	for _, m := range models {
 		modelIDs = append(modelIDs, m.ModelId)
@@ -3382,7 +3297,6 @@ func (h *Handler) apiGetAccountModels(w http.ResponseWriter, _ *http.Request, id
 	})
 }
 
-// apiGetAccountModelsCached 返回账号已缓存的模型列表（不实时拉取）
 func (h *Handler) apiGetAccountModelsCached(w http.ResponseWriter, _ *http.Request, id string) {
 	models := h.pool.GetModelList(id)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -3390,8 +3304,6 @@ func (h *Handler) apiGetAccountModelsCached(w http.ResponseWriter, _ *http.Reque
 		"models":  models,
 	})
 }
-
-// ==================== 静态文件服务 ====================
 
 func (h *Handler) serveAdminPage(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "web/index.html")
@@ -3402,7 +3314,6 @@ func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "web/"+path)
 }
 
-// apiGetThinkingConfig 获取 thinking 配置
 func (h *Handler) apiGetThinkingConfig(w http.ResponseWriter, _ *http.Request) {
 	cfg := config.GetThinkingConfig()
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -3412,7 +3323,6 @@ func (h *Handler) apiGetThinkingConfig(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// apiUpdateThinkingConfig 更新 thinking 配置
 func (h *Handler) apiUpdateThinkingConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Suffix       string `json:"suffix"`
@@ -3425,7 +3335,6 @@ func (h *Handler) apiUpdateThinkingConfig(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 验证格式
 	validFormats := map[string]bool{"reasoning_content": true, "thinking": true, "think": true}
 	if req.OpenAIFormat != "" && !validFormats[req.OpenAIFormat] {
 		w.WriteHeader(400)
@@ -3447,7 +3356,6 @@ func (h *Handler) apiUpdateThinkingConfig(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// apiGetEndpointConfig 获取端点配置
 func (h *Handler) apiGetEndpointConfig(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"preferredEndpoint": config.GetPreferredEndpoint(),
@@ -3455,7 +3363,6 @@ func (h *Handler) apiGetEndpointConfig(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// apiUpdateEndpointConfig 更新端点配置
 func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		PreferredEndpoint string `json:"preferredEndpoint"`
@@ -3487,20 +3394,17 @@ func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// applyProxyConfig 将代理配置应用到所有出站 HTTP 客户端（Kiro API + auth 模块）
 func applyProxyConfig(proxyURL string) {
 	InitKiroHttpClient(proxyURL)
 	auth.InitHttpClient(proxyURL)
 }
 
-// apiGetProxy 获取当前代理配置
 func (h *Handler) apiGetProxy(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"proxyURL": config.GetProxyURL(),
 	})
 }
 
-// apiUpdateProxy 更新代理配置并立即生效
 func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ProxyURL string `json:"proxyURL"`
@@ -3511,7 +3415,6 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 验证代理 URL 格式（非空时）
 	if req.ProxyURL != "" {
 		if !strings.HasPrefix(req.ProxyURL, "http://") &&
 			!strings.HasPrefix(req.ProxyURL, "https://") &&
@@ -3529,32 +3432,28 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 立即应用新的代理配置
 	applyProxyConfig(req.ProxyURL)
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// apiGetVersion 获取版本信息
 func (h *Handler) apiGetVersion(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"version": config.Version,
 	})
 }
 
-// apiExportAccounts 导出账号凭证
 func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IDs []string `json:"ids"` // 为空则导出全部
+		IDs []string `json:"ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		// 如果 body 为空或解析失败，导出全部
+
 		req.IDs = nil
 	}
 
 	accounts := config.GetAccounts()
 
-	// 如果指定了 ID，只导出指定的
 	if len(req.IDs) > 0 {
 		idSet := make(map[string]bool)
 		for _, id := range req.IDs {
@@ -3569,7 +3468,6 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 		accounts = filtered
 	}
 
-	// 构建兼容 Kiro Account Manager 的导出格式
 	type ExportCredentials struct {
 		AccessToken  string `json:"accessToken"`
 		CsrfToken    string `json:"csrfToken"`
@@ -3620,7 +3518,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 
 	exportAccounts := make([]ExportAccount, 0, len(accounts))
 	for _, a := range accounts {
-		// 映射 provider 到 idp
+
 		idp := a.Provider
 		if idp == "" {
 			if a.AuthMethod == "social" {
@@ -3630,13 +3528,11 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// 映射 authMethod
 		authMethod := a.AuthMethod
 		if authMethod == "idc" {
 			authMethod = "IdC"
 		}
 
-		// 映射订阅类型
 		subType := "Free"
 		rawType := strings.ToUpper(a.SubscriptionType)
 		if strings.Contains(rawType, "PRO_PLUS") || strings.Contains(rawType, "PROPLUS") {
@@ -3661,7 +3557,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 				ClientID:     a.ClientID,
 				ClientSecret: a.ClientSecret,
 				Region:       a.Region,
-				ExpiresAt:    a.ExpiresAt * 1000, // 转为毫秒时间戳
+				ExpiresAt:    a.ExpiresAt * 1000,
 				AuthMethod:   authMethod,
 				Provider:     a.Provider,
 			},

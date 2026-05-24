@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// ImportFromSsoToken 从 SSO Token (x-amz-sso_authn) 导入账号
 func ImportFromSsoToken(bearerToken, region string) (accessToken, refreshToken, clientID, clientSecret string, expiresIn int, err error) {
 	if region == "" {
 		region = "us-east-1"
@@ -21,43 +20,36 @@ func ImportFromSsoToken(bearerToken, region string) (accessToken, refreshToken, 
 	portalBase := "https://portal.sso.us-east-1.amazonaws.com"
 	startUrl := "https://view.awsapps.com/start"
 
-	// 1. 注册 OIDC 客户端
 	clientID, clientSecret, err = registerDeviceClient(oidcBase, startUrl)
 	if err != nil {
 		return "", "", "", "", 0, fmt.Errorf("注册客户端失败: %w", err)
 	}
 
-	// 2. 发起设备授权
 	deviceCode, userCode, interval, err := startDeviceAuth(oidcBase, clientID, clientSecret, startUrl)
 	if err != nil {
 		return "", "", "", "", 0, fmt.Errorf("设备授权失败: %w", err)
 	}
 
-	// 3. 验证 Bearer Token
 	if err := verifyBearerToken(portalBase, bearerToken); err != nil {
 		return "", "", "", "", 0, fmt.Errorf("Token 验证失败: %w", err)
 	}
 
-	// 4. 获取设备会话令牌
 	deviceSessionToken, err := getDeviceSessionToken(portalBase, bearerToken)
 	if err != nil {
 		return "", "", "", "", 0, fmt.Errorf("获取设备会话失败: %w", err)
 	}
 
-	// 5. 接受用户代码
 	deviceContext, err := acceptUserCode(oidcBase, userCode, deviceSessionToken)
 	if err != nil {
 		return "", "", "", "", 0, fmt.Errorf("接受用户代码失败: %w", err)
 	}
 
-	// 6. 批准授权
 	if deviceContext != nil {
 		if err := approveAuth(oidcBase, deviceContext, deviceSessionToken); err != nil {
 			return "", "", "", "", 0, fmt.Errorf("批准授权失败: %w", err)
 		}
 	}
 
-	// 7. 轮询获取 Token
 	accessToken, refreshToken, expiresIn, err = pollForToken(oidcBase, clientID, clientSecret, deviceCode, interval)
 	if err != nil {
 		return "", "", "", "", 0, fmt.Errorf("获取 Token 失败: %w", err)
@@ -300,9 +292,8 @@ func pollForToken(oidcBase, clientID, clientSecret, deviceCode string, interval 
 	}
 }
 
-// GetUserInfo 获取用户信息
 func GetUserInfo(accessToken string) (email, userID string, err error) {
-	// 调用 Kiro API 获取用量信息（包含用户信息）
+
 	url := "https://q.us-east-1.amazonaws.com/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST&isEmailRequired=true"
 
 	req, _ := http.NewRequest("GET", url, nil)
@@ -332,7 +323,6 @@ func GetUserInfo(accessToken string) (email, userID string, err error) {
 	return result.UserInfo.Email, result.UserInfo.UserID, nil
 }
 
-// GenerateAccountID 生成账号 ID
 func GenerateAccountID() string {
 	return uuid.New().String()
 }

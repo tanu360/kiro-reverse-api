@@ -1,4 +1,3 @@
-// Package proxy: admin API endpoints for observability tab.
 package proxy
 
 import (
@@ -9,13 +8,11 @@ import (
 	"kiro-proxy/config"
 )
 
-// apiObserveOverview GET /admin/api/observe/overview
 func (h *Handler) apiObserveOverview(w http.ResponseWriter, _ *http.Request) {
 	snap := getObserveStore().Overview()
 	json.NewEncoder(w).Encode(snap)
 }
 
-// apiObserveHeatmap GET /admin/api/observe/account-heatmap?windowMin=60
 func (h *Handler) apiObserveHeatmap(w http.ResponseWriter, r *http.Request) {
 	windowMin := 60
 	if v := r.URL.Query().Get("windowMin"); v != "" {
@@ -25,7 +22,6 @@ func (h *Handler) apiObserveHeatmap(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := getObserveStore().Heatmap(windowMin)
 
-	// 附带账号 email 便于前端展示
 	emailMap := map[string]string{}
 	for _, a := range config.GetAccounts() {
 		emailMap[a.ID] = a.Email
@@ -55,13 +51,11 @@ func (h *Handler) apiObserveHeatmap(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
-// apiObserveModelMix GET /admin/api/observe/model-mix
 func (h *Handler) apiObserveModelMix(w http.ResponseWriter, _ *http.Request) {
 	mix := getObserveStore().ModelMix()
 	json.NewEncoder(w).Encode(map[string]interface{}{"models": mix})
 }
 
-// apiObserveRecentErrors GET /admin/api/observe/recent-errors?limit=100
 func (h *Handler) apiObserveRecentErrors(w http.ResponseWriter, r *http.Request) {
 	limit := 100
 	if v := r.URL.Query().Get("limit"); v != "" {

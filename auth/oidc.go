@@ -10,10 +10,9 @@ import (
 	"time"
 )
 
-// RefreshToken 刷新 access token
-// Returns: accessToken, refreshToken, expiresAt, profileArn, error
 func RefreshToken(account *config.Account) (string, string, int64, string, error) {
-	// Resolve per-account proxy: account.ProxyURL > global config
+
+	//! Account proxy wins over global proxy so mixed-account pools can route independently.
 	proxyURL := account.ProxyURL
 	if proxyURL == "" {
 		proxyURL = config.GetProxyURL()
@@ -26,7 +25,6 @@ func RefreshToken(account *config.Account) (string, string, int64, string, error
 	return refreshOIDCToken(account.RefreshToken, account.ClientID, account.ClientSecret, account.Region, client)
 }
 
-// refreshOIDCToken IdC/Builder ID token 刷新
 func refreshOIDCToken(refreshToken, clientID, clientSecret, region string, client *http.Client) (string, string, int64, string, error) {
 	if clientID == "" || clientSecret == "" {
 		return "", "", 0, "", fmt.Errorf("OIDC refresh requires clientId and clientSecret")
@@ -74,7 +72,6 @@ func refreshOIDCToken(refreshToken, clientID, clientSecret, region string, clien
 	return result.AccessToken, result.RefreshToken, expiresAt, result.ProfileArn, nil
 }
 
-// refreshSocialToken Social (GitHub/Google) token 刷新
 func refreshSocialToken(refreshToken string, client *http.Client) (string, string, int64, string, error) {
 	url := "https://prod.us-east-1.auth.desktop.kiro.dev/refreshToken"
 

@@ -1,8 +1,6 @@
-/* Kiro-Go admin stylesheet. Keep selector order stable. */
-
 @import url("https://fonts.googleapis.com/css2?family=Geist:wght@100;200;300;400;500;600;700;800;900&family=Geist+Mono:wght@100;200;300;400;500;600;700;800;900&display=swap");
 
-/* Design tokens */
+/* ** Design tokens */
 :root {
   --background: #fcfcfc;
   --foreground: #000000;
@@ -36,8 +34,7 @@
   --sidebar: #fcfcfc;
   --sidebar-foreground: #000000;
   --sidebar-border: #ebebeb;
-  /* Shadows stay disabled for the flat UI. */
-  --shadow-2xs: none;
+    --shadow-2xs: none;
   --shadow-xs: none;
   --shadow-sm: none;
   --shadow: none;
@@ -45,7 +42,7 @@
   --shadow-lg: none;
   --shadow-xl: none;
   --shadow-2xl: none;
-  /* Radius scale */
+  /* ** Radius scale */
   --radius: 0.5rem;
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
@@ -95,7 +92,7 @@
   color-scheme: dark;
 }
 
-/* Tailwind theme bridge */
+/* ** Tailwind theme bridge */
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -130,7 +127,7 @@
   --font-mono: var(--font-mono);
 }
 
-/* Flat reset */
+/* ** Flat reset */
 *,
 *::before,
 *::after {
@@ -139,7 +136,7 @@
   text-shadow: none !important;
 }
 
-/* Base */
+/* ** Base */
 html,
 body {
   background: var(--background);
@@ -204,7 +201,7 @@ pre,
   color: var(--primary-foreground);
 }
 
-/* Scrollbar */
+/* ** Scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -220,9 +217,9 @@ pre,
   background: var(--muted-foreground);
 }
 
-/* Shared components */
+/* ** Shared components */
 
-/* Buttons */
+/* ** Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -345,7 +342,7 @@ pre,
   height: 1rem;
 }
 
-/* Cards */
+/* ** Cards */
 .card {
   background: var(--card);
   color: var(--card-foreground);
@@ -374,7 +371,7 @@ pre,
   flex-wrap: wrap;
 }
 
-/* Inputs */
+/* ** Inputs */
 .input,
 input:not([type]),
 input[type="text"],
@@ -562,7 +559,7 @@ select.custom-select-native {
   cursor: not-allowed;
 }
 
-/* Form groups */
+/* ** Form groups */
 .form-group {
   margin-bottom: 1rem;
 }
@@ -570,7 +567,7 @@ select.custom-select-native {
   margin-bottom: 1.75rem;
 }
 
-/* Remember row */
+/* ** Remember row */
 .remember-row {
   display: inline-flex;
   align-items: center;
@@ -637,7 +634,7 @@ select.custom-select-native {
   line-height: 1.5;
 }
 
-/* Badges */
+/* ** Badges */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -708,7 +705,7 @@ select.custom-select-native {
   border-color: #0d9488;
 }
 
-/* Switches */
+/* ** Switches */
 .switch {
   position: relative;
   display: inline-block;
@@ -751,7 +748,7 @@ label:has(> .switch) > span {
   transform: translateX(1rem);
 }
 
-/* Header tabs */
+/* ** Header tabs */
 .header-nav {
   display: inline-flex;
   align-items: center;
@@ -826,7 +823,7 @@ label:has(> .switch) > span {
   flex: 1 0 auto;
 }
 
-/* Footer */
+/* ** Footer */
 .app-footer {
   position: relative;
   margin-top: auto;
@@ -1022,14 +1019,14 @@ label:has(> .switch) > span {
   }
 }
 
-/* Tab content */
+/* ** Tab content */
 .tab-content {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-/* App shell */
+/* ** App shell */
 .app-header {
   position: static;
   background: var(--background);
@@ -1169,7 +1166,7 @@ img.brand-icon {
   }
 }
 
-/* Brand cluster */
+/* ** Brand cluster */
 .brand-wrap {
   display: inline-flex;
   align-items: center;
@@ -1218,7 +1215,7 @@ img.brand-icon {
   padding: 1.5rem;
 }
 
-/* Stats grid */
+/* ** Stats grid */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1340,7 +1337,7 @@ img.brand-icon {
   }
 }
 
-/* Login screen */
+/* ** Login screen */
 .login-wrapper {
   min-height: 100dvh;
   display: flex;
@@ -1502,7 +1499,7 @@ img.brand-icon {
   color: var(--muted-foreground);
 }
 
-/* Input affixes */
+/* ** Input affixes */
 .input-affix {
   position: relative;
   display: flex;
@@ -1539,7 +1536,7 @@ img.brand-icon {
   color: var(--foreground);
 }
 
-/* Login ambient background */
+/* ** Login ambient background */
 .ghost-bg {
   position: absolute;
   inset: 0;
@@ -1663,7 +1660,7 @@ img.brand-icon {
   }
 }
 
-/* Responsive layout */
+/* ** Responsive layout */
 @media (max-width: 640px) {
   .login-topbar-inner {
     padding: 0 1rem;
@@ -1693,7 +1690,7 @@ img.brand-icon {
   }
 }
 
-/* Account cards */
+/* ** Account cards */
 .account-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1846,7 +1843,7 @@ img.brand-icon {
   letter-spacing: 0.04em;
 }
 
-/* Usage bars */
+/* ** Usage bars */
 .account-usage {
   margin: 0.5rem 0 0.75rem;
 }
@@ -1884,7 +1881,7 @@ img.brand-icon {
   font-feature-settings: "tnum";
 }
 
-/* Modals */
+/* ** Modals */
 .modal {
   position: fixed;
   inset: 0;
@@ -1972,7 +1969,7 @@ img.brand-icon {
   line-height: 1.6;
 }
 
-/* Export modal */
+/* ** Export modal */
 .export-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2186,7 +2183,7 @@ img.brand-icon {
   padding-top: 0.25rem;
 }
 
-/* Add-account method picker */
+/* ** Add-account method picker */
 .method-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2279,7 +2276,7 @@ img.brand-icon {
   }
 }
 
-/* API endpoint panel */
+/* ** API endpoint panel */
 .api-card {
   background: var(--card);
   color: var(--card-foreground);
@@ -2363,7 +2360,7 @@ img.brand-icon {
   letter-spacing: 0.04em;
 }
 
-/* Endpoint code blocks */
+/* ** Endpoint code blocks */
 .endpoint {
   display: flex;
   align-items: center;
@@ -2427,7 +2424,7 @@ img.brand-icon {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-/* Dark endpoint surface */
+/* ** Dark endpoint surface */
 .dark .endpoint {
   background: var(--card);
   border-color: var(--border);
@@ -2455,7 +2452,7 @@ img.brand-icon {
   margin-top: 0.1875rem;
 }
 
-/* Detail modal */
+/* ** Detail modal */
 .detail-section {
   margin-bottom: 1.25rem;
   padding-bottom: 1.25rem;
@@ -2549,7 +2546,7 @@ img.brand-icon {
   line-height: 1.4;
 }
 
-/* Message banner */
+/* ** Message banner */
 .message {
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
@@ -2576,7 +2573,7 @@ img.brand-icon {
   font-weight: 600;
 }
 
-/* Test modal */
+/* ** Test modal */
 .test-modal-content {
   width: min(44rem, 92vw);
 }
@@ -2724,7 +2721,7 @@ img.brand-icon {
   }
 }
 
-/* Icon buttons */
+/* ** Icon buttons */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -2765,7 +2762,7 @@ img.brand-icon {
   width: 2.75rem;
 }
 
-/* Language switcher */
+/* ** Language switcher */
 .lang-switch {
   display: inline-flex;
   align-items: stretch;
@@ -2844,7 +2841,7 @@ img.brand-icon {
   display: inline-flex;
 }
 
-/* Prompt filter rules */
+/* ** Prompt filter rules */
 .rule-card {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -2970,7 +2967,7 @@ img.brand-icon {
   border-bottom-color: var(--border-focus) !important;
 }
 
-/* Accounts toolbar */
+/* ** Accounts toolbar */
 .toolbar {
   display: flex;
   gap: 0.5rem;
@@ -3010,7 +3007,7 @@ img.brand-icon {
   white-space: nowrap;
 }
 
-/* Feature panels */
+/* ** Feature panels */
 .feature-stats-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -3404,7 +3401,7 @@ img.brand-icon {
   margin-top: 1rem;
 }
 
-/* Accounts mobile layout */
+/* ** Accounts mobile layout */
 @media (max-width: 720px) {
   .card-header {
     flex-direction: column;
@@ -3602,7 +3599,7 @@ img.brand-icon {
   }
 }
 
-/* Utilities */
+/* ** Utilities */
 .hidden {
   display: none !important;
 }
@@ -3695,7 +3692,7 @@ img.brand-icon {
   margin-bottom: 0.75rem;
 }
 
-/* Compact responsive fixes */
+/* ** Compact responsive fixes */
 @media (max-width: 720px) {
   .detail-grid {
     grid-template-columns: 1fr;

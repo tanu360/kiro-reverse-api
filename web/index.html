@@ -23,7 +23,6 @@
 </head>
 
 <body>
-  <!-- Login -->
   <div id="loginPage" class="login-wrapper">
     <div class="ghost-bg" aria-hidden="true">
       <i class="fa-solid fa-ghost ghost ghost-1"></i>
@@ -95,7 +94,6 @@
     </main>
   </div>
 
-  <!-- Main app -->
   <div id="mainPage" class="hidden">
     <header class="app-header">
       <div class="app-header-inner">
@@ -143,7 +141,6 @@
     </header>
 
     <div class="container">
-      <!-- Stats summary -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-card-title" data-i18n="stats.accounts"></div>
@@ -195,7 +192,6 @@
         </div>
       </div>
 
-      <!-- Accounts tab -->
       <div id="tabAccounts" class="tab-content">
         <div class="card">
           <div class="card-header">
@@ -243,7 +239,6 @@
         </div>
       </div>
 
-      <!-- Observe tab -->
       <div id="tabObserve" class="tab-content hidden">
         <div class="card">
           <div class="card-header">
@@ -276,7 +271,6 @@
         </div>
       </div>
 
-      <!-- Requests tab -->
       <div id="tabRequests" class="tab-content hidden">
         <div class="card">
           <div class="card-header">
@@ -314,9 +308,7 @@
         </div>
       </div>
 
-      <!-- Settings tab -->
       <div id="tabSettings" class="tab-content hidden">
-        <!-- API settings -->
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.apiSettings"></span></div>
           <div class="form-group">
@@ -336,7 +328,6 @@
           <button class="btn btn-primary" id="saveApiSettingsBtn" data-i18n="settings.saveApiKey"></button>
         </div>
 
-        <!-- Usage settings -->
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.usageSettings"></span></div>
           <div class="form-group">
@@ -349,7 +340,6 @@
           <button class="btn btn-primary" id="saveOverUsageBtn" data-i18n="settings.saveUsage"></button>
         </div>
 
-        <!-- Thinking settings -->
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.thinkingSettings"></span></div>
           <div class="form-group">
@@ -375,7 +365,6 @@
           <button class="btn btn-primary" id="saveThinkingBtn" data-i18n="settings.saveThinking"></button>
         </div>
 
-        <!-- Endpoint settings -->
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.endpointSettings"></span></div>
           <div class="form-group">
@@ -399,7 +388,6 @@
           <button class="btn btn-primary" id="saveEndpointBtn" data-i18n="settings.saveEndpoint"></button>
         </div>
 
-        <!-- Admin password -->
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.adminPassword"></span></div>
           <div class="form-group">
@@ -409,7 +397,6 @@
           <button class="btn btn-primary" id="changePasswordBtn" data-i18n="settings.changePassword"></button>
         </div>
 
-        <!-- Outbound proxy -->
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.proxySettings"></span></div>
           <div class="form-group">
@@ -441,7 +428,6 @@
           <button class="btn btn-primary" id="saveProxyBtn" data-i18n="settings.saveProxy"></button>
         </div>
 
-        <!-- Prompt filter -->
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.promptFilter"></span></div>
           <div class="form-group">
@@ -485,14 +471,12 @@
           </div>
         </div>
 
-        <!-- Statistics reset -->
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.statistics"></span></div>
           <button class="btn btn-danger" id="resetStatsBtn" data-i18n="settings.resetStats"></button>
         </div>
       </div>
 
-      <!-- API tab -->
       <div id="tabApi" class="tab-content hidden">
         <section class="api-card" aria-labelledby="apiEndpointsTitle">
           <div class="card-header api-card-header">
@@ -565,7 +549,6 @@
         </section>
       </div>
 
-      <!-- Backups tab -->
       <div id="tabBackups" class="tab-content hidden">
         <div class="card">
           <div class="card-header">
@@ -611,7 +594,6 @@
 
     </div>
 
-    <!-- Footer -->
     <footer class="app-footer" aria-label="" data-i18n-aria-label="aria.footer">
       <div class="app-footer-inner">
         <div class="footer-panel">
@@ -650,7 +632,6 @@
     </footer>
   </div>
 
-  <!-- Modals -->
   <div id="addModal" class="modal">
     <div class="modal-content">
       <div class="modal-header"><span class="modal-title" id="modalTitle"></span><button class="modal-close"
@@ -701,7 +682,6 @@
     </div>
   </div>
 
-  <!-- Script loader -->
   <script>
     (function () {
       var v = window.__v || Date.now();

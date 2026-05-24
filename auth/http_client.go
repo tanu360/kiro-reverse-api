@@ -1,4 +1,3 @@
-// Package auth 提供认证相关功能的 HTTP 客户端
 package auth
 
 import (
@@ -9,13 +8,10 @@ import (
 	"time"
 )
 
-// 全局 HTTP 客户端存储，支持运行时代理重配置
 var httpClientStore atomic.Pointer[http.Client]
 
-// authProxyClientCache caches per-proxy auth HTTP clients.
 var authProxyClientCache sync.Map
 
-// httpClient 返回当前全局 auth HTTP 客户端
 func httpClient() *http.Client {
 	return httpClientStore.Load()
 }
@@ -24,8 +20,6 @@ func init() {
 	InitHttpClient("")
 }
 
-// GetAuthClientForProxy returns an auth HTTP client for the given proxy URL.
-// If proxyURL is empty, returns the global auth HTTP client.
 func GetAuthClientForProxy(proxyURL string) *http.Client {
 	if proxyURL == "" {
 		return httpClient()
@@ -41,7 +35,6 @@ func GetAuthClientForProxy(proxyURL string) *http.Client {
 	return client
 }
 
-// buildAuthTransport 构建带可选代理的 Transport
 func buildAuthTransport(proxyURL string) *http.Transport {
 	t := &http.Transport{
 		MaxIdleConns:        50,
@@ -61,7 +54,6 @@ func buildAuthTransport(proxyURL string) *http.Transport {
 	return t
 }
 
-// InitHttpClient 初始化（或重新初始化）auth 模块的全局 HTTP 客户端
 func InitHttpClient(proxyURL string) {
 	client := &http.Client{
 		Timeout:   30 * time.Second,

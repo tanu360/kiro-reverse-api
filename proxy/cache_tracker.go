@@ -13,10 +13,7 @@ import (
 
 const defaultPromptCacheTTL = 5 * time.Minute
 
-// Anthropic requires cached prefixes to reach a minimum token count before
-// caching takes effect. Breakpoints below this threshold are excluded from
-// matching and storage to avoid reporting unrealistic 100% cache hits on
-// short requests.
+//! Anthropic ignores cache prefixes below the model-specific token floor.
 const defaultMinCacheableTokens = 1024
 const opusMinCacheableTokens = 4096
 
@@ -84,11 +81,7 @@ func (t *promptCacheTracker) BuildClaudeProfile(req *ClaudeRequest, totalInputTo
 		writeHashChunk(hasher, canonical)
 		cumulativeTokens += block.Tokens
 
-		// Determine whether this block acts as a cache breakpoint:
-		//   1) Explicit cache_control on the block itself.
-		//   2) Once any explicit breakpoint has been seen, every message-end
-		//      boundary becomes an implicit breakpoint so that multi-turn
-		//      conversations can hit earlier stored prefixes.
+		//! After an explicit cache marker, message ends become reusable prefix boundaries.
 		breakpointTTL := time.Duration(0)
 		if block.TTL > 0 {
 			breakpointTTL = block.TTL
@@ -141,7 +134,7 @@ func (t *promptCacheTracker) Compute(accountID string, profile *promptCacheProfi
 
 	entries := t.entriesByAccount[accountID]
 	if len(entries) == 0 {
-		// First request for this account: report creation only if above threshold.
+
 		effectiveCreation := lastTokens
 		if effectiveCreation < minTokens {
 			effectiveCreation = 0
@@ -155,9 +148,7 @@ func (t *promptCacheTracker) Compute(accountID string, profile *promptCacheProfi
 		}
 	}
 
-	// Cap cacheable tokens at 85% of total input to ensure a realistic
-	// uncached portion. The newest content in a request is never fully
-	// served from cache on the current turn.
+	//! Leave some fresh input uncached so cache usage does not report impossible 100% hits.
 	maxCacheable := int(float64(profile.TotalInputTokens) * 0.85)
 	if lastTokens > maxCacheable {
 		lastTokens = maxCacheable
@@ -166,7 +157,7 @@ func (t *promptCacheTracker) Compute(accountID string, profile *promptCacheProfi
 	matchedTokens := 0
 	for i := len(profile.Breakpoints) - 1; i >= 0; i-- {
 		breakpoint := profile.Breakpoints[i]
-		// Skip breakpoints below the minimum cacheable token threshold.
+
 		if breakpoint.CumulativeTokens < minTokens {
 			continue
 		}
@@ -211,7 +202,7 @@ func (t *promptCacheTracker) Update(accountID string, profile *promptCacheProfil
 	}
 
 	for _, breakpoint := range profile.Breakpoints {
-		// Skip breakpoints below the minimum cacheable token threshold.
+
 		if breakpoint.CumulativeTokens < minTokens {
 			continue
 		}
@@ -358,9 +349,7 @@ func appendPromptBlock(blocks *[]cacheablePromptBlock, wrapper map[string]interf
 	blockValue := wrapper["block"]
 	ttl := normalizePromptCacheTTL(extractPromptCacheTTL(blockValue))
 
-	// Drop volatile billing metadata from the cache fingerprint. Claude Code's
-	// x-anthropic-billing-header can drift, appear, or disappear across
-	// otherwise identical requests, and it does not change model semantics.
+	//! Billing headers drift per request and must not affect prompt-cache fingerprints.
 	if isAnthropicBillingHeaderBlock(blockValue) {
 		return
 	}
@@ -392,7 +381,6 @@ func isAnthropicBillingHeaderBlock(value interface{}) bool {
 		return false
 	}
 
-	// Only normalize text blocks (or blocks without an explicit type but containing text).
 	if t, ok := blockMap["type"].(string); ok && t != "" && t != "text" {
 		return false
 	}

@@ -1,4 +1,3 @@
-// Package config: credential storage and writeback
 package config
 
 import (
@@ -16,14 +15,10 @@ var (
 	credLoaded  bool
 )
 
-// InitCredentials sets the credentials file path (called from Init)
 func InitCredentials(configDir string) {
 	credPath = filepath.Join(configDir, "credentials.json")
 }
 
-// LoadCredentials loads credentials from credentials.json
-// Supports both single-object format (legacy) and array format (multi-credential)
-// Returns nil if file doesn't exist (not an error)
 func LoadCredentials() error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -38,7 +33,6 @@ func LoadCredentials() error {
 		return fmt.Errorf("read credentials.json: %w", err)
 	}
 
-	// Try array format first
 	var arr []Account
 	if err := json.Unmarshal(data, &arr); err == nil {
 		credentials = arr
@@ -46,7 +40,6 @@ func LoadCredentials() error {
 		return nil
 	}
 
-	// Fallback to single-object format (legacy)
 	var single Account
 	if err := json.Unmarshal(data, &single); err != nil {
 		return fmt.Errorf("parse credentials.json (neither array nor object): %w", err)
@@ -57,8 +50,6 @@ func LoadCredentials() error {
 	return nil
 }
 
-// SaveCredentials writes credentials to credentials.json (array format)
-// Atomic write: tmp file + rename
 func SaveCredentials() error {
 	credLock.RLock()
 	data, err := json.MarshalIndent(credentials, "", "  ")
@@ -67,7 +58,7 @@ func SaveCredentials() error {
 		return fmt.Errorf("marshal credentials: %w", err)
 	}
 
-	// Atomic write: tmp + rename
+	//! Temp-file rename keeps credentials.json from being half-written.
 	tmpPath := credPath + ".tmp"
 	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return fmt.Errorf("write tmp credentials: %w", err)
@@ -79,7 +70,6 @@ func SaveCredentials() error {
 	return nil
 }
 
-// CredentialsSnapshot returns a copy of the current credentials state.
 func CredentialsSnapshot() (bool, []Account) {
 	credLock.RLock()
 	defer credLock.RUnlock()
@@ -88,7 +78,6 @@ func CredentialsSnapshot() (bool, []Account) {
 	return credLoaded, result
 }
 
-// ReplaceCredentials atomically replaces the credentials file and in-memory state.
 func ReplaceCredentials(loaded bool, accounts []Account) error {
 	snapshot := make([]Account, len(accounts))
 	copy(snapshot, accounts)
@@ -121,6 +110,7 @@ func writeCredentialsSnapshot(snapshot []Account) error {
 	if err != nil {
 		return fmt.Errorf("marshal credentials: %w", err)
 	}
+	//! Temp-file rename keeps credentials.json from being half-written.
 	tmpPath := credPath + ".tmp"
 	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return fmt.Errorf("write tmp credentials: %w", err)
@@ -132,7 +122,6 @@ func writeCredentialsSnapshot(snapshot []Account) error {
 	return nil
 }
 
-// GetCredentials returns a copy of all credentials
 func GetCredentials() []Account {
 	credLock.RLock()
 	defer credLock.RUnlock()
@@ -144,7 +133,6 @@ func GetCredentials() []Account {
 	return result
 }
 
-// GetCredentialByID returns a credential by ID
 func GetCredentialByID(id string) *Account {
 	credLock.RLock()
 	defer credLock.RUnlock()
@@ -157,7 +145,6 @@ func GetCredentialByID(id string) *Account {
 	return nil
 }
 
-// UpdateCredentialToken updates token fields and writes back to credentials.json
 func UpdateCredentialToken(id, accessToken, refreshToken string, expiresAt int64) error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -177,7 +164,6 @@ func UpdateCredentialToken(id, accessToken, refreshToken string, expiresAt int64
 	return fmt.Errorf("credential not found: %s", id)
 }
 
-// UpdateCredentialInfo updates account info fields
 func UpdateCredentialInfo(id string, info AccountInfo) error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -205,7 +191,6 @@ func UpdateCredentialInfo(id string, info AccountInfo) error {
 	return fmt.Errorf("credential not found: %s", id)
 }
 
-// UpdateCredentialStats updates runtime statistics
 func UpdateCredentialStats(id string, requestCount, errorCount, totalTokens int, totalCredits float64, lastUsed int64) error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -225,7 +210,6 @@ func UpdateCredentialStats(id string, requestCount, errorCount, totalTokens int,
 	return fmt.Errorf("credential not found: %s", id)
 }
 
-// UpdateCredentialProfileArn updates ProfileArn field
 func UpdateCredentialProfileArn(id, profileArn string) error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -241,7 +225,6 @@ func UpdateCredentialProfileArn(id, profileArn string) error {
 	return fmt.Errorf("credential not found: %s", id)
 }
 
-// AddCredential adds a new credential
 func AddCredential(acc Account) error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -253,7 +236,6 @@ func AddCredential(acc Account) error {
 	return err
 }
 
-// RemoveCredential removes a credential by ID
 func RemoveCredential(id string) error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -269,7 +251,6 @@ func RemoveCredential(id string) error {
 	return fmt.Errorf("credential not found: %s", id)
 }
 
-// UpdateCredential updates an entire credential entry
 func UpdateCredential(acc Account) error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -285,7 +266,6 @@ func UpdateCredential(acc Account) error {
 	return fmt.Errorf("credential not found: %s", acc.ID)
 }
 
-// CredentialsLoaded returns whether credentials.json was successfully loaded
 func CredentialsLoaded() bool {
 	credLock.RLock()
 	defer credLock.RUnlock()

@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// BuilderIdSession Builder ID 登录会话
 type BuilderIdSession struct {
 	ID              string
 	ClientID        string
@@ -28,7 +27,6 @@ var (
 	builderIdMu       sync.RWMutex
 )
 
-// StartBuilderIdLogin 开始 Builder ID 登录
 func StartBuilderIdLogin(region string) (*BuilderIdSession, error) {
 	if region == "" {
 		region = "us-east-1"
@@ -44,7 +42,6 @@ func StartBuilderIdLogin(region string) (*BuilderIdSession, error) {
 		"codewhisperer:taskassist",
 	}
 
-	// Step 1: 注册 OIDC 客户端
 	regPayload := map[string]interface{}{
 		"clientName": "Kiro",
 		"clientType": "public",
@@ -77,7 +74,6 @@ func StartBuilderIdLogin(region string) (*BuilderIdSession, error) {
 		return nil, fmt.Errorf("parse register response failed: %v", err)
 	}
 
-	// Step 2: 发起设备授权
 	authPayload := map[string]string{
 		"clientId":     regResult.ClientID,
 		"clientSecret": regResult.ClientSecret,
@@ -139,13 +135,11 @@ func StartBuilderIdLogin(region string) (*BuilderIdSession, error) {
 	builderIdSessions[session.ID] = session
 	builderIdMu.Unlock()
 
-	// 清理过期会话
 	go cleanupExpiredBuilderIdSessions()
 
 	return session, nil
 }
 
-// PollBuilderIdAuth 轮询 Builder ID 授权状态
 func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, clientSecret, region string, expiresIn int, status string, err error) {
 	builderIdMu.RLock()
 	session, exists := builderIdSessions[sessionID]
@@ -192,7 +186,6 @@ func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, c
 			return "", "", "", "", "", 0, "", fmt.Errorf("parse token response failed: %v", err)
 		}
 
-		// 清理会话
 		builderIdMu.Lock()
 		delete(builderIdSessions, sessionID)
 		builderIdMu.Unlock()
@@ -210,7 +203,7 @@ func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, c
 		case "authorization_pending":
 			return "", "", "", "", "", 0, "pending", nil
 		case "slow_down":
-			// 增加轮询间隔
+
 			builderIdMu.Lock()
 			if s, ok := builderIdSessions[sessionID]; ok {
 				s.Interval += 5
@@ -235,14 +228,12 @@ func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, c
 	return "", "", "", "", "", 0, "", fmt.Errorf("unexpected response: %d", tokenResp.StatusCode)
 }
 
-// GetBuilderIdSession 获取会话信息
 func GetBuilderIdSession(sessionID string) *BuilderIdSession {
 	builderIdMu.RLock()
 	defer builderIdMu.RUnlock()
 	return builderIdSessions[sessionID]
 }
 
-// cleanupExpiredBuilderIdSessions 清理过期会话
 func cleanupExpiredBuilderIdSessions() {
 	builderIdMu.Lock()
 	defer builderIdMu.Unlock()

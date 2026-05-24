@@ -1,4 +1,3 @@
-// Package proxy: observe data persistence.
 package proxy
 
 import (
@@ -32,7 +31,6 @@ var (
 	observePersistWriterStarted atomic.Bool
 )
 
-// observePersistData 持久化数据结构
 type observePersistData struct {
 	SavedAt        int64           `json:"savedAt"`
 	RecentRequests []requestRecord `json:"recentRequests"`
@@ -266,7 +264,6 @@ func (h *Handler) backgroundObserveRequestWriter() {
 	}
 }
 
-// Save 保存观测数据到磁盘
 func (s *observeStore) Save() error {
 	if s == nil {
 		return nil
@@ -311,7 +308,6 @@ func (s *observeStore) Save() error {
 	return os.WriteFile(observeDataPath(), jsonData, 0600)
 }
 
-// Load 从磁盘加载观测数据
 func (s *observeStore) Load() error {
 	if s == nil {
 		return nil
@@ -332,13 +328,11 @@ func (s *observeStore) Load() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 恢复请求记录（最新的在前，需要反向写入）
 	for i := len(persist.RecentRequests) - 1; i >= 0; i-- {
 		s.recentRequests[s.recentReqIdx] = persist.RecentRequests[i]
 		s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
 	}
 
-	// 恢复错误记录
 	for i := len(persist.RecentErrors) - 1; i >= 0; i-- {
 		s.recentErrors[s.recentErrIdx] = persist.RecentErrors[i]
 		s.recentErrIdx = (s.recentErrIdx + 1) % observeRecentErrs
@@ -348,14 +342,13 @@ func (s *observeStore) Load() error {
 	return nil
 }
 
-// backgroundObserveSaver 后台定期保存观测数据
 func (h *Handler) backgroundObserveSaver() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-h.stopStatsSaver:
-			// 停机前最后保存一次
+
 			if err := getObserveStore().Save(); err != nil {
 				logger.Warnf("[Observe] Failed to save on shutdown: %v", err)
 			}

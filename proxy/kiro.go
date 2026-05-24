@@ -1,5 +1,3 @@
-// Package proxy is the core proxy layer for the Kiro API.
-// It handles streaming API calls to the Kiro backend and parses AWS Event Stream responses.
 package proxy
 
 import (
@@ -20,7 +18,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Endpoint configuration (auto-fallback on quota exhaustion).
 type kiroEndpoint struct {
 	URL       string
 	Origin    string
@@ -49,19 +46,15 @@ var kiroEndpoints = []kiroEndpoint{
 	},
 }
 
-// Global HTTP clients, swappable at runtime to apply proxy reconfiguration without restart.
 var kiroHttpStore atomic.Pointer[http.Client]
 var kiroRestHttpStore atomic.Pointer[http.Client]
 
-// proxyClientCache caches http.Client instances keyed by proxy URL for per-account proxy support.
 var proxyClientCache sync.Map
 
 func init() {
 	InitKiroHttpClient("")
 }
 
-// GetClientForProxy returns an http.Client configured for the given proxy URL.
-// If proxyURL is empty, returns the global kiro HTTP client.
 func GetClientForProxy(proxyURL string) *http.Client {
 	if proxyURL == "" {
 		return kiroHttpStore.Load()
@@ -77,8 +70,6 @@ func GetClientForProxy(proxyURL string) *http.Client {
 	return client
 }
 
-// GetRestClientForProxy returns a rest http.Client (30s timeout) for the given proxy URL.
-// If proxyURL is empty, returns the global kiro REST HTTP client.
 func GetRestClientForProxy(proxyURL string) *http.Client {
 	if proxyURL == "" {
 		return kiroRestHttpStore.Load()
@@ -95,8 +86,6 @@ func GetRestClientForProxy(proxyURL string) *http.Client {
 	return client
 }
 
-// ResolveAccountProxyURL returns the effective proxy URL for an account.
-// Falls back to global config.GetProxyURL() if the account has no per-account proxy.
 func ResolveAccountProxyURL(account *config.Account) string {
 	if account != nil && account.ProxyURL != "" {
 		return account.ProxyURL
@@ -104,7 +93,6 @@ func ResolveAccountProxyURL(account *config.Account) string {
 	return config.GetProxyURL()
 }
 
-// buildKiroTransport constructs an HTTP Transport with optional outbound proxy support.
 func buildKiroTransport(proxyURL string) *http.Transport {
 	t := &http.Transport{
 		MaxIdleConns:        100,
@@ -116,7 +104,8 @@ func buildKiroTransport(proxyURL string) *http.Transport {
 	if proxyURL != "" {
 		if u, err := url.Parse(proxyURL); err == nil {
 			t.Proxy = http.ProxyURL(u)
-			// Proxied connections cannot negotiate HTTP/2.
+
+			//! Proxied streaming requests are forced to HTTP/1.1 to avoid broken HTTP/2 tunnels.
 			t.ForceAttemptHTTP2 = false
 		}
 	} else {
@@ -125,7 +114,6 @@ func buildKiroTransport(proxyURL string) *http.Transport {
 	return t
 }
 
-// InitKiroHttpClient initializes (or reinitializes) the HTTP clients used for Kiro API requests.
 func InitKiroHttpClient(proxyURL string) {
 	client := &http.Client{
 		Timeout:   5 * time.Minute,
@@ -140,9 +128,6 @@ func InitKiroHttpClient(proxyURL string) {
 	kiroRestHttpStore.Store(restClient)
 }
 
-// ==================== Request Structs ====================
-
-// KiroPayload is the top-level request body sent to the Kiro API.
 type KiroPayload struct {
 	ConversationState struct {
 		AgentContinuationId string `json:"agentContinuationId,omitempty"`
@@ -157,10 +142,7 @@ type KiroPayload struct {
 	ProfileArn      string           `json:"profileArn,omitempty"`
 	InferenceConfig *InferenceConfig `json:"inferenceConfig,omitempty"`
 
-	// ToolNameMap maps sanitized tool names (sent to Kiro) back to the
-	// original names supplied by the client. Used to restore original names
-	// in tool_use responses so the client can match them to its tool registry.
-	// Not serialized to the Kiro API request body.
+	//! Sanitized upstream tool names are mapped back before responses reach the client.
 	ToolNameMap map[string]string `json:"-"`
 }
 
@@ -228,9 +210,6 @@ type InferenceConfig struct {
 	TopP        float64 `json:"topP,omitempty"`
 }
 
-// ==================== Stream Callbacks ====================
-
-// KiroStreamCallback stream response callbacks
 type KiroStreamCallback struct {
 	OnText         func(text string, isThinking bool)
 	OnToolUse      func(toolUse KiroToolUse)
@@ -239,8 +218,6 @@ type KiroStreamCallback struct {
 	OnCredits      func(credits float64)
 	OnContextUsage func(percentage float64)
 }
-
-// ==================== API Call ====================
 
 func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Account) {
 	if payload == nil {
@@ -255,7 +232,6 @@ func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Accoun
 	}
 }
 
-// getSortedEndpoints returns endpoints ordered by user preference, with optional fallback.
 func getSortedEndpoints(preferred string) []kiroEndpoint {
 	fallback := config.GetEndpointFallback()
 
@@ -268,16 +244,15 @@ func getSortedEndpoints(preferred string) []kiroEndpoint {
 	case "amazonq":
 		primary = 2
 	default:
-		// "auto": Kiro first, then fallback to others
+
 		return []kiroEndpoint{kiroEndpoints[0], kiroEndpoints[1], kiroEndpoints[2]}
 	}
 
 	if !fallback {
-		// No fallback: only use the selected endpoint
+
 		return []kiroEndpoint{kiroEndpoints[primary]}
 	}
 
-	// With fallback: selected first, then others in order
 	result := []kiroEndpoint{kiroEndpoints[primary]}
 	for i, ep := range kiroEndpoints {
 		if i != primary {
@@ -287,7 +262,6 @@ func getSortedEndpoints(preferred string) []kiroEndpoint {
 	return result
 }
 
-// CallKiroAPI calls the Kiro streaming API, trying each configured endpoint with automatic fallback.
 func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
 	originalProfileArn := ""
 	if payload != nil {
@@ -302,12 +276,11 @@ func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroSt
 		return err
 	}
 
-	// Debug: dump full payload for troubleshooting upstream rejections
+	//! Full payload logging stays debug-only because it can include user prompts and tokens.
 	if payloadJSON, err := json.Marshal(payload); err == nil {
 		logger.Debugf("[KiroAPI] Request payload: %s", string(payloadJSON))
 	}
 
-	// Wrap OnToolUse to restore original tool names for the client.
 	if callback != nil && callback.OnToolUse != nil && len(payload.ToolNameMap) > 0 {
 		originalOnToolUse := callback.OnToolUse
 		nameMap := payload.ToolNameMap
@@ -333,12 +306,11 @@ func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroSt
 		}
 	}
 
-	// Build endpoint list ordered by configuration.
 	endpoints := getSortedEndpoints(config.GetPreferredEndpoint())
 
 	var lastErr error
 	for _, ep := range endpoints {
-		// Update the origin field for the selected endpoint.
+
 		payload.ConversationState.CurrentMessage.UserInputMessage.Origin = ep.Origin
 
 		reqBody, _ := json.Marshal(payload)
@@ -383,7 +355,7 @@ func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroSt
 			errBody, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
 			lastErr = fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, ep.Name, string(errBody))
-			// Authentication errors and payment errors are not retried across endpoints.
+
 			if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 402 {
 				return lastErr
 			}
@@ -402,23 +374,20 @@ func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroSt
 	return fmt.Errorf("all endpoints failed")
 }
 
-// ==================== Event Stream Parsing ====================
-
-// parseEventStream decodes an AWS binary Event Stream response body.
 func parseEventStream(body io.Reader, callback *KiroStreamCallback) error {
 	if callback == nil {
 		callback = &KiroStreamCallback{}
 	}
 
-	// Read directly without bufio to avoid buffering latency in streaming responses.
 	var inputTokens, outputTokens int
 	var totalCredits float64
 	var currentToolUse *toolUseState
 	var lastAssistantContent string
 	var lastReasoningContent string
 
+	//! Read directly from the stream so SSE chunks are not delayed by buffering.
 	for {
-		// Prelude: 12 bytes (total_len + headers_len + crc)
+
 		prelude := make([]byte, 12)
 		_, err := io.ReadFull(body, prelude)
 		if err == io.EOF {
@@ -435,7 +404,6 @@ func parseEventStream(body io.Reader, callback *KiroStreamCallback) error {
 			continue
 		}
 
-		// Read the remaining message bytes.
 		remaining := totalLength - 12
 		msgBuf := make([]byte, remaining)
 		_, err = io.ReadFull(body, msgBuf)
@@ -460,7 +428,6 @@ func parseEventStream(body io.Reader, callback *KiroStreamCallback) error {
 
 		inputTokens, outputTokens = updateTokensFromEvent(event, inputTokens, outputTokens)
 
-		// Dispatch by event type.
 		switch eventType {
 		case "assistantResponseEvent":
 			if content, ok := event["content"].(string); ok && content != "" {
@@ -558,10 +525,9 @@ func updateTokensFromEvent(event map[string]interface{}, currentInputTokens, cur
 	return inputTokens, outputTokens
 }
 
-// getContextWindowSize returns the context window size (in tokens) for a model.
 func getContextWindowSize(model string) int {
 	m := strings.ToLower(model)
-	// sonnet-4.6, opus-4.6, opus-4.7 all have 1M context windows
+
 	if strings.Contains(m, "4.6") || strings.Contains(m, "4-6") ||
 		strings.Contains(m, "4.7") || strings.Contains(m, "4-7") {
 		return 1_000_000
@@ -662,8 +628,6 @@ func readTokenNumber(m map[string]interface{}, keys ...string) (int, bool) {
 	return 0, false
 }
 
-// ==================== Tool Use Handling ====================
-
 type toolUseState struct {
 	ToolUseID   string
 	Name        string
@@ -752,7 +716,6 @@ func firstBoolField(m map[string]interface{}, keys ...string) bool {
 	return false
 }
 
-// extractEventType extracts the event type string from AWS Event Stream message headers.
 func extractEventType(headers []byte) string {
 	offset := 0
 	for offset < len(headers) {
@@ -772,7 +735,7 @@ func extractEventType(headers []byte) string {
 		valueType := headers[offset]
 		offset++
 
-		if valueType == 7 { // String
+		if valueType == 7 {
 			if offset+2 > len(headers) {
 				break
 			}
@@ -789,7 +752,6 @@ func extractEventType(headers []byte) string {
 			continue
 		}
 
-		// Skip other value types by their fixed byte widths.
 		skipSizes := map[byte]int{0: 0, 1: 0, 2: 1, 3: 2, 4: 4, 5: 8, 8: 8, 9: 16}
 		if valueType == 6 {
 			if offset+2 > len(headers) {

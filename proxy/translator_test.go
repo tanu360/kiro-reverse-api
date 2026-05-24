@@ -53,12 +53,10 @@ func TestOpenAIToKiroPreservesStructuredAssistantAndToolContent(t *testing.T) {
 
 	payload := OpenAIToKiro(req, false)
 
-	// History starts with a priming pair.
 	if len(payload.ConversationState.History) != 4 {
 		t.Fatalf("expected 4 history items (2 priming + 2 conversation), got %d", len(payload.ConversationState.History))
 	}
 
-	// history[0]: priming user
 	primingUser := payload.ConversationState.History[0].UserInputMessage
 	if primingUser == nil {
 		t.Fatalf("expected history[0] to be priming user message")
@@ -70,7 +68,6 @@ func TestOpenAIToKiroPreservesStructuredAssistantAndToolContent(t *testing.T) {
 		t.Fatalf("expected system prompt priming not to contain user question, got %q", primingUser.Content)
 	}
 
-	// history[1]: priming assistant
 	primingAssistant := payload.ConversationState.History[1].AssistantResponseMessage
 	if primingAssistant == nil {
 		t.Fatalf("expected history[1] to be priming assistant message")
@@ -79,7 +76,6 @@ func TestOpenAIToKiroPreservesStructuredAssistantAndToolContent(t *testing.T) {
 		t.Fatalf("expected priming assistant ack, got %q", primingAssistant.Content)
 	}
 
-	// history[2]: first user turn
 	firstConvUser := payload.ConversationState.History[2].UserInputMessage
 	if firstConvUser == nil {
 		t.Fatalf("expected history[2] to be first conversation user message")
@@ -88,7 +84,6 @@ func TestOpenAIToKiroPreservesStructuredAssistantAndToolContent(t *testing.T) {
 		t.Fatalf("expected history[2] to contain first-question, got %q", firstConvUser.Content)
 	}
 
-	// history[3]: assistant reply
 	historyAssistant := payload.ConversationState.History[3].AssistantResponseMessage
 	if historyAssistant == nil {
 		t.Fatalf("expected history[3] to be assistant message")

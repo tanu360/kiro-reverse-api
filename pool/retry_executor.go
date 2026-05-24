@@ -1,4 +1,3 @@
-// Package pool: retry execution orchestrator
 package pool
 
 import (
@@ -7,22 +6,19 @@ import (
 	"time"
 )
 
-// RetryResult holds the outcome of a retry attempt.
 type RetryResult struct {
 	Account       *config.Account
-	Attempt       int // 0-indexed attempt number
-	TotalAttempts int // Total attempts made across all accounts
+	Attempt       int
+	TotalAttempts int
 	Success       bool
 	Error         error
 }
 
-// RetryExecutor orchestrates multi-account retry with exponential backoff.
 type RetryExecutor struct {
 	pool   *AccountPool
 	config RetryConfig
 }
 
-// NewRetryExecutor creates a retry executor with config from global settings.
 func NewRetryExecutor(pool *AccountPool) *RetryExecutor {
 	maxPerAccount, maxPerRequest, baseDelayMs, maxDelayMs := config.GetRetryConfig()
 	return &RetryExecutor{
@@ -36,11 +32,6 @@ func NewRetryExecutor(pool *AccountPool) *RetryExecutor {
 	}
 }
 
-// ExecuteWithRetry attempts to get an account and execute fn, retrying on failure.
-// model: target model (after stripping thinking suffix)
-// fn: function to execute with the account, returns (shouldRetry, error)
-//
-//	shouldRetry=true means the error is transient and retry is worthwhile
 func (re *RetryExecutor) ExecuteWithRetry(
 	model string,
 	fn func(acc *config.Account) (shouldRetry bool, err error),
@@ -50,7 +41,7 @@ func (re *RetryExecutor) ExecuteWithRetry(
 	var lastErr error
 
 	for totalAttempts < re.config.MaxPerRequest {
-		// Get next available account (excluding failed ones)
+
 		acc := re.pool.GetNextForModelExcluding(model, excludeIDs)
 		if acc == nil {
 			return nil, fmt.Errorf("no available accounts after %d attempts (excluded: %d)", totalAttempts, len(excludeIDs))
@@ -61,10 +52,9 @@ func (re *RetryExecutor) ExecuteWithRetry(
 			totalAttempts++
 			accountAttempts++
 
-			// Execute the function
 			shouldRetry, err := fn(acc)
 			if err == nil {
-				// Success
+
 				return &RetryResult{
 					Account:       acc,
 					Attempt:       accountAttempts - 1,
@@ -75,7 +65,6 @@ func (re *RetryExecutor) ExecuteWithRetry(
 
 			lastErr = err
 
-			// If not retryable, fail fast
 			if !shouldRetry {
 				return &RetryResult{
 					Account:       acc,
@@ -86,13 +75,11 @@ func (re *RetryExecutor) ExecuteWithRetry(
 				}, err
 			}
 
-			// Check if we've exhausted per-account retries
 			if accountAttempts >= re.config.MaxPerAccount {
 				excludeIDs[acc.ID] = true
 				break
 			}
 
-			// Check if we've exhausted total retries
 			if totalAttempts >= re.config.MaxPerRequest {
 				return &RetryResult{
 					Account:       acc,
@@ -103,15 +90,12 @@ func (re *RetryExecutor) ExecuteWithRetry(
 				}, lastErr
 			}
 
-			// Backoff before next attempt
 			delay := re.config.CalculateBackoff(accountAttempts - 1)
 			time.Sleep(delay)
 		}
 
-		// Account exhausted, move to next account (no sleep between accounts)
 	}
 
-	// All retries exhausted
 	return &RetryResult{
 		Account:       nil,
 		Attempt:       0,

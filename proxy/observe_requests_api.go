@@ -1,4 +1,3 @@
-// Package proxy: observe recent requests API.
 package proxy
 
 import (
@@ -7,7 +6,6 @@ import (
 	"strconv"
 )
 
-// apiObserveRecentRequests GET /admin/api/observe/recent-requests?page=1&pageSize=25&search=&status=&sort=time&order=desc
 func (h *Handler) apiObserveRecentRequests(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	page := 1

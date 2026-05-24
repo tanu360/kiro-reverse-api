@@ -1,4 +1,3 @@
-// Package proxy: admin API endpoints for backups tab.
 package proxy
 
 import (
@@ -12,7 +11,6 @@ import (
 	"kiro-proxy/config"
 )
 
-// apiBackupsList GET /admin/api/backups?autoInclude=true
 func (h *Handler) apiBackupsList(w http.ResponseWriter, r *http.Request) {
 	autoInclude := r.URL.Query().Get("autoInclude") == "true"
 	list, err := config.ListBackups(autoInclude)
@@ -24,10 +22,9 @@ func (h *Handler) apiBackupsList(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"backups": list})
 }
 
-// apiBackupsCreate POST /admin/api/backups {kind, note}
 func (h *Handler) apiBackupsCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Kind string `json:"kind"` // manual / scheduled
+		Kind string `json:"kind"`
 		Note string `json:"note"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -48,7 +45,6 @@ func (h *Handler) apiBackupsCreate(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"backup": entry})
 }
 
-// apiBackupsGet GET /admin/api/backups/{id}
 func (h *Handler) apiBackupsGet(w http.ResponseWriter, _ *http.Request, id string) {
 	entry, err := config.FindBackup(id)
 	if err != nil {
@@ -59,7 +55,6 @@ func (h *Handler) apiBackupsGet(w http.ResponseWriter, _ *http.Request, id strin
 	json.NewEncoder(w).Encode(map[string]interface{}{"backup": entry})
 }
 
-// apiBackupsDownload GET /admin/api/backups/{id}/download
 func (h *Handler) apiBackupsDownload(w http.ResponseWriter, _ *http.Request, id string) {
 	entry, data, err := config.ReadBackupBytes(id)
 	if err != nil {
@@ -73,7 +68,6 @@ func (h *Handler) apiBackupsDownload(w http.ResponseWriter, _ *http.Request, id 
 	w.Write(data)
 }
 
-// apiBackupsRestore POST /admin/api/backups/{id}/restore
 func (h *Handler) apiBackupsRestore(w http.ResponseWriter, _ *http.Request, id string) {
 	if err := config.RestoreBackup(id); err != nil {
 		w.WriteHeader(500)
@@ -85,7 +79,6 @@ func (h *Handler) apiBackupsRestore(w http.ResponseWriter, _ *http.Request, id s
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// apiBackupsDelete DELETE /admin/api/backups/{id}
 func (h *Handler) apiBackupsDelete(w http.ResponseWriter, _ *http.Request, id string) {
 	if err := config.DeleteBackup(id); err != nil {
 		w.WriteHeader(500)
@@ -95,7 +88,6 @@ func (h *Handler) apiBackupsDelete(w http.ResponseWriter, _ *http.Request, id st
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// apiBackupsRestoreUpload POST /admin/api/backups/restore (multipart or raw JSON body)
 func (h *Handler) apiBackupsRestoreUpload(w http.ResponseWriter, r *http.Request) {
 	var data []byte
 	var note string
@@ -140,13 +132,11 @@ func (h *Handler) apiBackupsRestoreUpload(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// apiBackupsScheduleGet GET /admin/api/backups/schedule
 func (h *Handler) apiBackupsScheduleGet(w http.ResponseWriter, _ *http.Request) {
 	sched := config.GetBackupSchedule()
 	json.NewEncoder(w).Encode(map[string]interface{}{"schedule": sched})
 }
 
-// apiBackupsScheduleUpdate POST /admin/api/backups/schedule
 func (h *Handler) apiBackupsScheduleUpdate(w http.ResponseWriter, r *http.Request) {
 	var sched config.BackupSchedule
 	if err := json.NewDecoder(r.Body).Decode(&sched); err != nil {

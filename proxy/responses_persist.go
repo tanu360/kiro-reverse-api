@@ -1,4 +1,3 @@
-// Package proxy: persisted OpenAI Responses API state.
 package proxy
 
 import (

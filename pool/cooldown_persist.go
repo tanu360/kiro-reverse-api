@@ -1,4 +1,3 @@
-// Package pool: cooldown state persistence.
 package pool
 
 import (
@@ -15,13 +14,11 @@ func cooldownDataFile() string {
 	return filepath.Join(config.GetDataDir(), "pool", "cooldowns.json")
 }
 
-// cooldownPersistData 持久化数据结构
 type cooldownPersistData struct {
 	SavedAt   int64            `json:"savedAt"`
-	Cooldowns map[string]int64 `json:"cooldowns"` // accountID → Unix timestamp
+	Cooldowns map[string]int64 `json:"cooldowns"`
 }
 
-// SaveCooldowns 保存冷却状态到磁盘
 func (p *AccountPool) SaveCooldowns() error {
 	if p == nil {
 		return nil
@@ -30,7 +27,7 @@ func (p *AccountPool) SaveCooldowns() error {
 	cooldowns := make(map[string]int64, len(p.cooldowns))
 	now := time.Now()
 	for id, t := range p.cooldowns {
-		// 只保存未过期的冷却状态
+
 		if t.After(now) {
 			cooldowns[id] = t.Unix()
 		}
@@ -56,7 +53,6 @@ func (p *AccountPool) SaveCooldowns() error {
 	return os.WriteFile(path, jsonData, 0600)
 }
 
-// loadCooldowns 从磁盘加载冷却状态
 func (p *AccountPool) loadCooldowns() error {
 	if p == nil {
 		return nil
@@ -82,7 +78,7 @@ func (p *AccountPool) loadCooldowns() error {
 	loaded := 0
 	for id, ts := range persist.Cooldowns {
 		t := time.Unix(ts, 0)
-		// 只恢复未过期的冷却状态
+
 		if t.After(now) {
 			p.cooldowns[id] = t
 			loaded++

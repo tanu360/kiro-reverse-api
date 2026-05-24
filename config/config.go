@@ -1,13 +1,3 @@
-// Package config provides configuration management for Kiro API Proxy.
-//
-// This package handles persistent storage and retrieval of:
-//   - Account credentials and authentication tokens
-//   - Server settings (port, host, API keys)
-//   - Usage statistics and metrics
-//   - Thinking mode configuration for AI responses
-//
-// All configuration is stored in a JSON file with thread-safe access
-// via read-write mutex protection.
 package config
 
 import (
@@ -21,175 +11,130 @@ import (
 	"time"
 )
 
-// GenerateMachineId generates a UUID v4 format machine identifier.
-// This ID is used to uniquely identify the proxy instance in Kiro API requests,
-// helping with request tracking and rate limiting on the server side.
 func GenerateMachineId() string {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
-	bytes[6] = (bytes[6] & 0x0f) | 0x40 // 版本 4
-	bytes[8] = (bytes[8] & 0x3f) | 0x80 // 变体
+	bytes[6] = (bytes[6] & 0x0f) | 0x40
+	bytes[8] = (bytes[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		bytes[0:4], bytes[4:6], bytes[6:8], bytes[8:10], bytes[10:16])
 }
 
-// Account represents a Kiro API account with authentication credentials and usage statistics.
 type Account struct {
-	// Basic identification
-	ID       string `json:"id"`                 // Unique account identifier (UUID)
-	Email    string `json:"email,omitempty"`    // User email address
-	UserId   string `json:"userId,omitempty"`   // Kiro user ID
-	Nickname string `json:"nickname,omitempty"` // Display name for admin panel
+	ID       string `json:"id"`
+	Email    string `json:"email,omitempty"`
+	UserId   string `json:"userId,omitempty"`
+	Nickname string `json:"nickname,omitempty"`
 
-	// Authentication credentials
-	AccessToken  string `json:"accessToken"`            // OAuth access token for API calls
-	RefreshToken string `json:"refreshToken"`           // OAuth refresh token for token renewal
-	ClientID     string `json:"clientId,omitempty"`     // OIDC client ID (for IdC auth)
-	ClientSecret string `json:"clientSecret,omitempty"` // OIDC client secret (for IdC auth)
-	AuthMethod   string `json:"authMethod"`             // Authentication method: "idc" (AWS IdC) or "social" (GitHub/Google)
-	Provider     string `json:"provider,omitempty"`     // Identity provider name (e.g., "BuilderId", "GitHub")
-	Region       string `json:"region"`                 // AWS region for OIDC endpoints
-	StartUrl     string `json:"startUrl,omitempty"`     // AWS SSO start URL
-	ExpiresAt    int64  `json:"expiresAt,omitempty"`    // Token expiration timestamp (Unix seconds)
-	MachineId    string `json:"machineId,omitempty"`    // UUID machine identifier for request tracking
-	ProfileArn   string `json:"profileArn,omitempty"`   // CodeWhisperer/Kiro profile ARN for generation requests
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+	ClientID     string `json:"clientId,omitempty"`
+	ClientSecret string `json:"clientSecret,omitempty"`
+	AuthMethod   string `json:"authMethod"`
+	Provider     string `json:"provider,omitempty"`
+	Region       string `json:"region"`
+	StartUrl     string `json:"startUrl,omitempty"`
+	ExpiresAt    int64  `json:"expiresAt,omitempty"`
+	MachineId    string `json:"machineId,omitempty"`
+	ProfileArn   string `json:"profileArn,omitempty"`
 
-	// Per-account outbound proxy (falls back to global ProxyURL if empty)
 	ProxyURL string `json:"proxyURL,omitempty"`
 
-	// Priority weight for load balancing (higher = more requests)
-	Weight int `json:"weight,omitempty"` // 0 or 1 = normal, 2+ = higher priority
+	Weight int `json:"weight,omitempty"`
 
-	// Overage behavior after the main usage limit is reached.
-	AllowOverage  bool `json:"allowOverage,omitempty"`  // Whether to keep using the account after UsageLimit is reached
-	OverageWeight int  `json:"overageWeight,omitempty"` // 1-10, lower values reduce overage request frequency
+	AllowOverage  bool `json:"allowOverage,omitempty"`
+	OverageWeight int  `json:"overageWeight,omitempty"`
 
-	// Account status
-	Enabled      bool   `json:"enabled"`                // Whether account is active in the pool
-	Silent       bool   `json:"silent,omitempty"`       // Silent mode: account is disabled but not banned
-	SilentReason string `json:"silentReason,omitempty"` // Reason for silent mode
-	SilentTime   int64  `json:"silentTime,omitempty"`   // Timestamp when silent mode was set
-	BanStatus    string `json:"banStatus,omitempty"`    // Ban status: "ACTIVE", "BANNED", "SUSPENDED"
-	BanReason    string `json:"banReason,omitempty"`    // Reason for ban/suspension
-	BanTime      int64  `json:"banTime,omitempty"`      // Timestamp when ban was detected
+	Enabled      bool   `json:"enabled"`
+	Silent       bool   `json:"silent,omitempty"`
+	SilentReason string `json:"silentReason,omitempty"`
+	SilentTime   int64  `json:"silentTime,omitempty"`
+	BanStatus    string `json:"banStatus,omitempty"`
+	BanReason    string `json:"banReason,omitempty"`
+	BanTime      int64  `json:"banTime,omitempty"`
 
-	// Subscription information
-	SubscriptionType  string `json:"subscriptionType,omitempty"`  // Tier: FREE, PRO, PRO_PLUS, or POWER
-	SubscriptionTitle string `json:"subscriptionTitle,omitempty"` // Human-readable subscription name
-	DaysRemaining     int    `json:"daysRemaining,omitempty"`     // Days until subscription expires
+	SubscriptionType  string `json:"subscriptionType,omitempty"`
+	SubscriptionTitle string `json:"subscriptionTitle,omitempty"`
+	DaysRemaining     int    `json:"daysRemaining,omitempty"`
 
-	// Usage tracking
-	UsageCurrent  float64 `json:"usageCurrent,omitempty"`  // Current period usage (credits)
-	UsageLimit    float64 `json:"usageLimit,omitempty"`    // Maximum allowed usage per period
-	UsagePercent  float64 `json:"usagePercent,omitempty"`  // Usage percentage (0.0-1.0)
-	NextResetDate string  `json:"nextResetDate,omitempty"` // Date when usage resets (YYYY-MM-DD)
-	LastRefresh   int64   `json:"lastRefresh,omitempty"`   // Last info refresh timestamp
+	UsageCurrent  float64 `json:"usageCurrent,omitempty"`
+	UsageLimit    float64 `json:"usageLimit,omitempty"`
+	UsagePercent  float64 `json:"usagePercent,omitempty"`
+	NextResetDate string  `json:"nextResetDate,omitempty"`
+	LastRefresh   int64   `json:"lastRefresh,omitempty"`
 
-	// Trial usage tracking
-	TrialUsageCurrent float64 `json:"trialUsageCurrent,omitempty"` // Trial quota current usage
-	TrialUsageLimit   float64 `json:"trialUsageLimit,omitempty"`   // Trial quota total limit
-	TrialUsagePercent float64 `json:"trialUsagePercent,omitempty"` // Trial quota usage percentage (0.0-1.0)
-	TrialStatus       string  `json:"trialStatus,omitempty"`       // Trial status: ACTIVE, EXPIRED, NONE
-	TrialExpiresAt    int64   `json:"trialExpiresAt,omitempty"`    // Trial expiration timestamp (Unix seconds)
+	TrialUsageCurrent float64 `json:"trialUsageCurrent,omitempty"`
+	TrialUsageLimit   float64 `json:"trialUsageLimit,omitempty"`
+	TrialUsagePercent float64 `json:"trialUsagePercent,omitempty"`
+	TrialStatus       string  `json:"trialStatus,omitempty"`
+	TrialExpiresAt    int64   `json:"trialExpiresAt,omitempty"`
 
-	// Runtime statistics (updated during operation)
-	RequestCount int     `json:"requestCount,omitempty"` // Total requests processed
-	ErrorCount   int     `json:"errorCount,omitempty"`   // Total errors encountered
-	LastUsed     int64   `json:"lastUsed,omitempty"`     // Last request timestamp
-	TotalTokens  int     `json:"totalTokens,omitempty"`  // Cumulative tokens processed
-	TotalCredits float64 `json:"totalCredits,omitempty"` // Cumulative credits consumed
+	RequestCount int     `json:"requestCount,omitempty"`
+	ErrorCount   int     `json:"errorCount,omitempty"`
+	LastUsed     int64   `json:"lastUsed,omitempty"`
+	TotalTokens  int     `json:"totalTokens,omitempty"`
+	TotalCredits float64 `json:"totalCredits,omitempty"`
 }
 
-// PromptFilterRule defines a single custom prompt sanitization rule.
-// Type can be: "regex" (regexp find/replace within prompt) or
-// "lines-containing" (remove lines containing the match substring).
 type PromptFilterRule struct {
-	ID      string `json:"id"`                // Unique rule identifier
-	Name    string `json:"name"`              // Human-readable rule name
-	Type    string `json:"type"`              // "regex" or "lines-containing"
-	Match   string `json:"match"`             // Pattern to match (regex pattern or substring)
-	Replace string `json:"replace,omitempty"` // Replacement string (only for regex; empty = delete match)
-	Enabled bool   `json:"enabled"`           // Whether this rule is active
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	Match   string `json:"match"`
+	Replace string `json:"replace,omitempty"`
+	Enabled bool   `json:"enabled"`
 }
 
-// Config represents the global application configuration.
 type Config struct {
-	// Server settings
-	Password      string    `json:"password"`         // Admin panel password
-	Port          int       `json:"port"`             // HTTP server port (default: 8080)
-	Host          string    `json:"host"`             // HTTP server bind address (default: 0.0.0.0)
-	ApiKey        string    `json:"apiKey,omitempty"` // API key for client authentication
-	RequireApiKey bool      `json:"requireApiKey"`    // Whether to enforce API key validation
+	Password      string    `json:"password"`
+	Port          int       `json:"port"`
+	Host          string    `json:"host"`
+	ApiKey        string    `json:"apiKey,omitempty"`
+	RequireApiKey bool      `json:"requireApiKey"`
 	KiroVersion   string    `json:"kiroVersion,omitempty"`
 	SystemVersion string    `json:"systemVersion,omitempty"`
 	NodeVersion   string    `json:"nodeVersion,omitempty"`
-	Accounts      []Account `json:"accounts"` // Registered Kiro accounts
+	Accounts      []Account `json:"accounts"`
 
-	// Thinking mode configuration for extended reasoning output
-	ThinkingSuffix       string `json:"thinkingSuffix,omitempty"`       // Model suffix to trigger thinking mode (default: "-thinking")
-	OpenAIThinkingFormat string `json:"openaiThinkingFormat,omitempty"` // OpenAI output format: "reasoning_content", "thinking", or "think"
-	ClaudeThinkingFormat string `json:"claudeThinkingFormat,omitempty"` // Claude output format: "reasoning_content", "thinking", or "think"
+	ThinkingSuffix       string `json:"thinkingSuffix,omitempty"`
+	OpenAIThinkingFormat string `json:"openaiThinkingFormat,omitempty"`
+	ClaudeThinkingFormat string `json:"claudeThinkingFormat,omitempty"`
 
-	// Endpoint configuration: "auto", "kiro", "codewhisperer", or "amazonq"
 	PreferredEndpoint string `json:"preferredEndpoint,omitempty"`
 
-	// EndpointFallback controls whether to try other endpoints when the preferred one fails.
-	// Defaults to true. Set to false to only use the preferred endpoint.
 	EndpointFallback *bool `json:"endpointFallback,omitempty"`
 
-	// AllowOverUsage allows accounts to continue serving requests even when their
-	// usage quota has been exhausted. When enabled, the pool will not skip accounts
-	// solely because usageCurrent >= usageLimit.
 	AllowOverUsage bool `json:"allowOverUsage,omitempty"`
 
-	// Proxy configuration: optional outbound proxy for Kiro API requests
-	// Format: "socks5://host:port", "socks5://user:pass@host:port",
-	//         "http://host:port",  "http://user:pass@host:port"
-	// Leave empty to connect directly.
 	ProxyURL string `json:"proxyURL,omitempty"`
 
-	// SanitizeClaudeCodePrompt is kept for backward-compatible JSON loading only.
-	// Migrated to FilterClaudeCode on first load. Do not use directly.
+	//! Legacy prompt-filter flag kept only for backward-compatible config loading.
 	SanitizeClaudeCodePrompt bool `json:"sanitizeClaudeCodePrompt,omitempty"`
 
-	// FilterClaudeCode detects the Claude Code CLI built-in system prompt and replaces it
-	// with a compact backend-only prompt, reducing token usage significantly.
 	FilterClaudeCode bool `json:"filterClaudeCode,omitempty"`
 
-	// FilterEnvNoise strips environment metadata lines from system prompts:
-	// git status, recent commits, environment sections, fast_mode_info tags, etc.
 	FilterEnvNoise bool `json:"filterEnvNoise,omitempty"`
 
-	// FilterStripBoundaries removes --- SYSTEM PROMPT --- / --- END SYSTEM PROMPT --- markers.
 	FilterStripBoundaries bool `json:"filterStripBoundaries,omitempty"`
 
-	// PromptFilterRules is a list of user-defined prompt sanitization rules (regex or line-filter).
 	PromptFilterRules []PromptFilterRule `json:"promptFilterRules,omitempty"`
 
-	// LogLevel controls verbosity of application logs.
-	// Accepted values: "debug", "info", "warn", "error". Defaults to "info".
-	// Can be overridden by the LOG_LEVEL environment variable.
 	LogLevel string `json:"logLevel,omitempty"`
 
-	// Retry configuration for request-level fault tolerance
-	MaxRetriesPerAccount int `json:"maxRetriesPerAccount,omitempty"` // Max retries per single account (default: 3)
-	MaxRetriesPerRequest int `json:"maxRetriesPerRequest,omitempty"` // Max retries across all accounts (default: 9)
-	RetryBaseDelayMs     int `json:"retryBaseDelayMs,omitempty"`     // Base delay in milliseconds (default: 100)
-	RetryMaxDelayMs      int `json:"retryMaxDelayMs,omitempty"`      // Max delay in milliseconds (default: 5000)
+	MaxRetriesPerAccount int `json:"maxRetriesPerAccount,omitempty"`
+	MaxRetriesPerRequest int `json:"maxRetriesPerRequest,omitempty"`
+	RetryBaseDelayMs     int `json:"retryBaseDelayMs,omitempty"`
+	RetryMaxDelayMs      int `json:"retryMaxDelayMs,omitempty"`
 
-	// Global statistics (persisted across restarts)
-	TotalRequests   int     `json:"totalRequests,omitempty"`   // Total API requests received
-	SuccessRequests int     `json:"successRequests,omitempty"` // Successful requests count
-	FailedRequests  int     `json:"failedRequests,omitempty"`  // Failed requests count
-	TotalTokens     int     `json:"totalTokens,omitempty"`     // Total tokens processed
-	TotalCredits    float64 `json:"totalCredits,omitempty"`    // Total credits consumed
+	TotalRequests   int     `json:"totalRequests,omitempty"`
+	SuccessRequests int     `json:"successRequests,omitempty"`
+	FailedRequests  int     `json:"failedRequests,omitempty"`
+	TotalTokens     int     `json:"totalTokens,omitempty"`
+	TotalCredits    float64 `json:"totalCredits,omitempty"`
 
-	// Backup configuration
 	Backup BackupConfig `json:"backup,omitempty"`
 }
 
-// AccountInfo contains account metadata retrieved from Kiro API.
-// Used for updating subscription and usage information.
 type AccountInfo struct {
 	Email             string
 	UserId            string
@@ -208,7 +153,6 @@ type AccountInfo struct {
 	TrialExpiresAt    int64
 }
 
-// Version current version
 const Version = "1.0.8"
 
 var (
@@ -230,19 +174,15 @@ func getConfigPath() string {
 	return cfgPath
 }
 
-// Init initializes the configuration system with the specified file path.
-// If the file doesn't exist, a default configuration is created.
 func Init(path string) error {
 	setConfigPath(path)
 	if err := Load(); err != nil {
 		return err
 	}
 
-	// Initialize credentials system
 	configDir := filepath.Dir(getConfigPath())
 	InitCredentials(configDir)
 
-	// Load credentials from credentials.json (optional, not an error if missing)
 	if err := LoadCredentials(); err != nil {
 		return fmt.Errorf("load credentials: %w", err)
 	}
@@ -258,8 +198,7 @@ func Load() error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Create default configuration.
-			// Binds to 0.0.0.0 by default for Docker/container compatibility.
+
 			cfg = &Config{
 				Password:      "changeme",
 				Port:          8080,
@@ -280,8 +219,6 @@ func Load() error {
 	return nil
 }
 
-// Save persists the current configuration to the JSON file.
-// Uses indented formatting for human readability.
 func Save() error {
 	AutoSnapshotBeforeSave()
 	return saveConfigFile()
@@ -295,8 +232,6 @@ func saveConfigFile() error {
 	return os.WriteFile(getConfigPath(), data, 0600)
 }
 
-// SetPassword updates the admin password.
-// Primarily used for environment variable override in containerized deployments.
 func SetPassword(password string) {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
@@ -348,11 +283,11 @@ func GetDataDir() string {
 }
 
 func GetAccounts() []Account {
-	// Priority: credentials.json > config.json (backward compatibility)
+
 	if CredentialsLoaded() {
 		return GetCredentials()
 	}
-	// Fallback to config.json
+
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	accounts := make([]Account, len(cfg.Accounts))
@@ -361,7 +296,7 @@ func GetAccounts() []Account {
 }
 
 func GetEnabledAccounts() []Account {
-	// Priority: credentials.json > config.json (backward compatibility)
+
 	all := GetAccounts()
 	var accounts []Account
 	for _, a := range all {
@@ -373,11 +308,11 @@ func GetEnabledAccounts() []Account {
 }
 
 func AddAccount(account Account) error {
-	// Priority: credentials.json > config.json
+
 	if CredentialsLoaded() {
 		return AddCredential(account)
 	}
-	// Fallback to config.json
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	cfg.Accounts = append(cfg.Accounts, account)
@@ -385,11 +320,11 @@ func AddAccount(account Account) error {
 }
 
 func UpdateAccount(id string, account Account) error {
-	// Priority: credentials.json > config.json
+
 	if CredentialsLoaded() {
 		return UpdateCredential(account)
 	}
-	// Fallback to config.json
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -401,9 +336,8 @@ func UpdateAccount(id string, account Account) error {
 	return nil
 }
 
-// DisableAccountOverage turns off AllowOverage for a specific account.
 func DisableAccountOverage(id string) error {
-	// Priority: credentials.json > config.json
+
 	if CredentialsLoaded() {
 		acc := GetCredentialByID(id)
 		if acc == nil {
@@ -412,7 +346,7 @@ func DisableAccountOverage(id string) error {
 		acc.AllowOverage = false
 		return UpdateCredential(*acc)
 	}
-	// Fallback to config.json
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -424,7 +358,6 @@ func DisableAccountOverage(id string) error {
 	return nil
 }
 
-// SetAccountEnabled toggles an account and persists the change.
 func SetAccountEnabled(id string, enabled bool) error {
 	if CredentialsLoaded() {
 		acc := GetCredentialByID(id)
@@ -454,7 +387,6 @@ func SetAccountEnabled(id string, enabled bool) error {
 	return nil
 }
 
-// SetAccountBanStatus marks an account as banned/disabled with a visible reason.
 func SetAccountBanStatus(id, status, reason string) error {
 	if CredentialsLoaded() {
 		acc := GetCredentialByID(id)
@@ -487,11 +419,11 @@ func SetAccountBanStatus(id, status, reason string) error {
 }
 
 func UpdateAccountProfileArn(id, profileArn string) error {
-	// Priority: credentials.json > config.json
+
 	if CredentialsLoaded() {
 		return UpdateCredentialProfileArn(id, profileArn)
 	}
-	// Fallback to config.json
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -504,11 +436,11 @@ func UpdateAccountProfileArn(id, profileArn string) error {
 }
 
 func DeleteAccount(id string) error {
-	// Priority: credentials.json > config.json
+
 	if CredentialsLoaded() {
 		return RemoveCredential(id)
 	}
-	// Fallback to config.json
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -521,11 +453,11 @@ func DeleteAccount(id string) error {
 }
 
 func UpdateAccountToken(id, accessToken, refreshToken string, expiresAt int64) error {
-	// Priority: credentials.json > config.json (writeback)
+
 	if CredentialsLoaded() {
 		return UpdateCredentialToken(id, accessToken, refreshToken, expiresAt)
 	}
-	// Fallback to config.json
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -597,11 +529,11 @@ func GetStats() (int, int, int, int, float64) {
 }
 
 func UpdateAccountStats(id string, requestCount, errorCount, totalTokens int, totalCredits float64, lastUsed int64) error {
-	// Priority: credentials.json > config.json
+
 	if CredentialsLoaded() {
 		return UpdateCredentialStats(id, requestCount, errorCount, totalTokens, totalCredits, lastUsed)
 	}
-	// Fallback to config.json
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -617,12 +549,10 @@ func UpdateAccountStats(id string, requestCount, errorCount, totalTokens int, to
 	return nil
 }
 
-// UpdateAccountInfo updates an account's subscription and usage information.
-// Called after refreshing account data from Kiro API.
 func UpdateAccountInfo(id string, info AccountInfo) error {
-	// Priority: credentials.json > config.json
+
 	if CredentialsLoaded() {
-		// Update Email/UserId if provided
+
 		acc := GetCredentialByID(id)
 		if acc != nil {
 			if info.Email != "" {
@@ -639,7 +569,7 @@ func UpdateAccountInfo(id string, info AccountInfo) error {
 		}
 		return UpdateCredentialInfo(id, info)
 	}
-	// Fallback to config.json
+
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
@@ -669,8 +599,6 @@ func UpdateAccountInfo(id string, info AccountInfo) error {
 	return nil
 }
 
-// GetFilterClaudeCode returns whether Claude Code system prompt detection is enabled.
-// Also checks the legacy SanitizeClaudeCodePrompt flag for backward compatibility.
 func GetFilterClaudeCode() bool {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -680,7 +608,6 @@ func GetFilterClaudeCode() bool {
 	return cfg.FilterClaudeCode || cfg.SanitizeClaudeCodePrompt
 }
 
-// GetFilterEnvNoise returns whether environment noise line stripping is enabled.
 func GetFilterEnvNoise() bool {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -690,7 +617,6 @@ func GetFilterEnvNoise() bool {
 	return cfg.FilterEnvNoise
 }
 
-// GetFilterStripBoundaries returns whether boundary marker stripping is enabled.
 func GetFilterStripBoundaries() bool {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -700,7 +626,6 @@ func GetFilterStripBoundaries() bool {
 	return cfg.FilterStripBoundaries
 }
 
-// PromptFilterConfig holds all prompt filter settings for API responses.
 type PromptFilterConfig struct {
 	FilterClaudeCode      bool               `json:"filterClaudeCode"`
 	FilterEnvNoise        bool               `json:"filterEnvNoise"`
@@ -708,7 +633,6 @@ type PromptFilterConfig struct {
 	Rules                 []PromptFilterRule `json:"rules"`
 }
 
-// GetPromptFilterConfig returns all prompt filter settings.
 func GetPromptFilterConfig() PromptFilterConfig {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -725,14 +649,14 @@ func GetPromptFilterConfig() PromptFilterConfig {
 	}
 }
 
-// UpdatePromptFilterConfig saves all prompt filter settings atomically.
 func UpdatePromptFilterConfig(filterClaudeCode, filterEnvNoise, filterStripBoundaries bool, rules []PromptFilterRule) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	cfg.FilterClaudeCode = filterClaudeCode
 	cfg.FilterEnvNoise = filterEnvNoise
 	cfg.FilterStripBoundaries = filterStripBoundaries
-	// Clear legacy flag to avoid double-applying after first save
+
+	//! Clear the legacy flag after writing the new prompt-filter config.
 	cfg.SanitizeClaudeCodePrompt = false
 	if rules != nil {
 		cfg.PromptFilterRules = rules
@@ -740,7 +664,6 @@ func UpdatePromptFilterConfig(filterClaudeCode, filterEnvNoise, filterStripBound
 	return Save()
 }
 
-// GetPromptFilterRules returns the current prompt filter rules.
 func GetPromptFilterRules() []PromptFilterRule {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -752,15 +675,12 @@ func GetPromptFilterRules() []PromptFilterRule {
 	return rules
 }
 
-// ThinkingConfig holds settings for AI thinking/reasoning mode.
-// When enabled, models output their reasoning process alongside the response.
 type ThinkingConfig struct {
-	Suffix       string `json:"suffix"`       // Model name suffix that triggers thinking mode
-	OpenAIFormat string `json:"openaiFormat"` // Output format for OpenAI-compatible responses
-	ClaudeFormat string `json:"claudeFormat"` // Output format for Claude-compatible responses
+	Suffix       string `json:"suffix"`
+	OpenAIFormat string `json:"openaiFormat"`
+	ClaudeFormat string `json:"claudeFormat"`
 }
 
-// GetThinkingConfig 获取 thinking 配置
 func GetThinkingConfig() ThinkingConfig {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -785,7 +705,6 @@ func GetThinkingConfig() ThinkingConfig {
 	}
 }
 
-// UpdateThinkingConfig 更新 thinking 配置
 func UpdateThinkingConfig(suffix, openaiFormat, claudeFormat string) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
@@ -795,7 +714,6 @@ func UpdateThinkingConfig(suffix, openaiFormat, claudeFormat string) error {
 	return Save()
 }
 
-// GetPreferredEndpoint 获取首选端点配置
 func GetPreferredEndpoint() string {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -805,7 +723,6 @@ func GetPreferredEndpoint() string {
 	return cfg.PreferredEndpoint
 }
 
-// UpdatePreferredEndpoint 更新首选端点配置
 func UpdatePreferredEndpoint(endpoint string) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
@@ -813,7 +730,6 @@ func UpdatePreferredEndpoint(endpoint string) error {
 	return Save()
 }
 
-// GetEndpointFallback returns whether endpoint fallback is enabled. Defaults to true.
 func GetEndpointFallback() bool {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -823,7 +739,6 @@ func GetEndpointFallback() bool {
 	return *cfg.EndpointFallback
 }
 
-// UpdateEndpointFallback sets the endpoint fallback switch and persists the change.
 func UpdateEndpointFallback(enabled bool) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
@@ -831,14 +746,12 @@ func UpdateEndpointFallback(enabled bool) error {
 	return Save()
 }
 
-// GetProxyURL 获取出站代理地址
 func GetProxyURL() string {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	return cfg.ProxyURL
 }
 
-// UpdateProxySettings 更新出站代理配置
 func UpdateProxySettings(proxyURL string) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
@@ -846,7 +759,6 @@ func UpdateProxySettings(proxyURL string) error {
 	return Save()
 }
 
-// GetAllowOverUsage returns whether over-usage is allowed when account quota is exhausted.
 func GetAllowOverUsage() bool {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -856,7 +768,6 @@ func GetAllowOverUsage() bool {
 	return cfg.AllowOverUsage
 }
 
-// UpdateAllowOverUsage sets the over-usage setting and persists the change.
 func UpdateAllowOverUsage(allow bool) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
@@ -864,7 +775,6 @@ func UpdateAllowOverUsage(allow bool) error {
 	return Save()
 }
 
-// GetLogLevel returns the configured log level (debug/info/warn/error). Defaults to "info".
 func GetLogLevel() string {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -877,7 +787,6 @@ func GetLogLevel() string {
 	return cfg.LogLevel
 }
 
-// GetRetryConfig returns retry configuration with defaults applied.
 func GetRetryConfig() (maxPerAccount, maxPerRequest, baseDelayMs, maxDelayMs int) {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -905,7 +814,6 @@ func GetRetryConfig() (maxPerAccount, maxPerRequest, baseDelayMs, maxDelayMs int
 	return
 }
 
-// UpdateLogLevel updates the log level setting and persists the change.
 func UpdateLogLevel(level string) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()

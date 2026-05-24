@@ -1,4 +1,3 @@
-// Package proxy: OpenAI Responses API compatibility handlers.
 package proxy
 
 import (

@@ -1,10 +1,7 @@
-/*
- * Kiro Proxy admin UI logic.
- */
 (() => {
   'use strict';
 
-  // State
+  // ** State
   const baseUrl = location.origin;
   if (localStorage.getItem('kiro_remember') !== '1') {
     localStorage.removeItem('admin_password');
@@ -44,7 +41,7 @@
   let backupsCache = [];
   let backupScheduleCache = null;
 
-  // DOM helpers
+  // ** DOM helpers
   const $ = (id) => document.getElementById(id);
   const qsa = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   function escapeHtml(s) {
@@ -87,7 +84,7 @@
     }
   }
 
-  // i18n
+  // ** i18n
   async function loadLocale(lang) {
     if (dict[lang]) return dict[lang];
     try {
@@ -139,7 +136,7 @@
     setLang(currentLang === 'zh' ? 'en' : 'zh');
   }
 
-  // Custom select
+  // ** Custom select
   function getCustomSelectLabel(select) {
     const option = select.selectedOptions && select.selectedOptions[0];
     return ((option && option.textContent) || select.value || '').trim();
@@ -372,7 +369,7 @@
     });
   }
 
-  // Theme
+  // ** Theme
   const THEME_ORDER = ['system', 'light', 'dark'];
   const themeMQ = window.matchMedia('(prefers-color-scheme: dark)');
   function resolveTheme(pref) {
@@ -409,7 +406,7 @@
     applyTheme(next);
   }
 
-  // Privacy and email mask
+  // ** Privacy and email mask
   function initPrivacyMode() {
     const saved = localStorage.getItem('privacyMode');
     privacyModeEnabled = saved === null ? true : saved === 'true';
@@ -442,7 +439,7 @@
     return getDisplayEmail(email, id);
   }
 
-  // Toast bridge
+  // ** Toast bridge
   const toast = function (msg, variant, opts) {
     if (typeof window.toast === 'function') return window.toast(msg, variant, opts);
     try { console.warn('[toast missing]', variant, msg); } catch (_) { }
@@ -452,7 +449,7 @@
   const toastWarning = (msg, opts) => toast(msg, 'warning', opts);
   const toastError = (msg, opts) => toast(msg, 'error', opts);
 
-  // Modal helpers
+  // ** Modal helpers
   let modalScrollY = 0;
   let confirmResolve = null;
   const modalFocusStack = [];
@@ -579,7 +576,7 @@
     return pending;
   }
 
-  // Fetch wrapper
+  // ** Fetch wrapper
   function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'X-Admin-Password': password }, opts.headers || {});
@@ -587,7 +584,7 @@
     return fetch('/admin/api' + path, opts);
   }
 
-  // Login
+  // ** Login
   function clearActivePassword() {
     sessionStorage.removeItem('admin_password');
     sessionStorage.removeItem('admin_login_time');
@@ -675,7 +672,7 @@
     startAdminEvents();
   }
 
-  // Data loaders
+  // ** Data loaders
   async function loadData() {
     await Promise.all([loadStats(), loadAccounts(), loadSettings(), loadVersion()]);
     renderEndpointCode('claudeEndpoint', baseUrl + '/v1/messages');
@@ -735,7 +732,7 @@
     renderAccounts();
   }
 
-  // Account list
+  // ** Account list
   function getFilteredAccounts() {
     return accountsData.filter(a => {
       if (filterStatus === 'enabled' && !a.enabled) return false;
@@ -942,7 +939,7 @@
     enhanceCustomSelects(container);
   }
 
-  // Account actions
+  // ** Account actions
   async function refreshAccount(id, card) {
     if (card) card.classList.add('loading');
     try {
@@ -999,7 +996,7 @@
     setTimeout(() => { btn.disabled = false; btn.className = cls; btn.innerHTML = html; }, 800);
   }
 
-  // Batch actions
+  // ** Batch actions
   async function batchAction(action) {
     const ids = Array.from(selectedAccounts);
     if (!ids.length) return;
@@ -1087,7 +1084,7 @@
     }
   }
 
-  // Detail modal
+  // ** Detail modal
   function detailItem(label, value) {
     return '<div class="detail-item"><div class="detail-label">' + escapeHtml(label) + '</div><div class="detail-value">' + escapeHtml(value) + '</div></div>';
   }
@@ -1242,7 +1239,7 @@
   }
   function closeDetailModal() { closeDialog('detailModal'); }
 
-  // Test flow
+  // ** Test flow
   function getTestAccount(id) {
     return accountsData.find(a => a.id === id) || null;
   }
@@ -1377,7 +1374,7 @@
     if (modalBtn) modalBtn.removeAttribute('aria-busy');
   }
 
-  // Settings
+  // ** Settings
   async function loadSettings() {
     const res = await api('/settings');
     const d = await res.json();
@@ -1556,7 +1553,7 @@
       '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
   }
 
-  // Observability
+  // ** Observability
   async function loadObserve() {
     try {
       const [overviewRes, heatmapRes, mixRes, errorsRes] = await Promise.all([
@@ -1653,7 +1650,7 @@
     }
   }
 
-  // Request log
+  // ** Request log
   async function loadRequests() {
     try {
       const params = new URLSearchParams({
@@ -1754,7 +1751,7 @@
     }, 250);
   }
 
-  // Backups
+  // ** Backups
   async function loadBackups() {
     try {
       const [listRes, schedRes] = await Promise.all([api('/backups?autoInclude=true'), api('/backups/schedule')]);
@@ -1878,7 +1875,7 @@
     loadBackups();
   }
 
-  // Prompt filter rules
+  // ** Prompt filter rules
   async function loadPromptFilter() {
     const res = await api('/prompt-filter');
     const d = await res.json();
@@ -1940,7 +1937,7 @@
     renderPromptRules();
   }
 
-  // Add-account modal templates
+  // ** Add-account modal templates
   var METHOD_ICONS = {
     builderid: 'fa-solid fa-id-card',
     iam: 'fa-solid fa-key',
@@ -2158,7 +2155,7 @@
     r.readAsText(file);
   }
 
-  // Import handlers
+  // ** Import handlers
   async function importLocalKiro() {
     const provider = $('localProvider').value;
     const tokenJson = $('localTokenJson').value.trim();
@@ -2353,7 +2350,7 @@
     loadAccounts();
   }
 
-  // Export modal
+  // ** Export modal
   function showExportModal() {
     if (!accountsData.length) return toastWarning(t('accounts.empty'));
     exportSelectedIds = new Set(accountsData.map(a => a.id));
@@ -2442,7 +2439,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // Version and update
+  // ** Version and update
   function renderVersionBadge() {
     const badge = $('versionBadge');
     if (badge && currentVersion) badge.textContent = currentVersion.replace(/^v/i, '');
@@ -2559,7 +2556,7 @@
   }
   function closeUpdateModal() { closeDialog('updateModal'); }
 
-  // Tabs
+  // ** Tabs
   function switchTab(tab) {
     currentTab = tab;
     qsa('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
@@ -2570,7 +2567,7 @@
     else if (tab === 'backups') loadBackups();
   }
 
-  // Event wiring
+  // ** Event wiring
   function bindLoginEvents() {
     $('loginBtn').addEventListener('click', login);
     $('pwdField').addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
@@ -2820,7 +2817,7 @@
     bindTestEvents();
   }
 
-  // Init
+  // ** Init
   async function init() {
     initTheme();
     await loadLocale(currentLang);
