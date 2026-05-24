@@ -1,5 +1,5 @@
 {
-  "version": "1.0.8",
-  "changelog": "✨ Added and fixed several improvements across the project.\n✨ 新增并修复了一些内容，包含若干功能改进与问题修复。",
-  "download": "https://github.com/tanu360/kiro-reverse-api"
+  "version": "1.1.0",
+  "changelog": "✨ Added OpenAI /v1/responses endpoint with streaming, tool calls, and previous_response_id chaining.\n✨ Added SQLite-backed observability: persistent request history, paginated audit log, model mix, and heatmap.\n✨ Added admin backups with import/export and 30-day response retention.\n✨ Added account failover with auto-disable on bad credentials and overage errors.\n✨ Added Docker Compose setup that works locally and on Coolify out of the box.\n🛠 Modernized admin web UI with i18n (English / Chinese) and email masking.\n🐛 Fixed tool schema sanitization, system prompt history, and stream tool call edge cases.",
+  "download": "https://github.com/tanu360/kiro-reverse-proxy"
 }
