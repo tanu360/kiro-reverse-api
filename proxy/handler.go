@@ -1,6 +1,9 @@
 package proxy
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/klauspost/compress/zstd"
 )
 
 const tokenRefreshSkewSeconds int64 = 120
@@ -347,6 +351,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(204)
+		return
+	}
+
+	if err := decompressRequestBody(r); err != nil {
+		logger.Warnf("[HTTP] decompress failed: %v", err)
+		http.Error(w, "Invalid Content-Encoding", http.StatusBadRequest)
 		return
 	}
 
@@ -3597,4 +3607,60 @@ func clampInt(v, min, max int) int {
 		return max
 	}
 	return v
+}
+
+func decompressRequestBody(r *http.Request) error {
+	if r.Body == nil {
+		return nil
+	}
+	enc := strings.TrimSpace(strings.ToLower(r.Header.Get("Content-Encoding")))
+	if enc == "" || enc == "identity" {
+		return nil
+	}
+	encodings := strings.Split(enc, ",")
+	for i := len(encodings) - 1; i >= 0; i-- {
+		layer := strings.TrimSpace(encodings[i])
+		if layer == "" || layer == "identity" {
+			continue
+		}
+		raw, err := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		if err != nil {
+			return err
+		}
+		var decoded []byte
+		switch layer {
+		case "gzip", "x-gzip":
+			zr, gerr := gzip.NewReader(bytes.NewReader(raw))
+			if gerr != nil {
+				return gerr
+			}
+			decoded, err = io.ReadAll(zr)
+			zr.Close()
+		case "deflate":
+			zr, zerr := zlib.NewReader(bytes.NewReader(raw))
+			if zerr != nil {
+				return zerr
+			}
+			decoded, err = io.ReadAll(zr)
+			zr.Close()
+		case "zstd":
+			zr, zerr := zstd.NewReader(bytes.NewReader(raw))
+			if zerr != nil {
+				return zerr
+			}
+			decoded, err = io.ReadAll(zr)
+			zr.Close()
+		default:
+			return fmt.Errorf("unsupported Content-Encoding: %s", layer)
+		}
+		if err != nil {
+			return err
+		}
+		r.Body = io.NopCloser(bytes.NewReader(decoded))
+		r.ContentLength = int64(len(decoded))
+	}
+	r.Header.Del("Content-Encoding")
+	r.Header.Del("Content-Length")
+	return nil
 }
