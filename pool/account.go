@@ -3,7 +3,7 @@
 package pool
 
 import (
-	"kiro-go/config"
+	"kiro-proxy/config"
 	"strings"
 	"sync"
 	"sync/atomic"

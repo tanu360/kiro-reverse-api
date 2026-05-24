@@ -3,7 +3,7 @@ package proxy
 import (
 	"time"
 
-	"kiro-go/logger"
+	"kiro-proxy/logger"
 )
 
 func (h *Handler) backgroundCooldownSaver() {

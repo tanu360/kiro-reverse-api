@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"kiro-go/logger"
+	"kiro-proxy/logger"
 )
 
 const (

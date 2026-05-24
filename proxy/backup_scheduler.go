@@ -4,8 +4,8 @@ package proxy
 import (
 	"time"
 
-	"kiro-go/config"
-	"kiro-go/logger"
+	"kiro-proxy/config"
+	"kiro-proxy/logger"
 )
 
 // backgroundBackupScheduler 定时快照后台任务。

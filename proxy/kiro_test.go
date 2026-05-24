@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"kiro-go/config"
+	"kiro-proxy/config"
 	"net/http"
 	"net/url"
 	"testing"

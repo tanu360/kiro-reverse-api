@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"kiro-go/config"
-	"kiro-go/logger"
+	"kiro-proxy/config"
+	"kiro-proxy/logger"
 
 	"github.com/google/uuid"
 )

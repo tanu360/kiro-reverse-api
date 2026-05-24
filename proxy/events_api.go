@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"kiro-go/config"
+	"kiro-proxy/config"
 )
 
 func (h *Handler) apiEventsStream(w http.ResponseWriter, r *http.Request) {

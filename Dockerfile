@@ -12,16 +12,16 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o kiro-go .
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o kiro-proxy .
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
-COPY --from=builder /app/kiro-go .
+COPY --from=builder /app/kiro-proxy .
 COPY --from=builder /app/web ./web
 
 EXPOSE 8080
 VOLUME /app/data
 
-CMD ["./kiro-go"]
+CMD ["./kiro-proxy"]

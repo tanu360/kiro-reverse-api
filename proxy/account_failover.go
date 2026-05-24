@@ -1,9 +1,9 @@
 package proxy
 
 import (
-	"kiro-go/config"
-	"kiro-go/logger"
-	"kiro-go/pool"
+	"kiro-proxy/config"
+	"kiro-proxy/logger"
+	"kiro-proxy/pool"
 	"strings"
 	"time"
 )

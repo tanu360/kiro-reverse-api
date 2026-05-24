@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"kiro-go/config"
-	"kiro-go/logger"
+	"kiro-proxy/config"
+	"kiro-proxy/logger"
 )
 
 func cooldownDataFile() string {

@@ -2,7 +2,7 @@ package proxy
 
 import (
 	"fmt"
-	"kiro-go/config"
+	"kiro-proxy/config"
 	"net/http"
 )
 
