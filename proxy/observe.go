@@ -5,8 +5,11 @@ package proxy
 
 import (
 	"sort"
+	"strings"
 	"sync"
 	"time"
+
+	"kiro-go/logger"
 )
 
 const (
@@ -47,6 +50,7 @@ type errorRecord struct {
 
 // requestRecord 请求记录条目
 type requestRecord struct {
+	ID          int64   `json:"id,omitempty"`
 	TS          int64   `json:"ts"`
 	AccountID   string  `json:"accountId"`
 	Email       string  `json:"email,omitempty"`
@@ -56,6 +60,27 @@ type requestRecord struct {
 	TotalTokens int     `json:"totalTokens"`
 	Credits     float64 `json:"credits"`
 	Success     bool    `json:"success"`
+	Status      int     `json:"status,omitempty"`
+	Message     string  `json:"message,omitempty"`
+}
+
+type requestQuery struct {
+	Page     int
+	PageSize int
+	Search   string
+	Status   string
+	Sort     string
+	Order    string
+}
+
+type requestPage struct {
+	Requests   []requestRecord `json:"requests"`
+	Total      int             `json:"total"`
+	Page       int             `json:"page"`
+	PageSize   int             `json:"pageSize"`
+	Sort       string          `json:"sort"`
+	Order      string          `json:"order"`
+	Persistent bool            `json:"persistent"`
 }
 
 // observeStore 全局只读单例，写入加锁。
@@ -233,9 +258,12 @@ func (s *observeStore) RecordError(accountID, email, model string, status int, m
 }
 
 // RecordRequest 记录一次请求（成功或失败）
-func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, outTokens int, credits float64, success bool) {
+func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
 	if s == nil {
 		return
+	}
+	if len(message) > 500 {
+		message = message[:500]
 	}
 	rec := requestRecord{
 		TS:          time.Now().Unix(),
@@ -247,11 +275,17 @@ func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, o
 		TotalTokens: inTokens + outTokens,
 		Credits:     credits,
 		Success:     success,
+		Status:      status,
+		Message:     message,
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.recentRequests[s.recentReqIdx] = rec
 	s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
+	s.mu.Unlock()
+
+	if err := persistRequestRecord(rec); err != nil {
+		logger.Warnf("[Observe] Persist request failed: %v", err)
+	}
 }
 
 // ==================== 读出快照 ====================
@@ -488,6 +522,129 @@ func (s *observeStore) RecentRequests(limit int) []requestRecord {
 		out = append(out, rec)
 	}
 	return out
+}
+
+func normalizeRequestQuery(q requestQuery) requestQuery {
+	if q.Page < 1 {
+		q.Page = 1
+	}
+	if q.PageSize <= 0 {
+		q.PageSize = 25
+	}
+	if q.PageSize > 200 {
+		q.PageSize = 200
+	}
+	q.Search = strings.TrimSpace(q.Search)
+	q.Status = strings.TrimSpace(strings.ToLower(q.Status))
+	if q.Status != "success" && q.Status != "failed" {
+		q.Status = ""
+	}
+	q.Sort = strings.TrimSpace(strings.ToLower(q.Sort))
+	switch q.Sort {
+	case "time", "status", "account", "model", "tokens", "credits":
+	default:
+		q.Sort = "time"
+	}
+	q.Order = strings.TrimSpace(strings.ToLower(q.Order))
+	if q.Order != "asc" {
+		q.Order = "desc"
+	}
+	return q
+}
+
+func (s *observeStore) RequestPage(q requestQuery) requestPage {
+	q = normalizeRequestQuery(q)
+	if page, err := queryPersistedRequests(q); err == nil && page.Persistent {
+		if page.Total > 0 || len(s.RecentRequests(1)) == 0 {
+			return page
+		}
+	} else if err != nil {
+		logger.Warnf("[Observe] Query persisted requests failed: %v", err)
+	}
+	return s.memoryRequestPage(q)
+}
+
+func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
+	all := s.RecentRequests(observeRecentReqs)
+	filtered := make([]requestRecord, 0, len(all))
+	search := strings.ToLower(q.Search)
+	for _, rec := range all {
+		if q.Status == "success" && !rec.Success {
+			continue
+		}
+		if q.Status == "failed" && rec.Success {
+			continue
+		}
+		if search != "" {
+			haystack := strings.ToLower(rec.Email + " " + rec.AccountID + " " + rec.Model + " " + rec.Message)
+			if !strings.Contains(haystack, search) {
+				continue
+			}
+		}
+		filtered = append(filtered, rec)
+	}
+	sort.Slice(filtered, func(i, j int) bool {
+		a, b := filtered[i], filtered[j]
+		compare := 0
+		switch q.Sort {
+		case "status":
+			compare = boolInt(a.Success) - boolInt(b.Success)
+		case "account":
+			compare = strings.Compare(strings.ToLower(a.Email+a.AccountID), strings.ToLower(b.Email+b.AccountID))
+		case "model":
+			compare = strings.Compare(strings.ToLower(a.Model), strings.ToLower(b.Model))
+		case "tokens":
+			compare = a.TotalTokens - b.TotalTokens
+		case "credits":
+			if a.Credits < b.Credits {
+				compare = -1
+			} else if a.Credits > b.Credits {
+				compare = 1
+			}
+		default:
+			if a.TS < b.TS {
+				compare = -1
+			} else if a.TS > b.TS {
+				compare = 1
+			}
+		}
+		if compare == 0 {
+			if a.TS < b.TS {
+				compare = -1
+			} else if a.TS > b.TS {
+				compare = 1
+			}
+		}
+		if q.Order == "desc" {
+			return compare > 0
+		}
+		return compare < 0
+	})
+	total := len(filtered)
+	start := (q.Page - 1) * q.PageSize
+	if start > total {
+		start = total
+	}
+	end := start + q.PageSize
+	if end > total {
+		end = total
+	}
+	return requestPage{
+		Requests:   filtered[start:end],
+		Total:      total,
+		Page:       q.Page,
+		PageSize:   q.PageSize,
+		Sort:       q.Sort,
+		Order:      q.Order,
+		Persistent: false,
+	}
+}
+
+func boolInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 // Reset 清空（用于 admin /stats/reset 触发的同步重置）

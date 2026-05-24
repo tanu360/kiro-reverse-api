@@ -255,13 +255,19 @@
             </div>
           </div>
           <div class="feature-stats-grid" id="observeSummary"></div>
-          <div class="panel-split">
-            <section>
-              <div class="panel-section-title" data-i18n="observe.heatmap"></div>
+          <div class="panel-split observe-panels">
+            <section class="observe-panel">
+              <div class="observe-panel-head">
+                <div class="panel-section-title" data-i18n="observe.heatmap"></div>
+                <span class="observe-panel-note" data-i18n="observe.last60"></span>
+              </div>
               <div id="observeHeatmap" class="heatmap-wrap"></div>
             </section>
-            <section>
-              <div class="panel-section-title" data-i18n="observe.modelMix"></div>
+            <section class="observe-panel">
+              <div class="observe-panel-head">
+                <div class="panel-section-title" data-i18n="observe.modelMix"></div>
+                <span class="observe-panel-note" data-i18n="observe.byModel"></span>
+              </div>
               <div id="observeModelMix" class="table-wrap"></div>
             </section>
           </div>
@@ -280,7 +286,31 @@
                   class="fa-solid fa-arrows-rotate"></i><span class="btn-text" data-i18n="common.refresh"></span></button>
             </div>
           </div>
+          <div class="requests-toolbar">
+            <div class="requests-search">
+              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              <input type="search" id="requestSearchInput" data-i18n-placeholder="requests.searchPlaceholder"
+                data-i18n-aria-label="requests.search" />
+            </div>
+            <select id="requestStatusFilter" data-i18n-aria-label="requests.statusFilter">
+              <option value="" data-i18n="requests.allStatuses"></option>
+              <option value="success" data-i18n="requests.ok"></option>
+              <option value="failed" data-i18n="requests.fail"></option>
+            </select>
+            <select id="requestPageSize" data-i18n-aria-label="requests.pageSize">
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
           <div id="requestsTable" class="table-wrap"></div>
+          <div class="table-pagination">
+            <span id="requestsPageInfo" class="table-page-info"></span>
+            <div class="table-page-actions">
+              <button class="btn btn-outline btn-sm" id="requestsPrevBtn" type="button" data-i18n="requests.prev"></button>
+              <button class="btn btn-outline btn-sm" id="requestsNextBtn" type="button" data-i18n="requests.next"></button>
+            </div>
+          </div>
         </div>
       </div>
 
