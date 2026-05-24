@@ -1326,7 +1326,7 @@ func isSyntheticConversationAnchor(anchor string) bool {
 func extractOpenAITextPart(part map[string]interface{}) (string, bool) {
 	partType, _ := part["type"].(string)
 	switch partType {
-	case "text", "input_text":
+	case "text", "input_text", "output_text":
 		if t, ok := part["text"].(string); ok {
 			return t, true
 		}

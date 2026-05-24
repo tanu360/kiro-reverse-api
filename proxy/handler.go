@@ -381,6 +381,26 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.handleOpenAIChat(w, r)
+	case path == "/v1/responses" || path == "/responses":
+		if !h.validateApiKey(r) {
+			h.sendOpenAIError(w, 401, "authentication_error", "Invalid or missing API key")
+			return
+		}
+		h.handleOpenAIResponses(w, r)
+	case strings.HasPrefix(path, "/v1/responses/") || strings.HasPrefix(path, "/responses/"):
+		if !h.validateApiKey(r) {
+			h.sendOpenAIError(w, 401, "authentication_error", "Invalid or missing API key")
+			return
+		}
+		id := strings.TrimPrefix(strings.TrimPrefix(path, "/v1/responses/"), "/responses/")
+		switch r.Method {
+		case http.MethodGet:
+			h.apiGetOpenAIResponse(w, r, id)
+		case http.MethodDelete:
+			h.apiDeleteOpenAIResponse(w, r, id)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
 	case path == "/v1/models" || path == "/models":
 		h.handleModels(w, r)
 	case path == "/api/event_logging/batch":
