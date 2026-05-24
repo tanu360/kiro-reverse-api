@@ -53,7 +53,7 @@ type BackupSchedule struct {
 type BackupConfig struct {
 	AutoEnabled bool           `json:"autoEnabled,omitempty"`
 	AutoKeep    int            `json:"autoKeep,omitempty"`
-	Schedule    BackupSchedule `json:"schedule,omitempty"`
+	Schedule    BackupSchedule `json:"schedule,omitzero"`
 }
 
 type backupPayload struct {
