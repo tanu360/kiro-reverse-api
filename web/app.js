@@ -1555,7 +1555,7 @@
         api('/observe/overview'),
         api('/observe/account-heatmap?windowMin=60'),
         api('/observe/model-mix'),
-        api('/observe/recent-errors?limit=40')
+        api('/observe/recent-errors?limit=10')
       ]);
       observeCache = {
         overview: await overviewRes.json(),
@@ -1592,7 +1592,16 @@
     const heatmap = observeCache.heatmap || {};
     const rows = [];
     if (heatmap.global) rows.push({ label: t('observe.global'), cells: heatmap.global.cells || [] });
-    (heatmap.accounts || []).slice(0, 8).forEach(a => rows.push({ label: a.email || a.accountId, cells: a.cells || [] }));
+    const accounts = (heatmap.accounts || []).slice().sort((a, b) => {
+      const score = item => (item.cells || []).reduce((sum, c) => sum + (c.reqs || 0) + (c.failures || 0), 0);
+      return score(b) - score(a);
+    });
+    const visibleAccounts = accounts.slice(0, 2);
+    visibleAccounts.forEach(a => rows.push({ label: a.email || a.accountId, cells: a.cells || [] }));
+    const hasMoreAccounts = accounts.length > visibleAccounts.length;
+    el.classList.toggle('heatmap-single', rows.length === 1);
+    el.classList.toggle('heatmap-table', rows.length > 1);
+    el.classList.toggle('has-footer', hasMoreAccounts);
     if (!rows.length) {
       el.innerHTML = '<div class="empty-state">' + escapeHtml(t('observe.noTraffic')) + '</div>';
       return;
@@ -1607,18 +1616,33 @@
           escapeAttr((c.reqs || 0) + ' req / ' + (c.failures || 0) + ' err') + '"></span>';
       }).join('');
       return '<div class="heat-row"><div class="heat-label">' + escapeHtml(r.label) + '</div><div class="heat-cells">' + cells + '</div></div>';
-    }).join('');
+    }).join('') + (hasMoreAccounts
+      ? '<div class="observe-panel-footer">' + escapeHtml(t('observe.moreAccounts', accounts.length - visibleAccounts.length)) + '</div>'
+      : '');
   }
   function renderObserveTables() {
-    const models = ((observeCache.mix || {}).models || []).map(m => '<tr><td>' + escapeHtml(m.model || '-') +
+    const allModels = ((observeCache.mix || {}).models || []);
+    const visibleModels = allModels.slice(0, 3);
+    const models = visibleModels.map(m => '<tr><td>' + escapeHtml(m.model || '-') +
       '</td><td>' + (m.reqs || 0) + '</td><td>' + formatNum((m.inTokens || 0) + (m.outTokens || 0)) +
       '</td><td>' + (m.credits || 0).toFixed(2) + '</td></tr>');
     renderTable('observeModelMix', [t('requests.model'), t('accounts.requests'), t('stats.tokens'), t('stats.credits')], models, 'observe.noTraffic');
+    const mixEl = $('observeModelMix');
+    if (mixEl && allModels.length > visibleModels.length) {
+      mixEl.insertAdjacentHTML('beforeend', '<div class="observe-panel-footer">' +
+        escapeHtml(t('observe.moreModels', allModels.length - visibleModels.length)) + '</div>');
+    }
 
-    const errors = ((observeCache.errors || {}).errors || []).map(e => '<tr><td>' + escapeHtml(formatTime(e.ts)) +
+    const allErrors = ((observeCache.errors || {}).errors || []).slice(0, 10);
+    const errors = allErrors.map(e => '<tr><td>' + escapeHtml(formatTime(e.ts)) +
       '</td><td>' + escapeHtml(e.email || e.accountId || '-') + '</td><td>' + escapeHtml(e.model || '-') +
       '</td><td>' + escapeHtml(e.message || '-') + '</td></tr>');
     renderTable('observeErrors', [t('requests.time'), t('requests.account'), t('requests.model'), t('requests.message')], errors, 'observe.noErrors');
+    const errorsEl = $('observeErrors');
+    if (errorsEl && errors.length) {
+      errorsEl.insertAdjacentHTML('beforeend', '<button type="button" class="observe-panel-footer observe-footer-button" data-observe-view-requests>' +
+        escapeHtml(t('observe.viewAllRequests')) + '</button>');
+    }
   }
 
   // Request log
@@ -2647,6 +2671,9 @@
 
   function bindFeatureEvents() {
     $('refreshObserveBtn').addEventListener('click', loadObserve);
+    $('observeErrors').addEventListener('click', e => {
+      if (e.target.closest('[data-observe-view-requests]')) switchTab('requests');
+    });
     $('refreshRequestsBtn').addEventListener('click', loadRequests);
     $('requestSearchInput').addEventListener('input', queueRequestsSearch);
     $('requestStatusFilter').addEventListener('change', e => {
