@@ -1,9 +1,12 @@
 package proxy
 
 import (
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"kiro-go/config"
 )
 
 func TestObserveStore_RecordAndOverview(t *testing.T) {
@@ -97,5 +100,36 @@ func TestObserveStore_ModelMixSortedByCredits(t *testing.T) {
 	}
 	if mix[0].Model != "high" || mix[2].Model != "low" {
 		t.Fatalf("unexpected order: %v", mix)
+	}
+}
+
+func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
+	if observeDB != nil {
+		_ = observeDB.Close()
+	}
+	observeDBOnce = sync.Once{}
+	observeDB = nil
+	observeDBErr = nil
+	observeStoreOnce = sync.Once{}
+	observeStoreInst = nil
+
+	if err := config.Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+	s := getObserveStore()
+	defer s.Reset()
+
+	s.RecordRequest("acc-ok", "ok@example.com", "claude-sonnet", 10, 20, 0.03, true, 200, "")
+	s.RecordRequest("acc-fail", "fail@example.com", "claude-opus", 0, 0, 0, false, 429, "rate limit exceeded")
+
+	page := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "rate", Status: "failed", Sort: "time", Order: "desc"})
+	if !page.Persistent {
+		t.Fatalf("expected sqlite-backed request page")
+	}
+	if page.Total != 1 || len(page.Requests) != 1 {
+		t.Fatalf("expected 1 filtered request, total=%d len=%d", page.Total, len(page.Requests))
+	}
+	if page.Requests[0].Message != "rate limit exceeded" || page.Requests[0].Status != 429 {
+		t.Fatalf("unexpected persisted error request: %#v", page.Requests[0])
 	}
 }

@@ -38,6 +38,9 @@
   let observeRefreshTimer = null;
   let observeCache = null;
   let requestsCache = [];
+  let requestsMeta = { total: 0, page: 1, pageSize: 25, sort: 'time', order: 'desc', persistent: false };
+  let requestsSearchTimer = null;
+  let requestsQuery = { search: '', status: '', page: 1, pageSize: 25, sort: 'time', order: 'desc' };
   let backupsCache = [];
   let backupScheduleCache = null;
 
@@ -1621,19 +1624,102 @@
   // Request log
   async function loadRequests() {
     try {
-      const res = await api('/observe/recent-requests?limit=200');
-      requestsCache = (await res.json()).requests || [];
+      const params = new URLSearchParams({
+        page: String(requestsQuery.page),
+        pageSize: String(requestsQuery.pageSize),
+        sort: requestsQuery.sort,
+        order: requestsQuery.order
+      });
+      if (requestsQuery.search) params.set('search', requestsQuery.search);
+      if (requestsQuery.status) params.set('status', requestsQuery.status);
+      const res = await api('/observe/recent-requests?' + params.toString());
+      const data = await res.json();
+      requestsCache = data.requests || [];
+      requestsMeta = {
+        total: data.total || 0,
+        page: data.page || requestsQuery.page,
+        pageSize: data.pageSize || requestsQuery.pageSize,
+        sort: data.sort || requestsQuery.sort,
+        order: data.order || requestsQuery.order,
+        persistent: !!data.persistent
+      };
       renderRequestsCached();
     } catch (e) {
       toast(t('common.failed'), 'error');
     }
   }
   function renderRequestsCached() {
+    const el = $('requestsTable');
+    if (!el) return;
+    const headers = [
+      requestSortHeader('time', t('requests.time')),
+      requestSortHeader('status', t('requests.status')),
+      requestSortHeader('account', t('requests.account')),
+      requestSortHeader('model', t('requests.model')),
+      requestSortHeader('tokens', t('stats.tokens')),
+      requestSortHeader('credits', t('stats.credits')),
+      '<th>' + escapeHtml(t('requests.error')) + '</th>'
+    ].join('');
     const rows = (requestsCache || []).map(r => '<tr><td>' + escapeHtml(formatTime(r.ts)) + '</td><td>' +
-      (r.success ? '<span class="badge badge-success">' + escapeHtml(t('requests.ok')) + '</span>' : '<span class="badge badge-error">' + escapeHtml(t('requests.fail')) + '</span>') +
-      '</td><td>' + escapeHtml(r.email || r.accountId || '-') + '</td><td>' + escapeHtml(r.model || '-') +
-      '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + (r.credits || 0).toFixed(2) + '</td></tr>');
-    renderTable('requestsTable', [t('requests.time'), t('requests.status'), t('requests.account'), t('requests.model'), t('stats.tokens'), t('stats.credits')], rows, 'requests.empty');
+      formatRequestStatus(r) + '</td><td>' + escapeHtml(r.email || r.accountId || '-') + '</td><td>' + escapeHtml(r.model || '-') +
+      '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + (r.credits || 0).toFixed(2) + '</td><td>' + formatRequestError(r) + '</td></tr>');
+    if (!rows.length) {
+      el.innerHTML = '<div class="empty-state">' + escapeHtml(t('requests.empty')) + '</div>';
+    } else {
+      el.innerHTML = '<table class="data-table requests-data-table"><thead><tr>' + headers + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+    }
+    renderRequestsPagination();
+  }
+  function requestSortHeader(sort, label) {
+    const active = requestsMeta.sort === sort || requestsQuery.sort === sort;
+    const order = active ? (requestsMeta.order || requestsQuery.order) : '';
+    const icon = !active ? 'fa-sort' : (order === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+    return '<th><button type="button" class="table-sort-btn" data-request-sort="' + escapeAttr(sort) + '">' +
+      '<span>' + escapeHtml(label) + '</span><i class="fa-solid ' + icon + '" aria-hidden="true"></i></button></th>';
+  }
+  function formatRequestStatus(r) {
+    if (r.success) {
+      return '<span class="badge badge-success">' + escapeHtml(t('requests.ok')) + '</span>';
+    }
+    const code = r.status ? ' ' + r.status : '';
+    return '<span class="badge badge-error">' + escapeHtml(t('requests.fail') + code) + '</span>';
+  }
+  function formatRequestError(r) {
+    if (r.success) return '<span class="muted-text">-</span>';
+    const msg = r.message || t('requests.noErrorMessage');
+    return '<span class="request-error-cell" title="' + escapeAttr(msg) + '">' + escapeHtml(msg) + '</span>';
+  }
+  function renderRequestsPagination() {
+    const info = $('requestsPageInfo');
+    const prev = $('requestsPrevBtn');
+    const next = $('requestsNextBtn');
+    if (!info || !prev || !next) return;
+    const total = requestsMeta.total || 0;
+    const pageSize = requestsMeta.pageSize || requestsQuery.pageSize;
+    const page = requestsMeta.page || requestsQuery.page;
+    const start = total ? ((page - 1) * pageSize + 1) : 0;
+    const end = Math.min(total, page * pageSize);
+    info.textContent = t('requests.pageInfo', start, end, total);
+    prev.disabled = page <= 1;
+    next.disabled = end >= total;
+  }
+  function setRequestSort(sort) {
+    if (requestsQuery.sort === sort) {
+      requestsQuery.order = requestsQuery.order === 'asc' ? 'desc' : 'asc';
+    } else {
+      requestsQuery.sort = sort;
+      requestsQuery.order = sort === 'time' ? 'desc' : 'asc';
+    }
+    requestsQuery.page = 1;
+    loadRequests();
+  }
+  function queueRequestsSearch() {
+    clearTimeout(requestsSearchTimer);
+    requestsSearchTimer = setTimeout(() => {
+      requestsQuery.search = $('requestSearchInput').value.trim();
+      requestsQuery.page = 1;
+      loadRequests();
+    }, 250);
   }
 
   // Backups
@@ -2562,6 +2648,30 @@
   function bindFeatureEvents() {
     $('refreshObserveBtn').addEventListener('click', loadObserve);
     $('refreshRequestsBtn').addEventListener('click', loadRequests);
+    $('requestSearchInput').addEventListener('input', queueRequestsSearch);
+    $('requestStatusFilter').addEventListener('change', e => {
+      requestsQuery.status = e.target.value;
+      requestsQuery.page = 1;
+      loadRequests();
+    });
+    $('requestPageSize').addEventListener('change', e => {
+      requestsQuery.pageSize = parseInt(e.target.value, 10) || 25;
+      requestsQuery.page = 1;
+      loadRequests();
+    });
+    $('requestsPrevBtn').addEventListener('click', () => {
+      if (requestsQuery.page <= 1) return;
+      requestsQuery.page--;
+      loadRequests();
+    });
+    $('requestsNextBtn').addEventListener('click', () => {
+      requestsQuery.page++;
+      loadRequests();
+    });
+    $('requestsTable').addEventListener('click', e => {
+      const btn = e.target.closest('[data-request-sort]');
+      if (btn) setRequestSort(btn.dataset.requestSort);
+    });
     $('refreshBackupsBtn').addEventListener('click', loadBackups);
     $('createBackupBtn').addEventListener('click', createBackup);
     $('saveBackupScheduleBtn').addEventListener('click', saveBackupSchedule);
