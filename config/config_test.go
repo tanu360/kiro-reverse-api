@@ -54,6 +54,39 @@ func TestUpdateSettingsPatchCanExplicitlyDisableAPIKey(t *testing.T) {
 	}
 }
 
+func TestUpdateBackupSchedulePreservesLastRun(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+	if err := UpdateBackupSchedule(BackupSchedule{
+		Enabled: true,
+		Cadence: "daily",
+		Keep:    7,
+	}); err != nil {
+		t.Fatalf("seed schedule: %v", err)
+	}
+	const lastRun int64 = 1779654646
+	if err := MarkScheduleRan(lastRun); err != nil {
+		t.Fatalf("mark schedule ran: %v", err)
+	}
+
+	if err := UpdateBackupSchedule(BackupSchedule{
+		Enabled: true,
+		Cadence: "daily",
+		Keep:    7,
+	}); err != nil {
+		t.Fatalf("update schedule: %v", err)
+	}
+
+	got := GetBackupSchedule()
+	if got.LastRun != lastRun {
+		t.Fatalf("expected lastRun to be preserved, got %d", got.LastRun)
+	}
+	if !got.Enabled || got.Cadence != "daily" || got.Keep != 7 {
+		t.Fatalf("unexpected schedule after update: %#v", got)
+	}
+}
+
 func TestBackupRestoreIncludesCredentialsFile(t *testing.T) {
 	dir := t.TempDir()
 	if err := Init(filepath.Join(dir, "config.json")); err != nil {
