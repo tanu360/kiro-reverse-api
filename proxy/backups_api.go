@@ -49,7 +49,7 @@ func (h *Handler) apiBackupsCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // apiBackupsGet GET /admin/api/backups/{id}
-func (h *Handler) apiBackupsGet(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiBackupsGet(w http.ResponseWriter, _ *http.Request, id string) {
 	entry, err := config.FindBackup(id)
 	if err != nil {
 		w.WriteHeader(404)
@@ -60,7 +60,7 @@ func (h *Handler) apiBackupsGet(w http.ResponseWriter, r *http.Request, id strin
 }
 
 // apiBackupsDownload GET /admin/api/backups/{id}/download
-func (h *Handler) apiBackupsDownload(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiBackupsDownload(w http.ResponseWriter, _ *http.Request, id string) {
 	entry, data, err := config.ReadBackupBytes(id)
 	if err != nil {
 		w.WriteHeader(404)
@@ -74,7 +74,7 @@ func (h *Handler) apiBackupsDownload(w http.ResponseWriter, r *http.Request, id 
 }
 
 // apiBackupsRestore POST /admin/api/backups/{id}/restore
-func (h *Handler) apiBackupsRestore(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiBackupsRestore(w http.ResponseWriter, _ *http.Request, id string) {
 	if err := config.RestoreBackup(id); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -86,7 +86,7 @@ func (h *Handler) apiBackupsRestore(w http.ResponseWriter, r *http.Request, id s
 }
 
 // apiBackupsDelete DELETE /admin/api/backups/{id}
-func (h *Handler) apiBackupsDelete(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiBackupsDelete(w http.ResponseWriter, _ *http.Request, id string) {
 	if err := config.DeleteBackup(id); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -141,7 +141,7 @@ func (h *Handler) apiBackupsRestoreUpload(w http.ResponseWriter, r *http.Request
 }
 
 // apiBackupsScheduleGet GET /admin/api/backups/schedule
-func (h *Handler) apiBackupsScheduleGet(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiBackupsScheduleGet(w http.ResponseWriter, _ *http.Request) {
 	sched := config.GetBackupSchedule()
 	json.NewEncoder(w).Encode(map[string]interface{}{"schedule": sched})
 }

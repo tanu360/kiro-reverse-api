@@ -166,9 +166,10 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 
 	var where []string
 	var args []interface{}
-	if q.Status == "success" {
+	switch q.Status {
+	case "success":
 		where = append(where, "success = 1")
-	} else if q.Status == "failed" {
+	case "failed":
 		where = append(where, "success = 0")
 	}
 	if q.Search != "" {

@@ -416,7 +416,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleHealth 健康检查（不暴露统计数据）
-func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "ok",
@@ -426,7 +426,7 @@ func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleStats 统计数据（需要 API Key 鉴权）
-func (h *Handler) handleStats(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleStats(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":          "ok",
@@ -443,7 +443,7 @@ func (h *Handler) handleStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleModels 模型列表
-func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleModels(w http.ResponseWriter, _ *http.Request) {
 	// 尝试用缓存的真实模型列表
 	h.modelsCacheMu.RLock()
 	cached := h.cachedModels
@@ -474,7 +474,6 @@ func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 		"object": "list",
 		"data":   models,
 	})
-	return
 }
 
 func buildAnthropicModelsResponse(cached []ModelInfo, thinkingSuffix string) []map[string]interface{} {
@@ -530,7 +529,7 @@ func buildModelInfo(id, ownedBy string, supportsImage bool) map[string]interface
 	}
 	modalitiesMap := map[string][]string{
 		"input":  modalities,
-		"output": []string{"text"},
+		"output": {"text"},
 	}
 
 	return map[string]interface{}{
@@ -624,7 +623,7 @@ func (h *Handler) fetchAndCacheAccountModels(account *config.Account) error {
 
 // apiRefreshAccountModels POST /admin/api/accounts/{id}/models/refresh
 // 立即为指定账号拉取并更新模型路由缓存。
-func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, _ *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
 	for i := range accounts {
@@ -658,7 +657,7 @@ func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, r *http.Request
 
 // apiRefreshAllAccountsModels POST /admin/api/accounts/models/refresh
 // 直接复用 refreshModelsCache，为所有已启用账号刷新模型路由缓存。
-func (h *Handler) apiRefreshAllAccountsModels(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiRefreshAllAccountsModels(w http.ResponseWriter, _ *http.Request) {
 	h.refreshModelsCache()
 	h.modelsCacheMu.RLock()
 	cachedLen := len(h.cachedModels)
@@ -826,7 +825,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 }
 
 // handleClaudeStream Claude 流式响应
-func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
+func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -1351,7 +1350,7 @@ func (h *Handler) recordFailure() {
 }
 
 // handleClaudeNonStream Claude 非流式响应
-func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
+func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
 	excluded := make(map[string]bool)
 	var lastErr error
 
@@ -1544,7 +1543,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleOpenAIStream OpenAI 流式响应
-func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
+func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -1956,7 +1955,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 }
 
 // handleOpenAINonStream OpenAI 非流式响应
-func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
+func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
 	excluded := make(map[string]bool)
 	var lastErr error
 
@@ -2253,7 +2252,7 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) apiGetAccounts(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 	accounts := config.GetAccounts()
 	poolAccounts := h.pool.GetAllAccounts()
 
@@ -2347,7 +2346,7 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": account.ID})
 }
 
-func (h *Handler) apiDeleteAccount(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiDeleteAccount(w http.ResponseWriter, _ *http.Request, id string) {
 	if err := config.DeleteAccount(id); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -2926,7 +2925,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) apiGetStatus(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetStatus(w http.ResponseWriter, _ *http.Request) {
 	totalBanned := 0
 	todayBanned := 0
 	totalExhausted := 0
@@ -2958,7 +2957,7 @@ func (h *Handler) apiGetStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) apiGetSettings(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"apiKey":         config.GetApiKey(),
 		"requireApiKey":  config.IsApiKeyRequired(),
@@ -2968,7 +2967,7 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) apiGetPromptFilter(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetPromptFilter(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(config.GetPromptFilterConfig())
 }
 
@@ -3042,7 +3041,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-func (h *Handler) apiGetStats(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetStats(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"totalRequests":   atomic.LoadInt64(&h.totalRequests),
 		"successRequests": atomic.LoadInt64(&h.successRequests),
@@ -3053,7 +3052,7 @@ func (h *Handler) apiGetStats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) apiResetStats(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiResetStats(w http.ResponseWriter, _ *http.Request) {
 	atomic.StoreInt64(&h.totalRequests, 0)
 	atomic.StoreInt64(&h.successRequests, 0)
 	atomic.StoreInt64(&h.failedRequests, 0)
@@ -3070,7 +3069,7 @@ func (h *Handler) apiResetStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // apiGenerateMachineId 生成新的机器码
-func (h *Handler) apiGenerateMachineId(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGenerateMachineId(w http.ResponseWriter, _ *http.Request) {
 	machineId := config.GenerateMachineId()
 	json.NewEncoder(w).Encode(map[string]string{"machineId": machineId})
 }
@@ -3143,7 +3142,7 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 }
 
 // apiRefreshAccount 刷新账户信息（使用量、订阅等）
-func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
 	for i := range accounts {
@@ -3245,7 +3244,7 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id s
 }
 
 // apiGetAccountFull 获取单个账号的完整信息（包含敏感字段）
-func (h *Handler) apiGetAccountFull(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id string) {
 	accounts := config.GetAccounts()
 	poolAccounts := h.pool.GetAllAccounts()
 
@@ -3323,7 +3322,7 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, r *http.Request, id s
 }
 
 // apiGetAccountModels 获取账户可用模型
-func (h *Handler) apiGetAccountModels(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiGetAccountModels(w http.ResponseWriter, _ *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
 	for i := range accounts {
@@ -3364,7 +3363,7 @@ func (h *Handler) apiGetAccountModels(w http.ResponseWriter, r *http.Request, id
 }
 
 // apiGetAccountModelsCached 返回账号已缓存的模型列表（不实时拉取）
-func (h *Handler) apiGetAccountModelsCached(w http.ResponseWriter, r *http.Request, id string) {
+func (h *Handler) apiGetAccountModelsCached(w http.ResponseWriter, _ *http.Request, id string) {
 	models := h.pool.GetModelList(id)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
@@ -3384,7 +3383,7 @@ func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // apiGetThinkingConfig 获取 thinking 配置
-func (h *Handler) apiGetThinkingConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetThinkingConfig(w http.ResponseWriter, _ *http.Request) {
 	cfg := config.GetThinkingConfig()
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"suffix":       cfg.Suffix,
@@ -3429,7 +3428,7 @@ func (h *Handler) apiUpdateThinkingConfig(w http.ResponseWriter, r *http.Request
 }
 
 // apiGetEndpointConfig 获取端点配置
-func (h *Handler) apiGetEndpointConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetEndpointConfig(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"preferredEndpoint": config.GetPreferredEndpoint(),
 		"endpointFallback":  config.GetEndpointFallback(),
@@ -3475,7 +3474,7 @@ func applyProxyConfig(proxyURL string) {
 }
 
 // apiGetProxy 获取当前代理配置
-func (h *Handler) apiGetProxy(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetProxy(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"proxyURL": config.GetProxyURL(),
 	})
@@ -3517,7 +3516,7 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 }
 
 // apiGetVersion 获取版本信息
-func (h *Handler) apiGetVersion(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) apiGetVersion(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"version": config.Version,
 	})
