@@ -403,6 +403,7 @@
   "observe.global": "Global",
   "observe.noTraffic": "No traffic yet",
   "observe.noErrors": "No errors",
+  "observe.heatCellTooltip": "{0} req / {1} err",
   "observe.moreAccounts": "+{0} more accounts",
   "observe.moreModels": "+{0} more models",
   "observe.viewAllRequests": "View all in Requests",

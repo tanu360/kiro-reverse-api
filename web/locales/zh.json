@@ -403,6 +403,7 @@
   "observe.global": "全局",
   "observe.noTraffic": "暂无流量",
   "observe.noErrors": "暂无错误",
+  "observe.heatCellTooltip": "{0} 请求 / {1} 错误",
   "observe.moreAccounts": "+{0} 个账号",
   "observe.moreModels": "+{0} 个模型",
   "observe.viewAllRequests": "在请求中查看全部",

@@ -1621,7 +1621,7 @@
         const pct = Math.min(1, (c.reqs || 0) / maxReq);
         const cls = c.failures ? ' heat-cell-fail' : '';
         return '<span class="heat-cell' + cls + '" style="opacity:' + (0.18 + pct * 0.82).toFixed(2) + '" title="' +
-          escapeAttr((c.reqs || 0) + ' req / ' + (c.failures || 0) + ' err') + '"></span>';
+          escapeAttr(t('observe.heatCellTooltip', c.reqs || 0, c.failures || 0)) + '"></span>';
       }).join('');
       return '<div class="heat-row"><div class="heat-label">' + escapeHtml(r.label) + '</div><div class="heat-cells">' + cells + '</div></div>';
     }).join('') + (hasMoreAccounts
