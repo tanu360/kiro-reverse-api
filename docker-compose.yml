@@ -1,12 +1,3 @@
-# Single compose file used for both local development and Coolify deploys.
-#
-# Local:
-#   docker-compose up -d
-#
-# Coolify:
-#   New Resource -> Docker Compose -> point at this file in the repo.
-#   Coolify auto-fills SERVICE_FQDN_KIRO_PROXY and SERVICE_PASSWORD_KIRO_PROXY.
-
 services:
   kiro-proxy:
     build:
@@ -19,11 +10,7 @@ services:
     environment:
       CONFIG_PATH: ${CONFIG_PATH:-/app/data/config.json}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      # Coolify generates SERVICE_PASSWORD_KIRO_PROXY automatically.
-      # Outside Coolify, falls back to ADMIN_PASSWORD env or "changeme".
       ADMIN_PASSWORD: ${SERVICE_PASSWORD_KIRO_PROXY:-${ADMIN_PASSWORD:-changeme}}
-      # Coolify magic var: routes the public FQDN to container port 8080.
-      # Ignored outside Coolify.
       SERVICE_FQDN_KIRO_PROXY_8080: /
     volumes:
       - kiro-proxy-data:/app/data

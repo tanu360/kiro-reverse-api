@@ -1,13 +1,7 @@
+.DS_Store
+.vscode/
+*.out
+/data/
 /kiro-proxy
 /kiro-go
-.DS_Store
-/data/
-
-# editor / OS
-.idea/
-.vscode/
-*.swp
-
-# test / coverage artifacts
-*.out
 coverage.txt

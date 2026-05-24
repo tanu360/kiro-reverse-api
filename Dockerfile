@@ -1,4 +1,3 @@
-# builder 阶段始终运行在构建机原生平台（amd64），用 Go 交叉编译目标平台二进制
 FROM --platform=$BUILDPLATFORM golang:1.21-alpine AS builder
 
 ARG TARGETOS

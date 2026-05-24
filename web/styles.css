@@ -1,6 +1,4 @@
 @import url("https://fonts.googleapis.com/css2?family=Geist:wght@100;200;300;400;500;600;700;800;900&family=Geist+Mono:wght@100;200;300;400;500;600;700;800;900&display=swap");
-
-/* ** Design tokens */
 :root {
   --background: #fcfcfc;
   --foreground: #000000;
@@ -42,7 +40,6 @@
   --shadow-lg: none;
   --shadow-xl: none;
   --shadow-2xl: none;
-  /* ** Radius scale */
   --radius: 0.5rem;
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
@@ -91,8 +88,6 @@
   --kiro-icon-filter: invert(1);
   color-scheme: dark;
 }
-
-/* ** Tailwind theme bridge */
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -126,8 +121,6 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
-
-/* ** Flat reset */
 *,
 *::before,
 *::after {
@@ -135,8 +128,6 @@
   -webkit-box-shadow: none !important;
   text-shadow: none !important;
 }
-
-/* ** Base */
 html,
 body {
   background: var(--background);
@@ -200,8 +191,6 @@ pre,
   background: var(--primary);
   color: var(--primary-foreground);
 }
-
-/* ** Scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -216,10 +205,6 @@ pre,
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
 }
-
-/* ** Shared components */
-
-/* ** Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -341,8 +326,6 @@ pre,
   width: 1rem;
   height: 1rem;
 }
-
-/* ** Cards */
 .card {
   background: var(--card);
   color: var(--card-foreground);
@@ -370,8 +353,6 @@ pre,
   align-items: center;
   flex-wrap: wrap;
 }
-
-/* ** Inputs */
 .input,
 input:not([type]),
 input[type="text"],
@@ -558,16 +539,12 @@ select.custom-select-native {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
-/* ** Form groups */
 .form-group {
   margin-bottom: 1rem;
 }
 .form-group-lg {
   margin-bottom: 1.75rem;
 }
-
-/* ** Remember row */
 .remember-row {
   display: inline-flex;
   align-items: center;
@@ -633,8 +610,6 @@ select.custom-select-native {
   margin-top: 0.375rem;
   line-height: 1.5;
 }
-
-/* ** Badges */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -704,8 +679,6 @@ select.custom-select-native {
   color: #ffffff;
   border-color: #0d9488;
 }
-
-/* ** Switches */
 .switch {
   position: relative;
   display: inline-block;
@@ -747,8 +720,6 @@ label:has(> .switch) > span {
 .switch input:checked + .slider::before {
   transform: translateX(1rem);
 }
-
-/* ** Header tabs */
 .header-nav {
   display: inline-flex;
   align-items: center;
@@ -822,8 +793,6 @@ label:has(> .switch) > span {
 #mainPage > .container {
   flex: 1 0 auto;
 }
-
-/* ** Footer */
 .app-footer {
   position: relative;
   margin-top: auto;
@@ -1018,15 +987,11 @@ label:has(> .switch) > span {
     justify-content: center;
   }
 }
-
-/* ** Tab content */
 .tab-content {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
-
-/* ** App shell */
 .app-header {
   position: static;
   background: var(--background);
@@ -1165,8 +1130,6 @@ img.brand-icon {
     flex-wrap: nowrap;
   }
 }
-
-/* ** Brand cluster */
 .brand-wrap {
   display: inline-flex;
   align-items: center;
@@ -1214,8 +1177,6 @@ img.brand-icon {
   margin: 0 auto;
   padding: 1.5rem;
 }
-
-/* ** Stats grid */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1336,8 +1297,6 @@ img.brand-icon {
     display: none;
   }
 }
-
-/* ** Login screen */
 .login-wrapper {
   min-height: 100dvh;
   display: flex;
@@ -1498,8 +1457,6 @@ img.brand-icon {
 .login-footer i {
   color: var(--muted-foreground);
 }
-
-/* ** Input affixes */
 .input-affix {
   position: relative;
   display: flex;
@@ -1535,8 +1492,6 @@ img.brand-icon {
   background: transparent;
   color: var(--foreground);
 }
-
-/* ** Login ambient background */
 .ghost-bg {
   position: absolute;
   inset: 0;
@@ -1659,8 +1614,6 @@ img.brand-icon {
     animation: none;
   }
 }
-
-/* ** Responsive layout */
 @media (max-width: 640px) {
   .login-topbar-inner {
     padding: 0 1rem;
@@ -1689,8 +1642,6 @@ img.brand-icon {
     padding: 1rem;
   }
 }
-
-/* ** Account cards */
 .account-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1842,8 +1793,6 @@ img.brand-icon {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-
-/* ** Usage bars */
 .account-usage {
   margin: 0.5rem 0 0.75rem;
 }
@@ -1880,8 +1829,6 @@ img.brand-icon {
   margin-top: 0.25rem;
   font-feature-settings: "tnum";
 }
-
-/* ** Modals */
 .modal {
   position: fixed;
   inset: 0;
@@ -1968,8 +1915,6 @@ img.brand-icon {
   color: var(--muted-foreground);
   line-height: 1.6;
 }
-
-/* ** Export modal */
 .export-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2182,8 +2127,6 @@ img.brand-icon {
   flex-wrap: wrap;
   padding-top: 0.25rem;
 }
-
-/* ** Add-account method picker */
 .method-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2275,8 +2218,6 @@ img.brand-icon {
     grid-template-columns: 1fr;
   }
 }
-
-/* ** API endpoint panel */
 .api-card {
   background: var(--card);
   color: var(--card-foreground);
@@ -2359,8 +2300,6 @@ img.brand-icon {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
-
-/* ** Endpoint code blocks */
 .endpoint {
   display: flex;
   align-items: center;
@@ -2424,7 +2363,6 @@ img.brand-icon {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-/* ** Dark endpoint surface */
 .dark .endpoint {
   background: var(--card);
   border-color: var(--border);
@@ -2451,8 +2389,6 @@ img.brand-icon {
   color: var(--muted-foreground);
   margin-top: 0.1875rem;
 }
-
-/* ** Detail modal */
 .detail-section {
   margin-bottom: 1.25rem;
   padding-bottom: 1.25rem;
@@ -2545,8 +2481,6 @@ img.brand-icon {
   color: var(--muted-foreground);
   line-height: 1.4;
 }
-
-/* ** Message banner */
 .message {
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
@@ -2572,8 +2506,6 @@ img.brand-icon {
   font-size: 1.25rem;
   font-weight: 600;
 }
-
-/* ** Test modal */
 .test-modal-content {
   width: min(44rem, 92vw);
 }
@@ -2720,8 +2652,6 @@ img.brand-icon {
     gap: 0.125rem;
   }
 }
-
-/* ** Icon buttons */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -2761,8 +2691,6 @@ img.brand-icon {
 .lang-toggle {
   width: 2.75rem;
 }
-
-/* ** Language switcher */
 .lang-switch {
   display: inline-flex;
   align-items: stretch;
@@ -2840,8 +2768,6 @@ img.brand-icon {
 .theme-toggle[data-theme="dark"] .theme-ico-dark {
   display: inline-flex;
 }
-
-/* ** Prompt filter rules */
 .rule-card {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -2966,8 +2892,6 @@ img.brand-icon {
 .rule-field input:focus {
   border-bottom-color: var(--border-focus) !important;
 }
-
-/* ** Accounts toolbar */
 .toolbar {
   display: flex;
   gap: 0.5rem;
@@ -3006,8 +2930,6 @@ img.brand-icon {
   line-height: 1;
   white-space: nowrap;
 }
-
-/* ** Feature panels */
 .feature-stats-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -3400,8 +3322,6 @@ img.brand-icon {
 .mt-4 {
   margin-top: 1rem;
 }
-
-/* ** Accounts mobile layout */
 @media (max-width: 720px) {
   .card-header {
     flex-direction: column;
@@ -3598,8 +3518,6 @@ img.brand-icon {
     max-width: 100%;
   }
 }
-
-/* ** Utilities */
 .hidden {
   display: none !important;
 }
@@ -3691,8 +3609,6 @@ img.brand-icon {
   text-align: center;
   margin-bottom: 0.75rem;
 }
-
-/* ** Compact responsive fixes */
 @media (max-width: 720px) {
   .detail-grid {
     grid-template-columns: 1fr;
