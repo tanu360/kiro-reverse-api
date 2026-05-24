@@ -1,12 +1,23 @@
-version: '3.8'
-
 services:
   kiro-proxy:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kiro-proxy
+    restart: unless-stopped
     ports:
       - "8080:8080"
-    volumes:
-      - ./data:/app/data
     environment:
       - CONFIG_PATH=/app/data/config.json
-    restart: unless-stopped
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+    volumes:
+      - kiro-proxy-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  kiro-proxy-data:
