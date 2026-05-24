@@ -1,7 +1,5 @@
 (() => {
   'use strict';
-
-  // ** State
   const baseUrl = location.origin;
   if (localStorage.getItem('kiro_remember') !== '1') {
     localStorage.removeItem('admin_password');
@@ -40,8 +38,6 @@
   let requestsQuery = { search: '', status: '', page: 1, pageSize: 25, sort: 'time', order: 'desc' };
   let backupsCache = [];
   let backupScheduleCache = null;
-
-  // ** DOM helpers
   const $ = (id) => document.getElementById(id);
   const qsa = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   function escapeHtml(s) {
@@ -83,8 +79,6 @@
       el.textContent = raw;
     }
   }
-
-  // ** i18n
   async function loadLocale(lang) {
     if (dict[lang]) return dict[lang];
     try {
@@ -135,8 +129,6 @@
   function toggleLang() {
     setLang(currentLang === 'zh' ? 'en' : 'zh');
   }
-
-  // ** Custom select
   function getCustomSelectLabel(select) {
     const option = select.selectedOptions && select.selectedOptions[0];
     return ((option && option.textContent) || select.value || '').trim();
@@ -368,8 +360,6 @@
       attributeFilter: ['disabled', 'class', 'id', 'data-native-select']
     });
   }
-
-  // ** Theme
   const THEME_ORDER = ['system', 'light', 'dark'];
   const themeMQ = window.matchMedia('(prefers-color-scheme: dark)');
   function resolveTheme(pref) {
@@ -405,8 +395,6 @@
     localStorage.setItem('kiro_theme', next);
     applyTheme(next);
   }
-
-  // ** Privacy and email mask
   function initPrivacyMode() {
     const saved = localStorage.getItem('privacyMode');
     privacyModeEnabled = saved === null ? true : saved === 'true';
@@ -438,8 +426,6 @@
   function getDisplayAccount(email, id) {
     return getDisplayEmail(email, id);
   }
-
-  // ** Toast bridge
   const toast = function (msg, variant, opts) {
     if (typeof window.toast === 'function') return window.toast(msg, variant, opts);
     try { console.warn('[toast missing]', variant, msg); } catch (_) { }
@@ -448,8 +434,6 @@
   const toastPrimary = (msg, opts) => toast(msg, 'primary', opts);
   const toastWarning = (msg, opts) => toast(msg, 'warning', opts);
   const toastError = (msg, opts) => toast(msg, 'error', opts);
-
-  // ** Modal helpers
   let modalScrollY = 0;
   let confirmResolve = null;
   const modalFocusStack = [];
@@ -575,16 +559,12 @@
     ok.focus({ preventScroll: true });
     return pending;
   }
-
-  // ** Fetch wrapper
   function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'X-Admin-Password': password }, opts.headers || {});
     if (opts.body && !(opts.body instanceof FormData) && !opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
     return fetch('/admin/api' + path, opts);
   }
-
-  // ** Login
   function clearActivePassword() {
     sessionStorage.removeItem('admin_password');
     sessionStorage.removeItem('admin_login_time');
@@ -671,8 +651,6 @@
     $('mainPage').classList.remove('hidden');
     startAdminEvents();
   }
-
-  // ** Data loaders
   async function loadData() {
     await Promise.all([loadStats(), loadAccounts(), loadSettings(), loadVersion()]);
     renderEndpointCode('claudeEndpoint', baseUrl + '/v1/messages');
@@ -731,8 +709,6 @@
     accountsData = await res.json();
     renderAccounts();
   }
-
-  // ** Account list
   function getFilteredAccounts() {
     return accountsData.filter(a => {
       if (filterStatus === 'enabled' && !a.enabled) return false;
@@ -938,8 +914,6 @@
     applyUsageBars(container);
     enhanceCustomSelects(container);
   }
-
-  // ** Account actions
   async function refreshAccount(id, card) {
     if (card) card.classList.add('loading');
     try {
@@ -995,8 +969,6 @@
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     setTimeout(() => { btn.disabled = false; btn.className = cls; btn.innerHTML = html; }, 800);
   }
-
-  // ** Batch actions
   async function batchAction(action) {
     const ids = Array.from(selectedAccounts);
     if (!ids.length) return;
@@ -1083,8 +1055,6 @@
       toast(t('common.failed'), 'error');
     }
   }
-
-  // ** Detail modal
   function detailItem(label, value) {
     return '<div class="detail-item"><div class="detail-label">' + escapeHtml(label) + '</div><div class="detail-value">' + escapeHtml(value) + '</div></div>';
   }
@@ -1238,8 +1208,6 @@
     await putAccount(id, { proxyURL: url }, t('detail.proxySaved'));
   }
   function closeDetailModal() { closeDialog('detailModal'); }
-
-  // ** Test flow
   function getTestAccount(id) {
     return accountsData.find(a => a.id === id) || null;
   }
@@ -1373,8 +1341,6 @@
     testModalRunning = false;
     if (modalBtn) modalBtn.removeAttribute('aria-busy');
   }
-
-  // ** Settings
   async function loadSettings() {
     const res = await api('/settings');
     const d = await res.json();
@@ -1552,8 +1518,6 @@
       headers.map(h => '<th>' + escapeHtml(h) + '</th>').join('') +
       '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
   }
-
-  // ** Observability
   async function loadObserve() {
     try {
       const [overviewRes, heatmapRes, mixRes, errorsRes] = await Promise.all([
@@ -1649,8 +1613,6 @@
         escapeHtml(t('observe.viewAllRequests')) + '</button>');
     }
   }
-
-  // ** Request log
   async function loadRequests() {
     try {
       const params = new URLSearchParams({
@@ -1750,8 +1712,6 @@
       loadRequests();
     }, 250);
   }
-
-  // ** Backups
   async function loadBackups() {
     try {
       const [listRes, schedRes] = await Promise.all([api('/backups?autoInclude=true'), api('/backups/schedule')]);
@@ -1874,8 +1834,6 @@
     loadData();
     loadBackups();
   }
-
-  // ** Prompt filter rules
   async function loadPromptFilter() {
     const res = await api('/prompt-filter');
     const d = await res.json();
@@ -1936,8 +1894,6 @@
     promptRules.push({ id: 'rule-' + Date.now(), name: '', type, match: '', replace: '', enabled: true });
     renderPromptRules();
   }
-
-  // ** Add-account modal templates
   var METHOD_ICONS = {
     builderid: 'fa-solid fa-id-card',
     iam: 'fa-solid fa-key',
@@ -2154,8 +2110,6 @@
     r.onload = e => { $(targetId).value = e.target.result; };
     r.readAsText(file);
   }
-
-  // ** Import handlers
   async function importLocalKiro() {
     const provider = $('localProvider').value;
     const tokenJson = $('localTokenJson').value.trim();
@@ -2349,8 +2303,6 @@
     try { await api('/accounts/' + id + '/refresh', { method: 'POST' }); } catch (e) { }
     loadAccounts();
   }
-
-  // ** Export modal
   function showExportModal() {
     if (!accountsData.length) return toastWarning(t('accounts.empty'));
     exportSelectedIds = new Set(accountsData.map(a => a.id));
@@ -2438,8 +2390,6 @@
     a.click();
     URL.revokeObjectURL(url);
   }
-
-  // ** Version and update
   function renderVersionBadge() {
     const badge = $('versionBadge');
     if (badge && currentVersion) badge.textContent = currentVersion.replace(/^v/i, '');
@@ -2555,8 +2505,6 @@
     openDialog('updateModal');
   }
   function closeUpdateModal() { closeDialog('updateModal'); }
-
-  // ** Tabs
   function switchTab(tab) {
     currentTab = tab;
     qsa('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
@@ -2566,8 +2514,6 @@
     else if (tab === 'requests') loadRequests();
     else if (tab === 'backups') loadBackups();
   }
-
-  // ** Event wiring
   function bindLoginEvents() {
     $('loginBtn').addEventListener('click', login);
     $('pwdField').addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
@@ -2816,8 +2762,6 @@
     bindDetailEvents();
     bindTestEvents();
   }
-
-  // ** Init
   async function init() {
     initTheme();
     await loadLocale(currentLang);
