@@ -230,6 +230,16 @@ func NewHandler() *Handler {
 	go h.backgroundRefresh()
 	// 启动后台统计保存 (每30秒保存一次)
 	go h.backgroundStatsSaver()
+	// 启动后台 observe tick (每 5s 推一次)
+	go h.backgroundObserveTick()
+	// 启动后台 observe 数据保存 (每 5min 保存一次)
+	go h.backgroundObserveSaver()
+	if err := getObserveStore().Load(); err != nil {
+		logger.Warnf("[Observe] Failed to load: %v", err)
+	}
+	// 启动后台定时快照和冷却状态保存
+	go h.backgroundBackupScheduler()
+	go h.backgroundCooldownSaver()
 	return h
 }
 
@@ -257,9 +267,15 @@ func (h *Handler) backgroundRefresh() {
 // refreshAllAccounts 刷新所有账户信息
 func (h *Handler) refreshAllAccounts() {
 	accounts := config.GetAccounts()
+	now := time.Now().Unix()
+	const refreshInterval = 30 * 60
+
 	for i := range accounts {
 		account := &accounts[i]
 		if !account.Enabled || account.AccessToken == "" {
+			continue
+		}
+		if account.Silent || (account.BanStatus != "" && account.BanStatus != "ACTIVE") {
 			continue
 		}
 
@@ -268,20 +284,23 @@ func (h *Handler) refreshAllAccounts() {
 			newAccessToken, newRefreshToken, newExpiresAt, profileArn, err := auth.RefreshToken(account)
 			if err != nil {
 				logger.Warnf("[BackgroundRefresh] Token refresh failed for %s: %v", account.Email, err)
-				h.handleAccountFailure(account, err)
-				continue
+			} else {
+				account.AccessToken = newAccessToken
+				if newRefreshToken != "" {
+					account.RefreshToken = newRefreshToken
+				}
+				account.ExpiresAt = newExpiresAt
+				config.UpdateAccountToken(account.ID, newAccessToken, newRefreshToken, newExpiresAt)
+				h.pool.UpdateToken(account.ID, newAccessToken, newRefreshToken, newExpiresAt)
+				if profileArn != "" {
+					account.ProfileArn = profileArn
+					config.UpdateAccountProfileArn(account.ID, profileArn)
+				}
 			}
-			account.AccessToken = newAccessToken
-			if newRefreshToken != "" {
-				account.RefreshToken = newRefreshToken
-			}
-			account.ExpiresAt = newExpiresAt
-			config.UpdateAccountToken(account.ID, newAccessToken, newRefreshToken, newExpiresAt)
-			h.pool.UpdateToken(account.ID, newAccessToken, newRefreshToken, newExpiresAt)
-			if profileArn != "" {
-				account.ProfileArn = profileArn
-				config.UpdateAccountProfileArn(account.ID, profileArn)
-			}
+		}
+
+		if account.LastRefresh > 0 && now-account.LastRefresh < refreshInterval {
+			continue
 		}
 
 		// 刷新账户信息
@@ -308,7 +327,6 @@ func (h *Handler) validateApiKey(r *http.Request) bool {
 		return true
 	}
 
-	// 从 Authorization 头或 X-Api-Key 头获取
 	authHeader := r.Header.Get("Authorization")
 	apiKeyHeader := r.Header.Get("X-Api-Key")
 
@@ -799,14 +817,14 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 
 	// Stream or non-stream
 	if req.Stream {
-		h.handleClaudeStream(w, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile)
+		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile)
 	} else {
-		h.handleClaudeNonStream(w, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile)
+		h.handleClaudeNonStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile)
 	}
 }
 
 // handleClaudeStream Claude 流式响应
-func (h *Handler) handleClaudeStream(w http.ResponseWriter, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
+func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -847,395 +865,418 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, payload *KiroPayload
 		messageStarted = true
 	}
 
-	for attempt := 0; attempt < maxAccountRetryAttempts; attempt++ {
+	retryPlan := newRequestRetryPlan()
+	totalAttempts := 0
+	for totalAttempts < retryPlan.maxPerRequest {
 		account := h.pool.GetNextForModelExcluding(model, excluded)
 		if account == nil {
 			break
 		}
-		if err := h.ensureValidToken(account); err != nil {
-			lastErr = err
-			excluded[account.ID] = true
-			h.handleAccountFailure(account, err)
-			continue
-		}
-		cacheUsage := h.promptCache.Compute(account.ID, cacheProfile)
-		messageStartUsage = cacheUsage
-
-		var inputTokens, outputTokens int
-		var credits float64
-		var realInputTokens int
-		var toolUses []KiroToolUse
-		var nextContentIndex int
-		var rawContentBuilder strings.Builder
-		var rawThinkingBuilder strings.Builder
-		activeBlockIndex := -1
-		activeBlockType := ""
-
-		closeActiveBlock := func() {
-			if activeBlockIndex < 0 {
-				return
+		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
+			totalAttempts++
+			if err := h.ensureValidToken(account); err != nil {
+				lastErr = err
+				h.handleAccountFailure(account, err)
+				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+					continue
+				}
+				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+				}
+				break
 			}
-			h.sendSSE(w, flusher, "content_block_stop", map[string]interface{}{
-				"type":  "content_block_stop",
-				"index": activeBlockIndex,
-			})
-			activeBlockIndex = -1
-			activeBlockType = ""
-		}
+			cacheUsage := h.promptCache.Compute(account.ID, cacheProfile)
+			messageStartUsage = cacheUsage
 
-		startContentBlock := func(blockType string) {
-			if activeBlockType == blockType {
-				return
-			}
-			ensureMessageStart()
-			closeActiveBlock()
+			var inputTokens, outputTokens int
+			var credits float64
+			var realInputTokens int
+			var toolUses []KiroToolUse
+			var nextContentIndex int
+			var rawContentBuilder strings.Builder
+			var rawThinkingBuilder strings.Builder
+			activeBlockIndex := -1
+			activeBlockType := ""
 
-			idx := nextContentIndex
-			nextContentIndex++
-
-			if blockType == "thinking" {
-				h.sendSSE(w, flusher, "content_block_start", map[string]interface{}{
-					"type":  "content_block_start",
-					"index": idx,
-					"content_block": map[string]string{
-						"type":     "thinking",
-						"thinking": "",
-					},
-				})
-			} else {
-				h.sendSSE(w, flusher, "content_block_start", map[string]interface{}{
-					"type":  "content_block_start",
-					"index": idx,
-					"content_block": map[string]string{
-						"type": "text",
-						"text": "",
-					},
-				})
-			}
-
-			activeBlockIndex = idx
-			activeBlockType = blockType
-		}
-
-		var textBuffer string
-		var inThinkingBlock bool
-		var dropTagThinking bool
-		var thinkingSource thinkingStreamSource
-		var thinkingStarted bool
-		var eventThinkingOpen bool
-
-		sendText := func(text string, thinkingState int) {
-			if thinkingState == 0 {
-				if text == "" {
+			closeActiveBlock := func() {
+				if activeBlockIndex < 0 {
 					return
 				}
-				startContentBlock("text")
-				h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
-					"type":  "content_block_delta",
+				h.sendSSE(w, flusher, "content_block_stop", map[string]interface{}{
+					"type":  "content_block_stop",
 					"index": activeBlockIndex,
-					"delta": map[string]string{"type": "text_delta", "text": text},
 				})
-				return
+				activeBlockIndex = -1
+				activeBlockType = ""
 			}
 
-			if !thinking {
-				return
-			}
-
-			switch thinkingFormat {
-			case "think":
-				var outputText string
-				switch thinkingState {
-				case 1:
-					outputText = "<think>" + text
-				case 2:
-					outputText = text
-				case 3:
-					outputText = text + "</think>"
-				}
-				if outputText == "" {
+			startContentBlock := func(blockType string) {
+				if activeBlockType == blockType {
 					return
 				}
-				startContentBlock("text")
-				h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
-					"type":  "content_block_delta",
-					"index": activeBlockIndex,
-					"delta": map[string]string{"type": "text_delta", "text": outputText},
-				})
-			case "reasoning_content":
-				if text == "" {
-					return
-				}
-				startContentBlock("text")
-				h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
-					"type":  "content_block_delta",
-					"index": activeBlockIndex,
-					"delta": map[string]string{"type": "text_delta", "text": text},
-				})
-			default:
-				if thinkingOpts.OmitDisplay {
-					if thinkingState == 1 {
-						startContentBlock("thinking")
-						return
-					}
-					if thinkingState == 3 {
-						if activeBlockType != "thinking" {
-							startContentBlock("thinking")
-						}
-						closeActiveBlock()
-					}
-					return
-				}
-				if thinkingState == 3 && text == "" {
-					if activeBlockType == "thinking" {
-						closeActiveBlock()
-					}
-					return
-				}
-				if text != "" {
-					startContentBlock("thinking")
-					h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
-						"type":  "content_block_delta",
-						"index": activeBlockIndex,
-						"delta": map[string]string{"type": "thinking_delta", "thinking": text},
-					})
-				}
-				if thinkingState == 3 && activeBlockType == "thinking" {
-					closeActiveBlock()
-				}
-			}
-		}
-
-		processClaudeText := func(text string, isThinking bool, forceFlush bool) {
-			if isThinking && !thinking {
-				return
-			}
-
-			if isThinking {
-				if !allowReasoningSource(&thinkingSource) {
-					return
-				}
-				if !thinkingStarted {
-					sendText(text, 1)
-					thinkingStarted = true
-					eventThinkingOpen = true
-				} else {
-					sendText(text, 2)
-				}
-				return
-			}
-
-			if eventThinkingOpen {
-				sendText("", 3)
-				eventThinkingOpen = false
-				thinkingStarted = false
-			}
-
-			textBuffer += text
-
-			for {
-				if !inThinkingBlock {
-					thinkingStart := strings.Index(textBuffer, "<thinking>")
-					if thinkingStart != -1 {
-						if thinkingStart > 0 {
-							sendText(textBuffer[:thinkingStart], 0)
-						}
-						textBuffer = textBuffer[thinkingStart+10:]
-						inThinkingBlock = true
-						dropTagThinking = !allowTagSource(&thinkingSource)
-						thinkingStarted = false
-					} else if forceFlush || len([]rune(textBuffer)) > 50 {
-						runes := []rune(textBuffer)
-						safeLen := len(runes)
-						if !forceFlush {
-							safeLen = max(0, len(runes)-15)
-						}
-						if safeLen > 0 {
-							sendText(string(runes[:safeLen]), 0)
-							textBuffer = string(runes[safeLen:])
-						}
-						break
-					} else {
-						break
-					}
-				} else {
-					thinkingEnd := strings.Index(textBuffer, "</thinking>")
-					if thinkingEnd != -1 {
-						content := textBuffer[:thinkingEnd]
-						if !dropTagThinking {
-							if !thinkingStarted {
-								sendText(content, 1)
-								sendText("", 3)
-							} else {
-								sendText(content, 3)
-							}
-						}
-						textBuffer = textBuffer[thinkingEnd+11:]
-						inThinkingBlock = false
-						dropTagThinking = false
-						thinkingStarted = false
-					} else if forceFlush {
-						if textBuffer != "" {
-							if !dropTagThinking {
-								if !thinkingStarted {
-									sendText(textBuffer, 1)
-									sendText("", 3)
-								} else {
-									sendText(textBuffer, 3)
-								}
-							}
-							textBuffer = ""
-						}
-						inThinkingBlock = false
-						dropTagThinking = false
-						thinkingStarted = false
-						break
-					} else {
-						runes := []rune(textBuffer)
-						if len(runes) > 20 {
-							safeLen := len(runes) - 15
-							if safeLen > 0 {
-								if !dropTagThinking {
-									if !thinkingStarted {
-										sendText(string(runes[:safeLen]), 1)
-										thinkingStarted = true
-									} else {
-										sendText(string(runes[:safeLen]), 2)
-									}
-								}
-								textBuffer = string(runes[safeLen:])
-							}
-						}
-						break
-					}
-				}
-			}
-		}
-
-		callback := &KiroStreamCallback{
-			OnText: func(text string, isThinking bool) {
-				if text == "" {
-					return
-				}
-				if isThinking {
-					rawThinkingBuilder.WriteString(text)
-				} else {
-					rawContentBuilder.WriteString(text)
-				}
-				processClaudeText(text, isThinking, false)
-			},
-			OnToolUse: func(tu KiroToolUse) {
-				processClaudeText("", false, true)
-				rawContentBuilder.WriteString(tu.Name)
-				if b, err := json.Marshal(tu.Input); err == nil {
-					rawContentBuilder.Write(b)
-				}
-
-				toolUses = append(toolUses, tu)
 				ensureMessageStart()
 				closeActiveBlock()
 
 				idx := nextContentIndex
 				nextContentIndex++
 
-				h.sendSSE(w, flusher, "content_block_start", map[string]interface{}{
-					"type":  "content_block_start",
-					"index": idx,
-					"content_block": map[string]interface{}{
-						"type":  "tool_use",
-						"id":    tu.ToolUseID,
-						"name":  tu.Name,
-						"input": map[string]interface{}{},
-					},
-				})
+				if blockType == "thinking" {
+					h.sendSSE(w, flusher, "content_block_start", map[string]interface{}{
+						"type":  "content_block_start",
+						"index": idx,
+						"content_block": map[string]string{
+							"type":     "thinking",
+							"thinking": "",
+						},
+					})
+				} else {
+					h.sendSSE(w, flusher, "content_block_start", map[string]interface{}{
+						"type":  "content_block_start",
+						"index": idx,
+						"content_block": map[string]string{
+							"type": "text",
+							"text": "",
+						},
+					})
+				}
 
-				inputJSON, _ := json.Marshal(tu.Input)
-				h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
-					"type":  "content_block_delta",
-					"index": idx,
-					"delta": map[string]interface{}{
-						"type":         "input_json_delta",
-						"partial_json": string(inputJSON),
-					},
-				})
-
-				h.sendSSE(w, flusher, "content_block_stop", map[string]interface{}{
-					"type":  "content_block_stop",
-					"index": idx,
-				})
-			},
-			OnComplete: func(inTok, outTok int) {
-				inputTokens = inTok
-				outputTokens = outTok
-			},
-			OnCredits: func(c float64) {
-				credits = c
-			},
-			OnContextUsage: func(pct float64) {
-				realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
-			},
-		}
-
-		err := CallKiroAPI(account, payload, callback)
-		if err != nil {
-			lastErr = err
-			excluded[account.ID] = true
-			h.handleAccountFailure(account, err)
-			if !messageStarted {
-				continue
+				activeBlockIndex = idx
+				activeBlockType = blockType
 			}
-			h.recordFailure()
-			h.sendSSE(w, flusher, "error", map[string]interface{}{
-				"type":  "error",
-				"error": map[string]string{"type": "api_error", "message": err.Error()},
+
+			var textBuffer string
+			var inThinkingBlock bool
+			var dropTagThinking bool
+			var thinkingSource thinkingStreamSource
+			var thinkingStarted bool
+			var eventThinkingOpen bool
+
+			sendText := func(text string, thinkingState int) {
+				if thinkingState == 0 {
+					if text == "" {
+						return
+					}
+					startContentBlock("text")
+					h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
+						"type":  "content_block_delta",
+						"index": activeBlockIndex,
+						"delta": map[string]string{"type": "text_delta", "text": text},
+					})
+					return
+				}
+
+				if !thinking {
+					return
+				}
+
+				switch thinkingFormat {
+				case "think":
+					var outputText string
+					switch thinkingState {
+					case 1:
+						outputText = "<think>" + text
+					case 2:
+						outputText = text
+					case 3:
+						outputText = text + "</think>"
+					}
+					if outputText == "" {
+						return
+					}
+					startContentBlock("text")
+					h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
+						"type":  "content_block_delta",
+						"index": activeBlockIndex,
+						"delta": map[string]string{"type": "text_delta", "text": outputText},
+					})
+				case "reasoning_content":
+					if text == "" {
+						return
+					}
+					startContentBlock("text")
+					h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
+						"type":  "content_block_delta",
+						"index": activeBlockIndex,
+						"delta": map[string]string{"type": "text_delta", "text": text},
+					})
+				default:
+					if thinkingOpts.OmitDisplay {
+						if thinkingState == 1 {
+							startContentBlock("thinking")
+							return
+						}
+						if thinkingState == 3 {
+							if activeBlockType != "thinking" {
+								startContentBlock("thinking")
+							}
+							closeActiveBlock()
+						}
+						return
+					}
+					if thinkingState == 3 && text == "" {
+						if activeBlockType == "thinking" {
+							closeActiveBlock()
+						}
+						return
+					}
+					if text != "" {
+						startContentBlock("thinking")
+						h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
+							"type":  "content_block_delta",
+							"index": activeBlockIndex,
+							"delta": map[string]string{"type": "thinking_delta", "thinking": text},
+						})
+					}
+					if thinkingState == 3 && activeBlockType == "thinking" {
+						closeActiveBlock()
+					}
+				}
+			}
+
+			processClaudeText := func(text string, isThinking bool, forceFlush bool) {
+				if isThinking && !thinking {
+					return
+				}
+
+				if isThinking {
+					if !allowReasoningSource(&thinkingSource) {
+						return
+					}
+					if !thinkingStarted {
+						sendText(text, 1)
+						thinkingStarted = true
+						eventThinkingOpen = true
+					} else {
+						sendText(text, 2)
+					}
+					return
+				}
+
+				if eventThinkingOpen {
+					sendText("", 3)
+					eventThinkingOpen = false
+					thinkingStarted = false
+				}
+
+				textBuffer += text
+
+				for {
+					if !inThinkingBlock {
+						thinkingStart := strings.Index(textBuffer, "<thinking>")
+						if thinkingStart != -1 {
+							if thinkingStart > 0 {
+								sendText(textBuffer[:thinkingStart], 0)
+							}
+							textBuffer = textBuffer[thinkingStart+10:]
+							inThinkingBlock = true
+							dropTagThinking = !allowTagSource(&thinkingSource)
+							thinkingStarted = false
+						} else if forceFlush || len([]rune(textBuffer)) > 50 {
+							runes := []rune(textBuffer)
+							safeLen := len(runes)
+							if !forceFlush {
+								safeLen = max(0, len(runes)-15)
+							}
+							if safeLen > 0 {
+								sendText(string(runes[:safeLen]), 0)
+								textBuffer = string(runes[safeLen:])
+							}
+							break
+						} else {
+							break
+						}
+					} else {
+						thinkingEnd := strings.Index(textBuffer, "</thinking>")
+						if thinkingEnd != -1 {
+							content := textBuffer[:thinkingEnd]
+							if !dropTagThinking {
+								if !thinkingStarted {
+									sendText(content, 1)
+									sendText("", 3)
+								} else {
+									sendText(content, 3)
+								}
+							}
+							textBuffer = textBuffer[thinkingEnd+11:]
+							inThinkingBlock = false
+							dropTagThinking = false
+							thinkingStarted = false
+						} else if forceFlush {
+							if textBuffer != "" {
+								if !dropTagThinking {
+									if !thinkingStarted {
+										sendText(textBuffer, 1)
+										sendText("", 3)
+									} else {
+										sendText(textBuffer, 3)
+									}
+								}
+								textBuffer = ""
+							}
+							inThinkingBlock = false
+							dropTagThinking = false
+							thinkingStarted = false
+							break
+						} else {
+							runes := []rune(textBuffer)
+							if len(runes) > 20 {
+								safeLen := len(runes) - 15
+								if safeLen > 0 {
+									if !dropTagThinking {
+										if !thinkingStarted {
+											sendText(string(runes[:safeLen]), 1)
+											thinkingStarted = true
+										} else {
+											sendText(string(runes[:safeLen]), 2)
+										}
+									}
+									textBuffer = string(runes[safeLen:])
+								}
+							}
+							break
+						}
+					}
+				}
+			}
+
+			callback := &KiroStreamCallback{
+				OnText: func(text string, isThinking bool) {
+					if text == "" {
+						return
+					}
+					if isThinking {
+						rawThinkingBuilder.WriteString(text)
+					} else {
+						rawContentBuilder.WriteString(text)
+					}
+					processClaudeText(text, isThinking, false)
+				},
+				OnToolUse: func(tu KiroToolUse) {
+					processClaudeText("", false, true)
+					rawContentBuilder.WriteString(tu.Name)
+					if b, err := json.Marshal(tu.Input); err == nil {
+						rawContentBuilder.Write(b)
+					}
+
+					toolUses = append(toolUses, tu)
+					ensureMessageStart()
+					closeActiveBlock()
+
+					idx := nextContentIndex
+					nextContentIndex++
+
+					h.sendSSE(w, flusher, "content_block_start", map[string]interface{}{
+						"type":  "content_block_start",
+						"index": idx,
+						"content_block": map[string]interface{}{
+							"type":  "tool_use",
+							"id":    tu.ToolUseID,
+							"name":  tu.Name,
+							"input": map[string]interface{}{},
+						},
+					})
+
+					inputJSON, _ := json.Marshal(tu.Input)
+					h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{
+						"type":  "content_block_delta",
+						"index": idx,
+						"delta": map[string]interface{}{
+							"type":         "input_json_delta",
+							"partial_json": string(inputJSON),
+						},
+					})
+
+					h.sendSSE(w, flusher, "content_block_stop", map[string]interface{}{
+						"type":  "content_block_stop",
+						"index": idx,
+					})
+				},
+				OnComplete: func(inTok, outTok int) {
+					inputTokens = inTok
+					outputTokens = outTok
+				},
+				OnCredits: func(c float64) {
+					credits = c
+				},
+				OnContextUsage: func(pct float64) {
+					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
+				},
+			}
+
+			err := CallKiroAPI(account, payload, callback)
+			if err != nil {
+				lastErr = err
+				h.handleAccountFailure(account, err)
+				getObserveStore().RecordFailure(account.ID, model)
+				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
+				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false)
+				if !messageStarted {
+					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
+						retryPlan.waitBeforeRetry(totalAttempts)
+						continue
+					}
+					if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
+						retryPlan.waitBeforeRetry(totalAttempts)
+					}
+					break
+				}
+				h.recordFailure()
+				h.sendSSE(w, flusher, "error", map[string]interface{}{
+					"type":  "error",
+					"error": map[string]string{"type": "api_error", "message": err.Error()},
+				})
+				return
+			}
+
+			processClaudeText("", false, true)
+			if eventThinkingOpen {
+				sendText("", 3)
+			}
+			closeActiveBlock()
+
+			if realInputTokens > 0 {
+				inputTokens = realInputTokens
+			} else if inputTokens <= 0 {
+				inputTokens = estimatedInputTokens
+			}
+			outputContent, extractedReasoning := extractThinkingFromContent(rawContentBuilder.String())
+			thinkingOutput := rawThinkingBuilder.String()
+			if thinking && thinkingOutput == "" && extractedReasoning != "" {
+				thinkingOutput = extractedReasoning
+			}
+			if !thinking {
+				thinkingOutput = ""
+			}
+			outputTokens = estimateClaudeOutputTokens(outputContent, thinkingOutput, toolUses)
+
+			h.recordSuccess(inputTokens, outputTokens, credits)
+			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
+			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true)
+			h.pool.RecordSuccess(account.ID)
+			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+			h.promptCache.Update(account.ID, cacheProfile)
+
+			stopReason := "end_turn"
+			if len(toolUses) > 0 {
+				stopReason = "tool_use"
+			}
+
+			ensureMessageStart()
+			h.sendSSE(w, flusher, "message_delta", map[string]interface{}{
+				"type": "message_delta",
+				"delta": map[string]interface{}{
+					"stop_reason": stopReason,
+				},
+				"usage": buildClaudeUsageMap(inputTokens, outputTokens, cacheUsage, cacheProfile != nil),
+			})
+
+			h.sendSSE(w, flusher, "message_stop", map[string]interface{}{
+				"type": "message_stop",
 			})
 			return
 		}
-
-		processClaudeText("", false, true)
-		if eventThinkingOpen {
-			sendText("", 3)
-		}
-		closeActiveBlock()
-
-		if realInputTokens > 0 {
-			inputTokens = realInputTokens
-		} else if inputTokens <= 0 {
-			inputTokens = estimatedInputTokens
-		}
-		outputContent, extractedReasoning := extractThinkingFromContent(rawContentBuilder.String())
-		thinkingOutput := rawThinkingBuilder.String()
-		if thinking && thinkingOutput == "" && extractedReasoning != "" {
-			thinkingOutput = extractedReasoning
-		}
-		if !thinking {
-			thinkingOutput = ""
-		}
-		outputTokens = estimateClaudeOutputTokens(outputContent, thinkingOutput, toolUses)
-
-		h.recordSuccess(inputTokens, outputTokens, credits)
-		h.pool.RecordSuccess(account.ID)
-		h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
-		h.promptCache.Update(account.ID, cacheProfile)
-
-		stopReason := "end_turn"
-		if len(toolUses) > 0 {
-			stopReason = "tool_use"
-		}
-
-		ensureMessageStart()
-		h.sendSSE(w, flusher, "message_delta", map[string]interface{}{
-			"type": "message_delta",
-			"delta": map[string]interface{}{
-				"stop_reason": stopReason,
-			},
-			"usage": buildClaudeUsageMap(inputTokens, outputTokens, cacheUsage, cacheProfile != nil),
-		})
-
-		h.sendSSE(w, flusher, "message_stop", map[string]interface{}{
-			"type": "message_stop",
-		})
-		return
+		excluded[account.ID] = true
 	}
 
 	if lastErr == nil {
@@ -1308,114 +1349,137 @@ func (h *Handler) recordFailure() {
 }
 
 // handleClaudeNonStream Claude 非流式响应
-func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
+func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
 	excluded := make(map[string]bool)
 	var lastErr error
 
-	for attempt := 0; attempt < maxAccountRetryAttempts; attempt++ {
+	retryPlan := newRequestRetryPlan()
+	totalAttempts := 0
+	for totalAttempts < retryPlan.maxPerRequest {
 		account := h.pool.GetNextForModelExcluding(model, excluded)
 		if account == nil {
 			break
 		}
-		if err := h.ensureValidToken(account); err != nil {
-			lastErr = err
-			excluded[account.ID] = true
-			h.handleAccountFailure(account, err)
-			continue
-		}
-		cacheUsage := h.promptCache.Compute(account.ID, cacheProfile)
-
-		var content string
-		var thinkingContent string
-		var toolUses []KiroToolUse
-		var inputTokens, outputTokens int
-		var credits float64
-		var realInputTokens int
-
-		callback := &KiroStreamCallback{
-			OnText: func(text string, isThinking bool) {
-				if isThinking {
-					thinkingContent += text
-				} else {
-					content += text
+		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
+			totalAttempts++
+			if err := h.ensureValidToken(account); err != nil {
+				lastErr = err
+				h.handleAccountFailure(account, err)
+				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+					continue
 				}
-			},
-			OnToolUse: func(tu KiroToolUse) {
-				toolUses = append(toolUses, tu)
-			},
-			OnComplete: func(inTok, outTok int) {
-				inputTokens = inTok
-				outputTokens = outTok
-			},
-			OnCredits: func(c float64) {
-				credits = c
-			},
-			OnContextUsage: func(pct float64) {
-				realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
-			},
-		}
-
-		err := CallKiroAPI(account, payload, callback)
-		if err != nil {
-			lastErr = err
-			excluded[account.ID] = true
-			h.handleAccountFailure(account, err)
-			continue
-		}
-
-		thinkingFormat := thinkingOpts.Format
-		finalContent, extractedReasoning := extractThinkingFromContent(content)
-		rawThinkingContent := thinkingContent
-		if thinking && rawThinkingContent == "" && extractedReasoning != "" {
-			rawThinkingContent = extractedReasoning
-		}
-		if !thinking {
-			rawThinkingContent = ""
-		}
-
-		if realInputTokens > 0 {
-			inputTokens = realInputTokens
-		} else if inputTokens <= 0 {
-			inputTokens = estimatedInputTokens
-		}
-		outputTokens = estimateClaudeOutputTokens(finalContent, rawThinkingContent, toolUses)
-
-		h.recordSuccess(inputTokens, outputTokens, credits)
-		h.pool.RecordSuccess(account.ID)
-		h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
-		h.promptCache.Update(account.ID, cacheProfile)
-
-		responseThinkingContent := rawThinkingContent
-		includeEmptyThinkingBlock := thinking && thinkingOpts.OmitDisplay && rawThinkingContent != ""
-		if includeEmptyThinkingBlock {
-			responseThinkingContent = ""
-		}
-
-		if thinking && responseThinkingContent != "" {
-			switch thinkingFormat {
-			case "think":
-				finalContent = "<think>" + responseThinkingContent + "</think>" + finalContent
-				responseThinkingContent = ""
-			case "reasoning_content":
-				finalContent = responseThinkingContent + finalContent
-				responseThinkingContent = ""
-			default:
+				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+				}
+				break
 			}
-		}
+			cacheUsage := h.promptCache.Compute(account.ID, cacheProfile)
 
-		resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
-		resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
-		resp.Usage.CacheCreationInputTokens = cacheUsage.CacheCreationInputTokens
-		resp.Usage.CacheReadInputTokens = cacheUsage.CacheReadInputTokens
-		if cacheProfile != nil {
-			resp.Usage.CacheCreation = &ClaudeCacheCreationUsage{
-				Ephemeral5mInputTokens: cacheUsage.CacheCreation5mInputTokens,
-				Ephemeral1hInputTokens: cacheUsage.CacheCreation1hInputTokens,
+			var content string
+			var thinkingContent string
+			var toolUses []KiroToolUse
+			var inputTokens, outputTokens int
+			var credits float64
+			var realInputTokens int
+
+			callback := &KiroStreamCallback{
+				OnText: func(text string, isThinking bool) {
+					if isThinking {
+						thinkingContent += text
+					} else {
+						content += text
+					}
+				},
+				OnToolUse: func(tu KiroToolUse) {
+					toolUses = append(toolUses, tu)
+				},
+				OnComplete: func(inTok, outTok int) {
+					inputTokens = inTok
+					outputTokens = outTok
+				},
+				OnCredits: func(c float64) {
+					credits = c
+				},
+				OnContextUsage: func(pct float64) {
+					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
+				},
 			}
+
+			err := CallKiroAPI(account, payload, callback)
+			if err != nil {
+				lastErr = err
+				h.handleAccountFailure(account, err)
+				getObserveStore().RecordFailure(account.ID, model)
+				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
+				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false)
+				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+					continue
+				}
+				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+				}
+				break
+			}
+
+			thinkingFormat := thinkingOpts.Format
+			finalContent, extractedReasoning := extractThinkingFromContent(content)
+			rawThinkingContent := thinkingContent
+			if thinking && rawThinkingContent == "" && extractedReasoning != "" {
+				rawThinkingContent = extractedReasoning
+			}
+			if !thinking {
+				rawThinkingContent = ""
+			}
+
+			if realInputTokens > 0 {
+				inputTokens = realInputTokens
+			} else if inputTokens <= 0 {
+				inputTokens = estimatedInputTokens
+			}
+			outputTokens = estimateClaudeOutputTokens(finalContent, rawThinkingContent, toolUses)
+
+			h.recordSuccess(inputTokens, outputTokens, credits)
+			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
+			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true)
+			h.pool.RecordSuccess(account.ID)
+			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+			h.promptCache.Update(account.ID, cacheProfile)
+
+			responseThinkingContent := rawThinkingContent
+			includeEmptyThinkingBlock := thinking && thinkingOpts.OmitDisplay && rawThinkingContent != ""
+			if includeEmptyThinkingBlock {
+				responseThinkingContent = ""
+			}
+
+			if thinking && responseThinkingContent != "" {
+				switch thinkingFormat {
+				case "think":
+					finalContent = "<think>" + responseThinkingContent + "</think>" + finalContent
+					responseThinkingContent = ""
+				case "reasoning_content":
+					finalContent = responseThinkingContent + finalContent
+					responseThinkingContent = ""
+				default:
+				}
+			}
+
+			resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
+			resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
+			resp.Usage.CacheCreationInputTokens = cacheUsage.CacheCreationInputTokens
+			resp.Usage.CacheReadInputTokens = cacheUsage.CacheReadInputTokens
+			if cacheProfile != nil {
+				resp.Usage.CacheCreation = &ClaudeCacheCreationUsage{
+					Ephemeral5mInputTokens: cacheUsage.CacheCreation5mInputTokens,
+					Ephemeral1hInputTokens: cacheUsage.CacheCreation1hInputTokens,
+				}
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			json.NewEncoder(w).Encode(resp)
+			return
 		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		json.NewEncoder(w).Encode(resp)
-		return
+		excluded[account.ID] = true
 	}
 
 	if lastErr == nil {
@@ -1471,14 +1535,14 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	kiroPayload := OpenAIToKiro(&req, thinking)
 
 	if req.Stream {
-		h.handleOpenAIStream(w, kiroPayload, req.Model, thinking, estimatedInputTokens)
+		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens)
 	} else {
-		h.handleOpenAINonStream(w, kiroPayload, req.Model, thinking, estimatedInputTokens)
+		h.handleOpenAINonStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens)
 	}
 }
 
 // handleOpenAIStream OpenAI 流式响应
-func (h *Handler) handleOpenAIStream(w http.ResponseWriter, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
+func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -1496,94 +1560,120 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, payload *KiroPayload
 	excluded := make(map[string]bool)
 	var lastErr error
 
-	for attempt := 0; attempt < maxAccountRetryAttempts; attempt++ {
+	retryPlan := newRequestRetryPlan()
+	totalAttempts := 0
+	for totalAttempts < retryPlan.maxPerRequest {
 		account := h.pool.GetNextForModelExcluding(model, excluded)
 		if account == nil {
 			break
 		}
-		if err := h.ensureValidToken(account); err != nil {
-			lastErr = err
-			excluded[account.ID] = true
-			h.handleAccountFailure(account, err)
-			continue
-		}
-
-		var toolCalls []ToolCall
-		var toolCallIndex int
-		var inputTokens, outputTokens int
-		var credits float64
-		var realInputTokens int
-		var rawContentBuilder strings.Builder
-		var rawReasoningBuilder strings.Builder
-		var textBuffer string
-		var inThinkingBlock bool
-		var dropTagThinking bool
-		var thinkingSource thinkingStreamSource
-		var thinkingStarted bool
-		var eventThinkingOpen bool
-		responseStarted := false
-
-		sendChunk := func(content string, thinkingState int) {
-			if content == "" && thinkingState == 2 {
-				return
+		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
+			totalAttempts++
+			if err := h.ensureValidToken(account); err != nil {
+				lastErr = err
+				h.handleAccountFailure(account, err)
+				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+					continue
+				}
+				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+				}
+				break
 			}
 
-			var chunk map[string]interface{}
+			var toolCalls []ToolCall
+			var toolCallIndex int
+			var inputTokens, outputTokens int
+			var credits float64
+			var realInputTokens int
+			var rawContentBuilder strings.Builder
+			var rawReasoningBuilder strings.Builder
+			var textBuffer string
+			var inThinkingBlock bool
+			var dropTagThinking bool
+			var thinkingSource thinkingStreamSource
+			var thinkingStarted bool
+			var eventThinkingOpen bool
+			responseStarted := false
 
-			if thinkingState > 0 {
-				if !thinking {
+			sendChunk := func(content string, thinkingState int) {
+				if content == "" && thinkingState == 2 {
 					return
 				}
-				switch thinkingFormat {
-				case "thinking":
-					var text string
-					switch thinkingState {
-					case 1:
-						text = "<thinking>" + content
-					case 2:
-						text = content
-					case 3:
-						text = content + "</thinking>"
-					}
-					if text == "" {
+
+				var chunk map[string]interface{}
+
+				if thinkingState > 0 {
+					if !thinking {
 						return
 					}
-					chunk = map[string]interface{}{
-						"id":      chatID,
-						"object":  "chat.completion.chunk",
-						"created": time.Now().Unix(),
-						"model":   model,
-						"choices": []map[string]interface{}{{
-							"index":         0,
-							"delta":         map[string]string{"content": text},
-							"finish_reason": nil,
-						}},
+					switch thinkingFormat {
+					case "thinking":
+						var text string
+						switch thinkingState {
+						case 1:
+							text = "<thinking>" + content
+						case 2:
+							text = content
+						case 3:
+							text = content + "</thinking>"
+						}
+						if text == "" {
+							return
+						}
+						chunk = map[string]interface{}{
+							"id":      chatID,
+							"object":  "chat.completion.chunk",
+							"created": time.Now().Unix(),
+							"model":   model,
+							"choices": []map[string]interface{}{{
+								"index":         0,
+								"delta":         map[string]string{"content": text},
+								"finish_reason": nil,
+							}},
+						}
+					case "think":
+						var text string
+						switch thinkingState {
+						case 1:
+							text = "<think>" + content
+						case 2:
+							text = content
+						case 3:
+							text = content + "</think>"
+						}
+						if text == "" {
+							return
+						}
+						chunk = map[string]interface{}{
+							"id":      chatID,
+							"object":  "chat.completion.chunk",
+							"created": time.Now().Unix(),
+							"model":   model,
+							"choices": []map[string]interface{}{{
+								"index":         0,
+								"delta":         map[string]string{"content": text},
+								"finish_reason": nil,
+							}},
+						}
+					default:
+						if content == "" {
+							return
+						}
+						chunk = map[string]interface{}{
+							"id":      chatID,
+							"object":  "chat.completion.chunk",
+							"created": time.Now().Unix(),
+							"model":   model,
+							"choices": []map[string]interface{}{{
+								"index":         0,
+								"delta":         map[string]string{"reasoning_content": content},
+								"finish_reason": nil,
+							}},
+						}
 					}
-				case "think":
-					var text string
-					switch thinkingState {
-					case 1:
-						text = "<think>" + content
-					case 2:
-						text = content
-					case 3:
-						text = content + "</think>"
-					}
-					if text == "" {
-						return
-					}
-					chunk = map[string]interface{}{
-						"id":      chatID,
-						"object":  "chat.completion.chunk",
-						"created": time.Now().Unix(),
-						"model":   model,
-						"choices": []map[string]interface{}{{
-							"index":         0,
-							"delta":         map[string]string{"content": text},
-							"finish_reason": nil,
-						}},
-					}
-				default:
+				} else {
 					if content == "" {
 						return
 					}
@@ -1594,267 +1684,264 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, payload *KiroPayload
 						"model":   model,
 						"choices": []map[string]interface{}{{
 							"index":         0,
-							"delta":         map[string]string{"reasoning_content": content},
+							"delta":         map[string]string{"content": content},
 							"finish_reason": nil,
 						}},
 					}
 				}
-			} else {
-				if content == "" {
-					return
-				}
-				chunk = map[string]interface{}{
-					"id":      chatID,
-					"object":  "chat.completion.chunk",
-					"created": time.Now().Unix(),
-					"model":   model,
-					"choices": []map[string]interface{}{{
-						"index":         0,
-						"delta":         map[string]string{"content": content},
-						"finish_reason": nil,
-					}},
-				}
-			}
-			data, _ := json.Marshal(chunk)
-			fmt.Fprintf(w, "data: %s\n\n", string(data))
-			flusher.Flush()
-			responseStarted = true
-		}
-
-		processText := func(text string, isThinking bool, forceFlush bool) {
-			if isThinking && !thinking {
-				return
-			}
-
-			if isThinking {
-				if !allowReasoningSource(&thinkingSource) {
-					return
-				}
-				if !thinkingStarted {
-					sendChunk(text, 1)
-					thinkingStarted = true
-					eventThinkingOpen = true
-				} else {
-					sendChunk(text, 2)
-				}
-				return
-			}
-
-			if eventThinkingOpen {
-				sendChunk("", 3)
-				eventThinkingOpen = false
-				thinkingStarted = false
-			}
-
-			textBuffer += text
-
-			for {
-				if !inThinkingBlock {
-					thinkingStart := strings.Index(textBuffer, "<thinking>")
-					if thinkingStart != -1 {
-						if thinkingStart > 0 {
-							sendChunk(textBuffer[:thinkingStart], 0)
-						}
-						textBuffer = textBuffer[thinkingStart+10:]
-						inThinkingBlock = true
-						dropTagThinking = !allowTagSource(&thinkingSource)
-						thinkingStarted = false
-					} else if forceFlush || len([]rune(textBuffer)) > 50 {
-						runes := []rune(textBuffer)
-						safeLen := len(runes)
-						if !forceFlush {
-							safeLen = max(0, len(runes)-15)
-						}
-						if safeLen > 0 {
-							sendChunk(string(runes[:safeLen]), 0)
-							textBuffer = string(runes[safeLen:])
-						}
-						break
-					} else {
-						break
-					}
-				} else {
-					thinkingEnd := strings.Index(textBuffer, "</thinking>")
-					if thinkingEnd != -1 {
-						content := textBuffer[:thinkingEnd]
-						if !dropTagThinking {
-							if !thinkingStarted {
-								sendChunk(content, 1)
-								sendChunk("", 3)
-							} else {
-								sendChunk(content, 3)
-							}
-						}
-						textBuffer = textBuffer[thinkingEnd+11:]
-						inThinkingBlock = false
-						dropTagThinking = false
-						thinkingStarted = false
-					} else if forceFlush {
-						if textBuffer != "" {
-							if !dropTagThinking {
-								if !thinkingStarted {
-									sendChunk(textBuffer, 1)
-									sendChunk("", 3)
-								} else {
-									sendChunk(textBuffer, 3)
-								}
-							}
-							textBuffer = ""
-						}
-						inThinkingBlock = false
-						dropTagThinking = false
-						thinkingStarted = false
-						break
-					} else {
-						runes := []rune(textBuffer)
-						if len(runes) > 20 {
-							safeLen := len(runes) - 15
-							if safeLen > 0 {
-								if !dropTagThinking {
-									if !thinkingStarted {
-										sendChunk(string(runes[:safeLen]), 1)
-										thinkingStarted = true
-									} else {
-										sendChunk(string(runes[:safeLen]), 2)
-									}
-								}
-								textBuffer = string(runes[safeLen:])
-							}
-						}
-						break
-					}
-				}
-			}
-		}
-
-		callback := &KiroStreamCallback{
-			OnText: func(text string, isThinking bool) {
-				if text == "" {
-					return
-				}
-				if isThinking {
-					rawReasoningBuilder.WriteString(text)
-				} else {
-					rawContentBuilder.WriteString(text)
-				}
-				processText(text, isThinking, false)
-			},
-			OnToolUse: func(tu KiroToolUse) {
-				processText("", false, true)
-
-				args, _ := json.Marshal(tu.Input)
-				rawContentBuilder.WriteString(tu.Name)
-				rawContentBuilder.Write(args)
-				tc := ToolCall{ID: tu.ToolUseID, Type: "function"}
-				tc.Function.Name = tu.Name
-				tc.Function.Arguments = string(args)
-				toolCalls = append(toolCalls, tc)
-
-				chunk := map[string]interface{}{
-					"id":      chatID,
-					"object":  "chat.completion.chunk",
-					"created": time.Now().Unix(),
-					"model":   model,
-					"choices": []map[string]interface{}{{
-						"index": 0,
-						"delta": map[string]interface{}{
-							"tool_calls": []map[string]interface{}{{
-								"index": toolCallIndex,
-								"id":    tu.ToolUseID,
-								"type":  "function",
-								"function": map[string]string{
-									"name":      tu.Name,
-									"arguments": string(args),
-								},
-							}},
-						},
-						"finish_reason": nil,
-					}},
-				}
-				toolCallIndex++
 				data, _ := json.Marshal(chunk)
 				fmt.Fprintf(w, "data: %s\n\n", string(data))
 				flusher.Flush()
 				responseStarted = true
-			},
-			OnComplete: func(inTok, outTok int) {
-				inputTokens = inTok
-				outputTokens = outTok
-			},
-			OnCredits: func(c float64) {
-				credits = c
-			},
-			OnContextUsage: func(pct float64) {
-				realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
-			},
-		}
-
-		err := CallKiroAPI(account, payload, callback)
-		if err != nil {
-			lastErr = err
-			excluded[account.ID] = true
-			h.handleAccountFailure(account, err)
-			if !responseStarted {
-				continue
 			}
-			h.recordFailure()
+
+			processText := func(text string, isThinking bool, forceFlush bool) {
+				if isThinking && !thinking {
+					return
+				}
+
+				if isThinking {
+					if !allowReasoningSource(&thinkingSource) {
+						return
+					}
+					if !thinkingStarted {
+						sendChunk(text, 1)
+						thinkingStarted = true
+						eventThinkingOpen = true
+					} else {
+						sendChunk(text, 2)
+					}
+					return
+				}
+
+				if eventThinkingOpen {
+					sendChunk("", 3)
+					eventThinkingOpen = false
+					thinkingStarted = false
+				}
+
+				textBuffer += text
+
+				for {
+					if !inThinkingBlock {
+						thinkingStart := strings.Index(textBuffer, "<thinking>")
+						if thinkingStart != -1 {
+							if thinkingStart > 0 {
+								sendChunk(textBuffer[:thinkingStart], 0)
+							}
+							textBuffer = textBuffer[thinkingStart+10:]
+							inThinkingBlock = true
+							dropTagThinking = !allowTagSource(&thinkingSource)
+							thinkingStarted = false
+						} else if forceFlush || len([]rune(textBuffer)) > 50 {
+							runes := []rune(textBuffer)
+							safeLen := len(runes)
+							if !forceFlush {
+								safeLen = max(0, len(runes)-15)
+							}
+							if safeLen > 0 {
+								sendChunk(string(runes[:safeLen]), 0)
+								textBuffer = string(runes[safeLen:])
+							}
+							break
+						} else {
+							break
+						}
+					} else {
+						thinkingEnd := strings.Index(textBuffer, "</thinking>")
+						if thinkingEnd != -1 {
+							content := textBuffer[:thinkingEnd]
+							if !dropTagThinking {
+								if !thinkingStarted {
+									sendChunk(content, 1)
+									sendChunk("", 3)
+								} else {
+									sendChunk(content, 3)
+								}
+							}
+							textBuffer = textBuffer[thinkingEnd+11:]
+							inThinkingBlock = false
+							dropTagThinking = false
+							thinkingStarted = false
+						} else if forceFlush {
+							if textBuffer != "" {
+								if !dropTagThinking {
+									if !thinkingStarted {
+										sendChunk(textBuffer, 1)
+										sendChunk("", 3)
+									} else {
+										sendChunk(textBuffer, 3)
+									}
+								}
+								textBuffer = ""
+							}
+							inThinkingBlock = false
+							dropTagThinking = false
+							thinkingStarted = false
+							break
+						} else {
+							runes := []rune(textBuffer)
+							if len(runes) > 20 {
+								safeLen := len(runes) - 15
+								if safeLen > 0 {
+									if !dropTagThinking {
+										if !thinkingStarted {
+											sendChunk(string(runes[:safeLen]), 1)
+											thinkingStarted = true
+										} else {
+											sendChunk(string(runes[:safeLen]), 2)
+										}
+									}
+									textBuffer = string(runes[safeLen:])
+								}
+							}
+							break
+						}
+					}
+				}
+			}
+
+			callback := &KiroStreamCallback{
+				OnText: func(text string, isThinking bool) {
+					if text == "" {
+						return
+					}
+					if isThinking {
+						rawReasoningBuilder.WriteString(text)
+					} else {
+						rawContentBuilder.WriteString(text)
+					}
+					processText(text, isThinking, false)
+				},
+				OnToolUse: func(tu KiroToolUse) {
+					processText("", false, true)
+
+					args, _ := json.Marshal(tu.Input)
+					rawContentBuilder.WriteString(tu.Name)
+					rawContentBuilder.Write(args)
+					tc := ToolCall{ID: tu.ToolUseID, Type: "function"}
+					tc.Function.Name = tu.Name
+					tc.Function.Arguments = string(args)
+					toolCalls = append(toolCalls, tc)
+
+					chunk := map[string]interface{}{
+						"id":      chatID,
+						"object":  "chat.completion.chunk",
+						"created": time.Now().Unix(),
+						"model":   model,
+						"choices": []map[string]interface{}{{
+							"index": 0,
+							"delta": map[string]interface{}{
+								"tool_calls": []map[string]interface{}{{
+									"index": toolCallIndex,
+									"id":    tu.ToolUseID,
+									"type":  "function",
+									"function": map[string]string{
+										"name":      tu.Name,
+										"arguments": string(args),
+									},
+								}},
+							},
+							"finish_reason": nil,
+						}},
+					}
+					toolCallIndex++
+					data, _ := json.Marshal(chunk)
+					fmt.Fprintf(w, "data: %s\n\n", string(data))
+					flusher.Flush()
+					responseStarted = true
+				},
+				OnComplete: func(inTok, outTok int) {
+					inputTokens = inTok
+					outputTokens = outTok
+				},
+				OnCredits: func(c float64) {
+					credits = c
+				},
+				OnContextUsage: func(pct float64) {
+					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
+				},
+			}
+
+			err := CallKiroAPI(account, payload, callback)
+			if err != nil {
+				lastErr = err
+				h.handleAccountFailure(account, err)
+				getObserveStore().RecordFailure(account.ID, model)
+				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
+				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false)
+				if !responseStarted {
+					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
+						retryPlan.waitBeforeRetry(totalAttempts)
+						continue
+					}
+					if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
+						retryPlan.waitBeforeRetry(totalAttempts)
+					}
+					break
+				}
+				h.recordFailure()
+				return
+			}
+
+			processText("", false, true)
+			if eventThinkingOpen {
+				sendChunk("", 3)
+			}
+
+			if realInputTokens > 0 {
+				inputTokens = realInputTokens
+			} else if inputTokens <= 0 {
+				inputTokens = estimatedInputTokens
+			}
+			outputContent, extractedReasoning := extractThinkingFromContent(rawContentBuilder.String())
+			reasoningOutput := rawReasoningBuilder.String()
+			if thinking && reasoningOutput == "" && extractedReasoning != "" {
+				reasoningOutput = extractedReasoning
+			}
+			if !thinking {
+				reasoningOutput = ""
+			}
+			outputTokens = estimateApproxTokens(outputContent) + estimateApproxTokens(reasoningOutput)
+			for _, tc := range toolCalls {
+				outputTokens += estimateApproxTokens(tc.Function.Name)
+				outputTokens += estimateApproxTokens(tc.Function.Arguments)
+			}
+
+			h.recordSuccess(inputTokens, outputTokens, credits)
+			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
+			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true)
+			h.pool.RecordSuccess(account.ID)
+			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+
+			finishReason := "stop"
+			if len(toolCalls) > 0 {
+				finishReason = "tool_calls"
+			}
+
+			chunk := map[string]interface{}{
+				"id":      chatID,
+				"object":  "chat.completion.chunk",
+				"created": time.Now().Unix(),
+				"model":   model,
+				"choices": []map[string]interface{}{{
+					"index":         0,
+					"delta":         map[string]interface{}{},
+					"finish_reason": finishReason,
+				}},
+				"usage": map[string]int{
+					"prompt_tokens":     inputTokens,
+					"completion_tokens": outputTokens,
+					"total_tokens":      inputTokens + outputTokens,
+				},
+			}
+			data, _ := json.Marshal(chunk)
+			fmt.Fprintf(w, "data: %s\n\n", string(data))
+			fmt.Fprintf(w, "data: [DONE]\n\n")
+			flusher.Flush()
 			return
 		}
-
-		processText("", false, true)
-		if eventThinkingOpen {
-			sendChunk("", 3)
-		}
-
-		if realInputTokens > 0 {
-			inputTokens = realInputTokens
-		} else if inputTokens <= 0 {
-			inputTokens = estimatedInputTokens
-		}
-		outputContent, extractedReasoning := extractThinkingFromContent(rawContentBuilder.String())
-		reasoningOutput := rawReasoningBuilder.String()
-		if thinking && reasoningOutput == "" && extractedReasoning != "" {
-			reasoningOutput = extractedReasoning
-		}
-		if !thinking {
-			reasoningOutput = ""
-		}
-		outputTokens = estimateApproxTokens(outputContent) + estimateApproxTokens(reasoningOutput)
-		for _, tc := range toolCalls {
-			outputTokens += estimateApproxTokens(tc.Function.Name)
-			outputTokens += estimateApproxTokens(tc.Function.Arguments)
-		}
-
-		h.recordSuccess(inputTokens, outputTokens, credits)
-		h.pool.RecordSuccess(account.ID)
-		h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
-
-		finishReason := "stop"
-		if len(toolCalls) > 0 {
-			finishReason = "tool_calls"
-		}
-
-		chunk := map[string]interface{}{
-			"id":      chatID,
-			"object":  "chat.completion.chunk",
-			"created": time.Now().Unix(),
-			"model":   model,
-			"choices": []map[string]interface{}{{
-				"index":         0,
-				"delta":         map[string]interface{}{},
-				"finish_reason": finishReason,
-			}},
-			"usage": map[string]int{
-				"prompt_tokens":     inputTokens,
-				"completion_tokens": outputTokens,
-				"total_tokens":      inputTokens + outputTokens,
-			},
-		}
-		data, _ := json.Marshal(chunk)
-		fmt.Fprintf(w, "data: %s\n\n", string(data))
-		fmt.Fprintf(w, "data: [DONE]\n\n")
-		flusher.Flush()
-		return
+		excluded[account.ID] = true
 	}
 
 	if lastErr == nil {
@@ -1867,76 +1954,99 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, payload *KiroPayload
 }
 
 // handleOpenAINonStream OpenAI 非流式响应
-func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
+func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
 	excluded := make(map[string]bool)
 	var lastErr error
 
-	for attempt := 0; attempt < maxAccountRetryAttempts; attempt++ {
+	retryPlan := newRequestRetryPlan()
+	totalAttempts := 0
+	for totalAttempts < retryPlan.maxPerRequest {
 		account := h.pool.GetNextForModelExcluding(model, excluded)
 		if account == nil {
 			break
 		}
-		if err := h.ensureValidToken(account); err != nil {
-			lastErr = err
-			excluded[account.ID] = true
-			h.handleAccountFailure(account, err)
-			continue
-		}
-
-		var content string
-		var reasoningContent string
-		var toolUses []KiroToolUse
-		var inputTokens, outputTokens int
-		var credits float64
-		var realInputTokens int
-
-		callback := &KiroStreamCallback{
-			OnText: func(text string, isThinking bool) {
-				if isThinking {
-					reasoningContent += text
-				} else {
-					content += text
+		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
+			totalAttempts++
+			if err := h.ensureValidToken(account); err != nil {
+				lastErr = err
+				h.handleAccountFailure(account, err)
+				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+					continue
 				}
-			},
-			OnToolUse:  func(tu KiroToolUse) { toolUses = append(toolUses, tu) },
-			OnComplete: func(inTok, outTok int) { inputTokens = inTok; outputTokens = outTok },
-			OnCredits:  func(c float64) { credits = c },
-			OnContextUsage: func(pct float64) {
-				realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
-			},
+				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+				}
+				break
+			}
+
+			var content string
+			var reasoningContent string
+			var toolUses []KiroToolUse
+			var inputTokens, outputTokens int
+			var credits float64
+			var realInputTokens int
+
+			callback := &KiroStreamCallback{
+				OnText: func(text string, isThinking bool) {
+					if isThinking {
+						reasoningContent += text
+					} else {
+						content += text
+					}
+				},
+				OnToolUse:  func(tu KiroToolUse) { toolUses = append(toolUses, tu) },
+				OnComplete: func(inTok, outTok int) { inputTokens = inTok; outputTokens = outTok },
+				OnCredits:  func(c float64) { credits = c },
+				OnContextUsage: func(pct float64) {
+					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
+				},
+			}
+
+			err := CallKiroAPI(account, payload, callback)
+			if err != nil {
+				lastErr = err
+				h.handleAccountFailure(account, err)
+				getObserveStore().RecordFailure(account.ID, model)
+				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
+				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false)
+				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+					continue
+				}
+				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
+					retryPlan.waitBeforeRetry(totalAttempts)
+				}
+				break
+			}
+
+			finalContent, extractedReasoning := extractThinkingFromContent(content)
+			if thinking && reasoningContent == "" && extractedReasoning != "" {
+				reasoningContent = extractedReasoning
+			} else if !thinking {
+				reasoningContent = ""
+			}
+
+			if realInputTokens > 0 {
+				inputTokens = realInputTokens
+			} else if inputTokens <= 0 {
+				inputTokens = estimatedInputTokens
+			}
+			outputTokens = estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
+
+			h.recordSuccess(inputTokens, outputTokens, credits)
+			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
+			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true)
+			h.pool.RecordSuccess(account.ID)
+			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+
+			thinkingFormat := config.GetThinkingConfig().OpenAIFormat
+			resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			json.NewEncoder(w).Encode(resp)
+			return
 		}
-
-		err := CallKiroAPI(account, payload, callback)
-		if err != nil {
-			lastErr = err
-			excluded[account.ID] = true
-			h.handleAccountFailure(account, err)
-			continue
-		}
-
-		finalContent, extractedReasoning := extractThinkingFromContent(content)
-		if thinking && reasoningContent == "" && extractedReasoning != "" {
-			reasoningContent = extractedReasoning
-		} else if !thinking {
-			reasoningContent = ""
-		}
-
-		if realInputTokens > 0 {
-			inputTokens = realInputTokens
-		} else if inputTokens <= 0 {
-			inputTokens = estimatedInputTokens
-		}
-		outputTokens = estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
-
-		h.recordSuccess(inputTokens, outputTokens, credits)
-		h.pool.RecordSuccess(account.ID)
-		h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
-
-		thinkingFormat := config.GetThinkingConfig().OpenAIFormat
-		resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		json.NewEncoder(w).Encode(resp)
-		return
+		excluded[account.ID] = true
 	}
 
 	if lastErr == nil {
@@ -2005,6 +2115,11 @@ func (h *Handler) ensureValidToken(account *config.Account) error {
 // ==================== 管理 API ====================
 
 func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/admin/api/events" && r.Method == "GET" {
+		h.apiEventsStream(w, r)
+		return
+	}
+
 	// 验证密码
 	password := r.Header.Get("X-Admin-Password")
 	if password == "" {
@@ -2100,6 +2215,36 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetVersion(w, r)
 	case path == "/export" && r.Method == "POST":
 		h.apiExportAccounts(w, r)
+	case path == "/observe/overview" && r.Method == "GET":
+		h.apiObserveOverview(w, r)
+	case path == "/observe/account-heatmap" && r.Method == "GET":
+		h.apiObserveHeatmap(w, r)
+	case path == "/observe/model-mix" && r.Method == "GET":
+		h.apiObserveModelMix(w, r)
+	case path == "/observe/recent-errors" && r.Method == "GET":
+		h.apiObserveRecentErrors(w, r)
+	case path == "/observe/recent-requests" && r.Method == "GET":
+		h.apiObserveRecentRequests(w, r)
+	case path == "/backups" && r.Method == "GET":
+		h.apiBackupsList(w, r)
+	case path == "/backups" && r.Method == "POST":
+		h.apiBackupsCreate(w, r)
+	case path == "/backups/restore" && r.Method == "POST":
+		h.apiBackupsRestoreUpload(w, r)
+	case path == "/backups/schedule" && r.Method == "GET":
+		h.apiBackupsScheduleGet(w, r)
+	case path == "/backups/schedule" && r.Method == "POST":
+		h.apiBackupsScheduleUpdate(w, r)
+	case strings.HasPrefix(path, "/backups/") && strings.HasSuffix(path, "/download") && r.Method == "GET":
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/backups/"), "/download")
+		h.apiBackupsDownload(w, r, id)
+	case strings.HasPrefix(path, "/backups/") && strings.HasSuffix(path, "/restore") && r.Method == "POST":
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/backups/"), "/restore")
+		h.apiBackupsRestore(w, r, id)
+	case strings.HasPrefix(path, "/backups/") && r.Method == "GET":
+		h.apiBackupsGet(w, r, strings.TrimPrefix(path, "/backups/"))
+	case strings.HasPrefix(path, "/backups/") && r.Method == "DELETE":
+		h.apiBackupsDelete(w, r, strings.TrimPrefix(path, "/backups/"))
 	default:
 		w.WriteHeader(404)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Not Found"})
@@ -2131,6 +2276,9 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, r *http.Request) {
 			"provider":          a.Provider,
 			"region":            a.Region,
 			"enabled":           a.Enabled,
+			"silent":            a.Silent,
+			"silentReason":      a.SilentReason,
+			"silentTime":        a.SilentTime,
 			"banStatus":         a.BanStatus,
 			"banReason":         a.BanReason,
 			"banTime":           a.BanTime,
@@ -2234,6 +2382,14 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	oldEnabled := existing.Enabled
 	if v, ok := updates["enabled"].(bool); ok {
 		existing.Enabled = v
+		if v && existing.BanStatus != "" && existing.BanStatus != "ACTIVE" {
+			existing.BanStatus = "ACTIVE"
+			existing.BanReason = ""
+			existing.BanTime = 0
+			existing.Silent = false
+			existing.SilentReason = ""
+			existing.SilentTime = 0
+		}
 	}
 	if v, ok := updates["nickname"].(string); ok {
 		existing.Nickname = v
@@ -2253,7 +2409,23 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	if v, ok := updates["proxyURL"].(string); ok {
 		existing.ProxyURL = v
 	}
-
+	if v, ok := updates["silent"].(bool); ok {
+		existing.Silent = v
+		if v {
+			existing.Enabled = false
+			if reason, ok := updates["silentReason"].(string); ok && strings.TrimSpace(reason) != "" {
+				existing.SilentReason = strings.TrimSpace(reason)
+			} else if existing.SilentReason == "" {
+				existing.SilentReason = "manual"
+			}
+			if existing.SilentTime == 0 {
+				existing.SilentTime = time.Now().Unix()
+			}
+		} else {
+			existing.SilentReason = ""
+			existing.SilentTime = 0
+		}
+	}
 	if err := config.UpdateAccount(id, *existing); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -2309,6 +2481,11 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 					a.BanStatus = "ACTIVE"
 					a.BanReason = ""
 					a.BanTime = 0
+				}
+				if enabled {
+					a.Silent = false
+					a.SilentReason = ""
+					a.SilentTime = 0
 				}
 				config.UpdateAccount(a.ID, a)
 			}
@@ -2748,6 +2925,22 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) apiGetStatus(w http.ResponseWriter, r *http.Request) {
+	totalBanned := 0
+	todayBanned := 0
+	totalExhausted := 0
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+	for _, a := range config.GetAccounts() {
+		if a.BanStatus != "" && a.BanStatus != "ACTIVE" {
+			totalBanned++
+			if a.BanTime >= todayStart {
+				todayBanned++
+			}
+		}
+		if a.UsageLimit > 0 && a.UsageCurrent >= a.UsageLimit {
+			totalExhausted++
+		}
+	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"accounts":        h.pool.Count(),
 		"available":       h.pool.AvailableCount(),
@@ -2757,6 +2950,9 @@ func (h *Handler) apiGetStatus(w http.ResponseWriter, r *http.Request) {
 		"totalTokens":     h.totalTokens,
 		"totalCredits":    h.totalCredits,
 		"uptime":          time.Now().Unix() - h.startTime,
+		"totalBanned":     totalBanned,
+		"todayBanned":     todayBanned,
+		"totalExhausted":  totalExhausted,
 	})
 }
 
@@ -2864,6 +3060,10 @@ func (h *Handler) apiResetStats(w http.ResponseWriter, r *http.Request) {
 	h.totalCredits = 0
 	h.creditsMu.Unlock()
 	config.UpdateStats(0, 0, 0, 0, 0)
+	getObserveStore().Reset()
+	if err := getObserveStore().Save(); err != nil {
+		logger.Warnf("[Observe] Failed to persist reset state: %v", err)
+	}
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -3091,6 +3291,9 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, r *http.Request, id s
 		"overageWeight":     account.OverageWeight,
 		"proxyURL":          account.ProxyURL,
 		"enabled":           account.Enabled,
+		"silent":            account.Silent,
+		"silentReason":      account.SilentReason,
+		"silentTime":        account.SilentTime,
 		"banStatus":         account.BanStatus,
 		"banReason":         account.BanReason,
 		"banTime":           account.BanTime,

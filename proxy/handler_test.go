@@ -96,15 +96,16 @@ func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) 
 	}
 
 	rec := httptest.NewRecorder()
-	h.handleClaudeNonStream(rec, payload, "claude-sonnet-4.5", false, claudeThinkingResponseOptions{}, 1, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	h.handleClaudeNonStream(rec, req, payload, "claude-sonnet-4.5", false, claudeThinkingResponseOptions{}, 1, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected retry to succeed, status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if len(requestTokens) != 2 {
-		t.Fatalf("expected two account attempts, got %v", requestTokens)
+	if len(requestTokens) != 4 {
+		t.Fatalf("expected four account attempts, got %v", requestTokens)
 	}
-	if requestTokens[0] != "token-first" || requestTokens[1] != "token-second" {
+	if requestTokens[0] != "token-first" || requestTokens[1] != "token-first" || requestTokens[2] != "token-first" || requestTokens[3] != "token-second" {
 		t.Fatalf("expected first account to be excluded before retry, got %v", requestTokens)
 	}
 

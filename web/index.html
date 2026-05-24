@@ -109,6 +109,12 @@
           <div class="tabs" id="tabBar">
             <button type="button" class="tab active" data-tab="accounts"><i class="fa-solid fa-users tab-icon"></i><span
                 data-i18n="tabs.accounts"></span></button>
+            <button type="button" class="tab" data-tab="observe"><i
+                class="fa-solid fa-chart-line tab-icon"></i><span data-i18n="tabs.observe"></span></button>
+            <button type="button" class="tab" data-tab="requests"><i
+                class="fa-solid fa-list-check tab-icon"></i><span data-i18n="tabs.requests"></span></button>
+            <button type="button" class="tab" data-tab="backups"><i class="fa-solid fa-box-archive tab-icon"></i><span
+                data-i18n="tabs.backups"></span></button>
             <button type="button" class="tab" data-tab="settings"><i class="fa-solid fa-sliders tab-icon"></i><span
                 data-i18n="tabs.settings"></span></button>
             <button type="button" class="tab" data-tab="api"><i class="fa-solid fa-plug tab-icon"></i><span
@@ -233,6 +239,47 @@
           </div>
 
           <div id="accountsList"></div>
+        </div>
+      </div>
+
+      <!-- Observe tab -->
+      <div id="tabObserve" class="tab-content hidden">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="observe.title"></span>
+            <div class="card-actions">
+              <span class="badge badge-info" id="observeLiveBadge" data-i18n="observe.live"></span>
+              <button class="btn btn-outline btn-sm" id="refreshObserveBtn" type="button"><i
+                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text" data-i18n="common.refresh"></span></button>
+            </div>
+          </div>
+          <div class="feature-stats-grid" id="observeSummary"></div>
+          <div class="panel-split">
+            <section>
+              <div class="panel-section-title" data-i18n="observe.heatmap"></div>
+              <div id="observeHeatmap" class="heatmap-wrap"></div>
+            </section>
+            <section>
+              <div class="panel-section-title" data-i18n="observe.modelMix"></div>
+              <div id="observeModelMix" class="table-wrap"></div>
+            </section>
+          </div>
+          <div class="panel-section-title" data-i18n="observe.errors"></div>
+          <div id="observeErrors" class="table-wrap"></div>
+        </div>
+      </div>
+
+      <!-- Requests tab -->
+      <div id="tabRequests" class="tab-content hidden">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="requests.title"></span>
+            <div class="card-actions">
+              <button class="btn btn-outline btn-sm" id="refreshRequestsBtn" type="button"><i
+                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text" data-i18n="common.refresh"></span></button>
+            </div>
+          </div>
+          <div id="requestsTable" class="table-wrap"></div>
         </div>
       </div>
 
@@ -474,6 +521,51 @@
           <p class="api-hint"><i class="fa-solid fa-key"></i><span data-i18n="api.statsHint"></span></p>
         </section>
       </div>
+
+      <!-- Backups tab -->
+      <div id="tabBackups" class="tab-content hidden">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="backups.title"></span>
+            <div class="card-actions">
+              <input type="file" id="backupUploadInput" class="file-input-hidden" accept="application/json,.json" />
+              <button class="btn btn-outline btn-sm" id="uploadBackupBtn" type="button"><i
+                  class="fa-solid fa-file-import"></i><span class="btn-text" data-i18n="backups.upload"></span></button>
+              <button class="btn btn-outline btn-sm" id="refreshBackupsBtn" type="button"><i
+                  class="fa-solid fa-arrows-rotate"></i><span class="btn-text" data-i18n="common.refresh"></span></button>
+              <button class="btn btn-primary btn-sm" id="createBackupBtn" type="button"><i
+                  class="fa-solid fa-plus"></i><span class="btn-text" data-i18n="backups.create"></span></button>
+            </div>
+          </div>
+          <div class="settings-inline-grid backup-schedule-grid">
+            <label class="backup-schedule-toggle">
+              <span class="switch"><input type="checkbox" id="backupScheduleEnabled" /><span
+                  class="slider"></span></span>
+              <span data-i18n="backups.scheduleEnabled"></span>
+            </label>
+            <div class="backup-schedule-field">
+              <label class="backup-field-label" for="backupCadence" data-i18n="backups.cadence"></label>
+              <select id="backupCadence" data-i18n-aria-label="backups.cadence">
+                <option value="hourly" data-i18n="backups.hourly"></option>
+                <option value="daily" data-i18n="backups.daily"></option>
+                <option value="weekly" data-i18n="backups.weekly"></option>
+              </select>
+            </div>
+            <div class="backup-schedule-field backup-keep-field">
+              <label class="backup-field-label" for="backupKeep" data-i18n="backups.keepLatest"></label>
+              <div class="backup-keep-control">
+                <input type="number" id="backupKeep" min="1" max="200" value="20"
+                  data-i18n-aria-label="backups.keepLatest" />
+                <span class="backup-keep-unit" data-i18n="backups.backupsUnit"></span>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="saveBackupScheduleBtn" type="button"
+              data-i18n="backups.saveSchedule"></button>
+          </div>
+          <div id="backupsTable" class="table-wrap mt-4"></div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Footer -->
