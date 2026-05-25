@@ -50,8 +50,6 @@
 
 ## 🖼 界面预览
 
-> 截图会根据你的 GitHub 主题自动切换浅色 / 深色版本。
-
 <table>
   <tr>
     <td width="50%" align="center">
@@ -59,14 +57,14 @@
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/login-dark.webp">
         <img alt="登录" src="screenshots/login-light.webp" width="100%">
       </picture>
-      <br><sub><b>🔐 登录</b> — 简洁、随主题切换</sub>
+      <br><sub><b>登录</b> — 简洁、随主题切换</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/monitor-dark.webp">
         <img alt="实时监控" src="screenshots/monitor-light.webp" width="100%">
       </picture>
-      <br><sub><b>📈 实时监控</b> — RPM、错误率、流量热力图</sub>
+      <br><sub><b>实时监控</b> — RPM、错误率、流量热力图</sub>
     </td>
   </tr>
   <tr>
@@ -75,14 +73,14 @@
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/accounts-dark.webp">
         <img alt="账号池" src="screenshots/accounts-light.webp" width="100%">
       </picture>
-      <br><sub><b>👥 账号池</b> — 多账号、轮询、自动刷新令牌</sub>
+      <br><sub><b>账号池</b> — 多账号、轮询、自动刷新令牌</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/requests-dark.webp">
         <img alt="请求日志" src="screenshots/requests-light.webp" width="100%">
       </picture>
-      <br><sub><b>📜 请求日志</b> — 分页搜索、状态筛选、完整审计</sub>
+      <br><sub><b>请求日志</b> — 分页搜索、状态筛选、完整审计</sub>
     </td>
   </tr>
   <tr>
@@ -91,23 +89,30 @@
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/api-dark.webp">
         <img alt="API 测试台" src="screenshots/api-light.webp" width="100%">
       </picture>
-      <br><sub><b>🛰 API 测试台</b> — 面板内直接调试接口</sub>
+      <br><sub><b>API 测试台</b> — 面板内直接调试接口</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/backups-dark.webp">
         <img alt="备份" src="screenshots/backups-light.webp" width="100%">
       </picture>
-      <br><sub><b>💾 备份</b> — 快照、定时备份、一键恢复</sub>
+      <br><sub><b>备份</b> — 快照、定时备份、一键恢复</sub>
     </td>
   </tr>
   <tr>
-    <td colspan="2" align="center">
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/proxy-dark.webp">
+        <img alt="出站代理" src="screenshots/proxy-light.webp" width="100%">
+      </picture>
+      <br><sub><b>出站代理</b> — SOCKS5 / HTTP，无需重启热切换</sub>
+    </td>
+    <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/settings-dark.webp">
-        <img alt="设置" src="screenshots/settings-light.webp" width="70%">
+        <img alt="设置" src="screenshots/settings-light.webp" width="100%">
       </picture>
-      <br><sub><b>⚙️ 设置</b> — 思考模式、出站代理、主题、多语言</sub>
+      <br><sub><b>设置</b> — 思考模式、主题、多语言、管理员</sub>
     </td>
   </tr>
 </table>
@@ -318,7 +323,7 @@ Claude 兼容请求如果带有顶层 `thinking` 配置，也会自动启用：
 
 ## 📄 开源许可
 
-MIT。详见 [LICENSE](./LICENSE)。
+[MIT](./LICENSE)
 
 ---
 
