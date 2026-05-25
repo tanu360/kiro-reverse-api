@@ -50,8 +50,6 @@ If this project helps you, a Star would mean a lot.
 
 ## 🖼 Preview
 
-> Screenshots auto-switch between light and dark to match your GitHub theme.
-
 <table>
   <tr>
     <td width="50%" align="center">
@@ -59,14 +57,14 @@ If this project helps you, a Star would mean a lot.
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/login-dark.webp">
         <img alt="Login" src="screenshots/login-light.webp" width="100%">
       </picture>
-      <br><sub><b>🔐 Login</b> — minimal, theme-aware sign-in</sub>
+      <br><sub><b>Login</b> — minimal, theme-aware sign-in</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/monitor-dark.webp">
         <img alt="Live Monitor" src="screenshots/monitor-light.webp" width="100%">
       </picture>
-      <br><sub><b>📈 Live Monitor</b> — RPM, error rate, traffic heatmap</sub>
+      <br><sub><b>Live Monitor</b> — RPM, error rate, traffic heatmap</sub>
     </td>
   </tr>
   <tr>
@@ -75,14 +73,14 @@ If this project helps you, a Star would mean a lot.
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/accounts-dark.webp">
         <img alt="Account Pool" src="screenshots/accounts-light.webp" width="100%">
       </picture>
-      <br><sub><b>👥 Account Pool</b> — multi-account, round-robin, auto-refresh</sub>
+      <br><sub><b>Account Pool</b> — multi-account, round-robin, auto-refresh</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/requests-dark.webp">
         <img alt="Request Log" src="screenshots/requests-light.webp" width="100%">
       </picture>
-      <br><sub><b>📜 Request Log</b> — paginated search, filters, full audit</sub>
+      <br><sub><b>Request Log</b> — paginated search, filters, full audit</sub>
     </td>
   </tr>
   <tr>
@@ -91,23 +89,30 @@ If this project helps you, a Star would mean a lot.
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/api-dark.webp">
         <img alt="API Playground" src="screenshots/api-light.webp" width="100%">
       </picture>
-      <br><sub><b>🛰 API Playground</b> — test endpoints inside the panel</sub>
+      <br><sub><b>API Playground</b> — test endpoints inside the panel</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/backups-dark.webp">
         <img alt="Backups" src="screenshots/backups-light.webp" width="100%">
       </picture>
-      <br><sub><b>💾 Backups</b> — snapshots, schedules, one-click restore</sub>
+      <br><sub><b>Backups</b> — snapshots, schedules, one-click restore</sub>
     </td>
   </tr>
   <tr>
-    <td colspan="2" align="center">
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/proxy-dark.webp">
+        <img alt="Outbound Proxy" src="screenshots/proxy-light.webp" width="100%">
+      </picture>
+      <br><sub><b>Outbound Proxy</b> — SOCKS5 / HTTP, hot-swap without restart</sub>
+    </td>
+    <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/settings-dark.webp">
-        <img alt="Settings" src="screenshots/settings-light.webp" width="70%">
+        <img alt="Settings" src="screenshots/settings-light.webp" width="100%">
       </picture>
-      <br><sub><b>⚙️ Settings</b> — thinking mode, outbound proxy, theme, i18n</sub>
+      <br><sub><b>Settings</b> — thinking mode, theme, i18n, admin</sub>
     </td>
   </tr>
 </table>
@@ -318,7 +323,7 @@ This project is a continuation of [Quorinex/Kiro-Go](https://github.com/Quorinex
 
 ## 📄 License
 
-MIT. See [LICENSE](./LICENSE).
+[MIT](./LICENSE)
 
 ---
 
