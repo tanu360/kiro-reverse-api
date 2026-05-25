@@ -22,7 +22,6 @@
   <a href="#-usage">Usage</a> •
   <a href="#-thinking-mode">Thinking&nbsp;Mode</a> •
   <a href="#-outbound-proxy">Outbound&nbsp;Proxy</a> •
-  <a href="#-environment-variables">Env&nbsp;Vars</a> •
   <a href="#-safety">Safety</a>
 </p>
 
