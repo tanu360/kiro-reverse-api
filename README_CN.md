@@ -1,11 +1,13 @@
 <div align="center">
 
+<img src="screenshots/logo.png" alt="Kiro Proxy" width="180" />
+
 # Kiro Proxy
 
 #### 本地代理，将 Kiro 账号转换为兼容 OpenAI / Anthropic 的接口。
 
 <p>
-  <a href="https://go.dev/"><img alt="Go" src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white" /></a>
+  <a href="https://go.dev/"><img alt="Go" src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white" /></a>
   <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" /></a>
   <a href="https://www.sqlite.org/"><img alt="SQLite" src="https://img.shields.io/badge/SQLite-WAL-003B57?style=for-the-badge&logo=sqlite&logoColor=white" /></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" /></a>
@@ -13,6 +15,7 @@
 
 <p>
   <a href="#-概览">概览</a> •
+  <a href="#-界面预览">界面预览</a> •
   <a href="#-功能特性">功能特性</a> •
   <a href="#-快速开始">快速开始</a> •
   <a href="#-配置">配置</a> •
@@ -36,12 +39,78 @@
 1. 多账号池化，按轮询方式分发请求。
 2. 在 Anthropic `/v1/messages`、OpenAI `/v1/chat/completions` 与 OpenAI `/v1/responses` 与 Kiro 上游之间双向翻译。
 3. 自动刷新访问令牌，端到端转发 Server-Sent Events 流。
-4. 自带 Web 管理面板，提供账号管理、可观测性与请求审计。
+4. 自带精致的 Web 管理面板，提供账号管理、可观测性与请求审计。
 
 > [!IMPORTANT]
 > 单二进制本地代理。**非**托管服务，**不**隶属于 Amazon、AWS 或 Kiro。账号必须由你本人持有或经过合法授权方可加入账号池。
 
 如果项目对你有帮助，欢迎点个 Star 鼓励一下。
+
+---
+
+## 🖼 界面预览
+
+> 截图会根据你的 GitHub 主题自动切换浅色 / 深色版本。
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/login-dark.webp">
+        <img alt="登录" src="screenshots/login-light.webp" width="100%">
+      </picture>
+      <br><sub><b>🔐 登录</b> — 简洁、随主题切换</sub>
+    </td>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/monitor-dark.webp">
+        <img alt="实时监控" src="screenshots/monitor-light.webp" width="100%">
+      </picture>
+      <br><sub><b>📈 实时监控</b> — RPM、错误率、流量热力图</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/accounts-dark.webp">
+        <img alt="账号池" src="screenshots/accounts-light.webp" width="100%">
+      </picture>
+      <br><sub><b>👥 账号池</b> — 多账号、轮询、自动刷新令牌</sub>
+    </td>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/requests-dark.webp">
+        <img alt="请求日志" src="screenshots/requests-light.webp" width="100%">
+      </picture>
+      <br><sub><b>📜 请求日志</b> — 分页搜索、状态筛选、完整审计</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/api-dark.webp">
+        <img alt="API 测试台" src="screenshots/api-light.webp" width="100%">
+      </picture>
+      <br><sub><b>🛰 API 测试台</b> — 面板内直接调试接口</sub>
+    </td>
+    <td width="50%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/backups-dark.webp">
+        <img alt="备份" src="screenshots/backups-light.webp" width="100%">
+      </picture>
+      <br><sub><b>💾 备份</b> — 快照、定时备份、一键恢复</sub>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/settings-dark.webp">
+        <img alt="设置" src="screenshots/settings-light.webp" width="70%">
+      </picture>
+      <br><sub><b>⚙️ 设置</b> — 思考模式、出站代理、主题、多语言</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -53,6 +122,7 @@
 - OpenAI `/v1/chat/completions`，工具调用结构完全对齐。
 - OpenAI `/v1/responses`，支持 `previous_response_id` 链式调用与已存响应回查。
 - 全部端点支持 SSE 流式输出，上游瞬时错误时可在流中切换账号继续。
+- 支持请求体解压（gzip / deflate），方便预压缩负载的客户端接入。
 
 ### 👥 账号池
 
@@ -65,7 +135,9 @@
 
 - 实时可观测性：RPM、错误率、模型分布、流量热力图。
 - 请求日志支持分页搜索、状态筛选，SQLite 持久化存档。
+- 内置 API 测试台，无需离开面板即可调试接口。
 - 快照与定时备份，支持一键恢复。
+- 主题感知 UI（浅色 / 深色 / 跟随系统），具备友好的缓存头。
 - 内建 i18n：英文与简体中文同源同步。
 
 ### 🌐 网络
@@ -84,7 +156,7 @@
 
 | 组件   | 版本                 |
 | ------ | -------------------- |
-| Go     | 1.21+                |
+| Go     | 1.25+                |
 | 操作系统 | Linux / macOS        |
 | 容器   | Docker 24+（可选）   |
 | 存储   | 本地磁盘卷           |
@@ -247,3 +319,9 @@ Claude 兼容请求如果带有顶层 `thinking` 配置，也会自动启用：
 ## 📄 开源许可
 
 MIT。详见 [LICENSE](./LICENSE)。
+
+---
+
+<div align="center">
+<sub>用 ❤️ 与 Go 构建 · 如果项目帮你省了时间，请回仓库点个 ⭐</sub>
+</div>
