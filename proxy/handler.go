@@ -9,6 +9,7 @@ import (
 	"io"
 	"kiro-proxy/auth"
 	"kiro-proxy/config"
+	"kiro-proxy/db"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
 	"net/http"
@@ -236,10 +237,8 @@ func NewHandler() *Handler {
 
 	go h.backgroundObserveTick()
 
-	go h.backgroundObserveSaver()
-
 	go h.backgroundObserveRequestWriter()
-	if err := getObserveStore().Load(); err != nil {
+	if err := getObserveStore().LoadFromDB(); err != nil {
 		logger.Warnf("[Observe] Failed to load: %v", err)
 	}
 
@@ -3024,8 +3023,9 @@ func (h *Handler) apiResetStats(w http.ResponseWriter, _ *http.Request) {
 	h.creditsMu.Unlock()
 	config.UpdateStats(0, 0, 0, 0, 0)
 	getObserveStore().Reset()
-	if err := getObserveStore().Save(); err != nil {
-		logger.Warnf("[Observe] Failed to persist reset state: %v", err)
+	if d, err := db.Get(); err == nil {
+		_, _ = d.Exec(`DELETE FROM requests`)
+		_, _ = d.Exec(`DELETE FROM errors`)
 	}
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }

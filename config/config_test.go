@@ -7,7 +7,7 @@ import (
 )
 
 func TestUpdateSettingsPatchPreservesOmittedAPIKeyFields(t *testing.T) {
-	if err := Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	if err := UpdateSettings("proxy-api-key", true, "admin-password"); err != nil {
@@ -30,7 +30,7 @@ func TestUpdateSettingsPatchPreservesOmittedAPIKeyFields(t *testing.T) {
 }
 
 func TestUpdateSettingsPatchCanExplicitlyDisableAPIKey(t *testing.T) {
-	if err := Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	if err := UpdateSettings("proxy-api-key", true, "admin-password"); err != nil {
@@ -55,7 +55,7 @@ func TestUpdateSettingsPatchCanExplicitlyDisableAPIKey(t *testing.T) {
 }
 
 func TestUpdateBackupSchedulePreservesLastRun(t *testing.T) {
-	if err := Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	if err := UpdateBackupSchedule(BackupSchedule{
@@ -87,9 +87,9 @@ func TestUpdateBackupSchedulePreservesLastRun(t *testing.T) {
 	}
 }
 
-func TestBackupRestoreIncludesCredentialsFile(t *testing.T) {
+func TestBackupRestoreIncludesCredentialsData(t *testing.T) {
 	dir := t.TempDir()
-	if err := Init(filepath.Join(dir, "config.json")); err != nil {
+	if err := Init(filepath.Join(dir, "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	original := []Account{{
@@ -137,8 +137,33 @@ func TestBackupRestoreIncludesCredentialsFile(t *testing.T) {
 	}
 }
 
+func TestCreateBackupAllowsSamePayloadInSameSecond(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+
+	first, err := CreateBackup("manual", "first")
+	if err != nil {
+		t.Fatalf("create first backup: %v", err)
+	}
+	second, err := CreateBackup("manual", "second")
+	if err != nil {
+		t.Fatalf("create second backup: %v", err)
+	}
+	if first.ID == second.ID {
+		t.Fatalf("expected unique backup IDs, got %q", first.ID)
+	}
+	backups, err := ListBackups(true)
+	if err != nil {
+		t.Fatalf("list backups: %v", err)
+	}
+	if len(backups) != 2 {
+		t.Fatalf("expected 2 backups, got %d", len(backups))
+	}
+}
+
 func TestRestoreRejectsEmptyJSON(t *testing.T) {
-	if err := Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	if err := RestoreFromBytes([]byte(`{}`), "bad"); err == nil {
@@ -146,8 +171,8 @@ func TestRestoreRejectsEmptyJSON(t *testing.T) {
 	}
 }
 
-func TestRestoreRejectsLegacyConfigOnlyBackupWhenCredentialsLoaded(t *testing.T) {
-	if err := Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+func TestRestoreRejectsConfigOnlyBackupWhenCredentialsLoaded(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	if err := ReplaceCredentials(true, []Account{{
@@ -160,7 +185,7 @@ func TestRestoreRejectsLegacyConfigOnlyBackupWhenCredentialsLoaded(t *testing.T)
 	}}); err != nil {
 		t.Fatalf("seed credentials: %v", err)
 	}
-	legacy, err := json.Marshal(Config{
+	configOnly, err := json.Marshal(Config{
 		Password:      "changeme",
 		Port:          8080,
 		Host:          "0.0.0.0",
@@ -168,9 +193,9 @@ func TestRestoreRejectsLegacyConfigOnlyBackupWhenCredentialsLoaded(t *testing.T)
 		Accounts:      []Account{},
 	})
 	if err != nil {
-		t.Fatalf("marshal legacy config: %v", err)
+		t.Fatalf("marshal config-only backup: %v", err)
 	}
-	if err := RestoreFromBytes(legacy, "legacy"); err == nil {
-		t.Fatalf("expected legacy config-only restore to be rejected while credentials are loaded")
+	if err := RestoreFromBytes(configOnly, "config-only"); err == nil {
+		t.Fatalf("expected config-only restore to be rejected while credentials are loaded")
 	}
 }

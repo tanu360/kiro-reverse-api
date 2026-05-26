@@ -192,7 +192,7 @@ func TestGetNextForModelExcludingReturnsNilOnEmptyPool(t *testing.T) {
 
 func TestDisableAccountSetsCooldown(t *testing.T) {
 
-	cfgFile := filepath.Join(t.TempDir(), "config.json")
+	cfgFile := filepath.Join(t.TempDir(), "kiro.db")
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}

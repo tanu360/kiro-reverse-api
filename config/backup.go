@@ -2,24 +2,22 @@ package config
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
+
+	"kiro-proxy/db"
 )
 
 const (
-	backupDirName     = "backups"
-	autoSubDirName    = ".auto"
-	manifestName      = "manifest.json"
 	maxAutoKeep       = 20
 	defaultManualKeep = 100
-	backupFormat      = "kiro-go-backup"
+	backupFormat      = "kiro-proxy-backup"
 	backupVersion     = 1
 )
 
@@ -72,66 +70,12 @@ type parsedBackup struct {
 	envelope          bool
 }
 
-var (
-	backupMu sync.Mutex
-)
-
-func backupDir() string {
-	return filepath.Join(filepath.Dir(getConfigPath()), backupDirName)
-}
-
-func autoDir() string      { return filepath.Join(backupDir(), autoSubDirName) }
-func manifestPath() string { return filepath.Join(backupDir(), manifestName) }
-
-func ensureBackupDirs() error {
-	if err := os.MkdirAll(backupDir(), 0700); err != nil {
-		return err
-	}
-	return os.MkdirAll(autoDir(), 0700)
-}
-
-func loadManifest() (*BackupManifest, error) {
-	m := &BackupManifest{}
-	data, err := os.ReadFile(manifestPath())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return m, nil
-		}
-		return nil, err
-	}
-	if err := json.Unmarshal(data, m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func saveManifest(m *BackupManifest) error {
-	m.Updated = time.Now().Unix()
-	data, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(manifestPath(), data, 0600)
-}
+var backupMu sync.Mutex
 
 func sha8(s string) string { return s[:8] }
 
 func makeID(now time.Time, sum string) string {
-	return fmt.Sprintf("%s-%s", now.UTC().Format("20060102-150405"), sha8(sum))
-}
-
-func computeSha256File(path string) (string, int64, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", 0, err
-	}
-	defer f.Close()
-	h := sha256.New()
-	n, err := io.Copy(h, f)
-	if err != nil {
-		return "", 0, err
-	}
-	return hex.EncodeToString(h.Sum(nil)), n, nil
+	return fmt.Sprintf("%s-%09d-%s", now.UTC().Format("20060102-150405"), now.UTC().Nanosecond(), sha8(sum))
 }
 
 func countFromBytes(data []byte) (accounts int, version string) {
@@ -206,49 +150,51 @@ func CreateBackup(kind, note string) (*BackupEntry, error) {
 }
 
 func createBackupLocked(kind, note string, srcData []byte, accountCnt int, version string, includesCredentials bool, autoKeep int) (*BackupEntry, error) {
-	if getConfigPath() == "" {
-		return nil, fmt.Errorf("config path not initialized")
-	}
-	if err := ensureBackupDirs(); err != nil {
-		return nil, err
-	}
 	now := time.Now()
 	sum := sha256.Sum256(srcData)
 	sumHex := hex.EncodeToString(sum[:])
 	id := makeID(now, sumHex)
-	fileName := "config-" + id + ".json"
-	var fullPath string
-	if kind == "auto" {
-		fullPath = filepath.Join(autoDir(), fileName)
-	} else {
-		fullPath = filepath.Join(backupDir(), fileName)
+
+	includesInt := 0
+	if includesCredentials {
+		includesInt = 1
 	}
-	if err := os.WriteFile(fullPath, srcData, 0600); err != nil {
+
+	d, err := db.Get()
+	if err != nil {
 		return nil, err
 	}
+	tx, err := d.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`INSERT INTO backup_entries
+(id, created_at, kind, note, size, sha256, account_cnt, version, format, includes_credentials)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, now.Unix(), kind, note, int64(len(srcData)), sumHex, accountCnt, version, backupFormat, includesInt); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(`INSERT INTO backup_blobs(id, data) VALUES(?, ?)`, id, srcData); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
 	entry := BackupEntry{
 		ID:                  id,
 		CreatedAt:           now.Unix(),
 		Kind:                kind,
 		Note:                note,
-		File:                relFile(kind, fileName),
+		File:                id + ".json",
 		Size:                int64(len(srcData)),
 		Sha256:              sumHex,
 		AccountCnt:          accountCnt,
 		Version:             version,
 		Format:              backupFormat,
 		IncludesCredentials: includesCredentials,
-	}
-	if kind != "auto" {
-		m, err := loadManifest()
-		if err != nil {
-			return nil, err
-		}
-		m.Entries = append(m.Entries, entry)
-		sort.Slice(m.Entries, func(i, j int) bool { return m.Entries[i].CreatedAt > m.Entries[j].CreatedAt })
-		if err := saveManifest(m); err != nil {
-			return nil, err
-		}
 	}
 	pruneAutoBackups(autoKeep)
 	return &entry, nil
@@ -257,55 +203,44 @@ func createBackupLocked(kind, note string, srcData []byte, accountCnt int, versi
 func setRestoredAccountCnt(id string, count int) error {
 	backupMu.Lock()
 	defer backupMu.Unlock()
-	m, err := loadManifest()
+	d, err := db.Get()
 	if err != nil {
 		return err
 	}
-	for i := range m.Entries {
-		if m.Entries[i].ID == id {
-			m.Entries[i].RestoredAccountCnt = &count
-			return saveManifest(m)
-		}
+	res, err := d.Exec(`UPDATE backup_entries SET restored_account_cnt=? WHERE id=?`, count, id)
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("backup not found: %s", id)
-}
-
-func relFile(kind, fileName string) string {
-	if kind == "auto" {
-		return filepath.Join(autoSubDirName, fileName)
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("backup not found: %s", id)
 	}
-	return fileName
+	return nil
 }
 
 func pruneAutoBackups(keep int) {
 	if keep <= 0 {
 		keep = maxAutoKeep
 	}
-	files, err := os.ReadDir(autoDir())
+	d, err := db.Get()
 	if err != nil {
 		return
 	}
-	type ent struct {
-		name string
-		ts   int64
-	}
-	var entries []ent
-	for _, f := range files {
-		if f.IsDir() {
-			continue
-		}
-		info, err := f.Info()
-		if err != nil {
-			continue
-		}
-		entries = append(entries, ent{name: f.Name(), ts: info.ModTime().Unix()})
-	}
-	if len(entries) <= keep {
+	rows, err := d.Query(`SELECT id FROM backup_entries WHERE kind='auto'
+		ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?`, keep)
+	if err != nil {
 		return
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].ts > entries[j].ts })
-	for _, e := range entries[keep:] {
-		_ = os.Remove(filepath.Join(autoDir(), e.name))
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
+	for _, id := range ids {
+		_, _ = d.Exec(`DELETE FROM backup_entries WHERE id=?`, id)
 	}
 }
 
@@ -313,96 +248,112 @@ func pruneKindLocked(kind string, keep int) error {
 	if keep <= 0 {
 		return nil
 	}
-	m, err := loadManifest()
+	d, err := db.Get()
 	if err != nil {
 		return err
 	}
-	var kept []BackupEntry
-	var ofKind []BackupEntry
-	for _, e := range m.Entries {
-		if e.Kind == kind {
-			ofKind = append(ofKind, e)
-		} else {
-			kept = append(kept, e)
+	rows, err := d.Query(`SELECT id FROM backup_entries WHERE kind=?
+		ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?`, kind, keep)
+	if err != nil {
+		return err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
 		}
 	}
-	sort.Slice(ofKind, func(i, j int) bool { return ofKind[i].CreatedAt > ofKind[j].CreatedAt })
-	for i, e := range ofKind {
-		if i < keep {
-			kept = append(kept, e)
-		} else {
-			_ = os.Remove(filepath.Join(backupDir(), e.File))
+	rows.Close()
+	for _, id := range ids {
+		if _, err := d.Exec(`DELETE FROM backup_entries WHERE id=?`, id); err != nil {
+			return err
 		}
 	}
-	sort.Slice(kept, func(i, j int) bool { return kept[i].CreatedAt > kept[j].CreatedAt })
-	m.Entries = kept
-	return saveManifest(m)
+	return nil
 }
 
 func ListBackups(autoInclude bool) ([]BackupEntry, error) {
 	backupMu.Lock()
 	defer backupMu.Unlock()
-	if err := ensureBackupDirs(); err != nil {
-		return nil, err
-	}
-	m, err := loadManifest()
+	d, err := db.Get()
 	if err != nil {
 		return nil, err
 	}
-	out := append([]BackupEntry(nil), m.Entries...)
-	if autoInclude {
-		auto, err := scanAuto()
-		if err == nil {
-			out = append(out, auto...)
+	q := `SELECT id, created_at, kind, note, size, sha256, account_cnt, restored_account_cnt, version, format, includes_credentials
+FROM backup_entries`
+	if !autoInclude {
+		q += ` WHERE kind != 'auto'`
+	}
+	q += ` ORDER BY created_at DESC, id DESC`
+	rows, err := d.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []BackupEntry
+	for rows.Next() {
+		e, err := scanBackupEntry(rows)
+		if err != nil {
+			return nil, err
 		}
+		out = append(out, *e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
 	return out, nil
 }
 
-func scanAuto() ([]BackupEntry, error) {
-	files, err := os.ReadDir(autoDir())
-	if err != nil {
+func scanBackupEntry(rows *sql.Rows) (*BackupEntry, error) {
+	var e BackupEntry
+	var note sql.NullString
+	var restored sql.NullInt64
+	var includes int
+	if err := rows.Scan(&e.ID, &e.CreatedAt, &e.Kind, &note, &e.Size, &e.Sha256, &e.AccountCnt, &restored, &e.Version, &e.Format, &includes); err != nil {
 		return nil, err
 	}
-	var out []BackupEntry
-	for _, f := range files {
-		if f.IsDir() {
-			continue
-		}
-		fullPath := filepath.Join(autoDir(), f.Name())
-		sum, size, err := computeSha256File(fullPath)
-		if err != nil {
-			continue
-		}
-		info, err := f.Info()
-		if err != nil {
-			continue
-		}
-		id := info.ModTime().UTC().Format("20060102-150405") + "-" + sha8(sum)
-		out = append(out, BackupEntry{
-			ID:        id,
-			CreatedAt: info.ModTime().Unix(),
-			Kind:      "auto",
-			File:      filepath.Join(autoSubDirName, f.Name()),
-			Size:      size,
-			Sha256:    sum,
-		})
+	if note.Valid {
+		e.Note = note.String
 	}
-	return out, nil
+	if restored.Valid {
+		v := int(restored.Int64)
+		e.RestoredAccountCnt = &v
+	}
+	e.IncludesCredentials = includes != 0
+	e.File = e.ID + ".json"
+	return &e, nil
 }
 
 func FindBackup(id string) (*BackupEntry, error) {
-	all, err := ListBackups(true)
+	d, err := db.Get()
 	if err != nil {
 		return nil, err
 	}
-	for i := range all {
-		if all[i].ID == id {
-			return &all[i], nil
-		}
+	row := d.QueryRow(`SELECT id, created_at, kind, note, size, sha256, account_cnt, restored_account_cnt, version, format, includes_credentials
+FROM backup_entries WHERE id=?`, id)
+	var e BackupEntry
+	var note sql.NullString
+	var restored sql.NullInt64
+	var includes int
+	err = row.Scan(&e.ID, &e.CreatedAt, &e.Kind, &note, &e.Size, &e.Sha256, &e.AccountCnt, &restored, &e.Version, &e.Format, &includes)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("backup not found: %s", id)
 	}
-	return nil, fmt.Errorf("backup not found: %s", id)
+	if err != nil {
+		return nil, err
+	}
+	if note.Valid {
+		e.Note = note.String
+	}
+	if restored.Valid {
+		v := int(restored.Int64)
+		e.RestoredAccountCnt = &v
+	}
+	e.IncludesCredentials = includes != 0
+	e.File = e.ID + ".json"
+	return &e, nil
 }
 
 func ReadBackupBytes(id string) (*BackupEntry, []byte, error) {
@@ -410,8 +361,12 @@ func ReadBackupBytes(id string) (*BackupEntry, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(backupDir(), e.File))
+	d, err := db.Get()
 	if err != nil {
+		return nil, nil, err
+	}
+	var data []byte
+	if err := d.QueryRow(`SELECT data FROM backup_blobs WHERE id=?`, id).Scan(&data); err != nil {
 		return nil, nil, err
 	}
 	return e, data, nil
@@ -420,34 +375,19 @@ func ReadBackupBytes(id string) (*BackupEntry, []byte, error) {
 func DeleteBackup(id string) error {
 	backupMu.Lock()
 	defer backupMu.Unlock()
-	m, err := loadManifest()
+	d, err := db.Get()
 	if err != nil {
 		return err
 	}
-	idx := -1
-	var target BackupEntry
-	for i, e := range m.Entries {
-		if e.ID == id {
-			idx = i
-			target = e
-			break
-		}
-	}
-	if idx < 0 {
-
-		auto, _ := scanAuto()
-		for _, e := range auto {
-			if e.ID == id {
-				return os.Remove(filepath.Join(backupDir(), e.File))
-			}
-		}
-		return fmt.Errorf("backup not found: %s", id)
-	}
-	if err := os.Remove(filepath.Join(backupDir(), target.File)); err != nil && !os.IsNotExist(err) {
+	res, err := d.Exec(`DELETE FROM backup_entries WHERE id=?`, id)
+	if err != nil {
 		return err
 	}
-	m.Entries = append(m.Entries[:idx], m.Entries[idx+1:]...)
-	return saveManifest(m)
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("backup not found: %s", id)
+	}
+	return nil
 }
 
 func parseBackupData(data []byte, rejectLegacyWhenCredentialsLoaded bool) (*parsedBackup, error) {
@@ -491,17 +431,17 @@ func parseBackupData(data []byte, rejectLegacyWhenCredentialsLoaded bool) (*pars
 		}, nil
 	}
 
-	var legacy Config
-	if err := json.Unmarshal(data, &legacy); err != nil {
+	var configOnly Config
+	if err := json.Unmarshal(data, &configOnly); err != nil {
 		return nil, fmt.Errorf("backup schema mismatch: %w", err)
 	}
-	if err := validateRestoredConfig(legacy); err != nil {
+	if err := validateRestoredConfig(configOnly); err != nil {
 		return nil, err
 	}
 	if rejectLegacyWhenCredentialsLoaded && CredentialsLoaded() {
-		return nil, fmt.Errorf("legacy config-only backup does not include credentials.json; use a full kiro-go backup")
+		return nil, fmt.Errorf("config-only backup does not include saved credentials; use a full kiro-proxy backup")
 	}
-	return &parsedBackup{config: legacy}, nil
+	return &parsedBackup{config: configOnly}, nil
 }
 
 func validateRestoredConfig(c Config) error {
@@ -521,11 +461,11 @@ func validateRestoredConfig(c Config) error {
 }
 
 func writeRestoredConfig(parsed *parsedBackup) error {
-	configData, err := json.MarshalIndent(parsed.config, "", "  ")
+	configData, err := json.Marshal(parsed.config)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(getConfigPath(), configData, 0600); err != nil {
+	if err := setSetting("config", string(configData)); err != nil {
 		return err
 	}
 	if parsed.envelope {
@@ -569,41 +509,50 @@ func RestoreBackup(id string) error {
 }
 
 func readBackupBytesLocked(id string) (*BackupEntry, []byte, error) {
-
-	m, err := loadManifest()
+	d, err := db.Get()
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, e := range m.Entries {
-		if e.ID == id {
-			data, err := os.ReadFile(filepath.Join(backupDir(), e.File))
-			if err != nil {
-				return nil, nil, err
-			}
-			return &e, data, nil
-		}
+	row := d.QueryRow(`SELECT id, created_at, kind, note, size, sha256, account_cnt, restored_account_cnt, version, format, includes_credentials
+FROM backup_entries WHERE id=?`, id)
+	var e BackupEntry
+	var note sql.NullString
+	var restored sql.NullInt64
+	var includes int
+	err = row.Scan(&e.ID, &e.CreatedAt, &e.Kind, &note, &e.Size, &e.Sha256, &e.AccountCnt, &restored, &e.Version, &e.Format, &includes)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil, fmt.Errorf("backup not found: %s", id)
 	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if note.Valid {
+		e.Note = note.String
+	}
+	if restored.Valid {
+		v := int(restored.Int64)
+		e.RestoredAccountCnt = &v
+	}
+	e.IncludesCredentials = includes != 0
+	e.File = e.ID + ".json"
 
-	auto, _ := scanAuto()
-	for _, e := range auto {
-		if e.ID == id {
-			data, err := os.ReadFile(filepath.Join(backupDir(), e.File))
-			if err != nil {
-				return nil, nil, err
-			}
-			return &e, data, nil
-		}
+	var data []byte
+	if err := d.QueryRow(`SELECT data FROM backup_blobs WHERE id=?`, id).Scan(&data); err != nil {
+		return nil, nil, err
 	}
-	return nil, nil, fmt.Errorf("backup not found: %s", id)
+	return &e, data, nil
 }
 
 func reloadFromDisk() error {
-	data, err := os.ReadFile(getConfigPath())
+	raw, ok, err := getSetting("config")
 	if err != nil {
 		return err
 	}
+	if !ok {
+		return fmt.Errorf("config setting missing after restore")
+	}
 	var c Config
-	if err := json.Unmarshal(data, &c); err != nil {
+	if err := json.Unmarshal([]byte(raw), &c); err != nil {
 		return err
 	}
 	cfgLock.Lock()
@@ -659,7 +608,7 @@ func UpdateBackupConfig(bc BackupConfig) error {
 	cfgLock.Lock()
 	cfg.Backup = bc
 	defer cfgLock.Unlock()
-	return Save()
+	return saveLocked()
 }
 
 func GetBackupSchedule() BackupSchedule {
@@ -674,14 +623,14 @@ func UpdateBackupSchedule(s BackupSchedule) error {
 	cfg.Backup.Schedule.Enabled = s.Enabled
 	cfg.Backup.Schedule.Cadence = s.Cadence
 	cfg.Backup.Schedule.Keep = s.Keep
-	return Save()
+	return saveLocked()
 }
 
 func MarkScheduleRan(now int64) error {
 	cfgLock.Lock()
 	cfg.Backup.Schedule.LastRun = now
 	defer cfgLock.Unlock()
-	return saveConfigFile()
+	return saveLocked()
 }
 
 func PruneScheduled() error {

@@ -9,7 +9,7 @@
 <p>
   <a href="https://go.dev/"><img alt="Go" src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white" /></a>
   <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" /></a>
-  <a href="https://www.sqlite.org/"><img alt="SQLite" src="https://img.shields.io/badge/SQLite-WAL-003B57?style=for-the-badge&logo=sqlite&logoColor=white" /></a>
+  <a href="https://www.sqlite.org/"><img alt="SQLite" src="https://img.shields.io/badge/SQLite-kiro.db-003B57?style=for-the-badge&logo=sqlite&logoColor=white" /></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" /></a>
 </p>
 
@@ -151,7 +151,7 @@ If this project helps you, a Star would mean a lot.
 
 ### 🧩 Storage
 
-- SQLite (`modernc.org/sqlite`) in WAL mode for request history and stored responses.
+- Single-file SQLite (`modernc.org/sqlite`) database at `kiro.db`, using DELETE journal mode.
 - 30-day retention on stored responses, asynchronous writes off the request hot path.
 
 ---
@@ -174,7 +174,6 @@ If this project helps you, a Star would mean a lot.
 ```bash
 git clone https://github.com/tanu360/kiro-reverse-api.git
 cd kiro-reverse-api
-mkdir -p data
 docker-compose up -d
 ```
 
@@ -185,7 +184,7 @@ docker run -d \
   --name kiro-proxy \
   -p 8080:8080 \
   -e ADMIN_PASSWORD=your_secure_password \
-  -v /path/to/data:/app/data \
+  -v /path/to/kiro-proxy-state:/app/state \
   --restart unless-stopped \
   ghcr.io/tanu360/kiro-reverse-api:latest
 ```
@@ -200,7 +199,7 @@ go build -o kiro-proxy .
 ```
 
 > [!TIP]
-> Config is auto-created at `data/config.json` on first launch. Mount `/app/data` for persistence. The default admin password is `changeme` — override it via `ADMIN_PASSWORD` or change it from the admin panel before exposing the service.
+> `kiro.db` is auto-created on first launch. Set `DATA_DIR` to store it somewhere else; Docker uses `/app/state`. The default admin password is `changeme` — override it via `ADMIN_PASSWORD` or change it from the admin panel before exposing the service.
 
 ---
 
@@ -208,11 +207,11 @@ go build -o kiro-proxy .
 
 | Variable         | Purpose                                   | Default            |
 | ---------------- | ----------------------------------------- | ------------------ |
-| `CONFIG_PATH`    | Config file path                          | `data/config.json` |
+| `DATA_DIR`        | Directory for `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)   | —                  |
 
 > [!WARNING]
-> `data/config.json` holds OAuth tokens and admin credentials. Treat it as secret — keep it out of git, screenshots, and chat threads. Mount the `data/` directory as a private volume.
+> `kiro.db` holds OAuth tokens and admin credentials. Treat it as secret — keep it out of git, screenshots, and chat threads. Mount the database directory as a private volume.
 
 ---
 
@@ -288,16 +287,15 @@ For users in restricted network regions, configure an outbound proxy in the admi
 
 | Variable         | Description                              | Default            |
 | ---------------- | ---------------------------------------- | ------------------ |
-| `CONFIG_PATH`    | Config file path                         | `data/config.json` |
+| `DATA_DIR`        | Directory for `kiro.db`                  | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)  | —                  |
 
 ```diff
-+ data/                  # local state — config, SQLite, snapshots
-- data/config.json       # never commit this
++ kiro.db                # local state — config, credentials, SQLite history, backup blobs
 ```
 
 > [!CAUTION]
-> Treat `data/config.json` as sensitive — it stores account tokens and admin credentials in plain text on disk.
+> Treat `kiro.db` as sensitive — it stores account tokens and admin credentials in plain text on disk.
 
 ---
 
@@ -312,7 +310,7 @@ This project is a continuation of [Quorinex/Kiro-Go](https://github.com/Quorinex
 - ✅ Use only with accounts you are **authorized** to operate.
 - ❌ Do **not** use for bulk account scraping or terms-of-service evasion.
 - ❌ Do **not** add CAPTCHA bypass, identity spoofing, or rate-limit evasion.
-- 🔐 Keep `data/config.json` out of git, backups, and screenshots.
+- 🔐 Keep `kiro.db` out of git, public backups, and screenshots.
 - 🧯 If upstream returns persistent auth errors, the proxy fails fast — investigate before retrying.
 
 > [!IMPORTANT]

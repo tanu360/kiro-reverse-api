@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"kiro-proxy/config"
+	"kiro-proxy/db"
 )
 
 func resetObservePersistenceForTest(t *testing.T) {
 	t.Helper()
-	closeObserveDB()
 	observeRequestPersistOnce = sync.Once{}
 	observeRequestPersistQueue = nil
 	observePersistWriterActive.Store(false)
@@ -19,7 +19,6 @@ func resetObservePersistenceForTest(t *testing.T) {
 	observeStoreOnce = sync.Once{}
 	observeStoreInst = nil
 	t.Cleanup(func() {
-		closeObserveDB()
 		observeRequestPersistOnce = sync.Once{}
 		observeRequestPersistQueue = nil
 		observePersistWriterActive.Store(false)
@@ -126,8 +125,11 @@ func TestObserveStore_ModelMixSortedByCredits(t *testing.T) {
 func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 	dir := t.TempDir()
 	resetObservePersistenceForTest(t)
+	if err := db.ResetForTest(dir); err != nil {
+		t.Fatalf("reset db: %v", err)
+	}
 
-	if err := config.Init(filepath.Join(dir, "config.json")); err != nil {
+	if err := config.Init(filepath.Join(dir, "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	s := getObserveStore()

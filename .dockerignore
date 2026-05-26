@@ -1,7 +1,6 @@
 .git
 .github
-Kiro-Go
-data
+/kiro.db
 backup*
 PR-*.md
 docker-compose.yml

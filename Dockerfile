@@ -21,6 +21,7 @@ COPY --from=builder /app/kiro-proxy .
 COPY --from=builder /app/web ./web
 
 EXPOSE 8080
-VOLUME /app/data
+ENV DATA_DIR=/app/state
+VOLUME /app/state
 
 CMD ["./kiro-proxy"]

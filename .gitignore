@@ -1,7 +1,6 @@
 .DS_Store
 .vscode/
 *.out
-/data/
+/kiro.db
 /kiro-proxy
-/kiro-go
 coverage.txt

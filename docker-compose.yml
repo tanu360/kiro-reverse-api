@@ -8,12 +8,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      CONFIG_PATH: ${CONFIG_PATH:-/app/data/config.json}
+      DATA_DIR: ${DATA_DIR:-/app/state}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ADMIN_PASSWORD: ${SERVICE_PASSWORD_KIRO_PROXY:-${ADMIN_PASSWORD:-changeme}}
       SERVICE_FQDN_KIRO_PROXY_8080: /
     volumes:
-      - kiro-proxy-data:/app/data
+      - kiro-proxy-state:/app/state
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 30s
@@ -22,4 +22,4 @@ services:
       start_period: 10s
 
 volumes:
-  kiro-proxy-data:
+  kiro-proxy-state:

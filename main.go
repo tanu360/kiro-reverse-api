@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"kiro-proxy/config"
+	"kiro-proxy/db"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
 	"kiro-proxy/proxy"
@@ -14,16 +15,20 @@ import (
 
 func main() {
 
-	configPath := "data/config.json"
-	if envPath := os.Getenv("CONFIG_PATH"); envPath != "" {
-		configPath = envPath
+	dataDir := "."
+	if envDir := os.Getenv("DATA_DIR"); envDir != "" {
+		dataDir = envDir
 	}
 
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		log.Fatalf("Failed to create data directory: %v", err)
+	if err := os.MkdirAll(dataDir, 0700); err != nil {
+		log.Fatalf("Failed to create database directory: %v", err)
 	}
 
-	if err := config.Init(configPath); err != nil {
+	if err := db.Init(dataDir); err != nil {
+		log.Fatalf("Failed to open db: %v", err)
+	}
+
+	if err := config.Init(filepath.Join(dataDir, "kiro.db")); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 

@@ -254,7 +254,7 @@
   "credentials.authHint": "*Affects token refresh method",
   "credentials.social": "Social (AWS Builder ID / Google / GitHub)",
   "credentials.idc": "IAM Identity Center (Enterprise SSO)",
-  "credentials.jsonError": "Invalid JSON format",
+  "credentials.parseError": "Invalid JSON format",
   "credentials.batchHint": "Supports single object, JSON array, or Kiro Account Manager export format. Required: refreshToken. Optional: provider (BuilderID/Enterprise/GitHub/Google), clientId, clientSecret",
   "common.save": "Save Settings",
   "common.saved": "Saved",

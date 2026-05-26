@@ -2190,7 +2190,7 @@
       toastPrimary(msg, { duration: 5200 });
       newIds.forEach(autoRefreshNewAccount);
     } catch (e) {
-      toastWarning(t('credentials.jsonError'));
+      toastWarning(t('credentials.parseError'));
     }
   }
   async function importFromCookie() {

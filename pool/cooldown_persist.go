@@ -1,92 +1,92 @@
 package pool
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"time"
 
-	"kiro-proxy/config"
+	"kiro-proxy/db"
 	"kiro-proxy/logger"
 )
-
-func cooldownDataFile() string {
-	return filepath.Join(config.GetDataDir(), "pool", "cooldowns.json")
-}
-
-type cooldownPersistData struct {
-	SavedAt   int64            `json:"savedAt"`
-	Cooldowns map[string]int64 `json:"cooldowns"`
-}
 
 func (p *AccountPool) SaveCooldowns() error {
 	if p == nil {
 		return nil
 	}
 	p.mu.RLock()
-	cooldowns := make(map[string]int64, len(p.cooldowns))
 	now := time.Now()
+	type kv struct {
+		id  string
+		exp int64
+	}
+	active := make([]kv, 0, len(p.cooldowns))
 	for id, t := range p.cooldowns {
-
 		if t.After(now) {
-			cooldowns[id] = t.Unix()
+			active = append(active, kv{id, t.Unix()})
 		}
 	}
 	p.mu.RUnlock()
 
-	data := cooldownPersistData{
-		SavedAt:   now.Unix(),
-		Cooldowns: cooldowns,
-	}
-
-	path := cooldownDataFile()
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-
-	jsonData, err := json.MarshalIndent(data, "", "  ")
+	d, err := db.Get()
 	if err != nil {
 		return err
 	}
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
 
-	return os.WriteFile(path, jsonData, 0600)
+	if _, err := tx.Exec(`DELETE FROM cooldowns`); err != nil {
+		return err
+	}
+	if len(active) > 0 {
+		stmt, err := tx.Prepare(`INSERT INTO cooldowns(account_id, expires_at) VALUES(?, ?)`)
+		if err != nil {
+			return err
+		}
+		for _, kv := range active {
+			if _, err := stmt.Exec(kv.id, kv.exp); err != nil {
+				stmt.Close()
+				return err
+			}
+		}
+		stmt.Close()
+	}
+	return tx.Commit()
 }
 
 func (p *AccountPool) loadCooldowns() error {
 	if p == nil {
 		return nil
 	}
-	path := cooldownDataFile()
-	data, err := os.ReadFile(path)
+	d, err := db.Get()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
 		return err
 	}
-
-	var persist cooldownPersistData
-	if err := json.Unmarshal(data, &persist); err != nil {
+	now := time.Now().Unix()
+	rows, err := d.Query(`SELECT account_id, expires_at FROM cooldowns WHERE expires_at > ?`, now)
+	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	now := time.Now()
 	loaded := 0
-	for id, ts := range persist.Cooldowns {
-		t := time.Unix(ts, 0)
-
-		if t.After(now) {
-			p.cooldowns[id] = t
-			loaded++
+	for rows.Next() {
+		var id string
+		var exp int64
+		if err := rows.Scan(&id, &exp); err != nil {
+			return err
 		}
+		p.cooldowns[id] = time.Unix(exp, 0)
+		loaded++
 	}
-
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	if loaded > 0 {
-		logger.Infof("[Pool] Loaded %d active cooldowns from %s", loaded, path)
+		logger.Infof("[Pool] Loaded %d active cooldowns from db", loaded)
 	}
 	return nil
 }

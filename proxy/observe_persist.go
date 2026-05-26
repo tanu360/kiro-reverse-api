@@ -2,52 +2,22 @@ package proxy
 
 import (
 	"database/sql"
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"kiro-proxy/config"
+	"kiro-proxy/db"
 	"kiro-proxy/logger"
-
-	_ "modernc.org/sqlite"
 )
 
-const observeDataFileName = "observe.json"
-const observeRequestsDBFileName = "requests.sqlite"
 const observeRequestPersistQueueSize = 4096
 
 var (
-	observeDBOnce               sync.Once
-	observeDB                   *sql.DB
-	observeDBErr                error
 	observeRequestPersistOnce   sync.Once
 	observeRequestPersistQueue  chan requestRecord
 	observePersistWriterActive  atomic.Bool
 	observePersistWriterStarted atomic.Bool
 )
-
-type observePersistData struct {
-	SavedAt        int64           `json:"savedAt"`
-	RecentRequests []requestRecord `json:"recentRequests"`
-	RecentErrors   []errorRecord   `json:"recentErrors"`
-}
-
-func observeDir() string {
-	return filepath.Join(config.GetDataDir(), "observe")
-}
-
-func observeDataPath() string {
-	return filepath.Join(observeDir(), observeDataFileName)
-}
-
-func observeRequestsDBPath() string {
-	return filepath.Join(observeDir(), observeRequestsDBFileName)
-}
 
 func getObserveRequestPersistQueue() chan requestRecord {
 	observeRequestPersistOnce.Do(func() {
@@ -56,63 +26,8 @@ func getObserveRequestPersistQueue() chan requestRecord {
 	return observeRequestPersistQueue
 }
 
-func getObserveDB() (*sql.DB, error) {
-	observeDBOnce.Do(func() {
-		if err := os.MkdirAll(observeDir(), 0700); err != nil {
-			observeDBErr = err
-			return
-		}
-		db, err := sql.Open("sqlite", observeRequestsDBPath())
-		if err != nil {
-			observeDBErr = err
-			return
-		}
-		db.SetMaxOpenConns(1)
-		if _, err = db.Exec(`PRAGMA journal_mode=WAL;
-PRAGMA busy_timeout=5000;
-CREATE TABLE IF NOT EXISTS requests (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts INTEGER NOT NULL,
-  account_id TEXT NOT NULL DEFAULT '',
-  email TEXT NOT NULL DEFAULT '',
-  model TEXT NOT NULL DEFAULT '',
-  in_tokens INTEGER NOT NULL DEFAULT 0,
-  out_tokens INTEGER NOT NULL DEFAULT 0,
-  total_tokens INTEGER NOT NULL DEFAULT 0,
-  credits REAL NOT NULL DEFAULT 0,
-  success INTEGER NOT NULL DEFAULT 0,
-  status INTEGER NOT NULL DEFAULT 0,
-  message TEXT NOT NULL DEFAULT ''
-);
-CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests(ts DESC, id DESC);
-CREATE INDEX IF NOT EXISTS idx_requests_success ON requests(success);
-CREATE INDEX IF NOT EXISTS idx_requests_lookup ON requests(email, account_id, model);`); err != nil {
-			_ = db.Close()
-			observeDBErr = err
-			return
-		}
-		observeDB = db
-	})
-	if observeDBErr != nil {
-		return nil, observeDBErr
-	}
-	if observeDB == nil {
-		return nil, fmt.Errorf("observe request database unavailable")
-	}
-	return observeDB, nil
-}
-
-func closeObserveDB() {
-	if observeDB != nil {
-		_ = observeDB.Close()
-		observeDB = nil
-	}
-	observeDBOnce = sync.Once{}
-	observeDBErr = nil
-}
-
 func persistRequestRecord(rec requestRecord) error {
-	db, err := getObserveDB()
+	d, err := db.Get()
 	if err != nil {
 		return err
 	}
@@ -120,11 +35,23 @@ func persistRequestRecord(rec requestRecord) error {
 	if rec.Success {
 		success = 1
 	}
-	_, err = db.Exec(`INSERT INTO requests
+	_, err = d.Exec(`INSERT INTO requests
 (ts, account_id, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.TS, rec.AccountID, rec.Email, rec.Model, rec.InTokens, rec.OutTokens, rec.TotalTokens,
 		rec.Credits, success, rec.Status, rec.Message)
+	return err
+}
+
+func persistErrorRecord(rec errorRecord) error {
+	d, err := db.Get()
+	if err != nil {
+		return err
+	}
+	_, err = d.Exec(`INSERT INTO errors
+(ts, account_id, email, model, status, message)
+VALUES (?, ?, ?, ?, ?, ?)`,
+		rec.TS, rec.AccountID, rec.Email, rec.Model, rec.Status, rec.Message)
 	return err
 }
 
@@ -157,7 +84,7 @@ func escapeSQLLike(s string) string {
 
 func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	q = normalizeRequestQuery(q)
-	db, err := getObserveDB()
+	d, err := db.Get()
 	if err != nil {
 		return requestPage{}, err
 	}
@@ -181,7 +108,7 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	}
 
 	var total int
-	if err := db.QueryRow("SELECT COUNT(*) FROM requests"+whereSQL, args...).Scan(&total); err != nil {
+	if err := d.QueryRow("SELECT COUNT(*) FROM requests"+whereSQL, args...).Scan(&total); err != nil {
 		return requestPage{}, err
 	}
 
@@ -203,7 +130,7 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	offset := (q.Page - 1) * q.PageSize
 	queryArgs := append([]interface{}{}, args...)
 	queryArgs = append(queryArgs, q.PageSize, offset)
-	rows, err := db.Query(`SELECT id, ts, account_id, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message
+	rows, err := d.Query(`SELECT id, ts, account_id, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message
 FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? OFFSET ?`, queryArgs...)
 	if err != nil {
 		return requestPage{}, err
@@ -235,6 +162,84 @@ FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? O
 	}, nil
 }
 
+func loadRecentRequestsFromDB(limit int) ([]requestRecord, error) {
+	d, err := db.Get()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := d.Query(`SELECT id, ts, account_id, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message
+FROM requests ORDER BY ts DESC, id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []requestRecord
+	for rows.Next() {
+		var rec requestRecord
+		var success int
+		if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message); err != nil {
+			return nil, err
+		}
+		rec.Success = success == 1
+		out = append(out, rec)
+	}
+	return out, rows.Err()
+}
+
+func loadRecentErrorsFromDB(limit int) ([]errorRecord, error) {
+	d, err := db.Get()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := d.Query(`SELECT ts, account_id, email, model, status, message
+FROM errors ORDER BY ts DESC, id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []errorRecord
+	for rows.Next() {
+		var rec errorRecord
+		var email, model, message sql.NullString
+		if err := rows.Scan(&rec.TS, &rec.AccountID, &email, &model, &rec.Status, &message); err != nil {
+			return nil, err
+		}
+		rec.Email = email.String
+		rec.Model = model.String
+		rec.Message = message.String
+		out = append(out, rec)
+	}
+	return out, rows.Err()
+}
+
+func (s *observeStore) LoadFromDB() error {
+	if s == nil {
+		return nil
+	}
+	reqs, err := loadRecentRequestsFromDB(observeRecentReqs)
+	if err != nil {
+		return err
+	}
+	errs, err := loadRecentErrorsFromDB(observeRecentErrs)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := len(reqs) - 1; i >= 0; i-- {
+		s.recentRequests[s.recentReqIdx] = reqs[i]
+		s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
+	}
+	for i := len(errs) - 1; i >= 0; i-- {
+		s.recentErrors[s.recentErrIdx] = errs[i]
+		s.recentErrIdx = (s.recentErrIdx + 1) % observeRecentErrs
+	}
+	logger.Infof("[Observe] Warmed %d requests, %d errors from db", len(reqs), len(errs))
+	return nil
+}
+
 func (h *Handler) backgroundObserveRequestWriter() {
 	if !observePersistWriterStarted.CompareAndSwap(false, true) {
 		return
@@ -256,106 +261,8 @@ func (h *Handler) backgroundObserveRequestWriter() {
 				case rec := <-queue:
 					persistQueuedRequestRecord(rec)
 				default:
-					closeObserveDB()
 					return
 				}
-			}
-		}
-	}
-}
-
-func (s *observeStore) Save() error {
-	if s == nil {
-		return nil
-	}
-	s.mu.RLock()
-	reqs := make([]requestRecord, 0, observeRecentReqs)
-	for i := 0; i < observeRecentReqs; i++ {
-		idx := (s.recentReqIdx - 1 - i + observeRecentReqs) % observeRecentReqs
-		rec := s.recentRequests[idx]
-		if rec.TS == 0 {
-			continue
-		}
-		reqs = append(reqs, rec)
-	}
-	errs := make([]errorRecord, 0, observeRecentErrs)
-	for i := 0; i < observeRecentErrs; i++ {
-		idx := (s.recentErrIdx - 1 - i + observeRecentErrs) % observeRecentErrs
-		rec := s.recentErrors[idx]
-		if rec.TS == 0 {
-			continue
-		}
-		errs = append(errs, rec)
-	}
-	s.mu.RUnlock()
-
-	data := observePersistData{
-		SavedAt:        time.Now().Unix(),
-		RecentRequests: reqs,
-		RecentErrors:   errs,
-	}
-
-	dir := filepath.Dir(observeDataPath())
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-
-	jsonData, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(observeDataPath(), jsonData, 0600)
-}
-
-func (s *observeStore) Load() error {
-	if s == nil {
-		return nil
-	}
-	data, err := os.ReadFile(observeDataPath())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
-	var persist observePersistData
-	if err := json.Unmarshal(data, &persist); err != nil {
-		return err
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for i := len(persist.RecentRequests) - 1; i >= 0; i-- {
-		s.recentRequests[s.recentReqIdx] = persist.RecentRequests[i]
-		s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
-	}
-
-	for i := len(persist.RecentErrors) - 1; i >= 0; i-- {
-		s.recentErrors[s.recentErrIdx] = persist.RecentErrors[i]
-		s.recentErrIdx = (s.recentErrIdx + 1) % observeRecentErrs
-	}
-
-	logger.Infof("[Observe] Loaded %d requests, %d errors from %s", len(persist.RecentRequests), len(persist.RecentErrors), observeDataPath())
-	return nil
-}
-
-func (h *Handler) backgroundObserveSaver() {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-h.stopStatsSaver:
-
-			if err := getObserveStore().Save(); err != nil {
-				logger.Warnf("[Observe] Failed to save on shutdown: %v", err)
-			}
-			return
-		case <-ticker.C:
-			if err := getObserveStore().Save(); err != nil {
-				logger.Warnf("[Observe] Failed to save: %v", err)
 			}
 		}
 	}

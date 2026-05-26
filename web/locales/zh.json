@@ -254,7 +254,7 @@
   "credentials.authHint": "*影响 Token 刷新方式",
   "credentials.social": "Social (AWS Builder ID / Google / GitHub)",
   "credentials.idc": "IAM Identity Center (企业 SSO)",
-  "credentials.jsonError": "JSON 格式错误",
+  "credentials.parseError": "JSON 格式错误",
   "credentials.batchHint": "支持单个对象、JSON 数组或 Kiro Account Manager 导出格式批量导入。必填: refreshToken。可选: provider (BuilderID/Enterprise/GitHub/Google), clientId, clientSecret",
   "common.save": "保存设置",
   "common.saved": "保存",

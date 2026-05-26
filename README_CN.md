@@ -9,7 +9,7 @@
 <p>
   <a href="https://go.dev/"><img alt="Go" src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white" /></a>
   <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" /></a>
-  <a href="https://www.sqlite.org/"><img alt="SQLite" src="https://img.shields.io/badge/SQLite-WAL-003B57?style=for-the-badge&logo=sqlite&logoColor=white" /></a>
+  <a href="https://www.sqlite.org/"><img alt="SQLite" src="https://img.shields.io/badge/SQLite-kiro.db-003B57?style=for-the-badge&logo=sqlite&logoColor=white" /></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" /></a>
 </p>
 
@@ -151,7 +151,7 @@
 
 ### 🧩 存储
 
-- SQLite（`modernc.org/sqlite`）启用 WAL 模式，承载请求历史与已存响应。
+- 单文件 SQLite（`modernc.org/sqlite`）数据库 `kiro.db`，使用 DELETE journal 模式。
 - 已存响应保留 30 天，写盘异步进行，不阻塞请求主路径。
 
 ---
@@ -174,7 +174,6 @@
 ```bash
 git clone https://github.com/tanu360/kiro-reverse-api.git
 cd kiro-reverse-api
-mkdir -p data
 docker-compose up -d
 ```
 
@@ -185,7 +184,7 @@ docker run -d \
   --name kiro-proxy \
   -p 8080:8080 \
   -e ADMIN_PASSWORD=your_secure_password \
-  -v /path/to/data:/app/data \
+  -v /path/to/kiro-proxy-state:/app/state \
   --restart unless-stopped \
   ghcr.io/tanu360/kiro-reverse-api:latest
 ```
@@ -200,7 +199,7 @@ go build -o kiro-proxy .
 ```
 
 > [!TIP]
-> 首次运行会自动在 `data/config.json` 生成配置，挂载 `/app/data` 以持久化。默认管理密码为 `changeme`，对外暴露前请通过 `ADMIN_PASSWORD` 环境变量或管理面板进行修改。
+> 首次运行会自动创建 `kiro.db`。可通过 `DATA_DIR` 指定存储目录；Docker 使用 `/app/state`。默认管理密码为 `changeme`，对外暴露前请通过 `ADMIN_PASSWORD` 环境变量或管理面板进行修改。
 
 ---
 
@@ -208,11 +207,11 @@ go build -o kiro-proxy .
 
 | 变量             | 用途                                | 默认值             |
 | ---------------- | ----------------------------------- | ------------------ |
-| `CONFIG_PATH`    | 配置文件路径                        | `data/config.json` |
+| `DATA_DIR`        | `kiro.db` 所在目录                  | `.`                |
 | `ADMIN_PASSWORD` | 管理面板密码（覆盖配置文件）        | —                  |
 
 > [!WARNING]
-> `data/config.json` 包含 OAuth 令牌与管理员凭证。请按敏感信息处理，切勿提交到 git、截图或聊天记录中。`data/` 目录请挂载为私有卷。
+> `kiro.db` 包含 OAuth 令牌与管理员凭证。请按敏感信息处理，切勿提交到 git、截图或聊天记录中。数据库目录请挂载为私有卷。
 
 ---
 
@@ -288,16 +287,15 @@ Claude 兼容请求如果带有顶层 `thinking` 配置，也会自动启用：
 
 | 变量             | 说明                                  | 默认值             |
 | ---------------- | ------------------------------------- | ------------------ |
-| `CONFIG_PATH`    | 配置文件路径                          | `data/config.json` |
+| `DATA_DIR`        | `kiro.db` 所在目录                    | `.`                |
 | `ADMIN_PASSWORD` | 管理面板密码（覆盖配置文件）          | —                  |
 
 ```diff
-+ data/                  # 本地状态：配置、SQLite、快照
-- data/config.json       # 切勿提交到 git
++ kiro.db                # 本地状态：配置、凭据、SQLite 历史、备份 BLOB
 ```
 
 > [!CAUTION]
-> `data/config.json` 是敏感文件，账号令牌与管理员凭证以明文形式落盘存储，请严加保护。
+> `kiro.db` 是敏感文件，账号令牌与管理员凭证以明文形式落盘存储，请严加保护。
 
 ---
 
@@ -312,7 +310,7 @@ Claude 兼容请求如果带有顶层 `thinking` 配置，也会自动启用：
 - ✅ 仅用于你**有权限**操作的账号。
 - ❌ **不得**用于批量账号爬取或绕过服务条款。
 - ❌ **不得**叠加 CAPTCHA 绕过、身份伪造、限流绕过等行为。
-- 🔐 `data/config.json` 切勿出现在 git、备份与截图中。
+- 🔐 `kiro.db` 切勿出现在 git、公开备份与截图中。
 - 🧯 若上游持续返回鉴权错误，代理会快速失败，请先排查再重试。
 
 > [!IMPORTANT]

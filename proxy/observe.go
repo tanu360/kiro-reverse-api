@@ -238,9 +238,13 @@ func (s *observeStore) RecordError(accountID, email, model string, status int, m
 		Message:   message,
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.recentErrors[s.recentErrIdx] = rec
 	s.recentErrIdx = (s.recentErrIdx + 1) % observeRecentErrs
+	s.mu.Unlock()
+
+	if err := persistErrorRecord(rec); err != nil {
+		logger.Warnf("[Observe] Persist error failed: %v", err)
+	}
 }
 
 func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {

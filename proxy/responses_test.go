@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"kiro-proxy/config"
+	"kiro-proxy/db"
 	accountpool "kiro-proxy/pool"
 	"net/http"
 	"net/http/httptest"
@@ -15,8 +16,6 @@ import (
 
 func resetResponsesPersistenceForTest(t *testing.T) {
 	t.Helper()
-	closeResponsesDB()
-	t.Cleanup(closeResponsesDB)
 }
 
 func TestResponsesInputStringToKiro(t *testing.T) {
@@ -151,7 +150,6 @@ func TestResponsesNonStreamStoresRetrievesAndDeletes(t *testing.T) {
 		t.Fatalf("expected output_text, got %#v", got)
 	}
 
-	closeResponsesDB()
 	getRec := httptest.NewRecorder()
 	h.ServeHTTP(getRec, httptest.NewRequest(http.MethodGet, "/v1/responses/"+id, nil))
 	if getRec.Code != http.StatusOK {
@@ -423,7 +421,10 @@ func responseSSEInt(t *testing.T, value interface{}) int {
 func newResponsesTestHandler(t *testing.T, upstream http.HandlerFunc) *Handler {
 	t.Helper()
 	dir := t.TempDir()
-	if err := config.Init(filepath.Join(dir, "config.json")); err != nil {
+	if err := db.ResetForTest(dir); err != nil {
+		t.Fatalf("reset db: %v", err)
+	}
+	if err := config.Init(filepath.Join(dir, "kiro.db")); err != nil {
 		t.Fatalf("config init: %v", err)
 	}
 	resetResponsesPersistenceForTest(t)

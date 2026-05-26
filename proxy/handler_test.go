@@ -26,7 +26,7 @@ func TestThinkingSourceReasoningFirst(t *testing.T) {
 }
 
 func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) {
-	cfgFile := t.TempDir() + "/config.json"
+	cfgFile := t.TempDir() + "/kiro.db"
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}

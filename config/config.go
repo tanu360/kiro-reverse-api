@@ -4,11 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
+
+	"kiro-proxy/db"
 )
 
 func GenerateMachineId() string {
@@ -176,6 +177,10 @@ func getConfigPath() string {
 
 func Init(path string) error {
 	setConfigPath(path)
+	dir := filepath.Dir(path)
+	if err := db.Init(dir); err != nil {
+		return fmt.Errorf("db init: %w", err)
+	}
 	if err := Load(); err != nil {
 		return err
 	}
@@ -191,28 +196,26 @@ func Init(path string) error {
 }
 
 func Load() error {
-	path := getConfigPath()
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 
-	data, err := os.ReadFile(path)
+	raw, ok, err := getSetting("config")
 	if err != nil {
-		if os.IsNotExist(err) {
-
-			cfg = &Config{
-				Password:      "changeme",
-				Port:          8080,
-				Host:          "0.0.0.0",
-				RequireApiKey: false,
-				Accounts:      []Account{},
-			}
-			return Save()
-		}
 		return err
+	}
+	if !ok {
+		cfg = &Config{
+			Password:      "changeme",
+			Port:          8080,
+			Host:          "0.0.0.0",
+			RequireApiKey: false,
+			Accounts:      []Account{},
+		}
+		return saveLocked()
 	}
 
 	var c Config
-	if err := json.Unmarshal(data, &c); err != nil {
+	if err := json.Unmarshal([]byte(raw), &c); err != nil {
 		return err
 	}
 	cfg = &c
@@ -221,15 +224,17 @@ func Load() error {
 
 func Save() error {
 	AutoSnapshotBeforeSave()
-	return saveConfigFile()
+	return saveLocked()
 }
 
-func saveConfigFile() error {
-	data, err := json.MarshalIndent(cfg, "", "  ")
+// saveLocked writes the in-memory cfg to settings without acquiring cfgLock.
+// Caller must already hold cfgLock for writing.
+func saveLocked() error {
+	data, err := json.Marshal(cfg)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(getConfigPath(), data, 0600)
+	return setSetting("config", string(data))
 }
 
 func SetPassword(password string) {
@@ -279,7 +284,7 @@ func GetHost() string {
 }
 
 func GetDataDir() string {
-	return filepath.Dir(getConfigPath())
+	return db.DataDir()
 }
 
 func GetAccounts() []Account {
@@ -656,8 +661,8 @@ func UpdatePromptFilterConfig(filterClaudeCode, filterEnvNoise, filterStripBound
 	cfg.FilterEnvNoise = filterEnvNoise
 	cfg.FilterStripBoundaries = filterStripBoundaries
 
-	//! Clear the legacy flag after writing the new prompt-filter config.
-	cfg.SanitizeClaudeCodePrompt = false
+		//! Clear the superseded flag after writing the prompt-filter config.
+		cfg.SanitizeClaudeCodePrompt = false
 	if rules != nil {
 		cfg.PromptFilterRules = rules
 	}
