@@ -4,7 +4,6 @@ import (
 	"kiro-proxy/config"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -15,6 +14,7 @@ type AccountPool struct {
 	accounts      []config.Account
 	totalAccounts int
 	currentIndex  uint64
+	lastSelected  string
 	cooldowns     map[string]time.Time
 	errorCounts   map[string]int
 	modelLists    map[string]map[string]bool
@@ -57,7 +57,12 @@ func (p *AccountPool) Reload() {
 	}
 	p.accounts = weighted
 	p.totalAccounts = len(enabled)
-	atomic.StoreUint64(&p.currentIndex, ^uint64(0))
+	if len(weighted) == 0 {
+		p.currentIndex = 0
+		p.lastSelected = ""
+	} else if p.currentIndex >= uint64(len(weighted)) {
+		p.currentIndex %= uint64(len(weighted))
+	}
 }
 
 func (p *AccountPool) GetNext() *config.Account {
@@ -65,69 +70,10 @@ func (p *AccountPool) GetNext() *config.Account {
 }
 
 func (p *AccountPool) GetNextExcluding(excluded map[string]bool) *config.Account {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	if len(p.accounts) == 0 {
-		return nil
-	}
-
-	allowOverUsage := config.GetAllowOverUsage()
-	now := time.Now()
-	n := len(p.accounts)
-	seen := make(map[string]bool)
-
-	for i := 0; i < n; i++ {
-		idx := atomic.AddUint64(&p.currentIndex, 1) % uint64(n)
-		acc := &p.accounts[idx]
-
-		if excluded != nil && excluded[acc.ID] {
-			seen[acc.ID] = true
-			continue
-		}
-		if seen[acc.ID] {
-			continue
-		}
-
-		if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
-			seen[acc.ID] = true
-			continue
-		}
-
-		if acc.ExpiresAt > 0 && time.Now().Unix() > acc.ExpiresAt-tokenRefreshSkewSeconds {
-			seen[acc.ID] = true
-			continue
-		}
-
-		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
-			seen[acc.ID] = true
-			continue
-		}
-
-		return acc
-	}
-
-	var best *config.Account
-	var earliest time.Time
-	for i := range p.accounts {
-		acc := &p.accounts[i]
-		if excluded != nil && excluded[acc.ID] {
-			continue
-		}
-
-		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
-			continue
-		}
-		if cooldown, ok := p.cooldowns[acc.ID]; ok {
-			if best == nil || cooldown.Before(earliest) {
-				best = acc
-				earliest = cooldown
-			}
-		} else {
-			return acc
-		}
-	}
-	return best
+	return p.nextAccountLocked("", excluded)
 }
 
 func (p *AccountPool) SetModelList(accountID string, modelIDs []string) {
@@ -167,56 +113,86 @@ func (p *AccountPool) GetNextForModel(model string) *config.Account {
 }
 
 func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string]bool) *config.Account {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
+	return p.nextAccountLocked(model, excluded)
+}
+
+func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool) *config.Account {
 	if len(p.accounts) == 0 {
 		return nil
 	}
 
+	if acc := p.findNextAvailableLocked(model, excluded, true); acc != nil {
+		return acc
+	}
+	if acc := p.findNextAvailableLocked(model, excluded, false); acc != nil {
+		return acc
+	}
+	return p.findEarliestCooldownLocked(model, excluded)
+}
+
+func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]bool, avoidLast bool) *config.Account {
 	allowOverUsage := config.GetAllowOverUsage()
 	now := time.Now()
+	nowUnix := now.Unix()
 	n := len(p.accounts)
+	start := p.currentIndex
 	seen := make(map[string]bool)
 
 	for i := 0; i < n; i++ {
-		idx := atomic.AddUint64(&p.currentIndex, 1) % uint64(n)
+		idx := (start + uint64(i)) % uint64(n)
 		acc := &p.accounts[idx]
-
-		if excluded != nil && excluded[acc.ID] {
-			seen[acc.ID] = true
-			continue
-		}
 		if seen[acc.ID] {
 			continue
 		}
-		if !p.accountHasModel(acc.ID, model) {
-			seen[acc.ID] = true
-			continue
-		}
-		if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
-			seen[acc.ID] = true
-			continue
-		}
-		if acc.ExpiresAt > 0 && time.Now().Unix() > acc.ExpiresAt-tokenRefreshSkewSeconds {
-			seen[acc.ID] = true
-			continue
-		}
-		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
-			seen[acc.ID] = true
-			continue
-		}
-		return acc
-	}
+		seen[acc.ID] = true
 
-	var best *config.Account
-	var earliest time.Time
-	for i := range p.accounts {
-		acc := &p.accounts[i]
+		if avoidLast && acc.ID == p.lastSelected {
+			continue
+		}
 		if excluded != nil && excluded[acc.ID] {
 			continue
 		}
-		if !p.accountHasModel(acc.ID, model) {
+		if model != "" && !p.accountHasModel(acc.ID, model) {
+			continue
+		}
+		if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
+			continue
+		}
+		if acc.ExpiresAt > 0 && nowUnix > acc.ExpiresAt-tokenRefreshSkewSeconds {
+			continue
+		}
+		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
+			continue
+		}
+		p.currentIndex = (idx + 1) % uint64(n)
+		p.lastSelected = acc.ID
+		return acc
+	}
+	return nil
+}
+
+func (p *AccountPool) findEarliestCooldownLocked(model string, excluded map[string]bool) *config.Account {
+	allowOverUsage := config.GetAllowOverUsage()
+	nowUnix := time.Now().Unix()
+	var best *config.Account
+	var earliest time.Time
+	seen := make(map[string]bool)
+	for i := range p.accounts {
+		acc := &p.accounts[i]
+		if seen[acc.ID] {
+			continue
+		}
+		seen[acc.ID] = true
+		if excluded != nil && excluded[acc.ID] {
+			continue
+		}
+		if model != "" && !p.accountHasModel(acc.ID, model) {
+			continue
+		}
+		if acc.ExpiresAt > 0 && nowUnix > acc.ExpiresAt-tokenRefreshSkewSeconds {
 			continue
 		}
 		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
@@ -227,9 +203,10 @@ func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string
 				best = acc
 				earliest = cooldown
 			}
-		} else {
-			return acc
 		}
+	}
+	if best != nil {
+		p.lastSelected = best.ID
 	}
 	return best
 }

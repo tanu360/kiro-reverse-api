@@ -99,6 +99,118 @@ func TestGetNextKeepsFiveMinuteTokenAvailable(t *testing.T) {
 	}
 }
 
+func TestGetNextRotatesAcrossUsableAccounts(t *testing.T) {
+	p := newTestPool(
+		config.Account{ID: "a"},
+		config.Account{ID: "b"},
+		config.Account{ID: "c"},
+	)
+
+	var got []string
+	for i := 0; i < 6; i++ {
+		acc := p.GetNext()
+		if acc == nil {
+			t.Fatalf("selection %d returned nil", i)
+		}
+		got = append(got, acc.ID)
+	}
+
+	want := []string{"a", "b", "c", "a", "b", "c"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected rotation: got %v want %v", got, want)
+		}
+	}
+}
+
+func TestReloadDoesNotRestartRotationAtFirstAccount(t *testing.T) {
+	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "a", Enabled: true}); err != nil {
+		t.Fatalf("add account a: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "b", Enabled: true}); err != nil {
+		t.Fatalf("add account b: %v", err)
+	}
+
+	p := newTestPool()
+	p.Reload()
+	first := p.GetNext()
+	if first == nil || first.ID != "a" {
+		t.Fatalf("expected first account a, got %#v", first)
+	}
+
+	p.Reload()
+	second := p.GetNext()
+	if second == nil || second.ID != "b" {
+		t.Fatalf("expected reload to preserve rotation and select b, got %#v", second)
+	}
+}
+
+func TestWeightedAccountDoesNotRepeatWhenAnotherUsableAccountExists(t *testing.T) {
+	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "heavy", Enabled: true, Weight: 5}); err != nil {
+		t.Fatalf("add heavy account: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "normal", Enabled: true}); err != nil {
+		t.Fatalf("add normal account: %v", err)
+	}
+
+	p := newTestPool()
+	p.Reload()
+	var previous string
+	for i := 0; i < 6; i++ {
+		acc := p.GetNext()
+		if acc == nil {
+			t.Fatalf("selection %d returned nil", i)
+		}
+		if previous != "" && acc.ID == previous {
+			t.Fatalf("expected weighted rotation to avoid repeating %q while another account is usable", acc.ID)
+		}
+		previous = acc.ID
+	}
+}
+
+func TestGetNextForModelRotatesAcrossMatchingAccounts(t *testing.T) {
+	p := newTestPool(
+		config.Account{ID: "a"},
+		config.Account{ID: "b"},
+		config.Account{ID: "c"},
+	)
+	p.SetModelList("a", []string{"claude-sonnet"})
+	p.SetModelList("b", []string{"other-model"})
+	p.SetModelList("c", []string{"claude-sonnet"})
+
+	var got []string
+	for i := 0; i < 4; i++ {
+		acc := p.GetNextForModel("claude-sonnet")
+		if acc == nil {
+			t.Fatalf("selection %d returned nil", i)
+		}
+		got = append(got, acc.ID)
+	}
+
+	want := []string{"a", "c", "a", "c"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected model rotation: got %v want %v", got, want)
+		}
+	}
+}
+
+func TestSingleUsableAccountCanRepeat(t *testing.T) {
+	p := newTestPool(config.Account{ID: "only"})
+
+	first := p.GetNext()
+	second := p.GetNext()
+	if first == nil || second == nil || first.ID != "only" || second.ID != "only" {
+		t.Fatalf("expected single account to remain selectable, got %#v then %#v", first, second)
+	}
+}
+
 func TestIsAuthFailureRecognizes401And403(t *testing.T) {
 	positives := []string{
 		"HTTP 401 from server",
