@@ -998,7 +998,7 @@
           '</div>' : '') +
         '<div class="account-stats">' +
         '<div class="account-stat"><div class="account-stat-value">' + (a.requestCount || 0) + '</div><div class="account-stat-label">' + escapeHtml(t('accounts.requests')) + '</div></div>' +
-        '<div class="account-stat"><div class="account-stat-value">' + formatNum(a.totalTokens || 0) + '</div><div class="account-stat-label">' + escapeHtml(t('accounts.tokens')) + '</div></div>' +
+        '<div class="account-stat"><div class="account-stat-value">' + formatCompactNum(a.totalTokens || 0) + '</div><div class="account-stat-label">' + escapeHtml(t('accounts.tokens')) + '</div></div>' +
         '<div class="account-stat"><div class="account-stat-value">' + (a.totalCredits || 0).toFixed(1) + '</div><div class="account-stat-label">' + escapeHtml(t('accounts.credits')) + '</div></div>' +
         '<div class="account-stat"><div class="account-stat-value">' + escapeHtml(formatTokenExpiry(a.expiresAt)) + '</div><div class="account-stat-label">' + escapeHtml(t('accounts.expiry')) + '</div></div>' +
         '</div>' +
@@ -1210,7 +1210,7 @@
       '<div class="detail-section"><h4>' + escapeHtml(t('detail.statistics')) + '</h4><div class="detail-grid">' +
       detailItem(t('detail.requestCount'), a.requestCount || 0) +
       detailItem(t('detail.errorCount'), a.errorCount || 0) +
-      detailItem(t('detail.totalTokens'), formatNum(a.totalTokens || 0)) +
+      detailItem(t('detail.totalTokens'), formatCompactNum(a.totalTokens || 0)) +
       detailItem(t('detail.totalCredits'), (a.totalCredits || 0).toFixed(2)) +
       '</div></div>' +
 
