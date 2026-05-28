@@ -1693,18 +1693,25 @@
       createBtn.dataset.i18n = editingApiKeyId ? 'settings.updateApiKey' : 'settings.createApiKey';
       createBtn.textContent = t(createBtn.dataset.i18n);
     }
+    const keyInput = $('newApiKeyValue');
+    if (keyInput) {
+      keyInput.dataset.i18nPlaceholder = editingApiKeyId ? 'settings.apiKeyCustomValueEditPlaceholder' : 'settings.apiKeyCustomValuePlaceholder';
+      keyInput.placeholder = t(keyInput.dataset.i18nPlaceholder);
+    }
     const cancelBtn = $('cancelApiKeyEditBtn');
     if (cancelBtn) cancelBtn.classList.toggle('hidden', !editingApiKeyId);
   }
   function clearApiKeyEditor() {
     setApiKeyEditorMode('');
     $('newApiKeyName').value = '';
+    $('newApiKeyValue').value = '';
     $('newApiKeyTokenLimit').value = '0';
     $('newApiKeyCreditLimit').value = '0';
     $('createdApiKeyPanel').classList.add('hidden');
     renderApiKeys();
   }
   function getApiKeyEditorValues() {
+    const customKey = $('newApiKeyValue').value.trim();
     const tokenRaw = $('newApiKeyTokenLimit').value.trim();
     const creditRaw = $('newApiKeyCreditLimit').value.trim();
     const tokenLimit = tokenRaw === '' ? 0 : Number(tokenRaw);
@@ -1715,6 +1722,7 @@
     }
     return {
       name: $('newApiKeyName').value.trim(),
+      key: customKey,
       tokenLimit,
       creditLimit,
     };
@@ -1723,6 +1731,7 @@
     const key = apiKeysCache.find(k => k.id === id);
     if (!key) return;
     $('newApiKeyName').value = key.name || '';
+    $('newApiKeyValue').value = '';
     $('newApiKeyTokenLimit').value = String(key.tokenLimit || 0);
     $('newApiKeyCreditLimit').value = String(key.creditLimit || 0);
     $('createdApiKeyPanel').classList.add('hidden');
@@ -1744,23 +1753,27 @@
         toast(t('settings.apiKeyUpdated'), 'success');
         setApiKeyEditorMode('');
         $('newApiKeyName').value = '';
+        $('newApiKeyValue').value = '';
         $('newApiKeyTokenLimit').value = '0';
         $('newApiKeyCreditLimit').value = '0';
         await loadApiKeys();
         return;
       }
+      const payload = {
+        name: values.name,
+        enabled: true,
+        tokenLimit: values.tokenLimit,
+        creditLimit: values.creditLimit,
+      };
+      if (values.key) payload.key = values.key;
       const res = await api('/api-keys', {
         method: 'POST',
-        body: JSON.stringify({
-          name: values.name,
-          enabled: true,
-          tokenLimit: values.tokenLimit,
-          creditLimit: values.creditLimit,
-        })
+        body: JSON.stringify(payload)
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
       $('newApiKeyName').value = '';
+      $('newApiKeyValue').value = '';
       $('newApiKeyTokenLimit').value = '0';
       $('newApiKeyCreditLimit').value = '0';
       if (d.key) {

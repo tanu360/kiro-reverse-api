@@ -3428,13 +3428,38 @@ img.brand-icon {
 }
 .api-key-create-grid {
   display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 12rem) minmax(10rem, 12rem) auto auto;
+  grid-template-columns: minmax(12rem, 1fr) minmax(8rem, 10rem) minmax(8rem, 10rem) auto auto;
   gap: 0.75rem;
   align-items: end;
   margin: 1rem 0;
 }
+.api-key-custom-field {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.api-key-name-field {
+  grid-column: 1;
+  grid-row: 1;
+}
+.api-key-token-field {
+  grid-column: 2;
+  grid-row: 1;
+}
+.api-key-credit-field {
+  grid-column: 3;
+  grid-row: 1;
+}
+#createApiKeyBtn {
+  grid-column: 4;
+  grid-row: 1;
+}
+#cancelApiKeyEditBtn {
+  grid-column: 5;
+  grid-row: 1;
+}
 .api-key-create-grid .form-group {
   margin-bottom: 0;
+  min-width: 0;
 }
 .api-key-create-grid .btn {
   height: 2.25rem;
@@ -3687,9 +3712,46 @@ img.brand-icon {
   }
   .feature-stats-grid,
   .panel-split,
-  .api-key-create-grid,
   .settings-inline-grid {
     grid-template-columns: 1fr;
+  }
+  .api-key-create-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(4.75rem, 0.62fr) minmax(4.75rem, 0.62fr);
+    gap: 0.75rem 0.5rem;
+  }
+  .api-key-create-grid label {
+    font-size: 0.8125rem;
+    line-height: 1.25;
+  }
+  .api-key-create-grid input {
+    min-width: 0;
+    width: 100%;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+  .api-key-name-field {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .api-key-token-field {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .api-key-credit-field {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .api-key-custom-field {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  #createApiKeyBtn {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  #cancelApiKeyEditBtn {
+    grid-column: 1 / -1;
+    grid-row: 4;
   }
   .api-access-row {
     align-items: stretch;
