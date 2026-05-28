@@ -3937,6 +3937,12 @@ img.brand-icon {
   padding: 0.125rem 0.375rem;
   font-size: 0.75rem;
 }
+.code-inline.request-api-key-cell {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
 .steps-list {
   margin: 0;
   padding-left: 1.25rem;
