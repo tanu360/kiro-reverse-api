@@ -147,7 +147,7 @@ func (r *apiKeyUsageReservation) apiKeyValue() string {
 	return r.key
 }
 
-func tokenBudget(estimatedInputTokens, maxOutputTokens int) int64 {
+func tokenBudget(estimatedInputTokens int) int64 {
 	if estimatedInputTokens < 1 {
 		estimatedInputTokens = 1
 	}

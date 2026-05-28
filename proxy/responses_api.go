@@ -67,7 +67,7 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	prepared.OpenAIRequest.Model = actualModel
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)
-	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens, prepared.OpenAIRequest.MaxTokens))
+	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
 		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, prepared.OpenAIRequest.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
 		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
