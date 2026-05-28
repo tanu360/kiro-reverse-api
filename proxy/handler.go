@@ -328,7 +328,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 
 	case path == "/v1/messages" || path == "/messages" || path == "/anthropic/v1/messages":
-		ar := h.authenticateForClaude(w, r)
+		ar := h.authenticateForClaudeRequest(w, r)
 		if ar == nil {
 			return
 		}
@@ -340,13 +340,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		h.handleCountTokens(w, ar)
 	case path == "/v1/chat/completions" || path == "/chat/completions":
-		ar := h.authenticateForOpenAI(w, r)
+		ar := h.authenticateForOpenAIRequest(w, r)
 		if ar == nil {
 			return
 		}
 		h.handleOpenAIChat(w, ar)
 	case path == "/v1/responses" || path == "/responses":
-		ar := h.authenticateForOpenAI(w, r)
+		ar := h.authenticateForOpenAIRequest(w, r)
 		if ar == nil {
 			return
 		}
@@ -1265,11 +1265,6 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 			}
 			closeActiveBlock()
 
-			if realInputTokens > 0 {
-				inputTokens = realInputTokens
-			} else if inputTokens <= 0 {
-				inputTokens = estimatedInputTokens
-			}
 			outputContent, extractedReasoning := extractThinkingFromContent(rawContentBuilder.String())
 			thinkingOutput := rawThinkingBuilder.String()
 			if thinking && thinkingOutput == "" && extractedReasoning != "" {
@@ -1278,7 +1273,8 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 			if !thinking {
 				thinkingOutput = ""
 			}
-			outputTokens = estimateClaudeOutputTokens(outputContent, thinkingOutput, toolUses)
+			estimatedOutputTokens := estimateClaudeOutputTokens(outputContent, thinkingOutput, toolUses)
+			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
@@ -1332,6 +1328,20 @@ func (h *Handler) recordSuccessForApiKey(apiKeyReservation *apiKeyUsageReservati
 	if err := apiKeyReservation.finalize(int64(inputTokens+outputTokens), credits); err != nil {
 		logger.Warnf("[ApiKey] failed to finalize usage for key %s: %v", apiKeyReservation.id, err)
 	}
+}
+
+func finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, contextInputTokens, estimatedOutputTokens int) (int, int) {
+	if inputTokens <= 0 {
+		if contextInputTokens > 0 {
+			inputTokens = contextInputTokens
+		} else {
+			inputTokens = estimatedInputTokens
+		}
+	}
+	if outputTokens <= 0 {
+		outputTokens = estimatedOutputTokens
+	}
+	return inputTokens, outputTokens
 }
 
 func accountIdentity(account *config.Account) (string, string) {
@@ -1446,12 +1456,8 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 				rawThinkingContent = ""
 			}
 
-			if realInputTokens > 0 {
-				inputTokens = realInputTokens
-			} else if inputTokens <= 0 {
-				inputTokens = estimatedInputTokens
-			}
-			outputTokens = estimateClaudeOutputTokens(finalContent, rawThinkingContent, toolUses)
+			estimatedOutputTokens := estimateClaudeOutputTokens(finalContent, rawThinkingContent, toolUses)
+			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
@@ -1915,11 +1921,6 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 				sendChunk("", 3)
 			}
 
-			if realInputTokens > 0 {
-				inputTokens = realInputTokens
-			} else if inputTokens <= 0 {
-				inputTokens = estimatedInputTokens
-			}
 			outputContent, extractedReasoning := extractThinkingFromContent(rawContentBuilder.String())
 			reasoningOutput := rawReasoningBuilder.String()
 			if thinking && reasoningOutput == "" && extractedReasoning != "" {
@@ -1928,11 +1929,12 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 			if !thinking {
 				reasoningOutput = ""
 			}
-			outputTokens = estimateApproxTokens(outputContent) + estimateApproxTokens(reasoningOutput)
+			estimatedOutputTokens := estimateApproxTokens(outputContent) + estimateApproxTokens(reasoningOutput)
 			for _, tc := range toolCalls {
-				outputTokens += estimateApproxTokens(tc.Function.Name)
-				outputTokens += estimateApproxTokens(tc.Function.Arguments)
+				estimatedOutputTokens += estimateApproxTokens(tc.Function.Name)
+				estimatedOutputTokens += estimateApproxTokens(tc.Function.Arguments)
 			}
+			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
@@ -2056,12 +2058,8 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 				reasoningContent = ""
 			}
 
-			if realInputTokens > 0 {
-				inputTokens = realInputTokens
-			} else if inputTokens <= 0 {
-				inputTokens = estimatedInputTokens
-			}
-			outputTokens = estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
+			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
+			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)

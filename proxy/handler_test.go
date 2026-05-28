@@ -175,6 +175,39 @@ func TestClaudeNonStreamNoAccountsRecordsOneFailedRequest(t *testing.T) {
 	}
 }
 
+func TestClaudeAuthFailureRecordsOneFailedRequest(t *testing.T) {
+	resetObservePersistenceForTest(t)
+	cfgFile := t.TempDir() + "/kiro.db"
+	if err := config.Init(cfgFile); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	require := true
+	if err := config.UpdateSettingsPatch(&require, ""); err != nil {
+		t.Fatalf("enable auth: %v", err)
+	}
+
+	h := &Handler{}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"hello"}],"max_tokens":16}`))
+	req.Header.Set("Authorization", "Bearer sk-missing")
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected auth failure, status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	stats, err := queryPersistedRequestStats()
+	if err != nil {
+		t.Fatalf("query request stats: %v", err)
+	}
+	if stats.TotalRequests != 1 || stats.SuccessRequests != 0 || stats.FailedRequests != 1 {
+		t.Fatalf("expected one auth-failed request row, got %#v", stats)
+	}
+	page := getObserveStore().RequestPage(requestQuery{Page: 1, PageSize: 10, Status: "failed"})
+	if page.Total != 1 || len(page.Requests) != 1 || page.Requests[0].APIKeyMasked != "sk-missing" {
+		t.Fatalf("unexpected failed auth request page: total=%d rows=%#v", page.Total, page.Requests)
+	}
+}
+
 func TestAccountCreditTotalsSumsServerUsage(t *testing.T) {
 	used, limit := accountCreditTotals([]config.Account{
 		{UsageCurrent: 66, UsageLimit: 1000},
@@ -477,6 +510,25 @@ func TestRecordSuccessForApiKeyAttributesUsage(t *testing.T) {
 	got := config.GetApiKeyEntry(entry.ID)
 	if got == nil || got.TokensUsed != 10 || got.CreditsUsed != 1.25 || got.RequestsCount != 1 {
 		t.Fatalf("usage not attributed: %#v", got)
+	}
+}
+
+func TestFinalizeUsageTokensPrefersProviderUsage(t *testing.T) {
+	in, out := finalizeUsageTokens(120, 34, 999, 5000, 88)
+	if in != 120 || out != 34 {
+		t.Fatalf("expected provider usage to win, got input=%d output=%d", in, out)
+	}
+}
+
+func TestFinalizeUsageTokensFallsBackWhenProviderUsageMissing(t *testing.T) {
+	in, out := finalizeUsageTokens(0, 0, 999, 5000, 88)
+	if in != 5000 || out != 88 {
+		t.Fatalf("expected context input and estimated output fallback, got input=%d output=%d", in, out)
+	}
+
+	in, out = finalizeUsageTokens(0, 0, 999, 0, 88)
+	if in != 999 || out != 88 {
+		t.Fatalf("expected estimated input fallback, got input=%d output=%d", in, out)
 	}
 }
 

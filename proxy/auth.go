@@ -74,11 +74,22 @@ func (h *Handler) authenticate(r *http.Request) (*config.ApiKeyEntry, error) {
 }
 
 func (h *Handler) authenticateForClaude(w http.ResponseWriter, r *http.Request) *http.Request {
+	return h.authenticateForClaudeWithRequestLog(w, r, false)
+}
+
+func (h *Handler) authenticateForClaudeRequest(w http.ResponseWriter, r *http.Request) *http.Request {
+	return h.authenticateForClaudeWithRequestLog(w, r, true)
+}
+
+func (h *Handler) authenticateForClaudeWithRequestLog(w http.ResponseWriter, r *http.Request, recordRequest bool) *http.Request {
 	entry, err := h.authenticate(r)
 	if err != nil {
 		ae, _ := err.(*authError)
 		if ae == nil {
 			ae = newAuthError(http.StatusUnauthorized, "authentication_error", err.Error())
+		}
+		if recordRequest {
+			recordFinalRequestWithAPIKey("", extractProvidedKey(r), nil, "", 0, 0, 0, false, ae.status, ae.message)
 		}
 		h.sendClaudeError(w, ae.status, ae.code, ae.message)
 		return nil
@@ -87,11 +98,22 @@ func (h *Handler) authenticateForClaude(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) authenticateForOpenAI(w http.ResponseWriter, r *http.Request) *http.Request {
+	return h.authenticateForOpenAIWithRequestLog(w, r, false)
+}
+
+func (h *Handler) authenticateForOpenAIRequest(w http.ResponseWriter, r *http.Request) *http.Request {
+	return h.authenticateForOpenAIWithRequestLog(w, r, true)
+}
+
+func (h *Handler) authenticateForOpenAIWithRequestLog(w http.ResponseWriter, r *http.Request, recordRequest bool) *http.Request {
 	entry, err := h.authenticate(r)
 	if err != nil {
 		ae, _ := err.(*authError)
 		if ae == nil {
 			ae = newAuthError(http.StatusUnauthorized, "authentication_error", err.Error())
+		}
+		if recordRequest {
+			recordFinalRequestWithAPIKey("", extractProvidedKey(r), nil, "", 0, 0, 0, false, ae.status, ae.message)
 		}
 		h.sendOpenAIError(w, ae.status, ae.code, ae.message)
 		return nil

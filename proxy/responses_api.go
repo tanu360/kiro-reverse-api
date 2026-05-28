@@ -189,12 +189,8 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 			} else if !thinking {
 				reasoningContent = ""
 			}
-			if realInputTokens > 0 {
-				inputTokens = realInputTokens
-			} else if inputTokens <= 0 {
-				inputTokens = estimatedInputTokens
-			}
-			outputTokens = estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
+			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
+			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
@@ -407,12 +403,8 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 			} else if !thinking {
 				reasoningContent = ""
 			}
-			if realInputTokens > 0 {
-				inputTokens = realInputTokens
-			} else if inputTokens <= 0 {
-				inputTokens = estimatedInputTokens
-			}
-			outputTokens = estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
+			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
+			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
