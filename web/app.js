@@ -699,14 +699,36 @@
   async function loadStats() {
     const res = await api('/status');
     const d = await res.json();
-    $('statAccounts').textContent = d.accounts || 0;
-    $('statRequests').textContent = d.totalRequests || 0;
-    $('statSuccess').textContent = d.successRequests || 0;
-    $('statFailed').textContent = d.failedRequests || 0;
-    $('statTokens').textContent = formatCompactNum(d.totalTokens || 0);
-    $('statCredits').textContent = formatStatCredits(d.accountCreditsUsed || 0) + ' / ' + formatStatCredits(d.accountCreditsLimit || 0);
-    const appCredits = $('statAppCredits');
-    if (appCredits) appCredits.textContent = formatStatCredits(d.totalCredits || 0);
+    const accounts = Number(d.accounts || 0);
+    const available = Number(d.available || 0);
+    const exhausted = Number(d.totalExhausted || 0);
+    const totalRequests = Number(d.totalRequests || 0);
+    const successRequests = Number(d.successRequests || 0);
+    const failedRequests = Number(d.failedRequests || 0);
+    const totalTokens = Number(d.totalTokens || 0);
+    const appCredits = Number(d.totalCredits || 0);
+    const accountCreditsUsed = Number(d.accountCreditsUsed || 0);
+    const accountCreditsLimit = Number(d.accountCreditsLimit || 0);
+    const otherCredits = Math.max(0, accountCreditsUsed - appCredits);
+    const unavailable = Math.max(0, accounts - available);
+    setText('statAccounts', formatNum(accounts));
+    setText('statAvailable', formatCountRatio(available, accounts));
+    setText('statCapacityPct', formatPercent(accountCreditsUsed, accountCreditsLimit));
+    setText('statCredits', formatStatCredits(accountCreditsUsed) + ' / ' + formatStatCredits(accountCreditsLimit));
+    setText('statOtherCredits', formatStatCredits(otherCredits));
+    setText('statRequests', formatNum(totalRequests));
+    setText('statTokens', formatCompactNum(totalTokens));
+    setText('statAppCredits', formatStatCredits(appCredits));
+    setText('statAvgTokens', formatCompactNum(totalRequests ? totalTokens / totalRequests : 0));
+    setText('statAvgCredits', formatStatCredits(totalRequests ? appCredits / totalRequests : 0));
+    setText('statSuccess', formatNum(successRequests));
+    setText('statSuccessRate', formatPercent(successRequests, totalRequests));
+    setText('statSuccessRatio', formatCountRatio(successRequests, totalRequests));
+    setText('statFailed', formatNum(failedRequests));
+    setText('statFailedRate', formatPercent(failedRequests, totalRequests));
+    setText('statErrorEvents', formatNum(d.totalErrorEvents || 0));
+    setText('statExhausted', formatNum(exhausted));
+    setText('statUnavailable', formatNum(unavailable));
   }
   async function loadAccounts() {
     const res = await api('/accounts');
@@ -863,13 +885,27 @@
     if (!Number.isFinite(value)) return '0';
     return String(Math.trunc(value));
   }
+  function setText(id, value) {
+    const el = $(id);
+    if (el) el.textContent = value;
+  }
+  function formatCountRatio(part, total) {
+    return formatNum(part) + ' / ' + formatNum(total);
+  }
+  function formatPercent(part, total) {
+    const denominator = Number(total || 0);
+    if (!Number.isFinite(denominator) || denominator <= 0) return '0%';
+    const value = (Number(part || 0) / denominator) * 100;
+    if (!Number.isFinite(value)) return '0%';
+    return value.toFixed(value >= 10 ? 1 : 2).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '') + '%';
+  }
   function formatCompactNum(n) {
     const value = Number(n || 0);
     if (!Number.isFinite(value)) return '0';
     const abs = Math.abs(value);
-    if (abs >= 1e9) return (value / 1e9).toFixed(abs >= 10e9 ? 0 : 1).replace(/\.0$/, '') + 'B';
-    if (abs >= 1e6) return (value / 1e6).toFixed(abs >= 10e6 ? 0 : 1).replace(/\.0$/, '') + 'M';
-    if (abs >= 1e3) return (value / 1e3).toFixed(abs >= 10e3 ? 0 : 1).replace(/\.0$/, '') + 'K';
+    if (abs >= 1e9) return (value / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+    if (abs >= 1e6) return (value / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (abs >= 1e3) return (value / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
     return String(Math.trunc(value));
   }
   function formatCredits(n) {

@@ -194,6 +194,7 @@ func TestQueryPersistedRequestStats(t *testing.T) {
 	s.RecordRequest("acc-ok-1", "ok1@example.com", "claude-sonnet", 10, 20, 0.30, true, 200, "")
 	s.RecordRequest("acc-fail", "fail@example.com", "claude-opus", 0, 0, 0, false, 500, "boom")
 	s.RecordRequest("acc-ok-2", "ok2@example.com", "claude-haiku", 3, 7, 0.20, true, 200, "")
+	s.RecordError("acc-fail", "fail@example.com", "claude-opus", 500, "boom")
 
 	stats, err := queryPersistedRequestStats()
 	if err != nil {
@@ -207,5 +208,8 @@ func TestQueryPersistedRequestStats(t *testing.T) {
 	}
 	if math.Abs(stats.TotalCredits-0.50) > 0.000001 {
 		t.Fatalf("expected 0.50 credits, got %.2f", stats.TotalCredits)
+	}
+	if stats.TotalErrorEvents != 1 {
+		t.Fatalf("expected 1 error event, got %d", stats.TotalErrorEvents)
 	}
 }

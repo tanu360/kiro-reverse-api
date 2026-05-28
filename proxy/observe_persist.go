@@ -38,11 +38,12 @@ VALUES (?, ?, ?, ?, ?, ?)`,
 }
 
 type persistedRequestStats struct {
-	TotalRequests   int64
-	SuccessRequests int64
-	FailedRequests  int64
-	TotalTokens     int64
-	TotalCredits    float64
+	TotalRequests    int64
+	SuccessRequests  int64
+	FailedRequests   int64
+	TotalTokens      int64
+	TotalCredits     float64
+	TotalErrorEvents int64
 }
 
 func queryPersistedRequestStats() (persistedRequestStats, error) {
@@ -65,6 +66,10 @@ FROM requests`).Scan(
 		&stats.TotalTokens,
 		&stats.TotalCredits,
 	)
+	if err != nil {
+		return stats, err
+	}
+	err = d.QueryRow(`SELECT COUNT(*) FROM errors`).Scan(&stats.TotalErrorEvents)
 	return stats, err
 }
 

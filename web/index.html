@@ -190,12 +190,18 @@
           <div class="stat-body">
             <div class="stat-main">
               <div class="stat-value" id="statAccounts">0</div>
-              <div class="stat-sub">
-                <span class="stat-sub-sec"><span class="stat-value-sm" id="statCredits">0</span> <span
-                    class="stat-label" data-i18n="stats.credits"></span></span>
-              </div>
             </div>
             <i class="fa-solid fa-users stat-icon" aria-hidden="true"></i>
+          </div>
+          <div class="stat-metrics">
+            <div class="stat-metric"><span class="stat-metric-value" id="statAvailable">0 / 0</span><span
+                class="stat-metric-label" data-i18n="stats.available"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statCapacityPct">0%</span><span
+                class="stat-metric-label" data-i18n="stats.capacityUsed"></span></div>
+            <div class="stat-metric stat-metric-wide"><span class="stat-metric-value" id="statCredits">0 / 0</span><span
+                class="stat-metric-label" data-i18n="stats.accountCredits"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statOtherCredits">0.0</span><span
+                class="stat-metric-label" data-i18n="stats.otherCredits"></span></div>
           </div>
         </div>
         <div class="stat-card">
@@ -203,15 +209,18 @@
           <div class="stat-body">
             <div class="stat-main">
               <div class="stat-value" id="statRequests">0</div>
-              <div class="stat-sub">
-                <span class="stat-sub-sec"><span class="stat-value-sm" id="statTokens">0</span> <span class="stat-label"
-                    data-i18n="stats.tokens"></span></span>
-                <span class="stat-sep">/</span>
-                <span class="stat-sub-sec"><span class="stat-value-sm" id="statAppCredits">0</span> <span
-                    class="stat-label" data-i18n="stats.credits"></span></span>
-              </div>
             </div>
             <i class="fa-solid fa-route stat-icon" aria-hidden="true"></i>
+          </div>
+          <div class="stat-metrics">
+            <div class="stat-metric"><span class="stat-metric-value" id="statTokens">0</span><span
+                class="stat-metric-label" data-i18n="stats.tokens"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statAppCredits">0.0</span><span
+                class="stat-metric-label" data-i18n="stats.appCredits"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statAvgTokens">0</span><span
+                class="stat-metric-label" data-i18n="stats.avgTokens"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statAvgCredits">0.0</span><span
+                class="stat-metric-label" data-i18n="stats.avgCredits"></span></div>
           </div>
         </div>
         <div class="stat-card">
@@ -219,9 +228,14 @@
           <div class="stat-body">
             <div class="stat-main">
               <div class="stat-value" id="statSuccess">0</div>
-              <div class="stat-sub"><span class="stat-label" data-i18n="stats.completed"></span></div>
             </div>
             <i class="fa-solid fa-circle-check stat-icon" aria-hidden="true"></i>
+          </div>
+          <div class="stat-metrics stat-metrics-compact">
+            <div class="stat-metric"><span class="stat-metric-value" id="statSuccessRate">0%</span><span
+                class="stat-metric-label" data-i18n="stats.successRate"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statSuccessRatio">0 / 0</span><span
+                class="stat-metric-label" data-i18n="stats.completed"></span></div>
           </div>
         </div>
         <div class="stat-card">
@@ -229,11 +243,18 @@
           <div class="stat-body">
             <div class="stat-main">
               <div class="stat-value stat-value--danger" id="statFailed">0</div>
-              <div class="stat-sub">
-                <span class="stat-label" data-i18n="stats.errors"></span>
-              </div>
             </div>
             <i class="fa-solid fa-circle-xmark stat-icon stat-icon--danger" aria-hidden="true"></i>
+          </div>
+          <div class="stat-metrics">
+            <div class="stat-metric"><span class="stat-metric-value stat-metric-value--danger"
+                id="statFailedRate">0%</span><span class="stat-metric-label" data-i18n="stats.failedRate"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statErrorEvents">0</span><span
+                class="stat-metric-label" data-i18n="stats.errorEvents"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statExhausted">0</span><span
+                class="stat-metric-label" data-i18n="stats.exhausted"></span></div>
+            <div class="stat-metric"><span class="stat-metric-value" id="statUnavailable">0</span><span
+                class="stat-metric-label" data-i18n="stats.unavailable"></span></div>
           </div>
         </div>
       </div>

@@ -438,6 +438,7 @@ func (h *Handler) statusPayload(includeAdmin bool) map[string]interface{} {
 		"failedRequests":      requestStats.FailedRequests,
 		"totalTokens":         requestStats.TotalTokens,
 		"totalCredits":        requestStats.TotalCredits,
+		"totalErrorEvents":    requestStats.TotalErrorEvents,
 		"uptime":              time.Now().Unix() - h.startTime,
 	}
 

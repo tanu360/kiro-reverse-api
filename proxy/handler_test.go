@@ -204,6 +204,7 @@ func TestStatusPayloadUsesRequestDBAndAccountCredits(t *testing.T) {
 	defer s.Reset()
 	s.RecordRequest("acc-1", "one@example.com", "claude-sonnet", 10, 20, 0.30, true, http.StatusOK, "")
 	s.RecordRequest("acc-2", "two@example.com", "claude-opus", 0, 0, 0, false, http.StatusInternalServerError, "boom")
+	s.RecordError("acc-2", "two@example.com", "claude-opus", http.StatusInternalServerError, "boom")
 
 	p := accountpool.GetPool()
 	p.Reload()
@@ -223,6 +224,9 @@ func TestStatusPayloadUsesRequestDBAndAccountCredits(t *testing.T) {
 	}
 	if math.Abs(body["totalCredits"].(float64)-0.30) > 0.000001 {
 		t.Fatalf("expected 0.30 app credits, got %#v", body["totalCredits"])
+	}
+	if body["totalErrorEvents"].(float64) != 1 {
+		t.Fatalf("expected 1 error event, got %#v", body["totalErrorEvents"])
 	}
 	if body["accountCreditsUsed"].(float64) != 68 || body["accountCreditsLimit"].(float64) != 2000 {
 		t.Fatalf("unexpected account credits: used=%#v limit=%#v", body["accountCreditsUsed"], body["accountCreditsLimit"])
