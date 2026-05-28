@@ -234,6 +234,7 @@ func TestIsAuthFailureIgnoresFalsePositives(t *testing.T) {
 	negatives := []string{
 		"status code 4011 found",
 		"error 14013 exceeded",
+		"request id req-401abc failed upstream",
 		"some random error",
 		"status 200 OK",
 	}

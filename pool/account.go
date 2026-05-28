@@ -300,9 +300,9 @@ func hasStatusToken(s, status string) bool {
 		if idx < 0 {
 			return false
 		}
-		leftOK := idx == 0 || !isDigit(s[idx-1])
+		leftOK := idx == 0 || !isAlphaNumeric(s[idx-1])
 		rightIdx := idx + len(status)
-		rightOK := rightIdx >= len(s) || !isDigit(s[rightIdx])
+		rightOK := rightIdx >= len(s) || !isAlphaNumeric(s[rightIdx])
 		if leftOK && rightOK {
 			return true
 		}
@@ -310,8 +310,10 @@ func hasStatusToken(s, status string) bool {
 	}
 }
 
-func isDigit(b byte) bool {
-	return b >= '0' && b <= '9'
+func isAlphaNumeric(b byte) bool {
+	return (b >= '0' && b <= '9') ||
+		(b >= 'a' && b <= 'z') ||
+		(b >= 'A' && b <= 'Z')
 }
 
 func IsSuspensionError(err error) bool {
