@@ -797,7 +797,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	thinkingResponseOpts := resolveClaudeThinkingResponseOptions(req.Thinking, thinkingCfg.ClaudeFormat)
 	estimatedInputTokens := estimateClaudeRequestInputTokens(effectiveReq)
 	cacheProfile := h.promptCache.BuildClaudeProfile(effectiveReq, estimatedInputTokens)
-	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), tokenBudget(estimatedInputTokens, req.MaxTokens))
+	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), apiKeyValueFromContext(r.Context()), tokenBudget(estimatedInputTokens, req.MaxTokens))
 	if err != nil {
 		h.sendClaudeError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
@@ -1198,7 +1198,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 				h.handleAccountFailure(account, err)
 				getObserveStore().RecordFailure(account.ID, model)
 				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
-				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
+				getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
 				if !messageStarted {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 						retryPlan.waitBeforeRetry(totalAttempts)
@@ -1240,7 +1240,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
+			getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
@@ -1405,7 +1405,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 				h.handleAccountFailure(account, err)
 				getObserveStore().RecordFailure(account.ID, model)
 				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
-				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
+				getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(totalAttempts)
 					continue
@@ -1435,7 +1435,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
+			getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
@@ -1522,7 +1522,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	actualModel, thinking := ParseModelAndThinking(req.Model, thinkingCfg.Suffix)
 	req.Model = actualModel
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&req)
-	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), tokenBudget(estimatedInputTokens, req.MaxTokens))
+	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), apiKeyValueFromContext(r.Context()), tokenBudget(estimatedInputTokens, req.MaxTokens))
 	if err != nil {
 		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
@@ -1864,7 +1864,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 				h.handleAccountFailure(account, err)
 				getObserveStore().RecordFailure(account.ID, model)
 				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
-				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
+				getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
 				if !responseStarted {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 						retryPlan.waitBeforeRetry(totalAttempts)
@@ -1905,7 +1905,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
+			getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
@@ -2004,7 +2004,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 				h.handleAccountFailure(account, err)
 				getObserveStore().RecordFailure(account.ID, model)
 				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
-				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
+				getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(totalAttempts)
 					continue
@@ -2031,7 +2031,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
+			getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 

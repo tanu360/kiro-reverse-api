@@ -329,7 +329,7 @@ func TestApiKeyReservationRejectsProjectedTokenOverrun(t *testing.T) {
 		t.Fatalf("add key: %v", err)
 	}
 
-	if _, err := reserveApiKeyUsage(entry.ID, 11); err == nil {
+	if _, err := reserveApiKeyUsage(entry.ID, entry.Key, 11); err == nil {
 		t.Fatalf("expected projected token budget to fail")
 	}
 	got := config.GetApiKeyEntry(entry.ID)
@@ -347,7 +347,7 @@ func TestRecordSuccessForApiKeyAttributesUsage(t *testing.T) {
 		t.Fatalf("add key: %v", err)
 	}
 	h := &Handler{}
-	reservation, err := reserveApiKeyUsage(entry.ID, 10)
+	reservation, err := reserveApiKeyUsage(entry.ID, entry.Key, 10)
 	if err != nil {
 		t.Fatalf("reserve key usage: %v", err)
 	}

@@ -59,7 +59,7 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	prepared.OpenAIRequest.Model = actualModel
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)
-	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), tokenBudget(estimatedInputTokens, prepared.OpenAIRequest.MaxTokens))
+	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), apiKeyValueFromContext(r.Context()), tokenBudget(estimatedInputTokens, prepared.OpenAIRequest.MaxTokens))
 	if err != nil {
 		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
@@ -161,7 +161,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 				h.handleAccountFailure(account, err)
 				getObserveStore().RecordFailure(account.ID, model)
 				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
-				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
+				getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(totalAttempts)
 					continue
@@ -187,7 +187,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
+			getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
@@ -360,7 +360,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 				h.handleAccountFailure(account, err)
 				getObserveStore().RecordFailure(account.ID, model)
 				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
-				getObserveStore().RecordRequest(account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
+				getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
 				if !started {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 						retryPlan.waitBeforeRetry(totalAttempts)
@@ -401,7 +401,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
+			getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 

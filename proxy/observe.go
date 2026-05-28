@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"kiro-proxy/config"
 	"kiro-proxy/logger"
 )
 
@@ -43,18 +44,21 @@ type errorRecord struct {
 }
 
 type requestRecord struct {
-	ID          int64   `json:"id,omitempty"`
-	TS          int64   `json:"ts"`
-	AccountID   string  `json:"accountId"`
-	Email       string  `json:"email,omitempty"`
-	Model       string  `json:"model"`
-	InTokens    int     `json:"inTokens"`
-	OutTokens   int     `json:"outTokens"`
-	TotalTokens int     `json:"totalTokens"`
-	Credits     float64 `json:"credits"`
-	Success     bool    `json:"success"`
-	Status      int     `json:"status,omitempty"`
-	Message     string  `json:"message,omitempty"`
+	ID           int64   `json:"id,omitempty"`
+	TS           int64   `json:"ts"`
+	AccountID    string  `json:"accountId"`
+	APIKeyID     string  `json:"apiKeyId,omitempty"`
+	APIKey       string  `json:"-"`
+	APIKeyMasked string  `json:"apiKeyMasked,omitempty"`
+	Email        string  `json:"email,omitempty"`
+	Model        string  `json:"model"`
+	InTokens     int     `json:"inTokens"`
+	OutTokens    int     `json:"outTokens"`
+	TotalTokens  int     `json:"totalTokens"`
+	Credits      float64 `json:"credits"`
+	Success      bool    `json:"success"`
+	Status       int     `json:"status,omitempty"`
+	Message      string  `json:"message,omitempty"`
 }
 
 type requestQuery struct {
@@ -248,6 +252,14 @@ func (s *observeStore) RecordError(accountID, email, model string, status int, m
 }
 
 func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
+	s.RecordRequestWithAPIKey(accountID, "", "", email, model, inTokens, outTokens, credits, success, status, message)
+}
+
+func (s *observeStore) RecordRequestForApiKey(apiKeyReservation *apiKeyUsageReservation, accountID, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
+	s.RecordRequestWithAPIKey(accountID, apiKeyReservation.apiKeyID(), apiKeyReservation.apiKeyValue(), email, model, inTokens, outTokens, credits, success, status, message)
+}
+
+func (s *observeStore) RecordRequestWithAPIKey(accountID, apiKeyID, apiKey, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
 	if s == nil {
 		return
 	}
@@ -255,17 +267,20 @@ func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, o
 		message = message[:500]
 	}
 	rec := requestRecord{
-		TS:          time.Now().Unix(),
-		AccountID:   accountID,
-		Email:       email,
-		Model:       model,
-		InTokens:    inTokens,
-		OutTokens:   outTokens,
-		TotalTokens: inTokens + outTokens,
-		Credits:     credits,
-		Success:     success,
-		Status:      status,
-		Message:     message,
+		TS:           time.Now().Unix(),
+		AccountID:    accountID,
+		APIKeyID:     apiKeyID,
+		APIKey:       apiKey,
+		APIKeyMasked: requestAPIKeyMasked(apiKeyID, apiKey),
+		Email:        email,
+		Model:        model,
+		InTokens:     inTokens,
+		OutTokens:    outTokens,
+		TotalTokens:  inTokens + outTokens,
+		Credits:      credits,
+		Success:      success,
+		Status:       status,
+		Message:      message,
 	}
 	s.mu.Lock()
 	s.recentRequests[s.recentReqIdx] = rec
@@ -273,6 +288,18 @@ func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, o
 	s.mu.Unlock()
 
 	enqueuePersistRequestRecord(rec)
+}
+
+func requestAPIKeyMasked(apiKeyID, apiKey string) string {
+	if apiKey == "" && apiKeyID != "" {
+		if entry := config.GetApiKeyEntry(apiKeyID); entry != nil {
+			apiKey = entry.Key
+		}
+	}
+	if apiKey == "" {
+		return ""
+	}
+	return config.MaskApiKey(apiKey)
 }
 
 type OverviewSnapshot struct {
@@ -519,7 +546,7 @@ func normalizeRequestQuery(q requestQuery) requestQuery {
 	}
 	q.Sort = strings.TrimSpace(strings.ToLower(q.Sort))
 	switch q.Sort {
-	case "time", "status", "account", "model", "tokens", "credits":
+	case "time", "status", "account", "api_key", "model", "tokens", "credits":
 	default:
 		q.Sort = "time"
 	}
@@ -552,7 +579,7 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 			continue
 		}
 		if search != "" {
-			haystack := strings.ToLower(rec.Email + " " + rec.AccountID + " " + rec.Model + " " + rec.Message)
+			haystack := strings.ToLower(rec.Email + " " + rec.AccountID + " " + rec.APIKeyID + " " + rec.APIKey + " " + rec.APIKeyMasked + " " + rec.Model + " " + rec.Message)
 			if !strings.Contains(haystack, search) {
 				continue
 			}
@@ -567,6 +594,8 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 			compare = boolInt(a.Success) - boolInt(b.Success)
 		case "account":
 			compare = strings.Compare(strings.ToLower(a.Email+a.AccountID), strings.ToLower(b.Email+b.AccountID))
+		case "api_key":
+			compare = strings.Compare(strings.ToLower(a.APIKey+a.APIKeyID), strings.ToLower(b.APIKey+b.APIKeyID))
 		case "model":
 			compare = strings.Compare(strings.ToLower(a.Model), strings.ToLower(b.Model))
 		case "tokens":

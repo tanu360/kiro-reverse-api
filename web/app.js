@@ -857,9 +857,14 @@
     return Math.floor(diff / 86400) + t('time.days');
   }
   function formatNum(n) {
-    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-    return n.toString();
+    const value = Number(n || 0);
+    if (!Number.isFinite(value)) return '0';
+    return String(Math.trunc(value));
+  }
+  function formatCredits(n) {
+    const value = Number(n || 0);
+    if (!Number.isFinite(value)) return '0';
+    return value.toFixed(2);
   }
   function applyUsageBars(root) {
     qsa('.usage-fill[data-usage-pct]', root).forEach(el => {
@@ -1612,7 +1617,7 @@
       return '<span class="api-key-usage-unlimited"><i class="fa-solid fa-infinity" aria-hidden="true"></i>' + escapeHtml('Unlimited') + '</span>';
     }
     const tokenText = tokenLimit > 0 ? formatNum(k.tokensUsed || 0) + ' / ' + formatNum(tokenLimit) : 'No limit';
-    const creditText = creditLimit > 0 ? Number(k.creditsUsed || 0).toFixed(2) + ' / ' + Number(creditLimit).toFixed(2) : 'No limit';
+    const creditText = creditLimit > 0 ? formatCredits(k.creditsUsed || 0) + ' / ' + formatCredits(creditLimit) : 'No limit';
     return '<span class="api-key-usage">' +
       '<span class="api-key-usage-line"><span class="api-key-usage-icon" title="Tokens"><i class="fa-solid fa-cubes" aria-hidden="true"></i></span>' + escapeHtml(tokenText) + '</span>' +
       '<span class="api-key-usage-line api-key-muted"><span class="api-key-usage-icon" title="Credits"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>' + escapeHtml(creditText) + '</span>' +
@@ -1928,14 +1933,15 @@
       requestSortHeader('time', t('requests.time')),
       requestSortHeader('status', t('requests.status')),
       requestSortHeader('account', t('requests.account')),
+      requestSortHeader('api_key', t('requests.apiKey')),
       requestSortHeader('model', t('requests.model')),
       requestSortHeader('tokens', t('stats.tokens')),
       requestSortHeader('credits', t('stats.credits')),
       '<th>' + escapeHtml(t('requests.error')) + '</th>'
     ].join('');
     const rows = (requestsCache || []).map(r => '<tr><td>' + escapeHtml(formatTime(r.ts)) + '</td><td>' +
-      formatRequestStatus(r) + '</td><td>' + escapeHtml(getDisplayAccount(r.email, r.accountId)) + '</td><td>' + escapeHtml(r.model || '-') +
-      '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + (r.credits || 0).toFixed(2) + '</td><td>' + formatRequestError(r) + '</td></tr>');
+      formatRequestStatus(r) + '</td><td>' + escapeHtml(getDisplayAccount(r.email, r.accountId)) + '</td><td>' + formatRequestApiKey(r) + '</td><td>' + escapeHtml(r.model || '-') +
+      '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + formatCredits(r.credits || 0) + '</td><td>' + formatRequestError(r) + '</td></tr>');
     if (!rows.length) {
       el.innerHTML = '<div class="empty-state">' + escapeHtml(t('requests.empty')) + '</div>';
     } else {
@@ -1956,6 +1962,17 @@
     }
     const code = r.status ? ' ' + r.status : '';
     return '<span class="badge badge-error">' + escapeHtml(t('requests.fail') + code) + '</span>';
+  }
+  function normalizeApiKeyMask(value) {
+    value = String(value || '');
+    if (!value) return '';
+    if (value.length <= 10) return value;
+    return value.slice(0, 6) + '****' + value.slice(-4);
+  }
+  function formatRequestApiKey(r) {
+    const value = normalizeApiKeyMask(r.apiKeyMasked || '');
+    if (!value) return '<span class="muted-text">-</span>';
+    return '<code class="code-inline request-api-key-cell" title="' + escapeAttr(value) + '">' + escapeHtml(value) + '</code>';
   }
   function formatRequestError(r) {
     if (r.success) return '<span class="muted-text">-</span>';

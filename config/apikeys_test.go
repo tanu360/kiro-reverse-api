@@ -130,7 +130,7 @@ func TestApiKeyUsageReservationGuardsTokenLimit(t *testing.T) {
 	}
 }
 
-func TestApiKeyRequestReservationHoldsRemainingCredits(t *testing.T) {
+func TestApiKeyRequestReservationChecksCreditLimitWithoutBlockingConcurrentRequests(t *testing.T) {
 	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
@@ -143,11 +143,12 @@ func TestApiKeyRequestReservationHoldsRemainingCredits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reserve request usage: %v", err)
 	}
-	if reservedCredits != 2 {
-		t.Fatalf("expected all remaining credits to be reserved, got %v", reservedCredits)
+	if reservedCredits != 0 {
+		t.Fatalf("expected no credit hold, got %v", reservedCredits)
 	}
-	if _, err := ReserveApiKeyRequestUsage(created.ID, 1); err == nil {
-		t.Fatalf("expected concurrent credit reservation to fail")
+	secondReservedCredits, err := ReserveApiKeyRequestUsage(created.ID, 1)
+	if err != nil {
+		t.Fatalf("reserve concurrent request usage: %v", err)
 	}
 	if err := FinalizeApiKeyUsageReservation(created.ID, 1, reservedCredits, 1, 0.75); err != nil {
 		t.Fatalf("finalize usage: %v", err)
@@ -155,5 +156,12 @@ func TestApiKeyRequestReservationHoldsRemainingCredits(t *testing.T) {
 	got := GetApiKeyEntry(created.ID)
 	if got == nil || got.CreditsUsed != 0.75 || got.RequestsCount != 1 || !got.Enabled {
 		t.Fatalf("unexpected finalized credit usage: %#v", got)
+	}
+	if err := FinalizeApiKeyUsageReservation(created.ID, 1, secondReservedCredits, 1, 1.25); err != nil {
+		t.Fatalf("finalize second usage: %v", err)
+	}
+	got = GetApiKeyEntry(created.ID)
+	if got == nil || got.CreditsUsed != 2 || got.RequestsCount != 2 || got.Enabled {
+		t.Fatalf("expected credit limit to disable key after final usage: %#v", got)
 	}
 }

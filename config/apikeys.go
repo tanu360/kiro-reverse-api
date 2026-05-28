@@ -199,11 +199,8 @@ func ReserveApiKeyRequestUsage(id string, tokens int64) (float64, error) {
 			continue
 		}
 		credits := 0.0
-		if cfg.ApiKeys[i].CreditLimit > 0 {
-			credits = cfg.ApiKeys[i].CreditLimit - cfg.ApiKeys[i].CreditsUsed
-			if credits <= 0 {
-				return 0, errors.New("credit limit exceeded")
-			}
+		if cfg.ApiKeys[i].CreditLimit > 0 && cfg.ApiKeys[i].CreditsUsed >= cfg.ApiKeys[i].CreditLimit {
+			return 0, errors.New("credit limit exceeded")
 		}
 		if err := reserveApiKeyUsageAtIndexLocked(i, tokens, credits); err != nil {
 			return 0, err

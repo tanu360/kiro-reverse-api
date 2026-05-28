@@ -3025,6 +3025,13 @@ img.brand-icon {
 .requests-search input:focus {
   border-color: transparent;
 }
+.request-api-key-cell {
+  display: inline-block;
+  background: transparent;
+  border-color: transparent;
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .data-table {
   width: 100%;
   border-collapse: collapse;
