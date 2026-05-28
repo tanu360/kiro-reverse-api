@@ -782,10 +782,10 @@
   function renderOverageBadge(a) {
     const status = String(a.overageStatus || '').toUpperCase();
     if (status === 'ENABLED') {
-      return '<span class="badge badge-warning">' + escapeHtml(t('accounts.overageOn')) + '</span>';
+      return '<span class="badge badge-success" title="' + escapeAttr(t('accounts.overageOn')) + '">' + escapeHtml(t('accounts.overage')) + '</span>';
     }
     if (status === 'DISABLED') {
-      return '<span class="badge badge-muted">' + escapeHtml(t('accounts.overageOff')) + '</span>';
+      return '<span class="badge badge-muted" title="' + escapeAttr(t('accounts.overageOff')) + '">' + escapeHtml(t('accounts.overage')) + '</span>';
     }
     return '';
   }
@@ -1117,13 +1117,16 @@
       '<button class="btn btn-sm btn-primary" data-detail-action="saveWeight" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.save')) + '</button>' +
       '</div>' +
 
-      '<div class="detail-section"><h4>' + escapeHtml(t('detail.overage')) + '</h4>' +
+      '<div class="detail-section detail-section-overage">' +
+      '<div class="detail-section-header">' +
+      '<h4>' + escapeHtml(t('detail.overage')) + '</h4>' +
+      '<button class="btn btn-sm btn-outline" data-detail-action="refreshOverage" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.overageRefresh')) + '</button>' +
+      '</div>' +
       '<div class="form-group">' +
       '<label class="flex items-center gap-2"><span class="switch"><input type="checkbox" id="overageSwitchInput" data-id="' + idAttr + '" ' + (String(a.overageStatus || '').toUpperCase() === 'ENABLED' ? 'checked' : '') + (overageNotCapable ? ' disabled' : '') + ' /><span class="slider"></span></span><span>' + escapeHtml(t('detail.overageSwitch')) + '</span></label>' +
       '<small>' + escapeHtml(t('detail.overageHint')) + '</small>' +
       '</div>' +
       renderOverageMeta(a) +
-      '<button class="btn btn-sm btn-outline" data-detail-action="refreshOverage" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.overageRefresh')) + '</button>' +
       '</div>' +
 
       '<div class="detail-section"><h4>' + escapeHtml(t('detail.proxyURL')) + '</h4><div class="machine-id-row">' +
