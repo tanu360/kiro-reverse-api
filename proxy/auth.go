@@ -10,8 +10,14 @@ import (
 
 type apiKeyContextKey struct{}
 
+type apiKeyContextValue struct {
+	id  string
+	key string
+}
+
 type apiKeyUsageReservation struct {
 	id              string
+	key             string
 	reservedTokens  int64
 	reservedCredits float64
 	done            bool
@@ -97,30 +103,58 @@ func withApiKeyContext(r *http.Request, entry *config.ApiKeyEntry) *http.Request
 	if entry == nil {
 		return r
 	}
-	return r.WithContext(context.WithValue(r.Context(), apiKeyContextKey{}, entry.ID))
+	return r.WithContext(context.WithValue(r.Context(), apiKeyContextKey{}, apiKeyContextValue{
+		id:  entry.ID,
+		key: entry.Key,
+	}))
 }
 
 func apiKeyIDFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	if id, ok := ctx.Value(apiKeyContextKey{}).(string); ok {
-		return id
+	switch v := ctx.Value(apiKeyContextKey{}).(type) {
+	case apiKeyContextValue:
+		return v.id
+	case string:
+		return v
+	default:
+		return ""
+	}
+}
+
+func apiKeyValueFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if v, ok := ctx.Value(apiKeyContextKey{}).(apiKeyContextValue); ok {
+		return v.key
 	}
 	return ""
+}
+
+func (r *apiKeyUsageReservation) apiKeyID() string {
+	if r == nil {
+		return ""
+	}
+	return r.id
+}
+
+func (r *apiKeyUsageReservation) apiKeyValue() string {
+	if r == nil {
+		return ""
+	}
+	return r.key
 }
 
 func tokenBudget(estimatedInputTokens, maxOutputTokens int) int64 {
 	if estimatedInputTokens < 1 {
 		estimatedInputTokens = 1
 	}
-	if maxOutputTokens <= 0 {
-		maxOutputTokens = 4096
-	}
-	return int64(estimatedInputTokens + maxOutputTokens)
+	return int64(estimatedInputTokens)
 }
 
-func reserveApiKeyUsage(apiKeyID string, tokenBudget int64) (*apiKeyUsageReservation, error) {
+func reserveApiKeyUsage(apiKeyID, apiKey string, tokenBudget int64) (*apiKeyUsageReservation, error) {
 	if apiKeyID == "" {
 		return nil, nil
 	}
@@ -131,7 +165,7 @@ func reserveApiKeyUsage(apiKeyID string, tokenBudget int64) (*apiKeyUsageReserva
 	if err != nil {
 		return nil, err
 	}
-	return &apiKeyUsageReservation{id: apiKeyID, reservedTokens: tokenBudget, reservedCredits: reservedCredits}, nil
+	return &apiKeyUsageReservation{id: apiKeyID, key: apiKey, reservedTokens: tokenBudget, reservedCredits: reservedCredits}, nil
 }
 
 func (r *apiKeyUsageReservation) release() {

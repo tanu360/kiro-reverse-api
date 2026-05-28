@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts INTEGER NOT NULL,
   account_id TEXT NOT NULL DEFAULT '',
+  api_key_id TEXT NOT NULL DEFAULT '',
+  api_key TEXT NOT NULL DEFAULT '',
   email TEXT NOT NULL DEFAULT '',
   model TEXT NOT NULL DEFAULT '',
   in_tokens INTEGER NOT NULL DEFAULT 0,
@@ -48,6 +50,7 @@ CREATE TABLE IF NOT EXISTS requests (
 CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests(ts DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_success ON requests(success);
 CREATE INDEX IF NOT EXISTS idx_requests_lookup ON requests(email, account_id, model);
+CREATE INDEX IF NOT EXISTS idx_requests_api_key ON requests(api_key_id, api_key);
 
 CREATE TABLE IF NOT EXISTS errors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

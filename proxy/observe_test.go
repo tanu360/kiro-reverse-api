@@ -1,7 +1,9 @@
 package proxy
 
 import (
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -141,6 +143,10 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 	s.RecordRequest("acc-wild", "wild@example.com", "literalXmodel", 1, 1, 0.01, true, 200, "")
 	s.RecordRequest("b-id", "same@example.com", "sort-model", 1, 1, 0.01, true, 200, "")
 	s.RecordRequest("a-id", "same@example.com", "sort-model", 1, 1, 0.01, true, 200, "")
+	keyA := "sk-client-" + strings.Repeat("a", 50) + "middle-a" + strings.Repeat("z", 50)
+	keyB := "sk-client-" + strings.Repeat("b", 50) + "middle-b" + strings.Repeat("y", 50)
+	s.RecordRequestWithAPIKey("api-acc-a", "key-a", keyA, "api@example.com", "api-model", 1, 1, 0.01, true, 200, "")
+	s.RecordRequestWithAPIKey("api-acc-b", "key-b", keyB, "api@example.com", "api-model", 1, 1, 0.01, true, 200, "")
 
 	page := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "rate", Status: "failed", Sort: "time", Order: "desc"})
 	if !page.Persistent {
@@ -161,5 +167,21 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 	accountPage := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "same@example.com", Sort: "account", Order: "asc"})
 	if accountPage.Total != 2 || accountPage.Requests[0].AccountID != "a-id" {
 		t.Fatalf("expected account sort to use email+accountID, got total=%d rows=%#v", accountPage.Total, accountPage.Requests)
+	}
+
+	apiKeyPage := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "sk-client", Sort: "api_key", Order: "asc"})
+	if apiKeyPage.Total != 2 || apiKeyPage.Requests[0].APIKeyID != "key-a" || apiKeyPage.Requests[0].APIKeyMasked == "" {
+		t.Fatalf("expected API key search/sort with masked value, got total=%d rows=%#v", apiKeyPage.Total, apiKeyPage.Requests)
+	}
+	hiddenPartPage := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "middle-a", Sort: "api_key", Order: "asc"})
+	if hiddenPartPage.Total != 1 || hiddenPartPage.Requests[0].APIKeyID != "key-a" {
+		t.Fatalf("expected full API key value to be searchable, got total=%d rows=%#v", hiddenPartPage.Total, hiddenPartPage.Requests)
+	}
+	body, err := json.Marshal(hiddenPartPage.Requests[0])
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	if strings.Contains(string(body), keyA) || strings.Contains(string(body), "middle-a") {
+		t.Fatalf("request JSON exposed raw API key: %s", string(body))
 	}
 }
