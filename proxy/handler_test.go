@@ -97,7 +97,7 @@ func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) 
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
-	h.handleClaudeNonStream(rec, req, payload, "claude-sonnet-4.5", false, claudeThinkingResponseOptions{}, 1, nil)
+	h.handleClaudeNonStream(rec, req, payload, "claude-sonnet-4.5", false, claudeThinkingResponseOptions{}, 1, nil, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected retry to succeed, status=%d body=%s", rec.Code, rec.Body.String())
@@ -185,6 +185,132 @@ func TestValidateOpenAIRequestShapeAllowsToolResultFinalTurn(t *testing.T) {
 
 	if msg := validateOpenAIRequestShape(req); msg != "" {
 		t.Fatalf("expected tool-result final turn to be valid, got %q", msg)
+	}
+}
+
+func TestAuthenticateMultiApiKeyAndLimits(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	require := true
+	if err := config.UpdateSettingsPatch(&require, ""); err != nil {
+		t.Fatalf("enable auth: %v", err)
+	}
+	h := &Handler{}
+
+	missing := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	if _, err := h.authenticate(missing); err == nil {
+		t.Fatalf("expected fail-closed error when auth is enabled without keys")
+	}
+
+	entry, err := config.AddApiKey(config.ApiKeyEntry{Name: "limited", Key: "sk-limited", Enabled: true, TokenLimit: 10})
+	if err != nil {
+		t.Fatalf("add key: %v", err)
+	}
+	okReq := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	okReq.Header.Set("Authorization", "Bearer sk-limited")
+	got, err := h.authenticate(okReq)
+	if err != nil {
+		t.Fatalf("authenticate valid key: %v", err)
+	}
+	if got == nil || got.ID != entry.ID {
+		t.Fatalf("expected matched key in auth result, got %#v", got)
+	}
+
+	if err := config.RecordApiKeyUsage(entry.ID, 10, 0); err != nil {
+		t.Fatalf("record key usage: %v", err)
+	}
+	if _, err := h.authenticate(okReq); err == nil || !strings.Contains(err.Error(), "token limit exceeded") {
+		t.Fatalf("expected token limit error, got %v", err)
+	}
+}
+
+func TestModelsEndpointRequiresManagedApiKey(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	require := true
+	if err := config.UpdateSettingsPatch(&require, ""); err != nil {
+		t.Fatalf("enable auth: %v", err)
+	}
+	if _, err := config.AddApiKey(config.ApiKeyEntry{Name: "models", Key: "sk-models", Enabled: true}); err != nil {
+		t.Fatalf("add key: %v", err)
+	}
+	h := &Handler{
+		cachedModels: []ModelInfo{{ModelId: "claude-sonnet-4.5", InputTypes: []string{"TEXT"}}},
+	}
+
+	missing := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	missingRec := httptest.NewRecorder()
+	h.ServeHTTP(missingRec, missing)
+	if missingRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected missing key to fail, got %d", missingRec.Code)
+	}
+
+	okReq := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	okReq.Header.Set("Authorization", "Bearer sk-models")
+	okRec := httptest.NewRecorder()
+	h.ServeHTTP(okRec, okReq)
+	if okRec.Code != http.StatusOK {
+		t.Fatalf("expected valid key to pass, got %d body=%s", okRec.Code, okRec.Body.String())
+	}
+}
+
+func TestUnknownManagedApiKeyDoesNotAuthenticate(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	require := true
+	if err := config.UpdateSettingsPatch(&require, ""); err != nil {
+		t.Fatalf("update settings: %v", err)
+	}
+	if keys := config.ListApiKeys(); len(keys) != 0 {
+		t.Fatalf("expected no managed keys, got %#v", keys)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	req.Header.Set("Authorization", "Bearer sk-unknown")
+	if _, err := (&Handler{}).authenticate(req); err == nil {
+		t.Fatalf("expected unknown key to stay invalid")
+	}
+}
+
+func TestApiKeyReservationRejectsProjectedTokenOverrun(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	entry, err := config.AddApiKey(config.ApiKeyEntry{Name: "limited", Key: "sk-limited", Enabled: true, TokenLimit: 10})
+	if err != nil {
+		t.Fatalf("add key: %v", err)
+	}
+
+	if _, err := reserveApiKeyUsage(entry.ID, 11); err == nil {
+		t.Fatalf("expected projected token budget to fail")
+	}
+	got := config.GetApiKeyEntry(entry.ID)
+	if got == nil || got.TokensUsed != 0 || got.RequestsCount != 0 {
+		t.Fatalf("failed reservation changed usage: %#v", got)
+	}
+}
+
+func TestRecordSuccessForApiKeyAttributesUsage(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	entry, err := config.AddApiKey(config.ApiKeyEntry{Name: "usage", Key: "sk-usage", Enabled: true})
+	if err != nil {
+		t.Fatalf("add key: %v", err)
+	}
+	h := &Handler{}
+	reservation, err := reserveApiKeyUsage(entry.ID, 10)
+	if err != nil {
+		t.Fatalf("reserve key usage: %v", err)
+	}
+	h.recordSuccessForApiKey(reservation, 7, 3, 1.25)
+
+	got := config.GetApiKeyEntry(entry.ID)
+	if got == nil || got.TokensUsed != 10 || got.CreditsUsed != 1.25 || got.RequestsCount != 1 {
+		t.Fatalf("usage not attributed: %#v", got)
 	}
 }
 

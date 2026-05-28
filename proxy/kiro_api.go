@@ -218,7 +218,7 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 				logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
 			}
 
-			return nil, fmt.Errorf("Account suspended: %w", err)
+			return nil, fmt.Errorf("account suspended: %w", err)
 		} else if strings.Contains(errMsg, "403") || strings.Contains(errMsg, "401") ||
 			strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "expired") {
 

@@ -43,8 +43,12 @@ type Account struct {
 
 	Weight int `json:"weight,omitempty"`
 
-	AllowOverage  bool `json:"allowOverage,omitempty"`
-	OverageWeight int  `json:"overageWeight,omitempty"`
+	OverageStatus     string  `json:"overageStatus,omitempty"`
+	OverageCapability string  `json:"overageCapability,omitempty"`
+	OverageCap        float64 `json:"overageCap,omitempty"`
+	OverageRate       float64 `json:"overageRate,omitempty"`
+	CurrentOverages   float64 `json:"currentOverages,omitempty"`
+	OverageCheckedAt  int64   `json:"overageCheckedAt,omitempty"`
 
 	Enabled      bool   `json:"enabled"`
 	Silent       bool   `json:"silent,omitempty"`
@@ -86,16 +90,32 @@ type PromptFilterRule struct {
 	Enabled bool   `json:"enabled"`
 }
 
+type ApiKeyEntry struct {
+	ID         string `json:"id"`
+	Name       string `json:"name,omitempty"`
+	Key        string `json:"key"`
+	Enabled    bool   `json:"enabled"`
+	CreatedAt  int64  `json:"createdAt"`
+	LastUsedAt int64  `json:"lastUsedAt,omitempty"`
+
+	TokenLimit  int64   `json:"tokenLimit,omitempty"`
+	CreditLimit float64 `json:"creditLimit,omitempty"`
+
+	TokensUsed    int64   `json:"tokensUsed,omitempty"`
+	CreditsUsed   float64 `json:"creditsUsed,omitempty"`
+	RequestsCount int64   `json:"requestsCount,omitempty"`
+}
+
 type Config struct {
-	Password      string    `json:"password"`
-	Port          int       `json:"port"`
-	Host          string    `json:"host"`
-	ApiKey        string    `json:"apiKey,omitempty"`
-	RequireApiKey bool      `json:"requireApiKey"`
-	KiroVersion   string    `json:"kiroVersion,omitempty"`
-	SystemVersion string    `json:"systemVersion,omitempty"`
-	NodeVersion   string    `json:"nodeVersion,omitempty"`
-	Accounts      []Account `json:"accounts"`
+	Password      string        `json:"password"`
+	Port          int           `json:"port"`
+	Host          string        `json:"host"`
+	RequireApiKey bool          `json:"requireApiKey"`
+	ApiKeys       []ApiKeyEntry `json:"apiKeys,omitempty"`
+	KiroVersion   string        `json:"kiroVersion,omitempty"`
+	SystemVersion string        `json:"systemVersion,omitempty"`
+	NodeVersion   string        `json:"nodeVersion,omitempty"`
+	Accounts      []Account     `json:"accounts"`
 
 	ThinkingSuffix       string `json:"thinkingSuffix,omitempty"`
 	OpenAIThinkingFormat string `json:"openaiThinkingFormat,omitempty"`
@@ -108,9 +128,6 @@ type Config struct {
 	AllowOverUsage bool `json:"allowOverUsage,omitempty"`
 
 	ProxyURL string `json:"proxyURL,omitempty"`
-
-	//! Legacy prompt-filter flag kept only for backward-compatible config loading.
-	SanitizeClaudeCodePrompt bool `json:"sanitizeClaudeCodePrompt,omitempty"`
 
 	FilterClaudeCode bool `json:"filterClaudeCode,omitempty"`
 
@@ -157,26 +174,11 @@ type AccountInfo struct {
 const Version = "1.1.0"
 
 var (
-	cfg         *Config
-	cfgLock     sync.RWMutex
-	cfgPath     string
-	cfgPathLock sync.RWMutex
+	cfg     *Config
+	cfgLock sync.RWMutex
 )
 
-func setConfigPath(path string) {
-	cfgPathLock.Lock()
-	cfgPath = path
-	cfgPathLock.Unlock()
-}
-
-func getConfigPath() string {
-	cfgPathLock.RLock()
-	defer cfgPathLock.RUnlock()
-	return cfgPath
-}
-
 func Init(path string) error {
-	setConfigPath(path)
 	dir := filepath.Dir(path)
 	if err := db.Init(dir); err != nil {
 		return fmt.Errorf("db init: %w", err)
@@ -184,9 +186,6 @@ func Init(path string) error {
 	if err := Load(); err != nil {
 		return err
 	}
-
-	configDir := filepath.Dir(getConfigPath())
-	InitCredentials(configDir)
 
 	if err := LoadCredentials(); err != nil {
 		return fmt.Errorf("load credentials: %w", err)
@@ -252,6 +251,9 @@ func Get() *Config {
 	copyCfg := *cfg
 	if cfg.Accounts != nil {
 		copyCfg.Accounts = append([]Account(nil), cfg.Accounts...)
+	}
+	if cfg.ApiKeys != nil {
+		copyCfg.ApiKeys = append([]ApiKeyEntry(nil), cfg.ApiKeys...)
 	}
 	if cfg.PromptFilterRules != nil {
 		copyCfg.PromptFilterRules = append([]PromptFilterRule(nil), cfg.PromptFilterRules...)
@@ -341,26 +343,36 @@ func UpdateAccount(id string, account Account) error {
 	return nil
 }
 
-func DisableAccountOverage(id string) error {
+func UpdateAccountOverageStatus(id, status, capability string, cap, rate, current float64, checkedAt int64) error {
 
 	if CredentialsLoaded() {
-		acc := GetCredentialByID(id)
-		if acc == nil {
-			return nil
-		}
-		acc.AllowOverage = false
-		return UpdateCredential(*acc)
+		return UpdateCredentialOverageStatus(id, status, capability, cap, rate, current, checkedAt)
 	}
 
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
 		if a.ID == id {
-			cfg.Accounts[i].AllowOverage = false
+			if status != "" {
+				cfg.Accounts[i].OverageStatus = status
+			}
+			if capability != "" {
+				cfg.Accounts[i].OverageCapability = capability
+			}
+			cfg.Accounts[i].OverageCap = cap
+			cfg.Accounts[i].OverageRate = rate
+			cfg.Accounts[i].CurrentOverages = current
+			if checkedAt > 0 {
+				cfg.Accounts[i].OverageCheckedAt = checkedAt
+			}
 			return Save()
 		}
 	}
 	return nil
+}
+
+func DisableAccountOverage(id string) error {
+	return UpdateAccountOverageStatus(id, "DISABLED", "", 0, 0, 0, time.Now().Unix())
 }
 
 func SetAccountEnabled(id string, enabled bool) error {
@@ -478,35 +490,15 @@ func UpdateAccountToken(id, accessToken, refreshToken string, expiresAt int64) e
 	return nil
 }
 
-func GetApiKey() string {
-	cfgLock.RLock()
-	defer cfgLock.RUnlock()
-	return cfg.ApiKey
-}
-
 func IsApiKeyRequired() bool {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	return cfg.RequireApiKey
 }
 
-func UpdateSettings(apiKey string, requireApiKey bool, password string) error {
+func UpdateSettingsPatch(requireApiKey *bool, password string) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
-	cfg.ApiKey = apiKey
-	cfg.RequireApiKey = requireApiKey
-	if password != "" {
-		cfg.Password = password
-	}
-	return Save()
-}
-
-func UpdateSettingsPatch(apiKey *string, requireApiKey *bool, password string) error {
-	cfgLock.Lock()
-	defer cfgLock.Unlock()
-	if apiKey != nil {
-		cfg.ApiKey = *apiKey
-	}
 	if requireApiKey != nil {
 		cfg.RequireApiKey = *requireApiKey
 	}
@@ -610,7 +602,7 @@ func GetFilterClaudeCode() bool {
 	if cfg == nil {
 		return false
 	}
-	return cfg.FilterClaudeCode || cfg.SanitizeClaudeCodePrompt
+	return cfg.FilterClaudeCode
 }
 
 func GetFilterEnvNoise() bool {
@@ -647,7 +639,7 @@ func GetPromptFilterConfig() PromptFilterConfig {
 	rules := make([]PromptFilterRule, len(cfg.PromptFilterRules))
 	copy(rules, cfg.PromptFilterRules)
 	return PromptFilterConfig{
-		FilterClaudeCode:      cfg.FilterClaudeCode || cfg.SanitizeClaudeCodePrompt,
+		FilterClaudeCode:      cfg.FilterClaudeCode,
 		FilterEnvNoise:        cfg.FilterEnvNoise,
 		FilterStripBoundaries: cfg.FilterStripBoundaries,
 		Rules:                 rules,
@@ -660,9 +652,6 @@ func UpdatePromptFilterConfig(filterClaudeCode, filterEnvNoise, filterStripBound
 	cfg.FilterClaudeCode = filterClaudeCode
 	cfg.FilterEnvNoise = filterEnvNoise
 	cfg.FilterStripBoundaries = filterStripBoundaries
-
-		//! Clear the superseded flag after writing the prompt-filter config.
-		cfg.SanitizeClaudeCodePrompt = false
 	if rules != nil {
 		cfg.PromptFilterRules = rules
 	}

@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-const overageFrequencyScale = 10
 const tokenRefreshSkewSeconds int64 = 120
 
 type AccountPool struct {
@@ -45,21 +44,20 @@ func (p *AccountPool) Reload() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	enabled := config.GetEnabledAccounts()
+	allowOverUsage := config.GetAllowOverUsage()
 	var weighted []config.Account
 	for _, a := range enabled {
-		w := effectiveWeight(a.Weight) * overageFrequencyScale
-		if isOverUsageLimit(a) {
-			if !a.AllowOverage {
-				continue
-			}
-			w = effectiveOverageWeight(a.OverageWeight)
+		if isOverUsageLimit(a) && !isUpstreamOverageEnabled(a) && !allowOverUsage {
+			continue
 		}
+		w := effectiveWeight(a.Weight)
 		for j := 0; j < w; j++ {
 			weighted = append(weighted, a)
 		}
 	}
 	p.accounts = weighted
 	p.totalAccounts = len(enabled)
+	atomic.StoreUint64(&p.currentIndex, ^uint64(0))
 }
 
 func (p *AccountPool) GetNext() *config.Account {
@@ -101,7 +99,7 @@ func (p *AccountPool) GetNextExcluding(excluded map[string]bool) *config.Account
 			continue
 		}
 
-		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
+		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
 			seen[acc.ID] = true
 			continue
 		}
@@ -117,7 +115,7 @@ func (p *AccountPool) GetNextExcluding(excluded map[string]bool) *config.Account
 			continue
 		}
 
-		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
+		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
 			continue
 		}
 		if cooldown, ok := p.cooldowns[acc.ID]; ok {
@@ -204,7 +202,7 @@ func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string
 			seen[acc.ID] = true
 			continue
 		}
-		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
+		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
 			seen[acc.ID] = true
 			continue
 		}
@@ -221,7 +219,7 @@ func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string
 		if !p.accountHasModel(acc.ID, model) {
 			continue
 		}
-		if isOverUsageLimit(*acc) && !acc.AllowOverage && !allowOverUsage {
+		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
 			continue
 		}
 		if cooldown, ok := p.cooldowns[acc.ID]; ok {
@@ -364,9 +362,8 @@ func (p *AccountPool) DisableAccount(id, reason string) {
 }
 
 func (p *AccountPool) MarkOverLimit(id string) {
-	_ = config.DisableAccountOverage(id)
 	p.mu.Lock()
-	p.cooldowns[id] = p.calculateQuotaCooldown(id)
+	p.cooldowns[id] = time.Now().Add(time.Hour)
 	p.mu.Unlock()
 	_ = p.SaveCooldowns()
 	p.Reload()
@@ -466,19 +463,13 @@ func isOverUsageLimit(acc config.Account) bool {
 	return acc.UsageLimit > 0 && acc.UsageCurrent >= acc.UsageLimit
 }
 
+func isUpstreamOverageEnabled(acc config.Account) bool {
+	return strings.EqualFold(acc.OverageStatus, "ENABLED")
+}
+
 func effectiveWeight(weight int) int {
 	if weight < 1 {
 		return 1
-	}
-	return weight
-}
-
-func effectiveOverageWeight(weight int) int {
-	if weight < 1 {
-		return 1
-	}
-	if weight > overageFrequencyScale {
-		return overageFrequencyScale
 	}
 	return weight
 }

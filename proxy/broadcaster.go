@@ -60,14 +60,6 @@ func (b *broadcaster) Publish(evt Event) {
 	}
 }
 
-func publishAccountUpdated(accountID string) {
-	getBroadcaster().Publish(Event{Type: "account_updated", Payload: accountID})
-}
-
-func publishAccountsRefreshed() {
-	getBroadcaster().Publish(Event{Type: "accounts_refreshed"})
-}
-
 func publishObserveTick() {
 	getBroadcaster().Publish(Event{Type: "observe_tick"})
 }

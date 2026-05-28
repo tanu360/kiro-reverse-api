@@ -3,7 +3,6 @@ package config
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"kiro-proxy/db"
 )
@@ -41,14 +40,4 @@ func deleteSetting(key string) error {
 	}
 	_, err = d.Exec(`DELETE FROM settings WHERE key=?`, key)
 	return err
-}
-
-func mustString(v string, ok bool, err error) (string, error) {
-	if err != nil {
-		return "", fmt.Errorf("settings read: %w", err)
-	}
-	if !ok {
-		return "", nil
-	}
-	return v, nil
 }

@@ -316,26 +316,8 @@ func (h *Handler) refreshAllAccounts() {
 }
 
 func (h *Handler) validateApiKey(r *http.Request) bool {
-	if !config.IsApiKeyRequired() {
-		return true
-	}
-
-	expectedKey := config.GetApiKey()
-	if expectedKey == "" {
-		return true
-	}
-
-	authHeader := r.Header.Get("Authorization")
-	apiKeyHeader := r.Header.Get("X-Api-Key")
-
-	var providedKey string
-	if strings.HasPrefix(authHeader, "Bearer ") {
-		providedKey = strings.TrimPrefix(authHeader, "Bearer ")
-	} else if apiKeyHeader != "" {
-		providedKey = apiKeyHeader
-	}
-
-	return providedKey == expectedKey
+	_, err := h.authenticate(r)
+	return err == nil
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -362,45 +344,49 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 
 	case path == "/v1/messages" || path == "/messages" || path == "/anthropic/v1/messages":
-		if !h.validateApiKey(r) {
-			h.sendClaudeError(w, 401, "authentication_error", "Invalid or missing API key")
+		ar := h.authenticateForClaude(w, r)
+		if ar == nil {
 			return
 		}
-		h.handleClaudeMessages(w, r)
+		h.handleClaudeMessages(w, ar)
 	case path == "/v1/messages/count_tokens" || path == "/messages/count_tokens":
-		if !h.validateApiKey(r) {
-			h.sendClaudeError(w, 401, "authentication_error", "Invalid or missing API key")
+		ar := h.authenticateForClaude(w, r)
+		if ar == nil {
 			return
 		}
-		h.handleCountTokens(w, r)
+		h.handleCountTokens(w, ar)
 	case path == "/v1/chat/completions" || path == "/chat/completions":
-		if !h.validateApiKey(r) {
-			h.sendOpenAIError(w, 401, "authentication_error", "Invalid or missing API key")
+		ar := h.authenticateForOpenAI(w, r)
+		if ar == nil {
 			return
 		}
-		h.handleOpenAIChat(w, r)
+		h.handleOpenAIChat(w, ar)
 	case path == "/v1/responses" || path == "/responses":
-		if !h.validateApiKey(r) {
-			h.sendOpenAIError(w, 401, "authentication_error", "Invalid or missing API key")
+		ar := h.authenticateForOpenAI(w, r)
+		if ar == nil {
 			return
 		}
-		h.handleOpenAIResponses(w, r)
+		h.handleOpenAIResponses(w, ar)
 	case strings.HasPrefix(path, "/v1/responses/") || strings.HasPrefix(path, "/responses/"):
-		if !h.validateApiKey(r) {
-			h.sendOpenAIError(w, 401, "authentication_error", "Invalid or missing API key")
+		ar := h.authenticateForOpenAI(w, r)
+		if ar == nil {
 			return
 		}
 		id := strings.TrimPrefix(strings.TrimPrefix(path, "/v1/responses/"), "/responses/")
 		switch r.Method {
 		case http.MethodGet:
-			h.apiGetOpenAIResponse(w, r, id)
+			h.apiGetOpenAIResponse(w, ar, id)
 		case http.MethodDelete:
-			h.apiDeleteOpenAIResponse(w, r, id)
+			h.apiDeleteOpenAIResponse(w, ar, id)
 		default:
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	case path == "/v1/models" || path == "/models":
-		h.handleModels(w, r)
+		ar := h.authenticateForOpenAI(w, r)
+		if ar == nil {
+			return
+		}
+		h.handleModels(w, ar)
 	case path == "/api/event_logging/batch":
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -744,7 +730,7 @@ func mergeStringLists(base []string, extra []string) []string {
 
 func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "Method Not Allowed", 405)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -784,7 +770,7 @@ func (h *Handler) handleClaudeMessages(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "Method Not Allowed", 405)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -811,20 +797,26 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	thinkingResponseOpts := resolveClaudeThinkingResponseOptions(req.Thinking, thinkingCfg.ClaudeFormat)
 	estimatedInputTokens := estimateClaudeRequestInputTokens(effectiveReq)
 	cacheProfile := h.promptCache.BuildClaudeProfile(effectiveReq, estimatedInputTokens)
+	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), tokenBudget(estimatedInputTokens, req.MaxTokens))
+	if err != nil {
+		h.sendClaudeError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
+		return
+	}
 
 	kiroPayload := ClaudeToKiro(&req, thinking)
 
 	if req.Stream {
-		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile)
+		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile, apiKeyReservation)
 	} else {
-		h.handleClaudeNonStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile)
+		h.handleClaudeNonStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile, apiKeyReservation)
 	}
 }
 
-func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
+func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	defer apiKeyReservation.release()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -1246,7 +1238,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 			}
 			outputTokens = estimateClaudeOutputTokens(outputContent, thinkingOutput, toolUses)
 
-			h.recordSuccess(inputTokens, outputTokens, credits)
+			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
@@ -1334,14 +1326,25 @@ func (h *Handler) recordSuccess(inputTokens, outputTokens int, credits float64) 
 	h.addCredits(credits)
 }
 
+func (h *Handler) recordSuccessForApiKey(apiKeyReservation *apiKeyUsageReservation, inputTokens, outputTokens int, credits float64) {
+	h.recordSuccess(inputTokens, outputTokens, credits)
+	if apiKeyReservation == nil {
+		return
+	}
+	if err := apiKeyReservation.finalize(int64(inputTokens+outputTokens), credits); err != nil {
+		logger.Warnf("[ApiKey] failed to finalize usage for key %s: %v", apiKeyReservation.id, err)
+	}
+}
+
 func (h *Handler) recordFailure() {
 	atomic.AddInt64(&h.totalRequests, 1)
 	atomic.AddInt64(&h.failedRequests, 1)
 }
 
-func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile) {
+func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
 	excluded := make(map[string]bool)
 	var lastErr error
+	defer apiKeyReservation.release()
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
@@ -1430,7 +1433,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 			}
 			outputTokens = estimateClaudeOutputTokens(finalContent, rawThinkingContent, toolUses)
 
-			h.recordSuccess(inputTokens, outputTokens, credits)
+			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
@@ -1495,7 +1498,7 @@ func (h *Handler) sendClaudeError(w http.ResponseWriter, status int, errType, me
 
 func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "Method Not Allowed", 405)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -1519,20 +1522,26 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	actualModel, thinking := ParseModelAndThinking(req.Model, thinkingCfg.Suffix)
 	req.Model = actualModel
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&req)
+	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), tokenBudget(estimatedInputTokens, req.MaxTokens))
+	if err != nil {
+		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
+		return
+	}
 
 	kiroPayload := OpenAIToKiro(&req, thinking)
 
 	if req.Stream {
-		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens)
+		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)
 	} else {
-		h.handleOpenAINonStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens)
+		h.handleOpenAINonStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)
 	}
 }
 
-func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
+func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	defer apiKeyReservation.release()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -1894,7 +1903,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 				outputTokens += estimateApproxTokens(tc.Function.Arguments)
 			}
 
-			h.recordSuccess(inputTokens, outputTokens, credits)
+			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
@@ -1939,9 +1948,10 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 	h.sendOpenAIError(w, 500, "server_error", lastErr.Error())
 }
 
-func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int) {
+func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	excluded := make(map[string]bool)
 	var lastErr error
+	defer apiKeyReservation.release()
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
@@ -2019,7 +2029,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 			}
 			outputTokens = estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
 
-			h.recordSuccess(inputTokens, outputTokens, credits)
+			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
@@ -2144,6 +2154,13 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/models")
 		h.apiGetAccountModels(w, r, id)
 
+	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/overage") && r.Method == "GET":
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/overage")
+		h.apiGetAccountOverage(w, r, id)
+	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/overage") && r.Method == "POST":
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/overage")
+		h.apiSetAccountOverage(w, r, id)
+
 	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/full") && r.Method == "GET":
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/full")
 		h.apiGetAccountFull(w, r, id)
@@ -2195,6 +2212,19 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetVersion(w, r)
 	case path == "/export" && r.Method == "POST":
 		h.apiExportAccounts(w, r)
+	case path == "/api-keys" && r.Method == "GET":
+		h.apiListApiKeys(w, r)
+	case path == "/api-keys" && r.Method == "POST":
+		h.apiCreateApiKey(w, r)
+	case strings.HasPrefix(path, "/api-keys/") && strings.HasSuffix(path, "/reset-usage") && r.Method == "POST":
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/api-keys/"), "/reset-usage")
+		h.apiResetApiKeyUsage(w, r, id)
+	case strings.HasPrefix(path, "/api-keys/") && r.Method == "GET":
+		h.apiGetApiKey(w, r, strings.TrimPrefix(path, "/api-keys/"))
+	case strings.HasPrefix(path, "/api-keys/") && r.Method == "PUT":
+		h.apiUpdateApiKey(w, r, strings.TrimPrefix(path, "/api-keys/"))
+	case strings.HasPrefix(path, "/api-keys/") && r.Method == "DELETE":
+		h.apiDeleteApiKey(w, r, strings.TrimPrefix(path, "/api-keys/"))
 	case path == "/observe/overview" && r.Method == "GET":
 		h.apiObserveOverview(w, r)
 	case path == "/observe/account-heatmap" && r.Method == "GET":
@@ -2264,8 +2294,12 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 			"hasToken":          a.AccessToken != "",
 			"machineId":         a.MachineId,
 			"weight":            a.Weight,
-			"allowOverage":      a.AllowOverage,
-			"overageWeight":     a.OverageWeight,
+			"overageStatus":     a.OverageStatus,
+			"overageCapability": a.OverageCapability,
+			"overageCap":        a.OverageCap,
+			"overageRate":       a.OverageRate,
+			"currentOverages":   a.CurrentOverages,
+			"overageCheckedAt":  a.OverageCheckedAt,
 			"proxyURL":          a.ProxyURL,
 			"subscriptionType":  a.SubscriptionType,
 			"subscriptionTitle": a.SubscriptionTitle,
@@ -2376,12 +2410,6 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	if v, ok := updates["weight"].(float64); ok {
 		existing.Weight = int(v)
 	}
-	if v, ok := updates["allowOverage"].(bool); ok {
-		existing.AllowOverage = v
-	}
-	if v, ok := updates["overageWeight"].(float64); ok {
-		existing.OverageWeight = clampInt(int(v), 1, 10)
-	}
 	if v, ok := updates["proxyURL"].(string); ok {
 		existing.ProxyURL = v
 	}
@@ -2418,6 +2446,85 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 		}(*existing)
 	}
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func (h *Handler) apiGetAccountOverage(w http.ResponseWriter, _ *http.Request, id string) {
+	account := findAccountByID(id)
+	if account == nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		return
+	}
+
+	snap, err := FetchOverageStatus(account)
+	if err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	if err := PersistOverageSnapshot(id, snap); err != nil {
+		logger.Warnf("[Overage] persist GET overage failed for %s: %v", account.Email, err)
+	}
+	h.pool.Reload()
+	writeOverageSnapshot(w, snap)
+}
+
+func (h *Handler) apiSetAccountOverage(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		return
+	}
+
+	account := findAccountByID(id)
+	if account == nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		return
+	}
+	if body.Enabled && strings.EqualFold(account.OverageCapability, "NOT_OVERAGE_CAPABLE") {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Account is not overage capable"})
+		return
+	}
+
+	snap, err := SetOverageStatus(account, body.Enabled)
+	if err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	if err := PersistOverageSnapshot(id, snap); err != nil {
+		logger.Warnf("[Overage] persist SET overage failed for %s: %v", account.Email, err)
+	}
+	h.pool.Reload()
+	writeOverageSnapshot(w, snap)
+}
+
+func findAccountByID(id string) *config.Account {
+	accounts := config.GetAccounts()
+	for i := range accounts {
+		if accounts[i].ID == id {
+			return &accounts[i]
+		}
+	}
+	return nil
+}
+
+func writeOverageSnapshot(w http.ResponseWriter, snap *OverageSnapshot) {
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":           true,
+		"overageStatus":     snap.Status,
+		"overageCapability": snap.Capability,
+		"subscriptionTitle": snap.SubscriptionTitle,
+		"overageCap":        snap.OverageCap,
+		"overageRate":       snap.OverageRate,
+		"currentOverages":   snap.CurrentOverages,
+		"overageCheckedAt":  snap.CheckedAt,
+	})
 }
 
 func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
@@ -2922,7 +3029,6 @@ func (h *Handler) apiGetStatus(w http.ResponseWriter, _ *http.Request) {
 
 func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"apiKey":         config.GetApiKey(),
 		"requireApiKey":  config.IsApiKeyRequired(),
 		"port":           config.GetPort(),
 		"host":           config.GetHost(),
@@ -2974,10 +3080,9 @@ func (h *Handler) apiUpdatePromptFilter(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ApiKey         *string `json:"apiKey,omitempty"`
-		RequireApiKey  *bool   `json:"requireApiKey,omitempty"`
-		Password       string  `json:"password,omitempty"`
-		AllowOverUsage *bool   `json:"allowOverUsage,omitempty"`
+		RequireApiKey  *bool  `json:"requireApiKey,omitempty"`
+		Password       string `json:"password,omitempty"`
+		AllowOverUsage *bool  `json:"allowOverUsage,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -2985,7 +3090,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := config.UpdateSettingsPatch(req.ApiKey, req.RequireApiKey, req.Password); err != nil {
+	if err := config.UpdateSettingsPatch(req.RequireApiKey, req.Password); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -3149,7 +3254,8 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 	if err != nil {
 
 		errMsg := err.Error()
-		if strings.Contains(errMsg, "TEMPORARILY_SUSPENDED") || strings.Contains(errMsg, "Account suspended") {
+		errMsgLower := strings.ToLower(errMsg)
+		if strings.Contains(errMsg, "TEMPORARILY_SUSPENDED") || strings.Contains(errMsgLower, "account suspended") {
 
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": true,
@@ -3164,7 +3270,8 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 				info, err = RefreshAccountInfo(account)
 				if err != nil {
 
-					if strings.Contains(err.Error(), "TEMPORARILY_SUSPENDED") || strings.Contains(err.Error(), "Account suspended") {
+					retryErrMsg := err.Error()
+					if strings.Contains(retryErrMsg, "TEMPORARILY_SUSPENDED") || strings.Contains(strings.ToLower(retryErrMsg), "account suspended") {
 						json.NewEncoder(w).Encode(map[string]interface{}{
 							"success": true,
 							"message": "Account status updated",
@@ -3235,8 +3342,12 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		"expiresAt":         account.ExpiresAt,
 		"machineId":         account.MachineId,
 		"weight":            account.Weight,
-		"allowOverage":      account.AllowOverage,
-		"overageWeight":     account.OverageWeight,
+		"overageStatus":     account.OverageStatus,
+		"overageCapability": account.OverageCapability,
+		"overageCap":        account.OverageCap,
+		"overageRate":       account.OverageRate,
+		"currentOverages":   account.CurrentOverages,
+		"overageCheckedAt":  account.OverageCheckedAt,
 		"proxyURL":          account.ProxyURL,
 		"enabled":           account.Enabled,
 		"silent":            account.Silent,
@@ -3603,16 +3714,6 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(data)
-}
-
-func clampInt(v, min, max int) int {
-	if v < min {
-		return min
-	}
-	if v > max {
-		return max
-	}
-	return v
 }
 
 func decompressRequestBody(r *http.Request) error {
