@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"kiro-proxy/config"
 	accountpool "kiro-proxy/pool"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,6 +27,7 @@ func TestThinkingSourceReasoningFirst(t *testing.T) {
 }
 
 func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) {
+	resetObservePersistenceForTest(t)
 	cfgFile := t.TempDir() + "/kiro.db"
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
@@ -115,6 +117,115 @@ func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) 
 	}
 	if len(resp.Content) == 0 || resp.Content[0].Text != "retried successfully" {
 		t.Fatalf("expected retried response content, got %#v", resp.Content)
+	}
+
+	stats, err := queryPersistedRequestStats()
+	if err != nil {
+		t.Fatalf("query request stats: %v", err)
+	}
+	if stats.TotalRequests != 1 || stats.SuccessRequests != 1 || stats.FailedRequests != 0 {
+		t.Fatalf("expected one final successful request row, got %#v", stats)
+	}
+	errors, err := loadRecentErrorsFromDB(10)
+	if err != nil {
+		t.Fatalf("load errors: %v", err)
+	}
+	if len(errors) != 3 {
+		t.Fatalf("expected three retry error rows, got %d", len(errors))
+	}
+}
+
+func TestClaudeNonStreamNoAccountsRecordsOneFailedRequest(t *testing.T) {
+	resetObservePersistenceForTest(t)
+	cfgFile := t.TempDir() + "/kiro.db"
+	if err := config.Init(cfgFile); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+
+	p := accountpool.GetPool()
+	p.Reload()
+	h := &Handler{
+		pool:        p,
+		promptCache: newPromptCacheTracker(defaultPromptCacheTTL),
+	}
+	payload := &KiroPayload{}
+	payload.ConversationState.CurrentMessage.UserInputMessage = KiroUserInputMessage{
+		Content: "hello",
+		ModelID: "claude-sonnet-4.5",
+		Origin:  "AI_EDITOR",
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	h.handleClaudeNonStream(rec, req, payload, "claude-sonnet-4.5", false, claudeThinkingResponseOptions{}, 1, nil, nil)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected no-account failure, status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	stats, err := queryPersistedRequestStats()
+	if err != nil {
+		t.Fatalf("query request stats: %v", err)
+	}
+	if stats.TotalRequests != 1 || stats.SuccessRequests != 0 || stats.FailedRequests != 1 {
+		t.Fatalf("expected one final failed request row, got %#v", stats)
+	}
+	page := getObserveStore().RequestPage(requestQuery{Page: 1, PageSize: 10, Status: "failed"})
+	if page.Total != 1 || len(page.Requests) != 1 || page.Requests[0].Status != http.StatusServiceUnavailable {
+		t.Fatalf("unexpected failed request page: total=%d rows=%#v", page.Total, page.Requests)
+	}
+}
+
+func TestAccountCreditTotalsSumsServerUsage(t *testing.T) {
+	used, limit := accountCreditTotals([]config.Account{
+		{UsageCurrent: 66, UsageLimit: 1000},
+		{UsageCurrent: 2, UsageLimit: 1000},
+		{UsageCurrent: 745, UsageLimit: 1000},
+	})
+	if used != 813 || limit != 3000 {
+		t.Fatalf("expected 813/3000, got %.1f/%.1f", used, limit)
+	}
+}
+
+func TestStatusPayloadUsesRequestDBAndAccountCredits(t *testing.T) {
+	resetObservePersistenceForTest(t)
+	cfgFile := t.TempDir() + "/kiro.db"
+	if err := config.Init(cfgFile); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	for _, account := range []config.Account{
+		{ID: "acc-1", Enabled: true, UsageCurrent: 66, UsageLimit: 1000},
+		{ID: "acc-2", Enabled: true, UsageCurrent: 2, UsageLimit: 1000},
+	} {
+		if err := config.AddAccount(account); err != nil {
+			t.Fatalf("add account: %v", err)
+		}
+	}
+	s := getObserveStore()
+	defer s.Reset()
+	s.RecordRequest("acc-1", "one@example.com", "claude-sonnet", 10, 20, 0.30, true, http.StatusOK, "")
+	s.RecordRequest("acc-2", "two@example.com", "claude-opus", 0, 0, 0, false, http.StatusInternalServerError, "boom")
+
+	p := accountpool.GetPool()
+	p.Reload()
+	h := &Handler{pool: p, startTime: time.Now().Unix()}
+	rec := httptest.NewRecorder()
+	h.apiGetStatus(rec, httptest.NewRequest(http.MethodGet, "/admin/api/status", nil))
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if body["accounts"].(float64) != 2 || body["totalRequests"].(float64) != 2 || body["successRequests"].(float64) != 1 || body["failedRequests"].(float64) != 1 {
+		t.Fatalf("unexpected status counts: %#v", body)
+	}
+	if body["totalTokens"].(float64) != 30 {
+		t.Fatalf("expected 30 app tokens, got %#v", body["totalTokens"])
+	}
+	if math.Abs(body["totalCredits"].(float64)-0.30) > 0.000001 {
+		t.Fatalf("expected 0.30 app credits, got %#v", body["totalCredits"])
+	}
+	if body["accountCreditsUsed"].(float64) != 68 || body["accountCreditsLimit"].(float64) != 2000 {
+		t.Fatalf("unexpected account credits: used=%#v limit=%#v", body["accountCreditsUsed"], body["accountCreditsLimit"])
 	}
 }
 

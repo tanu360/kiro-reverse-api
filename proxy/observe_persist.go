@@ -3,28 +3,10 @@ package proxy
 import (
 	"database/sql"
 	"strings"
-	"sync"
-	"sync/atomic"
 
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
 )
-
-const observeRequestPersistQueueSize = 4096
-
-var (
-	observeRequestPersistOnce   sync.Once
-	observeRequestPersistQueue  chan requestRecord
-	observePersistWriterActive  atomic.Bool
-	observePersistWriterStarted atomic.Bool
-)
-
-func getObserveRequestPersistQueue() chan requestRecord {
-	observeRequestPersistOnce.Do(func() {
-		observeRequestPersistQueue = make(chan requestRecord, observeRequestPersistQueueSize)
-	})
-	return observeRequestPersistQueue
-}
 
 func persistRequestRecord(rec requestRecord) error {
 	d, err := db.Get()
@@ -55,17 +37,38 @@ VALUES (?, ?, ?, ?, ?, ?)`,
 	return err
 }
 
-func enqueuePersistRequestRecord(rec requestRecord) {
-	if !observePersistWriterActive.Load() {
-		if err := persistRequestRecord(rec); err != nil {
-			logger.Warnf("[Observe] Persist request failed: %v", err)
-		}
-		return
-	}
-	getObserveRequestPersistQueue() <- rec
+type persistedRequestStats struct {
+	TotalRequests   int64
+	SuccessRequests int64
+	FailedRequests  int64
+	TotalTokens     int64
+	TotalCredits    float64
 }
 
-func persistQueuedRequestRecord(rec requestRecord) {
+func queryPersistedRequestStats() (persistedRequestStats, error) {
+	d, err := db.Get()
+	if err != nil {
+		return persistedRequestStats{}, err
+	}
+
+	var stats persistedRequestStats
+	err = d.QueryRow(`SELECT
+COUNT(*),
+COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0),
+COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0),
+COALESCE(SUM(total_tokens), 0),
+COALESCE(SUM(credits), 0)
+FROM requests`).Scan(
+		&stats.TotalRequests,
+		&stats.SuccessRequests,
+		&stats.FailedRequests,
+		&stats.TotalTokens,
+		&stats.TotalCredits,
+	)
+	return stats, err
+}
+
+func enqueuePersistRequestRecord(rec requestRecord) {
 	if err := persistRequestRecord(rec); err != nil {
 		logger.Warnf("[Observe] Persist request failed: %v", err)
 	}
@@ -241,32 +244,4 @@ func (s *observeStore) LoadFromDB() error {
 	}
 	logger.Infof("[Observe] Warmed %d requests, %d errors from db", len(reqs), len(errs))
 	return nil
-}
-
-func (h *Handler) backgroundObserveRequestWriter() {
-	if !observePersistWriterStarted.CompareAndSwap(false, true) {
-		return
-	}
-	observePersistWriterActive.Store(true)
-	defer func() {
-		observePersistWriterActive.Store(false)
-		observePersistWriterStarted.Store(false)
-	}()
-
-	queue := getObserveRequestPersistQueue()
-	for {
-		select {
-		case rec := <-queue:
-			persistQueuedRequestRecord(rec)
-		case <-h.stopStatsSaver:
-			for {
-				select {
-				case rec := <-queue:
-					persistQueuedRequestRecord(rec)
-				default:
-					return
-				}
-			}
-		}
-	}
 }

@@ -703,8 +703,10 @@
     $('statRequests').textContent = d.totalRequests || 0;
     $('statSuccess').textContent = d.successRequests || 0;
     $('statFailed').textContent = d.failedRequests || 0;
-    $('statTokens').textContent = formatNum(d.totalTokens || 0);
-    $('statCredits').textContent = (d.totalCredits || 0).toFixed(1);
+    $('statTokens').textContent = formatCompactNum(d.totalTokens || 0);
+    $('statCredits').textContent = formatStatCredits(d.accountCreditsUsed || 0) + ' / ' + formatStatCredits(d.accountCreditsLimit || 0);
+    const appCredits = $('statAppCredits');
+    if (appCredits) appCredits.textContent = formatStatCredits(d.totalCredits || 0);
   }
   async function loadAccounts() {
     const res = await api('/accounts');
@@ -861,10 +863,24 @@
     if (!Number.isFinite(value)) return '0';
     return String(Math.trunc(value));
   }
+  function formatCompactNum(n) {
+    const value = Number(n || 0);
+    if (!Number.isFinite(value)) return '0';
+    const abs = Math.abs(value);
+    if (abs >= 1e9) return (value / 1e9).toFixed(abs >= 10e9 ? 0 : 1).replace(/\.0$/, '') + 'B';
+    if (abs >= 1e6) return (value / 1e6).toFixed(abs >= 10e6 ? 0 : 1).replace(/\.0$/, '') + 'M';
+    if (abs >= 1e3) return (value / 1e3).toFixed(abs >= 10e3 ? 0 : 1).replace(/\.0$/, '') + 'K';
+    return String(Math.trunc(value));
+  }
   function formatCredits(n) {
     const value = Number(n || 0);
     if (!Number.isFinite(value)) return '0';
     return value.toFixed(2);
+  }
+  function formatStatCredits(n) {
+    const value = Number(n || 0);
+    if (!Number.isFinite(value)) return '0.0';
+    return value.toFixed(1);
   }
   function applyUsageBars(root) {
     qsa('.usage-fill[data-usage-pct]', root).forEach(el => {
@@ -1966,6 +1982,7 @@
   function normalizeApiKeyMask(value) {
     value = String(value || '');
     if (!value) return '';
+    if (value.includes('****')) return value;
     if (value.length <= 10) return value;
     return value.slice(0, 6) + '****' + value.slice(-4);
   }

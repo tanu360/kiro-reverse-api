@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"math"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -14,17 +15,9 @@ import (
 
 func resetObservePersistenceForTest(t *testing.T) {
 	t.Helper()
-	observeRequestPersistOnce = sync.Once{}
-	observeRequestPersistQueue = nil
-	observePersistWriterActive.Store(false)
-	observePersistWriterStarted.Store(false)
 	observeStoreOnce = sync.Once{}
 	observeStoreInst = nil
 	t.Cleanup(func() {
-		observeRequestPersistOnce = sync.Once{}
-		observeRequestPersistQueue = nil
-		observePersistWriterActive.Store(false)
-		observePersistWriterStarted.Store(false)
 		observeStoreOnce = sync.Once{}
 		observeStoreInst = nil
 	})
@@ -183,5 +176,36 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 	}
 	if strings.Contains(string(body), keyA) || strings.Contains(string(body), "middle-a") {
 		t.Fatalf("request JSON exposed raw API key: %s", string(body))
+	}
+}
+
+func TestQueryPersistedRequestStats(t *testing.T) {
+	dir := t.TempDir()
+	resetObservePersistenceForTest(t)
+	if err := db.ResetForTest(dir); err != nil {
+		t.Fatalf("reset db: %v", err)
+	}
+	if err := config.Init(filepath.Join(dir, "kiro.db")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+
+	s := getObserveStore()
+	defer s.Reset()
+	s.RecordRequest("acc-ok-1", "ok1@example.com", "claude-sonnet", 10, 20, 0.30, true, 200, "")
+	s.RecordRequest("acc-fail", "fail@example.com", "claude-opus", 0, 0, 0, false, 500, "boom")
+	s.RecordRequest("acc-ok-2", "ok2@example.com", "claude-haiku", 3, 7, 0.20, true, 200, "")
+
+	stats, err := queryPersistedRequestStats()
+	if err != nil {
+		t.Fatalf("query stats: %v", err)
+	}
+	if stats.TotalRequests != 3 || stats.SuccessRequests != 2 || stats.FailedRequests != 1 {
+		t.Fatalf("unexpected counts: %#v", stats)
+	}
+	if stats.TotalTokens != 40 {
+		t.Fatalf("expected 40 tokens, got %d", stats.TotalTokens)
+	}
+	if math.Abs(stats.TotalCredits-0.50) > 0.000001 {
+		t.Fatalf("expected 0.50 credits, got %.2f", stats.TotalCredits)
 	}
 }

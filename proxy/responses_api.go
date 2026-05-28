@@ -17,19 +17,24 @@ import (
 )
 
 func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) {
+	apiKeyID := apiKeyIDFromContext(r.Context())
+	apiKeyValue := apiKeyValueFromContext(r.Context())
 	if r.Method != http.MethodPost {
+		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Failed to read request body")
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
 		return
 	}
 
 	var req OpenAIResponsesRequest
 	if err := json.Unmarshal(body, &req); err != nil {
+		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "Invalid JSON")
 		return
 	}
@@ -38,10 +43,12 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	if req.PreviousResponseID != "" {
 		state, err := loadResponseState(req.PreviousResponseID)
 		if errors.Is(err, sql.ErrNoRows) {
+			recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, "previous_response_id not found")
 			h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "previous_response_id not found")
 			return
 		}
 		if err != nil {
+			recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusInternalServerError, err.Error())
 			h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
@@ -50,6 +57,7 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 
 	prepared, msg := prepareResponsesRequest(&req, previousMessages)
 	if msg != "" {
+		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", msg)
 		return
 	}
@@ -59,8 +67,9 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	prepared.OpenAIRequest.Model = actualModel
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)
-	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), apiKeyValueFromContext(r.Context()), tokenBudget(estimatedInputTokens, prepared.OpenAIRequest.MaxTokens))
+	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens, prepared.OpenAIRequest.MaxTokens))
 	if err != nil {
+		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, prepared.OpenAIRequest.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
 		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
 	}
@@ -108,6 +117,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 	model := prepared.OpenAIRequest.Model
 	excluded := make(map[string]bool)
 	var lastErr error
+	var lastAccount *config.Account
 	defer apiKeyReservation.release()
 
 	retryPlan := newRequestRetryPlan()
@@ -121,7 +131,9 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 			totalAttempts++
 			if err := h.ensureValidToken(account); err != nil {
 				lastErr = err
+				lastAccount = account
 				h.handleAccountFailure(account, err)
+				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(totalAttempts)
 					continue
@@ -158,10 +170,9 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 			err := CallKiroAPI(account, payload, callback)
 			if err != nil {
 				lastErr = err
+				lastAccount = account
 				h.handleAccountFailure(account, err)
-				getObserveStore().RecordFailure(account.ID, model)
-				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
-				getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
+				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(totalAttempts)
 					continue
@@ -187,7 +198,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordFinalRequestForApiKey(apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
@@ -206,10 +217,11 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 	}
 
 	if lastErr == nil {
+		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
 		return
 	}
-	h.recordFailure()
+	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
 	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
 }
 
@@ -222,12 +234,14 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusInternalServerError, "Streaming not supported")
 		h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", "Streaming not supported")
 		return
 	}
 
 	excluded := make(map[string]bool)
 	var lastErr error
+	var lastAccount *config.Account
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest {
@@ -239,7 +253,9 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 			totalAttempts++
 			if err := h.ensureValidToken(account); err != nil {
 				lastErr = err
+				lastAccount = account
 				h.handleAccountFailure(account, err)
+				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(totalAttempts)
 					continue
@@ -357,10 +373,9 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 			err := CallKiroAPI(account, payload, callback)
 			if err != nil {
 				lastErr = err
+				lastAccount = account
 				h.handleAccountFailure(account, err)
-				getObserveStore().RecordFailure(account.ID, model)
-				getObserveStore().RecordError(account.ID, account.Email, model, 0, err.Error())
-				getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, 0, 0, 0, false, 0, err.Error())
+				recordAttemptError(account, model, 0, err)
 				if !started {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 						retryPlan.waitBeforeRetry(totalAttempts)
@@ -380,7 +395,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 						"error":  map[string]string{"message": err.Error()},
 					},
 				})
-				h.recordFailure()
+				recordFinalRequestForApiKey(apiKeyReservation, account, model, 0, 0, 0, false, http.StatusInternalServerError, err.Error())
 				return
 			}
 
@@ -401,7 +416,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			getObserveStore().RecordRequestForApiKey(apiKeyReservation, account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordFinalRequestForApiKey(apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
@@ -451,10 +466,11 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 	}
 
 	if lastErr == nil {
+		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
 		return
 	}
-	h.recordFailure()
+	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
 	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
 }
 
