@@ -167,9 +167,10 @@ func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]
 		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
 			continue
 		}
+		accCopy := *acc
 		p.currentIndex = (idx + 1) % uint64(n)
-		p.lastSelected = acc.ID
-		return acc
+		p.lastSelected = accCopy.ID
+		return &accCopy
 	}
 	return nil
 }
@@ -207,8 +208,10 @@ func (p *AccountPool) findEarliestCooldownLocked(model string, excluded map[stri
 	}
 	if best != nil {
 		p.lastSelected = best.ID
+		bestCopy := *best
+		return &bestCopy
 	}
-	return best
+	return nil
 }
 
 func (p *AccountPool) GetByID(id string) *config.Account {
@@ -216,7 +219,8 @@ func (p *AccountPool) GetByID(id string) *config.Account {
 	defer p.mu.RUnlock()
 	for i := range p.accounts {
 		if p.accounts[i].ID == id {
-			return &p.accounts[i]
+			accCopy := p.accounts[i]
+			return &accCopy
 		}
 	}
 	return nil

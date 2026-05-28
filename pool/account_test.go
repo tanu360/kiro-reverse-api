@@ -4,6 +4,8 @@ import (
 	"errors"
 	"kiro-proxy/config"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -325,6 +327,81 @@ func TestGetNextForModelExcludingReturnsNilOnEmptyPool(t *testing.T) {
 	if acc != nil {
 		t.Fatalf("expected nil for empty pool, got %q", acc.ID)
 	}
+}
+
+func TestReturnedAccountsAreSnapshots(t *testing.T) {
+	p := newTestPool(config.Account{
+		ID:           "acct",
+		AccessToken:  "pool-access",
+		RefreshToken: "pool-refresh",
+	})
+
+	next := p.GetNext()
+	if next == nil {
+		t.Fatal("expected account from GetNext")
+	}
+	next.AccessToken = "request-local-access"
+	next.RefreshToken = "request-local-refresh"
+
+	byID := p.GetByID("acct")
+	if byID == nil {
+		t.Fatal("expected account from GetByID")
+	}
+	if byID.AccessToken != "pool-access" || byID.RefreshToken != "pool-refresh" {
+		t.Fatalf("GetNext returned shared account pointer, pool now has access=%q refresh=%q", byID.AccessToken, byID.RefreshToken)
+	}
+
+	p.cooldowns["acct"] = time.Now().Add(time.Minute)
+	cooldown := p.GetNext()
+	if cooldown == nil {
+		t.Fatal("expected earliest cooldown account")
+	}
+	cooldown.AccessToken = "cooldown-local-access"
+
+	byID = p.GetByID("acct")
+	if byID == nil {
+		t.Fatal("expected account from GetByID after cooldown")
+	}
+	if byID.AccessToken != "pool-access" {
+		t.Fatalf("cooldown selection returned shared account pointer, pool now has access=%q", byID.AccessToken)
+	}
+}
+
+func TestGetNextAndUpdateTokenCanRunConcurrently(t *testing.T) {
+	p := newTestPool(config.Account{
+		ID:           "acct",
+		AccessToken:  "initial-access",
+		RefreshToken: "initial-refresh",
+		ExpiresAt:    time.Now().Add(time.Hour).Unix(),
+	})
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 2000; i++ {
+			p.UpdateToken("acct", "access-"+strconv.Itoa(i), "refresh-"+strconv.Itoa(i), time.Now().Add(time.Hour).Unix())
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 2000; i++ {
+			acc := p.GetNext()
+			if acc == nil {
+				t.Errorf("expected account on iteration %d", i)
+				return
+			}
+			_ = len(acc.AccessToken)
+			acc.AccessToken = "request-local-" + strconv.Itoa(i)
+			if latest := p.GetByID(acc.ID); latest != nil {
+				_ = len(latest.AccessToken)
+			}
+		}
+	}()
+
+	wg.Wait()
 }
 
 func TestDisableAccountSetsCooldown(t *testing.T) {
