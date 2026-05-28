@@ -36,6 +36,8 @@
   "stats.otherCredits": "其他使用",
   "stats.avgTokens": "平均 Tokens",
   "stats.avgCredits": "平均 Credits",
+  "stats.avgSuccessTokens": "平均 Tokens",
+  "stats.avgSuccessCredits": "平均 Credits",
   "stats.successRate": "成功率",
   "stats.failedRate": "失败率",
   "stats.errorEvents": "错误事件",

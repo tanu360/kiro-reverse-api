@@ -707,6 +707,8 @@
     const failedRequests = Number(d.failedRequests || 0);
     const totalTokens = Number(d.totalTokens || 0);
     const appCredits = Number(d.totalCredits || 0);
+    const successTokens = Number(d.successTokens || 0);
+    const successCredits = Number(d.successCredits || 0);
     const accountCreditsUsed = Number(d.accountCreditsUsed || 0);
     const accountCreditsLimit = Number(d.accountCreditsLimit || 0);
     const otherCredits = Math.max(0, accountCreditsUsed - appCredits);
@@ -724,6 +726,8 @@
     setText('statSuccess', formatNum(successRequests));
     setText('statSuccessRate', formatPercent(successRequests, totalRequests));
     setText('statSuccessRatio', formatCountRatio(successRequests, totalRequests));
+    setText('statAvgSuccessTokens', formatCompactNum(successRequests ? successTokens / successRequests : 0));
+    setText('statAvgSuccessCredits', formatStatCredits(successRequests ? successCredits / successRequests : 0));
     setText('statFailed', formatNum(failedRequests));
     setText('statFailedRate', formatPercent(failedRequests, totalRequests));
     setText('statErrorEvents', formatNum(d.totalErrorEvents || 0));
