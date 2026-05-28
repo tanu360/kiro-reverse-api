@@ -67,7 +67,6 @@ type parsedBackup struct {
 	config            Config
 	credentialsLoaded bool
 	credentials       []Account
-	envelope          bool
 }
 
 var backupMu sync.Mutex
@@ -76,22 +75,6 @@ func sha8(s string) string { return s[:8] }
 
 func makeID(now time.Time, sum string) string {
 	return fmt.Sprintf("%s-%09d-%s", now.UTC().Format("20060102-150405"), now.UTC().Nanosecond(), sha8(sum))
-}
-
-func countFromBytes(data []byte) (accounts int, version string) {
-	var payload backupPayload
-	if err := json.Unmarshal(data, &payload); err == nil && payload.Format == backupFormat {
-		if payload.CredentialsLoaded {
-			return len(payload.Credentials), Version
-		}
-		return len(payload.Config.Accounts), Version
-	}
-	var c struct {
-		Accounts []struct{} `json:"accounts"`
-		Version  string     `json:"version"`
-	}
-	_ = json.Unmarshal(data, &c)
-	return len(c.Accounts), c.Version
 }
 
 func backupDataFromSnapshot(configSnapshot Config, credentialsLoaded bool, credentialsSnapshot []Account, createdAt int64) ([]byte, int, string, bool, error) {
@@ -127,6 +110,7 @@ func currentBackupData() ([]byte, int, string, bool, int, error) {
 	if configSnapshot.Accounts == nil {
 		configSnapshot.Accounts = []Account{}
 	}
+	configSnapshot.ApiKeys = append([]ApiKeyEntry(nil), cfg.ApiKeys...)
 	configSnapshot.PromptFilterRules = append([]PromptFilterRule(nil), cfg.PromptFilterRules...)
 	autoKeep := maxAutoKeep
 	if cfg.Backup.AutoKeep > 0 {
@@ -390,7 +374,7 @@ func DeleteBackup(id string) error {
 	return nil
 }
 
-func parseBackupData(data []byte, rejectLegacyWhenCredentialsLoaded bool) (*parsedBackup, error) {
+func parseBackupData(data []byte) (*parsedBackup, error) {
 	if !json.Valid(data) {
 		return nil, fmt.Errorf("backup content is not valid JSON")
 	}
@@ -402,46 +386,35 @@ func parseBackupData(data []byte, rejectLegacyWhenCredentialsLoaded bool) (*pars
 		return nil, fmt.Errorf("backup JSON parse failed: %w", err)
 	}
 
-	if envelope.Format == backupFormat {
-		var payload backupPayload
-		if err := json.Unmarshal(data, &payload); err != nil {
-			return nil, fmt.Errorf("backup envelope parse failed: %w", err)
-		}
-		if payload.Version != backupVersion {
-			return nil, fmt.Errorf("unsupported backup version: %d", payload.Version)
-		}
-		if payload.Config.Accounts == nil {
-			payload.Config.Accounts = []Account{}
-		}
-		if err := validateRestoredConfig(payload.Config); err != nil {
-			return nil, err
-		}
-		if payload.CredentialsLoaded {
-			for i, acc := range payload.Credentials {
-				if acc.ID == "" {
-					return nil, fmt.Errorf("credential %d missing id", i)
-				}
-			}
-		}
-		return &parsedBackup{
-			config:            payload.Config,
-			credentialsLoaded: payload.CredentialsLoaded,
-			credentials:       append([]Account(nil), payload.Credentials...),
-			envelope:          true,
-		}, nil
+	if envelope.Format != backupFormat {
+		return nil, fmt.Errorf("unsupported backup format: expected %s", backupFormat)
 	}
 
-	var configOnly Config
-	if err := json.Unmarshal(data, &configOnly); err != nil {
-		return nil, fmt.Errorf("backup schema mismatch: %w", err)
+	var payload backupPayload
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("backup envelope parse failed: %w", err)
 	}
-	if err := validateRestoredConfig(configOnly); err != nil {
+	if payload.Version != backupVersion {
+		return nil, fmt.Errorf("unsupported backup version: %d", payload.Version)
+	}
+	if payload.Config.Accounts == nil {
+		payload.Config.Accounts = []Account{}
+	}
+	if err := validateRestoredConfig(payload.Config); err != nil {
 		return nil, err
 	}
-	if rejectLegacyWhenCredentialsLoaded && CredentialsLoaded() {
-		return nil, fmt.Errorf("config-only backup does not include saved credentials; use a full kiro-proxy backup")
+	if payload.CredentialsLoaded {
+		for i, acc := range payload.Credentials {
+			if acc.ID == "" {
+				return nil, fmt.Errorf("credential %d missing id", i)
+			}
+		}
 	}
-	return &parsedBackup{config: configOnly}, nil
+	return &parsedBackup{
+		config:            payload.Config,
+		credentialsLoaded: payload.CredentialsLoaded,
+		credentials:       append([]Account(nil), payload.Credentials...),
+	}, nil
 }
 
 func validateRestoredConfig(c Config) error {
@@ -468,10 +441,8 @@ func writeRestoredConfig(parsed *parsedBackup) error {
 	if err := setSetting("config", string(configData)); err != nil {
 		return err
 	}
-	if parsed.envelope {
-		if err := ReplaceCredentials(parsed.credentialsLoaded, parsed.credentials); err != nil {
-			return err
-		}
+	if err := ReplaceCredentials(parsed.credentialsLoaded, parsed.credentials); err != nil {
+		return err
 	}
 	return reloadFromDisk()
 }
@@ -493,7 +464,7 @@ func RestoreBackup(id string) error {
 	if err != nil {
 		return err
 	}
-	parsed, err := parseBackupData(data, true)
+	parsed, err := parseBackupData(data)
 	if err != nil {
 		return err
 	}
@@ -562,7 +533,7 @@ func reloadFromDisk() error {
 }
 
 func RestoreFromBytes(data []byte, note string) error {
-	parsed, err := parseBackupData(data, true)
+	parsed, err := parseBackupData(data)
 	if err != nil {
 		return err
 	}
@@ -585,6 +556,7 @@ func AutoSnapshotBeforeSave() {
 	if configSnapshot.Accounts == nil {
 		configSnapshot.Accounts = []Account{}
 	}
+	configSnapshot.ApiKeys = append([]ApiKeyEntry(nil), cfg.ApiKeys...)
 	configSnapshot.PromptFilterRules = append([]PromptFilterRule(nil), cfg.PromptFilterRules...)
 	autoKeep := cfg.Backup.AutoKeep
 	credentialsLoaded, credentialsSnapshot := CredentialsSnapshot()

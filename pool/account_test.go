@@ -32,8 +32,7 @@ func TestOverageAccountsCanBeSelectedWhenAllowed(t *testing.T) {
 		ID:            "over",
 		UsageCurrent:  10,
 		UsageLimit:    10,
-		AllowOverage:  true,
-		OverageWeight: 1,
+		OverageStatus: "ENABLED",
 	}
 
 	p.accounts = []config.Account{overLimit}
@@ -47,12 +46,37 @@ func TestOverageAccountsCanBeSelectedWhenAllowed(t *testing.T) {
 	}
 }
 
-func TestOverageWeightIsLowerThanNormalWeight(t *testing.T) {
-	normalWeight := effectiveWeight(1) * overageFrequencyScale
-	overageWeight := effectiveOverageWeight(1)
+func TestGlobalAllowOverUsageKeepsOverLimitAccountsInReloadedPool(t *testing.T) {
+	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.UpdateAllowOverUsage(true); err != nil {
+		t.Fatalf("enable allow over usage: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "over", Enabled: true, UsageCurrent: 10, UsageLimit: 10}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
 
-	if overageWeight >= normalWeight {
-		t.Fatalf("expected overage weight %d to be lower than normal weight %d", overageWeight, normalWeight)
+	p := newTestPool()
+	p.Reload()
+	acc := p.GetNext()
+	if acc == nil {
+		t.Fatalf("expected over-limit account when global allow over-usage is enabled")
+	}
+	if acc.ID != "over" {
+		t.Fatalf("expected over account, got %q", acc.ID)
+	}
+}
+
+func TestUpstreamOverageEnabledOnlyAcceptsEnabledStatus(t *testing.T) {
+	if !isUpstreamOverageEnabled(config.Account{OverageStatus: "ENABLED"}) {
+		t.Fatalf("expected ENABLED overage status to be accepted")
+	}
+	if isUpstreamOverageEnabled(config.Account{OverageStatus: "DISABLED"}) {
+		t.Fatalf("expected DISABLED overage status to be rejected")
+	}
+	if isUpstreamOverageEnabled(config.Account{}) {
+		t.Fatalf("expected empty overage status to be rejected")
 	}
 }
 

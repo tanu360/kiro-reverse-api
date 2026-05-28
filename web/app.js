@@ -38,6 +38,8 @@
   let requestsQuery = { search: '', status: '', page: 1, pageSize: 25, sort: 'time', order: 'desc' };
   let backupsCache = [];
   let backupScheduleCache = null;
+  let apiKeysCache = [];
+  let editingApiKeyId = '';
   const $ = (id) => document.getElementById(id);
   const qsa = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   function escapeHtml(s) {
@@ -777,6 +779,36 @@
     }
     return '';
   }
+  function renderOverageBadge(a) {
+    const status = String(a.overageStatus || '').toUpperCase();
+    if (status === 'ENABLED') {
+      return '<span class="badge badge-warning">' + escapeHtml(t('accounts.overageOn')) + '</span>';
+    }
+    if (status === 'DISABLED') {
+      return '<span class="badge badge-muted">' + escapeHtml(t('accounts.overageOff')) + '</span>';
+    }
+    return '';
+  }
+  function overageStatusLabel(a) {
+    const status = String(a.overageStatus || '').toUpperCase();
+    if (status === 'ENABLED') return t('detail.overageEnabled');
+    if (status === 'DISABLED') return t('detail.overageDisabled');
+    return t('detail.overageUnknown');
+  }
+  function formatMoney(n) {
+    return '$' + Number(n || 0).toFixed(2);
+  }
+  function renderOverageMeta(a) {
+    const notCapable = String(a.overageCapability || '').toUpperCase() === 'NOT_OVERAGE_CAPABLE';
+    return '<div class="detail-grid">' +
+      detailItem(t('detail.overageStatus'), overageStatusLabel(a)) +
+      detailItem(t('detail.overageCap'), formatMoney(a.overageCap)) +
+      detailItem(t('detail.overageRate'), formatMoney(a.overageRate)) +
+      detailItem(t('detail.overageCurrent'), formatMoney(a.currentOverages)) +
+      detailItem(t('detail.overageCheckedAt'), a.overageCheckedAt ? formatTime(a.overageCheckedAt) : '-') +
+      (notCapable ? detailItem(t('detail.overageCapability'), t('detail.overageNotCapable')) : '') +
+      '</div>';
+  }
   function formatTrialExpiry(ts) {
     if (!ts) return '';
     const date = new Date(ts * 1000);
@@ -852,7 +884,7 @@
       const isSelected = selectedAccounts.has(a.id);
       const weight = a.weight || 0;
       const weightBadge = weight >= 2 ? '<span class="badge badge-warning">' + escapeHtml(t('accounts.weightShort')) + ':' + weight + '</span>' : '';
-      const overageBadge = a.allowOverage ? '<span class="badge badge-warning">' + escapeHtml(t('accounts.overage')) + ':' + (a.overageWeight || 1) + '</span>' : '';
+      const overageBadge = renderOverageBadge(a);
       const banned = a.banStatus && a.banStatus !== 'ACTIVE';
       const idAttr = escapeAttr(a.id);
       const displayEmail = getDisplayEmail(a.email, a.id);
@@ -1062,6 +1094,7 @@
     const a = accountsData.find(x => x.id === id);
     if (!a) return;
     const idAttr = escapeAttr(id);
+    const overageNotCapable = String(a.overageCapability || '').toUpperCase() === 'NOT_OVERAGE_CAPABLE';
     $('detailBody').innerHTML =
       '<div class="detail-section"><h4>' + escapeHtml(t('detail.basicInfo')) + '</h4><div class="detail-grid">' +
       detailItem(t('detail.email'), getDisplayEmail(a.email, null)) +
@@ -1086,14 +1119,11 @@
 
       '<div class="detail-section"><h4>' + escapeHtml(t('detail.overage')) + '</h4>' +
       '<div class="form-group">' +
-      '<label class="flex items-center gap-2"><span class="switch"><input type="checkbox" id="allowOverageInput" ' + (a.allowOverage ? 'checked' : '') + ' /><span class="slider"></span></span><span>' + escapeHtml(t('detail.allowOverage')) + '</span></label>' +
-      '</div>' +
-      '<div class="form-group">' +
-      '<label>' + escapeHtml(t('detail.overageWeight')) + '</label>' +
-      '<input type="number" id="overageWeightInput" value="' + (a.overageWeight || 1) + '" min="1" max="10" />' +
+      '<label class="flex items-center gap-2"><span class="switch"><input type="checkbox" id="overageSwitchInput" data-id="' + idAttr + '" ' + (String(a.overageStatus || '').toUpperCase() === 'ENABLED' ? 'checked' : '') + (overageNotCapable ? ' disabled' : '') + ' /><span class="slider"></span></span><span>' + escapeHtml(t('detail.overageSwitch')) + '</span></label>' +
       '<small>' + escapeHtml(t('detail.overageHint')) + '</small>' +
       '</div>' +
-      '<button class="btn btn-sm btn-primary" data-detail-action="saveOverage" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.save')) + '</button>' +
+      renderOverageMeta(a) +
+      '<button class="btn btn-sm btn-outline" data-detail-action="refreshOverage" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.overageRefresh')) + '</button>' +
       '</div>' +
 
       '<div class="detail-section"><h4>' + escapeHtml(t('detail.proxyURL')) + '</h4><div class="machine-id-row">' +
@@ -1193,12 +1223,56 @@
     const weight = parseInt($('weightInput').value, 10) || 0;
     await putAccount(id, { weight }, t('detail.saved'));
   }
-  async function saveOverage(id) {
-    const allowOverage = $('allowOverageInput').checked;
-    let overageWeight = parseInt($('overageWeightInput').value, 10) || 1;
-    overageWeight = Math.max(1, Math.min(10, overageWeight));
-    $('overageWeightInput').value = overageWeight;
-    await putAccount(id, { allowOverage, overageWeight }, t('detail.saved'));
+  function mergeOverageSnapshot(id, d) {
+    const a = accountsData.find(x => x.id === id);
+    if (!a) return;
+    a.overageStatus = d.overageStatus;
+    a.overageCapability = d.overageCapability;
+    a.overageCap = d.overageCap;
+    a.overageRate = d.overageRate;
+    a.currentOverages = d.currentOverages;
+    a.overageCheckedAt = d.overageCheckedAt;
+  }
+  async function refreshOverage(id) {
+    const dismiss = toast(t('detail.overageSwitching'), 'info', { duration: 0 });
+    try {
+      const res = await api('/accounts/' + id + '/overage');
+      const d = await res.json();
+      dismiss();
+      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      mergeOverageSnapshot(id, d);
+      showDetail(id);
+      renderAccounts();
+      toast(t('detail.saved'), 'success');
+    } catch (e) {
+      dismiss();
+      toast((e && e.message) || t('accounts.overageSwitchFailed'), 'error');
+    }
+  }
+  async function setAccountOverage(id, enabled) {
+    const input = $('overageSwitchInput');
+    if (input) input.disabled = true;
+    const dismiss = toast(t('detail.overageSwitching'), 'info', { duration: 0 });
+    try {
+      const res = await api('/accounts/' + id + '/overage', {
+        method: 'POST',
+        body: JSON.stringify({ enabled })
+      });
+      const d = await res.json();
+      dismiss();
+      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      mergeOverageSnapshot(id, d);
+      showDetail(id);
+      renderAccounts();
+      toast(t('detail.saved'), 'success');
+    } catch (e) {
+      dismiss();
+      if (input) {
+        input.disabled = false;
+        input.checked = !enabled;
+      }
+      toast((e && e.message) || t('accounts.overageSwitchFailed'), 'error');
+    }
   }
   async function saveProxyURL(id) {
     const url = $('proxyURLInput').value.trim();
@@ -1345,9 +1419,8 @@
     const res = await api('/settings');
     const d = await res.json();
     $('requireApiKey').checked = d.requireApiKey;
-    $('apiKeyInput').value = d.apiKey || '';
     $('allowOverUsage').checked = d.allowOverUsage || false;
-    await Promise.all([loadThinkingConfig(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
+    await Promise.all([loadApiKeys(), loadThinkingConfig(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
     refreshCustomSelects();
   }
   async function loadThinkingConfig() {
@@ -1433,15 +1506,195 @@
   async function saveApiSettings() {
     try {
       const requireApiKey = $('requireApiKey').checked;
-      const apiKeyInput = $('apiKeyInput');
-      if (requireApiKey && !apiKeyInput.value.trim()) generateApiKey();
-      if (requireApiKey && !apiKeyInput.value.trim()) return;
-      const res = await api('/settings', { method: 'POST', body: JSON.stringify({ requireApiKey, apiKey: apiKeyInput.value }) });
+      const hasEnabledManagedKey = apiKeysCache.some(k => k.enabled);
+      if (requireApiKey && !hasEnabledManagedKey) {
+        toast(t('settings.enabledApiKeyRequired'), 'warning');
+        return;
+      }
+      const res = await api('/settings', { method: 'POST', body: JSON.stringify({ requireApiKey }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.success === false) throw new Error(d.error || t('common.saveFailed'));
       toast(t('detail.saved'), 'success');
     } catch (e) {
       toast((e && e.message) || t('common.saveFailed'), 'error');
+    }
+  }
+  async function loadApiKeys() {
+    const el = $('apiKeysList');
+    if (!el) return;
+    try {
+      const res = await api('/api-keys');
+      const d = await res.json();
+      apiKeysCache = d.apiKeys || [];
+      renderApiKeys();
+    } catch (e) {
+      apiKeysCache = [];
+      renderApiKeys(t('settings.apiKeysLoadFailed'));
+    }
+  }
+  function renderApiKeys(errorText) {
+    const el = $('apiKeysList');
+    if (!el) return;
+    if (errorText) {
+      el.innerHTML = '<div class="message message-error">' + escapeHtml(errorText) + '</div>';
+      return;
+    }
+    if (editingApiKeyId && !apiKeysCache.some(k => k.id === editingApiKeyId)) {
+      clearApiKeyEditor();
+    }
+    if (!apiKeysCache.length) {
+      el.innerHTML = '<div class="empty-state">' + escapeHtml(t('settings.noApiKeys')) + '</div>';
+      return;
+    }
+    const rows = apiKeysCache.map(k => {
+      const usage = formatNum(k.tokensUsed || 0) + (k.tokenLimit ? ' / ' + formatNum(k.tokenLimit) : '') +
+        '<br><span class="api-key-muted">' + Number(k.creditsUsed || 0).toFixed(2) + (k.creditLimit ? ' / ' + Number(k.creditLimit).toFixed(2) : '') + ' cr</span>';
+      const last = k.lastUsedAt ? formatTime(k.lastUsedAt) : '-';
+      const isEditing = k.id === editingApiKeyId;
+      return '<tr>' +
+        '<td><strong>' + escapeHtml(k.name || t('settings.unnamedApiKey')) + '</strong></td>' +
+        '<td><code class="code-inline">' + escapeHtml(k.keyMasked || '') + '</code></td>' +
+        '<td>' + (k.enabled ? escapeHtml(t('common.enabled')) : escapeHtml(t('common.disabled'))) + '</td>' +
+        '<td>' + usage + '</td>' +
+        '<td>' + escapeHtml(String(k.requestsCount || 0)) + '</td>' +
+        '<td>' + escapeHtml(last) + '</td>' +
+        '<td><span class="api-key-actions">' +
+        '<button class="btn btn-outline btn-sm" data-api-key-action="edit" data-id="' + escapeAttr(k.id) + '" type="button" ' + (isEditing ? 'disabled' : '') + '>' + escapeHtml(t('common.edit')) + '</button>' +
+        '<button class="btn btn-outline btn-sm" data-api-key-action="toggle" data-id="' + escapeAttr(k.id) + '" data-enabled="' + (k.enabled ? 'true' : 'false') + '" type="button">' + escapeHtml(k.enabled ? t('common.disable') : t('common.enable')) + '</button>' +
+        '<button class="btn btn-outline btn-sm" data-api-key-action="reset" data-id="' + escapeAttr(k.id) + '" type="button">' + escapeHtml(t('settings.resetUsage')) + '</button>' +
+        '<button class="btn btn-danger btn-sm" data-api-key-action="delete" data-id="' + escapeAttr(k.id) + '" type="button">' + escapeHtml(t('common.delete')) + '</button>' +
+        '</span></td>' +
+        '</tr>';
+    });
+    renderTable('apiKeysList', [
+      t('settings.apiKeyName'),
+      t('settings.apiKeyValue'),
+      t('common.status'),
+      t('settings.apiKeyUsage'),
+      t('settings.apiKeyRequests'),
+      t('settings.apiKeyLastUsed'),
+      t('common.actions'),
+    ], rows, 'settings.noApiKeys');
+  }
+  function setApiKeyEditorMode(id) {
+    editingApiKeyId = id || '';
+    const createBtn = $('createApiKeyBtn');
+    if (createBtn) {
+      createBtn.dataset.i18n = editingApiKeyId ? 'settings.updateApiKey' : 'settings.createApiKey';
+      createBtn.textContent = t(createBtn.dataset.i18n);
+    }
+    const cancelBtn = $('cancelApiKeyEditBtn');
+    if (cancelBtn) cancelBtn.classList.toggle('hidden', !editingApiKeyId);
+  }
+  function clearApiKeyEditor() {
+    setApiKeyEditorMode('');
+    $('newApiKeyName').value = '';
+    $('newApiKeyTokenLimit').value = '0';
+    $('newApiKeyCreditLimit').value = '0';
+    $('createdApiKeyPanel').classList.add('hidden');
+    renderApiKeys();
+  }
+  function getApiKeyEditorValues() {
+    const tokenRaw = $('newApiKeyTokenLimit').value.trim();
+    const creditRaw = $('newApiKeyCreditLimit').value.trim();
+    const tokenLimit = tokenRaw === '' ? 0 : Number(tokenRaw);
+    const creditLimit = creditRaw === '' ? 0 : Number(creditRaw);
+    if (!Number.isFinite(tokenLimit) || tokenLimit < 0 || Math.floor(tokenLimit) !== tokenLimit || !Number.isFinite(creditLimit) || creditLimit < 0) {
+      toast(t('settings.invalidApiKeyLimits'), 'warning');
+      return null;
+    }
+    return {
+      name: $('newApiKeyName').value.trim(),
+      tokenLimit,
+      creditLimit,
+    };
+  }
+  function beginEditApiKey(id) {
+    const key = apiKeysCache.find(k => k.id === id);
+    if (!key) return;
+    $('newApiKeyName').value = key.name || '';
+    $('newApiKeyTokenLimit').value = String(key.tokenLimit || 0);
+    $('newApiKeyCreditLimit').value = String(key.creditLimit || 0);
+    $('createdApiKeyPanel').classList.add('hidden');
+    setApiKeyEditorMode(id);
+    renderApiKeys();
+    $('newApiKeyName').focus();
+  }
+  async function createApiKey() {
+    const values = getApiKeyEditorValues();
+    if (!values) return;
+    try {
+      if (editingApiKeyId) {
+        const res = await api('/api-keys/' + encodeURIComponent(editingApiKeyId), {
+          method: 'PUT',
+          body: JSON.stringify(values)
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+        toast(t('settings.apiKeyUpdated'), 'success');
+        setApiKeyEditorMode('');
+        $('newApiKeyName').value = '';
+        $('newApiKeyTokenLimit').value = '0';
+        $('newApiKeyCreditLimit').value = '0';
+        await loadApiKeys();
+        return;
+      }
+      const res = await api('/api-keys', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: values.name,
+          enabled: true,
+          tokenLimit: values.tokenLimit,
+          creditLimit: values.creditLimit,
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      $('newApiKeyName').value = '';
+      $('newApiKeyTokenLimit').value = '0';
+      $('newApiKeyCreditLimit').value = '0';
+      if (d.key) {
+        $('createdApiKeyPanel').classList.remove('hidden');
+        $('createdApiKeyValue').textContent = d.key;
+      }
+      toast(t('settings.apiKeyCreated'), 'success');
+      await loadApiKeys();
+    } catch (e) {
+      toast((e && e.message) || t('common.failed'), 'error');
+    }
+  }
+  async function toggleApiKey(id, enabled) {
+    try {
+      const res = await api('/api-keys/' + encodeURIComponent(id), {
+        method: 'PUT',
+        body: JSON.stringify({ enabled: !enabled })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      await loadApiKeys();
+    } catch (e) {
+      toast((e && e.message) || t('common.failed'), 'error');
+    }
+  }
+  async function resetApiKeyUsage(id) {
+    try {
+      const res = await api('/api-keys/' + encodeURIComponent(id) + '/reset-usage', { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      await loadApiKeys();
+    } catch (e) {
+      toast((e && e.message) || t('common.failed'), 'error');
+    }
+  }
+  async function deleteApiKey(id) {
+    if (!window.confirm(t('settings.confirmDeleteApiKey'))) return;
+    try {
+      const res = await api('/api-keys/' + encodeURIComponent(id), { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      await loadApiKeys();
+    } catch (e) {
+      toast((e && e.message) || t('common.failed'), 'error');
     }
   }
   async function saveOverUsageConfig() {
@@ -1479,31 +1732,6 @@
       toastError((e && e.message) || t('common.failed'));
     }
   }
-  function generateApiKey() {
-    $('apiKeyInput').value = makeApiKey();
-  }
-
-  function makeApiKey() {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let k = 'sk-';
-    const cryptoApi = window.crypto || window.msCrypto;
-    if (!cryptoApi || !cryptoApi.getRandomValues) {
-      toast(t('common.failed'), 'error');
-      return '';
-    }
-    const bytes = new Uint8Array(32);
-    const limit = Math.floor(256 / chars.length) * chars.length;
-    while (k.length < 35) {
-      cryptoApi.getRandomValues(bytes);
-      for (const b of bytes) {
-        if (b >= limit) continue;
-        k += chars.charAt(b % chars.length);
-        if (k.length >= 35) break;
-      }
-    }
-    return k;
-  }
-
   function formatTime(ts) {
     return ts ? new Date(ts * 1000).toLocaleString() : '-';
   }
@@ -2612,8 +2840,24 @@
   }
 
   function bindSettingsEvents() {
-    $('generateApiKeyBtn').addEventListener('click', generateApiKey);
     $('saveApiSettingsBtn').addEventListener('click', saveApiSettings);
+    $('refreshApiKeysBtn').addEventListener('click', loadApiKeys);
+    $('createApiKeyBtn').addEventListener('click', createApiKey);
+    $('cancelApiKeyEditBtn').addEventListener('click', clearApiKeyEditor);
+    $('copyCreatedApiKeyBtn').addEventListener('click', async () => {
+      await copyText($('createdApiKeyValue').textContent || '');
+      toast(t('common.copied'), 'primary');
+    });
+    $('apiKeysList').addEventListener('click', e => {
+      const btn = e.target.closest('[data-api-key-action]');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const action = btn.dataset.apiKeyAction;
+      if (action === 'edit') beginEditApiKey(id);
+      else if (action === 'toggle') toggleApiKey(id, btn.dataset.enabled === 'true');
+      else if (action === 'reset') resetApiKeyUsage(id);
+      else if (action === 'delete') deleteApiKey(id);
+    });
     $('saveOverUsageBtn').addEventListener('click', saveOverUsageConfig);
     $('saveThinkingBtn').addEventListener('click', saveThinkingConfig);
     $('saveEndpointBtn').addEventListener('click', saveEndpointConfig);
@@ -2727,10 +2971,15 @@
       const a = b.dataset.detailAction;
       if (a === 'saveMachineId') saveMachineId(id);
       else if (a === 'saveWeight') saveWeight(id);
-      else if (a === 'saveOverage') saveOverage(id);
+      else if (a === 'refreshOverage') refreshOverage(id);
       else if (a === 'saveProxyURL') saveProxyURL(id);
       else if (a === 'loadModels') loadModels(id);
       else if (a === 'refreshModels') refreshAccountModels(id);
+    });
+    $('detailBody').addEventListener('change', e => {
+      if (e.target && e.target.id === 'overageSwitchInput') {
+        setAccountOverage(e.target.dataset.id, e.target.checked);
+      }
     });
   }
 

@@ -59,12 +59,17 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	prepared.OpenAIRequest.Model = actualModel
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)
-
-	if prepared.OpenAIRequest.Stream {
-		h.handleOpenAIResponsesStream(w, kiroPayload, prepared, thinking, estimatedInputTokens)
+	apiKeyReservation, err := reserveApiKeyUsage(apiKeyIDFromContext(r.Context()), tokenBudget(estimatedInputTokens, prepared.OpenAIRequest.MaxTokens))
+	if err != nil {
+		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
 	}
-	h.handleOpenAIResponsesNonStream(w, kiroPayload, prepared, thinking, estimatedInputTokens)
+
+	if prepared.OpenAIRequest.Stream {
+		h.handleOpenAIResponsesStream(w, kiroPayload, prepared, thinking, estimatedInputTokens, apiKeyReservation)
+		return
+	}
+	h.handleOpenAIResponsesNonStream(w, kiroPayload, prepared, thinking, estimatedInputTokens, apiKeyReservation)
 }
 
 func (h *Handler) apiGetOpenAIResponse(w http.ResponseWriter, _ *http.Request, id string) {
@@ -99,10 +104,11 @@ func (h *Handler) apiDeleteOpenAIResponse(w http.ResponseWriter, _ *http.Request
 	})
 }
 
-func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload *KiroPayload, prepared *responsesPreparedRequest, thinking bool, estimatedInputTokens int) {
+func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload *KiroPayload, prepared *responsesPreparedRequest, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	model := prepared.OpenAIRequest.Model
 	excluded := make(map[string]bool)
 	var lastErr error
+	defer apiKeyReservation.release()
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
@@ -179,7 +185,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 			}
 			outputTokens = estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
 
-			h.recordSuccess(inputTokens, outputTokens, credits)
+			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
@@ -207,11 +213,12 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
 }
 
-func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *KiroPayload, prepared *responsesPreparedRequest, thinking bool, estimatedInputTokens int) {
+func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *KiroPayload, prepared *responsesPreparedRequest, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	model := prepared.OpenAIRequest.Model
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	defer apiKeyReservation.release()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -392,7 +399,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 			}
 			outputTokens = estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
 
-			h.recordSuccess(inputTokens, outputTokens, credits)
+			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			getObserveStore().RecordRequest(account.ID, account.Email, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)

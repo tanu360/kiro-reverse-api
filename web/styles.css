@@ -638,6 +638,11 @@ select.custom-select-native {
   color: #ffffff;
   border-color: #2563eb;
 }
+.badge-muted {
+  background: #64748b;
+  color: #ffffff;
+  border-color: #64748b;
+}
 .badge-error {
   background: #dc2626;
   color: #ffffff;
@@ -3262,6 +3267,25 @@ img.brand-icon {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
+.api-key-create-grid {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 12rem) minmax(10rem, 12rem) auto auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin: 1rem 0;
+}
+.api-key-create-grid .btn {
+  min-height: 2.5rem;
+}
+.api-key-actions {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.api-key-muted {
+  color: var(--muted-foreground);
+}
 .backup-schedule-toggle {
   display: inline-flex;
   align-items: center;
@@ -3395,6 +3419,7 @@ img.brand-icon {
   }
   .feature-stats-grid,
   .panel-split,
+  .api-key-create-grid,
   .settings-inline-grid {
     grid-template-columns: 1fr;
   }

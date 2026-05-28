@@ -31,7 +31,7 @@ func ImportFromSsoToken(bearerToken, region string) (accessToken, refreshToken, 
 	}
 
 	if err := verifyBearerToken(portalBase, bearerToken); err != nil {
-		return "", "", "", "", 0, fmt.Errorf("Token 验证失败: %w", err)
+		return "", "", "", "", 0, fmt.Errorf("token 验证失败: %w", err)
 	}
 
 	deviceSessionToken, err := getDeviceSessionToken(portalBase, bearerToken)

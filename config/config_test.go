@@ -1,26 +1,23 @@
 package config
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"testing"
 )
 
-func TestUpdateSettingsPatchPreservesOmittedAPIKeyFields(t *testing.T) {
+func TestUpdateSettingsPatchPreservesOmittedAuthFields(t *testing.T) {
 	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
-	if err := UpdateSettings("proxy-api-key", true, "admin-password"); err != nil {
+	requireAPIKey := true
+	if err := UpdateSettingsPatch(&requireAPIKey, "admin-password"); err != nil {
 		t.Fatalf("seed settings: %v", err)
 	}
 
-	if err := UpdateSettingsPatch(nil, nil, "new-admin-password"); err != nil {
+	if err := UpdateSettingsPatch(nil, "new-admin-password"); err != nil {
 		t.Fatalf("patch settings: %v", err)
 	}
 
-	if got := GetApiKey(); got != "proxy-api-key" {
-		t.Fatalf("expected API key to be preserved, got %q", got)
-	}
 	if !IsApiKeyRequired() {
 		t.Fatalf("expected requireApiKey to stay enabled")
 	}
@@ -29,23 +26,20 @@ func TestUpdateSettingsPatchPreservesOmittedAPIKeyFields(t *testing.T) {
 	}
 }
 
-func TestUpdateSettingsPatchCanExplicitlyDisableAPIKey(t *testing.T) {
+func TestUpdateSettingsPatchCanExplicitlyDisableAPIKeyRequirement(t *testing.T) {
 	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
-	if err := UpdateSettings("proxy-api-key", true, "admin-password"); err != nil {
+	requireAPIKey := true
+	if err := UpdateSettingsPatch(&requireAPIKey, "admin-password"); err != nil {
 		t.Fatalf("seed settings: %v", err)
 	}
 
-	emptyKey := ""
-	requireAPIKey := false
-	if err := UpdateSettingsPatch(&emptyKey, &requireAPIKey, ""); err != nil {
+	requireAPIKey = false
+	if err := UpdateSettingsPatch(&requireAPIKey, ""); err != nil {
 		t.Fatalf("patch settings: %v", err)
 	}
 
-	if got := GetApiKey(); got != "" {
-		t.Fatalf("expected API key to be cleared, got %q", got)
-	}
 	if IsApiKeyRequired() {
 		t.Fatalf("expected requireApiKey to be disabled")
 	}
@@ -171,31 +165,12 @@ func TestRestoreRejectsEmptyJSON(t *testing.T) {
 	}
 }
 
-func TestRestoreRejectsConfigOnlyBackupWhenCredentialsLoaded(t *testing.T) {
+func TestRestoreRejectsConfigOnlyBackup(t *testing.T) {
 	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
-	if err := ReplaceCredentials(true, []Account{{
-		ID:           "cred-1",
-		AccessToken:  "access-1",
-		RefreshToken: "refresh-1",
-		AuthMethod:   "social",
-		Region:       "us-east-1",
-		Enabled:      true,
-	}}); err != nil {
-		t.Fatalf("seed credentials: %v", err)
-	}
-	configOnly, err := json.Marshal(Config{
-		Password:      "changeme",
-		Port:          8080,
-		Host:          "0.0.0.0",
-		RequireApiKey: false,
-		Accounts:      []Account{},
-	})
-	if err != nil {
-		t.Fatalf("marshal config-only backup: %v", err)
-	}
-	if err := RestoreFromBytes(configOnly, "config-only"); err == nil {
-		t.Fatalf("expected config-only restore to be rejected while credentials are loaded")
+	rawConfig := []byte(`{"password":"changeme","port":8080,"host":"0.0.0.0","requireApiKey":false,"accounts":[]}`)
+	if err := RestoreFromBytes(rawConfig, "raw-config"); err == nil {
+		t.Fatalf("expected config-only restore to be rejected")
 	}
 }

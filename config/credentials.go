@@ -15,9 +15,6 @@ var (
 	credLoaded  bool
 )
 
-// InitCredentials kept for API compatibility; no-op now (DB path managed by db pkg).
-func InitCredentials(_ string) {}
-
 func LoadCredentials() error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -193,6 +190,29 @@ func UpdateCredentialProfileArn(id, profileArn string) error {
 	for i := range credentials {
 		if credentials[i].ID == id {
 			credentials[i].ProfileArn = profileArn
+			return saveCredentialsLocked()
+		}
+	}
+	return fmt.Errorf("credential not found: %s", id)
+}
+
+func UpdateCredentialOverageStatus(id, status, capability string, cap, rate, current float64, checkedAt int64) error {
+	credLock.Lock()
+	defer credLock.Unlock()
+	for i := range credentials {
+		if credentials[i].ID == id {
+			if status != "" {
+				credentials[i].OverageStatus = status
+			}
+			if capability != "" {
+				credentials[i].OverageCapability = capability
+			}
+			credentials[i].OverageCap = cap
+			credentials[i].OverageRate = rate
+			credentials[i].CurrentOverages = current
+			if checkedAt > 0 {
+				credentials[i].OverageCheckedAt = checkedAt
+			}
 			return saveCredentialsLocked()
 		}
 	}
