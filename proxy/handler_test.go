@@ -225,6 +225,51 @@ func TestAuthenticateMultiApiKeyAndLimits(t *testing.T) {
 	}
 }
 
+func TestApiKeyListMasksAndDetailReturnsCopyableKey(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	entry, err := config.AddApiKey(config.ApiKeyEntry{Name: "client", Key: "sk-copyable", Enabled: true})
+	if err != nil {
+		t.Fatalf("add key: %v", err)
+	}
+	h := &Handler{}
+
+	listRec := httptest.NewRecorder()
+	h.apiListApiKeys(listRec, httptest.NewRequest(http.MethodGet, "/admin/api/api-keys", nil))
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status = %d body=%s", listRec.Code, listRec.Body.String())
+	}
+	var listBody struct {
+		ApiKeys []map[string]interface{} `json:"apiKeys"`
+	}
+	if err := json.Unmarshal(listRec.Body.Bytes(), &listBody); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(listBody.ApiKeys) != 1 {
+		t.Fatalf("expected one key, got %#v", listBody.ApiKeys)
+	}
+	if _, ok := listBody.ApiKeys[0]["key"]; ok {
+		t.Fatalf("list response must not expose raw key")
+	}
+	if listBody.ApiKeys[0]["keyMasked"] == "" {
+		t.Fatalf("expected masked key in list response")
+	}
+
+	getRec := httptest.NewRecorder()
+	h.apiGetApiKey(getRec, httptest.NewRequest(http.MethodGet, "/admin/api/api-keys/"+entry.ID, nil), entry.ID)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var detail map[string]interface{}
+	if err := json.Unmarshal(getRec.Body.Bytes(), &detail); err != nil {
+		t.Fatalf("decode detail: %v", err)
+	}
+	if detail["key"] != "sk-copyable" {
+		t.Fatalf("expected detail response to include copyable key, got %#v", detail["key"])
+	}
+}
+
 func TestModelsEndpointRequiresManagedApiKey(t *testing.T) {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatalf("config.Init: %v", err)

@@ -10,6 +10,7 @@ import (
 type apiKeyView struct {
 	ID            string  `json:"id"`
 	Name          string  `json:"name,omitempty"`
+	Key           string  `json:"key,omitempty"`
 	KeyMasked     string  `json:"keyMasked"`
 	Enabled       bool    `json:"enabled"`
 	CreatedAt     int64   `json:"createdAt"`
@@ -37,6 +38,12 @@ func toApiKeyView(entry config.ApiKeyEntry) apiKeyView {
 	}
 }
 
+func toApiKeyDetailView(entry config.ApiKeyEntry) apiKeyView {
+	view := toApiKeyView(entry)
+	view.Key = entry.Key
+	return view
+}
+
 func (h *Handler) apiListApiKeys(w http.ResponseWriter, _ *http.Request) {
 	entries := config.ListApiKeys()
 	out := make([]apiKeyView, len(entries))
@@ -53,7 +60,7 @@ func (h *Handler) apiGetApiKey(w http.ResponseWriter, _ *http.Request, id string
 		json.NewEncoder(w).Encode(map[string]string{"error": "API key not found"})
 		return
 	}
-	json.NewEncoder(w).Encode(toApiKeyView(*entry))
+	json.NewEncoder(w).Encode(toApiKeyDetailView(*entry))
 }
 
 type apiKeyCreateRequest struct {

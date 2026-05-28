@@ -3267,6 +3267,24 @@ img.brand-icon {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
+.api-access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.875rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.api-access-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
 .api-key-create-grid {
   display: grid;
   grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 12rem) minmax(10rem, 12rem) auto auto;
@@ -3274,17 +3292,126 @@ img.brand-icon {
   align-items: end;
   margin: 1rem 0;
 }
+.api-key-create-grid .form-group {
+  margin-bottom: 0;
+}
 .api-key-create-grid .btn {
-  min-height: 2.5rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+}
+.api-key-created-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.api-key-created-label {
+  white-space: nowrap;
+}
+.api-key-created-value,
+.api-key-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.api-key-created-value {
+  width: 100%;
+}
+.api-key-created-value .code-inline,
+.api-key-cell .code-inline {
+  flex: 1 1 auto;
+  display: block;
+  height: 2.25rem;
+  line-height: calc(2.25rem - 2px);
+  min-width: 0;
+  padding: 0 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.api-key-created-value .code-inline {
+  max-width: 100%;
+}
+.api-key-cell .code-inline {
+  max-width: min(14rem, 100%);
+}
+.api-key-created-value #copyCreatedApiKeyBtn,
+.api-key-copy-btn {
+  flex: none;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
 }
 .api-key-actions {
   display: inline-flex;
   gap: 0.375rem;
   align-items: center;
+  justify-content: flex-end;
   flex-wrap: nowrap;
+  width: 100%;
+}
+.api-key-actions .btn {
+  height: 2.25rem;
+  min-height: 2.25rem;
 }
 .api-key-muted {
   color: var(--muted-foreground);
+}
+.api-key-usage,
+.api-key-usage-line,
+.api-key-usage-unlimited {
+  display: inline-flex;
+  align-items: center;
+}
+.api-key-usage {
+  flex-direction: column;
+  gap: 0.1875rem;
+}
+.api-key-usage-line {
+  gap: 0.375rem;
+}
+.api-key-usage-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  color: var(--muted-foreground);
+}
+.api-key-usage-unlimited {
+  gap: 0.375rem;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.api-key-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.875rem;
+}
+.api-key-status-enabled {
+  color: var(--success);
+  background: color-mix(in oklab, var(--success) 10%, transparent);
+}
+.api-key-status-disabled {
+  color: var(--destructive);
+  background: color-mix(in oklab, var(--destructive) 10%, transparent);
+}
+#apiKeysList .data-table th:last-child,
+#apiKeysList .data-table td:last-child {
+  text-align: right;
+  width: 1%;
+}
+#apiKeysList .data-table th:nth-child(3),
+#apiKeysList .data-table td:nth-child(3) {
+  text-align: center;
 }
 .backup-schedule-toggle {
   display: inline-flex;
@@ -3422,6 +3549,117 @@ img.brand-icon {
   .api-key-create-grid,
   .settings-inline-grid {
     grid-template-columns: 1fr;
+  }
+  .api-access-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .api-access-row .btn,
+  .api-key-create-grid .btn {
+    width: 100%;
+  }
+  .api-key-created-panel {
+    grid-template-columns: 1fr;
+  }
+  .api-key-created-value,
+  .api-key-cell {
+    width: 100%;
+  }
+  #apiKeysList.table-wrap {
+    overflow-x: visible;
+    border: 0;
+  }
+  #apiKeysList .data-table,
+  #apiKeysList .data-table thead,
+  #apiKeysList .data-table tbody,
+  #apiKeysList .data-table tr,
+  #apiKeysList .data-table td {
+    display: block;
+  }
+  #apiKeysList .data-table thead {
+    display: none;
+  }
+  #apiKeysList .data-table tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+  #apiKeysList .data-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.625rem 0.75rem;
+    padding: 0.875rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+  #apiKeysList .data-table td {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+  #apiKeysList .data-table td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+  #apiKeysList .data-table td:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+    width: 100%;
+  }
+  #apiKeysList .data-table td:nth-child(2) .code-inline {
+    max-width: 100%;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: top;
+  }
+  #apiKeysList .data-table td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+  }
+  #apiKeysList .data-table td:nth-child(4) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    padding-top: 0.125rem;
+  }
+  #apiKeysList .data-table td:nth-child(5),
+  #apiKeysList .data-table td:nth-child(6) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.625rem;
+  }
+  #apiKeysList .data-table td:nth-child(5)::before {
+    content: "Requests";
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  #apiKeysList .data-table td:nth-child(6)::before {
+    content: "Last used";
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  #apiKeysList .data-table td:nth-child(7) {
+    grid-column: 1 / -1;
+    width: auto;
+    text-align: left;
+  }
+  #apiKeysList .api-key-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  #apiKeysList .api-key-actions .btn {
+    width: 100%;
+    min-width: 0;
   }
   .requests-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
