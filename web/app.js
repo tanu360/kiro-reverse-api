@@ -1419,8 +1419,10 @@
     const res = await api('/settings');
     const d = await res.json();
     $('requireApiKey').checked = d.requireApiKey;
+    syncApiKeyManagementVisibility();
     $('allowOverUsage').checked = d.allowOverUsage || false;
     await Promise.all([loadApiKeys(), loadThinkingConfig(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
+    syncApiKeyManagementVisibility();
     refreshCustomSelects();
   }
   async function loadThinkingConfig() {
@@ -1514,9 +1516,26 @@
       const res = await api('/settings', { method: 'POST', body: JSON.stringify({ requireApiKey }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.success === false) throw new Error(d.error || t('common.saveFailed'));
+      syncApiKeyManagementVisibility();
       toast(t('detail.saved'), 'success');
     } catch (e) {
       toast((e && e.message) || t('common.saveFailed'), 'error');
+    }
+  }
+  function syncApiKeyManagementVisibility() {
+    const enabled = !!$('requireApiKey').checked;
+    const management = $('apiKeyManagement');
+    if (management) management.classList.toggle('hidden', !enabled);
+    const refresh = $('refreshApiKeysBtn');
+    if (refresh) refresh.classList.toggle('hidden', !enabled);
+    if (!enabled) {
+      editingApiKeyId = '';
+      const cancelBtn = $('cancelApiKeyEditBtn');
+      if (cancelBtn) cancelBtn.classList.add('hidden');
+      const createdPanel = $('createdApiKeyPanel');
+      if (createdPanel) createdPanel.classList.add('hidden');
+    } else {
+      setApiKeyEditorMode(editingApiKeyId);
     }
   }
   async function loadApiKeys() {
@@ -1547,14 +1566,21 @@
       return;
     }
     const rows = apiKeysCache.map(k => {
-      const usage = formatNum(k.tokensUsed || 0) + (k.tokenLimit ? ' / ' + formatNum(k.tokenLimit) : '') +
-        '<br><span class="api-key-muted">' + Number(k.creditsUsed || 0).toFixed(2) + (k.creditLimit ? ' / ' + Number(k.creditLimit).toFixed(2) : '') + ' cr</span>';
+      const usage = formatApiKeyUsage(k);
       const last = k.lastUsedAt ? formatTime(k.lastUsedAt) : '-';
       const isEditing = k.id === editingApiKeyId;
+      const statusLabel = k.enabled ? t('common.enabled') : t('common.disabled');
+      const statusIcon = k.enabled ? 'fa-circle-check' : 'fa-circle-xmark';
+      const statusClass = k.enabled ? 'api-key-status-enabled' : 'api-key-status-disabled';
+      const copyLabel = t('common.copy');
+      const keyCell = '<span class="api-key-cell">' +
+        '<code class="code-inline">' + escapeHtml(k.keyMasked || '') + '</code>' +
+        '<button class="btn btn-outline btn-icon btn-sm api-key-copy-btn" data-api-key-action="copy" data-id="' + escapeAttr(k.id) + '" type="button" title="' + escapeAttr(copyLabel) + '" aria-label="' + escapeAttr(copyLabel) + '"><i class="fa-solid fa-copy" aria-hidden="true"></i></button>' +
+        '</span>';
       return '<tr>' +
         '<td><strong>' + escapeHtml(k.name || t('settings.unnamedApiKey')) + '</strong></td>' +
-        '<td><code class="code-inline">' + escapeHtml(k.keyMasked || '') + '</code></td>' +
-        '<td>' + (k.enabled ? escapeHtml(t('common.enabled')) : escapeHtml(t('common.disabled'))) + '</td>' +
+        '<td>' + keyCell + '</td>' +
+        '<td><span class="api-key-status ' + statusClass + '" title="' + escapeAttr(statusLabel) + '" aria-label="' + escapeAttr(statusLabel) + '"><i class="fa-solid ' + statusIcon + '" aria-hidden="true"></i></span></td>' +
         '<td>' + usage + '</td>' +
         '<td>' + escapeHtml(String(k.requestsCount || 0)) + '</td>' +
         '<td>' + escapeHtml(last) + '</td>' +
@@ -1575,6 +1601,26 @@
       t('settings.apiKeyLastUsed'),
       t('common.actions'),
     ], rows, 'settings.noApiKeys');
+  }
+  function formatApiKeyUsage(k) {
+    const tokenLimit = Number(k.tokenLimit || 0);
+    const creditLimit = Number(k.creditLimit || 0);
+    if (tokenLimit <= 0 && creditLimit <= 0) {
+      return '<span class="api-key-usage-unlimited"><i class="fa-solid fa-infinity" aria-hidden="true"></i>' + escapeHtml('Unlimited') + '</span>';
+    }
+    const tokenText = tokenLimit > 0 ? formatNum(k.tokensUsed || 0) + ' / ' + formatNum(tokenLimit) : 'No limit';
+    const creditText = creditLimit > 0 ? Number(k.creditsUsed || 0).toFixed(2) + ' / ' + Number(creditLimit).toFixed(2) : 'No limit';
+    return '<span class="api-key-usage">' +
+      '<span class="api-key-usage-line"><span class="api-key-usage-icon" title="Tokens"><i class="fa-solid fa-cubes" aria-hidden="true"></i></span>' + escapeHtml(tokenText) + '</span>' +
+      '<span class="api-key-usage-line api-key-muted"><span class="api-key-usage-icon" title="Credits"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>' + escapeHtml(creditText) + '</span>' +
+      '</span>';
+  }
+  async function copyApiKey(id) {
+    const res = await api('/api-keys/' + encodeURIComponent(id));
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.key) throw new Error(d.error || t('common.failed'));
+    await copyText(d.key);
+    toast(t('common.copied'), 'primary');
   }
   function setApiKeyEditorMode(id) {
     editingApiKeyId = id || '';
@@ -1687,7 +1733,12 @@
     }
   }
   async function deleteApiKey(id) {
-    if (!window.confirm(t('settings.confirmDeleteApiKey'))) return;
+    const ok = await confirmAction(t('settings.confirmDeleteApiKey'), {
+      title: t('common.delete'),
+      confirmText: t('common.delete'),
+      variant: 'danger'
+    });
+    if (!ok) return;
     try {
       const res = await api('/api-keys/' + encodeURIComponent(id), { method: 'DELETE' });
       const d = await res.json().catch(() => ({}));
@@ -2840,6 +2891,7 @@
   }
 
   function bindSettingsEvents() {
+    $('requireApiKey').addEventListener('change', syncApiKeyManagementVisibility);
     $('saveApiSettingsBtn').addEventListener('click', saveApiSettings);
     $('refreshApiKeysBtn').addEventListener('click', loadApiKeys);
     $('createApiKeyBtn').addEventListener('click', createApiKey);
@@ -2853,7 +2905,9 @@
       if (!btn) return;
       const id = btn.dataset.id;
       const action = btn.dataset.apiKeyAction;
-      if (action === 'edit') beginEditApiKey(id);
+      if (action === 'copy') {
+        copyApiKey(id).catch(e => toast((e && e.message) || t('common.failed'), 'error'));
+      } else if (action === 'edit') beginEditApiKey(id);
       else if (action === 'toggle') toggleApiKey(id, btn.dataset.enabled === 'true');
       else if (action === 'reset') resetApiKeyUsage(id);
       else if (action === 'delete') deleteApiKey(id);
