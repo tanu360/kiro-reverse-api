@@ -101,6 +101,41 @@ func TestGetNextKeepsFiveMinuteTokenAvailable(t *testing.T) {
 	}
 }
 
+func TestGetNextKeepsRefreshableNearExpiryTokenAvailable(t *testing.T) {
+	p := &AccountPool{}
+	account := config.Account{
+		ID:           "acct-refreshable",
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		ExpiresAt:    time.Now().Unix() + 60,
+	}
+
+	p.accounts = []config.Account{account}
+
+	got := p.GetNext()
+	if got == nil {
+		t.Fatalf("expected near-expiry account with refresh token to be available")
+	}
+	if got.ID != account.ID {
+		t.Fatalf("expected account %q, got %q", account.ID, got.ID)
+	}
+}
+
+func TestGetNextSkipsNearExpiryTokenWithoutRefreshToken(t *testing.T) {
+	p := &AccountPool{}
+	p.accounts = []config.Account{
+		{
+			ID:          "acct-no-refresh",
+			AccessToken: "access-token",
+			ExpiresAt:   time.Now().Unix() + 60,
+		},
+	}
+
+	if got := p.GetNext(); got != nil {
+		t.Fatalf("expected near-expiry account without refresh token to be skipped, got %q", got.ID)
+	}
+}
+
 func TestGetNextRotatesAcrossUsableAccounts(t *testing.T) {
 	p := newTestPool(
 		config.Account{ID: "a"},

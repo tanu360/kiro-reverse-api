@@ -161,7 +161,7 @@ func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]
 		if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
 			continue
 		}
-		if acc.ExpiresAt > 0 && nowUnix > acc.ExpiresAt-tokenRefreshSkewSeconds {
+		if tokenUnavailableForSelection(acc, nowUnix) {
 			continue
 		}
 		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
@@ -193,7 +193,7 @@ func (p *AccountPool) findEarliestCooldownLocked(model string, excluded map[stri
 		if model != "" && !p.accountHasModel(acc.ID, model) {
 			continue
 		}
-		if acc.ExpiresAt > 0 && nowUnix > acc.ExpiresAt-tokenRefreshSkewSeconds {
+		if tokenUnavailableForSelection(acc, nowUnix) {
 			continue
 		}
 		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
@@ -212,6 +212,16 @@ func (p *AccountPool) findEarliestCooldownLocked(model string, excluded map[stri
 		return &bestCopy
 	}
 	return nil
+}
+
+func tokenUnavailableForSelection(acc *config.Account, nowUnix int64) bool {
+	if acc == nil || acc.ExpiresAt == 0 {
+		return false
+	}
+	if nowUnix <= acc.ExpiresAt-tokenRefreshSkewSeconds {
+		return false
+	}
+	return acc.RefreshToken == ""
 }
 
 func (p *AccountPool) GetByID(id string) *config.Account {
