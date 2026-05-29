@@ -980,7 +980,7 @@
           '<button class="btn btn-sm ' + (a.enabled ? 'btn-outline' : 'btn-primary') + '" data-action="toggle" data-id="' + idAttr + '" data-enabled="' + (!a.enabled) + '">' +
           escapeHtml(a.enabled ? t('accounts.disable') : t('accounts.enable')) +
           '</button>') +
-        '<button class="btn btn-sm btn-secondary" data-action="test" data-id="' + idAttr + '" id="test-' + idAttr + '">' + escapeHtml(t('accounts.test')) + '</button>' +
+        '<button class="btn btn-sm btn-test" data-action="test" data-id="' + idAttr + '" id="test-' + idAttr + '"><i class="fa-solid fa-vial" aria-hidden="true"></i><span>' + escapeHtml(t('accounts.test')) + '</span></button>' +
         '<button class="btn btn-sm btn-danger" data-action="delete" data-id="' + idAttr + '">' + escapeHtml(t('accounts.delete')) + '</button>' +
         '</div>' +
         '</div>' +
@@ -1067,12 +1067,12 @@
     if (!ids.length) return;
     const confirmKey = 'batch.confirm' + action.charAt(0).toUpperCase() + action.slice(1);
     const ok = await confirmAction(t(confirmKey, ids.length), {
-      title: t('common.confirm'),
-      confirmText: t('common.confirm'),
-      variant: action === 'disable' ? 'danger' : 'primary'
+      title: action === 'delete' ? t('accounts.delete') : t('common.confirm'),
+      confirmText: action === 'delete' ? t('accounts.delete') : t('common.confirm'),
+      variant: action === 'disable' || action === 'delete' ? 'danger' : 'primary'
     });
     if (!ok) return;
-    const dismiss = toast(t('batch.processing'), 'info', { duration: 0 });
+    const dismiss = toast(t(action === 'delete' ? 'batch.deleting' : 'batch.processing'), 'info', { duration: 0 });
     try {
       const res = await api('/accounts/batch', { method: 'POST', body: JSON.stringify({ ids, action }) });
       const d = await res.json();
@@ -1084,6 +1084,8 @@
         toast(t('batch.enableResult', d.count || ids.length), 'success');
       } else if (action === 'disable') {
         toast(t('batch.disableResult', d.count || ids.length), 'success');
+      } else if (action === 'delete') {
+        toast(t('batch.deleteResult', d.deleted || 0, d.failed || 0), d.failed ? 'warning' : 'success');
       } else {
         toast(t('batch.done'), 'success');
       }

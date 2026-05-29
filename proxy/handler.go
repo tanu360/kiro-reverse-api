@@ -2665,6 +2665,32 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 			"failed":    failCount,
 		})
 
+	case "delete":
+		successCount := 0
+		failCount := 0
+		existing := make(map[string]bool)
+		for _, account := range config.GetAccounts() {
+			existing[account.ID] = true
+		}
+		for _, id := range req.IDs {
+			if !existing[id] {
+				failCount++
+				continue
+			}
+			if err := config.DeleteAccount(id); err != nil {
+				failCount++
+				continue
+			}
+			delete(existing, id)
+			successCount++
+		}
+		h.pool.Reload()
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"deleted": successCount,
+			"failed":  failCount,
+		})
+
 	default:
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid action: " + req.Action})
@@ -3107,6 +3133,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
+		h.pool.Reload()
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})

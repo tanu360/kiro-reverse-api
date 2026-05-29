@@ -272,6 +272,78 @@ func TestStatusPayloadUsesRequestDBAndAccountCredits(t *testing.T) {
 	}
 }
 
+func TestUpdateSettingsReloadsPoolAfterAllowOverUsageChange(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{
+		ID:           "over",
+		Enabled:      true,
+		UsageCurrent: 10,
+		UsageLimit:   10,
+	}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+
+	p := accountpool.GetPool()
+	p.Reload()
+	if got := p.GetNext(); got != nil {
+		t.Fatalf("expected over-quota account to be unavailable before enabling allowOverUsage, got %#v", got)
+	}
+
+	h := &Handler{pool: p}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/admin/api/settings", strings.NewReader(`{"allowOverUsage":true}`))
+	h.apiUpdateSettings(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected settings update to succeed, status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := p.GetNext(); got == nil || got.ID != "over" {
+		t.Fatalf("expected pool reload to make over-quota account routable, got %#v", got)
+	}
+}
+
+func TestBatchDeleteAccounts(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	for _, account := range []config.Account{
+		{ID: "keep", Enabled: true},
+		{ID: "delete-a", Enabled: true},
+		{ID: "delete-b", Enabled: true},
+	} {
+		if err := config.AddAccount(account); err != nil {
+			t.Fatalf("add account %s: %v", account.ID, err)
+		}
+	}
+
+	p := accountpool.GetPool()
+	p.Reload()
+	h := &Handler{pool: p}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/admin/api/accounts/batch", strings.NewReader(`{"ids":["delete-a","delete-b","missing"],"action":"delete"}`))
+	h.apiBatchAccounts(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected batch delete to succeed, status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode batch response: %v", err)
+	}
+	if body["deleted"].(float64) != 2 || body["failed"].(float64) != 1 {
+		t.Fatalf("unexpected delete counts: %#v", body)
+	}
+	accounts := config.GetAccounts()
+	if len(accounts) != 1 || accounts[0].ID != "keep" {
+		t.Fatalf("expected only keep account to remain, got %#v", accounts)
+	}
+	if got := p.GetNext(); got == nil || got.ID != "keep" {
+		t.Fatalf("expected pool reload to keep only remaining account, got %#v", got)
+	}
+}
+
 func TestThinkingSourceTagFirst(t *testing.T) {
 	var source thinkingStreamSource
 

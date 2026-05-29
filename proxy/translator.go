@@ -18,19 +18,6 @@ type modelMapping struct {
 
 var modelMapOrdered = []modelMapping{
 	{"claude-sonnet-4-20250514", "claude-sonnet-4"},
-	{"claude-sonnet-4-5", "claude-sonnet-4.5"},
-	{"claude-sonnet-4.5", "claude-sonnet-4.5"},
-	{"claude-sonnet-4-6", "claude-sonnet-4.6"},
-	{"claude-sonnet-4.6", "claude-sonnet-4.6"},
-	{"claude-opus-4-7", "claude-opus-4.7"},
-	{"claude-opus-4.7", "claude-opus-4.7"},
-	{"claude-haiku-4-5", "claude-haiku-4.5"},
-	{"claude-haiku-4.5", "claude-haiku-4.5"},
-	{"claude-opus-4-5", "claude-opus-4.5"},
-	{"claude-opus-4.5", "claude-opus-4.5"},
-	{"claude-opus-4-6", "claude-opus-4.6"},
-	{"claude-opus-4.6", "claude-opus-4.6"},
-	{"claude-sonnet-4", "claude-sonnet-4"},
 	{"claude-3-5-sonnet", "claude-sonnet-4.5"},
 	{"claude-3-opus", "claude-sonnet-4.5"},
 	{"claude-3-sonnet", "claude-sonnet-4"},
@@ -40,6 +27,8 @@ var modelMapOrdered = []modelMapping{
 	{"gpt-4", "claude-sonnet-4.5"},
 	{"gpt-3.5-turbo", "claude-sonnet-4.5"},
 }
+
+var claudeVersionPattern = regexp.MustCompile(`^(claude-(?:opus|sonnet|haiku)-\d+)-(\d+)$`)
 
 const ThinkingModePrompt = `<thinking_mode>enabled</thinking_mode>
 <max_thinking_length>200000</max_thinking_length>`
@@ -62,6 +51,10 @@ func ParseModelAndThinking(model string, thinkingSuffix string) (string, bool) {
 		if strings.Contains(lower, m.key) {
 			return m.value, thinking
 		}
+	}
+
+	if matches := claudeVersionPattern.FindStringSubmatch(lower); matches != nil {
+		return matches[1] + "." + matches[2], thinking
 	}
 
 	if strings.HasPrefix(lower, "claude-") {

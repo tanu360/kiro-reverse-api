@@ -381,3 +381,28 @@ func schemaContainsKey(value interface{}, key string) bool {
 	}
 	return false
 }
+
+func TestParseModelAndThinkingNormalizesClaudeDashVersions(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		wantModel    string
+		wantThinking bool
+	}{
+		{"future opus dash form", "claude-opus-4-8", "claude-opus-4.8", false},
+		{"future opus dot form", "claude-opus-4.8", "claude-opus-4.8", false},
+		{"future sonnet major", "claude-sonnet-5-0", "claude-sonnet-5.0", false},
+		{"thinking suffix", "claude-opus-4-8-thinking", "claude-opus-4.8", true},
+		{"dated snapshot alias", "claude-sonnet-4-20250514", "claude-sonnet-4", false},
+		{"legacy alias", "claude-3-5-sonnet", "claude-sonnet-4.5", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotModel, gotThinking := ParseModelAndThinking(tt.input, "-thinking")
+			if gotModel != tt.wantModel || gotThinking != tt.wantThinking {
+				t.Fatalf("ParseModelAndThinking(%q) = (%q, %v), want (%q, %v)", tt.input, gotModel, gotThinking, tt.wantModel, tt.wantThinking)
+			}
+		})
+	}
+}

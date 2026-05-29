@@ -294,6 +294,16 @@ pre,
   color: var(--success-foreground);
   border-color: var(--success);
 }
+.btn-test {
+  background: color-mix(in oklab, var(--primary) 8%, var(--background));
+  color: var(--primary);
+  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+}
+.btn-test:hover {
+  background: color-mix(in oklab, var(--primary) 14%, var(--background));
+  border-color: color-mix(in oklab, var(--primary) 58%, var(--border));
+  color: var(--primary);
+}
 .btn-sm {
   height: 2.25rem;
   padding: 0 0.875rem;
@@ -1842,6 +1852,9 @@ img.brand-icon {
 .account-actions .btn-icon.btn-success {
   background: transparent;
   border-color: transparent;
+}
+.account-actions .btn-test {
+  min-width: 5.25rem;
 }
 @keyframes account-action-icon-flash {
   0% {
