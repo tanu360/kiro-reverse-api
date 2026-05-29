@@ -261,6 +261,12 @@ func TestStatusPayloadUsesRequestDBAndAccountCredits(t *testing.T) {
 	if body["successTokens"].(float64) != 30 {
 		t.Fatalf("expected 30 success tokens, got %#v", body["successTokens"])
 	}
+	if body["successInTokens"].(float64) != 10 {
+		t.Fatalf("expected 10 success input tokens, got %#v", body["successInTokens"])
+	}
+	if body["successOutTokens"].(float64) != 20 {
+		t.Fatalf("expected 20 success output tokens, got %#v", body["successOutTokens"])
+	}
 	if math.Abs(body["successCredits"].(float64)-0.30) > 0.000001 {
 		t.Fatalf("expected 0.30 success credits, got %#v", body["successCredits"])
 	}

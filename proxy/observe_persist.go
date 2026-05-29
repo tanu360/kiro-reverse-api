@@ -44,6 +44,8 @@ type persistedRequestStats struct {
 	TotalTokens      int64
 	TotalCredits     float64
 	SuccessTokens    int64
+	SuccessInTokens  int64
+	SuccessOutTokens int64
 	SuccessCredits   float64
 	TotalErrorEvents int64
 }
@@ -62,6 +64,8 @@ COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0),
 COALESCE(SUM(total_tokens), 0),
 COALESCE(SUM(credits), 0),
 COALESCE(SUM(CASE WHEN success = 1 THEN total_tokens ELSE 0 END), 0),
+COALESCE(SUM(CASE WHEN success = 1 THEN in_tokens ELSE 0 END), 0),
+COALESCE(SUM(CASE WHEN success = 1 THEN out_tokens ELSE 0 END), 0),
 COALESCE(SUM(CASE WHEN success = 1 THEN credits ELSE 0 END), 0)
 FROM requests`).Scan(
 		&stats.TotalRequests,
@@ -70,6 +74,8 @@ FROM requests`).Scan(
 		&stats.TotalTokens,
 		&stats.TotalCredits,
 		&stats.SuccessTokens,
+		&stats.SuccessInTokens,
+		&stats.SuccessOutTokens,
 		&stats.SuccessCredits,
 	)
 	if err != nil {

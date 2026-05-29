@@ -212,6 +212,12 @@ func TestQueryPersistedRequestStats(t *testing.T) {
 	if stats.SuccessTokens != 40 {
 		t.Fatalf("expected 40 success tokens, got %d", stats.SuccessTokens)
 	}
+	if stats.SuccessInTokens != 13 {
+		t.Fatalf("expected 13 success input tokens, got %d", stats.SuccessInTokens)
+	}
+	if stats.SuccessOutTokens != 27 {
+		t.Fatalf("expected 27 success output tokens, got %d", stats.SuccessOutTokens)
+	}
 	if math.Abs(stats.SuccessCredits-0.50) > 0.000001 {
 		t.Fatalf("expected 0.50 success credits, got %.2f", stats.SuccessCredits)
 	}
