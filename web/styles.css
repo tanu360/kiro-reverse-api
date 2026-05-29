@@ -295,14 +295,14 @@ pre,
   border-color: var(--success);
 }
 .btn-test {
-  background: color-mix(in oklab, var(--primary) 8%, var(--background));
-  color: var(--primary);
-  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+  background: var(--info);
+  color: var(--info-foreground);
+  border-color: transparent;
 }
 .btn-test:hover {
-  background: color-mix(in oklab, var(--primary) 14%, var(--background));
-  border-color: color-mix(in oklab, var(--primary) 58%, var(--border));
-  color: var(--primary);
+  background: color-mix(in oklab, var(--info) 88%, var(--foreground));
+  border-color: transparent;
+  color: var(--info-foreground);
 }
 .btn-sm {
   height: 2.25rem;

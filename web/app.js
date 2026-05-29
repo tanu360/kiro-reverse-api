@@ -980,7 +980,7 @@
           '<button class="btn btn-sm ' + (a.enabled ? 'btn-outline' : 'btn-primary') + '" data-action="toggle" data-id="' + idAttr + '" data-enabled="' + (!a.enabled) + '">' +
           escapeHtml(a.enabled ? t('accounts.disable') : t('accounts.enable')) +
           '</button>') +
-        '<button class="btn btn-sm btn-test" data-action="test" data-id="' + idAttr + '" id="test-' + idAttr + '"><i class="fa-solid fa-vial" aria-hidden="true"></i><span>' + escapeHtml(t('accounts.test')) + '</span></button>' +
+        '<button class="btn btn-sm btn-test" data-action="test" data-id="' + idAttr + '" id="test-' + idAttr + '"><i class="fa-solid fa-play" aria-hidden="true"></i><span>' + escapeHtml(t('accounts.test')) + '</span></button>' +
         '<button class="btn btn-sm btn-danger" data-action="delete" data-id="' + idAttr + '">' + escapeHtml(t('accounts.delete')) + '</button>' +
         '</div>' +
         '</div>' +
