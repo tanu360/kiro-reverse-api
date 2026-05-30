@@ -659,6 +659,7 @@
     renderEndpointCode('openaiEndpoint', baseUrl + '/v1/chat/completions');
     renderEndpointCode('responsesEndpoint', baseUrl + '/v1/responses');
     renderEndpointCode('modelsEndpoint', baseUrl + '/v1/models');
+    renderEndpointCode('codexModelsEndpoint', baseUrl + '/v1/codex/models');
     renderEndpointCode('statsEndpoint', baseUrl + '/v1/stats');
     setTimeout(checkUpdate, 2000);
   }

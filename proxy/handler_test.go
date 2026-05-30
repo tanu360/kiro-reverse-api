@@ -3,6 +3,7 @@ package proxy
 import (
 	"encoding/json"
 	"kiro-proxy/config"
+	"kiro-proxy/db"
 	accountpool "kiro-proxy/pool"
 	"math"
 	"net/http"
@@ -533,6 +534,64 @@ func TestModelsEndpointRequiresManagedApiKey(t *testing.T) {
 	}
 }
 
+func TestCodexModelsEndpointReturnsManifest(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+	require := true
+	if err := config.UpdateSettingsPatch(&require, ""); err != nil {
+		t.Fatalf("enable auth: %v", err)
+	}
+	if _, err := config.AddApiKey(config.ApiKeyEntry{Name: "codex-models", Key: "sk-codex-models", Enabled: true}); err != nil {
+		t.Fatalf("add key: %v", err)
+	}
+	tokenLimits := &struct {
+		MaxInputTokens  int `json:"maxInputTokens"`
+		MaxOutputTokens int `json:"maxOutputTokens"`
+	}{MaxInputTokens: 1000000, MaxOutputTokens: 64000}
+	h := &Handler{
+		cachedModels: []ModelInfo{{
+			ModelId:     "claude-opus-4.8",
+			ModelName:   "Claude Opus 4.8",
+			Description: "Preview model",
+			InputTypes:  []string{"TEXT", "IMAGE"},
+			TokenLimits: tokenLimits,
+		}},
+	}
+
+	missing := httptest.NewRequest(http.MethodGet, "/v1/codex/models", nil)
+	missingRec := httptest.NewRecorder()
+	h.ServeHTTP(missingRec, missing)
+	if missingRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected missing key to fail, got %d", missingRec.Code)
+	}
+
+	okReq := httptest.NewRequest(http.MethodGet, "/v1/codex/models", nil)
+	okReq.Header.Set("Authorization", "Bearer sk-codex-models")
+	okRec := httptest.NewRecorder()
+	h.ServeHTTP(okRec, okReq)
+	if okRec.Code != http.StatusOK {
+		t.Fatalf("expected valid key to pass, got %d body=%s", okRec.Code, okRec.Body.String())
+	}
+
+	var body codexModelsResponse
+	if err := json.NewDecoder(okRec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Models) < 2 {
+		t.Fatalf("expected base and thinking entries, got %#v", body.Models)
+	}
+	if body.Models[0].Slug != "claude-opus-4.8" || body.Models[0].ContextWindow != 1000000 {
+		t.Fatalf("unexpected base model entry: %#v", body.Models[0])
+	}
+	if body.Models[1].Slug != "claude-opus-4.8-thinking" || body.Models[1].DefaultReasoningLevel != "high" {
+		t.Fatalf("unexpected thinking model entry: %#v", body.Models[1])
+	}
+}
+
 func TestUnknownManagedApiKeyDoesNotAuthenticate(t *testing.T) {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatalf("config.Init: %v", err)
@@ -895,5 +954,39 @@ func TestBuildAnthropicModelsResponseGeneratesThinkingVariants(t *testing.T) {
 	}
 	if supportsImage, ok := models[0]["supports_image"].(bool); !ok || !supportsImage {
 		t.Fatalf("expected image capability to be preserved, got %#v", models[0]["supports_image"])
+	}
+}
+
+func TestBuildCodexModelsResponseUsesKiroModelMetadata(t *testing.T) {
+	tokenLimits := &struct {
+		MaxInputTokens  int `json:"maxInputTokens"`
+		MaxOutputTokens int `json:"maxOutputTokens"`
+	}{MaxInputTokens: 1000000, MaxOutputTokens: 128000}
+	models := buildCodexModelsResponse([]ModelInfo{{
+		ModelId:        "claude-opus-4.8",
+		ModelName:      "Claude Opus 4.8",
+		Description:    "Experimental preview",
+		InputTypes:     []string{"TEXT", "IMAGE"},
+		RateMultiplier: 2.2,
+		TokenLimits:    tokenLimits,
+	}}, "-thinking")
+
+	if len(models) != 4 {
+		t.Fatalf("expected base, thinking, and two compatibility aliases, got %d", len(models))
+	}
+	if models[0].Slug != "claude-opus-4.8" || models[0].DisplayName != "Claude Opus 4.8" {
+		t.Fatalf("unexpected base model identity: %#v", models[0])
+	}
+	if models[0].ContextWindow != 1000000 || models[0].TruncationPolicy.Limit != 320000 {
+		t.Fatalf("expected Kiro token limits to drive Codex limits, got %#v", models[0])
+	}
+	if models[1].Slug != "claude-opus-4.8-thinking" || models[1].DefaultReasoningLevel != "high" {
+		t.Fatalf("unexpected thinking variant: %#v", models[1])
+	}
+	if !models[0].SupportsImageDetailOriginal || len(models[0].InputModalities) != 2 {
+		t.Fatalf("expected image capability to be preserved, got %#v", models[0])
+	}
+	if models[2].Slug != "gpt-4o" || models[3].Slug != "gpt-4" {
+		t.Fatalf("expected compatibility aliases at the end, got %#v %#v", models[2], models[3])
 	}
 }

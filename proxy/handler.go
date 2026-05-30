@@ -371,6 +371,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.handleModels(w, ar)
+	case path == "/v1/codex/models" || path == "/codex/models" || path == "/v1/codex-models":
+		ar := h.authenticateForOpenAI(w, r)
+		if ar == nil {
+			return
+		}
+		h.handleCodexModels(w, ar)
 	case path == "/api/event_logging/batch":
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
