@@ -27,10 +27,11 @@ type OpenAIResponsesText struct {
 }
 
 type OpenAIResponsesTool struct {
-	Type        string      `json:"type"`
-	Name        string      `json:"name,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Parameters  interface{} `json:"parameters,omitempty"`
+	Type        string                `json:"type"`
+	Name        string                `json:"name,omitempty"`
+	Description string                `json:"description,omitempty"`
+	Parameters  interface{}           `json:"parameters,omitempty"`
+	Tools       []OpenAIResponsesTool `json:"tools,omitempty"`
 	Function    struct {
 		Name        string      `json:"name"`
 		Description string      `json:"description,omitempty"`
@@ -69,10 +70,10 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 	}
 
 	messagesForKiro := make([]OpenAIMessage, 0, len(previous)+len(currentMessages)+1)
+	messagesForKiro = append(messagesForKiro, previous...)
 	if instructionText := strings.TrimSpace(extractOpenAIMessageText(responsesContentToOpenAIContent(req.Instructions))); instructionText != "" {
 		messagesForKiro = append(messagesForKiro, OpenAIMessage{Role: "system", Content: instructionText})
 	}
-	messagesForKiro = append(messagesForKiro, previous...)
 	messagesForKiro = append(messagesForKiro, currentMessages...)
 
 	openaiReq := OpenAIRequest{
@@ -128,48 +129,65 @@ func convertResponsesTools(tools []OpenAIResponsesTool, toolChoice interface{}) 
 
 	result := make([]OpenAITool, 0, len(tools))
 	for _, tool := range tools {
-		toolType := strings.ToLower(strings.TrimSpace(tool.Type))
-		if toolType == "" && tool.Function.Name != "" {
-			toolType = "function"
+		converted, msg := convertResponsesTool(tool)
+		if msg != "" {
+			return nil, msg
 		}
-
-		var name, description string
-		var parameters interface{}
-		switch toolType {
-		case "function":
-			name = firstNonEmpty(tool.Function.Name, tool.Name)
-			description = firstNonEmpty(tool.Function.Description, tool.Description)
-			parameters = tool.Function.Parameters
-			if parameters == nil {
-				parameters = tool.Parameters
-			}
-		case "custom":
-			name = tool.Name
-			description = tool.Description
-			parameters = tool.Parameters
-		default:
-			if toolType == "" {
-				toolType = "unknown"
-			}
-			return nil, "unsupported Responses tool type: " + toolType
-		}
-
-		name = strings.TrimSpace(name)
-		if name == "" {
-			return nil, "Responses tool name is required"
-		}
-		if parameters == nil {
-			parameters = map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}
-		}
-
-		var converted OpenAITool
-		converted.Type = "function"
-		converted.Function.Name = name
-		converted.Function.Description = description
-		converted.Function.Parameters = parameters
-		result = append(result, converted)
+		result = append(result, converted...)
 	}
 	return result, ""
+}
+
+func convertResponsesTool(tool OpenAIResponsesTool) ([]OpenAITool, string) {
+	toolType := strings.ToLower(strings.TrimSpace(tool.Type))
+	if toolType == "" && tool.Function.Name != "" {
+		toolType = "function"
+	}
+
+	if toolType == "namespace" {
+		result := make([]OpenAITool, 0, len(tool.Tools))
+		for _, child := range tool.Tools {
+			converted, msg := convertResponsesTool(child)
+			if msg != "" {
+				return nil, msg
+			}
+			result = append(result, converted...)
+		}
+		return result, ""
+	}
+
+	var name, description string
+	var parameters interface{}
+	switch toolType {
+	case "function":
+		name = firstNonEmpty(tool.Function.Name, tool.Name)
+		description = firstNonEmpty(tool.Function.Description, tool.Description)
+		parameters = tool.Function.Parameters
+		if parameters == nil {
+			parameters = tool.Parameters
+		}
+	case "custom":
+		name = tool.Name
+		description = tool.Description
+		parameters = tool.Parameters
+	default:
+		return nil, ""
+	}
+
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, "Responses tool name is required"
+	}
+	if parameters == nil {
+		parameters = map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}
+	}
+
+	var converted OpenAITool
+	converted.Type = "function"
+	converted.Function.Name = name
+	converted.Function.Description = description
+	converted.Function.Parameters = parameters
+	return []OpenAITool{converted}, ""
 }
 
 func validateResponsesToolChoice(toolChoice interface{}) string {
@@ -179,13 +197,13 @@ func validateResponsesToolChoice(toolChoice interface{}) string {
 	switch choice := toolChoice.(type) {
 	case string:
 		switch strings.ToLower(strings.TrimSpace(choice)) {
-		case "", "auto", "none":
+		case "", "auto", "none", "required":
 			return ""
 		default:
 			return "unsupported tool_choice: " + choice
 		}
 	default:
-		return "specific tool_choice is not supported"
+		return ""
 	}
 }
 
@@ -241,6 +259,8 @@ func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
 		return []OpenAIMessage{{Role: role, Content: responsesContentToOpenAIContent(obj["content"])}}, nil
 	case "input_text":
 		return []OpenAIMessage{{Role: "user", Content: responseTextFromItem(obj)}}, nil
+	case "output_text":
+		return []OpenAIMessage{{Role: "assistant", Content: responseTextFromItem(obj)}}, nil
 	case "function_call_output":
 		callID := firstString(obj["call_id"], obj["tool_call_id"], obj["id"])
 		return []OpenAIMessage{{Role: "tool", ToolCallID: callID, Content: responsesContentToOpenAIContent(firstExisting(obj, "output", "content"))}}, nil
@@ -262,6 +282,9 @@ func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
 	default:
 		if role != "" {
 			return []OpenAIMessage{{Role: role, Content: responsesContentToOpenAIContent(obj["content"])}}, nil
+		}
+		if strings.TrimSpace(itemType) != "" {
+			return nil, nil
 		}
 		return nil, fmt.Errorf("unsupported Responses input item type: %s", itemType)
 	}

@@ -62,7 +62,13 @@ func TestResponsesInputItemsAndInstructions(t *testing.T) {
 			t.Fatalf("instructions must not be stored as conversation history")
 		}
 	}
-	if prepared.OpenAIRequest.Messages[0].Role != "system" {
+	foundInstructions := false
+	for _, message := range prepared.OpenAIRequest.Messages {
+		if message.Role == "system" && message.Content == "current instructions only" {
+			foundInstructions = true
+		}
+	}
+	if !foundInstructions {
 		t.Fatalf("expected instructions to be added to Kiro request")
 	}
 	if prepared.OpenAIRequest.Messages[len(prepared.OpenAIRequest.Messages)-1].Role != "tool" {
@@ -97,32 +103,79 @@ func TestResponsesFunctionToolsConvertToKiroTools(t *testing.T) {
 	}
 }
 
-func TestResponsesUnsupportedToolRejected(t *testing.T) {
+func TestResponsesHostedToolIgnored(t *testing.T) {
 	req := &OpenAIResponsesRequest{
 		Model: "claude-sonnet-4.5",
 		Input: json.RawMessage(`"search"`),
-		Tools: []OpenAIResponsesTool{{Type: "web_search_preview"}},
+		Tools: []OpenAIResponsesTool{{Type: "web_search"}},
 	}
 
-	_, msg := prepareResponsesRequest(req, nil)
-	if !strings.Contains(msg, "unsupported Responses tool type") {
-		t.Fatalf("expected unsupported tool error, got %q", msg)
+	prepared, msg := prepareResponsesRequest(req, nil)
+	if msg != "" {
+		t.Fatalf("unexpected validation error: %s", msg)
+	}
+	if len(prepared.OpenAIRequest.Tools) != 0 {
+		t.Fatalf("expected hosted tool to be ignored, got %#v", prepared.OpenAIRequest.Tools)
 	}
 }
 
-func TestResponsesHandlerRejectsUnsupportedHostedTool(t *testing.T) {
+func TestResponsesFutureUnknownToolIgnored(t *testing.T) {
+	req := &OpenAIResponsesRequest{
+		Model: "claude-sonnet-4.5",
+		Input: json.RawMessage(`"search"`),
+		Tools: []OpenAIResponsesTool{{Type: "local_shell_preview", Name: "local_shell"}},
+	}
+
+	prepared, msg := prepareResponsesRequest(req, nil)
+	if msg != "" {
+		t.Fatalf("unexpected validation error: %s", msg)
+	}
+	if len(prepared.OpenAIRequest.Tools) != 0 {
+		t.Fatalf("expected future unknown tool to be ignored, got %#v", prepared.OpenAIRequest.Tools)
+	}
+}
+
+func TestResponsesNamespaceToolFlattensFunctions(t *testing.T) {
+	req := &OpenAIResponsesRequest{
+		Model: "claude-sonnet-4.5",
+		Input: json.RawMessage(`"weather"`),
+		Tools: []OpenAIResponsesTool{{
+			Type: "namespace",
+			Name: "tools",
+			Tools: []OpenAIResponsesTool{{
+				Type:        "function",
+				Name:        "get_weather",
+				Description: "Get weather",
+				Parameters:  map[string]interface{}{"type": "object"},
+			}},
+		}},
+	}
+
+	prepared, msg := prepareResponsesRequest(req, nil)
+	if msg != "" {
+		t.Fatalf("unexpected validation error: %s", msg)
+	}
+	if len(prepared.OpenAIRequest.Tools) != 1 {
+		t.Fatalf("expected one flattened function tool, got %#v", prepared.OpenAIRequest.Tools)
+	}
+	if got := prepared.OpenAIRequest.Tools[0].Function.Name; got != "get_weather" {
+		t.Fatalf("expected flattened tool name, got %q", got)
+	}
+}
+
+func TestResponsesHandlerAcceptsHostedTool(t *testing.T) {
 	h := newResponsesTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
-		t.Fatalf("unsupported tool request should not reach upstream")
+		writeKiroTextResponse(t, w, "searched")
 	})
 
 	rec := httptest.NewRecorder()
-	body := `{"model":"claude-sonnet-4.5","input":"search","tools":[{"type":"web_search_preview"}]}`
+	body := `{"model":"claude-sonnet-4.5","input":"search","tools":[{"type":"web_search"}]}`
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body)))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "unsupported Responses tool type") {
-		t.Fatalf("expected unsupported tool message, got %s", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "searched") {
+		t.Fatalf("expected upstream response, got %s", rec.Body.String())
 	}
 }
 
@@ -243,6 +296,75 @@ func TestResponsesPreviousResponseIDContinuesConversation(t *testing.T) {
 	}
 	if !foundAssistant {
 		t.Fatalf("expected first response to be restored into history, got %#v", history)
+	}
+}
+
+func TestResponsesContinuationInstructionsFollowPreviousHistory(t *testing.T) {
+	previous := []OpenAIMessage{
+		{Role: "user", Content: "first user"},
+		{Role: "assistant", Content: "first assistant"},
+	}
+	req := &OpenAIResponsesRequest{
+		Model:              "claude-sonnet-4.5",
+		PreviousResponseID: "resp_prev",
+		Instructions:       "speak only French",
+		Input:              json.RawMessage(`"second user"`),
+	}
+
+	prepared, msg := prepareResponsesRequest(req, previous)
+	if msg != "" {
+		t.Fatalf("unexpected validation error: %s", msg)
+	}
+	messages := prepared.OpenAIRequest.Messages
+	if len(messages) != 4 {
+		t.Fatalf("expected previous, instructions, and current message, got %#v", messages)
+	}
+	if messages[0].Role != "user" || messages[1].Role != "assistant" {
+		t.Fatalf("expected previous history first, got %#v", messages)
+	}
+	if messages[2].Role != "system" || messages[2].Content != "speak only French" {
+		t.Fatalf("expected continuation instructions after history, got %#v", messages)
+	}
+}
+
+func TestResponsesInputIgnoresHostedOutputItems(t *testing.T) {
+	msgs, err := responsesInputToMessages(json.RawMessage(`[
+		{"type":"web_search_call","id":"ws_1","status":"completed"},
+		{"type":"output_text","text":"prior assistant"},
+		{"type":"input_text","text":"next user"}
+	]`))
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("expected hosted output to be ignored, got %#v", msgs)
+	}
+	if msgs[0].Role != "assistant" || msgs[0].Content != "prior assistant" {
+		t.Fatalf("expected output_text assistant message, got %#v", msgs[0])
+	}
+	if msgs[1].Role != "user" || msgs[1].Content != "next user" {
+		t.Fatalf("expected input_text user message, got %#v", msgs[1])
+	}
+}
+
+func TestResponsesInputIgnoresFutureUnknownTypedItems(t *testing.T) {
+	msgs, err := responsesInputToMessages(json.RawMessage(`[
+		{"type":"local_shell_call","id":"call_future","status":"completed"},
+		{"type":"future_reasoning_trace","summary":[]},
+		{"type":"future_message","role":"user","content":"kept because role is explicit"},
+		{"type":"input_text","text":"next user"}
+	]`))
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("expected unknown artifacts to be ignored and role/input messages kept, got %#v", msgs)
+	}
+	if msgs[0].Role != "user" || msgs[0].Content != "kept because role is explicit" {
+		t.Fatalf("expected role-bearing unknown item to be kept, got %#v", msgs[0])
+	}
+	if msgs[1].Role != "user" || msgs[1].Content != "next user" {
+		t.Fatalf("expected input_text user message, got %#v", msgs[1])
 	}
 }
 
