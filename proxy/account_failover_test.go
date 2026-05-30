@@ -38,6 +38,9 @@ func TestProfileUnavailableFailureDoesNotDisableAccount(t *testing.T) {
 	if err := config.Init(filepath.Join(dir, "kiro.db")); err != nil {
 		t.Fatalf("config init: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
 
 	account := config.Account{
 		ID:      "acct-profile",
