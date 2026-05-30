@@ -3699,17 +3699,40 @@ img.brand-icon {
   }
   .batch-bar:not(.hidden) {
     width: 100%;
+    position: relative;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.375rem;
   }
   .batch-bar .batch-count {
-    grid-column: 1 / -1;
-    justify-self: start;
+    position: absolute;
+    top: -2rem;
+    right: 0;
   }
   .batch-bar .btn {
     width: 100%;
     min-width: 0;
+    padding: 0 0.375rem;
+  }
+  .batch-bar [data-batch="enable"] {
+    grid-column: 1 / span 3;
+    grid-row: 1;
+  }
+  .batch-bar [data-batch="delete"] {
+    grid-column: 4 / span 3;
+    grid-row: 1;
+  }
+  .batch-bar [data-batch="refresh"] {
+    grid-column: 1 / span 2;
+    grid-row: 2;
+  }
+  .batch-bar [data-batch="refreshModels"] {
+    grid-column: 3 / span 2;
+    grid-row: 2;
+  }
+  .batch-bar [data-batch="disable"] {
+    grid-column: 5 / span 2;
+    grid-row: 2;
   }
   #filterSearch {
     width: 100% !important;
