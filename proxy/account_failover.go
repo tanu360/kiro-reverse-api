@@ -157,7 +157,7 @@ func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 	case isSuspensionErrorMessage(errMsg):
 		h.disableAccount(account, "BANNED", "AWS temporarily suspended - unusual user activity detected")
 	case isProfileUnavailableErrorMessage(errMsg):
-		h.disableAccount(account, "SUSPENDED", "No available Kiro profile")
+		h.pool.RecordError(account.ID, false)
 	case isAuthErrorMessage(errMsg):
 		h.disableAccount(account, "BANNED", "Authentication failed - token invalid or expired")
 	default:

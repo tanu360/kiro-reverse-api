@@ -115,7 +115,7 @@ func ResolveProfileArn(account *config.Account) (string, error) {
 		return profileArn, nil
 	}
 
-	profileArn, err := listAvailableProfiles(account)
+	profileArn, err := listAvailableProfilesWithRetry(account)
 	if err == nil && profileArn != "" {
 		if updateErr := config.UpdateAccountProfileArn(account.ID, profileArn); updateErr != nil {
 			logger.Warnf("[ProfileArn] Failed to cache profile ARN for %s: %v", account.Email, updateErr)
@@ -136,6 +136,42 @@ func ResolveProfileArn(account *config.Account) (string, error) {
 	}
 
 	return "", fmt.Errorf("no available Kiro profile")
+}
+
+func listAvailableProfilesWithRetry(account *config.Account) (string, error) {
+	const maxAttempts = 3
+	backoff := 200 * time.Millisecond
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		profileArn, err := listAvailableProfiles(account)
+		if err == nil {
+			return profileArn, nil
+		}
+		lastErr = err
+		if !isTransientProfileFetchError(err) || attempt == maxAttempts {
+			return "", err
+		}
+		logger.Debugf("[ProfileArn] ListAvailableProfiles transient failure for %s (attempt %d/%d): %v",
+			account.Email, attempt, maxAttempts, err)
+		time.Sleep(backoff)
+		backoff *= 2
+	}
+	return "", lastErr
+}
+
+func isTransientProfileFetchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "empty profile list") {
+		return false
+	}
+	if strings.HasPrefix(msg, "HTTP ") {
+		return strings.HasPrefix(msg, "HTTP 5") || strings.HasPrefix(msg, "HTTP 429")
+	}
+	return true
 }
 
 func listAvailableProfiles(account *config.Account) (string, error) {
