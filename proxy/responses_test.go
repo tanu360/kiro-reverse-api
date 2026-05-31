@@ -76,6 +76,37 @@ func TestResponsesInputItemsAndInstructions(t *testing.T) {
 	}
 }
 
+func TestResponsesJSONSchemaTextFormatAddsInstruction(t *testing.T) {
+	req := &OpenAIResponsesRequest{
+		Model: "claude-sonnet-4.5",
+		Input: json.RawMessage(`"return json"`),
+		Text: &OpenAIResponsesText{Format: map[string]interface{}{
+			"type": "json_schema",
+			"name": "answer",
+			"schema": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"answer": map[string]interface{}{"type": "string"},
+				},
+			},
+		}},
+	}
+
+	prepared, msg := prepareResponsesRequest(req, nil)
+	if msg != "" {
+		t.Fatalf("unexpected validation error: %s", msg)
+	}
+	foundFormatInstruction := false
+	for _, message := range prepared.OpenAIRequest.Messages {
+		if message.Role == "system" && strings.Contains(extractOpenAIMessageText(message.Content), "valid JSON matching this JSON schema") {
+			foundFormatInstruction = true
+		}
+	}
+	if !foundFormatInstruction {
+		t.Fatalf("expected json_schema format instruction, got %#v", prepared.OpenAIRequest.Messages)
+	}
+}
+
 func TestResponsesFunctionToolsConvertToKiroTools(t *testing.T) {
 	req := &OpenAIResponsesRequest{
 		Model: "claude-sonnet-4.5",
@@ -98,7 +129,7 @@ func TestResponsesFunctionToolsConvertToKiroTools(t *testing.T) {
 	if ctx == nil || len(ctx.Tools) != 1 {
 		t.Fatalf("expected one converted tool")
 	}
-	if got := ctx.Tools[0].ToolSpecification.Name; got != "get_weather" {
+	if got := ctx.Tools[0].ToolSpecification.Name; got != "getWeather" {
 		t.Fatalf("expected converted tool name, got %q", got)
 	}
 }
@@ -158,8 +189,53 @@ func TestResponsesNamespaceToolFlattensFunctions(t *testing.T) {
 	if len(prepared.OpenAIRequest.Tools) != 1 {
 		t.Fatalf("expected one flattened function tool, got %#v", prepared.OpenAIRequest.Tools)
 	}
-	if got := prepared.OpenAIRequest.Tools[0].Function.Name; got != "get_weather" {
+	if got := prepared.OpenAIRequest.Tools[0].Function.Name; got != "tools__get_weather" {
 		t.Fatalf("expected flattened tool name, got %q", got)
+	}
+}
+
+func TestResponsesNamespaceToolQualifiesDuplicateChildren(t *testing.T) {
+	req := &OpenAIResponsesRequest{
+		Model: "claude-sonnet-4.5",
+		Input: json.RawMessage(`"click"`),
+		Tools: []OpenAIResponsesTool{
+			{
+				Type: "namespace",
+				Name: "mcp__computer_use",
+				Tools: []OpenAIResponsesTool{{
+					Type:       "function",
+					Name:       "click",
+					Parameters: map[string]interface{}{"type": "object"},
+				}},
+			},
+			{
+				Type: "namespace",
+				Name: "mcp__lightpanda",
+				Tools: []OpenAIResponsesTool{{
+					Type:       "function",
+					Name:       "click",
+					Parameters: map[string]interface{}{"type": "object"},
+				}},
+			},
+		},
+	}
+
+	prepared, msg := prepareResponsesRequest(req, nil)
+	if msg != "" {
+		t.Fatalf("unexpected validation error: %s", msg)
+	}
+	if len(prepared.OpenAIRequest.Tools) != 2 {
+		t.Fatalf("expected two tools, got %#v", prepared.OpenAIRequest.Tools)
+	}
+	names := []string{
+		prepared.OpenAIRequest.Tools[0].Function.Name,
+		prepared.OpenAIRequest.Tools[1].Function.Name,
+	}
+	if names[0] == names[1] {
+		t.Fatalf("expected qualified names to be unique, got %#v", names)
+	}
+	if names[0] != "mcp__computer_use__click" || names[1] != "mcp__lightpanda__click" {
+		t.Fatalf("unexpected qualified names %#v", names)
 	}
 }
 

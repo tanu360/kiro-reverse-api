@@ -74,6 +74,9 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 	if instructionText := strings.TrimSpace(extractOpenAIMessageText(responsesContentToOpenAIContent(req.Instructions))); instructionText != "" {
 		messagesForKiro = append(messagesForKiro, OpenAIMessage{Role: "system", Content: instructionText})
 	}
+	if formatInstruction := responsesTextFormatInstruction(req.Text); formatInstruction != "" {
+		messagesForKiro = append(messagesForKiro, OpenAIMessage{Role: "system", Content: formatInstruction})
+	}
 	messagesForKiro = append(messagesForKiro, currentMessages...)
 
 	openaiReq := OpenAIRequest{
@@ -113,10 +116,30 @@ func validateResponsesTextFormat(text *OpenAIResponsesText) string {
 		return ""
 	}
 	formatType, _ := text.Format["type"].(string)
-	if formatType == "" || formatType == "text" {
+	switch strings.ToLower(strings.TrimSpace(formatType)) {
+	case "", "text", "json_schema", "json_object":
 		return ""
 	}
 	return "unsupported text.format type: " + formatType
+}
+
+func responsesTextFormatInstruction(text *OpenAIResponsesText) string {
+	if text == nil || len(text.Format) == 0 {
+		return ""
+	}
+	formatType, _ := text.Format["type"].(string)
+	switch strings.ToLower(strings.TrimSpace(formatType)) {
+	case "json_schema":
+		b, err := json.Marshal(text.Format)
+		if err != nil {
+			return "Respond only with valid JSON matching the requested JSON schema. Do not include markdown fences or extra text."
+		}
+		return "Respond only with valid JSON matching this JSON schema. Do not include markdown fences or extra text.\n" + string(b)
+	case "json_object":
+		return "Respond only with a valid JSON object. Do not include markdown fences or extra text."
+	default:
+		return ""
+	}
 }
 
 func convertResponsesTools(tools []OpenAIResponsesTool, toolChoice interface{}) ([]OpenAITool, string) {
@@ -129,7 +152,7 @@ func convertResponsesTools(tools []OpenAIResponsesTool, toolChoice interface{}) 
 
 	result := make([]OpenAITool, 0, len(tools))
 	for _, tool := range tools {
-		converted, msg := convertResponsesTool(tool)
+		converted, msg := convertResponsesTool(tool, "")
 		if msg != "" {
 			return nil, msg
 		}
@@ -138,7 +161,7 @@ func convertResponsesTools(tools []OpenAIResponsesTool, toolChoice interface{}) 
 	return result, ""
 }
 
-func convertResponsesTool(tool OpenAIResponsesTool) ([]OpenAITool, string) {
+func convertResponsesTool(tool OpenAIResponsesTool, namespace string) ([]OpenAITool, string) {
 	toolType := strings.ToLower(strings.TrimSpace(tool.Type))
 	if toolType == "" && tool.Function.Name != "" {
 		toolType = "function"
@@ -146,8 +169,9 @@ func convertResponsesTool(tool OpenAIResponsesTool) ([]OpenAITool, string) {
 
 	if toolType == "namespace" {
 		result := make([]OpenAITool, 0, len(tool.Tools))
+		childNamespace := qualifiedResponsesToolName(namespace, tool.Name)
 		for _, child := range tool.Tools {
-			converted, msg := convertResponsesTool(child)
+			converted, msg := convertResponsesTool(child, childNamespace)
 			if msg != "" {
 				return nil, msg
 			}
@@ -184,10 +208,25 @@ func convertResponsesTool(tool OpenAIResponsesTool) ([]OpenAITool, string) {
 
 	var converted OpenAITool
 	converted.Type = "function"
-	converted.Function.Name = name
+	converted.Function.Name = qualifiedResponsesToolName(namespace, name)
 	converted.Function.Description = description
 	converted.Function.Parameters = parameters
 	return []OpenAITool{converted}, ""
+}
+
+func qualifiedResponsesToolName(namespace, name string) string {
+	namespace = strings.TrimSpace(namespace)
+	name = strings.TrimSpace(name)
+	if namespace == "" {
+		return name
+	}
+	if name == "" {
+		return namespace
+	}
+	if strings.HasPrefix(name, namespace+"__") {
+		return name
+	}
+	return namespace + "__" + name
 }
 
 func validateResponsesToolChoice(toolChoice interface{}) string {

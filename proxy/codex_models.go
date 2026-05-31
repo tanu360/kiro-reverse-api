@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"kiro-proxy/config"
 	"net/http"
 	"strings"
@@ -66,7 +67,7 @@ type codexModelMessages struct {
 }
 
 func (h *Handler) handleCodexModels(w http.ResponseWriter, _ *http.Request) {
-	cached := h.cachedModelsSnapshot(true)
+	cached := h.cachedModelsSnapshot(false)
 	thinkingSuffix := config.GetThinkingConfig().Suffix
 
 	models := buildCodexModelsResponse(cached, thinkingSuffix)
@@ -208,10 +209,8 @@ func buildCodexModelEntry(id, displayName, description string, contextWindow int
 		AvailableInPlans:            []string{"free", "plus", "pro", "team", "business", "enterprise"},
 		BaseInstructions:            "You are a coding agent running in Codex through a local BYOK shim.",
 		ModelMessages: codexModelMessages{
-			InstructionsTemplate: "You are Codex running on {model_name} through a local all-model shim. Be a helpful, direct coding collaborator.",
-			InstructionsVariables: map[string]string{
-				"model_name": id,
-			},
+			InstructionsTemplate:  fmt.Sprintf("You are Codex running on %s through a local all-model shim. Be a helpful, direct coding collaborator.", id),
+			InstructionsVariables: map[string]string{},
 		},
 		SupportsComputerUse: true,
 		SupportsMCP:         true,
@@ -254,8 +253,10 @@ func displayNameFromModelID(id string) string {
 
 func codexCompatibilityAliases(priority int) []codexModelEntry {
 	return []codexModelEntry{
-		buildCodexModelEntry("gpt-4o", "GPT 4o", "Custom model: gpt-4o", 128000, true, false, priority),
-		buildCodexModelEntry("gpt-4", "GPT 4", "Custom model: gpt-4", 8192, true, false, priority+1),
+		buildCodexModelEntry("gpt-5.4-mini", "GPT 5.4 Mini", "Compatibility alias: gpt-5.4-mini", 200000, true, false, priority),
+		buildCodexModelEntry("gpt-5", "GPT 5", "Compatibility alias: gpt-5", 200000, true, false, priority+1),
+		buildCodexModelEntry("gpt-4o", "GPT 4o", "Custom model: gpt-4o", 128000, true, false, priority+2),
+		buildCodexModelEntry("gpt-4", "GPT 4", "Custom model: gpt-4", 8192, true, false, priority+3),
 	}
 }
 

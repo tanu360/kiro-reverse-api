@@ -345,7 +345,7 @@ func TestConvertOpenAIToolsSanitizesSchemaAndDescription(t *testing.T) {
 		"additionalProperties": false,
 	}
 
-	tools := convertOpenAITools([]OpenAITool{tool})
+	tools, _ := convertOpenAITools([]OpenAITool{tool})
 	if len(tools) != 1 {
 		t.Fatalf("expected one converted tool, got %d", len(tools))
 	}
@@ -358,6 +358,34 @@ func TestConvertOpenAIToolsSanitizesSchemaAndDescription(t *testing.T) {
 	}
 	if schemaContainsKey(schema, "required") {
 		t.Fatalf("expected empty required field to be removed, got %#v", schema)
+	}
+}
+
+func TestConvertOpenAIToolsSanitizesDuplicateNamesAndMapsBack(t *testing.T) {
+	var first OpenAITool
+	first.Type = "function"
+	first.Function.Name = "mcp__computer_use__click"
+	first.Function.Parameters = map[string]interface{}{"type": "object"}
+
+	var second OpenAITool
+	second.Type = "function"
+	second.Function.Name = "mcp__lightpanda__click"
+	second.Function.Parameters = map[string]interface{}{"type": "object"}
+
+	tools, nameMap := convertOpenAITools([]OpenAITool{first, second})
+	if len(tools) != 2 {
+		t.Fatalf("expected two converted tools, got %d", len(tools))
+	}
+	firstName := tools[0].ToolSpecification.Name
+	secondName := tools[1].ToolSpecification.Name
+	if firstName == first.Function.Name || secondName == second.Function.Name {
+		t.Fatalf("expected namespaced tool names to be sanitized, got %q and %q", firstName, secondName)
+	}
+	if firstName == secondName {
+		t.Fatalf("expected sanitized tool names to be unique, got %q", firstName)
+	}
+	if nameMap[firstName] != first.Function.Name || nameMap[secondName] != second.Function.Name {
+		t.Fatalf("expected sanitized names to map back, got %#v", nameMap)
 	}
 }
 
@@ -393,8 +421,11 @@ func TestParseModelAndThinkingNormalizesClaudeDashVersions(t *testing.T) {
 		{"future opus dot form", "claude-opus-4.8", "claude-opus-4.8", false},
 		{"future sonnet major", "claude-sonnet-5-0", "claude-sonnet-5.0", false},
 		{"thinking suffix", "claude-opus-4-8-thinking", "claude-opus-4.8", true},
-		{"dated snapshot alias", "claude-sonnet-4-20250514", "claude-sonnet-4", false},
-		{"legacy alias", "claude-3-5-sonnet", "claude-sonnet-4.5", false},
+		{"dated snapshot alias", "claude-sonnet-4-20250514", "claude-sonnet-4.6", false},
+		{"legacy alias", "claude-3-5-sonnet", "claude-sonnet-4.6", false},
+		{"gpt 5 compatibility alias", "gpt-5.4-mini", "claude-haiku-4.5", false},
+		{"kiro listed gpt 4o stays direct", "gpt-4o", "gpt-4o", false},
+		{"kiro listed gpt 4 stays direct", "gpt-4", "gpt-4", false},
 	}
 
 	for _, tt := range tests {

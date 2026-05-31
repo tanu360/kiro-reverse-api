@@ -971,11 +971,22 @@ func TestBuildCodexModelsResponseUsesKiroModelMetadata(t *testing.T) {
 		TokenLimits:    tokenLimits,
 	}}, "-thinking")
 
-	if len(models) != 4 {
-		t.Fatalf("expected base, thinking, and two compatibility aliases, got %d", len(models))
+	if len(models) != 6 {
+		t.Fatalf("expected base, thinking, and compatibility aliases, got %d", len(models))
 	}
 	if models[0].Slug != "claude-opus-4.8" || models[0].DisplayName != "Claude Opus 4.8" {
 		t.Fatalf("unexpected base model identity: %#v", models[0])
+	}
+	if strings.ContainsAny(models[0].ModelMessages.InstructionsTemplate, "{}") || !strings.Contains(models[0].ModelMessages.InstructionsTemplate, "claude-opus-4.8") {
+		t.Fatalf("expected direct model name in instructions template, got %q", models[0].ModelMessages.InstructionsTemplate)
+	}
+	for _, model := range models {
+		if strings.ContainsAny(model.ModelMessages.InstructionsTemplate, "{}") {
+			t.Fatalf("expected direct model instructions for %s: %q", model.Slug, model.ModelMessages.InstructionsTemplate)
+		}
+		if len(model.ModelMessages.InstructionsVariables) != 0 {
+			t.Fatalf("expected no instruction variables for %s, got %#v", model.Slug, model.ModelMessages.InstructionsVariables)
+		}
 	}
 	if models[0].ContextWindow != 1000000 || models[0].TruncationPolicy.Limit != 320000 {
 		t.Fatalf("expected Kiro token limits to drive Codex limits, got %#v", models[0])
@@ -986,7 +997,7 @@ func TestBuildCodexModelsResponseUsesKiroModelMetadata(t *testing.T) {
 	if !models[0].SupportsImageDetailOriginal || len(models[0].InputModalities) != 2 {
 		t.Fatalf("expected image capability to be preserved, got %#v", models[0])
 	}
-	if models[2].Slug != "gpt-4o" || models[3].Slug != "gpt-4" {
-		t.Fatalf("expected compatibility aliases at the end, got %#v %#v", models[2], models[3])
+	if models[2].Slug != "gpt-5.4-mini" || models[3].Slug != "gpt-5" || models[4].Slug != "gpt-4o" || models[5].Slug != "gpt-4" {
+		t.Fatalf("expected compatibility aliases at the end, got %#v %#v %#v %#v", models[2], models[3], models[4], models[5])
 	}
 }

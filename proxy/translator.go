@@ -3,6 +3,7 @@ package proxy
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"kiro-proxy/config"
 	"regexp"
 	"strings"
@@ -17,15 +18,15 @@ type modelMapping struct {
 }
 
 var modelMapOrdered = []modelMapping{
-	{"claude-sonnet-4-20250514", "claude-sonnet-4"},
-	{"claude-3-5-sonnet", "claude-sonnet-4.5"},
-	{"claude-3-opus", "claude-sonnet-4.5"},
-	{"claude-3-sonnet", "claude-sonnet-4"},
+	{"claude-sonnet-4-20250514", "claude-sonnet-4.6"},
+	{"claude-3-5-sonnet", "claude-sonnet-4.6"},
+	{"claude-3-opus", "claude-sonnet-4.6"},
+	{"claude-3-sonnet", "claude-sonnet-4.6"},
 	{"claude-3-haiku", "claude-haiku-4.5"},
-	{"gpt-4-turbo", "claude-sonnet-4.5"},
-	{"gpt-4o", "claude-sonnet-4.5"},
-	{"gpt-4", "claude-sonnet-4.5"},
-	{"gpt-3.5-turbo", "claude-sonnet-4.5"},
+	{"gpt-5.4-mini", "claude-haiku-4.5"},
+	{"gpt-5", "claude-opus-4.8"},
+	{"gpt-4-turbo", "claude-sonnet-4.6"},
+	{"gpt-3.5-turbo", "claude-sonnet-4.6"},
 }
 
 var claudeVersionPattern = regexp.MustCompile(`^(claude-(?:opus|sonnet|haiku)-\d+)-(\d+)$`)
@@ -1047,9 +1048,10 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		}
 	}
 
-	kiroTools := convertOpenAITools(req.Tools)
+	kiroTools, toolNameMap := convertOpenAITools(req.Tools)
 
 	payload := &KiroPayload{}
+	payload.ToolNameMap = toolNameMap
 	payload.ConversationState.ChatTriggerType = "MANUAL"
 	payload.ConversationState.ConversationID = buildConversationID(modelID, systemPrompt, firstOpenAIConversationAnchor(nonSystemMessages))
 	payload.ConversationState.CurrentMessage.UserInputMessage = KiroUserInputMessage{
@@ -1415,27 +1417,63 @@ func parseBase64Image(data, format string) *KiroImage {
 	}
 }
 
-func convertOpenAITools(tools []OpenAITool) []KiroToolWrapper {
+func convertOpenAITools(tools []OpenAITool) ([]KiroToolWrapper, map[string]string) {
 	if len(tools) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	result := make([]KiroToolWrapper, 0, len(tools))
+	nameMap := make(map[string]string)
+	usedNames := make(map[string]bool)
 	for _, tool := range tools {
 		if tool.Type != "function" {
+			continue
+		}
+		originalName := strings.TrimSpace(tool.Function.Name)
+		if originalName == "" {
 			continue
 		}
 		desc := tool.Function.Description
 		if len(desc) > maxToolDescLen {
 			desc = desc[:maxToolDescLen] + "..."
 		}
+		//! Kiro rejects long, namespaced, or duplicate tool names; map sanitized names back before returning calls.
+		sanitized := uniqueKiroToolName(shortenToolName(sanitizeToolName(originalName)), usedNames)
+		if sanitized != originalName {
+			nameMap[sanitized] = originalName
+		}
 		wrapper := KiroToolWrapper{}
-		wrapper.ToolSpecification.Name = shortenToolName(tool.Function.Name)
+		wrapper.ToolSpecification.Name = sanitized
 		wrapper.ToolSpecification.Description = normalizeToolDesc(desc, wrapper.ToolSpecification.Name)
 		wrapper.ToolSpecification.InputSchema = InputSchema{JSON: ensureObjectSchema(tool.Function.Parameters)}
 		result = append(result, wrapper)
 	}
-	return result
+	if len(nameMap) == 0 {
+		nameMap = nil
+	}
+	return result, nameMap
+}
+
+func uniqueKiroToolName(name string, used map[string]bool) string {
+	if strings.TrimSpace(name) == "" {
+		name = "tool"
+	}
+	if !used[name] {
+		used[name] = true
+		return name
+	}
+	for i := 2; ; i++ {
+		suffix := fmt.Sprintf("%d", i)
+		base := name
+		if len(base)+len(suffix) > 64 {
+			base = base[:64-len(suffix)]
+		}
+		candidate := base + suffix
+		if !used[candidate] {
+			used[candidate] = true
+			return candidate
+		}
+	}
 }
 
 func KiroToOpenAIResponse(content string, toolUses []KiroToolUse, inputTokens, outputTokens int, model string) *OpenAIResponse {
