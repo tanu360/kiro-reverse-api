@@ -1390,7 +1390,7 @@
   }
   function getTestModelValue() {
     const choice = $('testModelChoice');
-    return (choice && choice.value.trim()) || 'claude-sonnet-4';
+    return (choice && choice.value.trim()) || 'claude-sonnet-4.6';
   }
   function renderTestLog() {
     const c = $('testModalLog');
@@ -1435,7 +1435,7 @@
         ? '<select id="testModelChoice">' +
         testModalModels.map(m => '<option value="' + escapeAttr(m) + '">' + escapeHtml(m) + '</option>').join('') +
         '</select>'
-        : '<input type="text" id="testModelChoice" placeholder="' + escapeAttr(t('accounts.testModelPlaceholder')) + '" value="claude-sonnet-4" />';
+        : '<input type="text" id="testModelChoice" placeholder="' + escapeAttr(t('accounts.testModelPlaceholder')) + '" value="claude-sonnet-4.6" />';
 
     body.innerHTML =
       '<div class="test-modal-account">' +

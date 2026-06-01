@@ -90,7 +90,7 @@
   "accounts.testModelsLoading": "正在加载模型...",
   "accounts.testModelsReady": "已缓存模型: {0}",
   "accounts.testModelsFallback": "模型列表不可用",
-  "accounts.testModelPlaceholder": "claude-sonnet-4",
+  "accounts.testModelPlaceholder": "claude-sonnet-4.6",
   "accounts.testLog.title": "测试日志",
   "accounts.testLog.clear": "清空",
   "accounts.testLog.hide": "隐藏",

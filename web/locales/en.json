@@ -90,7 +90,7 @@
   "accounts.testModelsLoading": "Loading models...",
   "accounts.testModelsReady": "Cached models: {0}",
   "accounts.testModelsFallback": "Model list unavailable",
-  "accounts.testModelPlaceholder": "claude-sonnet-4",
+  "accounts.testModelPlaceholder": "claude-sonnet-4.6",
   "accounts.testLog.title": "Test Log",
   "accounts.testLog.clear": "Clear",
   "accounts.testLog.hide": "Hide",

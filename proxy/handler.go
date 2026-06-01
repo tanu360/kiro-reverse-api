@@ -3209,7 +3209,7 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	if req.Model == "" {
-		req.Model = "claude-sonnet-4"
+		req.Model = "claude-sonnet-4.6"
 	}
 
 	thinkingCfg := config.GetThinkingConfig()
