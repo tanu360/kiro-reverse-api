@@ -2470,7 +2470,7 @@
       '<button class="btn btn-sm btn-outline flex-1" id="iamCopyBtn" type="button">' + escapeHtml(t('common.copy')) + '</button>' +
       '</div>' +
       '</div>' +
-      '<p class="text-sm mt-3 success-text">' + escapeHtml(t('iam.completeLogin')) + '</p>' +
+      '<p class="iam-login-instruction text-sm success-text">' + escapeHtml(t('iam.completeLogin')) + '</p>' +
       '<div class="form-group"><label>' + escapeHtml(t('iam.callbackUrl')) + '</label><input type="text" id="iamCallback" placeholder="' + escapeAttr(t('iam.callbackUrlPlaceholder')) + '" /></div>' +
       '</div>' +
       '<div class="modal-footer">' +
