@@ -3,6 +3,7 @@ package proxy
 import (
 	"io"
 	"kiro-proxy/config"
+	"math"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,58 @@ func TestResolveProfileArnFetchesAndCachesProfile(t *testing.T) {
 	}
 	if accounts[0].UsageCurrent != 7 {
 		t.Fatalf("expected profile cache update to preserve usage fields, got usageCurrent=%v", accounts[0].UsageCurrent)
+	}
+}
+
+func TestRefreshAccountInfoUsesPrecisionUsageFields(t *testing.T) {
+	kiroRestHttpStore.Store(&http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Path != "/getUsageLimits" {
+				t.Fatalf("expected getUsageLimits path, got %s", req.URL.Path)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"usageBreakdownList": [
+						{
+							"resourceType": "CREDIT",
+							"currentUsage": 2,
+							"currentUsageWithPrecision": 2.91,
+							"usageLimit": 10000,
+							"usageLimitWithPrecision": 10000,
+							"freeTrialInfo": {
+								"currentUsage": 1,
+								"currentUsageWithPrecision": 1.25,
+								"usageLimit": 10,
+								"usageLimitWithPrecision": 10.5,
+								"freeTrialStatus": "ACTIVE"
+							}
+						}
+					],
+					"subscriptionInfo": {"subscriptionTitle": "KIRO POWER"}
+				}`)),
+				Header: make(http.Header),
+			}, nil
+		}),
+	})
+	t.Cleanup(func() { InitKiroHttpClient("") })
+
+	info, err := RefreshAccountInfo(&config.Account{AccessToken: "token"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if diff := math.Abs(info.UsageCurrent - 2.91); diff > 0.000001 {
+		t.Fatalf("expected precise usage 2.91, got %v", info.UsageCurrent)
+	}
+	if diff := math.Abs(info.UsagePercent - 0.000291); diff > 0.000001 {
+		t.Fatalf("expected precise usage percent, got %v", info.UsagePercent)
+	}
+	if diff := math.Abs(info.TrialUsageCurrent - 1.25); diff > 0.000001 {
+		t.Fatalf("expected precise trial usage 1.25, got %v", info.TrialUsageCurrent)
+	}
+	if diff := math.Abs(info.TrialUsageLimit - 10.5); diff > 0.000001 {
+		t.Fatalf("expected precise trial limit 10.5, got %v", info.TrialUsageLimit)
 	}
 }
 

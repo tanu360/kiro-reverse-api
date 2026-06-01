@@ -313,10 +313,9 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 			info.SubscriptionType)
 	}
 
-	if len(usage.UsageBreakdownList) > 0 {
-		breakdown := usage.UsageBreakdownList[0]
-		info.UsageCurrent = breakdown.CurrentUsage
-		info.UsageLimit = breakdown.UsageLimit
+	if breakdown := creditUsageBreakdown(usage.UsageBreakdownList); breakdown != nil {
+		info.UsageCurrent = breakdown.CurrentUsageValue()
+		info.UsageLimit = breakdown.UsageLimitValue()
 		if info.UsageLimit > 0 {
 			info.UsagePercent = info.UsageCurrent / info.UsageLimit
 		}
@@ -330,11 +329,10 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 		}
 	}
 
-	if len(usage.UsageBreakdownList) > 0 {
-		breakdown := usage.UsageBreakdownList[0]
+	if breakdown := creditUsageBreakdown(usage.UsageBreakdownList); breakdown != nil {
 		if breakdown.FreeTrialInfo != nil {
-			info.TrialUsageCurrent = breakdown.FreeTrialInfo.CurrentUsage
-			info.TrialUsageLimit = breakdown.FreeTrialInfo.UsageLimit
+			info.TrialUsageCurrent = breakdown.FreeTrialInfo.CurrentUsageValue()
+			info.TrialUsageLimit = breakdown.FreeTrialInfo.UsageLimitValue()
 			if info.TrialUsageLimit > 0 {
 				info.TrialUsagePercent = info.TrialUsageCurrent / info.TrialUsageLimit
 			}
@@ -351,6 +349,18 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 	}
 
 	return info, nil
+}
+
+func creditUsageBreakdown(breakdowns []UsageBreakdown) *UsageBreakdown {
+	for i := range breakdowns {
+		if strings.EqualFold(breakdowns[i].ResourceType, "CREDIT") {
+			return &breakdowns[i]
+		}
+	}
+	if len(breakdowns) == 0 {
+		return nil
+	}
+	return &breakdowns[0]
 }
 
 func parseSubscriptionType(raw string) string {
@@ -375,21 +385,53 @@ type UsageLimitsResponse struct {
 }
 
 type UsageBreakdown struct {
-	ResourceType  string         `json:"resourceType"`
-	CurrentUsage  float64        `json:"currentUsage"`
-	UsageLimit    float64        `json:"usageLimit"`
-	Currency      string         `json:"currency"`
-	Unit          string         `json:"unit"`
-	OverageRate   float64        `json:"overageRate"`
-	FreeTrialInfo *FreeTrialInfo `json:"freeTrialInfo"`
-	Bonuses       []BonusInfo    `json:"bonuses"`
+	ResourceType              string         `json:"resourceType"`
+	CurrentUsage              float64        `json:"currentUsage"`
+	CurrentUsageWithPrecision *float64       `json:"currentUsageWithPrecision,omitempty"`
+	UsageLimit                float64        `json:"usageLimit"`
+	UsageLimitWithPrecision   *float64       `json:"usageLimitWithPrecision,omitempty"`
+	Currency                  string         `json:"currency"`
+	Unit                      string         `json:"unit"`
+	OverageRate               float64        `json:"overageRate"`
+	FreeTrialInfo             *FreeTrialInfo `json:"freeTrialInfo"`
+	Bonuses                   []BonusInfo    `json:"bonuses"`
+}
+
+func (b UsageBreakdown) CurrentUsageValue() float64 {
+	if b.CurrentUsageWithPrecision != nil {
+		return *b.CurrentUsageWithPrecision
+	}
+	return b.CurrentUsage
+}
+
+func (b UsageBreakdown) UsageLimitValue() float64 {
+	if b.UsageLimitWithPrecision != nil {
+		return *b.UsageLimitWithPrecision
+	}
+	return b.UsageLimit
 }
 
 type FreeTrialInfo struct {
-	CurrentUsage    float64     `json:"currentUsage"`
-	UsageLimit      float64     `json:"usageLimit"`
-	FreeTrialStatus string      `json:"freeTrialStatus"`
-	FreeTrialExpiry json.Number `json:"freeTrialExpiry"`
+	CurrentUsage              float64     `json:"currentUsage"`
+	CurrentUsageWithPrecision *float64    `json:"currentUsageWithPrecision,omitempty"`
+	UsageLimit                float64     `json:"usageLimit"`
+	UsageLimitWithPrecision   *float64    `json:"usageLimitWithPrecision,omitempty"`
+	FreeTrialStatus           string      `json:"freeTrialStatus"`
+	FreeTrialExpiry           json.Number `json:"freeTrialExpiry"`
+}
+
+func (f FreeTrialInfo) CurrentUsageValue() float64 {
+	if f.CurrentUsageWithPrecision != nil {
+		return *f.CurrentUsageWithPrecision
+	}
+	return f.CurrentUsage
+}
+
+func (f FreeTrialInfo) UsageLimitValue() float64 {
+	if f.UsageLimitWithPrecision != nil {
+		return *f.UsageLimitWithPrecision
+	}
+	return f.UsageLimit
 }
 
 type BonusInfo struct {
