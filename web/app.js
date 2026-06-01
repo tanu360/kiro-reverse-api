@@ -6,7 +6,7 @@
     localStorage.removeItem('admin_login_time');
   }
   let password = sessionStorage.getItem('admin_password') || localStorage.getItem('admin_password') || '';
-  let currentLang = localStorage.getItem('kiro_lang') || 'zh';
+  let currentLang = localStorage.getItem('kiro_lang') || 'en';
   const dict = { en: null, zh: null };
   let accountsData = [];
   const selectedAccounts = new Set();
@@ -112,10 +112,25 @@
   }
   function t(key, ...args) {
     const active = dict[currentLang] || {};
-    const fallback = dict.zh || {};
+    const fallback = dict.en || {};
     let text = active[key] || fallback[key] || key;
     args.forEach((arg, idx) => { text = text.replace('{' + idx + '}', arg); });
     return text;
+  }
+  function localizedError(message) {
+    const raw = String(message || '').trim();
+    const key = {
+      'Invalid JSON': 'serverError.invalidJSON',
+      'Unauthorized': 'serverError.unauthorized',
+      'Not Found': 'serverError.notFound',
+      'Account not found': 'serverError.accountNotFound',
+      'API key not found': 'serverError.apiKeyNotFound',
+      'No account IDs provided': 'serverError.noAccountIds',
+      'startUrl is required': 'serverError.startUrlRequired',
+      'bearerToken is required': 'serverError.bearerTokenRequired',
+      'refreshToken is required': 'serverError.refreshTokenRequired'
+    }[raw];
+    return key ? t(key) : raw;
   }
   function applyTranslations() {
     qsa('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
@@ -1034,7 +1049,7 @@
       const res = await api('/accounts/' + id + '/refresh', { method: 'POST' });
       const d = await res.json();
       if (d.success) loadAccounts();
-      else toastError(t('accounts.refreshFailed') + ': ' + (d.error || ''));
+      else toastError(t('accounts.refreshFailed') + ': ' + localizedError(d.error));
     } catch (e) {
       toastError(t('accounts.refreshFailed'));
     }
@@ -1054,7 +1069,7 @@
     try {
       const res = await api('/accounts/' + id, { method: 'DELETE' });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.failed'));
       toast(t('accounts.deleteSuccess'), 'danger', { icon: 'fa-solid fa-trash' });
       loadAccounts(); loadStats();
     } catch (e) {
@@ -1064,7 +1079,7 @@
   async function copyAccountJSON(id, btn) {
     try {
       const jsonPromise = api('/accounts/' + id + '/full').then(async res => {
-        if (!res.ok) throw new Error('Failed');
+        if (!res.ok) throw new Error(t('common.failed'));
         const a = await res.json();
         const { clientId, clientSecret, accessToken, refreshToken } = a;
         return JSON.stringify({ clientId, clientSecret, accessToken, refreshToken }, null, 2);
@@ -1098,7 +1113,7 @@
     try {
       const res = await api('/accounts/batch', { method: 'POST', body: JSON.stringify({ ids, action }) });
       const d = await res.json();
-      if (!res.ok || !d.success) throw new Error(d.error || t('common.failed'));
+      if (!res.ok || !d.success) throw new Error(localizedError(d.error) || t('common.failed'));
       dismiss();
       if (action === 'refresh') {
         toast(t('batch.refreshResult', d.refreshed || 0, d.failed || 0), d.failed ? 'warning' : 'success');
@@ -1166,7 +1181,7 @@
       const d = await res.json();
       dismiss();
       if (d.success) toast(t('detail.refreshModelCache') + ' · ' + (d.count || 0), 'success');
-      else toast(t('common.failed') + (d.error ? ': ' + d.error : ''), 'error');
+      else toast(t('common.failed') + (d.error ? ': ' + localizedError(d.error) : ''), 'error');
     } catch (e) {
       dismiss();
       toast(t('common.failed'), 'error');
@@ -1189,7 +1204,7 @@
       '</div></div>' +
 
       '<div class="detail-section"><h4>' + escapeHtml(t('detail.machineId')) + '</h4><div class="machine-id-row">' +
-      '<input type="text" id="machineIdInput" value="' + escapeAttr(a.machineId || '') + '" placeholder="UUID" />' +
+      '<input type="text" id="machineIdInput" value="' + escapeAttr(a.machineId || '') + '" placeholder="' + escapeAttr(t('detail.machineIdPlaceholder')) + '" />' +
       '<button class="btn btn-sm btn-outline" id="generateMachineIdBtn" type="button">' + escapeHtml(t('detail.generate')) + '</button>' +
       '<button class="btn btn-sm btn-primary" data-detail-action="saveMachineId" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.save')) + '</button>' +
       '</div></div>' +
@@ -1215,7 +1230,7 @@
       '</div>' +
 
       '<div class="detail-section"><h4>' + escapeHtml(t('detail.proxyURL')) + '</h4><div class="machine-id-row">' +
-      '<input type="text" id="proxyURLInput" value="' + escapeAttr(a.proxyURL || '') + '" placeholder="socks5://host:port" />' +
+      '<input type="text" id="proxyURLInput" value="' + escapeAttr(a.proxyURL || '') + '" placeholder="' + escapeAttr(t('detail.proxyURLPlaceholder')) + '" />' +
       '<button class="btn btn-sm btn-primary" data-detail-action="saveProxyURL" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.save')) + '</button>' +
       '</div><p class="help-block">' + escapeHtml(t('detail.proxyHint')) + '</p></div>' +
 
@@ -1269,8 +1284,8 @@
             '</div>';
         }).join('') || '<p class="empty-state">' + escapeHtml(t('detail.noModels')) + '</p>';
       } else {
-        c.innerHTML = '<p class="message message-error">' + escapeHtml(t('detail.loadFailed')) + ': ' + escapeHtml(d.error || '') + '</p>';
-        toast(t('detail.loadFailed') + (d.error ? ': ' + d.error : ''), 'error');
+        c.innerHTML = '<p class="message message-error">' + escapeHtml(t('detail.loadFailed')) + ': ' + escapeHtml(localizedError(d.error)) + '</p>';
+        toast(t('detail.loadFailed') + (d.error ? ': ' + localizedError(d.error) : ''), 'error');
       }
     } catch (e) {
       c.innerHTML = '<p class="message message-error">' + escapeHtml(t('detail.loadFailed')) + '</p>';
@@ -1294,7 +1309,7 @@
         toast(successMsg, 'success');
         loadAccounts();
       } else {
-        toast(t('detail.saveFailed') + (d.error ? ': ' + d.error : ''), 'error');
+        toast(t('detail.saveFailed') + (d.error ? ': ' + localizedError(d.error) : ''), 'error');
       }
     } catch (e) {
       toast(t('detail.saveFailed'), 'error');
@@ -1327,7 +1342,7 @@
       const res = await api('/accounts/' + id + '/overage');
       const d = await res.json();
       dismiss();
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.failed'));
       mergeOverageSnapshot(id, d);
       showDetail(id);
       renderAccounts();
@@ -1348,7 +1363,7 @@
       });
       const d = await res.json();
       dismiss();
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.failed'));
       mergeOverageSnapshot(id, d);
       showDetail(id);
       renderAccounts();
@@ -1420,7 +1435,7 @@
         ? '<select id="testModelChoice">' +
         testModalModels.map(m => '<option value="' + escapeAttr(m) + '">' + escapeHtml(m) + '</option>').join('') +
         '</select>'
-        : '<input type="text" id="testModelChoice" placeholder="claude-sonnet-4" value="claude-sonnet-4" />';
+        : '<input type="text" id="testModelChoice" placeholder="' + escapeAttr(t('accounts.testModelPlaceholder')) + '" value="claude-sonnet-4" />';
 
     body.innerHTML =
       '<div class="test-modal-account">' +
@@ -1495,7 +1510,7 @@
       if (d.success) {
         addTestLog(t('accounts.testLog.success', email, elapsed, d.reply), 'ok');
       } else {
-        addTestLog(t('accounts.testLog.failed', email, elapsed, d.error || t('common.unknownError')), 'err');
+        addTestLog(t('accounts.testLog.failed', email, elapsed, localizedError(d.error) || t('common.unknownError')), 'err');
       }
     } catch (e) {
       addTestLog(t('accounts.testLog.error', email, e.message), 'err');
@@ -1530,7 +1545,7 @@
     });
     const d = await res.json();
     if (d.success) toast(t('settings.thinkingSaved'), 'success');
-    else toast(t('common.saveFailed') + ': ' + (d.error || ''), 'error');
+    else toast(t('common.saveFailed') + ': ' + localizedError(d.error), 'error');
   }
   async function loadModelMappings() {
     const res = await api('/model-mappings');
@@ -1552,7 +1567,7 @@
       renderModelMappings();
       toast(t('settings.modelMappingsSaved'), 'success');
     } else {
-      toast(t('common.saveFailed') + ': ' + (d.error || ''), 'error');
+      toast(t('common.saveFailed') + ': ' + localizedError(d.error), 'error');
     }
   }
   function renderModelMappings() {
@@ -1624,7 +1639,7 @@
     });
     const d = await res.json();
     if (d.success) toast(t('settings.endpointSaved'), 'success');
-    else toast(t('common.saveFailed') + ': ' + (d.error || ''), 'error');
+    else toast(t('common.saveFailed') + ': ' + localizedError(d.error), 'error');
   }
   async function loadProxyConfig() {
     const res = await api('/proxy');
@@ -1668,7 +1683,7 @@
     const res = await api('/proxy', { method: 'POST', body: JSON.stringify({ proxyURL: url }) });
     const d = await res.json();
     if (d.success) toast(t('settings.proxySaved'), 'success');
-    else toast(t('common.saveFailed') + ': ' + (d.error || ''), 'error');
+    else toast(t('common.saveFailed') + ': ' + localizedError(d.error), 'error');
   }
   async function saveApiSettings() {
     try {
@@ -1680,7 +1695,7 @@
       }
       const res = await api('/settings', { method: 'POST', body: JSON.stringify({ requireApiKey }) });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.saveFailed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.saveFailed'));
       syncApiKeyManagementVisibility();
       toast(t('detail.saved'), 'success');
     } catch (e) {
@@ -1771,19 +1786,19 @@
     const tokenLimit = Number(k.tokenLimit || 0);
     const creditLimit = Number(k.creditLimit || 0);
     if (tokenLimit <= 0 && creditLimit <= 0) {
-      return '<span class="api-key-usage-unlimited"><i class="fa-solid fa-infinity" aria-hidden="true"></i>' + escapeHtml('Unlimited') + '</span>';
+      return '<span class="api-key-usage-unlimited"><i class="fa-solid fa-infinity" aria-hidden="true"></i>' + escapeHtml(t('common.unlimited')) + '</span>';
     }
-    const tokenText = tokenLimit > 0 ? formatNum(k.tokensUsed || 0) + ' / ' + formatNum(tokenLimit) : 'No limit';
-    const creditText = creditLimit > 0 ? formatCredits(k.creditsUsed || 0) + ' / ' + formatCredits(creditLimit) : 'No limit';
+    const tokenText = tokenLimit > 0 ? formatNum(k.tokensUsed || 0) + ' / ' + formatNum(tokenLimit) : t('common.noLimit');
+    const creditText = creditLimit > 0 ? formatCredits(k.creditsUsed || 0) + ' / ' + formatCredits(creditLimit) : t('common.noLimit');
     return '<span class="api-key-usage">' +
-      '<span class="api-key-usage-line"><span class="api-key-usage-icon" title="Tokens"><i class="fa-solid fa-cubes" aria-hidden="true"></i></span>' + escapeHtml(tokenText) + '</span>' +
-      '<span class="api-key-usage-line api-key-muted"><span class="api-key-usage-icon" title="Credits"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>' + escapeHtml(creditText) + '</span>' +
+      '<span class="api-key-usage-line"><span class="api-key-usage-icon" title="' + escapeAttr(t('stats.tokens')) + '"><i class="fa-solid fa-cubes" aria-hidden="true"></i></span>' + escapeHtml(tokenText) + '</span>' +
+      '<span class="api-key-usage-line api-key-muted"><span class="api-key-usage-icon" title="' + escapeAttr(t('stats.credits')) + '"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>' + escapeHtml(creditText) + '</span>' +
       '</span>';
   }
   async function copyApiKey(id) {
     const res = await api('/api-keys/' + encodeURIComponent(id));
     const d = await res.json().catch(() => ({}));
-    if (!res.ok || !d.key) throw new Error(d.error || t('common.failed'));
+    if (!res.ok || !d.key) throw new Error(localizedError(d.error) || t('common.failed'));
     await copyText(d.key);
     toast(t('common.copied'), 'primary');
   }
@@ -1850,7 +1865,7 @@
           body: JSON.stringify(values)
         });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+        if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.failed'));
         toast(t('settings.apiKeyUpdated'), 'success');
         setApiKeyEditorMode('');
         $('newApiKeyName').value = '';
@@ -1872,7 +1887,7 @@
         body: JSON.stringify(payload)
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.failed'));
       $('newApiKeyName').value = '';
       $('newApiKeyValue').value = '';
       $('newApiKeyTokenLimit').value = '0';
@@ -1894,7 +1909,7 @@
         body: JSON.stringify({ enabled: !enabled })
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.failed'));
       await loadApiKeys();
     } catch (e) {
       toast((e && e.message) || t('common.failed'), 'error');
@@ -1904,7 +1919,7 @@
     try {
       const res = await api('/api-keys/' + encodeURIComponent(id) + '/reset-usage', { method: 'POST' });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.failed'));
       await loadApiKeys();
     } catch (e) {
       toast((e && e.message) || t('common.failed'), 'error');
@@ -1920,7 +1935,7 @@
     try {
       const res = await api('/api-keys/' + encodeURIComponent(id), { method: 'DELETE' });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.failed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.failed'));
       await loadApiKeys();
     } catch (e) {
       toast((e && e.message) || t('common.failed'), 'error');
@@ -1937,7 +1952,7 @@
     try {
       const res = await api('/settings', { method: 'POST', body: JSON.stringify({ password: np }) });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || d.success === false) throw new Error(d.error || t('common.saveFailed'));
+      if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.saveFailed'));
       setActivePassword(np, localStorage.getItem('kiro_remember') === '1');
       toast(t('settings.passwordChanged'), 'success');
       $('newPassword').value = '';
@@ -2244,7 +2259,7 @@
       ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
     const res = await api('/backups', { method: 'POST', body: JSON.stringify({ kind: 'manual', note }) });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok || d.error) return toast((d && d.error) || t('common.failed'), 'error');
+    if (!res.ok || d.error) return toast(localizedError(d && d.error) || t('common.failed'), 'error');
     toast(t('backups.created'), 'success');
     loadBackups();
   }
@@ -2256,7 +2271,7 @@
     };
     const res = await api('/backups/schedule', { method: 'POST', body: JSON.stringify(schedule) });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok || d.success === false) return toast((d && d.error) || t('common.saveFailed'), 'error');
+    if (!res.ok || d.success === false) return toast(localizedError(d && d.error) || t('common.saveFailed'), 'error');
     toast(t('backups.scheduleSaved'), 'success');
     loadBackups();
   }
@@ -2277,7 +2292,7 @@
     if (!ok) return;
     const res = await api('/backups/' + encodeURIComponent(id) + '/restore', { method: 'POST' });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok || d.success === false) return toast((d && d.error) || t('common.failed'), 'error');
+    if (!res.ok || d.success === false) return toast(localizedError(d && d.error) || t('common.failed'), 'error');
     toast(t('backups.restored'), 'success');
     loadData();
     loadBackups();
@@ -2287,7 +2302,7 @@
     if (!ok) return;
     const res = await api('/backups/' + encodeURIComponent(id), { method: 'DELETE' });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok || d.success === false) return toast((d && d.error) || t('common.failed'), 'error');
+    if (!res.ok || d.success === false) return toast(localizedError(d && d.error) || t('common.failed'), 'error');
     toast(t('backups.deleted'), 'success');
     loadBackups();
   }
@@ -2299,7 +2314,7 @@
     body.append('file', file);
     const res = await api('/backups/restore', { method: 'POST', body, headers: { 'X-Admin-Password': password } });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok || d.success === false) return toast((d && d.error) || t('common.failed'), 'error');
+    if (!res.ok || d.success === false) return toast(localizedError(d && d.error) || t('common.failed'), 'error');
     toast(t('backups.restored'), 'success');
     loadData();
     loadBackups();
@@ -2324,7 +2339,7 @@
     });
     const d = await res.json();
     if (d.success) toast(t('settings.promptFilterSaved'), 'success');
-    else toast(t('common.saveFailed') + ': ' + (d.error || ''), 'error');
+    else toast(t('common.saveFailed') + ': ' + localizedError(d.error), 'error');
   }
   function renderPromptRules() {
     const c = $('promptFilterRules');
@@ -2445,7 +2460,7 @@
     title.textContent = t('modal.iamTitle');
     body.innerHTML =
       '<p class="help-block">' + escapeHtml(t('modal.iamDesc')) + '</p>' +
-      '<div class="form-group"><label>' + escapeHtml(t('iam.startUrl')) + '</label><input type="text" id="iamStartUrl" placeholder="https://xxx.awsapps.com/start" /></div>' +
+      '<div class="form-group"><label>' + escapeHtml(t('iam.startUrl')) + '</label><input type="text" id="iamStartUrl" placeholder="' + escapeAttr(t('iam.startUrlPlaceholder')) + '" /></div>' +
       '<div class="form-group"><label>' + escapeHtml(t('detail.region')) + '</label><input type="text" id="iamRegion" value="us-east-1" /></div>' +
       '<div id="iamStep2" class="hidden">' +
       '<div class="form-group"><label>' + escapeHtml(t('iam.loginUrl')) + '</label>' +
@@ -2456,7 +2471,7 @@
       '</div>' +
       '</div>' +
       '<p class="text-sm mt-3 success-text">' + escapeHtml(t('iam.completeLogin')) + '</p>' +
-      '<div class="form-group"><label>' + escapeHtml(t('iam.callbackUrl')) + '</label><input type="text" id="iamCallback" placeholder="http://127.0.0.1:xxx/?code=..." /></div>' +
+      '<div class="form-group"><label>' + escapeHtml(t('iam.callbackUrl')) + '</label><input type="text" id="iamCallback" placeholder="' + escapeAttr(t('iam.callbackUrlPlaceholder')) + '" /></div>' +
       '</div>' +
       '<div class="modal-footer">' +
       '<button class="btn btn-secondary" data-modal-goto="add" type="button">' + escapeHtml(t('common.back')) + '</button>' +
@@ -2609,7 +2624,7 @@
       closeModal(); loadAccounts(); loadStats();
       toastPrimary(t('local.importSuccess') + ': ' + (d.account?.email || d.account?.id));
       autoRefreshNewAccount(d.account?.id);
-    } else toastError(t('common.failed') + ': ' + (d.error || ''));
+    } else toastError(t('common.failed') + ': ' + localizedError(d.error));
   }
   async function importCredentials() {
     try {
@@ -2675,7 +2690,7 @@
       closeModal(); loadAccounts(); loadStats();
       toastPrimary(t('cookie.importSuccess') + ': ' + (d.account?.email || d.account?.id));
       autoRefreshNewAccount(d.account?.id);
-    } else toastError(t('common.failed') + ': ' + (d.error || ''));
+    } else toastError(t('common.failed') + ': ' + localizedError(d.error));
   }
   async function importSsoToken() {
     const res = await api('/auth/sso-token', {
@@ -2693,7 +2708,7 @@
       if (errs > 0) msg += t('sso.importPartial', errs);
       toastPrimary(msg, { duration: 5200 });
       if (d.accounts) d.accounts.forEach(a => autoRefreshNewAccount(a.id));
-    } else toastError(t('common.failed') + ': ' + (d.error || ''));
+    } else toastError(t('common.failed') + ': ' + localizedError(d.error));
   }
   async function startBuilderIdLogin() {
     const region = $('builderIdRegion').value || 'us-east-1';
@@ -2712,7 +2727,7 @@
       });
       $('builderIdCancelBtn').addEventListener('click', cancelBuilderIdLogin);
       pollBuilderIdAuth(d.interval || 5);
-    } else toastError(t('common.failed') + ': ' + (d.error || ''));
+    } else toastError(t('common.failed') + ': ' + localizedError(d.error));
   }
   function pollBuilderIdAuth(interval) {
     builderIdPollTimer = setTimeout(async () => {
@@ -2726,7 +2741,7 @@
         $('builderIdStatus').textContent = t('builderid.waiting');
         pollBuilderIdAuth(d.interval || interval);
       } else {
-        toastError(t('common.failed') + ': ' + (d.error || ''));
+        toastError(t('common.failed') + ': ' + localizedError(d.error));
         cancelBuilderIdLogin();
       }
     }, interval * 1000);
@@ -2748,7 +2763,7 @@
         closeModal(); loadAccounts(); loadStats();
         toastPrimary(t('builderid.success') + ': ' + (d.account?.email || d.account?.id));
         autoRefreshNewAccount(d.account?.id);
-      } else toastError(t('common.failed') + ': ' + (d.error || ''));
+      } else toastError(t('common.failed') + ': ' + localizedError(d.error));
     } else {
       const res = await api('/auth/iam-sso/start', {
         method: 'POST', body: JSON.stringify({
@@ -2766,7 +2781,7 @@
           await copyText($('iamAuthUrl').textContent);
           toast(t('common.copied'), 'primary');
         });
-      } else toastError(t('common.failed') + ': ' + (d.error || ''));
+      } else toastError(t('common.failed') + ': ' + localizedError(d.error));
     }
   }
   async function autoRefreshNewAccount(id) {
@@ -2829,7 +2844,7 @@
     const res = await api('/export', { method: 'POST', body: JSON.stringify({ ids: Array.from(exportSelectedIds) }) });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      toastError(t('common.failed') + ': ' + (err.error || t('common.unknownError')));
+      toastError(t('common.failed') + ': ' + (localizedError(err.error) || t('common.unknownError')));
       return null;
     }
     return res.json();
@@ -3353,7 +3368,7 @@
   async function init() {
     initTheme();
     await loadLocale(currentLang);
-    if (currentLang !== 'zh') await loadLocale('zh');
+    if (currentLang !== 'en') await loadLocale('en');
     applyTranslations();
     initCustomSelectObserver();
     initPrivacyMode();

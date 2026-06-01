@@ -311,6 +311,45 @@ func TestUpdateSettingsReloadsPoolAfterAllowOverUsageChange(t *testing.T) {
 	}
 }
 
+func TestAdminModelMappingsSaveAndApply(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	config.SetPassword("admin-password")
+	h := NewHandler()
+
+	body := strings.NewReader(`{"mappings":[{"key":"my-real-life-model","value":"claude-haiku-4.5"}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/admin/api/model-mappings", body)
+	req.Header.Set("X-Admin-Password", "admin-password")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save mappings status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/admin/api/model-mappings", nil)
+	req.Header.Set("X-Admin-Password", "admin-password")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get mappings status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Mappings []config.ModelMappingRule `json:"mappings"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode mappings: %v", err)
+	}
+	if len(got.Mappings) != 1 || got.Mappings[0].Key != "my-real-life-model" || got.Mappings[0].Value != "claude-haiku-4.5" {
+		t.Fatalf("unexpected saved mappings: %#v", got.Mappings)
+	}
+
+	gotModel, gotThinking := ParseModelAndThinking("vendor/my-real-life-model-thinking", "-thinking")
+	if gotModel != "claude-haiku-4.5" || !gotThinking {
+		t.Fatalf("custom mapping parse = (%q, %v), want (%q, %v)", gotModel, gotThinking, "claude-haiku-4.5", true)
+	}
+}
+
 func TestBatchDeleteAccounts(t *testing.T) {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatalf("config.Init: %v", err)
