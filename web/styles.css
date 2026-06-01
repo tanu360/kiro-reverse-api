@@ -2210,18 +2210,24 @@ img.brand-icon {
   padding: 0.75rem 0.875rem;
 }
 .update-version-card-current {
-  border-color: color-mix(in oklab, var(--primary) 48%, var(--border));
-  background: color-mix(in oklab, var(--primary) 12%, var(--card));
+  border-color: color-mix(in oklab, var(--info) 38%, var(--border));
+  background:
+    linear-gradient(135deg,
+      color-mix(in oklab, var(--info) 15%, var(--card)) 0%,
+      color-mix(in oklab, var(--info) 7%, var(--card)) 100%);
 }
 .update-version-card-latest {
-  border-color: color-mix(in oklab, var(--success) 48%, var(--border));
-  background: color-mix(in oklab, var(--success) 12%, var(--card));
+  border-color: color-mix(in oklab, var(--success) 42%, var(--border));
+  background:
+    linear-gradient(135deg,
+      color-mix(in oklab, var(--success) 16%, var(--card)) 0%,
+      color-mix(in oklab, var(--success) 7%, var(--card)) 100%);
 }
 .update-version-card-current .update-version-label {
-  color: var(--primary);
+  color: color-mix(in oklab, var(--info) 82%, var(--foreground));
 }
 .update-version-card-latest .update-version-label {
-  color: var(--success);
+  color: color-mix(in oklab, var(--success) 82%, var(--foreground));
 }
 .update-version-label,
 .update-notes-title {
@@ -2243,10 +2249,10 @@ img.brand-icon {
   word-break: break-word;
 }
 .update-version-value-success {
-  color: var(--success);
+  color: color-mix(in oklab, var(--success) 76%, var(--foreground));
 }
 .update-version-value-current {
-  color: var(--primary);
+  color: color-mix(in oklab, var(--info) 76%, var(--foreground));
 }
 .update-notes-body {
   margin: 0;
