@@ -12,23 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type modelMapping struct {
-	key   string
-	value string
-}
-
-var modelMapOrdered = []modelMapping{
-	{"claude-sonnet-4-20250514", "claude-sonnet-4.6"},
-	{"claude-3-5-sonnet", "claude-sonnet-4.6"},
-	{"claude-3-opus", "claude-sonnet-4.6"},
-	{"claude-3-sonnet", "claude-sonnet-4.6"},
-	{"claude-3-haiku", "claude-haiku-4.5"},
-	{"gpt-5.4-mini", "claude-haiku-4.5"},
-	{"gpt-5", "claude-opus-4.8"},
-	{"gpt-4-turbo", "claude-sonnet-4.6"},
-	{"gpt-3.5-turbo", "claude-sonnet-4.6"},
-}
-
 var claudeVersionPattern = regexp.MustCompile(`^(claude-(?:opus|sonnet|haiku)-\d+)-(\d+)$`)
 
 const ThinkingModePrompt = `<thinking_mode>enabled</thinking_mode>
@@ -53,9 +36,11 @@ func ParseModelAndThinking(model string, thinkingSuffix string) (string, bool) {
 		lower = strings.ToLower(model)
 	}
 
-	for _, m := range modelMapOrdered {
-		if strings.Contains(lower, m.key) {
-			return m.value, thinking
+	for _, m := range config.GetModelMappings() {
+		key := strings.ToLower(strings.TrimSpace(m.Key))
+		value := strings.TrimSpace(m.Value)
+		if key != "" && value != "" && strings.Contains(lower, key) {
+			return value, thinking
 		}
 	}
 

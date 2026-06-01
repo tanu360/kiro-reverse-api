@@ -112,6 +112,7 @@ func currentBackupData() ([]byte, int, string, bool, int, error) {
 	}
 	configSnapshot.ApiKeys = append([]ApiKeyEntry(nil), cfg.ApiKeys...)
 	configSnapshot.PromptFilterRules = append([]PromptFilterRule(nil), cfg.PromptFilterRules...)
+	configSnapshot.ModelMappings = append([]ModelMappingRule(nil), cfg.ModelMappings...)
 	autoKeep := maxAutoKeep
 	if cfg.Backup.AutoKeep > 0 {
 		autoKeep = cfg.Backup.AutoKeep
@@ -558,6 +559,7 @@ func AutoSnapshotBeforeSave() {
 	}
 	configSnapshot.ApiKeys = append([]ApiKeyEntry(nil), cfg.ApiKeys...)
 	configSnapshot.PromptFilterRules = append([]PromptFilterRule(nil), cfg.PromptFilterRules...)
+	configSnapshot.ModelMappings = append([]ModelMappingRule(nil), cfg.ModelMappings...)
 	autoKeep := cfg.Backup.AutoKeep
 	credentialsLoaded, credentialsSnapshot := CredentialsSnapshot()
 	data, accountCnt, version, includesCredentials, err := backupDataFromSnapshot(configSnapshot, credentialsLoaded, credentialsSnapshot, time.Now().Unix())

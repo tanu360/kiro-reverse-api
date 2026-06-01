@@ -2237,6 +2237,10 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetThinkingConfig(w, r)
 	case path == "/thinking" && r.Method == "POST":
 		h.apiUpdateThinkingConfig(w, r)
+	case path == "/model-mappings" && r.Method == "GET":
+		h.apiGetModelMappings(w, r)
+	case path == "/model-mappings" && r.Method == "POST":
+		h.apiUpdateModelMappings(w, r)
 	case path == "/endpoint" && r.Method == "GET":
 		h.apiGetEndpointConfig(w, r)
 	case path == "/endpoint" && r.Method == "POST":
@@ -3099,6 +3103,30 @@ func (h *Handler) apiUpdatePromptFilter(w http.ResponseWriter, r *http.Request) 
 		rules = *req.Rules
 	}
 	if err := config.UpdatePromptFilterConfig(fcc, fen, fsb, rules); err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func (h *Handler) apiGetModelMappings(w http.ResponseWriter, _ *http.Request) {
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"mappings": config.GetModelMappings(),
+		"defaults": config.DefaultModelMappings(),
+	})
+}
+
+func (h *Handler) apiUpdateModelMappings(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Mappings []config.ModelMappingRule `json:"mappings"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		return
+	}
+	if err := config.UpdateModelMappings(req.Mappings); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return

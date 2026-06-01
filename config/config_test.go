@@ -48,6 +48,41 @@ func TestUpdateSettingsPatchCanExplicitlyDisableAPIKeyRequirement(t *testing.T) 
 	}
 }
 
+func TestModelMappingsDefaultAndUpdate(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+
+	defaults := GetModelMappings()
+	if len(defaults) == 0 {
+		t.Fatalf("expected default model mappings")
+	}
+	defaults[0].Key = "mutated"
+	if got := GetModelMappings()[0].Key; got == "mutated" {
+		t.Fatalf("expected model mappings to be returned as a copy")
+	}
+
+	custom := []ModelMappingRule{
+		{Key: "  My-Alias  ", Value: " claude-haiku-4.5 "},
+		{Key: "", Value: "claude-opus-4.8"},
+		{Key: "blank-target", Value: ""},
+	}
+	if err := UpdateModelMappings(custom); err != nil {
+		t.Fatalf("update mappings: %v", err)
+	}
+	got := GetModelMappings()
+	if len(got) != 1 || got[0].Key != "my-alias" || got[0].Value != "claude-haiku-4.5" {
+		t.Fatalf("unexpected cleaned mappings: %#v", got)
+	}
+
+	if err := UpdateModelMappings([]ModelMappingRule{}); err != nil {
+		t.Fatalf("clear mappings: %v", err)
+	}
+	if got := GetModelMappings(); len(got) != 0 {
+		t.Fatalf("expected explicit empty mappings to be preserved, got %#v", got)
+	}
+}
+
 func TestUpdateBackupSchedulePreservesLastRun(t *testing.T) {
 	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)

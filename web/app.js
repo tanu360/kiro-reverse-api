@@ -14,6 +14,10 @@
   let filterStatus = 'all';
   let privacyModeEnabled = true;
   let promptRules = [];
+  let modelMappings = [];
+  let modelMappingDefaults = [];
+  let draggedModelMappingIndex = null;
+  let modelMappingDropIndex = null;
   let builderIdSession = '';
   let builderIdPollTimer = null;
   let iamSession = '';
@@ -132,6 +136,7 @@
     renderVersionBadge();
     renderAccounts();
     renderPromptRules();
+    renderModelMappings();
     renderObserveCached();
     renderRequestsCached();
     renderBackupsCached();
@@ -1504,7 +1509,7 @@
     $('requireApiKey').checked = d.requireApiKey;
     syncApiKeyManagementVisibility();
     $('allowOverUsage').checked = d.allowOverUsage || false;
-    await Promise.all([loadApiKeys(), loadThinkingConfig(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
+    await Promise.all([loadApiKeys(), loadThinkingConfig(), loadModelMappings(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
     syncApiKeyManagementVisibility();
     refreshCustomSelects();
   }
@@ -1526,6 +1531,83 @@
     const d = await res.json();
     if (d.success) toast(t('settings.thinkingSaved'), 'success');
     else toast(t('common.saveFailed') + ': ' + (d.error || ''), 'error');
+  }
+  async function loadModelMappings() {
+    const res = await api('/model-mappings');
+    const d = await res.json();
+    modelMappings = d.mappings || [];
+    modelMappingDefaults = d.defaults || [];
+    renderModelMappings();
+  }
+  async function saveModelMappings() {
+    const mappings = modelMappings
+      .map(m => ({ key: (m.key || '').trim(), value: (m.value || '').trim() }))
+      .filter(m => m.key && m.value);
+    const res = await api('/model-mappings', {
+      method: 'POST', body: JSON.stringify({ mappings })
+    });
+    const d = await res.json();
+    if (d.success) {
+      modelMappings = mappings;
+      renderModelMappings();
+      toast(t('settings.modelMappingsSaved'), 'success');
+    } else {
+      toast(t('common.saveFailed') + ': ' + (d.error || ''), 'error');
+    }
+  }
+  function renderModelMappings() {
+    const c = $('modelMappings');
+    if (!c) return;
+    if (!modelMappings.length) {
+      c.innerHTML = '<div class="model-mapping-empty">' + escapeHtml(t('modelMappings.noRules')) + '</div>';
+      return;
+    }
+    const rows = modelMappings.map((m, i) => (
+      '<div class="model-mapping-row" data-model-mapping-row="' + i + '">' +
+      '<button class="model-mapping-drag" type="button" draggable="true" data-model-mapping-handle="' + i + '" aria-label="' + escapeAttr(t('modelMappings.drag')) + '">' +
+      '<i class="fa-solid fa-grip-vertical" aria-hidden="true"></i>' +
+      '</button>' +
+      '<div class="model-mapping-cell model-mapping-source">' +
+      '<input value="' + escapeAttr(m.key || '') + '" data-model-mapping-idx="' + i + '" data-model-mapping-field="key" placeholder="' + escapeAttr(t('modelMappings.matchPlaceholder')) + '" spellcheck="false" />' +
+      '</div>' +
+      '<div class="model-mapping-arrow"><i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i></div>' +
+      '<div class="model-mapping-cell model-mapping-target">' +
+      '<input value="' + escapeAttr(m.value || '') + '" data-model-mapping-idx="' + i + '" data-model-mapping-field="value" placeholder="' + escapeAttr(t('modelMappings.targetPlaceholder')) + '" spellcheck="false" />' +
+      '</div>' +
+      '<button class="rule-remove model-mapping-delete" data-model-mapping-remove="' + i + '" type="button" aria-label="' + escapeAttr(t('common.remove')) + '">&times;</button>' +
+      '</div>'
+    )).join('');
+    c.innerHTML =
+      '<div class="model-mapping-table-head">' +
+      '<span></span>' +
+      '<span>' + escapeHtml(t('modelMappings.match')) + '</span>' +
+      '<span></span>' +
+      '<span>' + escapeHtml(t('modelMappings.target')) + '</span>' +
+      '<span></span>' +
+      '</div>' + rows;
+  }
+  function addModelMapping() {
+    modelMappings.unshift({ key: '', value: '' });
+    renderModelMappings();
+    requestAnimationFrame(() => {
+      const firstInput = $('modelMappings').querySelector('[data-model-mapping-field="key"]');
+      if (firstInput) firstInput.focus();
+    });
+  }
+  function resetModelMappingsToDefaults() {
+    modelMappings = modelMappingDefaults.map(m => ({ key: m.key || '', value: m.value || '' }));
+    renderModelMappings();
+  }
+  function clearModelMappingDropState() {
+    qsa('.model-mapping-row', $('modelMappings')).forEach(row => row.classList.remove('drag-over', 'drop-before', 'drop-after'));
+  }
+  function markModelMappingDropped(index) {
+    requestAnimationFrame(() => {
+      const row = qsa('.model-mapping-row', $('modelMappings'))[index];
+      if (!row) return;
+      row.classList.add('dropped');
+      setTimeout(() => row.classList.remove('dropped'), 260);
+    });
   }
   async function loadEndpointConfig() {
     const res = await api('/endpoint');
@@ -3111,6 +3193,89 @@
     });
   }
 
+  function bindModelMappingEvents() {
+    $('addModelMappingBtn').addEventListener('click', addModelMapping);
+    $('resetModelMappingsBtn').addEventListener('click', resetModelMappingsToDefaults);
+    $('saveModelMappingsBtn').addEventListener('click', saveModelMappings);
+
+    $('modelMappings').addEventListener('input', e => {
+      const idx = e.target.dataset.modelMappingIdx;
+      const field = e.target.dataset.modelMappingField;
+      if (idx != null && field && modelMappings[idx]) {
+        modelMappings[idx][field] = e.target.value;
+      }
+    });
+    $('modelMappings').addEventListener('click', e => {
+      const rm = e.target.closest('[data-model-mapping-remove]');
+      if (rm) {
+        modelMappings.splice(parseInt(rm.dataset.modelMappingRemove, 10), 1);
+        renderModelMappings();
+      }
+    });
+    $('modelMappings').addEventListener('dragstart', e => {
+      const handle = e.target.closest('[data-model-mapping-handle]');
+      if (!handle) return;
+      const row = handle.closest('[data-model-mapping-row]');
+      draggedModelMappingIndex = parseInt(handle.dataset.modelMappingHandle, 10);
+      modelMappingDropIndex = draggedModelMappingIndex;
+      if (e.dataTransfer) {
+        if (row) {
+          const dragImage = row.cloneNode(true);
+          dragImage.classList.add('model-mapping-drag-image');
+          dragImage.style.width = row.offsetWidth + 'px';
+          document.body.appendChild(dragImage);
+          e.dataTransfer.setDragImage(dragImage, 24, Math.max(18, row.offsetHeight / 2));
+          setTimeout(() => dragImage.remove(), 0);
+        }
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(draggedModelMappingIndex));
+      }
+      if (row) row.classList.add('dragging');
+      $('modelMappings').classList.add('drag-active');
+    });
+    $('modelMappings').addEventListener('dragover', e => {
+      const row = e.target.closest('[data-model-mapping-row]');
+      if (!row || draggedModelMappingIndex == null) return;
+      e.preventDefault();
+      const rowIndex = parseInt(row.dataset.modelMappingRow, 10);
+      const rect = row.getBoundingClientRect();
+      const placeAfter = e.clientY > rect.top + rect.height / 2;
+      modelMappingDropIndex = placeAfter ? rowIndex + 1 : rowIndex;
+      clearModelMappingDropState();
+      row.classList.add('drag-over', placeAfter ? 'drop-after' : 'drop-before');
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    });
+    $('modelMappings').addEventListener('dragleave', e => {
+      const row = e.target.closest('[data-model-mapping-row]');
+      if (row && !row.contains(e.relatedTarget)) row.classList.remove('drag-over', 'drop-before', 'drop-after');
+    });
+    $('modelMappings').addEventListener('drop', e => {
+      const row = e.target.closest('[data-model-mapping-row]');
+      if (!row || draggedModelMappingIndex == null) return;
+      e.preventDefault();
+      let insertIndex = modelMappingDropIndex == null ? parseInt(row.dataset.modelMappingRow, 10) : modelMappingDropIndex;
+      if (insertIndex !== draggedModelMappingIndex && insertIndex !== draggedModelMappingIndex + 1) {
+        const item = modelMappings.splice(draggedModelMappingIndex, 1)[0];
+        if (insertIndex > draggedModelMappingIndex) insertIndex--;
+        insertIndex = Math.max(0, Math.min(insertIndex, modelMappings.length));
+        modelMappings.splice(insertIndex, 0, item);
+        renderModelMappings();
+        markModelMappingDropped(insertIndex);
+      } else {
+        clearModelMappingDropState();
+      }
+      draggedModelMappingIndex = null;
+      modelMappingDropIndex = null;
+      $('modelMappings').classList.remove('drag-active');
+    });
+    $('modelMappings').addEventListener('dragend', () => {
+      draggedModelMappingIndex = null;
+      modelMappingDropIndex = null;
+      $('modelMappings').classList.remove('drag-active');
+      qsa('.model-mapping-row', $('modelMappings')).forEach(row => row.classList.remove('dragging', 'drag-over', 'drop-before', 'drop-after'));
+    });
+  }
+
   function bindModalEvents() {
     $('addModalClose').addEventListener('click', closeModal);
     $('detailModalClose').addEventListener('click', closeDetailModal);
@@ -3180,6 +3345,7 @@
     bindSettingsEvents();
     bindFeatureEvents();
     bindPromptFilterEvents();
+    bindModelMappingEvents();
     bindModalEvents();
     bindDetailEvents();
     bindTestEvents();

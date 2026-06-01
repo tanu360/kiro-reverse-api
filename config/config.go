@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -90,6 +91,11 @@ type PromptFilterRule struct {
 	Enabled bool   `json:"enabled"`
 }
 
+type ModelMappingRule struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type ApiKeyEntry struct {
 	ID         string `json:"id"`
 	Name       string `json:"name,omitempty"`
@@ -137,6 +143,8 @@ type Config struct {
 
 	PromptFilterRules []PromptFilterRule `json:"promptFilterRules,omitempty"`
 
+	ModelMappings []ModelMappingRule `json:"modelMappings,omitempty"`
+
 	LogLevel string `json:"logLevel,omitempty"`
 
 	MaxRetriesPerAccount int `json:"maxRetriesPerAccount,omitempty"`
@@ -177,6 +185,18 @@ var (
 	cfg     *Config
 	cfgLock sync.RWMutex
 )
+
+var defaultModelMappings = []ModelMappingRule{
+	{Key: "claude-sonnet-4-20250514", Value: "claude-sonnet-4.6"},
+	{Key: "claude-3-5-sonnet", Value: "claude-sonnet-4.6"},
+	{Key: "claude-3-opus", Value: "claude-sonnet-4.6"},
+	{Key: "claude-3-sonnet", Value: "claude-sonnet-4.6"},
+	{Key: "claude-3-haiku", Value: "claude-haiku-4.5"},
+	{Key: "gpt-5.4-mini", Value: "claude-haiku-4.5"},
+	{Key: "gpt-5", Value: "claude-opus-4.8"},
+	{Key: "gpt-4-turbo", Value: "claude-sonnet-4.6"},
+	{Key: "gpt-3.5-turbo", Value: "claude-sonnet-4.6"},
+}
 
 func Init(path string) error {
 	dir := filepath.Dir(path)
@@ -257,6 +277,9 @@ func Get() *Config {
 	}
 	if cfg.PromptFilterRules != nil {
 		copyCfg.PromptFilterRules = append([]PromptFilterRule(nil), cfg.PromptFilterRules...)
+	}
+	if cfg.ModelMappings != nil {
+		copyCfg.ModelMappings = append([]ModelMappingRule(nil), cfg.ModelMappings...)
 	}
 	return &copyCfg
 }
@@ -667,6 +690,44 @@ func GetPromptFilterRules() []PromptFilterRule {
 	rules := make([]PromptFilterRule, len(cfg.PromptFilterRules))
 	copy(rules, cfg.PromptFilterRules)
 	return rules
+}
+
+func DefaultModelMappings() []ModelMappingRule {
+	return copyModelMappings(defaultModelMappings)
+}
+
+func GetModelMappings() []ModelMappingRule {
+	cfgLock.RLock()
+	defer cfgLock.RUnlock()
+	if cfg == nil || cfg.ModelMappings == nil {
+		return DefaultModelMappings()
+	}
+	return copyModelMappings(cfg.ModelMappings)
+}
+
+func UpdateModelMappings(mappings []ModelMappingRule) error {
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	cleaned := make([]ModelMappingRule, 0, len(mappings))
+	for _, mapping := range mappings {
+		key := strings.ToLower(strings.TrimSpace(mapping.Key))
+		value := strings.TrimSpace(mapping.Value)
+		if key == "" || value == "" {
+			continue
+		}
+		cleaned = append(cleaned, ModelMappingRule{Key: key, Value: value})
+	}
+	cfg.ModelMappings = cleaned
+	return Save()
+}
+
+func copyModelMappings(mappings []ModelMappingRule) []ModelMappingRule {
+	if mappings == nil {
+		return nil
+	}
+	copied := make([]ModelMappingRule, len(mappings))
+	copy(copied, mappings)
+	return copied
 }
 
 type ThinkingConfig struct {

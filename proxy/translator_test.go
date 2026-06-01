@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"kiro-proxy/config"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -436,5 +438,24 @@ func TestParseModelAndThinkingNormalizesClaudeDashVersions(t *testing.T) {
 				t.Fatalf("ParseModelAndThinking(%q) = (%q, %v), want (%q, %v)", tt.input, gotModel, gotThinking, tt.wantModel, tt.wantThinking)
 			}
 		})
+	}
+}
+
+func TestParseModelAndThinkingUsesConfiguredMappings(t *testing.T) {
+	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = config.UpdateModelMappings(config.DefaultModelMappings())
+	})
+	if err := config.UpdateModelMappings([]config.ModelMappingRule{
+		{Key: "custom-mini", Value: "claude-haiku-4.5"},
+	}); err != nil {
+		t.Fatalf("UpdateModelMappings: %v", err)
+	}
+
+	gotModel, gotThinking := ParseModelAndThinking("vendor/custom-mini-thinking", "-thinking")
+	if gotModel != "claude-haiku-4.5" || !gotThinking {
+		t.Fatalf("ParseModelAndThinking custom mapping = (%q, %v), want (%q, %v)", gotModel, gotThinking, "claude-haiku-4.5", true)
 	}
 }
