@@ -1,5 +1,5 @@
 {
-  "version": "1.1.2",
-  "changelog": "🐛 Replaced duplicated Success-card averages with successful input/output token totals.\n✨ Added managed API keys with optional custom key values, masked display, per-key token/credit limits, and usage reset.\n✨ Added API-key-aware request history with masked key column, search, sort, and status filters.\n✨ Made dashboard stats consistent: request, token, credit, success, and failed totals now come from final request rows in SQLite.\n✨ Split account credits from app credits so Kiro server quota usage and proxy request usage are shown separately.\n🛠 Improved admin UI responsiveness, compact K/M/B token display, and mobile API-key management layout.\n🐛 Fixed quota checks to use raw values, fixed duplicate/missing request accounting paths, and fixed account-pool snapshot data races.",
+  "version": "1.1.3",
+  "changelog": "🐛 Fixed Copy JSON actions on Safari/iOS and other strict clipboard devices.\n✨ Update-available toasts are now clickable and open update details consistently.\n🐛 Fixed local credential import to require a successful refresh and preserve upstream expiry/region data.\n🐛 Fixed tool_result image extraction for Claude/OpenAI tool outputs.\n🛠 Improved long-session tool history cleanup, duplicate tool-result handling, and oversized Kiro payload truncation.\n✨ Improved Claude 4.6+ / 4.8 context-window detection and Responses parallel tool-call grouping.",
   "download": "https://github.com/tanu360/kiro-reverse-api"
 }
