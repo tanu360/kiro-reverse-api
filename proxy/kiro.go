@@ -9,6 +9,7 @@ import (
 	"kiro-proxy/logger"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -526,13 +527,35 @@ func updateTokensFromEvent(event map[string]interface{}, currentInputTokens, cur
 }
 
 func getContextWindowSize(model string) int {
-	m := strings.ToLower(model)
-
-	if strings.Contains(m, "4.6") || strings.Contains(m, "4-6") ||
-		strings.Contains(m, "4.7") || strings.Contains(m, "4-7") {
+	if isLargeContextModel(model) {
 		return 1_000_000
 	}
 	return 200_000
+}
+
+var claudeVersionExtractor = regexp.MustCompile(`claude-(?:opus|sonnet|haiku)-(\d+)[.-](\d+)`)
+
+func isLargeContextModel(model string) bool {
+	m := strings.ToLower(model)
+	if match := claudeVersionExtractor.FindStringSubmatch(m); match != nil {
+		major, errMaj := strconv.Atoi(match[1])
+		minor, errMin := strconv.Atoi(match[2])
+		if errMaj == nil && errMin == nil {
+			if major > 4 {
+				return true
+			}
+			if major == 4 && minor >= 6 {
+				return true
+			}
+			return false
+		}
+	}
+	for _, tag := range []string{"4.6", "4-6", "4.7", "4-7", "4.8", "4-8", "4.9", "4-9"} {
+		if strings.Contains(m, tag) {
+			return true
+		}
+	}
+	return false
 }
 
 func collectUsageMaps(v interface{}, out *[]map[string]interface{}) {

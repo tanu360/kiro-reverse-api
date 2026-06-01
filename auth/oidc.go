@@ -10,6 +10,14 @@ import (
 	"time"
 )
 
+var oidcTokenURL = func(region string) string {
+	return fmt.Sprintf("https://oidc.%s.amazonaws.com/token", region)
+}
+
+var socialTokenURL = func() string {
+	return "https://prod.us-east-1.auth.desktop.kiro.dev/refreshToken"
+}
+
 func RefreshToken(account *config.Account) (string, string, int64, string, error) {
 
 	//! Account proxy wins over global proxy so mixed-account pools can route independently.
@@ -33,7 +41,7 @@ func refreshOIDCToken(refreshToken, clientID, clientSecret, region string, clien
 		region = "us-east-1"
 	}
 
-	url := fmt.Sprintf("https://oidc.%s.amazonaws.com/token", region)
+	url := oidcTokenURL(region)
 
 	payload := map[string]string{
 		"clientId":     clientID,
@@ -73,7 +81,7 @@ func refreshOIDCToken(refreshToken, clientID, clientSecret, region string, clien
 }
 
 func refreshSocialToken(refreshToken string, client *http.Client) (string, string, int64, string, error) {
-	url := "https://prod.us-east-1.auth.desktop.kiro.dev/refreshToken"
+	url := socialTokenURL()
 
 	payload := map[string]string{
 		"refreshToken": refreshToken,

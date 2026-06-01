@@ -209,6 +209,16 @@
 
     btn.addEventListener('click', close);
 
+    if (opts.onClick) {
+      var clickHandler = opts.onClick;
+      node.classList.add('kt-clickable');
+      node.addEventListener('click', function (e) {
+        if (e.target === btn || btn.contains(e.target)) return;
+        dismiss(node);
+        clickHandler();
+      });
+    }
+
     root.appendChild(node);
 
     requestAnimationFrame(function () {

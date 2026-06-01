@@ -267,7 +267,7 @@ func responsesInputToMessages(raw json.RawMessage) ([]OpenAIMessage, error) {
 			if err != nil {
 				return nil, err
 			}
-			messages = append(messages, itemMessages...)
+			messages = appendResponseMessages(messages, itemMessages...)
 		}
 		return messages, nil
 	}
@@ -278,6 +278,23 @@ func responsesInputToMessages(raw json.RawMessage) ([]OpenAIMessage, error) {
 	}
 
 	return nil, fmt.Errorf("input must be a string or array")
+}
+
+func appendResponseMessages(messages []OpenAIMessage, next ...OpenAIMessage) []OpenAIMessage {
+	for _, msg := range next {
+		if len(messages) > 0 &&
+			messages[len(messages)-1].Role == "assistant" &&
+			msg.Role == "assistant" &&
+			len(messages[len(messages)-1].ToolCalls) > 0 &&
+			len(msg.ToolCalls) > 0 &&
+			strings.TrimSpace(extractOpenAIMessageText(messages[len(messages)-1].Content)) == "" &&
+			strings.TrimSpace(extractOpenAIMessageText(msg.Content)) == "" {
+			messages[len(messages)-1].ToolCalls = append(messages[len(messages)-1].ToolCalls, msg.ToolCalls...)
+			continue
+		}
+		messages = append(messages, msg)
+	}
+	return messages
 }
 
 func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {

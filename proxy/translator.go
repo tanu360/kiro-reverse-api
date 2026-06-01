@@ -36,6 +36,11 @@ const ThinkingModePrompt = `<thinking_mode>enabled</thinking_mode>
 
 const minimalFallbackUserContent = "."
 const toolResultsContinuationPrefix = "Tool results:"
+const toolResultImagePlaceholder = "[Tool returned an image; the image is attached to this message.]"
+
+const maxPayloadBytes = 900 * 1024
+const truncationPlaceholder = "[Earlier conversation history was truncated to fit the model's input limit. Older messages and tool activity have been omitted.]"
+const minRecentHistoryTurns = 4
 
 func ParseModelAndThinking(model string, thinkingSuffix string) (string, bool) {
 	lower := strings.ToLower(model)
@@ -230,6 +235,14 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		history = append(priming, history...)
 	}
 
+	currentToolResultIDs := collectToolResultIDs(currentToolResults)
+	keepCurrentToolResults := currentToolResultsMatchLastAssistant(history, currentToolResultIDs)
+	if keepCurrentToolResults {
+		history = sanitizeKiroHistory(history, currentToolResultIDs)
+	} else {
+		history = sanitizeKiroHistory(history, nil)
+	}
+
 	finalContent := ""
 	if currentContent != "" {
 		finalContent = currentContent
@@ -256,10 +269,14 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		Images:  currentImages,
 	}
 
-	if len(kiroTools) > 0 || len(currentToolResults) > 0 {
+	var attachToolResults []KiroToolResult
+	if keepCurrentToolResults {
+		attachToolResults = currentToolResults
+	}
+	if len(kiroTools) > 0 || len(attachToolResults) > 0 {
 		payload.ConversationState.CurrentMessage.UserInputMessage.UserInputMessageContext = &UserInputMessageContext{
 			Tools:       kiroTools,
-			ToolResults: currentToolResults,
+			ToolResults: attachToolResults,
 		}
 	}
 
@@ -274,6 +291,8 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 			TopP:        req.TopP,
 		}
 	}
+
+	truncatePayloadToLimit(payload, systemPrompt != "")
 
 	return payload
 }
@@ -560,7 +579,13 @@ func extractClaudeUserContent(content interface{}) (string, []KiroImage, []KiroT
 				}
 			case "tool_result":
 				toolUseID, _ := block["tool_use_id"].(string)
-				resultContent := extractToolResultContent(block["content"])
+				resultContent, resultImages := extractToolResultContent(block["content"])
+				if len(resultImages) > 0 {
+					images = append(images, resultImages...)
+					if strings.TrimSpace(resultContent) == "" {
+						resultContent = toolResultImagePlaceholder
+					}
+				}
 				toolResults = append(toolResults, KiroToolResult{
 					ToolUseID: toolUseID,
 					Content:   []KiroResultContent{{Text: resultContent}},
@@ -611,22 +636,37 @@ func extractImageFromClaudeBlock(block map[string]interface{}) *KiroImage {
 	return nil
 }
 
-func extractToolResultContent(content interface{}) string {
+func extractToolResultContent(content interface{}) (string, []KiroImage) {
 	if s, ok := content.(string); ok {
-		return s
+		return s, nil
 	}
 	if blocks, ok := content.([]interface{}); ok {
 		var parts []string
+		var images []KiroImage
 		for _, b := range blocks {
-			if block, ok := b.(map[string]interface{}); ok {
-				if text, ok := block["text"].(string); ok {
-					parts = append(parts, text)
+			block, ok := b.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			blockType, _ := block["type"].(string)
+			switch blockType {
+			case "image", "image_url", "input_image":
+				if img := extractImageFromClaudeBlock(block); img != nil {
+					images = append(images, *img)
+					continue
 				}
 			}
+			if text, ok := block["text"].(string); ok {
+				parts = append(parts, text)
+				continue
+			}
+			if img := extractImageFromClaudeBlock(block); img != nil {
+				images = append(images, *img)
+			}
 		}
-		return strings.Join(parts, "")
+		return strings.Join(parts, ""), images
 	}
-	return ""
+	return "", nil
 }
 
 func extractClaudeAssistantContent(content interface{}) (string, []KiroToolUse) {
@@ -993,7 +1033,17 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 			})
 
 		case "tool":
-			content := extractOpenAIMessageText(msg.Content)
+			cleanText, toolImages := extractOpenAIUserContent(msg.Content)
+			var content string
+			if len(toolImages) > 0 {
+				currentImages = append(currentImages, toolImages...)
+				content = strings.TrimSpace(cleanText)
+				if content == "" {
+					content = toolResultImagePlaceholder
+				}
+			} else {
+				content = extractOpenAIMessageText(msg.Content)
+			}
 			currentToolResults = append(currentToolResults, KiroToolResult{
 				ToolUseID: msg.ToolCallID,
 				Content:   []KiroResultContent{{Text: content}},
@@ -1005,15 +1055,16 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 				if !isLast {
 					history = append(history, KiroHistoryMessage{
 						UserInputMessage: &KiroUserInputMessage{
-							Content: buildToolResultsContinuation(currentToolResults),
 							ModelID: modelID,
 							Origin:  origin,
+							Images:  currentImages,
 							UserInputMessageContext: &UserInputMessageContext{
 								ToolResults: currentToolResults,
 							},
 						},
 					})
 					currentToolResults = nil
+					currentImages = nil
 				}
 			}
 		}
@@ -1035,6 +1086,14 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 			},
 		}
 		history = append(priming, history...)
+	}
+
+	currentToolResultIDs := collectToolResultIDs(currentToolResults)
+	keepCurrentToolResults := currentToolResultsMatchLastAssistant(history, currentToolResultIDs)
+	if keepCurrentToolResults {
+		history = sanitizeKiroHistory(history, currentToolResultIDs)
+	} else {
+		history = sanitizeKiroHistory(history, nil)
 	}
 
 	finalContent := currentContent
@@ -1061,10 +1120,14 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		Images:  currentImages,
 	}
 
-	if len(kiroTools) > 0 || len(currentToolResults) > 0 {
+	var attachToolResults []KiroToolResult
+	if keepCurrentToolResults {
+		attachToolResults = currentToolResults
+	}
+	if len(kiroTools) > 0 || len(attachToolResults) > 0 {
 		payload.ConversationState.CurrentMessage.UserInputMessage.UserInputMessageContext = &UserInputMessageContext{
 			Tools:       kiroTools,
-			ToolResults: currentToolResults,
+			ToolResults: attachToolResults,
 		}
 	}
 
@@ -1079,6 +1142,8 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 			TopP:        req.TopP,
 		}
 	}
+
+	truncatePayloadToLimit(payload, systemPrompt != "")
 
 	return payload
 }
@@ -1167,6 +1232,274 @@ func extractOpenAIMessageText(content interface{}) string {
 	}
 
 	return ""
+}
+
+func collectToolResultIDs(toolResults []KiroToolResult) map[string]bool {
+	if len(toolResults) == 0 {
+		return nil
+	}
+	ids := make(map[string]bool, len(toolResults))
+	for _, tr := range toolResults {
+		if id := strings.TrimSpace(tr.ToolUseID); id != "" {
+			ids[id] = true
+		}
+	}
+	return ids
+}
+
+func currentToolResultsMatchLastAssistant(history []KiroHistoryMessage, currentToolResultIDs map[string]bool) bool {
+	if len(currentToolResultIDs) == 0 || len(history) == 0 {
+		return false
+	}
+	last := history[len(history)-1]
+	if last.AssistantResponseMessage == nil || len(last.AssistantResponseMessage.ToolUses) == 0 {
+		return false
+	}
+	for _, tu := range last.AssistantResponseMessage.ToolUses {
+		if !currentToolResultIDs[tu.ToolUseID] {
+			return false
+		}
+	}
+	return true
+}
+
+var pollutedToolCallTextPattern = regexp.MustCompile(`\[Called tool [^\]]*\]`)
+
+func stripPollutedToolCallText(content string) string {
+	if !strings.Contains(content, "[Called tool ") {
+		return content
+	}
+	cleaned := pollutedToolCallTextPattern.ReplaceAllString(content, "")
+	cleaned = regexp.MustCompile(`\n{3,}`).ReplaceAllString(cleaned, "\n\n")
+	return strings.TrimSpace(cleaned)
+}
+
+func narrateToolResults(toolResults []KiroToolResult, names map[string]string) string {
+	if len(toolResults) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(toolResults))
+	for _, tr := range toolResults {
+		var texts []string
+		for _, c := range tr.Content {
+			if strings.TrimSpace(c.Text) != "" {
+				texts = append(texts, c.Text)
+			}
+		}
+		body := strings.Join(texts, "\n")
+		if strings.TrimSpace(body) == "" {
+			body = "(no output)"
+		}
+		if name := names[tr.ToolUseID]; name != "" {
+			parts = append(parts, fmt.Sprintf("[%s] %s", name, body))
+		} else {
+			parts = append(parts, body)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return toolResultsContinuationPrefix + "\n\n" + strings.Join(parts, "\n\n")
+}
+
+func joinHistoryText(existing, narrated string) string {
+	existing = strings.TrimSpace(existing)
+	narrated = strings.TrimSpace(narrated)
+	switch {
+	case existing != "" && narrated != "":
+		return existing + "\n\n" + narrated
+	case narrated != "":
+		return narrated
+	default:
+		return existing
+	}
+}
+
+func sanitizeKiroHistory(history []KiroHistoryMessage, currentToolResultIDs map[string]bool) []KiroHistoryMessage {
+	if len(history) == 0 {
+		return history
+	}
+
+	toolNames := make(map[string]string)
+	for i := range history {
+		if a := history[i].AssistantResponseMessage; a != nil {
+			for _, tu := range a.ToolUses {
+				if tu.ToolUseID != "" && tu.Name != "" {
+					toolNames[tu.ToolUseID] = tu.Name
+				}
+			}
+		}
+	}
+
+	activeIdx := -1
+	if len(currentToolResultIDs) > 0 {
+		last := history[len(history)-1]
+		if last.AssistantResponseMessage != nil && len(last.AssistantResponseMessage.ToolUses) > 0 {
+			allCovered := true
+			for _, tu := range last.AssistantResponseMessage.ToolUses {
+				if !currentToolResultIDs[tu.ToolUseID] {
+					allCovered = false
+					break
+				}
+			}
+			if allCovered {
+				activeIdx = len(history) - 1
+			}
+		}
+	}
+
+	for i := range history {
+		msg := &history[i]
+
+		if msg.AssistantResponseMessage != nil && msg.AssistantResponseMessage.Content != "" {
+			msg.AssistantResponseMessage.Content = stripPollutedToolCallText(msg.AssistantResponseMessage.Content)
+		}
+
+		if msg.AssistantResponseMessage != nil && len(msg.AssistantResponseMessage.ToolUses) > 0 {
+			if i == activeIdx {
+				continue
+			}
+			msg.AssistantResponseMessage.ToolUses = nil
+		}
+
+		if msg.UserInputMessage != nil && msg.UserInputMessage.UserInputMessageContext != nil {
+			ctx := msg.UserInputMessage.UserInputMessageContext
+			if len(ctx.ToolResults) > 0 {
+				narrated := narrateToolResults(ctx.ToolResults, toolNames)
+				msg.UserInputMessage.Content = joinHistoryText(msg.UserInputMessage.Content, narrated)
+				ctx.ToolResults = nil
+			}
+			ctx.Tools = nil
+			if len(ctx.Tools) == 0 && len(ctx.ToolResults) == 0 {
+				msg.UserInputMessage.UserInputMessageContext = nil
+			}
+		}
+
+		if msg.UserInputMessage != nil && strings.TrimSpace(msg.UserInputMessage.Content) == "" && len(msg.UserInputMessage.Images) == 0 {
+			msg.UserInputMessage.Content = minimalFallbackUserContent
+		}
+	}
+
+	cleaned := history[:0:0]
+	for i := range history {
+		msg := history[i]
+		if msg.AssistantResponseMessage != nil && len(msg.AssistantResponseMessage.ToolUses) == 0 {
+			c := strings.TrimSpace(msg.AssistantResponseMessage.Content)
+			if c == "" || c == minimalFallbackUserContent {
+				continue
+			}
+		}
+		if msg.UserInputMessage != nil && len(cleaned) > 0 {
+			last := cleaned[len(cleaned)-1]
+			if last.UserInputMessage != nil &&
+				strings.TrimSpace(last.UserInputMessage.Content) == strings.TrimSpace(msg.UserInputMessage.Content) &&
+				strings.TrimSpace(msg.UserInputMessage.Content) != "" &&
+				len(msg.UserInputMessage.Images) == 0 {
+				continue
+			}
+		}
+		cleaned = append(cleaned, msg)
+	}
+
+	return trimLeadingAssistantHistory(cleaned)
+}
+
+func truncatePayloadToLimit(payload *KiroPayload, hasPriming bool) {
+	if payload == nil || payloadByteSize(payload) <= maxPayloadBytes {
+		return
+	}
+
+	history := payload.ConversationState.History
+	primingCount := 0
+	if hasPriming && len(history) >= 2 {
+		primingCount = 2
+	}
+
+	priming := history[:primingCount]
+	conversation := history[primingCount:]
+
+	placeholderEntry := KiroHistoryMessage{
+		UserInputMessage: &KiroUserInputMessage{
+			Content: truncationPlaceholder,
+			ModelID: currentMessageModelID(payload),
+			Origin:  "AI_EDITOR",
+		},
+	}
+
+	entrySizes := make([]int, len(conversation))
+	for i := range conversation {
+		entrySizes[i] = historyEntryByteSize(conversation[i])
+	}
+
+	payload.ConversationState.History = priming
+	baseSize := payloadByteSize(payload) + historyEntryByteSize(placeholderEntry)
+
+	keepFrom := len(conversation)
+	running := baseSize
+	for i := len(conversation) - 1; i >= 0; i-- {
+		running += entrySizes[i]
+		kept := len(conversation) - i
+		if running > maxPayloadBytes && kept > minRecentHistoryTurns {
+			break
+		}
+		keepFrom = i
+	}
+
+	tail := dropLeadingAssistant(conversation[keepFrom:])
+	rebuilt := make([]KiroHistoryMessage, 0, len(priming)+1+len(tail))
+	rebuilt = append(rebuilt, priming...)
+	if keepFrom > 0 {
+		rebuilt = append(rebuilt, placeholderEntry)
+	}
+	rebuilt = append(rebuilt, tail...)
+	payload.ConversationState.History = rebuilt
+
+	if payloadByteSize(payload) > maxPayloadBytes {
+		truncateCurrentMessage(payload)
+	}
+}
+
+func historyEntryByteSize(entry KiroHistoryMessage) int {
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		return 0
+	}
+	return len(raw) + 1
+}
+
+func dropLeadingAssistant(tail []KiroHistoryMessage) []KiroHistoryMessage {
+	for len(tail) > 0 && tail[0].AssistantResponseMessage != nil {
+		tail = tail[1:]
+	}
+	return tail
+}
+
+func payloadByteSize(payload *KiroPayload) int {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return 0
+	}
+	return len(raw)
+}
+
+func currentMessageModelID(payload *KiroPayload) string {
+	return payload.ConversationState.CurrentMessage.UserInputMessage.ModelID
+}
+
+func truncateCurrentMessage(payload *KiroPayload) {
+	cur := &payload.ConversationState.CurrentMessage.UserInputMessage
+	overhead := payloadByteSize(payload) - len(cur.Content)
+	budget := maxPayloadBytes - overhead
+	if budget < 0 {
+		budget = 0
+	}
+	if len(cur.Content) > budget {
+		if budget == 0 {
+			cur.Content = minimalFallbackUserContent
+			return
+		}
+		cur.Content = cur.Content[:budget]
+	}
 }
 
 func buildToolResultsContinuation(toolResults []KiroToolResult) string {

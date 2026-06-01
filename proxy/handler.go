@@ -3000,8 +3000,6 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var accessToken string
-	var expiresAt int64
 	tempAccount := &config.Account{
 		RefreshToken: req.RefreshToken,
 		ClientID:     req.ClientID,
@@ -3009,23 +3007,14 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		AuthMethod:   req.AuthMethod,
 		Region:       req.Region,
 	}
-	newAccessToken, newRefreshToken, newExpiresAt, newProfileArn, err := auth.RefreshToken(tempAccount)
+	accessToken, newRefreshToken, expiresAt, newProfileArn, err := auth.RefreshToken(tempAccount)
 	if err != nil {
-
-		if req.AccessToken != "" {
-			accessToken = req.AccessToken
-			expiresAt = time.Now().Unix() + 300
-		} else {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Token refresh failed: " + err.Error()})
-			return
-		}
-	} else {
-		accessToken = newAccessToken
-		if newRefreshToken != "" {
-			req.RefreshToken = newRefreshToken
-		}
-		expiresAt = newExpiresAt
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Token refresh failed: " + err.Error()})
+		return
+	}
+	if newRefreshToken != "" {
+		req.RefreshToken = newRefreshToken
 	}
 
 	email, _, _ := auth.GetUserInfo(accessToken)

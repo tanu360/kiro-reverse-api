@@ -65,6 +65,16 @@
     transform 0.22s ease;
 }
 
+.kt-toast.kt-clickable {
+  cursor: pointer;
+}
+.kt-toast.kt-clickable:hover {
+  filter: brightness(0.96);
+  box-shadow:
+    0 12px 28px -5px rgba(0, 0, 0, 0.22),
+    0 8px 12px -6px rgba(0, 0, 0, 0.14);
+}
+
 @media (max-width: 480px) {
   .kt-toast {
     min-width: 0;
