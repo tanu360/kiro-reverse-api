@@ -189,8 +189,8 @@ var (
 var defaultModelMappings = []ModelMappingRule{
 	{Key: "claude-sonnet-4-20250514", Value: "claude-sonnet-4.6"},
 	{Key: "claude-3-5-sonnet", Value: "claude-sonnet-4.6"},
-	{Key: "claude-3-opus", Value: "claude-sonnet-4.6"},
 	{Key: "claude-3-sonnet", Value: "claude-sonnet-4.6"},
+	{Key: "claude-3-opus", Value: "claude-opus-4.8"},
 	{Key: "claude-3-haiku", Value: "claude-haiku-4.5"},
 	{Key: "gpt-5.4-mini", Value: "claude-haiku-4.5"},
 	{Key: "gpt-5", Value: "claude-opus-4.8"},
