@@ -388,17 +388,11 @@ func TestReturnedAccountsAreSnapshots(t *testing.T) {
 
 	p.cooldowns["acct"] = time.Now().Add(time.Minute)
 	cooldown := p.GetNext()
-	if cooldown == nil {
-		t.Fatal("expected earliest cooldown account")
+	if cooldown != nil {
+		t.Fatalf("expected cooled account to be withheld, got %q", cooldown.ID)
 	}
-	cooldown.AccessToken = "cooldown-local-access"
-
-	byID = p.GetByID("acct")
-	if byID == nil {
-		t.Fatal("expected account from GetByID after cooldown")
-	}
-	if byID.AccessToken != "pool-access" {
-		t.Fatalf("cooldown selection returned shared account pointer, pool now has access=%q", byID.AccessToken)
+	if retryAfter := p.RetryAfterForModelExcluding("", nil); retryAfter <= 0 {
+		t.Fatalf("expected retry-after for cooled account, got %v", retryAfter)
 	}
 }
 

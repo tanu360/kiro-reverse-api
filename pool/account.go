@@ -130,7 +130,7 @@ func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool) 
 	if acc := p.findNextAvailableLocked(model, excluded, false); acc != nil {
 		return acc
 	}
-	return p.findEarliestCooldownLocked(model, excluded)
+	return nil
 }
 
 func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]bool, avoidLast bool) *config.Account {
@@ -175,10 +175,13 @@ func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]
 	return nil
 }
 
-func (p *AccountPool) findEarliestCooldownLocked(model string, excluded map[string]bool) *config.Account {
+func (p *AccountPool) RetryAfterForModelExcluding(model string, excluded map[string]bool) time.Duration {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	allowOverUsage := config.GetAllowOverUsage()
-	nowUnix := time.Now().Unix()
-	var best *config.Account
+	now := time.Now()
+	nowUnix := now.Unix()
 	var earliest time.Time
 	seen := make(map[string]bool)
 	for i := range p.accounts {
@@ -199,19 +202,16 @@ func (p *AccountPool) findEarliestCooldownLocked(model string, excluded map[stri
 		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
 			continue
 		}
-		if cooldown, ok := p.cooldowns[acc.ID]; ok {
-			if best == nil || cooldown.Before(earliest) {
-				best = acc
+		if cooldown, ok := p.cooldowns[acc.ID]; ok && cooldown.After(now) {
+			if earliest.IsZero() || cooldown.Before(earliest) {
 				earliest = cooldown
 			}
 		}
 	}
-	if best != nil {
-		p.lastSelected = best.ID
-		bestCopy := *best
-		return &bestCopy
+	if earliest.IsZero() {
+		return 0
 	}
-	return nil
+	return time.Until(earliest)
 }
 
 func tokenUnavailableForSelection(acc *config.Account, nowUnix int64) bool {

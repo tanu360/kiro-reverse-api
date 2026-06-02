@@ -350,6 +350,73 @@ func TestAdminModelMappingsSaveAndApply(t *testing.T) {
 	}
 }
 
+func TestAdminAPIDoesNotAcceptPasswordCookie(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	config.SetPassword("admin-password")
+	h := NewHandler()
+
+	cookieReq := httptest.NewRequest(http.MethodGet, "/admin/api/status", nil)
+	cookieReq.AddCookie(&http.Cookie{Name: "admin_password", Value: "admin-password"})
+	cookieRec := httptest.NewRecorder()
+	h.ServeHTTP(cookieRec, cookieReq)
+	if cookieRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected cookie fallback to be rejected, got %d body=%s", cookieRec.Code, cookieRec.Body.String())
+	}
+
+	headerReq := httptest.NewRequest(http.MethodGet, "/admin/api/status", nil)
+	headerReq.Header.Set("X-Admin-Password", "admin-password")
+	headerRec := httptest.NewRecorder()
+	h.ServeHTTP(headerRec, headerReq)
+	if headerRec.Code != http.StatusOK {
+		t.Fatalf("expected header password to pass, got %d body=%s", headerRec.Code, headerRec.Body.String())
+	}
+}
+
+func TestOpenAINonStreamReturnsRetryAfterWhenAccountsAreCooling(t *testing.T) {
+	resetObservePersistenceForTest(t)
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{
+		ID:          "cooling",
+		Enabled:     true,
+		AccessToken: "token-cooling",
+		ProfileArn:  "arn:aws:codewhisperer:profile/cooling",
+	}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+
+	p := accountpool.GetPool()
+	p.Reload()
+	p.MarkOverLimit("cooling")
+	h := &Handler{
+		pool:        p,
+		promptCache: newPromptCacheTracker(defaultPromptCacheTTL),
+	}
+	payload := &KiroPayload{}
+	payload.ConversationState.CurrentMessage.UserInputMessage = KiroUserInputMessage{
+		Content: "hello",
+		ModelID: "claude-sonnet-4.5",
+		Origin:  "AI_EDITOR",
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	h.handleOpenAINonStream(rec, req, payload, "claude-sonnet-4.5", false, 1, nil)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected cooldown 429, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Retry-After") == "" {
+		t.Fatalf("expected Retry-After header")
+	}
+	if !strings.Contains(rec.Body.String(), cooldownRetryMessage) {
+		t.Fatalf("expected cooldown message, got %s", rec.Body.String())
+	}
+}
+
 func TestBatchDeleteAccounts(t *testing.T) {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatalf("config.Init: %v", err)
@@ -625,6 +692,9 @@ func TestCodexModelsEndpointReturnsManifest(t *testing.T) {
 	}
 	if body.Models[0].Slug != "claude-opus-4.8" || body.Models[0].ContextWindow != 1000000 {
 		t.Fatalf("unexpected base model entry: %#v", body.Models[0])
+	}
+	if !body.Models[0].SupportsSearchTool {
+		t.Fatalf("expected Codex manifest to expose hosted web search support")
 	}
 	if body.Models[1].Slug != "claude-opus-4.8-thinking" || body.Models[1].DefaultReasoningLevel != "high" {
 		t.Fatalf("unexpected thinking model entry: %#v", body.Models[1])

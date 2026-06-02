@@ -607,17 +607,7 @@
     sessionStorage.removeItem('admin_login_time');
     localStorage.removeItem('admin_password');
     localStorage.removeItem('admin_login_time');
-    clearAdminEventCookie();
     password = '';
-  }
-  function adminEventCookieSecureAttr() {
-    return location.protocol === 'https:' ? '; Secure' : '';
-  }
-  function setAdminEventCookie(nextPassword) {
-    document.cookie = 'admin_password=' + encodeURIComponent(nextPassword) + '; Path=/admin/api/events; SameSite=Strict' + adminEventCookieSecureAttr();
-  }
-  function clearAdminEventCookie() {
-    document.cookie = 'admin_password=; Max-Age=0; Path=/admin/api/events; SameSite=Strict' + adminEventCookieSecureAttr();
   }
   function getActiveLoginTime() {
     const storage = sessionStorage.getItem('admin_password') ? sessionStorage : localStorage;
@@ -626,7 +616,6 @@
   function setActivePassword(nextPassword, remember) {
     const now = Date.now().toString();
     password = nextPassword;
-    setAdminEventCookie(nextPassword);
     sessionStorage.setItem('admin_password', nextPassword);
     sessionStorage.setItem('admin_login_time', now);
     if (remember) {
@@ -701,8 +690,7 @@
 
   function startAdminEvents() {
     if (adminEventSource || !password || !window.EventSource) return;
-    setAdminEventCookie(password);
-    adminEventSource = new EventSource('/admin/api/events');
+    adminEventSource = new EventSource('/admin/api/events?admin_password=' + encodeURIComponent(password));
     adminEventSource.addEventListener('observe_tick', scheduleObserveRefresh);
     adminEventSource.addEventListener('account_updated', () => { loadAccounts(); loadStats(); });
     adminEventSource.addEventListener('accounts_refreshed', () => { loadAccounts(); loadStats(); });

@@ -65,8 +65,10 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(prepared.OpenAIRequest.Model, thinkingCfg.Suffix)
 	prepared.OpenAIRequest.Model = actualModel
+	thinking = resolveThinkingWithEffort(thinking, prepared.OpenAIRequest.ReasoningEffort)
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)
+	h.applyReasoningEffort(kiroPayload, prepared.OpenAIRequest.Model, prepared.OpenAIRequest.ReasoningEffort)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
 		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, prepared.OpenAIRequest.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
@@ -182,6 +184,25 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 				}
 				break
 			}
+			if allWebSearchToolUses(toolUses) {
+				webSearchToolUses := append([]KiroToolUse(nil), toolUses...)
+				results, err := resolveWebSearchToolResults(account, webSearchToolUses)
+				if err != nil {
+					lastErr = err
+					lastAccount = account
+					break
+				}
+				toolUses = nil
+				followupPayload := buildWebSearchFollowupPayload(payload, webSearchToolUses, results)
+				err = CallKiroAPI(account, followupPayload, callback)
+				if err != nil {
+					lastErr = err
+					lastAccount = account
+					h.handleAccountFailure(account, err)
+					recordAttemptError(account, model, 0, err)
+					break
+				}
+			}
 
 			finalContent, extractedReasoning := extractThinkingFromContent(content)
 			if thinking && reasoningContent == "" && extractedReasoning != "" {
@@ -210,6 +231,13 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 			return
 		}
 		excluded[account.ID] = true
+	}
+
+	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
+		setRetryAfterHeader(w, retryAfter)
+		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
+		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
+		return
 	}
 
 	if lastErr == nil {
@@ -455,6 +483,13 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 			return
 		}
 		excluded[account.ID] = true
+	}
+
+	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
+		setRetryAfterHeader(w, retryAfter)
+		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
+		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
+		return
 	}
 
 	if lastErr == nil {

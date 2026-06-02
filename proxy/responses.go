@@ -7,19 +7,24 @@ import (
 )
 
 type OpenAIResponsesRequest struct {
-	Model              string                 `json:"model"`
-	Input              json.RawMessage        `json:"input"`
-	Instructions       interface{}            `json:"instructions,omitempty"`
-	PreviousResponseID string                 `json:"previous_response_id,omitempty"`
-	Stream             bool                   `json:"stream,omitempty"`
-	MaxOutputTokens    int                    `json:"max_output_tokens,omitempty"`
-	Temperature        float64                `json:"temperature,omitempty"`
-	TopP               float64                `json:"top_p,omitempty"`
-	Tools              []OpenAIResponsesTool  `json:"tools,omitempty"`
-	ToolChoice         interface{}            `json:"tool_choice,omitempty"`
-	Text               *OpenAIResponsesText   `json:"text,omitempty"`
-	Store              *bool                  `json:"store,omitempty"`
-	Metadata           map[string]interface{} `json:"metadata,omitempty"`
+	Model              string                    `json:"model"`
+	Input              json.RawMessage           `json:"input"`
+	Instructions       interface{}               `json:"instructions,omitempty"`
+	PreviousResponseID string                    `json:"previous_response_id,omitempty"`
+	Stream             bool                      `json:"stream,omitempty"`
+	MaxOutputTokens    int                       `json:"max_output_tokens,omitempty"`
+	Temperature        float64                   `json:"temperature,omitempty"`
+	TopP               float64                   `json:"top_p,omitempty"`
+	Tools              []OpenAIResponsesTool     `json:"tools,omitempty"`
+	ToolChoice         interface{}               `json:"tool_choice,omitempty"`
+	Text               *OpenAIResponsesText      `json:"text,omitempty"`
+	Reasoning          *OpenAIResponsesReasoning `json:"reasoning,omitempty"`
+	Store              *bool                     `json:"store,omitempty"`
+	Metadata           map[string]interface{}    `json:"metadata,omitempty"`
+}
+
+type OpenAIResponsesReasoning struct {
+	Effort string `json:"effort,omitempty"`
 }
 
 type OpenAIResponsesText struct {
@@ -80,13 +85,14 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 	messagesForKiro = append(messagesForKiro, currentMessages...)
 
 	openaiReq := OpenAIRequest{
-		Model:       req.Model,
-		Messages:    messagesForKiro,
-		MaxTokens:   req.MaxOutputTokens,
-		Temperature: req.Temperature,
-		TopP:        req.TopP,
-		Stream:      req.Stream,
-		Tools:       tools,
+		Model:           req.Model,
+		Messages:        messagesForKiro,
+		MaxTokens:       req.MaxOutputTokens,
+		Temperature:     req.Temperature,
+		TopP:            req.TopP,
+		Stream:          req.Stream,
+		Tools:           tools,
+		ReasoningEffort: reqReasoningEffort(req),
 	}
 	if msg := validateOpenAIRequestShape(&openaiReq); msg != "" {
 		return nil, msg
@@ -109,6 +115,13 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		Metadata:         req.Metadata,
 		PreviousResponse: req.PreviousResponseID,
 	}, ""
+}
+
+func reqReasoningEffort(req *OpenAIResponsesRequest) string {
+	if req == nil || req.Reasoning == nil {
+		return ""
+	}
+	return req.Reasoning.Effort
 }
 
 func validateResponsesTextFormat(text *OpenAIResponsesText) string {
@@ -182,20 +195,26 @@ func convertResponsesTool(tool OpenAIResponsesTool, namespace string) ([]OpenAIT
 
 	var name, description string
 	var parameters interface{}
-	switch toolType {
-	case "function":
-		name = firstNonEmpty(tool.Function.Name, tool.Name)
-		description = firstNonEmpty(tool.Function.Description, tool.Description)
-		parameters = tool.Function.Parameters
-		if parameters == nil {
+	if isHostedWebSearchToolType(toolType) {
+		name = webSearchToolName
+		description = "Search the web for current information."
+		parameters = webSearchInputSchema()
+	} else {
+		switch toolType {
+		case "function":
+			name = firstNonEmpty(tool.Function.Name, tool.Name)
+			description = firstNonEmpty(tool.Function.Description, tool.Description)
+			parameters = tool.Function.Parameters
+			if parameters == nil {
+				parameters = tool.Parameters
+			}
+		case "custom":
+			name = tool.Name
+			description = tool.Description
 			parameters = tool.Parameters
+		default:
+			return nil, ""
 		}
-	case "custom":
-		name = tool.Name
-		description = tool.Description
-		parameters = tool.Parameters
-	default:
-		return nil, ""
 	}
 
 	name = strings.TrimSpace(name)

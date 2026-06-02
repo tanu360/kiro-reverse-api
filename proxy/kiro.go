@@ -140,8 +140,9 @@ type KiroPayload struct {
 		} `json:"currentMessage"`
 		History []KiroHistoryMessage `json:"history,omitempty"`
 	} `json:"conversationState"`
-	ProfileArn      string           `json:"profileArn,omitempty"`
-	InferenceConfig *InferenceConfig `json:"inferenceConfig,omitempty"`
+	ProfileArn                   string                 `json:"profileArn,omitempty"`
+	InferenceConfig              *InferenceConfig       `json:"inferenceConfig,omitempty"`
+	AdditionalModelRequestFields map[string]interface{} `json:"additionalModelRequestFields,omitempty"`
 
 	//! Sanitized upstream tool names are mapped back before responses reach the client.
 	ToolNameMap map[string]string `json:"-"`

@@ -4,26 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
-
-	"kiro-proxy/config"
 )
 
 func (h *Handler) apiEventsStream(w http.ResponseWriter, r *http.Request) {
-	password := ""
-	if cookie, _ := r.Cookie("admin_password"); cookie != nil {
-		password = cookie.Value
-		if decoded, err := url.QueryUnescape(password); err == nil {
-			password = decoded
-		}
-	}
-
-	if password != config.GetPassword() {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)

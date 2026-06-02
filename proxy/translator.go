@@ -890,13 +890,14 @@ func KiroToClaudeResponse(content, thinkingContent string, includeEmptyThinkingB
 }
 
 type OpenAIRequest struct {
-	Model       string          `json:"model"`
-	Messages    []OpenAIMessage `json:"messages"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Temperature float64         `json:"temperature,omitempty"`
-	TopP        float64         `json:"top_p,omitempty"`
-	Stream      bool            `json:"stream,omitempty"`
-	Tools       []OpenAITool    `json:"tools,omitempty"`
+	Model           string          `json:"model"`
+	Messages        []OpenAIMessage `json:"messages"`
+	MaxTokens       int             `json:"max_tokens,omitempty"`
+	Temperature     float64         `json:"temperature,omitempty"`
+	TopP            float64         `json:"top_p,omitempty"`
+	Stream          bool            `json:"stream,omitempty"`
+	Tools           []OpenAITool    `json:"tools,omitempty"`
+	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
 }
 
 type OpenAIMessage struct {
@@ -1744,6 +1745,16 @@ func convertOpenAITools(tools []OpenAITool) ([]KiroToolWrapper, map[string]strin
 	nameMap := make(map[string]string)
 	usedNames := make(map[string]bool)
 	for _, tool := range tools {
+		if isHostedWebSearchToolType(tool.Type) {
+			wrapper := KiroToolWrapper{}
+			wrapper.ToolSpecification.Name = kiroWebSearchToolName
+			wrapper.ToolSpecification.Description = "Search the web for current information."
+			wrapper.ToolSpecification.InputSchema = InputSchema{JSON: webSearchInputSchema()}
+			result = append(result, wrapper)
+			nameMap[kiroWebSearchToolName] = webSearchToolName
+			usedNames[kiroWebSearchToolName] = true
+			continue
+		}
 		if tool.Type != "function" {
 			continue
 		}

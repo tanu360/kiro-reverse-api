@@ -464,12 +464,13 @@ type UserInfoResponse struct {
 }
 
 type ModelInfo struct {
-	ModelId        string   `json:"modelId"`
-	ModelName      string   `json:"modelName"`
-	Description    string   `json:"description"`
-	InputTypes     []string `json:"supportedInputTypes"`
-	RateMultiplier float64  `json:"rateMultiplier"`
-	TokenLimits    *struct {
+	ModelId                            string                 `json:"modelId"`
+	ModelName                          string                 `json:"modelName"`
+	Description                        string                 `json:"description"`
+	InputTypes                         []string               `json:"supportedInputTypes"`
+	RateMultiplier                     float64                `json:"rateMultiplier"`
+	AdditionalModelRequestFieldsSchema map[string]interface{} `json:"additionalModelRequestFieldsSchema,omitempty"`
+	TokenLimits                        *struct {
 		MaxInputTokens  int `json:"maxInputTokens"`
 		MaxOutputTokens int `json:"maxOutputTokens"`
 	} `json:"tokenLimits"`

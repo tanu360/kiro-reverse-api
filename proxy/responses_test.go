@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"kiro-proxy/config"
 	"kiro-proxy/db"
 	accountpool "kiro-proxy/pool"
@@ -134,7 +135,7 @@ func TestResponsesFunctionToolsConvertToKiroTools(t *testing.T) {
 	}
 }
 
-func TestResponsesHostedToolIgnored(t *testing.T) {
+func TestResponsesHostedToolConvertsToWebSearchFunction(t *testing.T) {
 	req := &OpenAIResponsesRequest{
 		Model: "claude-sonnet-4.5",
 		Input: json.RawMessage(`"search"`),
@@ -145,8 +146,11 @@ func TestResponsesHostedToolIgnored(t *testing.T) {
 	if msg != "" {
 		t.Fatalf("unexpected validation error: %s", msg)
 	}
-	if len(prepared.OpenAIRequest.Tools) != 0 {
-		t.Fatalf("expected hosted tool to be ignored, got %#v", prepared.OpenAIRequest.Tools)
+	if len(prepared.OpenAIRequest.Tools) != 1 {
+		t.Fatalf("expected hosted tool to convert, got %#v", prepared.OpenAIRequest.Tools)
+	}
+	if got := prepared.OpenAIRequest.Tools[0].Function.Name; got != webSearchToolName {
+		t.Fatalf("expected web_search function name, got %q", got)
 	}
 }
 
@@ -252,6 +256,70 @@ func TestResponsesHandlerAcceptsHostedTool(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "searched") {
 		t.Fatalf("expected upstream response, got %s", rec.Body.String())
+	}
+}
+
+func TestResponsesWebSearchEmulationRunsMCPFollowup(t *testing.T) {
+	upstreamCalls := 0
+	h := newResponsesTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		var payload KiroPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode Kiro payload: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+		if upstreamCalls == 1 {
+			ctx := payload.ConversationState.CurrentMessage.UserInputMessage.UserInputMessageContext
+			if ctx == nil || len(ctx.Tools) != 1 || ctx.Tools[0].ToolSpecification.Name != kiroWebSearchToolName {
+				t.Fatalf("expected web_search tool in first payload, got %#v", ctx)
+			}
+			_, _ = w.Write(bytes.Join([][]byte{
+				awsEventStreamFrame(t, "toolUseEvent", map[string]interface{}{
+					"toolUseId": "ws_1",
+					"name":      kiroWebSearchToolName,
+					"input":     `{"query":"kiro latest"}`,
+					"stop":      true,
+				}),
+				awsEventStreamFrame(t, "contextUsageEvent", map[string]interface{}{"contextUsagePercentage": 1}),
+				awsEventStreamFrame(t, "meteringEvent", map[string]interface{}{"usage": 0.01}),
+			}, nil))
+			return
+		}
+		if upstreamCalls == 2 {
+			ctx := payload.ConversationState.CurrentMessage.UserInputMessage.UserInputMessageContext
+			if ctx == nil || len(ctx.ToolResults) != 1 {
+				t.Fatalf("expected MCP tool result in follow-up payload, got %#v", ctx)
+			}
+			if got := ctx.ToolResults[0].Content[0].Text; !strings.Contains(got, "Kiro Search Result") {
+				t.Fatalf("expected formatted search result, got %q", got)
+			}
+			writeKiroTextResponse(t, w, "answer after search")
+			return
+		}
+		t.Fatalf("unexpected extra upstream call %d", upstreamCalls)
+	})
+
+	oldRest := kiroRestHttpStore.Load()
+	kiroRestHttpStore.Store(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/mcp" {
+			t.Fatalf("expected MCP path, got %s", req.URL.Path)
+		}
+		body := `{"jsonrpc":"2.0","id":"1","result":{"content":[{"type":"text","text":"{\"results\":[{\"title\":\"Kiro Search Result\",\"url\":\"https://example.com\",\"snippet\":\"fresh data\",\"publishedDate\":1710000000}]}"}]}}`
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+	})})
+	t.Cleanup(func() { kiroRestHttpStore.Store(oldRest) })
+
+	rec := httptest.NewRecorder()
+	body := `{"model":"claude-sonnet-4.5","input":"search","tools":[{"type":"web_search"}]}`
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if upstreamCalls != 2 {
+		t.Fatalf("expected initial and follow-up upstream calls, got %d", upstreamCalls)
+	}
+	if !strings.Contains(rec.Body.String(), "answer after search") {
+		t.Fatalf("expected follow-up answer, got %s", rec.Body.String())
 	}
 }
 
@@ -653,6 +721,7 @@ func newResponsesTestHandler(t *testing.T, upstream http.HandlerFunc) *Handler {
 
 	p := accountpool.GetPool()
 	p.Reload()
+	p.RecordSuccess("responses-account")
 	return &Handler{
 		pool:        p,
 		promptCache: newPromptCacheTracker(defaultPromptCacheTTL),

@@ -193,7 +193,7 @@ func buildCodexModelEntry(id, displayName, description string, contextWindow int
 		SupportVerbosity:            false,
 		ApplyPatchToolType:          "freeform",
 		WebSearchToolType:           "text_and_image",
-		SupportsSearchTool:          false,
+		SupportsSearchTool:          true,
 		SupportsParallelToolCalls:   true,
 		ExperimentalSupportedTools:  []string{"computer_use", "mcp"},
 		InputModalities:             inputModalities,

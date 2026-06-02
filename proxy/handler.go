@@ -739,6 +739,9 @@ func mergeModelInfo(base ModelInfo, extra ModelInfo) ModelInfo {
 	if base.TokenLimits == nil {
 		base.TokenLimits = extra.TokenLimits
 	}
+	if base.AdditionalModelRequestFieldsSchema == nil {
+		base.AdditionalModelRequestFieldsSchema = extra.AdditionalModelRequestFieldsSchema
+	}
 	base.InputTypes = mergeStringLists(base.InputTypes, extra.InputTypes)
 	return base
 }
@@ -1313,14 +1316,21 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 		excluded[account.ID] = true
 	}
 
-	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, 503, "No available accounts")
-		h.sendClaudeError(w, 503, "api_error", "No available accounts")
+	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
+		setRetryAfterHeader(w, retryAfter)
+		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
+		h.sendClaudeError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
 		return
 	}
 
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, 500, lastErr.Error())
-	h.sendClaudeError(w, 500, "api_error", lastErr.Error())
+	if lastErr == nil {
+		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		h.sendClaudeError(w, http.StatusServiceUnavailable, "api_error", "No available accounts")
+		return
+	}
+
+	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
+	h.sendClaudeError(w, http.StatusInternalServerError, "api_error", lastErr.Error())
 }
 
 func (h *Handler) sendSSE(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {
@@ -1375,6 +1385,33 @@ func recordFinalRequestForApiKey(apiKeyReservation *apiKeyUsageReservation, acco
 func recordFinalRequestWithAPIKey(apiKeyID, apiKey string, account *config.Account, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
 	accountID, email := accountIdentity(account)
 	getObserveStore().RecordRequestWithAPIKey(accountID, apiKeyID, apiKey, email, model, inTokens, outTokens, credits, success, status, message)
+}
+
+const cooldownRetryMessage = "All matching accounts are cooling down"
+
+func retryAfterHeaderValue(d time.Duration) string {
+	seconds := int((d + time.Second - time.Nanosecond) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	return fmt.Sprintf("%d", seconds)
+}
+
+func (h *Handler) shouldReturnCooldown(lastErr error, model string) (time.Duration, bool) {
+	retryAfter := h.pool.RetryAfterForModelExcluding(model, nil)
+	if retryAfter <= 0 {
+		return 0, false
+	}
+	if lastErr == nil || isQuotaErrorMessage(lastErr.Error()) {
+		return retryAfter, true
+	}
+	return 0, false
+}
+
+func setRetryAfterHeader(w http.ResponseWriter, retryAfter time.Duration) {
+	if retryAfter > 0 {
+		w.Header().Set("Retry-After", retryAfterHeaderValue(retryAfter))
+	}
 }
 
 func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
@@ -1509,14 +1546,21 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 		excluded[account.ID] = true
 	}
 
-	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, 503, "No available accounts")
-		h.sendClaudeError(w, 503, "api_error", "No available accounts")
+	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
+		setRetryAfterHeader(w, retryAfter)
+		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
+		h.sendClaudeError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
 		return
 	}
 
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, 500, lastErr.Error())
-	h.sendClaudeError(w, 500, "api_error", lastErr.Error())
+	if lastErr == nil {
+		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		h.sendClaudeError(w, http.StatusServiceUnavailable, "api_error", "No available accounts")
+		return
+	}
+
+	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
+	h.sendClaudeError(w, http.StatusInternalServerError, "api_error", lastErr.Error())
 }
 
 func (h *Handler) sendClaudeError(w http.ResponseWriter, status int, errType, message string) {
@@ -1562,6 +1606,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(req.Model, thinkingCfg.Suffix)
 	req.Model = actualModel
+	thinking = resolveThinkingWithEffort(thinking, req.ReasoningEffort)
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&req)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
@@ -1571,6 +1616,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kiroPayload := OpenAIToKiro(&req, thinking)
+	h.applyReasoningEffort(kiroPayload, req.Model, req.ReasoningEffort)
 
 	if req.Stream {
 		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)
@@ -1980,14 +2026,21 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 		excluded[account.ID] = true
 	}
 
-	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, 503, "No available accounts")
-		h.sendOpenAIError(w, 503, "server_error", "No available accounts")
+	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
+		setRetryAfterHeader(w, retryAfter)
+		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
+		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
 		return
 	}
 
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, 500, lastErr.Error())
-	h.sendOpenAIError(w, 500, "server_error", lastErr.Error())
+	if lastErr == nil {
+		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
+		return
+	}
+
+	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
+	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
 }
 
 func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
@@ -2058,6 +2111,25 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 				}
 				break
 			}
+			if allWebSearchToolUses(toolUses) {
+				webSearchToolUses := append([]KiroToolUse(nil), toolUses...)
+				results, err := resolveWebSearchToolResults(account, webSearchToolUses)
+				if err != nil {
+					lastErr = err
+					lastAccount = account
+					break
+				}
+				toolUses = nil
+				followupPayload := buildWebSearchFollowupPayload(payload, webSearchToolUses, results)
+				err = CallKiroAPI(account, followupPayload, callback)
+				if err != nil {
+					lastErr = err
+					lastAccount = account
+					h.handleAccountFailure(account, err)
+					recordAttemptError(account, model, 0, err)
+					break
+				}
+			}
 
 			finalContent, extractedReasoning := extractThinkingFromContent(content)
 			if thinking && reasoningContent == "" && extractedReasoning != "" {
@@ -2084,14 +2156,21 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 		excluded[account.ID] = true
 	}
 
-	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, 503, "No available accounts")
-		h.sendOpenAIError(w, 503, "server_error", "No available accounts")
+	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
+		setRetryAfterHeader(w, retryAfter)
+		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
+		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
 		return
 	}
 
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, 500, lastErr.Error())
-	h.sendOpenAIError(w, 500, "server_error", lastErr.Error())
+	if lastErr == nil {
+		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
+		return
+	}
+
+	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
+	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
 }
 
 func (h *Handler) sendOpenAIError(w http.ResponseWriter, status int, errType, message string) {
@@ -2146,17 +2225,10 @@ func (h *Handler) ensureValidToken(account *config.Account) error {
 }
 
 func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/admin/api/events" && r.Method == "GET" {
-		h.apiEventsStream(w, r)
-		return
-	}
-
+	path := strings.TrimPrefix(r.URL.Path, "/admin/api")
 	password := r.Header.Get("X-Admin-Password")
-	if password == "" {
-		cookie, _ := r.Cookie("admin_password")
-		if cookie != nil {
-			password = cookie.Value
-		}
+	if password == "" && path == "/events" && r.Method == "GET" {
+		password = r.URL.Query().Get("admin_password")
 	}
 
 	if password != config.GetPassword() {
@@ -2165,10 +2237,11 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := strings.TrimPrefix(r.URL.Path, "/admin/api")
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	switch {
+	case path == "/events" && r.Method == "GET":
+		h.apiEventsStream(w, r)
 	case path == "/accounts" && r.Method == "GET":
 		h.apiGetAccounts(w, r)
 	case path == "/accounts" && r.Method == "POST":
