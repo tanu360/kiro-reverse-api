@@ -374,49 +374,6 @@ func TestAdminAPIDoesNotAcceptPasswordCookie(t *testing.T) {
 	}
 }
 
-func TestOpenAINonStreamReturnsRetryAfterWhenAccountsAreCooling(t *testing.T) {
-	resetObservePersistenceForTest(t)
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
-		t.Fatalf("config.Init: %v", err)
-	}
-	if err := config.AddAccount(config.Account{
-		ID:          "cooling",
-		Enabled:     true,
-		AccessToken: "token-cooling",
-		ProfileArn:  "arn:aws:codewhisperer:profile/cooling",
-	}); err != nil {
-		t.Fatalf("add account: %v", err)
-	}
-
-	p := accountpool.GetPool()
-	p.Reload()
-	p.MarkOverLimit("cooling")
-	h := &Handler{
-		pool:        p,
-		promptCache: newPromptCacheTracker(defaultPromptCacheTTL),
-	}
-	payload := &KiroPayload{}
-	payload.ConversationState.CurrentMessage.UserInputMessage = KiroUserInputMessage{
-		Content: "hello",
-		ModelID: "claude-sonnet-4.5",
-		Origin:  "AI_EDITOR",
-	}
-
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
-	h.handleOpenAINonStream(rec, req, payload, "claude-sonnet-4.5", false, 1, nil)
-
-	if rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("expected cooldown 429, got %d body=%s", rec.Code, rec.Body.String())
-	}
-	if rec.Header().Get("Retry-After") == "" {
-		t.Fatalf("expected Retry-After header")
-	}
-	if !strings.Contains(rec.Body.String(), cooldownRetryMessage) {
-		t.Fatalf("expected cooldown message, got %s", rec.Body.String())
-	}
-}
-
 func TestBatchDeleteAccounts(t *testing.T) {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatalf("config.Init: %v", err)

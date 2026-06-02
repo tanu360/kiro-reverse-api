@@ -233,13 +233,6 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 		excluded[account.ID] = true
 	}
 
-	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
-		setRetryAfterHeader(w, retryAfter)
-		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
-		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
-		return
-	}
-
 	if lastErr == nil {
 		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
@@ -483,13 +476,6 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 			return
 		}
 		excluded[account.ID] = true
-	}
-
-	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
-		setRetryAfterHeader(w, retryAfter)
-		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
-		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
-		return
 	}
 
 	if lastErr == nil {

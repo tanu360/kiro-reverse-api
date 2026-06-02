@@ -1316,13 +1316,6 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 		excluded[account.ID] = true
 	}
 
-	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
-		setRetryAfterHeader(w, retryAfter)
-		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
-		h.sendClaudeError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
-		return
-	}
-
 	if lastErr == nil {
 		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendClaudeError(w, http.StatusServiceUnavailable, "api_error", "No available accounts")
@@ -1385,33 +1378,6 @@ func recordFinalRequestForApiKey(apiKeyReservation *apiKeyUsageReservation, acco
 func recordFinalRequestWithAPIKey(apiKeyID, apiKey string, account *config.Account, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
 	accountID, email := accountIdentity(account)
 	getObserveStore().RecordRequestWithAPIKey(accountID, apiKeyID, apiKey, email, model, inTokens, outTokens, credits, success, status, message)
-}
-
-const cooldownRetryMessage = "All matching accounts are cooling down"
-
-func retryAfterHeaderValue(d time.Duration) string {
-	seconds := int((d + time.Second - time.Nanosecond) / time.Second)
-	if seconds < 1 {
-		seconds = 1
-	}
-	return fmt.Sprintf("%d", seconds)
-}
-
-func (h *Handler) shouldReturnCooldown(lastErr error, model string) (time.Duration, bool) {
-	retryAfter := h.pool.RetryAfterForModelExcluding(model, nil)
-	if retryAfter <= 0 {
-		return 0, false
-	}
-	if lastErr == nil || isQuotaErrorMessage(lastErr.Error()) {
-		return retryAfter, true
-	}
-	return 0, false
-}
-
-func setRetryAfterHeader(w http.ResponseWriter, retryAfter time.Duration) {
-	if retryAfter > 0 {
-		w.Header().Set("Retry-After", retryAfterHeaderValue(retryAfter))
-	}
 }
 
 func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
@@ -1544,13 +1510,6 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 			return
 		}
 		excluded[account.ID] = true
-	}
-
-	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
-		setRetryAfterHeader(w, retryAfter)
-		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
-		h.sendClaudeError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
-		return
 	}
 
 	if lastErr == nil {
@@ -2026,13 +1985,6 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 		excluded[account.ID] = true
 	}
 
-	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
-		setRetryAfterHeader(w, retryAfter)
-		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
-		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
-		return
-	}
-
 	if lastErr == nil {
 		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
@@ -2154,13 +2106,6 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 			return
 		}
 		excluded[account.ID] = true
-	}
-
-	if retryAfter, ok := h.shouldReturnCooldown(lastErr, model); ok {
-		setRetryAfterHeader(w, retryAfter)
-		recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusTooManyRequests, cooldownRetryMessage)
-		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", cooldownRetryMessage)
-		return
 	}
 
 	if lastErr == nil {

@@ -388,11 +388,8 @@ func TestReturnedAccountsAreSnapshots(t *testing.T) {
 
 	p.cooldowns["acct"] = time.Now().Add(time.Minute)
 	cooldown := p.GetNext()
-	if cooldown != nil {
-		t.Fatalf("expected cooled account to be withheld, got %q", cooldown.ID)
-	}
-	if retryAfter := p.RetryAfterForModelExcluding("", nil); retryAfter <= 0 {
-		t.Fatalf("expected retry-after for cooled account, got %v", retryAfter)
+	if cooldown == nil || cooldown.ID != "acct" {
+		t.Fatalf("expected cooled account fallback, got %#v", cooldown)
 	}
 }
 
