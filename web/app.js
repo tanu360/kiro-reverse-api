@@ -3,12 +3,6 @@
   const baseUrl = location.origin;
   const TOKEN_KEY = 'kiro_admin_token';
   const TOKEN_EXP_KEY = 'kiro_admin_token_exp';
-  //! Older builds stored the admin password itself. Purge those keys on every load,
-  //! so upgrading removes the secret from disk instead of only stopping new writes.
-  ['admin_password', 'admin_login_time', 'kiro_remembered_pwd'].forEach(key => {
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
-  });
   let adminToken = readStoredToken();
   let currentLang = localStorage.getItem('kiro_lang') || 'en';
   const dict = { en: null, zh: null };
@@ -671,6 +665,15 @@
     if (!data.token) return false;
     storeSession(data.token, data.expiresAt, remember);
     return true;
+  }
+  async function loadFirstRunPassword() {
+    try {
+      const res = await fetch('/admin/api/first-run', { cache: 'no-store' });
+      const d = await res.json();
+      if (!d.password) return;
+      $('firstRunPasswordValue').textContent = d.password;
+      $('firstRunPassword').classList.remove('hidden');
+    } catch (e) { }
   }
   async function tryAutoLogin() {
     if (!adminToken) return;
@@ -1567,27 +1570,9 @@
     syncApiKeyManagementVisibility();
     $('allowOverUsage').checked = d.allowOverUsage || false;
     $('lenientStreamIntegrity').checked = d.lenientStreamIntegrity || false;
-    renderPasswordWarning(d);
     await Promise.all([loadApiKeys(), loadThinkingConfig(), loadModelMappings(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
     syncApiKeyManagementVisibility();
     refreshCustomSelects();
-  }
-  function renderPasswordWarning(settings) {
-    const banner = $('passwordWarning');
-    const text = $('passwordWarningText');
-    if (!banner || !text) return;
-    //! A rotated default is always strong, so the two warnings never both apply.
-    const key = settings.passwordRotated ? 'settings.passwordRotatedWarning'
-      : settings.passwordWeak ? 'settings.passwordWeakWarning' : '';
-    banner.classList.toggle('hidden', !key);
-    //! data-i18n keeps the banner in sync with applyTranslations on a language switch.
-    if (key) {
-      text.dataset.i18n = key;
-      text.textContent = t(key);
-    } else {
-      delete text.dataset.i18n;
-      text.textContent = '';
-    }
   }
   async function loadThinkingConfig() {
     const res = await api('/thinking');
@@ -2015,6 +2000,7 @@
   async function changePassword() {
     const np = $('newPassword').value;
     if (!np) return toast(t('settings.passwordRequired'), 'warning');
+    if ([...np].length < 8) return toast(t('settings.passwordTooShort'), 'warning');
     try {
       const res = await api('/settings', { method: 'POST', body: JSON.stringify({ password: np }) });
       const d = await res.json().catch(() => ({}));
@@ -3537,6 +3523,7 @@
     if (yr) yr.textContent = new Date().getFullYear();
     wireEvents();
     if (adminToken) tryAutoLogin();
+    else loadFirstRunPassword();
     setInterval(() => {
       if (!$('mainPage').classList.contains('hidden')) loadStats();
     }, 10000);

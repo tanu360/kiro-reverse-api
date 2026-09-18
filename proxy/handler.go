@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
@@ -2267,10 +2268,16 @@ func (h *Handler) authorizeAdmin(r *http.Request, path string) bool {
 func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/admin/api")
 
-	//! Login is the one route that runs before authorization; it verifies the password itself.
+	//! Login and the first-run password are the only routes that run before authorization.
 	if path == "/session" && r.Method == "POST" {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		h.apiCreateAdminSession(w, r)
+		return
+	}
+	if path == "/first-run" && r.Method == "GET" {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		json.NewEncoder(w).Encode(map[string]string{"password": config.FirstRunPassword()})
 		return
 	}
 
@@ -3235,11 +3242,6 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"host":                   config.GetHost(),
 		"allowOverUsage":         config.GetAllowOverUsage(),
 		"lenientStreamIntegrity": config.GetLenientStreamIntegrity(),
-		//! Credential health, so the settings tab can warn where the fix lives.
-		//! Rotated means this boot replaced a shipped default; weak means the
-		//! operator's own password is short and only they can change it.
-		"passwordRotated": config.AdminPasswordRotated(),
-		"passwordWeak":    config.AdminPasswordWeak(),
 	})
 }
 
@@ -3319,6 +3321,12 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		return
+	}
+
+	if req.Password != "" && utf8.RuneCountInString(req.Password) < config.MinAdminPasswordLength {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Password must be at least %d characters", config.MinAdminPasswordLength)})
 		return
 	}
 

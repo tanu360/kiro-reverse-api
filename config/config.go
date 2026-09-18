@@ -139,6 +139,8 @@ type Config struct {
 
 	LenientStreamIntegrity bool `json:"lenientStreamIntegrity,omitempty"`
 
+	FirstRunPasswordPending bool `json:"firstRunPasswordPending,omitempty"`
+
 	ProxyURL string `json:"proxyURL,omitempty"`
 
 	FilterClaudeCode bool `json:"filterClaudeCode,omitempty"`
@@ -190,10 +192,6 @@ const Version = "2.0.0"
 var (
 	cfg     *Config
 	cfgLock sync.RWMutex
-
-	// adminPasswordRotated records whether this boot replaced a shipped default
-	// password. Guarded by cfgLock.
-	adminPasswordRotated bool
 )
 
 var defaultModelMappings = []ModelMappingRule{
@@ -242,11 +240,12 @@ func Load() error {
 			}
 		}
 		cfg = &Config{
-			Password:      password,
-			Port:          8080,
-			Host:          "0.0.0.0",
-			RequireApiKey: false,
-			Accounts:      []Account{},
+			Password:                password,
+			FirstRunPasswordPending: generated,
+			Port:                    8080,
+			Host:                    "0.0.0.0",
+			RequireApiKey:           false,
+			Accounts:                []Account{},
 		}
 		if err := saveLocked(); err != nil {
 			return err
@@ -262,15 +261,6 @@ func Load() error {
 		return err
 	}
 	cfg = &c
-
-	//! Installs created before first-run generation still carry a shipped default.
-	//! Upgrading must not silently leave a publicly known admin credential in place.
-	if err := migrateAdminPasswordLocked(); err != nil {
-		return err
-	}
-	if adminPasswordRotated {
-		log.Printf("Rotated default admin password; new admin password: %s", cfg.Password)
-	}
 	return nil
 }
 
@@ -293,6 +283,7 @@ func SetPassword(password string) {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	cfg.Password = password
+	cfg.FirstRunPasswordPending = false
 }
 
 func Get() *Config {
@@ -585,6 +576,7 @@ func UpdateSettingsPatch(requireApiKey *bool, password string) error {
 	}
 	if password != "" {
 		cfg.Password = password
+		cfg.FirstRunPasswordPending = false
 	}
 	return Save()
 }
