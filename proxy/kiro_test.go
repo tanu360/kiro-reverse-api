@@ -2,46 +2,78 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
+	"hash/crc32"
+	"io"
 	"kiro-proxy/config"
 	"net/http"
 	"net/url"
+	"sort"
 	"testing"
 	"time"
 )
 
-func TestNormalizeChunkBasicProgression(t *testing.T) {
-	prev := ""
+func TestParseEventStreamKeepsRepeatedAssistantContent(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		chunks []string
+		want   string
+	}{
+		{"repeated equal chunks", []string{"666", "666", "666", "6"}, "6666666666"},
+		{"repeated period", []string{"abab", "abab"}, "abababab"},
+		{"repeated digit", []string{"18", "3", "3"}, "1833"},
+		{"prefix shaped chunks", []string{"6", "66"}, "666"},
+		{"overlap shaped chunks", []string{"hello world", "world!!!"}, "hello worldworld!!!"},
+		{"non repeating control", []string{"123", "4567890"}, "1234567890"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stream bytes.Buffer
+			for _, chunk := range tc.chunks {
+				stream.Write(awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": chunk}))
+			}
+			stream.Write(meteringFrame(t))
 
-	if got := normalizeChunk("abc", &prev); got != "abc" {
-		t.Fatalf("expected first chunk to pass through, got %q", got)
-	}
-	if got := normalizeChunk("abcde", &prev); got != "de" {
-		t.Fatalf("expected appended delta, got %q", got)
+			var got string
+			err := parseEventStream(&stream, &KiroStreamCallback{
+				OnText: func(text string, isThinking bool) {
+					if !isThinking {
+						got += text
+					}
+				},
+			})
+			if err != nil {
+				t.Fatalf("unexpected parse error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("assistant text = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
-func TestNormalizeChunkPrefixRewindDoesNotReplay(t *testing.T) {
-	prev := ""
-
-	_ = normalizeChunk("abcde", &prev)
-	if got := normalizeChunk("abc", &prev); got != "" {
-		t.Fatalf("expected rewind chunk to be ignored, got %q", got)
+func TestParseEventStreamKeepsRepeatedReasoningContent(t *testing.T) {
+	var stream bytes.Buffer
+	for _, chunk := range []string{"666", "666", "666", "6"} {
+		stream.Write(awsEventStreamFrame(t, "reasoningContentEvent", map[string]interface{}{"text": chunk}))
 	}
-	if prev != "abcde" {
-		t.Fatalf("expected previous snapshot to remain longest version, got %q", prev)
-	}
-	if got := normalizeChunk("abcdef", &prev); got != "f" {
-		t.Fatalf("expected only unseen suffix after rewind, got %q", got)
-	}
-}
+	stream.Write(awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "done"}))
+	stream.Write(meteringFrame(t))
 
-func TestNormalizeChunkOverlapDelta(t *testing.T) {
-	prev := "hello world"
-
-	if got := normalizeChunk("world!!!", &prev); got != "!!!" {
-		t.Fatalf("expected overlap suffix delta, got %q", got)
+	var got string
+	err := parseEventStream(&stream, &KiroStreamCallback{
+		OnText: func(text string, isThinking bool) {
+			if isThinking {
+				got += text
+			}
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if got != "6666666666" {
+		t.Fatalf("reasoning text = %q, want %q", got, "6666666666")
 	}
 }
 
@@ -98,9 +130,10 @@ func TestParseEventStreamNilCallbackIsNoOp(t *testing.T) {
 }
 
 func TestParseEventStreamNilCallbackFieldsAreNoOp(t *testing.T) {
-	stream := bytes.NewReader(awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{
-		"content": "hello",
-	}))
+	stream := bytes.NewReader(bytes.Join([][]byte{
+		awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "hello"}),
+		meteringFrame(t),
+	}, nil))
 
 	if err := parseEventStream(stream, &KiroStreamCallback{}); err != nil {
 		t.Fatalf("expected empty callback to be a no-op, got %v", err)
@@ -109,18 +142,21 @@ func TestParseEventStreamNilCallbackFieldsAreNoOp(t *testing.T) {
 
 func TestHandleToolUseEventGeneratesMissingToolUseID(t *testing.T) {
 	var toolUses []KiroToolUse
-	current := handleToolUseEvent(map[string]interface{}{
+	pending := &pendingToolUses{}
+	err := handleToolUseEvent(map[string]interface{}{
 		"name":  "mcpIdaProMcpStatus",
 		"input": `{"server":"ida-pro-mcp"}`,
 		"stop":  true,
-	}, nil, &KiroStreamCallback{
+	}, pending, &KiroStreamCallback{
 		OnToolUse: func(toolUse KiroToolUse) {
 			toolUses = append(toolUses, toolUse)
 		},
 	})
-
-	if current != nil {
-		t.Fatalf("expected stopped tool use to clear current state")
+	if err != nil {
+		t.Fatalf("unexpected tool error: %v", err)
+	}
+	if len(pending.order) != 0 {
+		t.Fatalf("expected stopped tool use to leave no pending state, got %v", pending.order)
 	}
 	if len(toolUses) != 1 {
 		t.Fatalf("expected one tool use, got %d", len(toolUses))
@@ -135,25 +171,24 @@ func TestHandleToolUseEventGeneratesMissingToolUseID(t *testing.T) {
 
 func TestHandleToolUseEventReplacesGeneratedIDWhenRealIDArrives(t *testing.T) {
 	var toolUses []KiroToolUse
+	pending := &pendingToolUses{}
 	callback := &KiroStreamCallback{
 		OnToolUse: func(toolUse KiroToolUse) {
 			toolUses = append(toolUses, toolUse)
 		},
 	}
 
-	current := handleToolUseEvent(map[string]interface{}{
-		"name":  "mcpIdaProMcpStatus",
-		"input": `{"server":`,
-	}, nil, callback)
-	current = handleToolUseEvent(map[string]interface{}{
-		"toolUseId": "toolu_real",
-		"name":      "mcpIdaProMcpStatus",
-		"input":     `"ida-pro-mcp"}`,
-		"stop":      true,
-	}, current, callback)
+	for _, event := range []map[string]interface{}{
+		{"name": "mcpIdaProMcpStatus", "input": `{"server":`},
+		{"toolUseId": "toolu_real", "name": "mcpIdaProMcpStatus", "input": `"ida-pro-mcp"}`, "stop": true},
+	} {
+		if err := handleToolUseEvent(event, pending, callback); err != nil {
+			t.Fatalf("unexpected tool error: %v", err)
+		}
+	}
 
-	if current != nil {
-		t.Fatalf("expected stopped tool use to clear current state")
+	if len(pending.order) != 0 {
+		t.Fatalf("expected stopped tool use to leave no pending state, got %v", pending.order)
 	}
 	if len(toolUses) != 1 {
 		t.Fatalf("expected one completed tool use, got %d", len(toolUses))
@@ -246,26 +281,147 @@ func assertProxyURL(t *testing.T, got *url.URL, want string) {
 
 func awsEventStreamFrame(t *testing.T, eventType string, payload map[string]interface{}) []byte {
 	t.Helper()
+	return awsEventStreamFrameWithHeaders(t, map[string]string{
+		":event-type":   eventType,
+		":message-type": "event",
+	}, payload)
+}
+
+func meteringFrame(t *testing.T) []byte {
+	//! meteringFrame is the trailer upstream sends after a finished answer.
+	t.Helper()
+	return awsEventStreamFrame(t, "meteringEvent", map[string]interface{}{"usage": 0.01})
+}
+
+func awsEventStreamFrameWithHeaders(t *testing.T, headerValues map[string]string, payload map[string]interface{}) []byte {
+	t.Helper()
 
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	headerValue := []byte(eventType)
-	headers := make([]byte, 0, 1+len(":event-type")+1+2+len(headerValue))
-	headers = append(headers, byte(len(":event-type")))
-	headers = append(headers, []byte(":event-type")...)
-	headers = append(headers, byte(7))
-	headers = append(headers, byte(len(headerValue)>>8), byte(len(headerValue)))
-	headers = append(headers, headerValue...)
+	names := make([]string, 0, len(headerValues))
+	for name := range headerValues {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var headers []byte
+	for _, name := range names {
+		value := []byte(headerValues[name])
+		headers = append(headers, byte(len(name)))
+		headers = append(headers, name...)
+		headers = append(headers, 7)
+		headers = append(headers, byte(len(value)>>8), byte(len(value)))
+		headers = append(headers, value...)
+	}
 
 	totalLength := 12 + len(headers) + len(payloadBytes) + 4
 	frame := make([]byte, 12, totalLength)
 	binary.BigEndian.PutUint32(frame[0:4], uint32(totalLength))
 	binary.BigEndian.PutUint32(frame[4:8], uint32(len(headers)))
+	binary.BigEndian.PutUint32(frame[8:12], crc32.ChecksumIEEE(frame[:8]))
 	frame = append(frame, headers...)
 	frame = append(frame, payloadBytes...)
-	frame = append(frame, 0, 0, 0, 0)
-	return frame
+	return binary.BigEndian.AppendUint32(frame, crc32.ChecksumIEEE(frame))
+}
+
+func TestSetPayloadProfileArnForAccountClearsAPIKeyProfile(t *testing.T) {
+	payload := &KiroPayload{ProfileArn: "arn:aws:codewhisperer:us-east-1:123456789012:profile/STALE"}
+	setPayloadProfileArnForAccount(payload, &config.Account{
+		AuthMethod: config.AuthMethodAPIKey,
+		KiroApiKey: "ksk_test",
+		ProfileArn: "arn:aws:codewhisperer:us-east-1:123456789012:profile/STALE",
+	})
+	if payload.ProfileArn != "" {
+		t.Fatalf("expected empty profileArn for API key account, got %q", payload.ProfileArn)
+	}
+}
+
+func TestEndpointsForAccountUsesCLIForAPIKey(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	account := &config.Account{AuthMethod: config.AuthMethodAPIKey, KiroApiKey: "ksk_x", Region: "eu-central-1"}
+	eps := endpointsForAccount(account)
+	if len(eps) != 1 || eps[0].Name != "Kiro CLI" || eps[0].Origin != "KIRO_CLI" {
+		t.Fatalf("expected single CLI endpoint, got %+v", eps)
+	}
+	if got := kiroEndpointURL(eps[0], account, ""); got != "https://runtime.eu-central-1.kiro.dev/" {
+		t.Fatalf("cli url = %q", got)
+	}
+
+	//! A stale ARN (from before a re-import) must not move the key to another region's runtime.
+	account.ProfileArn = "arn:aws:codewhisperer:us-east-1:123456789012:profile/STALE"
+	if got := kiroEndpointURL(eps[0], account, account.ProfileArn); got != "https://runtime.eu-central-1.kiro.dev/" {
+		t.Fatalf("API key region must ignore profile ARNs, got %q", got)
+	}
+
+	if eps := endpointsForAccount(&config.Account{AccessToken: "oauth", AuthMethod: "social"}); len(eps) == 0 || eps[0].Origin == "KIRO_CLI" {
+		t.Fatalf("OAuth accounts must keep the IDE endpoints, got %+v", eps)
+	}
+}
+
+func TestCallKiroAPIUsesCLIRuntimeForAPIKeyAccount(t *testing.T) {
+	var captured *http.Request
+	var body []byte
+	oldClient := kiroHttpStore.Load()
+	kiroHttpStore.Store(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		captured = req
+		body, _ = io.ReadAll(req.Body)
+		frames := append(
+			awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "hi"}),
+			meteringFrame(t)...,
+		)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(frames)), Header: make(http.Header)}, nil
+	})})
+	t.Cleanup(func() { kiroHttpStore.Store(oldClient) })
+
+	account := &config.Account{ID: "api-1", KiroApiKey: "ksk_live_test", AuthMethod: config.AuthMethodAPIKey, Region: "eu-central-1"}
+	payload := testKiroPayload()
+	payload.ProfileArn = "arn:aws:codewhisperer:us-east-1:123456789012:profile/EXPLICIT"
+
+	var text string
+	err := CallKiroAPIContext(context.Background(), account, payload, &KiroStreamCallback{
+		OnText: func(s string, _ bool) { text += s },
+	})
+	if err != nil {
+		t.Fatalf("CallKiroAPIContext: %v", err)
+	}
+	if text != "hi" {
+		t.Fatalf("text = %q", text)
+	}
+	if captured == nil {
+		t.Fatal("expected one upstream request")
+	}
+	if got := captured.URL.String(); got != "https://runtime.eu-central-1.kiro.dev/" {
+		t.Fatalf("url = %q", got)
+	}
+	for header, want := range map[string]string{
+		"Authorization":               "Bearer ksk_live_test",
+		"tokentype":                   "API_KEY",
+		"Content-Type":                "application/x-amz-json-1.0",
+		"X-Amz-Target":                "AmazonCodeWhispererStreamingService.GenerateAssistantResponse",
+		"x-amzn-codewhisperer-optout": "false",
+		"x-amzn-kiro-agent-mode":      "",
+	} {
+		if got := captured.Header.Get(header); got != want {
+			t.Fatalf("header %s = %q, want %q", header, got, want)
+		}
+	}
+
+	var sent map[string]interface{}
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("decode sent payload: %v", err)
+	}
+	if _, ok := sent["profileArn"]; ok {
+		t.Fatalf("API key request must not carry a profileArn, got %v", sent["profileArn"])
+	}
+	origin := sent["conversationState"].(map[string]interface{})["currentMessage"].(map[string]interface{})["userInputMessage"].(map[string]interface{})["origin"]
+	if origin != "KIRO_CLI" {
+		t.Fatalf("origin = %v, want KIRO_CLI", origin)
+	}
+	if payload.ProfileArn != "arn:aws:codewhisperer:us-east-1:123456789012:profile/EXPLICIT" {
+		t.Fatalf("caller payload must be restored after the call, got %q", payload.ProfileArn)
+	}
 }

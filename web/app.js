@@ -128,7 +128,13 @@
       'No account IDs provided': 'serverError.noAccountIds',
       'startUrl is required': 'serverError.startUrlRequired',
       'bearerToken is required': 'serverError.bearerTokenRequired',
-      'refreshToken is required': 'serverError.refreshTokenRequired'
+      'refreshToken is required': 'serverError.refreshTokenRequired',
+      'refreshToken or kiroApiKey is required': 'serverError.refreshTokenRequired',
+      'kiroApiKey is empty': 'serverError.kiroApiKeyEmpty',
+      'kiroApiKey contains invalid characters': 'serverError.kiroApiKeyInvalid',
+      "kiroApiKey has more than one '|' separator": 'serverError.kiroApiKeyInvalid',
+      'invalid Kiro API key region': 'serverError.kiroApiKeyRegion',
+      'this Kiro API key is already added': 'serverError.kiroApiKeyDuplicate'
     }[raw];
     return key ? t(key) : raw;
   }
@@ -874,6 +880,7 @@
     if (!method) return '-';
     const normalized = String(method).toLowerCase();
     if (normalized === 'idc') return t('auth.enterprise');
+    if (normalized === 'apikey' || normalized === 'api_key') return t('auth.apiKey');
     if (normalized === 'social') return t('auth.social');
     if (normalized === 'builderid') return 'BuilderID';
     if (normalized === 'github') return t('local.providerGithub');
@@ -1069,6 +1076,7 @@
       const jsonPromise = api('/accounts/' + id + '/full').then(async res => {
         if (!res.ok) throw new Error(t('common.failed'));
         const a = await res.json();
+        if (a.authMethod === 'api_key') return JSON.stringify({ kiroApiKey: a.accessToken, region: a.region, authMethod: 'api_key' }, null, 2);
         const { clientId, clientSecret, accessToken, refreshToken } = a;
         return JSON.stringify({ clientId, clientSecret, accessToken, refreshToken }, null, 2);
       });
@@ -2107,14 +2115,17 @@
       requestSortHeader('status', t('requests.status')),
       requestSortHeader('account', t('requests.account')),
       requestSortHeader('api_key', t('requests.apiKey')),
+      '<th>' + escapeHtml(t('requests.endpoint')) + '</th>',
       requestSortHeader('model', t('requests.model')),
       requestSortHeader('tokens', t('stats.tokens')),
       requestSortHeader('credits', t('stats.credits')),
+      requestSortHeader('duration', t('requests.duration')),
       '<th>' + escapeHtml(t('requests.error')) + '</th>'
     ].join('');
     const rows = (requestsCache || []).map(r => '<tr><td>' + escapeHtml(formatTime(r.ts)) + '</td><td>' +
-      formatRequestStatus(r) + '</td><td>' + escapeHtml(getDisplayAccount(r.email, r.accountId)) + '</td><td>' + formatRequestApiKey(r) + '</td><td>' + escapeHtml(r.model || '-') +
-      '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + formatCredits(r.credits || 0) + '</td><td>' + formatRequestError(r) + '</td></tr>');
+      formatRequestStatus(r) + '</td><td>' + escapeHtml(getDisplayAccount(r.email, r.accountId)) + '</td><td>' + formatRequestApiKey(r) + '</td><td>' + formatRequestEndpoint(r) +
+      '</td><td>' + escapeHtml(r.model || '-') + '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + formatCredits(r.credits || 0) +
+      '</td><td>' + formatRequestDuration(r) + '</td><td>' + formatRequestError(r) + '</td></tr>');
     if (!rows.length) {
       el.innerHTML = '<div class="empty-state">' + escapeHtml(t('requests.empty')) + '</div>';
     } else {
@@ -2148,10 +2159,37 @@
     if (!value) return '<span class="muted-text">-</span>';
     return '<code class="code-inline request-api-key-cell" title="' + escapeAttr(value) + '">' + escapeHtml(value) + '</code>';
   }
+  function formatRequestEndpoint(r) {
+    if (!r.endpoint) return '<span class="muted-text">-</span>';
+    return escapeHtml(t('requests.endpoint.' + r.endpoint));
+  }
+  function formatRequestDuration(r) {
+    const ms = Number(r.durationMs || 0);
+    //! Rows logged before durations were tracked have no endpoint either; a real 0ms request still shows 0 ms.
+    if (!Number.isFinite(ms) || (!ms && !r.endpoint)) return '<span class="muted-text">-</span>';
+    if (ms < 1000) return escapeHtml(Math.round(ms) + ' ms');
+    if (ms < 60000) return escapeHtml((ms / 1000).toFixed(ms < 10000 ? 2 : 1) + ' s');
+    const totalSec = Math.round(ms / 1000);
+    return escapeHtml(Math.floor(totalSec / 60) + 'm ' + (totalSec % 60) + 's');
+  }
+  const requestErrorTypeBadges = {
+    client_closed: 'badge-muted',
+    invalid_request: 'badge-muted',
+    api_key_limit: 'badge-muted',
+    stream: 'badge-warning',
+    timeout: 'badge-warning',
+    rate_limit: 'badge-warning',
+    upstream: 'badge-warning',
+    unknown: 'badge-warning'
+  };
   function formatRequestError(r) {
     if (r.success) return '<span class="muted-text">-</span>';
     const msg = maskEmailsInText(r.message || t('requests.noErrorMessage'));
-    return '<span class="request-error-cell" title="' + escapeAttr(msg) + '">' + escapeHtml(msg) + '</span>';
+    const badge = r.errorType
+      ? '<span class="badge ' + (requestErrorTypeBadges[r.errorType] || 'badge-error') + ' request-error-type">' + escapeHtml(t('requests.errorType.' + r.errorType)) + '</span>'
+      : '';
+    return '<div class="request-error">' + badge +
+      '<span class="request-error-cell" title="' + escapeAttr(msg) + '">' + escapeHtml(msg) + '</span></div>';
   }
   function renderRequestsPagination() {
     const info = $('requestsPageInfo');
@@ -2373,7 +2411,8 @@
     sso: 'fa-solid fa-shield-halved',
     local: 'fa-solid fa-folder-open',
     credentials: 'fa-solid fa-code',
-    cookie: 'fa-solid fa-cookie-bite'
+    cookie: 'fa-solid fa-cookie-bite',
+    apikey: 'fa-solid fa-terminal'
   };
   function methodCard(type, title, desc) {
     var icon = METHOD_ICONS[type] || 'fa-solid fa-circle-plus';
@@ -2397,6 +2436,7 @@
     else if (type === 'local') modalLocal(title, body);
     else if (type === 'credentials') modalCredentials(title, body);
     else if (type === 'cookie') modalCookie(title, body);
+    else if (type === 'apikey') modalApiKey(title, body);
     if (!modal.classList.contains('active')) openDialog('addModal');
     enhanceCustomSelects(body);
   }
@@ -2416,6 +2456,7 @@
       methodCard('local', t('modal.localTitle'), t('modal.localDesc')) +
       methodCard('credentials', t('modal.credentialsTitle'), t('modal.credentialsDesc')) +
       methodCard('cookie', t('modal.cookieTitle'), t('modal.cookieDesc')) +
+      methodCard('apikey', t('modal.apiKeyTitle'), t('modal.apiKeyDesc')) +
       '</div>' +
       '<div class="modal-footer"><button class="btn btn-secondary" data-close-add="1" type="button">' + escapeHtml(t('common.cancel')) + '</button></div>';
   }
@@ -2572,6 +2613,45 @@
       '</div>';
     $('importCookieBtn').addEventListener('click', importFromCookie);
   }
+  function modalApiKey(title, body) {
+    title.textContent = t('modal.apiKeyTitle');
+    body.innerHTML =
+      '<p class="help-block">' + escapeHtml(t('apikey.help')) + '</p>' +
+      '<div class="form-group"><label>' + escapeHtml(t('apikey.keysLabel')) + ' <small>' + escapeHtml(t('apikey.keysHint')) + '</small></label>' +
+      '<textarea id="kiroApiKeys" class="font-mono" autocomplete="off" spellcheck="false" placeholder="' + escapeAttr('ksk_...\nksk_...|eu-central-1') + '"></textarea>' +
+      '</div>' +
+      '<div class="form-group"><label>' + escapeHtml(t('detail.region')) + ' <small>' + escapeHtml(t('apikey.regionHint')) + '</small></label><input type="text" id="kiroApiKeyRegion" value="us-east-1" autocomplete="off" /></div>' +
+      '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" data-modal-goto="add" type="button">' + escapeHtml(t('common.back')) + '</button>' +
+      '<button class="btn btn-primary" id="importApiKeyBtn" type="button">' + escapeHtml(t('common.add')) + '</button>' +
+      '</div>';
+    $('importApiKeyBtn').addEventListener('click', importKiroApiKeys);
+  }
+  async function importKiroApiKeys() {
+    const keys = $('kiroApiKeys').value.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!keys.length) return toastWarning(t('apikey.keyMissing'));
+    const region = $('kiroApiKeyRegion').value.trim();
+    const btn = $('importApiKeyBtn');
+    btn.disabled = true;
+    let ok = 0;
+    const newIds = [], errs = [];
+    for (const key of keys) {
+      const payload = { kiroApiKey: key, authMethod: 'api_key', region: key.includes('|') ? '' : region };
+      try {
+        const res = await api('/auth/credentials', { method: 'POST', body: JSON.stringify(payload) });
+        const d = await res.json();
+        if (d.success) { ok++; if (d.account?.id) newIds.push(d.account.id); }
+        else errs.push(localizedError(d.error));
+      } catch { errs.push(t('common.failed')); }
+    }
+    btn.disabled = false;
+    if (ok === 0) return toastError(t('common.failed') + ': ' + (errs[0] || ''));
+    closeModal(); loadAccounts(); loadStats();
+    let msg = t('sso.importSuccess', ok);
+    if (errs.length) msg += t('sso.importPartial', errs.length);
+    toastPrimary(msg, { duration: 5200 });
+    newIds.forEach(autoRefreshNewAccount);
+  }
   function updateLocalFields() {
     const p = $('localProvider').value;
     $('localClientGroup').classList.toggle('hidden', p === 'Google' || p === 'Github');
@@ -2623,6 +2703,8 @@
           const c = a.credentials || {};
           return {
             refreshToken: c.refreshToken || a.refreshToken,
+            accessToken: c.accessToken || a.accessToken,
+            kiroApiKey: c.kiroApiKey || a.kiroApiKey,
             clientId: c.clientId || a.clientId,
             clientSecret: c.clientSecret || a.clientSecret,
             region: c.region || a.region,
@@ -2635,6 +2717,17 @@
       }
       let ok = 0, fail = 0, newIds = [];
       for (const item of items) {
+        const method = String(item.authMethod || '').toLowerCase();
+        const apiKey = item.kiroApiKey || ((method === 'api_key' || method === 'apikey' || String(item.accessToken || '').startsWith('ksk_')) && !item.refreshToken ? item.accessToken : '');
+        if (apiKey) {
+          try {
+            const res = await api('/auth/credentials', { method: 'POST', body: JSON.stringify({ kiroApiKey: apiKey, authMethod: 'api_key', region: item.region || '' }) });
+            const d = await res.json();
+            if (d.success) { ok++; if (d.account?.id) newIds.push(d.account.id); }
+            else fail++;
+          } catch { fail++; }
+          continue;
+        }
         if (!item.refreshToken) { fail++; continue; }
         let authMethod = item.authMethod || '';
         if (item.clientId && item.clientSecret) authMethod = 'idc';
@@ -2848,7 +2941,8 @@
     const jsonPromise = getExportData().then(data => {
       if (!data) throw new Error('no-data');
       const filtered = (data.accounts || []).map(a => {
-        const { clientId, clientSecret, accessToken, refreshToken } = a.credentials || {};
+        const { clientId, clientSecret, accessToken, refreshToken, authMethod, region } = a.credentials || {};
+        if (authMethod === 'api_key') return { kiroApiKey: accessToken, region, authMethod };
         return { clientId, clientSecret, accessToken, refreshToken };
       });
       return JSON.stringify(filtered, null, 2);

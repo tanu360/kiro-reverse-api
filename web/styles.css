@@ -3515,14 +3515,31 @@ img.brand-icon {
   color: var(--muted-foreground);
   font-size: 0.6875rem;
 }
-.request-error-cell {
-  display: inline-block;
+.requests-data-table th,
+.requests-data-table td {
+  padding-right: 0.5rem;
+  padding-left: 0.5rem;
+}
+.request-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 10rem;
   max-width: 24rem;
+}
+.request-error-type {
+  flex-shrink: 0;
+}
+.request-error-cell {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
   color: var(--destructive);
-  text-overflow: ellipsis;
-  vertical-align: bottom;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .table-pagination {
   display: flex;

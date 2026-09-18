@@ -45,7 +45,10 @@ CREATE TABLE IF NOT EXISTS requests (
   credits REAL NOT NULL DEFAULT 0,
   success INTEGER NOT NULL DEFAULT 0,
   status INTEGER NOT NULL DEFAULT 0,
-  message TEXT NOT NULL DEFAULT ''
+  message TEXT NOT NULL DEFAULT '',
+  endpoint TEXT NOT NULL DEFAULT '',
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  error_type TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests(ts DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_success ON requests(success);

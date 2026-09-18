@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"compress/zlib"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"kiro-proxy/auth"
@@ -34,7 +36,6 @@ type Handler struct {
 	modelsCacheMu   sync.RWMutex
 	modelsCacheTime int64
 	promptCache     *promptCacheTracker
-	tokenRefreshMu  sync.Mutex
 }
 
 type thinkingStreamSource int
@@ -64,6 +65,9 @@ func allowTagSource(source *thinkingStreamSource) bool {
 }
 
 func validateClaudeRequestShape(req *ClaudeRequest) string {
+	if msg := validateClaudeToolChoice(req); msg != "" {
+		return msg
+	}
 	if len(req.Messages) == 0 {
 		return "messages must not be empty"
 	}
@@ -265,21 +269,9 @@ func (h *Handler) refreshAllAccounts() {
 		}
 
 		if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {
-			newAccessToken, newRefreshToken, newExpiresAt, profileArn, err := auth.RefreshToken(account)
-			if err != nil {
+			if err := refreshStoredAccount(context.Background(), account, false); err != nil {
 				logger.Warnf("[BackgroundRefresh] Token refresh failed for %s: %v", account.Email, err)
-			} else {
-				account.AccessToken = newAccessToken
-				if newRefreshToken != "" {
-					account.RefreshToken = newRefreshToken
-				}
-				account.ExpiresAt = newExpiresAt
-				config.UpdateAccountToken(account.ID, newAccessToken, newRefreshToken, newExpiresAt)
-				h.pool.UpdateToken(account.ID, newAccessToken, newRefreshToken, newExpiresAt)
-				if profileArn != "" {
-					account.ProfileArn = profileArn
-					config.UpdateAccountProfileArn(account.ID, profileArn)
-				}
+				continue
 			}
 		}
 
@@ -317,6 +309,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(204)
 		return
+	}
+
+	if endpoint := requestEndpointForPath(path); endpoint != "" {
+		r = withRequestTrace(r, endpoint)
 	}
 
 	if err := decompressRequestBody(r); err != nil {
@@ -505,6 +501,7 @@ func (h *Handler) handleModels(w http.ResponseWriter, _ *http.Request) {
 		buildModelInfo("gpt-4o", "kiro-proxy", true),
 		buildModelInfo("gpt-4", "kiro-proxy", true),
 	)
+	models = appendConfiguredModelAliases(models, thinkingSuffix)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -815,26 +812,26 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
 	if r.Method != "POST" {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Failed to read request body")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Failed to read request body")
 		h.sendClaudeError(w, 400, "invalid_request_error", "Failed to read request body")
 		return
 	}
 
 	var req ClaudeRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON: "+err.Error())
 		h.sendClaudeError(w, 400, "invalid_request_error", "Invalid JSON: "+err.Error())
 		return
 	}
 	if msg := validateClaudeRequestShape(&req); msg != "" {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
 	}
@@ -848,8 +845,17 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	cacheProfile := h.promptCache.BuildClaudeProfile(effectiveReq, estimatedInputTokens)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
 		h.sendClaudeError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
+		return
+	}
+
+	switch mode, query := claudeWebSearchModeFor(&req); mode {
+	case claudeWebSearchDirect:
+		h.handleClaudeDirectWebSearch(w, r, req.Model, query, estimatedInputTokens, apiKeyReservation, req.Stream)
+		return
+	case claudeWebSearchLoop:
+		h.runClaudeWebSearchLoop(w, r, &req, thinking, thinkingResponseOpts, estimatedInputTokens, apiKeyReservation)
 		return
 	}
 
@@ -862,7 +868,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	}
 }
 
-func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
+func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -870,7 +876,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusInternalServerError, "Streaming not supported")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusInternalServerError, "Streaming not supported")
 		h.sendClaudeError(w, 500, "api_error", "Streaming not supported")
 		return
 	}
@@ -914,17 +920,21 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
-			if err := h.ensureValidToken(account); err != nil {
+			if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
+				if r.Context().Err() != nil {
+					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 				}
 				break
 			}
@@ -938,6 +948,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 			var nextContentIndex int
 			var rawContentBuilder strings.Builder
 			var rawThinkingBuilder strings.Builder
+			var upstreamStopReason string
 			activeBlockIndex := -1
 			activeBlockType := ""
 
@@ -1244,25 +1255,38 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnStopReason: func(reason string) {
+					upstreamStopReason = reason
+				},
 			}
 
-			err := CallKiroAPI(account, payload, callback)
+			err := CallKiroAPIContext(r.Context(), account, payload, callback)
 			if err != nil {
+				if isContextCanceledError(err) {
+					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if !messageStarted {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-						retryPlan.waitBeforeRetry(totalAttempts)
+						retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 						continue
 					}
 					if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-						retryPlan.waitBeforeRetry(totalAttempts)
+						retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					}
 					break
 				}
-				recordFinalRequestForApiKey(apiKeyReservation, account, model, 0, 0, 0, false, 500, err.Error())
+				//! The client already holds part of the answer; hand over the held-back tail before the error.
+				processClaudeText("", false, true)
+				if eventThinkingOpen {
+					sendText("", 3)
+				}
+				closeActiveBlock()
+				recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, 500, err.Error())
 				h.sendSSE(w, flusher, "error", map[string]interface{}{
 					"type":  "error",
 					"error": map[string]string{"type": "api_error", "message": err.Error()},
@@ -1289,15 +1313,12 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
 
-			stopReason := "end_turn"
-			if len(toolUses) > 0 {
-				stopReason = "tool_use"
-			}
+			stopReason := mapClaudeStopReason(upstreamStopReason, len(toolUses))
 
 			ensureMessageStart()
 			h.sendSSE(w, flusher, "message_delta", map[string]interface{}{
@@ -1317,13 +1338,13 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, _ *http.Request, pay
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendClaudeError(w, http.StatusServiceUnavailable, "api_error", "No available accounts")
 		return
 	}
 
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
-	h.sendClaudeError(w, http.StatusInternalServerError, "api_error", lastErr.Error())
+	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.sendClaudeUpstreamError(w, lastErr)
 }
 
 func (h *Handler) sendSSE(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {
@@ -1362,6 +1383,11 @@ func accountIdentity(account *config.Account) (string, string) {
 	return account.ID, account.Email
 }
 
+func recordClientDisconnect(ctx context.Context, apiKeyReservation *apiKeyUsageReservation, account *config.Account, model string) {
+	//! 499 is the de facto "client closed request" status; nothing is written back to the gone client.
+	recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, 0, 0, 0, false, 499, "client disconnected")
+}
+
 func recordAttemptError(account *config.Account, model string, status int, err error) {
 	if account == nil || err == nil {
 		return
@@ -1370,17 +1396,16 @@ func recordAttemptError(account *config.Account, model string, status int, err e
 	getObserveStore().RecordError(account.ID, account.Email, model, status, err.Error())
 }
 
-func recordFinalRequestForApiKey(apiKeyReservation *apiKeyUsageReservation, account *config.Account, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
-	accountID, email := accountIdentity(account)
-	getObserveStore().RecordRequestForApiKey(apiKeyReservation, accountID, email, model, inTokens, outTokens, credits, success, status, message)
+func recordFinalRequestForApiKey(ctx context.Context, apiKeyReservation *apiKeyUsageReservation, account *config.Account, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
+	recordFinalRequestWithAPIKey(ctx, apiKeyReservation.apiKeyID(), apiKeyReservation.apiKeyValue(), account, model, inTokens, outTokens, credits, success, status, message)
 }
 
-func recordFinalRequestWithAPIKey(apiKeyID, apiKey string, account *config.Account, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
+func recordFinalRequestWithAPIKey(ctx context.Context, apiKeyID, apiKey string, account *config.Account, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
 	accountID, email := accountIdentity(account)
-	getObserveStore().RecordRequestWithAPIKey(accountID, apiKeyID, apiKey, email, model, inTokens, outTokens, credits, success, status, message)
+	getObserveStore().RecordTracedRequest(requestTraceFromContext(ctx), accountID, apiKeyID, apiKey, email, model, inTokens, outTokens, credits, success, status, message)
 }
 
-func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
+func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
 	excluded := make(map[string]bool)
 	var lastErr error
 	var lastAccount *config.Account
@@ -1395,17 +1420,21 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
-			if err := h.ensureValidToken(account); err != nil {
+			if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
+				if r.Context().Err() != nil {
+					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 				}
 				break
 			}
@@ -1417,6 +1446,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 			var inputTokens, outputTokens int
 			var credits float64
 			var realInputTokens int
+			var upstreamStopReason string
 
 			callback := &KiroStreamCallback{
 				OnText: func(text string, isThinking bool) {
@@ -1439,20 +1469,27 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnStopReason: func(reason string) {
+					upstreamStopReason = reason
+				},
 			}
 
-			err := CallKiroAPI(account, payload, callback)
+			err := CallKiroAPIContext(r.Context(), account, payload, callback)
 			if err != nil {
+				if isContextCanceledError(err) {
+					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 				}
 				break
 			}
@@ -1472,7 +1509,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
@@ -1496,6 +1533,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 			}
 
 			resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
+			resp.StopReason = mapClaudeStopReason(upstreamStopReason, len(toolUses))
 			resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
 			resp.Usage.CacheCreationInputTokens = cacheUsage.CacheCreationInputTokens
 			resp.Usage.CacheReadInputTokens = cacheUsage.CacheReadInputTokens
@@ -1513,13 +1551,13 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, _ *http.Request, 
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendClaudeError(w, http.StatusServiceUnavailable, "api_error", "No available accounts")
 		return
 	}
 
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
-	h.sendClaudeError(w, http.StatusInternalServerError, "api_error", lastErr.Error())
+	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.sendClaudeUpstreamError(w, lastErr)
 }
 
 func (h *Handler) sendClaudeError(w http.ResponseWriter, status int, errType, message string) {
@@ -1538,26 +1576,26 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
 	if r.Method != "POST" {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Failed to read request body")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Failed to read request body")
 		h.sendOpenAIError(w, 400, "invalid_request_error", "Failed to read request body")
 		return
 	}
 
 	var req OpenAIRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
 		h.sendOpenAIError(w, 400, "invalid_request_error", "Invalid JSON")
 		return
 	}
 	if msg := validateOpenAIRequestShape(&req); msg != "" {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
 		return
 	}
@@ -1569,7 +1607,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&req)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
 		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
 	}
@@ -1584,7 +1622,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
+func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -1592,7 +1630,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusInternalServerError, "Streaming not supported")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusInternalServerError, "Streaming not supported")
 		h.sendOpenAIError(w, 500, "server_error", "Streaming not supported")
 		return
 	}
@@ -1613,17 +1651,21 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
-			if err := h.ensureValidToken(account); err != nil {
+			if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
+				if r.Context().Err() != nil {
+					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 				}
 				break
 			}
@@ -1633,6 +1675,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 			var inputTokens, outputTokens int
 			var credits float64
 			var realInputTokens int
+			var upstreamStopReason string
 			var rawContentBuilder strings.Builder
 			var rawReasoningBuilder strings.Builder
 			var textBuffer string
@@ -1907,25 +1950,42 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnStopReason: func(reason string) {
+					upstreamStopReason = reason
+				},
 			}
 
-			err := CallKiroAPI(account, payload, callback)
+			err := CallKiroAPIContext(r.Context(), account, payload, callback)
 			if err != nil {
+				if isContextCanceledError(err) {
+					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if !responseStarted {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-						retryPlan.waitBeforeRetry(totalAttempts)
+						retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 						continue
 					}
 					if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-						retryPlan.waitBeforeRetry(totalAttempts)
+						retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					}
 					break
 				}
-				recordFinalRequestForApiKey(apiKeyReservation, account, model, 0, 0, 0, false, 500, err.Error())
+				//! Hand over the held-back tail, then fail loudly: ending without [DONE] alone reads as success to many clients.
+				processText("", false, true)
+				if eventThinkingOpen {
+					sendChunk("", 3)
+				}
+				recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, 500, err.Error())
+				errData, _ := json.Marshal(map[string]interface{}{
+					"error": map[string]string{"message": err.Error(), "type": "server_error"},
+				})
+				fmt.Fprintf(w, "data: %s\n\n", string(errData))
+				flusher.Flush()
 				return
 			}
 
@@ -1951,14 +2011,11 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
-			finishReason := "stop"
-			if len(toolCalls) > 0 {
-				finishReason = "tool_calls"
-			}
+			finishReason := mapOpenAIFinishReason(upstreamStopReason, len(toolCalls))
 
 			chunk := map[string]interface{}{
 				"id":      chatID,
@@ -1970,11 +2027,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 					"delta":         map[string]interface{}{},
 					"finish_reason": finishReason,
 				}},
-				"usage": map[string]int{
-					"prompt_tokens":     inputTokens,
-					"completion_tokens": outputTokens,
-					"total_tokens":      inputTokens + outputTokens,
-				},
+				"usage": buildOpenAIUsage(inputTokens, outputTokens, resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)),
 			}
 			data, _ := json.Marshal(chunk)
 			fmt.Fprintf(w, "data: %s\n\n", string(data))
@@ -1986,16 +2039,16 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, _ *http.Request, pay
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
 		return
 	}
 
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
-	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
+	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.sendOpenAIUpstreamError(w, lastErr)
 }
 
-func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
+func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	excluded := make(map[string]bool)
 	var lastErr error
 	var lastAccount *config.Account
@@ -2010,17 +2063,21 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
-			if err := h.ensureValidToken(account); err != nil {
+			if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
+				if r.Context().Err() != nil {
+					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 				}
 				break
 			}
@@ -2031,6 +2088,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 			var inputTokens, outputTokens int
 			var credits float64
 			var realInputTokens int
+			var upstreamStopReason string
 
 			callback := &KiroStreamCallback{
 				OnText: func(text string, isThinking bool) {
@@ -2046,35 +2104,47 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnStopReason: func(reason string) {
+					upstreamStopReason = reason
+				},
 			}
 
-			err := CallKiroAPI(account, payload, callback)
+			err := CallKiroAPIContext(r.Context(), account, payload, callback)
 			if err != nil {
+				if isContextCanceledError(err) {
+					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 				}
 				break
 			}
 			if allWebSearchToolUses(toolUses) {
 				webSearchToolUses := append([]KiroToolUse(nil), toolUses...)
-				results, err := resolveWebSearchToolResults(account, webSearchToolUses)
+				results, err := resolveWebSearchToolResults(r.Context(), account, webSearchToolUses)
 				if err != nil {
 					lastErr = err
 					lastAccount = account
 					break
 				}
 				toolUses = nil
+				upstreamStopReason = ""
 				followupPayload := buildWebSearchFollowupPayload(payload, webSearchToolUses, results)
-				err = CallKiroAPI(account, followupPayload, callback)
+				err = CallKiroAPIContext(r.Context(), account, followupPayload, callback)
 				if err != nil {
+					if isContextCanceledError(err) {
+						recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
+						return
+					}
 					lastErr = err
 					lastAccount = account
 					h.handleAccountFailure(account, err)
@@ -2095,12 +2165,16 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
 			thinkingFormat := config.GetThinkingConfig().OpenAIFormat
 			resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
+			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens))
+			if choices, ok := resp["choices"].([]map[string]interface{}); ok && len(choices) > 0 {
+				choices[0]["finish_reason"] = mapOpenAIFinishReason(upstreamStopReason, len(toolUses))
+			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			json.NewEncoder(w).Encode(resp)
 			return
@@ -2109,13 +2183,13 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, _ *http.Request, 
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
 		return
 	}
 
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
-	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
+	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.sendOpenAIUpstreamError(w, lastErr)
 }
 
 func (h *Handler) sendOpenAIError(w http.ResponseWriter, status int, errType, message string) {
@@ -2130,43 +2204,24 @@ func (h *Handler) sendOpenAIError(w http.ResponseWriter, status int, errType, me
 }
 
 func (h *Handler) ensureValidToken(account *config.Account) error {
+	return h.ensureValidTokenContext(context.Background(), account)
+}
+
+func (h *Handler) ensureValidTokenContext(ctx context.Context, account *config.Account) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if config.IsAPIKeyAccount(account) {
+		if accountBearerToken(account) == "" {
+			return fmt.Errorf("account %s has no Kiro API key", account.ID)
+		}
+		return nil
+	}
 	if account.ExpiresAt == 0 || time.Now().Unix() < account.ExpiresAt-tokenRefreshSkewSeconds {
 		return nil
 	}
 
-	h.tokenRefreshMu.Lock()
-	defer h.tokenRefreshMu.Unlock()
-
-	//! Another request may have refreshed the same account while this one waited.
-	if latest := h.pool.GetByID(account.ID); latest != nil {
-		account.AccessToken = latest.AccessToken
-		account.RefreshToken = latest.RefreshToken
-		account.ExpiresAt = latest.ExpiresAt
-		account.ProfileArn = latest.ProfileArn
-		if account.ExpiresAt == 0 || time.Now().Unix() < account.ExpiresAt-tokenRefreshSkewSeconds {
-			return nil
-		}
-	}
-
-	accessToken, refreshToken, expiresAt, profileArn, err := auth.RefreshToken(account)
-	if err != nil {
-		return err
-	}
-
-	h.pool.UpdateToken(account.ID, accessToken, refreshToken, expiresAt)
-	account.AccessToken = accessToken
-	if refreshToken != "" {
-		account.RefreshToken = refreshToken
-	}
-	account.ExpiresAt = expiresAt
-	if profileArn != "" {
-		account.ProfileArn = profileArn
-		config.UpdateAccountProfileArn(account.ID, profileArn)
-	}
-
-	config.UpdateAccountToken(account.ID, accessToken, refreshToken, expiresAt)
-
-	return nil
+	return refreshStoredAccount(ctx, account, false)
 }
 
 func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
@@ -2665,18 +2720,9 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if account.RefreshToken != "" {
-				if newAccess, newRefresh, newExpires, profileArn, err := auth.RefreshToken(account); err == nil {
-					account.AccessToken = newAccess
-					if newRefresh != "" {
-						account.RefreshToken = newRefresh
-					}
-					account.ExpiresAt = newExpires
-					config.UpdateAccountToken(id, newAccess, newRefresh, newExpires)
-					if profileArn != "" {
-						account.ProfileArn = profileArn
-						config.UpdateAccountProfileArn(id, profileArn)
-					}
-					h.pool.UpdateToken(id, newAccess, newRefresh, newExpires)
+				if err := refreshStoredAccount(r.Context(), account, true); err != nil {
+					failCount++
+					continue
 				}
 			}
 
@@ -2980,11 +3026,14 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		AccessToken  string `json:"accessToken"`
 		RefreshToken string `json:"refreshToken"`
+		KiroApiKey   string `json:"kiroApiKey"`
 		ClientID     string `json:"clientId"`
 		ClientSecret string `json:"clientSecret"`
 		AuthMethod   string `json:"authMethod"`
 		Provider     string `json:"provider"`
 		Region       string `json:"region"`
+		Email        string `json:"email"`
+		Nickname     string `json:"nickname"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -2992,9 +3041,32 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.RefreshToken = strings.TrimSpace(req.RefreshToken)
+	req.AccessToken = strings.TrimSpace(req.AccessToken)
+	req.KiroApiKey = strings.TrimSpace(req.KiroApiKey)
+	methodHint := strings.ToLower(strings.TrimSpace(req.AuthMethod))
+	//! A bare ksk_ accessToken with no refresh token is an API key pasted into the token field.
+	if req.KiroApiKey == "" && req.RefreshToken == "" &&
+		(methodHint == config.AuthMethodAPIKey || methodHint == "apikey" || config.LooksLikeKiroAPIKey(req.AccessToken)) {
+		req.KiroApiKey = req.AccessToken
+	}
+	if req.KiroApiKey != "" {
+		h.importKiroAPIKeyAccount(w, config.Account{
+			ID:         auth.GenerateAccountID(),
+			Email:      strings.TrimSpace(req.Email),
+			Nickname:   strings.TrimSpace(req.Nickname),
+			KiroApiKey: req.KiroApiKey,
+			AuthMethod: config.AuthMethodAPIKey,
+			Provider:   strings.TrimSpace(req.Provider),
+			Region:     strings.TrimSpace(req.Region),
+			Enabled:    true,
+		})
+		return
+	}
+
 	if req.RefreshToken == "" {
 		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "refreshToken is required"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "refreshToken or kiroApiKey is required"})
 		return
 	}
 
@@ -3064,6 +3136,38 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.pool.Reload()
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"account": map[string]interface{}{
+			"id":    account.ID,
+			"email": account.Email,
+		},
+	})
+}
+
+func (h *Handler) importKiroAPIKeyAccount(w http.ResponseWriter, account config.Account) {
+	//! No OAuth refresh and no profile lookup: the key is the credential, and it never expires.
+	if err := config.NormalizeAPIKeyAccount(&account); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	if err := config.AddAccount(account); err != nil {
+		if errors.Is(err, config.ErrDuplicateKiroAPIKey) {
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.pool.Reload()
+	go func(acc config.Account) {
+		if err := h.fetchAndCacheAccountModels(&acc); err != nil {
+			logger.Warnf("[ModelsCache] Auto-refresh failed for new API key account %s: %v", acc.Email, err)
+		}
+	}(account)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"account": map[string]interface{}{
@@ -3251,7 +3355,7 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 		OnContextUsage: func(pct float64) {},
 	}
 
-	err := CallKiroAPI(account, kiroPayload, callback)
+	err := CallKiroAPIContext(r.Context(), account, kiroPayload, callback)
 	if err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -3265,7 +3369,7 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 	})
 }
 
-func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id string) {
+func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
 	for i := range accounts {
@@ -3285,22 +3389,7 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, _ *http.Request, id s
 		if account.RefreshToken == "" {
 			return nil
 		}
-		newAccessToken, newRefreshToken, newExpiresAt, profileArn, err := auth.RefreshToken(account)
-		if err != nil {
-			return err
-		}
-		account.AccessToken = newAccessToken
-		if newRefreshToken != "" {
-			account.RefreshToken = newRefreshToken
-		}
-		account.ExpiresAt = newExpiresAt
-		config.UpdateAccountToken(id, newAccessToken, newRefreshToken, newExpiresAt)
-		h.pool.UpdateToken(id, newAccessToken, newRefreshToken, newExpiresAt)
-		if profileArn != "" {
-			account.ProfileArn = profileArn
-			config.UpdateAccountProfileArn(id, profileArn)
-		}
-		return nil
+		return refreshStoredAccount(r.Context(), account, true)
 	}
 
 	if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {

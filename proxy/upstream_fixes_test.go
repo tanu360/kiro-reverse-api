@@ -83,6 +83,33 @@ func TestOpenAIToolResultImageCarriedWhenFollowedByUser(t *testing.T) {
 	}
 }
 
+func TestOpenAIToolResultImageAttachedToCurrentMessage(t *testing.T) {
+	const dataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+	req := &OpenAIRequest{
+		Model: "claude-sonnet-4.5",
+		Messages: []OpenAIMessage{
+			{Role: "user", Content: "look at the file"},
+			{Role: "assistant", ToolCalls: []ToolCall{testToolCall("call_img", "read", `{"path":"a.png"}`)}},
+			{Role: "tool", ToolCallID: "call_img", Content: []interface{}{map[string]interface{}{"type": "image_url", "image_url": map[string]interface{}{"url": dataURL}}}},
+		},
+	}
+
+	payload := OpenAIToKiro(req, false)
+	cur := payload.ConversationState.CurrentMessage.UserInputMessage
+	if len(cur.Images) != 1 || cur.Images[0].Format != "png" {
+		t.Fatalf("expected one png tool image on the current message, got %+v", cur.Images)
+	}
+	ctx := cur.UserInputMessageContext
+	if ctx == nil || len(ctx.ToolResults) != 1 || ctx.ToolResults[0].ToolUseID != "call_img" {
+		t.Fatalf("expected the active tool result kept structured, got %#v", ctx)
+	}
+	for _, h := range payload.ConversationState.History {
+		if h.UserInputMessage != nil && len(h.UserInputMessage.Images) > 0 {
+			t.Fatalf("tool image duplicated into history")
+		}
+	}
+}
+
 func TestClaudeToolResultPreservesMixedTextAndImage(t *testing.T) {
 	const imgData = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 	req := &ClaudeRequest{
@@ -257,6 +284,30 @@ func TestGetContextWindowSizeClassifiesLargeContextModels(t *testing.T) {
 		"claude-sonnet-4.5":        200_000,
 		"claude-haiku-4.5":         200_000,
 		"unknown-model":            200_000,
+
+		"claude-opus-5":              1_000_000,
+		"claude-sonnet-5":            1_000_000,
+		"claude-opus-5-thinking":     1_000_000,
+		"claude-opus-5.1":            1_000_000,
+		"claude-sonnet-5-0":          1_000_000,
+		"claude-sonnet-4":            200_000,
+		"claude-sonnet-4-20250514":   200_000,
+		"claude-sonnet-4.20250514":   200_000,
+		"claude-opus-4-20250514":     200_000,
+		"claude-opus-4-1-20250805":   200_000,
+		"claude-sonnet-4-5-20250929": 200_000,
+		"claude-haiku-4-5-20251001":  200_000,
+		"claude-sonnet-4-6-20260101": 1_000_000,
+
+		"claude-opus-4.7":   1_000_000,
+		"claude-opus-4.6":   1_000_000,
+		"CLAUDE-OPUS-4.8":   1_000_000,
+		"CLAUDE-OPUS-5":     1_000_000,
+		"claude-opus-5-1":   1_000_000,
+		"claude-haiku-5":    1_000_000,
+		"claude-opus-6":     1_000_000,
+		"claude-opus-4.5":   200_000,
+		"claude-3-5-sonnet": 200_000,
 	}
 	for model, want := range cases {
 		if got := getContextWindowSize(model); got != want {

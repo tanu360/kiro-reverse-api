@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -20,21 +21,21 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
 	if r.Method != http.MethodPost {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Failed to read request body")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Failed to read request body")
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
 		return
 	}
 
 	var req OpenAIResponsesRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "Invalid JSON")
 		return
 	}
@@ -43,12 +44,12 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	if req.PreviousResponseID != "" {
 		state, err := loadResponseState(req.PreviousResponseID)
 		if errors.Is(err, sql.ErrNoRows) {
-			recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, "previous_response_id not found")
+			recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, "previous_response_id not found")
 			h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "previous_response_id not found")
 			return
 		}
 		if err != nil {
-			recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusInternalServerError, err.Error())
+			recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusInternalServerError, err.Error())
 			h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
@@ -57,7 +58,7 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 
 	prepared, msg := prepareResponsesRequest(&req, previousMessages)
 	if msg != "" {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", msg)
 		return
 	}
@@ -71,16 +72,16 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	h.applyReasoningEffort(kiroPayload, prepared.OpenAIRequest.Model, prepared.OpenAIRequest.ReasoningEffort)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
-		recordFinalRequestWithAPIKey(apiKeyID, apiKeyValue, nil, prepared.OpenAIRequest.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, prepared.OpenAIRequest.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
 		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
 	}
 
 	if prepared.OpenAIRequest.Stream {
-		h.handleOpenAIResponsesStream(w, kiroPayload, prepared, thinking, estimatedInputTokens, apiKeyReservation)
+		h.handleOpenAIResponsesStream(r.Context(), w, kiroPayload, prepared, thinking, estimatedInputTokens, apiKeyReservation)
 		return
 	}
-	h.handleOpenAIResponsesNonStream(w, kiroPayload, prepared, thinking, estimatedInputTokens, apiKeyReservation)
+	h.handleOpenAIResponsesNonStream(r.Context(), w, kiroPayload, prepared, thinking, estimatedInputTokens, apiKeyReservation)
 }
 
 func (h *Handler) apiGetOpenAIResponse(w http.ResponseWriter, _ *http.Request, id string) {
@@ -115,7 +116,7 @@ func (h *Handler) apiDeleteOpenAIResponse(w http.ResponseWriter, _ *http.Request
 	})
 }
 
-func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload *KiroPayload, prepared *responsesPreparedRequest, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
+func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.ResponseWriter, payload *KiroPayload, prepared *responsesPreparedRequest, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	model := prepared.OpenAIRequest.Model
 	excluded := make(map[string]bool)
 	var lastErr error
@@ -131,17 +132,21 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
-			if err := h.ensureValidToken(account); err != nil {
+			if err := h.ensureValidTokenContext(ctx, account); err != nil {
+				if ctx.Err() != nil {
+					recordClientDisconnect(ctx, apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 				}
 				break
 			}
@@ -152,6 +157,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 			var inputTokens, outputTokens int
 			var credits float64
 			var realInputTokens int
+			var upstreamStopReason string
 
 			callback := &KiroStreamCallback{
 				OnText: func(text string, isThinking bool) {
@@ -167,35 +173,47 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnStopReason: func(reason string) {
+					upstreamStopReason = reason
+				},
 			}
 
-			err := CallKiroAPI(account, payload, callback)
+			err := CallKiroAPIContext(ctx, account, payload, callback)
 			if err != nil {
+				if isContextCanceledError(err) {
+					recordClientDisconnect(ctx, apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 				}
 				break
 			}
 			if allWebSearchToolUses(toolUses) {
 				webSearchToolUses := append([]KiroToolUse(nil), toolUses...)
-				results, err := resolveWebSearchToolResults(account, webSearchToolUses)
+				results, err := resolveWebSearchToolResults(ctx, account, webSearchToolUses)
 				if err != nil {
 					lastErr = err
 					lastAccount = account
 					break
 				}
 				toolUses = nil
+				upstreamStopReason = ""
 				followupPayload := buildWebSearchFollowupPayload(payload, webSearchToolUses, results)
-				err = CallKiroAPI(account, followupPayload, callback)
+				err = CallKiroAPIContext(ctx, account, followupPayload, callback)
 				if err != nil {
+					if isContextCanceledError(err) {
+						recordClientDisconnect(ctx, apiKeyReservation, account, model)
+						return
+					}
 					lastErr = err
 					lastAccount = account
 					h.handleAccountFailure(account, err)
@@ -215,11 +233,13 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
 			response, storedMessages := buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
+			addResponsesCacheUsage(response, resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens))
+			applyResponsesStopReason(response, upstreamStopReason)
 			if prepared.Store {
 				if err := saveResponseState(responseStateFromObject(response, storedMessages)); err != nil {
 					logger.Warnf("[Responses] Failed to persist response %s: %v", responseIDFromObject(response), err)
@@ -234,15 +254,15 @@ func (h *Handler) handleOpenAIResponsesNonStream(w http.ResponseWriter, payload 
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
 		return
 	}
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
-	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
+	recordFinalRequestForApiKey(ctx, apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.sendOpenAIUpstreamError(w, lastErr)
 }
 
-func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *KiroPayload, prepared *responsesPreparedRequest, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
+func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.ResponseWriter, payload *KiroPayload, prepared *responsesPreparedRequest, thinking bool, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	model := prepared.OpenAIRequest.Model
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -251,7 +271,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusInternalServerError, "Streaming not supported")
+		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusInternalServerError, "Streaming not supported")
 		h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", "Streaming not supported")
 		return
 	}
@@ -268,17 +288,21 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
-			if err := h.ensureValidToken(account); err != nil {
+			if err := h.ensureValidTokenContext(ctx, account); err != nil {
+				if ctx.Err() != nil {
+					recordClientDisconnect(ctx, apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 					continue
 				}
 				if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-					retryPlan.waitBeforeRetry(totalAttempts)
+					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 				}
 				break
 			}
@@ -289,6 +313,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 			var inputTokens, outputTokens int
 			var credits float64
 			var realInputTokens int
+			var upstreamStopReason string
 			responseID := "resp_" + uuid.NewString()
 			createdAt := time.Now().Unix()
 			started := false
@@ -365,15 +390,27 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 				OnToolUse: func(tu KiroToolUse) {
 					ensureStarted()
 					toolUses = append(toolUses, tu)
-					item := buildResponsesToolOutputItem(tu)
+					item := buildPreparedResponsesToolOutputItem(prepared, tu)
 					outputIndex := nextOutputIndex
 					nextOutputIndex++
 					reserveOutputItem(outputIndex, item)
+					added := make(map[string]interface{}, len(item))
+					for key, value := range item {
+						added[key] = value
+					}
+					added["status"] = "in_progress"
+					field, event := "arguments", "response.function_call_arguments"
+					if item["type"] == "custom_tool_call" {
+						field, event = "input", "response.custom_tool_call_input"
+					}
+					added[field] = ""
 					sendResponsesSSE(w, flusher, "response.output_item.added", map[string]interface{}{
 						"type":         "response.output_item.added",
 						"output_index": outputIndex,
-						"item":         item,
+						"item":         added,
 					})
+					sendResponsesSSE(w, flusher, event+".delta", map[string]interface{}{"type": event + ".delta", "item_id": item["id"], "output_index": outputIndex, "delta": item[field]})
+					sendResponsesSSE(w, flusher, event+".done", map[string]interface{}{"type": event + ".done", "item_id": item["id"], "output_index": outputIndex, field: item[field]})
 					sendResponsesSSE(w, flusher, "response.output_item.done", map[string]interface{}{
 						"type":         "response.output_item.done",
 						"output_index": outputIndex,
@@ -385,21 +422,28 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnStopReason: func(reason string) {
+					upstreamStopReason = reason
+				},
 			}
 
-			err := CallKiroAPI(account, payload, callback)
+			err := CallKiroAPIContext(ctx, account, payload, callback)
 			if err != nil {
+				if isContextCanceledError(err) {
+					recordClientDisconnect(ctx, apiKeyReservation, account, model)
+					return
+				}
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
 				recordAttemptError(account, model, 0, err)
 				if !started {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
-						retryPlan.waitBeforeRetry(totalAttempts)
+						retryPlan.waitBeforeRetry(ctx, totalAttempts)
 						continue
 					}
 					if retryPlan.shouldBackoffBeforeNextAccount(err, totalAttempts) {
-						retryPlan.waitBeforeRetry(totalAttempts)
+						retryPlan.waitBeforeRetry(ctx, totalAttempts)
 					}
 					break
 				}
@@ -412,7 +456,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 						"error":  map[string]string{"message": err.Error()},
 					},
 				})
-				recordFinalRequestForApiKey(apiKeyReservation, account, model, 0, 0, 0, false, http.StatusInternalServerError, err.Error())
+				recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, 0, 0, 0, false, http.StatusInternalServerError, err.Error())
 				return
 			}
 
@@ -429,7 +473,7 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
@@ -464,8 +508,10 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 				nextOutputIndex++
 			}
 			response, storedMessages := buildResponsesCompletedObjectWithOutput(responseID, createdAt, prepared, outputItems, finalContent, toolUses, inputTokens, outputTokens)
-			sendResponsesSSE(w, flusher, "response.completed", map[string]interface{}{
-				"type":     "response.completed",
+			addResponsesCacheUsage(response, resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens))
+			terminalEvent := applyResponsesStopReason(response, upstreamStopReason)
+			sendResponsesSSE(w, flusher, terminalEvent, map[string]interface{}{
+				"type":     terminalEvent,
 				"response": response,
 			})
 			if prepared.Store {
@@ -479,12 +525,12 @@ func (h *Handler) handleOpenAIResponsesStream(w http.ResponseWriter, payload *Ki
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
+		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
 		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
 		return
 	}
-	recordFinalRequestForApiKey(apiKeyReservation, lastAccount, model, 0, 0, 0, false, http.StatusInternalServerError, lastErr.Error())
-	h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", lastErr.Error())
+	recordFinalRequestForApiKey(ctx, apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
+	h.sendOpenAIUpstreamError(w, lastErr)
 }
 
 func sendResponsesSSE(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {
@@ -500,6 +546,9 @@ func buildResponsesCompletedObject(prepared *responsesPreparedRequest, content, 
 
 func buildResponsesCompletedObjectWithID(id string, createdAt int64, prepared *responsesPreparedRequest, content, reasoning string, toolUses []KiroToolUse, inputTokens, outputTokens int) (map[string]interface{}, []OpenAIMessage) {
 	output := buildResponsesOutput(content, reasoning, toolUses)
+	for i, tu := range toolUses {
+		output[len(output)-len(toolUses)+i] = buildPreparedResponsesToolOutputItem(prepared, tu)
+	}
 	return buildResponsesCompletedObjectWithOutput(id, createdAt, prepared, output, content, toolUses, inputTokens, outputTokens)
 }
 
@@ -514,6 +563,18 @@ func buildResponsesCompletedObjectWithOutput(id string, createdAt int64, prepare
 	storedMessages := append([]OpenAIMessage(nil), prepared.StoredMessages...)
 	storedMessages = append(storedMessages, responsesAssistantMessage(outputText, toolUses))
 	return response, storedMessages
+}
+
+func applyResponsesStopReason(response map[string]interface{}, stopReason string) (terminalEvent string) {
+	//! A length or content-filter stop is reported as "incomplete" so clients do not treat a cut-off answer as whole.
+	status, incompleteReason := mapResponsesCompletion(stopReason)
+	response["status"] = status
+	if status == "incomplete" {
+		response["incomplete_details"] = map[string]string{"reason": incompleteReason}
+		return "response.incomplete"
+	}
+	response["incomplete_details"] = nil
+	return "response.completed"
 }
 
 func buildResponsesBaseObject(id string, createdAt int64, status string, prepared *responsesPreparedRequest, output []map[string]interface{}, outputText string) map[string]interface{} {

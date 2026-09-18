@@ -1,7 +1,9 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"kiro-proxy/auth"
@@ -10,15 +12,29 @@ import (
 	"net/http"
 	neturl "net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	kiroRestAPIBase = "https://codewhisperer.us-east-1.amazonaws.com"
+	kiroRestAPIBase               = "https://codewhisperer.us-east-1.amazonaws.com"
+	profileArnUnsupportedCooldown = 24 * time.Hour
+	maxProfilePages               = 20
+	maxProfileResponseBytes       = 1 << 20
+	maxProfileErrorBytes          = 64 << 10
+)
+
+var (
+	profileArnResolutionCooldowns sync.Map
+
+	errProfileArnLookupSuppressed  = errors.New("profile ARN resolution skipped: previous Builder ID profile lookup was unsupported")
+	errProfileArnLookupUnsupported = errors.New("profile ARN unsupported for Builder ID account")
 )
 
 func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
+	ensureRestProfileArn(account)
 	url := fmt.Sprintf("%s/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST&isEmailRequired=true", kiroRestAPIBase)
+	url = regionalizeURL(url, account)
 	url = withProfileArnQuery(url, account)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -47,7 +63,7 @@ func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
 }
 
 func GetUserInfo(account *config.Account) (*UserInfoResponse, error) {
-	url := fmt.Sprintf("%s/GetUserInfo", kiroRestAPIBase)
+	url := regionalizeURL(fmt.Sprintf("%s/GetUserInfo", kiroRestAPIBase), account)
 
 	payload := `{"origin":"KIRO_IDE"}`
 	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
@@ -77,7 +93,9 @@ func GetUserInfo(account *config.Account) (*UserInfoResponse, error) {
 }
 
 func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
+	ensureRestProfileArn(account)
 	url := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&maxResults=50", kiroRestAPIBase)
+	url = regionalizeURL(url, account)
 	url = withProfileArnQuery(url, account)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -108,43 +126,172 @@ func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 }
 
 func ResolveProfileArn(account *config.Account) (string, error) {
+	return resolveProfileArnContext(context.Background(), account)
+}
+
+func resolveProfileArnContext(ctx context.Context, account *config.Account) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if account == nil {
 		return "", fmt.Errorf("account is nil")
+	}
+	//! API keys have no IDE profile; a lookup would only fail and spam the log.
+	if config.IsAPIKeyAccount(account) {
+		return "", nil
 	}
 	if profileArn := strings.TrimSpace(account.ProfileArn); profileArn != "" {
 		return profileArn, nil
 	}
 
-	profileArn, err := listAvailableProfilesWithRetry(account)
-	if err == nil && profileArn != "" {
-		if updateErr := config.UpdateAccountProfileArn(account.ID, profileArn); updateErr != nil {
-			logger.Warnf("[ProfileArn] Failed to cache profile ARN for %s: %v", account.Email, updateErr)
+	suppressed := isProfileArnResolutionSuppressed(account)
+	var lookupErr error
+	if !suppressed {
+		profileArn, err := resolveProfileArnAcrossRegions(ctx, account)
+		if err == nil {
+			cacheResolvedProfileArn(account, profileArn)
+			return profileArn, nil
 		}
-		account.ProfileArn = profileArn
-		return profileArn, nil
+		lookupErr = err
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
 
+	//! AWS refresh responses can carry profileArn, so refresh stays the fallback even for Builder ID.
 	if account.RefreshToken != "" {
-		_, _, _, refreshedArn, refreshErr := auth.RefreshToken(account)
-		if refreshErr == nil && refreshedArn != "" {
-			if updateErr := config.UpdateAccountProfileArn(account.ID, refreshedArn); updateErr != nil {
-				logger.Warnf("[ProfileArn] Failed to cache profile ARN for %s: %v", account.Email, updateErr)
+		var refreshedArn string
+		var refreshErr error
+		if storedAccount(account.ID) != nil {
+			refreshErr = refreshStoredAccount(ctx, account, true)
+			refreshedArn = account.ProfileArn
+		} else {
+			// Credential import probes an account before it is persisted.
+			var accessToken, refreshToken string
+			var expiresAt int64
+			accessToken, refreshToken, expiresAt, refreshedArn, refreshErr = auth.RefreshTokenContext(ctx, account)
+			if refreshErr == nil {
+				account.AccessToken = accessToken
+				if refreshToken != "" {
+					account.RefreshToken = refreshToken
+				}
+				account.ExpiresAt = expiresAt
 			}
-			account.ProfileArn = refreshedArn
+		}
+		if refreshErr == nil && refreshedArn != "" {
+			cacheResolvedProfileArn(account, refreshedArn)
 			return refreshedArn, nil
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 
-	return "", fmt.Errorf("no available Kiro profile")
+	if suppressed {
+		return "", errProfileArnLookupSuppressed
+	}
+	if isBuilderIDProfileUnsupportedError(account, lookupErr) {
+		suppressProfileArnResolution(account)
+		logger.Debugf("[ProfileArn] Builder ID profile lookup unsupported for %s: %v", accountEmailForLog(account), lookupErr)
+		return "", errProfileArnLookupUnsupported
+	}
+	return "", fmt.Errorf("no available Kiro profile: %w", lookupErr)
 }
 
-func listAvailableProfilesWithRetry(account *config.Account) (string, error) {
+func cacheResolvedProfileArn(account *config.Account, profileArn string) {
+	if err := config.UpdateAccountProfileArn(account.ID, profileArn); err != nil {
+		logger.Warnf("[ProfileArn] Failed to cache profile ARN for %s: %v", account.Email, err)
+	}
+	account.ProfileArn = profileArn
+}
+
+func ensureRestProfileArn(account *config.Account) {
+	//! REST calls worked without an ARN before, so a failed lookup degrades to that instead of failing the call.
+	if account == nil || strings.TrimSpace(account.ProfileArn) != "" || config.IsAPIKeyAccount(account) {
+		return
+	}
+	if _, err := ResolveProfileArn(account); err != nil {
+		if isProfileArnResolutionSoftError(err) {
+			logger.Debugf("[ProfileArn] Continuing REST request without profile ARN for %s: %v", accountEmailForLog(account), err)
+			return
+		}
+		logger.Warnf("[ProfileArn] Continuing REST request without profile ARN for %s: %v", accountEmailForLog(account), err)
+	}
+}
+
+func isBuilderIDProfileUnsupportedError(account *config.Account, err error) bool {
+	if account == nil || err == nil || !strings.EqualFold(strings.TrimSpace(account.Provider), "BuilderId") {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "HTTP 403") && strings.Contains(msg, "AWS Builder ID is not supported for this operation")
+}
+
+func isProfileArnResolutionSoftError(err error) bool {
+	return errors.Is(err, errProfileArnLookupSuppressed) || errors.Is(err, errProfileArnLookupUnsupported)
+}
+
+func profileArnCooldownKey(account *config.Account) string {
+	if account == nil {
+		return ""
+	}
+	provider := strings.TrimSpace(account.Provider)
+	for _, id := range []string{account.ID, account.UserId, account.Email} {
+		if id = strings.TrimSpace(id); id != "" {
+			return provider + "\x00" + id
+		}
+	}
+	return ""
+}
+
+func suppressProfileArnResolution(account *config.Account) {
+	//! Builder ID cannot list profiles; without a cooldown every request would re-probe and log the same 403.
+	if key := profileArnCooldownKey(account); key != "" {
+		profileArnResolutionCooldowns.Store(key, time.Now().Add(profileArnUnsupportedCooldown))
+	}
+}
+
+func isProfileArnResolutionSuppressed(account *config.Account) bool {
+	key := profileArnCooldownKey(account)
+	if key == "" {
+		return false
+	}
+	value, ok := profileArnResolutionCooldowns.Load(key)
+	if !ok {
+		return false
+	}
+	if until, ok := value.(time.Time); !ok || time.Now().After(until) {
+		profileArnResolutionCooldowns.Delete(key)
+		return false
+	}
+	return true
+}
+
+func resolveProfileArnAcrossRegions(ctx context.Context, account *config.Account) (string, error) {
+	var probeErrors []error
+	for _, region := range kiroProfileRegionCandidates(account) {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		profileArn, err := listAvailableProfilesWithRetry(ctx, account, region)
+		if err == nil {
+			return profileArn, nil
+		}
+		if isBuilderIDProfileUnsupportedError(account, err) {
+			return "", err
+		}
+		probeErrors = append(probeErrors, fmt.Errorf("%s: %w", region, err))
+	}
+	return "", errors.Join(probeErrors...)
+}
+
+func listAvailableProfilesWithRetry(ctx context.Context, account *config.Account, region string) (string, error) {
 	const maxAttempts = 3
 	backoff := 200 * time.Millisecond
 
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		profileArn, err := listAvailableProfiles(account)
+		profileArn, err := listAvailableProfiles(ctx, account, region)
 		if err == nil {
 			return profileArn, nil
 		}
@@ -152,9 +299,11 @@ func listAvailableProfilesWithRetry(account *config.Account) (string, error) {
 		if !isTransientProfileFetchError(err) || attempt == maxAttempts {
 			return "", err
 		}
-		logger.Debugf("[ProfileArn] ListAvailableProfiles transient failure for %s (attempt %d/%d): %v",
-			account.Email, attempt, maxAttempts, err)
-		time.Sleep(backoff)
+		logger.Debugf("[ProfileArn] ListAvailableProfiles transient failure for %s in %s (attempt %d/%d): %v",
+			account.Email, region, attempt, maxAttempts, err)
+		if err := waitForStreamRetry(ctx, backoff); err != nil {
+			return "", err
+		}
 		backoff *= 2
 	}
 	return "", lastErr
@@ -165,7 +314,7 @@ func isTransientProfileFetchError(err error) bool {
 		return false
 	}
 	msg := err.Error()
-	if strings.Contains(msg, "empty profile list") {
+	if strings.Contains(msg, "empty profile list") || strings.Contains(msg, "no valid Kiro profile ARN") {
 		return false
 	}
 	if strings.HasPrefix(msg, "HTTP ") {
@@ -174,37 +323,65 @@ func isTransientProfileFetchError(err error) bool {
 	return true
 }
 
-func listAvailableProfiles(account *config.Account) (string, error) {
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/ListAvailableProfiles", kiroRestAPIBase), strings.NewReader(`{"maxResults":10}`))
-	if err != nil {
-		return "", err
-	}
-	setKiroHeaders(req, account)
-	req.Header.Set("Content-Type", "application/json")
+func listAvailableProfiles(ctx context.Context, account *config.Account, region string) (string, error) {
+	endpoint := regionalizeURLForRegion(fmt.Sprintf("%s/ListAvailableProfiles", kiroRestAPIBase), region)
+	client := GetRestClientForProxy(ResolveAccountProxyURL(account))
 
-	resp, err := GetRestClientForProxy(ResolveAccountProxyURL(account)).Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Profiles []struct {
-			Arn string `json:"arn"`
-		} `json:"profiles"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
-	}
-	for _, profile := range result.Profiles {
-		if profileArn := strings.TrimSpace(profile.Arn); profileArn != "" {
-			return profileArn, nil
+	invalidCount := 0
+	nextToken := ""
+	//! Pages are bounded so a misbehaving upstream cannot loop forever.
+	for page := 0; page < maxProfilePages; page++ {
+		requestBody := map[string]interface{}{"maxResults": 50}
+		if nextToken != "" {
+			requestBody["nextToken"] = nextToken
 		}
+		payload, _ := json.Marshal(requestBody)
+		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(string(payload)))
+		if err != nil {
+			return "", err
+		}
+		setKiroHeaders(req, account)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", err
+		}
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, maxProfileErrorBytes))
+			resp.Body.Close()
+			return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxProfileResponseBytes+1))
+		resp.Body.Close()
+		if err != nil {
+			return "", err
+		}
+		if len(body) > maxProfileResponseBytes {
+			return "", fmt.Errorf("profile response exceeds %d bytes", maxProfileResponseBytes)
+		}
+
+		var result struct {
+			Profiles []struct {
+				Arn string `json:"arn"`
+			} `json:"profiles"`
+			NextToken string `json:"nextToken"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			return "", err
+		}
+		for _, profile := range result.Profiles {
+			if profileArn, _, ok := parseKiroProfileArn(profile.Arn); ok {
+				return profileArn, nil
+			}
+			invalidCount++
+		}
+		if nextToken = strings.TrimSpace(result.NextToken); nextToken == "" {
+			break
+		}
+	}
+	if invalidCount > 0 {
+		return "", fmt.Errorf("profile response contained no valid Kiro profile ARN")
 	}
 	return "", fmt.Errorf("empty profile list")
 }
