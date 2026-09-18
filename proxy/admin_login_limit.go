@@ -11,8 +11,13 @@ import (
 
 const adminGuessWindow = time.Minute
 const adminGuessesPerClient = 5
+
+// Past adminGuessesGlobal failures in a window, every client drops to
+// adminGuessesUnderAttack tries instead of being locked out, so a distributed
+// attack slows down without shutting the real admin out.
 const adminGuessesGlobal = 30
-const maxAdminGuessClients = 4096
+const adminGuessesUnderAttack = 1
+const maxAdminGuessClients = 65536
 
 type adminGuessBucket struct {
 	count int
@@ -30,6 +35,10 @@ func adminRemoteHost(r *http.Request) string {
 		host = r.RemoteAddr
 	}
 	if ip := net.ParseIP(host); ip != nil {
+		if ip.To4() == nil {
+			//! One IPv6 host usually owns a whole /64; per-address buckets would let it rotate freely.
+			return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
+		}
 		return ip.String()
 	}
 	return host
@@ -52,10 +61,11 @@ func (l *adminGuessLimiter) allowLocked(host string, now time.Time) time.Duratio
 	if !now.Before(b.until) {
 		b = adminGuessBucket{until: now.Add(adminGuessWindow)}
 	}
+	limit := adminGuessesPerClient
 	if l.global.count >= adminGuessesGlobal {
-		return l.global.until.Sub(now)
+		limit = adminGuessesUnderAttack
 	}
-	if b.count >= adminGuessesPerClient {
+	if b.count >= limit {
 		return b.until.Sub(now)
 	}
 	if len(l.clients) >= maxAdminGuessClients {

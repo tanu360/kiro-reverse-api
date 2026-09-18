@@ -50,7 +50,11 @@ func TestAdminPasswordLimitsCoverBothRoutes(t *testing.T) {
 		t.Fatalf("existing session throttled: %d", rec.Code)
 	}
 }
-func TestAdminLimiterGlobalAndExpiry(t *testing.T) {
+func TestAdminLimiterSlowsDistributedGuessesWithoutLockout(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatal(err)
+	}
+	config.SetPassword("12345678")
 	var l adminGuessLimiter
 	now := time.Now()
 	for i := 0; i < adminGuessesGlobal; i++ {
@@ -58,11 +62,36 @@ func TestAdminLimiterGlobalAndExpiry(t *testing.T) {
 			t.Fatal("early global limit")
 		}
 	}
-	if l.allow("new", now) == 0 {
-		t.Fatal("distributed guesses not limited")
+	for i := 0; i < adminGuessesUnderAttack; i++ {
+		if l.allow("attacker", now) != 0 {
+			t.Fatal("fresh client locked out during attack")
+		}
 	}
-	if l.allow("new", now.Add(adminGuessWindow)) != 0 {
+	if l.allow("attacker", now) == 0 {
+		t.Fatal("distributed guesses not slowed")
+	}
+	if valid, delay := l.checkPassword("admin", "12345678", now); !valid || delay != 0 {
+		t.Fatalf("real admin locked out: valid=%v delay=%s", valid, delay)
+	}
+	if l.allow("attacker", now.Add(adminGuessWindow)) != 0 {
 		t.Fatal("window did not expire")
+	}
+}
+
+func TestAdminLimiterGroupsIPv6ByPrefix(t *testing.T) {
+	key := func(addr string) string {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = addr
+		return adminRemoteHost(req)
+	}
+	if key("[2001:db8:1:2::1]:1000") != key("[2001:db8:1:2:ffff::9]:2000") {
+		t.Fatal("addresses in one /64 must share a bucket")
+	}
+	if key("[2001:db8:1:2::1]:1000") == key("[2001:db8:1:3::1]:1000") {
+		t.Fatal("different /64 prefixes must not share a bucket")
+	}
+	if got := key("[::ffff:192.0.2.1]:1000"); got != "192.0.2.1" {
+		t.Fatalf("IPv4-mapped address keyed as %q", got)
 	}
 }
 
