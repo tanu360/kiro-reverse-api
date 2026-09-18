@@ -36,12 +36,7 @@ func LoadCredentials() error {
 		return fmt.Errorf("parse credentials: %w", err)
 	}
 	credentials = arr
-	if loadedRaw == "" {
-		// If a credentials row exists without a flag, treat it as loaded.
-		credLoaded = len(arr) > 0
-	} else {
-		credLoaded = loadedRaw == "1"
-	}
+	credLoaded = loadedRaw == "1"
 	return nil
 }
 
@@ -222,6 +217,9 @@ func UpdateCredentialOverageStatus(id, status, capability string, cap, rate, cur
 func AddCredential(acc Account) error {
 	credLock.Lock()
 	defer credLock.Unlock()
+	if hasKiroAPIKey(credentials, acc.KiroApiKey) {
+		return ErrDuplicateKiroAPIKey
+	}
 	credentials = append(credentials, acc)
 	credLoaded = true
 	if err := setSetting(credentialsLoadedKey, "1"); err != nil {
@@ -247,6 +245,7 @@ func UpdateCredential(acc Account) error {
 	defer credLock.Unlock()
 	for i := range credentials {
 		if credentials[i].ID == acc.ID {
+			preserveAccountCredentials(&acc, credentials[i])
 			credentials[i] = acc
 			return saveCredentialsLocked()
 		}

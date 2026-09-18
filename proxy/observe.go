@@ -59,6 +59,9 @@ type requestRecord struct {
 	Success      bool    `json:"success"`
 	Status       int     `json:"status,omitempty"`
 	Message      string  `json:"message,omitempty"`
+	Endpoint     string  `json:"endpoint,omitempty"`
+	DurationMs   int64   `json:"durationMs,omitempty"`
+	ErrorType    string  `json:"errorType,omitempty"`
 }
 
 type requestQuery struct {
@@ -255,14 +258,15 @@ func (s *observeStore) RecordRequest(accountID, email, model string, inTokens, o
 	s.RecordRequestWithAPIKey(accountID, "", "", email, model, inTokens, outTokens, credits, success, status, message)
 }
 
-func (s *observeStore) RecordRequestForApiKey(apiKeyReservation *apiKeyUsageReservation, accountID, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
-	s.RecordRequestWithAPIKey(accountID, apiKeyReservation.apiKeyID(), apiKeyReservation.apiKeyValue(), email, model, inTokens, outTokens, credits, success, status, message)
+func (s *observeStore) RecordRequestWithAPIKey(accountID, apiKeyID, apiKey, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
+	s.RecordTracedRequest(nil, accountID, apiKeyID, apiKey, email, model, inTokens, outTokens, credits, success, status, message)
 }
 
-func (s *observeStore) RecordRequestWithAPIKey(accountID, apiKeyID, apiKey, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
+func (s *observeStore) RecordTracedRequest(trace *requestTrace, accountID, apiKeyID, apiKey, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
 	if s == nil {
 		return
 	}
+	errorType := classifyRequestError(success, status, message)
 	if len(message) > 500 {
 		message = message[:500]
 	}
@@ -281,6 +285,9 @@ func (s *observeStore) RecordRequestWithAPIKey(accountID, apiKeyID, apiKey, emai
 		Success:      success,
 		Status:       status,
 		Message:      message,
+		Endpoint:     trace.endpointName(),
+		DurationMs:   trace.durationMs(),
+		ErrorType:    errorType,
 	}
 	s.mu.Lock()
 	s.recentRequests[s.recentReqIdx] = rec
@@ -546,7 +553,7 @@ func normalizeRequestQuery(q requestQuery) requestQuery {
 	}
 	q.Sort = strings.TrimSpace(strings.ToLower(q.Sort))
 	switch q.Sort {
-	case "time", "status", "account", "api_key", "model", "tokens", "credits":
+	case "time", "status", "account", "api_key", "model", "tokens", "credits", "duration":
 	default:
 		q.Sort = "time"
 	}
@@ -579,7 +586,7 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 			continue
 		}
 		if search != "" {
-			haystack := strings.ToLower(rec.Email + " " + rec.AccountID + " " + rec.APIKeyID + " " + rec.APIKey + " " + rec.APIKeyMasked + " " + rec.Model + " " + rec.Message)
+			haystack := strings.ToLower(rec.Email + " " + rec.AccountID + " " + rec.APIKeyID + " " + rec.APIKey + " " + rec.APIKeyMasked + " " + rec.Model + " " + rec.Message + " " + rec.Endpoint + " " + rec.ErrorType)
 			if !strings.Contains(haystack, search) {
 				continue
 			}
@@ -604,6 +611,12 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 			if a.Credits < b.Credits {
 				compare = -1
 			} else if a.Credits > b.Credits {
+				compare = 1
+			}
+		case "duration":
+			if a.DurationMs < b.DurationMs {
+				compare = -1
+			} else if a.DurationMs > b.DurationMs {
 				compare = 1
 			}
 		default:

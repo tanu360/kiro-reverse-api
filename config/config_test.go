@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -207,5 +209,141 @@ func TestRestoreRejectsConfigOnlyBackup(t *testing.T) {
 	rawConfig := []byte(`{"password":"changeme","port":8080,"host":"0.0.0.0","requireApiKey":false,"accounts":[]}`)
 	if err := RestoreFromBytes(rawConfig, "raw-config"); err == nil {
 		t.Fatalf("expected config-only restore to be rejected")
+	}
+}
+
+func TestNormalizeAPIKeyAccountPipeRegionAndMachineId(t *testing.T) {
+	account := Account{
+		KiroApiKey:   " ksk_test_key|EU-Central-1 ",
+		AuthMethod:   "API KEY",
+		RefreshToken: "stale-refresh",
+		ClientID:     "stale-client",
+		ClientSecret: "stale-secret",
+		ProfileArn:   "arn:aws:codewhisperer:us-east-1:123456789012:profile/STALE",
+		ExpiresAt:    1234,
+	}
+	if err := NormalizeAPIKeyAccount(&account); err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if account.KiroApiKey != "ksk_test_key" {
+		t.Fatalf("key = %q", account.KiroApiKey)
+	}
+	if account.AccessToken != "ksk_test_key" {
+		t.Fatalf("accessToken should mirror api key, got %q", account.AccessToken)
+	}
+	if account.AuthMethod != AuthMethodAPIKey {
+		t.Fatalf("authMethod = %q", account.AuthMethod)
+	}
+	if account.Region != "eu-central-1" {
+		t.Fatalf("region = %q", account.Region)
+	}
+	if account.RefreshToken != "" || account.ClientID != "" || account.ClientSecret != "" ||
+		account.ProfileArn != "" || account.ExpiresAt != 0 {
+		t.Fatalf("oauth fields should be cleared: %+v", account)
+	}
+	if want := MachineIdFromAPIKey("ksk_test_key"); account.MachineId != want {
+		t.Fatalf("machineId = %q, want %q", account.MachineId, want)
+	}
+	if account.Email == "" || strings.Contains(account.Email, "ksk_") {
+		t.Fatalf("label must be set and must not leak the key, got %q", account.Email)
+	}
+	if !IsAPIKeyAccount(&account) {
+		t.Fatal("expected IsAPIKeyAccount true")
+	}
+}
+
+func TestNormalizeAPIKeyAccountRegionPrecedence(t *testing.T) {
+	explicit := Account{KiroApiKey: "ksk_a|eu-central-1", Region: "us-west-2"}
+	if err := NormalizeAPIKeyAccount(&explicit); err != nil {
+		t.Fatalf("normalize explicit: %v", err)
+	}
+	if explicit.Region != "us-west-2" {
+		t.Fatalf("explicit Region should win over the key suffix, got %q", explicit.Region)
+	}
+
+	fallback := Account{AccessToken: "ksk_b", AuthMethod: "apikey"}
+	if err := NormalizeAPIKeyAccount(&fallback); err != nil {
+		t.Fatalf("normalize fallback: %v", err)
+	}
+	if fallback.KiroApiKey != "ksk_b" || fallback.Region != "us-east-1" {
+		t.Fatalf("expected key from accessToken and default region, got key=%q region=%q", fallback.KiroApiKey, fallback.Region)
+	}
+
+	bad := Account{KiroApiKey: "ksk_c", Region: "evil.example.com/x"}
+	if err := NormalizeAPIKeyAccount(&bad); !errors.Is(err, ErrInvalidKiroRegion) {
+		t.Fatalf("expected ErrInvalidKiroRegion for a host-like region, got %v", err)
+	}
+}
+
+func TestSplitKiroAPIKeyAndRegionValidation(t *testing.T) {
+	key, region, err := SplitKiroAPIKeyAndRegion("ksk_abc|us-east-1")
+	if err != nil || key != "ksk_abc" || region != "us-east-1" {
+		t.Fatalf("got key=%q region=%q err=%v", key, region, err)
+	}
+	if _, _, err := SplitKiroAPIKeyAndRegion("ksk_abc|us-east-1|extra"); err == nil {
+		t.Fatal("expected multi-pipe error")
+	}
+	if _, _, err := SplitKiroAPIKeyAndRegion("|us-east-1"); !errors.Is(err, ErrEmptyKiroAPIKey) {
+		t.Fatalf("expected ErrEmptyKiroAPIKey, got %v", err)
+	}
+	if _, _, err := SplitKiroAPIKeyAndRegion("ksk_abc\r\nX-Injected: 1"); !errors.Is(err, ErrInvalidKiroAPIKey) {
+		t.Fatalf("expected ErrInvalidKiroAPIKey for header-breaking bytes, got %v", err)
+	}
+	if _, _, err := SplitKiroAPIKeyAndRegion("ksk_abc|attacker.example"); !errors.Is(err, ErrInvalidKiroRegion) {
+		t.Fatalf("expected ErrInvalidKiroRegion, got %v", err)
+	}
+}
+
+func TestLooksLikeKiroAPIKey(t *testing.T) {
+	for _, v := range []string{"ksk_abc", " ksk_abc|eu-central-1 "} {
+		if !LooksLikeKiroAPIKey(v) {
+			t.Fatalf("expected %q to look like an API key", v)
+		}
+	}
+	for _, v := range []string{"", "aoaAAAA", "Bearer ksk_abc"} {
+		if LooksLikeKiroAPIKey(v) {
+			t.Fatalf("expected %q not to look like an API key", v)
+		}
+	}
+}
+
+func TestAddAccountRejectsDuplicateAPIKey(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+	first := Account{ID: "api-1", KiroApiKey: "ksk_dup", AuthMethod: AuthMethodAPIKey, Enabled: true}
+	if err := AddAccount(first); err != nil {
+		t.Fatalf("add first: %v", err)
+	}
+	//! The pipe form normalizes to the same key, so it must count as a duplicate too.
+	second := Account{ID: "api-2", KiroApiKey: "ksk_dup|eu-central-1", AuthMethod: AuthMethodAPIKey, Enabled: true}
+	if err := AddAccount(second); !errors.Is(err, ErrDuplicateKiroAPIKey) {
+		t.Fatalf("expected ErrDuplicateKiroAPIKey, got %v", err)
+	}
+	if !AccountAPIKeyExists(" ksk_dup ") {
+		t.Fatal("expected AccountAPIKeyExists to find the stored key")
+	}
+	if n := len(GetAccounts()); n != 1 {
+		t.Fatalf("expected 1 account after duplicate rejection, got %d", n)
+	}
+}
+
+func TestAddCredentialRejectsDuplicateAPIKey(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+	first := Account{ID: "api-1", KiroApiKey: "ksk_cred_dup", AuthMethod: AuthMethodAPIKey, Enabled: true}
+	if err := NormalizeAPIKeyAccount(&first); err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if err := AddCredential(first); err != nil {
+		t.Fatalf("add credential: %v", err)
+	}
+	if !CredentialsLoaded() {
+		t.Fatal("expected credentials store to be active")
+	}
+	second := Account{ID: "api-2", KiroApiKey: "ksk_cred_dup", AuthMethod: AuthMethodAPIKey, Enabled: true}
+	if err := AddAccount(second); !errors.Is(err, ErrDuplicateKiroAPIKey) {
+		t.Fatalf("expected ErrDuplicateKiroAPIKey on the credentials path, got %v", err)
 	}
 }

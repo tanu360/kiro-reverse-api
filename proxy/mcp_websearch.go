@@ -78,13 +78,13 @@ func allWebSearchToolUses(toolUses []KiroToolUse) bool {
 	return true
 }
 
-func resolveWebSearchToolResults(account *config.Account, toolUses []KiroToolUse) ([]KiroToolResult, error) {
+func resolveWebSearchToolResults(ctx context.Context, account *config.Account, toolUses []KiroToolUse) ([]KiroToolResult, error) {
 	results := make([]KiroToolResult, 0, len(toolUses))
 	for _, tu := range toolUses {
 		if !isWebSearchToolUse(tu) {
 			return nil, fmt.Errorf("unsupported hosted tool: %s", tu.Name)
 		}
-		searchResults, err := performKiroWebSearch(context.Background(), account, tu)
+		searchResults, err := performKiroWebSearch(ctx, account, webSearchQueryFromInput(tu.Input))
 		text := formatWebSearchResults(searchResults)
 		status := "success"
 		if err != nil {
@@ -128,13 +128,18 @@ func buildWebSearchFollowupPayload(base *KiroPayload, toolUses []KiroToolUse, re
 	return &next
 }
 
-func performKiroWebSearch(ctx context.Context, account *config.Account, toolUse KiroToolUse) ([]WebSearchResult, error) {
-	query := webSearchQueryFromInput(toolUse.Input)
+func performKiroWebSearch(ctx context.Context, account *config.Account, query string) ([]WebSearchResult, error) {
+	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("query is required")
 	}
 	reqCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
+	if !config.IsAPIKeyAccount(account) {
+		if _, err := resolveProfileArnContext(reqCtx, account); err != nil && !isProfileArnResolutionSoftError(err) {
+			return nil, err
+		}
+	}
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"jsonrpc": "2.0",
@@ -158,6 +163,12 @@ func performKiroWebSearch(ctx context.Context, account *config.Account, toolUse 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Amz-Sdk-Request", "attempt=1; max=3")
 	req.Header.Set("Amz-Sdk-Invocation-Id", uuid.NewString())
+	if !config.IsAPIKeyAccount(account) && account != nil {
+		//! Kiro IDE names the profile on MCP calls; API keys carry no profile.
+		if arn, _, ok := parseKiroProfileArn(account.ProfileArn); ok {
+			req.Header.Set("x-amzn-kiro-profile-arn", arn)
+		}
+	}
 
 	resp, err := GetRestClientForProxy(ResolveAccountProxyURL(account)).Do(req)
 	if err != nil {
@@ -175,11 +186,8 @@ func performKiroWebSearch(ctx context.Context, account *config.Account, toolUse 
 }
 
 func webSearchMCPHost(account *config.Account) string {
-	region := "us-east-1"
-	if account != nil && strings.TrimSpace(account.Region) != "" {
-		region = strings.TrimSpace(account.Region)
-	}
-	return "https://q." + region + ".amazonaws.com"
+	//! account.Region is the login region; MCP lives next to the profile, like every other data-plane call.
+	return "https://q." + kiroRegionForProfile(account, "") + ".amazonaws.com"
 }
 
 func webSearchQueryFromInput(input map[string]interface{}) string {
@@ -220,28 +228,36 @@ func parseMCPWebSearchResponse(data []byte) ([]WebSearchResult, error) {
 		if strings.ToLower(content.Type) != "text" || strings.TrimSpace(content.Text) == "" {
 			continue
 		}
-		if results, ok := decodeWebSearchResults([]byte(content.Text)); ok {
-			return capWebSearchResults(results), nil
+		if results, ok, err := decodeWebSearchResults([]byte(content.Text)); ok {
+			return capWebSearchResults(results), err
 		}
 	}
-	if results, ok := decodeWebSearchResults(data); ok {
-		return capWebSearchResults(results), nil
+	if results, ok, err := decodeWebSearchResults(data); ok {
+		return capWebSearchResults(results), err
 	}
-	return nil, nil
+	//! A 200 with no readable results must fail, or callers show an empty search as a real answer.
+	return nil, errors.New("web_search returned no readable results")
 }
 
-func decodeWebSearchResults(data []byte) ([]WebSearchResult, bool) {
+func decodeWebSearchResults(data []byte) ([]WebSearchResult, bool, error) {
+	//! ok means the payload is a search result; an empty list is a valid answer, an error field is not.
 	var wrapped struct {
-		Results []WebSearchResult `json:"results"`
+		Results *[]WebSearchResult `json:"results"`
+		Error   string             `json:"error"`
 	}
-	if err := json.Unmarshal(data, &wrapped); err == nil && len(wrapped.Results) > 0 {
-		return wrapped.Results, true
+	if err := json.Unmarshal(data, &wrapped); err == nil {
+		if msg := strings.TrimSpace(wrapped.Error); msg != "" {
+			return nil, true, errors.New(msg)
+		}
+		if wrapped.Results != nil {
+			return *wrapped.Results, true, nil
+		}
 	}
 	var bare []WebSearchResult
-	if err := json.Unmarshal(data, &bare); err == nil && len(bare) > 0 {
-		return bare, true
+	if err := json.Unmarshal(data, &bare); err == nil && bare != nil {
+		return bare, true, nil
 	}
-	return nil, false
+	return nil, false, nil
 }
 
 func capWebSearchResults(results []WebSearchResult) []WebSearchResult {

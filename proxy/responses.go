@@ -51,6 +51,7 @@ type responsesPreparedRequest struct {
 	Store            bool
 	Metadata         map[string]interface{}
 	PreviousResponse string
+	ToolIdentities   map[string]responsesToolIdentity
 }
 
 func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessage) (*responsesPreparedRequest, string) {
@@ -61,7 +62,16 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		return nil, msg
 	}
 
-	tools, msg := convertResponsesTools(req.Tools, req.ToolChoice)
+	extra, err := extractAdditionalResponsesTools(req.Input)
+	if err != nil {
+		return nil, err.Error()
+	}
+	declarations := append(append([]OpenAIResponsesTool(nil), req.Tools...), extra...)
+	identities, err := responsesToolIdentities(declarations)
+	if err != nil {
+		return nil, err.Error()
+	}
+	tools, msg := convertResponsesTools(declarations, req.ToolChoice)
 	if msg != "" {
 		return nil, msg
 	}
@@ -114,6 +124,7 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		Store:            store,
 		Metadata:         req.Metadata,
 		PreviousResponse: req.PreviousResponseID,
+		ToolIdentities:   identities,
 	}, ""
 }
 
@@ -164,12 +175,22 @@ func convertResponsesTools(tools []OpenAIResponsesTool, toolChoice interface{}) 
 	}
 
 	result := make([]OpenAITool, 0, len(tools))
+	seen := make(map[string]OpenAITool)
 	for _, tool := range tools {
 		converted, msg := convertResponsesTool(tool, "")
 		if msg != "" {
 			return nil, msg
 		}
-		result = append(result, converted...)
+		for _, item := range converted {
+			if prior, exists := seen[item.Function.Name]; exists {
+				if canonicalizeCacheValue(prior) != canonicalizeCacheValue(item) {
+					return nil, "conflicting Responses tool declarations: " + item.Function.Name
+				}
+				continue
+			}
+			seen[item.Function.Name] = item
+			result = append(result, item)
+		}
 	}
 	return result, ""
 }
@@ -211,7 +232,7 @@ func convertResponsesTool(tool OpenAIResponsesTool, namespace string) ([]OpenAIT
 		case "custom":
 			name = tool.Name
 			description = tool.Description
-			parameters = tool.Parameters
+			parameters = map[string]interface{}{"type": "object", "properties": map[string]interface{}{"input": map[string]interface{}{"type": "string", "description": "The raw text to pass to this custom tool."}}, "required": []string{"input"}}
 		default:
 			return nil, ""
 		}
@@ -327,6 +348,23 @@ func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
 	role = normalizeResponsesRole(role)
 
 	switch itemType {
+	case "additional_tools":
+		return nil, nil
+	case "agent_message":
+		var parts []string
+		if content, ok := obj["content"].([]interface{}); ok {
+			for _, value := range content {
+				if part, ok := value.(map[string]interface{}); ok {
+					if text := firstString(part["text"], part["encrypted_content"]); text != "" {
+						parts = append(parts, text)
+					}
+				}
+			}
+		}
+		if len(parts) == 0 {
+			return nil, fmt.Errorf("agent_message requires text content")
+		}
+		return []OpenAIMessage{{Role: "user", Content: strings.Join(parts, "\n")}}, nil
 	case "", "message":
 		if role == "" {
 			role = "user"
@@ -336,13 +374,21 @@ func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
 		return []OpenAIMessage{{Role: "user", Content: responseTextFromItem(obj)}}, nil
 	case "output_text":
 		return []OpenAIMessage{{Role: "assistant", Content: responseTextFromItem(obj)}}, nil
-	case "function_call_output":
+	case "function_call_output", "custom_tool_call_output":
 		callID := firstString(obj["call_id"], obj["tool_call_id"], obj["id"])
 		return []OpenAIMessage{{Role: "tool", ToolCallID: callID, Content: responsesContentToOpenAIContent(firstExisting(obj, "output", "content"))}}, nil
-	case "function_call":
+	case "function_call", "custom_tool_call":
 		callID := firstString(obj["call_id"], obj["id"])
-		name := firstString(obj["name"])
+		name := qualifiedResponsesToolName(firstString(obj["namespace"]), firstString(obj["name"]))
 		arguments := firstString(obj["arguments"])
+		if itemType == "custom_tool_call" {
+			input, ok := obj["input"].(string)
+			if !ok {
+				return nil, fmt.Errorf("custom_tool_call input must be a string")
+			}
+			b, _ := json.Marshal(map[string]string{"input": input})
+			arguments = string(b)
+		}
 		if arguments == "" {
 			if rawArgs, ok := obj["arguments"]; ok {
 				if b, err := json.Marshal(rawArgs); err == nil {

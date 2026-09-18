@@ -202,7 +202,7 @@ go build -o kiro-proxy .
 ```
 
 > [!TIP]
-> `kiro.db` is auto-created on first launch. Set `DATA_DIR` to store it somewhere else; Docker uses `/app/state`. The default admin password is `changeme` — override it via `ADMIN_PASSWORD` or change it from the admin panel before exposing the service.
+> `kiro.db` is auto-created on first launch. Set `DATA_DIR` to store it somewhere else; Docker uses `/app/state`. Set `ADMIN_PASSWORD` to choose the admin password. Otherwise, the first launch generates a random password, saves it, and prints it once in the startup logs. Docker users can read it with `docker compose logs kiro-proxy`. Restarts retain the saved password.
 
 ---
 

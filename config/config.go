@@ -2,8 +2,11 @@ package config
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -30,6 +33,8 @@ type Account struct {
 
 	AccessToken  string `json:"accessToken"`
 	RefreshToken string `json:"refreshToken"`
+	//! KiroApiKey (ksk_...) is a headless credential: used as the Bearer token directly, never OAuth-refreshed.
+	KiroApiKey   string `json:"kiroApiKey,omitempty"`
 	ClientID     string `json:"clientId,omitempty"`
 	ClientSecret string `json:"clientSecret,omitempty"`
 	AuthMethod   string `json:"authMethod"`
@@ -223,14 +228,29 @@ func Load() error {
 		return err
 	}
 	if !ok {
+		password := os.Getenv("ADMIN_PASSWORD")
+		generated := password == ""
+		if generated {
+			var secret [24]byte
+			if _, err := rand.Read(secret[:]); err != nil {
+				return fmt.Errorf("generate admin password: %w", err)
+			}
+			password = hex.EncodeToString(secret[:])
+		}
 		cfg = &Config{
-			Password:      "changeme",
+			Password:      password,
 			Port:          8080,
 			Host:          "0.0.0.0",
 			RequireApiKey: false,
 			Accounts:      []Account{},
 		}
-		return saveLocked()
+		if err := saveLocked(); err != nil {
+			return err
+		}
+		if generated {
+			log.Printf("Generated first-run admin password: %s", password)
+		}
+		return nil
 	}
 
 	var c Config
@@ -338,6 +358,11 @@ func GetEnabledAccounts() []Account {
 }
 
 func AddAccount(account Account) error {
+	if IsAPIKeyAccount(&account) {
+		if err := NormalizeAPIKeyAccount(&account); err != nil {
+			return err
+		}
+	}
 
 	if CredentialsLoaded() {
 		return AddCredential(account)
@@ -345,6 +370,10 @@ func AddAccount(account Account) error {
 
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
+	//! Checked under the write lock so two concurrent imports of one key cannot both land.
+	if hasKiroAPIKey(cfg.Accounts, account.KiroApiKey) {
+		return ErrDuplicateKiroAPIKey
+	}
 	cfg.Accounts = append(cfg.Accounts, account)
 	return Save()
 }
@@ -359,11 +388,27 @@ func UpdateAccount(id string, account Account) error {
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
 		if a.ID == id {
+			preserveAccountCredentials(&account, a)
 			cfg.Accounts[i] = account
 			return Save()
 		}
 	}
-	return nil
+	return fmt.Errorf("account not found: %s", id)
+}
+
+// Status/admin updates must not replace credentials rotated after their snapshot.
+func preserveAccountCredentials(account *Account, current Account) {
+	account.AccessToken = current.AccessToken
+	account.RefreshToken = current.RefreshToken
+	account.KiroApiKey = current.KiroApiKey
+	account.ClientID = current.ClientID
+	account.ClientSecret = current.ClientSecret
+	account.AuthMethod = current.AuthMethod
+	account.Provider = current.Provider
+	account.Region = current.Region
+	account.StartUrl = current.StartUrl
+	account.ExpiresAt = current.ExpiresAt
+	account.ProfileArn = current.ProfileArn
 }
 
 func UpdateAccountOverageStatus(id, status, capability string, cap, rate, current float64, checkedAt int64) error {
@@ -472,7 +517,7 @@ func UpdateAccountProfileArn(id, profileArn string) error {
 			return Save()
 		}
 	}
-	return nil
+	return fmt.Errorf("account not found: %s", id)
 }
 
 func DeleteAccount(id string) error {
@@ -510,7 +555,7 @@ func UpdateAccountToken(id, accessToken, refreshToken string, expiresAt int64) e
 			return Save()
 		}
 	}
-	return nil
+	return fmt.Errorf("account not found: %s", id)
 }
 
 func IsApiKeyRequired() bool {

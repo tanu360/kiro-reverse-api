@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +20,13 @@ var socialTokenURL = func() string {
 }
 
 func RefreshToken(account *config.Account) (string, string, int64, string, error) {
+	return RefreshTokenContext(context.Background(), account)
+}
+
+func RefreshTokenContext(ctx context.Context, account *config.Account) (string, string, int64, string, error) {
+	if config.IsAPIKeyAccount(account) {
+		return "", "", 0, "", fmt.Errorf("kiro API key accounts do not support token refresh")
+	}
 
 	//! Account proxy wins over global proxy so mixed-account pools can route independently.
 	proxyURL := account.ProxyURL
@@ -28,12 +36,12 @@ func RefreshToken(account *config.Account) (string, string, int64, string, error
 	client := GetAuthClientForProxy(proxyURL)
 
 	if account.AuthMethod == "social" {
-		return refreshSocialToken(account.RefreshToken, client)
+		return refreshSocialToken(ctx, account.RefreshToken, client)
 	}
-	return refreshOIDCToken(account.RefreshToken, account.ClientID, account.ClientSecret, account.Region, client)
+	return refreshOIDCToken(ctx, account.RefreshToken, account.ClientID, account.ClientSecret, account.Region, client)
 }
 
-func refreshOIDCToken(refreshToken, clientID, clientSecret, region string, client *http.Client) (string, string, int64, string, error) {
+func refreshOIDCToken(ctx context.Context, refreshToken, clientID, clientSecret, region string, client *http.Client) (string, string, int64, string, error) {
 	if clientID == "" || clientSecret == "" {
 		return "", "", 0, "", fmt.Errorf("OIDC refresh requires clientId and clientSecret")
 	}
@@ -51,7 +59,10 @@ func refreshOIDCToken(refreshToken, clientID, clientSecret, region string, clien
 	}
 
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return "", "", 0, "", err
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
@@ -80,7 +91,7 @@ func refreshOIDCToken(refreshToken, clientID, clientSecret, region string, clien
 	return result.AccessToken, result.RefreshToken, expiresAt, result.ProfileArn, nil
 }
 
-func refreshSocialToken(refreshToken string, client *http.Client) (string, string, int64, string, error) {
+func refreshSocialToken(ctx context.Context, refreshToken string, client *http.Client) (string, string, int64, string, error) {
 	url := socialTokenURL()
 
 	payload := map[string]string{
@@ -88,7 +99,10 @@ func refreshSocialToken(refreshToken string, client *http.Client) (string, strin
 	}
 
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return "", "", 0, "", err
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)

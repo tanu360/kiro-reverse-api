@@ -130,7 +130,7 @@ func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool) 
 	if acc := p.findNextAvailableLocked(model, excluded, false); acc != nil {
 		return acc
 	}
-	return p.findEarliestCooldownLocked(model, excluded)
+	return nil
 }
 
 func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]bool, avoidLast bool) *config.Account {
@@ -175,45 +175,6 @@ func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]
 	return nil
 }
 
-func (p *AccountPool) findEarliestCooldownLocked(model string, excluded map[string]bool) *config.Account {
-	allowOverUsage := config.GetAllowOverUsage()
-	nowUnix := time.Now().Unix()
-	var best *config.Account
-	var earliest time.Time
-	seen := make(map[string]bool)
-	for i := range p.accounts {
-		acc := &p.accounts[i]
-		if seen[acc.ID] {
-			continue
-		}
-		seen[acc.ID] = true
-		if excluded != nil && excluded[acc.ID] {
-			continue
-		}
-		if model != "" && !p.accountHasModel(acc.ID, model) {
-			continue
-		}
-		if tokenUnavailableForSelection(acc, nowUnix) {
-			continue
-		}
-		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
-			continue
-		}
-		if cooldown, ok := p.cooldowns[acc.ID]; ok {
-			if best == nil || cooldown.Before(earliest) {
-				best = acc
-				earliest = cooldown
-			}
-		}
-	}
-	if best != nil {
-		p.lastSelected = best.ID
-		bestCopy := *best
-		return &bestCopy
-	}
-	return nil
-}
-
 func tokenUnavailableForSelection(acc *config.Account, nowUnix int64) bool {
 	if acc == nil || acc.ExpiresAt == 0 {
 		return false
@@ -244,12 +205,26 @@ func (p *AccountPool) RecordSuccess(id string) {
 }
 
 func (p *AccountPool) RecordError(id string, isQuotaError bool) int {
+	return p.recordError(id, isQuotaError, 0)
+}
+
+func (p *AccountPool) RecordQuotaError(id string, retryAfter time.Duration) int {
+	return p.recordError(id, true, retryAfter)
+}
+
+func (p *AccountPool) recordError(id string, isQuotaError bool, retryAfter time.Duration) int {
 	p.mu.Lock()
 	p.errorCounts[id]++
 	count := p.errorCounts[id]
 
 	if isQuotaError {
-		p.cooldowns[id] = p.calculateQuotaCooldown(id)
+		until := p.calculateQuotaCooldown(id)
+		if retryAfter > 0 {
+			until = time.Now().Add(retryAfter)
+		}
+		if until.After(p.cooldowns[id]) {
+			p.cooldowns[id] = until
+		}
 	} else if count >= 3 {
 
 		p.cooldowns[id] = time.Now().Add(time.Minute)

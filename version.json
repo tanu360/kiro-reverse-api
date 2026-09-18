@@ -1,5 +1,5 @@
 {
-  "version": "1.1.4",
+  "version": "2.0.0",
   "changelog": "✨ Added configurable model mappings with admin UI, reset/save controls, and drag-friendly row editing.\n🌐 Default language is now English while Chinese remains available from the language switcher.\n🐛 Localized hardcoded UI strings, placeholders, and common backend error messages.\n⚙️ Default account test model is now claude-sonnet-4.6.",
   "download": "https://github.com/tanu360/kiro-reverse-api"
 }

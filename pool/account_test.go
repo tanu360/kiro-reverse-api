@@ -388,8 +388,8 @@ func TestReturnedAccountsAreSnapshots(t *testing.T) {
 
 	p.cooldowns["acct"] = time.Now().Add(time.Minute)
 	cooldown := p.GetNext()
-	if cooldown == nil || cooldown.ID != "acct" {
-		t.Fatalf("expected cooled account fallback, got %#v", cooldown)
+	if cooldown != nil {
+		t.Fatalf("expected active cooldown to block selection, got %#v", cooldown)
 	}
 }
 

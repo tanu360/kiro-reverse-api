@@ -10,7 +10,7 @@ services:
     environment:
       DATA_DIR: ${DATA_DIR:-/app/state}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      ADMIN_PASSWORD: ${SERVICE_PASSWORD_KIRO_PROXY:-${ADMIN_PASSWORD:-changeme}}
+      ADMIN_PASSWORD: ${SERVICE_PASSWORD_KIRO_PROXY:-${ADMIN_PASSWORD:-}}
       SERVICE_FQDN_KIRO_PROXY_8080: /
     volumes:
       - kiro-proxy-state:/app/state

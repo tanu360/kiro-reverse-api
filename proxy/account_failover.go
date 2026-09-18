@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"context"
+	"errors"
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
@@ -35,17 +37,22 @@ func newRequestRetryPlan() requestRetryPlan {
 }
 
 func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalAttempts int) bool {
-	if err == nil || accountAttempt+1 >= rp.maxPerAccount || totalAttempts >= rp.maxPerRequest {
+	if err == nil || accountAttempt+1 >= rp.maxPerAccount || totalAttempts >= rp.maxPerRequest || isContextCanceledError(err) {
 		return false
 	}
-	return !isTerminalAccountErrorMessage(err.Error())
+	return isStreamIntegrityError(err) || !isTerminalAccountErrorMessage(err.Error())
 }
 
 func (rp requestRetryPlan) shouldBackoffBeforeNextAccount(err error, totalAttempts int) bool {
-	if err == nil || totalAttempts >= rp.maxPerRequest {
+	if err == nil || totalAttempts >= rp.maxPerRequest || isContextCanceledError(err) {
 		return false
 	}
-	return !isTerminalAccountErrorMessage(err.Error())
+	return isStreamIntegrityError(err) || !isTerminalAccountErrorMessage(err.Error())
+}
+
+func isContextCanceledError(err error) bool {
+	//! Only client cancellation counts; an HTTP client timeout is still an upstream failure.
+	return errors.Is(err, context.Canceled)
 }
 
 func isTerminalAccountErrorMessage(msg string) bool {
@@ -56,10 +63,10 @@ func isTerminalAccountErrorMessage(msg string) bool {
 		isAuthErrorMessage(msg)
 }
 
-func (rp requestRetryPlan) waitBeforeRetry(totalAttempts int) {
+func (rp requestRetryPlan) waitBeforeRetry(ctx context.Context, totalAttempts int) {
 	delay := rp.backoff.CalculateBackoff(totalAttempts - 1)
 	if delay > 0 {
-		time.Sleep(delay)
+		_ = waitForStreamRetry(ctx, delay)
 	}
 }
 
@@ -143,7 +150,8 @@ func (h *Handler) disableAccountOverage(account *config.Account) {
 }
 
 func (h *Handler) handleAccountFailure(account *config.Account, err error) {
-	if account == nil || err == nil {
+	//! A client disconnect or an upstream stream hiccup says nothing about the account's health.
+	if account == nil || err == nil || isStreamIntegrityError(err) || isContextCanceledError(err) {
 		return
 	}
 
@@ -153,7 +161,12 @@ func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 		h.disableAccountOverage(account)
 		h.pool.RecordError(account.ID, false)
 	case isQuotaErrorMessage(errMsg):
-		h.pool.RecordError(account.ID, true)
+		var quota *upstreamQuotaError
+		if errors.As(err, &quota) {
+			h.pool.RecordQuotaError(account.ID, quota.retryFor)
+		} else {
+			h.pool.RecordError(account.ID, true)
+		}
 	case isSuspensionErrorMessage(errMsg):
 		h.disableAccount(account, "BANNED", "AWS temporarily suspended - unusual user activity detected")
 	case isProfileUnavailableErrorMessage(errMsg):

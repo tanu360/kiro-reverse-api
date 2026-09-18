@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"kiro-proxy/config"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -56,8 +57,13 @@ func buildKiroHeaderValues(account *config.Account, host, apiName, sdkVersion, m
 }
 
 func applyKiroBaseHeaders(req *http.Request, account *config.Account, values kiroHeaderValues) {
-	if account != nil && account.AccessToken != "" {
-		req.Header.Set("Authorization", "Bearer "+account.AccessToken)
+	if token := accountBearerToken(account); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	//! Kiro rejects an API key sent as a plain Bearer token; the tokentype header marks it. Kiro CLI sends it lowercase.
+	req.Header.Del("tokentype")
+	if config.IsAPIKeyAccount(account) {
+		req.Header.Set("tokentype", "API_KEY")
 	}
 	req.Header.Set("User-Agent", values.UserAgent)
 	req.Header.Set("x-amz-user-agent", values.AmzUserAgent)
@@ -65,4 +71,16 @@ func applyKiroBaseHeaders(req *http.Request, account *config.Account, values kir
 	if values.Host != "" {
 		req.Host = values.Host
 	}
+}
+
+func accountBearerToken(account *config.Account) string {
+	if account == nil {
+		return ""
+	}
+	if config.IsAPIKeyAccount(account) {
+		if key := strings.TrimSpace(account.KiroApiKey); key != "" {
+			return key
+		}
+	}
+	return strings.TrimSpace(account.AccessToken)
 }

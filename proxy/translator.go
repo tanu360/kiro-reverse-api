@@ -30,10 +30,20 @@ func ParseModelAndThinking(model string, thinkingSuffix string) (string, bool) {
 	thinking := false
 
 	suffixLower := strings.ToLower(thinkingSuffix)
-	if strings.HasSuffix(lower, suffixLower) {
+	for _, m := range config.GetModelMappings() {
+		if strings.EqualFold(strings.TrimSpace(m.Key), model) && strings.TrimSpace(m.Value) != "" {
+			return strings.TrimSpace(m.Value), suffixLower != "" && strings.HasSuffix(lower, suffixLower)
+		}
+	}
+	if suffixLower != "" && strings.HasSuffix(lower, suffixLower) {
 		thinking = true
 		model = model[:len(model)-len(thinkingSuffix)]
 		lower = strings.ToLower(model)
+	}
+	for _, m := range config.GetModelMappings() {
+		if strings.EqualFold(strings.TrimSpace(m.Key), model) && strings.TrimSpace(m.Value) != "" {
+			return strings.TrimSpace(m.Value), thinking
+		}
 	}
 
 	for _, m := range config.GetModelMappings() {
@@ -117,9 +127,12 @@ type ImageSource struct {
 }
 
 type ClaudeTool struct {
+	//! Type is set only on Anthropic server tools such as "web_search_20250305"; client tools leave it empty.
+	Type        string      `json:"type,omitempty"`
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	InputSchema interface{} `json:"input_schema"`
+	MaxUses     int         `json:"max_uses,omitempty"`
 }
 
 type ClaudeResponse struct {
@@ -228,18 +241,39 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		history = sanitizeKiroHistory(history, nil)
 	}
 
-	finalContent := ""
-	if currentContent != "" {
-		finalContent = currentContent
-	} else if len(currentImages) > 0 {
-		finalContent = normalizeUserContent("", true)
-	} else if len(currentToolResults) > 0 {
-		finalContent = buildToolResultsContinuation(currentToolResults)
-	} else {
-		finalContent = minimalFallbackUserContent
+	finalContent := currentContent
+	if len(currentToolResults) > 0 {
+		finalContent = joinHistoryText(finalContent, buildToolResultsContinuation(currentToolResults))
+	}
+	if finalContent == "" {
+		if len(currentImages) > 0 {
+			finalContent = normalizeUserContent("", true)
+		} else {
+			finalContent = minimalFallbackUserContent
+		}
 	}
 
-	kiroTools, toolNameMap := convertClaudeTools(req.Tools)
+	tools := req.Tools
+	choice, name := claudeToolChoice(req.ToolChoice)
+	if choice == "none" {
+		tools = nil
+	}
+	if choice == "tool" {
+		tools = nil
+		for _, tool := range req.Tools {
+			if tool.Name == name {
+				tools = append(tools, tool)
+			}
+		}
+	}
+	kiroTools, toolNameMap := convertClaudeTools(tools)
+	if len(kiroTools) > 0 && (choice == "any" || choice == "tool") {
+		directive := "The client requires a tool call on this turn. Call at least one available tool."
+		if choice == "tool" {
+			directive = fmt.Sprintf("The client requires the tool %q on this turn. Call that tool.", kiroTools[0].ToolSpecification.Name)
+		}
+		finalContent = joinHistoryText(finalContent, directive)
+	}
 
 	payload := &KiroPayload{}
 	payload.ToolNameMap = toolNameMap
@@ -687,6 +721,9 @@ func extractClaudeAssistantContent(content interface{}) (string, []KiroToolUse) 
 					Name:      name,
 					Input:     input,
 				})
+			case "web_search_tool_result":
+				//! Kiro has no server-tool blocks; as text the next turn still knows what the search found.
+				text += webSearchResultHistoryText(block["content"])
 			}
 		}
 	}
@@ -699,6 +736,8 @@ func convertClaudeTools(tools []ClaudeTool) ([]KiroToolWrapper, map[string]strin
 		return nil, nil
 	}
 
+	//! Native web_search runs through MCP in this proxy, so Kiro sees a plain function tool in its place.
+	tools = withKiroWebSearchTool(tools)
 	result := make([]KiroToolWrapper, 0, len(tools))
 	nameMap := make(map[string]string)
 	for _, tool := range tools {
@@ -757,6 +796,7 @@ func cloneSchemaValue(v interface{}) interface{} {
 }
 
 func cleanSchema(m map[string]interface{}) {
+	delete(m, "encrypted")
 	delete(m, "additionalProperties")
 
 	//! Kiro rejects empty or malformed required arrays in tool schemas.
@@ -925,6 +965,27 @@ type OpenAITool struct {
 	} `json:"function"`
 }
 
+func (t *OpenAITool) UnmarshalJSON(data []byte) error {
+	//! Some clients send the flat Responses tool shape to chat completions; the nested fields win when both exist.
+	type nestedTool OpenAITool
+	var raw struct {
+		nestedTool
+		Name        string      `json:"name"`
+		Description string      `json:"description"`
+		Parameters  interface{} `json:"parameters"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*t = OpenAITool(raw.nestedTool)
+	t.Function.Name = firstNonEmpty(t.Function.Name, raw.Name)
+	t.Function.Description = firstNonEmpty(t.Function.Description, raw.Description)
+	if t.Function.Parameters == nil {
+		t.Function.Parameters = raw.Parameters
+	}
+	return nil
+}
+
 type OpenAIResponse struct {
 	ID      string         `json:"id"`
 	Object  string         `json:"object"`
@@ -1083,11 +1144,12 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 	}
 
 	finalContent := currentContent
+	if len(currentToolResults) > 0 {
+		finalContent = joinHistoryText(finalContent, buildToolResultsContinuation(currentToolResults))
+	}
 	if finalContent == "" {
 		if len(currentImages) > 0 {
 			finalContent = normalizeUserContent("", true)
-		} else if len(currentToolResults) > 0 {
-			finalContent = buildToolResultsContinuation(currentToolResults)
 		} else {
 			finalContent = minimalFallbackUserContent
 		}

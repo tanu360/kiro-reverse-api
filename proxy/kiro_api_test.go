@@ -58,7 +58,7 @@ func TestResolveProfileArnFetchesAndCachesProfile(t *testing.T) {
 			}
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"profiles":[{"arn":" arn:aws:codewhisperer:profile/fetched "}]} `)),
+				Body:       io.NopCloser(strings.NewReader(`{"profiles":[{"arn":" arn:aws:codewhisperer:us-east-1:123456789012:profile/fetched "}]} `)),
 				Header:     make(http.Header),
 			}, nil
 		}),
@@ -71,7 +71,7 @@ func TestResolveProfileArnFetchesAndCachesProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "arn:aws:codewhisperer:profile/fetched" {
+	if got != "arn:aws:codewhisperer:us-east-1:123456789012:profile/fetched" {
 		t.Fatalf("expected fetched ARN, got %q", got)
 	}
 	if requestAccount.ProfileArn != got {
@@ -123,7 +123,7 @@ func TestRefreshAccountInfoUsesPrecisionUsageFields(t *testing.T) {
 	})
 	t.Cleanup(func() { InitKiroHttpClient("") })
 
-	info, err := RefreshAccountInfo(&config.Account{AccessToken: "token"})
+	info, err := RefreshAccountInfo(&config.Account{AccessToken: "token", ProfileArn: "arn:aws:codewhisperer:us-east-1:123456789012:profile/test"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
