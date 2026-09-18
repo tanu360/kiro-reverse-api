@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"kiro-proxy/db"
+	"kiro-proxy/logger"
 )
 
 func GenerateMachineId() string {
@@ -258,7 +258,7 @@ func Load() error {
 			return err
 		}
 		if generated {
-			log.Printf("Generated first-run admin password: %s", password)
+			logger.Infof("Generated first-run admin password: %s", password)
 		}
 		return nil
 	}
@@ -273,7 +273,7 @@ func Load() error {
 		return err
 	}
 	if shortened {
-		log.Printf("Generated first-run admin password: %s", cfg.Password)
+		logger.Infof("Generated first-run admin password: %s", cfg.Password)
 	}
 	return nil
 }

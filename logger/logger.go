@@ -22,7 +22,7 @@ var (
 
 	debugLog = log.New(os.Stdout, "DEBUG ", log.LstdFlags)
 	infoLog  = log.New(os.Stdout, "INFO  ", log.LstdFlags)
-	warnLog  = log.New(os.Stderr, "WARN  ", log.LstdFlags)
+	warnLog  = log.New(os.Stdout, "WARN  ", log.LstdFlags)
 	errorLog = log.New(os.Stderr, "ERROR ", log.LstdFlags)
 )
 
@@ -71,6 +71,15 @@ func SetOutput(w io.Writer) {
 	infoLog.SetOutput(w)
 	warnLog.SetOutput(w)
 	errorLog.SetOutput(w)
+}
+
+// ResetOutput restores the default stdout/stderr split (debug/info/warn to
+// stdout, error to stderr) after a test has redirected SetOutput.
+func ResetOutput() {
+	debugLog.SetOutput(os.Stdout)
+	infoLog.SetOutput(os.Stdout)
+	warnLog.SetOutput(os.Stdout)
+	errorLog.SetOutput(os.Stderr)
 }
 
 func Init(fallback string) {

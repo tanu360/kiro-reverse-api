@@ -2,19 +2,19 @@ package config
 
 import (
 	"bytes"
-	"log"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"kiro-proxy/logger"
 )
 
 func TestFreshAdminPasswordIsRandomPersistedAndPrintedOnce(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "")
 	var output bytes.Buffer
-	old := log.Writer()
-	log.SetOutput(&output)
-	defer log.SetOutput(old)
+	logger.SetOutput(&output)
+	defer logger.ResetOutput()
 	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatal(err)
 	}
@@ -43,9 +43,8 @@ func TestFreshAdminPasswordIsRandomPersistedAndPrintedOnce(t *testing.T) {
 func TestFreshAdminPasswordUsesExplicitEnvironment(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "chosen-admin-password")
 	var output bytes.Buffer
-	old := log.Writer()
-	log.SetOutput(&output)
-	defer log.SetOutput(old)
+	logger.SetOutput(&output)
+	defer logger.ResetOutput()
 	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatal(err)
 	}
