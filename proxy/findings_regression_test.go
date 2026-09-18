@@ -26,6 +26,56 @@ func TestUpstreamBadRequestDoesNotRetryOrCoolAccount(t *testing.T) {
 		t.Fatalf("status=%d", rec.Code)
 	}
 }
+
+func TestUpstreamClientErrorKeepsEndpointFallback(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		secondOK   bool
+		wantStatus int
+	}{
+		{"second endpoint succeeds", true, 200},
+		{"every endpoint rejects", false, 400},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			firstCalls, secondCalls := 0, 0
+			h := newStreamTestHandler(t, func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected default endpoint") })
+			first := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				firstCalls++
+				http.Error(w, "UnknownOperationException", 404)
+			}))
+			defer first.Close()
+			second := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				secondCalls++
+				if tc.secondOK {
+					writeKiroTextResponse(t, w, "hello back")
+					return
+				}
+				http.Error(w, "Improperly formed request", 400)
+			}))
+			defer second.Close()
+			kiroEndpoints = []kiroEndpoint{
+				{URL: first.URL, Origin: "AI_EDITOR", Name: "first"},
+				{URL: second.URL, Origin: "AI_EDITOR", Name: "second"},
+			}
+			if err := config.UpdateEndpointFallback(true); err != nil {
+				t.Fatal(err)
+			}
+			h.pool.RecordSuccess("only")
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"hello"}]}`)))
+			if rec.Code != tc.wantStatus {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			if firstCalls != 1 || secondCalls != 1 {
+				t.Fatalf("calls first=%d second=%d", firstCalls, secondCalls)
+			}
+			if h.pool.GetNext() == nil {
+				t.Fatal("healthy account was cooled")
+			}
+		})
+	}
+}
+
 func TestAdminRefreshAuthRetryPreservesEnabledState(t *testing.T) {
 	h := newStreamTestHandler(t, func(http.ResponseWriter, *http.Request) { t.Fatal("unexpected inference") })
 	acc := testAccount(t)

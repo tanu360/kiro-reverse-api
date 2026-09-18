@@ -362,6 +362,7 @@ func CallKiroAPIContext(ctx context.Context, account *config.Account, payload *K
 
 	var lastErr error
 	var quotaErr *upstreamQuotaError
+	var clientErr *upstreamClientError
 endpointLoop:
 	for epIndex, ep := range endpoints {
 		if err := ctx.Err(); err != nil {
@@ -425,7 +426,11 @@ endpointLoop:
 				resp.Body.Close()
 				lastErr = fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, ep.Name, string(errBody))
 				if isClientHTTPStatus(resp.StatusCode) {
-					return &upstreamClientError{status: resp.StatusCode, message: lastErr.Error()}
+					//! A 4xx can be endpoint-specific, so keep the endpoint fallback; only account-level retries stop.
+					clientErr = &upstreamClientError{status: resp.StatusCode, message: lastErr.Error()}
+					lastErr = clientErr
+					logger.Warnf("[KiroAPI] Endpoint %s rejected request: %v", ep.Name, lastErr)
+					continue endpointLoop
 				}
 				if resp.StatusCode == http.StatusTooManyRequests {
 					delay := retryAfterDuration(resp.Header.Get("Retry-After"), time.Now())
@@ -476,6 +481,10 @@ endpointLoop:
 
 	if quotaErr != nil {
 		return quotaErr
+	}
+	//! Any endpoint calling the request invalid means another account would reject it too.
+	if clientErr != nil {
+		return clientErr
 	}
 	if lastErr != nil {
 		return lastErr
