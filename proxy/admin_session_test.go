@@ -183,7 +183,7 @@ func newAdminAuthTestHandler(t *testing.T, password string) *Handler {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword(password)
-	return NewHandler()
+	return newHandlerWithoutBackgroundForTest(t)
 }
 
 func adminStatusCode(h *Handler, req *http.Request) int {

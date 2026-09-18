@@ -317,7 +317,7 @@ func TestAdminModelMappingsSaveAndApply(t *testing.T) {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")
-	h := NewHandler()
+	h := newHandlerWithoutBackgroundForTest(t)
 
 	body := strings.NewReader(`{"mappings":[{"key":"my-real-life-model","value":"claude-haiku-4.5"}]}`)
 	req := httptest.NewRequest(http.MethodPost, "/admin/api/model-mappings", body)
@@ -356,7 +356,7 @@ func TestAdminAPIDoesNotAcceptPasswordCookie(t *testing.T) {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")
-	h := NewHandler()
+	h := newHandlerWithoutBackgroundForTest(t)
 
 	cookieReq := httptest.NewRequest(http.MethodGet, "/admin/api/status", nil)
 	cookieReq.AddCookie(&http.Cookie{Name: "admin_password", Value: "admin-password"})
@@ -1074,7 +1074,7 @@ func TestAdminPasswordChangeRequiresEightCharacters(t *testing.T) {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")
-	h := NewHandler()
+	h := newHandlerWithoutBackgroundForTest(t)
 
 	change := func(password string) int {
 		body := strings.NewReader(`{"password":"` + password + `"}`)

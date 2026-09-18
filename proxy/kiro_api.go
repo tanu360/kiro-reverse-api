@@ -484,6 +484,9 @@ func setKiroHeaders(req *http.Request, account *config.Account) {
 }
 
 func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
+	return refreshAccountInfo(account, true)
+}
+func refreshAccountInfo(account *config.Account, markFailure bool) (*config.AccountInfo, error) {
 	info := &config.AccountInfo{
 		LastRefresh: time.Now().Unix(),
 	}
@@ -502,8 +505,10 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 			updatedAccount.BanReason = "AWS temporarily suspended - unusual user activity detected"
 			updatedAccount.BanTime = time.Now().Unix()
 
-			if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
-				logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
+			if markFailure {
+				if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
+					logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
+				}
 			}
 
 			return nil, fmt.Errorf("account suspended: %w", err)
@@ -518,8 +523,10 @@ func RefreshAccountInfo(account *config.Account) (*config.AccountInfo, error) {
 			updatedAccount.BanReason = "Authentication failed - token invalid or expired"
 			updatedAccount.BanTime = time.Now().Unix()
 
-			if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
-				logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
+			if markFailure {
+				if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
+					logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
+				}
 			}
 		}
 

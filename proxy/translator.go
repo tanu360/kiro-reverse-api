@@ -957,8 +957,9 @@ type ToolCall struct {
 }
 
 type OpenAITool struct {
-	Type     string `json:"type"`
-	Function struct {
+	HostedWebSearch bool   `json:"-"`
+	Type            string `json:"type"`
+	Function        struct {
 		Name        string      `json:"name"`
 		Description string      `json:"description"`
 		Parameters  interface{} `json:"parameters"`
@@ -1193,6 +1194,18 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 
 	truncatePayloadToLimit(payload, systemPrompt != "")
 
+	for _, tool := range req.Tools {
+		if tool.HostedWebSearch || isHostedWebSearchToolType(tool.Type) {
+			if payload.HostedSearchTools == nil {
+				payload.HostedSearchTools = make(map[string]bool)
+			}
+			name := tool.Function.Name
+			if isHostedWebSearchToolType(tool.Type) {
+				name = webSearchToolName
+			}
+			payload.HostedSearchTools[name] = true
+		}
+	}
 	return payload
 }
 

@@ -171,9 +171,7 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 	if supplied == "" {
 		supplied = r.Header.Get("X-Admin-Password")
 	}
-	if !adminPasswordMatches(supplied) {
-		w.WriteHeader(401)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
+	if !h.checkAdminPassword(w, r, supplied) {
 		return
 	}
 

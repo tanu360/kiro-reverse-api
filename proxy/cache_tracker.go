@@ -204,7 +204,7 @@ func (t *promptCacheTracker) Compute(accountID string, profile *promptCacheProfi
 		if effectiveCreation < minTokens {
 			effectiveCreation = 0
 		}
-		cache5m, cache1h := computePromptCacheTTLBreakdown(profile, 0)
+		cache5m, cache1h := computePromptCacheTTLBreakdownLimited(profile, 0, effectiveCreation)
 		return promptCacheUsage{
 			CacheCreationInputTokens:   effectiveCreation,
 			CacheReadInputTokens:       0,
@@ -240,7 +240,7 @@ func (t *promptCacheTracker) Compute(accountID string, profile *promptCacheProfi
 	}
 
 	creation := maxInt(lastTokens-matchedTokens, 0)
-	cache5m, cache1h := computePromptCacheTTLBreakdown(profile, matchedTokens)
+	cache5m, cache1h := computePromptCacheTTLBreakdownLimited(profile, matchedTokens, creation)
 	return promptCacheUsage{
 		CacheCreationInputTokens:   creation,
 		CacheReadInputTokens:       matchedTokens,
@@ -536,6 +536,12 @@ func normalizePromptCacheTTL(ttl time.Duration) time.Duration {
 }
 
 func computePromptCacheTTLBreakdown(profile *promptCacheProfile, matchedTokens int) (int, int) {
+	if profile == nil {
+		return 0, 0
+	}
+	return computePromptCacheTTLBreakdownLimited(profile, matchedTokens, maxInt(profile.TotalInputTokens-matchedTokens, 0))
+}
+func computePromptCacheTTLBreakdownLimited(profile *promptCacheProfile, matchedTokens, creation int) (int, int) {
 	if profile == nil || len(profile.Breakpoints) == 0 {
 		return 0, 0
 	}
@@ -544,7 +550,7 @@ func computePromptCacheTTLBreakdown(profile *promptCacheProfile, matchedTokens i
 	cache1h := 0
 	previous := matchedTokens
 	for _, breakpoint := range profile.Breakpoints {
-		current := minInt(breakpoint.CumulativeTokens, profile.TotalInputTokens)
+		current := minInt(breakpoint.CumulativeTokens, minInt(profile.TotalInputTokens, matchedTokens+creation))
 		if current <= previous {
 			continue
 		}

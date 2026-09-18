@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+type upstreamClientError struct {
+	status  int
+	message string
+}
+
+func (e *upstreamClientError) Error() string { return e.message }
+func isUpstreamClientError(err error) bool   { var e *upstreamClientError; return errors.As(err, &e) }
+func isClientHTTPStatus(status int) bool {
+	return status >= 400 && status < 500 && status != 401 && status != 402 && status != 403 && status != 429
+}
+
 type upstreamQuotaError struct {
 	message  string
 	retryFor time.Duration
@@ -41,6 +52,10 @@ func retryAfterDuration(value string, now time.Time) time.Duration {
 }
 
 func upstreamFailureStatus(err error) int {
+	var client *upstreamClientError
+	if errors.As(err, &client) {
+		return client.status
+	}
 	var quota *upstreamQuotaError
 	if errors.As(err, &quota) {
 		return http.StatusTooManyRequests
@@ -60,6 +75,9 @@ func setUpstreamRetryAfter(w http.ResponseWriter, err error) {
 func (h *Handler) sendClaudeUpstreamError(w http.ResponseWriter, err error) {
 	setUpstreamRetryAfter(w, err)
 	kind := "api_error"
+	if isUpstreamClientError(err) {
+		kind = "invalid_request_error"
+	}
 	if upstreamFailureStatus(err) == 429 {
 		kind = "rate_limit_error"
 	}
@@ -69,6 +87,9 @@ func (h *Handler) sendClaudeUpstreamError(w http.ResponseWriter, err error) {
 func (h *Handler) sendOpenAIUpstreamError(w http.ResponseWriter, err error) {
 	setUpstreamRetryAfter(w, err)
 	kind := "server_error"
+	if isUpstreamClientError(err) {
+		kind = "invalid_request_error"
+	}
 	if upstreamFailureStatus(err) == 429 {
 		kind = "rate_limit_error"
 	}

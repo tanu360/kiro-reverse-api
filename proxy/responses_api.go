@@ -125,7 +125,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest {
+	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
 		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
@@ -178,7 +178,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				},
 			}
 
-			err := CallKiroAPIContext(ctx, account, payload, callback)
+			err := callKiroWithHostedSearch(ctx, account, payload, callback)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(ctx, apiKeyReservation, account, model)
@@ -196,30 +196,6 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 				}
 				break
-			}
-			if allWebSearchToolUses(toolUses) {
-				webSearchToolUses := append([]KiroToolUse(nil), toolUses...)
-				results, err := resolveWebSearchToolResults(ctx, account, webSearchToolUses)
-				if err != nil {
-					lastErr = err
-					lastAccount = account
-					break
-				}
-				toolUses = nil
-				upstreamStopReason = ""
-				followupPayload := buildWebSearchFollowupPayload(payload, webSearchToolUses, results)
-				err = CallKiroAPIContext(ctx, account, followupPayload, callback)
-				if err != nil {
-					if isContextCanceledError(err) {
-						recordClientDisconnect(ctx, apiKeyReservation, account, model)
-						return
-					}
-					lastErr = err
-					lastAccount = account
-					h.handleAccountFailure(account, err)
-					recordAttemptError(account, model, 0, err)
-					break
-				}
 			}
 
 			finalContent, extractedReasoning := extractThinkingFromContent(content)
@@ -282,7 +258,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 	var lastAccount *config.Account
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest {
+	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
 		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
@@ -428,7 +404,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				},
 			}
 
-			err := CallKiroAPIContext(ctx, account, payload, callback)
+			err := callKiroWithHostedSearch(ctx, account, payload, callback)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(ctx, apiKeyReservation, account, model)
