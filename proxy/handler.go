@@ -339,10 +339,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errRequestBodyTooLarge) {
 			status = http.StatusRequestEntityTooLarge
 		}
-		if errors.Is(err, errRequestBodyBusy) {
-			status = http.StatusServiceUnavailable
-			w.Header().Set("Retry-After", "1")
-		}
 		http.Error(w, err.Error(), status)
 		return
 	}
@@ -4096,16 +4092,19 @@ func decompressRequestBody(r *http.Request) error {
 			return fmt.Errorf("unsupported Content-Encoding: %s", encoding)
 		}
 	}
-	select {
-	case requestBodySlots <- struct{}{}:
-		defer func() { <-requestBodySlots }()
-	default:
-		return errRequestBodyBusy
-	}
 	raw, err := readRequestBody(r.Body)
 	_ = r.Body.Close()
 	if err != nil {
 		return err
+	}
+	//! The network read holds no slot, so slow uploads cannot starve others; only in-memory expansion is gated.
+	if hasCompressionLayer(encodings) {
+		select {
+		case requestBodySlots <- struct{}{}:
+			defer func() { <-requestBodySlots }()
+		case <-r.Context().Done():
+			return r.Context().Err()
+		}
 	}
 	for i := len(encodings) - 1; i >= 0; i-- {
 		switch strings.TrimSpace(encodings[i]) {

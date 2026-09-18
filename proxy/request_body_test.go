@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"compress/zlib"
+	"context"
 	"errors"
 	"github.com/klauspost/compress/zstd"
 	"io"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 )
 
 func encodeBody(t *testing.T, codec string, plain []byte) []byte {
@@ -108,15 +111,25 @@ func TestIdentityListsCannotBypassBodyLimit(t *testing.T) {
 		}
 	}
 }
-func TestBusyBodyReadersDoNotBlockBodylessRequests(t *testing.T) {
+func fillRequestBodySlots(t *testing.T) (release func()) {
+	t.Helper()
 	for i := 0; i < cap(requestBodySlots); i++ {
 		requestBodySlots <- struct{}{}
 	}
-	defer func() {
-		for i := 0; i < cap(requestBodySlots); i++ {
-			<-requestBodySlots
-		}
-	}()
+	var once sync.Once
+	release = func() {
+		once.Do(func() {
+			for i := 0; i < cap(requestBodySlots); i++ {
+				<-requestBodySlots
+			}
+		})
+	}
+	t.Cleanup(release)
+	return release
+}
+
+func TestBusyDecompressionDoesNotBlockPlainRequests(t *testing.T) {
+	fillRequestBodySlots(t)
 	rec := httptest.NewRecorder()
 	(&Handler{}).ServeHTTP(rec, httptest.NewRequest("GET", "/missing", nil))
 	if rec.Code != 404 {
@@ -124,7 +137,61 @@ func TestBusyBodyReadersDoNotBlockBodylessRequests(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	(&Handler{}).ServeHTTP(rec, httptest.NewRequest("POST", "/missing", bytes.NewReader([]byte("body"))))
-	if rec.Code != 503 {
-		t.Fatalf("busy admission=%d", rec.Code)
+	if rec.Code != 404 {
+		t.Fatalf("plain body blocked by decompression slots: %d", rec.Code)
+	}
+}
+
+func TestSlowUploadsDoNotHoldDecompressionSlots(t *testing.T) {
+	var writers []*io.PipeWriter
+	done := make(chan error, cap(requestBodySlots))
+	for i := 0; i < cap(requestBodySlots); i++ {
+		pr, pw := io.Pipe()
+		writers = append(writers, pw)
+		req := httptest.NewRequest("POST", "/", pr)
+		req.Header.Set("Content-Encoding", "gzip")
+		go func() { done <- decompressRequestBody(req) }()
+	}
+	defer func() {
+		for _, pw := range writers {
+			pw.Close()
+		}
+		for range writers {
+			<-done
+		}
+	}()
+	time.Sleep(50 * time.Millisecond)
+	if len(requestBodySlots) != 0 {
+		t.Fatalf("slow uploads hold %d decompression slots", len(requestBodySlots))
+	}
+	req := httptest.NewRequest("POST", "/", bytes.NewReader(encodeBody(t, "gzip", []byte("hello"))))
+	req.Header.Set("Content-Encoding", "gzip")
+	if err := decompressRequestBody(req); err != nil {
+		t.Fatalf("compressed request failed beside slow uploads: %v", err)
+	}
+}
+
+func TestCompressedRequestWaitsForDecompressionSlot(t *testing.T) {
+	release := fillRequestBodySlots(t)
+	time.AfterFunc(50*time.Millisecond, release)
+	req := httptest.NewRequest("POST", "/", bytes.NewReader(encodeBody(t, "gzip", []byte("hello"))))
+	req.Header.Set("Content-Encoding", "gzip")
+	if err := decompressRequestBody(req); err != nil {
+		t.Fatalf("compressed request rejected instead of waiting: %v", err)
+	}
+	got, _ := io.ReadAll(req.Body)
+	if string(got) != "hello" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestDisconnectedClientStopsWaitingForDecompressionSlot(t *testing.T) {
+	fillRequestBodySlots(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+	req := httptest.NewRequest("POST", "/", bytes.NewReader(encodeBody(t, "gzip", []byte("hello")))).WithContext(ctx)
+	req.Header.Set("Content-Encoding", "gzip")
+	if err := decompressRequestBody(req); !errors.Is(err, context.Canceled) {
+		t.Fatalf("disconnected client still waiting: %v", err)
 	}
 }
