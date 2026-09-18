@@ -88,3 +88,26 @@ func buildPreparedResponsesToolOutputItem(prepared *responsesPreparedRequest, tu
 	}
 	return item
 }
+
+// customToolDescription carries a custom tool's grammar into its description.
+// Kiro only takes a JSON schema, so without this the model never sees the
+// exact input syntax (Codex's freeform apply_patch declares a Lark grammar).
+func customToolDescription(tool OpenAIResponsesTool) string {
+	description := strings.TrimSpace(tool.Description)
+	if strings.ToLower(firstString(tool.Format["type"])) != "grammar" {
+		return description
+	}
+	definition := strings.TrimSpace(firstString(tool.Format["definition"]))
+	if definition == "" {
+		return description
+	}
+	grammar := "grammar"
+	if syntax := strings.TrimSpace(firstString(tool.Format["syntax"])); syntax != "" {
+		grammar = syntax + " grammar"
+	}
+	hint := "The input string must match this " + grammar + ":\n" + definition
+	if description == "" {
+		return hint
+	}
+	return description + "\n\n" + hint
+}

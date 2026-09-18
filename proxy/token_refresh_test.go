@@ -3,8 +3,12 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -100,5 +104,80 @@ func TestCanceledProfileLookupDoesNotReachUpstream(t *testing.T) {
 	cancel()
 	if _, err := resolveProfileArnContext(ctx, &config.Account{AccessToken: "token"}); !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+// Entra rotates the refresh token on every use. Two requests that both hold
+// the pre-rotation snapshot must spend it once; the second adopts the result.
+func TestStoredRefreshSpendsRotatingExternalIdpTokenOnce(t *testing.T) {
+	newStreamTestHandler(t, func(http.ResponseWriter, *http.Request) { t.Error("unexpected model call") })
+	const tenant, client = "a1111111-b222-4ccc-8ddd-e55555555555", "f1111111-a222-4bbb-8ccc-d55555555555"
+	tokenEndpoint := "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/token"
+	account := config.Account{
+		ID: "entra-refresh", Enabled: true, AccessToken: "access-0", RefreshToken: "refresh-1", ExpiresAt: 1,
+		ClientID: client, AuthMethod: auth.MicrosoftSSOAuthMethod, Provider: auth.MicrosoftSSOProvider, Region: "us-east-1",
+		TokenEndpoint: tokenEndpoint,
+		IssuerURL:     "https://login.microsoftonline.com/" + tenant + "/v2.0",
+		Scopes:        "api://" + client + "/codewhisperer:conversations api://" + client + "/codewhisperer:completions offline_access",
+	}
+	if err := config.AddAccount(account); err != nil {
+		t.Fatal(err)
+	}
+
+	var spent []string
+	var mu sync.Mutex
+	entered, release := make(chan struct{}), make(chan struct{})
+	oldClient := auth.SetGlobalAuthClientForTest(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.String() != tokenEndpoint {
+			return nil, fmt.Errorf("unexpected request %s", r.URL)
+		}
+		if err := r.ParseForm(); err != nil {
+			return nil, err
+		}
+		mu.Lock()
+		spent = append(spent, r.Form.Get("refresh_token"))
+		first := len(spent) == 1
+		mu.Unlock()
+		if first {
+			close(entered)
+			<-release
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"access_token":"access-1","refresh_token":"refresh-2","expires_in":3600,"token_type":"Bearer"}`)),
+			Request:    r,
+		}, nil
+	})})
+	defer auth.SetGlobalAuthClientForTest(oldClient)
+
+	first, second := account, account
+	done := make(chan error, 2)
+	go func() { done <- refreshStoredAccount(context.Background(), &first, true) }()
+	<-entered
+	go func() { done <- refreshStoredAccount(context.Background(), &second, true) }()
+	close(release)
+	for i := 0; i < 2; i++ {
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if strings.Join(spent, ",") != "refresh-1" {
+		t.Fatalf("refresh tokens sent = %v, want refresh-1 once", spent)
+	}
+	if first.RefreshToken != "refresh-2" || second.RefreshToken != "refresh-2" {
+		t.Fatalf("callers hold %q and %q, want refresh-2", first.RefreshToken, second.RefreshToken)
+	}
+	var stored *config.Account
+	for _, a := range config.GetAccounts() {
+		if a.ID == account.ID {
+			stored = &a
+		}
+	}
+	if stored == nil || stored.RefreshToken != "refresh-2" || stored.AccessToken != "access-1" {
+		t.Fatalf("stored account = %+v, want rotated tokens", stored)
 	}
 }

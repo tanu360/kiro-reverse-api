@@ -44,6 +44,11 @@ type Account struct {
 	MachineId    string `json:"machineId,omitempty"`
 	ProfileArn   string `json:"profileArn,omitempty"`
 
+	//! Microsoft Enterprise SSO (AuthMethod "external_idp") refreshes against the tenant's Entra token endpoint, not AWS OIDC.
+	TokenEndpoint string `json:"tokenEndpoint,omitempty"`
+	IssuerURL     string `json:"issuerUrl,omitempty"`
+	Scopes        string `json:"scopes,omitempty"`
+
 	ProxyURL string `json:"proxyURL,omitempty"`
 
 	Weight int `json:"weight,omitempty"`
@@ -138,6 +143,8 @@ type Config struct {
 	AllowOverUsage bool `json:"allowOverUsage,omitempty"`
 
 	LenientStreamIntegrity bool `json:"lenientStreamIntegrity,omitempty"`
+
+	SessionAffinity *bool `json:"sessionAffinity,omitempty"`
 
 	FirstRunPasswordPending bool `json:"firstRunPasswordPending,omitempty"`
 
@@ -400,6 +407,13 @@ func UpdateAccount(id string, account Account) error {
 	return fmt.Errorf("account not found: %s", id)
 }
 
+// AuthMethodExternalIdp marks a Microsoft Enterprise SSO account.
+const AuthMethodExternalIdp = "external_idp"
+
+func IsExternalIdpAccount(account *Account) bool {
+	return account != nil && strings.EqualFold(strings.TrimSpace(account.AuthMethod), AuthMethodExternalIdp)
+}
+
 // Status/admin updates must not replace credentials rotated after their snapshot.
 func preserveAccountCredentials(account *Account, current Account) {
 	account.AccessToken = current.AccessToken
@@ -413,6 +427,9 @@ func preserveAccountCredentials(account *Account, current Account) {
 	account.StartUrl = current.StartUrl
 	account.ExpiresAt = current.ExpiresAt
 	account.ProfileArn = current.ProfileArn
+	account.TokenEndpoint = current.TokenEndpoint
+	account.IssuerURL = current.IssuerURL
+	account.Scopes = current.Scopes
 }
 
 func UpdateAccountOverageStatus(id, status, capability string, cap, rate, current float64, checkedAt int64) error {
@@ -896,6 +913,25 @@ func UpdateLenientStreamIntegrity(lenient bool) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	cfg.LenientStreamIntegrity = lenient
+	return Save()
+}
+
+// GetSessionAffinity reports whether follow-up turns of a conversation go back
+// to the account that served the previous turn. On by default: that account
+// already holds the conversation's prompt cache.
+func GetSessionAffinity() bool {
+	cfgLock.RLock()
+	defer cfgLock.RUnlock()
+	if cfg == nil || cfg.SessionAffinity == nil {
+		return true
+	}
+	return *cfg.SessionAffinity
+}
+
+func UpdateSessionAffinity(enabled bool) error {
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	cfg.SessionAffinity = &enabled
 	return Save()
 }
 

@@ -126,7 +126,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest {
-		account := h.pool.GetNextForModelExcluding(model, excluded)
+		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -235,6 +235,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
+			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
 			response, storedMessages := buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
@@ -282,7 +283,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest {
-		account := h.pool.GetNextForModelExcluding(model, excluded)
+		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -475,6 +476,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
+			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
 			if messageAdded {

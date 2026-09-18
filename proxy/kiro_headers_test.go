@@ -82,3 +82,20 @@ func TestApplyKiroBaseHeadersClearsTokenTypeForOAuth(t *testing.T) {
 		t.Fatalf("expected no tokentype for OAuth, got %q", got)
 	}
 }
+
+func TestApplyKiroBaseHeadersMarksExternalIdpTokens(t *testing.T) {
+	req, err := http.NewRequest(http.MethodPost, "https://q.us-east-1.amazonaws.com/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := &config.Account{AccessToken: "entra-access", AuthMethod: " External_IDP "}
+
+	applyKiroBaseHeaders(req, account, buildRuntimeHeaderValues(account, req.URL.Host))
+
+	if got := req.Header.Get("Authorization"); got != "Bearer entra-access" {
+		t.Fatalf("expected Entra bearer, got %q", got)
+	}
+	if got := req.Header.Get("tokentype"); got != "EXTERNAL_IDP" {
+		t.Fatalf("expected tokentype EXTERNAL_IDP, got %q", got)
+	}
+}
