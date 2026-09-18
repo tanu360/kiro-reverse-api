@@ -36,6 +36,7 @@ type Handler struct {
 	modelsCacheMu   sync.RWMutex
 	modelsCacheTime int64
 	promptCache     *promptCacheTracker
+	adminSessions   *adminSessionStore
 }
 
 type thinkingStreamSource int
@@ -220,6 +221,7 @@ func NewHandler() *Handler {
 		stopRefresh:    make(chan struct{}),
 		stopStatsSaver: make(chan struct{}),
 		promptCache:    newPromptCacheTracker(defaultPromptCacheTTL),
+		adminSessions:  newAdminSessionStore(),
 	}
 
 	go h.backgroundRefresh()
@@ -301,10 +303,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	logger.Debugf("[HTTP] %s %s from %s", r.Method, path, r.RemoteAddr)
 
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key, anthropic-version, anthropic-beta, x-api-key, x-stainless-os, x-stainless-lang, x-stainless-package-version, x-stainless-runtime, x-stainless-runtime-version, x-stainless-arch")
-	w.Header().Set("Access-Control-Expose-Headers", "x-request-id, x-ratelimit-limit-requests, x-ratelimit-limit-tokens, x-ratelimit-remaining-requests, x-ratelimit-remaining-tokens, x-ratelimit-reset-requests, x-ratelimit-reset-tokens")
+	//! The wildcard belongs to the inference API, which any client may call.
+	//! The admin API holds account credentials, so no origin may read it cross-site.
+	isAdminPath := strings.HasPrefix(path, "/admin/")
+	if !isAdminPath {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key, anthropic-version, anthropic-beta, x-api-key, x-stainless-os, x-stainless-lang, x-stainless-package-version, x-stainless-runtime, x-stainless-runtime-version, x-stainless-arch")
+		w.Header().Set("Access-Control-Expose-Headers", "x-request-id, x-ratelimit-limit-requests, x-ratelimit-limit-tokens, x-ratelimit-remaining-requests, x-ratelimit-remaining-tokens, x-ratelimit-reset-requests, x-ratelimit-reset-tokens")
+	}
 
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(204)
@@ -600,14 +607,16 @@ func (h *Handler) refreshModelsCache() {
 		account := &accounts[i]
 		if err := h.ensureValidToken(account); err != nil {
 			logger.Warnf("[ModelsCache] Skip %s token refresh failed: %v", account.Email, err)
-			h.handleAccountFailure(account, err)
+			h.handleBackgroundAccountFailure(account, err)
 			continue
 		}
 
 		models, err := ListAvailableModels(account)
 		if err != nil {
+			//! Listing models is housekeeping on a timer, not traffic. Disabling or
+			//! cooling an account here takes it out of rotation over a request no
+			//! client made; real requests decide account health.
 			logger.Warnf("[ModelsCache] Failed to refresh for %s: %v", account.Email, err)
-			h.handleAccountFailure(account, err)
 			continue
 		}
 
@@ -2224,14 +2233,48 @@ func (h *Handler) ensureValidTokenContext(ctx context.Context, account *config.A
 	return refreshStoredAccount(ctx, account, false)
 }
 
+// adminPasswordMatches verifies the admin password in constant time, so a
+// caller cannot learn the password one character at a time from response
+// latency.
+func adminPasswordMatches(supplied string) bool {
+	if supplied == "" {
+		return false
+	}
+	return secureCompare(supplied, config.GetPassword())
+}
+
+// authorizeAdmin gates every /admin/api route.
+//
+// Three credentials are accepted, in descending order of preference:
+//   - X-Admin-Token: a session token the browser holds instead of the password.
+//   - X-Admin-Password: the password itself, kept for scripts and curl.
+//   - ?ticket= on /events only: EventSource cannot set headers, so it carries a
+//     single-use credential that expires in adminTicketTTL. The password itself
+//     is never accepted from the query string, where access logs would keep it.
+func (h *Handler) authorizeAdmin(r *http.Request, path string) bool {
+	if token := r.Header.Get("X-Admin-Token"); token != "" {
+		return h.adminSessions.Valid(token)
+	}
+	if password := r.Header.Get("X-Admin-Password"); password != "" {
+		return adminPasswordMatches(password)
+	}
+	if path == "/events" && r.Method == "GET" {
+		return h.adminSessions.ConsumeTicket(r.URL.Query().Get("ticket"))
+	}
+	return false
+}
+
 func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/admin/api")
-	password := r.Header.Get("X-Admin-Password")
-	if password == "" && path == "/events" && r.Method == "GET" {
-		password = r.URL.Query().Get("admin_password")
+
+	//! Login is the one route that runs before authorization; it verifies the password itself.
+	if path == "/session" && r.Method == "POST" {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		h.apiCreateAdminSession(w, r)
+		return
 	}
 
-	if password != config.GetPassword() {
+	if !h.authorizeAdmin(r, path) {
 		w.WriteHeader(401)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
 		return
@@ -2240,6 +2283,10 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	switch {
+	case path == "/session" && r.Method == "DELETE":
+		h.apiDeleteAdminSession(w, r)
+	case path == "/session/ticket" && r.Method == "POST":
+		h.apiCreateAdminTicket(w, r)
 	case path == "/events" && r.Method == "GET":
 		h.apiEventsStream(w, r)
 	case path == "/accounts" && r.Method == "GET":
@@ -3183,10 +3230,16 @@ func (h *Handler) apiGetStatus(w http.ResponseWriter, _ *http.Request) {
 
 func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"requireApiKey":  config.IsApiKeyRequired(),
-		"port":           config.GetPort(),
-		"host":           config.GetHost(),
-		"allowOverUsage": config.GetAllowOverUsage(),
+		"requireApiKey":          config.IsApiKeyRequired(),
+		"port":                   config.GetPort(),
+		"host":                   config.GetHost(),
+		"allowOverUsage":         config.GetAllowOverUsage(),
+		"lenientStreamIntegrity": config.GetLenientStreamIntegrity(),
+		//! Credential health, so the settings tab can warn where the fix lives.
+		//! Rotated means this boot replaced a shipped default; weak means the
+		//! operator's own password is short and only they can change it.
+		"passwordRotated": config.AdminPasswordRotated(),
+		"passwordWeak":    config.AdminPasswordWeak(),
 	})
 }
 
@@ -3258,9 +3311,10 @@ func (h *Handler) apiUpdateModelMappings(w http.ResponseWriter, r *http.Request)
 
 func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		RequireApiKey  *bool  `json:"requireApiKey,omitempty"`
-		Password       string `json:"password,omitempty"`
-		AllowOverUsage *bool  `json:"allowOverUsage,omitempty"`
+		RequireApiKey          *bool  `json:"requireApiKey,omitempty"`
+		Password               string `json:"password,omitempty"`
+		AllowOverUsage         *bool  `json:"allowOverUsage,omitempty"`
+		LenientStreamIntegrity *bool  `json:"lenientStreamIntegrity,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -3274,6 +3328,11 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//! A password change must actually lock out whoever held the old one.
+	if strings.TrimSpace(req.Password) != "" {
+		h.adminSessions.RevokeAll()
+	}
+
 	if req.AllowOverUsage != nil {
 		if err := config.UpdateAllowOverUsage(*req.AllowOverUsage); err != nil {
 			w.WriteHeader(500)
@@ -3281,6 +3340,14 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.pool.Reload()
+	}
+
+	if req.LenientStreamIntegrity != nil {
+		if err := config.UpdateLenientStreamIntegrity(*req.LenientStreamIntegrity); err != nil {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
@@ -3345,14 +3412,26 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 	}
 	kiroPayload := OpenAIToKiro(openaiReq, thinking)
 
-	var content string
+	var content, reasoning, stopReason string
+	var inputTokens, outputTokens int
+	var credits, contextUsage float64
 	callback := &KiroStreamCallback{
-		OnText:         func(text string, isThinking bool) { content += text },
+		OnText: func(text string, isThinking bool) {
+			if isThinking {
+				reasoning += text
+				return
+			}
+			content += text
+		},
 		OnToolUse:      func(tu KiroToolUse) {},
-		OnComplete:     func(inTok, outTok int) {},
+		OnComplete:     func(inTok, outTok int) { inputTokens, outputTokens = inTok, outTok },
 		OnError:        func(err error) {},
-		OnCredits:      func(c float64) {},
-		OnContextUsage: func(pct float64) {},
+		OnCredits:      func(c float64) { credits = c },
+		OnContextUsage: func(pct float64) { contextUsage = pct },
+		//! An account that answers but reports no stop reason is the IdC signature
+		//! behind Kiro-Go #147/#158. Without this the test cannot tell that apart
+		//! from a cleanly completed turn, so report what the stream actually proved.
+		OnStopReason: func(reason string) { stopReason = reason },
 	}
 
 	err := CallKiroAPIContext(r.Context(), account, kiroPayload, callback)
@@ -3363,9 +3442,15 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"reply":   content,
-		"model":   req.Model,
+		"success":      true,
+		"reply":        content,
+		"model":        req.Model,
+		"stopReason":   stopReason,
+		"reasoning":    reasoning,
+		"inputTokens":  inputTokens,
+		"outputTokens": outputTokens,
+		"credits":      credits,
+		"contextUsage": contextUsage,
 	})
 }
 

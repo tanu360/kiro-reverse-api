@@ -1,11 +1,15 @@
 (() => {
   'use strict';
   const baseUrl = location.origin;
-  if (localStorage.getItem('kiro_remember') !== '1') {
-    localStorage.removeItem('admin_password');
-    localStorage.removeItem('admin_login_time');
-  }
-  let password = sessionStorage.getItem('admin_password') || localStorage.getItem('admin_password') || '';
+  const TOKEN_KEY = 'kiro_admin_token';
+  const TOKEN_EXP_KEY = 'kiro_admin_token_exp';
+  //! Older builds stored the admin password itself. Purge those keys on every load,
+  //! so upgrading removes the secret from disk instead of only stopping new writes.
+  ['admin_password', 'admin_login_time', 'kiro_remembered_pwd'].forEach(key => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
+  let adminToken = readStoredToken();
   let currentLang = localStorage.getItem('kiro_lang') || 'en';
   const dict = { en: null, zh: null };
   let accountsData = [];
@@ -34,6 +38,8 @@
   let customSelectRefreshQueued = false;
   let currentTab = 'accounts';
   let adminEventSource = null;
+  let adminEventsStarting = false;
+  let sessionExpiredNotified = false;
   let observeRefreshTimer = null;
   let observeCache = null;
   let requestsCache = [];
@@ -604,78 +610,100 @@
   }
   function api(path, opts) {
     opts = opts || {};
-    opts.headers = Object.assign({ 'X-Admin-Password': password }, opts.headers || {});
+    opts.headers = Object.assign({ 'X-Admin-Token': adminToken }, opts.headers || {});
     if (opts.body && !(opts.body instanceof FormData) && !opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
-    return fetch('/admin/api' + path, opts);
+    return fetch('/admin/api' + path, opts).then(res => {
+      if (res.status === 401 && adminToken) handleSessionExpired();
+      return res;
+    });
   }
-  function clearActivePassword() {
-    sessionStorage.removeItem('admin_password');
-    sessionStorage.removeItem('admin_login_time');
-    localStorage.removeItem('admin_password');
-    localStorage.removeItem('admin_login_time');
-    password = '';
+  //! Unlike the password it replaced, a token expires and is revoked when the
+  //! password changes. Drop the dead session once instead of letting every later
+  //! call fail silently. Auto-login runs before the main page shows, so a stale
+  //! token there is cleared without a reload.
+  function handleSessionExpired() {
+    stopAdminEvents();
+    clearSession();
+    const main = $('mainPage');
+    if (!main || main.classList.contains('hidden') || sessionExpiredNotified) return;
+    sessionExpiredNotified = true;
+    toast(t('login.sessionExpired'), 'warning');
+    setTimeout(() => location.reload(), 1500);
   }
-  function getActiveLoginTime() {
-    const storage = sessionStorage.getItem('admin_password') ? sessionStorage : localStorage;
-    return parseInt(storage.getItem('admin_login_time') || '0', 10);
-  }
-  function setActivePassword(nextPassword, remember) {
-    const now = Date.now().toString();
-    password = nextPassword;
-    sessionStorage.setItem('admin_password', nextPassword);
-    sessionStorage.setItem('admin_login_time', now);
-    if (remember) {
-      localStorage.setItem('admin_password', nextPassword);
-      localStorage.setItem('admin_login_time', now);
-      localStorage.setItem('kiro_remember', '1');
-      localStorage.setItem('kiro_remembered_pwd', nextPassword);
-    } else {
-      localStorage.removeItem('admin_password');
-      localStorage.removeItem('admin_login_time');
-      localStorage.removeItem('kiro_remember');
-      localStorage.removeItem('kiro_remembered_pwd');
+  function readStoredToken() {
+    for (const store of [sessionStorage, localStorage]) {
+      const token = store.getItem(TOKEN_KEY);
+      if (!token) continue;
+      const expiresAt = parseInt(store.getItem(TOKEN_EXP_KEY) || '0', 10);
+      if (expiresAt && Date.now() >= expiresAt) {
+        store.removeItem(TOKEN_KEY);
+        store.removeItem(TOKEN_EXP_KEY);
+        continue;
+      }
+      return token;
     }
+    return '';
+  }
+  function clearSession() {
+    [sessionStorage, localStorage].forEach(store => {
+      store.removeItem(TOKEN_KEY);
+      store.removeItem(TOKEN_EXP_KEY);
+    });
+    adminToken = '';
+  }
+  function storeSession(token, expiresAt, remember) {
+    clearSession();
+    adminToken = token;
+    const store = remember ? localStorage : sessionStorage;
+    store.setItem(TOKEN_KEY, token);
+    store.setItem(TOKEN_EXP_KEY, String(expiresAt || 0));
+    if (remember) localStorage.setItem('kiro_remember', '1');
+    else localStorage.removeItem('kiro_remember');
+  }
+  async function createSession(adminPassword, remember) {
+    const res = await fetch('/admin/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: adminPassword })
+    });
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => ({}));
+    if (!data.token) return false;
+    storeSession(data.token, data.expiresAt, remember);
+    return true;
   }
   async function tryAutoLogin() {
-    if (!password) return;
-    const loginTime = getActiveLoginTime();
-    if (loginTime && Date.now() - loginTime > 72 * 3600 * 1000) {
-      clearActivePassword();
-      return;
-    }
+    if (!adminToken) return;
     try {
       const res = await api('/status');
-      if (res.ok) { showMain(); loadData(); }
-    } catch (e) { }
+      if (res.ok) { showMain(); loadData(); return; }
+    } catch (e) { return; }
+    clearSession();
   }
   async function login() {
-    password = $('pwdField').value;
+    const supplied = $('pwdField').value;
+    if (!supplied) return toast(t('login.error'), 'error');
+    const remember = $('rememberPwd');
     try {
-      const res = await api('/status');
-      if (res.ok) {
-        const remember = $('rememberPwd');
-        setActivePassword(password, !!(remember && remember.checked));
-        showMain(); loadData();
-      } else {
-        toast(t('login.error'), 'error');
+      if (!await createSession(supplied, !!(remember && remember.checked))) {
+        return toast(t('login.error'), 'error');
       }
+      $('pwdField').value = '';
+      showMain(); loadData();
     } catch (e) {
       toast(t('login.connectError'), 'error');
     }
   }
   function initRememberMe() {
     const remember = $('rememberPwd');
-    const field = $('pwdField');
-    if (!remember || !field) return;
-    if (localStorage.getItem('kiro_remember') === '1') {
-      remember.checked = true;
-      const saved = localStorage.getItem('kiro_remembered_pwd');
-      if (saved) field.value = saved;
-    }
+    if (!remember) return;
+    remember.checked = localStorage.getItem('kiro_remember') === '1';
   }
-  function logout() {
+  async function logout() {
     stopAdminEvents();
-    clearActivePassword();
+    if (adminToken) { try { await api('/session', { method: 'DELETE' }); } catch (e) { } }
+    clearSession();
+    localStorage.removeItem('kiro_remember');
     location.reload();
   }
   function showMain() {
@@ -694,9 +722,19 @@
     setTimeout(checkUpdate, 2000);
   }
 
-  function startAdminEvents() {
-    if (adminEventSource || !password || !window.EventSource) return;
-    adminEventSource = new EventSource('/admin/api/events?admin_password=' + encodeURIComponent(password));
+  async function startAdminEvents() {
+    if (adminEventSource || adminEventsStarting || !adminToken || !window.EventSource) return;
+    //! EventSource cannot send headers, so the stream authenticates with a
+    //! single-use ticket that expires in seconds rather than with a credential.
+    adminEventsStarting = true;
+    let ticket = '';
+    try {
+      const res = await api('/session/ticket', { method: 'POST' });
+      if (res.ok) ticket = (await res.json().catch(() => ({}))).ticket || '';
+    } catch (e) { }
+    adminEventsStarting = false;
+    if (!ticket || adminEventSource) return;
+    adminEventSource = new EventSource('/admin/api/events?ticket=' + encodeURIComponent(ticket));
     adminEventSource.addEventListener('observe_tick', scheduleObserveRefresh);
     adminEventSource.addEventListener('account_updated', () => { loadAccounts(); loadStats(); });
     adminEventSource.addEventListener('accounts_refreshed', () => { loadAccounts(); loadStats(); });
@@ -1505,6 +1543,14 @@
       const d = await res.json();
       if (d.success) {
         addTestLog(t('accounts.testLog.success', email, elapsed, d.reply), 'ok');
+        addTestLog(t('accounts.testLog.details',
+          d.stopReason || t('accounts.testLog.noStopReason'),
+          (d.inputTokens || 0) + '/' + (d.outputTokens || 0),
+          (d.credits || 0),
+          (d.contextUsage || 0).toFixed(1)), 'info');
+        //! No stop reason means the stream ended without metadataEvent. The turn may
+        //! still be complete on IdC accounts, so this reports rather than fails.
+        if (!d.stopReason) addTestLog(t('accounts.testLog.noStopReasonHint'), 'warn');
       } else {
         addTestLog(t('accounts.testLog.failed', email, elapsed, localizedError(d.error) || t('common.unknownError')), 'err');
       }
@@ -1520,9 +1566,28 @@
     $('requireApiKey').checked = d.requireApiKey;
     syncApiKeyManagementVisibility();
     $('allowOverUsage').checked = d.allowOverUsage || false;
+    $('lenientStreamIntegrity').checked = d.lenientStreamIntegrity || false;
+    renderPasswordWarning(d);
     await Promise.all([loadApiKeys(), loadThinkingConfig(), loadModelMappings(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
     syncApiKeyManagementVisibility();
     refreshCustomSelects();
+  }
+  function renderPasswordWarning(settings) {
+    const banner = $('passwordWarning');
+    const text = $('passwordWarningText');
+    if (!banner || !text) return;
+    //! A rotated default is always strong, so the two warnings never both apply.
+    const key = settings.passwordRotated ? 'settings.passwordRotatedWarning'
+      : settings.passwordWeak ? 'settings.passwordWeakWarning' : '';
+    banner.classList.toggle('hidden', !key);
+    //! data-i18n keeps the banner in sync with applyTranslations on a language switch.
+    if (key) {
+      text.dataset.i18n = key;
+      text.textContent = t(key);
+    } else {
+      delete text.dataset.i18n;
+      text.textContent = '';
+    }
   }
   async function loadThinkingConfig() {
     const res = await api('/thinking');
@@ -1942,6 +2007,11 @@
     await api('/settings', { method: 'POST', body: JSON.stringify({ allowOverUsage }) });
     toast(t('settings.overUsageSaved'), 'success');
   }
+  async function saveStreamIntegrityConfig() {
+    const lenientStreamIntegrity = $('lenientStreamIntegrity').checked;
+    await api('/settings', { method: 'POST', body: JSON.stringify({ lenientStreamIntegrity }) });
+    toast(t('settings.streamIntegritySaved'), 'success');
+  }
   async function changePassword() {
     const np = $('newPassword').value;
     if (!np) return toast(t('settings.passwordRequired'), 'warning');
@@ -1949,7 +2019,14 @@
       const res = await api('/settings', { method: 'POST', body: JSON.stringify({ password: np }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.success === false) throw new Error(localizedError(d.error) || t('common.saveFailed'));
-      setActivePassword(np, localStorage.getItem('kiro_remember') === '1');
+      //! The server revokes every session on a password change, so this tab must
+      //! trade the new password for a fresh token or the next call returns 401.
+      stopAdminEvents();
+      if (!await createSession(np, localStorage.getItem('kiro_remember') === '1')) {
+        clearSession();
+        return location.reload();
+      }
+      startAdminEvents();
       toast(t('settings.passwordChanged'), 'success');
       $('newPassword').value = '';
     } catch (e) {
@@ -2338,7 +2415,7 @@
     if (!ok) return;
     const body = new FormData();
     body.append('file', file);
-    const res = await api('/backups/restore', { method: 'POST', body, headers: { 'X-Admin-Password': password } });
+    const res = await api('/backups/restore', { method: 'POST', body });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.success === false) return toast(localizedError(d && d.error) || t('common.failed'), 'error');
     toast(t('backups.restored'), 'success');
@@ -3211,6 +3288,7 @@
       else if (action === 'delete') deleteApiKey(id);
     });
     $('saveOverUsageBtn').addEventListener('click', saveOverUsageConfig);
+    $('saveStreamIntegrityBtn').addEventListener('click', saveStreamIntegrityConfig);
     $('saveThinkingBtn').addEventListener('click', saveThinkingConfig);
     $('saveEndpointBtn').addEventListener('click', saveEndpointConfig);
     $('changePasswordBtn').addEventListener('click', changePassword);
@@ -3458,7 +3536,7 @@
     const yr = $('footerYear');
     if (yr) yr.textContent = new Date().getFullYear();
     wireEvents();
-    if (password) tryAutoLogin();
+    if (adminToken) tryAutoLogin();
     setInterval(() => {
       if (!$('mainPage').classList.contains('hidden')) loadStats();
     }, 10000);

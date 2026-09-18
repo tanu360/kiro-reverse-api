@@ -419,13 +419,6 @@ endpointLoop:
 				continue endpointLoop
 			}
 
-			if resp.StatusCode == 429 {
-				resp.Body.Close()
-				logger.Warnf("[KiroAPI] Endpoint %s quota exhausted (429), trying next...", ep.Name)
-				lastErr = fmt.Errorf("quota exhausted on %s", ep.Name)
-				continue endpointLoop
-			}
-
 			if resp.StatusCode != 200 {
 				errBody, _ := io.ReadAll(resp.Body)
 				resp.Body.Close()
@@ -436,6 +429,7 @@ endpointLoop:
 						quotaErr = &upstreamQuotaError{message: lastErr.Error(), retryFor: delay}
 					}
 					lastErr = quotaErr
+					logger.Warnf("[KiroAPI] Endpoint %s quota exhausted (429, retry-after %s), trying next...", ep.Name, delay)
 				}
 
 				if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 402 {
@@ -637,7 +631,7 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 	}
 	logger.Debugf("[KiroAPI] Stream end: content=%t reasoning=%t tools=%d stopReason=%q trailer=%t",
 		turn.sawContent, turn.sawReasoning, turn.toolCount, turn.stopReason, turn.sawTrailer)
-	if err := classifyStreamIntegrity(turn); err != nil {
+	if err := classifyStreamIntegrity(turn, config.GetLenientStreamIntegrity()); err != nil {
 		return emitted, err
 	}
 	if callback.OnStopReason != nil {

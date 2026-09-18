@@ -1,5 +1,5 @@
 {
   "version": "2.0.0",
-  "changelog": "✨ Added configurable model mappings with admin UI, reset/save controls, and drag-friendly row editing.\n🌐 Default language is now English while Chinese remains available from the language switcher.\n🐛 Localized hardcoded UI strings, placeholders, and common backend error messages.\n⚙️ Default account test model is now claude-sonnet-4.6.",
+  "changelog": "🔐 Admin login now issues a session token, so the password is no longer sent with every request or placed in the event-stream URL.\n🔑 First run generates a random admin password, and upgrades rotate any shipped default automatically. Set ADMIN_PASSWORD to choose your own.\n🐛 Upstream rate limits are now returned as 429 with a correct Retry-After header instead of a generic 500.\n♻️ A failed background model-list refresh no longer takes a healthy account out of rotation.\n🔍 The account test now reports stop reason, token counts, credits, and context usage.\n⚙️ Added an opt-in lenient stream integrity mode for upstreams that omit trailing metadata.",
   "download": "https://github.com/tanu360/kiro-reverse-api"
 }

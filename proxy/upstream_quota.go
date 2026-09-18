@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -52,7 +51,9 @@ func upstreamFailureStatus(err error) int {
 func setUpstreamRetryAfter(w http.ResponseWriter, err error) {
 	var quota *upstreamQuotaError
 	if errors.As(err, &quota) && quota.retryFor > 0 {
-		w.Header().Set("Retry-After", fmt.Sprint((quota.retryFor+time.Second-1)/time.Second))
+		//! Duration division yields a Duration; int64 strips the unit so the header is bare seconds per RFC 9110.
+		seconds := int64((quota.retryFor + time.Second - 1) / time.Second)
+		w.Header().Set("Retry-After", strconv.FormatInt(seconds, 10))
 	}
 }
 

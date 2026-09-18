@@ -2,7 +2,6 @@ package config
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -138,6 +137,8 @@ type Config struct {
 
 	AllowOverUsage bool `json:"allowOverUsage,omitempty"`
 
+	LenientStreamIntegrity bool `json:"lenientStreamIntegrity,omitempty"`
+
 	ProxyURL string `json:"proxyURL,omitempty"`
 
 	FilterClaudeCode bool `json:"filterClaudeCode,omitempty"`
@@ -184,11 +185,15 @@ type AccountInfo struct {
 	TrialExpiresAt    int64
 }
 
-const Version = "1.1.4"
+const Version = "2.0.0"
 
 var (
 	cfg     *Config
 	cfgLock sync.RWMutex
+
+	// adminPasswordRotated records whether this boot replaced a shipped default
+	// password. Guarded by cfgLock.
+	adminPasswordRotated bool
 )
 
 var defaultModelMappings = []ModelMappingRule{
@@ -231,11 +236,10 @@ func Load() error {
 		password := os.Getenv("ADMIN_PASSWORD")
 		generated := password == ""
 		if generated {
-			var secret [24]byte
-			if _, err := rand.Read(secret[:]); err != nil {
-				return fmt.Errorf("generate admin password: %w", err)
+			var err error
+			if password, err = generateAdminPassword(); err != nil {
+				return err
 			}
-			password = hex.EncodeToString(secret[:])
 		}
 		cfg = &Config{
 			Password:      password,
@@ -258,6 +262,15 @@ func Load() error {
 		return err
 	}
 	cfg = &c
+
+	//! Installs created before first-run generation still carry a shipped default.
+	//! Upgrading must not silently leave a publicly known admin credential in place.
+	if err := migrateAdminPasswordLocked(); err != nil {
+		return err
+	}
+	if adminPasswordRotated {
+		log.Printf("Rotated default admin password; new admin password: %s", cfg.Password)
+	}
 	return nil
 }
 
@@ -872,6 +885,25 @@ func UpdateAllowOverUsage(allow bool) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	cfg.AllowOverUsage = allow
+	return Save()
+}
+
+// GetLenientStreamIntegrity reports whether a stream carrying answer text counts
+// as complete without metering or a stop reason. Off by default: the same shape
+// is what a stream truncated mid-answer leaves behind.
+func GetLenientStreamIntegrity() bool {
+	cfgLock.RLock()
+	defer cfgLock.RUnlock()
+	if cfg == nil {
+		return false
+	}
+	return cfg.LenientStreamIntegrity
+}
+
+func UpdateLenientStreamIntegrity(lenient bool) error {
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	cfg.LenientStreamIntegrity = lenient
 	return Save()
 }
 
