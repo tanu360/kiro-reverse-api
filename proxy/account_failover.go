@@ -149,6 +149,17 @@ func (h *Handler) disableAccountOverage(account *config.Account) {
 	h.pool.Reload()
 }
 
+// handleBackgroundAccountFailure records only failures that prove an account
+// cannot serve at all. Background housekeeping sees errors no client ever saw, so
+// anything transient must stay out of the pool; otherwise a model listing that
+// hiccups pulls an account real traffic would still succeed on.
+func (h *Handler) handleBackgroundAccountFailure(account *config.Account, err error) {
+	if err == nil || !isTerminalAccountErrorMessage(err.Error()) {
+		return
+	}
+	h.handleAccountFailure(account, err)
+}
+
 func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 	//! A client disconnect or an upstream stream hiccup says nothing about the account's health.
 	if account == nil || err == nil || isStreamIntegrityError(err) || isContextCanceledError(err) {

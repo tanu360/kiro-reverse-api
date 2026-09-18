@@ -448,6 +448,18 @@
         </div>
 
         <div class="card">
+          <div class="card-header"><span class="card-title" data-i18n="settings.streamIntegrity"></span></div>
+          <div class="form-group">
+            <label class="flex items-center gap-2">
+              <span class="switch"><input type="checkbox" id="lenientStreamIntegrity" /><span class="slider"></span></span>
+              <span data-i18n="settings.lenientStreamIntegrity"></span>
+            </label>
+            <small data-i18n="settings.lenientStreamIntegrityHint"></small>
+          </div>
+          <button class="btn btn-primary" id="saveStreamIntegrityBtn" data-i18n="settings.saveStreamIntegrity"></button>
+        </div>
+
+        <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.thinkingSettings"></span></div>
           <div class="form-group">
             <label data-i18n="settings.thinkingSuffix"></label>
@@ -520,6 +532,10 @@
 
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.adminPassword"></span></div>
+          <div class="cred-warning hidden" id="passwordWarning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span id="passwordWarningText"></span>
+          </div>
           <div class="form-group">
             <label data-i18n="settings.newPassword"></label>
             <input type="password" id="newPassword" data-i18n-placeholder="settings.newPasswordPlaceholder" />

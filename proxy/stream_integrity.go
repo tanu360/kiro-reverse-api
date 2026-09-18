@@ -23,7 +23,7 @@ type streamTurnSignals struct {
 	sawTrailer bool
 }
 
-func classifyStreamIntegrity(turn streamTurnSignals) error {
+func classifyStreamIntegrity(turn streamTurnSignals, lenient bool) error {
 	//! A clean EOF proves nothing: a stream that died mid-answer looks like a finished one.
 	//! stopReason only rides in metadataEvent, which IdC / Enterprise accounts never send
 	//! (upstream Kiro-Go #147, #158), so answer text plus metering also counts as complete.
@@ -36,6 +36,12 @@ func classifyStreamIntegrity(turn streamTurnSignals) error {
 	case strings.TrimSpace(turn.stopReason) != "":
 		return nil
 	case turn.sawContent && turn.sawTrailer:
+		return nil
+	//! Opt-in escape hatch for deployments that never receive metering at all
+	//! (Kiro-Go #161 residual). Answer text with no reasoning and no trailer is
+	//! accepted as complete. Off by default, because a stream cut mid-answer
+	//! leaves exactly this shape, and then a truncated reply is served as final.
+	case lenient && turn.sawContent && !turn.sawReasoning:
 		return nil
 	default:
 		return errUpstreamTruncatedResponse
