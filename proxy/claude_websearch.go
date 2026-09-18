@@ -492,7 +492,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest {
-		account := h.pool.GetNextForModelExcluding(req.Model, excluded)
+		account := h.pickAccount(payload, req.Model, excluded)
 		if account == nil {
 			break
 		}
@@ -500,6 +500,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 			totalAttempts++
 			round, err := h.callClaudeRound(ctx, account, payload, req.Model, thinking, estimatedInputTokens)
 			if err == nil {
+				h.rememberAccount(payload, account)
 				return round, account, nil
 			}
 			lastErr = err

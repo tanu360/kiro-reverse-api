@@ -36,7 +36,9 @@ type Handler struct {
 	cachedModels    []ModelInfo
 	modelsCacheMu   sync.RWMutex
 	modelsCacheTime int64
+	modelsSweep     sweepGroup
 	promptCache     *promptCacheTracker
+	affinity        *sessionAffinity
 	adminSessions   *adminSessionStore
 }
 
@@ -222,6 +224,7 @@ func NewHandler() *Handler {
 		stopRefresh:    make(chan struct{}),
 		stopStatsSaver: make(chan struct{}),
 		promptCache:    newPromptCacheTracker(defaultPromptCacheTTL),
+		affinity:       newSessionAffinity(),
 		adminSessions:  newAdminSessionStore(),
 	}
 
@@ -259,39 +262,41 @@ func (h *Handler) backgroundRefresh() {
 
 func (h *Handler) refreshAllAccounts() {
 	accounts := config.GetAccounts()
-	now := time.Now().Unix()
+	start := time.Now()
+	now := start.Unix()
 	const refreshInterval = 30 * 60
 
-	for i := range accounts {
-		account := &accounts[i]
+	forEachAccount(accounts, backgroundRefreshWorkers, func(_ int, account *config.Account) {
 		if !account.Enabled || account.AccessToken == "" {
-			continue
+			return
 		}
 		if account.Silent || (account.BanStatus != "" && account.BanStatus != "ACTIVE") {
-			continue
+			return
 		}
 
 		if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {
 			if err := refreshStoredAccount(context.Background(), account, false); err != nil {
 				logger.Warnf("[BackgroundRefresh] Token refresh failed for %s: %v", account.Email, err)
-				continue
+				return
 			}
 		}
 
 		if account.LastRefresh > 0 && now-account.LastRefresh < refreshInterval {
-			continue
+			return
 		}
 
 		info, err := RefreshAccountInfo(account)
 		if err != nil {
 			logger.Warnf("[BackgroundRefresh] Failed to refresh %s: %v", account.Email, err)
-			continue
+			return
 		}
 
 		config.UpdateAccountInfo(account.ID, *info)
 		logger.Infof("[BackgroundRefresh] Refreshed %s: %s %.1f/%.1f", account.Email, info.SubscriptionType, info.UsageCurrent, info.UsageLimit)
-	}
+	})
 	h.pool.Reload()
+	logger.Infof("[BackgroundRefresh] Sweep finished: %d accounts in %s (%d workers)",
+		len(accounts), time.Since(start).Round(time.Millisecond), max(1, min(backgroundRefreshWorkers, len(accounts))))
 }
 
 func (h *Handler) validateApiKey(r *http.Request) bool {
@@ -597,19 +602,24 @@ func buildModelInfo(id, ownedBy string, supportsImage bool) map[string]interface
 	}
 }
 
+// refreshModelsCache lists models on every enabled account. /v1/models, the
+// admin panel and the timer can all ask at once; they share one sweep.
 func (h *Handler) refreshModelsCache() {
+	h.modelsSweep.Do(h.sweepModelsCache)
+}
+
+func (h *Handler) sweepModelsCache() {
 	accounts := config.GetEnabledAccounts()
 	if len(accounts) == 0 {
 		return
 	}
 
-	aggregated := make([]ModelInfo, 0)
-	for i := range accounts {
-		account := &accounts[i]
+	listed := make([][]ModelInfo, len(accounts))
+	forEachAccount(accounts, backgroundRefreshWorkers, func(i int, account *config.Account) {
 		if err := h.ensureValidToken(account); err != nil {
 			logger.Warnf("[ModelsCache] Skip %s token refresh failed: %v", account.Email, err)
 			h.handleBackgroundAccountFailure(account, err)
-			continue
+			return
 		}
 
 		models, err := ListAvailableModels(account)
@@ -618,7 +628,7 @@ func (h *Handler) refreshModelsCache() {
 			//! cooling an account here takes it out of rotation over a request no
 			//! client made; real requests decide account health.
 			logger.Warnf("[ModelsCache] Failed to refresh for %s: %v", account.Email, err)
-			continue
+			return
 		}
 
 		modelIDs := make([]string, 0, len(models))
@@ -626,6 +636,13 @@ func (h *Handler) refreshModelsCache() {
 			modelIDs = append(modelIDs, m.ModelId)
 		}
 		h.pool.SetModelList(account.ID, modelIDs)
+		listed[i] = models
+	})
+
+	//! Merge in account order, not completion order, so /v1/models lists the
+	//! same models in the same order on every sweep.
+	aggregated := make([]ModelInfo, 0)
+	for _, models := range listed {
 		aggregated = mergeUniqueModels(aggregated, models)
 	}
 
@@ -924,7 +941,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest {
-		account := h.pool.GetNextForModelExcluding(model, excluded)
+		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -1325,6 +1342,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
+			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
 
@@ -1424,7 +1442,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest {
-		account := h.pool.GetNextForModelExcluding(model, excluded)
+		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -1521,6 +1539,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
+			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
 
@@ -1655,7 +1674,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest {
-		account := h.pool.GetNextForModelExcluding(model, excluded)
+		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -2023,6 +2042,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
+			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
 			finishReason := mapOpenAIFinishReason(upstreamStopReason, len(toolCalls))
@@ -2067,7 +2087,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest {
-		account := h.pool.GetNextForModelExcluding(model, excluded)
+		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -2177,6 +2197,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
 			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
 			h.pool.RecordSuccess(account.ID)
+			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
 			thinkingFormat := config.GetThinkingConfig().OpenAIFormat
@@ -2340,6 +2361,14 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiStartIamSso(w, r)
 	case path == "/auth/iam-sso/complete" && r.Method == "POST":
 		h.apiCompleteIamSso(w, r)
+	case path == "/auth/microsoft-sso/start" && r.Method == "POST":
+		h.apiStartMicrosoftSSO(w, r)
+	case path == "/auth/microsoft-sso/complete" && r.Method == "POST":
+		h.apiCompleteMicrosoftSSO(w, r)
+	case path == "/auth/microsoft-sso/select-profile" && r.Method == "POST":
+		h.apiSelectMicrosoftSSOProfile(w, r)
+	case path == "/auth/microsoft-sso/cancel" && r.Method == "POST":
+		h.apiCancelMicrosoftSSO(w, r)
 	case path == "/auth/builderid/start" && r.Method == "POST":
 		h.apiStartBuilderIdLogin(w, r)
 	case path == "/auth/builderid/poll" && r.Method == "POST":
@@ -3088,6 +3117,12 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		Region       string `json:"region"`
 		Email        string `json:"email"`
 		Nickname     string `json:"nickname"`
+		UserID       string `json:"userId"`
+		ProfileArn   string `json:"profileArn"`
+
+		TokenEndpoint string `json:"tokenEndpoint"`
+		IssuerURL     string `json:"issuerUrl"`
+		Scopes        string `json:"scopes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -3127,33 +3162,48 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	if req.Region == "" {
 		req.Region = "us-east-1"
 	}
-	if req.AuthMethod == "" {
-		if req.ClientID != "" {
-			req.AuthMethod = "idc"
-		} else {
-			req.AuthMethod = "social"
-		}
+	switch {
+	case methodHint == "idc" || methodHint == "builderid" || methodHint == "enterprise":
+		req.AuthMethod = "idc"
+	case methodHint == "social" || methodHint == "google" || methodHint == "github":
+		req.AuthMethod = "social"
+	case isMicrosoftImport(methodHint, req.Provider, req.TokenEndpoint, req.IssuerURL, req.UserID, req.ClientID, req.AccessToken):
+		req.AuthMethod = auth.MicrosoftSSOAuthMethod
+	case methodHint == "" && req.ClientID != "":
+		req.AuthMethod = "idc"
+	case req.ClientID != "" && req.ClientSecret != "":
+		req.AuthMethod = "idc"
+	default:
+		req.AuthMethod = "social"
 	}
 
-	switch strings.ToLower(req.AuthMethod) {
-	case "idc", "builderid", "enterprise":
-		req.AuthMethod = "idc"
-	case "social", "google", "github":
-		req.AuthMethod = "social"
-	default:
-		if req.ClientID != "" && req.ClientSecret != "" {
-			req.AuthMethod = "idc"
-		} else {
-			req.AuthMethod = "social"
+	var profileArn string
+	if req.ProfileArn != "" {
+		canonical, _, ok := parseKiroProfileArn(req.ProfileArn)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "profileArn is invalid"})
+			return
 		}
+		profileArn = canonical
 	}
 
 	tempAccount := &config.Account{
 		RefreshToken: req.RefreshToken,
-		ClientID:     req.ClientID,
+		ClientID:     strings.TrimSpace(req.ClientID),
 		ClientSecret: req.ClientSecret,
 		AuthMethod:   req.AuthMethod,
 		Region:       req.Region,
+	}
+	if config.IsExternalIdpAccount(tempAccount) {
+		if err := completeMicrosoftImport(tempAccount, req.UserID, req.AccessToken, req.TokenEndpoint, req.IssuerURL, req.Scopes); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		req.ClientID = tempAccount.ClientID
+		req.ClientSecret = ""
+		req.Provider = auth.MicrosoftSSOProvider
 	}
 	accessToken, newRefreshToken, expiresAt, newProfileArn, err := auth.RefreshToken(tempAccount)
 	if err != nil {
@@ -3164,26 +3214,64 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	if newRefreshToken != "" {
 		req.RefreshToken = newRefreshToken
 	}
-
-	email, _, _ := auth.GetUserInfo(accessToken)
-
-	account := config.Account{
-		ID:           auth.GenerateAccountID(),
-		Email:        email,
-		AccessToken:  accessToken,
-		RefreshToken: req.RefreshToken,
-		ClientID:     req.ClientID,
-		ClientSecret: req.ClientSecret,
-		AuthMethod:   req.AuthMethod,
-		Provider:     req.Provider,
-		Region:       req.Region,
-		ExpiresAt:    expiresAt,
-		Enabled:      true,
-		MachineId:    config.GenerateMachineId(),
-		ProfileArn:   newProfileArn,
+	if profileArn == "" {
+		profileArn = newProfileArn
 	}
 
-	if err := config.AddAccount(account); err != nil {
+	var email, userID string
+	if config.IsExternalIdpAccount(tempAccount) {
+		email, userID = auth.ExternalIdpTokenIdentity(accessToken, tempAccount.IssuerURL)
+		if profileArn != "" {
+			//! Same trust boundary as interactive login: only a profile Kiro lists for this token may be pinned.
+			probe := *tempAccount
+			probe.AccessToken = accessToken
+			if err := verifyOfferedProfile(r.Context(), &probe, profileArn); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+				return
+			}
+		}
+	} else {
+		email, _, _ = auth.GetUserInfo(accessToken)
+	}
+	if email == "" {
+		email = strings.TrimSpace(req.Email)
+	}
+	if userID == "" {
+		userID = strings.TrimSpace(req.UserID)
+	}
+
+	account := config.Account{
+		ID:            auth.GenerateAccountID(),
+		Email:         email,
+		UserId:        userID,
+		Nickname:      strings.TrimSpace(req.Nickname),
+		AccessToken:   accessToken,
+		RefreshToken:  req.RefreshToken,
+		ClientID:      req.ClientID,
+		ClientSecret:  req.ClientSecret,
+		AuthMethod:    req.AuthMethod,
+		Provider:      req.Provider,
+		Region:        req.Region,
+		ExpiresAt:     expiresAt,
+		Enabled:       true,
+		MachineId:     config.GenerateMachineId(),
+		ProfileArn:    profileArn,
+		TokenEndpoint: tempAccount.TokenEndpoint,
+		IssuerURL:     tempAccount.IssuerURL,
+		Scopes:        tempAccount.Scopes,
+	}
+
+	if config.IsExternalIdpAccount(&account) {
+		//! Same lock and duplicate check as interactive login, so an import cannot add a second copy of one Entra user.
+		microsoftSSOFlows.mu.Lock()
+		err = microsoftSSOFlows.addAccountLocked("", account)
+		microsoftSSOFlows.mu.Unlock()
+		if err != nil {
+			writeMicrosoftAddError(w, err)
+			return
+		}
+	} else if err := config.AddAccount(account); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -3242,6 +3330,7 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"host":                   config.GetHost(),
 		"allowOverUsage":         config.GetAllowOverUsage(),
 		"lenientStreamIntegrity": config.GetLenientStreamIntegrity(),
+		"sessionAffinity":        config.GetSessionAffinity(),
 	})
 }
 
@@ -3317,6 +3406,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		Password               string `json:"password,omitempty"`
 		AllowOverUsage         *bool  `json:"allowOverUsage,omitempty"`
 		LenientStreamIntegrity *bool  `json:"lenientStreamIntegrity,omitempty"`
+		SessionAffinity        *bool  `json:"sessionAffinity,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -3352,6 +3442,14 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.LenientStreamIntegrity != nil {
 		if err := config.UpdateLenientStreamIntegrity(*req.LenientStreamIntegrity); err != nil {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+	}
+
+	if req.SessionAffinity != nil {
+		if err := config.UpdateSessionAffinity(*req.SessionAffinity); err != nil {
 			w.WriteHeader(500)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
@@ -3582,6 +3680,10 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		"authMethod":        account.AuthMethod,
 		"provider":          account.Provider,
 		"region":            account.Region,
+		"profileArn":        account.ProfileArn,
+		"tokenEndpoint":     account.TokenEndpoint,
+		"issuerUrl":         account.IssuerURL,
+		"scopes":            account.Scopes,
 		"expiresAt":         account.ExpiresAt,
 		"machineId":         account.MachineId,
 		"weight":            account.Weight,
@@ -3848,6 +3950,10 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt    int64  `json:"expiresAt"`
 		AuthMethod   string `json:"authMethod,omitempty"`
 		Provider     string `json:"provider,omitempty"`
+
+		TokenEndpoint string `json:"tokenEndpoint,omitempty"`
+		IssuerURL     string `json:"issuerUrl,omitempty"`
+		Scopes        string `json:"scopes,omitempty"`
 	}
 
 	type ExportSubscription struct {
@@ -3868,6 +3974,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 		Nickname     string             `json:"nickname,omitempty"`
 		Idp          string             `json:"idp"`
 		UserId       string             `json:"userId,omitempty"`
+		ProfileArn   string             `json:"profileArn,omitempty"`
 		MachineId    string             `json:"machineId,omitempty"`
 		Credentials  ExportCredentials  `json:"credentials"`
 		Subscription ExportSubscription `json:"subscription"`
@@ -3893,6 +4000,8 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 		if idp == "" {
 			if a.AuthMethod == "social" {
 				idp = "Google"
+			} else if config.IsExternalIdpAccount(&a) {
+				idp = auth.MicrosoftSSOProvider
 			} else {
 				idp = "BuilderId"
 			}
@@ -3914,22 +4023,26 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 		}
 
 		exportAccounts = append(exportAccounts, ExportAccount{
-			ID:        a.ID,
-			Email:     a.Email,
-			Nickname:  a.Nickname,
-			Idp:       idp,
-			UserId:    a.UserId,
-			MachineId: a.MachineId,
+			ID:         a.ID,
+			Email:      a.Email,
+			Nickname:   a.Nickname,
+			Idp:        idp,
+			UserId:     a.UserId,
+			ProfileArn: a.ProfileArn,
+			MachineId:  a.MachineId,
 			Credentials: ExportCredentials{
-				AccessToken:  a.AccessToken,
-				CsrfToken:    "",
-				RefreshToken: a.RefreshToken,
-				ClientID:     a.ClientID,
-				ClientSecret: a.ClientSecret,
-				Region:       a.Region,
-				ExpiresAt:    a.ExpiresAt * 1000,
-				AuthMethod:   authMethod,
-				Provider:     a.Provider,
+				AccessToken:   a.AccessToken,
+				CsrfToken:     "",
+				RefreshToken:  a.RefreshToken,
+				ClientID:      a.ClientID,
+				ClientSecret:  a.ClientSecret,
+				Region:        a.Region,
+				ExpiresAt:     a.ExpiresAt * 1000,
+				AuthMethod:    authMethod,
+				Provider:      a.Provider,
+				TokenEndpoint: a.TokenEndpoint,
+				IssuerURL:     a.IssuerURL,
+				Scopes:        a.Scopes,
 			},
 			Subscription: ExportSubscription{
 				Type:  subType,

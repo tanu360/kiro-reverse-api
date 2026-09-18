@@ -119,6 +119,32 @@ func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string
 	return p.nextAccountLocked(model, excluded)
 }
 
+// GetPreferredForModelExcluding returns preferredID when that account can serve
+// model right now, and the round-robin pick otherwise. A preferred hit leaves
+// the rotation cursor alone, so sticky conversations do not skew where new
+// conversations land.
+func (p *AccountPool) GetPreferredForModelExcluding(preferredID, model string, excluded map[string]bool) *config.Account {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if preferredID != "" {
+		allowOverUsage := config.GetAllowOverUsage()
+		now := time.Now()
+		for i := range p.accounts {
+			acc := &p.accounts[i]
+			if acc.ID != preferredID {
+				continue
+			}
+			if p.canServeLocked(acc, model, excluded, now, allowOverUsage) {
+				accCopy := *acc
+				return &accCopy
+			}
+			break
+		}
+	}
+	return p.nextAccountLocked(model, excluded)
+}
+
 func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool) *config.Account {
 	if len(p.accounts) == 0 {
 		return nil
@@ -136,7 +162,6 @@ func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool) 
 func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]bool, avoidLast bool) *config.Account {
 	allowOverUsage := config.GetAllowOverUsage()
 	now := time.Now()
-	nowUnix := now.Unix()
 	n := len(p.accounts)
 	start := p.currentIndex
 	seen := make(map[string]bool)
@@ -152,19 +177,7 @@ func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]
 		if avoidLast && acc.ID == p.lastSelected {
 			continue
 		}
-		if excluded != nil && excluded[acc.ID] {
-			continue
-		}
-		if model != "" && !p.accountHasModel(acc.ID, model) {
-			continue
-		}
-		if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
-			continue
-		}
-		if tokenUnavailableForSelection(acc, nowUnix) {
-			continue
-		}
-		if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
+		if !p.canServeLocked(acc, model, excluded, now, allowOverUsage) {
 			continue
 		}
 		accCopy := *acc
@@ -173,6 +186,25 @@ func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]
 		return &accCopy
 	}
 	return nil
+}
+
+func (p *AccountPool) canServeLocked(acc *config.Account, model string, excluded map[string]bool, now time.Time, allowOverUsage bool) bool {
+	if excluded != nil && excluded[acc.ID] {
+		return false
+	}
+	if model != "" && !p.accountHasModel(acc.ID, model) {
+		return false
+	}
+	if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
+		return false
+	}
+	if tokenUnavailableForSelection(acc, now.Unix()) {
+		return false
+	}
+	if isOverUsageLimit(*acc) && !isUpstreamOverageEnabled(*acc) && !allowOverUsage {
+		return false
+	}
+	return true
 }
 
 func tokenUnavailableForSelection(acc *config.Account, nowUnix int64) bool {

@@ -60,10 +60,12 @@ func applyKiroBaseHeaders(req *http.Request, account *config.Account, values kir
 	if token := accountBearerToken(account); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	//! Kiro rejects an API key sent as a plain Bearer token; the tokentype header marks it. Kiro CLI sends it lowercase.
+	//! Kiro rejects an API key or a Microsoft Entra token sent as a plain Bearer token; the tokentype header marks it. Kiro CLI sends it lowercase.
 	req.Header.Del("tokentype")
 	if config.IsAPIKeyAccount(account) {
 		req.Header.Set("tokentype", "API_KEY")
+	} else if config.IsExternalIdpAccount(account) {
+		req.Header.Set("tokentype", "EXTERNAL_IDP")
 	}
 	req.Header.Set("User-Agent", values.UserAgent)
 	req.Header.Set("x-amz-user-agent", values.AmzUserAgent)

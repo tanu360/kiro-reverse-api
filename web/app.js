@@ -19,6 +19,8 @@
   let builderIdSession = '';
   let builderIdPollTimer = null;
   let iamSession = '';
+  // Microsoft SSO: 'kiro' (portal callback) then 'microsoft' (Entra callback), then maybe a profile pick.
+  let ms = { session: '', stage: 'kiro', authorizeUrl: '', selectionId: '', profiles: [], busy: false, generation: 0 };
   let exportSelectedIds = new Set();
   let currentVersion = '';
   let testLogs = [];
@@ -921,6 +923,7 @@
     if (!method) return '-';
     const normalized = String(method).toLowerCase();
     if (normalized === 'idc') return t('auth.enterprise');
+    if (normalized === 'external_idp' || normalized === 'azuread') return t('auth.microsoft');
     if (normalized === 'apikey' || normalized === 'api_key') return t('auth.apiKey');
     if (normalized === 'social') return t('auth.social');
     if (normalized === 'builderid') return 'BuilderID';
@@ -1119,6 +1122,10 @@
         const a = await res.json();
         if (a.authMethod === 'api_key') return JSON.stringify({ kiroApiKey: a.accessToken, region: a.region, authMethod: 'api_key' }, null, 2);
         const { clientId, clientSecret, accessToken, refreshToken } = a;
+        if (a.authMethod === 'external_idp') {
+          const { authMethod, provider, userId, profileArn, tokenEndpoint, issuerUrl, scopes } = a;
+          return JSON.stringify({ clientId, accessToken, refreshToken, authMethod, provider, userId, profileArn, tokenEndpoint, issuerUrl, scopes }, null, 2);
+        }
         return JSON.stringify({ clientId, clientSecret, accessToken, refreshToken }, null, 2);
       });
       await copyText(jsonPromise);
@@ -1570,6 +1577,7 @@
     syncApiKeyManagementVisibility();
     $('allowOverUsage').checked = d.allowOverUsage || false;
     $('lenientStreamIntegrity').checked = d.lenientStreamIntegrity || false;
+    $('sessionAffinity').checked = d.sessionAffinity !== false;
     await Promise.all([loadApiKeys(), loadThinkingConfig(), loadModelMappings(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
     syncApiKeyManagementVisibility();
     refreshCustomSelects();
@@ -1996,6 +2004,11 @@
     const lenientStreamIntegrity = $('lenientStreamIntegrity').checked;
     await api('/settings', { method: 'POST', body: JSON.stringify({ lenientStreamIntegrity }) });
     toast(t('settings.streamIntegritySaved'), 'success');
+  }
+  async function saveRoutingConfig() {
+    const sessionAffinity = $('sessionAffinity').checked;
+    await api('/settings', { method: 'POST', body: JSON.stringify({ sessionAffinity }) });
+    toast(t('settings.routingSaved'), 'success');
   }
   async function changePassword() {
     const np = $('newPassword').value;
@@ -2471,6 +2484,7 @@
   var METHOD_ICONS = {
     builderid: 'fa-solid fa-id-card',
     iam: 'fa-solid fa-key',
+    microsoft: 'fa-brands fa-microsoft',
     sso: 'fa-solid fa-shield-halved',
     local: 'fa-solid fa-folder-open',
     credentials: 'fa-solid fa-code',
@@ -2495,6 +2509,7 @@
     if (type === 'add') modalAdd(title, body);
     else if (type === 'builderid') modalBuilderId(title, body);
     else if (type === 'iam') modalIam(title, body);
+    else if (type === 'microsoft') { resetMicrosoftFlow(true); renderMicrosoftModal(); }
     else if (type === 'sso') modalSso(title, body);
     else if (type === 'local') modalLocal(title, body);
     else if (type === 'credentials') modalCredentials(title, body);
@@ -2505,6 +2520,7 @@
   }
   function closeModal() {
     closeDialog('addModal');
+    resetMicrosoftFlow(true);
     iamSession = '';
     if (builderIdPollTimer) { clearTimeout(builderIdPollTimer); builderIdPollTimer = null; }
     builderIdSession = '';
@@ -2515,6 +2531,7 @@
       '<div class="method-list">' +
       methodCard('builderid', t('modal.builderIdTitle'), t('modal.builderIdDesc')) +
       methodCard('iam', t('modal.iamTitle'), t('modal.iamDesc')) +
+      methodCard('microsoft', t('modal.microsoftTitle'), t('modal.microsoftDesc')) +
       methodCard('sso', t('modal.ssoTitle'), t('modal.ssoDesc')) +
       methodCard('local', t('modal.localTitle'), t('modal.localDesc')) +
       methodCard('credentials', t('modal.credentialsTitle'), t('modal.credentialsDesc')) +
@@ -2570,6 +2587,116 @@
       '<button class="btn btn-primary" id="iamBtn" type="button">' + escapeHtml(t('builderid.startLogin')) + '</button>' +
       '</div>';
     $('iamBtn').addEventListener('click', startIamSso);
+  }
+  function renderMicrosoftModal() {
+    $('modalTitle').textContent = t('modal.microsoftTitle');
+    const body = $('modalBody');
+    const back = '<button class="btn btn-secondary" data-microsoft-back="1" type="button">' + escapeHtml(t('common.back')) + '</button>';
+    if (ms.selectionId) {
+      body.innerHTML =
+        '<p class="help-block">' + escapeHtml(t('microsoft.selectProfileDesc')) + '</p>' +
+        '<div class="form-group microsoft-profile-list">' + ms.profiles.map((p, i) =>
+          '<label class="microsoft-profile-card"><input type="radio" name="microsoftProfile" value="' + escapeAttr(p.arn) + '"' + (i === 0 ? ' checked' : '') + ' />' +
+          '<span class="microsoft-profile-body"><span class="microsoft-profile-name">' + escapeHtml(p.name || p.arn) + '</span>' +
+          '<span class="microsoft-profile-meta">' + escapeHtml(p.region || '') + '</span>' +
+          (p.name ? '<span class="microsoft-profile-meta font-mono">' + escapeHtml(p.arn) + '</span>' : '') + '</span></label>').join('') + '</div>' +
+        '<div class="modal-footer">' + back +
+        '<button class="btn btn-primary" id="microsoftBtn" type="button">' + escapeHtml(t('microsoft.selectProfile')) + '</button></div>';
+      $('microsoftBtn').addEventListener('click', selectMicrosoftProfile);
+      return;
+    }
+    const step = ms.authorizeUrl
+      ? '<div class="form-group"><label>' + escapeHtml(ms.stage === 'microsoft' ? t('microsoft.providerStep') : t('microsoft.portalStep')) + '</label>' +
+        '<div class="endpoint"><span id="microsoftAuthUrl" class="font-mono text-xs"></span></div>' +
+        '<div class="flex gap-2 mt-2">' +
+        '<button class="btn btn-sm btn-outline flex-1" id="microsoftOpenBtn" type="button">' + escapeHtml(t('builderid.open')) + '</button>' +
+        '<button class="btn btn-sm btn-outline flex-1" id="microsoftCopyBtn" type="button">' + escapeHtml(t('common.copy')) + '</button>' +
+        '</div></div>' +
+        '<p class="iam-login-instruction text-sm success-text">' + escapeHtml(t('microsoft.callbackInstructions')) + '</p>' +
+        '<div class="form-group"><label>' + escapeHtml(t('iam.callbackUrl')) + '</label>' +
+        '<input type="text" id="microsoftCallback" placeholder="http://localhost:3128/..." /></div>'
+      : '';
+    body.innerHTML =
+      '<p class="help-block">' + escapeHtml(t('modal.microsoftDesc')) + '</p>' + step +
+      '<div class="modal-footer">' + back +
+      '<button class="btn btn-primary" id="microsoftBtn" type="button">' + escapeHtml(ms.authorizeUrl ? t('iam.complete') : t('builderid.startLogin')) + '</button></div>';
+    if (ms.authorizeUrl) {
+      $('microsoftAuthUrl').textContent = ms.authorizeUrl;
+      $('microsoftOpenBtn').addEventListener('click', () => window.open(ms.authorizeUrl, '_blank', 'noopener'));
+      $('microsoftCopyBtn').addEventListener('click', async () => {
+        await copyText(ms.authorizeUrl);
+        toast(t('common.copied'), 'primary');
+      });
+    }
+    $('microsoftBtn').addEventListener('click', ms.authorizeUrl ? completeMicrosoftLogin : startMicrosoftLogin);
+  }
+  function resetMicrosoftFlow(notifyServer) {
+    if (notifyServer && (ms.session || ms.selectionId)) {
+      api('/auth/microsoft-sso/cancel', { method: 'POST', body: JSON.stringify({ sessionId: ms.session, selectionId: ms.selectionId }) }).catch(() => {});
+    }
+    ms = { session: '', stage: 'kiro', authorizeUrl: '', selectionId: '', profiles: [], busy: false, generation: ms.generation + 1 };
+  }
+  // Runs one Microsoft SSO request. A response that lands after the operator
+  // left the flow is dropped, and its server session canceled.
+  async function microsoftStep(path, payload, onSuccess) {
+    if (ms.busy) return;
+    ms.busy = true;
+    const btn = $('microsoftBtn');
+    if (btn) btn.disabled = true;
+    const generation = ms.generation;
+    try {
+      const res = await api(path, { method: 'POST', body: JSON.stringify(payload) });
+      const d = await res.json().catch(() => ({}));
+      if (generation !== ms.generation) {
+        if (d.sessionId || d.selectionId) api('/auth/microsoft-sso/cancel', { method: 'POST', body: JSON.stringify({ sessionId: d.sessionId || '', selectionId: d.selectionId || '' }) }).catch(() => {});
+        return;
+      }
+      ms.busy = false;
+      if (!res.ok || d.error) return toastError(t('common.failed') + ': ' + localizedError(d.error || res.statusText));
+      if (d.account) {
+        resetMicrosoftFlow(false);
+        closeModal(); loadAccounts(); loadStats();
+        toastPrimary(t('builderid.success') + ': ' + (d.account.email || d.account.id));
+        if (d.warning) toastWarning(d.warning);
+        autoRefreshNewAccount(d.account.id);
+        return;
+      }
+      onSuccess(d);
+      renderMicrosoftModal();
+    } catch (e) {
+      if (generation === ms.generation) toastError(t('common.failed') + ': ' + ((e && e.message) || ''));
+    } finally {
+      if (generation === ms.generation) {
+        ms.busy = false;
+        const b = $('microsoftBtn');
+        if (b) b.disabled = false;
+      }
+    }
+  }
+  function startMicrosoftLogin() {
+    return microsoftStep('/auth/microsoft-sso/start', {}, d => {
+      ms.session = d.sessionId;
+      ms.authorizeUrl = d.authorizeUrl;
+      ms.stage = 'kiro';
+    });
+  }
+  function completeMicrosoftLogin() {
+    const callbackUrl = ($('microsoftCallback')?.value || '').trim();
+    if (!callbackUrl) return toastWarning(t('microsoft.callbackRequired'));
+    return microsoftStep('/auth/microsoft-sso/complete', { sessionId: ms.session, callbackUrl }, d => {
+      if (d.stage === 'profile') {
+        ms.selectionId = d.selectionId;
+        ms.profiles = d.profiles || [];
+      } else {
+        ms.stage = 'microsoft';
+        ms.authorizeUrl = d.authorizeUrl;
+      }
+    });
+  }
+  function selectMicrosoftProfile() {
+    const picked = document.querySelector('input[name="microsoftProfile"]:checked');
+    if (!picked) return toastWarning(t('microsoft.profileRequired'));
+    return microsoftStep('/auth/microsoft-sso/select-profile', { selectionId: ms.selectionId, profileArn: picked.value }, () => {});
   }
   function modalSso(title, body) {
     title.textContent = t('modal.ssoTitle');
@@ -2772,7 +2899,12 @@
             clientSecret: c.clientSecret || a.clientSecret,
             region: c.region || a.region,
             authMethod: c.authMethod || a.authMethod,
-            provider: c.provider || a.provider || a.idp
+            provider: c.provider || a.provider || a.idp,
+            userId: a.userId,
+            profileArn: a.profileArn,
+            tokenEndpoint: c.tokenEndpoint,
+            issuerUrl: c.issuerUrl,
+            scopes: c.scopes
           };
         });
       } else {
@@ -2792,6 +2924,22 @@
           continue;
         }
         if (!item.refreshToken) { fail++; continue; }
+        //! Entra credentials go through untouched: the server owns alias detection and endpoint recovery.
+        if (isMicrosoftCredential(item)) {
+          const payload = {
+            refreshToken: item.refreshToken, accessToken: item.accessToken || '', clientId: item.clientId || '',
+            authMethod: 'external_idp', provider: 'AzureAD', region: item.region || '',
+            userId: item.userId || '', profileArn: item.profileArn || '',
+            tokenEndpoint: item.tokenEndpoint || '', issuerUrl: item.issuerUrl || '', scopes: item.scopes || ''
+          };
+          try {
+            const res = await api('/auth/credentials', { method: 'POST', body: JSON.stringify(payload) });
+            const d = await res.json();
+            if (d.success) { ok++; if (d.account?.id) newIds.push(d.account.id); }
+            else fail++;
+          } catch { fail++; }
+          continue;
+        }
         let authMethod = item.authMethod || '';
         if (item.clientId && item.clientSecret) authMethod = 'idc';
         else if (!authMethod || authMethod === 'social') authMethod = 'social';
@@ -2822,6 +2970,12 @@
     } catch (e) {
       toastWarning(t('credentials.parseError'));
     }
+  }
+  function isMicrosoftCredential(item) {
+    const aliases = ['external_idp', 'external-idp', 'external', 'microsoft', 'm365', 'office365', 'azure', 'azuread', 'azure-ad', 'azure_ad', 'entra', 'entra-id'];
+    return aliases.includes(String(item.authMethod || '').toLowerCase()) ||
+      aliases.includes(String(item.provider || '').toLowerCase()) ||
+      Boolean(item.tokenEndpoint || item.issuerUrl);
   }
   async function importFromCookie() {
     const refreshToken = $('cookieRefreshToken').value.trim();
@@ -3275,6 +3429,7 @@
     });
     $('saveOverUsageBtn').addEventListener('click', saveOverUsageConfig);
     $('saveStreamIntegrityBtn').addEventListener('click', saveStreamIntegrityConfig);
+    $('saveRoutingBtn').addEventListener('click', saveRoutingConfig);
     $('saveThinkingBtn').addEventListener('click', saveThinkingConfig);
     $('saveEndpointBtn').addEventListener('click', saveEndpointConfig);
     $('changePasswordBtn').addEventListener('click', changePassword);
@@ -3455,6 +3610,7 @@
     $('modalBody').addEventListener('click', e => {
       const m = e.target.closest('[data-method]');
       if (m) { showModal(m.dataset.method); return; }
+      if (e.target.closest('[data-microsoft-back]')) { resetMicrosoftFlow(true); showModal('add'); return; }
       const g = e.target.closest('[data-modal-goto]');
       if (g) { showModal(g.dataset.modalGoto); return; }
       if (e.target.dataset.closeAdd) closeModal();

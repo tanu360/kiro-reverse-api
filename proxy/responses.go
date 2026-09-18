@@ -32,11 +32,12 @@ type OpenAIResponsesText struct {
 }
 
 type OpenAIResponsesTool struct {
-	Type        string                `json:"type"`
-	Name        string                `json:"name,omitempty"`
-	Description string                `json:"description,omitempty"`
-	Parameters  interface{}           `json:"parameters,omitempty"`
-	Tools       []OpenAIResponsesTool `json:"tools,omitempty"`
+	Type        string                 `json:"type"`
+	Name        string                 `json:"name,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Parameters  interface{}            `json:"parameters,omitempty"`
+	Tools       []OpenAIResponsesTool  `json:"tools,omitempty"`
+	Format      map[string]interface{} `json:"format,omitempty"`
 	Function    struct {
 		Name        string      `json:"name"`
 		Description string      `json:"description,omitempty"`
@@ -231,7 +232,7 @@ func convertResponsesTool(tool OpenAIResponsesTool, namespace string) ([]OpenAIT
 			}
 		case "custom":
 			name = tool.Name
-			description = tool.Description
+			description = customToolDescription(tool)
 			parameters = map[string]interface{}{"type": "object", "properties": map[string]interface{}{"input": map[string]interface{}{"type": "string", "description": "The raw text to pass to this custom tool."}}, "required": []string{"input"}}
 		default:
 			return nil, ""

@@ -35,6 +35,9 @@ func RefreshTokenContext(ctx context.Context, account *config.Account) (string, 
 	}
 	client := GetAuthClientForProxy(proxyURL)
 
+	if config.IsExternalIdpAccount(account) {
+		return refreshExternalIdpToken(ctx, account.RefreshToken, account.ClientID, account.TokenEndpoint, account.IssuerURL, account.Scopes, client)
+	}
 	if account.AuthMethod == "social" {
 		return refreshSocialToken(ctx, account.RefreshToken, client)
 	}

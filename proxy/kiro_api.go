@@ -158,8 +158,8 @@ func resolveProfileArnContext(ctx context.Context, account *config.Account) (str
 		return "", err
 	}
 
-	//! AWS refresh responses can carry profileArn, so refresh stays the fallback even for Builder ID.
-	if account.RefreshToken != "" {
+	//! AWS refresh responses can carry profileArn, so refresh stays the fallback even for Builder ID. Entra refresh never does.
+	if account.RefreshToken != "" && !config.IsExternalIdpAccount(account) {
 		var refreshedArn string
 		var refreshErr error
 		if storedAccount(account.ID) != nil {
@@ -286,27 +286,35 @@ func resolveProfileArnAcrossRegions(ctx context.Context, account *config.Account
 }
 
 func listAvailableProfilesWithRetry(ctx context.Context, account *config.Account, region string) (string, error) {
+	profiles, err := listKiroProfilesWithRetry(ctx, account, region, true)
+	if err != nil {
+		return "", err
+	}
+	return profiles[0].ARN, nil
+}
+
+func listKiroProfilesWithRetry(ctx context.Context, account *config.Account, region string, firstOnly bool) ([]KiroProfile, error) {
 	const maxAttempts = 3
 	backoff := 200 * time.Millisecond
 
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		profileArn, err := listAvailableProfiles(ctx, account, region)
+		profiles, err := listKiroProfiles(ctx, account, region, firstOnly)
 		if err == nil {
-			return profileArn, nil
+			return profiles, nil
 		}
 		lastErr = err
 		if !isTransientProfileFetchError(err) || attempt == maxAttempts {
-			return "", err
+			return nil, err
 		}
 		logger.Debugf("[ProfileArn] ListAvailableProfiles transient failure for %s in %s (attempt %d/%d): %v",
 			account.Email, region, attempt, maxAttempts, err)
 		if err := waitForStreamRetry(ctx, backoff); err != nil {
-			return "", err
+			return nil, err
 		}
 		backoff *= 2
 	}
-	return "", lastErr
+	return nil, lastErr
 }
 
 func isTransientProfileFetchError(err error) bool {
@@ -323,10 +331,29 @@ func isTransientProfileFetchError(err error) bool {
 	return true
 }
 
+// KiroProfile is one Kiro data-plane profile a credential may use.
+type KiroProfile struct {
+	ARN    string `json:"arn"`
+	Name   string `json:"name,omitempty"`
+	Region string `json:"region"`
+}
+
 func listAvailableProfiles(ctx context.Context, account *config.Account, region string) (string, error) {
+	profiles, err := listKiroProfiles(ctx, account, region, true)
+	if err != nil {
+		return "", err
+	}
+	return profiles[0].ARN, nil
+}
+
+// listKiroProfiles returns the valid profiles in one region. firstOnly stops
+// paging at the first one, which is all request-time resolution needs.
+func listKiroProfiles(ctx context.Context, account *config.Account, region string, firstOnly bool) ([]KiroProfile, error) {
 	endpoint := regionalizeURLForRegion(fmt.Sprintf("%s/ListAvailableProfiles", kiroRestAPIBase), region)
 	client := GetRestClientForProxy(ResolveAccountProxyURL(account))
 
+	var profiles []KiroProfile
+	seen := make(map[string]bool)
 	invalidCount := 0
 	nextToken := ""
 	//! Pages are bounded so a misbehaving upstream cannot loop forever.
@@ -338,52 +365,100 @@ func listAvailableProfiles(ctx context.Context, account *config.Account, region 
 		payload, _ := json.Marshal(requestBody)
 		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, strings.NewReader(string(payload)))
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		setKiroHeaders(req, account)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, maxProfileErrorBytes))
 			resp.Body.Close()
-			return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+			return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 		}
 		body, err := io.ReadAll(io.LimitReader(resp.Body, maxProfileResponseBytes+1))
 		resp.Body.Close()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if len(body) > maxProfileResponseBytes {
-			return "", fmt.Errorf("profile response exceeds %d bytes", maxProfileResponseBytes)
+			return nil, fmt.Errorf("profile response exceeds %d bytes", maxProfileResponseBytes)
 		}
 
 		var result struct {
 			Profiles []struct {
-				Arn string `json:"arn"`
+				Arn  string `json:"arn"`
+				Name string `json:"profileName"`
 			} `json:"profiles"`
 			NextToken string `json:"nextToken"`
 		}
 		if err := json.Unmarshal(body, &result); err != nil {
-			return "", err
+			return nil, err
 		}
 		for _, profile := range result.Profiles {
-			if profileArn, _, ok := parseKiroProfileArn(profile.Arn); ok {
-				return profileArn, nil
+			profileArn, profileRegion, ok := parseKiroProfileArn(profile.Arn)
+			if !ok {
+				invalidCount++
+				continue
 			}
-			invalidCount++
+			if seen[profileArn] {
+				continue
+			}
+			seen[profileArn] = true
+			profiles = append(profiles, KiroProfile{ARN: profileArn, Name: strings.TrimSpace(profile.Name), Region: profileRegion})
+			if firstOnly {
+				return profiles, nil
+			}
 		}
 		if nextToken = strings.TrimSpace(result.NextToken); nextToken == "" {
 			break
 		}
 	}
-	if invalidCount > 0 {
-		return "", fmt.Errorf("profile response contained no valid Kiro profile ARN")
+	if len(profiles) > 0 {
+		return profiles, nil
 	}
-	return "", fmt.Errorf("empty profile list")
+	if invalidCount > 0 {
+		return nil, fmt.Errorf("profile response contained no valid Kiro profile ARN")
+	}
+	return nil, fmt.Errorf("empty profile list")
+}
+
+// DiscoverKiroProfiles lists every profile across the candidate data-plane
+// regions, de-duplicated by ARN. A failed region does not hide profiles found
+// in another; only when no region yields one are the failures returned.
+func DiscoverKiroProfiles(ctx context.Context, account *config.Account) ([]KiroProfile, error) {
+	if account == nil {
+		return nil, fmt.Errorf("account is nil")
+	}
+	var profiles []KiroProfile
+	seen := make(map[string]bool)
+	var probeErrors []error
+	for _, region := range kiroProfileRegionCandidates(account) {
+		found, err := listKiroProfilesWithRetry(ctx, account, region, false)
+		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			probeErrors = append(probeErrors, fmt.Errorf("%s: %w", region, err))
+			continue
+		}
+		for _, profile := range found {
+			if !seen[profile.ARN] {
+				seen[profile.ARN] = true
+				profiles = append(profiles, profile)
+			}
+		}
+	}
+	if len(profiles) > 0 {
+		return profiles, nil
+	}
+	if len(probeErrors) > 0 {
+		return nil, errors.Join(probeErrors...)
+	}
+	return nil, fmt.Errorf("no available Kiro profile")
 }
 
 func withProfileArnQuery(rawURL string, account *config.Account) string {
