@@ -1068,3 +1068,33 @@ func TestBuildCodexModelsResponseUsesKiroModelMetadata(t *testing.T) {
 		t.Fatalf("expected compatibility aliases at the end, got %#v %#v %#v %#v", models[2], models[3], models[4], models[5])
 	}
 }
+
+func TestAdminPasswordChangeRequiresEightCharacters(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	config.SetPassword("admin-password")
+	h := NewHandler()
+
+	change := func(password string) int {
+		body := strings.NewReader(`{"password":"` + password + `"}`)
+		req := httptest.NewRequest(http.MethodPost, "/admin/api/settings", body)
+		req.Header.Set("X-Admin-Password", config.GetPassword())
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	if code := change("1234567"); code != http.StatusBadRequest {
+		t.Fatalf("7-character password: got %d, want 400", code)
+	}
+	if config.GetPassword() != "admin-password" {
+		t.Fatal("a rejected password was still saved")
+	}
+	if code := change("12345678"); code != http.StatusOK {
+		t.Fatalf("8-character password: got %d, want 200", code)
+	}
+	if config.GetPassword() != "12345678" {
+		t.Fatal("an accepted password was not saved")
+	}
+}

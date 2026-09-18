@@ -106,6 +106,10 @@
       <div class="login-box">
         <h1 class="login-title" data-i18n="login.title"></h1>
         <p class="login-subtitle" data-i18n="login.subtitle"></p>
+        <div class="login-first-run hidden" id="firstRunPassword">
+          <span data-i18n="login.firstRunPassword"></span>
+          <code id="firstRunPasswordValue"></code>
+        </div>
         <div class="form-group">
           <label data-i18n="login.password"></label>
           <div class="input-affix">
@@ -532,10 +536,6 @@
 
         <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.adminPassword"></span></div>
-          <div class="cred-warning hidden" id="passwordWarning">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span id="passwordWarningText"></span>
-          </div>
           <div class="form-group">
             <label data-i18n="settings.newPassword"></label>
             <input type="password" id="newPassword" data-i18n-placeholder="settings.newPasswordPlaceholder" />

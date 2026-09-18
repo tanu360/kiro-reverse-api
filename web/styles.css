@@ -1521,6 +1521,20 @@ img.brand-icon {
   margin: 0 0 1.75rem;
   text-align: center;
 }
+.login-first-run {
+  margin: -1rem 0 1.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+.login-first-run code {
+  display: block;
+  margin-top: 0.35rem;
+  font-family: var(--font-mono);
+  color: var(--foreground);
+  word-break: break-all;
+  user-select: all;
+}
 .login-meta {
   position: relative;
   margin-top: 1.75rem;
@@ -4301,23 +4315,6 @@ img.brand-icon {
 }
 .hidden {
   display: none !important;
-}
-.cred-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  margin-bottom: 1rem;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--warning);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-  color: var(--foreground);
-  font-size: 0.875rem;
-  line-height: 1.45;
-}
-.cred-warning i {
-  color: var(--warning);
-  margin-top: 0.15rem;
 }
 .empty-state {
   text-align: center;

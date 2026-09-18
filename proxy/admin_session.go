@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"kiro-proxy/config"
+	"kiro-proxy/logger"
 	"net/http"
 	"sync"
 	"time"
@@ -180,6 +182,9 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
+	}
+	if err := config.ClearFirstRunPassword(); err != nil {
+		logger.Warnf("[Admin] Failed to hide first-run password: %v", err)
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"token":     token,

@@ -211,19 +211,11 @@ func pruneAutoBackups(keep int) {
 	if err != nil {
 		return
 	}
-	rows, err := d.Query(`SELECT id FROM backup_entries WHERE kind='auto'
+	ids, err := queryBackupIDs(d, `SELECT id FROM backup_entries WHERE kind='auto'
 		ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?`, keep)
 	if err != nil {
 		return
 	}
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err == nil {
-			ids = append(ids, id)
-		}
-	}
-	rows.Close()
 	for _, id := range ids {
 		_, _ = d.Exec(`DELETE FROM backup_entries WHERE id=?`, id)
 	}
@@ -237,25 +229,41 @@ func pruneKindLocked(kind string, keep int) error {
 	if err != nil {
 		return err
 	}
-	rows, err := d.Query(`SELECT id FROM backup_entries WHERE kind=?
+	ids, err := queryBackupIDs(d, `SELECT id FROM backup_entries WHERE kind=?
 		ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?`, kind, keep)
 	if err != nil {
 		return err
 	}
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err == nil {
-			ids = append(ids, id)
-		}
-	}
-	rows.Close()
 	for _, id := range ids {
 		if _, err := d.Exec(`DELETE FROM backup_entries WHERE id=?`, id); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// queryBackupIDs collects every id the query returns, or an error if any row
+// could not be read. The pool holds a single connection, so the rows are closed
+// before returning: a caller that deletes while they are still open would wait
+// on that connection forever.
+func queryBackupIDs(d *sql.DB, query string, args ...any) ([]string, error) {
+	rows, err := d.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 func ListBackups(autoInclude bool) ([]BackupEntry, error) {
