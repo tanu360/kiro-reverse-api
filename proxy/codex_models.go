@@ -266,8 +266,8 @@ func fallbackCodexModelInfos() []ModelInfo {
 			MaxInputTokens  int `json:"maxInputTokens"`
 			MaxOutputTokens int `json:"maxOutputTokens"`
 		}{MaxInputTokens: 200000, MaxOutputTokens: 64000}},
-		{ModelId: "claude-sonnet-4.6", ModelName: "Claude Sonnet 4.6", InputTypes: []string{"TEXT", "IMAGE"}},
-		{ModelId: "claude-opus-4.6", ModelName: "Claude Opus 4.6", InputTypes: []string{"TEXT", "IMAGE"}},
+		{ModelId: "claude-sonnet-5", ModelName: "Claude Sonnet 5", InputTypes: []string{"TEXT", "IMAGE"}},
+		{ModelId: "claude-opus-5", ModelName: "Claude Opus 5", InputTypes: []string{"TEXT", "IMAGE"}},
 		{ModelId: "claude-sonnet-4.5", ModelName: "Claude Sonnet 4.5", InputTypes: []string{"TEXT", "IMAGE"}},
 		{ModelId: "claude-haiku-4.5", ModelName: "Claude Haiku 4.5", InputTypes: []string{"TEXT", "IMAGE"}},
 	}
