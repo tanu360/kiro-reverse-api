@@ -443,6 +443,8 @@ func validateRestoredConfig(c Config) error {
 }
 
 func writeRestoredConfig(parsed *parsedBackup) error {
+	// Restoring an installation must not reopen its public first-run disclosure.
+	parsed.config.FirstRunPasswordPending = false
 	configData, err := json.Marshal(parsed.config)
 	if err != nil {
 		return err

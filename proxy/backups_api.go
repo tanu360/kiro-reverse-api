@@ -74,6 +74,7 @@ func (h *Handler) apiBackupsRestore(w http.ResponseWriter, _ *http.Request, id s
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+	h.adminSessions.RevokeAll()
 	h.pool.Reload()
 	getBroadcaster().Publish(Event{Type: "backup_restored", Payload: id})
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
@@ -127,6 +128,7 @@ func (h *Handler) apiBackupsRestoreUpload(w http.ResponseWriter, r *http.Request
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+	h.adminSessions.RevokeAll()
 	h.pool.Reload()
 	getBroadcaster().Publish(Event{Type: "backup_restored", Payload: "upload"})
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
