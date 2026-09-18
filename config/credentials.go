@@ -41,16 +41,9 @@ func LoadCredentials() error {
 }
 
 func SaveCredentials() error {
-	credLock.RLock()
-	data, err := json.Marshal(credentials)
-	credLock.RUnlock()
-	if err != nil {
-		return fmt.Errorf("marshal credentials: %w", err)
-	}
-	if err := setSetting(credentialsKey, string(data)); err != nil {
-		return fmt.Errorf("write credentials: %w", err)
-	}
-	return nil
+	credLock.Lock()
+	defer credLock.Unlock()
+	return saveCredentialsLocked()
 }
 
 func CredentialsSnapshot() (bool, []Account) {
@@ -62,6 +55,8 @@ func CredentialsSnapshot() (bool, []Account) {
 }
 
 func ReplaceCredentials(loaded bool, accounts []Account) error {
+	credLock.Lock()
+	defer credLock.Unlock()
 	snapshot := make([]Account, len(accounts))
 	copy(snapshot, accounts)
 
@@ -85,10 +80,8 @@ func ReplaceCredentials(loaded bool, accounts []Account) error {
 		}
 	}
 
-	credLock.Lock()
 	credentials = snapshot
 	credLoaded = loaded
-	credLock.Unlock()
 	return nil
 }
 

@@ -206,6 +206,10 @@ go build -o kiro-proxy .
 
 ---
 
+Request bodies are limited to 32 MiB, both on the wire and after each decompression layer. Up to three encoding layers are accepted. Oversized requests return HTTP 413; saturated body processing returns HTTP 503 with `Retry-After`. Body reads have a 30-second deadline.
+
+Admin password authentication allows five failed attempts per client IP per minute and 30 globally per minute, across sign-in and `X-Admin-Password` requests. Further attempts return HTTP 429 with `Retry-After`; existing session tokens continue working. Forwarded IP headers are not trusted, so clients behind the same reverse proxy share its IP budget. Successful password checks do not consume the failure budget. Backup restores preserve an active `ADMIN_PASSWORD` override.
+
 ## 🔧 Configuration
 
 | Variable         | Purpose                                   | Default            |

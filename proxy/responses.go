@@ -248,6 +248,7 @@ func convertResponsesTool(tool OpenAIResponsesTool, namespace string) ([]OpenAIT
 	}
 
 	var converted OpenAITool
+	converted.HostedWebSearch = isHostedWebSearchToolType(toolType)
 	converted.Type = "function"
 	converted.Function.Name = qualifiedResponsesToolName(namespace, name)
 	converted.Function.Description = description

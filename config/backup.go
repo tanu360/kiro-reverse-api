@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -117,9 +118,8 @@ func currentBackupData() ([]byte, int, string, bool, int, error) {
 	if cfg.Backup.AutoKeep > 0 {
 		autoKeep = cfg.Backup.AutoKeep
 	}
-	cfgLock.RUnlock()
-
 	credentialsLoaded, credentialsSnapshot := CredentialsSnapshot()
+	cfgLock.RUnlock()
 	data, count, version, includesCredentials, err := backupDataFromSnapshot(configSnapshot, credentialsLoaded, credentialsSnapshot, time.Now().Unix())
 	return data, count, version, includesCredentials, autoKeep, err
 }
@@ -443,19 +443,59 @@ func validateRestoredConfig(c Config) error {
 }
 
 func writeRestoredConfig(parsed *parsedBackup) error {
-	// Restoring an installation must not reopen its public first-run disclosure.
-	parsed.config.FirstRunPasswordPending = false
-	configData, err := json.Marshal(parsed.config)
+	restored := parsed.config
+	restored.FirstRunPasswordPending = false
+	if password := os.Getenv("ADMIN_PASSWORD"); password != "" {
+		restored.Password = password
+	}
+	configData, err := json.Marshal(restored)
 	if err != nil {
 		return err
 	}
-	if err := setSetting("config", string(configData)); err != nil {
+	snapshot := append([]Account(nil), parsed.credentials...)
+	credentialData, err := json.Marshal(snapshot)
+	if err != nil {
 		return err
 	}
-	if err := ReplaceCredentials(parsed.credentialsLoaded, parsed.credentials); err != nil {
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	credLock.Lock()
+	defer credLock.Unlock()
+	d, err := db.Get()
+	if err != nil {
 		return err
 	}
-	return reloadFromDisk()
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	put := func(key, value string) error {
+		_, err := tx.Exec(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
+		return err
+	}
+	if err := put("config", string(configData)); err != nil {
+		return err
+	}
+	flag := "0"
+	if parsed.credentialsLoaded {
+		flag = "1"
+		if err := put(credentialsKey, string(credentialData)); err != nil {
+			return err
+		}
+	} else if _, err := tx.Exec(`DELETE FROM settings WHERE key=?`, credentialsKey); err != nil {
+		return err
+	}
+	if err := put(credentialsLoadedKey, flag); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	cfg = &restored
+	credentials = snapshot
+	credLoaded = parsed.credentialsLoaded
+	return nil
 }
 
 func restoredAccountCount(parsed *parsedBackup) int {

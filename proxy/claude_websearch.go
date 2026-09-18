@@ -491,7 +491,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest {
+	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
 		account := h.pickAccount(payload, req.Model, excluded)
 		if account == nil {
 			break

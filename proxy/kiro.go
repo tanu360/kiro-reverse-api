@@ -151,6 +151,7 @@ func InitKiroHttpClient(proxyURL string) {
 }
 
 type KiroPayload struct {
+	HostedSearchTools map[string]bool `json:"-"`
 	ConversationState struct {
 		AgentContinuationId string `json:"agentContinuationId,omitempty"`
 		AgentTaskType       string `json:"agentTaskType,omitempty"`
@@ -423,6 +424,9 @@ endpointLoop:
 				errBody, _ := io.ReadAll(resp.Body)
 				resp.Body.Close()
 				lastErr = fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, ep.Name, string(errBody))
+				if isClientHTTPStatus(resp.StatusCode) {
+					return &upstreamClientError{status: resp.StatusCode, message: lastErr.Error()}
+				}
 				if resp.StatusCode == http.StatusTooManyRequests {
 					delay := retryAfterDuration(resp.Header.Get("Retry-After"), time.Now())
 					if quotaErr == nil || delay > quotaErr.retryFor {

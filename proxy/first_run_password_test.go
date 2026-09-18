@@ -38,7 +38,7 @@ func TestFirstRunPasswordShownUntilFirstSignIn(t *testing.T) {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatal(err)
 	}
-	h := NewHandler()
+	h := newHandlerWithoutBackgroundForTest(t)
 
 	shown := firstRunPassword(t, h)
 	if shown == "" || shown != config.GetPassword() {
@@ -82,7 +82,7 @@ func TestFirstRunPasswordNeverShownForChosenPassword(t *testing.T) {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatal(err)
 	}
-	if got := firstRunPassword(t, NewHandler()); got != "" {
+	if got := firstRunPassword(t, newHandlerWithoutBackgroundForTest(t)); got != "" {
 		t.Fatalf("an ADMIN_PASSWORD value was shown on the login page: %q", got)
 	}
 }
@@ -94,7 +94,7 @@ func TestFirstRunPasswordHiddenAfterEnvOverride(t *testing.T) {
 	}
 	//! main applies ADMIN_PASSWORD after Load; the page must not then show that value.
 	config.SetPassword("operator-chosen")
-	if got := firstRunPassword(t, NewHandler()); got != "" {
+	if got := firstRunPassword(t, newHandlerWithoutBackgroundForTest(t)); got != "" {
 		t.Fatalf("an ADMIN_PASSWORD override was shown on the login page: %q", got)
 	}
 }

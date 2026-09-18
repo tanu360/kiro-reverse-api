@@ -51,7 +51,7 @@ func TestBackupRestoreRevokesSessionsAndKeepsPasswordPrivate(t *testing.T) {
 			if err := config.UpdateSettingsPatch(nil, "replacement-password"); err != nil {
 				t.Fatal(err)
 			}
-			h := NewHandler()
+			h := newHandlerWithoutBackgroundForTest(t)
 			token, _, err := h.adminSessions.Issue()
 			if err != nil {
 				t.Fatal(err)

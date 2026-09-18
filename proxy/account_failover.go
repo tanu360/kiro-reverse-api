@@ -37,6 +37,9 @@ func newRequestRetryPlan() requestRetryPlan {
 }
 
 func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalAttempts int) bool {
+	if isUpstreamClientError(err) {
+		return false
+	}
 	if err == nil || accountAttempt+1 >= rp.maxPerAccount || totalAttempts >= rp.maxPerRequest || isContextCanceledError(err) {
 		return false
 	}
@@ -44,6 +47,9 @@ func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalA
 }
 
 func (rp requestRetryPlan) shouldBackoffBeforeNextAccount(err error, totalAttempts int) bool {
+	if isUpstreamClientError(err) {
+		return false
+	}
 	if err == nil || totalAttempts >= rp.maxPerRequest || isContextCanceledError(err) {
 		return false
 	}
@@ -162,7 +168,7 @@ func (h *Handler) handleBackgroundAccountFailure(account *config.Account, err er
 
 func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 	//! A client disconnect or an upstream stream hiccup says nothing about the account's health.
-	if account == nil || err == nil || isStreamIntegrityError(err) || isContextCanceledError(err) {
+	if account == nil || err == nil || isUpstreamClientError(err) || isStreamIntegrityError(err) || isContextCanceledError(err) {
 		return
 	}
 

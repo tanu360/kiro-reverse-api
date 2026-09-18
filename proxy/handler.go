@@ -27,7 +27,8 @@ import (
 const tokenRefreshSkewSeconds int64 = 120
 
 type Handler struct {
-	pool *pool.AccountPool
+	adminGuesses adminGuessLimiter
+	pool         *pool.AccountPool
 
 	startTime      int64
 	stopRefresh    chan struct{}
@@ -328,9 +329,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r = withRequestTrace(r, endpoint)
 	}
 
-	if err := decompressRequestBody(r); err != nil {
+	controller := http.NewResponseController(w)
+	_ = controller.SetReadDeadline(time.Now().Add(30 * time.Second))
+	bodyErr := decompressRequestBody(r)
+	_ = controller.SetReadDeadline(time.Time{})
+	if err := bodyErr; err != nil {
 		logger.Warnf("[HTTP] decompress failed: %v", err)
-		http.Error(w, "Invalid Content-Encoding", http.StatusBadRequest)
+		status := http.StatusBadRequest
+		if errors.Is(err, errRequestBodyTooLarge) {
+			status = http.StatusRequestEntityTooLarge
+		}
+		if errors.Is(err, errRequestBodyBusy) {
+			status = http.StatusServiceUnavailable
+			w.Header().Set("Retry-After", "1")
+		}
+		http.Error(w, err.Error(), status)
 		return
 	}
 
@@ -938,7 +951,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest {
+	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
 		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
@@ -1439,7 +1452,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest {
+	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
 		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
@@ -1671,7 +1684,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest {
+	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
 		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
@@ -1982,7 +1995,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				},
 			}
 
-			err := CallKiroAPIContext(r.Context(), account, payload, callback)
+			err := callKiroWithHostedSearch(r.Context(), account, payload, callback)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -2084,7 +2097,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest {
+	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
 		account := h.pickAccount(payload, model, excluded)
 		if account == nil {
 			break
@@ -2137,7 +2150,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				},
 			}
 
-			err := CallKiroAPIContext(r.Context(), account, payload, callback)
+			err := callKiroWithHostedSearch(r.Context(), account, payload, callback)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -2155,30 +2168,6 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 				}
 				break
-			}
-			if allWebSearchToolUses(toolUses) {
-				webSearchToolUses := append([]KiroToolUse(nil), toolUses...)
-				results, err := resolveWebSearchToolResults(r.Context(), account, webSearchToolUses)
-				if err != nil {
-					lastErr = err
-					lastAccount = account
-					break
-				}
-				toolUses = nil
-				upstreamStopReason = ""
-				followupPayload := buildWebSearchFollowupPayload(payload, webSearchToolUses, results)
-				err = CallKiroAPIContext(r.Context(), account, followupPayload, callback)
-				if err != nil {
-					if isContextCanceledError(err) {
-						recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
-						return
-					}
-					lastErr = err
-					lastAccount = account
-					h.handleAccountFailure(account, err)
-					recordAttemptError(account, model, 0, err)
-					break
-				}
 			}
 
 			finalContent, extractedReasoning := extractThinkingFromContent(content)
@@ -2300,6 +2289,9 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Get("X-Admin-Token") == "" && r.Header.Get("X-Admin-Password") != "" && !h.checkAdminPassword(w, r, r.Header.Get("X-Admin-Password")) {
+		return
+	}
 	if !h.authorizeAdmin(r, path) {
 		w.WriteHeader(401)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
@@ -2647,7 +2639,7 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-func (h *Handler) apiGetAccountOverage(w http.ResponseWriter, _ *http.Request, id string) {
+func (h *Handler) apiGetAccountOverage(w http.ResponseWriter, r *http.Request, id string) {
 	account := findAccountByID(id)
 	if account == nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -2655,6 +2647,11 @@ func (h *Handler) apiGetAccountOverage(w http.ResponseWriter, _ *http.Request, i
 		return
 	}
 
+	if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
 	snap, err := FetchOverageStatus(account)
 	if err != nil {
 		w.WriteHeader(http.StatusBadGateway)
@@ -2690,6 +2687,11 @@ func (h *Handler) apiSetAccountOverage(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 
+	if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
 	snap, err := SetOverageStatus(account, body.Enabled)
 	if err != nil {
 		w.WriteHeader(http.StatusBadGateway)
@@ -3574,6 +3576,7 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 
+	defer h.pool.Reload()
 	refreshTokenIfNeeded := func() error {
 		if account.RefreshToken == "" {
 			return nil
@@ -3589,12 +3592,13 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id s
 		}
 	}
 
-	info, err := RefreshAccountInfo(account)
+	info, err := refreshAccountInfo(account, false)
 	if err != nil {
 
 		errMsg := err.Error()
 		errMsgLower := strings.ToLower(errMsg)
 		if strings.Contains(errMsg, "TEMPORARILY_SUSPENDED") || strings.Contains(errMsgLower, "account suspended") {
+			h.handleBackgroundAccountFailure(account, err)
 
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": true,
@@ -3606,11 +3610,12 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id s
 		if strings.Contains(errMsg, "403") || strings.Contains(errMsg, "401") || strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "expired") {
 			if refreshErr := refreshTokenIfNeeded(); refreshErr == nil {
 
-				info, err = RefreshAccountInfo(account)
+				info, err = refreshAccountInfo(account, false)
 				if err != nil {
 
 					retryErrMsg := err.Error()
 					if strings.Contains(retryErrMsg, "TEMPORARILY_SUSPENDED") || strings.Contains(strings.ToLower(retryErrMsg), "account suspended") {
+						h.handleBackgroundAccountFailure(account, err)
 						json.NewEncoder(w).Encode(map[string]interface{}{
 							"success": true,
 							"message": "Account status updated",
@@ -3622,6 +3627,7 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id s
 		}
 
 		if err != nil {
+			h.handleBackgroundAccountFailure(account, err)
 			w.WriteHeader(500)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
@@ -3722,7 +3728,7 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 	json.NewEncoder(w).Encode(result)
 }
 
-func (h *Handler) apiGetAccountModels(w http.ResponseWriter, _ *http.Request, id string) {
+func (h *Handler) apiGetAccountModels(w http.ResponseWriter, r *http.Request, id string) {
 	accounts := config.GetAccounts()
 	var account *config.Account
 	for i := range accounts {
@@ -3738,6 +3744,11 @@ func (h *Handler) apiGetAccountModels(w http.ResponseWriter, _ *http.Request, id
 		return
 	}
 
+	if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
 	models, err := ListAvailableModels(account)
 	if err != nil {
 		w.WriteHeader(500)
@@ -4071,56 +4082,63 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 }
 
 func decompressRequestBody(r *http.Request) error {
-	if r.Body == nil {
+	if r.Body == nil || r.Body == http.NoBody {
 		return nil
 	}
-	enc := strings.TrimSpace(strings.ToLower(r.Header.Get("Content-Encoding")))
-	if enc == "" || enc == "identity" {
-		return nil
+	encodings := strings.Split(strings.ToLower(r.Header.Get("Content-Encoding")), ",")
+	if len(encodings) > 3 {
+		return fmt.Errorf("too many Content-Encoding layers")
 	}
-	encodings := strings.Split(enc, ",")
-	for i := len(encodings) - 1; i >= 0; i-- {
-		layer := strings.TrimSpace(encodings[i])
-		if layer == "" || layer == "identity" {
-			continue
-		}
-		raw, err := io.ReadAll(r.Body)
-		_ = r.Body.Close()
-		if err != nil {
-			return err
-		}
-		var decoded []byte
-		switch layer {
-		case "gzip", "x-gzip":
-			zr, gerr := gzip.NewReader(bytes.NewReader(raw))
-			if gerr != nil {
-				return gerr
-			}
-			decoded, err = io.ReadAll(zr)
-			zr.Close()
-		case "deflate":
-			zr, zerr := zlib.NewReader(bytes.NewReader(raw))
-			if zerr != nil {
-				return zerr
-			}
-			decoded, err = io.ReadAll(zr)
-			zr.Close()
-		case "zstd":
-			zr, zerr := zstd.NewReader(bytes.NewReader(raw))
-			if zerr != nil {
-				return zerr
-			}
-			decoded, err = io.ReadAll(zr)
-			zr.Close()
+	for _, encoding := range encodings {
+		switch strings.TrimSpace(encoding) {
+		case "", "identity", "gzip", "x-gzip", "deflate", "zstd":
 		default:
-			return fmt.Errorf("unsupported Content-Encoding: %s", layer)
+			return fmt.Errorf("unsupported Content-Encoding: %s", encoding)
+		}
+	}
+	select {
+	case requestBodySlots <- struct{}{}:
+		defer func() { <-requestBodySlots }()
+	default:
+		return errRequestBodyBusy
+	}
+	raw, err := readRequestBody(r.Body)
+	_ = r.Body.Close()
+	if err != nil {
+		return err
+	}
+	for i := len(encodings) - 1; i >= 0; i-- {
+		switch strings.TrimSpace(encodings[i]) {
+		case "", "identity":
+			continue
+		case "gzip", "x-gzip":
+			reader, e := gzip.NewReader(bytes.NewReader(raw))
+			if e != nil {
+				return e
+			}
+			raw, err = readRequestBody(reader)
+			reader.Close()
+		case "deflate":
+			reader, e := zlib.NewReader(bytes.NewReader(raw))
+			if e != nil {
+				return e
+			}
+			raw, err = readRequestBody(reader)
+			reader.Close()
+		case "zstd":
+			reader, e := zstd.NewReader(bytes.NewReader(raw), zstd.WithDecoderMaxMemory(uint64(maxRequestBodyBytes)), zstd.WithDecoderConcurrency(1))
+			if e != nil {
+				return e
+			}
+			raw, err = readRequestBody(reader)
+			reader.Close()
 		}
 		if err != nil {
 			return err
 		}
-		r.Body = io.NopCloser(bytes.NewReader(decoded))
-		r.ContentLength = int64(len(decoded))
 	}
+	r.Body = io.NopCloser(bytes.NewReader(raw))
+	r.ContentLength = int64(len(raw))
 	r.Header.Del("Content-Encoding")
 	r.Header.Del("Content-Length")
 	return nil

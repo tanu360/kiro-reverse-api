@@ -107,13 +107,44 @@ func buildWebSearchFollowupPayload(base *KiroPayload, toolUses []KiroToolUse, re
 	next := *base
 	current := base.ConversationState.CurrentMessage.UserInputMessage
 	historyUser := current
-	historyUser.UserInputMessageContext = nil
-	history := append([]KiroHistoryMessage(nil), base.ConversationState.History...)
+	if current.UserInputMessageContext != nil {
+		contextCopy := *current.UserInputMessageContext
+		historyUser.UserInputMessageContext = &contextCopy
+	}
+	history := make([]KiroHistoryMessage, len(base.ConversationState.History))
+	for i, message := range base.ConversationState.History {
+		history[i] = message
+		if message.AssistantResponseMessage != nil {
+			copied := *message.AssistantResponseMessage
+			history[i].AssistantResponseMessage = &copied
+		}
+		if message.UserInputMessage != nil {
+			copied := *message.UserInputMessage
+			if copied.UserInputMessageContext != nil {
+				ctxCopy := *copied.UserInputMessageContext
+				copied.UserInputMessageContext = &ctxCopy
+			}
+			history[i].UserInputMessage = &copied
+		}
+	}
+	historyTools := append([]KiroToolUse(nil), toolUses...)
+	for i := range historyTools {
+		for upstream, original := range base.ToolNameMap {
+			if historyTools[i].Name == original {
+				historyTools[i].Name = upstream
+				break
+			}
+		}
+	}
 	history = append(history,
 		KiroHistoryMessage{UserInputMessage: &historyUser},
-		KiroHistoryMessage{AssistantResponseMessage: &KiroAssistantResponseMessage{ToolUses: toolUses}},
+		KiroHistoryMessage{AssistantResponseMessage: &KiroAssistantResponseMessage{ToolUses: historyTools}},
 	)
-	next.ConversationState.History = history
+	ids := make(map[string]bool, len(results))
+	for _, result := range results {
+		ids[result.ToolUseID] = true
+	}
+	next.ConversationState.History = sanitizeKiroHistory(history, ids)
 	next.ConversationState.CurrentMessage.UserInputMessage = KiroUserInputMessage{
 		Content: buildToolResultsContinuation(results),
 		ModelID: current.ModelID,
@@ -313,4 +344,91 @@ func scalarString(v interface{}) string {
 	default:
 		return fmt.Sprint(t)
 	}
+}
+
+// Hosted tools never reach the client as executable function calls. Text still
+// streams normally; tool calls are held until the upstream turn is complete.
+func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
+	if len(payload.HostedSearchTools) == 0 {
+		return CallKiroAPIContext(ctx, account, payload, callback)
+	}
+	const maxRounds = 5
+	next := payload
+	totalIn, totalOut := 0, 0
+	totalCredits := 0.0
+	for round := 0; round <= maxRounds; round++ {
+		var tools []KiroToolUse
+		stop := ""
+		cb := *callback
+		cb.OnToolUse = func(tu KiroToolUse) { tools = append(tools, tu) }
+		cb.OnComplete = func(in, out int) { totalIn += in; totalOut += out }
+		cb.OnCredits = func(c float64) { totalCredits += c }
+		cb.OnStopReason = func(reason string) { stop = reason }
+		if err := CallKiroAPIContext(ctx, account, next, &cb); err != nil {
+			return err
+		}
+		var searches, clientTools []KiroToolUse
+		for _, tu := range tools {
+			if payload.HostedSearchTools[tu.Name] {
+				searches = append(searches, tu)
+			} else {
+				clientTools = append(clientTools, tu)
+			}
+		}
+		if len(searches) == 0 {
+			for _, tu := range clientTools {
+				if callback.OnToolUse != nil {
+					callback.OnToolUse(tu)
+				}
+			}
+			if callback.OnComplete != nil {
+				callback.OnComplete(totalIn, totalOut)
+			}
+			if callback.OnCredits != nil {
+				callback.OnCredits(totalCredits)
+			}
+			if callback.OnStopReason != nil {
+				callback.OnStopReason(stop)
+			}
+			return nil
+		}
+		if round == maxRounds {
+			return fmt.Errorf("hosted web search exceeded %d rounds", maxRounds)
+		}
+		canonicalSearches := append([]KiroToolUse(nil), searches...)
+		for i := range canonicalSearches {
+			canonicalSearches[i].Name = webSearchToolName
+		}
+		results, err := resolveWebSearchToolResults(ctx, account, canonicalSearches)
+		if err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if len(clientTools) > 0 {
+			// Client tools must return before another upstream turn can complete them.
+			// Include completed hosted results in text and expose only client-owned calls.
+			if callback.OnText != nil {
+				callback.OnText(buildToolResultsContinuation(results), false)
+			}
+			for _, tu := range clientTools {
+				if callback.OnToolUse != nil {
+					callback.OnToolUse(tu)
+				}
+			}
+			if callback.OnComplete != nil {
+				callback.OnComplete(totalIn, totalOut)
+			}
+			if callback.OnCredits != nil {
+				callback.OnCredits(totalCredits)
+			}
+			if callback.OnStopReason != nil {
+				callback.OnStopReason(stop)
+			}
+			return nil
+		}
+		next = buildWebSearchFollowupPayload(next, searches, results)
+	}
+	return nil
 }

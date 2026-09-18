@@ -15,7 +15,7 @@ func TestBackgroundFailureIgnoresTransientErrors(t *testing.T) {
 	if err := config.AddAccount(config.Account{ID: "acct", Email: "a@example.com", Enabled: true}); err != nil {
 		t.Fatalf("AddAccount: %v", err)
 	}
-	h := NewHandler()
+	h := newHandlerWithoutBackgroundForTest(t)
 	account := &config.Account{ID: "acct", Email: "a@example.com", Enabled: true}
 
 	for _, err := range []error{
@@ -45,7 +45,7 @@ func TestBackgroundFailureStillHandlesTerminalErrors(t *testing.T) {
 	if err := config.AddAccount(config.Account{ID: "acct", Email: "a@example.com", Enabled: true}); err != nil {
 		t.Fatalf("AddAccount: %v", err)
 	}
-	h := NewHandler()
+	h := newHandlerWithoutBackgroundForTest(t)
 	account := &config.Account{ID: "acct", Email: "a@example.com", Enabled: true}
 
 	h.handleBackgroundAccountFailure(account, errors.New("token refresh failed: invalid_grant"))
