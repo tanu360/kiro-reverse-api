@@ -268,6 +268,13 @@ func Load() error {
 		return err
 	}
 	cfg = &c
+	shortened, err := shortenPendingAdminPasswordLocked()
+	if err != nil {
+		return err
+	}
+	if shortened {
+		log.Printf("Generated first-run admin password: %s", cfg.Password)
+	}
 	return nil
 }
 

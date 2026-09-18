@@ -202,7 +202,7 @@ go build -o kiro-proxy .
 ```
 
 > [!TIP]
-> 首次运行会自动创建 `kiro.db`。可通过 `DATA_DIR` 指定存储目录；Docker 使用 `/app/state`。通过 `ADMIN_PASSWORD` 设置管理密码；未设置时，首次启动会生成并保存随机密码，仅在启动日志中显示一次。Docker 用户可运行 `docker compose logs kiro-proxy` 查看。重启后保留已保存的密码。
+> 首次运行会自动创建 `kiro.db`。可通过 `DATA_DIR` 指定存储目录；Docker 使用 `/app/state`。通过 `ADMIN_PASSWORD` 设置管理密码；未设置时，首次启动会生成并保存 8 位随机数字密码，在启动日志中显示一次，并在登录页面显示至首次成功登录。Docker 用户可运行 `docker compose logs kiro-proxy` 查看。重启后保留已保存的密码。旧版本生成且尚未用于登录的 48 字符密码会一次性替换为 8 位数字密码；已用于登录或显式设置的密码保持不变。
 
 ---
 

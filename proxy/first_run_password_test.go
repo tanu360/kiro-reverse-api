@@ -5,6 +5,7 @@ import (
 	"kiro-proxy/config"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -42,6 +43,9 @@ func TestFirstRunPasswordShownUntilFirstSignIn(t *testing.T) {
 	shown := firstRunPassword(t, h)
 	if shown == "" || shown != config.GetPassword() {
 		t.Fatalf("login page did not show the generated password: %q", shown)
+	}
+	if !regexp.MustCompile(`^[0-9]{8}$`).MatchString(shown) {
+		t.Fatal("first-run endpoint must return an eight-digit password")
 	}
 
 	//! A restart before anyone signs in must not lose the only copy the owner can see.

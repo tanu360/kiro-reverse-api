@@ -3427,7 +3427,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//! A password change must actually lock out whoever held the old one.
-	if strings.TrimSpace(req.Password) != "" {
+	if req.Password != "" {
 		h.adminSessions.RevokeAll()
 	}
 
