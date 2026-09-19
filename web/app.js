@@ -693,22 +693,40 @@
       if (!await createSession(supplied, !!(remember && remember.checked))) {
         return toast(t('login.error'), 'error');
       }
+      if (remember && remember.checked) saveBrowserPassword(supplied);
       $('pwdField').value = '';
       showMain(); loadData();
     } catch (e) {
       toast(t('login.connectError'), 'error');
     }
   }
+  //! The Credential Management API asks the browser's password manager directly,
+  //! so saving does not depend on its form-submit heuristics. Chromium only and
+  //! only in a secure context (HTTPS or localhost); elsewhere autocomplete applies.
+  function saveBrowserPassword(password) {
+    if (!window.PasswordCredential || !navigator.credentials) return;
+    try {
+      navigator.credentials.store(new PasswordCredential({ id: 'admin', password, name: 'Kiro admin' })).catch(() => { });
+    } catch (e) { }
+  }
+  async function fillBrowserPassword() {
+    if (!window.PasswordCredential || !navigator.credentials) return;
+    try {
+      const cred = await navigator.credentials.get({ password: true, mediation: 'silent' });
+      const field = $('pwdField');
+      if (cred && cred.password && field && !field.value) field.value = cred.password;
+    } catch (e) { }
+  }
   function initRememberMe() {
     const remember = $('rememberPwd');
     if (!remember) return;
     remember.checked = localStorage.getItem('kiro_remember') === '1';
+    if (remember.checked && !adminToken) fillBrowserPassword();
   }
   async function logout() {
     stopAdminEvents();
     if (adminToken) { try { await api('/session', { method: 'DELETE' }); } catch (e) { } }
     clearSession();
-    localStorage.removeItem('kiro_remember');
     location.reload();
   }
   function showMain() {
@@ -3309,8 +3327,7 @@
     else if (tab === 'backups') loadBackups();
   }
   function bindLoginEvents() {
-    $('loginBtn').addEventListener('click', login);
-    $('pwdField').addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
+    $('loginForm').addEventListener('submit', e => { e.preventDefault(); login(); });
 
     const pwdToggle = $('pwdToggle');
     if (pwdToggle) {

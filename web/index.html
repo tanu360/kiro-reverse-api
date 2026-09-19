@@ -103,7 +103,8 @@
       </div>
     </header>
     <main class="login-main">
-      <div class="login-box">
+      <form class="login-box" id="loginForm" action="#" method="post" autocomplete="on">
+        <input type="text" name="username" autocomplete="username" value="admin" hidden readonly />
         <h1 class="login-title" data-i18n="login.title"></h1>
         <p class="login-subtitle" data-i18n="login.subtitle"></p>
         <div class="login-first-run hidden" id="firstRunPassword">
@@ -114,7 +115,7 @@
           <label data-i18n="login.password"></label>
           <div class="input-affix">
             <i class="fa-solid fa-lock affix-icon"></i>
-            <input type="password" id="pwdField" data-i18n-placeholder="login.passwordPlaceholder" autocomplete="off" />
+            <input type="password" id="pwdField" name="password" data-i18n-placeholder="login.passwordPlaceholder" autocomplete="current-password" />
             <button type="button" class="affix-btn" id="pwdToggle" aria-label=""
               data-i18n-aria-label="login.showPassword" data-shown="false">
               <i class="fa-solid fa-eye"></i>
@@ -126,7 +127,7 @@
           <span class="remember-box" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
           <span class="remember-label" data-i18n="login.remember"></span>
         </label>
-        <button type="button" class="btn btn-primary btn-lg w-full" id="loginBtn">
+        <button type="submit" class="btn btn-primary btn-lg w-full" id="loginBtn">
           <i class="fa-solid fa-arrow-right-to-bracket"></i>
           <span data-i18n="login.submit"></span>
         </button>
@@ -137,7 +138,7 @@
                 data-i18n="login.compatAnthropic"></span></span>
           </div>
         </div>
-      </div>
+      </form>
     </main>
   </div>
 
