@@ -766,10 +766,52 @@ func ensureObjectSchema(schema interface{}) interface{} {
 	}
 	cleaned := cloneSchemaMap(m)
 	cleanSchema(cleaned)
+	//! Anthropic rejects oneOf/allOf/anyOf at the schema root ("input_schema does not
+	//! support oneOf, allOf, or anyOf at the top level"); flatten them into properties.
+	flattenTopLevelComposition(cleaned)
 	if _, hasType := cleaned["type"]; !hasType {
 		cleaned["type"] = "object"
 	}
 	return cleaned
+}
+
+//! flattenTopLevelComposition lifts oneOf/anyOf/allOf branch properties to the root
+//! and drops the composition keyword. Nested composition (inside properties) is left
+//! untouched since Anthropic only forbids it at the top level.
+func flattenTopLevelComposition(m map[string]interface{}) {
+	for _, keyword := range []string{"oneOf", "anyOf", "allOf"} {
+		branches, ok := m[keyword].([]interface{})
+		if !ok {
+			delete(m, keyword)
+			continue
+		}
+		mergeBranchesIntoRoot(m, branches)
+		delete(m, keyword)
+	}
+	m["type"] = "object"
+}
+
+func mergeBranchesIntoRoot(root map[string]interface{}, branches []interface{}) {
+	props, _ := root["properties"].(map[string]interface{})
+	if props == nil {
+		props = map[string]interface{}{}
+	}
+	for _, b := range branches {
+		branch, ok := b.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if bp, ok := branch["properties"].(map[string]interface{}); ok {
+			for name, spec := range bp {
+				if _, exists := props[name]; !exists {
+					props[name] = spec
+				}
+			}
+		}
+	}
+	if len(props) > 0 {
+		root["properties"] = props
+	}
 }
 
 func cloneSchemaMap(m map[string]interface{}) map[string]interface{} {

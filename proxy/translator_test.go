@@ -338,6 +338,45 @@ func TestEnsureObjectSchemaRemovesKiroRejectedFieldsRecursively(t *testing.T) {
 	}
 }
 
+func TestEnsureObjectSchemaFlattensTopLevelComposition(t *testing.T) {
+	input := map[string]interface{}{
+		"oneOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"command": map[string]interface{}{"type": "string"},
+				},
+			},
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"patch": map[string]interface{}{"type": "string"},
+				},
+			},
+		},
+	}
+
+	got := ensureObjectSchema(input).(map[string]interface{})
+	for _, kw := range []string{"oneOf", "anyOf", "allOf"} {
+		if _, present := got[kw]; present {
+			t.Fatalf("expected %s removed from top level, got %#v", kw, got)
+		}
+	}
+	if got["type"] != "object" {
+		t.Fatalf("expected type object, got %#v", got["type"])
+	}
+	props, ok := got["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected merged properties, got %#v", got)
+	}
+	if _, ok := props["command"]; !ok {
+		t.Fatalf("expected command property lifted, got %#v", props)
+	}
+	if _, ok := props["patch"]; !ok {
+		t.Fatalf("expected patch property lifted, got %#v", props)
+	}
+}
+
 func TestConvertOpenAIToolsSanitizesSchemaAndDescription(t *testing.T) {
 	var tool OpenAITool
 	tool.Type = "function"
