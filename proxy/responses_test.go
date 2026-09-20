@@ -738,3 +738,169 @@ func writeKiroTextResponse(t *testing.T, w http.ResponseWriter, text string) {
 		awsEventStreamFrame(t, "meteringEvent", map[string]interface{}{"usage": 0.01}),
 	}, nil))
 }
+
+func TestResponsesStreamEmitsReasoningSummaryEvents(t *testing.T) {
+	h := newResponsesTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bytes.Join([][]byte{
+			awsEventStreamFrame(t, "reasoningContentEvent", map[string]interface{}{"text": "step one "}),
+			awsEventStreamFrame(t, "reasoningContentEvent", map[string]interface{}{"text": "step two"}),
+			awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "final answer"}),
+			awsEventStreamFrame(t, "contextUsageEvent", map[string]interface{}{"contextUsagePercentage": 1}),
+			awsEventStreamFrame(t, "meteringEvent", map[string]interface{}{"usage": 0.01}),
+		}, nil))
+	})
+
+	rec := httptest.NewRecorder()
+	body := `{"model":"claude-sonnet-4.5","input":"hi","stream":true,"store":false,"reasoning":{"effort":"high"}}`
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stream status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	events := parseResponsesSSE(t, rec.Body.String())
+	var reasoningAdded, reasoningDone, partAdded, summaryDone, completed map[string]interface{}
+	var deltas []string
+	for _, event := range events {
+		switch event.Name {
+		case "response.output_item.added":
+			if item := responseSSEMap(t, event.Data["item"]); item["type"] == "reasoning" {
+				reasoningAdded = event.Data
+			}
+		case "response.output_item.done":
+			if item := responseSSEMap(t, event.Data["item"]); item["type"] == "reasoning" {
+				reasoningDone = event.Data
+			}
+		case "response.reasoning_summary_part.added":
+			partAdded = event.Data
+		case "response.reasoning_summary_text.delta":
+			text, _ := event.Data["delta"].(string)
+			deltas = append(deltas, text)
+		case "response.reasoning_summary_text.done":
+			summaryDone = event.Data
+		case "response.completed":
+			completed = event.Data
+		}
+	}
+	if reasoningAdded == nil || reasoningDone == nil || partAdded == nil || summaryDone == nil || completed == nil {
+		t.Fatalf("missing reasoning stream events: %#v", events)
+	}
+	if got := strings.Join(deltas, ""); got != "step one step two" {
+		t.Fatalf("expected streamed reasoning deltas, got %q", got)
+	}
+	if got := responseSSEInt(t, reasoningAdded["output_index"]); got != 0 {
+		t.Fatalf("expected reasoning to lead output at index 0, got %d", got)
+	}
+	if got, _ := summaryDone["text"].(string); got != "step one step two" {
+		t.Fatalf("expected reasoning summary done text, got %q", got)
+	}
+
+	doneItem := responseSSEMap(t, reasoningDone["item"])
+	summary, ok := doneItem["summary"].([]interface{})
+	if !ok || len(summary) != 1 {
+		t.Fatalf("expected one summary part on reasoning item, got %#v", doneItem["summary"])
+	}
+	part := responseSSEMap(t, summary[0])
+	if part["type"] != "summary_text" || part["text"] != "step one step two" {
+		t.Fatalf("expected summary_text part with reasoning, got %#v", part)
+	}
+	if _, isArray := doneItem["content"].([]interface{}); !isArray {
+		t.Fatalf("expected reasoning content to be an array, got %#v", doneItem["content"])
+	}
+
+	response := responseSSEMap(t, completed["response"])
+	output, ok := response["output"].([]interface{})
+	if !ok || len(output) == 0 {
+		t.Fatalf("expected completed output items, got %#v", response["output"])
+	}
+	first := responseSSEMap(t, output[0])
+	if first["type"] != "reasoning" {
+		t.Fatalf("expected reasoning first in completed output, got %#v", first["type"])
+	}
+	if firstSummary, ok := first["summary"].([]interface{}); !ok || len(firstSummary) != 1 {
+		t.Fatalf("expected completed reasoning item to carry summary, got %#v", first["summary"])
+	}
+}
+
+func TestResponsesStreamRoutesInlineThinkingTagsToReasoning(t *testing.T) {
+	h := newResponsesTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		//! Kiro splits inline thinking tags across chunks; the tag must survive reassembly.
+		frames := [][]byte{}
+		for _, chunk := range []string{"<think", "ing>plan the ", "answer</think", "ing>\n\nHello ", "world"} {
+			frames = append(frames, awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": chunk}))
+		}
+		frames = append(frames, awsEventStreamFrame(t, "meteringEvent", map[string]interface{}{"usage": 0.01}))
+		_, _ = w.Write(bytes.Join(frames, nil))
+	})
+
+	rec := httptest.NewRecorder()
+	body := `{"model":"claude-sonnet-4.5","input":"hi","stream":true,"store":false,"reasoning":{"effort":"medium","summary":"auto"}}`
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stream status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	events := parseResponsesSSE(t, rec.Body.String())
+	var reasoningDeltas, textDeltas []string
+	var textDone string
+	var reasoningDone map[string]interface{}
+	for _, event := range events {
+		switch event.Name {
+		case "response.reasoning_summary_text.delta":
+			delta, _ := event.Data["delta"].(string)
+			reasoningDeltas = append(reasoningDeltas, delta)
+		case "response.output_text.delta":
+			delta, _ := event.Data["delta"].(string)
+			textDeltas = append(textDeltas, delta)
+		case "response.output_text.done":
+			textDone, _ = event.Data["text"].(string)
+		case "response.output_item.done":
+			if item := responseSSEMap(t, event.Data["item"]); item["type"] == "reasoning" {
+				reasoningDone = event.Data
+			}
+		}
+	}
+
+	if got := strings.Join(reasoningDeltas, ""); got != "plan the answer" {
+		t.Fatalf("expected inline thinking streamed as reasoning, got %q", got)
+	}
+	streamedText := strings.Join(textDeltas, "")
+	if streamedText != "Hello world" {
+		t.Fatalf("expected answer text without thinking tags, got %q", streamedText)
+	}
+	//! A mismatch here is what made the thinking block appear and then vanish: the
+	//! authoritative done text replaced everything the client had already rendered.
+	if textDone != streamedText {
+		t.Fatalf("output_text.done %q must equal streamed deltas %q", textDone, streamedText)
+	}
+	if strings.Contains(streamedText, "<thinking>") || strings.Contains(textDone, "thinking") {
+		t.Fatalf("thinking tags leaked into answer text: %q", textDone)
+	}
+	if reasoningDone == nil {
+		t.Fatalf("expected reasoning item to be completed: %#v", events)
+	}
+	if got := responseSSEInt(t, reasoningDone["output_index"]); got != 0 {
+		t.Fatalf("expected reasoning at output_index 0, got %d", got)
+	}
+}
+
+func TestThinkingTagSplitterHoldsPartialTagsAndUnterminatedBlocks(t *testing.T) {
+	var s thinkingTagSplitter
+	var text, reasoning strings.Builder
+	onText := func(v string) { text.WriteString(v) }
+	onReasoning := func(v string) { reasoning.WriteString(v) }
+
+	for _, chunk := range []string{"a<", "thi", "nking>r1", "</thinking", ">b<thinking>r2"} {
+		s.Push(chunk, onText, onReasoning)
+	}
+	//! No closing tag arrived, so the trailing block flushes as reasoning, never as answer.
+	s.Flush(onText, onReasoning)
+
+	if text.String() != "ab" {
+		t.Fatalf("expected visible text %q, got %q", "ab", text.String())
+	}
+	if reasoning.String() != "r1r2" {
+		t.Fatalf("expected reasoning %q, got %q", "r1r2", reasoning.String())
+	}
+}

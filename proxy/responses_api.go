@@ -286,6 +286,10 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 
 			var contentBuilder strings.Builder
 			var reasoningBuilder strings.Builder
+			var splitter thinkingTagSplitter
+			var thinkingSource thinkingStreamSource
+			sawVisibleText := false
+			sawReasoningText := false
 			var toolUses []KiroToolUse
 			var inputTokens, outputTokens int
 			var credits float64
@@ -297,6 +301,9 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			messageItemID := "msg_" + uuid.NewString()
 			messageAdded := false
 			messageOutputIndex := -1
+			reasoningItemID := "rs_" + uuid.NewString()
+			reasoningAdded := false
+			reasoningOutputIndex := -1
 			nextOutputIndex := 0
 			var outputItems []map[string]interface{}
 			reserveOutputItem := func(index int, item map[string]interface{}) {
@@ -315,6 +322,61 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					"response": buildResponsesBaseObject(responseID, createdAt, "in_progress", prepared, nil, ""),
 				})
 				started = true
+			}
+			//! The reasoning item must be announced before its deltas; clients ignore
+			//! summary deltas for an item they never saw in response.output_item.added.
+			ensureReasoningAdded := func() {
+				ensureStarted()
+				if reasoningAdded {
+					return
+				}
+				reasoningOutputIndex = nextOutputIndex
+				nextOutputIndex++
+				reserveOutputItem(reasoningOutputIndex, buildResponsesReasoningOutputItemWithID(reasoningItemID, ""))
+				sendResponsesSSE(w, flusher, "response.output_item.added", map[string]interface{}{
+					"type":         "response.output_item.added",
+					"output_index": reasoningOutputIndex,
+					"item": map[string]interface{}{
+						"id":      reasoningItemID,
+						"type":    "reasoning",
+						"status":  "in_progress",
+						"summary": []interface{}{},
+						"content": []interface{}{},
+					},
+				})
+				sendResponsesSSE(w, flusher, "response.reasoning_summary_part.added", map[string]interface{}{
+					"type":          "response.reasoning_summary_part.added",
+					"item_id":       reasoningItemID,
+					"output_index":  reasoningOutputIndex,
+					"summary_index": 0,
+					"part":          map[string]interface{}{"type": "summary_text", "text": ""},
+				})
+				reasoningAdded = true
+			}
+			finishReasoning := func(reasoning string) {
+				if !reasoningAdded {
+					return
+				}
+				reserveOutputItem(reasoningOutputIndex, buildResponsesReasoningOutputItemWithID(reasoningItemID, reasoning))
+				sendResponsesSSE(w, flusher, "response.reasoning_summary_text.done", map[string]interface{}{
+					"type":          "response.reasoning_summary_text.done",
+					"item_id":       reasoningItemID,
+					"output_index":  reasoningOutputIndex,
+					"summary_index": 0,
+					"text":          reasoning,
+				})
+				sendResponsesSSE(w, flusher, "response.reasoning_summary_part.done", map[string]interface{}{
+					"type":          "response.reasoning_summary_part.done",
+					"item_id":       reasoningItemID,
+					"output_index":  reasoningOutputIndex,
+					"summary_index": 0,
+					"part":          map[string]interface{}{"type": "summary_text", "text": reasoning},
+				})
+				sendResponsesSSE(w, flusher, "response.output_item.done", map[string]interface{}{
+					"type":         "response.output_item.done",
+					"output_index": reasoningOutputIndex,
+					"item":         outputItems[reasoningOutputIndex],
+				})
 			}
 			ensureMessageAdded := func() {
 				ensureStarted()
@@ -345,24 +407,69 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				messageAdded = true
 			}
 
+			//! Trim the newline the model leaves after <thinking> so clients do not render a
+			//! blank line above every reasoning block. Builder and deltas stay in sync.
+			emitReasoningDelta := func(text string) {
+				if !sawReasoningText {
+					text = strings.TrimLeft(text, " \t\r\n")
+					if text == "" {
+						return
+					}
+					sawReasoningText = true
+				}
+				reasoningBuilder.WriteString(text)
+				ensureReasoningAdded()
+				sendResponsesSSE(w, flusher, "response.reasoning_summary_text.delta", map[string]interface{}{
+					"type":          "response.reasoning_summary_text.delta",
+					"item_id":       reasoningItemID,
+					"output_index":  reasoningOutputIndex,
+					"summary_index": 0,
+					"delta":         text,
+				})
+			}
+			//! response.output_text.done is authoritative for clients, so the final text must
+			//! equal the concatenated deltas. Leading whitespace left behind by a stripped
+			//! thinking block is dropped here, before it is ever streamed or buffered.
+			emitTextDelta := func(text string) {
+				if !sawVisibleText {
+					text = strings.TrimLeft(text, " \t\r\n")
+					if text == "" {
+						return
+					}
+					sawVisibleText = true
+				}
+				contentBuilder.WriteString(text)
+				ensureMessageAdded()
+				sendResponsesSSE(w, flusher, "response.output_text.delta", map[string]interface{}{
+					"type":          "response.output_text.delta",
+					"item_id":       messageItemID,
+					"output_index":  messageOutputIndex,
+					"content_index": 0,
+					"delta":         text,
+				})
+			}
+			//! Thinking recovered from inline tags is dropped when the caller did not ask for
+			//! it, and yields to a native reasoning stream if the upstream provides both.
+			emitTagThinking := func(text string) {
+				if !thinking || !allowTagSource(&thinkingSource) {
+					return
+				}
+				emitReasoningDelta(text)
+			}
+
 			callback := &KiroStreamCallback{
 				OnText: func(text string, isThinking bool) {
 					if text == "" {
 						return
 					}
 					if isThinking {
-						reasoningBuilder.WriteString(text)
+						if !thinking || !allowReasoningSource(&thinkingSource) {
+							return
+						}
+						emitReasoningDelta(text)
 						return
 					}
-					contentBuilder.WriteString(text)
-					ensureMessageAdded()
-					sendResponsesSSE(w, flusher, "response.output_text.delta", map[string]interface{}{
-						"type":          "response.output_text.delta",
-						"item_id":       messageItemID,
-						"output_index":  messageOutputIndex,
-						"content_index": 0,
-						"delta":         text,
-					})
+					splitter.Push(text, emitTextDelta, emitTagThinking)
 				},
 				OnToolUse: func(tu KiroToolUse) {
 					ensureStarted()
@@ -438,11 +545,13 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			}
 
 			ensureStarted()
-			finalContent, extractedReasoning := extractThinkingFromContent(contentBuilder.String())
+			//! Release the tag buffer before reading the builders; the splitter has already
+			//! separated thinking from answer text, so no post-hoc extraction is needed and
+			//! finalContent stays byte-identical to what was streamed.
+			splitter.Flush(emitTextDelta, emitTagThinking)
+			finalContent := contentBuilder.String()
 			reasoningContent := reasoningBuilder.String()
-			if thinking && reasoningContent == "" && extractedReasoning != "" {
-				reasoningContent = extractedReasoning
-			} else if !thinking {
+			if !thinking {
 				reasoningContent = ""
 			}
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
@@ -454,6 +563,20 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+
+			//! Reasoning recovered from inline <thinking> tags never streamed, so announce
+			//! it now and replay it as one delta before closing the item.
+			if reasoningContent != "" && !reasoningAdded {
+				ensureReasoningAdded()
+				sendResponsesSSE(w, flusher, "response.reasoning_summary_text.delta", map[string]interface{}{
+					"type":          "response.reasoning_summary_text.delta",
+					"item_id":       reasoningItemID,
+					"output_index":  reasoningOutputIndex,
+					"summary_index": 0,
+					"delta":         reasoningContent,
+				})
+			}
+			finishReasoning(reasoningContent)
 
 			if messageAdded {
 				reserveOutputItem(messageOutputIndex, buildResponsesMessageOutputItem(messageItemID, finalContent))
@@ -477,12 +600,8 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					"item":         outputItems[messageOutputIndex],
 				})
 			}
-			if len(outputItems) == 0 && len(toolUses) == 0 {
+			if !messageAdded && len(toolUses) == 0 {
 				reserveOutputItem(nextOutputIndex, buildResponsesMessageOutputItem(messageItemID, finalContent))
-				nextOutputIndex++
-			}
-			if reasoningContent != "" {
-				reserveOutputItem(nextOutputIndex, buildResponsesReasoningOutputItem(reasoningContent))
 				nextOutputIndex++
 			}
 			response, storedMessages := buildResponsesCompletedObjectWithOutput(responseID, createdAt, prepared, outputItems, finalContent, toolUses, inputTokens, outputTokens)
@@ -580,11 +699,12 @@ func buildResponsesBaseObject(id string, createdAt int64, status string, prepare
 
 func buildResponsesOutput(content, reasoning string, toolUses []KiroToolUse) []map[string]interface{} {
 	output := make([]map[string]interface{}, 0, 2+len(toolUses))
-	if content != "" || len(toolUses) == 0 {
-		output = append(output, buildResponsesMessageOutputItem("msg_"+uuid.NewString(), content))
-	}
+	//! Reasoning precedes the message so clients render thinking before the answer.
 	if reasoning != "" {
 		output = append(output, buildResponsesReasoningOutputItem(reasoning))
+	}
+	if content != "" || len(toolUses) == 0 {
+		output = append(output, buildResponsesMessageOutputItem("msg_"+uuid.NewString(), content))
 	}
 	for _, tu := range toolUses {
 		output = append(output, buildResponsesToolOutputItem(tu))
@@ -607,11 +727,25 @@ func buildResponsesMessageOutputItem(id, content string) map[string]interface{} 
 }
 
 func buildResponsesReasoningOutputItem(reasoning string) map[string]interface{} {
+	return buildResponsesReasoningOutputItemWithID("rs_"+uuid.NewString(), reasoning)
+}
+
+//! Codex decodes reasoning items strictly: "summary" holds summary_text parts and
+//! "content" holds reasoning_text parts. A bare string or an empty summary leaves the
+//! client with nothing to render, so the thinking block vanishes after the stream ends.
+func buildResponsesReasoningOutputItemWithID(id, reasoning string) map[string]interface{} {
+	summary := []interface{}{}
+	content := []interface{}{}
+	if reasoning != "" {
+		summary = append(summary, map[string]interface{}{"type": "summary_text", "text": reasoning})
+		content = append(content, map[string]interface{}{"type": "reasoning_text", "text": reasoning})
+	}
 	return map[string]interface{}{
-		"id":      "rs_" + uuid.NewString(),
+		"id":      id,
 		"type":    "reasoning",
-		"summary": []interface{}{},
-		"content": reasoning,
+		"status":  "completed",
+		"summary": summary,
+		"content": content,
 	}
 }
 
