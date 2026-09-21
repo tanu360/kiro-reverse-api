@@ -779,16 +779,22 @@ func ensureObjectSchema(schema interface{}) interface{} {
 //! and drops the composition keyword. Nested composition (inside properties) is left
 //! untouched since Anthropic only forbids it at the top level.
 func flattenTopLevelComposition(m map[string]interface{}) {
+	flattened := false
 	for _, keyword := range []string{"oneOf", "anyOf", "allOf"} {
-		branches, ok := m[keyword].([]interface{})
-		if !ok {
-			delete(m, keyword)
+		if _, present := m[keyword]; !present {
 			continue
 		}
-		mergeBranchesIntoRoot(m, branches)
+		if branches, ok := m[keyword].([]interface{}); ok {
+			mergeBranchesIntoRoot(m, branches)
+		}
 		delete(m, keyword)
+		flattened = true
 	}
-	m["type"] = "object"
+	//! Only a schema that actually carried a root composition keyword is forced back to an
+	//! object; every other schema keeps the type it declared, exactly as before.
+	if flattened {
+		m["type"] = "object"
+	}
 }
 
 func mergeBranchesIntoRoot(root map[string]interface{}, branches []interface{}) {
