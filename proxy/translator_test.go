@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/json"
 	"kiro-proxy/config"
 	"path/filepath"
 	"strings"
@@ -496,5 +497,68 @@ func TestParseModelAndThinkingUsesConfiguredMappings(t *testing.T) {
 	gotModel, gotThinking := ParseModelAndThinking("vendor/custom-mini-thinking", "-thinking")
 	if gotModel != "claude-haiku-4.5" || !gotThinking {
 		t.Fatalf("ParseModelAndThinking custom mapping = (%q, %v), want (%q, %v)", gotModel, gotThinking, "claude-haiku-4.5", true)
+	}
+}
+
+//! Guards the Claude Code (/v1/messages) path: the top-level composition flattener must
+//! leave ordinary tool schemas, and any nested oneOf/anyOf/allOf, completely untouched.
+func TestEnsureObjectSchemaLeavesClaudeCodeToolSchemasIntact(t *testing.T) {
+	const schemas = `[
+	{"type":"object","properties":{"file_path":{"type":"string"},"limit":{"type":"integer"},"offset":{"type":"integer"}},"required":["file_path"]},
+	{"type":"object","properties":{"command":{"type":"string"},"timeout":{"type":"number"},"run_in_background":{"type":"boolean"}},"required":["command"]},
+	{"type":"object","properties":{
+	   "files":{"anyOf":[{"type":"array","items":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}},{"type":"object"}]},
+	   "contract":{"anyOf":[{"const":"latest","type":"string"},{"pattern":"^[0-9]+$","type":"string"}]}},
+	 "required":["files"]}
+	]`
+
+	var parsed []map[string]interface{}
+	if err := json.Unmarshal([]byte(schemas), &parsed); err != nil {
+		t.Fatalf("bad fixture: %v", err)
+	}
+	for i, schema := range parsed {
+		got := ensureObjectSchema(schema).(map[string]interface{})
+		if got["type"] != "object" {
+			t.Fatalf("schema %d lost object root: %#v", i, got)
+		}
+		wantProps, _ := schema["properties"].(map[string]interface{})
+		gotProps, ok := got["properties"].(map[string]interface{})
+		if !ok || len(gotProps) != len(wantProps) {
+			t.Fatalf("schema %d property set changed: %#v", i, got["properties"])
+		}
+		for _, key := range []string{"oneOf", "anyOf", "allOf"} {
+			if _, present := got[key]; present {
+				t.Fatalf("schema %d gained a root %s: %#v", i, key, got)
+			}
+		}
+	}
+
+	nested := ensureObjectSchema(parsed[2]).(map[string]interface{})["properties"].(map[string]interface{})
+	for _, name := range []string{"files", "contract"} {
+		prop := nested[name].(map[string]interface{})
+		branches, ok := prop["anyOf"].([]interface{})
+		if !ok || len(branches) != 2 {
+			t.Fatalf("nested anyOf on %q was altered: %#v", name, prop)
+		}
+	}
+}
+
+//! A schema with no root composition keyword keeps whatever type it declared; only a
+//! flattened schema is forced back to "object".
+func TestEnsureObjectSchemaKeepsDeclaredTypeWithoutComposition(t *testing.T) {
+	got := ensureObjectSchema(map[string]interface{}{
+		"type":       "string",
+		"properties": map[string]interface{}{"a": map[string]interface{}{"type": "string"}},
+	}).(map[string]interface{})
+	if got["type"] != "string" {
+		t.Fatalf("expected declared type preserved, got %#v", got["type"])
+	}
+
+	flattened := ensureObjectSchema(map[string]interface{}{
+		"type":  "string",
+		"oneOf": []interface{}{map[string]interface{}{"properties": map[string]interface{}{"a": map[string]interface{}{"type": "string"}}}},
+	}).(map[string]interface{})
+	if flattened["type"] != "object" {
+		t.Fatalf("expected flattened schema forced to object, got %#v", flattened["type"])
 	}
 }
