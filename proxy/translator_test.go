@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestExtractOpenAIMessageTextStructured(t *testing.T) {
@@ -23,6 +24,58 @@ func TestExtractOpenAIMessageTextStructured(t *testing.T) {
 	}
 	if got := extractOpenAIMessageText(nested); got != "nested" {
 		t.Fatalf("expected nested content extraction, got %q", got)
+	}
+}
+
+// Live on 8080 a developer message never reached upstream: no effect on the
+// reply and 142 fewer prompt tokens than the same text sent as system.
+func TestOpenAIToKiroKeepsDeveloperMessages(t *testing.T) {
+	payload := OpenAIToKiro(&OpenAIRequest{
+		Model: "claude-sonnet-4.5",
+		Messages: []OpenAIMessage{
+			{Role: "developer", Content: "DEVELOPER-RULE-7"},
+			{Role: "user", Content: "hello"},
+		},
+	}, false)
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "DEVELOPER-RULE-7") {
+		t.Fatalf("developer message dropped from payload: %s", raw)
+	}
+	if got := payload.ConversationState.CurrentMessage.UserInputMessage.Content; strings.Contains(got, "DEVELOPER-RULE-7") {
+		t.Fatalf("developer message leaked into user turn: %q", got)
+	}
+}
+
+// Live: with a partially answered parallel batch the narrated text is the only
+// carrier of tool output, and the model saw lines 0000-0159 of 300 (the 4000-byte cap).
+func TestPartialToolBatchKeepsFullToolOutput(t *testing.T) {
+	output := strings.Repeat("line of build output\n", 400) + "FINAL_MARKER=ZEBRA"
+	payload := OpenAIToKiro(&OpenAIRequest{
+		Model: "claude-sonnet-4.5",
+		Messages: []OpenAIMessage{
+			{Role: "user", Content: "run both"},
+			{Role: "assistant", ToolCalls: []ToolCall{testToolCall("call_1", "run_a", `{}`), testToolCall("call_2", "run_b", `{}`)}},
+			{Role: "tool", ToolCallID: "call_1", Content: output},
+		},
+	}, false)
+
+	current := payload.ConversationState.CurrentMessage.UserInputMessage
+	if ctx := current.UserInputMessageContext; ctx != nil && len(ctx.ToolResults) > 0 {
+		t.Fatalf("partial batch should travel as text, got structured results")
+	}
+	if !strings.Contains(current.Content, "FINAL_MARKER=ZEBRA") {
+		t.Fatalf("tool output cut: %d bytes, tail %q", len(current.Content), current.Content[len(current.Content)-40:])
+	}
+}
+
+func TestToolResultsSummaryCapKeepsValidUTF8(t *testing.T) {
+	got := buildToolResultsContinuation([]KiroToolResult{{Content: []KiroResultContent{{Text: strings.Repeat("é", 3000)}}}})
+	if len(got) > 4000 || !utf8.ValidString(got) {
+		t.Fatalf("summary len=%d valid=%v", len(got), utf8.ValidString(got))
 	}
 }
 

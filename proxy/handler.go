@@ -177,6 +177,9 @@ func resolveClaudeThinkingResponseOptions(thinking *ClaudeThinkingConfig, defaul
 }
 
 func validateOpenAIRequestShape(req *OpenAIRequest) string {
+	if msg := validateOpenAIToolChoice(req); msg != "" {
+		return msg
+	}
 	if len(req.Messages) == 0 {
 		return "messages must not be empty"
 	}
@@ -189,7 +192,7 @@ func validateOpenAIRequestShape(req *OpenAIRequest) string {
 		if role == "" {
 			continue
 		}
-		if role != "system" {
+		if role != "system" && role != "developer" {
 			hasNonSystem = true
 			lastRole = role
 		}

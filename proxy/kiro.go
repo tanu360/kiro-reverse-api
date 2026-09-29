@@ -759,7 +759,24 @@ func updateTokensFromEvent(event map[string]interface{}, currentInputTokens, cur
 	return inputTokens, outputTokens
 }
 
+// upstreamContextWindows maps lowercase Kiro model IDs to the maxInputTokens
+// ListAvailableModels reported for them.
+var upstreamContextWindows sync.Map
+
+func recordUpstreamContextWindows(models []ModelInfo) {
+	for _, m := range models {
+		if m.TokenLimits != nil && m.TokenLimits.MaxInputTokens > 0 {
+			upstreamContextWindows.Store(strings.ToLower(m.ModelId), m.TokenLimits.MaxInputTokens)
+		}
+	}
+}
+
 func getContextWindowSize(model string) int {
+	//! contextUsagePercentage is measured against the window upstream reports, so that
+	//! number wins over any name-based guess. Live: auto reports 1M, deepseek-3.2 164K.
+	if window, ok := upstreamContextWindows.Load(strings.ToLower(model)); ok {
+		return window.(int)
+	}
 	if isLargeContextModel(model) {
 		return 1_000_000
 	}
