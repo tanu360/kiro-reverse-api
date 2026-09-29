@@ -40,6 +40,18 @@ func TestClassifyStreamIntegrityLenientMode(t *testing.T) {
 			lenient: errUpstreamTruncatedResponse,
 		},
 		{
+			name:    "inline thinking without answer stays truncated",
+			turn:    streamTurnSignals{sawInlineThinking: true, sawTrailer: true},
+			strict:  errUpstreamTruncatedResponse,
+			lenient: errUpstreamTruncatedResponse,
+		},
+		{
+			name:    "inline thinking plus answer without metering",
+			turn:    streamTurnSignals{sawContent: true, sawInlineThinking: true},
+			strict:  errUpstreamTruncatedResponse,
+			lenient: nil,
+		},
+		{
 			name:    "stop reason completes the turn",
 			turn:    streamTurnSignals{sawContent: true, stopReason: "end_turn"},
 			strict:  nil,

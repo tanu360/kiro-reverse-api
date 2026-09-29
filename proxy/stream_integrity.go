@@ -15,10 +15,13 @@ var (
 
 type streamTurnSignals struct {
 	//! What one upstream stream proved about its own completeness.
+	// sawContent counts only answer text outside inline <thinking> blocks; handlers render those blocks as reasoning.
 	sawContent   bool
 	sawReasoning bool
-	toolCount    int
-	stopReason   string
+	// Thinking-mode reasoning that arrived inline in assistantResponseEvent rather than as reasoningContentEvent.
+	sawInlineThinking bool
+	toolCount         int
+	stopReason        string
 	// Only metering confirms a completed turn; context occupancy can arrive before completion.
 	sawTrailer bool
 }
@@ -28,10 +31,11 @@ func classifyStreamIntegrity(turn streamTurnSignals, lenient bool) error {
 	//! stopReason only rides in metadataEvent, which IdC / Enterprise accounts never send
 	//! (upstream Kiro-Go #147, #158), so answer text plus metering also counts as complete.
 	//! Reasoning without an answer stays truncated: metering bills thinking even when the turn died.
+	//! That holds for inline <thinking> blocks too, which is why they never count as answer text.
 	switch {
 	case turn.toolCount > 0:
 		return nil
-	case !turn.sawContent && !turn.sawReasoning:
+	case !turn.sawContent && !turn.sawReasoning && !turn.sawInlineThinking:
 		return errEmptyKiroStream
 	case strings.TrimSpace(turn.stopReason) != "":
 		return nil
@@ -41,6 +45,8 @@ func classifyStreamIntegrity(turn streamTurnSignals, lenient bool) error {
 	//! (Kiro-Go #161 residual). Answer text with no reasoning and no trailer is
 	//! accepted as complete. Off by default, because a stream cut mid-answer
 	//! leaves exactly this shape, and then a truncated reply is served as final.
+	//! Inline thinking is deliberately not excluded here: every thinking-mode turn on
+	//! these accounts carries it, so excluding it would reject all of them.
 	case lenient && turn.sawContent && !turn.sawReasoning:
 		return nil
 	default:

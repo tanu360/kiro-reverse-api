@@ -534,6 +534,14 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 	var contextUsagePercentages []float64
 	var turn streamTurnSignals
 	pending := &pendingToolUses{}
+	//! Only for classification: callers still receive raw text and split tags themselves.
+	var inlineThinking thinkingTagSplitter
+	markAnswer := func(text string) {
+		if strings.TrimSpace(text) != "" {
+			turn.sawContent = true
+		}
+	}
+	markInlineThinking := func(string) { turn.sawInlineThinking = true }
 
 	tracked := *callback
 	originalOnToolUse := tracked.OnToolUse
@@ -608,7 +616,7 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		switch eventType {
 		case "assistantResponseEvent":
 			if content, ok := event["content"].(string); ok && content != "" {
-				turn.sawContent = true
+				inlineThinking.Push(content, markAnswer, markInlineThinking)
 				if callback.OnText != nil {
 					emitted = true
 					callback.OnText(content, false)
@@ -642,8 +650,9 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 	if err := pending.flushAll(callback); err != nil {
 		return emitted, err
 	}
-	logger.Debugf("[KiroAPI] Stream end: content=%t reasoning=%t tools=%d stopReason=%q trailer=%t",
-		turn.sawContent, turn.sawReasoning, turn.toolCount, turn.stopReason, turn.sawTrailer)
+	inlineThinking.Flush(markAnswer, markInlineThinking)
+	logger.Debugf("[KiroAPI] Stream end: content=%t reasoning=%t inlineThinking=%t tools=%d stopReason=%q trailer=%t",
+		turn.sawContent, turn.sawReasoning, turn.sawInlineThinking, turn.toolCount, turn.stopReason, turn.sawTrailer)
 	if err := classifyStreamIntegrity(turn, config.GetLenientStreamIntegrity()); err != nil {
 		return emitted, err
 	}

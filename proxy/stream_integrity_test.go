@@ -496,3 +496,128 @@ func collectOpenAIContentDeltas(t *testing.T, body string) string {
 	}
 	return text.String()
 }
+
+// Kiro-Go #158: IdC accounts end every turn with contextUsageEvent + meteringEvent
+// and never send metadataEvent. Frames mirror the probe dump in that issue.
+func TestIssue158MeteringWithoutMetadataEventCompletesEveryEndpoint(t *testing.T) {
+	frames := func(t *testing.T) [][]byte {
+		return [][]byte{
+			awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "你", "modelId": "claude-sonnet-4.6"}),
+			awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "好！有", "modelId": "claude-sonnet-4.6"}),
+			awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "什么我可以帮你", "modelId": "claude-sonnet-4.6"}),
+			awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "的吗？", "modelId": "claude-sonnet-4.6"}),
+			awsEventStreamFrame(t, "contextUsageEvent", map[string]interface{}{"contextUsagePercentage": 0.4122999906539917}),
+			awsEventStreamFrame(t, "meteringEvent", map[string]interface{}{"unit": "credit", "unitPlural": "credits", "usage": 0.01967914129353234}),
+		}
+	}
+	for _, path := range []string{"/v1/messages", "/v1/chat/completions", "/v1/responses"} {
+		for _, model := range []string{"claude-sonnet-4.6", "claude-sonnet-4.6-thinking"} {
+			for _, stream := range []bool{false, true} {
+				t.Run(path+"/"+model+map[bool]string{false: "/json", true: "/sse"}[stream], func(t *testing.T) {
+					var calls atomic.Int32
+					h := newStreamTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
+						calls.Add(1)
+						writeFrames(w, frames(t)...)
+					})
+					body := map[string]interface{}{"model": model, "max_tokens": 512, "stream": stream, "store": false, "input": "hi",
+						"messages": []interface{}{map[string]interface{}{"role": "user", "content": "hi"}}}
+					raw, _ := json.Marshal(body)
+					rec := httptest.NewRecorder()
+					h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(string(raw))))
+
+					got := rec.Body.String()
+					if rec.Code != http.StatusOK || strings.Contains(got, errUpstreamTruncatedResponse.Error()) {
+						t.Fatalf("status=%d body=%s", rec.Code, got)
+					}
+					for _, piece := range []string{"你", "好！有", "什么我可以帮你", "的吗？"} {
+						if !strings.Contains(got, piece) {
+							t.Fatalf("answer piece %q missing: %s", piece, got)
+						}
+					}
+					if n := calls.Load(); n != 1 {
+						t.Fatalf("upstream called %d times; a complete turn must not be retried and re-billed", n)
+					}
+				})
+			}
+		}
+	}
+}
+
+// Thinking-mode turns carry reasoning inline as <thinking>...</thinking> inside
+// assistantResponseEvent. Metering bills that reasoning even when the turn died
+// before the answer, so tagged text alone must not count as an answer.
+func TestParseEventStreamInlineThinkingWithoutAnswerIsTruncated(t *testing.T) {
+	for name, chunks := range map[string][]string{
+		"closed block":       {"<thinking>plan the answer</thinking>"},
+		"closed then blank":  {"<thinking>plan</thinking>", "\n\n"},
+		"tags split":         {"<thin", "king>plan the ", "answer</thin", "king>\n"},
+		"unterminated block": {"<thinking>plan the ans"},
+		"leading whitespace": {"\n", "<thinking>plan</thinking>"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			frames := make([][]byte, 0, len(chunks)+1)
+			for _, chunk := range chunks {
+				frames = append(frames, awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": chunk}))
+			}
+			frames = append(frames, meteringFrame(t))
+			if err := parseFrames(t, &KiroStreamCallback{}, frames...); !errors.Is(err, errUpstreamTruncatedResponse) {
+				t.Fatalf("expected truncated response error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestParseEventStreamInlineThinkingWithAnswerCompletes(t *testing.T) {
+	chunks := []string{"<thin", "king>plan</thinking>\n\n", "The answer."}
+	for name, content := range map[string][]string{
+		"answer after block":    chunks,
+		"literal tag in answer": {"Wrap it in a <thinking> tag"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			frames := make([][]byte, 0, len(content)+1)
+			for _, chunk := range content {
+				frames = append(frames, awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": chunk}))
+			}
+			frames = append(frames, meteringFrame(t))
+			var text string
+			err := parseFrames(t, &KiroStreamCallback{OnText: func(s string, _ bool) { text += s }}, frames...)
+			if err != nil {
+				t.Fatalf("unexpected parse error: %v", err)
+			}
+			//! Classification must not rewrite what handlers receive; they split tags themselves.
+			if want := strings.Join(content, ""); text != want {
+				t.Fatalf("OnText got %q, want raw %q", text, want)
+			}
+		})
+	}
+}
+
+func TestIssueInlineThinkingOnlyTurnIsRetriedOnEveryEndpoint(t *testing.T) {
+	for _, path := range []string{"/v1/messages", "/v1/chat/completions", "/v1/responses"} {
+		for _, stream := range []bool{false, true} {
+			t.Run(path+map[bool]string{false: "/json", true: "/sse"}[stream], func(t *testing.T) {
+				var calls atomic.Int32
+				h := newStreamTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
+					calls.Add(1)
+					writeFrames(w,
+						awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "<thinking>plan the answer</thinking>"}),
+						meteringFrame(t),
+					)
+				})
+				body := map[string]interface{}{"model": "claude-sonnet-4.6-thinking", "max_tokens": 512, "stream": stream, "store": false, "input": "hi",
+					"messages": []interface{}{map[string]interface{}{"role": "user", "content": "hi"}}}
+				raw, _ := json.Marshal(body)
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(string(raw))))
+
+				if !strings.Contains(rec.Body.String(), errUpstreamTruncatedResponse.Error()) {
+					t.Fatalf("thinking-only turn served as complete: status=%d body=%s", rec.Code, rec.Body.String())
+				}
+				//! SSE already streamed the reasoning, so it can only end with an error event; JSON can still retry.
+				if !stream && calls.Load() < 2 {
+					t.Fatalf("upstream called %d times; a truncated turn must be retried", calls.Load())
+				}
+			})
+		}
+	}
+}
