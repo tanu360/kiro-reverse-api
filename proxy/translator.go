@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -233,18 +234,8 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		history = append(priming, history...)
 	}
 
-	currentToolResultIDs := collectToolResultIDs(currentToolResults)
-	keepCurrentToolResults := currentToolResultsMatchLastAssistant(history, currentToolResultIDs)
-	if keepCurrentToolResults {
-		history = sanitizeKiroHistory(history, currentToolResultIDs)
-	} else {
-		history = sanitizeKiroHistory(history, nil)
-	}
-
-	finalContent := currentContent
-	if len(currentToolResults) > 0 {
-		finalContent = joinHistoryText(finalContent, buildToolResultsContinuation(currentToolResults))
-	}
+	choice, name := claudeToolChoice(req.ToolChoice)
+	history, finalContent, keepCurrentToolResults := attachCurrentToolResults(history, currentContent, currentToolResults, choice)
 	if finalContent == "" {
 		if len(currentImages) > 0 {
 			finalContent = normalizeUserContent("", true)
@@ -254,7 +245,6 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 	}
 
 	tools := req.Tools
-	choice, name := claudeToolChoice(req.ToolChoice)
 	if choice == "none" {
 		tools = nil
 	}
@@ -268,11 +258,7 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 	}
 	kiroTools, toolNameMap := convertClaudeTools(tools)
 	if len(kiroTools) > 0 && (choice == "any" || choice == "tool") {
-		directive := "The client requires a tool call on this turn. Call at least one available tool."
-		if choice == "tool" {
-			directive = fmt.Sprintf("The client requires the tool %q on this turn. Call that tool.", kiroTools[0].ToolSpecification.Name)
-		}
-		finalContent = joinHistoryText(finalContent, directive)
+		finalContent = joinHistoryText(finalContent, toolChoiceDirective(choice, kiroTools[0].ToolSpecification.Name))
 	}
 
 	payload := &KiroPayload{}
@@ -985,6 +971,7 @@ type OpenAIRequest struct {
 	TopP            float64         `json:"top_p,omitempty"`
 	Stream          bool            `json:"stream,omitempty"`
 	Tools           []OpenAITool    `json:"tools,omitempty"`
+	ToolChoice      interface{}     `json:"tool_choice,omitempty"`
 	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
 }
 
@@ -1064,7 +1051,9 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 	var nonSystemMessages []OpenAIMessage
 
 	for _, msg := range req.Messages {
-		if msg.Role == "system" {
+		//! "developer" is the newer OpenAI name for "system"; matching only "system"
+		//! let developer messages fall through the role switch below and vanish.
+		if msg.Role == "system" || msg.Role == "developer" {
 			if s := extractOpenAIMessageText(msg.Content); s != "" {
 				systemPrompt += s + "\n"
 			}
@@ -1184,18 +1173,8 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		history = append(priming, history...)
 	}
 
-	currentToolResultIDs := collectToolResultIDs(currentToolResults)
-	keepCurrentToolResults := currentToolResultsMatchLastAssistant(history, currentToolResultIDs)
-	if keepCurrentToolResults {
-		history = sanitizeKiroHistory(history, currentToolResultIDs)
-	} else {
-		history = sanitizeKiroHistory(history, nil)
-	}
-
-	finalContent := currentContent
-	if len(currentToolResults) > 0 {
-		finalContent = joinHistoryText(finalContent, buildToolResultsContinuation(currentToolResults))
-	}
+	choice, name := openAIToolChoice(req.ToolChoice)
+	history, finalContent, keepCurrentToolResults := attachCurrentToolResults(history, currentContent, currentToolResults, choice)
 	if finalContent == "" {
 		if len(currentImages) > 0 {
 			finalContent = normalizeUserContent("", true)
@@ -1204,7 +1183,22 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		}
 	}
 
-	kiroTools, toolNameMap := convertOpenAITools(req.Tools)
+	tools := req.Tools
+	if choice == "none" {
+		tools = nil
+	}
+	if choice == "tool" {
+		tools = nil
+		for _, tool := range req.Tools {
+			if tool.Function.Name == name {
+				tools = append(tools, tool)
+			}
+		}
+	}
+	kiroTools, toolNameMap := convertOpenAITools(tools)
+	if len(kiroTools) > 0 && (choice == "any" || choice == "tool") {
+		finalContent = joinHistoryText(finalContent, toolChoiceDirective(choice, kiroTools[0].ToolSpecification.Name))
+	}
 
 	payload := &KiroPayload{}
 	payload.ToolNameMap = toolNameMap
@@ -1429,16 +1423,7 @@ func sanitizeKiroHistory(history []KiroHistoryMessage, currentToolResultIDs map[
 		return history
 	}
 
-	toolNames := make(map[string]string)
-	for i := range history {
-		if a := history[i].AssistantResponseMessage; a != nil {
-			for _, tu := range a.ToolUses {
-				if tu.ToolUseID != "" && tu.Name != "" {
-					toolNames[tu.ToolUseID] = tu.Name
-				}
-			}
-		}
-	}
+	toolNames := historyToolNames(history)
 
 	activeIdx := -1
 	if len(currentToolResultIDs) > 0 {
@@ -1611,6 +1596,46 @@ func truncateCurrentMessage(payload *KiroPayload) {
 	}
 }
 
+// attachCurrentToolResults decides whether this turn's tool results travel as
+// structured toolResults or as narrated text, and sanitizes history to match.
+func attachCurrentToolResults(history []KiroHistoryMessage, currentContent string, currentToolResults []KiroToolResult, toolChoice string) ([]KiroHistoryMessage, string, bool) {
+	currentToolResultIDs := collectToolResultIDs(currentToolResults)
+	//! tool_choice none sends no tool list, and upstream rejects structured toolUse /
+	//! toolResult blocks without one (TOOL_CONFIG_MISSING), so narrate that turn instead.
+	keep := toolChoice != "none" && currentToolResultsMatchLastAssistant(history, currentToolResultIDs)
+	names := historyToolNames(history)
+	if keep {
+		history = sanitizeKiroHistory(history, currentToolResultIDs)
+	} else {
+		history = sanitizeKiroHistory(history, nil)
+	}
+	if len(currentToolResults) == 0 {
+		return history, currentContent, keep
+	}
+	if keep {
+		return history, joinHistoryText(currentContent, buildToolResultsContinuation(currentToolResults)), true
+	}
+	//! Text is the only carrier here (e.g. a partially answered parallel batch), so it
+	//! must not get the short summary cap; truncatePayloadToLimit bounds the total.
+	return history, joinHistoryText(currentContent, narrateToolResults(currentToolResults, names)), false
+}
+
+func historyToolNames(history []KiroHistoryMessage) map[string]string {
+	names := make(map[string]string)
+	for i := range history {
+		if a := history[i].AssistantResponseMessage; a != nil {
+			for _, tu := range a.ToolUses {
+				if tu.ToolUseID != "" && tu.Name != "" {
+					names[tu.ToolUseID] = tu.Name
+				}
+			}
+		}
+	}
+	return names
+}
+
+// buildToolResultsContinuation summarizes tool results that also travel as
+// structured toolResults, so it is capped.
 func buildToolResultsContinuation(toolResults []KiroToolResult) string {
 	if len(toolResults) == 0 {
 		return minimalFallbackUserContent
@@ -1634,7 +1659,11 @@ func buildToolResultsContinuation(toolResults []KiroToolResult) string {
 
 	joined := toolResultsContinuationPrefix + "\n\n" + strings.Join(parts, "\n\n")
 	if len(joined) > 4000 {
-		return joined[:4000]
+		cut := 4000
+		for cut > 0 && !utf8.RuneStart(joined[cut]) {
+			cut--
+		}
+		return joined[:cut]
 	}
 	return joined
 }

@@ -316,6 +316,61 @@ func TestGetContextWindowSizeClassifiesLargeContextModels(t *testing.T) {
 	}
 }
 
+// Live ListAvailableModels reported these; the name guess said 200K for all three.
+// auto's contextUsagePercentage was exactly 1/5 of sonnet's for the same prompt.
+func TestGetContextWindowSizePrefersUpstreamLimit(t *testing.T) {
+	limits := func(in int) *struct {
+		MaxInputTokens  int `json:"maxInputTokens"`
+		MaxOutputTokens int `json:"maxOutputTokens"`
+	} {
+		return &struct {
+			MaxInputTokens  int `json:"maxInputTokens"`
+			MaxOutputTokens int `json:"maxOutputTokens"`
+		}{MaxInputTokens: in}
+	}
+	models := []ModelInfo{
+		{ModelId: "auto", TokenLimits: limits(1_000_000)},
+		{ModelId: "deepseek-3.2", TokenLimits: limits(164_000)},
+		{ModelId: "qwen3-coder-next", TokenLimits: limits(256_000)},
+		{ModelId: "no-limits-model"},
+	}
+	t.Cleanup(func() {
+		for _, m := range models {
+			upstreamContextWindows.Delete(m.ModelId)
+		}
+	})
+	recordUpstreamContextWindows(models)
+
+	for model, want := range map[string]int{
+		"auto":             1_000_000,
+		"AUTO":             1_000_000,
+		"deepseek-3.2":     164_000,
+		"qwen3-coder-next": 256_000,
+		"no-limits-model":  200_000,
+	} {
+		if got := getContextWindowSize(model); got != want {
+			t.Fatalf("getContextWindowSize(%q) = %d, want %d", model, got, want)
+		}
+	}
+}
+
+// Kiro-Go PR #159: a no-argument tool call must reach clients as "{}", never
+// "null". Codex discards a function_call whose arguments are not an object.
+func TestFinishToolUseNeverEmitsNullInput(t *testing.T) {
+	for _, raw := range []string{"", "  ", "null"} {
+		state := &toolUseState{ToolUseID: "call_1", Name: "list_files"}
+		state.InputBuffer.WriteString(raw)
+		var got KiroToolUse
+		if err := finishToolUse(state, &KiroStreamCallback{OnToolUse: func(tu KiroToolUse) { got = tu }}); err != nil {
+			t.Fatalf("finishToolUse(%q): %v", raw, err)
+		}
+		args, _ := json.Marshal(got.Input)
+		if string(args) != "{}" {
+			t.Fatalf("finishToolUse(%q) arguments = %s, want {}", raw, args)
+		}
+	}
+}
+
 func testToolCall(id, name, args string) ToolCall {
 	tc := ToolCall{ID: id, Type: "function"}
 	tc.Function.Name = name

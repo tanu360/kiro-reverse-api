@@ -103,6 +103,7 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		TopP:            req.TopP,
 		Stream:          req.Stream,
 		Tools:           tools,
+		ToolChoice:      req.ToolChoice,
 		ReasoningEffort: reqReasoningEffort(req),
 	}
 	if msg := validateOpenAIRequestShape(&openaiReq); msg != "" {

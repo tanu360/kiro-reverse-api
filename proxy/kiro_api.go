@@ -122,6 +122,8 @@ func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
+	//! Recorded here, not in the callers, so no listing path can skip it.
+	recordUpstreamContextWindows(result.Models)
 	return result.Models, nil
 }
 
