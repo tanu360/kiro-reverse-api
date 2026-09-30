@@ -108,18 +108,26 @@ func TestInvalidNativeOptionsStayLocal(t *testing.T) {
 }
 
 func TestInvalidUpstreamBodyIsNotRepeated(t *testing.T) {
-	calls := 0
-	h := newStreamTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		w.WriteHeader(400)
-		w.Write([]byte(`{"message":"Invalid input","reason":"REQUEST_BODY_INVALID"}`))
-	})
-	rec := postClaudeMessages(t, h, `{"model":"claude-sonnet-4.5","max_tokens":2048,"messages":[{"role":"user","content":"hi"}]}`)
-	if rec.Code != 400 || calls != 1 {
-		t.Fatalf("code=%d calls=%d", rec.Code, calls)
-	}
-	if h.pool.GetNext() == nil {
-		t.Fatal("invalid request cooled down the account")
+	for _, body := range []string{
+		`{"message":"Invalid input","reason":"REQUEST_BODY_INVALID"}`,
+		`{"message":"Invalid additionalModelRequestFields"}`,
+		`{"message":"Invalid"}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			calls := 0
+			h := newStreamTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.WriteHeader(400)
+				w.Write([]byte(body))
+			})
+			rec := postClaudeMessages(t, h, `{"model":"claude-sonnet-4.5","max_tokens":2048,"messages":[{"role":"user","content":"hi"}]}`)
+			if rec.Code != 400 || calls != 1 {
+				t.Fatalf("code=%d calls=%d", rec.Code, calls)
+			}
+			if h.pool.GetNext() == nil {
+				t.Fatal("invalid request cooled down the account")
+			}
+		})
 	}
 }
 

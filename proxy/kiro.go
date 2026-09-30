@@ -440,9 +440,9 @@ endpointLoop:
 					clientErr = &upstreamClientError{status: resp.StatusCode, message: lastErr.Error()}
 					lastErr = clientErr
 					logger.Warnf("[KiroAPI] Endpoint %s rejected request: %v", ep.Name, lastErr)
-					// Invalid model options and request bodies cannot improve by
-					// sending the same body to another endpoint or account.
-					if resp.StatusCode == 400 && (strings.Contains(string(errBody), "REQUEST_BODY_INVALID") || strings.Contains(string(errBody), "Invalid additionalModelRequestFields")) {
+					// Any 400 rejects this request. Do not repeat an invalid body
+					// based on the upstream's changing error text.
+					if resp.StatusCode == http.StatusBadRequest {
 						return clientErr
 					}
 					continue endpointLoop

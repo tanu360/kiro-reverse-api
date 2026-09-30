@@ -16,8 +16,7 @@ rejection; it never changes an accepted request's content.
   before a generation request. A cold model cache still validates the verified
   Opus 5.5 schema. Wrong types, enums, native token bounds and unsupported
   structured-output settings return a local 400.
-- A Kiro 400 carrying REQUEST_BODY_INVALID or Invalid
-  additionalModelRequestFields is returned immediately. The same invalid body
+- Every Kiro HTTP 400 is returned immediately, regardless of error wording. The same invalid body
   is not resent to the other two endpoints or another account. Such a request
   does not disable or cool down the account.
 - Opus 5.5 sampling defaults are validated: temperature 1 and top_p >= 0.99
@@ -52,7 +51,7 @@ x-kiro-max-tokens-mode: upstream-not-enforced; no-local-truncation.
 
 stop_sequences, strict output_config.format, mid-conversation system roles,
 inference_geo, MCP server execution, paid service tiers, Files and Batches
-remain unsupported. The gateway does not add a prompt to fake a capability.
+remain unsupported. This repair does not add a prompt-based substitute for these capabilities.
 The upstream Kiro identity/system instructions and hidden prompt token overhead
 cannot be removed by this adapter. Local count_tokens estimates cannot serve
 as exact upstream billing records. Thinking signatures are opaque and are
@@ -61,7 +60,7 @@ still be normalized, and anthropic-version is still optional for legacy clients.
 
 ## Validation
 
-614 tests/subtests passed; go vet passed. Real isolated requests verified
+617 tests/subtests passed; go vet passed. Real isolated requests verified
 local rejection without upstream calls, native thinking, full output without
 local truncation, PDF recognition, remote images, all three protocol adapters,
 large inline images with accompanying text and labels, a one-million-character
