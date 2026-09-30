@@ -779,11 +779,11 @@ func TestResolveClaudeThinkingModeHonorsRequestThinking(t *testing.T) {
 			wantThinking: false,
 		},
 		{
-			name:         "suffix remains supported when thinking is disabled",
+			name:         "explicit disabled overrides the model suffix",
 			model:        "claude-sonnet-4.5-thinking",
 			thinking:     &ClaudeThinkingConfig{Type: "disabled"},
 			wantModel:    "claude-sonnet-4.5",
-			wantThinking: true,
+			wantThinking: false,
 		},
 	}
 

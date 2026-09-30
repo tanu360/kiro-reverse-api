@@ -56,7 +56,7 @@ func TestNoToolInvocationTextInAssistantHistory(t *testing.T) {
 	}
 }
 
-func TestCollapsesConsecutiveIdenticalToolResults(t *testing.T) {
+func TestPreservesConsecutiveIdenticalToolResults(t *testing.T) {
 	msgs := []OpenAIMessage{{Role: "user", Content: "start"}}
 	for i := 0; i < 5; i++ {
 		msgs = append(msgs,
@@ -76,13 +76,13 @@ func TestCollapsesConsecutiveIdenticalToolResults(t *testing.T) {
 			count++
 		}
 	}
-	if count != 1 {
-		t.Fatalf("expected 5 identical tool-result turns collapsed to 1, got %d", count)
+	if count != 5 {
+		t.Fatalf("expected all 5 tool-result turns retained, got %d", count)
 	}
 }
 
-func TestDropsDotPollutedAssistantTurns(t *testing.T) {
-	//! A history of "." placeholder turns teaches the model to answer ".".
+func TestPreservesClientDotsAndRelocatesLegacyToolMarkers(t *testing.T) {
+	// Actual client text, including dots, must survive conversion.
 	msgs := []ClaudeMessage{{Role: "user", Content: "start"}}
 	for i := 0; i < 6; i++ {
 		msgs = append(msgs,
@@ -104,7 +104,7 @@ func TestDropsDotPollutedAssistantTurns(t *testing.T) {
 			continue
 		}
 		c := strings.TrimSpace(a.Content)
-		if c == "." || c == "" {
+		if c == "" {
 			t.Fatalf("history[%d] is a hollow/dot assistant turn that should have been dropped", i)
 		}
 		if strings.Contains(a.Content, "[Called tool") {

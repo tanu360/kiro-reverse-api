@@ -7,20 +7,24 @@ import (
 )
 
 type OpenAIResponsesRequest struct {
-	Model              string                    `json:"model"`
-	Input              json.RawMessage           `json:"input"`
-	Instructions       interface{}               `json:"instructions,omitempty"`
-	PreviousResponseID string                    `json:"previous_response_id,omitempty"`
-	Stream             bool                      `json:"stream,omitempty"`
-	MaxOutputTokens    int                       `json:"max_output_tokens,omitempty"`
-	Temperature        float64                   `json:"temperature,omitempty"`
-	TopP               float64                   `json:"top_p,omitempty"`
-	Tools              []OpenAIResponsesTool     `json:"tools,omitempty"`
-	ToolChoice         interface{}               `json:"tool_choice,omitempty"`
-	Text               *OpenAIResponsesText      `json:"text,omitempty"`
-	Reasoning          *OpenAIResponsesReasoning `json:"reasoning,omitempty"`
-	Store              *bool                     `json:"store,omitempty"`
-	Metadata           map[string]interface{}    `json:"metadata,omitempty"`
+	Model                        string                    `json:"model"`
+	Input                        json.RawMessage           `json:"input"`
+	Instructions                 interface{}               `json:"instructions,omitempty"`
+	PreviousResponseID           string                    `json:"previous_response_id,omitempty"`
+	Stream                       bool                      `json:"stream,omitempty"`
+	MaxOutputTokens              int                       `json:"max_output_tokens,omitempty"`
+	Temperature                  *float64                  `json:"temperature,omitempty"`
+	TopP                         *float64                  `json:"top_p,omitempty"`
+	Tools                        []OpenAIResponsesTool     `json:"tools,omitempty"`
+	ToolChoice                   interface{}               `json:"tool_choice,omitempty"`
+	Text                         *OpenAIResponsesText      `json:"text,omitempty"`
+	Reasoning                    *OpenAIResponsesReasoning `json:"reasoning,omitempty"`
+	Store                        *bool                     `json:"store,omitempty"`
+	Metadata                     map[string]interface{}    `json:"metadata,omitempty"`
+	ConversationID               string                    `json:"conversation_id,omitempty"`
+	KiroContext                  map[string]interface{}    `json:"kiro_context,omitempty"`
+	AdditionalModelRequestFields map[string]interface{}    `json:"additional_model_request_fields,omitempty"`
+	ParallelToolCalls            *bool                     `json:"parallel_tool_calls,omitempty"`
 }
 
 type OpenAIResponsesReasoning struct {
@@ -87,7 +91,7 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 
 	messagesForKiro := make([]OpenAIMessage, 0, len(previous)+len(currentMessages)+1)
 	messagesForKiro = append(messagesForKiro, previous...)
-	if instructionText := strings.TrimSpace(extractOpenAIMessageText(responsesContentToOpenAIContent(req.Instructions))); instructionText != "" {
+	if instructionText := extractOpenAIMessageText(responsesContentToOpenAIContent(req.Instructions)); instructionText != "" {
 		messagesForKiro = append(messagesForKiro, OpenAIMessage{Role: "system", Content: instructionText})
 	}
 	if formatInstruction := responsesTextFormatInstruction(req.Text); formatInstruction != "" {
@@ -96,15 +100,19 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 	messagesForKiro = append(messagesForKiro, currentMessages...)
 
 	openaiReq := OpenAIRequest{
-		Model:           req.Model,
-		Messages:        messagesForKiro,
-		MaxTokens:       req.MaxOutputTokens,
-		Temperature:     req.Temperature,
-		TopP:            req.TopP,
-		Stream:          req.Stream,
-		Tools:           tools,
-		ToolChoice:      req.ToolChoice,
-		ReasoningEffort: reqReasoningEffort(req),
+		Model:                        req.Model,
+		Messages:                     messagesForKiro,
+		MaxTokens:                    req.MaxOutputTokens,
+		Temperature:                  req.Temperature,
+		TopP:                         req.TopP,
+		Stream:                       req.Stream,
+		Tools:                        tools,
+		ToolChoice:                   req.ToolChoice,
+		ReasoningEffort:              reqReasoningEffort(req),
+		ConversationID:               req.ConversationID,
+		KiroContext:                  req.KiroContext,
+		AdditionalModelRequestFields: req.AdditionalModelRequestFields,
+		ParallelToolCalls:            req.ParallelToolCalls,
 	}
 	if msg := validateOpenAIRequestShape(&openaiReq); msg != "" {
 		return nil, msg

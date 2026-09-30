@@ -70,6 +70,28 @@ func allowTagSource(source *thinkingStreamSource) bool {
 }
 
 func validateClaudeRequestShape(req *ClaudeRequest) string {
+	if msg := validateAdapterOptions(req.MaxTokens, req.Temperature, req.TopP, req.KiroContext); msg != "" {
+		return msg
+	}
+	if msg := validateAdapterContent(req.System, "system", true); msg != "" {
+		return msg
+	}
+	for _, item := range req.Messages {
+		if item.Role != "user" && item.Role != "assistant" {
+			return "unsupported message role: " + item.Role
+		}
+		if msg := validateAdapterContent(item.Content, item.Role, true); msg != "" {
+			return msg
+		}
+		if msg := validateAdapterCache(item.CacheControl); msg != "" {
+			return msg
+		}
+	}
+	for _, tool := range req.Tools {
+		if msg := validateAdapterCache(tool.CacheControl); msg != "" {
+			return msg
+		}
+	}
 	if msg := validateClaudeToolChoice(req); msg != "" {
 		return msg
 	}
@@ -93,7 +115,7 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 		}
 
 		text, images, toolResults := extractClaudeUserContent(msg.Content)
-		if normalizeUserContent(text, len(images) > 0) != "" || len(toolResults) > 0 {
+		if normalizeUserContent(text, len(images) > 0) != "" || len(toolResults) > 0 || len(documentsFromContent(msg.Content)) > 0 {
 			hasUserContext = true
 		}
 	}
@@ -177,6 +199,54 @@ func resolveClaudeThinkingResponseOptions(thinking *ClaudeThinkingConfig, defaul
 }
 
 func validateOpenAIRequestShape(req *OpenAIRequest) string {
+	if msg := validateAdapterOptions(req.MaxTokens, req.Temperature, req.TopP, req.KiroContext); msg != "" {
+		return msg
+	}
+	if msg := validateChatResponseFormat(req.ResponseFormat); msg != "" {
+		return msg
+	}
+	if req.MaxCompletionTokens != nil {
+		if *req.MaxCompletionTokens <= 0 {
+			return "max_completion_tokens must be positive"
+		}
+		if req.MaxTokens != 0 && req.MaxTokens != *req.MaxCompletionTokens {
+			return "conflicting max_tokens and max_completion_tokens"
+		}
+	}
+	thinkingLimit := req.MaxTokens
+	if req.MaxCompletionTokens != nil {
+		thinkingLimit = *req.MaxCompletionTokens
+	}
+	if thinkingLimit == 0 {
+		thinkingLimit = -1
+	}
+	if msg := validateClaudeThinkingConfig(req.Thinking, thinkingLimit); msg != "" {
+		return msg
+	}
+	for _, item := range req.Messages {
+		switch item.Role {
+		case "user", "assistant", "system", "developer", "tool":
+		default:
+			return "unsupported message role: " + item.Role
+		}
+		if msg := validateAdapterContent(item.Content, item.Role, false); msg != "" {
+			return msg
+		}
+		if msg := validateAdapterCache(item.CacheControl); msg != "" {
+			return msg
+		}
+		for _, call := range item.ToolCalls {
+			var input map[string]interface{}
+			if err := json.Unmarshal([]byte(call.Function.Arguments), &input); err != nil || input == nil {
+				return "tool call arguments must be a JSON object"
+			}
+		}
+	}
+	for _, tool := range req.Tools {
+		if msg := validateAdapterCache(tool.CacheControl); msg != "" {
+			return msg
+		}
+	}
 	if msg := validateOpenAIToolChoice(req); msg != "" {
 		return msg
 	}
@@ -201,7 +271,7 @@ func validateOpenAIRequestShape(req *OpenAIRequest) string {
 			continue
 		}
 		text, images := extractOpenAIUserContent(msg.Content)
-		if normalizeUserContent(text, len(images) > 0) != "" {
+		if normalizeUserContent(text, len(images) > 0) != "" || len(documentsFromContent(msg.Content)) > 0 {
 			hasUserContext = true
 		}
 	}
@@ -867,6 +937,10 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 		h.sendClaudeError(w, 400, "invalid_request_error", "Invalid JSON: "+err.Error())
 		return
 	}
+	if msg := validateRequestParameters(body, &req); msg != "" {
+		h.sendClaudeError(w, 400, "invalid_request_error", msg)
+		return
+	}
 	if msg := validateClaudeRequestShape(&req); msg != "" {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
@@ -897,6 +971,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	}
 
 	kiroPayload := ClaudeToKiro(&req, thinking)
+	h.applyAdapterThinking(kiroPayload, req.Model, req.Thinking, "")
 
 	if req.Stream {
 		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile, apiKeyReservation)
@@ -1633,6 +1708,10 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		h.sendOpenAIError(w, 400, "invalid_request_error", "Invalid JSON")
 		return
 	}
+	if msg := validateRequestParameters(body, &req); msg != "" {
+		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
+		return
+	}
 	if msg := validateOpenAIRequestShape(&req); msg != "" {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
@@ -1642,7 +1721,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(req.Model, thinkingCfg.Suffix)
 	req.Model = actualModel
-	thinking = resolveThinkingWithEffort(thinking, req.ReasoningEffort)
+	thinking = resolveAdapterThinking(thinking, req.Thinking, req.ReasoningEffort)
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&req)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
@@ -1652,7 +1731,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kiroPayload := OpenAIToKiro(&req, thinking)
-	h.applyReasoningEffort(kiroPayload, req.Model, req.ReasoningEffort)
+	h.applyAdapterThinking(kiroPayload, req.Model, req.Thinking, req.ReasoningEffort)
 
 	if req.Stream {
 		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)

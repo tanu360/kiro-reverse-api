@@ -167,7 +167,8 @@ type KiroPayload struct {
 	AdditionalModelRequestFields map[string]interface{} `json:"additionalModelRequestFields,omitempty"`
 
 	//! Sanitized upstream tool names are mapped back before responses reach the client.
-	ToolNameMap map[string]string `json:"-"`
+	ToolNameMap          map[string]string `json:"-"`
+	LegacyThinkingPrompt bool              `json:"-"`
 }
 
 type KiroUserInputMessage struct {
@@ -175,15 +176,23 @@ type KiroUserInputMessage struct {
 	ModelID                 string                   `json:"modelId,omitempty"`
 	Origin                  string                   `json:"origin"`
 	Images                  []KiroImage              `json:"images,omitempty"`
+	Documents               []KiroDocument           `json:"documents,omitempty"`
+	CachePoint              *KiroCachePoint          `json:"cachePoint,omitempty"`
 	UserInputMessageContext *UserInputMessageContext `json:"userInputMessageContext,omitempty"`
 }
 
 type UserInputMessageContext struct {
-	Tools       []KiroToolWrapper `json:"tools,omitempty"`
-	ToolResults []KiroToolResult  `json:"toolResults,omitempty"`
+	Tools             []KiroToolWrapper `json:"tools,omitempty"`
+	ToolResults       []KiroToolResult  `json:"toolResults,omitempty"`
+	EditorState       interface{}       `json:"editorState,omitempty"`
+	ShellState        interface{}       `json:"shellState,omitempty"`
+	GitState          interface{}       `json:"gitState,omitempty"`
+	EnvState          interface{}       `json:"envState,omitempty"`
+	AdditionalContext interface{}       `json:"additionalContext,omitempty"`
 }
 
 type KiroToolWrapper struct {
+	CachePoint        *KiroCachePoint `json:"cachePoint,omitempty"`
 	ToolSpecification struct {
 		Name        string      `json:"name"`
 		Description string      `json:"description"`
@@ -229,9 +238,9 @@ type KiroToolUse struct {
 }
 
 type InferenceConfig struct {
-	MaxTokens   int     `json:"maxTokens,omitempty"`
-	Temperature float64 `json:"temperature,omitempty"`
-	TopP        float64 `json:"topP,omitempty"`
+	MaxTokens   int      `json:"maxTokens,omitempty"`
+	Temperature *float64 `json:"temperature,omitempty"`
+	TopP        *float64 `json:"topP,omitempty"`
 }
 
 type KiroStreamCallback struct {
