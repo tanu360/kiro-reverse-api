@@ -47,7 +47,7 @@ func (h *Handler) applyAdapterThinking(payload *KiroPayload, model string, think
 	if effort == "" && output != nil {
 		effort = firstString(output["effort"])
 	}
-	wanted := isClaudeThinkingRequested(thinking) || (effort != "" && effort != "none" && effort != "minimal")
+	wanted := payload.LegacyThinkingPrompt || isClaudeThinkingRequested(thinking) || (effort != "" && effort != "none" && effort != "minimal")
 	if thinking != nil && thinking.Type == "disabled" {
 		wanted = false
 	}

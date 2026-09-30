@@ -1,0 +1,4 @@
+FROM ghcr.io/tanu360/kiro-reverse-api@sha256:890fc0b97f96a30192466135d18503c42c9b4d7fd5042b9cad7a5656494c8366
+COPY kiro-proxy-compat /app/kiro-proxy
+ARG REVISION
+LABEL io.local.kiro.feature="api-compat-passthrough-20261001" org.opencontainers.image.revision=$REVISION

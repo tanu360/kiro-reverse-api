@@ -251,6 +251,7 @@ type KiroStreamCallback struct {
 	OnCredits      func(credits float64)
 	OnContextUsage func(percentage float64)
 	OnStopReason   func(reason string)
+	OnSignature    func(signature string)
 }
 
 func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Account) {
@@ -439,6 +440,11 @@ endpointLoop:
 					clientErr = &upstreamClientError{status: resp.StatusCode, message: lastErr.Error()}
 					lastErr = clientErr
 					logger.Warnf("[KiroAPI] Endpoint %s rejected request: %v", ep.Name, lastErr)
+					// Invalid model options and request bodies cannot improve by
+					// sending the same body to another endpoint or account.
+					if resp.StatusCode == 400 && (strings.Contains(string(errBody), "REQUEST_BODY_INVALID") || strings.Contains(string(errBody), "Invalid additionalModelRequestFields")) {
+						return clientErr
+					}
 					continue endpointLoop
 				}
 				if resp.StatusCode == http.StatusTooManyRequests {
@@ -638,6 +644,10 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 					emitted = true
 					callback.OnText(text, true)
 				}
+			}
+			if signature, ok := event["signature"].(string); ok && signature != "" && callback.OnSignature != nil {
+				emitted = true
+				callback.OnSignature(signature)
 			}
 		case "toolUseEvent":
 			if toolErr := handleToolUseEvent(event, pending, callback); toolErr != nil {

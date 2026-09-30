@@ -70,6 +70,15 @@ func allowTagSource(source *thinkingStreamSource) bool {
 }
 
 func validateClaudeRequestShape(req *ClaudeRequest) string {
+	if req.MaxTokens <= 0 {
+		return "max_tokens is required and must be positive"
+	}
+	if msg := validateAdapterCache(req.CacheControl); msg != "" {
+		return msg
+	}
+	if msg := validateClaudeToolPairs(req.Messages); msg != "" {
+		return msg
+	}
 	if msg := validateAdapterOptions(req.MaxTokens, req.Temperature, req.TopP, req.KiroContext); msg != "" {
 		return msg
 	}
@@ -380,6 +389,13 @@ func (h *Handler) validateApiKey(r *http.Request) bool {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
+	id := "req_" + uuid.New().String()
+	w.Header().Set("request-id", id)
+	w.Header().Set("x-request-id", id)
+	if requestEndpointForPath(path) != "" {
+		w.Header().Set("x-kiro-max-tokens-mode", "upstream-not-enforced; no-local-truncation")
+		w.Header().Set("x-kiro-token-count-mode", "estimated-until-upstream-usage")
+	}
 
 	logger.Debugf("[HTTP] %s %s from %s", r.Method, path, r.RemoteAddr)
 
@@ -390,7 +406,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key, anthropic-version, anthropic-beta, x-api-key, x-stainless-os, x-stainless-lang, x-stainless-package-version, x-stainless-runtime, x-stainless-runtime-version, x-stainless-arch")
-		w.Header().Set("Access-Control-Expose-Headers", "x-request-id, x-ratelimit-limit-requests, x-ratelimit-limit-tokens, x-ratelimit-remaining-requests, x-ratelimit-remaining-tokens, x-ratelimit-reset-requests, x-ratelimit-reset-tokens")
+		w.Header().Set("Access-Control-Expose-Headers", "request-id, x-request-id, x-kiro-max-tokens-mode, x-kiro-token-count-mode, x-ratelimit-limit-requests, x-ratelimit-limit-tokens, x-ratelimit-remaining-requests, x-ratelimit-remaining-tokens, x-ratelimit-reset-requests, x-ratelimit-reset-tokens")
 	}
 
 	if r.Method == "OPTIONS" {
@@ -876,6 +892,7 @@ func mergeStringLists(base []string, extra []string) []string {
 }
 
 func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("x-kiro-token-count-mode", "local-estimate; not-upstream-billing")
 	if r.Method != "POST" {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -931,6 +948,11 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	body, err = normalizeRemoteImages(r.Context(), body)
+	if err != nil {
+		h.sendClaudeError(w, 400, "invalid_request_error", err.Error())
+		return
+	}
 	var req ClaudeRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON: "+err.Error())
@@ -940,6 +962,18 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	if msg := validateRequestParameters(body, &req); msg != "" {
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
+	}
+	if msg := h.validateModelControls(req.Model, req.MaxTokens, req.Temperature, req.TopP, req.Thinking, req.OutputConfig, req.AdditionalModelRequestFields); msg != "" {
+		h.sendClaudeError(w, 400, "invalid_request_error", msg)
+		return
+	}
+	resolved, _ := ParseModelAndThinking(req.Model, "-thinking")
+	if resolved == "claude-opus-5.5" || resolved == "claude-opus-5-5" {
+		kind, _ := claudeToolChoice(req.ToolChoice)
+		if kind == "tool" || kind == "any" {
+			h.sendClaudeError(w, 400, "invalid_request_error", "Claude Opus 5.5 does not support forced tool_choice")
+			return
+		}
 	}
 	if msg := validateClaudeRequestShape(&req); msg != "" {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
@@ -1306,6 +1340,13 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			}
 
 			callback := &KiroStreamCallback{
+				OnSignature: func(signature string) {
+					if !thinking || thinkingFormat != "thinking" {
+						return
+					}
+					startContentBlock("thinking")
+					h.sendSSE(w, flusher, "content_block_delta", map[string]interface{}{"type": "content_block_delta", "index": activeBlockIndex, "delta": map[string]string{"type": "signature_delta", "signature": signature}})
+				},
 				OnText: func(text string, isThinking bool) {
 					if text == "" {
 						return
@@ -1560,8 +1601,10 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			var credits float64
 			var realInputTokens int
 			var upstreamStopReason string
+			var reasoningSignature string
 
 			callback := &KiroStreamCallback{
+				OnSignature: func(signature string) { reasoningSignature = signature },
 				OnText: func(text string, isThinking bool) {
 					if isThinking {
 						thinkingContent += text
@@ -1629,7 +1672,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			h.promptCache.Update(account.ID, cacheProfile)
 
 			responseThinkingContent := rawThinkingContent
-			includeEmptyThinkingBlock := thinking && thinkingOpts.OmitDisplay && rawThinkingContent != ""
+			includeEmptyThinkingBlock := thinking && ((thinkingOpts.OmitDisplay && rawThinkingContent != "") || (rawThinkingContent == "" && reasoningSignature != ""))
 			if includeEmptyThinkingBlock {
 				responseThinkingContent = ""
 			}
@@ -1648,6 +1691,13 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 
 			resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
 			resp.StopReason = mapClaudeStopReason(upstreamStopReason, len(toolUses))
+			if reasoningSignature != "" {
+				for i := range resp.Content {
+					if resp.Content[i].Type == "thinking" {
+						resp.Content[i].Signature = reasoningSignature
+					}
+				}
+			}
 			resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
 			resp.Usage.CacheCreationInputTokens = cacheUsage.CacheCreationInputTokens
 			resp.Usage.CacheReadInputTokens = cacheUsage.CacheReadInputTokens
@@ -1702,6 +1752,11 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body, err = normalizeRemoteImages(r.Context(), body)
+	if err != nil {
+		h.sendOpenAIError(w, 400, "invalid_request_error", err.Error())
+		return
+	}
 	var req OpenAIRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
@@ -1714,6 +1769,14 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 	if msg := validateOpenAIRequestShape(&req); msg != "" {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
+		return
+	}
+	limit := req.MaxTokens
+	if req.MaxCompletionTokens != nil {
+		limit = *req.MaxCompletionTokens
+	}
+	if msg := h.validateModelControls(req.Model, limit, req.Temperature, req.TopP, req.Thinking, req.OutputConfig, req.AdditionalModelRequestFields); msg != "" {
 		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
 		return
 	}

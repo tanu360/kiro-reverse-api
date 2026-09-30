@@ -71,6 +71,10 @@ func validateRequestParameters(body []byte, request interface{}) string {
 			if value == false {
 				continue
 			}
+		case "service_tier":
+			if value == "auto" {
+				continue
+			}
 		case "stop", "stop_sequences":
 			if list, ok := value.([]interface{}); ok && len(list) == 0 {
 				continue

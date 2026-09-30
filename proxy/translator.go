@@ -98,6 +98,7 @@ type ClaudeRequest struct {
 	OutputConfig                 map[string]interface{} `json:"output_config,omitempty"`
 	AdditionalModelRequestFields map[string]interface{} `json:"additional_model_request_fields,omitempty"`
 	Metadata                     map[string]interface{} `json:"metadata,omitempty"`
+	CacheControl                 map[string]interface{} `json:"cache_control,omitempty"`
 }
 
 type ClaudeThinkingConfig struct {
@@ -197,7 +198,7 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		}
 	}
 	kiroTools, names := convertClaudeTools(tools)
-	return buildAdapterPayload(adapterRequest{
+	payload := buildAdapterPayload(adapterRequest{
 		Model: modelID, System: buildClaudeSystemPrompt(req.System, thinking),
 		SystemCache: contentCachePoint(req.System, nil), Messages: messages,
 		Tools: kiroTools, ToolNames: names, ToolChoice: choice,
@@ -207,6 +208,10 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		OutputConfig:   req.OutputConfig,
 		LegacyThinking: thinking,
 	})
+	if req.CacheControl["type"] == "ephemeral" {
+		payload.ConversationState.CurrentMessage.UserInputMessage.CachePoint = &KiroCachePoint{Type: "default"}
+	}
+	return payload
 }
 
 func buildClaudeSystemPrompt(system interface{}, thinking bool) string {
@@ -522,6 +527,9 @@ func extractClaudeUserContent(content interface{}) (string, []KiroImage, []KiroT
 }
 
 func extractImageFromClaudeBlock(block map[string]interface{}) *KiroImage {
+	if kind := firstString(block["type"]); kind == "document" || kind == "file" || kind == "input_file" {
+		return adapterFileImage(block)
+	}
 	if source, ok := block["source"].(map[string]interface{}); ok {
 		if data, ok := source["data"].(string); ok {
 			if img := parseDataURL(data); img != nil {
@@ -1061,6 +1069,7 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		LegacyThinking: thinking,
 	})
 	for _, tool := range req.Tools {
+		// Tool declarations are retained below, independently of output controls.
 		if tool.HostedWebSearch || isHostedWebSearchToolType(tool.Type) {
 			if payload.HostedSearchTools == nil {
 				payload.HostedSearchTools = make(map[string]bool)
@@ -1511,6 +1520,9 @@ func parseBase64Image(data, format string) *KiroImage {
 	format = strings.ToLower(format)
 	if format == "jpg" {
 		format = "jpeg"
+	}
+	if format != "" && format != "png" && format != "jpeg" && format != "gif" && format != "webp" {
+		return nil
 	}
 
 	if _, err := base64.StdEncoding.DecodeString(data); err != nil {

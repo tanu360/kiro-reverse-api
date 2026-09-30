@@ -33,6 +33,11 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	body, err = normalizeRemoteImages(r.Context(), body)
+	if err != nil {
+		h.sendOpenAIError(w, 400, "invalid_request_error", err.Error())
+		return
+	}
 	var req OpenAIResponsesRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
@@ -70,6 +75,14 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(prepared.OpenAIRequest.Model, thinkingCfg.Suffix)
 	prepared.OpenAIRequest.Model = actualModel
+	limit := prepared.OpenAIRequest.MaxTokens
+	if prepared.OpenAIRequest.MaxCompletionTokens != nil {
+		limit = *prepared.OpenAIRequest.MaxCompletionTokens
+	}
+	if msg := h.validateModelControls(actualModel, limit, prepared.OpenAIRequest.Temperature, prepared.OpenAIRequest.TopP, prepared.OpenAIRequest.Thinking, prepared.OpenAIRequest.OutputConfig, prepared.OpenAIRequest.AdditionalModelRequestFields); msg != "" {
+		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
+		return
+	}
 	thinking = resolveThinkingWithEffort(thinking, prepared.OpenAIRequest.ReasoningEffort)
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)

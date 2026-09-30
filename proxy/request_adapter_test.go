@@ -87,7 +87,7 @@ func TestAdapterDocumentsCacheAndContext(t *testing.T) {
 			context := map[string]interface{}{"additionalContext": map[string]interface{}{"scene": "SCENE_1"}}
 			var payload *KiroPayload
 			if protocol == "claude" {
-				req := &ClaudeRequest{Model: "claude-opus-5.5", ConversationID: "session-id", KiroContext: context, Messages: []ClaudeMessage{{Role: "user", Content: content}}}
+				req := &ClaudeRequest{Model: "claude-opus-5.5", MaxTokens: 1024, ConversationID: "session-id", KiroContext: context, Messages: []ClaudeMessage{{Role: "user", Content: content}}}
 				if msg := validateClaudeRequestShape(req); msg != "" {
 					t.Fatal(msg)
 				}
