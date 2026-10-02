@@ -72,9 +72,9 @@ func TestPartialToolBatchKeepsFullToolOutput(t *testing.T) {
 	}
 }
 
-func TestToolResultsSummaryCapKeepsValidUTF8(t *testing.T) {
+func TestToolResultsTextFallbackKeepsFullValidUTF8(t *testing.T) {
 	got := buildToolResultsContinuation([]KiroToolResult{{Content: []KiroResultContent{{Text: strings.Repeat("é", 3000)}}}})
-	if len(got) > 4000 || !utf8.ValidString(got) {
+	if !strings.Contains(got, strings.Repeat("é", 3000)) || !utf8.ValidString(got) {
 		t.Fatalf("summary len=%d valid=%v", len(got), utf8.ValidString(got))
 	}
 }
@@ -287,7 +287,7 @@ func TestOpenAIConversationIDRandomForSyntheticAnchor(t *testing.T) {
 	}
 }
 
-func TestClaudeToKiroDropsLeadingAssistantHistory(t *testing.T) {
+func TestClaudeToKiroPreservesLeadingAssistantHistory(t *testing.T) {
 	req := &ClaudeRequest{
 		Model: "claude-sonnet-4.5",
 		Messages: []ClaudeMessage{
@@ -298,8 +298,8 @@ func TestClaudeToKiroDropsLeadingAssistantHistory(t *testing.T) {
 
 	payload := ClaudeToKiro(req, false)
 
-	if len(payload.ConversationState.History) != 0 {
-		t.Fatalf("expected leading assistant-only history to be dropped, got %d entries", len(payload.ConversationState.History))
+	if len(payload.ConversationState.History) != 2 || payload.ConversationState.History[1].AssistantResponseMessage.Content != "prefill" {
+		t.Fatalf("leading assistant text lost: %+v", payload.ConversationState.History)
 	}
 
 	if strings.Contains(payload.ConversationState.CurrentMessage.UserInputMessage.Content, "Begin conversation") {

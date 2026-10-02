@@ -2,80 +2,47 @@ package proxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
 
-func TestClaudeToKiroTruncatesOversizedHistory(t *testing.T) {
-	//! Kiro rejects oversized input with CONTENT_LENGTH_EXCEEDS_THRESHOLD; old history goes first.
-	big := strings.Repeat("lorem ipsum dolor sit amet ", 80)
-
-	msgs := []ClaudeMessage{
-		{Role: "user", Content: "start the long task"},
-	}
+func TestClaudeToKiroPreservesOversizedHistory(t *testing.T) {
+	big := strings.Repeat("long history with exact text ", 80)
+	messages := []ClaudeMessage{{Role: "user", Content: "START"}}
 	for i := 0; i < 800; i++ {
-		msgs = append(msgs,
-			ClaudeMessage{Role: "assistant", Content: "step result: " + big},
-			ClaudeMessage{Role: "user", Content: "next: " + big},
+		messages = append(messages,
+			ClaudeMessage{Role: "assistant", Content: fmt.Sprintf("RESULT_%d %s", i, big)},
+			ClaudeMessage{Role: "user", Content: fmt.Sprintf("NEXT_%d %s", i, big)},
 		)
 	}
-	msgs = append(msgs, ClaudeMessage{Role: "user", Content: "FINAL: summarize everything above"})
-
-	req := &ClaudeRequest{
-		Model:    "claude-opus-4.8",
-		System:   "You are a helpful assistant.",
-		Messages: msgs,
-	}
-
-	payload := ClaudeToKiro(req, false)
-
+	messages = append(messages, ClaudeMessage{Role: "user", Content: "FINAL"})
+	payload := ClaudeToKiro(&ClaudeRequest{Model: "claude-opus-5.5", System: "  SYSTEM\n", Messages: messages}, false)
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		t.Fatalf("marshal failed: %v", err)
+		t.Fatal(err)
 	}
-	if len(raw) > maxPayloadBytes {
-		t.Fatalf("payload size %d exceeds limit %d after truncation", len(raw), maxPayloadBytes)
+	if len(raw) <= 900*1024 {
+		t.Fatalf("fixture no longer exceeds the old cap: %d", len(raw))
 	}
-
-	cur := payload.ConversationState.CurrentMessage.UserInputMessage
-	if !strings.Contains(cur.Content, "FINAL: summarize everything above") {
-		t.Fatalf("current message lost after truncation, got %q", cur.Content[:min(80, len(cur.Content))])
-	}
-
-	foundPlaceholder := false
-	for _, h := range payload.ConversationState.History {
-		if h.UserInputMessage != nil && strings.Contains(h.UserInputMessage.Content, "truncated to fit") {
-			foundPlaceholder = true
-			break
+	for _, message := range messages[:len(messages)-1] {
+		found := false
+		for _, history := range payload.ConversationState.History {
+			if history.UserInputMessage != nil && history.UserInputMessage.Content == message.Content {
+				found = true
+			}
+			if history.AssistantResponseMessage != nil && history.AssistantResponseMessage.Content == message.Content {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("lost history message %.50s", message.Content)
 		}
 	}
-	if !foundPlaceholder {
-		t.Fatalf("expected a truncation placeholder in history")
+	if payload.ConversationState.History[0].UserInputMessage.Content != "  SYSTEM\n" {
+		t.Fatal("system whitespace changed")
 	}
-
-	if len(payload.ConversationState.History) < 2 {
-		t.Fatalf("expected priming retained, history too short")
-	}
-	primingUser := payload.ConversationState.History[0].UserInputMessage
-	if primingUser == nil || !strings.Contains(primingUser.Content, "helpful assistant") {
-		t.Fatalf("expected system priming retained at front")
-	}
-}
-
-func TestClaudeToKiroSmallPayloadNotTruncated(t *testing.T) {
-	req := &ClaudeRequest{
-		Model:  "claude-opus-4.8",
-		System: "You are helpful.",
-		Messages: []ClaudeMessage{
-			{Role: "user", Content: "hello"},
-			{Role: "assistant", Content: "hi"},
-			{Role: "user", Content: "how are you?"},
-		},
-	}
-	payload := ClaudeToKiro(req, false)
-	for _, h := range payload.ConversationState.History {
-		if h.UserInputMessage != nil && strings.Contains(h.UserInputMessage.Content, "truncated to fit") {
-			t.Fatalf("small payload should not be truncated")
-		}
+	if payload.ConversationState.CurrentMessage.UserInputMessage.Content != "FINAL" {
+		t.Fatal("current text changed")
 	}
 }

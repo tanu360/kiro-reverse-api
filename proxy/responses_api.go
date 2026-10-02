@@ -33,6 +33,11 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	body, err = normalizeRemoteImages(r.Context(), body)
+	if err != nil {
+		h.sendOpenAIError(w, 400, "invalid_request_error", err.Error())
+		return
+	}
 	var req OpenAIResponsesRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
@@ -40,6 +45,10 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if msg := validateRequestParameters(body, &req); msg != "" {
+		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
+		return
+	}
 	var previousMessages []OpenAIMessage
 	if req.PreviousResponseID != "" {
 		state, err := loadResponseState(req.PreviousResponseID)
@@ -66,10 +75,18 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(prepared.OpenAIRequest.Model, thinkingCfg.Suffix)
 	prepared.OpenAIRequest.Model = actualModel
+	limit := prepared.OpenAIRequest.MaxTokens
+	if prepared.OpenAIRequest.MaxCompletionTokens != nil {
+		limit = *prepared.OpenAIRequest.MaxCompletionTokens
+	}
+	if msg := h.validateModelControls(actualModel, limit, prepared.OpenAIRequest.Temperature, prepared.OpenAIRequest.TopP, prepared.OpenAIRequest.Thinking, prepared.OpenAIRequest.OutputConfig, prepared.OpenAIRequest.AdditionalModelRequestFields); msg != "" {
+		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
+		return
+	}
 	thinking = resolveThinkingWithEffort(thinking, prepared.OpenAIRequest.ReasoningEffort)
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)
-	h.applyReasoningEffort(kiroPayload, prepared.OpenAIRequest.Model, prepared.OpenAIRequest.ReasoningEffort)
+	h.applyAdapterThinking(kiroPayload, prepared.OpenAIRequest.Model, prepared.OpenAIRequest.Thinking, prepared.OpenAIRequest.ReasoningEffort)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, prepared.OpenAIRequest.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
@@ -730,9 +747,9 @@ func buildResponsesReasoningOutputItem(reasoning string) map[string]interface{} 
 	return buildResponsesReasoningOutputItemWithID("rs_"+uuid.NewString(), reasoning)
 }
 
-//! Codex decodes reasoning items strictly: "summary" holds summary_text parts and
-//! "content" holds reasoning_text parts. A bare string or an empty summary leaves the
-//! client with nothing to render, so the thinking block vanishes after the stream ends.
+// ! Codex decodes reasoning items strictly: "summary" holds summary_text parts and
+// ! "content" holds reasoning_text parts. A bare string or an empty summary leaves the
+// ! client with nothing to render, so the thinking block vanishes after the stream ends.
 func buildResponsesReasoningOutputItemWithID(id, reasoning string) map[string]interface{} {
 	summary := []interface{}{}
 	content := []interface{}{}

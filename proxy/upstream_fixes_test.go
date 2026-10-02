@@ -10,6 +10,7 @@ func TestToolResultImagesAreAttached(t *testing.T) {
 	const imgData = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 	req := &ClaudeRequest{
 		Model: "claude-opus-4.8",
+		Tools: []ClaudeTool{{Name: "read", Description: "Read a file", InputSchema: map[string]interface{}{"type": "object"}}},
 		Messages: []ClaudeMessage{
 			{Role: "user", Content: "read this image"},
 			{
@@ -94,6 +95,11 @@ func TestOpenAIToolResultImageAttachedToCurrentMessage(t *testing.T) {
 		},
 	}
 
+	tool := OpenAITool{Type: "function"}
+	tool.Function.Name = "read"
+	tool.Function.Description = "Read a file"
+	tool.Function.Parameters = map[string]interface{}{"type": "object"}
+	req.Tools = []OpenAITool{tool}
 	payload := OpenAIToKiro(req, false)
 	cur := payload.ConversationState.CurrentMessage.UserInputMessage
 	if len(cur.Images) != 1 || cur.Images[0].Format != "png" {
@@ -114,6 +120,7 @@ func TestClaudeToolResultPreservesMixedTextAndImage(t *testing.T) {
 	const imgData = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 	req := &ClaudeRequest{
 		Model: "claude-opus-4.8",
+		Tools: []ClaudeTool{{Name: "read", Description: "Read a file", InputSchema: map[string]interface{}{"type": "object"}}},
 		Messages: []ClaudeMessage{
 			{Role: "user", Content: "inspect"},
 			{
@@ -203,7 +210,7 @@ func TestOpenAIHistoryRemovesFakeToolCallNarration(t *testing.T) {
 	}
 }
 
-func TestOpenAIHistoryCollapsesRepeatedIdenticalToolResults(t *testing.T) {
+func TestOpenAIHistoryPreservesRepeatedIdenticalToolResults(t *testing.T) {
 	req := &OpenAIRequest{
 		Model: "claude-opus-4.8",
 		Messages: []OpenAIMessage{
@@ -226,26 +233,17 @@ func TestOpenAIHistoryCollapsesRepeatedIdenticalToolResults(t *testing.T) {
 			count += strings.Count(h.AssistantResponseMessage.Content, "DUPLICATE_TOOL_OUTPUT")
 		}
 	}
-	if count != 1 {
-		t.Fatalf("expected duplicate tool output collapsed to one history copy, got %d", count)
+	if count != 2 {
+		t.Fatalf("expected both tool outputs retained, got %d", count)
 	}
 }
 
-func TestOpenAIHistoryDropsHollowAssistantTurns(t *testing.T) {
-	req := &OpenAIRequest{
-		Model: "claude-opus-4.8",
-		Messages: []OpenAIMessage{
-			{Role: "user", Content: "first"},
-			{Role: "assistant", Content: "."},
-			{Role: "user", Content: "next"},
-		},
-	}
-
-	payload := OpenAIToKiro(req, false)
-	for _, h := range payload.ConversationState.History {
-		if h.AssistantResponseMessage != nil && strings.TrimSpace(h.AssistantResponseMessage.Content) == "." {
-			t.Fatalf("hollow assistant turn leaked into history")
-		}
+func TestOpenAIHistoryPreservesClientDotReply(t *testing.T) {
+	payload := OpenAIToKiro(&OpenAIRequest{Model: "claude-opus-4.8", Messages: []OpenAIMessage{
+		{Role: "user", Content: "first"}, {Role: "assistant", Content: "."}, {Role: "user", Content: "next"},
+	}}, false)
+	if len(payload.ConversationState.History) != 2 || payload.ConversationState.History[1].AssistantResponseMessage.Content != "." {
+		t.Fatal("client dot reply lost")
 	}
 }
 
