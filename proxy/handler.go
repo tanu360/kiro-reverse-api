@@ -86,7 +86,7 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 		return msg
 	}
 	for _, item := range req.Messages {
-		if item.Role != "user" && item.Role != "assistant" {
+		if item.Role != "user" && item.Role != "assistant" && item.Role != "system" {
 			return "unsupported message role: " + item.Role
 		}
 		if msg := validateAdapterContent(item.Content, item.Role, true); msg != "" {

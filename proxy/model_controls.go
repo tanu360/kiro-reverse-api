@@ -132,6 +132,11 @@ func validateClaudeToolPairs(messages []ClaudeMessage) string {
 	pending := map[string]bool{}
 	seen := map[string]bool{}
 	for _, message := range messages {
+		// Claude Code can append instructions between tool_use and tool_result.
+		// They neither consume nor clear the outstanding tool IDs.
+		if message.Role == "system" {
+			continue
+		}
 		results := map[string]bool{}
 		uses := map[string]bool{}
 		for _, block := range adapterContentBlocks(message.Content) {

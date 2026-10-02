@@ -169,7 +169,7 @@ type ClaudeUsage struct {
 func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 	modelID := MapModel(req.Model)
 	messages := make([]KiroHistoryMessage, 0, len(req.Messages))
-	for _, msg := range req.Messages {
+	for _, msg := range normalizeClaudeMessageRoles(req.Messages) {
 		switch msg.Role {
 		case "user":
 			text, images, results := extractClaudeUserContent(msg.Content)

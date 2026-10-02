@@ -1,4 +1,4 @@
-# Kiro API compatibility repair — 2026-10-01
+# Kiro API compatibility repair — 2026-10-02
 
 This service adapts Anthropic, Chat Completions and Responses requests to
 Kiro's protocol. It is not the official Anthropic API.
@@ -49,7 +49,13 @@ tokens. Therefore max_tokens is not a reliable length or cost control here.
 The gateway leaves complete output intact as requested. Responses expose
 x-kiro-max-tokens-mode: upstream-not-enforced; no-local-truncation.
 
-stop_sequences, strict output_config.format, mid-conversation system roles,
+Message-level system instructions, including mid-conversation Claude Code
+updates, are merged into adjacent user turns in their original chronological
+position. Text, whitespace and cache markers are preserved; tool result IDs
+remain paired across these instructions. Kiro has no separate system role,
+so this is protocol adaptation rather than an identical instruction hierarchy.
+
+stop_sequences, strict output_config.format,
 inference_geo, MCP server execution, paid service tiers, Files and Batches
 remain unsupported. This repair does not add a prompt-based substitute for these capabilities.
 The upstream Kiro identity/system instructions and hidden prompt token overhead
@@ -60,7 +66,9 @@ still be normalized, and anthropic-version is still optional for legacy clients.
 
 ## Validation
 
-617 tests/subtests passed; go vet passed. Real isolated requests verified
+630 tests/subtests passed; go vet passed. Regressions cover chronological
+message-level system instructions, cache markers, large text and interleaved
+tool results in both streaming and non-streaming requests. Real isolated requests verified
 local rejection without upstream calls, native thinking, full output without
 local truncation, PDF recognition, remote images, all three protocol adapters,
 large inline images with accompanying text and labels, a one-million-character
