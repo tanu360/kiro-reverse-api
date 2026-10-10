@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestClaudeToKiroTruncatesOversizedHistory(t *testing.T) {
@@ -77,5 +78,44 @@ func TestClaudeToKiroSmallPayloadNotTruncated(t *testing.T) {
 		if h.UserInputMessage != nil && strings.Contains(h.UserInputMessage.Content, "truncated to fit") {
 			t.Fatalf("small payload should not be truncated")
 		}
+	}
+}
+
+func TestLargeImageDoesNotReplaceUserText(t *testing.T) {
+	//! A large image used to eat the whole text budget and the user's text became ".".
+	text := "HEAD " + strings.Repeat("context ", 1000) + " TAIL"
+	req := &ClaudeRequest{Model: "claude-sonnet-4.5", MaxTokens: 1024, Messages: []ClaudeMessage{
+		{Role: "user", Content: []interface{}{
+			map[string]interface{}{"type": "image", "source": map[string]interface{}{"type": "base64", "media_type": "image/png", "data": strings.Repeat("A", maxPayloadBytes+4096)}},
+			map[string]interface{}{"type": "text", "text": text},
+		}},
+	}}
+	cur := ClaudeToKiro(req, false).ConversationState.CurrentMessage.UserInputMessage
+	if cur.Content != text || len(cur.Images) != 1 {
+		t.Fatalf("text lost next to a large image: images=%d content=%.40q", len(cur.Images), cur.Content)
+	}
+}
+
+func TestOpenAIImageKeepsTextFormatting(t *testing.T) {
+	text := "fix this:\n\nfunc main() {\n    fmt.Println(\"[Image 1]\")\n}"
+	req := &OpenAIRequest{Model: "claude-sonnet-4.5", Messages: []OpenAIMessage{
+		{Role: "user", Content: []interface{}{
+			map[string]interface{}{"type": "text", "text": text},
+			map[string]interface{}{"type": "image_url", "image_url": map[string]interface{}{"url": "data:image/png;base64," + testPNGBase64}},
+		}},
+	}}
+	cur := OpenAIToKiro(req, false).ConversationState.CurrentMessage.UserInputMessage
+	if cur.Content != text || len(cur.Images) != 1 {
+		t.Fatalf("content = %q, images = %d", cur.Content, len(cur.Images))
+	}
+}
+
+func TestTruncateCurrentMessageKeepsUTF8Valid(t *testing.T) {
+	payload := testKiroPayload()
+	payload.ConversationState.CurrentMessage.UserInputMessage.Content = strings.Repeat("é", maxPayloadBytes)
+	truncateCurrentMessage(payload)
+	got := payload.ConversationState.CurrentMessage.UserInputMessage.Content
+	if !utf8.ValidString(got) || len(got) > maxPayloadBytes || len(got) == 0 {
+		t.Fatalf("invalid truncation: valid=%v len=%d", utf8.ValidString(got), len(got))
 	}
 }

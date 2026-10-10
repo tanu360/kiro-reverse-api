@@ -133,3 +133,24 @@ func TestClaudeWebSearchLoopForwardsOutputConfigEffort(t *testing.T) {
 		t.Fatalf("additionalModelRequestFields = %#v, want output_config.effort=medium", fields)
 	}
 }
+
+func TestApplyReasoningEffortSendsSchemaSpelling(t *testing.T) {
+	for _, tc := range []struct {
+		levels []interface{}
+		effort string
+		want   string
+	}{
+		{[]interface{}{"low", "medium", "high", "max"}, "max", "max"},
+		{[]interface{}{"low", "medium", "high", "max"}, "xhigh", "max"},
+		{[]interface{}{"low", "medium", "high", "xhigh"}, "max", "xhigh"},
+		{[]interface{}{"low", "medium", "high", "max"}, "medium", "medium"},
+	} {
+		h := &Handler{cachedModels: []ModelInfo{effortSchemaModel("claude-opus-4.8", tc.levels...)}}
+		payload := &KiroPayload{}
+		h.applyReasoningEffort(payload, "claude-opus-4.8", tc.effort)
+		outputConfig, _ := payload.AdditionalModelRequestFields["output_config"].(map[string]interface{})
+		if got := outputConfig["effort"]; got != tc.want {
+			t.Fatalf("levels %v effort %q: got %#v, want %q", tc.levels, tc.effort, got, tc.want)
+		}
+	}
+}

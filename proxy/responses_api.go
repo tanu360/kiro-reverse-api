@@ -32,6 +32,7 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
 		return
 	}
+	body = inlineRemoteImages(r.Context(), body)
 
 	var req OpenAIResponsesRequest
 	if err := json.Unmarshal(body, &req); err != nil {

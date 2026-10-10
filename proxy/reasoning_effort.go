@@ -88,8 +88,10 @@ func effortLevelsFromSchema(schema map[string]interface{}) []string {
 	levels := make([]string, 0, len(rawEnum))
 	for _, raw := range rawEnum {
 		if s, ok := raw.(string); ok {
+			//! Keep the schema's spelling: upstream validates against its own enum, so a
+			//! model advertising "max" rejects the normalized "xhigh".
 			if normalized := normalizeReasoningEffort(s); normalized != effortUnset && normalized != effortMinimal {
-				levels = append(levels, normalized)
+				levels = append(levels, strings.TrimSpace(s))
 			}
 		}
 	}
@@ -126,7 +128,7 @@ func resolveModelEffort(rawEffort string, supportedLevels []string) (string, boo
 			continue
 		}
 		if rank <= target && rank > bestRank {
-			best = normalized
+			best = level
 			bestRank = rank
 		}
 	}
@@ -139,7 +141,7 @@ func resolveModelEffort(rawEffort string, supportedLevels []string) (string, boo
 		normalized := normalizeReasoningEffort(level)
 		rank, ok := effortOrder[normalized]
 		if ok && rank < lowestRank {
-			lowest = normalized
+			lowest = level
 			lowestRank = rank
 		}
 	}

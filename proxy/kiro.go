@@ -175,6 +175,7 @@ type KiroUserInputMessage struct {
 	ModelID                 string                   `json:"modelId,omitempty"`
 	Origin                  string                   `json:"origin"`
 	Images                  []KiroImage              `json:"images,omitempty"`
+	Documents               []KiroDocument           `json:"documents,omitempty"`
 	UserInputMessageContext *UserInputMessageContext `json:"userInputMessageContext,omitempty"`
 }
 

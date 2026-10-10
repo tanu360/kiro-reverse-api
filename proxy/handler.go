@@ -82,7 +82,7 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 
 	hasUserContext := false
 	lastRole := ""
-	for _, msg := range req.Messages {
+	for _, msg := range normalizeClaudeMessageRoles(req.Messages) {
 		role := strings.TrimSpace(msg.Role)
 		if role == "" {
 			continue
@@ -93,7 +93,7 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 		}
 
 		text, images, toolResults := extractClaudeUserContent(msg.Content)
-		if normalizeUserContent(text, len(images) > 0) != "" || len(toolResults) > 0 {
+		if normalizeUserContent(text, len(images) > 0) != "" || len(toolResults) > 0 || len(extractDocuments(msg.Content)) > 0 {
 			hasUserContext = true
 		}
 	}
@@ -201,7 +201,7 @@ func validateOpenAIRequestShape(req *OpenAIRequest) string {
 			continue
 		}
 		text, images := extractOpenAIUserContent(msg.Content)
-		if normalizeUserContent(text, len(images) > 0) != "" {
+		if normalizeUserContent(text, len(images) > 0) != "" || len(extractDocuments(msg.Content)) > 0 {
 			hasUserContext = true
 		}
 	}
@@ -860,6 +860,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 		h.sendClaudeError(w, 400, "invalid_request_error", "Failed to read request body")
 		return
 	}
+	body = inlineRemoteImages(r.Context(), body)
 
 	var req ClaudeRequest
 	if err := json.Unmarshal(body, &req); err != nil {
@@ -1627,6 +1628,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		h.sendOpenAIError(w, 400, "invalid_request_error", "Failed to read request body")
 		return
 	}
+	body = inlineRemoteImages(r.Context(), body)
 
 	var req OpenAIRequest
 	if err := json.Unmarshal(body, &req); err != nil {
