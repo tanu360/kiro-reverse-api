@@ -485,6 +485,7 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 
 func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRequest, thinking bool, estimatedInputTokens int) (*claudeWebSearchRound, *config.Account, error) {
 	payload := ClaudeToKiro(req, thinking)
+	h.applyReasoningEffort(payload, req.Model, claudeOutputEffort(req))
 	excluded := make(map[string]bool)
 	var lastErr error
 	var lastAccount *config.Account

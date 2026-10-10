@@ -897,6 +897,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	}
 
 	kiroPayload := ClaudeToKiro(&req, thinking)
+	h.applyReasoningEffort(kiroPayload, req.Model, claudeOutputEffort(&req))
 
 	if req.Stream {
 		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile, apiKeyReservation)
