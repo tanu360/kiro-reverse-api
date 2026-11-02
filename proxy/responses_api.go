@@ -313,10 +313,14 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			started := false
 			messageItemID := "msg_" + uuid.NewString()
 			messageAdded := false
+			messageDone := false
 			messageOutputIndex := -1
+			var messageText strings.Builder
 			reasoningItemID := "rs_" + uuid.NewString()
 			reasoningAdded := false
+			reasoningDone := false
 			reasoningOutputIndex := -1
+			var reasoningText strings.Builder
 			nextOutputIndex := 0
 			var outputItems []map[string]interface{}
 			reserveOutputItem := func(index int, item map[string]interface{}) {
@@ -340,8 +344,14 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			//! summary deltas for an item they never saw in response.output_item.added.
 			ensureReasoningAdded := func() {
 				ensureStarted()
-				if reasoningAdded {
+				if reasoningAdded && !reasoningDone {
 					return
+				}
+				if reasoningDone {
+					//! The previous reasoning item was closed by a tool call; later reasoning gets its own item.
+					reasoningItemID = "rs_" + uuid.NewString()
+					reasoningText.Reset()
+					reasoningDone = false
 				}
 				reasoningOutputIndex = nextOutputIndex
 				nextOutputIndex++
@@ -366,10 +376,12 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				})
 				reasoningAdded = true
 			}
-			finishReasoning := func(reasoning string) {
-				if !reasoningAdded {
+			finishReasoning := func() {
+				if !reasoningAdded || reasoningDone {
 					return
 				}
+				reasoningDone = true
+				reasoning := reasoningText.String()
 				reserveOutputItem(reasoningOutputIndex, buildResponsesReasoningOutputItemWithID(reasoningItemID, reasoning))
 				sendResponsesSSE(w, flusher, "response.reasoning_summary_text.done", map[string]interface{}{
 					"type":          "response.reasoning_summary_text.done",
@@ -393,8 +405,14 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			}
 			ensureMessageAdded := func() {
 				ensureStarted()
-				if messageAdded {
+				if messageAdded && !messageDone {
 					return
+				}
+				if messageDone {
+					//! Text after a tool call cannot reopen a closed item; it starts a new message.
+					messageItemID = "msg_" + uuid.NewString()
+					messageText.Reset()
+					messageDone = false
 				}
 				messageOutputIndex = nextOutputIndex
 				nextOutputIndex++
@@ -420,6 +438,33 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				messageAdded = true
 			}
 
+			finishMessage := func() {
+				if !messageAdded || messageDone {
+					return
+				}
+				messageDone = true
+				text := messageText.String()
+				reserveOutputItem(messageOutputIndex, buildResponsesMessageOutputItem(messageItemID, text))
+				sendResponsesSSE(w, flusher, "response.output_text.done", map[string]interface{}{
+					"type":          "response.output_text.done",
+					"item_id":       messageItemID,
+					"output_index":  messageOutputIndex,
+					"content_index": 0,
+					"text":          text,
+				})
+				sendResponsesSSE(w, flusher, "response.content_part.done", map[string]interface{}{
+					"type":          "response.content_part.done",
+					"item_id":       messageItemID,
+					"output_index":  messageOutputIndex,
+					"content_index": 0,
+					"part":          map[string]interface{}{"type": "output_text", "text": text, "annotations": []interface{}{}},
+				})
+				sendResponsesSSE(w, flusher, "response.output_item.done", map[string]interface{}{
+					"type":         "response.output_item.done",
+					"output_index": messageOutputIndex,
+					"item":         outputItems[messageOutputIndex],
+				})
+			}
 			//! Trim the newline the model leaves after <thinking> so clients do not render a
 			//! blank line above every reasoning block. Builder and deltas stay in sync.
 			emitReasoningDelta := func(text string) {
@@ -431,7 +476,10 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					sawReasoningText = true
 				}
 				reasoningBuilder.WriteString(text)
+				//! Only one item is open at a time; text before this reasoning is closed first.
+				finishMessage()
 				ensureReasoningAdded()
+				reasoningText.WriteString(text)
 				sendResponsesSSE(w, flusher, "response.reasoning_summary_text.delta", map[string]interface{}{
 					"type":          "response.reasoning_summary_text.delta",
 					"item_id":       reasoningItemID,
@@ -452,7 +500,9 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					sawVisibleText = true
 				}
 				contentBuilder.WriteString(text)
+				finishReasoning()
 				ensureMessageAdded()
+				messageText.WriteString(text)
 				sendResponsesSSE(w, flusher, "response.output_text.delta", map[string]interface{}{
 					"type":          "response.output_text.delta",
 					"item_id":       messageItemID,
@@ -486,6 +536,11 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				},
 				OnToolUse: func(tu KiroToolUse) {
 					ensureStarted()
+					//! Items stream one at a time: reasoning and text that precede the call are
+					//! closed before it, so clients record them in the order the model wrote them.
+					splitter.Flush(emitTextDelta, emitTagThinking)
+					finishReasoning()
+					finishMessage()
 					toolUses = append(toolUses, tu)
 					item := buildPreparedResponsesToolOutputItem(prepared, tu)
 					outputIndex := nextOutputIndex
@@ -594,7 +649,9 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			//! Reasoning recovered from inline <thinking> tags never streamed, so announce
 			//! it now and replay it as one delta before closing the item.
 			if reasoningContent != "" && !reasoningAdded {
+				finishMessage()
 				ensureReasoningAdded()
+				reasoningText.WriteString(reasoningContent)
 				sendResponsesSSE(w, flusher, "response.reasoning_summary_text.delta", map[string]interface{}{
 					"type":          "response.reasoning_summary_text.delta",
 					"item_id":       reasoningItemID,
@@ -603,30 +660,8 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					"delta":         reasoningContent,
 				})
 			}
-			finishReasoning(reasoningContent)
-
-			if messageAdded {
-				reserveOutputItem(messageOutputIndex, buildResponsesMessageOutputItem(messageItemID, finalContent))
-				sendResponsesSSE(w, flusher, "response.output_text.done", map[string]interface{}{
-					"type":          "response.output_text.done",
-					"item_id":       messageItemID,
-					"output_index":  messageOutputIndex,
-					"content_index": 0,
-					"text":          finalContent,
-				})
-				sendResponsesSSE(w, flusher, "response.content_part.done", map[string]interface{}{
-					"type":          "response.content_part.done",
-					"item_id":       messageItemID,
-					"output_index":  messageOutputIndex,
-					"content_index": 0,
-					"part":          map[string]interface{}{"type": "output_text", "text": finalContent, "annotations": []interface{}{}},
-				})
-				sendResponsesSSE(w, flusher, "response.output_item.done", map[string]interface{}{
-					"type":         "response.output_item.done",
-					"output_index": messageOutputIndex,
-					"item":         outputItems[messageOutputIndex],
-				})
-			}
+			finishReasoning()
+			finishMessage()
 			if !messageAdded && len(toolUses) == 0 {
 				reserveOutputItem(nextOutputIndex, buildResponsesMessageOutputItem(messageItemID, finalContent))
 				nextOutputIndex++
