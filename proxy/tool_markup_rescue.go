@@ -427,6 +427,13 @@ func (f *toolMarkupFilter) stepCalls(final bool) bool {
 // parseInvoke reads one complete <invoke> block for a declared tool at the start of s
 // and records it. It returns the bytes consumed on success.
 func (f *toolMarkupFilter) parseInvoke(s string, tags *toolMarkupTags) (int, markupParse) {
+	//! A wrapper can arrive before its first invoke, so s may still be empty or a tag prefix.
+	if !strings.HasPrefix(s, tags.invokeOpen) {
+		if isPartialTag(s, tags.invokeOpen) {
+			return 0, markupNeedMore
+		}
+		return 0, markupInvalid
+	}
 	name, pos, status := markupName(s, len(tags.invokeOpen))
 	if status != markupComplete {
 		return 0, status

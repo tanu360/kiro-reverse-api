@@ -368,3 +368,29 @@ func TestToolMarkupFilterRescuesRunFollowedOnlyByWhitespace(t *testing.T) {
 		}
 	}
 }
+
+func TestToolMarkupFilterRescuesSecondWrapperBlock(t *testing.T) {
+	first := "<function_calls>\n<invoke name=\"Read\"><parameter name=\"path\">/a</parameter></invoke>\n</function_calls>\n"
+	second := "<function_calls>\n<invoke name=\"Bash\"><parameter name=\"command\">pwd</parameter></invoke>\n</function_calls>"
+	for name, chunks := range map[string][]string{
+		"whole":      {first, second},
+		"every byte": byteChunks(first + second),
+		"bare open":  {first, "<function_calls>", "\n", second[len("<function_calls>\n"):]},
+	} {
+		text, tools := runMarkupFilter(t, chunks)
+		if strings.TrimSpace(text) != "" {
+			t.Fatalf("%s: text = %q, want no visible markup", name, text)
+		}
+		if len(tools) != 2 || tools[0].Name != "Read" || tools[1].Name != "Bash" {
+			t.Fatalf("%s: tools = %#v", name, tools)
+		}
+	}
+}
+
+func TestToolMarkupFilterReleasesWrapperWithoutInvokeAfterRun(t *testing.T) {
+	in := "<function_calls>\n<invoke name=\"Read\"><parameter name=\"path\">/a</parameter></invoke>\n</function_calls>\n<function_calls>"
+	text, tools := runMarkupFilter(t, []string{in})
+	if len(tools) != 0 || !strings.Contains(text, "<invoke name=\"Read\">") {
+		t.Fatalf("a run followed by a dangling wrapper is not the end of the turn: text=%q tools=%#v", text, tools)
+	}
+}
