@@ -124,6 +124,8 @@ type toolMarkupFilter struct {
 	inThinking bool
 	// calls is the dialect of a run of rescued invokes whose closing wrapper may still follow.
 	calls *toolMarkupTags
+	// wrapped is true while that run sits inside a <function_calls> block whose closing tag has not been seen.
+	wrapped bool
 	// run holds the parsed invokes of the current run and runRaw their markup. The run is
 	// committed when the stream ends with only whitespace after it, and released as text otherwise.
 	run     []KiroToolUse
@@ -266,6 +268,7 @@ func (f *toolMarkupFilter) stepAfterRun(final bool, out *strings.Builder) bool {
 			f.runRaw.WriteString(f.buf[:consumed])
 			f.buf = f.buf[consumed:]
 			f.calls = tags
+			f.wrapped = body != rest
 			return true
 		}
 		break
@@ -381,6 +384,7 @@ func (f *toolMarkupFilter) stepTag(final bool, out *strings.Builder) bool {
 			f.runRaw.WriteString(f.buf[:offset+n])
 			f.buf = f.buf[offset+n:]
 			f.calls = tags
+			f.wrapped = offset > 0
 			return true
 		}
 		if status == markupNeedMore && !final {
@@ -407,6 +411,7 @@ func (f *toolMarkupFilter) stepCalls(final bool) bool {
 		f.runRaw.WriteString(f.buf[:skipped+len(tags.callsClose)])
 		f.buf = rest[len(tags.callsClose):]
 		f.calls = nil
+		f.wrapped = false
 		return true
 	case strings.HasPrefix(rest, tags.invokeOpen):
 		n, status := f.parseInvoke(rest, tags)
@@ -422,12 +427,16 @@ func (f *toolMarkupFilter) stepCalls(final bool) bool {
 		if !final {
 			return false
 		}
+	case final && f.wrapped && isPartialTag(rest, tags.callsClose):
+		//! A stream cut inside the closing tag still ended on a finished call; the stub is not text.
+		f.buf = ""
 	case isPartialTag(rest, tags.callsClose) || isPartialTag(rest, tags.invokeOpen):
 		if !final {
 			return false
 		}
 	}
 	f.calls = nil
+	f.wrapped = false
 	return true
 }
 

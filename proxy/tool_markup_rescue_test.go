@@ -424,3 +424,35 @@ func TestToolMarkupFilterDropsOnlyAsManyDuplicatesAsRealCalls(t *testing.T) {
 		t.Fatalf("one real call covers one markup copy, the other must run; got %#v", tools)
 	}
 }
+
+func TestToolMarkupFilterRescuesRunWithTruncatedClosingWrapper(t *testing.T) {
+	inv := `<invoke name="Bash"><parameter name="command">ls</parameter></invoke>`
+	for _, tail := range []string{"<", "</", "</function_ca", "\n</function_calls"} {
+		in := "Go. <function_calls>" + inv + tail
+		for _, chunks := range [][]string{{in}, byteChunks(in)} {
+			text, tools := runMarkupFilter(t, chunks)
+			if text != "Go. " || len(tools) != 1 {
+				t.Fatalf("tail %q: text=%q tools=%#v, want the call rescued and no stray tag bytes", tail, text, tools)
+			}
+		}
+	}
+}
+
+func TestToolMarkupFilterKeepsBareRunFollowedByAngleBracketAsText(t *testing.T) {
+	in := `x <invoke name="Bash"><parameter name="command">ls</parameter></invoke><`
+	text, tools := runMarkupFilter(t, byteChunks(in))
+	if text != in || len(tools) != 0 {
+		t.Fatalf("text=%q tools=%#v, a bare run with trailing text is not a clean turn end", text, tools)
+	}
+}
+
+func TestToolMarkupFilterRescuesSecondWrapperWithTruncatedClosing(t *testing.T) {
+	inv := `<invoke name="Bash"><parameter name="command">ls</parameter></invoke>`
+	in := "<function_calls>" + inv + "</function_calls>\n<function_calls>" + inv + "</fun"
+	for _, chunks := range [][]string{{in}, byteChunks(in)} {
+		text, tools := runMarkupFilter(t, chunks)
+		if strings.TrimSpace(text) != "" || len(tools) != 2 {
+			t.Fatalf("text=%q tools=%#v", text, tools)
+		}
+	}
+}
