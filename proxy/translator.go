@@ -18,13 +18,24 @@ var claudeVersionPattern = regexp.MustCompile(`^(claude-(?:opus|sonnet|haiku)-\d
 const ThinkingModePrompt = `<thinking_mode>enabled</thinking_mode>
 <max_thinking_length>200000</max_thinking_length>`
 
-const minimalFallbackUserContent = "."
+//! A bare "." replayed across a long history taught the model to answer "." and
+//! hid that the turn was an automated continuation (upstream PR #168).
+
+const minimalFallbackUserContent = "[No new user text in this turn. Continue from the conversation above.]"
 const toolResultsContinuationPrefix = "Tool results:"
 const toolResultImagePlaceholder = "[Tool returned an image; the image is attached to this message.]"
 
 const maxPayloadBytes = 900 * 1024
 const truncationPlaceholder = "[Earlier conversation history was truncated to fit the model's input limit. Older messages and tool activity have been omitted.]"
 const minRecentHistoryTurns = 4
+
+//! Every turn replays the whole history, so each earlier screenshot was re-sent on
+//! every request, unbounded and outside maxPayloadBytes. Only the newest historical
+//! images stay inline; current-turn images are never touched.
+
+const maxHistoryImages = 4
+const maxHistoryImageBytes = 2 << 20
+const historyImageOmittedNote = "removed from this earlier turn to keep the request small"
 
 func ParseModelAndThinking(model string, thinkingSuffix string) (string, bool) {
 	lower := strings.ToLower(model)
@@ -316,6 +327,7 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		}
 	}
 
+	limitHistoryImages(payload.ConversationState.History)
 	truncatePayloadToLimit(payload, systemPrompt != "")
 
 	return payload
@@ -1267,6 +1279,7 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		}
 	}
 
+	limitHistoryImages(payload.ConversationState.History)
 	truncatePayloadToLimit(payload, systemPrompt != "")
 
 	for _, tool := range req.Tools {
@@ -1495,6 +1508,9 @@ func sanitizeKiroHistoryKeeping(history []KiroHistoryMessage, currentToolResultI
 			ctx := msg.UserInputMessage.UserInputMessageContext
 			if len(ctx.ToolResults) > 0 && !keep[i] {
 				narrated := narrateToolResults(ctx.ToolResults, toolNames)
+				if strings.TrimSpace(msg.UserInputMessage.Content) == minimalFallbackUserContent {
+					msg.UserInputMessage.Content = ""
+				}
 				msg.UserInputMessage.Content = joinHistoryText(msg.UserInputMessage.Content, narrated)
 				ctx.ToolResults = nil
 			}
@@ -1514,7 +1530,8 @@ func sanitizeKiroHistoryKeeping(history []KiroHistoryMessage, currentToolResultI
 		msg := history[i]
 		if msg.AssistantResponseMessage != nil && len(msg.AssistantResponseMessage.ToolUses) == 0 {
 			c := strings.TrimSpace(msg.AssistantResponseMessage.Content)
-			if c == "" || c == minimalFallbackUserContent {
+			//! "." is what older builds used as the fallback; clients still replay it.
+			if c == "" || c == "." || c == minimalFallbackUserContent {
 				continue
 			}
 		}
@@ -1532,6 +1549,48 @@ func sanitizeKiroHistoryKeeping(history []KiroHistoryMessage, currentToolResultI
 	}
 
 	return trimLeadingAssistantHistory(cleaned)
+}
+
+// limitHistoryImages keeps the newest historical images within maxHistoryImages and
+// maxHistoryImageBytes (base64 length) and replaces older ones with a note.
+func limitHistoryImages(history []KiroHistoryMessage) {
+	count, size := 0, 0
+	full := false
+	for i := len(history) - 1; i >= 0; i-- {
+		msg := history[i].UserInputMessage
+		if msg == nil || len(msg.Images) == 0 {
+			continue
+		}
+		kept := 0
+		for j := len(msg.Images) - 1; j >= 0; j-- {
+			n := len(msg.Images[j].Source.Bytes)
+			if full || count >= maxHistoryImages || size+n > maxHistoryImageBytes {
+				//! Keeping an older image after dropping a newer one would scramble the timeline.
+				full = true
+				break
+			}
+			count++
+			size += n
+			kept++
+		}
+		removed := len(msg.Images) - kept
+		if removed == 0 {
+			continue
+		}
+		msg.Images = msg.Images[removed:]
+		if len(msg.Images) == 0 {
+			msg.Images = nil
+		}
+		note := "[An image was " + historyImageOmittedNote + ".]"
+		if removed > 1 {
+			note = fmt.Sprintf("[%d images were %s.]", removed, historyImageOmittedNote)
+		}
+		content := msg.Content
+		if strings.TrimSpace(content) == normalizeUserContent("", true) && len(msg.Images) == 0 {
+			content = ""
+		}
+		msg.Content = joinHistoryText(content, note)
+	}
 }
 
 func truncatePayloadToLimit(payload *KiroPayload, hasPriming bool) {
