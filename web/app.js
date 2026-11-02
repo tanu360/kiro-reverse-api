@@ -1656,6 +1656,8 @@
     $('allowOverUsage').checked = d.allowOverUsage || false;
     $('lenientStreamIntegrity').checked = d.lenientStreamIntegrity || false;
     $('sessionAffinity').checked = d.sessionAffinity !== false;
+    $('autoContinue').checked = d.autoContinue || false;
+    $('autoContinueMax').value = d.autoContinueMax || 3;
     $('structuredToolHistory').checked = d.structuredToolHistory !== false;
     await Promise.all([loadApiKeys(), loadThinkingConfig(), loadModelMappings(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
     syncApiKeyManagementVisibility();
@@ -2103,6 +2105,17 @@
     const sessionAffinity = $('sessionAffinity').checked;
     await api('/settings', { method: 'POST', body: JSON.stringify({ sessionAffinity }) });
     toast(t('settings.routingSaved'), 'success');
+  }
+  async function saveAutoContinueConfig() {
+    const autoContinue = $('autoContinue').checked;
+    const autoContinueMax = Number($('autoContinueMax').value);
+    if (!Number.isInteger(autoContinueMax) || autoContinueMax < 1 || autoContinueMax > 10) {
+      return toast(t('settings.autoContinueMaxInvalid', 10), 'warning');
+    }
+    const res = await api('/settings', { method: 'POST', body: JSON.stringify({ autoContinue, autoContinueMax }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.success === false) return toast(localizedError(d.error) || t('common.saveFailed'), 'error');
+    toast(t('settings.autoContinueSaved'), 'success');
   }
   async function saveToolHistoryConfig() {
     const structuredToolHistory = $('structuredToolHistory').checked;
@@ -3597,6 +3610,7 @@
     $('saveOverUsageBtn').addEventListener('click', saveOverUsageConfig);
     $('saveStreamIntegrityBtn').addEventListener('click', saveStreamIntegrityConfig);
     $('saveRoutingBtn').addEventListener('click', saveRoutingConfig);
+    $('saveAutoContinueBtn').addEventListener('click', saveAutoContinueConfig);
     $('saveToolHistoryBtn').addEventListener('click', saveToolHistoryConfig);
     $('saveThinkingBtn').addEventListener('click', saveThinkingConfig);
     $('saveEndpointBtn').addEventListener('click', saveEndpointConfig);

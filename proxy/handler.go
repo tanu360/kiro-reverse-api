@@ -1306,7 +1306,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				},
 			}
 
-			err := CallKiroAPIContext(r.Context(), account, payload, callback)
+			err := callKiroAutoContinue(r.Context(), account, payload, callback, CallKiroAPIContext)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -1525,7 +1525,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				},
 			}
 
-			err := CallKiroAPIContext(r.Context(), account, payload, callback)
+			err := callKiroAutoContinue(r.Context(), account, payload, callback, CallKiroAPIContext)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -2015,7 +2015,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				},
 			}
 
-			err := callKiroWithHostedSearch(r.Context(), account, payload, callback)
+			err := callKiroAutoContinue(r.Context(), account, payload, callback, callKiroWithHostedSearch)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -2175,7 +2175,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				},
 			}
 
-			err := callKiroWithHostedSearch(r.Context(), account, payload, callback)
+			err := callKiroAutoContinue(r.Context(), account, payload, callback, callKiroWithHostedSearch)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -3401,6 +3401,8 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"allowOverUsage":         config.GetAllowOverUsage(),
 		"lenientStreamIntegrity": config.GetLenientStreamIntegrity(),
 		"sessionAffinity":        config.GetSessionAffinity(),
+		"autoContinue":           config.GetAutoContinue(),
+		"autoContinueMax":        config.GetAutoContinueMax(),
 		"structuredToolHistory":  config.GetStructuredToolHistory(),
 	})
 }
@@ -3484,11 +3486,19 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		AllowOverUsage         *bool  `json:"allowOverUsage,omitempty"`
 		LenientStreamIntegrity *bool  `json:"lenientStreamIntegrity,omitempty"`
 		SessionAffinity        *bool  `json:"sessionAffinity,omitempty"`
+		AutoContinue           *bool  `json:"autoContinue,omitempty"`
+		AutoContinueMax        *int   `json:"autoContinueMax,omitempty"`
 		StructuredToolHistory  *bool  `json:"structuredToolHistory,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		return
+	}
+
+	if req.AutoContinueMax != nil && (*req.AutoContinueMax < 1 || *req.AutoContinueMax > config.MaxAutoContinueMax) {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("autoContinueMax must be between 1 and %d", config.MaxAutoContinueMax)})
 		return
 	}
 
@@ -3528,6 +3538,22 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.SessionAffinity != nil {
 		if err := config.UpdateSessionAffinity(*req.SessionAffinity); err != nil {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+	}
+
+	if req.AutoContinue != nil {
+		if err := config.UpdateAutoContinue(*req.AutoContinue); err != nil {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+	}
+
+	if req.AutoContinueMax != nil {
+		if err := config.UpdateAutoContinueMax(*req.AutoContinueMax); err != nil {
 			w.WriteHeader(500)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return

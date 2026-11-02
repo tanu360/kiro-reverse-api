@@ -183,7 +183,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				},
 			}
 
-			err := callKiroWithHostedSearch(ctx, account, payload, callback)
+			err := callKiroAutoContinue(ctx, account, payload, callback, callKiroWithHostedSearch)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(ctx, apiKeyReservation, account, model)
@@ -535,7 +535,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				},
 			}
 
-			err := callKiroWithHostedSearch(ctx, account, payload, callback)
+			err := callKiroAutoContinue(ctx, account, payload, callback, callKiroWithHostedSearch)
 			if err != nil {
 				if isContextCanceledError(err) {
 					recordClientDisconnect(ctx, apiKeyReservation, account, model)

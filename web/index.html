@@ -477,6 +477,23 @@
         </div>
 
         <div class="card">
+          <div class="card-header"><span class="card-title" data-i18n="settings.autoContinue"></span></div>
+          <div class="form-group">
+            <label class="flex items-center gap-2">
+              <span class="switch"><input type="checkbox" id="autoContinue" /><span class="slider"></span></span>
+              <span data-i18n="settings.autoContinueEnable"></span>
+            </label>
+            <small data-i18n="settings.autoContinueHint"></small>
+          </div>
+          <div class="form-group">
+            <label for="autoContinueMax" data-i18n="settings.autoContinueMax"></label>
+            <input type="number" id="autoContinueMax" min="1" max="10" step="1" value="3" />
+            <small data-i18n="settings.autoContinueMaxHint"></small>
+          </div>
+          <button class="btn btn-primary" id="saveAutoContinueBtn" data-i18n="settings.saveAutoContinue"></button>
+        </div>
+
+        <div class="card">
           <div class="card-header"><span class="card-title" data-i18n="settings.toolHistory"></span></div>
           <div class="form-group">
             <label class="flex items-center gap-2">

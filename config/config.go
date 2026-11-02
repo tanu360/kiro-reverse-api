@@ -154,6 +154,9 @@ type Config struct {
 
 	ProxyURL string `json:"proxyURL,omitempty"`
 
+	AutoContinue    bool `json:"autoContinue,omitempty"`
+	AutoContinueMax int  `json:"autoContinueMax,omitempty"`
+
 	FilterClaudeCode bool `json:"filterClaudeCode,omitempty"`
 
 	FilterEnvNoise bool `json:"filterEnvNoise,omitempty"`
