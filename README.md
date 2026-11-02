@@ -216,6 +216,7 @@ Admin password authentication allows five failed attempts per client per minute,
 | ---------------- | ----------------------------------------- | ------------------ |
 | `DATA_DIR`        | Directory for `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)   | —                  |
+| `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 
 > [!WARNING]
 > `kiro.db` holds OAuth tokens and admin credentials. Treat it as secret — keep it out of git, screenshots, and chat threads. Mount the database directory as a private volume.
@@ -322,6 +323,7 @@ For users in restricted network regions, configure an outbound proxy in the admi
 | ---------------- | ---------------------------------------- | ------------------ |
 | `DATA_DIR`        | Directory for `kiro.db`                  | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)  | —                  |
+| `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 
 ```diff
 + kiro.db                # local state — config, credentials, SQLite history, backup blobs

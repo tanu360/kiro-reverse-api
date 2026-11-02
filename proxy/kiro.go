@@ -238,6 +238,9 @@ type KiroStreamCallback struct {
 	OnStopReason   func(reason string)
 	//! Called only when Kiro itself reports cache counts; both are already part of OnComplete's input total.
 	OnCacheUsage func(cacheReadTokens, cacheWriteTokens int)
+
+	// markupTools maps declared upstream tool names to parameter types; leaked call markup for them is rescued.
+	markupTools map[string]map[string]string
 }
 
 func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Account) {
@@ -348,6 +351,7 @@ func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payloa
 		}
 		callback = &wrapped
 	}
+	callback = withToolMarkupRescue(callback, payload)
 
 	isAPIKey := config.IsAPIKeyAccount(account)
 	if payload != nil && strings.TrimSpace(payload.ProfileArn) == "" && !isAPIKey {
@@ -549,17 +553,29 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		}
 	}
 	markInlineThinking := func(string) { turn.sawInlineThinking = true }
+	markup := newToolMarkupFilter(callback.markupTools)
 
 	tracked := *callback
 	originalOnToolUse := tracked.OnToolUse
 	tracked.OnToolUse = func(toolUse KiroToolUse) {
 		turn.toolCount++
+		markup.markSeen(toolUse)
 		if originalOnToolUse != nil {
 			emitted = true
 			originalOnToolUse(toolUse)
 		}
 	}
 	callback = &tracked
+	emitAssistantText := func(content string) {
+		if content == "" {
+			return
+		}
+		inlineThinking.Push(content, markAnswer, markInlineThinking)
+		if callback.OnText != nil {
+			emitted = true
+			callback.OnText(content, false)
+		}
+	}
 
 	//! Read directly from the stream so SSE chunks are not delayed by buffering.
 	for {
@@ -624,11 +640,7 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		switch eventType {
 		case "assistantResponseEvent":
 			if content, ok := event["content"].(string); ok && content != "" {
-				inlineThinking.Push(content, markAnswer, markInlineThinking)
-				if callback.OnText != nil {
-					emitted = true
-					callback.OnText(content, false)
-				}
+				emitAssistantText(markup.Push(content))
 			}
 		case "reasoningContentEvent":
 			if text, ok := event["text"].(string); ok && text != "" {
@@ -658,6 +670,8 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 	if err := pending.flushAll(callback); err != nil {
 		return emitted, err
 	}
+	emitAssistantText(markup.Flush())
+	markup.emitRescued(callback)
 	inlineThinking.Flush(markAnswer, markInlineThinking)
 	logger.Debugf("[KiroAPI] Stream end: content=%t reasoning=%t inlineThinking=%t tools=%d stopReason=%q trailer=%t",
 		turn.sawContent, turn.sawReasoning, turn.sawInlineThinking, turn.toolCount, turn.stopReason, turn.sawTrailer)
