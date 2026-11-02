@@ -555,6 +555,8 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					}
 					break
 				}
+				//! The client already holds part of the answer; hand over the held-back tail before the failure.
+				splitter.Flush(emitTextDelta, emitTagThinking)
 				sendResponsesSSE(w, flusher, "response.failed", map[string]interface{}{
 					"type": "response.failed",
 					"response": map[string]interface{}{
