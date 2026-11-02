@@ -73,6 +73,10 @@ var kiroRestHttpStore atomic.Pointer[http.Client]
 
 var proxyClientCache sync.Map
 
+// maxUpstreamErrorBytes bounds how much of a non-200 upstream body is kept for
+// the error message and quota checks.
+const maxUpstreamErrorBytes = 64 << 10
+
 func init() {
 	InitKiroHttpClient("")
 }
@@ -428,7 +432,8 @@ endpointLoop:
 			}
 
 			if resp.StatusCode != 200 {
-				errBody, _ := io.ReadAll(resp.Body)
+				//! Error bodies are short JSON; the cap keeps a misbehaving endpoint from filling memory.
+				errBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamErrorBytes))
 				resp.Body.Close()
 				lastErr = fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, ep.Name, string(errBody))
 				if isClientHTTPStatus(resp.StatusCode) {
