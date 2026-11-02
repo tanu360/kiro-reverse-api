@@ -43,6 +43,8 @@ type Account struct {
 	ExpiresAt    int64  `json:"expiresAt,omitempty"`
 	MachineId    string `json:"machineId,omitempty"`
 	ProfileArn   string `json:"profileArn,omitempty"`
+	//! A pinned ARN is an operator choice; discovery and refresh responses must not move the account back.
+	ProfileArnPinned bool `json:"profileArnPinned,omitempty"`
 
 	//! Microsoft Enterprise SSO (AuthMethod "external_idp") refreshes against the tenant's Entra token endpoint, not AWS OIDC.
 	TokenEndpoint string `json:"tokenEndpoint,omitempty"`
@@ -438,6 +440,7 @@ func preserveAccountCredentials(account *Account, current Account) {
 	account.StartUrl = current.StartUrl
 	account.ExpiresAt = current.ExpiresAt
 	account.ProfileArn = current.ProfileArn
+	account.ProfileArnPinned = current.ProfileArnPinned
 	account.TokenEndpoint = current.TokenEndpoint
 	account.IssuerURL = current.IssuerURL
 	account.Scopes = current.Scopes
@@ -545,7 +548,31 @@ func UpdateAccountProfileArn(id, profileArn string) error {
 	defer cfgLock.Unlock()
 	for i, a := range cfg.Accounts {
 		if a.ID == id {
+			if a.ProfileArnPinned {
+				return nil
+			}
 			cfg.Accounts[i].ProfileArn = profileArn
+			return Save()
+		}
+	}
+	return fmt.Errorf("account not found: %s", id)
+}
+
+// PinAccountProfileArn stores an operator-chosen profile ARN that automatic
+// resolution will not replace. An empty ARN clears the pin and the ARN so the
+// next request resolves the profile automatically again.
+func PinAccountProfileArn(id, profileArn string) error {
+	profileArn = strings.TrimSpace(profileArn)
+	if CredentialsLoaded() {
+		return PinCredentialProfileArn(id, profileArn)
+	}
+
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	for i, a := range cfg.Accounts {
+		if a.ID == id {
+			cfg.Accounts[i].ProfileArn = profileArn
+			cfg.Accounts[i].ProfileArnPinned = profileArn != ""
 			return Save()
 		}
 	}

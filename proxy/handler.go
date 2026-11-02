@@ -2342,6 +2342,13 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/overage")
 		h.apiSetAccountOverage(w, r, id)
 
+	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/profiles") && r.Method == "GET":
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/profiles")
+		h.apiGetAccountProfiles(w, r, id)
+	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/profile") && r.Method == "POST":
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/profile")
+		h.apiSetAccountProfile(w, r, id)
+
 	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/full") && r.Method == "GET":
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/full")
 		h.apiGetAccountFull(w, r, id)
@@ -2476,6 +2483,9 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 			"authMethod":        a.AuthMethod,
 			"provider":          a.Provider,
 			"region":            a.Region,
+			"profileArn":        a.ProfileArn,
+			"profileArnPinned":  a.ProfileArnPinned,
+			"activeRegion":      kiroRegionForProfile(&a, ""),
 			"enabled":           a.Enabled,
 			"silent":            a.Silent,
 			"silentReason":      a.SilentReason,
@@ -3728,6 +3738,7 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		"provider":          account.Provider,
 		"region":            account.Region,
 		"profileArn":        account.ProfileArn,
+		"profileArnPinned":  account.ProfileArnPinned,
 		"tokenEndpoint":     account.TokenEndpoint,
 		"issuerUrl":         account.IssuerURL,
 		"scopes":            account.Scopes,

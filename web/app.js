@@ -1248,6 +1248,8 @@
       detailItem(t('detail.region'), a.region || 'us-east-1') +
       '</div></div>' +
 
+      renderProfileSection(a, idAttr) +
+
       '<div class="detail-section"><h4>' + escapeHtml(t('detail.machineId')) + '</h4><div class="machine-id-row">' +
       '<input type="text" id="machineIdInput" value="' + escapeAttr(a.machineId || '') + '" placeholder="' + escapeAttr(t('detail.machineIdPlaceholder')) + '" />' +
       '<button class="btn btn-sm btn-outline" id="generateMachineIdBtn" type="button">' + escapeHtml(t('detail.generate')) + '</button>' +
@@ -1307,6 +1309,81 @@
       '</div>';
 
     openDialog('detailModal');
+  }
+  //! API-key accounts route by their imported region and have no Kiro profile to pick.
+  function renderProfileSection(a, idAttr) {
+    if (String(a.authMethod || '').toLowerCase() === 'api_key') return '';
+    return '<div class="detail-section">' +
+      '<div class="detail-section-header">' +
+      '<h4>' + escapeHtml(t('detail.profile')) + '</h4>' +
+      '<button class="btn btn-sm btn-outline" data-detail-action="loadProfiles" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.profileLoad')) + '</button>' +
+      '</div>' +
+      '<div class="detail-grid">' +
+      detailItem(t('detail.profileRegion'), a.activeRegion || 'us-east-1') +
+      detailItem(t('detail.profileMode'), a.profileArnPinned ? t('detail.profilePinned') : t('detail.profileAuto')) +
+      '</div>' +
+      '<p class="help-block">' + escapeHtml(t('detail.profileHint')) + '</p>' +
+      '<div id="profileList"></div>' +
+      '</div>';
+  }
+  async function loadAccountProfiles(id) {
+    const c = $('profileList');
+    if (!c) return;
+    c.innerHTML = '<p class="empty-state">' + escapeHtml(t('detail.loading')) + '</p>';
+    try {
+      const res = await api('/accounts/' + encodeURIComponent(id) + '/profiles');
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.success === false) {
+        c.innerHTML = '<p class="message message-error">' + escapeHtml(t('detail.loadFailed')) + (d.error ? ': ' + escapeHtml(localizedError(d.error)) : '') + '</p>';
+        return;
+      }
+      const profiles = d.profiles || [];
+      if (!profiles.length) {
+        c.innerHTML = '<p class="empty-state">' + escapeHtml(t('detail.profileNone')) + '</p>';
+        return;
+      }
+      const idAttr = escapeAttr(id);
+      const hasCurrent = profiles.some(p => p.current);
+      c.innerHTML =
+        '<div class="form-group microsoft-profile-list">' + profiles.map((p, i) =>
+          '<label class="microsoft-profile-card"><input type="radio" name="accountProfile" value="' + escapeAttr(p.arn) + '"' + ((p.current || (!hasCurrent && i === 0)) ? ' checked' : '') + ' />' +
+          '<span class="microsoft-profile-body"><span class="microsoft-profile-name">' + escapeHtml(p.name || p.arn) +
+          (p.current ? ' <span class="badge badge-success">' + escapeHtml(t('detail.profileCurrent')) + '</span>' : '') + '</span>' +
+          '<span class="microsoft-profile-meta">' + escapeHtml(p.region || '') + '</span>' +
+          (p.name ? '<span class="microsoft-profile-meta font-mono">' + escapeHtml(p.arn) + '</span>' : '') + '</span></label>').join('') + '</div>' +
+        '<div class="flex gap-2">' +
+        '<button class="btn btn-sm btn-primary" data-detail-action="pinProfile" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.profileUse')) + '</button>' +
+        (d.pinned ? '<button class="btn btn-sm btn-outline" data-detail-action="unpinProfile" data-id="' + idAttr + '" type="button">' + escapeHtml(t('detail.profileUnpin')) + '</button>' : '') +
+        '</div>';
+    } catch (e) {
+      c.innerHTML = '<p class="message message-error">' + escapeHtml(t('detail.loadFailed')) + '</p>';
+    }
+  }
+  async function setAccountProfile(id, profileArn) {
+    const dismiss = toast(t('detail.profileSaving'), 'info', { duration: 0 });
+    try {
+      const res = await api('/accounts/' + encodeURIComponent(id) + '/profile', {
+        method: 'POST',
+        body: JSON.stringify({ profileArn })
+      });
+      const d = await res.json().catch(() => ({}));
+      dismiss();
+      if (!res.ok || d.success === false) {
+        toast(t('detail.saveFailed') + (d.error ? ': ' + localizedError(d.error) : ''), 'error');
+        return;
+      }
+      toast(d.pinned ? t('detail.profilePinnedTo', d.region || '') : t('detail.profileAutoRestored'), 'success');
+      await loadAccounts();
+      showDetail(id);
+    } catch (e) {
+      dismiss();
+      toast(t('detail.saveFailed'), 'error');
+    }
+  }
+  function pinSelectedProfile(id) {
+    const picked = document.querySelector('input[name="accountProfile"]:checked');
+    if (!picked) return toastWarning(t('detail.profileNone'));
+    setAccountProfile(id, picked.value);
   }
   async function loadModels(id) {
     const c = $('modelsList');
@@ -3645,6 +3722,9 @@
       else if (a === 'saveProxyURL') saveProxyURL(id);
       else if (a === 'loadModels') loadModels(id);
       else if (a === 'refreshModels') refreshAccountModels(id);
+      else if (a === 'loadProfiles') loadAccountProfiles(id);
+      else if (a === 'pinProfile') pinSelectedProfile(id);
+      else if (a === 'unpinProfile') setAccountProfile(id, '');
     });
     $('detailBody').addEventListener('change', e => {
       if (e.target && e.target.id === 'overageSwitchInput') {

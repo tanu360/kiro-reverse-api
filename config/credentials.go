@@ -177,7 +177,23 @@ func UpdateCredentialProfileArn(id, profileArn string) error {
 	defer credLock.Unlock()
 	for i := range credentials {
 		if credentials[i].ID == id {
+			if credentials[i].ProfileArnPinned {
+				return nil
+			}
 			credentials[i].ProfileArn = profileArn
+			return saveCredentialsLocked()
+		}
+	}
+	return fmt.Errorf("credential not found: %s", id)
+}
+
+func PinCredentialProfileArn(id, profileArn string) error {
+	credLock.Lock()
+	defer credLock.Unlock()
+	for i := range credentials {
+		if credentials[i].ID == id {
+			credentials[i].ProfileArn = profileArn
+			credentials[i].ProfileArnPinned = profileArn != ""
 			return saveCredentialsLocked()
 		}
 	}
