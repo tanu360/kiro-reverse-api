@@ -18,6 +18,8 @@ type AccountPool struct {
 	cooldowns     map[string]time.Time
 	errorCounts   map[string]int
 	modelLists    map[string]map[string]bool
+	// enabledIDs lists every enabled account, including over-limit ones Reload keeps out of rotation.
+	enabledIDs []string
 }
 
 var (
@@ -46,7 +48,9 @@ func (p *AccountPool) Reload() {
 	enabled := config.GetEnabledAccounts()
 	allowOverUsage := config.GetAllowOverUsage()
 	var weighted []config.Account
+	enabledIDs := make([]string, 0, len(enabled))
 	for _, a := range enabled {
+		enabledIDs = append(enabledIDs, a.ID)
 		if isOverUsageLimit(a) && !isUpstreamOverageEnabled(a) && !allowOverUsage {
 			continue
 		}
@@ -56,6 +60,7 @@ func (p *AccountPool) Reload() {
 		}
 	}
 	p.accounts = weighted
+	p.enabledIDs = enabledIDs
 	p.totalAccounts = len(enabled)
 	if len(weighted) == 0 {
 		p.currentIndex = 0
@@ -114,8 +119,15 @@ func (p *AccountPool) accountHasModel(accountID, model string) bool {
 func (p *AccountPool) OffersModel(model string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	if len(p.accounts) == 0 || strings.TrimSpace(model) == "" {
+	if (len(p.accounts) == 0 && len(p.enabledIDs) == 0) || strings.TrimSpace(model) == "" {
 		return true
+	}
+	//! Over-limit accounts are out of rotation but still offer their models: a model only
+	//! they list is a quota problem (503), not an unknown model (404).
+	for _, id := range p.enabledIDs {
+		if p.accountHasModel(id, model) {
+			return true
+		}
 	}
 	for i := range p.accounts {
 		if p.accountHasModel(p.accounts[i].ID, model) {

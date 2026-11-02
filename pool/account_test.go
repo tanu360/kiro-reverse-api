@@ -512,3 +512,29 @@ func TestOffersModel(t *testing.T) {
 		t.Fatal("a model no account lists must not be offered")
 	}
 }
+
+func TestOffersModelCountsOverLimitAccountsOutOfRotation(t *testing.T) {
+	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "pro", Enabled: true, UsageCurrent: 10, UsageLimit: 10}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "free", Enabled: true}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+	p := newTestPool()
+	p.Reload()
+	p.SetModelList("pro", []string{"claude-opus-5", "claude-sonnet-5"})
+	p.SetModelList("free", []string{"claude-sonnet-5"})
+
+	if acc := p.GetNextForModel("claude-opus-5"); acc != nil {
+		t.Fatalf("over-limit account must stay out of rotation, got %q", acc.ID)
+	}
+	if !p.OffersModel("claude-opus-5") {
+		t.Fatal("a model only an over-limit account lists is a quota problem, not an unknown model")
+	}
+	if p.OffersModel("no-such-model") {
+		t.Fatal("a model no enabled account lists must not be offered")
+	}
+}
