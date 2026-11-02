@@ -443,11 +443,14 @@ endpointLoop:
 				}
 				if resp.StatusCode == http.StatusTooManyRequests {
 					delay := retryAfterDuration(resp.Header.Get("Retry-After"), time.Now())
-					if quotaErr == nil || delay > quotaErr.retryFor {
-						quotaErr = &upstreamQuotaError{message: lastErr.Error(), retryFor: delay}
-					}
+					throttled := !isUsageQuotaExhaustedMessage(string(errBody))
+					quotaErr = quotaErr.merge(&upstreamQuotaError{message: lastErr.Error(), retryFor: delay, throttled: throttled})
 					lastErr = quotaErr
-					logger.Warnf("[KiroAPI] Endpoint %s quota exhausted (429, retry-after %s), trying next...", ep.Name, delay)
+					kind := "quota exhausted"
+					if throttled {
+						kind = "throttled"
+					}
+					logger.Warnf("[KiroAPI] Endpoint %s %s (429, retry-after %s), trying next...", ep.Name, kind, delay)
 				}
 
 				if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 402 {

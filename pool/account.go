@@ -244,6 +244,47 @@ func (p *AccountPool) RecordQuotaError(id string, retryAfter time.Duration) int 
 	return p.recordError(id, true, retryAfter)
 }
 
+const (
+	throttleBaseCooldown = time.Minute
+	throttleMaxCooldown  = 10 * time.Minute
+)
+
+// RecordThrottleError cools an account after transient upstream throttling.
+// Without a retry hint the cooldown starts at a minute and doubles with every
+// consecutive failure, capped at ten minutes; a success resets it.
+func (p *AccountPool) RecordThrottleError(id string, retryAfter time.Duration) int {
+	p.mu.Lock()
+	p.errorCounts[id]++
+	count := p.errorCounts[id]
+
+	delay := retryAfter
+	if delay <= 0 {
+		delay = throttleBaseCooldown
+		for i := 1; i < count && delay < throttleMaxCooldown; i++ {
+			delay *= 2
+		}
+		delay = min(delay, throttleMaxCooldown)
+	}
+	//! Never shorten a longer cooldown, such as a quota cooldown already in force.
+	if until := time.Now().Add(delay); until.After(p.cooldowns[id]) {
+		p.cooldowns[id] = until
+	}
+	p.mu.Unlock()
+
+	go func() {
+		_ = p.SaveCooldowns()
+	}()
+
+	return count
+}
+
+// CooldownUntil reports when the account's current cooldown ends; zero means none.
+func (p *AccountPool) CooldownUntil(id string) time.Time {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.cooldowns[id]
+}
+
 func (p *AccountPool) recordError(id string, isQuotaError bool, retryAfter time.Duration) int {
 	p.mu.Lock()
 	p.errorCounts[id]++

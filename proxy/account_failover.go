@@ -77,8 +77,28 @@ func (rp requestRetryPlan) waitBeforeRetry(ctx context.Context, totalAttempts in
 }
 
 func isQuotaErrorMessage(msg string) bool {
-	msg = strings.ToLower(msg)
-	return strings.Contains(msg, "429") || strings.Contains(msg, "quota")
+	//! A bare substring match let request ids like 74291abc read as a 429.
+	return hasStandaloneNumber(msg, "429") ||
+		strings.Contains(strings.ToLower(msg), "quota") ||
+		isUsageQuotaExhaustedMessage(msg)
+}
+
+func hasStandaloneNumber(s, number string) bool {
+	for offset := 0; ; {
+		idx := strings.Index(s[offset:], number)
+		if idx < 0 {
+			return false
+		}
+		start, end := offset+idx, offset+idx+len(number)
+		if (start == 0 || !isASCIIAlphaNumeric(s[start-1])) && (end == len(s) || !isASCIIAlphaNumeric(s[end])) {
+			return true
+		}
+		offset = end
+	}
+}
+
+func isASCIIAlphaNumeric(b byte) bool {
+	return (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
 func isOverageErrorMessage(msg string) bool {
@@ -179,10 +199,15 @@ func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 		h.pool.RecordError(account.ID, false)
 	case isQuotaErrorMessage(errMsg):
 		var quota *upstreamQuotaError
-		if errors.As(err, &quota) {
+		switch {
+		case errors.As(err, &quota) && quota.throttled:
+			h.pool.RecordThrottleError(account.ID, quota.retryFor)
+		case errors.As(err, &quota):
 			h.pool.RecordQuotaError(account.ID, quota.retryFor)
-		} else {
+		case isUsageQuotaExhaustedMessage(errMsg):
 			h.pool.RecordError(account.ID, true)
+		default:
+			h.pool.RecordThrottleError(account.ID, 0)
 		}
 	case isSuspensionErrorMessage(errMsg):
 		h.disableAccount(account, "BANNED", "AWS temporarily suspended - unusual user activity detected")

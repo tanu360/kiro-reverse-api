@@ -22,9 +22,44 @@ func isClientHTTPStatus(status int) bool {
 type upstreamQuotaError struct {
 	message  string
 	retryFor time.Duration
+	//! throttled marks a transient rate limit; only real usage exhaustion benches an account for days.
+	throttled bool
 }
 
 func (e *upstreamQuotaError) Error() string { return e.message }
+
+func (e *upstreamQuotaError) merge(next *upstreamQuotaError) *upstreamQuotaError {
+	//! Quota is account-wide: one endpoint reporting exhaustion outweighs another's throttle.
+	if e == nil {
+		return next
+	}
+	if next.retryFor > e.retryFor || (e.throttled && !next.throttled) {
+		e.message = next.message
+	}
+	e.retryFor = max(e.retryFor, next.retryFor)
+	e.throttled = e.throttled && next.throttled
+	return e
+}
+
+func isUsageQuotaExhaustedMessage(msg string) bool {
+	//! Kiro reports spent monthly usage as reason MONTHLY_REQUEST_COUNT; ThrottlingException,
+	//! INSUFFICIENT_MODEL_CAPACITY and unknown 429s are transient and must not cost days.
+	msg = strings.ToLower(msg)
+	for _, marker := range []string{
+		"monthly",
+		"usage limit",
+		"quota exhausted",
+		"quota exceeded",
+		"quota reached",
+		"insufficient_quota",
+		"exceeded your current quota",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
 
 func retryAfterDuration(value string, now time.Time) time.Duration {
 	value = strings.TrimSpace(value)
