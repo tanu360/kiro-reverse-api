@@ -129,7 +129,8 @@ type toolMarkupFilter struct {
 	run     []KiroToolUse
 	runRaw  strings.Builder
 	rescued []KiroToolUse
-	seen    map[string]bool
+	//! seen counts real tool calls by signature; each one cancels at most one markup copy.
+	seen map[string]int
 	// Code-span tracking over emitted text: pending backticks, open fence, open inline span.
 	ticks      int
 	fenced     bool
@@ -140,7 +141,7 @@ func newToolMarkupFilter(tools map[string]map[string]string) *toolMarkupFilter {
 	if len(tools) == 0 {
 		return nil
 	}
-	return &toolMarkupFilter{tools: tools, seen: make(map[string]bool)}
+	return &toolMarkupFilter{tools: tools, seen: make(map[string]int)}
 }
 
 // Push takes one upstream text chunk and returns the text that is safe to emit now.
@@ -164,7 +165,7 @@ func (f *toolMarkupFilter) markSeen(toolUse KiroToolUse) {
 	if f == nil {
 		return
 	}
-	f.seen[toolUseSignature(toolUse)] = true
+	f.seen[toolUseSignature(toolUse)]++
 }
 
 func (f *toolMarkupFilter) emitRescued(callback *KiroStreamCallback) {
@@ -173,14 +174,20 @@ func (f *toolMarkupFilter) emitRescued(callback *KiroStreamCallback) {
 	if f == nil || len(f.rescued) == 0 {
 		return
 	}
+	//! Rescued calls go through the tracking callback, which also counts them in seen, so
+	//! duplicates are matched against a snapshot of the real calls taken before any emit.
+	realCalls := make(map[string]int, len(f.seen))
+	for signature, n := range f.seen {
+		realCalls[signature] = n
+	}
 	rescued, duplicates := 0, 0
 	for _, toolUse := range f.rescued {
 		signature := toolUseSignature(toolUse)
-		if f.seen[signature] {
+		if realCalls[signature] > 0 {
+			realCalls[signature]--
 			duplicates++
 			continue
 		}
-		f.seen[signature] = true
 		toolUse.ToolUseID = "toolu_" + uuid.New().String()
 		rescued++
 		if callback != nil && callback.OnToolUse != nil {

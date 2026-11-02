@@ -394,3 +394,33 @@ func TestToolMarkupFilterReleasesWrapperWithoutInvokeAfterRun(t *testing.T) {
 		t.Fatalf("a run followed by a dangling wrapper is not the end of the turn: text=%q tools=%#v", text, tools)
 	}
 }
+
+func TestToolMarkupFilterKeepsIdenticalParallelInvokes(t *testing.T) {
+	inv := `<invoke name="Bash"><parameter name="command">ls</parameter></invoke>`
+	in := "<function_calls>\n" + inv + "\n" + inv + "\n</function_calls>"
+	for _, chunks := range [][]string{{in}, byteChunks(in)} {
+		_, tools := runMarkupFilter(t, chunks)
+		if len(tools) != 2 {
+			t.Fatalf("two identical calls in one block are two calls, got %#v", tools)
+		}
+	}
+}
+
+func TestToolMarkupFilterDropsOnlyAsManyDuplicatesAsRealCalls(t *testing.T) {
+	inv := `<invoke name="Bash"><parameter name="command">ls</parameter></invoke>`
+	f := newToolMarkupFilter(markupTestTools())
+	f.markSeen(KiroToolUse{ToolUseID: "real", Name: "Bash", Input: map[string]interface{}{"command": "ls"}})
+	f.Push("<function_calls>" + inv + inv + "</function_calls>")
+	f.Flush()
+	var tools []KiroToolUse
+	callback := &KiroStreamCallback{}
+	//! Mirrors the stream loop, where rescued calls go through the tracking callback that also calls markSeen.
+	callback.OnToolUse = func(tu KiroToolUse) {
+		tools = append(tools, tu)
+		f.markSeen(tu)
+	}
+	f.emitRescued(callback)
+	if len(tools) != 1 {
+		t.Fatalf("one real call covers one markup copy, the other must run; got %#v", tools)
+	}
+}
