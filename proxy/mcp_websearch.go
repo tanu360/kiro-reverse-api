@@ -144,7 +144,11 @@ func buildWebSearchFollowupPayload(base *KiroPayload, toolUses []KiroToolUse, re
 	for _, result := range results {
 		ids[result.ToolUseID] = true
 	}
-	next.ConversationState.History = sanitizeKiroHistory(history, ids)
+	var declared map[string]string
+	if current.UserInputMessageContext != nil {
+		declared = structuredToolHistoryNames(current.UserInputMessageContext.Tools, base.ToolNameMap)
+	}
+	next.ConversationState.History = sanitizeKiroHistoryForTools(history, ids, declared)
 	next.ConversationState.CurrentMessage.UserInputMessage = KiroUserInputMessage{
 		Content: buildToolResultsContinuation(results),
 		ModelID: current.ModelID,

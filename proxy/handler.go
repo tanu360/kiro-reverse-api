@@ -3395,6 +3395,7 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"allowOverUsage":         config.GetAllowOverUsage(),
 		"lenientStreamIntegrity": config.GetLenientStreamIntegrity(),
 		"sessionAffinity":        config.GetSessionAffinity(),
+		"structuredToolHistory":  config.GetStructuredToolHistory(),
 	})
 }
 
@@ -3477,6 +3478,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		AllowOverUsage         *bool  `json:"allowOverUsage,omitempty"`
 		LenientStreamIntegrity *bool  `json:"lenientStreamIntegrity,omitempty"`
 		SessionAffinity        *bool  `json:"sessionAffinity,omitempty"`
+		StructuredToolHistory  *bool  `json:"structuredToolHistory,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -3520,6 +3522,14 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.SessionAffinity != nil {
 		if err := config.UpdateSessionAffinity(*req.SessionAffinity); err != nil {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+	}
+
+	if req.StructuredToolHistory != nil {
+		if err := config.UpdateStructuredToolHistory(*req.StructuredToolHistory); err != nil {
 			w.WriteHeader(500)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return

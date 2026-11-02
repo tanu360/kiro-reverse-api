@@ -20,39 +20,64 @@ func TestNoToolInvocationTextInAssistantHistory(t *testing.T) {
 	}
 	msgs = append(msgs, OpenAIMessage{Role: "user", Content: "summarize"})
 
-	payload := OpenAIToKiro(&OpenAIRequest{Model: "claude-opus-4.8", Messages: msgs}, false)
+	for _, structured := range []bool{false, true} {
+		t.Run(map[bool]string{false: "narrated", true: "structured"}[structured], func(t *testing.T) {
+			setStructuredToolHistoryForTest(t, structured)
+			payload := OpenAIToKiro(&OpenAIRequest{Model: "claude-opus-4.8", Messages: msgs, Tools: []OpenAITool{testOpenAIFunctionTool("exec_command")}}, false)
 
-	for i, h := range payload.ConversationState.History {
-		a := h.AssistantResponseMessage
-		if a == nil {
-			continue
-		}
-		for _, bad := range []string{"[Called tool", "Called tool ", "with input {"} {
-			if strings.Contains(a.Content, bad) {
-				t.Fatalf("history[%d] assistant content contains mimicable tool text %q: %q", i, bad, a.Content)
+			calls := 0
+			for i, h := range payload.ConversationState.History {
+				a := h.AssistantResponseMessage
+				if a == nil {
+					continue
+				}
+				for _, bad := range []string{"[Called tool", "Called tool ", "with input {"} {
+					if strings.Contains(a.Content, bad) {
+						t.Fatalf("history[%d] assistant content contains mimicable tool text %q: %q", i, bad, a.Content)
+					}
+				}
+				calls += len(a.ToolUses)
 			}
-		}
-		if len(a.ToolUses) > 0 {
-			t.Fatalf("history[%d] assistant retains %d structured toolUses", i, len(a.ToolUses))
-		}
-	}
 
-	var allText strings.Builder
-	for _, h := range payload.ConversationState.History {
-		if h.UserInputMessage != nil {
-			allText.WriteString(h.UserInputMessage.Content)
-			allText.WriteString("\n")
-		}
-	}
-	combined := allText.String()
-	for i := 0; i < 8; i++ {
-		marker := fmt.Sprintf("OUTPUT_%d", i)
-		if !strings.Contains(combined, marker) {
-			t.Fatalf("tool output %q lost from history", marker)
-		}
-	}
-	if !strings.Contains(combined, "[exec_command]") {
-		t.Fatalf("expected tool results attributed to exec_command on the user side")
+			var allText strings.Builder
+			for _, h := range payload.ConversationState.History {
+				if u := h.UserInputMessage; u != nil {
+					allText.WriteString(u.Content)
+					allText.WriteString("\n")
+					if u.UserInputMessageContext != nil {
+						for _, tr := range u.UserInputMessageContext.ToolResults {
+							for _, c := range tr.Content {
+								allText.WriteString(c.Text + "\n")
+							}
+						}
+					}
+				}
+			}
+			combined := allText.String()
+			for i := 0; i < 8; i++ {
+				marker := fmt.Sprintf("OUTPUT_%d", i)
+				if !strings.Contains(combined, marker) {
+					t.Fatalf("tool output %q lost from history", marker)
+				}
+			}
+			if !structured {
+				if calls > 0 {
+					t.Fatalf("narrated history retains %d structured toolUses", calls)
+				}
+				if !strings.Contains(combined, "[exec_command]") {
+					t.Fatalf("expected tool results attributed to exec_command on the user side")
+				}
+				return
+			}
+			//! Structured mode shows the model its own earlier calls (upstream issue #170).
+			if calls != 8 {
+				t.Fatalf("structured history kept %d toolUses, want 8", calls)
+			}
+			if strings.Contains(combined, "[exec_command]") {
+				t.Fatalf("structured results must not also be narrated")
+			}
+			assertToolHistoryPaired(t, payload)
+		})
 	}
 }
 

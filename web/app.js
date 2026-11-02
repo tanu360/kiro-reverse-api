@@ -1656,6 +1656,7 @@
     $('allowOverUsage').checked = d.allowOverUsage || false;
     $('lenientStreamIntegrity').checked = d.lenientStreamIntegrity || false;
     $('sessionAffinity').checked = d.sessionAffinity !== false;
+    $('structuredToolHistory').checked = d.structuredToolHistory !== false;
     await Promise.all([loadApiKeys(), loadThinkingConfig(), loadModelMappings(), loadEndpointConfig(), loadProxyConfig(), loadPromptFilter()]);
     syncApiKeyManagementVisibility();
     refreshCustomSelects();
@@ -2102,6 +2103,11 @@
     const sessionAffinity = $('sessionAffinity').checked;
     await api('/settings', { method: 'POST', body: JSON.stringify({ sessionAffinity }) });
     toast(t('settings.routingSaved'), 'success');
+  }
+  async function saveToolHistoryConfig() {
+    const structuredToolHistory = $('structuredToolHistory').checked;
+    await api('/settings', { method: 'POST', body: JSON.stringify({ structuredToolHistory }) });
+    toast(t('settings.toolHistorySaved'), 'success');
   }
   async function changePassword() {
     const np = $('newPassword').value;
@@ -3591,6 +3597,7 @@
     $('saveOverUsageBtn').addEventListener('click', saveOverUsageConfig);
     $('saveStreamIntegrityBtn').addEventListener('click', saveStreamIntegrityConfig);
     $('saveRoutingBtn').addEventListener('click', saveRoutingConfig);
+    $('saveToolHistoryBtn').addEventListener('click', saveToolHistoryConfig);
     $('saveThinkingBtn').addEventListener('click', saveThinkingConfig);
     $('saveEndpointBtn').addEventListener('click', saveEndpointConfig);
     $('changePasswordBtn').addEventListener('click', changePassword);

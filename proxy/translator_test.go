@@ -200,22 +200,27 @@ func TestOpenAIToKiroAssistantToolCallsDoNotInjectPlaceholder(t *testing.T) {
 			},
 			{Role: "user", Content: "continue"},
 		},
+		Tools: []OpenAITool{testOpenAIFunctionTool("get_weather")},
 	}
 
-	payload := OpenAIToKiro(req, false)
-	for i, h := range payload.ConversationState.History {
-		a := h.AssistantResponseMessage
-		if a == nil {
-			continue
-		}
-		if len(a.ToolUses) != 0 {
-			t.Fatalf("history[%d] retains structured toolUses", i)
-		}
-		if strings.Contains(a.Content, "get_weather") || strings.Contains(a.Content, "[Called tool") {
-			t.Fatalf("history[%d] assistant contains tool-invocation text: %q", i, a.Content)
-		}
-		if strings.TrimSpace(a.Content) == "." || strings.TrimSpace(a.Content) == "" {
-			t.Fatalf("history[%d] is a hollow assistant turn that should have been dropped", i)
+	//! A call the client never answered stays unpaired, so even structured mode must drop it.
+	for _, structured := range []bool{false, true} {
+		setStructuredToolHistoryForTest(t, structured)
+		payload := OpenAIToKiro(req, false)
+		for i, h := range payload.ConversationState.History {
+			a := h.AssistantResponseMessage
+			if a == nil {
+				continue
+			}
+			if len(a.ToolUses) != 0 {
+				t.Fatalf("structured=%v: history[%d] retains unanswered toolUses", structured, i)
+			}
+			if strings.Contains(a.Content, "get_weather") || strings.Contains(a.Content, "[Called tool") {
+				t.Fatalf("structured=%v: history[%d] assistant contains tool-invocation text: %q", structured, i, a.Content)
+			}
+			if c := strings.TrimSpace(a.Content); c == "." || c == "" || c == minimalFallbackUserContent {
+				t.Fatalf("structured=%v: history[%d] is a hollow assistant turn that should have been dropped", structured, i)
+			}
 		}
 	}
 }

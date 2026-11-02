@@ -315,6 +315,12 @@ func CallKiroAPI(account *config.Account, payload *KiroPayload, callback *KiroSt
 }
 
 func CallKiroAPIContext(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
+	return callWithToolHistoryFallback(payload, func() error {
+		return callKiroAPIContextOnce(ctx, account, payload, callback)
+	})
+}
+
+func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
 	//! ctx is the client request context: a disconnect aborts the upstream stream and frees the account.
 	if ctx == nil {
 		ctx = context.Background()

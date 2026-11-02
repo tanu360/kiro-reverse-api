@@ -148,6 +148,8 @@ type Config struct {
 
 	SessionAffinity *bool `json:"sessionAffinity,omitempty"`
 
+	StructuredToolHistory *bool `json:"structuredToolHistory,omitempty"`
+
 	FirstRunPasswordPending bool `json:"firstRunPasswordPending,omitempty"`
 
 	ProxyURL string `json:"proxyURL,omitempty"`
@@ -965,6 +967,26 @@ func UpdateSessionAffinity(enabled bool) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	cfg.SessionAffinity = &enabled
+	return Save()
+}
+
+// GetStructuredToolHistory reports whether earlier tool calls and their results
+// are replayed to Kiro as structured toolUses/toolResults instead of narrated
+// text. On by default: narrated history taught the model to describe a tool
+// call and stop without making it.
+func GetStructuredToolHistory() bool {
+	cfgLock.RLock()
+	defer cfgLock.RUnlock()
+	if cfg == nil || cfg.StructuredToolHistory == nil {
+		return true
+	}
+	return *cfg.StructuredToolHistory
+}
+
+func UpdateStructuredToolHistory(enabled bool) error {
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	cfg.StructuredToolHistory = &enabled
 	return Save()
 }
 
