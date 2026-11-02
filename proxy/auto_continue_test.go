@@ -23,6 +23,8 @@ type scriptedHop struct {
 	credits  float64
 	cache    [2]int
 	err      error
+	// followup is reported as the payload a hosted-search round sent.
+	followup *KiroPayload
 }
 
 type scriptedKiro struct {
@@ -42,7 +44,13 @@ func (s *scriptedKiro) call(_ context.Context, _ *config.Account, payload *KiroP
 	for _, tool := range hop.tools {
 		cb.OnToolUse(tool)
 	}
+	if hop.followup != nil && cb.onFollowupPayload != nil {
+		cb.onFollowupPayload(hop.followup)
+	}
 	if hop.err != nil {
+		if hop.credits > 0 {
+			cb.OnCredits(hop.credits)
+		}
 		return hop.err
 	}
 	cb.OnStopReason(hop.stop)
@@ -560,5 +568,205 @@ func TestAutoContinueDoesNotContinueShortAnswerWithoutStopReason(t *testing.T) {
 	}
 	if len(script.payloads) != 1 {
 		t.Fatalf("calls=%d, a short answer without a stop reason is finished", len(script.payloads))
+	}
+}
+
+func TestAutoContinueDropsTextThatRepeatsTheAnswerEnd(t *testing.T) {
+	rec, _, err := runScriptedContinue(t, testKiroPayload(), 3,
+		scriptedHop{text: []string{"Intro.\nThe quick brown fox ju"}, stop: "max_tokens"},
+		scriptedHop{text: []string{"The quick brown", " fox jumps over the dog."}, stop: "end_turn"},
+	)
+	if err != nil {
+		t.Fatalf("runAutoContinue: %v", err)
+	}
+	if want := "Intro.\nThe quick brown fox jumps over the dog."; rec.text != want {
+		t.Fatalf("text = %q, want %q", rec.text, want)
+	}
+}
+
+func TestAutoContinueKeepsShortOrAbsentOverlap(t *testing.T) {
+	for _, tc := range []struct{ first, next, want string }{
+		{"one two ", "two three", "one two two three"},
+		{"Part one, ", "part two.", "Part one, part two."},
+		{"```\n\n\n\n\n\n\n\n", "\n\n\n\n\n\n\n\ncode", "```\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\ncode"},
+	} {
+		rec, _, err := runScriptedContinue(t, testKiroPayload(), 3,
+			scriptedHop{text: []string{tc.first}, stop: "max_tokens"},
+			scriptedHop{text: []string{tc.next}, stop: "end_turn"},
+		)
+		if err != nil || rec.text != tc.want {
+			t.Fatalf("text = %q err=%v, want %q", rec.text, err, tc.want)
+		}
+	}
+}
+
+func TestAutoContinueTrimsOnlyTheOpeningOfALongContinuation(t *testing.T) {
+	head := strings.Repeat("x", 2000) + "the closing line of part one"
+	rest := strings.Repeat("y", 3000) + " the closing line of part one again"
+	rec, _, err := runScriptedContinue(t, testKiroPayload(), 3,
+		scriptedHop{text: []string{head}, stop: "max_tokens"},
+		scriptedHop{text: []string{"the closing line ", "of part one", rest[:1500], rest[1500:]}, stop: "end_turn"},
+	)
+	if err != nil {
+		t.Fatalf("runAutoContinue: %v", err)
+	}
+	if rec.text != head+rest {
+		t.Fatalf("text has %d bytes, want %d with only the opening repeat removed", len(rec.text), len(head+rest))
+	}
+}
+
+func TestAutoContinueFlushesHeldTextBeforeAToolCall(t *testing.T) {
+	var order []string
+	script := &scriptedKiro{hops: []scriptedHop{
+		{text: []string{"long answer so far"}, stop: "max_tokens"},
+		{text: []string{" and more"}, tools: []KiroToolUse{{ToolUseID: "t1", Name: "Read"}}, stop: "tool_use"},
+	}}
+	cb := &KiroStreamCallback{
+		OnText:    func(text string, _ bool) { order = append(order, "text:"+text) },
+		OnToolUse: func(KiroToolUse) { order = append(order, "tool") },
+	}
+	if err := runAutoContinue(context.Background(), nil, testKiroPayload(), cb, script.call, 3); err != nil {
+		t.Fatalf("runAutoContinue: %v", err)
+	}
+	if got := strings.Join(order, "|"); got != "text:long answer so far|text: and more|tool" {
+		t.Fatalf("order = %s", got)
+	}
+}
+
+func searchFollowupPayload(base *KiroPayload, query, results string) *KiroPayload {
+	return buildWebSearchFollowupPayload(base,
+		[]KiroToolUse{{ToolUseID: "ws-" + query, Name: webSearchToolName, Input: map[string]interface{}{"query": query}}},
+		[]KiroToolResult{{ToolUseID: "ws-" + query, Status: "success", Content: []KiroResultContent{{Text: results}}}},
+	)
+}
+
+func TestAutoContinueReplaysHostedSearchResults(t *testing.T) {
+	payload := testKiroPayload()
+	followup := searchFollowupPayload(payload, "kiro", "SEARCH RESULT: kiro is an IDE")
+	_, script, err := runScriptedContinue(t, payload, 3,
+		scriptedHop{text: []string{"Kiro is "}, followup: followup, stop: "max_tokens"},
+		scriptedHop{text: []string{"an IDE."}, stop: "end_turn"},
+	)
+	if err != nil || len(script.payloads) != 2 {
+		t.Fatalf("calls=%d err=%v", len(script.payloads), err)
+	}
+	encoded, _ := json.Marshal(script.payloads[1])
+	if !strings.Contains(string(encoded), "SEARCH RESULT: kiro is an IDE") {
+		t.Fatalf("continuation lost the search results: %s", encoded)
+	}
+	history := script.payloads[1].ConversationState.History
+	if last := history[len(history)-1].AssistantResponseMessage; last == nil || last.Content != "Kiro is " {
+		t.Fatalf("history must end with the answer so far, got %#v", history[len(history)-1])
+	}
+	if got := script.payloads[1].ConversationState.CurrentMessage.UserInputMessage.Content; got != autoContinuePrompt {
+		t.Fatalf("continuation prompt = %q", got)
+	}
+}
+
+func TestAutoContinueReplaysSearchMadeDuringAContinuation(t *testing.T) {
+	payload := testKiroPayload()
+	rec, script, err := runScriptedContinue(t, payload, 3,
+		scriptedHop{text: []string{"first part "}, stop: "max_tokens"},
+		scriptedHop{text: []string{"second part "}, stop: "max_tokens"},
+		scriptedHop{text: []string{"third part"}, stop: "end_turn"},
+	)
+	if err != nil || rec.text != "first part second part third part" {
+		t.Fatalf("text=%q err=%v", rec.text, err)
+	}
+
+	searched := searchFollowupPayload(script.payloads[1], "later", "LATER RESULT")
+	_, script, err = runScriptedContinue(t, payload, 3,
+		scriptedHop{text: []string{"first part "}, stop: "max_tokens"},
+		scriptedHop{text: []string{"second part "}, followup: searched, stop: "max_tokens"},
+		scriptedHop{text: []string{"third part"}, stop: "end_turn"},
+	)
+	if err != nil {
+		t.Fatalf("runAutoContinue: %v", err)
+	}
+	third := script.payloads[2]
+	encoded, _ := json.Marshal(third)
+	if !strings.Contains(string(encoded), "LATER RESULT") {
+		t.Fatalf("third call lost the continuation's search results: %s", encoded)
+	}
+	if n := strings.Count(string(encoded), "first part"); n != 1 {
+		t.Fatalf("the first part appears %d times, want once: %s", n, encoded)
+	}
+	history := third.ConversationState.History
+	if last := history[len(history)-1].AssistantResponseMessage; last == nil || last.Content != "second part " {
+		t.Fatalf("history must end with the text written after the search, got %#v", history[len(history)-1])
+	}
+}
+
+func TestAutoContinueCountsUsageOfAFailedContinuation(t *testing.T) {
+	rec, _, err := runScriptedContinue(t, testKiroPayload(), 3,
+		scriptedHop{text: []string{"part one "}, stop: "max_tokens", in: 100, out: 8192, credits: 0.5},
+		scriptedHop{text: []string{"part two"}, credits: 0.25, err: errors.New("stream cut")},
+	)
+	if err != nil {
+		t.Fatalf("runAutoContinue: %v", err)
+	}
+	if rec.text != "part one part two" || rec.stop != "max_tokens" {
+		t.Fatalf("text=%q stop=%q", rec.text, rec.stop)
+	}
+	if rec.credits != 0.75 {
+		t.Fatalf("credits = %v, want the failed hop's credits counted too", rec.credits)
+	}
+}
+
+// searchThenCapUpstream searches once, writes a capped answer, then continues with a repeat of its end.
+func searchThenCapUpstream(t *testing.T, bodies *[]string) http.HandlerFunc {
+	var mu sync.Mutex
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		*bodies = append(*bodies, string(body))
+		call := len(*bodies)
+		mu.Unlock()
+		switch call {
+		case 1:
+			w.Write(awsEventStreamFrame(t, "toolUseEvent", map[string]interface{}{"toolUseId": "ws", "name": "web_search", "input": `{"query":"kiro"}`, "stop": true}))
+		case 2:
+			writeFrames(w,
+				awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "According to the source, Kiro ships an agen"}),
+				awsEventStreamFrame(t, "metadataEvent", map[string]interface{}{"stopReason": "max_tokens", "usage": map[string]interface{}{"inputTokens": 100, "outputTokens": 8192}}),
+			)
+		default:
+			writeFrames(w,
+				awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "Kiro ships an agentic IDE."}),
+				awsEventStreamFrame(t, "metadataEvent", map[string]interface{}{"stopReason": "end_turn", "usage": map[string]interface{}{"inputTokens": 130, "outputTokens": 40}}),
+			)
+		}
+	}
+}
+
+func TestHostedSearchAutoContinueKeepsSourcesAndDropsRepeat(t *testing.T) {
+	for _, path := range []string{"/v1/chat/completions", "/v1/responses"} {
+		t.Run(path, func(t *testing.T) {
+			var bodies []string
+			h := newStreamTestHandler(t, searchThenCapUpstream(t, &bodies))
+			enableAutoContinueForTest(t)
+			h.pool.RecordSuccess("only")
+			stubRestTransport(t, func(*http.Request) (*http.Response, error) {
+				return jsonResponse(200, `{"result":{"content":[{"type":"text","text":"{\"results\":[{\"title\":\"Kiro\",\"url\":\"https://example.com/kiro\",\"snippet\":\"UNIQUE-SNIPPET\"}]}"}]}}`), nil
+			})
+			req := `{"model":"claude-sonnet-4.5","stream":true,"store":false,"input":"search","messages":[{"role":"user","content":"search"}],"tools":[{"type":"web_search"}]}`
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest("POST", path, strings.NewReader(req)))
+			if rec.Code != 200 || len(bodies) != 3 {
+				t.Fatalf("status=%d calls=%d body=%s", rec.Code, len(bodies), rec.Body.String())
+			}
+			if !strings.Contains(bodies[2], "UNIQUE-SNIPPET") {
+				t.Fatalf("continuation request lost the search results: %s", bodies[2])
+			}
+			body := rec.Body.String()
+			const want = "According to the source, Kiro ships an agentic IDE."
+			if path == "/v1/chat/completions" {
+				if got := collectOpenAIContentDeltas(t, body); got != want {
+					t.Fatalf("text = %q, want %q", got, want)
+				}
+			} else if !strings.Contains(body, `"output_text":"`+want+`"`) {
+				t.Fatalf("output_text is not %q: %s", want, body)
+			}
+		})
 	}
 }

@@ -245,6 +245,8 @@ type KiroStreamCallback struct {
 
 	// markupTools maps declared upstream tool names to parameter types; leaked call markup for them is rescued.
 	markupTools map[string]map[string]string
+	// onFollowupPayload receives each payload a hosted-search round sends after resolving searches.
+	onFollowupPayload func(payload *KiroPayload)
 }
 
 func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Account) {

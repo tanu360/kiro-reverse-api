@@ -441,6 +441,9 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 			return nil
 		}
 		next = buildWebSearchFollowupPayload(next, searches, results)
+		if callback.onFollowupPayload != nil {
+			callback.onFollowupPayload(next)
+		}
 	}
 	return nil
 }

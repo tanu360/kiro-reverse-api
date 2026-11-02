@@ -15,6 +15,10 @@ import (
 //! text, is not continued; resuming mid-thought would splice reasoning into the answer.
 //! Continuation hops drop all reasoning (reasoning events and inline <thinking> blocks),
 //! so the client sees the first hop's thinking followed by one growing answer.
+//!
+//! Hosted web search: a hop that searched is continued from the payload that carried the
+//! search results, so later parts keep the sources. A continuation that repeats the end of
+//! the answer has the repeated part cut before it reaches the client.
 
 const autoContinuePrompt = "Your previous response was cut off by the output limit. Continue exactly where it stopped, even mid-sentence or mid-code block. Do not repeat any earlier text and do not add a preamble or summary."
 
@@ -35,17 +39,18 @@ func runAutoContinue(ctx context.Context, account *config.Account, payload *Kiro
 	totalCacheRead, totalCacheWrite := 0, 0
 	stopReason := ""
 	next := payload
+	// base is the payload continuations replay; sinceBase is the answer text it has not seen yet.
+	base := payload
+	var sinceBase strings.Builder
 	for hop := 0; ; hop++ {
 		state := &continuationHop{continuation: hop > 0, downstream: callback}
-		if err := call(ctx, account, next, state.callback()); err != nil {
+		if hop > 0 {
+			state.tail = overlapTail(answer.String())
+		}
+		err := call(ctx, account, next, state.callback())
+		if err != nil && (hop == 0 || isContextCanceledError(err) || ctx.Err() != nil) {
 			//! The first hop's errors belong to the handler's retry logic, and a gone client ends everything.
-			if hop == 0 || isContextCanceledError(err) || ctx.Err() != nil {
-				return err
-			}
-			//! The client already holds the earlier hops; end the message there, still marked as cut off.
-			state.flush()
-			logger.Warnf("[AutoContinue] Continuation %d failed, ending with the partial answer: %v", hop, err)
-			break
+			return err
 		}
 		openThinking := state.flush()
 		answer.WriteString(state.answer.String())
@@ -54,7 +59,18 @@ func runAutoContinue(ctx context.Context, account *config.Account, payload *Kiro
 		totalCredits += state.credits
 		totalCacheRead += state.cacheRead
 		totalCacheWrite += state.cacheWrite
+		if err != nil {
+			//! The client already holds the earlier hops; end the message there, still marked as cut off.
+			logger.Warnf("[AutoContinue] Continuation %d failed, ending with the partial answer: %v", hop, err)
+			break
+		}
 		stopReason = state.stopReason
+		if state.followup != nil {
+			//! Search results live only in the follow-up payload; continuing from the request would drop them.
+			base = state.followup
+			sinceBase.Reset()
+		}
+		sinceBase.WriteString(state.answer.String())
 
 		if hop >= maxContinuations || !state.cutAtOutputCap(openThinking) {
 			break
@@ -67,7 +83,7 @@ func runAutoContinue(ctx context.Context, account *config.Account, payload *Kiro
 			return err
 		}
 		logger.Infof("[AutoContinue] Answer hit the output cap, requesting continuation %d/%d", hop+1, maxContinuations)
-		next = buildContinuationPayload(payload, answer.String(), budget)
+		next = buildContinuationPayload(base, sinceBase.String(), budget)
 	}
 
 	if callback.OnStopReason != nil {
@@ -90,8 +106,13 @@ type continuationHop struct {
 	continuation bool
 	downstream   *KiroStreamCallback
 	// splitter tracks inline thinking; on continuation hops it also strips it from the forwarded text.
-	splitter     thinkingTagSplitter
-	answer       strings.Builder
+	splitter thinkingTagSplitter
+	answer   strings.Builder
+	// tail is the end of the answer so far; a continuation's opening text is held until it can be compared.
+	tail         string
+	held         strings.Builder
+	released     bool
+	followup     *KiroPayload
 	toolCount    int
 	stopReason   string
 	inputTokens  int
@@ -127,6 +148,7 @@ func (h *continuationHop) callback() *KiroStreamCallback {
 			h.downstream.OnToolUse(toolUse)
 		}
 	}
+	cb.onFollowupPayload = func(payload *KiroPayload) { h.followup = payload }
 	cb.OnStopReason = func(reason string) { h.stopReason = reason }
 	cb.OnCredits = func(credits float64) { h.credits += credits }
 	cb.OnCacheUsage = func(read, write int) { h.cacheRead, h.cacheWrite = read, write }
@@ -147,8 +169,34 @@ func (h *continuationHop) recordAnswer(text string) {
 }
 
 func (h *continuationHop) forwardAnswer(text string) {
+	if !h.released {
+		h.held.WriteString(text)
+		if h.held.Len() < len(h.tail) {
+			return
+		}
+		h.releaseHeld()
+		return
+	}
 	h.answer.WriteString(text)
 	h.forward(text, false)
+}
+
+// releaseHeld sends the held opening text minus any repeat of the answer's end.
+func (h *continuationHop) releaseHeld() {
+	if h.released {
+		return
+	}
+	h.released = true
+	text := h.held.String()
+	h.held.Reset()
+	if n := repeatedOverlap(h.tail, text); n > 0 {
+		logger.Infof("[AutoContinue] Dropped %d bytes the continuation repeated from the answer", n)
+		text = text[n:]
+	}
+	if text != "" {
+		h.answer.WriteString(text)
+		h.forward(text, false)
+	}
 }
 
 // flush releases held text and reports whether the hop ended inside a thinking block.
@@ -156,10 +204,40 @@ func (h *continuationHop) flush() bool {
 	openThinking := h.splitter.inBlock
 	if h.continuation {
 		h.splitter.Flush(h.forwardAnswer, nil)
+		h.releaseHeld()
 	} else {
 		h.splitter.Flush(h.recordAnswer, nil)
 	}
 	return openThinking
+}
+
+const (
+	// maxContinuationOverlap bounds how much of the answer's end a continuation is checked
+	// against, and so how much of its opening text is held back.
+	maxContinuationOverlap = 1024
+	// minContinuationOverlap is the shortest non-blank repeat that is cut; shorter matches
+	// are as likely to be text the answer needs twice.
+	minContinuationOverlap = 16
+)
+
+func overlapTail(answer string) string {
+	if len(answer) <= maxContinuationOverlap {
+		return answer
+	}
+	return answer[len(answer)-maxContinuationOverlap:]
+}
+
+// repeatedOverlap returns the length of the longest start of text that repeats the end of tail.
+func repeatedOverlap(tail, text string) int {
+	for n := min(len(tail), len(text)); n > 0; n-- {
+		if len(strings.TrimSpace(text[:n])) < minContinuationOverlap {
+			return 0
+		}
+		if strings.HasSuffix(tail, text[:n]) {
+			return n
+		}
+	}
+	return 0
 }
 
 func (h *continuationHop) cutAtOutputCap(openThinking bool) bool {
