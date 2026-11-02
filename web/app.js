@@ -2827,6 +2827,7 @@
       '<option value="Enterprise">' + escapeHtml(t('local.providerEnterprise')) + '</option>' +
       '<option value="Google">' + escapeHtml(t('local.providerGoogle')) + '</option>' +
       '<option value="Github">' + escapeHtml(t('local.providerGithub')) + '</option>' +
+      '<option value="Microsoft">' + escapeHtml(t('local.providerMicrosoft')) + '</option>' +
       '</select>' +
       '</div>' +
       '<div class="form-group">' +
@@ -2839,7 +2840,7 @@
       '</div>' +
       '</div>' +
       '<div id="localClientGroup" class="form-group">' +
-      '<label>' + escapeHtml(t('local.clientFile')) + ' <small>' + escapeHtml(t('local.clientRequired')) + '</small></label>' +
+      '<label>' + escapeHtml(t('local.clientFile')) + ' <small id="localClientHint">' + escapeHtml(t('local.clientRequired')) + '</small></label>' +
       '<div class="input-row">' +
       '<textarea id="localClientJson" placeholder="' + escapeAttr(t('local.pasteOrUpload')) + '" class="font-mono"></textarea>' +
       '<label class="btn btn-outline btn-sm">' + escapeHtml(t('local.upload')) +
@@ -2938,6 +2939,46 @@
   function updateLocalFields() {
     const p = $('localProvider').value;
     $('localClientGroup').classList.toggle('hidden', p === 'Google' || p === 'Github');
+    $('localClientHint').textContent = t(p === 'Microsoft' ? 'local.clientOptionalMicrosoft' : 'local.clientRequired');
+  }
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function jwtClaims(token) {
+    try {
+      const part = String(token || '').split('.')[1];
+      if (!part) return {};
+      const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(b64 + '='.repeat((4 - b64.length % 4) % 4))) || {};
+    } catch { return {}; }
+  }
+  //! Kiro IDE spells Microsoft sign-ins its own way (e.g. "ExternalIdp"), so the local path also folds case and separators.
+  function isLocalMicrosoftToken(data) {
+    if (!data || typeof data !== 'object') return false;
+    const fold = v => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const aliases = ['externalidp', 'external', 'microsoft', 'm365', 'office365', 'azure', 'azuread', 'entra', 'entraid'];
+    return isMicrosoftCredential(data) || aliases.includes(fold(data.authMethod)) || aliases.includes(fold(data.provider));
+  }
+  //! The Entra access token is audience-bound to the Kiro app, so it names the client ID when the file omits it.
+  function microsoftClientIdFromToken(accessToken) {
+    const c = jwtClaims(accessToken);
+    const aud = String((Array.isArray(c.aud) ? c.aud[0] : c.aud) || '').replace(/^api:\/\//i, '').replace(/\/.*$/, '');
+    return [aud, c.azp, c.appid].find(v => UUID_RE.test(String(v || ''))) || '';
+  }
+  function localMicrosoftPayload(tokenData, clientData) {
+    const pick = key => String(tokenData[key] || (clientData && clientData[key]) || '').trim();
+    const clientId = pick('clientId') || microsoftClientIdFromToken(tokenData.accessToken);
+    if (!UUID_RE.test(clientId)) return { error: t('local.microsoftClientIdMissing') };
+    const tokenEndpoint = pick('tokenEndpoint');
+    const issuerUrl = pick('issuerUrl');
+    const userId = String(tokenData.userId || '').trim();
+    if (!tokenEndpoint && !issuerUrl && !userId && !jwtClaims(tokenData.accessToken).iss) return { error: t('local.microsoftTenantMissing') };
+    return {
+      payload: {
+        refreshToken: tokenData.refreshToken, accessToken: tokenData.accessToken || '', clientId,
+        authMethod: 'external_idp', provider: 'AzureAD', region: tokenData.region || '',
+        userId, profileArn: tokenData.profileArn || '',
+        tokenEndpoint, issuerUrl, scopes: pick('scopes')
+      }
+    };
   }
   function loadLocalFile(input, targetId) {
     const file = input.files[0];
@@ -2955,20 +2996,31 @@
     let tokenData, clientData;
     try { tokenData = JSON.parse(tokenJson); } catch { return toastWarning(t('local.tokenInvalid')); }
     if (!tokenData.refreshToken) return toastWarning(t('local.refreshTokenMissing'));
-    if (!isSocial) {
-      if (!clientJson) return toastWarning(t('local.clientMissing'));
+    if (clientJson && !isSocial) {
       try { clientData = JSON.parse(clientJson); } catch { return toastWarning(t('local.clientInvalid')); }
-      if (!clientData.clientId || !clientData.clientSecret) return toastWarning(t('local.clientSecretMissing'));
     }
-    const authMethod = clientData ? 'idc' : 'social';
-    const payload = {
-      refreshToken: tokenData.refreshToken,
-      accessToken: tokenData.accessToken || '',
-      clientId: clientData?.clientId || '',
-      clientSecret: clientData?.clientSecret || '',
-      region: tokenData.region || '',
-      authMethod, provider
-    };
+    let payload;
+    if (provider === 'Microsoft' || isLocalMicrosoftToken(tokenData) || (clientData && !clientData.clientSecret && isLocalMicrosoftToken(clientData))) {
+      const built = localMicrosoftPayload(tokenData, clientData);
+      if (built.error) return toastWarning(built.error, { duration: 7000 });
+      payload = built.payload;
+    } else {
+      if (!isSocial) {
+        if (!clientData) {
+          const hash = String(tokenData.clientIdHash || '').trim();
+          return toastWarning((hash ? t('local.clientMissingNamed', hash) : t('local.clientMissing')) + ' ' + t('local.microsoftChoiceHint'), { duration: 7000 });
+        }
+        if (!clientData.clientId || !clientData.clientSecret) return toastWarning(t('local.clientSecretMissing'));
+      }
+      payload = {
+        refreshToken: tokenData.refreshToken,
+        accessToken: tokenData.accessToken || '',
+        clientId: clientData?.clientId || '',
+        clientSecret: clientData?.clientSecret || '',
+        region: tokenData.region || '',
+        authMethod: clientData ? 'idc' : 'social', provider
+      };
+    }
     const res = await api('/auth/credentials', { method: 'POST', body: JSON.stringify(payload) });
     const d = await res.json();
     if (d.success) {

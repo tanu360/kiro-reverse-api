@@ -757,9 +757,25 @@ func parseExternalTokenMetadata(accessToken string) externalTokenMetadata {
 func DeriveExternalIdpEndpoints(userID, clientID, accessToken string) (tokenEndpoint, issuerURL, scopes string) {
 	issuerURL = issuerFromKAMUserID(userID)
 	if issuerURL == "" {
-		issuerURL = parseExternalTokenMetadata(accessToken).Issuer
+		issuerURL = entraV2IssuerFromV1(parseExternalTokenMetadata(accessToken).Issuer)
 	}
 	return ExternalIdpConfigurationFromIssuer(issuerURL, clientID)
+}
+
+// entraV2IssuerFromV1 maps an Entra v1 access-token issuer
+// (https://sts.windows.net/<tenant>/) to the same tenant's v2 issuer on the
+// public login host; any other issuer is returned unchanged.
+func entraV2IssuerFromV1(issuer string) string {
+	u, err := url.Parse(strings.TrimSpace(issuer))
+	if err != nil || u.Scheme != "https" || !strings.EqualFold(u.Host, "sts.windows.net") ||
+		u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return issuer
+	}
+	tenant := strings.Trim(u.Path, "/")
+	if _, err := uuid.Parse(tenant); err != nil || strings.Contains(tenant, "/") {
+		return issuer
+	}
+	return "https://login.microsoftonline.com/" + tenant + "/v2.0"
 }
 
 // ExternalIdpConfigurationFromIssuer builds the tenant-bound token endpoint
