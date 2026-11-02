@@ -1121,7 +1121,7 @@
       const jsonPromise = api('/accounts/' + id + '/full').then(async res => {
         if (!res.ok) throw new Error(t('common.failed'));
         const a = await res.json();
-        if (a.authMethod === 'api_key') return JSON.stringify({ kiroApiKey: a.accessToken, region: a.region, authMethod: 'api_key' }, null, 2);
+        if (a.authMethod === 'api_key') return JSON.stringify({ kiroApiKey: a.kiroApiKey || a.accessToken, region: a.region, authMethod: 'api_key' }, null, 2);
         const { clientId, clientSecret, accessToken, refreshToken } = a;
         if (a.authMethod === 'external_idp') {
           const { authMethod, provider, userId, profileArn, tokenEndpoint, issuerUrl, scopes } = a;

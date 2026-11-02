@@ -3721,6 +3721,7 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		"nickname":          account.Nickname,
 		"accessToken":       account.AccessToken,
 		"refreshToken":      account.RefreshToken,
+		"kiroApiKey":        account.KiroApiKey,
 		"clientId":          account.ClientID,
 		"clientSecret":      account.ClientSecret,
 		"authMethod":        account.AuthMethod,
@@ -3995,6 +3996,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 		AccessToken  string `json:"accessToken"`
 		CsrfToken    string `json:"csrfToken"`
 		RefreshToken string `json:"refreshToken"`
+		KiroApiKey   string `json:"kiroApiKey,omitempty"`
 		ClientID     string `json:"clientId,omitempty"`
 		ClientSecret string `json:"clientSecret,omitempty"`
 		Region       string `json:"region,omitempty"`
@@ -4085,6 +4087,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 				AccessToken:   a.AccessToken,
 				CsrfToken:     "",
 				RefreshToken:  a.RefreshToken,
+				KiroApiKey:    a.KiroApiKey,
 				ClientID:      a.ClientID,
 				ClientSecret:  a.ClientSecret,
 				Region:        a.Region,
