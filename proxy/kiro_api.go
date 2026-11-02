@@ -19,6 +19,7 @@ import (
 const (
 	kiroRestAPIBase               = "https://codewhisperer.us-east-1.amazonaws.com"
 	profileArnUnsupportedCooldown = 24 * time.Hour
+	profileLookupFailureTTL       = 10 * time.Minute
 	maxProfilePages               = 20
 	maxModelPages                 = 20
 	maxProfileResponseBytes       = 1 << 20
@@ -185,7 +186,9 @@ func resolveProfileArnContext(ctx context.Context, account *config.Account) (str
 	}
 
 	//! AWS refresh responses can carry profileArn, so refresh stays the fallback even for Builder ID. Entra refresh never does.
-	if account.RefreshToken != "" && !config.IsExternalIdpAccount(account) {
+	//! A forced refresh rotates the refresh token and holds the account refresh lock, so it runs once per failure window, not per call.
+	unsupported := suppressed || isBuilderIDProfileUnsupportedError(account, lookupErr)
+	if account.RefreshToken != "" && !config.IsExternalIdpAccount(account) && claimProfileArnRefreshFallback(account, unsupported) {
 		var refreshedArn string
 		var refreshErr error
 		if storedAccount(account.ID) != nil {
@@ -207,6 +210,9 @@ func resolveProfileArnContext(ctx context.Context, account *config.Account) (str
 		if refreshErr == nil && refreshedArn != "" {
 			cacheResolvedProfileArn(account, refreshedArn)
 			return refreshedArn, nil
+		}
+		if ctx.Err() != nil {
+			releaseProfileArnRefreshFallback(account)
 		}
 	}
 	if err := ctx.Err(); err != nil {
@@ -277,6 +283,79 @@ func suppressProfileArnResolution(account *config.Account) {
 	}
 }
 
+func profileLookupFailureKey(account *config.Account, region string) string {
+	if key := profileArnCooldownKey(account); key != "" {
+		return key + "\x00lookup\x00" + region
+	}
+	return ""
+}
+
+func profileArnRefreshFallbackKey(account *config.Account) string {
+	if key := profileArnCooldownKey(account); key != "" {
+		return key + "\x00refresh"
+	}
+	return ""
+}
+
+type profileLookupFailure struct {
+	until time.Time
+	err   error
+}
+
+func rememberProfileLookupFailure(account *config.Account, region string, err error) {
+	//! Without a negative cache a rejected lookup is re-probed in every region on every chat and REST call.
+	if key := profileLookupFailureKey(account, region); key != "" {
+		profileArnResolutionCooldowns.Store(key, profileLookupFailure{until: time.Now().Add(profileLookupFailureTTL), err: err})
+	}
+}
+
+func cachedProfileLookupFailure(account *config.Account, region string) error {
+	key := profileLookupFailureKey(account, region)
+	if key == "" {
+		return nil
+	}
+	value, ok := profileArnResolutionCooldowns.Load(key)
+	if !ok {
+		return nil
+	}
+	failure, ok := value.(profileLookupFailure)
+	if !ok || time.Now().After(failure.until) {
+		profileArnResolutionCooldowns.Delete(key)
+		return nil
+	}
+	return failure.err
+}
+
+func claimProfileArnRefreshFallback(account *config.Account, unsupported bool) bool {
+	key := profileArnRefreshFallbackKey(account)
+	if key == "" {
+		return true
+	}
+	window := profileLookupFailureTTL
+	if unsupported {
+		window = profileArnUnsupportedCooldown
+	}
+	now := time.Now()
+	for {
+		value, loaded := profileArnResolutionCooldowns.LoadOrStore(key, now.Add(window))
+		if !loaded {
+			return true
+		}
+		if until, ok := value.(time.Time); ok && now.Before(until) {
+			return false
+		}
+		if profileArnResolutionCooldowns.CompareAndSwap(key, value, now.Add(window)) {
+			return true
+		}
+	}
+}
+
+func releaseProfileArnRefreshFallback(account *config.Account) {
+	if key := profileArnRefreshFallbackKey(account); key != "" {
+		profileArnResolutionCooldowns.Delete(key)
+	}
+}
+
 func isProfileArnResolutionSuppressed(account *config.Account) bool {
 	key := profileArnCooldownKey(account)
 	if key == "" {
@@ -299,12 +378,19 @@ func resolveProfileArnAcrossRegions(ctx context.Context, account *config.Account
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
+		if cached := cachedProfileLookupFailure(account, region); cached != nil {
+			probeErrors = append(probeErrors, fmt.Errorf("%s (cached): %w", region, cached))
+			continue
+		}
 		profileArn, err := listAvailableProfilesWithRetry(ctx, account, region)
 		if err == nil {
 			return profileArn, nil
 		}
 		if isBuilderIDProfileUnsupportedError(account, err) {
 			return "", err
+		}
+		if ctx.Err() == nil && !isTransientProfileFetchError(err) {
+			rememberProfileLookupFailure(account, region, err)
 		}
 		probeErrors = append(probeErrors, fmt.Errorf("%s: %w", region, err))
 	}
