@@ -59,8 +59,12 @@ func TestListKiroProfilesFollowsNextTokenPagination(t *testing.T) {
 	if len(profiles) != 2 || profiles[0].ARN == "" || profiles[1].ARN == "" {
 		t.Fatalf("profiles = %+v, want two ARNs across pages", profiles)
 	}
-	if !strings.Contains(pages[0], `"maxResults":50`) {
-		t.Fatalf("first page body = %s, want maxResults 50", pages[0])
+	//! Upstream now answers maxResults with HTTP 400 REQUEST_BODY_INVALID.
+	if pages[0] != `{}` {
+		t.Fatalf("first page body = %s, want {}", pages[0])
+	}
+	if pages[1] != `{"nextToken":"page-2"}` {
+		t.Fatalf("second page body = %s, want only nextToken", pages[1])
 	}
 }
 

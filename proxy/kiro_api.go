@@ -20,6 +20,7 @@ const (
 	kiroRestAPIBase               = "https://codewhisperer.us-east-1.amazonaws.com"
 	profileArnUnsupportedCooldown = 24 * time.Hour
 	maxProfilePages               = 20
+	maxModelPages                 = 20
 	maxProfileResponseBytes       = 1 << 20
 	maxProfileErrorBytes          = 64 << 10
 )
@@ -94,37 +95,60 @@ func GetUserInfo(account *config.Account) (*UserInfoResponse, error) {
 
 func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 	ensureRestProfileArn(account)
-	url := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&maxResults=50", kiroRestAPIBase)
-	url = regionalizeURL(url, account)
-	url = withProfileArnQuery(url, account)
+	baseURL := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&maxResults=50", kiroRestAPIBase)
+	baseURL = regionalizeURL(baseURL, account)
+	baseURL = withProfileArnQuery(baseURL, account)
+	client := GetRestClientForProxy(ResolveAccountProxyURL(account))
 
+	var models []ModelInfo
+	nextToken := ""
+	//! A page holds at most 50 models; follow nextToken (bounded) so a longer catalogue is not cut off.
+	for page := 0; page < maxModelPages; page++ {
+		url := baseURL
+		if nextToken != "" {
+			url += "&nextToken=" + neturl.QueryEscape(nextToken)
+		}
+		pageModels, token, err := listAvailableModelsPage(client, url, account)
+		if err != nil {
+			return nil, err
+		}
+		models = append(models, pageModels...)
+		if nextToken = strings.TrimSpace(token); nextToken == "" {
+			break
+		}
+	}
+	//! Recorded here, not in the callers, so no listing path can skip it.
+	recordUpstreamContextWindows(models)
+	return models, nil
+}
+
+func listAvailableModelsPage(client *http.Client, url string, account *config.Account) ([]ModelInfo, string, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	setKiroHeaders(req, account)
 
-	resp, err := GetRestClientForProxy(ResolveAccountProxyURL(account)).Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+		return nil, "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result struct {
-		Models []ModelInfo `json:"models"`
+		Models    []ModelInfo `json:"models"`
+		NextToken string      `json:"nextToken"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	//! Recorded here, not in the callers, so no listing path can skip it.
-	recordUpstreamContextWindows(result.Models)
-	return result.Models, nil
+	return result.Models, result.NextToken, nil
 }
 
 func ResolveProfileArn(account *config.Account) (string, error) {
@@ -360,7 +384,8 @@ func listKiroProfiles(ctx context.Context, account *config.Account, region strin
 	nextToken := ""
 	//! Pages are bounded so a misbehaving upstream cannot loop forever.
 	for page := 0; page < maxProfilePages; page++ {
-		requestBody := map[string]interface{}{"maxResults": 50}
+		//! Upstream rejects maxResults with HTTP 400 REQUEST_BODY_INVALID; only nextToken is sent.
+		requestBody := map[string]interface{}{}
 		if nextToken != "" {
 			requestBody["nextToken"] = nextToken
 		}
