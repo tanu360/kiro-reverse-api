@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-//! A model that no account lists is a client mistake: it must come back as 404
-//! in each API's own error shape, not as a 503 that tells clients to retry.
+// A model that no account lists is a client mistake: it must come back as 404
+// in each API's own error shape, not as a 503 that tells clients to retry.
 func TestUnknownModelReturnsNotFound(t *testing.T) {
 	cases := []struct {
 		name, path, body, errType string

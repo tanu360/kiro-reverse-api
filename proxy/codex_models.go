@@ -89,8 +89,8 @@ func (h *Handler) cachedModelsSnapshot(refreshIfEmpty bool) []ModelInfo {
 	return cached
 }
 
-//! One entry per model, with no "-thinking" twin: on the Responses path any
-//! reasoning effort above minimal already turns thinking on.
+// buildCodexModelsResponse lists one entry per model, with no "-thinking" twin: on the
+// Responses path any reasoning effort above minimal already turns thinking on.
 func buildCodexModelsResponse(models []ModelInfo) []codexModelEntry {
 	entries := make([]codexModelEntry, 0, len(models)+len(codexCompatibilityAliases))
 	seen := make(map[string]bool, len(models))
