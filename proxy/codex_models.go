@@ -3,7 +3,6 @@ package proxy
 import (
 	"encoding/json"
 	"fmt"
-	"kiro-proxy/config"
 	"net/http"
 	"strings"
 )
@@ -67,12 +66,9 @@ type codexModelMessages struct {
 }
 
 func (h *Handler) handleCodexModels(w http.ResponseWriter, _ *http.Request) {
-	cached := h.cachedModelsSnapshot(false)
-	thinkingSuffix := config.GetThinkingConfig().Suffix
-
-	models := buildCodexModelsResponse(cached, thinkingSuffix)
+	models := buildCodexModelsResponse(h.cachedModelsSnapshot(false))
 	if len(models) == 0 {
-		models = buildCodexModelsResponse(fallbackCodexModelInfos(), thinkingSuffix)
+		models = buildCodexModelsResponse(fallbackCodexModelInfos())
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -93,13 +89,11 @@ func (h *Handler) cachedModelsSnapshot(refreshIfEmpty bool) []ModelInfo {
 	return cached
 }
 
-func buildCodexModelsResponse(models []ModelInfo, thinkingSuffix string) []codexModelEntry {
-	if thinkingSuffix == "" {
-		thinkingSuffix = "-thinking"
-	}
-
-	entries := make([]codexModelEntry, 0, len(models)*2+2)
-	seen := make(map[string]bool, len(models)*2+2)
+//! One entry per model, with no "-thinking" twin: on the Responses path any
+//! reasoning effort above minimal already turns thinking on.
+func buildCodexModelsResponse(models []ModelInfo) []codexModelEntry {
+	entries := make([]codexModelEntry, 0, len(models)+len(codexCompatibilityAliases))
+	seen := make(map[string]bool, len(models))
 	priority := 1
 	for _, model := range models {
 		id := strings.TrimSpace(model.ModelId)
@@ -122,35 +116,23 @@ func buildCodexModelsResponse(models []ModelInfo, thinkingSuffix string) []codex
 		supportsImage := modelSupportsImage(model.InputTypes)
 		contextWindow := modelContextWindow(model)
 
-		entries = append(entries, buildCodexModelEntry(id, displayName, description, contextWindow, supportsImage, false, priority))
-		priority++
-
-		thinkingID := id + thinkingSuffix
-		seen[strings.ToLower(thinkingID)] = true
-		entries = append(entries, buildCodexModelEntry(
-			thinkingID,
-			displayName+" Thinking",
-			"Thinking variant: "+description,
-			contextWindow,
-			supportsImage,
-			true,
-			priority,
-		))
+		entries = append(entries, buildCodexModelEntry(id, displayName, description, contextWindow, supportsImage, priority))
 		priority++
 	}
 
-	for _, alias := range codexCompatibilityAliases(priority) {
-		if seen[strings.ToLower(alias.Slug)] {
+	for _, alias := range codexCompatibilityAliases {
+		//! An alias whose mapped model is not served here fails upstream, so it is not listed.
+		if seen[strings.ToLower(alias.slug)] || !seen[strings.ToLower(MapModel(alias.slug))] {
 			continue
 		}
-		entries = append(entries, alias)
+		entries = append(entries, buildCodexModelEntry(alias.slug, alias.displayName, "Compatibility alias: "+alias.slug, alias.contextWindow, true, priority))
 		priority++
 	}
 
 	return entries
 }
 
-func buildCodexModelEntry(id, displayName, description string, contextWindow int, supportsImage, thinking bool, priority int) codexModelEntry {
+func buildCodexModelEntry(id, displayName, description string, contextWindow int, supportsImage bool, priority int) codexModelEntry {
 	if contextWindow <= 0 {
 		contextWindow = 200000
 	}
@@ -160,19 +142,11 @@ func buildCodexModelEntry(id, displayName, description string, contextWindow int
 		inputModalities = append(inputModalities, "image")
 	}
 
-	defaultReasoningLevel := "medium"
 	reasoningLevels := []codexReasoningLevel{
 		{Effort: "low", Description: "Fast responses"},
 		{Effort: "medium", Description: "Balanced reasoning"},
 		{Effort: "high", Description: "Deep reasoning"},
-	}
-	if thinking {
-		defaultReasoningLevel = "high"
-		reasoningLevels = []codexReasoningLevel{
-			{Effort: "medium", Description: "Balanced reasoning"},
-			{Effort: "high", Description: "Deep reasoning"},
-			{Effort: "xhigh", Description: "Extra high reasoning"},
-		}
+		{Effort: "xhigh", Description: "Extra high reasoning"},
 	}
 
 	return codexModelEntry{
@@ -184,7 +158,7 @@ func buildCodexModelEntry(id, displayName, description string, contextWindow int
 		MaxContextWindow:            contextWindow,
 		AutoCompactTokenLimit:       scaledTokenLimit(contextWindow, 0.8),
 		TruncationPolicy:            codexTruncationPolicy{Mode: "tokens", Limit: scaledTokenLimit(contextWindow, 0.32)},
-		DefaultReasoningLevel:       defaultReasoningLevel,
+		DefaultReasoningLevel:       "medium",
 		SupportedReasoningLevels:    reasoningLevels,
 		DefaultReasoningSummary:     "none",
 		ReasoningSummaryFormat:      "none",
@@ -251,13 +225,14 @@ func displayNameFromModelID(id string) string {
 	return strings.Join(parts, " ")
 }
 
-func codexCompatibilityAliases(priority int) []codexModelEntry {
-	return []codexModelEntry{
-		buildCodexModelEntry("gpt-5.4-mini", "GPT 5.4 Mini", "Compatibility alias: gpt-5.4-mini", 200000, true, false, priority),
-		buildCodexModelEntry("gpt-5", "GPT 5", "Compatibility alias: gpt-5", 200000, true, false, priority+1),
-		buildCodexModelEntry("gpt-4o", "GPT 4o", "Custom model: gpt-4o", 128000, true, false, priority+2),
-		buildCodexModelEntry("gpt-4", "GPT 4", "Custom model: gpt-4", 8192, true, false, priority+3),
-	}
+var codexCompatibilityAliases = []struct {
+	slug, displayName string
+	contextWindow     int
+}{
+	{"gpt-5.4-mini", "GPT 5.4 Mini", 200000},
+	{"gpt-5", "GPT 5", 200000},
+	{"gpt-4o", "GPT 4o", 128000},
+	{"gpt-4", "GPT 4", 8192},
 }
 
 func fallbackCodexModelInfos() []ModelInfo {

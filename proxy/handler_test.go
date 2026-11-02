@@ -645,17 +645,14 @@ func TestCodexModelsEndpointReturnsManifest(t *testing.T) {
 	if err := json.NewDecoder(okRec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(body.Models) < 2 {
-		t.Fatalf("expected base and thinking entries, got %#v", body.Models)
+	if len(body.Models) != 1 {
+		t.Fatalf("expected one entry and no aliases to unserved models, got %#v", body.Models)
 	}
 	if body.Models[0].Slug != "claude-opus-4.8" || body.Models[0].ContextWindow != 1000000 {
 		t.Fatalf("unexpected base model entry: %#v", body.Models[0])
 	}
 	if !body.Models[0].SupportsSearchTool {
 		t.Fatalf("expected Codex manifest to expose hosted web search support")
-	}
-	if body.Models[1].Slug != "claude-opus-4.8-thinking" || body.Models[1].DefaultReasoningLevel != "high" {
-		t.Fatalf("unexpected thinking model entry: %#v", body.Models[1])
 	}
 }
 
@@ -1036,10 +1033,10 @@ func TestBuildCodexModelsResponseUsesKiroModelMetadata(t *testing.T) {
 		InputTypes:     []string{"TEXT", "IMAGE"},
 		RateMultiplier: 2.2,
 		TokenLimits:    tokenLimits,
-	}}, "-thinking")
+	}, {ModelId: "claude-haiku-4.5", ModelName: "Claude Haiku 4.5"}})
 
-	if len(models) != 6 {
-		t.Fatalf("expected base, thinking, and compatibility aliases, got %d", len(models))
+	if len(models) != 3 {
+		t.Fatalf("expected two models and the gpt-5.4-mini alias, got %#v", models)
 	}
 	if models[0].Slug != "claude-opus-4.8" || models[0].DisplayName != "Claude Opus 4.8" {
 		t.Fatalf("unexpected base model identity: %#v", models[0])
@@ -1058,14 +1055,14 @@ func TestBuildCodexModelsResponseUsesKiroModelMetadata(t *testing.T) {
 	if models[0].ContextWindow != 1000000 || models[0].TruncationPolicy.Limit != 320000 {
 		t.Fatalf("expected Kiro token limits to drive Codex limits, got %#v", models[0])
 	}
-	if models[1].Slug != "claude-opus-4.8-thinking" || models[1].DefaultReasoningLevel != "high" {
-		t.Fatalf("unexpected thinking variant: %#v", models[1])
+	if levels := models[0].SupportedReasoningLevels; len(levels) != 4 || levels[3].Effort != "xhigh" {
+		t.Fatalf("expected low through xhigh efforts, got %#v", levels)
 	}
 	if !models[0].SupportsImageDetailOriginal || len(models[0].InputModalities) != 2 {
 		t.Fatalf("expected image capability to be preserved, got %#v", models[0])
 	}
-	if models[2].Slug != "gpt-5.4-mini" || models[3].Slug != "gpt-5" || models[4].Slug != "gpt-4o" || models[5].Slug != "gpt-4" {
-		t.Fatalf("expected compatibility aliases at the end, got %#v %#v %#v %#v", models[2], models[3], models[4], models[5])
+	if models[1].Slug != "claude-haiku-4.5" || models[2].Slug != "gpt-5.4-mini" {
+		t.Fatalf("expected only the alias to a served model at the end, got %#v", models)
 	}
 }
 
