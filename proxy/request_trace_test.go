@@ -166,9 +166,9 @@ func TestRequestPageSortsByDuration(t *testing.T) {
 	s := setupTraceTestStore(t)
 	defer s.Reset()
 
-	now := time.Now()
 	for _, d := range []time.Duration{2 * time.Second, 50 * time.Millisecond, 700 * time.Millisecond} {
-		trace := &requestTrace{startedAt: now.Add(-d), endpoint: requestEndpointClaude}
+		//! Anchor each start to its own record call: persisting the earlier rows to sqlite takes real time.
+		trace := &requestTrace{startedAt: time.Now().Add(-d), endpoint: requestEndpointClaude}
 		s.RecordTracedRequest(trace, "acc", "", "", "a@example.com", "claude-sonnet-4.5", 1, 1, 0, true, 200, "")
 	}
 	s.RecordRequest("acc", "a@example.com", "claude-sonnet-4.5", 1, 1, 0, true, 200, "")
