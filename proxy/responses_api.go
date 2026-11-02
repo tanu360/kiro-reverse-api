@@ -240,8 +240,9 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
-		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
+		status, errType, message := h.noAccountError(model, "server_error")
+		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
+		h.sendOpenAIError(w, status, errType, message)
 		return
 	}
 	recordFinalRequestForApiKey(ctx, apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
@@ -687,8 +688,9 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
-		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
+		status, errType, message := h.noAccountError(model, "server_error")
+		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
+		h.sendOpenAIError(w, status, errType, message)
 		return
 	}
 	recordFinalRequestForApiKey(ctx, apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())

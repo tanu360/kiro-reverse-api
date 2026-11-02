@@ -491,3 +491,24 @@ func TestGetNextForModelExcludingSkipsExcludedAccount(t *testing.T) {
 		t.Fatalf("expected account b, got %#v", acc)
 	}
 }
+
+func TestOffersModel(t *testing.T) {
+	if !newTestPool().OffersModel("anything") {
+		t.Fatal("empty pool must not blame the model")
+	}
+	p := newTestPool(config.Account{ID: "a"}, config.Account{ID: "b"})
+	if !p.OffersModel("x") {
+		t.Fatal("accounts without a model list may serve any model")
+	}
+	p.SetModelList("a", []string{"claude-sonnet-4.5"})
+	if !p.OffersModel("x") {
+		t.Fatal("account b has no list, so x may still be served")
+	}
+	p.SetModelList("b", []string{"Claude-Haiku-4.5"})
+	if !p.OffersModel(" claude-haiku-4.5 ") || !p.OffersModel("claude-sonnet-4.5") {
+		t.Fatal("listed models must be offered, case and space insensitive")
+	}
+	if p.OffersModel("no-such-model") {
+		t.Fatal("a model no account lists must not be offered")
+	}
+}

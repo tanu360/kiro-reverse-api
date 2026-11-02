@@ -1385,8 +1385,9 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
-		h.sendClaudeError(w, http.StatusServiceUnavailable, "api_error", "No available accounts")
+		status, errType, message := h.noAccountError(model, "api_error")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
+		h.sendClaudeError(w, status, errType, message)
 		return
 	}
 
@@ -1603,13 +1604,28 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
-		h.sendClaudeError(w, http.StatusServiceUnavailable, "api_error", "No available accounts")
+		status, errType, message := h.noAccountError(model, "api_error")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
+		h.sendClaudeError(w, status, errType, message)
 		return
 	}
 
 	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, model, 0, 0, 0, false, upstreamFailureStatus(lastErr), lastErr.Error())
 	h.sendClaudeUpstreamError(w, lastErr)
+}
+
+// noAccountError describes a request that no account took. A model that no
+// enabled account lists is the client's mistake and gets 404; an empty or busy
+// pool is ours and keeps 503 with the API's own server error type.
+func (h *Handler) noAccountError(model, serverErrType string) (int, string, string) {
+	if !h.pool.OffersModel(model) {
+		errType := "invalid_request_error"
+		if serverErrType == "api_error" {
+			errType = "not_found_error"
+		}
+		return http.StatusNotFound, errType, fmt.Sprintf("model %q is not available on any account", model)
+	}
+	return http.StatusServiceUnavailable, serverErrType, "No available accounts"
 }
 
 func (h *Handler) sendClaudeError(w http.ResponseWriter, status int, errType, message string) {
@@ -2101,8 +2117,9 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
-		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
+		status, errType, message := h.noAccountError(model, "server_error")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
+		h.sendOpenAIError(w, status, errType, message)
 		return
 	}
 
@@ -2227,8 +2244,9 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if lastErr == nil {
-		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, http.StatusServiceUnavailable, "No available accounts")
-		h.sendOpenAIError(w, http.StatusServiceUnavailable, "server_error", "No available accounts")
+		status, errType, message := h.noAccountError(model, "server_error")
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
+		h.sendOpenAIError(w, status, errType, message)
 		return
 	}
 

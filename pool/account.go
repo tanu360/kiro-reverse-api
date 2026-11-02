@@ -108,6 +108,23 @@ func (p *AccountPool) accountHasModel(accountID, model string) bool {
 	return list[strings.ToLower(strings.TrimSpace(model))]
 }
 
+// OffersModel reports whether some enabled account may serve model. An empty
+// pool answers true, so callers keep reporting a capacity problem rather than
+// blaming the model.
+func (p *AccountPool) OffersModel(model string) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if len(p.accounts) == 0 || strings.TrimSpace(model) == "" {
+		return true
+	}
+	for i := range p.accounts {
+		if p.accountHasModel(p.accounts[i].ID, model) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *AccountPool) GetNextForModel(model string) *config.Account {
 	return p.GetNextForModelExcluding(model, nil)
 }

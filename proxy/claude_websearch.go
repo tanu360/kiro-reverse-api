@@ -402,13 +402,13 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 				recordClientDisconnect(r.Context(), apiKeyReservation, lastAccount, req.Model)
 				return
 			}
-			status, message := http.StatusInternalServerError, err.Error()
+			status, errType, message := http.StatusInternalServerError, "api_error", err.Error()
 			if errors.Is(err, errNoClaudeAccounts) {
-				//! Same text as the plain Claude path, so clients see one message for an empty pool.
-				status, message = http.StatusServiceUnavailable, "No available accounts"
+				//! Same answer as the plain Claude path, so clients see one message for an empty pool or unknown model.
+				status, errType, message = h.noAccountError(req.Model, "api_error")
 			}
 			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, req.Model, 0, 0, 0, false, status, message)
-			h.sendClaudeError(w, status, "api_error", message)
+			h.sendClaudeError(w, status, errType, message)
 			return
 		}
 		credits += round.credits
