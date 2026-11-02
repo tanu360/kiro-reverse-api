@@ -66,8 +66,6 @@ func TestModelMappingsDefaultAndUpdate(t *testing.T) {
 
 	custom := []ModelMappingRule{
 		{Key: "  My-Alias  ", Value: " claude-haiku-4.5 "},
-		{Key: "", Value: "claude-opus-4.8"},
-		{Key: "blank-target", Value: ""},
 	}
 	if err := UpdateModelMappings(custom); err != nil {
 		t.Fatalf("update mappings: %v", err)

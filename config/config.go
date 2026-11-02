@@ -784,17 +784,12 @@ func GetModelMappings() []ModelMappingRule {
 }
 
 func UpdateModelMappings(mappings []ModelMappingRule) error {
+	cleaned, err := normalizeModelMappings(mappings)
+	if err != nil {
+		return err
+	}
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
-	cleaned := make([]ModelMappingRule, 0, len(mappings))
-	for _, mapping := range mappings {
-		key := strings.ToLower(strings.TrimSpace(mapping.Key))
-		value := strings.TrimSpace(mapping.Value)
-		if key == "" || value == "" {
-			continue
-		}
-		cleaned = append(cleaned, ModelMappingRule{Key: key, Value: value})
-	}
 	cfg.ModelMappings = cleaned
 	return Save()
 }

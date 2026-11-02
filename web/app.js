@@ -1610,9 +1610,16 @@
     renderModelMappings();
   }
   async function saveModelMappings() {
-    const mappings = modelMappings
-      .map(m => ({ key: (m.key || '').trim(), value: (m.value || '').trim() }))
-      .filter(m => m.key && m.value);
+    //! Only fully blank rows are dropped; half-filled ones go to the server so its validation can name them.
+    const rowIndexes = [];
+    const mappings = [];
+    modelMappings.forEach((m, i) => {
+      const key = (m.key || '').trim();
+      const value = (m.value || '').trim();
+      if (!key && !value) return;
+      rowIndexes.push(i);
+      mappings.push({ key, value });
+    });
     const res = await api('/model-mappings', {
       method: 'POST', body: JSON.stringify({ mappings })
     });
@@ -1623,7 +1630,15 @@
       toast(t('settings.modelMappingsSaved'), 'success');
     } else {
       toast(t('common.saveFailed') + ': ' + localizedError(d.error), 'error');
+      focusModelMappingRow(rowIndexes[d.index]);
     }
+  }
+  function focusModelMappingRow(index) {
+    if (typeof index !== 'number') return;
+    const row = $('modelMappings')?.querySelector('[data-model-mapping-row="' + index + '"]');
+    const inputs = row ? qsa('input', row) : [];
+    const input = inputs.find(el => !el.value.trim()) || inputs[0];
+    if (input) input.focus();
   }
   function renderModelMappings() {
     const c = $('modelMappings');

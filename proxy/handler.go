@@ -3429,6 +3429,12 @@ func (h *Handler) apiUpdateModelMappings(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err := config.UpdateModelMappings(req.Mappings); err != nil {
+		var mappingErr *config.ModelMappingError
+		if errors.As(err, &mappingErr) {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error(), "index": mappingErr.Index})
+			return
+		}
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
