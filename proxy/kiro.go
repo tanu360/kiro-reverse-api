@@ -84,10 +84,7 @@ func GetClientForProxy(proxyURL string) *http.Client {
 	if cached, ok := proxyClientCache.Load(proxyURL); ok {
 		return cached.(*http.Client)
 	}
-	client := &http.Client{
-		Timeout:   5 * time.Minute,
-		Transport: buildKiroTransport(proxyURL),
-	}
+	client := newKiroStreamClient(proxyURL)
 	proxyClientCache.Store(proxyURL, client)
 	return client
 }
@@ -137,11 +134,7 @@ func buildKiroTransport(proxyURL string) *http.Transport {
 }
 
 func InitKiroHttpClient(proxyURL string) {
-	client := &http.Client{
-		Timeout:   5 * time.Minute,
-		Transport: buildKiroTransport(proxyURL),
-	}
-	kiroHttpStore.Store(client)
+	kiroHttpStore.Store(newKiroStreamClient(proxyURL))
 
 	restClient := &http.Client{
 		Timeout:   30 * time.Second,
@@ -460,8 +453,9 @@ endpointLoop:
 				continue endpointLoop
 			}
 
-			emitted, err := parseEventStreamTracked(resp.Body, callback)
-			resp.Body.Close()
+			body := newIdleTimeoutBody(resp.Body, kiroStreamIdleTimeout)
+			emitted, err := parseEventStreamTracked(body, callback)
+			body.Close()
 			if err == nil {
 				return nil
 			}

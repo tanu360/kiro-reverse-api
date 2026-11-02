@@ -11,6 +11,7 @@ var (
 	errIncompleteKiroToolInput   = errors.New("upstream stream ended with incomplete tool input")
 	errInvalidKiroEventStream    = errors.New("invalid upstream event stream")
 	errKiroEventStreamUpstream   = errors.New("upstream event stream error")
+	errKiroStreamIdle            = errors.New("upstream stream idle timeout")
 )
 
 type streamTurnSignals struct {
@@ -109,7 +110,8 @@ func isStreamIntegrityError(err error) bool {
 	return errors.Is(err, errEmptyKiroStream) ||
 		errors.Is(err, errUpstreamTruncatedResponse) ||
 		errors.Is(err, errIncompleteKiroToolInput) ||
-		errors.Is(err, errInvalidKiroEventStream)
+		errors.Is(err, errInvalidKiroEventStream) ||
+		errors.Is(err, errKiroStreamIdle)
 }
 
 func normalizeStopReason(reason string) string {
