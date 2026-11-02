@@ -35,7 +35,13 @@ func classifyStreamIntegrity(turn streamTurnSignals, lenient bool) error {
 	switch {
 	case turn.toolCount > 0:
 		return nil
-	case !turn.sawContent && !turn.sawReasoning && !turn.sawInlineThinking:
+	//! A tool_use stop with no tool delivered lost the tool frames (upstream Kiro-Go #159).
+	//! Accepting it maps the turn to end_turn / stop, and the agent loop stalls without an error.
+	case isToolUseStopReason(turn.stopReason):
+		return errUpstreamTruncatedResponse
+	//! A refusal, filter or cap may legitimately end a turn before any output; retrying it
+	//! as an empty stream would replace the right stop reason with an error.
+	case !turn.sawContent && !turn.sawReasoning && !turn.sawInlineThinking && !isExplicitNonEndTurnStop(turn.stopReason):
 		return errEmptyKiroStream
 	case strings.TrimSpace(turn.stopReason) != "":
 		return nil
@@ -52,6 +58,35 @@ func classifyStreamIntegrity(turn streamTurnSignals, lenient bool) error {
 	default:
 		return errUpstreamTruncatedResponse
 	}
+}
+
+func isToolUseStopReason(reason string) bool {
+	switch strings.NewReplacer("_", "", "-", "", " ", "").Replace(normalizeStopReason(reason)) {
+	case "tooluse", "toolcalls", "toolcall":
+		return true
+	}
+	return false
+}
+
+func isExplicitNonEndTurnStop(reason string) bool {
+	return mapClaudeStopReason(reason, 0) != "end_turn"
+}
+
+func inferMaxTokensStop(reason string, outputTokens, maxTokens int) string {
+	//! IdC / Enterprise accounts never send a stopReason, so a reply cut at the output cap
+	//! would read as finished. Output reaching the requested cap is the only evidence left.
+	//! outputTokens may be a local estimate; only a reply at or past the cap counts.
+	if strings.TrimSpace(reason) == "" && maxTokens > 0 && outputTokens >= maxTokens {
+		return "max_tokens"
+	}
+	return reason
+}
+
+func requestedMaxTokens(payload *KiroPayload) int {
+	if payload == nil || payload.InferenceConfig == nil {
+		return 0
+	}
+	return payload.InferenceConfig.MaxTokens
 }
 
 func eventStopReason(event map[string]interface{}) string {

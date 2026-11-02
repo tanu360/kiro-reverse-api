@@ -61,7 +61,8 @@ func TestStopReasonRetryAcrossOpenAIEndpoints(t *testing.T) {
 				var calls atomic.Int32
 				h := newStreamTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
 					if calls.Add(1) == 1 {
-						writeFrames(w, awsEventStreamFrame(t, "metadataEvent", map[string]interface{}{"stopReason": "max_tokens"}))
+						//! A cut frame forces the retry; an explicit stop without output is a final turn.
+						writeFrames(w, awsEventStreamFrame(t, "metadataEvent", map[string]interface{}{"stopReason": "max_tokens"}), meteringFrame(t)[:5])
 						return
 					}
 					writeFrames(w, awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "complete"}), meteringFrame(t))
@@ -162,7 +163,8 @@ func TestReviewRetryDoesNotLeakStopReason(t *testing.T) {
 	var calls atomic.Int32
 	h := newStreamTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if calls.Add(1) == 1 {
-			writeFrames(w, awsEventStreamFrame(t, "metadataEvent", map[string]interface{}{"stopReason": "max_tokens"}))
+			//! A cut frame forces the retry; an explicit stop without output is a final turn.
+			writeFrames(w, awsEventStreamFrame(t, "metadataEvent", map[string]interface{}{"stopReason": "max_tokens"}), meteringFrame(t)[:5])
 			return
 		}
 		writeFrames(w, awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "complete successful second attempt"}), meteringFrame(t))

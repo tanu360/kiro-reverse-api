@@ -222,6 +222,9 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 
 			response, storedMessages := buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
 			addResponsesCacheUsage(response, cacheDetails)
+			if len(toolUses) == 0 {
+				upstreamStopReason = inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload))
+			}
 			applyResponsesStopReason(response, upstreamStopReason)
 			if prepared.Store {
 				if err := saveResponseState(responseStateFromObject(response, storedMessages)); err != nil {
@@ -625,6 +628,9 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			}
 			response, storedMessages := buildResponsesCompletedObjectWithOutput(responseID, createdAt, prepared, outputItems, finalContent, toolUses, inputTokens, outputTokens)
 			addResponsesCacheUsage(response, cacheDetails)
+			if len(toolUses) == 0 {
+				upstreamStopReason = inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload))
+			}
 			terminalEvent := applyResponsesStopReason(response, upstreamStopReason)
 			sendResponsesSSE(w, flusher, terminalEvent, map[string]interface{}{
 				"type":     terminalEvent,

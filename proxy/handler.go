@@ -1362,7 +1362,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
 
-			stopReason := mapClaudeStopReason(upstreamStopReason, len(toolUses))
+			stopReason := mapClaudeStopReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
 
 			ensureMessageStart()
 			h.sendSSE(w, flusher, "message_delta", map[string]interface{}{
@@ -1582,7 +1582,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			}
 
 			resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
-			resp.StopReason = mapClaudeStopReason(upstreamStopReason, len(toolUses))
+			resp.StopReason = mapClaudeStopReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
 			resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
 			resp.Usage.CacheCreationInputTokens = cacheUsage.CacheCreationInputTokens
 			resp.Usage.CacheReadInputTokens = cacheUsage.CacheReadInputTokens
@@ -2071,7 +2071,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
-			finishReason := mapOpenAIFinishReason(upstreamStopReason, len(toolCalls))
+			finishReason := mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolCalls))
 
 			chunk := map[string]interface{}{
 				"id":      chatID,
@@ -2211,7 +2211,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
 			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, cacheDetails)
 			if choices, ok := resp["choices"].([]map[string]interface{}); ok && len(choices) > 0 {
-				choices[0]["finish_reason"] = mapOpenAIFinishReason(upstreamStopReason, len(toolUses))
+				choices[0]["finish_reason"] = mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
 			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			json.NewEncoder(w).Encode(resp)
