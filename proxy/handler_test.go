@@ -723,8 +723,8 @@ func TestFinalizeUsageTokensPrefersProviderUsage(t *testing.T) {
 
 func TestFinalizeUsageTokensFallsBackWhenProviderUsageMissing(t *testing.T) {
 	in, out := finalizeUsageTokens(0, 0, 999, 5000, 88)
-	if in != 5000 || out != 88 {
-		t.Fatalf("expected context input and estimated output fallback, got input=%d output=%d", in, out)
+	if in != 4912 || out != 88 {
+		t.Fatalf("expected context minus output as input and estimated output fallback, got input=%d output=%d", in, out)
 	}
 
 	in, out = finalizeUsageTokens(0, 0, 999, 0, 88)
@@ -1093,5 +1093,30 @@ func TestAdminPasswordChangeRequiresEightCharacters(t *testing.T) {
 	}
 	if config.GetPassword() != "12345678" {
 		t.Fatal("an accepted password was not saved")
+	}
+}
+
+func TestFinalizeUsageTokensRemovesTheAnswerFromKiroContext(t *testing.T) {
+	cases := []struct {
+		name                               string
+		estimatedIn, context, estimatedOut int
+		wantIn                             int
+	}{
+		// Live counts: a 400-word answer moved Kiro's context from 4110 to 4642.
+		{"answer counted once", 40, 4642, 532, 4110},
+		{"overestimated answer stops at the request estimate", 999, 1200, 800, 999},
+		{"request estimate never exceeds the context", 6000, 5000, 88, 5000},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in, out := finalizeUsageTokens(0, 0, tc.estimatedIn, tc.context, tc.estimatedOut)
+			if in != tc.wantIn || out != tc.estimatedOut {
+				t.Fatalf("input=%d output=%d, want input=%d output=%d", in, out, tc.wantIn, tc.estimatedOut)
+			}
+		})
+	}
+	//! Output Kiro reports itself is subtracted the same way.
+	if in, out := finalizeUsageTokens(0, 600, 40, 4710, 900); in != 4110 || out != 600 {
+		t.Fatalf("input=%d output=%d, want the reported output removed from the context", in, out)
 	}
 }

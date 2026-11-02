@@ -1408,18 +1408,30 @@ func (h *Handler) recordSuccessForApiKey(apiKeyReservation *apiKeyUsageReservati
 	}
 }
 
-func finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, contextInputTokens, estimatedOutputTokens int) (int, int) {
+// finalizeUsageTokens fills in usage Kiro did not report. contextTokens comes from
+// contextUsagePercentage, which Kiro measures after the turn: the prompt plus this answer.
+func finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, contextTokens, estimatedOutputTokens int) (int, int) {
+	if outputTokens <= 0 {
+		outputTokens = estimatedOutputTokens
+	}
 	if inputTokens <= 0 {
-		if contextInputTokens > 0 {
-			inputTokens = contextInputTokens
+		if contextTokens > 0 {
+			inputTokens = inputFromContextTokens(contextTokens, outputTokens, estimatedInputTokens)
 		} else {
 			inputTokens = estimatedInputTokens
 		}
 	}
-	if outputTokens <= 0 {
-		outputTokens = estimatedOutputTokens
-	}
 	return inputTokens, outputTokens
+}
+
+// inputFromContextTokens removes the answer from Kiro's context count. Live (2026-11-02,
+// 200K window): a 2-token answer read 4110, a 400-word answer 4642 and a 1500-word answer
+// 5821 for near-identical prompts, so taking the count as input billed every answer twice.
+func inputFromContextTokens(contextTokens, outputTokens, estimatedInputTokens int) int {
+	//! outputTokens is usually a local estimate that runs above Kiro's own count, so the
+	//! difference can undershoot; the request's own estimated size is a floor, capped by
+	//! the context it is part of.
+	return max(contextTokens-outputTokens, min(estimatedInputTokens, contextTokens))
 }
 
 func accountIdentity(account *config.Account) (string, string) {
