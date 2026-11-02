@@ -27,10 +27,12 @@ func appendConfiguredModelAliases(models []map[string]interface{}, suffix string
 				continue
 			}
 			target, _ := ParseModelAndThinking(id, suffix)
-			supportsImage := false
-			if model := byID[strings.ToLower(target)]; model != nil {
-				supportsImage, _ = model["supports_image"].(bool)
+			served := byID[strings.ToLower(target)]
+			if served == nil {
+				//! An alias to a model no listed account serves only fails (404), so it is not advertised.
+				continue
 			}
+			supportsImage, _ := served["supports_image"].(bool)
 			alias := buildModelInfo(id, "kiro-proxy", supportsImage)
 			key := strings.ToLower(id)
 			if existing := byID[key]; existing != nil {

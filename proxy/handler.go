@@ -521,11 +521,9 @@ func (h *Handler) handleModels(w http.ResponseWriter, _ *http.Request) {
 		models = fallbackAnthropicModels(thinkingSuffix)
 	}
 
-	models = append(models,
-		buildModelInfo("auto", "kiro-proxy", true),
-		buildModelInfo("gpt-4o", "kiro-proxy", true),
-		buildModelInfo("gpt-4", "kiro-proxy", true),
-	)
+	//! gpt-4o and gpt-4 are not listed by hand: no account serves them and no default
+	//! mapping points them anywhere, so they only failed. A model mapping still adds them.
+	models = append(models, buildModelInfo("auto", "kiro-proxy", true))
 	models = appendConfiguredModelAliases(models, thinkingSuffix)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

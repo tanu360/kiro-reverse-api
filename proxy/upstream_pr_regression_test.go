@@ -168,7 +168,10 @@ func TestConfiguredAliasesAdvertisedWithExactPrecedence(t *testing.T) {
 	if _, thinking := ParseModelAndThinking("plain", ""); thinking {
 		t.Fatal("empty suffix enabled thinking")
 	}
-	models := appendConfiguredModelAliases([]map[string]interface{}{buildModelInfo("claude-opus-4.8", "anthropic", true)}, "-thinking")
+	models := appendConfiguredModelAliases([]map[string]interface{}{
+		buildModelInfo("claude-opus-4.8", "anthropic", true),
+		buildModelInfo("claude-sonnet-4.5", "anthropic", true),
+	}, "-thinking")
 	seen := map[string]bool{}
 	for _, model := range models {
 		id := model["id"].(string)
@@ -182,6 +185,9 @@ func TestConfiguredAliasesAdvertisedWithExactPrecedence(t *testing.T) {
 	}
 	if !seen["alias-pro"] || !seen["alias-pro-thinking"] {
 		t.Fatal("aliases absent from discovery")
+	}
+	if seen["alias"] || seen["alias-thinking"] {
+		t.Fatal("an alias to a model that is not served must not be advertised")
 	}
 }
 
