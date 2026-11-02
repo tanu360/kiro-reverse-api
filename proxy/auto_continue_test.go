@@ -600,6 +600,39 @@ func TestAutoContinueKeepsShortOrAbsentOverlap(t *testing.T) {
 	}
 }
 
+func TestAutoContinueKeepsWholeLineRepeatAfterALineBreakCut(t *testing.T) {
+	for _, tc := range []struct{ name, first, next, want string }{
+		{
+			"identical next line",
+			"func main() {\n    fmt.Println(\"done\")\n",
+			"    fmt.Println(\"done\")\n}\n",
+			"func main() {\n    fmt.Println(\"done\")\n    fmt.Println(\"done\")\n}\n",
+		},
+		{
+			"partial line restart is still cut",
+			"func main() {\n    fmt.Println(\"done\")\n",
+			"fmt.Println(\"done\")\n    os.Exit(0)\n}\n",
+			"func main() {\n    fmt.Println(\"done\")\n    os.Exit(0)\n}\n",
+		},
+		{
+			"mid-line cut restart is still cut",
+			"Intro.\nThe quick brown fox ju",
+			"The quick brown fox jumps.",
+			"Intro.\nThe quick brown fox jumps.",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec, _, err := runScriptedContinue(t, testKiroPayload(), 3,
+				scriptedHop{text: []string{tc.first}, stop: "max_tokens"},
+				scriptedHop{text: []string{tc.next}, stop: "end_turn"},
+			)
+			if err != nil || rec.text != tc.want {
+				t.Fatalf("text = %q err=%v, want %q", rec.text, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestAutoContinueTrimsOnlyTheOpeningOfALongContinuation(t *testing.T) {
 	head := strings.Repeat("x", 2000) + "the closing line of part one"
 	rest := strings.Repeat("y", 3000) + " the closing line of part one again"

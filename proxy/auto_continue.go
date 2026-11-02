@@ -229,13 +229,21 @@ func overlapTail(answer string) string {
 
 // repeatedOverlap returns the length of the longest start of text that repeats the end of tail.
 func repeatedOverlap(tail, text string) int {
+	lineCut := strings.HasSuffix(tail, "\n")
 	for n := min(len(tail), len(text)); n > 0; n-- {
 		if len(strings.TrimSpace(text[:n])) < minContinuationOverlap {
 			return 0
 		}
-		if strings.HasSuffix(tail, text[:n]) {
-			return n
+		if !strings.HasSuffix(tail, text[:n]) {
+			continue
 		}
+		//! An answer cut on a line break may really need the same line again (a repeated code
+		//! line or table row). Whole-line repeats there are kept: dropping one would lose text
+		//! silently, while a kept restart only shows a duplicate.
+		if lineCut && n < len(tail) && tail[len(tail)-n-1] == '\n' {
+			return 0
+		}
+		return n
 	}
 	return 0
 }
