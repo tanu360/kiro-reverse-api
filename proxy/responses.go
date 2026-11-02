@@ -33,6 +33,7 @@ type OpenAIResponsesText struct {
 
 type OpenAIResponsesTool struct {
 	Type        string                 `json:"type"`
+	Execution   string                 `json:"execution,omitempty"`
 	Name        string                 `json:"name,omitempty"`
 	Description string                 `json:"description,omitempty"`
 	Parameters  interface{}            `json:"parameters,omitempty"`
@@ -63,7 +64,7 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		return nil, msg
 	}
 
-	extra, err := extractAdditionalResponsesTools(req.Input)
+	extra, err := extractInputResponsesTools(req.Input)
 	if err != nil {
 		return nil, err.Error()
 	}
@@ -235,6 +236,13 @@ func convertResponsesTool(tool OpenAIResponsesTool, namespace string) ([]OpenAIT
 			name = tool.Name
 			description = customToolDescription(tool)
 			parameters = map[string]interface{}{"type": "object", "properties": map[string]interface{}{"input": map[string]interface{}{"type": "string", "description": "The raw text to pass to this custom tool."}}, "required": []string{"input"}}
+		case toolSearchToolType:
+			if !isClientToolSearch(tool) {
+				return nil, ""
+			}
+			name = toolSearchToolType
+			description = tool.Description
+			parameters = tool.Parameters
 		default:
 			return nil, ""
 		}
@@ -380,6 +388,26 @@ func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
 	case "function_call_output", "custom_tool_call_output":
 		callID := firstString(obj["call_id"], obj["tool_call_id"], obj["id"])
 		return []OpenAIMessage{{Role: "tool", ToolCallID: callID, Content: responsesContentToOpenAIContent(firstExisting(obj, "output", "content"))}}, nil
+	case "tool_search_call":
+		callID := firstString(obj["call_id"])
+		if callID == "" {
+			return nil, nil
+		}
+		arguments := firstString(obj["arguments"])
+		if arguments == "" {
+			b, _ := json.Marshal(obj["arguments"])
+			arguments = string(b)
+		}
+		tc := ToolCall{ID: callID, Type: "function"}
+		tc.Function.Name = toolSearchToolType
+		tc.Function.Arguments = arguments
+		return []OpenAIMessage{{Role: "assistant", Content: nil, ToolCalls: []ToolCall{tc}}}, nil
+	case "tool_search_output":
+		callID := firstString(obj["call_id"])
+		if callID == "" {
+			return nil, nil
+		}
+		return []OpenAIMessage{{Role: "tool", ToolCallID: callID, Content: toolSearchOutputText(obj["tools"])}}, nil
 	case "function_call", "custom_tool_call":
 		callID := firstString(obj["call_id"], obj["id"])
 		name := qualifiedResponsesToolName(firstString(obj["namespace"]), firstString(obj["name"]))

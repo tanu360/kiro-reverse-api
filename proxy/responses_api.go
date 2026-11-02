@@ -484,18 +484,26 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 						added[key] = value
 					}
 					added["status"] = "in_progress"
-					field, event := "arguments", "response.function_call_arguments"
-					if item["type"] == "custom_tool_call" {
+					//! tool_search_call has no argument delta events; its arguments arrive whole.
+					field, event := "", ""
+					switch item["type"] {
+					case "function_call":
+						field, event = "arguments", "response.function_call_arguments"
+					case "custom_tool_call":
 						field, event = "input", "response.custom_tool_call_input"
 					}
-					added[field] = ""
+					if field != "" {
+						added[field] = ""
+					}
 					sendResponsesSSE(w, flusher, "response.output_item.added", map[string]interface{}{
 						"type":         "response.output_item.added",
 						"output_index": outputIndex,
 						"item":         added,
 					})
-					sendResponsesSSE(w, flusher, event+".delta", map[string]interface{}{"type": event + ".delta", "item_id": item["id"], "output_index": outputIndex, "delta": item[field]})
-					sendResponsesSSE(w, flusher, event+".done", map[string]interface{}{"type": event + ".done", "item_id": item["id"], "output_index": outputIndex, field: item[field]})
+					if field != "" {
+						sendResponsesSSE(w, flusher, event+".delta", map[string]interface{}{"type": event + ".delta", "item_id": item["id"], "output_index": outputIndex, "delta": item[field]})
+						sendResponsesSSE(w, flusher, event+".done", map[string]interface{}{"type": event + ".done", "item_id": item["id"], "output_index": outputIndex, field: item[field]})
+					}
 					sendResponsesSSE(w, flusher, "response.output_item.done", map[string]interface{}{
 						"type":         "response.output_item.done",
 						"output_index": outputIndex,
