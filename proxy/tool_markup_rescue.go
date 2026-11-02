@@ -163,6 +163,18 @@ func (f *toolMarkupFilter) Flush() string {
 	return f.drain(true)
 }
 
+// Abandon hands back everything held as plain text when the stream fails mid-way. Held
+// calls are never rescued: the turn did not finish, so running them would be a guess.
+func (f *toolMarkupFilter) Abandon() string {
+	if f == nil {
+		return ""
+	}
+	held := f.runRaw.String() + f.buf
+	f.runRaw.Reset()
+	f.buf, f.run, f.calls, f.wrapped, f.rescued = "", nil, nil, false, nil
+	return held
+}
+
 func (f *toolMarkupFilter) markSeen(toolUse KiroToolUse) {
 	if f == nil {
 		return

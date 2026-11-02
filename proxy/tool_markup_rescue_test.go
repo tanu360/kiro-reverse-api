@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -454,5 +455,63 @@ func TestToolMarkupFilterRescuesSecondWrapperWithTruncatedClosing(t *testing.T) 
 		if strings.TrimSpace(text) != "" || len(tools) != 2 {
 			t.Fatalf("text=%q tools=%#v", text, tools)
 		}
+	}
+}
+
+func TestToolMarkupFilterAbandonReleasesHeldMarkupAsText(t *testing.T) {
+	f := newToolMarkupFilter(markupTestTools())
+	inv := `<invoke name="Bash"><parameter name="command">ls</parameter></invoke>`
+	got := f.Push("a <function_calls>"+inv+" ") + f.Push("<invo")
+	if got != "a " {
+		t.Fatalf("Push = %q", got)
+	}
+	if rest := f.Abandon(); rest != "<function_calls>"+inv+" <invo" {
+		t.Fatalf("Abandon = %q, want everything held returned as text", rest)
+	}
+	if rest := f.Abandon(); rest != "" {
+		t.Fatalf("second Abandon = %q", rest)
+	}
+	var tools []KiroToolUse
+	f.emitRescued(&KiroStreamCallback{OnToolUse: func(tu KiroToolUse) { tools = append(tools, tu) }})
+	if len(tools) != 0 {
+		t.Fatalf("an aborted stream must not run held calls, got %#v", tools)
+	}
+}
+
+func TestParseEventStreamFlushesHeldMarkupTextOnUpstreamError(t *testing.T) {
+	var text string
+	callback := &KiroStreamCallback{
+		OnText:      func(s string, _ bool) { text += s },
+		markupTools: markupTestTools(),
+	}
+	err := parseFrames(t, callback,
+		awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "Looking <invo"}),
+		awsEventStreamFrameWithHeaders(t, map[string]string{
+			":message-type":   "exception",
+			":exception-type": "InternalServerException",
+		}, map[string]interface{}{"message": "boom"}),
+	)
+	if !errors.Is(err, errKiroEventStreamUpstream) {
+		t.Fatalf("err = %v", err)
+	}
+	if text != "Looking <invo" {
+		t.Fatalf("text = %q, held bytes must reach the client before the error", text)
+	}
+}
+
+func TestParseEventStreamKeepsRetryOpenWhenOnlyHeldTextWasPending(t *testing.T) {
+	callback := &KiroStreamCallback{
+		OnText:      func(string, bool) {},
+		markupTools: markupTestTools(),
+	}
+	emitted, err := parseEventStreamTracked(bytes.NewReader(bytes.Join([][]byte{
+		awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "<invo"}),
+		awsEventStreamFrameWithHeaders(t, map[string]string{
+			":message-type":   "exception",
+			":exception-type": "InternalServerException",
+		}, map[string]interface{}{"message": "boom"}),
+	}, nil)), callback)
+	if err == nil || emitted {
+		t.Fatalf("emitted=%t err=%v, nothing reached the client so the attempt stays retryable", emitted, err)
 	}
 }

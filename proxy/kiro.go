@@ -581,6 +581,13 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 			callback.OnText(content, false)
 		}
 	}
+	defer func() {
+		//! Text held back as possible markup was already part of the answer; an error must not cut
+		//! it out of what the client saw. Skipped before any output, where a retry regenerates it.
+		if err != nil && emitted {
+			emitAssistantText(markup.Abandon())
+		}
+	}()
 
 	//! Read directly from the stream so SSE chunks are not delayed by buffering.
 	for {
