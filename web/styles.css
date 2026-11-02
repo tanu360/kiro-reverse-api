@@ -3557,11 +3557,26 @@ img.brand-icon {
 }
 #observeModelMix .data-table th:nth-child(1),
 #observeModelMix .data-table td:nth-child(1) {
-  width: 46%;
+  width: 36%;
 }
 #observeModelMix .data-table th:nth-child(n + 2),
 #observeModelMix .data-table td:nth-child(n + 2) {
   width: 18%;
+}
+#observeModelMix .data-table th:nth-child(3),
+#observeModelMix .data-table td:nth-child(3) {
+  width: 28%;
+}
+.token-cell {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  line-height: 1.25;
+}
+.token-breakdown {
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
 }
 #observeModelMix .data-table td {
   height: 3.5rem;

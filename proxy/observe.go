@@ -16,22 +16,33 @@ const (
 	observeRecentReqs  = 200
 )
 
+// cacheTokenCounts splits out the prompt-cache share of a request's input
+// tokens. Both counts are subsets of the input total, never added to it.
+type cacheTokenCounts struct {
+	Read  int
+	Write int
+}
+
 type minuteBucket struct {
-	WindowMin int64
-	Reqs      int
-	Successes int
-	Failures  int
-	InTokens  int64
-	OutTokens int64
-	Credits   float64
+	WindowMin        int64
+	Reqs             int
+	Successes        int
+	Failures         int
+	InTokens         int64
+	OutTokens        int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
+	Credits          float64
 }
 
 type modelStat struct {
-	Reqs      int64
-	InTokens  int64
-	OutTokens int64
-	Credits   float64
-	LastUsed  int64
+	Reqs             int64
+	InTokens         int64
+	OutTokens        int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
+	Credits          float64
+	LastUsed         int64
 }
 
 type errorRecord struct {
@@ -55,6 +66,8 @@ type requestRecord struct {
 	InTokens     int     `json:"inTokens"`
 	OutTokens    int     `json:"outTokens"`
 	TotalTokens  int     `json:"totalTokens"`
+	CacheRead    int     `json:"cacheReadTokens"`
+	CacheWrite   int     `json:"cacheWriteTokens"`
 	Credits      float64 `json:"credits"`
 	Success      bool    `json:"success"`
 	Status       int     `json:"status,omitempty"`
@@ -161,6 +174,10 @@ func (s *observeStore) getOrCreateAccountRing(accountID string) *[observeMinuteS
 }
 
 func (s *observeStore) RecordSuccess(accountID, model string, inTokens, outTokens int, credits float64) {
+	s.RecordSuccessWithCache(accountID, model, inTokens, outTokens, credits, cacheTokenCounts{})
+}
+
+func (s *observeStore) RecordSuccessWithCache(accountID, model string, inTokens, outTokens int, credits float64, cache cacheTokenCounts) {
 	if s == nil {
 		return
 	}
@@ -174,6 +191,8 @@ func (s *observeStore) RecordSuccess(accountID, model string, inTokens, outToken
 	g.Successes++
 	g.InTokens += int64(inTokens)
 	g.OutTokens += int64(outTokens)
+	g.CacheReadTokens += int64(cache.Read)
+	g.CacheWriteTokens += int64(cache.Write)
 	g.Credits += credits
 
 	if ring := s.getOrCreateAccountRing(accountID); ring != nil {
@@ -182,6 +201,8 @@ func (s *observeStore) RecordSuccess(accountID, model string, inTokens, outToken
 		b.Successes++
 		b.InTokens += int64(inTokens)
 		b.OutTokens += int64(outTokens)
+		b.CacheReadTokens += int64(cache.Read)
+		b.CacheWriteTokens += int64(cache.Write)
 		b.Credits += credits
 	}
 
@@ -194,6 +215,8 @@ func (s *observeStore) RecordSuccess(accountID, model string, inTokens, outToken
 		ms.Reqs++
 		ms.InTokens += int64(inTokens)
 		ms.OutTokens += int64(outTokens)
+		ms.CacheReadTokens += int64(cache.Read)
+		ms.CacheWriteTokens += int64(cache.Write)
 		ms.Credits += credits
 		ms.LastUsed = now
 	}
@@ -263,6 +286,10 @@ func (s *observeStore) RecordRequestWithAPIKey(accountID, apiKeyID, apiKey, emai
 }
 
 func (s *observeStore) RecordTracedRequest(trace *requestTrace, accountID, apiKeyID, apiKey, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
+	s.RecordTracedRequestWithCache(trace, accountID, apiKeyID, apiKey, email, model, inTokens, outTokens, credits, success, status, message, cacheTokenCounts{})
+}
+
+func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, accountID, apiKeyID, apiKey, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string, cache cacheTokenCounts) {
 	if s == nil {
 		return
 	}
@@ -281,6 +308,8 @@ func (s *observeStore) RecordTracedRequest(trace *requestTrace, accountID, apiKe
 		InTokens:     inTokens,
 		OutTokens:    outTokens,
 		TotalTokens:  inTokens + outTokens,
+		CacheRead:    cache.Read,
+		CacheWrite:   cache.Write,
 		Credits:      credits,
 		Success:      success,
 		Status:       status,
@@ -462,12 +491,14 @@ func (s *observeStore) Heatmap(windowMin int) HeatmapResponse {
 }
 
 type ModelMixEntry struct {
-	Model     string  `json:"model"`
-	Reqs      int64   `json:"reqs"`
-	InTokens  int64   `json:"inTokens"`
-	OutTokens int64   `json:"outTokens"`
-	Credits   float64 `json:"credits"`
-	LastUsed  int64   `json:"lastUsed"`
+	Model            string  `json:"model"`
+	Reqs             int64   `json:"reqs"`
+	InTokens         int64   `json:"inTokens"`
+	OutTokens        int64   `json:"outTokens"`
+	CacheReadTokens  int64   `json:"cacheReadTokens"`
+	CacheWriteTokens int64   `json:"cacheWriteTokens"`
+	Credits          float64 `json:"credits"`
+	LastUsed         int64   `json:"lastUsed"`
 }
 
 func (s *observeStore) ModelMix() []ModelMixEntry {
@@ -479,12 +510,14 @@ func (s *observeStore) ModelMix() []ModelMixEntry {
 	out := make([]ModelMixEntry, 0, len(s.modelStats))
 	for m, st := range s.modelStats {
 		out = append(out, ModelMixEntry{
-			Model:     m,
-			Reqs:      st.Reqs,
-			InTokens:  st.InTokens,
-			OutTokens: st.OutTokens,
-			Credits:   st.Credits,
-			LastUsed:  st.LastUsed,
+			Model:            m,
+			Reqs:             st.Reqs,
+			InTokens:         st.InTokens,
+			OutTokens:        st.OutTokens,
+			CacheReadTokens:  st.CacheReadTokens,
+			CacheWriteTokens: st.CacheWriteTokens,
+			Credits:          st.Credits,
+			LastUsed:         st.LastUsed,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

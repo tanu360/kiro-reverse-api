@@ -356,6 +356,7 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 	next := payload
 	totalIn, totalOut := 0, 0
 	totalCredits := 0.0
+	var totalCache cacheTokenCounts
 	for round := 0; round <= maxRounds; round++ {
 		var tools []KiroToolUse
 		stop := ""
@@ -364,6 +365,7 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 		cb.OnComplete = func(in, out int) { totalIn += in; totalOut += out }
 		cb.OnCredits = func(c float64) { totalCredits += c }
 		cb.OnStopReason = func(reason string) { stop = reason }
+		cb.OnCacheUsage = func(read, write int) { totalCache.Read += read; totalCache.Write += write }
 		if err := CallKiroAPIContext(ctx, account, next, &cb); err != nil {
 			return err
 		}
@@ -380,6 +382,9 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 				if callback.OnToolUse != nil {
 					callback.OnToolUse(tu)
 				}
+			}
+			if callback.OnCacheUsage != nil && totalCache.Read+totalCache.Write > 0 {
+				callback.OnCacheUsage(totalCache.Read, totalCache.Write)
 			}
 			if callback.OnComplete != nil {
 				callback.OnComplete(totalIn, totalOut)
@@ -416,6 +421,9 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 				if callback.OnToolUse != nil {
 					callback.OnToolUse(tu)
 				}
+			}
+			if callback.OnCacheUsage != nil && totalCache.Read+totalCache.Write > 0 {
+				callback.OnCacheUsage(totalCache.Read, totalCache.Write)
 			}
 			if callback.OnComplete != nil {
 				callback.OnComplete(totalIn, totalOut)

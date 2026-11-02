@@ -982,6 +982,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 
 			var inputTokens, outputTokens int
 			var credits float64
+			var upstreamCache cacheTokenCounts
 			var realInputTokens int
 			var toolUses []KiroToolUse
 			var nextContentIndex int
@@ -1297,6 +1298,9 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
+				OnCacheUsage: func(read, write int) {
+					upstreamCache = cacheTokenCounts{Read: read, Write: write}
+				},
 			}
 
 			err := CallKiroAPIContext(r.Context(), account, payload, callback)
@@ -1351,8 +1355,8 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
-			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
+				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
@@ -1485,6 +1489,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			var toolUses []KiroToolUse
 			var inputTokens, outputTokens int
 			var credits float64
+			var upstreamCache cacheTokenCounts
 			var realInputTokens int
 			var upstreamStopReason string
 
@@ -1511,6 +1516,9 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				},
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
+				},
+				OnCacheUsage: func(read, write int) {
+					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
 			}
 
@@ -1548,8 +1556,8 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
-			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
+				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
@@ -1716,6 +1724,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			var toolCallIndex int
 			var inputTokens, outputTokens int
 			var credits float64
+			var upstreamCache cacheTokenCounts
 			var realInputTokens int
 			var upstreamStopReason string
 			var rawContentBuilder strings.Builder
@@ -1995,6 +2004,9 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
+				OnCacheUsage: func(read, write int) {
+					upstreamCache = cacheTokenCounts{Read: read, Write: write}
+				},
 			}
 
 			err := callKiroWithHostedSearch(r.Context(), account, payload, callback)
@@ -2051,9 +2063,10 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			}
 			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
+			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
-			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
+				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
@@ -2070,7 +2083,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 					"delta":         map[string]interface{}{},
 					"finish_reason": finishReason,
 				}},
-				"usage": buildOpenAIUsage(inputTokens, outputTokens, resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)),
+				"usage": buildOpenAIUsage(inputTokens, outputTokens, cacheDetails),
 			}
 			data, _ := json.Marshal(chunk)
 			fmt.Fprintf(w, "data: %s\n\n", string(data))
@@ -2130,6 +2143,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			var toolUses []KiroToolUse
 			var inputTokens, outputTokens int
 			var credits float64
+			var upstreamCache cacheTokenCounts
 			var realInputTokens int
 			var upstreamStopReason string
 
@@ -2149,6 +2163,9 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				},
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
+				},
+				OnCacheUsage: func(read, write int) {
+					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
 			}
 
@@ -2182,16 +2199,17 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
 			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
+			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
-			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
+				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
 			thinkingFormat := config.GetThinkingConfig().OpenAIFormat
 			resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
-			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens))
+			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, cacheDetails)
 			if choices, ok := resp["choices"].([]map[string]interface{}); ok && len(choices) > 0 {
 				choices[0]["finish_reason"] = mapOpenAIFinishReason(upstreamStopReason, len(toolUses))
 			}

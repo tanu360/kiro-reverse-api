@@ -2230,7 +2230,7 @@
     const allModels = ((observeCache.mix || {}).models || []);
     const visibleModels = allModels.slice(0, 3);
     const models = visibleModels.map(m => '<tr><td>' + escapeHtml(m.model || '-') +
-      '</td><td>' + (m.reqs || 0) + '</td><td>' + formatNum((m.inTokens || 0) + (m.outTokens || 0)) +
+      '</td><td>' + (m.reqs || 0) + '</td><td>' + formatTokenCell(m.inTokens, m.outTokens, m.cacheReadTokens, m.cacheWriteTokens) +
       '</td><td>' + (m.credits || 0).toFixed(2) + '</td></tr>');
     renderTable('observeModelMix', [t('requests.model'), t('accounts.requests'), t('stats.tokens'), t('stats.credits')], models, 'observe.noTraffic');
     const mixEl = $('observeModelMix');
@@ -2293,7 +2293,7 @@
     ].join('');
     const rows = (requestsCache || []).map(r => '<tr><td>' + escapeHtml(formatTime(r.ts)) + '</td><td>' +
       formatRequestStatus(r) + '</td><td>' + escapeHtml(getDisplayAccount(r.email, r.accountId)) + '</td><td>' + formatRequestApiKey(r) + '</td><td>' + formatRequestEndpoint(r) +
-      '</td><td>' + escapeHtml(r.model || '-') + '</td><td>' + formatNum(r.totalTokens || 0) + '</td><td>' + formatCredits(r.credits || 0) +
+      '</td><td>' + escapeHtml(r.model || '-') + '</td><td>' + formatTokenCell(r.inTokens, r.outTokens, r.cacheReadTokens, r.cacheWriteTokens, r.totalTokens) + '</td><td>' + formatCredits(r.credits || 0) +
       '</td><td>' + formatRequestDuration(r) + '</td><td>' + formatRequestError(r) + '</td></tr>');
     if (!rows.length) {
       el.innerHTML = '<div class="empty-state">' + escapeHtml(t('requests.empty')) + '</div>';
@@ -2301,6 +2301,23 @@
       el.innerHTML = '<table class="data-table requests-data-table"><thead><tr>' + headers + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
     }
     renderRequestsPagination();
+  }
+  //! Cache read/write are shares of the input count, so the headline total stays input + output.
+  function formatTokenCell(inTokens, outTokens, cacheRead, cacheWrite, total) {
+    const input = Number(inTokens || 0), output = Number(outTokens || 0);
+    const read = Number(cacheRead || 0), write = Number(cacheWrite || 0);
+    const sum = total == null ? input + output : Number(total || 0);
+    if (!sum) return formatNum(sum);
+    const parts = [t('tokens.in', formatCompactNum(input)), t('tokens.out', formatCompactNum(output))];
+    if (read || write) parts.push(t('tokens.cache', formatCompactNum(read), formatCompactNum(write)));
+    const title = [
+      t('tokens.input') + ': ' + formatNum(input),
+      t('tokens.output') + ': ' + formatNum(output),
+      t('tokens.cacheRead') + ': ' + formatNum(read),
+      t('tokens.cacheWrite') + ': ' + formatNum(write)
+    ].join('\n');
+    return '<span class="token-cell" title="' + escapeAttr(title) + '">' + escapeHtml(formatNum(sum)) +
+      '<span class="token-breakdown">' + escapeHtml(parts.join(' · ')) + '</span></span>';
   }
   function requestSortHeader(sort, label) {
     const active = requestsMeta.sort === sort || requestsQuery.sort === sort;

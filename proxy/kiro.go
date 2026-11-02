@@ -243,6 +243,8 @@ type KiroStreamCallback struct {
 	OnCredits      func(credits float64)
 	OnContextUsage func(percentage float64)
 	OnStopReason   func(reason string)
+	//! Called only when Kiro itself reports cache counts; both are already part of OnComplete's input total.
+	OnCacheUsage func(cacheReadTokens, cacheWriteTokens int)
 }
 
 func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Account) {
@@ -531,6 +533,7 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 	}
 
 	var inputTokens, outputTokens int
+	var cacheReadTokens, cacheWriteTokens int
 	var totalCredits float64
 	var contextUsagePercentages []float64
 	var turn streamTurnSignals
@@ -609,6 +612,7 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		}
 
 		inputTokens, outputTokens = updateTokensFromEvent(event, inputTokens, outputTokens)
+		cacheReadTokens, cacheWriteTokens = updateCacheTokensFromEvent(event, cacheReadTokens, cacheWriteTokens)
 		if reason := eventStopReason(event); reason != "" {
 			turn.stopReason = reason
 		}
@@ -667,6 +671,9 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		for _, percentage := range contextUsagePercentages {
 			callback.OnContextUsage(percentage)
 		}
+	}
+	if callback.OnCacheUsage != nil && cacheReadTokens+cacheWriteTokens > 0 {
+		callback.OnCacheUsage(cacheReadTokens, cacheWriteTokens)
 	}
 	if callback.OnComplete != nil {
 		callback.OnComplete(inputTokens, outputTokens)
@@ -758,6 +765,25 @@ func updateTokensFromEvent(event map[string]interface{}, currentInputTokens, cur
 	}
 
 	return inputTokens, outputTokens
+}
+
+// updateCacheTokensFromEvent reads the cache counts that updateTokensFromEvent
+// folds into the input total, so stats can report them separately.
+func updateCacheTokensFromEvent(event map[string]interface{}, currentRead, currentWrite int) (int, int) {
+	candidates := []map[string]interface{}{event}
+	collectUsageMaps(event, &candidates)
+	for _, usage := range candidates {
+		if usage == nil {
+			continue
+		}
+		if v, ok := readTokenNumber(usage, "cacheReadInputTokens", "cache_read_input_tokens"); ok {
+			currentRead = v
+		}
+		if v, ok := readTokenNumber(usage, "cacheWriteInputTokens", "cache_write_input_tokens", "cacheCreationInputTokens", "cache_creation_input_tokens"); ok {
+			currentWrite = v
+		}
+	}
+	return currentRead, currentWrite
 }
 
 // upstreamContextWindows maps lowercase Kiro model IDs to the maxInputTokens

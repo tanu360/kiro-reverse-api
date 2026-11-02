@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS requests (
   message TEXT NOT NULL DEFAULT '',
   endpoint TEXT NOT NULL DEFAULT '',
   duration_ms INTEGER NOT NULL DEFAULT 0,
-  error_type TEXT NOT NULL DEFAULT ''
+  error_type TEXT NOT NULL DEFAULT '',
+  cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests(ts DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_success ON requests(success);
@@ -160,6 +162,11 @@ func Get() (*sql.DB, error) {
 			openErr = err
 			return
 		}
+		if err := addMissingColumns(db, "requests", requestColumnMigrations); err != nil {
+			_ = db.Close()
+			openErr = err
+			return
+		}
 		handle = db
 	})
 	if openErr != nil {
@@ -169,6 +176,43 @@ func Get() (*sql.DB, error) {
 		return nil, fmt.Errorf("db: handle nil")
 	}
 	return handle, nil
+}
+
+// requestColumnMigrations lists requests columns added after the first
+// release. CREATE TABLE IF NOT EXISTS leaves an older table as it was, so
+// addMissingColumns appends them on open.
+var requestColumnMigrations = []struct{ name, definition string }{
+	{"cache_read_tokens", "INTEGER NOT NULL DEFAULT 0"},
+	{"cache_write_tokens", "INTEGER NOT NULL DEFAULT 0"},
+}
+
+func addMissingColumns(db *sql.DB, table string, columns []struct{ name, definition string }) error {
+	rows, err := db.Query(`SELECT name FROM pragma_table_info(?)`, table)
+	if err != nil {
+		return err
+	}
+	existing := make(map[string]bool)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[name] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, column := range columns {
+		if existing[column.name] {
+			continue
+		}
+		if _, err := db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column.name + ` ` + column.definition); err != nil {
+			return fmt.Errorf("add %s.%s: %w", table, column.name, err)
+		}
+	}
+	return nil
 }
 
 func Close() error {

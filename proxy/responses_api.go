@@ -157,6 +157,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 			var toolUses []KiroToolUse
 			var inputTokens, outputTokens int
 			var credits float64
+			var upstreamCache cacheTokenCounts
 			var realInputTokens int
 			var upstreamStopReason string
 
@@ -176,6 +177,9 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				},
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
+				},
+				OnCacheUsage: func(read, write int) {
+					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
 			}
 
@@ -208,15 +212,16 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
 			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
+			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
-			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordObservedSuccess(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits,
+				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
 
 			response, storedMessages := buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
-			addResponsesCacheUsage(response, resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens))
+			addResponsesCacheUsage(response, cacheDetails)
 			applyResponsesStopReason(response, upstreamStopReason)
 			if prepared.Store {
 				if err := saveResponseState(responseStateFromObject(response, storedMessages)); err != nil {
@@ -294,6 +299,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			var toolUses []KiroToolUse
 			var inputTokens, outputTokens int
 			var credits float64
+			var upstreamCache cacheTokenCounts
 			var realInputTokens int
 			var upstreamStopReason string
 			responseID := "resp_" + uuid.NewString()
@@ -518,6 +524,9 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
+				OnCacheUsage: func(read, write int) {
+					upstreamCache = cacheTokenCounts{Read: read, Write: write}
+				},
 			}
 
 			err := callKiroWithHostedSearch(ctx, account, payload, callback)
@@ -566,9 +575,10 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
 			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
+			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
-			getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, credits)
-			recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits, true, 200, "")
+			recordObservedSuccess(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits,
+				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
 			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
@@ -614,7 +624,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				nextOutputIndex++
 			}
 			response, storedMessages := buildResponsesCompletedObjectWithOutput(responseID, createdAt, prepared, outputItems, finalContent, toolUses, inputTokens, outputTokens)
-			addResponsesCacheUsage(response, resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens))
+			addResponsesCacheUsage(response, cacheDetails)
 			terminalEvent := applyResponsesStopReason(response, upstreamStopReason)
 			sendResponsesSSE(w, flusher, terminalEvent, map[string]interface{}{
 				"type":     terminalEvent,

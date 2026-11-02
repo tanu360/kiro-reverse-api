@@ -18,10 +18,10 @@ func persistRequestRecord(rec requestRecord) error {
 		success = 1
 	}
 	_, err = d.Exec(`INSERT INTO requests
-(ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+(ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.TS, rec.AccountID, rec.APIKeyID, rec.APIKey, rec.Email, rec.Model, rec.InTokens, rec.OutTokens, rec.TotalTokens,
-		rec.Credits, success, rec.Status, rec.Message, rec.Endpoint, rec.DurationMs, rec.ErrorType)
+		rec.Credits, success, rec.Status, rec.Message, rec.Endpoint, rec.DurationMs, rec.ErrorType, rec.CacheRead, rec.CacheWrite)
 	return err
 }
 
@@ -152,7 +152,7 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	offset := (q.Page - 1) * q.PageSize
 	queryArgs := append([]interface{}{}, args...)
 	queryArgs = append(queryArgs, q.PageSize, offset)
-	rows, err := d.Query(`SELECT id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type
+	rows, err := d.Query(`SELECT id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens
 FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? OFFSET ?`, queryArgs...)
 	if err != nil {
 		return requestPage{}, err
@@ -163,7 +163,7 @@ FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? O
 	for rows.Next() {
 		var rec requestRecord
 		var success int
-		if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType); err != nil {
+		if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType, &rec.CacheRead, &rec.CacheWrite); err != nil {
 			return requestPage{}, err
 		}
 		rec.Success = success == 1
@@ -190,7 +190,7 @@ func loadRecentRequestsFromDB(limit int) ([]requestRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := d.Query(`SELECT id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type
+	rows, err := d.Query(`SELECT id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens
 FROM requests ORDER BY ts DESC, id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
@@ -200,7 +200,7 @@ FROM requests ORDER BY ts DESC, id DESC LIMIT ?`, limit)
 	for rows.Next() {
 		var rec requestRecord
 		var success int
-		if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType); err != nil {
+		if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType, &rec.CacheRead, &rec.CacheWrite); err != nil {
 			return nil, err
 		}
 		rec.Success = success == 1
