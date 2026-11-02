@@ -919,6 +919,9 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 		h.sendClaudeError(w, 500, "api_error", "Streaming not supported")
 		return
 	}
+	keepalive := newSSEKeepaliveWriter(w, flusher, claudePingKeepalive)
+	defer keepalive.Close()
+	w, flusher = keepalive, keepalive
 
 	thinkingFormat := thinkingOpts.Format
 
@@ -1684,6 +1687,9 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 		h.sendOpenAIError(w, 500, "server_error", "Streaming not supported")
 		return
 	}
+	keepalive := newSSEKeepaliveWriter(w, flusher, sseCommentKeepalive)
+	defer keepalive.Close()
+	w, flusher = keepalive, keepalive
 
 	thinkingFormat := config.GetThinkingConfig().OpenAIFormat
 

@@ -261,6 +261,9 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 		h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", "Streaming not supported")
 		return
 	}
+	keepalive := newSSEKeepaliveWriter(w, flusher, sseCommentKeepalive)
+	defer keepalive.Close()
+	w, flusher = keepalive, keepalive
 
 	excluded := make(map[string]bool)
 	var lastErr error
@@ -657,8 +660,8 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 
 func sendResponsesSSE(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {
 	b, _ := json.Marshal(data)
-	fmt.Fprintf(w, "event: %s\n", event)
-	fmt.Fprintf(w, "data: %s\n\n", string(b))
+	//! One write per event: a keepalive between the event and data lines would split it.
+	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, string(b))
 	flusher.Flush()
 }
 
