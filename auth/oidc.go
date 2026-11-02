@@ -12,7 +12,20 @@ import (
 )
 
 var oidcTokenURL = func(region string) string {
-	return fmt.Sprintf("https://oidc.%s.amazonaws.com/token", region)
+	base, err := oidcBaseURL(region)
+	if err != nil {
+		return ""
+	}
+	return base + "/token"
+}
+
+func oidcBaseURL(region string) (string, error) {
+	//! The region becomes the OIDC host; an unchecked value would send refresh tokens and client secrets to another host.
+	region, err := config.NormalizeAWSRegion(region)
+	if err != nil {
+		return "", err
+	}
+	return "https://oidc." + region + ".amazonaws.com", nil
 }
 
 var socialTokenURL = func() string {
@@ -48,8 +61,9 @@ func refreshOIDCToken(ctx context.Context, refreshToken, clientID, clientSecret,
 	if clientID == "" || clientSecret == "" {
 		return "", "", 0, "", fmt.Errorf("OIDC refresh requires clientId and clientSecret")
 	}
-	if region == "" {
-		region = "us-east-1"
+	region, err := config.NormalizeAWSRegion(region)
+	if err != nil {
+		return "", "", 0, "", err
 	}
 
 	url := oidcTokenURL(region)

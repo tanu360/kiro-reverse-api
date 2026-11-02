@@ -225,6 +225,7 @@ func Init(path string) error {
 	if err := LoadCredentials(); err != nil {
 		return fmt.Errorf("load credentials: %w", err)
 	}
+	warnUnservedAPIKeyRegions()
 
 	return nil
 }
@@ -379,6 +380,9 @@ func AddAccount(account Account) error {
 	if IsAPIKeyAccount(&account) {
 		if err := NormalizeAPIKeyAccount(&account); err != nil {
 			return err
+		}
+		if !IsKiroServiceRegion(account.Region) {
+			return ErrUnsupportedKiroAPIKeyRegion
 		}
 	}
 

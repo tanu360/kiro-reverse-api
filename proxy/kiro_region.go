@@ -14,7 +14,7 @@ var (
 	kiroProfilePattern = regexp.MustCompile(`^[A-Za-z0-9+=,.@_-]+$`)
 
 	//! Known Kiro data-plane regions; an explicit list keeps stored input from becoming an arbitrary outbound host.
-	defaultKiroProfileRegions = []string{"us-east-1", "eu-central-1"}
+	defaultKiroProfileRegions = config.KiroServiceRegions()
 )
 
 func parseKiroProfileArn(profileArn string) (canonical, region string, ok bool) {

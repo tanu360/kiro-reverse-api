@@ -464,6 +464,8 @@
   "serverError.kiroApiKeyInvalid": "API Key 格式无效",
   "serverError.kiroApiKeyRegion": "区域无效 (例如: us-east-1)",
   "serverError.kiroApiKeyDuplicate": "该 API Key 已添加",
+  "serverError.invalidRegion": "区域无效 (例如: us-east-1)",
+  "serverError.kiroApiKeyRegionUnsupported": "Kiro API Key 仅支持 us-east-1 或 eu-central-1 区域",
   "login.showPassword": "显示密码",
   "login.hidePassword": "隐藏密码",
   "api.copyClaude": "复制 Claude API 端点",

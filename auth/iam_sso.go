@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"kiro-proxy/config"
 	"net/http"
 	"net/url"
 	"sync"
@@ -41,11 +42,11 @@ var scopes = []string{
 }
 
 func StartIamSsoLogin(startUrl, region string) (sessionID, authorizeUrl string, expiresIn int, err error) {
-	if region == "" {
-		region = "us-east-1"
+	region, err = config.NormalizeAWSRegion(region)
+	if err != nil {
+		return "", "", 0, err
 	}
-
-	oidcBase := fmt.Sprintf("https://oidc.%s.amazonaws.com", region)
+	oidcBase, _ := oidcBaseURL(region)
 	redirectUri := "http://127.0.0.1/oauth/callback"
 
 	clientID, clientSecret, err := registerOIDCClient(oidcBase, startUrl, redirectUri)
@@ -126,7 +127,10 @@ func CompleteIamSsoLogin(sessionID, callbackUrl string) (accessToken, refreshTok
 		return "", "", "", "", "", 0, fmt.Errorf("未收到授权码")
 	}
 
-	oidcBase := fmt.Sprintf("https://oidc.%s.amazonaws.com", session.Region)
+	oidcBase, err := oidcBaseURL(session.Region)
+	if err != nil {
+		return "", "", "", "", "", 0, err
+	}
 	accessToken, refreshToken, expiresIn, err = exchangeToken(
 		oidcBase,
 		session.ClientID,

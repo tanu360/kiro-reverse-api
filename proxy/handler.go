@@ -2528,12 +2528,16 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 	if account.ID == "" {
 		account.ID = auth.GenerateAccountID()
 	}
-	if account.Region == "" {
-		account.Region = "us-east-1"
+	region, err := config.NormalizeAWSRegion(account.Region)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
 	}
+	account.Region = region
 
 	if err := config.AddAccount(account); err != nil {
-		w.WriteHeader(500)
+		w.WriteHeader(addAccountErrorStatus(err))
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
@@ -2874,8 +2878,14 @@ func (h *Handler) apiStartIamSso(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "startUrl is required"})
 		return
 	}
+	region, err := config.NormalizeAWSRegion(req.Region)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
 
-	sessionID, authorizeUrl, expiresIn, err := auth.StartIamSsoLogin(req.StartUrl, req.Region)
+	sessionID, authorizeUrl, expiresIn, err := auth.StartIamSsoLogin(req.StartUrl, region)
 	if err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -2944,8 +2954,14 @@ func (h *Handler) apiStartBuilderIdLogin(w http.ResponseWriter, r *http.Request)
 		Region string `json:"region"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
+	region, err := config.NormalizeAWSRegion(req.Region)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
 
-	session, err := auth.StartBuilderIdLogin(req.Region)
+	session, err := auth.StartBuilderIdLogin(region)
 	if err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -3045,6 +3061,13 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "bearerToken is required"})
 		return
 	}
+	region, err := config.NormalizeAWSRegion(req.Region)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	req.Region = region
 
 	tokens := strings.Split(strings.TrimSpace(req.BearerToken), "\n")
 	var imported []map[string]interface{}
@@ -3161,9 +3184,13 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Region == "" {
-		req.Region = "us-east-1"
+	region, err := config.NormalizeAWSRegion(req.Region)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
 	}
+	req.Region = region
 	switch {
 	case methodHint == "idc" || methodHint == "builderid" || methodHint == "enterprise":
 		req.AuthMethod = "idc"
@@ -3297,11 +3324,7 @@ func (h *Handler) importKiroAPIKeyAccount(w http.ResponseWriter, account config.
 		return
 	}
 	if err := config.AddAccount(account); err != nil {
-		if errors.Is(err, config.ErrDuplicateKiroAPIKey) {
-			w.WriteHeader(http.StatusConflict)
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+		w.WriteHeader(addAccountErrorStatus(err))
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
@@ -3319,6 +3342,17 @@ func (h *Handler) importKiroAPIKeyAccount(w http.ResponseWriter, account config.
 			"email": account.Email,
 		},
 	})
+}
+
+func addAccountErrorStatus(err error) int {
+	switch {
+	case errors.Is(err, config.ErrDuplicateKiroAPIKey):
+		return http.StatusConflict
+	case errors.Is(err, config.ErrUnsupportedKiroAPIKeyRegion), errors.Is(err, config.ErrInvalidKiroRegion),
+		errors.Is(err, config.ErrEmptyKiroAPIKey), errors.Is(err, config.ErrInvalidKiroAPIKey):
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
 }
 
 func (h *Handler) apiGetStatus(w http.ResponseWriter, _ *http.Request) {

@@ -464,6 +464,8 @@
   "serverError.kiroApiKeyInvalid": "API key format is invalid",
   "serverError.kiroApiKeyRegion": "Region is invalid (example: us-east-1)",
   "serverError.kiroApiKeyDuplicate": "This API key is already added",
+  "serverError.invalidRegion": "Region is invalid (example: us-east-1)",
+  "serverError.kiroApiKeyRegionUnsupported": "Kiro API keys only work in us-east-1 or eu-central-1",
   "login.showPassword": "Show password",
   "login.hidePassword": "Hide password",
   "api.copyClaude": "Copy Claude API endpoint",

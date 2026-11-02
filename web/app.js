@@ -136,7 +136,9 @@
       'kiroApiKey contains invalid characters': 'serverError.kiroApiKeyInvalid',
       "kiroApiKey has more than one '|' separator": 'serverError.kiroApiKeyInvalid',
       'invalid Kiro API key region': 'serverError.kiroApiKeyRegion',
-      'this Kiro API key is already added': 'serverError.kiroApiKeyDuplicate'
+      'this Kiro API key is already added': 'serverError.kiroApiKeyDuplicate',
+      'unsupported Kiro API key region: use us-east-1 or eu-central-1': 'serverError.kiroApiKeyRegionUnsupported',
+      'invalid region': 'serverError.invalidRegion'
     }[raw];
     return key ? t(key) : raw;
   }

@@ -12,11 +12,10 @@ import (
 )
 
 func ImportFromSsoToken(bearerToken, region string) (accessToken, refreshToken, clientID, clientSecret string, expiresIn int, err error) {
-	if region == "" {
-		region = "us-east-1"
+	oidcBase, err := oidcBaseURL(region)
+	if err != nil {
+		return "", "", "", "", 0, err
 	}
-
-	oidcBase := fmt.Sprintf("https://oidc.%s.amazonaws.com", region)
 	portalBase := "https://portal.sso.us-east-1.amazonaws.com"
 	startUrl := "https://view.awsapps.com/start"
 
