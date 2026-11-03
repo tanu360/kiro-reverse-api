@@ -11,10 +11,12 @@ import {
   MenuTrigger,
 } from "@/components/ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
-import { LANGS, type Lang, useLanguage, useT } from "@/lib/i18n";
+import { LANGUAGES, type SupportedLang, useLanguage, useT } from "@/lib/i18n";
 
 /** Language names are shown in their own script, whatever the active language. */
-export const LANGUAGE_NAMES: Record<Lang, string> = { en: "English", zh: "中文" };
+export const LANGUAGE_NAMES: Record<SupportedLang, string> = Object.fromEntries(
+  LANGUAGES.map((option) => [option.code, option.nativeLabel]),
+) as Record<SupportedLang, string>;
 
 export function LanguageSwitch(): JSX.Element {
   const { t } = useT();
@@ -45,10 +47,10 @@ export function LanguageSwitch(): JSX.Element {
       <MenuPopup align="end">
         <MenuGroup>
           <MenuGroupLabel>{label}</MenuGroupLabel>
-          <MenuRadioGroup onValueChange={(value) => setLang(value as Lang)} value={lang}>
-            {LANGS.map((code) => (
-              <MenuRadioItem key={code} lang={code} value={code}>
-                {LANGUAGE_NAMES[code]}
+          <MenuRadioGroup onValueChange={(value) => setLang(value as SupportedLang)} value={lang}>
+            {LANGUAGES.map((option) => (
+              <MenuRadioItem key={option.code} lang={option.code} value={option.code}>
+                {option.nativeLabel}
               </MenuRadioItem>
             ))}
           </MenuRadioGroup>
