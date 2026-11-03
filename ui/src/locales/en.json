@@ -84,7 +84,7 @@
   "shell.theme.dark": "Dark",
   "shell.privacy.label": "Privacy mode",
   "shell.privacy.tooltip": "Hide email addresses",
-  "shell.version.current": "Current version",
+  "shell.version.label": "Current version: {version}. {status}",
   "shell.update.check": "Check for updates",
   "shell.update.checking": "Checking…",
   "shell.update.available": "Update available: {latest}",
@@ -106,5 +106,7 @@
   "shell.toast.dismiss": "Dismiss notification",
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Sign in",
-  "shell.page.setup": "Set up"
+  "shell.page.setup": "Set up",
+  "a11y.labelWithDetail": "{label}. {detail}",
+  "text.joinSentences": "{first} {second}"
 }

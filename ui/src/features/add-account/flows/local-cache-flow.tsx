@@ -136,7 +136,12 @@ export function LocalCacheFlow(): JSX.Element {
   // The message goes under the textarea it is about, so it shows next to the focused field.
   const problemField = problem ? localCacheErrorField(problem.key, showClient) : null;
   const problemText = problem
-    ? `${t(`local.${problem.key}`, problem.params)}${problem.hint ? ` ${t(`local.${problem.hint}`)}` : ""}`
+    ? problem.hint
+      ? t("common:text.joinSentences", {
+          first: t(`local.${problem.key}`, problem.params),
+          second: t(`local.${problem.hint}`),
+        })
+      : t(`local.${problem.key}`, problem.params)
     : null;
   const items = LOCAL_PROVIDERS.map((value) => ({
     value,

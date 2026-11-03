@@ -144,6 +144,9 @@ describe("keepSentenceParts", () => {
     expect(keepSentenceParts(t, "en", 20)).toEqual(["Keep latest", "backups"]);
     expect(keepSentenceParts(t, "en", 1)).toEqual(["Keep latest", "backup"]);
     expect(keepSentenceParts(tFor("zh"), "zh", 1)).toEqual(["保留最新", "份备份"]);
+    expect(keepSentenceParts(tFor("vi"), "vi", 1)).toEqual(["Giữ", "bản sao lưu mới nhất"]);
+    expect(keepSentenceParts(tFor("pt-BR"), "pt-BR", 1)).toEqual(["Manter", "backup mais recente"]);
+    expect(keepSentenceParts(tFor("pt-BR"), "pt-BR", 0)).toEqual(["Manter", "backups mais recentes"]);
   });
 });
 

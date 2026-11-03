@@ -31,6 +31,7 @@ export function subscriptionLabel(type: string, t: TFunction): string {
 
 const AUTH_KEYS: Readonly<Record<string, string>> = {
   idc: "auth.enterprise",
+  enterprise: "auth.enterprise",
   external_idp: "auth.microsoft",
   azuread: "auth.microsoft",
   apikey: "auth.apiKey",

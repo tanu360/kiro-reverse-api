@@ -101,5 +101,6 @@
   "snippets.python": "Python",
   "snippets.typescript": "TypeScript",
   "snippets.copy": "Sao chép đoạn mã {name}",
-  "snippets.codeRegion": "Mã {name}"
+  "snippets.codeRegion": "Mã {name}",
+  "snippets.sdkWithLanguage": "{sdk} ({language})"
 }

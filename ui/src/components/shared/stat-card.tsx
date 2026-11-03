@@ -1,5 +1,7 @@
 import { type LucideIcon, MinusIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import type { JSX, ReactNode } from "react";
+import { numberFormat } from "@/lib/format";
+import type { Lang } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -29,13 +31,14 @@ export interface StatCardProps {
   loading?: boolean;
 }
 
-/** 0.125 -> "+12.5%", -0.2 -> "-20%", 0 -> "0%". */
-export function formatDelta(fraction: number): string {
-  const percent = Math.round(fraction * 1000) / 10;
-  const text = Number.isInteger(percent) ? String(Math.abs(percent)) : Math.abs(percent).toFixed(1);
-  if (percent > 0) return `+${text}%`;
-  if (percent < 0) return `-${text}%`;
-  return "0%";
+/** 0.125 -> "+12.5%", -0.2 -> "-20%", 0 -> "0%" (in the UI language's number format). */
+export function formatDelta(fraction: number, lang?: Lang): string {
+  const rounded = Math.round(fraction * 1000) / 1000;
+  return numberFormat(lang, {
+    style: "percent",
+    maximumFractionDigits: 1,
+    signDisplay: "exceptZero",
+  }).format(rounded);
 }
 
 function DeltaBadge({ delta }: { delta: NonNullable<StatCardProps["delta"]> }): JSX.Element {

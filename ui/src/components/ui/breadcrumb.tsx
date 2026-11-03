@@ -5,11 +5,13 @@ import { useRender } from "@base-ui/react/use-render";
 import { ChevronRight, MoreHorizontal } from "lucide-react";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
+import { useUiT } from "@/components/ui/messages";
 
 export function Breadcrumb({
   ...props
 }: React.ComponentProps<"nav">): React.ReactElement {
-  return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />;
+  const { t } = useUiT();
+  return <nav aria-label={t("breadcrumb.label")} data-slot="breadcrumb" {...props} />;
 }
 
 export function BreadcrumbList({
@@ -94,6 +96,7 @@ export function BreadcrumbEllipsis({
   className,
   ...props
 }: React.ComponentProps<"span">): React.ReactElement {
+  const { t } = useUiT();
   return (
     <span
       aria-hidden="true"
@@ -103,7 +106,7 @@ export function BreadcrumbEllipsis({
       {...props}
     >
       <MoreHorizontal className="size-4" />
-      <span className="sr-only">More</span>
+      <span className="sr-only">{t("breadcrumb.more")}</span>
     </span>
   );
 }

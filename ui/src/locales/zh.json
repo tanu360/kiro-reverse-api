@@ -84,7 +84,7 @@
   "shell.theme.dark": "深色",
   "shell.privacy.label": "隐私模式",
   "shell.privacy.tooltip": "隐藏邮箱地址",
-  "shell.version.current": "当前版本",
+  "shell.version.label": "当前版本：{version}。{status}",
   "shell.update.check": "检查更新",
   "shell.update.checking": "正在检查…",
   "shell.update.available": "有可用更新：{latest}",
@@ -106,5 +106,7 @@
   "shell.toast.dismiss": "关闭通知",
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "登录",
-  "shell.page.setup": "初始设置"
+  "shell.page.setup": "初始设置",
+  "a11y.labelWithDetail": "{label}。{detail}",
+  "text.joinSentences": "{first}{second}"
 }

@@ -51,7 +51,11 @@ export function NavFooter(): JSX.Element {
         <SidebarMenuItem>
           {/* In the rail the version badge is hidden, so a newer release marks this button. */}
           <SidebarMenuButton
-            aria-label={updateLabel ? `${t("shell.about")}. ${updateLabel}` : t("shell.about")}
+            aria-label={
+              updateLabel
+                ? t("a11y.labelWithDetail", { label: t("shell.about"), detail: updateLabel })
+                : t("shell.about")
+            }
             className="relative"
             onClick={latest ? openDialog : undefined}
             tooltip={[updateLabel, `${t("shell.running")} · ${copyright} · ${t("shell.builtFor")}`]

@@ -6,7 +6,7 @@ import { StatCard, type StatCardProps } from "@/components/shared/stat-card";
 import { heatmapQuery } from "@/lib/api/observe";
 import { statusQuery } from "@/lib/api/system";
 import type { HeatmapCell, StatusResponse } from "@/lib/api/types";
-import { EMPTY, formatCompact, formatNumber, formatPercent } from "@/lib/format";
+import { EMPTY, formatCompact, formatCredits, formatNumber, formatPercent } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { type CellValue, HOUR_PAIR_WINDOW, hourDelta, sparklineBuckets } from "./aggregate";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
@@ -74,13 +74,13 @@ function accountsCard(s: StatusResponse, t: TFunction, lang: Lang): StatCardProp
       },
       {
         label: t("stats.accountCredits"),
-        value: `${s.accountCreditsUsed.toFixed(1)} / ${s.accountCreditsLimit.toFixed(1)}`,
+        value: `${formatCredits(s.accountCreditsUsed, 1, lang)} / ${formatCredits(s.accountCreditsLimit, 1, lang)}`,
         hint: t("stats.accountCreditsHint"),
         wide: true,
       },
       {
         label: t("stats.otherCredits"),
-        value: Math.max(0, s.accountCreditsUsed - s.totalCredits).toFixed(1),
+        value: formatCredits(Math.max(0, s.accountCreditsUsed - s.totalCredits), 1, lang),
         hint: t("stats.otherCreditsHint"),
         wide: true,
       },
@@ -99,11 +99,14 @@ function requestsCard(s: StatusResponse, t: TFunction, lang: Lang): StatCardProp
       { label: t("stats.tokens"), value: formatCompact(s.totalTokens) },
       {
         label: t("stats.appCredits"),
-        value: s.totalCredits.toFixed(1),
+        value: formatCredits(s.totalCredits, 1, lang),
         hint: t("stats.appCreditsHint"),
       },
       { label: t("stats.avgTokens"), value: formatCompact(total > 0 ? s.totalTokens / total : 0) },
-      { label: t("stats.avgCredits"), value: (total > 0 ? s.totalCredits / total : 0).toFixed(1) },
+      {
+        label: t("stats.avgCredits"),
+        value: formatCredits(total > 0 ? s.totalCredits / total : 0, 1, lang),
+      },
     ],
   };
 }

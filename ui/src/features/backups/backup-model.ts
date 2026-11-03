@@ -1,6 +1,6 @@
 import type { BackupCadence, BackupEntry, BackupSchedule } from "@/lib/api/types";
 import { EMPTY } from "@/lib/format";
-import type { Lang, TFunction } from "@/lib/i18n";
+import { type Lang, pluralCategory, type TFunction } from "@/lib/i18n";
 
 /** The server caps every request body at 32 MiB and answers a larger one with a plain 413. */
 export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
@@ -148,8 +148,10 @@ const COUNT_MARKER = "\u0000";
  * can sit where the count goes. The plural form follows `keep`.
  */
 export function keepSentenceParts(t: TFunction, lang: Lang, keep: number): [string, string] {
-  const form = new Intl.PluralRules(lang).select(keep) === "one" ? "one" : "other";
-  const text = t(`keepLatest_${form}`, { count: COUNT_MARKER });
+  // The language's own form first, then `other` (zh and vi only have `other`).
+  const forms = [pluralCategory(lang, keep), "other"];
+  const key = forms.map((form) => `keepLatest_${form}`).find((name) => t(name) !== name);
+  const text = t(key ?? "keepLatest_other", { count: COUNT_MARKER });
   const [before = "", after = ""] = text.split(COUNT_MARKER);
   return [before.trim(), after.trim()];
 }

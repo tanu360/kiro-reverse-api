@@ -6,7 +6,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { observeOverviewQuery } from "@/lib/api/observe";
 import type { ObserveOverview } from "@/lib/api/types";
-import { EMPTY, formatFraction, formatNumber } from "@/lib/format";
+import { EMPTY, formatCredits, formatFraction, formatNumber } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 
 // Columns follow the page's content width (@container/main), not the viewport, so labels such
@@ -35,10 +35,10 @@ function labels(t: TFunction): Omit<Tile, "value">[] {
 function values(o: ObserveOverview, lang: Lang): Record<string, string> {
   return {
     rpm: formatNumber(o.rpm1, lang),
-    errRate: formatFraction(o.errRate5),
+    errRate: formatFraction(o.errRate5, 1, lang),
     inTpm: formatNumber(Math.round(o.inTpm5), lang),
     outTpm: formatNumber(Math.round(o.outTpm5), lang),
-    credits60: o.credits60.toFixed(2),
+    credits60: formatCredits(o.credits60, 2, lang),
     activeAccounts: `${formatNumber(o.activeAccts, lang)} / ${formatNumber(o.totalAccts, lang)}`,
   };
 }

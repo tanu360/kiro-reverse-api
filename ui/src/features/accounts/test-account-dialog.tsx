@@ -15,6 +15,7 @@ import { getAccountModelsCached, testAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
+import { formatClockTime, formatCredits } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
@@ -106,7 +107,7 @@ export function TestAccountDialog({
   const append = (type: LogType, text: string, keep?: string) => {
     const line: LogLine = {
       id: nextIdRef.current++,
-      time: new Date().toLocaleTimeString(),
+      time: formatClockTime(new Date()),
       type,
       text,
       keep,
@@ -123,7 +124,7 @@ export function TestAccountDialog({
     const target = modelValue.trim() || DEFAULT_TEST_MODEL;
     append("info", t("testLog.start", { email, model: target, proxy }), target);
     const started = Date.now();
-    const seconds = () => ((Date.now() - started) / 1000).toFixed(1);
+    const seconds = () => formatCredits((Date.now() - started) / 1000, 1);
     try {
       const result = await testAccount(account.id, { model: target });
       append("ok", t("testLog.success", { email, seconds: seconds(), reply: result.reply }));
@@ -134,7 +135,7 @@ export function TestAccountDialog({
           input: result.inputTokens,
           output: result.outputTokens,
           credits: result.credits,
-          context: Number(result.contextUsage).toFixed(1),
+          context: formatCredits(Number(result.contextUsage), 1),
         }),
       );
       if (!result.stopReason) append("warn", t("testLog.noStopReasonHint"));

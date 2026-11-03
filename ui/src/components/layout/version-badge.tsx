@@ -30,7 +30,7 @@ export function VersionBadge({ className }: { className?: string }): JSX.Element
         render={
           <button
             aria-busy={checking || undefined}
-            aria-label={`${t("shell.version.current")}: ${version}. ${tooltip}`}
+            aria-label={t("shell.version.label", { version, status: tooltip })}
             className={cn(
               "relative inline-flex h-6 items-center gap-1.5 rounded-md border bg-background px-2 font-mono text-xs tabular-nums outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-64",
               className,

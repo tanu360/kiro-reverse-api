@@ -80,7 +80,10 @@ describe("errorMessage", () => {
       serverMessage: "token 1: token 验证失败: 401 Unauthorized",
     });
     expect(errorMessage(error, tWithParams)).toBe(
-      't(errors:serverError.ssoTokenRejected) t(errors:serverError.detail, {"detail":"401 Unauthorized"})',
+      `t(common:text.joinSentences, ${JSON.stringify({
+        first: "t(errors:serverError.ssoTokenRejected)",
+        second: 't(errors:serverError.detail, {"detail":"401 Unauthorized"})',
+      })})`,
     );
   });
 

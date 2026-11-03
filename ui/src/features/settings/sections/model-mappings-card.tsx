@@ -336,7 +336,10 @@ function MappingRowItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: row.id });
+  } = useSortable({
+    id: row.id,
+    attributes: { roleDescription: t("modelMappings.roleDescription") },
+  });
   const isFirst = index === 0;
   const isLast = index === count - 1;
 

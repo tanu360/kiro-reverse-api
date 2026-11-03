@@ -66,10 +66,17 @@ export function ClientSnippetsCard(): JSX.Element {
   return (
     <SectionCard
       description={
-        <>
-          <CodeText code={env} text={t("snippets.description")} />
-          {settings.data && !settings.data.requireApiKey ? ` ${t("snippets.anyKeyWorks")}` : null}
-        </>
+        <CodeText
+          code={env}
+          text={
+            settings.data && !settings.data.requireApiKey
+              ? t("common:text.joinSentences", {
+                  first: t("snippets.description"),
+                  second: t("snippets.anyKeyWorks"),
+                })
+              : t("snippets.description")
+          }
+        />
       }
       id="api-client-setup"
       title={t("snippets.title")}
@@ -133,14 +140,24 @@ export function ClientSnippetsCard(): JSX.Element {
             <TabsPanel className="min-w-0" value="python">
               <CodeBlock
                 code={snippets.openaiSdk.python}
-                copyLabel={copy(`${t("snippets.openaiSdk")} (${t("snippets.python")})`)}
+                copyLabel={copy(
+                  t("snippets.sdkWithLanguage", {
+                    sdk: t("snippets.openaiSdk"),
+                    language: t("snippets.python"),
+                  }),
+                )}
                 title="main.py"
               />
             </TabsPanel>
             <TabsPanel className="min-w-0" value="typescript">
               <CodeBlock
                 code={snippets.openaiSdk.typescript}
-                copyLabel={copy(`${t("snippets.openaiSdk")} (${t("snippets.typescript")})`)}
+                copyLabel={copy(
+                  t("snippets.sdkWithLanguage", {
+                    sdk: t("snippets.openaiSdk"),
+                    language: t("snippets.typescript"),
+                  }),
+                )}
                 title="main.ts"
               />
             </TabsPanel>

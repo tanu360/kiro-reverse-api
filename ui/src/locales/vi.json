@@ -84,7 +84,7 @@
   "shell.theme.dark": "Tối",
   "shell.privacy.label": "Chế độ riêng tư",
   "shell.privacy.tooltip": "Ẩn địa chỉ email",
-  "shell.version.current": "Phiên bản hiện tại",
+  "shell.version.label": "Phiên bản hiện tại: {version}. {status}",
   "shell.update.check": "Kiểm tra cập nhật",
   "shell.update.checking": "Đang kiểm tra…",
   "shell.update.available": "Có bản cập nhật: {latest}",
@@ -106,5 +106,7 @@
   "shell.toast.dismiss": "Đóng thông báo",
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Đăng nhập",
-  "shell.page.setup": "Thiết lập"
+  "shell.page.setup": "Thiết lập",
+  "a11y.labelWithDetail": "{label}. {detail}",
+  "text.joinSentences": "{first} {second}"
 }

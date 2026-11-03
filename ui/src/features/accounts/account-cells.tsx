@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterLabel, MeterTrack } from "@/components/ui/meter";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
+import { formatFraction } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
@@ -136,7 +137,9 @@ function CreditMeter({
           {label}
           {hint ? <span className="ms-1 text-warning-foreground">{hint}</span> : null}
         </MeterLabel>
-        <span className="ms-auto text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+        <span className="ms-auto text-muted-foreground tabular-nums">
+          {formatFraction(pct / 100, 1)}
+        </span>
       </div>
       <MeterTrack className="h-1.5 rounded-full">
         <MeterIndicator className={cn("rounded-full", TONE_CLASS[creditTone(pct)])} />

@@ -13,9 +13,10 @@ import {
   defaultChartStatFlowFormat,
 } from "./chart-stat-flow";
 import { useRingHover, useRingStable } from "./ring-context";
+import { useUiT } from "@/components/ui/messages";
 
 export interface RingCenterProps {
-  /** Label shown below the value. Default: "Total" when not hovering */
+  /** Label shown below the value when not hovering. Default: the `ui` namespace's chart.total. */
   defaultLabel?: string;
   /** Format options for NumberFlow. Default: standard notation */
   formatOptions?: ChartStatFlowFormat;
@@ -49,7 +50,7 @@ export interface RingCenterProps {
  * on top of the SVG rings.
  */
 export function RingCenter({
-  defaultLabel = "Total",
+  defaultLabel: defaultLabelProp,
   formatOptions = defaultChartStatFlowFormat,
   children,
   className = "",
@@ -59,6 +60,8 @@ export function RingCenter({
   suffix,
 }: RingCenterProps) {
   const { data, totalValue, baseInnerRadius } = useRingStable();
+  const { t } = useUiT();
+  const defaultLabel = defaultLabelProp ?? t("chart.total");
   const { hoveredIndex } = useRingHover();
 
   const hoveredData = hoveredIndex === null ? null : data[hoveredIndex];

@@ -98,7 +98,10 @@ function translateServerMessage(message: string, t: TFunction): string | null {
   if (!phrase) return null;
   const text = t(phrase.key);
   return phrase.detail
-    ? `${text} ${t("errors:serverError.detail", { detail: phrase.detail })}`
+    ? t("common:text.joinSentences", {
+        first: text,
+        second: t("errors:serverError.detail", { detail: phrase.detail }),
+      })
     : text;
 }
 

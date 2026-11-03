@@ -72,12 +72,13 @@ function UserMenuItems(): JSX.Element {
 }
 
 function AdminAvatar(): JSX.Element {
+  const { t } = useT();
   return (
     <span
       aria-hidden="true"
       className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted font-medium text-muted-foreground text-xs"
     >
-      A
+      {t("shell.avatarInitial")}
     </span>
   );
 }

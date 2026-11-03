@@ -20,21 +20,17 @@
   "discardBody": "Some settings cards have changes that are not saved. Leaving this page discards them.",
   "discardAction": "Discard changes",
   "keepEditing": "Keep editing",
-
   "usageSettings": "Usage",
   "allowOverUsage": "Allow overage",
   "allowOverUsageHint": "Accounts keep serving requests after their credits run out.",
-
   "streamIntegrity": "Stream integrity",
   "lenientStreamIntegrity": "Accept replies without metering",
   "lenientStreamIntegrityHint": "Kiro marks a turn complete with a stop reason or a metering event. Some IdC and Enterprise accounts send neither, so their replies are rejected as truncated.",
   "lenientStreamIntegrityRisk": "Turn this on only if your accounts are affected. A reply cut off mid-answer then looks complete and is served as final.",
-
   "routing": "Account routing",
   "sessionAffinity": "Keep conversations on one account",
   "sessionAffinityHint": "Follow-up turns go back to the account that answered the previous turn, which already holds the prompt cache. Turn this off for strict round-robin on every request.",
   "sessionAffinityMore": "New conversations still rotate across accounts. If that account is cooling down, out of credits or failing, the request moves to another account.",
-
   "autoContinue": "Auto-continue",
   "autoContinueEnable": "Continue answers cut off by the output limit",
   "autoContinueHint": "Kiro stops a single answer at about 8192 output tokens. When an answer stops there without a tool call, the proxy asks Kiro to continue and appends the rest.",
@@ -42,12 +38,10 @@
   "autoContinueMax": "Maximum continuations per answer",
   "autoContinueMaxHint": "Between 1 and 10. Continuation also stops at the client's own max_tokens.",
   "autoContinueMaxInvalid": "Maximum continuations must be a whole number between 1 and {max}.",
-
   "toolHistory": "Tool history",
   "structuredToolHistory": "Send earlier tool calls as structured tool calls",
   "structuredToolHistoryHint": "Earlier tool calls and results reach the model as real tool calls, so long agent sessions keep calling tools. Turn this off to always send earlier tool activity as plain text.",
   "structuredToolHistoryMore": "A pair falls back to plain text when the request does not declare that tool or the call and result IDs do not match. If Kiro rejects the structured form, the proxy retries once with plain text and keeps using plain text for an hour.",
-
   "thinkingSettings": "Thinking",
   "thinkingHint": "Choose the model suffix that turns on thinking and how thinking output reaches each API.",
   "thinkingSuffix": "Trigger suffix",
@@ -57,7 +51,6 @@
   "formatReasoningContent": "reasoning_content (DeepSeek)",
   "formatThinkingClaude": "<thinking> (Claude)",
   "formatThinkOpenAI": "<think> (OpenAI)",
-
   "modelMappings": "Model mapping",
   "modelMappingsHint": "Map client model names to Kiro model IDs. Rules are checked in order; the first rule whose text the model name contains wins.",
   "modelMappings.add": "Add mapping",
@@ -74,11 +67,11 @@
   "modelMappings.noRules": "No model mappings. Direct Claude model IDs still work.",
   "modelMappings.emptyIgnored": "Empty rows are ignored when saving.",
   "modelMappings.dragInstructions": "To pick up a mapping, press Space or Enter. Use the arrow keys to move it, Space or Enter to drop it, and Escape to cancel.",
+  "modelMappings.roleDescription": "Reorderable row",
   "modelMappings.dragStart": "Picked up mapping {from}.",
   "modelMappings.dragOver": "Mapping {from} is over position {to}.",
   "modelMappings.dragEnd": "Mapping {from} dropped at position {to}.",
   "modelMappings.dragCancel": "Reordering cancelled. Mapping {from} stays in place.",
-
   "endpointSettings": "Kiro endpoint",
   "endpointSettingsHint": "Choose which Kiro endpoint receives requests.",
   "preferredEndpoint": "Preferred endpoint",
@@ -89,7 +82,6 @@
   "endpointAmazonQ": "Amazon Q",
   "endpointFallback": "Fall back to other endpoints",
   "endpointFallbackHint": "When off, only the selected endpoint is used.",
-
   "adminPassword": "Admin password",
   "adminPasswordHint": "Changing the password ends every other signed-in session. This browser stays signed in.",
   "newPassword": "New password",
@@ -101,7 +93,6 @@
   "confirmPasswordTitle": "Change the admin password?",
   "confirmPasswordBody": "All other signed-in sessions end.",
   "passwordChanged": "Password changed",
-
   "proxySettings": "Outbound proxy",
   "proxyHint": "Send Kiro and sign-in traffic through a SOCKS5 or HTTP proxy. Changes apply right away, without a restart.",
   "proxyType": "Proxy type",
@@ -116,7 +107,6 @@
   "proxyUsername": "Username",
   "proxyPassword": "Password",
   "proxyHostRequired": "Enter a proxy host and port.",
-
   "promptFilter": "System prompt filter",
   "promptFilterHint": "Clean system prompts before they reach Kiro. Built-in filters run first, then custom rules in list order.",
   "builtinFilters": "Built-in filters",
@@ -142,7 +132,6 @@
   "promptFilter.addRegex": "Add regex rule",
   "promptFilter.addContains": "Add line filter",
   "promptFilter.invalidRegex": "This regex does not compile; the proxy skips it.",
-
   "dangerZone": "Danger zone",
   "statistics": "Statistics",
   "resetStats": "Reset statistics",

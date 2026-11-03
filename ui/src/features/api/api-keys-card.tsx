@@ -206,7 +206,10 @@ export function ApiKeysCard(): JSX.Element {
     const ok = await confirm({
       title: t("keys.confirmDeleteTitle"),
       description: lockout
-        ? `${t("keys.confirmDeleteBody")} ${t("keys.lockoutWarning")}`
+        ? t("common:text.joinSentences", {
+            first: t("keys.confirmDeleteBody"),
+            second: t("keys.lockoutWarning"),
+          })
         : t("keys.confirmDeleteBody"),
       confirmLabel: t("common:actions.delete"),
       variant: "danger",

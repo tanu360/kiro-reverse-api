@@ -102,5 +102,6 @@
   "snippets.python": "Python",
   "snippets.typescript": "TypeScript",
   "snippets.copy": "Copiar snippet de {name}",
-  "snippets.codeRegion": "Código {name}"
+  "snippets.codeRegion": "Código {name}",
+  "snippets.sdkWithLanguage": "{sdk} ({language})"
 }

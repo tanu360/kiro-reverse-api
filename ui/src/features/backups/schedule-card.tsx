@@ -170,7 +170,10 @@ export function ScheduleCard(): JSX.Element {
   return (
     <SectionCard
       actions={schedule ? <LastRun schedule={schedule} /> : null}
-      description={`${t("schedule.description")} ${t("keepHint")}`}
+      description={t("common:text.joinSentences", {
+        first: t("schedule.description"),
+        second: t("keepHint"),
+      })}
       id="backup-schedule"
       title={t("schedule.title")}
     >

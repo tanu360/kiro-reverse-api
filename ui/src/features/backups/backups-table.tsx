@@ -82,10 +82,11 @@ function HintText({
   label: string;
   className?: string;
 }): JSX.Element {
+  const { t } = useT();
   return (
     <Popover>
       <PopoverTrigger
-        aria-label={`${label}. ${hint}`}
+        aria-label={t("a11y.labelWithDetail", { label, detail: hint })}
         className={cn(
           "cursor-default rounded-sm text-left underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring",
           TOUCH_HIT_AREA,

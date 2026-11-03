@@ -63,7 +63,9 @@ describe("formatAuthMethod", () => {
   });
 
   it("returns an unknown method raw and an empty one as a dash", () => {
-    expect(formatAuthMethod("Enterprise", t)).toBe("Enterprise");
+    expect(formatAuthMethod("SomethingNew", t)).toBe("SomethingNew");
+    // The server's provider name for IAM Identity Center accounts is translated.
+    expect(formatAuthMethod("Enterprise", t)).toBe("auth.enterprise");
     expect(formatAuthMethod("", t)).toBe("—");
   });
 });

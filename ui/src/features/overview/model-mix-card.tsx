@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { modelMixQuery } from "@/lib/api/observe";
 import type { ModelMixEntry } from "@/lib/api/types";
-import { formatNumber } from "@/lib/format";
+import { formatCredits, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { modelSlices } from "./aggregate";
 import { MODEL_COLORS, OTHER_MODEL_COLOR } from "./colors";
@@ -103,7 +103,7 @@ export function ModelMixCard(): JSX.Element {
         id: "credits",
         header: t("modelMix.credits"),
         align: "end",
-        cell: (row) => <span className="tabular-nums">{row.credits.toFixed(2)}</span>,
+        cell: (row) => <span className="tabular-nums">{formatCredits(row.credits)}</span>,
       },
     ],
     [t, lang, mix],
@@ -164,7 +164,7 @@ export function ModelMixCard(): JSX.Element {
                     </span>
                     <span className="flex shrink-0 items-baseline gap-1.5">
                       <span className="text-muted-foreground text-xs">{t("modelMix.credits")}</span>
-                      <span className="font-medium tabular-nums">{row.credits.toFixed(2)}</span>
+                      <span className="font-medium tabular-nums">{formatCredits(row.credits)}</span>
                     </span>
                   </div>
                   <dl className="grid grid-cols-2 gap-2 text-xs">

@@ -24,6 +24,7 @@ import {
   TooltipPopup,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useUiT } from "@/components/ui/messages";
 
 // Kiro patch: persist the open state in localStorage instead of the Cookie Store API,
 // which Firefox lacks. The admin UI relies on no cookies.
@@ -201,8 +202,8 @@ export function Sidebar({
   collapsible = "offcanvas",
   className,
   children,
-  sheetTitle = "Sidebar",
-  sheetDescription = "Displays the mobile sidebar.",
+  sheetTitle,
+  sheetDescription,
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right";
@@ -213,6 +214,7 @@ export function Sidebar({
   sheetDescription?: string;
 }): React.ReactElement {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { t } = useUiT();
   // Kiro patch: the sidebar-scoped palette attribute must reach the portaled mobile sheet too.
   const appSidebar = (props as { "data-app-sidebar"?: string })["data-app-sidebar"];
 
@@ -248,8 +250,8 @@ export function Sidebar({
           }
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>{sheetTitle}</SheetTitle>
-            <SheetDescription>{sheetDescription}</SheetDescription>
+            <SheetTitle>{sheetTitle ?? t("sidebar.title")}</SheetTitle>
+            <SheetDescription>{sheetDescription ?? t("sidebar.description")}</SheetDescription>
           </SheetHeader>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetPopup>
@@ -311,6 +313,7 @@ export function SidebarTrigger({
   ...props
 }: React.ComponentProps<typeof Button>): React.ReactElement {
   const { toggleSidebar } = useSidebar();
+  const { t } = useUiT();
 
   return (
     <Button
@@ -326,8 +329,8 @@ export function SidebarTrigger({
       {...props}
     >
       <PanelLeftIcon aria-hidden="true" />
-      {/* Kiro patch: callers pass a translated aria-label; the English text is a fallback. */}
-      {props["aria-label"] ? null : <span className="sr-only">Toggle Sidebar</span>}
+      {/* Kiro patch: callers may pass their own aria-label; the ui namespace has the fallback. */}
+      {props["aria-label"] ? null : <span className="sr-only">{t("sidebar.toggle")}</span>}
     </Button>
   );
 }
@@ -337,10 +340,11 @@ export function SidebarRail({
   ...props
 }: React.ComponentProps<"button">): React.ReactElement {
   const { toggleSidebar } = useSidebar();
+  const { t } = useUiT();
 
   return (
     <button
-      aria-label="Toggle Sidebar"
+      aria-label={t("sidebar.toggle")}
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
@@ -354,7 +358,7 @@ export function SidebarRail({
       data-slot="sidebar-rail"
       onClick={toggleSidebar}
       tabIndex={-1}
-      title="Toggle Sidebar"
+      title={t("sidebar.toggle")}
       type="button"
       {...props}
     />

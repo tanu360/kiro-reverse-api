@@ -12,6 +12,7 @@ import {
   generateChartSkeletonData,
 } from "./generate-chart-skeleton-data";
 import { Grid } from "./grid";
+import { useUiT } from "@/components/ui/messages";
 
 const LOADING_DATA_KEY = DEFAULT_SKELETON_DATA_KEY;
 const DEFAULT_LOADING_STROKE = "var(--foreground)";
@@ -43,7 +44,7 @@ export interface AreaChartLoadingProps {
   /** Loading animation: `"pulse"` (default traveling pulse) or `"sweep"` (a
    * diagonal shimmer across the skeleton area). Default: `"pulse"`. */
   loadingStyle?: LoadingStyle;
-  /** Centered shimmer label text. Default: "Loading" */
+  /** Centered shimmer label text. Default: the `ui` namespace's chart.loading. */
   label?: string;
   /** Aspect ratio as "width / height". Default: "2 / 1" */
   aspectRatio?: string;
@@ -62,10 +63,12 @@ export function AreaChartLoading({
   gridShimmerSpeed,
   gridShimmerSync = false,
   loadingStyle = "pulse",
-  label = "Loading",
+  label: labelProp,
   aspectRatio = "2 / 1",
   className = "",
 }: AreaChartLoadingProps) {
+  const { t } = useUiT();
+  const label = labelProp ?? t("chart.loading");
   const data = useMemo(
     () =>
       generateChartSkeletonData({

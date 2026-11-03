@@ -20,21 +20,17 @@
   "discardBody": "部分设置卡片有尚未保存的更改。离开此页面会放弃这些更改。",
   "discardAction": "放弃更改",
   "keepEditing": "继续编辑",
-
   "usageSettings": "用量",
   "allowOverUsage": "允许超额用量",
   "allowOverUsageHint": "账号的 Credits 用尽后仍继续处理请求。",
-
   "streamIntegrity": "流完整性",
   "lenientStreamIntegrity": "接受没有计量事件的回复",
   "lenientStreamIntegrityHint": "Kiro 通过停止原因或计量事件标记一轮完成。部分 IdC 和企业账号两者都不发送，其回复会被判定为截断。",
   "lenientStreamIntegrityRisk": "仅在您的账号受影响时开启。开启后，中途被截断的回复看起来是完整的，并会作为最终回复返回。",
-
   "routing": "账号路由",
   "sessionAffinity": "同一会话固定使用同一账号",
   "sessionAffinityHint": "会话的后续轮次会回到上一轮应答的账号，该账号已持有提示缓存。关闭后每个请求都严格轮询。",
   "sessionAffinityMore": "新会话仍在各账号间轮询。若该账号处于冷却、Credits 用尽或请求失败，请求会切换到其他账号。",
-
   "autoContinue": "自动续写",
   "autoContinueEnable": "回复被输出上限截断时自动续写",
   "autoContinueHint": "Kiro 单次回复约在 8192 个输出 Token 处停止。若回复在此处停止且未调用工具，代理会请求 Kiro 继续，并追加后续内容。",
@@ -42,12 +38,10 @@
   "autoContinueMax": "每条回复的最大续写次数",
   "autoContinueMaxHint": "取值 1 到 10。达到客户端自身的 max_tokens 时也会停止续写。",
   "autoContinueMaxInvalid": "最大续写次数必须是 1 到 {max} 之间的整数。",
-
   "toolHistory": "工具历史",
   "structuredToolHistory": "以结构化工具调用发送历史工具调用",
   "structuredToolHistoryHint": "历史中的工具调用及其结果会以真实的工具调用形式发送给模型，长时间的智能体会话因此会继续调用工具。关闭后，历史工具活动始终以纯文本发送。",
   "structuredToolHistoryMore": "若本次请求未声明该工具，或调用与结果的 ID 不匹配，该组调用会改为纯文本发送。若 Kiro 拒绝结构化格式，代理会用纯文本重试一次，并在接下来一小时内都使用纯文本。",
-
   "thinkingSettings": "Thinking",
   "thinkingHint": "设置开启 Thinking 的模型后缀，以及 Thinking 内容在各 API 中的输出方式。",
   "thinkingSuffix": "触发后缀",
@@ -57,7 +51,6 @@
   "formatReasoningContent": "reasoning_content (DeepSeek)",
   "formatThinkingClaude": "<thinking> (Claude)",
   "formatThinkOpenAI": "<think> (OpenAI)",
-
   "modelMappings": "模型映射",
   "modelMappingsHint": "将客户端模型名映射到 Kiro 模型 ID。规则按顺序检查，第一个被模型名包含的匹配文本生效。",
   "modelMappings.add": "添加映射",
@@ -74,11 +67,11 @@
   "modelMappings.noRules": "暂无模型映射。直接使用 Claude 模型 ID 仍然有效。",
   "modelMappings.emptyIgnored": "保存时会忽略空行。",
   "modelMappings.dragInstructions": "按空格键或回车键拿起映射，用方向键移动，再按空格键或回车键放下，按 Esc 取消。",
+  "modelMappings.roleDescription": "可排序的行",
   "modelMappings.dragStart": "已拿起映射 {from}。",
   "modelMappings.dragOver": "映射 {from} 位于第 {to} 位。",
   "modelMappings.dragEnd": "映射 {from} 已放到第 {to} 位。",
   "modelMappings.dragCancel": "已取消排序。映射 {from} 保持原位。",
-
   "endpointSettings": "Kiro 端点",
   "endpointSettingsHint": "选择接收请求的 Kiro 端点。",
   "preferredEndpoint": "首选端点",
@@ -89,7 +82,6 @@
   "endpointAmazonQ": "Amazon Q",
   "endpointFallback": "端点不可用时切换到其他端点",
   "endpointFallbackHint": "关闭后，仅使用选定的端点。",
-
   "adminPassword": "管理员密码",
   "adminPasswordHint": "修改密码会结束其他所有已登录的会话。当前浏览器保持登录。",
   "newPassword": "新密码",
@@ -101,7 +93,6 @@
   "confirmPasswordTitle": "修改管理员密码？",
   "confirmPasswordBody": "其他所有已登录的会话都会结束。",
   "passwordChanged": "密码已修改",
-
   "proxySettings": "出站代理",
   "proxyHint": "通过 SOCKS5 或 HTTP 代理发送 Kiro 和登录流量。更改立即生效，无需重启。",
   "proxyType": "代理类型",
@@ -116,7 +107,6 @@
   "proxyUsername": "用户名",
   "proxyPassword": "密码",
   "proxyHostRequired": "请填写代理地址和端口。",
-
   "promptFilter": "System Prompt 过滤",
   "promptFilterHint": "在系统提示发送到 Kiro 之前进行清理。先运行内置过滤器，再按列表顺序运行自定义规则。",
   "builtinFilters": "内置过滤器",
@@ -142,7 +132,6 @@
   "promptFilter.addRegex": "添加正则规则",
   "promptFilter.addContains": "添加行级过滤",
   "promptFilter.invalidRegex": "此正则表达式无法编译，代理会跳过它。",
-
   "dangerZone": "危险操作",
   "statistics": "统计",
   "resetStats": "重置统计",

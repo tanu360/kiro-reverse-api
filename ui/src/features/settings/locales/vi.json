@@ -67,6 +67,7 @@
   "modelMappings.noRules": "Không có ánh xạ model. ID model Claude trực tiếp vẫn hoạt động.",
   "modelMappings.emptyIgnored": "Dòng trống sẽ bị bỏ qua khi lưu.",
   "modelMappings.dragInstructions": "Để chọn một ánh xạ, nhấn Space hoặc Enter. Dùng phím mũi tên để di chuyển, Space hoặc Enter để thả, và Escape để hủy.",
+  "modelMappings.roleDescription": "Hàng có thể sắp xếp",
   "modelMappings.dragStart": "Đã chọn ánh xạ {from}.",
   "modelMappings.dragOver": "Ánh xạ {from} đang ở vị trí {to}.",
   "modelMappings.dragEnd": "Đã thả ánh xạ {from} tại vị trí {to}.",

@@ -7,6 +7,7 @@ import {
   area as d3Area,
   line as d3Line,
 } from "d3-shape";
+import { translate } from "@/lib/i18n";
 
 export type SparklineCurve = "linear" | "monotone" | "natural" | "step";
 
@@ -272,13 +273,7 @@ export type SparklineTranslate = (
   params?: Record<string, string | number>
 ) => string;
 
-const englishSummary: SparklineTranslate = (key, params = {}) => {
-  const base = `${params.count} points, from ${params.first} to ${params.last}`;
-  if (key === "sparkline.empty") return "No data";
-  if (key === "sparkline.summaryUp") return `${base}, up ${params.change}%`;
-  if (key === "sparkline.summaryDown") return `${base}, down ${params.change}%`;
-  return base;
-};
+const englishSummary: SparklineTranslate = (key, params) => translate("en", "ui", key, params);
 
 /**
  * Screen-reader summary, e.g. "12 points, from 3.1K to 4.2K, up 35%". Pass the UI language's

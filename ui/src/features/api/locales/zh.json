@@ -101,5 +101,6 @@
   "snippets.python": "Python",
   "snippets.typescript": "TypeScript",
   "snippets.copy": "复制 {name} 示例",
-  "snippets.codeRegion": "{name} 代码"
+  "snippets.codeRegion": "{name} 代码",
+  "snippets.sdkWithLanguage": "{sdk}（{language}）"
 }

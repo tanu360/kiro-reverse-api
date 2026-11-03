@@ -119,7 +119,7 @@ function interpolate(text: string, params?: TParams): string {
  * The CLDR plural category for `count` in `lang`. Ruling: Brazilian Portuguese uses `other` for
  * zero ("0 contas"), although CLDR puts 0 in `one` for Portuguese.
  */
-export function pluralCategory(lang: SupportedLang, count: number): Intl.LDMLPluralRule {
+export function pluralCategory(lang: Lang, count: number): Intl.LDMLPluralRule {
   if (lang === "pt-BR" && count === 0) return "other";
   const locale = intlLocale(lang);
   let rules = pluralRules.get(locale);

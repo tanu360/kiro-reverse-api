@@ -67,6 +67,7 @@
   "modelMappings.noRules": "Nenhum mapeamento de modelos. IDs de modelo do Claude continuam funcionando diretamente.",
   "modelMappings.emptyIgnored": "Linhas vazias são ignoradas ao salvar.",
   "modelMappings.dragInstructions": "Para pegar um mapeamento, pressione Espaço ou Enter. Use as setas para movê-lo, Espaço ou Enter para soltá-lo e Esc para cancelar.",
+  "modelMappings.roleDescription": "Linha reordenável",
   "modelMappings.dragStart": "Mapeamento {from} selecionado.",
   "modelMappings.dragOver": "Mapeamento {from} sobre a posição {to}.",
   "modelMappings.dragEnd": "Mapeamento {from} solto na posição {to}.",

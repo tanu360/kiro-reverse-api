@@ -8,6 +8,7 @@ import {
   LOADING_LABEL_EXIT_S,
   LOADING_LABEL_EXIT_Y_PX,
 } from "./line-loading-timing";
+import { useUiT } from "@/components/ui/messages";
 
 export interface ChartLoadingLabelProps {
   /** Label shown centered over the chart. */
@@ -18,10 +19,12 @@ export interface ChartLoadingLabelProps {
 }
 
 export function ChartLoadingLabel({
-  text = "Loading",
+  text: textProp,
   className,
   exiting = false,
 }: ChartLoadingLabelProps) {
+  const { t } = useUiT();
+  const text = textProp ?? t("chart.loading");
   if (!text.trim()) {
     return null;
   }

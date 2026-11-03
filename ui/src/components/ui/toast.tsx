@@ -12,6 +12,7 @@ import {
 import type React from "react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { useUiT } from "@/components/ui/messages";
 
 const TOAST_ICONS = {
   error: CircleAlertIcon,
@@ -78,6 +79,7 @@ function Toasts({
   closeLabel?: string;
 }): React.ReactElement {
   const { toasts } = Toast.useToastManager();
+  const { t } = useUiT();
   const swipeDirection = getSwipeDirection(position);
 
   return (
@@ -192,7 +194,7 @@ function Toasts({
                   )}
                   {/* Kiro patch: every toast can be dismissed; error toasts never time out. */}
                   <Toast.Close
-                    aria-label={closeLabel ?? "Dismiss"}
+                    aria-label={closeLabel ?? t("toast.dismiss")}
                     className={cn(
                       buttonVariants({ size: "icon-xs", variant: "ghost" }),
                       "-me-1.5 text-muted-foreground hover:text-foreground max-sm:-me-2 max-sm:size-10",
