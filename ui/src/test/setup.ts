@@ -49,6 +49,12 @@ if (!Element.prototype.releasePointerCapture) {
   Element.prototype.releasePointerCapture = () => {};
 }
 
+// jsdom has no Web Animations API; Base UI's ScrollArea (sidebar content) calls
+// getAnimations() from a timer.
+if (!Element.prototype.getAnimations) {
+  Element.prototype.getAnimations = () => [];
+}
+
 if (!URL.createObjectURL) {
   URL.createObjectURL = () => "blob:mock";
 }

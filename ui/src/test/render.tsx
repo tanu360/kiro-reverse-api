@@ -19,13 +19,6 @@ import { I18nProvider, type Lang } from "@/lib/i18n";
 import { PrivacyProvider } from "@/lib/privacy";
 import { routeTree } from "@/routeTree.gen";
 
-// jsdom has no Web Animations API; Base UI's ScrollArea (sidebar content) calls
-// getAnimations() from a timer. test/setup.ts belongs to the data-layer task, so the shell's
-// render helpers install the stub they need.
-if (typeof Element !== "undefined" && !Element.prototype.getAnimations) {
-  Element.prototype.getAnimations = () => [];
-}
-
 export interface RenderOptions {
   lang?: Lang;
   privacy?: boolean;
