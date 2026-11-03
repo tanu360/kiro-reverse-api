@@ -28,7 +28,8 @@
   --card-foreground: var(--color-zinc-900);
   --popover: var(--color-white);
   --popover-foreground: var(--color-zinc-900);
-  --primary: oklch(0.488 0.217 264);
+  /* Kiro purple-500 (#9046ff, kiro.dev --cta-primary): white text on it is 4.6:1. */
+  --primary: #9046ff;
   --primary-foreground: var(--color-white);
   --secondary: var(--color-zinc-50);
   --secondary-foreground: var(--color-zinc-800);
@@ -45,8 +46,9 @@
   /* red-600, not t3code's red-500: white button text on red-500 is only 3.8:1 (AA needs 4.5). */
   --destructive: var(--color-red-600);
   --destructive-foreground: var(--color-red-700);
-  --info: var(--color-blue-500);
-  --info-foreground: var(--color-blue-700);
+  /* Kiro purple, not blue: purple-700 text is 7.4:1 on white. */
+  --info: #9046ff;
+  --info-foreground: #7a0ecd;
   --success: var(--color-emerald-500);
   --success-foreground: var(--color-emerald-700);
   --warning: var(--color-amber-500);
@@ -84,7 +86,7 @@
   --card-foreground: var(--color-neutral-100);
   --popover: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
   --popover-foreground: var(--color-neutral-100);
-  --primary: oklch(0.571 0.21 264);
+  --primary: #9046ff;
   --secondary: --alpha(var(--color-white) / 3%);
   --secondary-foreground: var(--color-neutral-100);
   --muted: --alpha(var(--color-white) / 3%);
@@ -96,7 +98,8 @@
   /* Same red-600 as light: the lighter t3code mix put white button text at 3.5:1. */
   --destructive: var(--color-red-600);
   --destructive-foreground: var(--color-red-400);
-  --info-foreground: var(--color-blue-400);
+  /* Kiro purple-300: 9.7:1 on black. */
+  --info-foreground: #c59eff;
   --success-foreground: var(--color-emerald-400);
   --warning-foreground: var(--color-amber-400);
   --sidebar: var(--card);
@@ -366,7 +369,7 @@
   --chart-foreground-muted: oklch(0.55 0.014 260);
   --chart-line-primary: var(--chart-1);
   --chart-line-secondary: var(--chart-2);
-  --chart-crosshair: oklch(0.4 0.1828 274.34);
+  --chart-crosshair: #5e17ab;
   --chart-grid: oklch(0.9 0 0);
   --chart-brush-border: var(--chart-grid);
   --chart-tooltip-background: var(--popover);
