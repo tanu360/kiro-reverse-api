@@ -1,3 +1,4 @@
+import { apiRequest } from "./client";
 import type {
   BuilderIdPollRequest,
   BuilderIdPollResponse,
@@ -16,54 +17,63 @@ import type {
   MicrosoftSelectProfileResponse,
   MicrosoftStartResponse,
   SsoTokenImportRequest,
+  SsoTokenImportResponse,
   SsoTokenImportResult,
 } from "./types";
 
-const notImplemented = () => Promise.reject(new Error("not implemented"));
-
-export function startIamSso(_req: IamSsoStartRequest): Promise<IamSsoStartResponse> {
-  return notImplemented();
+export function startIamSso(req: IamSsoStartRequest): Promise<IamSsoStartResponse> {
+  return apiRequest("/auth/iam-sso/start", { method: "POST", body: req });
 }
 
-export function completeIamSso(_req: IamSsoCompleteRequest): Promise<IamSsoCompleteResponse> {
-  return notImplemented();
+export function completeIamSso(req: IamSsoCompleteRequest): Promise<IamSsoCompleteResponse> {
+  return apiRequest("/auth/iam-sso/complete", { method: "POST", body: req });
 }
 
 export function startMicrosoftSso(): Promise<MicrosoftStartResponse> {
-  return notImplemented();
+  return apiRequest("/auth/microsoft-sso/start", { method: "POST", body: {} });
 }
 
 export function completeMicrosoftSso(
-  _req: MicrosoftCompleteRequest,
+  req: MicrosoftCompleteRequest,
 ): Promise<MicrosoftCompleteResponse> {
-  return notImplemented();
+  return apiRequest("/auth/microsoft-sso/complete", { method: "POST", body: req });
 }
 
 export function selectMicrosoftProfile(
-  _req: MicrosoftSelectProfileRequest,
+  req: MicrosoftSelectProfileRequest,
 ): Promise<MicrosoftSelectProfileResponse> {
-  return notImplemented();
+  return apiRequest("/auth/microsoft-sso/select-profile", { method: "POST", body: req });
 }
 
-/** Never throws. */
-export function cancelMicrosoftSso(_req: MicrosoftCancelRequest): Promise<void> {
-  return Promise.resolve();
+/** Fire-and-forget: frees the server-side login state. Never throws. */
+export async function cancelMicrosoftSso(req: MicrosoftCancelRequest): Promise<void> {
+  try {
+    await apiRequest("/auth/microsoft-sso/cancel", { method: "POST", body: req });
+  } catch {
+    // Nothing to do: the server session expires on its own.
+  }
 }
 
-export function startBuilderId(_req: BuilderIdStartRequest): Promise<BuilderIdStartResponse> {
-  return notImplemented();
+export function startBuilderId(req: BuilderIdStartRequest): Promise<BuilderIdStartResponse> {
+  return apiRequest("/auth/builderid/start", { method: "POST", body: req });
 }
 
-export function pollBuilderId(_req: BuilderIdPollRequest): Promise<BuilderIdPollResponse> {
-  return notImplemented();
+/** A failed poll is HTTP 400 with `success: false`, which the client throws as ApiError. */
+export function pollBuilderId(req: BuilderIdPollRequest): Promise<BuilderIdPollResponse> {
+  return apiRequest("/auth/builderid/poll", { method: "POST", body: req });
 }
 
-export function importSsoToken(_req: SsoTokenImportRequest): Promise<SsoTokenImportResult> {
-  return notImplemented();
+/** Partial success is 200 with `errors`; the server sends `errors: null` when there are none. */
+export async function importSsoToken(req: SsoTokenImportRequest): Promise<SsoTokenImportResult> {
+  const res = await apiRequest<SsoTokenImportResponse>("/auth/sso-token", {
+    method: "POST",
+    body: req,
+  });
+  return { ...res, accounts: res.accounts ?? [], errors: res.errors ?? [] };
 }
 
 export function importCredentials(
-  _req: CredentialsImportRequest,
+  req: CredentialsImportRequest,
 ): Promise<CredentialsImportResponse> {
-  return notImplemented();
+  return apiRequest("/auth/credentials", { method: "POST", body: req });
 }

@@ -1,24 +1,39 @@
 import { queryOptions } from "@tanstack/react-query";
+import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
 import { getRecentRequests } from "./requests";
-import type { HeatmapData, ModelMixEntry, ObserveError, ObserveOverview } from "./types";
-
-const notImplemented = () => Promise.reject(new Error("not implemented"));
+import type {
+  HeatmapData,
+  HeatmapResponse,
+  ModelMixEntry,
+  ModelMixResponse,
+  ObserveError,
+  ObserveOverview,
+  RecentErrorsResponse,
+} from "./types";
 
 export function getObserveOverview(): Promise<ObserveOverview> {
-  return notImplemented();
+  return apiRequest("/observe/overview");
 }
 
-export function getAccountHeatmap(_windowMin: number): Promise<HeatmapData> {
-  return notImplemented();
+/** `accounts` is null on the wire when no account has traffic; it is always an array here. */
+export async function getAccountHeatmap(windowMin: number): Promise<HeatmapData> {
+  const res = await apiRequest<HeatmapResponse>("/observe/account-heatmap", {
+    query: { windowMin },
+  });
+  return { ...res, accounts: res.accounts ?? [] };
 }
 
-export function getModelMix(): Promise<ModelMixEntry[]> {
-  return notImplemented();
+export async function getModelMix(): Promise<ModelMixEntry[]> {
+  const res = await apiRequest<ModelMixResponse>("/observe/model-mix");
+  return res.models ?? [];
 }
 
-export function getRecentErrors(_limit: number): Promise<ObserveError[]> {
-  return notImplemented();
+export async function getRecentErrors(limit: number): Promise<ObserveError[]> {
+  const res = await apiRequest<RecentErrorsResponse>("/observe/recent-errors", {
+    query: { limit },
+  });
+  return res.errors ?? [];
 }
 
 export function observeOverviewQuery() {

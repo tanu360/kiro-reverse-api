@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
 import type {
   Account,
@@ -20,10 +21,10 @@ import type {
   UpdateAccountRequest,
 } from "./types";
 
-const notImplemented = () => Promise.reject(new Error("not implemented"));
+const accountPath = (id: string, suffix = "") => `/accounts/${encodeURIComponent(id)}${suffix}`;
 
 export function listAccounts(): Promise<Account[]> {
-  return notImplemented();
+  return apiRequest<Account[] | null>("/accounts").then((list) => list ?? []);
 }
 
 export function accountsQuery() {
@@ -33,67 +34,79 @@ export function accountsQuery() {
   });
 }
 
-export function updateAccount(_id: string, _patch: UpdateAccountRequest): Promise<SuccessResponse> {
-  return notImplemented();
+export function updateAccount(id: string, patch: UpdateAccountRequest): Promise<SuccessResponse> {
+  return apiRequest(accountPath(id), { method: "PUT", body: patch });
 }
 
-export function deleteAccount(_id: string): Promise<SuccessResponse> {
-  return notImplemented();
+export function deleteAccount(id: string): Promise<SuccessResponse> {
+  return apiRequest(accountPath(id), { method: "DELETE" });
 }
 
-export function batchAccounts(_req: BatchAccountsRequest): Promise<BatchAccountsResponse> {
-  return notImplemented();
+export function batchAccounts(req: BatchAccountsRequest): Promise<BatchAccountsResponse> {
+  return apiRequest("/accounts/batch", { method: "POST", body: req });
 }
 
-export function refreshAccount(_id: string): Promise<RefreshAccountResponse> {
-  return notImplemented();
+export function refreshAccount(id: string): Promise<RefreshAccountResponse> {
+  return apiRequest(accountPath(id, "/refresh"), { method: "POST" });
 }
 
-export function testAccount(_id: string, _req: TestAccountRequest): Promise<TestAccountResponse> {
-  return notImplemented();
+export function testAccount(id: string, req: TestAccountRequest): Promise<TestAccountResponse> {
+  return apiRequest(accountPath(id, "/test"), { method: "POST", body: req });
 }
 
-export function getAccountModels(_id: string): Promise<AccountModelsResponse> {
-  return notImplemented();
+/** Live list from AWS. No query options: features call it on demand. */
+export function getAccountModels(id: string): Promise<AccountModelsResponse> {
+  return apiRequest<AccountModelsResponse>(accountPath(id, "/models")).then((res) => ({
+    ...res,
+    models: res.models ?? [],
+  }));
 }
 
-export function getAccountModelsCached(_id: string): Promise<AccountModelsCachedResponse> {
-  return notImplemented();
+export function getAccountModelsCached(id: string): Promise<AccountModelsCachedResponse> {
+  return apiRequest<AccountModelsCachedResponse>(accountPath(id, "/models/cached")).then((res) => ({
+    ...res,
+    models: res.models ?? [],
+  }));
 }
 
-export function refreshAccountModels(_id: string): Promise<RefreshAccountModelsResponse> {
-  return notImplemented();
+export function refreshAccountModels(id: string): Promise<RefreshAccountModelsResponse> {
+  return apiRequest(accountPath(id, "/models/refresh"), { method: "POST" });
 }
 
 export function refreshAllModels(): Promise<RefreshAllModelsResponse> {
-  return notImplemented();
+  return apiRequest("/accounts/models/refresh", { method: "POST" });
 }
 
-export function getAccountOverage(_id: string): Promise<OverageResponse> {
-  return notImplemented();
+export function getAccountOverage(id: string): Promise<OverageResponse> {
+  return apiRequest(accountPath(id, "/overage"));
 }
 
-export function setAccountOverage(_id: string, _enabled: boolean): Promise<OverageResponse> {
-  return notImplemented();
+export function setAccountOverage(id: string, enabled: boolean): Promise<OverageResponse> {
+  return apiRequest(accountPath(id, "/overage"), { method: "POST", body: { enabled } });
 }
 
-export function getAccountProfiles(_id: string): Promise<AccountProfilesResponse> {
-  return notImplemented();
+/** Discovers Kiro profiles upstream. No query options: features call it on demand. */
+export function getAccountProfiles(id: string): Promise<AccountProfilesResponse> {
+  return apiRequest<AccountProfilesResponse>(accountPath(id, "/profiles")).then((res) => ({
+    ...res,
+    profiles: res.profiles ?? [],
+  }));
 }
 
+/** An empty profileArn unpins the account. */
 export function setAccountProfile(
-  _id: string,
-  _profileArn: string,
+  id: string,
+  profileArn: string,
 ): Promise<SetAccountProfileResponse> {
-  return notImplemented();
+  return apiRequest(accountPath(id, "/profile"), { method: "POST", body: { profileArn } });
 }
 
 /** Full secrets. Never cache. */
-export function getAccountFull(_id: string): Promise<AccountFull> {
-  return notImplemented();
+export function getAccountFull(id: string): Promise<AccountFull> {
+  return apiRequest(accountPath(id, "/full"));
 }
 
-/** POST /export { ids } */
-export function exportAccounts(_ids: string[]): Promise<ExportData> {
-  return notImplemented();
+/** POST /export { ids }. The server exports every account for an empty list; callers guard it. */
+export function exportAccounts(ids: string[]): Promise<ExportData> {
+  return apiRequest("/export", { method: "POST", body: { ids } });
 }

@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
 import type {
   FirstRunResponse,
@@ -7,26 +8,24 @@ import type {
   SuccessResponse,
 } from "./types";
 
-const notImplemented = () => Promise.reject(new Error("not implemented"));
-
-/** POST /session, auth: false */
-export function createSession(_password: string): Promise<SessionCreateResponse> {
-  return notImplemented();
+/** POST /session, auth: false. The only request that ever carries the admin password. */
+export function createSession(password: string): Promise<SessionCreateResponse> {
+  return apiRequest("/session", { method: "POST", body: { password }, auth: false });
 }
 
 /** DELETE /session */
 export function deleteSession(): Promise<SuccessResponse> {
-  return notImplemented();
+  return apiRequest("/session", { method: "DELETE" });
 }
 
-/** POST /session/ticket */
+/** POST /session/ticket: a single-use ticket for the SSE stream (30 s). */
 export function createTicket(): Promise<SessionTicketResponse> {
-  return notImplemented();
+  return apiRequest("/session/ticket", { method: "POST" });
 }
 
 /** GET /first-run, auth: false */
 export function getFirstRun(): Promise<FirstRunResponse> {
-  return notImplemented();
+  return apiRequest("/first-run", { auth: false });
 }
 
 export function firstRunQuery() {
@@ -34,5 +33,7 @@ export function firstRunQuery() {
     queryKey: queryKeys.firstRun,
     queryFn: getFirstRun,
     staleTime: 0,
+    gcTime: 0,
+    retry: false,
   });
 }
