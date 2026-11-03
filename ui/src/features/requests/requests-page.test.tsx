@@ -1,0 +1,292 @@
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mockDb } from "@/lib/mocks/db";
+import { apiUrl, jsonError } from "@/lib/mocks/http";
+import { mockServer } from "@/lib/mocks/node";
+import { maskEmail, maskEmailsInText } from "@/lib/privacy";
+import { toastError } from "@/lib/toast";
+import { renderApp } from "@/test/render";
+import { inMemoryRequestsHandler } from "./mocks";
+
+vi.mock("@/lib/toast", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/toast")>();
+  return { ...actual, toastError: vi.fn() };
+});
+
+const RECENT_REQUESTS = apiUrl("/observe/recent-requests");
+
+/** Records every list request, then falls through to the feature mock. */
+function recordRequests(): URLSearchParams[] {
+  const seen: URLSearchParams[] = [];
+  mockServer.use(
+    http.get(RECENT_REQUESTS, ({ request }) => {
+      seen.push(new URL(request.url).searchParams);
+    }),
+  );
+  return seen;
+}
+
+function last(seen: URLSearchParams[]): URLSearchParams {
+  const params = seen.at(-1);
+  if (!params) throw new Error("no request recorded");
+  return params;
+}
+
+function bodyRows(): HTMLElement[] {
+  return within(screen.getByRole("table")).getAllByRole("row").slice(1);
+}
+
+async function waitForRows(count = 25): Promise<void> {
+  await waitFor(() => expect(bodyRows()).toHaveLength(count));
+}
+
+// jsdom has no window.scrollTo; the router calls it on every navigation. restoreMocks undoes
+// the spy after each test, so it is set per test.
+beforeEach(() => {
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.mocked(toastError).mockClear();
+});
+
+describe("RequestsPage", () => {
+  it("renders the first 25 rows and the page info", async () => {
+    const seen = recordRequests();
+    await renderApp("/requests");
+    await waitForRows();
+    expect(screen.getByRole("heading", { name: "Requests" })).toBeInTheDocument();
+    expect(screen.getByText("1–25 of 320")).toBeInTheDocument();
+    const params = last(seen);
+    expect(params.get("page")).toBe("1");
+    expect(params.get("pageSize")).toBe("25");
+    expect(params.get("sort")).toBe("time");
+    expect(params.get("order")).toBe("desc");
+    expect(params.has("search")).toBe(false);
+    expect(params.has("status")).toBe(false);
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
+  });
+
+  it("debounces the search by 250 ms, resets the page and keeps the search in the URL", async () => {
+    const seen = recordRequests();
+    const { router } = await renderApp("/requests?page=2");
+    await waitForRows();
+    expect(last(seen).get("page")).toBe("2");
+
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search requests" }), {
+      target: { value: "  sonnet " },
+    });
+    act(() => {
+      vi.advanceTimersByTime(249);
+    });
+    expect(router.state.location.search).not.toHaveProperty("search");
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => expect(router.state.location.search).toEqual({ search: "sonnet" }));
+    await waitFor(() => expect(last(seen).get("search")).toBe("sonnet"));
+    expect(last(seen).get("page")).toBe("1");
+    expect(seen.every((params) => params.get("search") !== "  sonnet ")).toBe(true);
+  });
+
+  it("filters by failed status", async () => {
+    const seen = recordRequests();
+    const { user, router } = await renderApp("/requests");
+    await waitForRows();
+    await user.click(screen.getByRole("button", { name: "Failed" }));
+    await waitFor(() => expect(last(seen).get("status")).toBe("failed"));
+    expect(router.state.location.search).toEqual({ status: "failed" });
+    expect(screen.getByRole("button", { name: "Failed" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => {
+      for (const row of bodyRows()) expect(within(row).getByText(/^Failed/)).toBeInTheDocument();
+    });
+  });
+
+  it("sorts on the server and toggles the order on a second click", async () => {
+    const seen = recordRequests();
+    const { user, router } = await renderApp("/requests?page=2");
+    await waitForRows();
+
+    await user.click(screen.getByRole("button", { name: "Tokens" }));
+    await waitFor(() => expect(last(seen).get("sort")).toBe("tokens"));
+    expect(last(seen).get("order")).toBe("asc");
+    expect(last(seen).get("page")).toBe("1");
+    expect(router.state.location.search).toEqual({ sort: "tokens", order: "asc" });
+
+    await user.click(screen.getByRole("button", { name: "Tokens" }));
+    await waitFor(() => expect(last(seen).get("order")).toBe("desc"));
+    expect(last(seen).get("sort")).toBe("tokens");
+  });
+
+  it("writes the next page to the URL", async () => {
+    const { user, router } = await renderApp("/requests");
+    await waitForRows();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
+    expect(await screen.findByText("26–50 of 320")).toBeInTheDocument();
+  });
+
+  it("renders a deep-linked page and page size directly", async () => {
+    const seen = recordRequests();
+    await renderApp("/requests?page=3&pageSize=50");
+    await waitForRows(50);
+    expect(screen.getByText("101–150 of 320")).toBeInTheDocument();
+    expect(seen).toHaveLength(1);
+    expect(last(seen).get("page")).toBe("3");
+    expect(last(seen).get("pageSize")).toBe("50");
+  });
+
+  it("shows a dash for the account and model of an auth failure", async () => {
+    await renderApp("/requests");
+    await waitForRows();
+    const row = bodyRows().find((candidate) =>
+      within(candidate).queryByText("Invalid or missing API key"),
+    );
+    if (!row) throw new Error("auth failure row missing");
+    const cells = within(row).getAllByRole("cell");
+    expect(cells[1]).toHaveTextContent("Failed 401");
+    expect(cells[2]).toHaveTextContent(/^—$/);
+    expect(cells[5]).toHaveTextContent(/^—$/);
+    expect(within(cells[9]).getByText("Auth")).toBeInTheDocument();
+  });
+
+  it("opens the detail sheet with the full message on row click", async () => {
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    const failed = mockDb.requests
+      .slice(0, 25)
+      .filter((record) => !record.success && record.email && record.message)
+      .sort((a, b) => (b.message?.length ?? 0) - (a.message?.length ?? 0))[0];
+    if (!failed?.message) throw new Error("no failed row with a message");
+    const masked = maskEmailsInText(failed.message);
+
+    const row = bodyRows().find((candidate) => within(candidate).queryByText(masked));
+    if (!row) throw new Error("row not rendered");
+    await user.click(row);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Request details")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("request-message")).toHaveTextContent(masked);
+    expect(within(dialog).getByText(String(failed.id))).toBeInTheDocument();
+    expect(within(dialog).getByText(failed.accountId)).toBeInTheDocument();
+  });
+
+  it("opens the sheet with Enter and steps to the next row", async () => {
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    const first = mockDb.requests[0];
+    const second = mockDb.requests[1];
+    bodyRows()[0].focus();
+    await user.keyboard("{Enter}");
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(String(first.id))).toBeInTheDocument();
+    expect(within(dialog).getByText("1 of 25 on this page")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Previous request" })).toBeDisabled();
+    await user.click(within(dialog).getByRole("button", { name: "Next request" }));
+    expect(await within(dialog).findByText(String(second.id))).toBeInTheDocument();
+    expect(within(dialog).getByText("2 of 25 on this page")).toBeInTheDocument();
+  });
+
+  it("masks emails when privacy mode is on", async () => {
+    await renderApp("/requests", { privacy: true });
+    await waitForRows();
+    const emails = [
+      ...new Set(
+        mockDb.requests
+          .slice(0, 25)
+          .map((record) => record.email)
+          .filter((email): email is string => Boolean(email?.includes("@"))),
+      ),
+    ];
+    expect(emails.length).toBeGreaterThan(0);
+    const table = screen.getByRole("table");
+    for (const email of emails) {
+      expect(table).not.toHaveTextContent(email);
+      expect(within(table).getAllByText(maskEmail(email)).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("shows full emails when privacy mode is off", async () => {
+    await renderApp("/requests", { privacy: false });
+    await waitForRows();
+    const email = mockDb.requests.slice(0, 25).find((record) => record.email)?.email;
+    if (!email) throw new Error("no email in the first page");
+    expect(within(screen.getByRole("table")).getAllByText(email).length).toBeGreaterThan(0);
+  });
+
+  it("shows the memory note for an in-memory response", async () => {
+    mockServer.use(inMemoryRequestsHandler());
+    await renderApp("/requests");
+    await waitForRows();
+    expect(
+      screen.getByText("Showing the last 200 requests from memory. History is unavailable."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1–25 of 200")).toBeInTheDocument();
+  });
+
+  it("does not show the memory note for persisted history", async () => {
+    await renderApp("/requests");
+    await waitForRows();
+    expect(screen.queryByText(/from memory/)).not.toBeInTheDocument();
+  });
+
+  it("shows No matches with a Clear filters action", async () => {
+    const { user, router } = await renderApp("/requests?search=no-such-request&status=failed");
+    expect(await screen.findByText("No matches")).toBeInTheDocument();
+    expect(screen.getByText("0–0 of 0")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    await waitForRows();
+    expect(screen.getByRole("searchbox", { name: "Search requests" })).toHaveValue("");
+  });
+
+  it("shows the empty state when there are no requests", async () => {
+    mockDb.requests = [];
+    await renderApp("/requests");
+    expect(await screen.findByText("No requests yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("Requests appear here once a client calls the proxy."),
+    ).toBeInTheDocument();
+  });
+
+  it("offers the first page when the page is out of range", async () => {
+    const { user, router } = await renderApp("/requests?page=40");
+    expect(await screen.findByText("No requests on this page")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Go to first page" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    await waitForRows();
+  });
+
+  it("shows an error state with retry when the first load fails", async () => {
+    let fail = true;
+    mockServer.use(
+      http.get(RECENT_REQUESTS, () => (fail ? jsonError(500, "database is locked") : undefined)),
+    );
+    const { user } = await renderApp("/requests");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load this data");
+    fail = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitForRows();
+  });
+
+  it("keeps the rows and shows a toast when a refresh fails", async () => {
+    let fail = false;
+    mockServer.use(
+      http.get(RECENT_REQUESTS, () =>
+        fail ? HttpResponse.json({ error: "database is locked" }, { status: 500 }) : undefined,
+      ),
+    );
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    fail = true;
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    expect(bodyRows()).toHaveLength(25);
+  });
+});
