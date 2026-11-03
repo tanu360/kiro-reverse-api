@@ -16,11 +16,8 @@ import { SignInForm } from "./sign-in-form";
 // Long enough to reach the toast's "Open settings" action.
 const CHANGE_PASSWORD_TOAST_MS = 10_000;
 
-/** Fira Code when the system has it, else the app's mono stack (index.css --font-mono). */
-const PASSWORD_FONT = {
-  fontFamily:
-    '"Fira Code", "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-};
+/** The app's mono stack (index.css --font-mono, self-hosted Fira Code). */
+const PASSWORD_FONT = { fontFamily: "var(--font-mono)" };
 
 /**
  * /setup: shows the generated first-run password from the public GET /first-run, as the old

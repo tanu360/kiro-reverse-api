@@ -181,10 +181,10 @@ importers:
       '@fontsource-variable/caveat':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource-variable/geist-mono':
+      '@fontsource-variable/fira-code':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource-variable/inter':
+      '@fontsource-variable/geist':
         specifier: ^5.3.0
         version: 5.3.0
       '@fontsource/patrick-hand':
@@ -581,11 +581,11 @@ packages:
   '@fontsource-variable/caveat@5.3.0':
     resolution: {integrity: sha512-Q3mjghoYIlXgwqBPJKZ4q6f3zu921Gq7UU76r9Z+NAmhapHfX130GIFpOCYf8vt2SIcgCi9RHDT7anfJKg/kiA==}
 
-  '@fontsource-variable/geist-mono@5.3.0':
-    resolution: {integrity: sha512-vBbuwDEo9AkrqADMXOrlAR3DFcJi4/JxeuU43FoiQERnNwsfXNnvxvReZG02cQKmyk4DZkZdBZX3oTDvy2zBAw==}
+  '@fontsource-variable/fira-code@5.3.0':
+    resolution: {integrity: sha512-ZhvHeknlicraKVSJBa1NrJnXDVByUkC407zwgELYfmnx3p9g8vwIPfQCxx8YD3K7dAeCdLuHJOHlpMfRsIcApQ==}
 
-  '@fontsource-variable/inter@5.3.0':
-    resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
+  '@fontsource-variable/geist@5.3.0':
+    resolution: {integrity: sha512-j0m+vLQuG5XAYoHtGCVu0spvlGreR3EzpECUVzkFmI1mTVnAO38l/NEPDCFgZ177JxzYJCLSmTQibIiYPilGrA==}
 
   '@fontsource/patrick-hand@5.3.0':
     resolution: {integrity: sha512-V8C38IlIFfdWg0Xtri3F7sLCVpm069rUwn6w4n+oyn38gt7H4arOJmuReg3tAw1Q6jHqZp89wTnAAJagq4Atxw==}
@@ -2357,9 +2357,9 @@ snapshots:
 
   '@fontsource-variable/caveat@5.3.0': {}
 
-  '@fontsource-variable/geist-mono@5.3.0': {}
+  '@fontsource-variable/fira-code@5.3.0': {}
 
-  '@fontsource-variable/inter@5.3.0': {}
+  '@fontsource-variable/geist@5.3.0': {}
 
   '@fontsource/patrick-hand@5.3.0': {}
 
