@@ -12,34 +12,47 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { recentErrorsQuery, recentRequestsPreviewQuery } from "@/lib/api/observe";
 import type { ObserveError, RequestRecord } from "@/lib/api/types";
 import { EMPTY, formatDateTime, formatDurationMs } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
+import { cn } from "@/lib/utils";
+import { ResponsiveList } from "./responsive-list";
 
 const PREVIEW_ROWS = 10;
+// Below the table width the cards pair up once the card is 36rem wide.
+const CARD_GRID = "@xl:grid-cols-2";
+// The panel is a tab stop (its first content is not focusable), so it shows where focus is.
+const PANEL_CLASS =
+  "mt-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 type ActivityTab = "errors" | "requests";
 
-function TruncatedText({ text }: { text: string }): JSX.Element {
+/** Go sends "-" for an unknown model; empty cells show the copy guide's em dash. */
+function modelText(model: string | null | undefined): string {
+  return !model || model === "-" ? EMPTY : model;
+}
+
+/**
+ * Model names are monospace; the empty dash is not, because a monospace em dash is drawn as
+ * narrow as an en dash and then differs from the account column's dash.
+ */
+function ModelName({ model, className }: { model?: string; className?: string }): JSX.Element {
+  const text = modelText(model);
+  if (text === EMPTY) return <span className="text-muted-foreground">{EMPTY}</span>;
+  return <span className={cn("font-mono text-xs", className)}>{text}</span>;
+}
+
+/**
+ * The message wraps to two lines. It is plain text, not a focusable tooltip trigger, so each
+ * row costs no extra tab stop; the full text is on the Requests page and in the title.
+ */
+function MessageText({ text }: { text: string }): JSX.Element {
   if (!text) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <span
-            className="block max-w-80 truncate rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            // Focusable so keyboard users can read the full message in the tooltip.
-            // biome-ignore lint/a11y/noNoninteractiveTabindex: tooltip trigger needs focus.
-            tabIndex={0}
-          />
-        }
-      >
-        {text}
-      </TooltipTrigger>
-      <TooltipPopup className="max-w-96 break-words">{text}</TooltipPopup>
-    </Tooltip>
+    <span className="line-clamp-2 whitespace-normal break-words" title={text}>
+      {text}
+    </span>
   );
 }
 
@@ -108,14 +121,14 @@ function ErrorsPanel(): JSX.Element {
       {
         id: "model",
         header: t("activity.model"),
-        cell: (row) => <span className="font-mono text-xs">{row.model || EMPTY}</span>,
+        cell: (row) => <ModelName model={row.model} />,
       },
       { id: "status", header: t("activity.status"), cell: (row) => <ErrorStatus row={row} /> },
       {
         id: "message",
         header: t("activity.message"),
-        cell: (row) => <TruncatedText text={mask(row.message)} />,
-        className: "max-w-80",
+        cell: (row) => <MessageText text={mask(row.message)} />,
+        className: "min-w-56 max-w-80",
       },
     ],
     [t, lang, mask],
@@ -125,31 +138,34 @@ function ErrorsPanel(): JSX.Element {
     return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   }
 
+  const empty = (
+    <EmptyState
+      description={t("activity.noErrorsBody")}
+      icon={CircleCheckIcon}
+      title={t("activity.noErrors")}
+      variant="compact"
+    />
+  );
+  const rowId = (row: ObserveError, index: number) => `${row.ts}-${row.accountId}-${index}`;
+
   return (
     <div className="flex flex-col gap-3">
       {query.data && query.isError ? (
         <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
       ) : null}
-      <DataTable
+      <ResponsiveList
+        at="4xl"
         caption={t("activity.errors")}
-        columns={columns}
-        data={rows}
-        emptyState={
-          <EmptyState
-            description={t("activity.noErrorsBody")}
-            icon={CircleCheckIcon}
-            title={t("activity.noErrors")}
-            variant="compact"
-          />
-        }
-        getRowId={(row, index) => `${row.ts}-${row.accountId}-${index}`}
+        emptyState={empty}
+        getRowId={rowId}
+        listClassName={CARD_GRID}
         loading={query.isPending}
-        renderMobileCard={(row) => (
+        renderCard={(row) => (
           <MobileCard status={<ErrorStatus row={row} />} time={formatDateTime(row.ts, lang)}>
             <DisplayEmail className="block font-medium" email={row.email} id={row.accountId} />
-            {row.model ? (
+            {modelText(row.model) === EMPTY ? null : (
               <span className="truncate font-mono text-muted-foreground text-xs">{row.model}</span>
-            ) : null}
+            )}
             {row.message ? (
               <p className="line-clamp-2 break-words text-muted-foreground text-xs">
                 {mask(row.message)}
@@ -157,6 +173,17 @@ function ErrorsPanel(): JSX.Element {
             ) : null}
           </MobileCard>
         )}
+        rows={rows}
+        table={
+          <DataTable
+            caption={t("activity.errors")}
+            columns={columns}
+            data={rows}
+            emptyState={empty}
+            getRowId={rowId}
+            loading={query.isPending}
+          />
+        }
       />
       {rows.length > 0 ? (
         <div className="flex justify-end">
@@ -173,7 +200,7 @@ function RequestStatus({ row }: { row: RequestRecord }): JSX.Element {
   return (
     <Badge className="tabular-nums" variant="error">
       {t("activity.failed")}
-      {row.status ? ` · ${row.status}` : ""}
+      {row.status ? ` ${row.status}` : ""}
     </Badge>
   );
 }
@@ -201,7 +228,7 @@ function RequestsPanel(): JSX.Element {
       {
         id: "model",
         header: t("activity.model"),
-        cell: (row) => <span className="font-mono text-xs">{row.model || EMPTY}</span>,
+        cell: (row) => <ModelName model={row.model} />,
       },
       {
         id: "tokens",
@@ -233,36 +260,51 @@ function RequestsPanel(): JSX.Element {
     return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   }
 
+  const empty = (
+    <EmptyState
+      description={t("activity.noRequestsBody")}
+      icon={ListIcon}
+      title={t("activity.noRequests")}
+      variant="compact"
+    />
+  );
+  const rowId = (row: RequestRecord, index: number) =>
+    row.id === undefined ? `${row.ts}-${index}` : String(row.id);
+
   return (
     <div className="flex flex-col gap-3">
       {query.data && query.isError ? (
         <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
       ) : null}
-      <DataTable
+      <ResponsiveList
+        at="4xl"
         caption={t("activity.requests")}
-        columns={columns}
-        data={rows}
-        emptyState={
-          <EmptyState
-            description={t("activity.noRequestsBody")}
-            icon={ListIcon}
-            title={t("activity.noRequests")}
-            variant="compact"
-          />
-        }
-        getRowId={(row, index) => (row.id === undefined ? `${row.ts}-${index}` : String(row.id))}
+        emptyState={empty}
+        getRowId={rowId}
+        listClassName={CARD_GRID}
         loading={query.isPending}
-        renderMobileCard={(row) => (
+        renderCard={(row) => (
           <MobileCard status={<RequestStatus row={row} />} time={formatDateTime(row.ts, lang)}>
             <DisplayEmail className="block font-medium" email={row.email} id={row.accountId} />
             <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
-              <span className="truncate font-mono">{row.model || EMPTY}</span>
+              <ModelName className="truncate" model={row.model} />
               <span className="shrink-0 tabular-nums">
                 {formatDurationMs(row.durationMs, Boolean(row.endpoint))}
               </span>
             </div>
           </MobileCard>
         )}
+        rows={rows}
+        table={
+          <DataTable
+            caption={t("activity.requests")}
+            columns={columns}
+            data={rows}
+            emptyState={empty}
+            getRowId={rowId}
+            loading={query.isPending}
+          />
+        }
       />
       {rows.length > 0 ? (
         <div className="flex justify-end">
@@ -290,10 +332,10 @@ export function RecentActivity(): JSX.Element {
           <TabsTab value="requests">{t("activity.requests")}</TabsTab>
         </TabsList>
         {/* Panels mount on demand, so recent requests load only when that tab opens. */}
-        <TabsPanel className="pt-2" value="errors">
+        <TabsPanel className={PANEL_CLASS} value="errors">
           <ErrorsPanel />
         </TabsPanel>
-        <TabsPanel className="pt-2" value="requests">
+        <TabsPanel className={PANEL_CLASS} value="requests">
           <RequestsPanel />
         </TabsPanel>
       </Tabs>

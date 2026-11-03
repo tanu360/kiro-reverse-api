@@ -3,8 +3,10 @@ import type { AccountHeatmap, HeatmapCell, HeatmapData, ModelMixEntry } from "@/
 import {
   bucketGlobal,
   cellOpacity,
+  countTicks,
   hourDelta,
   modelSlices,
+  RANGE_WINDOWS,
   sparklineBuckets,
   topAccounts,
   windowCells,
@@ -260,5 +262,32 @@ describe("windowCells", () => {
       { offset: 1, reqs: 0, failures: 0 },
       { offset: 0, reqs: 1, failures: 0 },
     ]);
+  });
+});
+
+describe("countTicks", () => {
+  const at = (succeeded: number, failed = 0) => ({ date: new Date(0), succeeded, failed });
+
+  it("returns only the zero tick without traffic", () => {
+    expect(countTicks([])).toEqual([0]);
+    expect(countTicks([at(0), at(0)])).toEqual([0]);
+  });
+
+  it("never returns fractional ticks for small counts", () => {
+    expect(countTicks([at(1), at(0)])).toEqual([0, 1]);
+    expect(countTicks([at(2), at(0, 3)])).toEqual([0, 1, 2, 3]);
+  });
+
+  it("uses 1-2-5 steps up to the busiest bucket", () => {
+    expect(countTicks([at(9)])).toEqual([0, 5]);
+    expect(countTicks([at(37)])).toEqual([0, 10, 20, 30]);
+    expect(countTicks([at(1200)])).toEqual([0, 500, 1000]);
+  });
+});
+
+describe("RANGE_WINDOWS", () => {
+  it("buckets the 1 h view by 2 min so sparse minutes do not draw a comb", () => {
+    expect(RANGE_WINDOWS["1h"]).toEqual({ windowMin: 60, bucketMin: 2 });
+    expect(bucketGlobal(zeros(60), 0, RANGE_WINDOWS["1h"].bucketMin)).toHaveLength(30);
   });
 });

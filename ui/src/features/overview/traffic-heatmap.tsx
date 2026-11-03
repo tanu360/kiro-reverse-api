@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { ActivityIcon } from "lucide-react";
 import { type JSX, type ReactNode, useMemo } from "react";
 import { DisplayEmail } from "@/components/shared/display-email";
+import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,8 +16,11 @@ import { cellOpacity, HOUR, HOUR_PAIR_WINDOW, topAccounts, windowCells } from ".
 import { FAILED_COLOR, SUCCEEDED_COLOR } from "./colors";
 
 const TOP_ACCOUNTS = 5;
-// An 8rem label column plus 60 cells of at least about 3.5 px; narrower cards scroll inside.
-const ROW_GRID = "grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-x-3";
+// Sized by the card (SectionCard is a container). Narrow cards put the label above its cells,
+// so the 60 cells get the full width (about 4 px each at 360 px) and nothing scrolls sideways;
+// from 28rem the label sits in an 8rem column beside them.
+const ROW_GRID =
+  "grid grid-cols-1 gap-y-1 @md:grid-cols-[8rem_minmax(0,1fr)] @md:items-center @md:gap-x-3";
 
 interface HeatRow {
   key: string;
@@ -75,13 +80,19 @@ function HeatCells({
         });
         return (
           <span
-            className="rounded-[2px]"
+            className={cn("rounded-[2px]", cell.reqs === 0 && cell.failures === 0 && "bg-muted")}
+            data-empty={(cell.reqs === 0 && cell.failures === 0) || undefined}
             data-failed={cell.failures > 0 || undefined}
             key={cell.offset}
-            style={{
-              backgroundColor: cell.failures > 0 ? FAILED_COLOR : SUCCEEDED_COLOR,
-              opacity: cellOpacity(cell.reqs, maxReq),
-            }}
+            // A quiet minute is neutral grey, not faint blue that reads as light traffic.
+            style={
+              cell.reqs === 0 && cell.failures === 0
+                ? undefined
+                : {
+                    backgroundColor: cell.failures > 0 ? FAILED_COLOR : SUCCEEDED_COLOR,
+                    opacity: cellOpacity(cell.reqs, maxReq),
+                  }
+            }
             title={t("heatmap.cellTooltip", {
               requests,
               errors,
@@ -141,13 +152,18 @@ export function TrafficHeatmap(): JSX.Element {
           <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
         ) : null}
         <p className="sr-only">{t("heatmap.summary", counts(t, lang, view.total))}</p>
-        <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
-          <div className="flex min-w-[26rem] flex-col gap-2">
+        {view.total.requests === 0 ? (
+          <EmptyState
+            description={t("traffic.noTrafficBody")}
+            icon={ActivityIcon}
+            title={t("traffic.noTraffic")}
+            variant="compact"
+          />
+        ) : (
+          <div className="flex flex-col gap-3 @md:gap-2">
             {view.rows.map((row) => (
               <div className={ROW_GRID} key={row.key}>
-                <div className="sticky left-0 z-[1] min-w-0 truncate bg-card py-0.5 text-sm">
-                  {row.label}
-                </div>
+                <div className="min-w-0 truncate py-0.5 text-sm">{row.label}</div>
                 <HeatCells
                   maxReq={view.maxReq}
                   nowUnix={view.nowUnix}
@@ -160,14 +176,14 @@ export function TrafficHeatmap(): JSX.Element {
               </div>
             ))}
             <div aria-hidden="true" className={cn(ROW_GRID, "text-muted-foreground text-xs")}>
-              <span className="sticky left-0 bg-card" />
+              <span className="hidden @md:block" />
               <div className="flex justify-between">
                 <span>{t("heatmap.oldest")}</span>
                 <span>{t("heatmap.newest")}</span>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }

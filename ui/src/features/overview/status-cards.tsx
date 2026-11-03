@@ -1,21 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { CircleCheckIcon, CircleXIcon, RouteIcon, UsersIcon } from "lucide-react";
 import { type JSX, lazy, Suspense, useMemo } from "react";
-import { ErrorState } from "@/components/shared/error-state";
 import { StatCardSkeleton } from "@/components/shared/loading-state";
 import { StatCard, type StatCardProps } from "@/components/shared/stat-card";
-import { Card } from "@/components/ui/card";
 import { heatmapQuery } from "@/lib/api/observe";
 import { statusQuery } from "@/lib/api/system";
 import type { HeatmapCell, StatusResponse } from "@/lib/api/types";
-import { formatCompact, formatNumber, formatPercent } from "@/lib/format";
+import { EMPTY, formatCompact, formatNumber, formatPercent } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { type CellValue, HOUR_PAIR_WINDOW, hourDelta, sparklineBuckets } from "./aggregate";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 const StatSparkline = lazy(() => import("./stat-sparkline"));
 
-const GRID_CLASS = "grid grid-cols-1 gap-4 @md/main:grid-cols-2 @5xl/main:grid-cols-4";
+// Columns follow the page's content width (@container/main), not the viewport: a card needs
+// about 20rem for its two metric columns, so two cards per row start at 42rem.
+const GRID_CLASS = "grid grid-cols-1 gap-4 @2xl/main:grid-cols-2 @5xl/main:grid-cols-4";
+
+/** Titles kept on the cards while /status has failed; the page shows one error banner. */
+const PLACEHOLDERS: readonly (Pick<StatCardProps, "icon" | "tone"> & { label: string })[] = [
+  { icon: UsersIcon, label: "stats.accounts" },
+  { icon: RouteIcon, label: "stats.requests" },
+  { icon: CircleCheckIcon, label: "stats.success" },
+  { icon: CircleXIcon, label: "stats.failed", tone: "danger" },
+];
 
 const succeeded: CellValue = (cell) => Math.max(0, cell.reqs - cell.failures);
 const failures: CellValue = (cell) => cell.failures;
@@ -170,10 +178,19 @@ export function StatusCards(): JSX.Element {
   const data = status.data;
   if (!data) {
     if (status.isError) {
+      // The error and its Retry live in the page banner (OverviewPage), shown once.
       return (
-        <Card aria-label={t("stats.label")} render={<section />}>
-          <ErrorState error={status.error} onRetry={() => void status.refetch()} />
-        </Card>
+        <section aria-label={t("stats.label")} className={GRID_CLASS} data-state="error">
+          {PLACEHOLDERS.map((card) => (
+            <StatCard
+              icon={card.icon}
+              key={card.label}
+              label={t(card.label)}
+              tone={card.tone}
+              value={EMPTY}
+            />
+          ))}
+        </section>
       );
     }
     return (
@@ -186,19 +203,13 @@ export function StatusCards(): JSX.Element {
     );
   }
 
+  // A failed background refetch keeps the last values; the page banner reports it.
   return (
-    <section aria-label={t("stats.label")} className="flex flex-col gap-4">
-      {status.isError ? (
-        <Card>
-          <ErrorState compact error={status.error} onRetry={() => void status.refetch()} />
-        </Card>
-      ) : null}
-      <div className={GRID_CLASS}>
-        <StatCard {...accountsCard(data, t, lang)} />
-        <StatCard {...requestsCard(data, t, lang)} {...trends.requests} />
-        <StatCard {...succeededCard(data, t, lang)} {...trends.succeeded} />
-        <StatCard {...failedCard(data, t, lang)} {...trends.failed} />
-      </div>
+    <section aria-label={t("stats.label")} className={GRID_CLASS}>
+      <StatCard {...accountsCard(data, t, lang)} />
+      <StatCard {...requestsCard(data, t, lang)} {...trends.requests} />
+      <StatCard {...succeededCard(data, t, lang)} {...trends.succeeded} />
+      <StatCard {...failedCard(data, t, lang)} {...trends.failed} />
     </section>
   );
 }

@@ -1,6 +1,7 @@
 {
   "title": "概览",
   "description": "所有账号的实时流量、Credits 与错误。",
+  "errors.totals": "无法加载统计和实时流量",
   "stats.label": "统计",
   "stats.accounts": "账号",
   "stats.available": "可用",
@@ -37,7 +38,7 @@
   "live.activeAccounts": "活跃账号",
   "live.activeAccountsHint": "最近 5 分钟内有请求的账号数，以及代理启动以来处理过流量的账号数。",
   "traffic.title": "流量",
-  "traffic.description.1h": "每分钟请求数，最近 1 小时",
+  "traffic.description.1h": "每 2 分钟请求数，最近 1 小时",
   "traffic.description.6h": "每 5 分钟请求数，最近 6 小时",
   "traffic.description.24h": "每 15 分钟请求数，最近 24 小时",
   "traffic.range": "时间范围",

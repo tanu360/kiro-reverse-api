@@ -1,6 +1,7 @@
 {
   "title": "Overview",
   "description": "Live traffic, credits and errors across your accounts.",
+  "errors.totals": "Could not load the totals and live traffic",
   "stats.label": "Totals",
   "stats.accounts": "Accounts",
   "stats.available": "Available",
@@ -37,7 +38,7 @@
   "live.activeAccounts": "Active accounts",
   "live.activeAccountsHint": "Accounts with requests in the last 5 min, out of the accounts that served traffic since the proxy started.",
   "traffic.title": "Traffic",
-  "traffic.description.1h": "Requests per minute, last hour",
+  "traffic.description.1h": "Requests per 2 min, last hour",
   "traffic.description.6h": "Requests per 5 min, last 6 h",
   "traffic.description.24h": "Requests per 15 min, last 24 h",
   "traffic.range": "Time range",
