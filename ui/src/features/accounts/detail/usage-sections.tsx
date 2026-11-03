@@ -2,34 +2,33 @@ import type { JSX } from "react";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
 import type { Account } from "@/lib/api/types";
 import { EMPTY, formatCompact, formatDateTime, formatNumber } from "@/lib/format";
-import { useT } from "@/lib/i18n";
-import { subscriptionLabel } from "../account-model";
+import { type Lang, useT } from "@/lib/i18n";
+import { formatCreditAmount, formatResetDate, planLabel } from "../account-model";
 import { DetailSection } from "./detail-section";
 
-function credits(current: number, limit: number): string {
-  return `${Number(current).toFixed(1)} / ${Number(limit).toFixed(0)}`;
+function credits(current: number, limit: number, lang: Lang): string {
+  return `${formatCreditAmount(current, lang)} / ${formatCreditAmount(limit, lang)}`;
 }
 
 export function SubscriptionSection({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
-  const plan =
-    account.subscriptionTitle ||
-    (account.subscriptionType ? subscriptionLabel(account.subscriptionType, t) : "") ||
-    EMPTY;
   const items = [
-    { label: t("detail.plan"), value: plan },
+    { label: t("detail.plan"), value: planLabel(account, t) },
     {
       label: t("detail.tokenExpiry"),
       value: account.expiresAt ? formatDateTime(account.expiresAt, lang) : EMPTY,
     },
-    { label: t("detail.planCredits"), value: credits(account.usageCurrent, account.usageLimit) },
-    { label: t("detail.resetDate"), value: account.nextResetDate || EMPTY },
+    {
+      label: t("detail.planCredits"),
+      value: credits(account.usageCurrent, account.usageLimit, lang),
+    },
+    { label: t("detail.resetDate"), value: formatResetDate(account.nextResetDate, lang) },
   ];
   if (account.trialUsageLimit > 0) {
     items.push(
       {
         label: t("detail.trialCredits"),
-        value: credits(account.trialUsageCurrent, account.trialUsageLimit),
+        value: credits(account.trialUsageCurrent, account.trialUsageLimit, lang),
       },
       { label: t("detail.trialStatus"), value: account.trialStatus || EMPTY },
       {
@@ -54,7 +53,10 @@ export function StatisticsSection({ account }: { account: Account }): JSX.Elemen
           { label: t("detail.requests"), value: formatNumber(account.requestCount, lang) },
           { label: t("detail.errors"), value: formatNumber(account.errorCount, lang) },
           { label: t("detail.totalTokens"), value: formatCompact(account.totalTokens) },
-          { label: t("detail.totalCredits"), value: Number(account.totalCredits).toFixed(2) },
+          {
+            label: t("detail.totalCredits"),
+            value: formatCreditAmount(account.totalCredits, lang),
+          },
         ]}
       />
     </DetailSection>

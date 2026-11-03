@@ -12,7 +12,7 @@ import type { Account, AccountProfilesResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { useInvalidateAccounts } from "../use-account-actions";
-import { DetailSection } from "./detail-section";
+import { DetailSection, TOUCH_BUTTON } from "./detail-section";
 
 function defaultArn(result: AccountProfilesResponse): string {
   return (result.profiles.find((profile) => profile.current) ?? result.profiles[0])?.arn ?? "";
@@ -66,7 +66,13 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
   return (
     <DetailSection
       actions={
-        <Button loading={load.isPending} onClick={() => load.mutate()} size="sm" variant="outline">
+        <Button
+          loading={load.isPending}
+          onClick={() => load.mutate()}
+          className={TOUCH_BUTTON}
+          size="sm"
+          variant="outline"
+        >
           <ScanSearchIcon aria-hidden="true" />
           {t("detail.profileLoad")}
         </Button>
@@ -132,6 +138,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
                 disabled={pin.isPending}
                 loading={pin.isPending && pin.variables !== ""}
                 onClick={onUseSelected}
+                className={TOUCH_BUTTON}
                 size="sm"
               >
                 {t("detail.profileUse")}
@@ -141,6 +148,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
                   disabled={pin.isPending}
                   loading={pin.isPending && pin.variables === ""}
                   onClick={() => pin.mutate("")}
+                  className={TOUCH_BUTTON}
                   size="sm"
                   variant="outline"
                 >

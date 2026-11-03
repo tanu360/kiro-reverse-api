@@ -38,7 +38,8 @@ export function EnabledSwitch({ account }: { account: Account }): JSX.Element | 
     <Switch
       aria-label={t("actions.enableAccount", { email: displayEmail(account.email, account.id) })}
       checked={account.enabled}
-      className="pointer-coarse:after:absolute"
+      // Grows the hit area 10 px on each side: 58x42 around the 38x22 phone track.
+      className="relative after:absolute after:-inset-2.5"
       disabled={toggle.isPending}
       onCheckedChange={(checked) => toggle.mutate(checked)}
     />

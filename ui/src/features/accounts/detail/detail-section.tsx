@@ -8,6 +8,15 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useInvalidateAccounts } from "../use-account-actions";
 
+/**
+ * Touch targets of at least 40 px on phones for the sheet's buttons and inputs. `max-sm`
+ * because the controls' own `sm:` heights win from 640 px up. A button next to an input
+ * stretches to the input's height, so the pair lines up. The input rule sizes the inner
+ * `<input>`, which holds the height, through the `Input` wrapper.
+ */
+export const TOUCH_BUTTON = "max-sm:h-auto max-sm:min-h-10";
+export const TOUCH_INPUT = "max-sm:*:data-[slot=input]:h-10 max-sm:*:data-[slot=input]:leading-10";
+
 /** One titled block of the detail sheet. */
 export function DetailSection({
   title,

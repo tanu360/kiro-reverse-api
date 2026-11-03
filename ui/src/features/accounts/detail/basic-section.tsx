@@ -8,7 +8,7 @@ import { EMPTY } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { authLabel } from "../account-model";
-import { DetailSection, useSaveAccountField } from "./detail-section";
+import { DetailSection, TOUCH_BUTTON, TOUCH_INPUT, useSaveAccountField } from "./detail-section";
 
 export function BasicSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
@@ -36,12 +36,18 @@ export function BasicSection({ account }: { account: Account }): JSX.Element {
           <FieldLabel>{t("detail.nickname")}</FieldLabel>
           <div className="flex w-full gap-2">
             <Input
+              className={TOUCH_INPUT}
               maxLength={200}
               onChange={(event) => setNickname(event.target.value)}
               placeholder={t("detail.nicknamePlaceholder")}
               value={nickname}
             />
-            <Button loading={save.isPending} type="submit" variant="outline">
+            <Button
+              className={TOUCH_BUTTON}
+              loading={save.isPending}
+              type="submit"
+              variant="outline"
+            >
               {t("detail.save")}
             </Button>
           </div>

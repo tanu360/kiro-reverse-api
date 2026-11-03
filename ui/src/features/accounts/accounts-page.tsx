@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   DownloadIcon,
+  EllipsisVerticalIcon,
   LayersIcon,
   PlusIcon,
   RotateCwIcon,
@@ -9,7 +10,7 @@ import {
   SearchXIcon,
   UsersRoundIcon,
 } from "lucide-react";
-import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
+import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -17,10 +18,11 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { AddAccountDialog } from "@/features/add-account/add-account-dialog";
-import { useIsMobile } from "@/hooks/use-media-query";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { accountsQuery, refreshAllModels } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
@@ -33,6 +35,7 @@ import { AccountsTable } from "./accounts-table";
 import { BatchBar } from "./batch-bar";
 import { ExportDialog } from "./export-dialog";
 import { TestAccountDialog } from "./test-account-dialog";
+import { useListLayout } from "./use-list-layout";
 
 const NO_ACCOUNTS: Account[] = [];
 const STATUS_FILTERS: readonly AccountStatusFilter[] = ["all", "enabled", "disabled", "banned"];
@@ -64,8 +67,10 @@ export function AccountsPage(): JSX.Element {
   const { t: tc } = useT();
   const search = useSearch({ from: "/_app/accounts" });
   const navigate = useNavigate({ from: "/accounts" });
-  const isMobile = useIsMobile();
+  const isPhone = useMediaQuery("max-sm");
   const confirm = useConfirm();
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const layout = useListLayout(listRef);
 
   const query = useQuery(accountsQuery());
   const accounts = query.data ?? NO_ACCOUNTS;
@@ -90,7 +95,7 @@ export function AccountsPage(): JSX.Element {
     () => filterAccounts(accounts, search.status, search.q),
     [accounts, search.status, search.q],
   );
-  const counts = useMemo(() => statusCounts(accounts), [accounts]);
+  const counts = useMemo(() => (query.data ? statusCounts(query.data) : null), [query.data]);
 
   const setSearchText = (value: string) => {
     void navigate({ search: (prev) => ({ ...prev, q: value || undefined }), replace: true });
@@ -178,6 +183,7 @@ export function AccountsPage(): JSX.Element {
     <AccountsTable
       accounts={filtered}
       emptyState={emptyState}
+      layout={layout}
       loading={query.isPending}
       onDetails={onDetails}
       onSelectionChange={setSelected}
@@ -211,18 +217,45 @@ export function AccountsPage(): JSX.Element {
               </TooltipTrigger>
               <TooltipPopup>{t("actions.refreshList")}</TooltipPopup>
             </Tooltip>
-            <Button className="max-sm:h-10" onClick={onExport} variant="outline">
-              <DownloadIcon aria-hidden="true" />
-              {t("actions.export")}
-            </Button>
-            <Button
-              className="max-sm:h-10"
-              onClick={() => void onRefreshAllModels()}
-              variant="outline"
-            >
-              <LayersIcon aria-hidden="true" />
-              {t("models.refreshAll")}
-            </Button>
+            {isPhone ? (
+              // On phones the secondary actions share one menu, so Add account stays on the
+              // first row next to Refresh.
+              <Menu>
+                <MenuTrigger
+                  render={
+                    <Button
+                      aria-label={t("actions.moreList")}
+                      className="size-10"
+                      size="icon"
+                      variant="outline"
+                    />
+                  }
+                >
+                  <EllipsisVerticalIcon aria-hidden="true" />
+                </MenuTrigger>
+                <MenuPopup align="end">
+                  <MenuItem className="min-h-10" onClick={onExport}>
+                    <DownloadIcon aria-hidden="true" />
+                    {t("actions.export")}
+                  </MenuItem>
+                  <MenuItem className="min-h-10" onClick={() => void onRefreshAllModels()}>
+                    <LayersIcon aria-hidden="true" />
+                    {t("models.refreshAll")}
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
+            ) : (
+              <>
+                <Button onClick={onExport} variant="outline">
+                  <DownloadIcon aria-hidden="true" />
+                  {t("actions.export")}
+                </Button>
+                <Button onClick={() => void onRefreshAllModels()} variant="outline">
+                  <LayersIcon aria-hidden="true" />
+                  {t("models.refreshAll")}
+                </Button>
+              </>
+            )}
             <Button className="max-sm:h-10" onClick={() => setAddOpen(true)}>
               <PlusIcon aria-hidden="true" />
               {t("actions.add")}
@@ -232,57 +265,64 @@ export function AccountsPage(): JSX.Element {
         title={t("title")}
       />
 
-      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <InputGroup className="w-full md:max-w-80">
-          <InputGroupInput
-            aria-label={t("filter.search")}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder={t("filter.search")}
-            type="search"
-            value={search.q ?? ""}
-          />
-          <InputGroupAddon>
-            <SearchIcon aria-hidden="true" />
-          </InputGroupAddon>
-        </InputGroup>
-        <div className="-mx-4 min-w-0 overflow-x-auto px-4 md:mx-0 md:px-0">
-          <SegmentedControl aria-label={t("filter.status")} role="group">
-            {STATUS_FILTERS.map((value) => {
-              const active = status === value;
-              return (
-                <SegmentedControlItem
-                  aria-pressed={active}
-                  className="max-md:h-10"
-                  data-pressed={active ? "" : undefined}
-                  key={value}
-                  onClick={() => setStatus(value)}
-                >
-                  {t(`filter.${value}`)}
-                  <span className="text-muted-foreground tabular-nums">{counts[value]}</span>
-                </SegmentedControlItem>
-              );
-            })}
-          </SegmentedControl>
+      {/* Lays out from the page's own width (a container query), so the open sidebar counts. */}
+      <div className="@container">
+        <div className="flex min-w-0 flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
+          <InputGroup className="w-full @3xl:max-w-80">
+            <InputGroupInput
+              aria-label={t("filter.search")}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder={t("filter.search")}
+              type="search"
+              value={search.q ?? ""}
+            />
+            <InputGroupAddon>
+              <SearchIcon aria-hidden="true" />
+            </InputGroupAddon>
+          </InputGroup>
+          <div className="-mx-4 min-w-0 overflow-x-auto px-4 md:mx-0 md:px-0">
+            <SegmentedControl aria-label={t("filter.status")} role="group">
+              {STATUS_FILTERS.map((value) => {
+                const active = status === value;
+                return (
+                  <SegmentedControlItem
+                    aria-pressed={active}
+                    className="max-md:h-10"
+                    data-pressed={active ? "" : undefined}
+                    key={value}
+                    onClick={() => setStatus(value)}
+                  >
+                    {t(`filter.${value}`)}
+                    {/* No counts until the list loads: zeros would read as an empty fleet. */}
+                    {counts ? (
+                      <span className="text-muted-foreground tabular-nums">{counts[value]}</span>
+                    ) : null}
+                  </SegmentedControlItem>
+                );
+              })}
+            </SegmentedControl>
+          </div>
         </div>
       </div>
 
-      {selected.size > 0 ? (
-        <BatchBar onClear={() => setSelected(new Set())} selectedIds={[...selected]} />
-      ) : null}
-
-      {query.isError && !query.data ? (
-        <Card>
-          <ErrorState
-            error={query.error}
-            onRetry={() => void query.refetch()}
-            title={t("loadError")}
-          />
-        </Card>
-      ) : isMobile ? (
-        table
-      ) : (
-        <Card className="min-w-0 overflow-hidden py-0">{table}</Card>
-      )}
+      <div className="flex min-w-0 flex-col gap-4 md:gap-6" ref={listRef}>
+        {query.isError && !query.data ? (
+          <Card>
+            <ErrorState
+              error={query.error}
+              onRetry={() => void query.refetch()}
+              title={t("loadError")}
+            />
+          </Card>
+        ) : layout === "cards" ? (
+          table
+        ) : (
+          <Card className="min-w-0 overflow-hidden py-0">{table}</Card>
+        )}
+        {selected.size > 0 ? (
+          <BatchBar onClear={() => setSelected(new Set())} selectedIds={[...selected]} />
+        ) : null}
+      </div>
 
       {detail ? (
         <AccountDetailSheet

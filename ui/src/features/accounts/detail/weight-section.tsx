@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/number-field";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { DetailSection, useSaveAccountField } from "./detail-section";
+import { DetailSection, TOUCH_BUTTON, useSaveAccountField } from "./detail-section";
 
 const MIN_WEIGHT = 0;
 const MAX_WEIGHT = 10;
@@ -33,7 +33,7 @@ export function WeightSection({ account }: { account: Account }): JSX.Element {
       <form onSubmit={onSubmit}>
         <Field>
           <FieldLabel className="sr-only">{t("detail.weight")}</FieldLabel>
-          <div className="flex w-full items-start gap-2">
+          <div className="flex w-full items-start gap-2 max-sm:items-stretch">
             <NumberField
               className="w-36"
               max={MAX_WEIGHT}
@@ -44,11 +44,19 @@ export function WeightSection({ account }: { account: Account }): JSX.Element {
             >
               <NumberFieldGroup>
                 <NumberFieldDecrement />
-                <NumberFieldInput aria-label={t("detail.weight")} />
+                <NumberFieldInput
+                  aria-label={t("detail.weight")}
+                  className="max-sm:h-10 max-sm:leading-10"
+                />
                 <NumberFieldIncrement />
               </NumberFieldGroup>
             </NumberField>
-            <Button loading={save.isPending} type="submit" variant="outline">
+            <Button
+              className={TOUCH_BUTTON}
+              loading={save.isPending}
+              type="submit"
+              variant="outline"
+            >
               {t("detail.save")}
             </Button>
           </div>

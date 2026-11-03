@@ -1,6 +1,7 @@
 import {
   CircleCheckIcon,
   CircleOffIcon,
+  EllipsisVerticalIcon,
   LayersIcon,
   RotateCwIcon,
   Trash2Icon,
@@ -9,6 +10,8 @@ import {
 import { type JSX, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
+import { useIsMobile } from "@/hooks/use-media-query";
 import { batchAccounts, refreshAccountModels } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import type {
@@ -19,9 +22,18 @@ import type {
 } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { useInvalidateAccounts } from "./use-account-actions";
 
 type BarAction = BatchAction | "refreshModels";
+
+/**
+ * Sticks to the bottom of the viewport (above the home indicator) while the list scrolls under
+ * it, so the actions stay in reach after selecting a card far down the page. The page renders
+ * it after the list, so it rests below the last row once the list ends.
+ */
+const BAR_CLASS =
+  "sticky bottom-[calc(env(safe-area-inset-bottom,0px)+--spacing(3))] z-20 flex flex-col gap-2 rounded-xl border bg-background/95 p-2 shadow-lg/5 backdrop-blur-sm";
 
 const CONFIRM_KEYS: Record<BarAction, string> = {
   enable: "batch.confirmEnable",
@@ -44,6 +56,7 @@ export function BatchBar({
 }): JSX.Element {
   const { t } = useT("accounts");
   const confirm = useConfirm();
+  const isMobile = useIsMobile();
   const invalidate = useInvalidateAccounts();
   const [running, setRunning] = useState<BarAction | null>(null);
   const count = selectedIds.length;
@@ -97,21 +110,92 @@ export function BatchBar({
   };
 
   const busy = running !== null;
+  const countLabel = (
+    <p aria-live="polite" className="px-1 font-medium text-sm tabular-nums">
+      {t("batch.selected", { count })}
+    </p>
+  );
+
+  if (isMobile) {
+    // Two rows of 40 px controls: the common actions stay visible, the rest sit in a menu.
+    const menuAction = running === "refresh" || running === "refreshModels" || running === "delete";
+    return (
+      <section aria-label={t("batch.label")} className={BAR_CLASS}>
+        <div className="flex items-center justify-between gap-2">
+          {countLabel}
+          <Button className="h-10" disabled={busy} onClick={onClear} variant="ghost">
+            <XIcon aria-hidden="true" />
+            {t("batch.clear")}
+          </Button>
+        </div>
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          <Button
+            className="h-10"
+            disabled={busy}
+            loading={running === "enable"}
+            onClick={() => void run("enable")}
+          >
+            <CircleCheckIcon aria-hidden="true" />
+            {t("batch.enableShort")}
+          </Button>
+          <Button
+            className="h-10"
+            disabled={busy}
+            loading={running === "disable"}
+            onClick={() => void run("disable")}
+            variant="outline"
+          >
+            <CircleOffIcon aria-hidden="true" />
+            {t("batch.disableShort")}
+          </Button>
+          <Menu>
+            <MenuTrigger
+              render={
+                <Button
+                  aria-label={t("batch.more")}
+                  className="size-10"
+                  disabled={busy}
+                  loading={menuAction}
+                  size="icon"
+                  variant="outline"
+                />
+              }
+            >
+              <EllipsisVerticalIcon aria-hidden="true" />
+            </MenuTrigger>
+            <MenuPopup align="end">
+              <MenuItem className="min-h-10" onClick={() => void run("refresh")}>
+                <RotateCwIcon aria-hidden="true" />
+                {t("batch.refresh")}
+              </MenuItem>
+              <MenuItem className="min-h-10" onClick={() => void run("refreshModels")}>
+                <LayersIcon aria-hidden="true" />
+                {t("batch.refreshModels")}
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem
+                className="min-h-10"
+                onClick={() => void run("delete")}
+                variant="destructive"
+              >
+                <Trash2Icon aria-hidden="true" />
+                {t("batch.delete")}
+              </MenuItem>
+            </MenuPopup>
+          </Menu>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label={t("batch.label")}
-      className="flex flex-col gap-2 rounded-xl border bg-muted/50 p-2 sm:flex-row sm:flex-wrap sm:items-center"
+      className={cn(BAR_CLASS, "md:flex-row md:flex-wrap md:items-center")}
     >
-      <p aria-live="polite" className="px-1 font-medium text-sm tabular-nums">
-        {t("batch.selected", { count })}
-      </p>
-      <div className="flex flex-wrap items-center gap-1.5 sm:ms-auto">
-        <Button
-          disabled={busy}
-          loading={running === "enable"}
-          onClick={() => void run("enable")}
-          size="sm"
-        >
+      {countLabel}
+      <div className="flex flex-wrap items-center gap-1.5 md:ms-auto">
+        <Button disabled={busy} loading={running === "enable"} onClick={() => void run("enable")}>
           <CircleCheckIcon aria-hidden="true" />
           {t("batch.enable")}
         </Button>
@@ -119,7 +203,6 @@ export function BatchBar({
           disabled={busy}
           loading={running === "disable"}
           onClick={() => void run("disable")}
-          size="sm"
           variant="outline"
         >
           <CircleOffIcon aria-hidden="true" />
@@ -129,7 +212,6 @@ export function BatchBar({
           disabled={busy}
           loading={running === "refresh"}
           onClick={() => void run("refresh")}
-          size="sm"
           variant="outline"
         >
           <RotateCwIcon aria-hidden="true" />
@@ -139,7 +221,6 @@ export function BatchBar({
           disabled={busy}
           loading={running === "refreshModels"}
           onClick={() => void run("refreshModels")}
-          size="sm"
           variant="outline"
         >
           <LayersIcon aria-hidden="true" />
@@ -149,13 +230,12 @@ export function BatchBar({
           disabled={busy}
           loading={running === "delete"}
           onClick={() => void run("delete")}
-          size="sm"
           variant="destructive-outline"
         >
           <Trash2Icon aria-hidden="true" />
           {t("batch.delete")}
         </Button>
-        <Button disabled={busy} onClick={onClear} size="sm" variant="ghost">
+        <Button disabled={busy} onClick={onClear} variant="ghost">
           <XIcon aria-hidden="true" />
           {t("batch.clear")}
         </Button>

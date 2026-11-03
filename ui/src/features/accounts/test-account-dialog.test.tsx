@@ -86,4 +86,18 @@ describe("TestAccountDialog", () => {
     // The oldest lines are dropped: the log now starts with a details line of run 1.
     expect(logLines(dialog)[0]).toHaveTextContent("stop reason end_turn");
   });
+
+  it("names the button that opens the model list", async () => {
+    const { dialog } = await openDialog(accountBy((a) => a.email.startsWith("dana.")));
+    expect(within(dialog).getByRole("button", { name: "Show models" })).toBeInTheDocument();
+  });
+
+  it("keeps the model id on one line in the log", async () => {
+    const { dialog, user } = await openDialog(accountBy((a) => a.email.startsWith("dana.")));
+    await user.click(within(dialog).getByRole("button", { name: "Test" }));
+    await waitFor(() => expect(logLines(dialog).length).toBeGreaterThan(0));
+    const model = within(logLines(dialog)[0]).getByText("claude-sonnet-4.6");
+    expect(model.tagName).toBe("SPAN");
+    expect(model).toHaveClass("whitespace-nowrap");
+  });
 });

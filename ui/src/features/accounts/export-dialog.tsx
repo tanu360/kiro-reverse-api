@@ -1,5 +1,5 @@
 import { CopyIcon, DownloadIcon, FileJsonIcon } from "lucide-react";
-import { type JSX, useEffect, useId, useState } from "react";
+import { type JSX, useEffect, useId, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,6 +33,18 @@ export function ExportDialog({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [json, setJson] = useState<string | null>(null);
   const [busy, setBusy] = useState<"show" | "copy" | "download" | null>(null);
+  const jsonRef = useRef<HTMLTextAreaElement | null>(null);
+  const hasJson = json !== null;
+
+  // The JSON renders under the account list, below the fold on phones: bring it into view and
+  // focus it, so the tap on Show JSON visibly does something and the text is ready to select.
+  useEffect(() => {
+    if (!hasJson) return;
+    const field = jsonRef.current;
+    if (!field) return;
+    field.focus({ preventScroll: true });
+    field.scrollIntoView({ block: "nearest" });
+  }, [hasJson]);
 
   // Every opening starts with all accounts selected and no JSON on screen.
   // Only on open: a refetch while the dialog is open keeps the user's choice.
@@ -123,24 +135,27 @@ export function ExportDialog({
           <Button onClick={() => onOpenChange(false)} variant="ghost">
             {tc("actions.cancel")}
           </Button>
-          <Button
-            loading={busy === "show"}
-            disabled={busy !== null}
-            onClick={() => void onShow()}
-            variant="outline"
-          >
-            <FileJsonIcon aria-hidden="true" />
-            {t("export.showJson")}
-          </Button>
-          <Button
-            loading={busy === "copy"}
-            disabled={busy !== null}
-            onClick={onCopy}
-            variant="outline"
-          >
-            <CopyIcon aria-hidden="true" />
-            {t("export.copyJson")}
-          </Button>
+          {/* One row in the stacked phone footer; `contents` keeps the desktop row as it was. */}
+          <div className="flex gap-2 max-sm:*:flex-1 sm:contents">
+            <Button
+              loading={busy === "show"}
+              disabled={busy !== null}
+              onClick={() => void onShow()}
+              variant="outline"
+            >
+              <FileJsonIcon aria-hidden="true" />
+              {t("export.showJson")}
+            </Button>
+            <Button
+              loading={busy === "copy"}
+              disabled={busy !== null}
+              onClick={onCopy}
+              variant="outline"
+            >
+              <CopyIcon aria-hidden="true" />
+              {t("export.copyJson")}
+            </Button>
+          </div>
           <Button
             loading={busy === "download"}
             disabled={busy !== null}
@@ -165,6 +180,7 @@ export function ExportDialog({
             onClick={() =>
               setSelected(allSelected ? new Set() : new Set(accounts.map((account) => account.id)))
             }
+            className="max-sm:h-10"
             size="sm"
             variant="outline"
           >
@@ -198,7 +214,14 @@ export function ExportDialog({
             <label className="font-medium text-sm" htmlFor={jsonId}>
               {t("export.json")}
             </label>
-            <Textarea className="font-mono text-xs" id={jsonId} readOnly rows={12} value={json} />
+            <Textarea
+              className="font-mono text-xs"
+              id={jsonId}
+              readOnly
+              ref={jsonRef}
+              rows={12}
+              value={json}
+            />
           </div>
         ) : null}
       </div>

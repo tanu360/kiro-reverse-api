@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
@@ -30,6 +30,51 @@ async function renderAccounts(path = "/accounts") {
 
 function bodyRows(table: HTMLElement): HTMLElement[] {
   return within(table).getAllByRole("row").slice(1);
+}
+
+const spies: MockInstance[] = [];
+afterEach(() => {
+  for (const spy of spies.splice(0)) spy.mockRestore();
+});
+
+/** Answers width media queries as a viewport of `width` px would (no pointer queries). */
+function mockViewport(width: number): void {
+  spies.push(
+    vi.spyOn(window, "matchMedia").mockImplementation((query: string) => {
+      const max = /max-width:\s*(\d+)px/.exec(query);
+      const min = /min-width:\s*(\d+)px/.exec(query);
+      const matches =
+        !query.includes("pointer") &&
+        (!max || width <= Number(max[1])) &&
+        (!min || width >= Number(min[1]));
+      return {
+        matches,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      } as MediaQueryList;
+    }),
+  );
+}
+
+/** Gives every element a layout box `width` px wide (jsdom has no layout). */
+function mockElementWidth(width: number): void {
+  spies.push(
+    vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue(DOMRect.fromRect({ width, height: 40 })),
+  );
+}
+
+async function renderCards(path = "/accounts") {
+  const view = await renderApp(path);
+  const list = await screen.findByRole("list", { name: "Accounts" });
+  await within(list).findByText(DANA_MASKED);
+  return { ...view, list };
 }
 
 describe("AccountsPage", () => {
@@ -127,5 +172,103 @@ describe("AccountsPage", () => {
     const empty = title.closest('[data-slot="empty"]') as HTMLElement;
     await user.click(within(empty).getByRole("button", { name: "Add account" }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ add: true }));
+  });
+
+  it("shows no status counts while the list loads", async () => {
+    mockServer.use(http.get(apiUrl("/accounts"), () => new Promise<Response>(() => {})));
+    await renderApp("/accounts");
+    const group = await screen.findByRole("group", { name: "Account status" });
+    const labels = within(group)
+      .getAllByRole("button")
+      .map((button) => button.textContent);
+    expect(labels).toEqual(["All", "Enabled", "Disabled", "Banned"]);
+  });
+
+  it("shows no status counts after the list fails to load", async () => {
+    mockServer.use(http.get(apiUrl("/accounts"), () => HttpResponse.json({}, { status: 500 })));
+    await renderApp("/accounts");
+    expect(await screen.findByText("Could not load accounts")).toBeInTheDocument();
+    const group = screen.getByRole("group", { name: "Account status" });
+    expect(within(group).getByRole("button", { name: "Banned" })).toHaveTextContent(/^Banned$/);
+  });
+
+  it("does not make the overage badge a tab stop", async () => {
+    const { table } = await renderAccounts();
+    const badges = within(table).getAllByText("Overage");
+    expect(badges.length).toBeGreaterThan(0);
+    for (const text of badges) {
+      const badge = text.parentElement as HTMLElement;
+      expect(badge).not.toHaveAttribute("tabindex");
+      // The state still reaches screen readers.
+      expect(badge).toHaveTextContent(/Overage (enabled|disabled)/);
+    }
+  });
+
+  it("names the plan meter only for screen readers in the table, under its column header", async () => {
+    const { table } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    expect(within(row).getByText("Plan credits")).toHaveClass("sr-only");
+    expect(within(row).getByText("450 / 1,000")).toBeInTheDocument();
+  });
+});
+
+describe("AccountsPage layout", () => {
+  it("shows cards when the list is narrower than the table, even on a wide viewport", async () => {
+    mockElementWidth(900);
+    await renderCards();
+    expect(screen.queryByRole("table", { name: "Accounts" })).not.toBeInTheDocument();
+  });
+
+  it("shows the table when the list has room for every column", async () => {
+    mockElementWidth(1200);
+    await renderAccounts();
+    expect(screen.queryByRole("list", { name: "Accounts" })).not.toBeInTheDocument();
+  });
+
+  it("selects a card from anywhere in its 40 px checkbox square", async () => {
+    mockViewport(390);
+    const { list, user } = await renderCards();
+    const checkbox = within(list).getByRole("checkbox", { name: `Select ${DANA_MASKED}` });
+    const square = checkbox.closest("label") as HTMLElement;
+    expect(square).toHaveClass("size-10");
+    await user.click(square);
+    expect(await screen.findByText("1 selected")).toBeInTheDocument();
+    expect(checkbox).toBeChecked();
+  });
+
+  it("puts the batch bar after the list, sticky, with phone-sized actions and a menu", async () => {
+    mockViewport(390);
+    const bodies = captureBodies("post", "/accounts/batch");
+    const { list, user } = await renderCards();
+    const checkboxes = within(list).getAllByRole("checkbox");
+    await user.click(checkboxes[checkboxes.length - 1]);
+
+    const bar = await screen.findByRole("region", { name: "Batch actions" });
+    // After the list in the DOM, so `sticky bottom-*` keeps it in view while the list scrolls.
+    expect(list.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bar.className).toMatch(/(^|\s)sticky(\s|$)/);
+    expect(bar.className).toMatch(/(^|\s)bottom-/);
+    for (const name of ["Enable", "Disable"]) {
+      expect(within(bar).getByRole("button", { name })).toHaveClass("h-10");
+    }
+    expect(within(bar).getByRole("button", { name: "More batch actions" })).toHaveClass("size-10");
+
+    await user.click(within(bar).getByRole("button", { name: "More batch actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete selected" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+  });
+
+  it("keeps Refresh and Add account in the phone header and moves the rest to a menu", async () => {
+    mockViewport(390);
+    const { user } = await renderCards();
+    const main = screen.getByRole("main");
+    expect(within(main).getByRole("button", { name: "Refresh list" })).toBeInTheDocument();
+    expect(within(main).getByRole("button", { name: "Add account" })).toBeInTheDocument();
+    expect(within(main).queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
+    await user.click(within(main).getByRole("button", { name: "More list actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Export" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Refresh all models" })).toBeInTheDocument();
   });
 });
