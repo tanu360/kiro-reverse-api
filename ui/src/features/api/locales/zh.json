@@ -8,6 +8,10 @@
   "access.stateOff": "任何客户端都可以调用代理",
   "access.enabledApiKeyRequired": "要求 API Key 之前，先创建并启用至少一个 API Key。",
   "access.loadFailed": "无法加载 API 访问设置",
+  "access.discardTitle": "放弃未保存的更改？",
+  "access.discardBody": "API 访问的更改还没有保存。仍要离开此页面吗？",
+  "access.discard": "放弃",
+  "access.keepEditing": "继续编辑",
   "keys.title": "API Key",
   "keys.description": "为每个客户端创建一个 Key。可设置 Token 或 Credits 限额，0 表示不限。",
   "keys.create": "创建 API Key",
@@ -97,5 +101,6 @@
   "snippets.sdkLanguage": "SDK 语言",
   "snippets.python": "Python",
   "snippets.typescript": "TypeScript",
-  "snippets.copy": "复制 {name} 示例"
+  "snippets.copy": "复制 {name} 示例",
+  "snippets.codeRegion": "{name} 代码"
 }

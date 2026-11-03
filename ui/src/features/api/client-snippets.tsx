@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, useMemo } from "react";
+import { type JSX, useMemo, useRef } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { SectionCard } from "@/components/shared/section-card";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
@@ -7,12 +7,16 @@ import { settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { CodeText } from "./code-text";
 import { buildClientSnippets, SNIPPET_KEY_ENV } from "./snippets";
+import { useHorizontalOverflow } from "./use-element-size";
 
 const CODEX_CONFIG_FILE = "~/.codex/config.toml";
 // Four tabs fit in one row on a 390 px phone; narrower screens scroll the row.
 const TAB_CLASS = "max-sm:px-2 max-sm:text-sm";
 
-/** A scrollable mono code block with its own copy button. Long lines never widen the page. */
+/**
+ * A scrollable mono code block with its own copy button. Long lines never widen the page.
+ * While the code scrolls sideways, the block is a labelled tab stop so arrow keys can scroll it.
+ */
 function CodeBlock({
   code,
   title,
@@ -22,6 +26,9 @@ function CodeBlock({
   title: string;
   copyLabel: string;
 }): JSX.Element {
+  const { t } = useT("api");
+  const preRef = useRef<HTMLPreElement>(null);
+  const scrolls = useHorizontalOverflow(preRef, code);
   return (
     <figure className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-muted/40">
       <div className="flex min-h-10 items-center justify-between gap-2 border-b py-1 ps-3 pe-1">
@@ -30,7 +37,14 @@ function CodeBlock({
         </figcaption>
         <CopyButton label={copyLabel} value={code} />
       </div>
-      <pre className="max-w-full overflow-x-auto p-3 font-mono text-xs leading-relaxed">
+      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: the label is set only with role="region". */}
+      <pre
+        aria-label={scrolls ? t("snippets.codeRegion", { name: title }) : undefined}
+        className="max-w-full overflow-x-auto rounded-b-lg p-3 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        ref={preRef}
+        role={scrolls ? "region" : undefined}
+        tabIndex={scrolls ? 0 : undefined}
+      >
         <code>{code}</code>
       </pre>
     </figure>
