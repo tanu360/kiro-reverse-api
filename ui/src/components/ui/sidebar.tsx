@@ -5,7 +5,7 @@ import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { useSidebarIsSheet } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,13 +53,17 @@ const sidebarMenuButtonVariants = cva(
     },
     variants: {
       size: {
+        // Kiro patch: 40 px rows in the sheet (below lg), where they are touch targets.
         default:
-          "h-8 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-sm",
+          "h-8 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-sm max-lg:h-10",
         lg: "h-12 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-sm group-data-[collapsible=icon]:p-0!",
         sm: "h-7 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-xs",
       },
       variant: {
-        default: "font-medium text-sidebar-muted-foreground/80",
+        // Kiro patch: full-strength muted text in light (AA 4.5:1 on --sidebar); t3code's
+        // 80 % alpha stays in dark, where it still passes.
+        default:
+          "font-medium text-sidebar-muted-foreground dark:text-sidebar-muted-foreground/80",
         outline:
           "bg-sidebar-control-surface font-medium text-sidebar-foreground ring-1 ring-sidebar-border focus-visible:ring-ring",
       },
@@ -102,7 +106,9 @@ export function SidebarProvider({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }): React.ReactElement {
-  const isMobile = useMediaQuery("max-md");
+  // Kiro patch: the sidebar is a sheet below lg (1024 px), not md; at 768 a persistent
+  // 272 px sidebar leaves too little room for the pages.
+  const isMobile = useSidebarIsSheet();
   const [openMobile, setOpenMobile] = React.useState(false);
 
   // This is the internal state of the sidebar.
@@ -195,11 +201,16 @@ export function Sidebar({
   collapsible = "offcanvas",
   className,
   children,
+  sheetTitle = "Sidebar",
+  sheetDescription = "Displays the mobile sidebar.",
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right";
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
+  /** Kiro patch: screen-reader title and description of the mobile sheet (translatable). */
+  sheetTitle?: string;
+  sheetDescription?: string;
 }): React.ReactElement {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
   // Kiro patch: the sidebar-scoped palette attribute must reach the portaled mobile sheet too.
@@ -237,8 +248,8 @@ export function Sidebar({
           }
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            <SheetTitle>{sheetTitle}</SheetTitle>
+            <SheetDescription>{sheetDescription}</SheetDescription>
           </SheetHeader>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetPopup>
@@ -248,7 +259,7 @@ export function Sidebar({
 
   return (
     <div
-      className="group peer hidden text-sidebar-foreground md:block"
+      className="group peer hidden text-sidebar-foreground lg:block"
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-side={side}
       data-slot="sidebar"
@@ -269,7 +280,7 @@ export function Sidebar({
       />
       <div
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear lg:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -314,8 +325,9 @@ export function SidebarTrigger({
       variant="ghost"
       {...props}
     >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <PanelLeftIcon aria-hidden="true" />
+      {/* Kiro patch: callers pass a translated aria-label; the English text is a fallback. */}
+      {props["aria-label"] ? null : <span className="sr-only">Toggle Sidebar</span>}
     </Button>
   );
 }
@@ -357,7 +369,7 @@ export function SidebarInset({
     <main
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background",
-        "md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ms-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm/5",
+        "lg:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 lg:peer-data-[variant=inset]:m-2 lg:peer-data-[variant=inset]:ms-0 lg:peer-data-[variant=inset]:rounded-xl lg:peer-data-[variant=inset]:shadow-sm/5",
         className,
       )}
       data-slot="sidebar-inset"
@@ -486,7 +498,7 @@ export function SidebarGroupAction({
     className: cn(
       "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-lg p-0 text-sidebar-foreground outline-hidden ring-sidebar-ring transition-transform hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0",
       // Increases the hit area of the button on mobile.
-      "after:absolute after:-inset-2 md:after:hidden",
+      "after:absolute after:-inset-2 lg:after:hidden",
       "group-data-[collapsible=icon]:hidden",
       className,
     ),
@@ -583,14 +595,19 @@ export function SidebarMenuButton({
     };
   }
 
+  // Kiro patch: disable the tooltip, not only hide its popup, when the label is visible. A
+  // hidden popup still opened on focus, so in the mobile sheet the first Escape closed that
+  // invisible tooltip and the sheet needed a second (or third) Escape.
+  const tooltipOff = state !== "collapsed" || isMobile;
+
   return (
-    <Tooltip>
+    <Tooltip disabled={tooltipOff}>
       <TooltipTrigger
         render={buttonElement as React.ReactElement<Record<string, unknown>>}
       />
       <TooltipPopup
         align="center"
-        hidden={state !== "collapsed" || isMobile}
+        hidden={tooltipOff}
         side="right"
         {...tooltip}
       />
@@ -610,13 +627,13 @@ export function SidebarMenuAction({
     className: cn(
       "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-lg p-0 text-sidebar-foreground outline-hidden ring-sidebar-ring transition-transform hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 peer-hover/menu-button:text-sidebar-foreground [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0",
       // Increases the hit area of the button on mobile.
-      "after:absolute after:-inset-2 md:after:hidden",
+      "after:absolute after:-inset-2 lg:after:hidden",
       "peer-data-[size=sm]/menu-button:top-1",
       "peer-data-[size=default]/menu-button:top-1.5",
       "peer-data-[size=lg]/menu-button:top-2.5",
       "group-data-[collapsible=icon]:hidden",
       showOnHover &&
-        "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-foreground md:opacity-0",
+        "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-foreground lg:opacity-0",
       className,
     ),
     "data-sidebar": "menu-action",

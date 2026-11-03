@@ -3,7 +3,13 @@ import { type TFunction, translate } from "@/lib/i18n";
 import en from "@/locales/errors/en.json";
 import zh from "@/locales/errors/zh.json";
 import { ApiError } from "./errors";
-import { errorMessage, SERVER_ERROR_KEYS, serverErrorKey } from "./server-errors";
+import {
+  errorMessage,
+  SERVER_ERROR_KEYS,
+  SERVER_ERROR_PHRASES,
+  serverErrorKey,
+  serverErrorPhrase,
+} from "./server-errors";
 
 // Echoes the key so assertions show which translation was chosen.
 const t: TFunction = (key) => `t(${key})`;
@@ -55,8 +61,63 @@ describe("errorMessage", () => {
   });
 
   it("returns an unknown server message verbatim", () => {
-    const error = new ApiError({ status: 500, serverMessage: "注册客户端失败: timeout" });
-    expect(errorMessage(error, t)).toBe("注册客户端失败: timeout");
+    const error = new ApiError({ status: 500, serverMessage: "backup not found: abc" });
+    expect(errorMessage(error, t)).toBe("backup not found: abc");
+  });
+
+  it("translates the Chinese AWS sign-in errors", () => {
+    const iam = new ApiError({ status: 400, serverMessage: "无效的回调 URL" });
+    expect(errorMessage(iam, t)).toBe("t(errors:serverError.invalidCallbackUrl)");
+    const expired = new ApiError({ status: 400, serverMessage: "会话不存在或已过期" });
+    expect(errorMessage(expired, t)).toBe("t(errors:serverError.ssoSessionExpired)");
+  });
+
+  it("finds a wrapped phrase and keeps the text after it as the detail", () => {
+    const tWithParams: TFunction = (key, params) =>
+      params ? `t(${key}, ${JSON.stringify(params)})` : `t(${key})`;
+    const error = new ApiError({
+      status: 500,
+      serverMessage: "token 1: token 验证失败: 401 Unauthorized",
+    });
+    expect(errorMessage(error, tWithParams)).toBe(
+      't(errors:serverError.ssoTokenRejected) t(errors:serverError.detail, {"detail":"401 Unauthorized"})',
+    );
+  });
+
+  it("prefers the longest phrase", () => {
+    expect(serverErrorPhrase("批准授权失败: boom")?.key).toBe(
+      "errors:serverError.ssoTokenFlowFailed",
+    );
+    expect(serverErrorPhrase("授权失败: access_denied")).toEqual({
+      key: "errors:serverError.ssoDenied",
+      detail: "access_denied",
+    });
+  });
+
+  it("translates each part of a '; '-joined SSO import error", () => {
+    const error = new ApiError({
+      status: 500,
+      serverMessage: "授权超时; disk full",
+    });
+    expect(errorMessage(error, t)).toBe("t(errors:serverError.ssoTimeout) disk full");
+  });
+
+  it("shows real text in the English and Chinese UI", () => {
+    const error = new ApiError({ status: 400, serverMessage: "无效的回调 URL" });
+    const enT: TFunction = (key, params) => translate("en", "common", key, params);
+    const zhT: TFunction = (key, params) => translate("zh", "common", key, params);
+    expect(errorMessage(error, enT)).toBe(
+      "The callback URL is not valid. Copy the full address again.",
+    );
+    expect(errorMessage(error, zhT)).toBe("回调 URL 无效，请重新复制完整地址。");
+  });
+
+  it("maps every phrase to a key present in both locales", () => {
+    for (const key of Object.values(SERVER_ERROR_PHRASES)) {
+      const name = key.slice("errors:".length);
+      expect(en, name).toHaveProperty([name]);
+      expect(zh, name).toHaveProperty([name]);
+    }
   });
 
   it("falls back for an empty message or a non-API error", () => {

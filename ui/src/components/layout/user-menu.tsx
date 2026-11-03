@@ -1,5 +1,11 @@
 import { useNavigate } from "@tanstack/react-router";
-import { EllipsisVerticalIcon, LogOutIcon, RefreshCwIcon, UserRoundIcon } from "lucide-react";
+import {
+  CircleArrowUpIcon,
+  EllipsisVerticalIcon,
+  LogOutIcon,
+  RefreshCwIcon,
+  UserRoundIcon,
+} from "lucide-react";
 import { type JSX, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +22,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { signOut } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
-import { useUpdateCheck } from "./update-check";
+import { toast } from "@/lib/toast";
+import { UpdateDot, useUpdateCheck } from "./update-check";
+import { stripV } from "./update-dialog";
 
 /** DELETE /session (errors ignored), then the sign-in page. No confirm (old UI parity). */
 export function useSignOut(): () => Promise<void> {
@@ -27,22 +35,32 @@ export function useSignOut(): () => Promise<void> {
     } catch {
       // The server session may already be gone; the local session is cleared either way.
     }
+    // Toasts from the session (for example "Change the generated password" with its link to
+    // Settings) must not follow the user onto the sign-in page.
+    toast.dismiss();
     await navigate({ to: "/login" });
   }, [navigate]);
 }
 
 function UserMenuItems(): JSX.Element {
   const { t } = useT();
-  const { checking, checkNow } = useUpdateCheck();
+  const { checking, checkNow, latest, openDialog } = useUpdateCheck();
   const handleSignOut = useSignOut();
   return (
     <>
       <MenuGroup>
         <MenuGroupLabel>{t("shell.admin")}</MenuGroupLabel>
-        <MenuItem disabled={checking} onClick={checkNow}>
-          {checking ? <Spinner aria-hidden="true" /> : <RefreshCwIcon aria-hidden="true" />}
-          {checking ? t("shell.update.checking") : t("shell.update.check")}
-        </MenuItem>
+        {latest ? (
+          <MenuItem onClick={openDialog}>
+            <CircleArrowUpIcon aria-hidden="true" className="text-warning-foreground" />
+            {t("shell.update.available", { latest: stripV(latest.version) })}
+          </MenuItem>
+        ) : (
+          <MenuItem disabled={checking} onClick={checkNow}>
+            {checking ? <Spinner aria-hidden="true" /> : <RefreshCwIcon aria-hidden="true" />}
+            {checking ? t("shell.update.checking") : t("shell.update.check")}
+          </MenuItem>
+        )}
       </MenuGroup>
       <MenuSeparator />
       <MenuItem onClick={() => void handleSignOut()}>
@@ -106,6 +124,7 @@ export function UserMenu({ variant = "sidebar" }: { variant?: "sidebar" | "heade
 function SidebarUserMenu(): JSX.Element {
   const { t } = useT();
   const { isMobile } = useSidebar();
+  const { latest } = useUpdateCheck();
   return (
     <Menu>
       <MenuTrigger
@@ -118,7 +137,10 @@ function SidebarUserMenu(): JSX.Element {
           />
         }
       >
-        <AdminAvatar />
+        <span className="relative shrink-0">
+          <AdminAvatar />
+          {latest ? <UpdateDot className="-top-0.5 -right-0.5 ring-sidebar" /> : null}
+        </span>
         <span className="grid flex-1 text-left text-sm leading-tight">
           <span className="truncate font-medium text-sidebar-foreground">{t("shell.admin")}</span>
           <span className="truncate text-secondary-label text-xs">{t("shell.appName")}</span>

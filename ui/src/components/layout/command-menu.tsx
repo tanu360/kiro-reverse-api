@@ -152,7 +152,8 @@ export function CommandMenu(): JSX.Element {
       <Button
         aria-keyshortcuts="Meta+K Control+K"
         aria-label={t("shell.search")}
-        className="h-10 gap-2 px-2 font-normal text-muted-foreground md:h-8"
+        // Icon-only and 40x40 below sm; with its label from sm up.
+        className="size-10 gap-2 px-2 font-normal text-muted-foreground sm:w-auto md:h-8"
         onClick={() => setOpen(true)}
         variant="ghost"
       >

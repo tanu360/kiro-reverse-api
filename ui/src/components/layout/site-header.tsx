@@ -9,6 +9,7 @@ import { LanguageSwitch } from "./language-switch";
 import { activeNavItem } from "./nav-items";
 import { PrivacyToggle } from "./privacy-toggle";
 import { ThemeSwitch } from "./theme-switch";
+import { UpdateIndicator } from "./update-indicator";
 import { UserMenu } from "./user-menu";
 
 /** Port of the Studio Admin dashboard header: sticky, 48 px, blurred. */
@@ -25,7 +26,7 @@ export function SiteHeader(): JSX.Element {
           <Tooltip>
             <TooltipTrigger
               render={
-                <SidebarTrigger aria-label={toggleLabel} className="-ml-1 size-10 md:size-8" />
+                <SidebarTrigger aria-label={toggleLabel} className="-ml-1 size-10 lg:size-8" />
               }
             />
             <TooltipPopup>{toggleLabel}</TooltipPopup>
@@ -39,6 +40,7 @@ export function SiteHeader(): JSX.Element {
           <CommandMenu />
         </div>
         <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+          <UpdateIndicator />
           <PrivacyToggle />
           <LanguageSwitch />
           <ThemeSwitch />

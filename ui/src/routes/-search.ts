@@ -65,40 +65,38 @@ function integer(value: unknown): number | undefined {
   return Number.isInteger(n) ? n : undefined;
 }
 
+// Every validator returns each key it owns, set to undefined when the raw value is invalid.
+// TanStack Router merges a route's validated search over its parent's search, and the root's
+// parent is the raw URL search. A key left out keeps its raw value (?range=7d), and the page
+// then reads a value that was never validated.
+
 export function validateOverviewSearch(input: Record<string, unknown>): OverviewSearch {
-  const range = oneOf(input.range, OVERVIEW_RANGES);
-  return range ? { range } : {};
+  return { range: oneOf(input.range, OVERVIEW_RANGES) };
 }
 
 export function validateAccountsSearch(input: Record<string, unknown>): AccountsSearch {
-  const out: AccountsSearch = {};
-  if (input.add === true || input.add === 1 || input.add === "1" || input.add === "true") {
-    out.add = true;
-  }
-  const status = oneOf(input.status, ACCOUNT_STATUSES);
-  if (status) out.status = status;
-  const q = text(input.q);
-  if (q !== undefined) out.q = q;
-  return out;
+  const add = input.add === true || input.add === 1 || input.add === "1" || input.add === "true";
+  return {
+    add: add ? true : undefined,
+    status: oneOf(input.status, ACCOUNT_STATUSES),
+    q: text(input.q),
+  };
 }
 
 export function validateRequestsSearch(input: Record<string, unknown>): RequestsSearch {
-  const out: RequestsSearch = {};
   const page = integer(input.page);
-  if (page !== undefined && page >= 1) out.page = page;
   const pageSize = integer(input.pageSize);
-  if (pageSize !== undefined && (PAGE_SIZES as readonly number[]).includes(pageSize)) {
-    out.pageSize = pageSize as RequestsSearch["pageSize"];
-  }
-  const search = text(input.search);
-  if (search !== undefined) out.search = search;
-  const status = oneOf(input.status, ["success", "failed"] as const);
-  if (status) out.status = status;
-  const sort = oneOf(input.sort, REQUEST_SORTS);
-  if (sort) out.sort = sort;
-  const order = oneOf(input.order, ["asc", "desc"] as const);
-  if (order) out.order = order;
-  return out;
+  return {
+    page: page !== undefined && page >= 1 ? page : undefined,
+    pageSize:
+      pageSize !== undefined && (PAGE_SIZES as readonly number[]).includes(pageSize)
+        ? (pageSize as RequestsSearch["pageSize"])
+        : undefined,
+    search: text(input.search),
+    status: oneOf(input.status, ["success", "failed"] as const),
+    sort: oneOf(input.sort, REQUEST_SORTS),
+    order: oneOf(input.order, ["asc", "desc"] as const),
+  };
 }
 
 /** Same-origin app paths only: "/x" but never "//host" or "/\host" (open-redirect guard). */
@@ -112,7 +110,7 @@ function isSafeRedirect(value: unknown): value is string {
 }
 
 export function validateLoginSearch(input: Record<string, unknown>): LoginSearch {
-  return isSafeRedirect(input.redirect) ? { redirect: input.redirect } : {};
+  return { redirect: isSafeRedirect(input.redirect) ? input.redirect : undefined };
 }
 
 /**

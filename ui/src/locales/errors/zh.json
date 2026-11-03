@@ -32,5 +32,15 @@
   "serverError.tokenLimitNegative": "Token 限额必须大于或等于 0。",
   "serverError.creditLimitNegative": "Credits 限额必须大于或等于 0。",
   "serverError.microsoftCanceled": "Microsoft 登录已取消，请重新开始。",
-  "serverError.microsoftDuplicate": "该 Microsoft 账号已添加。"
+  "serverError.microsoftDuplicate": "该 Microsoft 账号已添加。",
+  "serverError.ssoSessionExpired": "登录会话已过期，请重新开始。",
+  "serverError.invalidCallbackUrl": "回调 URL 无效，请重新复制完整地址。",
+  "serverError.ssoStateMismatch": "该回调 URL 属于另一次登录，请重新开始并使用新链接。",
+  "serverError.ssoNoCode": "回调 URL 中没有授权码，请重新复制完整地址。",
+  "serverError.ssoTimeout": "登录超时，请重新开始。",
+  "serverError.ssoDenied": "AWS 未授权此次登录，请重新开始。",
+  "serverError.ssoRegisterFailed": "无法开始 AWS 登录，请检查区域后重试。",
+  "serverError.ssoTokenRejected": "AWS 未接受该 SSO Token，请复制新的 Token 后重试。",
+  "serverError.ssoTokenFlowFailed": "无法使用该 Token 完成 AWS 登录，请复制新的 Token 后重试。",
+  "serverError.detail": "（详情：{detail}）"
 }
