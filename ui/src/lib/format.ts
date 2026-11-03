@@ -1,9 +1,44 @@
-import type { Lang } from "@/lib/i18n";
+import { getActiveLang, intlLocale, type Lang } from "@/lib/i18n";
+
+/**
+ * Number, date and duration formatting through Intl in the UI language. Every formatter takes
+ * an optional language; without one it uses the active UI language (the I18nProvider's).
+ */
 
 export const EMPTY = "—";
 
+const numberFormats = new Map<string, Intl.NumberFormat>();
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+
 function locale(lang?: Lang): string {
-  return lang === "zh" ? "zh-CN" : "en-US";
+  return intlLocale(lang ?? getActiveLang());
+}
+
+/** A cached Intl.NumberFormat for the language and options. */
+export function numberFormat(lang: Lang | undefined, options: Intl.NumberFormatOptions = {}) {
+  const tag = locale(lang);
+  const id = `${tag}|${JSON.stringify(options)}`;
+  let format = numberFormats.get(id);
+  if (!format) {
+    format = new Intl.NumberFormat(tag, options);
+    numberFormats.set(id, format);
+  }
+  return format;
+}
+
+/** A cached Intl.DateTimeFormat for the language and options. */
+export function dateTimeFormat(
+  lang: Lang | undefined,
+  options: Intl.DateTimeFormatOptions = {},
+): Intl.DateTimeFormat {
+  const tag = locale(lang);
+  const id = `${tag}|${JSON.stringify(options)}`;
+  let format = dateFormats.get(id);
+  if (!format) {
+    format = new Intl.DateTimeFormat(tag, options);
+    dateFormats.set(id, format);
+  }
+  return format;
 }
 
 function finite(value: number): number {
@@ -11,100 +46,142 @@ function finite(value: number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Drops trailing zeros after the decimal point, and the point itself when nothing is left. */
-function trimZeros(text: string): string {
-  return text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
-}
-
 /** Grouped integer (truncated toward zero). */
 export function formatNumber(value: number, lang?: Lang): string {
-  return new Intl.NumberFormat(locale(lang), { maximumFractionDigits: 0 }).format(
-    Math.trunc(finite(value)),
-  );
+  return numberFormat(lang, { maximumFractionDigits: 0 }).format(Math.trunc(finite(value)));
 }
 
 export function formatDecimal(value: number, digits: number, lang?: Lang): string {
-  return new Intl.NumberFormat(locale(lang), {
+  return numberFormat(lang, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(finite(value));
 }
 
-/** 999, 1K, 1.2K, 3.4M, 5B: one decimal, a trailing ".0" dropped. */
-export function formatCompact(value: number): string {
+/** Compact notation with at most one decimal: 999, 1K, 1.2K, 3.4M in English. */
+export function formatCompact(value: number, lang?: Lang): string {
   const n = finite(value);
-  const abs = Math.abs(n);
-  if (abs >= 1e9) return `${(n / 1e9).toFixed(1).replace(/\.0$/, "")}B`;
-  if (abs >= 1e6) return `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M`;
-  if (abs >= 1e3) return `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K`;
-  return String(Math.trunc(n));
+  if (Math.abs(n) < 1000) return formatNumber(n, lang);
+  return numberFormat(lang, { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
 /** part/total as a percent: 1 decimal from 10 % up, else 2, trailing zeros dropped. */
-export function formatPercent(part: number, total: number): string {
+export function formatPercent(part: number, total: number, lang?: Lang): string {
   const denominator = finite(total);
-  if (denominator <= 0) return "0%";
-  const value = (finite(part) / denominator) * 100;
-  if (!Number.isFinite(value)) return "0%";
-  return `${trimZeros(value.toFixed(value >= 10 ? 1 : 2))}%`;
+  const ratio = denominator > 0 ? finite(part) / denominator : 0;
+  const value = Number.isFinite(ratio) ? ratio : 0;
+  return numberFormat(lang, {
+    style: "percent",
+    maximumFractionDigits: value * 100 >= 10 ? 1 : 2,
+  }).format(value);
 }
 
-/** A 0..1 ratio as a percent: formatFraction(0.1234) is "12.3%". */
-export function formatFraction(fraction: number, digits = 1): string {
-  return `${(finite(fraction) * 100).toFixed(digits)}%`;
+/** A 0..1 ratio as a percent with fixed decimals: formatFraction(0.1234) is "12.3%". */
+export function formatFraction(fraction: number, digits = 1, lang?: Lang): string {
+  return numberFormat(lang, {
+    style: "percent",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(finite(fraction));
 }
 
-export function formatCredits(value: number, digits = 2): string {
-  return finite(value).toFixed(digits);
+/** A plain number with `digits` decimals, without grouping changes: 0.25 → "0.25". */
+export function formatCredits(value: number, digits = 2, lang?: Lang): string {
+  return formatDecimal(value, digits, lang);
 }
 
-export function formatUsd(value: number): string {
-  const n = finite(value);
-  return `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
+export function formatUsd(value: number, lang?: Lang): string {
+  return numberFormat(lang, { style: "currency", currency: "USD" }).format(finite(value));
 }
 
-const BYTE_UNITS = ["KB", "MB", "GB"] as const;
+function formatUnit(
+  value: number,
+  unit: string,
+  lang: Lang | undefined,
+  digits = 0,
+  display: "short" | "narrow" = "short",
+): string {
+  return numberFormat(lang, {
+    style: "unit",
+    unit,
+    unitDisplay: display,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
 
+const BYTE_UNITS = ["kilobyte", "megabyte", "gigabyte"] as const;
+
+/** 512 B, 47.1 kB, 5.0 MB: binary steps, one decimal from a kilobyte up. */
 export function formatBytes(bytes: number, lang?: Lang): string {
   let value = finite(bytes);
-  if (Math.abs(value) < 1024) return `${Math.trunc(value)} B`;
-  let unit: (typeof BYTE_UNITS)[number] = "KB";
+  if (Math.abs(value) < 1024) return formatUnit(Math.trunc(value), "byte", lang, 0, "narrow");
+  let unit: (typeof BYTE_UNITS)[number] = "kilobyte";
   for (const next of BYTE_UNITS) {
     unit = next;
     value /= 1024;
-    if (Math.abs(value) < 1024) break;
+    // Round first so 1023.96 KB becomes 1.0 MB instead of "1,024.0 KB".
+    if (Math.abs(Math.round(value * 10) / 10) < 1024) break;
   }
-  return `${formatDecimal(value, 1, lang)} ${unit}`;
+  return formatUnit(value, unit, lang, 1);
 }
 
 /**
  * Request duration. Rows logged before durations were tracked have no endpoint either, so a
  * missing value without an endpoint is "—", while a real 0 ms request still shows "0 ms".
  */
-export function formatDurationMs(ms: number | undefined, hasEndpoint: boolean): string {
+export function formatDurationMs(
+  ms: number | undefined,
+  hasEndpoint: boolean,
+  lang?: Lang,
+): string {
   const value = Number(ms ?? 0);
   if (!Number.isFinite(value) || (!value && !hasEndpoint)) return EMPTY;
-  if (value < 1000) return `${Math.round(value)} ms`;
-  if (value < 60_000) return `${(value / 1000).toFixed(value < 10_000 ? 2 : 1)} s`;
-  const totalSec = Math.round(value / 1000);
-  return `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`;
+  if (value < 1000) return formatUnit(Math.round(value), "millisecond", lang, 0, "narrow");
+  // Rounded to the shown precision first, so 59 960 ms is "1m 0s" and not "60.0 s".
+  const seconds = value / 1000;
+  const digits = seconds < 10 ? 2 : 1;
+  const shown = Math.round(seconds * 10 ** digits) / 10 ** digits;
+  if (shown < 60) return formatUnit(shown, "second", lang, shown < 10 ? 2 : 1, "narrow");
+  const totalSec = Math.round(seconds);
+  return joinUnits(
+    [
+      [Math.floor(totalSec / 60), "minute"],
+      [totalSec % 60, "second"],
+    ],
+    lang,
+  );
 }
 
-const UPTIME_UNITS: Record<Lang, { d: string; h: string; min: string }> = {
-  en: { d: "d", h: "h", min: "min" },
-  zh: { d: "天", h: "小时", min: "分钟" },
-};
+function joinUnits(parts: [number, string][], lang: Lang | undefined): string {
+  return parts.map(([value, unit]) => formatUnit(value, unit, lang, 0, "narrow")).join(" ");
+}
 
-/** "3 d 4 h", "4 h 12 min" or "12 min". */
-export function formatUptime(seconds: number, lang: Lang): string {
-  const units = UPTIME_UNITS[lang] ?? UPTIME_UNITS.en;
+/** "3d 4h", "4h 12m" or "12m" in English; the units follow the UI language. */
+export function formatUptime(seconds: number, lang?: Lang): string {
   const total = Math.max(0, Math.floor(finite(seconds)));
   const days = Math.floor(total / 86_400);
   const hours = Math.floor((total % 86_400) / 3600);
   const minutes = Math.floor((total % 3600) / 60);
-  if (days > 0) return `${days} ${units.d} ${hours} ${units.h}`;
-  if (hours > 0) return `${hours} ${units.h} ${minutes} ${units.min}`;
-  return `${minutes} ${units.min}`;
+  if (days > 0) {
+    return joinUnits(
+      [
+        [days, "day"],
+        [hours, "hour"],
+      ],
+      lang,
+    );
+  }
+  if (hours > 0) {
+    return joinUnits(
+      [
+        [hours, "hour"],
+        [minutes, "minute"],
+      ],
+      lang,
+    );
+  }
+  return joinUnits([[minutes, "minute"]], lang);
 }
 
 export function unixToDate(unixSec: number): Date {
@@ -112,17 +189,20 @@ export function unixToDate(unixSec: number): Date {
 }
 
 /** Medium date and short time in the active language. */
-export function formatDateTime(unixSec: number, lang: Lang): string {
-  return new Intl.DateTimeFormat(locale(lang), { dateStyle: "medium", timeStyle: "short" }).format(
+export function formatDateTime(unixSec: number, lang?: Lang): string {
+  return dateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" }).format(
     unixToDate(finite(unixSec)),
   );
 }
 
 /** Short time in the active language. */
-export function formatTime(unixSec: number, lang: Lang): string {
-  return new Intl.DateTimeFormat(locale(lang), { timeStyle: "short" }).format(
-    unixToDate(finite(unixSec)),
-  );
+export function formatTime(unixSec: number, lang?: Lang): string {
+  return dateTimeFormat(lang, { timeStyle: "short" }).format(unixToDate(finite(unixSec)));
+}
+
+/** Time with seconds (a log line timestamp) in the active language. */
+export function formatClockTime(date: Date, lang?: Lang): string {
+  return dateTimeFormat(lang, { timeStyle: "medium" }).format(date);
 }
 
 // [unit, seconds per unit, use this unit while |diff| is below this many seconds]
@@ -138,7 +218,7 @@ const RELATIVE_STEPS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number, number
 /** "5 minutes ago", "yesterday", "in 3 days" (numeric: 'auto'). */
 export function formatRelativeTime(
   unixSec: number,
-  lang: Lang,
+  lang?: Lang,
   nowMs: number = Date.now(),
 ): string {
   const diff = finite(unixSec) - nowMs / 1000;

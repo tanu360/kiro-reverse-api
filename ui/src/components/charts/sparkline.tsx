@@ -46,6 +46,7 @@ import {
   sparklineBarWidth,
   sparklineIndexAtX,
 } from "./sparkline-geometry";
+import { intlLocale } from "@/lib/i18n";
 
 export const DEFAULT_SPARKLINE_ANIMATION_DURATION_MS = 900;
 /** Matches the main charts' data-change tween (`DEFAULT_Y_DOMAIN_TWEEN_MS`). */
@@ -444,7 +445,7 @@ function SparklineFrame<T>({
   const { t, lang } = useUiT();
   const label =
     config["aria-label"] ??
-    describeSparkline(values, t, lang === "zh" ? "zh-CN" : "en");
+    describeSparkline(values, t, intlLocale(lang));
 
   return (
     <div

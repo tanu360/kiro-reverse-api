@@ -1,26 +1,24 @@
-export const shortDateFmt = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-});
+import { dateTimeFormat, numberFormat } from "@/lib/format";
 
-export const weekdayDateFmt = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-});
+// Formatters in the active UI language: each call resolves the cached Intl formatter for it.
+function dateFormatter(options: Intl.DateTimeFormatOptions): { format: (date: Date | number) => string } {
+  return { format: (date) => dateTimeFormat(undefined, options).format(date) };
+}
 
-export const hmsTimeFmt = new Intl.DateTimeFormat("en-US", {
+export const shortDateFmt = dateFormatter({ month: "short", day: "numeric" });
+
+export const weekdayDateFmt = dateFormatter({ weekday: "short", month: "short", day: "numeric" });
+
+export const hmsTimeFmt = dateFormatter({
   hour: "2-digit",
   minute: "2-digit",
   second: "2-digit",
   hour12: false,
 });
 
-// `Intl.NumberFormat.prototype.format` is a bound getter — safe to extract.
-export const intFmt = new Intl.NumberFormat("en-US").format;
-export const valueLabelFmt = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 0,
-}).format;
+export const intFmt = (value: number): string => numberFormat(undefined).format(value);
+export const valueLabelFmt = (value: number): string =>
+  numberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);

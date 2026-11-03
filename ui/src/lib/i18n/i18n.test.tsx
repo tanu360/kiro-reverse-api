@@ -4,7 +4,14 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   getInitialLang,
   I18nProvider,
+  intlLocale,
   LANG_STORAGE_KEY,
+  LANGS,
+  LANGUAGES,
+  matchLang,
+  PSEUDO_ENABLED,
+  PSEUDO_LANG,
+  pluralCategory,
   registerMessages,
   translate,
   useLanguage,
@@ -83,6 +90,19 @@ function Common() {
   return <p>{useT().t("fixture.commonKey")}</p>;
 }
 
+function Switcher() {
+  const { setLang } = useLanguage();
+  return (
+    <>
+      {LANGUAGES.map((option) => (
+        <button key={option.code} onClick={() => setLang(option.code)} type="button">
+          {option.code}
+        </button>
+      ))}
+    </>
+  );
+}
+
 describe("I18nProvider", () => {
   it("renders with the initial language and switches with setLang", async () => {
     render(
@@ -98,6 +118,19 @@ describe("I18nProvider", () => {
     expect(screen.getByTestId("lang")).toHaveTextContent("zh");
     expect(localStorage.getItem(LANG_STORAGE_KEY)).toBe("zh");
     expect(document.documentElement.lang).toBe("zh");
+  });
+
+  it("sets <html lang> for every language", async () => {
+    render(
+      <I18nProvider initialLang="en">
+        <Switcher />
+      </I18nProvider>,
+    );
+    for (const option of LANGUAGES) {
+      await userEvent.click(screen.getByRole("button", { name: option.code }));
+      expect(document.documentElement.lang).toBe(option.code);
+      expect(localStorage.getItem(LANG_STORAGE_KEY)).toBe(option.code);
+    }
   });
 
   it("defaults to the common namespace", () => {
@@ -117,14 +150,88 @@ describe("getInitialLang", () => {
     expect(getInitialLang()).toBe("zh");
   });
 
-  it("uses navigator.language zh-CN when nothing is stored", () => {
-    vi.spyOn(navigator, "language", "get").mockReturnValue("zh-CN");
-    expect(getInitialLang()).toBe("zh");
+  it.each([
+    [["zh-CN"], "zh"],
+    [["zh-TW", "en"], "zh"],
+    [["vi-VN"], "vi"],
+    [["vi"], "vi"],
+    [["pt-PT"], "pt-BR"],
+    [["pt-BR", "en-US"], "pt-BR"],
+    [["en-GB"], "en"],
+    [["fr-FR", "vi-VN"], "vi"],
+  ])("maps navigator.languages %j to %s", (languages, expected) => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(languages);
+    expect(getInitialLang()).toBe(expected);
   });
 
   it("falls back to English and ignores unknown stored values", () => {
     localStorage.setItem(LANG_STORAGE_KEY, "fr");
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["de-DE"]);
     vi.spyOn(navigator, "language", "get").mockReturnValue("de-DE");
     expect(getInitialLang()).toBe("en");
+  });
+
+  it("restores every supported stored language", () => {
+    for (const lang of LANGS) {
+      localStorage.setItem(LANG_STORAGE_KEY, lang);
+      expect(getInitialLang()).toBe(lang);
+    }
+  });
+});
+
+describe("matchLang", () => {
+  it("maps zh*, vi*, pt* and en* and nothing else", () => {
+    expect(matchLang("zh-Hans-CN")).toBe("zh");
+    expect(matchLang("VI")).toBe("vi");
+    expect(matchLang("pt")).toBe("pt-BR");
+    expect(matchLang("en-AU")).toBe("en");
+    expect(matchLang("de")).toBeUndefined();
+  });
+});
+
+describe("plural selection", () => {
+  beforeAll(() => {
+    registerMessages("en", "fixture-plural", {
+      n_one: "{count} account",
+      n_other: "{count} accounts",
+    });
+    registerMessages("pt-BR", "fixture-plural", {
+      n_one: "{count} conta",
+      n_other: "{count} contas",
+    });
+    registerMessages("vi", "fixture-plural", { n_other: "{count} tài khoản" });
+  });
+
+  it("follows CLDR through Intl.PluralRules, with pt-BR 0 as other", () => {
+    expect(pluralCategory("en", 0)).toBe("other");
+    expect(pluralCategory("en", 1)).toBe("one");
+    expect(pluralCategory("pt-BR", 0)).toBe("other");
+    expect(pluralCategory("pt-BR", 1)).toBe("one");
+    expect(pluralCategory("pt-BR", 2)).toBe("other");
+    expect(pluralCategory("vi", 1)).toBe("other");
+    expect(pluralCategory("zh", 1)).toBe("other");
+    expect(translate("pt-BR", "fixture-plural", "n", { count: 0 })).toBe("0 contas");
+    expect(translate("pt-BR", "fixture-plural", "n", { count: 1 })).toBe("1 conta");
+    expect(translate("pt-BR", "fixture-plural", "n", { count: 5 })).toBe("5 contas");
+    expect(translate("vi", "fixture-plural", "n", { count: 1 })).toBe("1 tài khoản");
+  });
+
+  it("falls back to English for a key missing in the language", () => {
+    expect(translate("vi", "fixture", "onlyEnglish")).toBe("English only");
+    expect(translate("pt-BR", "fixture", "onlyEnglish")).toBe("English only");
+  });
+});
+
+describe("pseudo language", () => {
+  it("wraps every translated string in markers in tests and dev", () => {
+    expect(PSEUDO_ENABLED).toBe(true);
+    expect(translate(PSEUDO_LANG, "fixture", "greeting", { name: "Ada" })).toBe("⟦Hello Ada⟧");
+    // A missing key is not translated, so it stays unwrapped and the e2e check flags it.
+    expect(translate(PSEUDO_LANG, "fixture", "missing.key")).toBe("missing.key");
+  });
+
+  it("is not a selectable language and formats like English", () => {
+    expect(LANGS).not.toContain(PSEUDO_LANG);
+    expect(intlLocale(PSEUDO_LANG)).toBe("en-US");
   });
 });

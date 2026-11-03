@@ -1,6 +1,8 @@
 "use client";
 
 import NumberFlow from "@number-flow/react";
+import { numberFormat } from "@/lib/format";
+import { intlLocale, useT } from "@/lib/i18n";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -31,9 +33,7 @@ function formatStatValue(
   prefix?: string,
   suffix?: string
 ): string {
-  const formatted = new Intl.NumberFormat(undefined, formatOptions).format(
-    value
-  );
+  const formatted = numberFormat(undefined, formatOptions).format(value);
   return `${prefix ?? ""}${formatted}${suffix ?? ""}`;
 }
 
@@ -88,9 +88,11 @@ export function ChartStatFlow({
   icon,
 }: ChartStatFlowProps) {
   const numberFlowReady = useNumberFlowElementReady();
+  const { lang } = useT();
   const staticValue = useMemo(
     () => formatStatValue(value, formatOptions, prefix, suffix),
-    [value, formatOptions, prefix, suffix]
+    // lang: the static value is formatted in the UI language.
+    [value, formatOptions, prefix, suffix, lang]
   );
 
   return (
@@ -105,6 +107,7 @@ export function ChartStatFlow({
           <NumberFlow
             format={formatOptions}
             isolate
+            locales={intlLocale(lang)}
             prefix={prefix}
             suffix={suffix}
             value={value}
