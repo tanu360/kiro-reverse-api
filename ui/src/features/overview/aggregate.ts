@@ -1,11 +1,14 @@
 import type { AccountHeatmap, HeatmapCell, HeatmapData, ModelMixEntry } from "@/lib/api/types";
 import type { OverviewRange } from "@/routes/-search";
 
-/** Heatmap window and bucket size per traffic-chart range: 60, 72 and 96 points. */
+/**
+ * Heatmap window and bucket size per traffic-chart range: 30, 72 and 96 points. The 1 h view
+ * uses 2-minute buckets because sparse per-minute counts draw as a comb of spikes.
+ */
 export const RANGE_WINDOWS: Readonly<
   Record<OverviewRange, { windowMin: number; bucketMin: number }>
 > = {
-  "1h": { windowMin: 60, bucketMin: 1 },
+  "1h": { windowMin: 60, bucketMin: 2 },
   "6h": { windowMin: 360, bucketMin: 5 },
   "24h": { windowMin: 1440, bucketMin: 15 },
 };
@@ -52,6 +55,21 @@ export function bucketGlobal(
     point.succeeded += Math.max(0, cell.reqs - cell.failures);
   }
   return points;
+}
+
+/**
+ * Whole-number y-axis ticks for request counts: 0 and up to about `target` even steps of 1, 2
+ * or 5 x 10^n below the busiest bucket. `[0]` when there is no traffic.
+ */
+export function countTicks(points: readonly TrafficPoint[], target = 4): number[] {
+  const max = points.reduce((top, p) => Math.max(top, p.succeeded, p.failed), 0);
+  if (!(max > 0)) return [0];
+  const raw = Math.max(1, max / Math.max(1, target));
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const step = ([1, 2, 5, 10].find((f) => f * magnitude >= raw) ?? 10) * magnitude;
+  const ticks: number[] = [];
+  for (let tick = 0; tick <= max; tick += step) ticks.push(tick);
+  return ticks;
 }
 
 export interface HourDelta {

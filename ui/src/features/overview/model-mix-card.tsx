@@ -16,6 +16,7 @@ import { useT } from "@/lib/i18n";
 import { modelSlices } from "./aggregate";
 import { MODEL_COLORS, OTHER_MODEL_COLOR } from "./colors";
 import type { RingSlice } from "./model-mix-ring";
+import { ResponsiveList } from "./responsive-list";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 const ModelMixRing = lazy(() => import("./model-mix-ring"));
@@ -113,7 +114,7 @@ export function ModelMixCard(): JSX.Element {
     body = query.isError ? (
       <ErrorState error={query.error} onRetry={() => void query.refetch()} />
     ) : (
-      <div aria-hidden="true" className="flex flex-col items-center gap-4 @xl:flex-row">
+      <div aria-hidden="true" className="flex flex-col items-center gap-4 @3xl:flex-row">
         <Skeleton className="size-48 shrink-0 rounded-full" />
         <TableSkeleton columns={4} rows={4} />
       </div>
@@ -134,7 +135,8 @@ export function ModelMixCard(): JSX.Element {
         {query.isError ? (
           <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
         ) : null}
-        <div className="flex flex-col items-center gap-4 @xl:flex-row @xl:items-start">
+        {/* Ring beside the table only when the card fits both (48rem); otherwise stacked. */}
+        <div className="flex flex-col items-center gap-4 @3xl:flex-row @3xl:items-start">
           <figure
             aria-label={t(credits ? "modelMix.chartLabel" : "modelMix.chartLabelRequests")}
             className="w-full max-w-56 shrink-0"
@@ -149,12 +151,11 @@ export function ModelMixCard(): JSX.Element {
             </Suspense>
           </figure>
           <div className="flex w-full min-w-0 flex-col gap-2">
-            <DataTable
+            <ResponsiveList
+              at="lg"
               caption={t("modelMix.title")}
-              columns={columns}
-              data={mix.rows}
               getRowId={(row) => row.model}
-              renderMobileCard={(row) => (
+              renderCard={(row) => (
                 <Card className="min-w-0 gap-2 p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2">
@@ -185,6 +186,15 @@ export function ModelMixCard(): JSX.Element {
                   </dl>
                 </Card>
               )}
+              rows={mix.rows}
+              table={
+                <DataTable
+                  caption={t("modelMix.title")}
+                  columns={columns}
+                  data={mix.rows}
+                  getRowId={(row) => row.model}
+                />
+              }
             />
             {mix.rest > 0 ? (
               <p className="px-2 text-muted-foreground text-xs">

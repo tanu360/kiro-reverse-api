@@ -24,7 +24,8 @@ import { usePrefersReducedMotion } from "./use-reduced-motion";
 const TrafficChart = lazy(() => import("./traffic-chart"));
 
 const RANGES: readonly OverviewRange[] = ["1h", "6h", "24h"];
-const PLOT_HEIGHT = "h-72 md:h-80";
+// Sized by the card's width (SectionCard is a container), not the viewport.
+const PLOT_HEIGHT = "h-72 @2xl:h-80";
 
 function isRange(value: unknown): value is OverviewRange {
   return typeof value === "string" && (RANGES as readonly string[]).includes(value);
@@ -51,7 +52,9 @@ function LegendChip({
 /** Port of Studio's performance overview: succeeded and failed requests over 1, 6 or 24 h. */
 export function TrafficCard(): JSX.Element {
   const { t, lang } = useT("overview");
-  const { range = "1h" } = useSearch({ from: "/_app/" });
+  // An unknown `?range=` must not crash the page, even if it slips past the route validator.
+  const { range: rawRange } = useSearch({ from: "/_app/" });
+  const range: OverviewRange = isRange(rawRange) ? rawRange : "1h";
   const navigate = useNavigate({ from: "/" });
   const reducedMotion = usePrefersReducedMotion();
   const { windowMin, bucketMin } = RANGE_WINDOWS[range];
@@ -128,12 +131,15 @@ export function TrafficCard(): JSX.Element {
           </div>
           {empty ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <EmptyState
-                description={t("traffic.noTrafficBody")}
-                icon={ActivityIcon}
-                title={t("traffic.noTraffic")}
-                variant="compact"
-              />
+              {/* Backdrop so the message does not sit on the gridlines. */}
+              <div className="rounded-xl bg-card/80 backdrop-blur-[1px]">
+                <EmptyState
+                  description={t("traffic.noTrafficBody")}
+                  icon={ActivityIcon}
+                  title={t("traffic.noTraffic")}
+                  variant="compact"
+                />
+              </div>
             </div>
           ) : null}
         </div>

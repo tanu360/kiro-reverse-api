@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
@@ -43,7 +43,8 @@ function errorsTable(): Promise<HTMLElement> {
 }
 
 describe("OverviewPage", () => {
-  it("shows the four status cards with values from /status", async () => {
+  // The first test renders the whole app cold; on a loaded machine that can pass 5 s.
+  it("shows the four status cards with values from /status", { timeout: 20_000 }, async () => {
     await renderApp("/");
     const status = buildStatus(mockDb);
 
@@ -149,12 +150,127 @@ describe("OverviewPage", () => {
       http.get(apiUrl("/status"), () => jsonError(500, "status exploded"), { once: true }),
     );
     const { user } = await renderApp("/");
-    const region = await screen.findByRole("region", { name: "Totals" });
-    expect(await within(region).findByRole("alert")).toBeInTheDocument();
+    const title = await screen.findByText("Could not load the totals and live traffic");
+    const banner = title.closest<HTMLElement>('[role="alert"]');
+    if (!banner) throw new Error("the banner is not an alert");
+    // The cards keep their titles instead of collapsing into an untitled error block.
+    const accounts = await statCard("Accounts");
+    expect(within(accounts).getByText("—")).toBeInTheDocument();
 
-    await user.click(within(region).getByRole("button", { name: "Try again" }));
+    await user.click(within(banner).getByRole("button", { name: "Try again" }));
+    await waitFor(() => {
+      expect(screen.queryByText("Could not load the totals and live traffic")).toBeNull();
+    });
+    const recovered = await statCard("Accounts");
+    expect(metricValue(recovered, "Available")).toMatch(/^\d+ \/ \d+$/);
+  });
+
+  it("shows one error banner, not one per card group, when /status and the tiles fail", async () => {
+    mockServer.use(
+      http.get(apiUrl("/status"), () => jsonError(500, "status exploded")),
+      http.get(apiUrl("/observe/overview"), () => jsonError(500, "overview exploded")),
+    );
+    const { container } = await renderApp("/");
+    await screen.findByText("Could not load the totals and live traffic");
+    await waitFor(() => {
+      expect(container.querySelectorAll('[data-slot="live-tile"]')).toHaveLength(6);
+    });
+    const tiles = screen.getByRole("region", { name: "Live traffic" });
+    expect(within(tiles).getByText("Requests/min")).toBeInTheDocument();
+    expect(within(tiles).queryByRole("alert")).toBeNull();
+    const totals = screen.getByRole("region", { name: "Totals" });
+    expect(within(totals).queryByRole("alert")).toBeNull();
+    for (const label of ["Accounts", "Requests", "Succeeded", "Failed"]) {
+      expect(await statCard(label)).toBeInTheDocument();
+    }
+    expect(within(totals).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
+  });
+
+  it("falls back to the 1 h range for an unknown ?range= instead of crashing", async () => {
+    await renderApp("/?range=7d");
+    const traffic = await screen.findByRole("region", { name: "Traffic" });
+    expect(within(traffic).getByText("Requests per 2 min, last hour")).toBeInTheDocument();
+    expect(within(traffic).getByRole("combobox", { name: "Time range" })).toHaveTextContent("1 h");
     expect(await statCard("Accounts")).toBeInTheDocument();
-    const recovered = screen.getByRole("region", { name: "Totals" });
-    expect(within(recovered).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("opens the live-tile hint on click, so touch screens can read it", async () => {
+    await renderApp("/");
+    const trigger = await screen.findByRole("button", { name: "Active accounts" });
+    // A bare click with no hover first, as a tap sends; a hover-only tooltip stays closed.
+    fireEvent.click(trigger);
+    expect(await screen.findByText(/Accounts with requests in the last 5 min/)).toBeInTheDocument();
+  });
+
+  it("draws the account heatmap without a sideways scroller", async () => {
+    await renderApp("/");
+    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
+    await within(heatmap).findByText("All accounts");
+    expect(heatmap.querySelector('[class*="overflow-x-auto"]')).toBeNull();
+    expect(heatmap.querySelector('[class*="min-w-[26rem]"]')).toBeNull();
+    // The newest minute stays on screen with its label.
+    expect(within(heatmap).getByText("Now")).toBeInTheDocument();
+    // Quiet minutes are neutral, not a faint tint of the traffic colour.
+    const quiet = heatmap.querySelectorAll<HTMLElement>("[data-empty]");
+    expect(quiet.length).toBeGreaterThan(0);
+    for (const cell of quiet) {
+      expect(cell).toHaveClass("bg-muted");
+      expect(cell.style.backgroundColor).toBe("");
+    }
+  });
+
+  it("shows an empty state in the heatmap without traffic", async () => {
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
+        const windowMin = Number(new URL(request.url).searchParams.get("windowMin") ?? 60);
+        return HttpResponse.json({
+          windowMin,
+          nowUnix: 1_700_000_000,
+          global: { accountId: "_global_", cells: [] },
+          accounts: null,
+        });
+      }),
+    );
+    await renderApp("/");
+    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
+    expect(await within(heatmap).findByText("No traffic yet")).toBeInTheDocument();
+    expect(within(heatmap).queryByText("All accounts")).toBeNull();
+  });
+
+  it("keeps error messages out of the tab order and uses one dash for missing values", async () => {
+    mockServer.use(
+      http.get(apiUrl("/observe/recent-errors"), () =>
+        HttpResponse.json({
+          errors: [
+            {
+              ts: 1_700_000_000,
+              accountId: "",
+              email: "",
+              model: "-",
+              status: 401,
+              message: "Invalid or missing API key",
+            },
+          ],
+        }),
+      ),
+    );
+    await renderApp("/");
+    const table = await errorsTable();
+    const message = await within(table).findByText("Invalid or missing API key");
+    expect(message).not.toHaveAttribute("tabindex");
+    const row = message.closest("tr") as HTMLElement;
+    expect(within(row).queryByText("-")).toBeNull();
+    expect(within(row).getAllByText("—").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("formats a failed request's badge like the Requests page", async () => {
+    const { user } = await renderApp("/");
+    await user.click(await screen.findByRole("tab", { name: "Recent requests" }));
+    const table = await screen.findByRole("table", { name: "Recent requests" });
+    const failed = mockDb.requests.slice(0, 10).find((r) => !r.success && r.status);
+    if (!failed) throw new Error("fixture has no failed request in the first 10");
+    expect(await within(table).findAllByText(`Failed ${failed.status}`)).not.toHaveLength(0);
+    expect(within(table).queryByText(/Failed · /)).toBeNull();
   });
 });
