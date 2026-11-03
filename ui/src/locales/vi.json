@@ -70,6 +70,7 @@
   "shell.copyright": "© {year} Kiro Proxy",
   "shell.builtFor": "Tự host · Mã nguồn mở",
   "shell.language": "Ngôn ngữ",
+  "shell.languageCurrent": "Ngôn ngữ: {name}",
   "shell.theme.title": "Giao diện",
   "shell.theme.label": "Giao diện: {mode}",
   "shell.theme.system": "Hệ thống",

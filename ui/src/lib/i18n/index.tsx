@@ -29,15 +29,17 @@ export interface LanguageOption {
   code: SupportedLang;
   /** The language's name in its own script, shown the same whatever the UI language. */
   nativeLabel: string;
+  /** A short tag for compact controls (the sign-in language button), also in its own script. */
+  shortLabel: string;
   /** BCP 47 locale for Intl formatting. */
   intl: string;
 }
 
 export const LANGUAGES: readonly LanguageOption[] = [
-  { code: "en", nativeLabel: "English", intl: "en-US" },
-  { code: "zh", nativeLabel: "中文", intl: "zh-CN" },
-  { code: "vi", nativeLabel: "Tiếng Việt", intl: "vi-VN" },
-  { code: "pt-BR", nativeLabel: "Português (Brasil)", intl: "pt-BR" },
+  { code: "en", nativeLabel: "English", shortLabel: "EN", intl: "en-US" },
+  { code: "zh", nativeLabel: "中文", shortLabel: "中文", intl: "zh-CN" },
+  { code: "vi", nativeLabel: "Tiếng Việt", shortLabel: "VI", intl: "vi-VN" },
+  { code: "pt-BR", nativeLabel: "Português (Brasil)", shortLabel: "PT", intl: "pt-BR" },
 ];
 export const LANGS: readonly SupportedLang[] = LANGUAGES.map((option) => option.code);
 export const LANG_STORAGE_KEY = "kiro_lang";

@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOKEN_KEY } from "@/lib/auth/session";
@@ -36,11 +36,15 @@ describe("LoginPage", () => {
     expect(passwordInput()).toHaveAttribute("placeholder", "Password");
     expect(passwordInput()).toHaveFocus();
     expect(screen.getByRole("checkbox", { name: "Stay signed in" })).not.toBeChecked();
-    expect(screen.getByText("OpenAI-compatible")).toBeInTheDocument();
-    expect(screen.getByText("Anthropic-compatible")).toBeInTheDocument();
+    const labels = screen.getByRole("list", { name: "Works with" });
     expect(
-      screen.getByText("Self-hosted. Encrypted local session. No telemetry."),
-    ).toBeInTheDocument();
+      within(labels)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Claude API", "OpenAI API", "Codex"]);
+    expect(screen.getByText("Self-hosted · No telemetry")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Language: English" })).toHaveTextContent("EN");
+    expect(screen.getByRole("button", { name: /^Theme:/ })).toBeInTheDocument();
     expect(screen.queryByText(PASSWORD)).not.toBeInTheDocument();
   });
 

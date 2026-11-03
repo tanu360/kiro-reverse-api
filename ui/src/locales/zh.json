@@ -70,6 +70,7 @@
   "shell.copyright": "© {year} Kiro Proxy",
   "shell.builtFor": "自托管 · 开源",
   "shell.language": "语言",
+  "shell.languageCurrent": "语言：{name}",
   "shell.theme.title": "主题",
   "shell.theme.label": "主题：{mode}",
   "shell.theme.system": "跟随系统",

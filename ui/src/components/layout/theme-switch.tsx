@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { THEMES, type Theme, useTheme } from "./theme-provider";
 
 export const THEME_ICONS = { system: MonitorIcon, light: SunIcon, dark: MoonIcon } as const;
@@ -21,7 +22,13 @@ function nextTheme(theme: Theme): Theme {
   return THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length] ?? "system";
 }
 
-export function ThemeSwitch({ variant = "icon" }: { variant?: "icon" | "menu" }): JSX.Element {
+export function ThemeSwitch({
+  variant = "icon",
+  className,
+}: {
+  variant?: "icon" | "menu";
+  className?: string;
+}): JSX.Element {
   const { t } = useT();
   const { theme, setTheme } = useTheme();
   const label = t("shell.theme.label", { mode: t(`shell.theme.${theme}`) });
@@ -77,7 +84,7 @@ export function ThemeSwitch({ variant = "icon" }: { variant?: "icon" | "menu" })
         render={
           <Button
             aria-label={label}
-            className="size-10 md:size-8"
+            className={cn("size-10 md:size-8", className)}
             data-theme-mode={theme}
             onClick={() => setTheme(nextTheme(theme))}
             size="icon"

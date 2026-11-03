@@ -70,6 +70,7 @@
   "shell.copyright": "© {year} Kiro Proxy",
   "shell.builtFor": "Auto-hospedado · Código aberto",
   "shell.language": "Idioma",
+  "shell.languageCurrent": "Idioma: {name}",
   "shell.theme.title": "Tema",
   "shell.theme.label": "Tema: {mode}",
   "shell.theme.system": "Sistema",

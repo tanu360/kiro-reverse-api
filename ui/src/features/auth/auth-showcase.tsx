@@ -6,7 +6,9 @@ import {
   CircleCheckIcon,
   ClockIcon,
   type LucideIcon,
-  PlugIcon,
+  MessagesSquareIcon,
+  SparkleIcon,
+  SquareTerminalIcon,
 } from "lucide-react";
 import type { CSSProperties, JSX } from "react";
 import { NAV_ITEMS } from "@/components/layout/nav-items";
@@ -59,8 +61,37 @@ const HAND_FONT: Record<Lang, string> = {
   pseudo: '"Caveat Variable", cursive',
 };
 
-/** Deep violet ink: at least 6:1 on the lavender glow the note sits on. */
+/** Deep violet ink: at least 5:1 on the lavender glow the note sits on. */
 const INK = "#2a0b5c";
+
+/**
+ * Glossy candy labels: a pastel body lit from the top, a slightly darker rim in the same hue, a
+ * white highlight along the top edge, a soft inner glow at the bottom and a violet drop shadow.
+ * The bold text clears 3:1 (large text) on its own pastel.
+ */
+const CANDY = {
+  sky: {
+    background: "linear-gradient(180deg, #eef7ff 0%, #d6eaff 55%, #c4e0ff 100%)",
+    borderColor: "#93c2f4",
+    color: "#2563d9",
+    glow: "rgb(59 130 246 / 0.28)",
+  },
+  lime: {
+    background: "linear-gradient(180deg, #fbfec4 0%, #eef98f 55%, #e2f46a 100%)",
+    borderColor: "#c5da4f",
+    color: "#4d8a07",
+    glow: "rgb(132 204 22 / 0.32)",
+  },
+  mint: {
+    background: "linear-gradient(180deg, #e6fdf0 0%, #c9f6dc 55%, #b3efcd 100%)",
+    borderColor: "#86d9ad",
+    color: "#138a63",
+    glow: "rgb(16 185 129 / 0.28)",
+  },
+} as const satisfies Record<
+  string,
+  { background: string; borderColor: string; color: string; glow: string }
+>;
 
 type Health = "active" | "outOfCredits" | "expired";
 
@@ -106,17 +137,7 @@ export function AuthShowcase(): JSX.Element {
         className="pointer-events-none absolute inset-0 -z-10 opacity-[0.22] mix-blend-overlay"
         style={GRAIN}
       />
-      <div className="relative z-10 flex flex-col gap-5 p-12 xl:p-14">
-        <ul className="flex flex-wrap gap-2">
-          {[t("compatOpenAI"), t("compatAnthropic")].map((label) => (
-            <li key={label}>
-              <Badge className="border-white/25 bg-[#2a0b5c]/30 text-white" variant="outline">
-                <PlugIcon aria-hidden="true" />
-                {label}
-              </Badge>
-            </li>
-          ))}
-        </ul>
+      <div className="relative z-10 p-12 xl:p-14">
         <p className="max-w-[24rem] text-balance font-heading font-semibold text-3xl leading-tight tracking-tight">
           {t("tagline")}
         </p>
@@ -124,8 +145,9 @@ export function AuthShowcase(): JSX.Element {
 
       <FlightPath />
       <PaperPlane />
+      <CandyLabels />
       <p
-        className="absolute top-[51%] left-[56%] z-10 max-w-[34%] -rotate-[4deg] text-balance text-[1.75rem] leading-[1.05] xl:text-[2rem]"
+        className="absolute top-[75%] left-[5%] z-10 max-w-[25%] -rotate-[5deg] text-balance text-[1.625rem] leading-[1.05] xl:text-[1.875rem]"
         style={{ color: INK, fontFamily: HAND_FONT[lang] }}
       >
         {t("showcaseNote")}
@@ -133,6 +155,82 @@ export function AuthShowcase(): JSX.Element {
 
       <AccountsPreview />
     </aside>
+  );
+}
+
+/**
+ * Three stacked candy labels for the APIs the proxy speaks, tilted in alternating directions and
+ * overlapping a little past their text. Each one is wider than the space to the panel's right edge, so it runs
+ * off the panel like a sticker, while its icon and text stay in view.
+ */
+function CandyLabels(): JSX.Element {
+  const { t } = useT("auth");
+  const labels = [
+    {
+      id: "claude",
+      text: t("labelClaude"),
+      icon: SparkleIcon,
+      hue: CANDY.sky,
+      tilt: 3,
+      inset: "0%",
+    },
+    {
+      id: "openai",
+      text: t("labelOpenAI"),
+      icon: MessagesSquareIcon,
+      hue: CANDY.lime,
+      tilt: -4,
+      inset: "9%",
+    },
+    {
+      id: "codex",
+      text: t("labelCodex"),
+      icon: SquareTerminalIcon,
+      hue: CANDY.mint,
+      tilt: 2.5,
+      inset: "-4%",
+    },
+  ];
+  return (
+    <ul
+      aria-label={t("worksWith")}
+      className="absolute top-[37%] right-0 left-[41%] z-10 flex select-none flex-col gap-3.5"
+    >
+      {labels.map((label, index) => {
+        const Icon = label.icon;
+        return (
+          <li
+            className="relative flex w-[calc(100%+4rem)] items-center gap-3 overflow-hidden rounded-[1.1rem] border-2 px-5 py-2 font-bold text-[clamp(1.75rem,2.6vw,2.5rem)] leading-tight tracking-tight"
+            key={label.id}
+            style={{
+              background: label.hue.background,
+              borderColor: label.hue.borderColor,
+              color: label.hue.color,
+              marginInlineStart: label.inset,
+              rotate: `${label.tilt}deg`,
+              // Pivot near the words, so neighbours meet (and overlap) only past the text.
+              transformOrigin: "12rem 50%",
+              zIndex: labels.length - index,
+              boxShadow: [
+                "inset 0 2px 0 rgb(255 255 255 / 0.9)",
+                `inset 0 -4px 10px ${label.hue.glow}`,
+                "0 2px 4px rgb(42 11 92 / 0.12)",
+                "0 16px 28px -10px rgb(42 11 92 / 0.5)",
+              ].join(","),
+              textShadow: "0 1px 0 rgb(255 255 255 / 0.7)",
+            }}
+          >
+            {/* The gloss: a soft white sheen over the top half. */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-3 top-1 h-[42%] rounded-full bg-linear-to-b from-white/70 to-white/0"
+            />
+            <Icon aria-hidden="true" className="relative size-[1em] shrink-0" strokeWidth={2.25} />
+            <span className="relative">{label.text}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -151,7 +249,7 @@ function FlightPath(): JSX.Element {
     >
       <path
         className="motion-safe:animate-flight-dash"
-        d="M 40 74 C 33 67, 30 58, 36 54 C 42 50, 51 50, 52 44 C 53 37, 45 35, 41 39 C 37 44, 42 51, 51 49 C 58 47, 65 39, 73.5 36"
+        d="M 33 70 C 24 68, 13 62, 14 53 C 15 45, 26 43, 28 50 C 30 57, 18 59, 17 50 C 16 39, 32 31, 49 29 C 59 28, 66 25, 72 21.5"
         stroke="white"
         strokeDasharray="7 9"
         strokeLinecap="round"
@@ -168,7 +266,7 @@ function PaperPlane(): JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute top-[33%] left-[79%] w-[clamp(5.5rem,11vw,8.5rem)] -translate-x-1/2 -translate-y-1/2"
+      className="pointer-events-none absolute top-[20%] left-[80%] w-[clamp(5.5rem,11vw,8.5rem)] -translate-x-1/2 -translate-y-1/2"
     >
       <svg
         aria-hidden="true"

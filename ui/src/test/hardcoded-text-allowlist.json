@@ -20,6 +20,21 @@
     "reason": "Language names are shown in their own script in every UI language."
   },
   {
+    "file": "src/lib/i18n/index.tsx",
+    "text": "EN",
+    "reason": "Short language tags for the sign-in language button, the same in every UI language."
+  },
+  {
+    "file": "src/lib/i18n/index.tsx",
+    "text": "VI",
+    "reason": "Short language tags for the sign-in language button, the same in every UI language."
+  },
+  {
+    "file": "src/lib/i18n/index.tsx",
+    "text": "PT",
+    "reason": "Short language tags for the sign-in language button, the same in every UI language."
+  },
+  {
     "file": "src/components/layout/update-dialog.tsx",
     "text": "v",
     "reason": "Version tag prefix (v1.2.3), a data format that is the same in every language."

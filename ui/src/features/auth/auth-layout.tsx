@@ -2,7 +2,6 @@ import { ShieldCheckIcon } from "lucide-react";
 import type { JSX, ReactNode } from "react";
 import { LanguageSwitch } from "@/components/layout/language-switch";
 import { ThemeSwitch } from "@/components/layout/theme-switch";
-import { Separator } from "@/components/ui/separator";
 import { useT } from "@/lib/i18n";
 import { AuthShowcase } from "./auth-showcase";
 
@@ -24,17 +23,21 @@ export function AuthLayout({ children }: { children: ReactNode }): JSX.Element {
               {tShared("shell.appName")}
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <LanguageSwitch />
-            <Separator className="mx-1 h-5" orientation="vertical" />
-            <ThemeSwitch />
+          {/* One segmented control: the language (globe and short tag) and the theme toggle. */}
+          <div className="flex items-center gap-0.5 rounded-full border bg-card/80 p-0.5 shadow-xs dark:bg-card">
+            <LanguageSwitch className="rounded-full" variant="pill" />
+            <span aria-hidden="true" className="h-4 w-px bg-border" />
+            <ThemeSwitch className="rounded-full" />
           </div>
         </header>
         <main className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10" id="main">
           <div className="mx-auto flex w-full max-w-sm flex-col gap-8">{children}</div>
         </main>
         <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 pb-6 text-muted-foreground text-xs sm:px-10 lg:pb-8">
-          <p>{tShared("shell.copyright", { year: new Date().getFullYear() })}</p>
+          {/* Quieter than the hint beside it: smaller, and dimmer in dark (neutral-500, 4.6:1). */}
+          <p className="font-normal text-[0.6875rem] tabular-nums dark:text-neutral-500">
+            {tShared("shell.copyright", { year: new Date().getFullYear() })}
+          </p>
           <p className="flex items-center gap-1.5">
             <ShieldCheckIcon aria-hidden="true" className="size-3.5 shrink-0" />
             {t("secureHint")}

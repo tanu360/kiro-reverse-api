@@ -1,4 +1,4 @@
-import { LanguagesIcon } from "lucide-react";
+import { GlobeIcon, LanguagesIcon } from "lucide-react";
 import type { JSX } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,16 +12,30 @@ import {
 } from "@/components/ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { LANGUAGES, type SupportedLang, useLanguage, useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 /** Language names are shown in their own script, whatever the active language. */
 export const LANGUAGE_NAMES: Record<SupportedLang, string> = Object.fromEntries(
   LANGUAGES.map((option) => [option.code, option.nativeLabel]),
 ) as Record<SupportedLang, string>;
 
-export function LanguageSwitch(): JSX.Element {
+/**
+ * `icon`: a bare icon button (the app header). `pill`: a globe and the current language's short
+ * tag, for the segmented control on the sign-in pages.
+ */
+export function LanguageSwitch({
+  variant = "icon",
+  className,
+}: {
+  variant?: "icon" | "pill";
+  className?: string;
+}): JSX.Element {
   const { t } = useT();
   const { lang, setLang } = useLanguage();
   const label = t("shell.language");
+  const current = LANGUAGES.find((option) => option.code === lang) ?? LANGUAGES[0];
+  const pill = variant === "pill";
+  const triggerLabel = pill ? t("shell.languageCurrent", { name: current.nativeLabel }) : label;
 
   return (
     <Menu>
@@ -31,18 +45,25 @@ export function LanguageSwitch(): JSX.Element {
             <MenuTrigger
               render={
                 <Button
-                  aria-label={label}
-                  className="size-10 md:size-8"
-                  size="icon"
+                  aria-label={triggerLabel}
+                  className={cn(pill ? "h-10 gap-1.5 px-3 md:h-8" : "size-10 md:size-8", className)}
+                  size={pill ? "sm" : "icon"}
                   variant="ghost"
                 />
               }
             />
           }
         >
-          <LanguagesIcon aria-hidden="true" />
+          {pill ? (
+            <>
+              <GlobeIcon aria-hidden="true" />
+              <span className="font-medium text-xs tracking-wide">{current.shortLabel}</span>
+            </>
+          ) : (
+            <LanguagesIcon aria-hidden="true" />
+          )}
         </TooltipTrigger>
-        <TooltipPopup>{label}</TooltipPopup>
+        <TooltipPopup>{triggerLabel}</TooltipPopup>
       </Tooltip>
       <MenuPopup align="end">
         <MenuGroup>
