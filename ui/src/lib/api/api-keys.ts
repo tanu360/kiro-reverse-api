@@ -1,20 +1,24 @@
 import { queryOptions } from "@tanstack/react-query";
+import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
 import type {
   ApiKey,
   ApiKeyCreateRequest,
   ApiKeyCreateResponse,
   ApiKeyDetailResponse,
+  ApiKeyListResponse,
   ApiKeyResetUsageResponse,
   ApiKeyUpdateRequest,
   ApiKeyUpdateResponse,
   SuccessResponse,
 } from "./types";
 
-const notImplemented = () => Promise.reject(new Error("not implemented"));
+const keyPath = (id: string, suffix = "") => `/api-keys/${encodeURIComponent(id)}${suffix}`;
 
-export function listApiKeys(): Promise<ApiKey[]> {
-  return notImplemented();
+/** The list carries only `keyMasked`, never the secret. */
+export async function listApiKeys(): Promise<ApiKey[]> {
+  const res = await apiRequest<ApiKeyListResponse>("/api-keys");
+  return res.apiKeys ?? [];
 }
 
 export function apiKeysQuery() {
@@ -25,25 +29,22 @@ export function apiKeysQuery() {
 }
 
 /** Full secret. Never cache. */
-export function getApiKey(_id: string): Promise<ApiKeyDetailResponse> {
-  return notImplemented();
+export function getApiKey(id: string): Promise<ApiKeyDetailResponse> {
+  return apiRequest(keyPath(id));
 }
 
-export function createApiKey(_req: ApiKeyCreateRequest): Promise<ApiKeyCreateResponse> {
-  return notImplemented();
+export function createApiKey(req: ApiKeyCreateRequest): Promise<ApiKeyCreateResponse> {
+  return apiRequest("/api-keys", { method: "POST", body: req });
 }
 
-export function updateApiKey(
-  _id: string,
-  _req: ApiKeyUpdateRequest,
-): Promise<ApiKeyUpdateResponse> {
-  return notImplemented();
+export function updateApiKey(id: string, req: ApiKeyUpdateRequest): Promise<ApiKeyUpdateResponse> {
+  return apiRequest(keyPath(id), { method: "PUT", body: req });
 }
 
-export function deleteApiKey(_id: string): Promise<SuccessResponse> {
-  return notImplemented();
+export function deleteApiKey(id: string): Promise<SuccessResponse> {
+  return apiRequest(keyPath(id), { method: "DELETE" });
 }
 
-export function resetApiKeyUsage(_id: string): Promise<ApiKeyResetUsageResponse> {
-  return notImplemented();
+export function resetApiKeyUsage(id: string): Promise<ApiKeyResetUsageResponse> {
+  return apiRequest(keyPath(id, "/reset-usage"), { method: "POST" });
 }

@@ -17,14 +17,17 @@ export function jsonError(
 }
 
 /**
- * 401 {"error":"Unauthorized"} unless X-Admin-Token starts with 'mock-'.
- * Skeleton: lets every request through.
+ * 401 {"error":"Unauthorized"} unless X-Admin-Token starts with 'mock-'. Any mock token is
+ * accepted, so a reload in mock mode keeps the stored session.
  */
-export function requireAuth(_request: Request): Response | null {
-  return null;
+export function requireAuth(request: Request): Response | null {
+  const token = request.headers.get("X-Admin-Token") ?? "";
+  return token.startsWith("mock-") ? null : jsonError(401, "Unauthorized");
 }
 
-/** 0 ms in tests, 120-400 ms otherwise. Skeleton: no delay. */
+/** 0 ms in tests, 120-400 ms otherwise, so loading states are visible in mock mode. */
 export function mockDelay(): Promise<void> {
-  return Promise.resolve();
+  if (import.meta.env.MODE === "test") return Promise.resolve();
+  const ms = 120 + Math.floor(Math.random() * 281);
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
