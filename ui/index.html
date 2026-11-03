@@ -31,14 +31,30 @@
         }
         root.classList.toggle("dark", dark);
         root.style.colorScheme = dark ? "dark" : "light";
+        // Mirrors getInitialLang and matchLang in src/lib/i18n (boot-script.test.ts keeps
+        // them in step): the stored language, else the first supported navigator language.
+        const matchLang = (tag) => {
+          const lower = String(tag || "").toLowerCase();
+          if (lower.startsWith("zh")) return "zh";
+          if (lower.startsWith("vi")) return "vi";
+          if (lower.startsWith("pt")) return "pt-BR";
+          if (lower.startsWith("en")) return "en";
+          return undefined;
+        };
         const storedLang = read("kiro_lang");
-        const navLang = (navigator.language || "").toLowerCase();
-        root.lang =
-          storedLang === "en" || storedLang === "zh"
-            ? storedLang
-            : navLang.startsWith("zh")
-              ? "zh"
-              : "en";
+        let lang = ["en", "zh", "vi", "pt-BR"].includes(storedLang)
+          ? storedLang
+          : storedLang === "pseudo" // the dev-only pseudo language renders as English
+            ? "en"
+            : undefined;
+        if (!lang) {
+          const preferred = navigator.languages?.length ? navigator.languages : [navigator.language];
+          for (const tag of preferred) {
+            lang = matchLang(tag);
+            if (lang) break;
+          }
+        }
+        root.lang = lang || "en";
       })();
     </script>
   </head>
