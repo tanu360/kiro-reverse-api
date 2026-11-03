@@ -204,7 +204,8 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
   return (
     <SettingsSection
       actions={
-        <>
+        // One row beside the title on a wide card; it wraps under the title on a narrow one.
+        <div className="flex flex-wrap items-center gap-2 @md:flex-nowrap">
           <Button onClick={addRow} size="sm" variant="outline">
             <PlusIcon aria-hidden="true" />
             {t("modelMappings.add")}
@@ -214,7 +215,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
             {t("modelMappings.reset")}
           </Button>
           <SaveButton dirty={draft.dirty} saving={saving} />
-        </>
+        </div>
       }
       footer={
         <div className="flex w-full flex-col gap-1 text-muted-foreground text-xs">

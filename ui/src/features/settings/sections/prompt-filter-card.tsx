@@ -176,6 +176,7 @@ function RuleCard({
   const regex = isRegexRule(rule);
   const invalid = regex && regexFails(rule.match);
   const ruleLabel = t("promptFilter.ruleLabel", { n: index + 1 });
+  const typeLabel = regex ? t("promptFilter.typeRegex") : t("promptFilter.typeContains");
 
   return (
     <li
@@ -200,8 +201,8 @@ function RuleCard({
           size="sm"
           value={rule.name}
         />
-        <Badge className="shrink-0" variant="secondary">
-          {regex ? t("promptFilter.typeRegex") : t("promptFilter.typeContains")}
+        <Badge className="hidden shrink-0 sm:inline-flex" variant="secondary">
+          {typeLabel}
         </Badge>
         <Button
           aria-label={t("remove")}
@@ -214,6 +215,10 @@ function RuleCard({
           <XIcon aria-hidden="true" />
         </Button>
       </div>
+      {/* On phones the type moves under the header so the name keeps its width. */}
+      <Badge className="self-start sm:hidden" variant="secondary">
+        {typeLabel}
+      </Badge>
       <div className={cn("grid gap-3", regex && "sm:grid-cols-2")}>
         <div className="flex min-w-0 flex-col gap-1.5">
           <Label className="text-xs" htmlFor={`${id}-match`}>
