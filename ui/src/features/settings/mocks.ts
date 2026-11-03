@@ -1,3 +1,357 @@
-import type { HttpHandler } from "msw";
+import { type HttpHandler, HttpResponse, http } from "msw";
+import type {
+  ModelMappingRule,
+  PreferredEndpoint,
+  PromptFilterRule,
+  SettingsPatch,
+  ThinkingFormat,
+} from "@/lib/api/types";
+import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { defaultModelMappings } from "@/lib/mocks/fixtures";
+import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
-export const handlers: HttpHandler[] = [];
+// Mirrors the Go admin API (proxy/handler.go, config/model_mapping_validation.go): the same
+// validation order, error strings and patch semantics.
+
+const OK = { success: true } as const;
+const MAX_AUTO_CONTINUE = 10;
+const MIN_PASSWORD_RUNES = 8;
+const MAX_MAPPINGS = 200;
+const MAX_MODEL_ID_BYTES = 256;
+const THINKING_FORMATS: readonly ThinkingFormat[] = ["reasoning_content", "thinking", "think"];
+const ENDPOINTS: readonly PreferredEndpoint[] = ["auto", "kiro", "codewhisperer", "amazonq"];
+const PROXY_SCHEMES = ["http://", "https://", "socks5://", "socks5h://"];
+
+type Json = Record<string, unknown>;
+
+function isRecord(value: unknown): value is Json {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The JSON object body, or null when Go's decoder would answer 400 Invalid JSON. */
+async function readObject(request: Request): Promise<Json | null> {
+  const body: unknown = await request.json().catch(() => undefined);
+  return isRecord(body) ? body : null;
+}
+
+function invalidJson(): Response {
+  return jsonError(400, "Invalid JSON");
+}
+
+/** Optional typed field: undefined when absent, null when the type would fail Go's decoder. */
+function optional<T>(
+  body: Json,
+  key: string,
+  check: (value: unknown) => value is T,
+): T | undefined | null {
+  if (!(key in body) || body[key] === null) return undefined;
+  return check(body[key]) ? (body[key] as T) : null;
+}
+
+const isBool = (value: unknown): value is boolean => typeof value === "boolean";
+const isString = (value: unknown): value is string => typeof value === "string";
+const isInteger = (value: unknown): value is number => Number.isInteger(value);
+
+function readSettingsPatch(body: Json): SettingsPatch | null {
+  const patch: SettingsPatch = {};
+  const boolKeys = [
+    "requireApiKey",
+    "allowOverUsage",
+    "lenientStreamIntegrity",
+    "sessionAffinity",
+    "autoContinue",
+    "structuredToolHistory",
+  ] as const;
+  for (const key of boolKeys) {
+    const value = optional(body, key, isBool);
+    if (value === null) return null;
+    if (value !== undefined) patch[key] = value;
+  }
+  const max = optional(body, "autoContinueMax", isInteger);
+  if (max === null) return null;
+  if (max !== undefined) patch.autoContinueMax = max;
+  const password = optional(body, "password", isString);
+  if (password === null) return null;
+  if (password !== undefined) patch.password = password;
+  return patch;
+}
+
+function validateModelId(id: string): string | null {
+  if (new TextEncoder().encode(id).length > MAX_MODEL_ID_BYTES) {
+    return `model ID ${JSON.stringify(id.slice(0, 32))}... is longer than ${MAX_MODEL_ID_BYTES} bytes`;
+  }
+  // Go: unicode.IsSpace || unicode.IsControl
+  if (/[\s\p{Cc}]/u.test(id)) {
+    return `model ID ${JSON.stringify(id)} contains whitespace or control characters`;
+  }
+  return null;
+}
+
+type MappingResult =
+  | { ok: true; rules: ModelMappingRule[] }
+  | { ok: false; error: string; index: number };
+
+/** config.normalizeModelMappings: keys trimmed and lowercased, values trimmed. */
+function normalizeMappings(input: ModelMappingRule[]): MappingResult {
+  if (input.length > MAX_MAPPINGS) {
+    return { ok: false, index: -1, error: `at most ${MAX_MAPPINGS} model mappings are allowed` };
+  }
+  const cleaned: ModelMappingRule[] = [];
+  for (const [i, mapping] of input.entries()) {
+    const key = mapping.key.trim().toLowerCase();
+    const value = mapping.value.trim();
+    if (!key && !value) return { ok: false, index: i, error: `model mapping ${i + 1} is empty` };
+    if (!key) {
+      return {
+        ok: false,
+        index: i,
+        error: `mapping to ${JSON.stringify(value)} has no source model`,
+      };
+    }
+    if (!value) {
+      return { ok: false, index: i, error: `mapping ${JSON.stringify(key)} has no target model` };
+    }
+    for (const id of [key, value]) {
+      const problem = validateModelId(id);
+      if (problem) return { ok: false, index: i, error: problem };
+    }
+    if (key === value.toLowerCase()) {
+      return { ok: false, index: i, error: `mapping ${JSON.stringify(key)} points to itself` };
+    }
+    if (cleaned.some((previous) => previous.key === key)) {
+      return {
+        ok: false,
+        index: i,
+        error: `source ${JSON.stringify(key)} is mapped more than once`,
+      };
+    }
+    cleaned.push({ key, value });
+  }
+  for (const [i, mapping] of cleaned.entries()) {
+    if (cleaned.some((other) => other.key === mapping.value.toLowerCase())) {
+      return {
+        ok: false,
+        index: i,
+        error: `target ${JSON.stringify(mapping.value)} is also a mapping source; mappings resolve in one hop`,
+      };
+    }
+  }
+  return { ok: true, rules: cleaned };
+}
+
+function readMappings(body: Json): ModelMappingRule[] | null {
+  const list = body.mappings;
+  if (list === undefined || list === null) return [];
+  if (!Array.isArray(list)) return null;
+  const rules: ModelMappingRule[] = [];
+  for (const item of list) {
+    if (!isRecord(item)) return null;
+    const key = item.key ?? "";
+    const value = item.value ?? "";
+    if (!isString(key) || !isString(value)) return null;
+    rules.push({ key, value });
+  }
+  return rules;
+}
+
+function readRules(value: unknown): PromptFilterRule[] | null {
+  if (!Array.isArray(value)) return null;
+  const rules: PromptFilterRule[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const rule: PromptFilterRule = {
+      id: isString(item.id) ? item.id : "",
+      name: isString(item.name) ? item.name : "",
+      type: (isString(item.type) ? item.type : "") as PromptFilterRule["type"],
+      match: isString(item.match) ? item.match : "",
+      enabled: item.enabled === true,
+    };
+    // Go: `replace,omitempty`
+    if (isString(item.replace) && item.replace) rule.replace = item.replace;
+    rules.push(rule);
+  }
+  return rules;
+}
+
+export const handlers: HttpHandler[] = [
+  http.get(apiUrl("/settings"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json(mockDb.settings);
+  }),
+
+  http.post(apiUrl("/settings"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    const patch = body ? readSettingsPatch(body) : null;
+    if (!patch) return invalidJson();
+    if (
+      patch.autoContinueMax !== undefined &&
+      (patch.autoContinueMax < 1 || patch.autoContinueMax > MAX_AUTO_CONTINUE)
+    ) {
+      return jsonError(400, "autoContinueMax must be between 1 and 10");
+    }
+    if (patch.password && [...patch.password].length < MIN_PASSWORD_RUNES) {
+      return jsonError(400, "Password must be at least 8 characters");
+    }
+    const { password, ...rest } = patch;
+    // An empty password is ignored, like Go. A real one would also revoke every admin session;
+    // mock tokens stay valid, so only the next POST /session sees the new password.
+    if (password) {
+      mockDb.adminPassword = password;
+      mockDb.firstRunPending = false;
+    }
+    Object.assign(mockDb.settings, rest);
+    return HttpResponse.json(OK);
+  }),
+
+  http.get(apiUrl("/thinking"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const { suffix, openaiFormat, claudeFormat } = mockDb.thinking;
+    // Empty stored values read back as their defaults.
+    return HttpResponse.json({
+      suffix: suffix || "-thinking",
+      openaiFormat: openaiFormat || "reasoning_content",
+      claudeFormat: claudeFormat || "thinking",
+    });
+  }),
+
+  http.post(apiUrl("/thinking"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    if (!body) return invalidJson();
+    const suffix = optional(body, "suffix", isString);
+    const openaiFormat = optional(body, "openaiFormat", isString);
+    const claudeFormat = optional(body, "claudeFormat", isString);
+    if (suffix === null || openaiFormat === null || claudeFormat === null) return invalidJson();
+    const formats = THINKING_FORMATS as readonly string[];
+    if (openaiFormat && !formats.includes(openaiFormat)) {
+      return jsonError(400, "Invalid openaiFormat, must be: reasoning_content, thinking, or think");
+    }
+    if (claudeFormat && !formats.includes(claudeFormat)) {
+      return jsonError(400, "Invalid claudeFormat, must be: reasoning_content, thinking, or think");
+    }
+    // Not a patch: all three fields are written, an omitted one as "".
+    mockDb.thinking = {
+      suffix: suffix ?? "",
+      openaiFormat: (openaiFormat ?? "") as ThinkingFormat,
+      claudeFormat: (claudeFormat ?? "") as ThinkingFormat,
+    };
+    return HttpResponse.json(OK);
+  }),
+
+  http.get(apiUrl("/model-mappings"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json({ mappings: mockDb.modelMappings, defaults: defaultModelMappings() });
+  }),
+
+  http.post(apiUrl("/model-mappings"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    const input = body ? readMappings(body) : null;
+    if (!input) return invalidJson();
+    const result = normalizeMappings(input);
+    if (!result.ok) return jsonError(400, result.error, { index: result.index });
+    mockDb.modelMappings = result.rules;
+    return HttpResponse.json(OK);
+  }),
+
+  http.get(apiUrl("/endpoint"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json(mockDb.endpoint);
+  }),
+
+  http.post(apiUrl("/endpoint"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    if (!body) return invalidJson();
+    const preferred = optional(body, "preferredEndpoint", isString);
+    const fallback = optional(body, "endpointFallback", isBool);
+    if (preferred === null || fallback === null) return invalidJson();
+    if (!preferred || !(ENDPOINTS as readonly string[]).includes(preferred)) {
+      return jsonError(400, "Invalid endpoint, must be: auto, kiro, codewhisperer, or amazonq");
+    }
+    mockDb.endpoint = {
+      preferredEndpoint: preferred as PreferredEndpoint,
+      endpointFallback: fallback ?? mockDb.endpoint.endpointFallback,
+    };
+    return HttpResponse.json(OK);
+  }),
+
+  http.get(apiUrl("/proxy"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json(mockDb.proxy);
+  }),
+
+  http.post(apiUrl("/proxy"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    const proxyURL = body ? optional(body, "proxyURL", isString) : null;
+    if (proxyURL === null) return invalidJson();
+    const url = (proxyURL ?? "").trim();
+    if (url && !PROXY_SCHEMES.some((scheme) => url.startsWith(scheme))) {
+      return jsonError(400, "proxyURL must start with http://, https://, socks5://, or socks5h://");
+    }
+    mockDb.proxy = { proxyURL: url };
+    return HttpResponse.json(OK);
+  }),
+
+  http.get(apiUrl("/prompt-filter"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json({ ...mockDb.promptFilter, rules: [...mockDb.promptFilter.rules] });
+  }),
+
+  http.post(apiUrl("/prompt-filter"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    if (!body) return invalidJson();
+    const next = { ...mockDb.promptFilter };
+    for (const key of ["filterClaudeCode", "filterEnvNoise", "filterStripBoundaries"] as const) {
+      const value = optional(body, key, isBool);
+      if (value === null) return invalidJson();
+      if (value !== undefined) next[key] = value;
+    }
+    // Omitted or null rules keep the current list; [] clears it.
+    if (body.rules !== undefined && body.rules !== null) {
+      const rules = readRules(body.rules);
+      if (!rules) return invalidJson();
+      next.rules = rules;
+    }
+    mockDb.promptFilter = next;
+    return HttpResponse.json(OK);
+  }),
+
+  http.post(apiUrl("/stats/reset"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    mockDb.requests = [];
+    mockDb.errors = [];
+    mockDb.modelMix = [];
+    mockDb.startedAt = mockNowUnix();
+    return HttpResponse.json(OK);
+  }),
+];
