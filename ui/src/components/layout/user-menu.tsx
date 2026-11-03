@@ -112,7 +112,7 @@ function SidebarUserMenu(): JSX.Element {
         render={
           <SidebarMenuButton
             aria-label={t("shell.userMenu")}
-            className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
+            className="data-popup-open:bg-sidebar-row-active data-popup-open:text-sidebar-foreground"
             size="lg"
             tooltip={t("shell.admin")}
           />
@@ -120,8 +120,8 @@ function SidebarUserMenu(): JSX.Element {
       >
         <AdminAvatar />
         <span className="grid flex-1 text-left text-sm leading-tight">
-          <span className="truncate font-medium">{t("shell.admin")}</span>
-          <span className="truncate text-muted-foreground text-xs">{t("shell.appName")}</span>
+          <span className="truncate font-medium text-sidebar-foreground">{t("shell.admin")}</span>
+          <span className="truncate text-secondary-label text-xs">{t("shell.appName")}</span>
         </span>
         <EllipsisVerticalIcon aria-hidden="true" className="ms-auto size-4" />
       </MenuTrigger>

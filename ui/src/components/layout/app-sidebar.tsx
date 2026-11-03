@@ -14,13 +14,16 @@ import { useT } from "@/lib/i18n";
 import { NavFooter } from "./nav-footer";
 import { NavMain } from "./nav-main";
 
-/** Port of Studio Admin app-sidebar: logo header, nav, and a footer without the promo card. */
+/**
+ * Port of Studio Admin app-sidebar: logo header, nav, and a footer without the promo card.
+ * `data-app-sidebar` scopes t3code's sidebar palette (see index.css) to this sidebar.
+ */
 export function AppSidebar(): JSX.Element {
   const { t } = useT();
   const { isMobile, setOpenMobile } = useSidebar();
 
   return (
-    <Sidebar collapsible="icon" variant="sidebar">
+    <Sidebar collapsible="icon" data-app-sidebar="" variant="sidebar">
       <SidebarHeader className="h-12 justify-center py-0">
         <SidebarMenu>
           <SidebarMenuItem>
@@ -33,12 +36,14 @@ export function AppSidebar(): JSX.Element {
             >
               <img
                 alt=""
-                className="size-5 shrink-0 rounded-sm"
+                className="size-5 shrink-0 rounded-sm dark:invert"
                 height={20}
                 src="/admin/icon.png"
                 width={20}
               />
-              <span className="font-semibold text-base">{t("shell.appName")}</span>
+              <span className="font-semibold text-base text-sidebar-foreground">
+                {t("shell.appName")}
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

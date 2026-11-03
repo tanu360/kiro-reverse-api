@@ -13,7 +13,10 @@ import {
 import { useT } from "@/lib/i18n";
 import { activeNavItem, NAV_GROUPS, NAV_ITEMS } from "./nav-items";
 
-/** Port of Studio Admin nav-main: a primary "Add account" action, then the grouped pages. */
+/**
+ * Port of Studio Admin nav-main: an "Add account" action, then the grouped pages. The action is
+ * a quiet outline row, as t3code styles its sidebar header actions.
+ */
 export function NavMain(): JSX.Element {
   const { t } = useT();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -31,10 +34,11 @@ export function NavMain(): JSX.Element {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+                className="min-w-8"
                 onClick={closeOnMobile}
                 render={<Link search={{ add: true }} to="/accounts" />}
                 tooltip={t("shell.addAccount")}
+                variant="outline"
               >
                 <PlusIcon aria-hidden="true" />
                 <span>{t("shell.addAccount")}</span>
