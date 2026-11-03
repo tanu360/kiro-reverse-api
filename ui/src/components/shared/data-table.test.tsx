@@ -210,6 +210,48 @@ describe("DataTable", () => {
     expect(onRowClick).toHaveBeenLastCalledWith(ROWS[1]);
   });
 
+  it("renders the empty state outside the horizontally scrolling table", () => {
+    renderWithProviders(
+      <DataTable
+        columns={COLUMNS}
+        data={[]}
+        emptyState={<p>No requests yet</p>}
+        getRowId={(row) => row.id}
+      />,
+    );
+    const empty = screen.getByText("No requests yet");
+    // Inside the table it would be centred across the full scroll width, off-screen on phones.
+    expect(empty.closest("table")).toBeNull();
+    expect(empty.closest('[data-slot="table-container"]')).toBeNull();
+    // The header row stays, so the columns are still visible.
+    expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
+  });
+
+  it("makes the whole header height the sort button's target", () => {
+    renderWithProviders(<SortedTable onSortChange={() => {}} />);
+    expect(screen.getByRole("button", { name: "Name" }).className).toContain("h-10");
+  });
+
+  it("pins a sticky end column to the right edge and a sticky column to the left", () => {
+    renderWithProviders(
+      <DataTable
+        columns={[
+          { ...COLUMNS[0], sticky: true } as DataTableColumn<Row>,
+          COLUMNS[1] as DataTableColumn<Row>,
+          { ...COLUMNS[2], sticky: "end" } as DataTableColumn<Row>,
+        ]}
+        data={ROWS}
+        getRowId={(row) => row.id}
+      />,
+    );
+    const actionsHeader = screen.getByRole("columnheader", { name: "Actions" });
+    expect(actionsHeader.className).toContain("right-0");
+    expect(actionsHeader.className).toContain("sticky");
+    const actionsCell = screen.getByRole("button", { name: "Open Alpha" }).closest("td");
+    expect(actionsCell?.className).toContain("right-0");
+    expect(screen.getByRole("columnheader", { name: "Name" }).className).toContain("left-0");
+  });
+
   it("leaves rows unfocusable without onRowClick", () => {
     renderWithProviders(<DataTable columns={COLUMNS} data={ROWS} getRowId={(row) => row.id} />);
     expect(screen.getByRole("row", { name: /Alpha/ })).not.toHaveAttribute("tabindex");

@@ -24,6 +24,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useUiT } from "@/components/ui/messages";
 import { cn } from "@/lib/utils";
 import { DEFAULT_ANIMATION_EASING } from "./animation";
 import { chartCssVars } from "./chart-context";
@@ -440,7 +441,10 @@ function SparklineFrame<T>({
     [setHoverIndex]
   );
 
-  const label = config["aria-label"] ?? describeSparkline(values);
+  const { t, lang } = useUiT();
+  const label =
+    config["aria-label"] ??
+    describeSparkline(values, t, lang === "zh" ? "zh-CN" : "en");
 
   return (
     <div

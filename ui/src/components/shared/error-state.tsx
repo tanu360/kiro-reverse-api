@@ -33,7 +33,7 @@ export function ErrorState({
         {message ? <p className="break-words text-muted-foreground text-sm">{message}</p> : null}
       </div>
       {onRetry ? (
-        <Button onClick={onRetry} size="sm" variant="outline">
+        <Button onClick={onRetry} variant="outline">
           <RotateCwIcon aria-hidden="true" />
           {t("actions.retry")}
         </Button>
