@@ -5,8 +5,10 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { XIcon } from "lucide-react";
 import type React from "react";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const Sheet: typeof SheetPrimitive.Root = SheetPrimitive.Root;
@@ -75,6 +77,7 @@ export function SheetPopup({
   variant = "default",
   closeProps,
   portalProps,
+  onKeyDown,
   ...props
 }: SheetPrimitive.Popup.Props & {
   showCloseButton?: boolean;
@@ -83,6 +86,7 @@ export function SheetPopup({
   closeProps?: SheetPrimitive.Close.Props;
   portalProps?: SheetPrimitive.Portal.Props;
 }): React.ReactElement {
+  const { t } = useT();
   return (
     <SheetPortal {...portalProps}>
       <SheetBackdrop />
@@ -103,12 +107,16 @@ export function SheetPopup({
             className,
           )}
           data-slot="sheet-popup"
+          onKeyDown={(event) => {
+            onKeyDown?.(event);
+            wrapTabFocus(event);
+          }}
           {...props}
         >
           {children}
           {showCloseButton && (
             <SheetPrimitive.Close
-              aria-label="Close"
+              aria-label={t("actions.close")}
               className="absolute end-2 top-2"
               render={<Button size="icon" variant="ghost" />}
               {...closeProps}

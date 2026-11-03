@@ -5,6 +5,7 @@ import { MinusIcon, PlusIcon } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { useUiT } from "@/components/ui/messages";
 
 export const NumberFieldContext: React.Context<{
   fieldId: string;
@@ -56,8 +57,10 @@ export function NumberFieldDecrement({
   className,
   ...props
 }: NumberFieldPrimitive.Decrement.Props): React.ReactElement {
+  const { t } = useUiT();
   return (
     <NumberFieldPrimitive.Decrement
+      aria-label={t("numberField.decrease")}
       className={cn(
         "relative flex shrink-0 cursor-pointer items-center justify-center rounded-s-[calc(var(--radius-lg)-1px)] in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] transition-colors pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:bg-accent",
         className,
@@ -74,8 +77,10 @@ export function NumberFieldIncrement({
   className,
   ...props
 }: NumberFieldPrimitive.Increment.Props): React.ReactElement {
+  const { t } = useUiT();
   return (
     <NumberFieldPrimitive.Increment
+      aria-label={t("numberField.increase")}
       className={cn(
         "relative flex shrink-0 cursor-pointer items-center justify-center rounded-e-[calc(var(--radius-lg)-1px)] in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] transition-colors pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:bg-accent",
         className,
@@ -95,7 +100,7 @@ export function NumberFieldInput({
   return (
     <NumberFieldPrimitive.Input
       className={cn(
-        "h-8.5 in-data-[size=lg]:h-9.5 in-data-[size=sm]:h-7.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground tabular-nums in-data-[size=lg]:leading-9.5 in-data-[size=sm]:leading-7.5 leading-8.5 outline-none sm:h-7.5 sm:in-data-[size=lg]:h-8.5 sm:in-data-[size=sm]:h-6.5 sm:in-data-[size=lg]:leading-8.5 sm:in-data-[size=sm]:leading-8.5 sm:leading-7.5",
+        "h-8.5 in-data-[size=lg]:h-9.5 in-data-[size=sm]:h-7.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground tabular-nums in-data-[size=lg]:leading-9.5 in-data-[size=sm]:leading-7.5 leading-8.5 outline-none sm:h-7.5 sm:in-data-[size=lg]:h-8.5 sm:in-data-[size=sm]:h-6.5 sm:in-data-[size=lg]:leading-8.5 sm:in-data-[size=sm]:leading-8.5 sm:leading-7.5 pointer-coarse:h-10 pointer-coarse:leading-10",
         className,
       )}
       data-slot="number-field-input"

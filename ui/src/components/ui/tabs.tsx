@@ -8,6 +8,7 @@ import {
   segmentedControlIndicatorSurfaceClassName,
   segmentedControlItemLayoutClassName,
   segmentedControlItemSizeClassNames,
+  segmentedControlItemTouchClassName,
 } from "@/components/ui/segmented-control";
 
 type TabsVariant = "default" | "underline";
@@ -48,7 +49,8 @@ export function TabsList({
         "relative z-0 flex w-fit items-center justify-center gap-x-0.5 text-muted-foreground",
         "data-[orientation=vertical]:flex-col",
         variant === "default"
-          ? "rounded-lg bg-muted p-0.5 text-muted-foreground/72"
+          ? // Full-strength muted text: the coss /72 tint fell to 2.8:1 (light) and 4.1:1 (dark).
+            "rounded-lg bg-muted p-0.5 text-muted-foreground"
           : "data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:hover:bg-accent",
         className,
       )}
@@ -85,8 +87,9 @@ export function TabsTab({
   return (
     <TabsPrimitive.Tab
       className={cn(
-        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base outline-none transition-[color,background-color,box-shadow] hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64 sm:text-sm",
+        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64 sm:text-sm",
         segmentedControlItemLayoutClassName,
+        segmentedControlItemTouchClassName,
         segmentedControlItemSizeClassNames[resolvedSize],
         className,
       )}
@@ -103,7 +106,11 @@ export function TabsPanel({
 }: TabsPrimitive.Panel.Props): React.ReactElement {
   return (
     <TabsPrimitive.Panel
-      className={cn("flex-1 outline-none", className)}
+      // The panel is a tab stop (Base UI sets tabIndex 0), so it shows the same ring as tabs.
+      className={cn(
+        "flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        className,
+      )}
       data-slot="tabs-content"
       {...props}
     />

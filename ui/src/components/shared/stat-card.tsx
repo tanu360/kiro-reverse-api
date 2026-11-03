@@ -1,15 +1,9 @@
-import {
-  InfoIcon,
-  type LucideIcon,
-  MinusIcon,
-  TrendingDownIcon,
-  TrendingUpIcon,
-} from "lucide-react";
+import { type LucideIcon, MinusIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import type { JSX, ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { InfoHint } from "./info-hint";
 import { StatCardSkeleton } from "./loading-state";
 
 export interface StatMetric {
@@ -17,7 +11,7 @@ export interface StatMetric {
   value: ReactNode;
   tone?: "default" | "danger" | "muted";
   wide?: boolean;
-  /** Shown as a tooltip on the label, with an info affordance. */
+  /** Explains the label in a popup that opens on hover, click or tap (info icon on the label). */
   hint?: string;
 }
 
@@ -74,20 +68,7 @@ function MetricLabel({ metric }: { metric: StatMetric }): JSX.Element {
   }
   return (
     <dt className="min-w-0">
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <button
-              className="inline-flex max-w-full items-center gap-1 rounded-sm text-left text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              type="button"
-            />
-          }
-        >
-          <span className="truncate">{metric.label}</span>
-          <InfoIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" />
-        </TooltipTrigger>
-        <TooltipPopup className="max-w-72">{metric.hint}</TooltipPopup>
-      </Tooltip>
+      <InfoHint hint={metric.hint}>{metric.label}</InfoHint>
     </dt>
   );
 }

@@ -259,28 +259,55 @@ export function sparklineIndexAtX(
   return Math.min(count - 1, Math.max(0, raw));
 }
 
-function formatCompact(value: number): string {
-  return new Intl.NumberFormat("en", {
+function formatCompact(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
 }
 
-/** Screen-reader summary, e.g. "12 points, from 3.1K to 4.2K, up 35%". */
-export function describeSparkline(values: readonly number[]): string {
+/** Message lookup for the summary; keys are `sparkline.*` in the `ui` namespace. */
+export type SparklineTranslate = (
+  key: "sparkline.empty" | "sparkline.summary" | "sparkline.summaryUp" | "sparkline.summaryDown",
+  params?: Record<string, string | number>
+) => string;
+
+const englishSummary: SparklineTranslate = (key, params = {}) => {
+  const base = `${params.count} points, from ${params.first} to ${params.last}`;
+  if (key === "sparkline.empty") return "No data";
+  if (key === "sparkline.summaryUp") return `${base}, up ${params.change}%`;
+  if (key === "sparkline.summaryDown") return `${base}, down ${params.change}%`;
+  return base;
+};
+
+/**
+ * Screen-reader summary, e.g. "12 points, from 3.1K to 4.2K, up 35%". Pass the UI language's
+ * `t` and locale so the summary is read in that language; English is the fallback.
+ */
+export function describeSparkline(
+  values: readonly number[],
+  t: SparklineTranslate = englishSummary,
+  locale = "en"
+): string {
   const finite = values.filter(Number.isFinite);
   if (finite.length === 0) {
-    return "No data";
+    return t("sparkline.empty");
   }
   const first = finite[0] as number;
   const last = finite.at(-1) as number;
-  let summary = `${finite.length} points, from ${formatCompact(first)} to ${formatCompact(last)}`;
-  if (first !== 0) {
-    const change = ((last - first) / Math.abs(first)) * 100;
-    const direction = change >= 0 ? "up" : "down";
-    summary += `, ${direction} ${Math.abs(Math.round(change))}%`;
+  const params = {
+    count: finite.length,
+    first: formatCompact(first, locale),
+    last: formatCompact(last, locale),
+  };
+  if (first === 0) {
+    return t("sparkline.summary", params);
   }
-  return summary;
+  const change = ((last - first) / Math.abs(first)) * 100;
+  return t(change >= 0 ? "sparkline.summaryUp" : "sparkline.summaryDown", {
+    ...params,
+    change: Math.abs(Math.round(change)),
+  });
 }
 
 /**

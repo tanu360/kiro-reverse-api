@@ -9,8 +9,10 @@ import { useRender } from "@base-ui/react/use-render";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import type React from "react";
 import { createContext, useContext } from "react";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type DrawerPosition = "right" | "left" | "top" | "bottom";
@@ -145,6 +147,7 @@ export function DrawerPopup({
   variant = "default",
   showBar = false,
   portalProps,
+  onKeyDown,
   ...props
 }: DrawerPrimitive.Popup.Props & {
   showCloseButton?: boolean;
@@ -153,6 +156,7 @@ export function DrawerPopup({
   showBar?: boolean;
   portalProps?: DrawerPrimitive.Portal.Props;
 }): React.ReactElement {
+  const { t } = useT();
   const { position: contextPosition } = useContext(DrawerContext);
   const position = positionProp ?? contextPosition;
 
@@ -209,12 +213,16 @@ export function DrawerPopup({
             className,
           )}
           data-slot="drawer-popup"
+          onKeyDown={(event) => {
+            onKeyDown?.(event);
+            wrapTabFocus(event);
+          }}
           {...props}
         >
           {children}
           {showCloseButton && (
             <DrawerPrimitive.Close
-              aria-label="Close"
+              aria-label={t("actions.close")}
               className="absolute end-2 top-2 z-1"
               render={<Button size="icon" variant="ghost" />}
             >

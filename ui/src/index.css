@@ -42,7 +42,8 @@
   --border: var(--color-zinc-200);
   --input: var(--color-zinc-300);
   --ring: var(--primary);
-  --destructive: var(--color-red-500);
+  /* red-600, not t3code's red-500: white button text on red-500 is only 3.8:1 (AA needs 4.5). */
+  --destructive: var(--color-red-600);
   --destructive-foreground: var(--color-red-700);
   --info: var(--color-blue-500);
   --info-foreground: var(--color-blue-700);
@@ -66,6 +67,13 @@
   --sidebar-ring: var(--ring);
   --code-background: color-mix(in srgb, var(--card) 90%, var(--background));
   --code-foreground: var(--foreground);
+  /*
+   * Off switch: a light track with a zinc-500 edge, so the control boundary reaches the 3:1
+   * non-text contrast of WCAG 1.4.11 on white cards and the zinc-25 page (about 4.7:1).
+   */
+  --switch-track: var(--color-zinc-200);
+  --switch-border: var(--color-zinc-500);
+  --switch-thumb: var(--color-white);
 }
 
 .dark {
@@ -85,7 +93,8 @@
   --accent-foreground: var(--color-neutral-100);
   --border: --alpha(var(--color-white) / 8%);
   --input: --alpha(var(--color-white) / 11%);
-  --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
+  /* Same red-600 as light: the lighter t3code mix put white button text at 3.5:1. */
+  --destructive: var(--color-red-600);
   --destructive-foreground: var(--color-red-400);
   --info-foreground: var(--color-blue-400);
   --success-foreground: var(--color-emerald-400);
@@ -96,6 +105,10 @@
   --sidebar-row-active: var(--accent);
   --sidebar-row-selected: var(--muted);
   --sidebar-stage-fade: var(--card);
+  /* neutral-500 edge: about 4:1 on the #111 card and 4.4:1 on the black page; light thumb. */
+  --switch-track: --alpha(var(--color-white) / 8%);
+  --switch-border: var(--color-neutral-500);
+  --switch-thumb: var(--color-neutral-300);
 }
 
 /*
@@ -211,6 +224,9 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-code: var(--code-background);
   --color-code-foreground: var(--code-foreground);
+  --color-switch-track: var(--switch-track);
+  --color-switch-border: var(--switch-border);
+  --color-switch-thumb: var(--switch-thumb);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

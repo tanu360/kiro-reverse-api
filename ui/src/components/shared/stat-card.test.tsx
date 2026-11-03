@@ -38,6 +38,22 @@ describe("StatCard", () => {
     expect(await screen.findByText("Kiro-reported usage")).toBeInTheDocument();
   });
 
+  it("opens a metric hint with a click or tap, which a hover tooltip never does", async () => {
+    const { user } = renderWithProviders(
+      <StatCard
+        icon={UsersIcon}
+        label="Accounts"
+        metrics={[{ label: "Plan credits", value: "120 / 500", hint: "Kiro-reported usage" }]}
+        value="8"
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: /Plan credits/ });
+    // A touch tap has no hover phase: pointer down/up plus click only.
+    await user.pointer({ keys: "[TouchA]", target: trigger });
+    expect(await screen.findByText("Kiro-reported usage")).toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("formats a positive delta", () => {
     renderWithProviders(
       <StatCard

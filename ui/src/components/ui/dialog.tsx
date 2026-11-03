@@ -5,8 +5,10 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { XIcon } from "lucide-react";
 import type React from "react";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const DialogCreateHandle: typeof DialogPrimitive.createHandle =
@@ -68,6 +70,7 @@ export function DialogPopup({
   bottomStickOnMobile = true,
   closeProps,
   portalProps,
+  onKeyDown,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
@@ -75,6 +78,7 @@ export function DialogPopup({
   closeProps?: DialogPrimitive.Close.Props;
   portalProps?: DialogPrimitive.Portal.Props;
 }): React.ReactElement {
+  const { t } = useT();
   return (
     <DialogPortal {...portalProps}>
       <DialogBackdrop />
@@ -92,12 +96,16 @@ export function DialogPopup({
             className,
           )}
           data-slot="dialog-popup"
+          onKeyDown={(event) => {
+            onKeyDown?.(event);
+            wrapTabFocus(event);
+          }}
           {...props}
         >
           {children}
           {showCloseButton && (
             <DialogPrimitive.Close
-              aria-label="Close"
+              aria-label={t("actions.close")}
               className="absolute end-2 top-2"
               render={<Button size="icon" variant="ghost" />}
               {...closeProps}

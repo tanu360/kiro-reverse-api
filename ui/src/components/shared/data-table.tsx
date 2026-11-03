@@ -26,7 +26,12 @@ export interface DataTableColumn<T> {
   width?: string;
   className?: string;
   headerClassName?: string;
-  sticky?: boolean;
+  /**
+   * Pins the column while the table scrolls sideways. `true` or "start" pins it to the left
+   * edge (a row label such as Time); "end" pins it to the right edge (row actions), so they stay
+   * reachable when a narrow container hides the middle columns.
+   */
+  sticky?: boolean | "start" | "end";
 }
 
 export interface DataTableSort {
@@ -66,7 +71,19 @@ function fromInteractiveChild(event: { target: EventTarget; currentTarget: Event
 }
 
 const ALIGN_CLASS = { start: "text-left", center: "text-center", end: "text-right" } as const;
-const STICKY_CLASS = "sticky left-0 z-[1] bg-card";
+// Sticky cells need an opaque background; they repeat the row's hover and selected tints so a
+// pinned cell does not read as a separate block.
+const STICKY_BASE =
+  "sticky z-[1] bg-card [tr:hover>&]:bg-[color-mix(in_srgb,var(--background),var(--color-black)_2%)] [tr[data-state=selected]>&]:bg-[color-mix(in_srgb,var(--background),var(--color-black)_4%)] dark:[tr:hover>&]:bg-[color-mix(in_srgb,var(--background),var(--color-white)_2%)] dark:[tr[data-state=selected]>&]:bg-[color-mix(in_srgb,var(--background),var(--color-white)_4%)]";
+const STICKY_CLASS = {
+  start: cn(STICKY_BASE, "left-0"),
+  end: cn(STICKY_BASE, "right-0 shadow-[inset_1px_0_0_var(--border)]"),
+} as const;
+
+function stickyClass(sticky: DataTableColumn<unknown>["sticky"]): string | undefined {
+  if (!sticky) return undefined;
+  return STICKY_CLASS[sticky === "end" ? "end" : "start"];
+}
 const coreFeatures = tableFeatures({});
 const SKELETON_ROWS = 5;
 
@@ -166,7 +183,7 @@ export function DataTable<T>({
         <div aria-busy="true" className={cn("flex flex-col gap-2", className)}>
           {Array.from({ length: 3 }, (_, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
-            <Skeleton className="h-20 w-full rounded-xl" key={index} />
+            <Skeleton className="h-20 w-full rounded-xl border" key={index} />
           ))}
         </div>
       );
@@ -191,127 +208,130 @@ export function DataTable<T>({
 
   const columnCount = columns.length + (selection ? 1 : 0);
 
+  // The empty state sits under the table, outside its horizontal scroller, so it stays centred
+  // in the visible width instead of across the full scroll width of a wide table.
   return (
-    <Table aria-busy={loading || undefined} className={className}>
-      {caption ? <TableCaption className="sr-only">{caption}</TableCaption> : null}
-      <TableHeader>
-        <TableRow className="hover:bg-transparent">
-          {selection ? (
-            <TableHead className="w-px">
-              <Checkbox
-                aria-label={t("table.selectAll")}
-                checked={allSelected}
-                disabled={rowIds.length === 0}
-                indeterminate={someSelected}
-                onCheckedChange={toggleAll}
-              />
-            </TableHead>
-          ) : null}
-          {columns.map((column) => {
-            const active = sort?.id === column.id;
-            const ariaSort = column.sortable
-              ? active
-                ? sort?.desc
-                  ? "descending"
-                  : "ascending"
-                : "none"
-              : undefined;
-            const SortIcon = active ? (sort?.desc ? ArrowDownIcon : ArrowUpIcon) : ArrowUpDownIcon;
-            return (
-              <TableHead
-                aria-sort={ariaSort}
-                className={cn(
-                  ALIGN_CLASS[column.align ?? "start"],
-                  column.sticky && STICKY_CLASS,
-                  column.headerClassName,
-                )}
-                key={column.id}
-                style={column.width ? { width: column.width } : undefined}
-              >
-                {column.sortable && onSortChange ? (
-                  <button
-                    className={cn(
-                      "-mx-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 font-medium outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
-                      active && "text-foreground",
-                      column.align === "end" && "flex-row-reverse",
-                    )}
-                    onClick={() => sortBy(column)}
-                    type="button"
-                  >
-                    {column.header}
-                    <SortIcon
-                      aria-hidden="true"
-                      className={cn("size-3.5 shrink-0", !active && "opacity-50")}
-                    />
-                  </button>
-                ) : (
-                  column.header
-                )}
+    <div className="min-w-0" data-slot="data-table">
+      <Table aria-busy={loading || undefined} className={className}>
+        {caption ? <TableCaption className="sr-only">{caption}</TableCaption> : null}
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            {selection ? (
+              <TableHead className="w-px">
+                <Checkbox
+                  aria-label={t("table.selectAll")}
+                  checked={allSelected}
+                  disabled={rowIds.length === 0}
+                  indeterminate={someSelected}
+                  onCheckedChange={toggleAll}
+                />
               </TableHead>
-            );
-          })}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {loading && rows.length === 0
-          ? Array.from({ length: SKELETON_ROWS }, (_, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
-              <TableRow aria-hidden="true" className="hover:bg-transparent" key={index}>
-                {Array.from({ length: columnCount }, (_, cell) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cells never reorder.
-                  <TableCell key={cell}>
-                    <Skeleton className="h-4 w-full max-w-32" />
+            ) : null}
+            {columns.map((column) => {
+              const active = sort?.id === column.id;
+              const ariaSort = column.sortable
+                ? active
+                  ? sort?.desc
+                    ? "descending"
+                    : "ascending"
+                  : "none"
+                : undefined;
+              const SortIcon = active
+                ? sort?.desc
+                  ? ArrowDownIcon
+                  : ArrowUpIcon
+                : ArrowUpDownIcon;
+              return (
+                <TableHead
+                  aria-sort={ariaSort}
+                  className={cn(
+                    ALIGN_CLASS[column.align ?? "start"],
+                    stickyClass(column.sticky),
+                    column.headerClassName,
+                  )}
+                  key={column.id}
+                  style={column.width ? { width: column.width } : undefined}
+                >
+                  {column.sortable && onSortChange ? (
+                    <button
+                      // Fills the 40 px header height so the whole header cell is the target.
+                      className={cn(
+                        "-mx-1 inline-flex h-10 items-center gap-1 rounded-md px-1 font-medium outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                        active && "text-foreground",
+                        column.align === "end" && "flex-row-reverse",
+                      )}
+                      onClick={() => sortBy(column)}
+                      type="button"
+                    >
+                      {column.header}
+                      <SortIcon
+                        aria-hidden="true"
+                        className={cn("size-3.5 shrink-0", !active && "opacity-50")}
+                      />
+                    </button>
+                  ) : (
+                    column.header
+                  )}
+                </TableHead>
+              );
+            })}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading && rows.length === 0
+            ? Array.from({ length: SKELETON_ROWS }, (_, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
+                <TableRow aria-hidden="true" className="hover:bg-transparent" key={index}>
+                  {Array.from({ length: columnCount }, (_, cell) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cells never reorder.
+                    <TableCell key={cell}>
+                      <Skeleton className="h-4 w-full max-w-32" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            : null}
+          {rows.map((row) => {
+            const isSelected = selected?.has(row.id) ?? false;
+            return (
+              <TableRow
+                className={cn(
+                  onRowClick &&
+                    "cursor-pointer outline-none focus-visible:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                )}
+                data-state={isSelected ? "selected" : undefined}
+                key={row.id}
+                onClick={onRowClick ? onRowClickEvent(row.original) : undefined}
+                onKeyDown={onRowClick ? onRowKeyDown(row.original) : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+              >
+                {selection ? (
+                  <TableCell className="w-px">
+                    <Checkbox
+                      aria-label={t("table.selectRow", { label: selection.rowLabel(row.original) })}
+                      checked={isSelected}
+                      onCheckedChange={() => toggleOne(row.id)}
+                    />
+                  </TableCell>
+                ) : null}
+                {columns.map((column) => (
+                  <TableCell
+                    className={cn(
+                      ALIGN_CLASS[column.align ?? "start"],
+                      stickyClass(column.sticky),
+                      column.className,
+                    )}
+                    key={column.id}
+                  >
+                    {column.cell(row.original, row.index)}
                   </TableCell>
                 ))}
               </TableRow>
-            ))
-          : null}
-        {showEmpty ? (
-          <TableRow className="hover:bg-transparent">
-            <TableCell className="whitespace-normal p-0" colSpan={columnCount}>
-              {emptyState}
-            </TableCell>
-          </TableRow>
-        ) : null}
-        {rows.map((row) => {
-          const isSelected = selected?.has(row.id) ?? false;
-          return (
-            <TableRow
-              className={cn(
-                onRowClick &&
-                  "cursor-pointer outline-none focus-visible:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-              )}
-              data-state={isSelected ? "selected" : undefined}
-              key={row.id}
-              onClick={onRowClick ? onRowClickEvent(row.original) : undefined}
-              onKeyDown={onRowClick ? onRowKeyDown(row.original) : undefined}
-              tabIndex={onRowClick ? 0 : undefined}
-            >
-              {selection ? (
-                <TableCell className="w-px">
-                  <Checkbox
-                    aria-label={t("table.selectRow", { label: selection.rowLabel(row.original) })}
-                    checked={isSelected}
-                    onCheckedChange={() => toggleOne(row.id)}
-                  />
-                </TableCell>
-              ) : null}
-              {columns.map((column) => (
-                <TableCell
-                  className={cn(
-                    ALIGN_CLASS[column.align ?? "start"],
-                    column.sticky && STICKY_CLASS,
-                    column.className,
-                  )}
-                  key={column.id}
-                >
-                  {column.cell(row.original, row.index)}
-                </TableCell>
-              ))}
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+            );
+          })}
+        </TableBody>
+      </Table>
+      {showEmpty ? <div data-slot="data-table-empty">{emptyState}</div> : null}
+    </div>
   );
 }

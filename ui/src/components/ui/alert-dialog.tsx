@@ -3,6 +3,7 @@
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
 import type React from "react";
 import { cn } from "@/lib/utils";
+import { wrapTabFocus } from "@/components/ui/modal-focus";
 
 export const AlertDialogCreateHandle: typeof AlertDialogPrimitive.createHandle =
   AlertDialogPrimitive.createHandle;
@@ -57,6 +58,7 @@ export function AlertDialogPopup({
   className,
   bottomStickOnMobile = true,
   portalProps,
+  onKeyDown,
   ...props
 }: AlertDialogPrimitive.Popup.Props & {
   bottomStickOnMobile?: boolean;
@@ -79,6 +81,10 @@ export function AlertDialogPopup({
             className,
           )}
           data-slot="alert-dialog-popup"
+          onKeyDown={(event) => {
+            onKeyDown?.(event);
+            wrapTabFocus(event);
+          }}
           {...props}
         />
       </AlertDialogViewport>
