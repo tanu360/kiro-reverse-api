@@ -1,5 +1,4 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
@@ -14,8 +13,9 @@ import type { KiroProfile, MicrosoftSelectProfileResponse } from "@/lib/api/type
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FormField, HelpText, UrlBox } from "../fields";
+import { FormField, HelpText, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { useFocusAfter } from "../focus";
 
 type Stage = "idle" | "kiro" | "microsoft" | "profile";
 
@@ -39,8 +39,19 @@ export function MicrosoftFlow(): JSX.Element {
   // The state update lands a render later; the ref blocks a second submit right away.
   const busyRef = useRef(false);
   useReportBusy(busy);
+  const focusAfter = useFocusAfter(busy);
+  const callbackRef = useRef<HTMLInputElement>(null);
+  const profilesRef = useRef<HTMLDivElement>(null);
+  // The checked profile, or the first one; Base UI radios are focusable role="radio" elements.
+  const focusProfile = () =>
+    profilesRef.current?.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]') ??
+    profilesRef.current?.querySelector<HTMLElement>('[role="radio"]');
 
-  const step = async <T,>(request: () => Promise<T>, apply: (res: T) => void) => {
+  const step = async <T,>(
+    request: () => Promise<T>,
+    apply: (res: T) => void,
+    onError: () => void = () => {},
+  ) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -61,6 +72,7 @@ export function MicrosoftFlow(): JSX.Element {
     } catch (error) {
       if (sessions.isCurrent(generation)) {
         toast.error(t("failed", { error: errorMessage(error, t) }));
+        onError();
       }
     } finally {
       busyRef.current = false;
@@ -83,12 +95,14 @@ export function MicrosoftFlow(): JSX.Element {
       setAuthorizeUrl(res.authorizeUrl);
       setCallbackUrl("");
       setStage("kiro");
+      focusAfter(callbackRef);
     });
 
   const complete = () => {
     const callback = callbackUrl.trim();
     if (!callback) {
       setFieldError(t("callbackRequired"));
+      focusAfter(callbackRef);
       return;
     }
     setFieldError(null);
@@ -102,18 +116,22 @@ export function MicrosoftFlow(): JSX.Element {
           setProfiles(res.profiles ?? []);
           setSelectedArn(res.profiles?.[0]?.arn ?? "");
           setStage("profile");
+          focusAfter(focusProfile);
         } else {
           setAuthorizeUrl(res.authorizeUrl);
           setCallbackUrl("");
           setStage("microsoft");
+          focusAfter(callbackRef);
         }
       },
+      () => focusAfter(callbackRef),
     );
   };
 
   const selectProfile = () => {
     if (!selectedArn) {
       setFieldError(t("microsoft.profileRequired"));
+      focusAfter(focusProfile);
       return;
     }
     setFieldError(null);
@@ -124,11 +142,13 @@ export function MicrosoftFlow(): JSX.Element {
           profileArn: selectedArn,
         }),
       done,
+      () => focusAfter(focusProfile),
     );
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busyRef.current) return;
     if (stage === "idle") void start();
     else if (stage === "profile") void selectProfile();
     else void complete();
@@ -140,6 +160,8 @@ export function MicrosoftFlow(): JSX.Element {
       : stage === "profile"
         ? t("microsoft.selectProfile")
         : t("completeSignIn");
+  const busyLabel =
+    stage === "idle" ? t("starting") : stage === "profile" ? t("adding") : t("completing");
 
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
@@ -152,6 +174,7 @@ export function MicrosoftFlow(): JSX.Element {
             className="w-full gap-2"
             disabled={busy}
             onValueChange={(value) => setSelectedArn(String(value))}
+            ref={profilesRef}
             value={selectedArn}
           >
             {profiles.map((profile) => (
@@ -162,15 +185,13 @@ export function MicrosoftFlow(): JSX.Element {
               >
                 <Radio className="mt-0.5" value={profile.arn} />
                 <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="break-all font-medium text-sm">
-                    {profile.name || profile.arn}
+                  <span className="break-words font-medium text-sm">
+                    {profile.name || t("microsoft.unnamedProfile")}
                   </span>
                   <span className="text-muted-foreground text-xs">{profile.region}</span>
-                  {profile.name ? (
-                    <span className="break-all font-mono text-muted-foreground text-xs">
-                      {profile.arn}
-                    </span>
-                  ) : null}
+                  <span className="break-all font-mono text-muted-foreground text-xs">
+                    {profile.arn}
+                  </span>
                 </span>
               </label>
             ))}
@@ -197,6 +218,7 @@ export function MicrosoftFlow(): JSX.Element {
                   inputMode="url"
                   onChange={(event) => setCallbackUrl(event.target.value)}
                   placeholder="http://localhost:3128/..."
+                  ref={callbackRef}
                   spellCheck={false}
                   value={callbackUrl}
                 />
@@ -206,9 +228,7 @@ export function MicrosoftFlow(): JSX.Element {
         </>
       )}
       <FlowFooter>
-        <Button className="h-10 sm:h-8" form={formId} loading={busy} type="submit">
-          {submitLabel}
-        </Button>
+        <SubmitButton busy={busy} busyLabel={busyLabel} formId={formId} label={submitLabel} />
       </FlowFooter>
     </form>
   );

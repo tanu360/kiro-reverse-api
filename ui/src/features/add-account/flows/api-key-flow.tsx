@@ -1,4 +1,4 @@
-import { type FormEvent, type JSX, useState } from "react";
+import { type FormEvent, type JSX, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FormField, HelpText, RegionField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { useFocusAfter } from "../focus";
 import { parseApiKeyLines } from "../lib/api-key-lines";
 import { parseRegion } from "../lib/region";
 import { showBatchResult } from "../result-toast";
@@ -21,6 +22,9 @@ export function ApiKeyFlow(): JSX.Element {
   const [errors, setErrors] = useState<{ keys?: string; region?: string }>({});
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
+  const focusAfter = useFocusAfter(pending);
+  const keysRef = useRef<HTMLTextAreaElement>(null);
+  const regionRef = useRef<HTMLInputElement>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -33,7 +37,10 @@ export function ApiKeyFlow(): JSX.Element {
       region: parsed.ok ? undefined : t("regionInvalid"),
     };
     setErrors(nextErrors);
-    if (nextErrors.keys || !parsed.ok) return;
+    if (nextErrors.keys || !parsed.ok) {
+      focusAfter(nextErrors.keys ? keysRef : regionRef);
+      return;
+    }
     const generation = sessions.generation;
     setPending(true);
     const added: AddedAccountRef[] = [];
@@ -50,6 +57,7 @@ export function ApiKeyFlow(): JSX.Element {
       }
       if (added.length === 0) {
         toast.error(t("failed", { error: failures[0] ?? "" }));
+        focusAfter(keysRef);
         return;
       }
       showBatchResult(t, added.length, failures);
@@ -68,6 +76,7 @@ export function ApiKeyFlow(): JSX.Element {
           className="font-mono"
           disabled={pending}
           onChange={(event) => setKeys(event.target.value)}
+          ref={keysRef}
           placeholder={"ksk_...\nksk_...|eu-central-1"}
           spellCheck={false}
           value={keys}
@@ -77,6 +86,7 @@ export function ApiKeyFlow(): JSX.Element {
         disabled={pending}
         error={errors.region}
         hint={t("apikey.regionHint")}
+        inputRef={regionRef}
         onChange={setRegion}
         value={region}
       />

@@ -1,5 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { buildLocalCachePayload, jwtClaims, UUID_RE } from "./local-cache";
+import { buildLocalCachePayload, jwtClaims, localCacheErrorField, UUID_RE } from "./local-cache";
+
+describe("localCacheErrorField", () => {
+  it("puts token problems under kiro-auth-token.json", () => {
+    for (const key of ["tokenMissing", "tokenInvalid", "refreshTokenMissing"] as const) {
+      expect(localCacheErrorField(key, true)).toBe("token");
+    }
+    expect(localCacheErrorField("microsoftTenantMissing", true)).toBe("token");
+  });
+
+  it("puts client problems under {hash}.json while that field is shown", () => {
+    for (const key of [
+      "clientInvalid",
+      "clientSecretMissing",
+      "clientMissing",
+      "clientMissingNamed",
+      "microsoftClientIdMissing",
+    ] as const) {
+      expect(localCacheErrorField(key, true)).toBe("client");
+      expect(localCacheErrorField(key, false)).toBe("token");
+    }
+  });
+});
 
 const CLIENT_ID = "0f3c2b1a-9d8e-4c7b-a6f5-e4d3c2b1a098";
 

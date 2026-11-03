@@ -1,4 +1,4 @@
-import { type FormEvent, type JSX, useState } from "react";
+import { type FormEvent, type JSX, useRef, useState } from "react";
 import {
   Select,
   SelectItem,
@@ -14,6 +14,7 @@ import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { Code, FormField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { useFocusAfter } from "../focus";
 
 type CookieProvider = "Google" | "Github";
 
@@ -28,6 +29,8 @@ export function CookieFlow(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
+  const focusAfter = useFocusAfter(pending);
+  const tokenRef = useRef<HTMLTextAreaElement>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -35,6 +38,7 @@ export function CookieFlow(): JSX.Element {
     const token = refreshToken.trim();
     if (!token) {
       setError(t("cookie.refreshTokenMissing"));
+      focusAfter(tokenRef);
       return;
     }
     setError(null);
@@ -55,6 +59,7 @@ export function CookieFlow(): JSX.Element {
     } catch (caught) {
       if (sessions.isCurrent(generation)) {
         toast.error(t("failed", { error: errorMessage(caught, t) }));
+        focusAfter(tokenRef);
       }
     } finally {
       setPending(false);
@@ -116,6 +121,7 @@ export function CookieFlow(): JSX.Element {
           className="font-mono"
           disabled={pending}
           onChange={(event) => setRefreshToken(event.target.value)}
+          ref={tokenRef}
           spellCheck={false}
           value={refreshToken}
         />

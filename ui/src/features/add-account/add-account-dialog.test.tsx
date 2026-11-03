@@ -379,7 +379,7 @@ describe("IAM Identity Center", () => {
 });
 
 describe("SSO token", () => {
-  it("disables Add and blocks Escape while the import runs", async () => {
+  it("keeps the busy Add button focusable, ignores it and blocks Escape while the import runs", async () => {
     mockRefresh();
     const onAdded = vi.fn();
     const pending = deferred("/auth/sso-token", {
@@ -387,12 +387,20 @@ describe("SSO token", () => {
       accounts: [{ id: "acc-sso-1", email: "" }],
       errors: null,
     });
+    // Registered last, so it sees each request before the deferred handler answers it.
+    const imports = logRequests("/auth/sso-token");
     const { user } = renderWithProviders(<Harness initialMethod="sso" onAdded={onAdded} />);
 
     await user.type(await screen.findByRole("textbox", { name: "SSO tokens" }), "token-1");
     await user.click(screen.getByRole("button", { name: "Add" }));
     const busy = await screen.findByRole("button", { name: "Importing…" });
-    expect(busy).toBeDisabled();
+    // aria-disabled, not disabled: focus stays on it instead of falling to <body>.
+    expect(busy).toHaveAttribute("aria-disabled", "true");
+    expect(busy).toBeEnabled();
+    await waitFor(() => expect(busy).toHaveFocus());
+    await user.click(busy);
+    await user.keyboard("{Enter}");
+    expect(imports.count).toBe(1);
 
     await user.keyboard("{Escape}");
     expect(screen.getByRole("dialog", { name: "SSO token" })).toBeInTheDocument();
@@ -442,5 +450,170 @@ describe("Credentials JSON", () => {
     await user.type(await screen.findByRole("textbox", { name: "Credentials JSON" }), "nope");
     await user.click(screen.getByRole("button", { name: "Add" }));
     expect(await screen.findByText("The text is not valid JSON.")).toBeInTheDocument();
+  });
+});
+
+describe("Focus after a failed submit or a step change", () => {
+  it("moves into the chosen flow, and back to that method on Back", async () => {
+    const { user } = renderWithProviders(<Harness />);
+    await user.click(await screen.findByRole("button", { name: /IAM Identity Center/ }));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Start URL" })).toHaveFocus());
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /IAM Identity Center/ })).toHaveFocus(),
+    );
+
+    // Microsoft starts with no field, so its submit button takes focus.
+    await user.click(screen.getByRole("button", { name: /Microsoft SSO/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Start sign-in" })).toHaveFocus(),
+    );
+  });
+
+  it("IAM: focuses the first invalid field, the new step and the field to fix", async () => {
+    const { user } = renderWithProviders(<Harness initialMethod="iam" />);
+    const startUrl = await screen.findByRole("textbox", { name: "Start URL" });
+    await user.click(screen.getByRole("button", { name: "Start sign-in" }));
+    await waitFor(() => expect(startUrl).toHaveFocus());
+    expect(startUrl).toHaveAttribute("aria-invalid", "true");
+
+    // jsdom skips implicit (Enter) submission for a form with two text fields and its submit
+    // button outside, so these steps click the button; browsers submit on Enter.
+    await user.type(startUrl, "https://acme.awsapps.com/start");
+    await user.click(screen.getByRole("button", { name: "Start sign-in" }));
+    const callback = await screen.findByRole("textbox", { name: "Callback URL" });
+    await waitFor(() => expect(callback).toHaveFocus());
+
+    await user.type(callback, "http://127.0.0.1/oauth/callback?error=denied");
+    await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
+    await expectToast("Could not add the account: 无效的回调 URL");
+    await waitFor(() => expect(callback).toHaveFocus());
+    expect(callback).toBeEnabled();
+  });
+
+  it("SSO token: returns focus to the tokens after the server rejects them", async () => {
+    const { user } = renderWithProviders(<Harness initialMethod="sso" />);
+    const tokens = await screen.findByRole("textbox", { name: "SSO tokens" });
+    await user.type(tokens, "bad");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await expectToast(/^Could not add the account: /);
+    await waitFor(() => expect(tokens).toHaveFocus());
+  });
+
+  it("Builder ID: focuses the code, then the region when polling fails", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderWithProviders(<Harness initialMethod="builderid" />);
+      const region = await screen.findByRole("textbox", { name: "Region" });
+      await user.clear(region);
+      await user.type(region, "eu-west-9{Enter}");
+      const code = await screen.findByText("ABCD-EFGH", { selector: "kbd" });
+      await waitFor(() => expect(code.parentElement).toHaveFocus());
+
+      // eu-west-9 makes the mock report an expired authorization on the first poll.
+      await act(() => vi.advanceTimersByTimeAsync(6000));
+      await expectToast("Could not add the account: authorization expired");
+      await waitFor(() => expect(screen.getByRole("textbox", { name: "Region" })).toHaveFocus());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Microsoft: focuses each step's callback field, then the chosen profile", async () => {
+    const { user } = renderWithProviders(<Harness initialMethod="microsoft" />);
+    await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
+    const callback = await screen.findByRole("textbox", { name: "Callback URL" });
+    await waitFor(() => expect(callback).toHaveFocus());
+
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText("Paste the callback URL first.")).toBeInTheDocument();
+    await waitFor(() => expect(callback).toHaveFocus());
+
+    await user.type(callback, "http://x/leg1{Enter}");
+    await screen.findByText("Step 2: sign in with Microsoft");
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Callback URL" })).toHaveFocus(),
+    );
+
+    await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/?profiles=2");
+    await user.keyboard("{Enter}");
+    const radios = await screen.findAllByRole("radio");
+    await waitFor(() => expect(radios[0]).toHaveFocus());
+  });
+
+  it("Microsoft: every profile card shows title, region, then ARN", async () => {
+    const { user } = renderWithProviders(<Harness initialMethod="microsoft" />);
+    await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
+    await user.type(await screen.findByRole("textbox", { name: "Callback URL" }), "http://x/leg1");
+    await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
+    await screen.findByText("Step 2: sign in with Microsoft");
+    await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/?profiles=2");
+    await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
+    await screen.findAllByRole("radio");
+
+    const cards = screen.getAllByRole("radio").map((radio) => radio.closest("label"));
+    const lines = cards.map((card) =>
+      Array.from(card?.querySelectorAll(":scope > span:last-of-type > span") ?? []).map(
+        (el) => el.textContent,
+      ),
+    );
+    expect(lines).toEqual([
+      [
+        "Northwind Engineering",
+        "eu-central-1",
+        "arn:aws:codewhisperer:eu-central-1:381492027763:profile/QK7M2XRZ9PLA",
+      ],
+      [
+        "Unnamed profile",
+        "us-east-1",
+        "arn:aws:codewhisperer:us-east-1:381492027763:profile/HV4N8TQW2JDE",
+      ],
+    ]);
+  });
+
+  it("Kiro local cache: shows the error under the textarea it is about and focuses it", async () => {
+    const { user } = renderWithProviders(<Harness initialMethod="local" />);
+    const token = await screen.findByRole("textbox", { name: /kiro-auth-token\.json/ });
+    // Instructions are helper text; the placeholder is an example value.
+    expect(token).toHaveAttribute("placeholder", '{"refreshToken": "…"}');
+    expect(token).toHaveAccessibleDescription(
+      expect.stringContaining("Paste the file contents or upload the file."),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(token).toHaveFocus());
+    expect(token).toHaveAttribute("aria-invalid", "true");
+    expect(token).toHaveAccessibleDescription(
+      expect.stringContaining("Paste the contents of kiro-auth-token.json."),
+    );
+
+    // A client-file problem goes under {hash}.json instead.
+    await user.type(token, '{{"refreshToken": "r"}');
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    const client = screen.getByRole("textbox", { name: /\{hash\}\.json/ });
+    await waitFor(() => expect(client).toHaveFocus());
+    expect(client).toHaveAttribute("aria-invalid", "true");
+    expect(client).toHaveAccessibleDescription(
+      expect.stringContaining("IdC sign-in needs the {hash}.json file."),
+    );
+    expect(token).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("Credentials, cookie and API key: focus the field with the error", async () => {
+    const cases: Array<[AddAccountMethod, string]> = [
+      ["credentials", "Credentials JSON"],
+      ["cookie", "Refresh token"],
+      ["apikey", "Kiro API keys"],
+    ];
+    for (const [method, label] of cases) {
+      const { user, unmount } = renderWithProviders(<Harness initialMethod={method} />);
+      const field = await screen.findByRole("textbox", { name: label });
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      await waitFor(() => expect(field).toHaveFocus());
+      expect(field).toHaveAttribute("aria-invalid", "true");
+      unmount();
+    }
   });
 });

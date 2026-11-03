@@ -1,14 +1,14 @@
 import { Loader2Icon } from "lucide-react";
 import { type FormEvent, type JSX, useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { pollBuilderId, startBuilderId } from "@/lib/api/auth-flows";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { HelpText, RegionField, UrlBox } from "../fields";
+import { HelpText, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
 
 const DEFAULT_INTERVAL_S = 5;
@@ -32,10 +32,13 @@ export function BuilderIdFlow(): JSX.Element {
   const [code, setCode] = useState<DeviceCode | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   useReportBusy(starting);
+  const focusAfter = useFocusAfter(starting);
+  const regionRef = useRef<HTMLInputElement>(null);
+  const codeRef = useRef<HTMLDivElement>(null);
 
   // The poll chain reads the latest render's helpers, not the ones from when it started.
-  const latest = useRef({ t, display, finishAdd });
-  latest.current = { t, display, finishAdd };
+  const latest = useRef({ t, display, finishAdd, focusAfter });
+  latest.current = { t, display, finishAdd, focusAfter };
 
   // Stop polling if this view goes away while the dialog stays open.
   useEffect(() => () => sessions.stopBuilderId(), [sessions]);
@@ -45,7 +48,7 @@ export function BuilderIdFlow(): JSX.Element {
       sessions.builderIdTimer = null;
       const sessionId = sessions.builderIdSession;
       if (!sessionId || !sessions.isCurrent(generation)) return;
-      const { t: tr, display: show, finishAdd: finish } = latest.current;
+      const { t: tr, display: show, finishAdd: finish, focusAfter: refocus } = latest.current;
       try {
         const res = await pollBuilderId({ sessionId });
         if (!sessions.isCurrent(generation) || sessions.builderIdSession !== sessionId) return;
@@ -69,6 +72,8 @@ export function BuilderIdFlow(): JSX.Element {
         setCode(null);
         setReconnecting(false);
         toast.error(tr("failed", { error: errorMessage(error, tr) }));
+        // Back on the first step; the code view and its focus are gone.
+        refocus(regionRef);
       }
     }, intervalS * 1000);
   };
@@ -79,6 +84,7 @@ export function BuilderIdFlow(): JSX.Element {
     const parsed = parseRegion(region);
     if (!parsed.ok) {
       setRegionError(t("regionInvalid"));
+      focusAfter(regionRef);
       return;
     }
     setRegionError(null);
@@ -90,10 +96,12 @@ export function BuilderIdFlow(): JSX.Element {
       sessions.stopBuilderId();
       sessions.builderIdSession = res.sessionId;
       setCode({ userCode: res.userCode, verificationUri: res.verificationUri });
+      focusAfter(codeRef);
       schedule(generation, res.interval || DEFAULT_INTERVAL_S, 0);
     } catch (error) {
       if (sessions.isCurrent(generation)) {
         toast.error(t("startFailed", { error: errorMessage(error, t) }));
+        focusAfter(regionRef);
       }
     } finally {
       setStarting(false);
@@ -103,7 +111,12 @@ export function BuilderIdFlow(): JSX.Element {
   if (code) {
     return (
       <div className="flex flex-col gap-5">
-        <div className="flex flex-col items-center gap-2 rounded-xl border bg-muted/40 px-4 py-5 text-center">
+        {/* The code is the new step's main content, so it takes focus when the step opens. */}
+        <div
+          className="flex flex-col items-center gap-2 rounded-xl border bg-muted/40 px-4 py-5 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+          ref={codeRef}
+          tabIndex={-1}
+        >
           <span className="sr-only">{t("builderid.userCode")}</span>
           <kbd className="select-all rounded-lg border bg-background px-4 py-2 font-mono font-semibold text-2xl tracking-[0.2em] shadow-xs sm:text-3xl">
             {code.userCode}
@@ -127,11 +140,20 @@ export function BuilderIdFlow(): JSX.Element {
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onStart}>
       <HelpText>{t("methods.builderid.description")}</HelpText>
-      <RegionField disabled={starting} error={regionError} onChange={setRegion} value={region} />
+      <RegionField
+        disabled={starting}
+        error={regionError}
+        inputRef={regionRef}
+        onChange={setRegion}
+        value={region}
+      />
       <FlowFooter>
-        <Button className="h-10 sm:h-8" form={formId} loading={starting} type="submit">
-          {t("startSignIn")}
-        </Button>
+        <SubmitButton
+          busy={starting}
+          busyLabel={t("starting")}
+          formId={formId}
+          label={t("startSignIn")}
+        />
       </FlowFooter>
     </form>
   );

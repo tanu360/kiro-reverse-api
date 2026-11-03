@@ -1,4 +1,4 @@
-import { type FormEvent, type JSX, useState } from "react";
+import { type FormEvent, type JSX, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FormField, HelpText, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { useFocusAfter } from "../focus";
 import {
   type CredentialSource,
   mapCredential,
@@ -23,6 +24,8 @@ export function CredentialsFlow(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
+  const focusAfter = useFocusAfter(pending);
+  const jsonRef = useRef<HTMLTextAreaElement>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -32,10 +35,12 @@ export function CredentialsFlow(): JSX.Element {
       items = parseCredentialsJson(json);
     } catch {
       setError(t("credentials.parseError"));
+      focusAfter(jsonRef);
       return;
     }
     if (items.length === 0) {
       setError(t("credentials.noItems"));
+      focusAfter(jsonRef);
       return;
     }
     setError(null);
@@ -65,6 +70,7 @@ export function CredentialsFlow(): JSX.Element {
         toast.error(t("allFailed", { error: failures[0] ?? "" }), {
           description: failures.length > 1 ? failures.slice(1, 3).join("; ") : undefined,
         });
+        focusAfter(jsonRef);
         return;
       }
       showBatchResult(t, added.length, failures);
@@ -88,6 +94,7 @@ export function CredentialsFlow(): JSX.Element {
           className="font-mono"
           disabled={pending}
           onChange={(event) => setJson(event.target.value)}
+          ref={jsonRef}
           placeholder='[{"refreshToken":"xxx","provider":"BuilderID"}]'
           spellCheck={false}
           value={json}

@@ -1,13 +1,13 @@
-import { type FormEvent, type JSX, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { type FormEvent, type JSX, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { completeIamSso, startIamSso } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FormField, HelpText, RegionField, UrlBox } from "../fields";
+import { FormField, HelpText, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
 
 /**
@@ -28,6 +28,10 @@ export function IamFlow(): JSX.Element {
   );
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
+  const focusAfter = useFocusAfter(pending);
+  const startUrlRef = useRef<HTMLInputElement>(null);
+  const regionRef = useRef<HTMLInputElement>(null);
+  const callbackRef = useRef<HTMLInputElement>(null);
 
   const start = async () => {
     const parsed = parseRegion(region);
@@ -36,7 +40,10 @@ export function IamFlow(): JSX.Element {
       region: parsed.ok ? undefined : t("regionInvalid"),
     };
     setErrors(nextErrors);
-    if (nextErrors.startUrl || !parsed.ok) return;
+    if (nextErrors.startUrl || !parsed.ok) {
+      focusAfter(nextErrors.startUrl ? startUrlRef : regionRef);
+      return;
+    }
     const generation = sessions.generation;
     setPending(true);
     try {
@@ -44,9 +51,11 @@ export function IamFlow(): JSX.Element {
       if (!sessions.isCurrent(generation)) return;
       sessions.iamSession = res.sessionId;
       setAuthorizeUrl(res.authorizeUrl);
+      focusAfter(callbackRef);
     } catch (error) {
       if (sessions.isCurrent(generation)) {
         toast.error(t("startFailed", { error: errorMessage(error, t) }));
+        focusAfter(startUrlRef);
       }
     } finally {
       setPending(false);
@@ -57,6 +66,7 @@ export function IamFlow(): JSX.Element {
     const callback = callbackUrl.trim();
     if (!callback) {
       setErrors({ callback: t("callbackRequired") });
+      focusAfter(callbackRef);
       return;
     }
     setErrors({});
@@ -70,6 +80,7 @@ export function IamFlow(): JSX.Element {
     } catch (error) {
       if (sessions.isCurrent(generation)) {
         toast.error(t("failed", { error: errorMessage(error, t) }));
+        focusAfter(callbackRef);
       }
     } finally {
       setPending(false);
@@ -94,6 +105,7 @@ export function IamFlow(): JSX.Element {
           inputMode="url"
           onChange={(event) => setStartUrl(event.target.value)}
           placeholder={t("iam.startUrlPlaceholder")}
+          ref={startUrlRef}
           spellCheck={false}
           value={startUrl}
         />
@@ -101,6 +113,7 @@ export function IamFlow(): JSX.Element {
       <RegionField
         disabled={started || pending}
         error={errors.region}
+        inputRef={regionRef}
         onChange={setRegion}
         value={region}
       />
@@ -112,11 +125,11 @@ export function IamFlow(): JSX.Element {
             <Input
               autoCapitalize="off"
               autoComplete="off"
-              autoFocus
               disabled={pending}
               inputMode="url"
               onChange={(event) => setCallbackUrl(event.target.value)}
               placeholder={t("iam.callbackUrlPlaceholder")}
+              ref={callbackRef}
               spellCheck={false}
               value={callbackUrl}
             />
@@ -124,9 +137,12 @@ export function IamFlow(): JSX.Element {
         </>
       ) : null}
       <FlowFooter>
-        <Button className="h-10 sm:h-8" form={formId} loading={pending} type="submit">
-          {started ? t("completeSignIn") : t("startSignIn")}
-        </Button>
+        <SubmitButton
+          busy={pending}
+          busyLabel={started ? t("completing") : t("starting")}
+          formId={formId}
+          label={started ? t("completeSignIn") : t("startSignIn")}
+        />
       </FlowFooter>
     </form>
   );
