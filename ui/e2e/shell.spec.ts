@@ -40,7 +40,7 @@ test.describe("app shell", () => {
 
   test("Ctrl+K opens the command menu and Enter runs the match", async ({ page }) => {
     await page.keyboard.press("Control+k");
-    const input = page.getByRole("combobox");
+    const input = page.getByRole("combobox", { name: "Search" });
     await expect(input).toBeVisible();
     await input.fill("Backups");
     await page.keyboard.press("Enter");
