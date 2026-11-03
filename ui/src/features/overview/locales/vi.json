@@ -37,7 +37,7 @@
   "live.activeAccounts": "Tài khoản hoạt động",
   "live.activeAccountsHint": "Số tài khoản có yêu cầu trong 5 phút qua, trên tổng số tài khoản đã phục vụ lưu lượng kể từ khi proxy khởi động.",
   "traffic.title": "Lưu lượng",
-  "traffic.description.1h": "Yêu cầu mỗi phút, 1 giờ qua",
+  "traffic.description.1h": "Yêu cầu mỗi 2 phút, 1 giờ qua",
   "traffic.description.6h": "Yêu cầu mỗi 5 phút, 6 giờ qua",
   "traffic.description.24h": "Yêu cầu mỗi 15 phút, 24 giờ qua",
   "traffic.range": "Khoảng thời gian",
