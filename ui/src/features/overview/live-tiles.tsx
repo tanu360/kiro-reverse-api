@@ -57,7 +57,7 @@ function HintLabel({ label, hint }: { label: string; hint: string }): JSX.Elemen
         delay={200}
         openOnHover
       >
-        <span className="truncate">{label}</span>
+        <span className="line-clamp-2 text-pretty leading-snug">{label}</span>
         <InfoIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" />
       </PopoverTrigger>
       <PopoverPopup className="max-w-72" side="top" tooltipStyle>
@@ -69,7 +69,11 @@ function HintLabel({ label, hint }: { label: string; hint: string }): JSX.Elemen
 
 function TileLabel({ tile }: { tile: Omit<Tile, "value"> }): JSX.Element {
   if (!tile.hint) {
-    return <dt className="truncate text-muted-foreground text-sm">{tile.label}</dt>;
+    return (
+      <dt className="line-clamp-2 text-pretty text-muted-foreground text-sm leading-snug">
+        {tile.label}
+      </dt>
+    );
   }
   return (
     <dt className="min-w-0">
@@ -106,7 +110,7 @@ export function LiveTiles(): JSX.Element {
         {labels(t).map((tile) => (
           <Card className={TILE_CLASS} data-slot="live-tile" data-tile={tile.id} key={tile.id}>
             <TileLabel tile={tile} />
-            <dd className="truncate font-medium text-2xl leading-tight tracking-tight tabular-nums">
+            <dd className="mt-auto truncate font-medium text-2xl leading-tight tracking-tight tabular-nums">
               {shown[tile.id] ?? EMPTY}
             </dd>
           </Card>

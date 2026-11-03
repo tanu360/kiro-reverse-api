@@ -67,7 +67,7 @@ function DeltaBadge({ delta }: { delta: NonNullable<StatCardProps["delta"]> }): 
 
 function MetricLabel({ metric }: { metric: StatMetric }): JSX.Element {
   if (!metric.hint) {
-    return <dt className="truncate text-muted-foreground">{metric.label}</dt>;
+    return <dt className="line-clamp-2 text-pretty text-muted-foreground">{metric.label}</dt>;
   }
   return (
     <dt className="min-w-0">

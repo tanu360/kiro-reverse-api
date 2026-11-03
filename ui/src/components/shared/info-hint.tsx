@@ -30,7 +30,7 @@ export function InfoHint({
         delay={300}
         openOnHover
       >
-        <span className="truncate">{children}</span>
+        <span className="line-clamp-2 text-pretty">{children}</span>
         <InfoIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" />
       </PopoverTrigger>
       <PopoverPopup className="max-w-72" side="top" tooltipStyle>
