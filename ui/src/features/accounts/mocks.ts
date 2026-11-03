@@ -1,3 +1,387 @@
-import type { HttpHandler } from "msw";
+import { type HttpHandler, HttpResponse, http } from "msw";
+import type {
+  Account,
+  AccountFull,
+  AccountInfo,
+  BatchAction,
+  UpdateAccountRequest,
+} from "@/lib/api/types";
+import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import {
+  makeCachedModelIds,
+  makeExport,
+  makeModelInfo,
+  makeOverage,
+  makeProfiles,
+  makeTestResult,
+} from "@/lib/mocks/fixtures";
+import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
-export const handlers: HttpHandler[] = [];
+// Accounts endpoints over mockDb, with the Go server's semantics (research area-accounts §1).
+
+const BATCH_ACTIONS: readonly BatchAction[] = ["enable", "disable", "refresh", "delete"];
+
+function findAccount(id: string): Account | undefined {
+  return mockDb.accounts.find((account) => account.id === id);
+}
+
+function accountId(params: Record<string, string | readonly string[] | undefined>): string {
+  const id = params.id;
+  return decodeURIComponent(Array.isArray(id) ? (id[0] ?? "") : String(id ?? ""));
+}
+
+async function readJson(request: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const body: unknown = await request.json();
+    return typeof body === "object" && body !== null && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function isApiKey(account: Account): boolean {
+  return account.authMethod === "api_key" || account.authMethod === "apikey";
+}
+
+function isBanned(account: Account): boolean {
+  return account.banStatus !== "" && account.banStatus !== "ACTIVE";
+}
+
+/** enabled:true on a banned account resets the ban and the silent flags (Go apiUpdateAccount). */
+function enableAccount(account: Account): void {
+  if (isBanned(account)) {
+    account.banStatus = "ACTIVE";
+    account.banReason = "";
+    account.banTime = 0;
+    account.silent = false;
+    account.silentReason = "";
+    account.silentTime = 0;
+  }
+  account.enabled = true;
+}
+
+/** Only the keys and types the server honours; anything else is ignored. */
+function applyUpdate(account: Account, body: Record<string, unknown>): void {
+  const patch = body as UpdateAccountRequest;
+  if (typeof patch.enabled === "boolean") {
+    if (patch.enabled) enableAccount(account);
+    else account.enabled = false;
+  }
+  if (typeof patch.nickname === "string") account.nickname = patch.nickname;
+  if (typeof patch.machineId === "string") account.machineId = patch.machineId;
+  if (typeof patch.weight === "number") account.weight = Math.trunc(patch.weight);
+  if (typeof patch.proxyURL === "string") account.proxyURL = patch.proxyURL;
+  if (typeof patch.silent === "boolean") {
+    if (patch.silent) {
+      account.enabled = false;
+      const reason = typeof patch.silentReason === "string" ? patch.silentReason.trim() : "";
+      account.silent = true;
+      account.silentReason = reason || account.silentReason || "manual";
+      if (!account.silentTime) account.silentTime = mockNowUnix();
+    } else {
+      account.silent = false;
+      account.silentReason = "";
+      account.silentTime = 0;
+    }
+  }
+}
+
+/** The /full view: the stored secrets over the current list fields. */
+function fullAccount(account: Account): AccountFull {
+  const { hasToken: _hasToken, activeRegion: _activeRegion, ...fields } = account;
+  const secrets: Partial<AccountFull> = mockDb.secrets[account.id] ?? {};
+  return {
+    ...fields,
+    accessToken: secrets.accessToken ?? "",
+    refreshToken: secrets.refreshToken ?? "",
+    kiroApiKey: secrets.kiroApiKey ?? "",
+    clientId: secrets.clientId ?? "",
+    clientSecret: secrets.clientSecret ?? "",
+    tokenEndpoint: secrets.tokenEndpoint ?? "",
+    issuerUrl: secrets.issuerUrl ?? "",
+    scopes: secrets.scopes ?? "",
+  };
+}
+
+function accountInfo(account: Account): AccountInfo {
+  return {
+    Email: account.email,
+    UserId: account.userId,
+    SubscriptionType: account.subscriptionType,
+    SubscriptionTitle: account.subscriptionTitle,
+    DaysRemaining: account.daysRemaining,
+    UsageCurrent: account.usageCurrent,
+    UsageLimit: account.usageLimit,
+    UsagePercent: account.usagePercent,
+    NextResetDate: account.nextResetDate,
+    LastRefresh: account.lastRefresh,
+    TrialUsageCurrent: account.trialUsageCurrent,
+    TrialUsageLimit: account.trialUsageLimit,
+    TrialUsagePercent: account.trialUsagePercent,
+    TrialStatus: account.trialStatus,
+    TrialExpiresAt: account.trialExpiresAt,
+  };
+}
+
+/** The live model list: the catalog plus `auto`, in server order. */
+function liveModels() {
+  return [
+    ...makeCachedModelIds().map((modelId) => makeModelInfo({ modelId })),
+    makeModelInfo({
+      modelId: "auto",
+      modelName: "Auto",
+      description: "Kiro picks a model per request",
+      rateMultiplier: 1,
+    }),
+  ];
+}
+
+export const handlers: HttpHandler[] = [
+  http.get(apiUrl("/accounts"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json(mockDb.accounts);
+  }),
+
+  http.post(apiUrl("/accounts/batch"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const body = await readJson(request);
+    if (!body) return jsonError(400, "Invalid JSON");
+    const ids = Array.isArray(body.ids) ? body.ids.filter((id) => typeof id === "string") : [];
+    if (ids.length === 0) return jsonError(400, "No account IDs provided");
+    const action = body.action as BatchAction;
+    if (!BATCH_ACTIONS.includes(action)) return jsonError(400, `Invalid action: ${body.action}`);
+    await mockDelay();
+    const idSet = new Set(ids);
+    if (action === "enable" || action === "disable") {
+      for (const account of mockDb.accounts) {
+        if (!idSet.has(account.id)) continue;
+        if (action === "enable") {
+          enableAccount(account);
+          account.silent = false;
+          account.silentReason = "";
+          account.silentTime = 0;
+        } else {
+          account.enabled = false;
+        }
+      }
+      // count echoes the requested ids, not the matched ones.
+      return HttpResponse.json({ success: true, count: ids.length });
+    }
+    if (action === "refresh") {
+      let refreshed = 0;
+      let failed = 0;
+      for (const id of ids) {
+        const account = findAccount(id);
+        if (!account) {
+          failed++;
+          continue;
+        }
+        account.lastRefresh = mockNowUnix();
+        refreshed++;
+      }
+      return HttpResponse.json({ success: true, refreshed, failed });
+    }
+    let deleted = 0;
+    let failed = 0;
+    for (const id of ids) {
+      const index = mockDb.accounts.findIndex((account) => account.id === id);
+      if (index === -1) {
+        failed++;
+        continue;
+      }
+      mockDb.accounts.splice(index, 1);
+      delete mockDb.secrets[id];
+      deleted++;
+    }
+    return HttpResponse.json({ success: true, deleted, failed });
+  }),
+
+  // Registered before /accounts/:id/... so "models" is never read as an account id.
+  http.post(apiUrl("/accounts/models/refresh"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json({ success: true, refreshed: liveModels().length, failed: 0 });
+  }),
+
+  http.post(apiUrl("/accounts/:id/models/refresh"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    if (!findAccount(accountId(params))) return jsonError(404, "Account not found");
+    await mockDelay();
+    return HttpResponse.json({ success: true, count: liveModels().length });
+  }),
+
+  http.post(apiUrl("/accounts/:id/refresh"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const account = findAccount(accountId(params));
+    if (!account) return jsonError(404, "Account not found");
+    await mockDelay();
+    // The suspended branch marks the account and answers without `info`.
+    if (account.banStatus === "SUSPENDED") {
+      account.enabled = false;
+      return HttpResponse.json({ success: true, message: "Account status updated" });
+    }
+    account.lastRefresh = mockNowUnix();
+    return HttpResponse.json({ success: true, info: accountInfo(account) });
+  }),
+
+  http.post(apiUrl("/accounts/:id/test"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const account = findAccount(accountId(params));
+    if (!account) return jsonError(404, "Account not found");
+    const body = await readJson(request);
+    await mockDelay();
+    if (account.banStatus === "BANNED") {
+      return jsonError(500, "AccessDeniedException: account access has been revoked (403)");
+    }
+    const model = typeof body?.model === "string" && body.model ? body.model : "claude-sonnet-5";
+    return HttpResponse.json(makeTestResult(model));
+  }),
+
+  http.get(apiUrl("/accounts/:id/models/cached"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    // Never 404s; the server iterates a set, so the order is not sorted.
+    const models = findAccount(accountId(params)) ? [...makeCachedModelIds()].reverse() : [];
+    return HttpResponse.json({ success: true, models });
+  }),
+
+  http.get(apiUrl("/accounts/:id/models"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    if (!findAccount(accountId(params))) return jsonError(404, "Account not found");
+    await mockDelay();
+    return HttpResponse.json({ success: true, models: liveModels() });
+  }),
+
+  http.get(apiUrl("/accounts/:id/overage"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const account = findAccount(accountId(params));
+    if (!account) return jsonError(404, "Account not found");
+    await mockDelay();
+    const snapshot = makeOverage(account);
+    account.overageCheckedAt = snapshot.overageCheckedAt;
+    return HttpResponse.json(snapshot);
+  }),
+
+  http.post(apiUrl("/accounts/:id/overage"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const body = await readJson(request);
+    if (!body || typeof body.enabled !== "boolean") return jsonError(400, "Invalid JSON");
+    const account = findAccount(accountId(params));
+    if (!account) return jsonError(404, "Account not found");
+    if (body.enabled && account.overageCapability.toUpperCase() === "NOT_OVERAGE_CAPABLE") {
+      return jsonError(400, "Account is not overage capable");
+    }
+    await mockDelay();
+    account.overageStatus = body.enabled ? "ENABLED" : "DISABLED";
+    const snapshot = makeOverage(account);
+    account.overageCheckedAt = snapshot.overageCheckedAt;
+    return HttpResponse.json(snapshot);
+  }),
+
+  http.get(apiUrl("/accounts/:id/profiles"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const account = findAccount(accountId(params));
+    if (!account) return jsonError(404, "Account not found");
+    if (isApiKey(account)) {
+      return jsonError(400, "API key accounts have no Kiro profile; their region is set at import");
+    }
+    await mockDelay();
+    return HttpResponse.json({
+      success: true,
+      profiles: makeProfiles(account),
+      currentArn: account.profileArn,
+      activeRegion: account.activeRegion,
+      pinned: account.profileArnPinned,
+    });
+  }),
+
+  http.post(apiUrl("/accounts/:id/profile"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const body = await readJson(request);
+    if (!body) return jsonError(400, "Invalid JSON");
+    const account = findAccount(accountId(params));
+    if (!account) return jsonError(404, "Account not found");
+    if (isApiKey(account)) {
+      return jsonError(400, "API key accounts have no Kiro profile; their region is set at import");
+    }
+    await mockDelay();
+    const arn = typeof body.profileArn === "string" ? body.profileArn.trim() : "";
+    if (!arn) {
+      account.profileArnPinned = false;
+      return HttpResponse.json({ success: true, pinned: false });
+    }
+    if (!arn.startsWith("arn:aws:codewhisperer:")) return jsonError(400, "profileArn is invalid");
+    const profile = makeProfiles(account).find((candidate) => candidate.arn === arn);
+    if (!profile) return jsonError(400, "Selected Kiro profile is not available for this account");
+    account.profileArn = profile.arn;
+    account.profileArnPinned = true;
+    account.activeRegion = profile.region;
+    return HttpResponse.json({
+      success: true,
+      pinned: true,
+      profileArn: profile.arn,
+      region: profile.region,
+    });
+  }),
+
+  http.get(apiUrl("/accounts/:id/full"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const account = findAccount(accountId(params));
+    if (!account) return jsonError(404, "Account not found");
+    await mockDelay();
+    return HttpResponse.json(fullAccount(account));
+  }),
+
+  http.put(apiUrl("/accounts/:id"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const body = await readJson(request);
+    if (!body) return jsonError(400, "Invalid JSON");
+    const account = findAccount(accountId(params));
+    if (!account) return jsonError(404, "Account not found");
+    await mockDelay();
+    applyUpdate(account, body);
+    return HttpResponse.json({ success: true });
+  }),
+
+  // Unknown ids also answer 200 (config.DeleteAccount returns nil when not found).
+  http.delete(apiUrl("/accounts/:id"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const id = accountId(params);
+    mockDb.accounts = mockDb.accounts.filter((account) => account.id !== id);
+    delete mockDb.secrets[id];
+    return HttpResponse.json({ success: true });
+  }),
+
+  // An empty or invalid body exports every account.
+  http.post(apiUrl("/export"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const body = await readJson(request);
+    await mockDelay();
+    const ids = Array.isArray(body?.ids) ? new Set(body.ids) : null;
+    const accounts =
+      ids && ids.size > 0
+        ? mockDb.accounts.filter((account) => ids.has(account.id))
+        : mockDb.accounts;
+    return HttpResponse.json(makeExport(accounts));
+  }),
+];
