@@ -4,7 +4,7 @@
   "numberField.decrease": "Diminuir",
   "numberField.increase": "Aumentar",
   "numberField.roleDescription": "Campo numérico",
-  "sparkline.empty": "Sem dados",
+  "sparkline.empty": "Nada para mostrar por enquanto",
   "sparkline.summary_one": "{count} ponto, de {first} a {last}",
   "sparkline.summary_other": "{count} pontos, de {first} a {last}",
   "sparkline.summaryUp_one": "{count} ponto, de {first} a {last}, alta de {change}%",
