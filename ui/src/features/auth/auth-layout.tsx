@@ -22,9 +22,9 @@ export function AuthLayout({ children }: { children: ReactNode }): JSX.Element {
         <div className="flex min-w-0 items-center gap-2">
           <img
             alt=""
-            className="size-6 shrink-0 rounded-md dark:invert"
+            className="size-6 shrink-0 rounded-md"
             height={24}
-            src="/admin/icon.png"
+            src="/admin/icon.webp"
             width={24}
           />
           <span className="truncate font-semibold text-base">{tShared("shell.appName")}</span>

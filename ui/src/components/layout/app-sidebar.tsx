@@ -42,9 +42,9 @@ export function AppSidebar(): JSX.Element {
             >
               <img
                 alt=""
-                className="size-5 shrink-0 rounded-sm dark:invert"
+                className="size-5 shrink-0 rounded-sm"
                 height={20}
-                src="/admin/icon.png"
+                src="/admin/icon.webp"
                 width={20}
               />
               <span className="font-semibold text-base text-sidebar-foreground">
