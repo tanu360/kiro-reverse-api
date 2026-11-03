@@ -8,6 +8,10 @@
   "access.stateOff": "Mọi client đều gọi được proxy",
   "access.enabledApiKeyRequired": "Tạo và bật ít nhất một API key trước khi bắt buộc API key.",
   "access.loadFailed": "Không thể tải cài đặt truy cập API",
+  "access.discardTitle": "Bỏ các thay đổi chưa lưu?",
+  "access.discardBody": "Thay đổi quyền truy cập API chưa được lưu. Vẫn rời khỏi trang này?",
+  "access.discard": "Bỏ thay đổi",
+  "access.keepEditing": "Tiếp tục sửa",
   "keys.title": "API key",
   "keys.description": "Tạo một key cho mỗi client. Đặt giới hạn token hoặc credit; 0 nghĩa là không giới hạn.",
   "keys.create": "Tạo API key",
@@ -40,7 +44,6 @@
   "keys.confirmDeleteBody": "Các client đang dùng key này sẽ ngừng hoạt động.",
   "keys.confirmDisableTitle": "Tắt API key đang bật cuối cùng?",
   "keys.lockoutWarning": "API key đang bắt buộc và đây là key đang bật cuối cùng, nên mọi client sẽ bị chặn cho đến khi bạn bật một key.",
-  "keys.requestsCount_one": "{n} yêu cầu",
   "keys.requestsCount_other": "{n} yêu cầu",
   "keys.lastUsedLabel": "Dùng lần cuối {time}",
   "keys.neverUsed": "Chưa dùng",
@@ -97,5 +100,6 @@
   "snippets.sdkLanguage": "Ngôn ngữ SDK",
   "snippets.python": "Python",
   "snippets.typescript": "TypeScript",
-  "snippets.copy": "Sao chép đoạn mã {name}"
+  "snippets.copy": "Sao chép đoạn mã {name}",
+  "snippets.codeRegion": "Mã {name}"
 }

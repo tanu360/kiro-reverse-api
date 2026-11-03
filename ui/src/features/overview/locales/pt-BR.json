@@ -1,6 +1,7 @@
 {
   "title": "Visão geral",
   "description": "Tráfego ao vivo, créditos e erros de todas as suas contas.",
+  "errors.totals": "Não foi possível carregar os totais e o tráfego ao vivo",
   "stats.label": "Totais",
   "stats.accounts": "Contas",
   "stats.available": "Disponíveis",

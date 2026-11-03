@@ -68,6 +68,7 @@
   "shell.addAccount": "Thêm tài khoản",
   "shell.signOut": "Đăng xuất",
   "shell.admin": "Quản trị",
+  "shell.avatarInitial": "Q",
   "shell.userMenu": "Menu quản trị",
   "shell.about": "Giới thiệu",
   "shell.running": "Đang chạy",
@@ -99,5 +100,11 @@
   "shell.update.viewRelease": "Xem bản phát hành",
   "shell.notFound.title": "Không tìm thấy trang",
   "shell.notFound.description": "Địa chỉ này không khớp với trang nào.",
-  "shell.notFound.action": "Về Tổng quan"
+  "shell.notFound.action": "Về Tổng quan",
+  "shell.sheetDescription": "Trang, Thêm tài khoản và menu Quản trị.",
+  "shell.notifications": "Thông báo",
+  "shell.toast.dismiss": "Đóng thông báo",
+  "shell.documentTitle": "{page} · Kiro Proxy",
+  "shell.page.login": "Đăng nhập",
+  "shell.page.setup": "Thiết lập"
 }

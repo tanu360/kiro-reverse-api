@@ -32,5 +32,15 @@
   "serverError.tokenLimitNegative": "O limite de tokens deve ser 0 ou mais.",
   "serverError.creditLimitNegative": "O limite de créditos deve ser 0 ou mais.",
   "serverError.microsoftCanceled": "O login da Microsoft foi cancelado. Comece novamente.",
-  "serverError.microsoftDuplicate": "Esta conta Microsoft já foi adicionada."
+  "serverError.microsoftDuplicate": "Esta conta Microsoft já foi adicionada.",
+  "serverError.ssoSessionExpired": "A sessão de login expirou. Comece novamente.",
+  "serverError.invalidCallbackUrl": "A URL de callback não é válida. Copie o endereço completo novamente.",
+  "serverError.ssoStateMismatch": "A URL de callback pertence a outro login. Comece novamente e use o novo link.",
+  "serverError.ssoNoCode": "A URL de callback não tem código de autorização. Copie o endereço completo novamente.",
+  "serverError.ssoTimeout": "O login expirou por tempo limite. Comece novamente.",
+  "serverError.ssoDenied": "A AWS não autorizou o login. Comece novamente.",
+  "serverError.ssoRegisterFailed": "Não foi possível iniciar o login da AWS. Verifique a região e tente novamente.",
+  "serverError.ssoTokenRejected": "A AWS não aceitou o token SSO. Copie um token novo e tente novamente.",
+  "serverError.ssoTokenFlowFailed": "Não foi possível concluir o login da AWS com este token. Copie um token novo e tente novamente.",
+  "serverError.detail": "(Detalhes: {detail})"
 }

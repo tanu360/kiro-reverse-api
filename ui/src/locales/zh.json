@@ -68,6 +68,7 @@
   "shell.addAccount": "添加账号",
   "shell.signOut": "退出登录",
   "shell.admin": "管理员",
+  "shell.avatarInitial": "管",
   "shell.userMenu": "管理员菜单",
   "shell.about": "关于",
   "shell.running": "运行中",

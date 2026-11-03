@@ -25,7 +25,6 @@
   "importPartial_other": "{count} contas adicionadas, {failed} com falha.",
   "moreFailures_one": "Mais {count} falha.",
   "moreFailures_other": "Mais {count} falhas.",
-
   "methods.builderid.title": "AWS Builder ID",
   "methods.builderid.description": "Adicione uma conta pessoal com o AWS Builder ID.",
   "methods.iam.title": "IAM Identity Center (SSO corporativo)",
@@ -42,20 +41,17 @@
   "methods.cookie.description": "Adicione uma conta com o refresh token do cookie web do Kiro.",
   "methods.apikey.title": "Chave de API do Kiro",
   "methods.apikey.description": "Adicione uma conta headless com uma chave de API do Kiro CLI (ksk_...).",
-
   "builderid.verifyCode": "Informe este código no link abaixo.",
   "builderid.userCode": "Seu código",
   "builderid.verifyUrl": "URL de verificação",
   "builderid.waiting": "Aguardando autorização…",
   "builderid.reconnecting": "Conexão perdida. Tentando novamente…",
-
   "iam.startUrl": "URL inicial",
   "iam.startUrlPlaceholder": "https://xxx.awsapps.com/start",
   "iam.startUrlRequired": "Informe uma URL inicial.",
   "iam.loginUrl": "URL de login",
   "iam.completeLogin": "Conclua o login no navegador e cole a URL de callback.",
   "iam.callbackUrlPlaceholder": "http://127.0.0.1:xxx/?code=...",
-
   "microsoft.portalStep": "Etapa 1: entre no portal do Kiro",
   "microsoft.providerStep": "Etapa 2: entre com a Microsoft",
   "microsoft.callbackInstructions": "Abra o link e entre. Depois o navegador mostra uma página que não carrega em http://localhost:3128. Isso é esperado. Copie o endereço completo da barra de endereços e cole abaixo.",
@@ -63,7 +59,7 @@
   "microsoft.profileLabel": "Perfil do Kiro",
   "microsoft.selectProfile": "Usar perfil",
   "microsoft.profileRequired": "Escolha um perfil do Kiro primeiro.",
-
+  "microsoft.unnamedProfile": "Perfil sem nome",
   "sso.howToGet": "Como obter o token",
   "sso.step1": "Entre em",
   "sso.step2": "Pressione F12 para abrir o DevTools → Application → Cookies.",
@@ -73,7 +69,6 @@
   "sso.tokenRequired": "Cole pelo menos um token SSO.",
   "sso.slowHint": "Cada token pode levar até 2 minutos para importar.",
   "sso.importing": "Importando…",
-
   "local.fileLocation": "Local do arquivo",
   "local.windows": "Windows",
   "local.macosLinux": "macOS e Linux",
@@ -102,7 +97,6 @@
   "local.microsoftChoiceHint": "Para login Microsoft, escolha Microsoft (Entra ID) como provedor.",
   "local.microsoftClientIdMissing": "O login Microsoft precisa do ID do aplicativo (cliente) do Entra como UUID. Adicione clientId ao kiro-auth-token.json ou cole o {hash}.json que o contém.",
   "local.microsoftTenantMissing": "O login Microsoft precisa do tenant. O kiro-auth-token.json deve conter tokenEndpoint, issuerUrl ou um accessToken do Entra.",
-
   "credentials.label": "JSON de credenciais",
   "credentials.formats": "Aceita um objeto, um array JSON ou uma exportação do Kiro Account Manager.",
   "credentials.required": "Obrigatório: refreshToken, ou kiroApiKey para contas com chave de API.",
@@ -111,7 +105,6 @@
   "credentials.noItems": "O JSON não tem contas.",
   "credentials.missingRefreshToken": "sem refreshToken",
   "credentials.failureItem": "Item {index}: {reason}",
-
   "cookie.howToGet": "Como obter o refresh token",
   "cookie.step1": "Entre em",
   "cookie.step2": "Clique com o botão direito na página → Inspecionar → Application → Cookies → https://app.kiro.dev.",
@@ -122,7 +115,6 @@
   "cookie.github": "GitHub",
   "cookie.refreshToken": "Refresh token",
   "cookie.refreshTokenMissing": "Informe um refresh token.",
-
   "apikey.help": "Chaves de API do Kiro nunca expiram e dispensam a atualização OAuth. As requisições vão para o runtime do Kiro CLI na região da chave.",
   "apikey.keysLabel": "Chaves de API do Kiro",
   "apikey.keysHint": "Uma por linha. Adicione uma região com ksk_...|eu-central-1.",

@@ -68,6 +68,7 @@
   "shell.addAccount": "Add account",
   "shell.signOut": "Sign out",
   "shell.admin": "Admin",
+  "shell.avatarInitial": "A",
   "shell.userMenu": "Admin menu",
   "shell.about": "About",
   "shell.running": "Running",

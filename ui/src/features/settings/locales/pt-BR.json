@@ -14,21 +14,23 @@
   "remove": "Remover",
   "showPassword": "Mostrar senha",
   "hidePassword": "Ocultar senha",
-
+  "loadFailed": "Não foi possível carregar as configurações",
+  "unsavedMark": "(alterações não salvas)",
+  "discardTitle": "Descartar alterações não salvas?",
+  "discardBody": "Alguns cartões de configurações têm alterações não salvas. Sair desta página as descarta.",
+  "discardAction": "Descartar alterações",
+  "keepEditing": "Continuar editando",
   "usageSettings": "Uso",
   "allowOverUsage": "Permitir excedente",
   "allowOverUsageHint": "As contas continuam atendendo requisições depois que os créditos acabam.",
-
   "streamIntegrity": "Integridade do stream",
   "lenientStreamIntegrity": "Aceitar respostas sem medição",
   "lenientStreamIntegrityHint": "O Kiro marca um turno como concluído com um motivo de parada ou um evento de medição. Algumas contas IdC e Enterprise não enviam nenhum dos dois, então as respostas delas são rejeitadas como truncadas.",
   "lenientStreamIntegrityRisk": "Habilite isto só se suas contas forem afetadas. Uma resposta cortada no meio passa a parecer completa e é entregue como final.",
-
   "routing": "Roteamento de contas",
   "sessionAffinity": "Manter conversas em uma conta",
   "sessionAffinityHint": "Os turnos seguintes voltam para a conta que respondeu ao turno anterior, que já tem o cache do prompt. Desabilite para round-robin estrito em toda requisição.",
   "sessionAffinityMore": "Conversas novas continuam alternando entre as contas. Se essa conta estiver em espera, sem créditos ou falhando, a requisição vai para outra conta.",
-
   "autoContinue": "Continuação automática",
   "autoContinueEnable": "Continuar respostas cortadas pelo limite de saída",
   "autoContinueHint": "O Kiro interrompe uma resposta em cerca de 8192 tokens de saída. Quando uma resposta para aí sem chamada de ferramenta, o proxy pede ao Kiro para continuar e anexa o restante.",
@@ -36,12 +38,10 @@
   "autoContinueMax": "Máximo de continuações por resposta",
   "autoContinueMaxHint": "Entre 1 e 10. A continuação também para no max_tokens do próprio cliente.",
   "autoContinueMaxInvalid": "O máximo de continuações deve ser um número inteiro entre 1 e {max}.",
-
   "toolHistory": "Histórico de ferramentas",
   "structuredToolHistory": "Enviar chamadas de ferramenta anteriores de forma estruturada",
   "structuredToolHistoryHint": "Chamadas de ferramenta e resultados anteriores chegam ao modelo como chamadas reais, então sessões longas de agente continuam chamando ferramentas. Desabilite para sempre enviar a atividade anterior como texto simples.",
   "structuredToolHistoryMore": "Um par volta para texto simples quando a requisição não declara a ferramenta ou os IDs da chamada e do resultado não batem. Se o Kiro rejeitar a forma estruturada, o proxy tenta novamente uma vez com texto simples e continua usando texto simples por uma hora.",
-
   "thinkingSettings": "Raciocínio",
   "thinkingHint": "Escolha o sufixo de modelo que habilita o raciocínio e como a saída de raciocínio chega a cada API.",
   "thinkingSuffix": "Sufixo de ativação",
@@ -51,7 +51,6 @@
   "formatReasoningContent": "reasoning_content (DeepSeek)",
   "formatThinkingClaude": "<thinking> (Claude)",
   "formatThinkOpenAI": "<think> (OpenAI)",
-
   "modelMappings": "Mapeamento de modelos",
   "modelMappingsHint": "Mapeie nomes de modelo do cliente para IDs de modelo do Kiro. As regras são verificadas em ordem; vence a primeira cujo texto está contido no nome do modelo.",
   "modelMappings.add": "Adicionar mapeamento",
@@ -72,7 +71,6 @@
   "modelMappings.dragOver": "Mapeamento {from} sobre a posição {to}.",
   "modelMappings.dragEnd": "Mapeamento {from} solto na posição {to}.",
   "modelMappings.dragCancel": "Reordenação cancelada. O mapeamento {from} fica no lugar.",
-
   "endpointSettings": "Endpoint do Kiro",
   "endpointSettingsHint": "Escolha qual endpoint do Kiro recebe as requisições.",
   "preferredEndpoint": "Endpoint preferido",
@@ -83,7 +81,6 @@
   "endpointAmazonQ": "Amazon Q",
   "endpointFallback": "Usar outros endpoints como alternativa",
   "endpointFallbackHint": "Quando desabilitado, só o endpoint selecionado é usado.",
-
   "adminPassword": "Senha de administrador",
   "adminPasswordHint": "Alterar a senha encerra todas as outras sessões conectadas. Este navegador continua conectado.",
   "newPassword": "Nova senha",
@@ -95,7 +92,6 @@
   "confirmPasswordTitle": "Alterar a senha de administrador?",
   "confirmPasswordBody": "Todas as outras sessões conectadas são encerradas.",
   "passwordChanged": "Senha alterada",
-
   "proxySettings": "Proxy de saída",
   "proxyHint": "Envie o tráfego do Kiro e de login por um proxy SOCKS5 ou HTTP. As alterações valem na hora, sem reiniciar.",
   "proxyType": "Tipo de proxy",
@@ -110,7 +106,6 @@
   "proxyUsername": "Usuário",
   "proxyPassword": "Senha",
   "proxyHostRequired": "Informe o host e a porta do proxy.",
-
   "promptFilter": "Filtro de system prompt",
   "promptFilterHint": "Limpe os system prompts antes que cheguem ao Kiro. Os filtros integrados rodam primeiro, depois as regras personalizadas na ordem da lista.",
   "builtinFilters": "Filtros integrados",
@@ -136,7 +131,6 @@
   "promptFilter.addRegex": "Adicionar regra de regex",
   "promptFilter.addContains": "Adicionar filtro de linha",
   "promptFilter.invalidRegex": "Esta regex não compila; o proxy a ignora.",
-
   "dangerZone": "Zona de perigo",
   "statistics": "Estatísticas",
   "resetStats": "Redefinir estatísticas",

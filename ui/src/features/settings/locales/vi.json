@@ -14,21 +14,23 @@
   "remove": "Gỡ",
   "showPassword": "Hiện mật khẩu",
   "hidePassword": "Ẩn mật khẩu",
-
+  "loadFailed": "Không thể tải cài đặt",
+  "unsavedMark": "(có thay đổi chưa lưu)",
+  "discardTitle": "Bỏ các thay đổi chưa lưu?",
+  "discardBody": "Một số thẻ cài đặt có thay đổi chưa lưu. Rời khỏi trang này sẽ bỏ các thay đổi đó.",
+  "discardAction": "Bỏ thay đổi",
+  "keepEditing": "Tiếp tục sửa",
   "usageSettings": "Mức sử dụng",
   "allowOverUsage": "Cho phép vượt mức",
   "allowOverUsageHint": "Tài khoản tiếp tục phục vụ yêu cầu sau khi hết credit.",
-
   "streamIntegrity": "Toàn vẹn stream",
   "lenientStreamIntegrity": "Chấp nhận phản hồi không có metering",
   "lenientStreamIntegrityHint": "Kiro đánh dấu một lượt hoàn tất bằng stop reason hoặc sự kiện metering. Một số tài khoản IdC và Enterprise không gửi cả hai, nên phản hồi của chúng bị từ chối vì bị cắt cụt.",
   "lenientStreamIntegrityRisk": "Chỉ bật khi tài khoản của bạn bị ảnh hưởng. Khi đó, phản hồi bị cắt giữa chừng sẽ trông như hoàn chỉnh và được trả về như bản cuối.",
-
   "routing": "Định tuyến tài khoản",
   "sessionAffinity": "Giữ hội thoại trên một tài khoản",
   "sessionAffinityHint": "Các lượt tiếp theo quay về tài khoản đã trả lời lượt trước, nơi đã có sẵn prompt cache. Tắt để luân phiên round-robin nghiêm ngặt cho mọi yêu cầu.",
   "sessionAffinityMore": "Hội thoại mới vẫn luân phiên giữa các tài khoản. Nếu tài khoản đó đang trong thời gian chờ, hết credit hoặc đang lỗi, yêu cầu sẽ chuyển sang tài khoản khác.",
-
   "autoContinue": "Tự động viết tiếp",
   "autoContinueEnable": "Viết tiếp câu trả lời bị cắt do giới hạn đầu ra",
   "autoContinueHint": "Kiro dừng một câu trả lời ở khoảng 8192 token đầu ra. Khi câu trả lời dừng ở đó mà không có lệnh gọi tool, proxy yêu cầu Kiro viết tiếp và nối phần còn lại.",
@@ -36,12 +38,10 @@
   "autoContinueMax": "Số lần viết tiếp tối đa mỗi câu trả lời",
   "autoContinueMaxHint": "Từ 1 đến 10. Việc viết tiếp cũng dừng khi đạt max_tokens của client.",
   "autoContinueMaxInvalid": "Số lần viết tiếp tối đa phải là số nguyên từ 1 đến {max}.",
-
   "toolHistory": "Lịch sử tool",
   "structuredToolHistory": "Gửi lệnh gọi tool trước đó ở dạng có cấu trúc",
   "structuredToolHistoryHint": "Lệnh gọi tool và kết quả trước đó đến model dưới dạng lệnh gọi tool thật, nên các phiên agent dài vẫn tiếp tục gọi tool. Tắt để luôn gửi hoạt động tool trước đó ở dạng văn bản thuần.",
   "structuredToolHistoryMore": "Một cặp sẽ chuyển về văn bản thuần khi yêu cầu không khai báo tool đó hoặc ID của lệnh gọi và kết quả không khớp. Nếu Kiro từ chối dạng có cấu trúc, proxy thử lại một lần bằng văn bản thuần và tiếp tục dùng văn bản thuần trong một giờ.",
-
   "thinkingSettings": "Thinking",
   "thinkingHint": "Chọn hậu tố model để bật thinking và cách đầu ra thinking đến từng API.",
   "thinkingSuffix": "Hậu tố bật thinking",
@@ -51,7 +51,6 @@
   "formatReasoningContent": "reasoning_content (DeepSeek)",
   "formatThinkingClaude": "<thinking> (Claude)",
   "formatThinkOpenAI": "<think> (OpenAI)",
-
   "modelMappings": "Ánh xạ model",
   "modelMappingsHint": "Ánh xạ tên model của client sang ID model của Kiro. Các quy tắc được kiểm tra theo thứ tự; quy tắc đầu tiên có chuỗi nằm trong tên model sẽ được dùng.",
   "modelMappings.add": "Thêm ánh xạ",
@@ -72,7 +71,6 @@
   "modelMappings.dragOver": "Ánh xạ {from} đang ở vị trí {to}.",
   "modelMappings.dragEnd": "Đã thả ánh xạ {from} tại vị trí {to}.",
   "modelMappings.dragCancel": "Đã hủy sắp xếp. Ánh xạ {from} giữ nguyên vị trí.",
-
   "endpointSettings": "Endpoint Kiro",
   "endpointSettingsHint": "Chọn endpoint Kiro nhận yêu cầu.",
   "preferredEndpoint": "Endpoint ưu tiên",
@@ -83,7 +81,6 @@
   "endpointAmazonQ": "Amazon Q",
   "endpointFallback": "Chuyển sang endpoint khác khi lỗi",
   "endpointFallbackHint": "Khi tắt, chỉ dùng endpoint đã chọn.",
-
   "adminPassword": "Mật khẩu quản trị",
   "adminPasswordHint": "Đổi mật khẩu sẽ kết thúc mọi phiên đăng nhập khác. Trình duyệt này vẫn giữ đăng nhập.",
   "newPassword": "Mật khẩu mới",
@@ -95,7 +92,6 @@
   "confirmPasswordTitle": "Đổi mật khẩu quản trị?",
   "confirmPasswordBody": "Mọi phiên đăng nhập khác sẽ kết thúc.",
   "passwordChanged": "Đã đổi mật khẩu",
-
   "proxySettings": "Proxy outbound",
   "proxyHint": "Gửi lưu lượng Kiro và đăng nhập qua proxy SOCKS5 hoặc HTTP. Thay đổi áp dụng ngay, không cần khởi động lại.",
   "proxyType": "Loại proxy",
@@ -110,7 +106,6 @@
   "proxyUsername": "Tên người dùng",
   "proxyPassword": "Mật khẩu",
   "proxyHostRequired": "Nhập host và cổng proxy.",
-
   "promptFilter": "Bộ lọc system prompt",
   "promptFilterHint": "Làm sạch system prompt trước khi gửi tới Kiro. Bộ lọc tích hợp chạy trước, sau đó đến quy tắc tùy chỉnh theo thứ tự danh sách.",
   "builtinFilters": "Bộ lọc tích hợp",
@@ -136,7 +131,6 @@
   "promptFilter.addRegex": "Thêm quy tắc regex",
   "promptFilter.addContains": "Thêm bộ lọc dòng",
   "promptFilter.invalidRegex": "Regex này không hợp lệ; proxy sẽ bỏ qua.",
-
   "dangerZone": "Vùng nguy hiểm",
   "statistics": "Thống kê",
   "resetStats": "Đặt lại thống kê",

@@ -68,6 +68,7 @@
   "shell.addAccount": "Adicionar conta",
   "shell.signOut": "Sair",
   "shell.admin": "Admin",
+  "shell.avatarInitial": "A",
   "shell.userMenu": "Menu do admin",
   "shell.about": "Sobre",
   "shell.running": "Em execução",
@@ -99,5 +100,11 @@
   "shell.update.viewRelease": "Ver versão",
   "shell.notFound.title": "Página não encontrada",
   "shell.notFound.description": "Este endereço não corresponde a nenhuma página.",
-  "shell.notFound.action": "Ir para Visão geral"
+  "shell.notFound.action": "Ir para Visão geral",
+  "shell.sheetDescription": "Páginas, Adicionar conta e o menu Admin.",
+  "shell.notifications": "Notificações",
+  "shell.toast.dismiss": "Fechar notificação",
+  "shell.documentTitle": "{page} · Kiro Proxy",
+  "shell.page.login": "Entrar",
+  "shell.page.setup": "Configuração"
 }

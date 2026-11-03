@@ -32,5 +32,15 @@
   "serverError.tokenLimitNegative": "Giới hạn token phải từ 0 trở lên.",
   "serverError.creditLimitNegative": "Giới hạn credit phải từ 0 trở lên.",
   "serverError.microsoftCanceled": "Đăng nhập Microsoft đã bị hủy. Bắt đầu lại.",
-  "serverError.microsoftDuplicate": "Tài khoản Microsoft này đã được thêm."
+  "serverError.microsoftDuplicate": "Tài khoản Microsoft này đã được thêm.",
+  "serverError.ssoSessionExpired": "Phiên đăng nhập đã hết hạn. Hãy bắt đầu lại.",
+  "serverError.invalidCallbackUrl": "URL callback không hợp lệ. Hãy sao chép lại toàn bộ địa chỉ.",
+  "serverError.ssoStateMismatch": "URL callback thuộc về một lần đăng nhập khác. Hãy bắt đầu lại và dùng liên kết mới.",
+  "serverError.ssoNoCode": "URL callback không có mã ủy quyền. Hãy sao chép lại toàn bộ địa chỉ.",
+  "serverError.ssoTimeout": "Đăng nhập đã hết thời gian chờ. Hãy bắt đầu lại.",
+  "serverError.ssoDenied": "AWS không ủy quyền lần đăng nhập này. Hãy bắt đầu lại.",
+  "serverError.ssoRegisterFailed": "Không thể bắt đầu đăng nhập AWS. Hãy kiểm tra khu vực rồi thử lại.",
+  "serverError.ssoTokenRejected": "AWS không chấp nhận SSO token. Hãy sao chép token mới rồi thử lại.",
+  "serverError.ssoTokenFlowFailed": "Không thể hoàn tất đăng nhập AWS bằng token này. Hãy sao chép token mới rồi thử lại.",
+  "serverError.detail": "(Chi tiết: {detail})"
 }

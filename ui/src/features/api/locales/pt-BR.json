@@ -8,6 +8,10 @@
   "access.stateOff": "Qualquer cliente pode chamar o proxy",
   "access.enabledApiKeyRequired": "Crie e habilite pelo menos uma chave de API antes de exigi-la.",
   "access.loadFailed": "Não foi possível carregar o acesso à API",
+  "access.discardTitle": "Descartar alterações não salvas?",
+  "access.discardBody": "A alteração de acesso à API ainda não foi salva. Sair desta página mesmo assim?",
+  "access.discard": "Descartar",
+  "access.keepEditing": "Continuar editando",
   "keys.title": "Chaves de API",
   "keys.description": "Crie uma chave por cliente. Defina limites de tokens ou créditos; 0 significa ilimitado.",
   "keys.create": "Criar chave de API",
@@ -97,5 +101,6 @@
   "snippets.sdkLanguage": "Linguagem do SDK",
   "snippets.python": "Python",
   "snippets.typescript": "TypeScript",
-  "snippets.copy": "Copiar snippet de {name}"
+  "snippets.copy": "Copiar snippet de {name}",
+  "snippets.codeRegion": "Código {name}"
 }
