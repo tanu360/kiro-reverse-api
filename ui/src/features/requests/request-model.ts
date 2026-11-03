@@ -5,6 +5,8 @@ import type {
   RequestErrorType,
   RequestRecord,
 } from "@/lib/api/types";
+import { unixToDate } from "@/lib/format";
+import type { Lang } from "@/lib/i18n";
 import type { RequestSort, RequestsSearch } from "@/routes/-search";
 
 export const DEFAULT_PAGE = 1;
@@ -118,4 +120,26 @@ export function defaultSortDesc(columnId: string): boolean {
 
 export function hasFilters(search: RequestsSearch): boolean {
   return Boolean(search.search?.trim() || search.status);
+}
+
+const LOCALES: Record<Lang, string> = { en: "en-US", zh: "zh-CN" };
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+
+function dateFormat(lang: Lang, withYear: boolean): Intl.DateTimeFormat {
+  const key = `${lang}:${withYear}`;
+  let format = dateFormats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(
+      LOCALES[lang],
+      withYear ? { dateStyle: "medium" } : { month: "short", day: "numeric" },
+    );
+    dateFormats.set(key, format);
+  }
+  return format;
+}
+
+/** Date line of the Time column: "Nov 3" this year, "Nov 3, 2025" for older rows. */
+export function formatRowDate(unixSec: number, lang: Lang, now: Date = new Date()): string {
+  const date = unixToDate(unixSec);
+  return dateFormat(lang, date.getFullYear() !== now.getFullYear()).format(date);
 }

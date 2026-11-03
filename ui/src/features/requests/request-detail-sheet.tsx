@@ -1,5 +1,5 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import type { JSX, ReactNode } from "react";
+import { type JSX, type ReactNode, useRef } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { DisplayEmail } from "@/components/shared/display-email";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
@@ -62,10 +62,13 @@ export function RequestDetailSheet({
 }: RequestDetailSheetProps): JSX.Element {
   const { t, lang } = useT("requests");
   const maskText = useMaskText();
+  // Focus the sheet itself on open. The default (first tabbable) is a copy button, which
+  // shows its tooltip on focus and spends the first Escape on closing that tooltip.
+  const popupRef = useRef<HTMLDivElement>(null);
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
-      <SheetPopup className="max-w-lg">
+      <SheetPopup className="max-w-lg outline-none" initialFocus={popupRef} ref={popupRef}>
         <SheetHeader>
           <SheetTitle>{t("detail.title")}</SheetTitle>
           <SheetDescription>{record ? formatDateTime(record.ts, lang) : EMPTY}</SheetDescription>
