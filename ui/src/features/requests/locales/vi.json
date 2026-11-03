@@ -1,6 +1,6 @@
 {
   "title": "Yêu cầu",
-  "description": "Mọi lệnh gọi đến proxy, mới nhất trước.",
+  "description": "Mọi yêu cầu gửi đến proxy, mới nhất trước.",
   "search": "Tìm yêu cầu",
   "searchPlaceholder": "Tìm tài khoản, API key, model hoặc lỗi",
   "searchHint": "Tìm kiếm cũng khớp với API key đầy đủ, nên kết quả khớp có thể không hiện trong cột API key đã che.",
@@ -10,7 +10,7 @@
   "allStatuses": "Tất cả",
   "ok": "Thành công",
   "fail": "Thất bại",
-  "pageSize": "Số dòng mỗi trang",
+  "pageSize": "Số dòng trên mỗi trang",
   "pageSizeOption": "{count} / trang",
   "table": "Yêu cầu",
   "time": "Thời gian",

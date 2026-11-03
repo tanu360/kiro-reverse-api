@@ -202,7 +202,7 @@
   "testLog.empty": "Chưa chạy kiểm tra nào",
   "testLog.start": "{email} · {model} · {proxy}",
   "testLog.success": "✓ {email} OK ({seconds} giây) Phản hồi: {reply}",
-  "testLog.details": "stop reason {stopReason} | vào/ra {input}/{output} | credit {credits} | ngữ cảnh {context}%",
+  "testLog.details": "stop reason {stopReason} | đầu vào/đầu ra {input}/{output} | credit {credits} | ngữ cảnh {context}%",
   "testLog.noStopReason": "không có",
   "testLog.noStopReasonHint": "Stream không mang stop reason. Điều này thường gặp ở tài khoản Enterprise (IdC).",
   "testLog.failed": "✗ {email} Thất bại ({seconds} giây): {reason}",
