@@ -84,7 +84,7 @@
   --sidebar: #121212;
   --sidebar-foreground: #ffffff;
   --sidebar-border: #333333;
-  --kiro-icon-filter: invert(1);
+  --kiro-icon-filter: none;
   color-scheme: dark;
 }
 @theme {
