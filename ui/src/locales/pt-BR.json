@@ -99,7 +99,7 @@
   "shell.toast.dismiss": "Fechar notificação",
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Entrar",
-  "shell.page.setup": "Configuração",
+  "shell.page.setup": "Configuração inicial",
   "a11y.labelWithDetail": "{label}. {detail}",
   "text.joinSentences": "{first} {second}"
 }

@@ -37,7 +37,7 @@
   "live.activeAccounts": "Contas ativas",
   "live.activeAccountsHint": "Contas com requisições nos últimos 5 min, do total de contas que atenderam tráfego desde que o proxy iniciou.",
   "traffic.title": "Tráfego",
-  "traffic.description.1h": "Requisições por minuto, última hora",
+  "traffic.description.1h": "Requisições a cada 2 min, última hora",
   "traffic.description.6h": "Requisições a cada 5 min, últimas 6 h",
   "traffic.description.24h": "Requisições a cada 15 min, últimas 24 h",
   "traffic.range": "Intervalo de tempo",
