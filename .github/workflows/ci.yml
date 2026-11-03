@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+    branches: [main, master, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # The pnpm version comes from the packageManager field; there is no root package.json.
+          package_json_file: ui/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint UI
+        working-directory: ui
+        run: pnpm lint
+
+      - name: Typecheck UI
+        working-directory: ui
+        run: pnpm typecheck
+
+      - name: Test UI
+        working-directory: ui
+        run: pnpm test
+
+      # Build the UI before Go so the binary embeds ui/dist.
+      - name: Build UI
+        working-directory: ui
+        run: pnpm build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build Go
+        run: go build ./...
+
+      - name: Test Go
+        run: go test ./...
