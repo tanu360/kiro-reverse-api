@@ -1,0 +1,317 @@
+import { type ColumnDef, tableFeatures, useTable } from "@tanstack/react-table";
+import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from "lucide-react";
+import { type JSX, type KeyboardEvent, type MouseEvent, type ReactNode, useMemo } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useIsMobile } from "@/hooks/use-media-query";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+
+/** Own column type, so features do not depend on the TanStack Table major version. */
+export interface DataTableColumn<T> {
+  id: string;
+  header: ReactNode;
+  cell: (row: T, index: number) => ReactNode;
+  sortable?: boolean;
+  align?: "start" | "end" | "center";
+  width?: string;
+  className?: string;
+  headerClassName?: string;
+  sticky?: boolean;
+}
+
+export interface DataTableSort {
+  id: string;
+  desc: boolean;
+}
+
+export interface DataTableProps<T> {
+  columns: DataTableColumn<T>[];
+  data: T[];
+  getRowId: (row: T, index: number) => string;
+  sort?: DataTableSort | null;
+  onSortChange?: (sort: DataTableSort) => void;
+  defaultSortDesc?: (columnId: string) => boolean;
+  selection?: {
+    selected: ReadonlySet<string>;
+    onChange: (next: Set<string>) => void;
+    rowLabel: (row: T) => string;
+  };
+  onRowClick?: (row: T) => void;
+  renderMobileCard?: (row: T, ctx: { selected: boolean; toggleSelected: () => void }) => ReactNode;
+  loading?: boolean;
+  emptyState?: ReactNode;
+  caption?: string;
+  className?: string;
+}
+
+// Row-level click and key handlers ignore events that start inside these.
+const INTERACTIVE_SELECTOR =
+  'a, button, input, select, textarea, label, summary, [role="button"], [role="checkbox"], [role="link"], [role="menuitem"], [role="switch"], [role="tab"], [contenteditable="true"], [data-row-interactive]';
+
+function fromInteractiveChild(event: { target: EventTarget; currentTarget: EventTarget }): boolean {
+  const target = event.target as HTMLElement | null;
+  if (!target || target === event.currentTarget) return false;
+  const hit = target.closest(INTERACTIVE_SELECTOR);
+  return hit !== null && (event.currentTarget as HTMLElement).contains(hit);
+}
+
+const ALIGN_CLASS = { start: "text-left", center: "text-center", end: "text-right" } as const;
+const STICKY_CLASS = "sticky left-0 z-[1] bg-card";
+const coreFeatures = tableFeatures({});
+const SKELETON_ROWS = 5;
+
+interface Boxed<T> {
+  value: T;
+}
+
+export function DataTable<T>({
+  columns,
+  data,
+  getRowId,
+  sort,
+  onSortChange,
+  defaultSortDesc,
+  selection,
+  onRowClick,
+  renderMobileCard,
+  loading = false,
+  emptyState,
+  caption,
+  className,
+}: DataTableProps<T>): JSX.Element {
+  const { t } = useT();
+  const isMobile = useIsMobile();
+
+  // Rows are boxed because TanStack constrains row data to object shapes and T is open.
+  const boxed = useMemo(() => data.map((value) => ({ value })), [data]);
+  const tableColumns = useMemo<ColumnDef<typeof coreFeatures, Boxed<T>, unknown>[]>(
+    () => columns.map((column) => ({ id: column.id })),
+    [columns],
+  );
+  const table = useTable({
+    features: coreFeatures,
+    data: boxed,
+    columns: tableColumns,
+    getRowId: (row: Boxed<T>, index: number) => getRowId(row.value, index),
+  });
+  const rows = table.getRowModel().rows.map((row) => ({
+    id: row.id,
+    index: row.index,
+    original: row.original.value,
+  }));
+  const rowIds = rows.map((row) => row.id);
+
+  const selected = selection?.selected;
+  const selectedCount = selected ? rowIds.filter((id) => selected.has(id)).length : 0;
+  const allSelected = rowIds.length > 0 && selectedCount === rowIds.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+
+  const toggleAll = () => {
+    if (!selection) return;
+    // Clearing from the all-selected state drops the whole selection, including rows a
+    // filter hides (old UI parity). Otherwise every visible row is added.
+    if (allSelected) {
+      selection.onChange(new Set());
+      return;
+    }
+    const next = new Set(selection.selected);
+    for (const id of rowIds) next.add(id);
+    selection.onChange(next);
+  };
+
+  const toggleOne = (id: string) => {
+    if (!selection) return;
+    const next = new Set(selection.selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selection.onChange(next);
+  };
+
+  const sortBy = (column: DataTableColumn<T>) => {
+    if (!onSortChange) return;
+    if (sort?.id === column.id) {
+      onSortChange({ id: column.id, desc: !sort.desc });
+      return;
+    }
+    onSortChange({ id: column.id, desc: defaultSortDesc?.(column.id) ?? false });
+  };
+
+  const onRowClickEvent = (row: T) => (event: MouseEvent<HTMLElement>) => {
+    if (fromInteractiveChild(event)) return;
+    onRowClick?.(row);
+  };
+
+  const onRowKeyDown = (row: T) => (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    onRowClick?.(row);
+  };
+
+  const showEmpty = !loading && rows.length === 0;
+
+  if (isMobile && renderMobileCard) {
+    if (loading && rows.length === 0) {
+      return (
+        <div aria-busy="true" className={cn("flex flex-col gap-2", className)}>
+          {Array.from({ length: 3 }, (_, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
+            <Skeleton className="h-20 w-full rounded-xl" key={index} />
+          ))}
+        </div>
+      );
+    }
+    if (showEmpty) return <div className={className}>{emptyState}</div>;
+    return (
+      <ul aria-label={caption} className={cn("flex flex-col gap-2", className)}>
+        {rows.map((row) => {
+          const isSelected = selected?.has(row.id) ?? false;
+          return (
+            <li data-state={isSelected ? "selected" : undefined} key={row.id}>
+              {renderMobileCard(row.original, {
+                selected: isSelected,
+                toggleSelected: () => toggleOne(row.id),
+              })}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  const columnCount = columns.length + (selection ? 1 : 0);
+
+  return (
+    <Table aria-busy={loading || undefined} className={className}>
+      {caption ? <TableCaption className="sr-only">{caption}</TableCaption> : null}
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          {selection ? (
+            <TableHead className="w-px">
+              <Checkbox
+                aria-label={t("table.selectAll")}
+                checked={allSelected}
+                disabled={rowIds.length === 0}
+                indeterminate={someSelected}
+                onCheckedChange={toggleAll}
+              />
+            </TableHead>
+          ) : null}
+          {columns.map((column) => {
+            const active = sort?.id === column.id;
+            const ariaSort = column.sortable
+              ? active
+                ? sort?.desc
+                  ? "descending"
+                  : "ascending"
+                : "none"
+              : undefined;
+            const SortIcon = active ? (sort?.desc ? ArrowDownIcon : ArrowUpIcon) : ArrowUpDownIcon;
+            return (
+              <TableHead
+                aria-sort={ariaSort}
+                className={cn(
+                  ALIGN_CLASS[column.align ?? "start"],
+                  column.sticky && STICKY_CLASS,
+                  column.headerClassName,
+                )}
+                key={column.id}
+                style={column.width ? { width: column.width } : undefined}
+              >
+                {column.sortable && onSortChange ? (
+                  <button
+                    className={cn(
+                      "-mx-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 font-medium outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                      active && "text-foreground",
+                      column.align === "end" && "flex-row-reverse",
+                    )}
+                    onClick={() => sortBy(column)}
+                    type="button"
+                  >
+                    {column.header}
+                    <SortIcon
+                      aria-hidden="true"
+                      className={cn("size-3.5 shrink-0", !active && "opacity-50")}
+                    />
+                  </button>
+                ) : (
+                  column.header
+                )}
+              </TableHead>
+            );
+          })}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {loading && rows.length === 0
+          ? Array.from({ length: SKELETON_ROWS }, (_, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
+              <TableRow aria-hidden="true" className="hover:bg-transparent" key={index}>
+                {Array.from({ length: columnCount }, (_, cell) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cells never reorder.
+                  <TableCell key={cell}>
+                    <Skeleton className="h-4 w-full max-w-32" />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          : null}
+        {showEmpty ? (
+          <TableRow className="hover:bg-transparent">
+            <TableCell className="whitespace-normal p-0" colSpan={columnCount}>
+              {emptyState}
+            </TableCell>
+          </TableRow>
+        ) : null}
+        {rows.map((row) => {
+          const isSelected = selected?.has(row.id) ?? false;
+          return (
+            <TableRow
+              className={cn(
+                onRowClick &&
+                  "cursor-pointer outline-none focus-visible:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+              )}
+              data-state={isSelected ? "selected" : undefined}
+              key={row.id}
+              onClick={onRowClick ? onRowClickEvent(row.original) : undefined}
+              onKeyDown={onRowClick ? onRowKeyDown(row.original) : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+            >
+              {selection ? (
+                <TableCell className="w-px">
+                  <Checkbox
+                    aria-label={t("table.selectRow", { label: selection.rowLabel(row.original) })}
+                    checked={isSelected}
+                    onCheckedChange={() => toggleOne(row.id)}
+                  />
+                </TableCell>
+              ) : null}
+              {columns.map((column) => (
+                <TableCell
+                  className={cn(
+                    ALIGN_CLASS[column.align ?? "start"],
+                    column.sticky && STICKY_CLASS,
+                    column.className,
+                  )}
+                  key={column.id}
+                >
+                  {column.cell(row.original, row.index)}
+                </TableCell>
+              ))}
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}

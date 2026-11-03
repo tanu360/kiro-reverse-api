@@ -1,0 +1,32 @@
+import { EyeIcon, EyeOffIcon } from "lucide-react";
+import type { JSX } from "react";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { useT } from "@/lib/i18n";
+import { usePrivacy } from "@/lib/privacy";
+
+export function PrivacyToggle(): JSX.Element {
+  const { t } = useT();
+  const { enabled, toggle } = usePrivacy();
+  const Icon = enabled ? EyeOffIcon : EyeIcon;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            aria-label={t("shell.privacy.label")}
+            aria-pressed={enabled}
+            className="size-10 md:size-8"
+            onClick={toggle}
+            size="icon"
+            variant="ghost"
+          />
+        }
+      >
+        <Icon aria-hidden="true" />
+      </TooltipTrigger>
+      <TooltipPopup>{t("shell.privacy.tooltip")}</TooltipPopup>
+    </Tooltip>
+  );
+}

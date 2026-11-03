@@ -1,0 +1,168 @@
+import {
+  InfoIcon,
+  type LucideIcon,
+  MinusIcon,
+  TrendingDownIcon,
+  TrendingUpIcon,
+} from "lucide-react";
+import type { JSX, ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { StatCardSkeleton } from "./loading-state";
+
+export interface StatMetric {
+  label: string;
+  value: ReactNode;
+  tone?: "default" | "danger" | "muted";
+  wide?: boolean;
+  /** Shown as a tooltip on the label, with an info affordance. */
+  hint?: string;
+}
+
+export interface StatCardProps {
+  icon: LucideIcon;
+  label: string;
+  value: ReactNode;
+  tone?: "default" | "danger";
+  /** value is a fraction: 0.12 = +12 % */
+  delta?: { value: number; label: string; goodWhen?: "up" | "down" } | null;
+  caption?: ReactNode;
+  /** Decorative; wrapped in aria-hidden. */
+  sparkline?: ReactNode;
+  metrics?: StatMetric[];
+  loading?: boolean;
+}
+
+/** 0.125 -> "+12.5%", -0.2 -> "-20%", 0 -> "0%". */
+export function formatDelta(fraction: number): string {
+  const percent = Math.round(fraction * 1000) / 10;
+  const text = Number.isInteger(percent) ? String(Math.abs(percent)) : Math.abs(percent).toFixed(1);
+  if (percent > 0) return `+${text}%`;
+  if (percent < 0) return `-${text}%`;
+  return "0%";
+}
+
+function DeltaBadge({ delta }: { delta: NonNullable<StatCardProps["delta"]> }): JSX.Element {
+  const direction = delta.value > 0 ? "up" : delta.value < 0 ? "down" : "flat";
+  const goodWhen = delta.goodWhen ?? "up";
+  const tone = direction === "flat" ? "neutral" : direction === goodWhen ? "good" : "bad";
+  const Icon =
+    direction === "up" ? TrendingUpIcon : direction === "down" ? TrendingDownIcon : MinusIcon;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <Badge
+        className={cn(
+          "h-5 gap-1 rounded-full px-2 tabular-nums",
+          tone === "bad" && "bg-destructive/10 text-destructive-foreground dark:bg-destructive/20",
+        )}
+        data-tone={tone}
+        variant={tone === "good" ? "default" : tone === "bad" ? "error" : "secondary"}
+      >
+        <Icon aria-hidden="true" className="size-3" />
+        {formatDelta(delta.value)}
+      </Badge>
+      <span className="text-muted-foreground text-xs">{delta.label}</span>
+    </span>
+  );
+}
+
+function MetricLabel({ metric }: { metric: StatMetric }): JSX.Element {
+  if (!metric.hint) {
+    return <dt className="truncate text-muted-foreground">{metric.label}</dt>;
+  }
+  return (
+    <dt className="min-w-0">
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              className="inline-flex max-w-full items-center gap-1 rounded-sm text-left text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              type="button"
+            />
+          }
+        >
+          <span className="truncate">{metric.label}</span>
+          <InfoIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" />
+        </TooltipTrigger>
+        <TooltipPopup className="max-w-72">{metric.hint}</TooltipPopup>
+      </Tooltip>
+    </dt>
+  );
+}
+
+export function StatCard({
+  icon: Icon,
+  label,
+  value,
+  tone = "default",
+  delta,
+  caption,
+  sparkline,
+  metrics,
+  loading = false,
+}: StatCardProps): JSX.Element {
+  if (loading) return <StatCardSkeleton />;
+
+  const danger = tone === "danger";
+  return (
+    <Card
+      className="min-w-0 gap-4 bg-linear-to-t from-primary/5 to-card p-4 shadow-xs dark:bg-card dark:from-card"
+      data-slot="stat-card"
+      data-tone={tone}
+    >
+      <div className="flex flex-col gap-1">
+        <div
+          className={cn(
+            "flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground",
+            danger && "border-destructive/20 bg-destructive/10 text-destructive-foreground",
+          )}
+        >
+          <Icon aria-hidden="true" className="size-4" />
+        </div>
+        <p className="text-muted-foreground text-sm">{label}</p>
+      </div>
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className={cn(
+              "font-medium text-3xl leading-none tracking-tight tabular-nums",
+              danger && "text-destructive-foreground",
+            )}
+          >
+            {value}
+          </div>
+          {delta ? <DeltaBadge delta={delta} /> : null}
+        </div>
+        {caption ? <div className="text-muted-foreground text-sm">{caption}</div> : null}
+      </div>
+      {sparkline ? (
+        <div aria-hidden="true" className="-mx-1 h-10 min-w-0">
+          {sparkline}
+        </div>
+      ) : null}
+      {metrics && metrics.length > 0 ? (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-3 text-xs">
+          {metrics.map((metric) => (
+            <div
+              className={cn("flex min-w-0 flex-col gap-0.5", metric.wide && "col-span-2")}
+              key={metric.label}
+            >
+              <MetricLabel metric={metric} />
+              <dd
+                className={cn(
+                  "truncate font-medium text-sm tabular-nums",
+                  metric.tone === "danger" && "text-destructive-foreground",
+                  metric.tone === "muted" && "text-muted-foreground",
+                )}
+              >
+                {metric.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </Card>
+  );
+}

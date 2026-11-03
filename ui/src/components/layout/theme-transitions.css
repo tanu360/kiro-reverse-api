@@ -1,0 +1,8 @@
+/* ThemeProvider adds this class for one frame while it swaps the theme. */
+.no-transitions,
+.no-transitions *,
+.no-transitions ::before,
+.no-transitions ::after {
+  /* biome-ignore lint/complexity/noImportantStyles: must beat every component transition. */
+  transition: none !important;
+}
