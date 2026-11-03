@@ -40,8 +40,10 @@ export function PasswordField({
           value={value}
         />
         <InputGroupAddon align="inline-end">
+          {/* 40 px on phones (touch target rule), the compact size from md up. */}
           <Button
             aria-label={visible ? t("hidePassword") : t("showPassword")}
+            className="max-md:size-10"
             onClick={() => setVisible((shown) => !shown)}
             size="icon-sm"
             variant="ghost"

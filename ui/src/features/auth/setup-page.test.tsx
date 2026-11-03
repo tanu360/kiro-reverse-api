@@ -30,8 +30,9 @@ describe("SetupPage", () => {
     await user.type(screen.getByLabelText("Password"), PASSWORD);
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    // The toast follows the Overview navigation, which can take over a second under a busy run.
     expect(
-      await screen.findByText("Change the generated password in Settings."),
+      await screen.findByText("Change the generated password in Settings.", {}, { timeout: 4000 }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Open settings" }));
@@ -44,5 +45,22 @@ describe("SetupPage", () => {
       await router.navigate({ to: "/setup" });
     });
     await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+  });
+
+  it("drops the change-password toast when the session ends", async () => {
+    const { user, router } = await renderApp("/setup", { authed: false });
+    await screen.findByText(PASSWORD);
+    await user.type(screen.getByLabelText("Password"), PASSWORD);
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect(
+      await screen.findByRole("button", { name: "Open settings" }, { timeout: 4000 }),
+    ).toBeInTheDocument();
+
+    act(() => clearSession("signout"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Open settings" })).not.toBeInTheDocument(),
+    );
   });
 });

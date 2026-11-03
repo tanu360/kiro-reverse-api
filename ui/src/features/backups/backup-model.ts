@@ -52,6 +52,19 @@ export function scheduleForm(schedule: BackupSchedule): ScheduleForm {
   };
 }
 
+/** True when saving would change the schedule. An emptied keep field counts as a change. */
+export function scheduleDirty(
+  initial: ScheduleForm,
+  current: { enabled: boolean; cadence: BackupCadence; keep: number | null },
+): boolean {
+  if (current.keep === null) return true;
+  return (
+    current.enabled !== initial.enabled ||
+    current.cadence !== initial.cadence ||
+    clampKeep(current.keep) !== initial.keep
+  );
+}
+
 export function cadenceLabel(cadence: BackupCadence, t: TFunction): string {
   return t(cadence);
 }
@@ -109,6 +122,23 @@ export function accountsCell(entry: BackupEntry, t: TFunction): { text: string; 
     };
   }
   return { text: String(entry.accountCnt || 0) };
+}
+
+// Server messages (config/backup.go parseBackupData) for a file that is not a usable backup.
+const NOT_A_BACKUP = [
+  /^backup content is not valid JSON$/i,
+  /^backup JSON parse failed\b/i,
+  /^unsupported backup format\b/i,
+  /^backup envelope parse failed\b/i,
+  /^unsupported backup version\b/i,
+  /^backup schema mismatch\b/i,
+  /^credential \d+ missing id$/i,
+];
+
+/** True when the server rejected an uploaded file because it is not a Kiro Proxy backup. */
+export function isNotABackupMessage(message: string): boolean {
+  const text = message.trim();
+  return NOT_A_BACKUP.some((pattern) => pattern.test(text));
 }
 
 const COUNT_MARKER = "\u0000";
