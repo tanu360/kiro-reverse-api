@@ -1,0 +1,57 @@
+[
+  {
+    "file": "src/lib/i18n/index.tsx",
+    "text": "English",
+    "reason": "Language names are shown in their own script in every UI language."
+  },
+  {
+    "file": "src/lib/i18n/index.tsx",
+    "text": "中文",
+    "reason": "Language names are shown in their own script in every UI language."
+  },
+  {
+    "file": "src/lib/i18n/index.tsx",
+    "text": "Tiếng Việt",
+    "reason": "Language names are shown in their own script in every UI language."
+  },
+  {
+    "file": "src/lib/i18n/index.tsx",
+    "text": "Português (Brasil)",
+    "reason": "Language names are shown in their own script in every UI language."
+  },
+  {
+    "file": "src/components/layout/update-dialog.tsx",
+    "text": "v",
+    "reason": "Version tag prefix (v1.2.3), a data format that is the same in every language."
+  },
+  {
+    "file": "src/features/add-account/fields.tsx",
+    "text": "us-east-1",
+    "reason": "AWS region id example; region ids are data values."
+  },
+  {
+    "file": "src/features/add-account/flows/api-key-flow.tsx",
+    "text": "ksk_... ksk_...|eu-central-1",
+    "reason": "Kiro API key format example (key prefix and region id), typed as data."
+  },
+  {
+    "file": "src/features/add-account/flows/credentials-flow.tsx",
+    "text": "[{\"refreshToken\":\"xxx\",\"provider\":\"BuilderID\"}]",
+    "reason": "JSON example of the credentials payload; wire field names are code."
+  },
+  {
+    "file": "src/features/add-account/flows/local-cache-flow.tsx",
+    "text": "{\"refreshToken\": \"…\"}",
+    "reason": "JSON example of the AWS SSO cache token file; wire field names are code."
+  },
+  {
+    "file": "src/features/add-account/flows/local-cache-flow.tsx",
+    "text": "{\"clientId\": \"…\", \"clientSecret\": \"…\"}",
+    "reason": "JSON example of the AWS SSO cache client file; wire field names are code."
+  },
+  {
+    "file": "src/features/add-account/flows/microsoft-flow.tsx",
+    "text": "http://localhost:3128/...",
+    "reason": "Example callback URL; URLs are data values."
+  }
+]
