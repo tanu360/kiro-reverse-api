@@ -53,8 +53,9 @@ export const badgeVariants = cva(
         soft: "bg-[color-mix(in_oklab,var(--badge-tint)_11%,transparent)] text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-fg)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_18%,transparent)] [button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_18%,transparent)] dark:[button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_26%,transparent)]",
         "soft-outline":
           "border-[color-mix(in_oklab,var(--badge-tint)_28%,transparent)] bg-[color-mix(in_oklab,var(--badge-tint)_9%,transparent)] text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-fg)] dark:border-[color-mix(in_oklab,var(--badge-tint)_36%,transparent)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_15%,transparent)] [button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_16%,transparent)]",
+        // The buttons' faint film grain (index.css grain-overlay) on the solid fill.
         solid:
-          "bg-(--badge-solid) text-(--badge-solid-fg) [--badge-dot:var(--badge-solid-fg)] [--badge-glyph:var(--badge-solid)] [--badge-icon:var(--badge-solid-fg)] [button&,a&]:hover:opacity-90",
+          "grain-overlay [--grain-overlay-opacity:0.1] bg-(--badge-solid) text-(--badge-solid-fg) [--badge-dot:var(--badge-solid-fg)] [--badge-glyph:var(--badge-solid)] [--badge-icon:var(--badge-solid-fg)] [button&,a&]:hover:opacity-90",
         outline:
           "border-border bg-background text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-disc)] dark:border-input dark:bg-input/16 [button&,a&]:hover:bg-accent",
       },

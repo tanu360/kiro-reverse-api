@@ -11,9 +11,9 @@ export const segmentedControlItemSizeClassNames: Record<
   SegmentedControlSize,
   string
 > = {
-  default: "h-8.5 px-[calc(--spacing(2.5)-1px)] sm:h-7.5",
-  lg: "h-9.5 px-[calc(--spacing(3)-1px)] sm:h-8.5",
-  sm: "h-7.5 px-[calc(--spacing(2)-1px)] sm:h-6.5",
+  default: "h-8 px-[calc(--spacing(2.5)-1px)] sm:h-7",
+  lg: "h-9 px-[calc(--spacing(3)-1px)] sm:h-8",
+  sm: "h-7 px-[calc(--spacing(2)-1px)] sm:h-6",
 };
 
 /**
@@ -26,8 +26,14 @@ export const segmentedControlItemTouchClassName = "pointer-coarse:h-10";
 export const segmentedControlItemLayoutClassName =
   "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0";
 
+/**
+ * Flat, as the sign-in theme switch: a hairline frame with no track fill (the control and the
+ * tab list) and a shadowless highlight: the accent, a step lighter on the dark theme, where the
+ * accent all but vanishes on the black page. The 1 px frame and 1 px padding keep each size the
+ * height of the matching field and button: 36 / 32 px by default, 40 / 36 lg, 32 / 28 sm.
+ */
 export const segmentedControlIndicatorSurfaceClassName =
-  "rounded-md bg-background shadow-sm/5 dark:bg-input";
+  "rounded-md bg-accent dark:bg-input/64";
 
 const SegmentedControlContext: React.Context<SegmentedControlSize> =
   React.createContext<SegmentedControlSize>("default");
@@ -49,7 +55,7 @@ export function SegmentedControl({
       </>
     ),
     className: cn(
-      "relative z-0 flex w-fit items-center justify-center gap-0.5 rounded-lg bg-muted p-0.5",
+      "relative z-0 flex w-fit items-center justify-center gap-0.5 rounded-lg border p-px",
       className,
     ),
     "data-size": size,
@@ -82,11 +88,11 @@ export function SegmentedControlItem({
 
   const defaultProps = {
     className: cn(
-      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base text-muted-foreground outline-2 outline-transparent transition-[color,outline-color] hover:bg-transparent hover:text-foreground focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm",
-      "data-checked:bg-background data-checked:text-foreground data-checked:shadow-sm/5 dark:data-checked:bg-input",
-      "aria-[current=page]:bg-background aria-[current=page]:text-foreground aria-[current=page]:shadow-sm/5 dark:aria-[current=page]:bg-input",
-      "data-pressed:bg-background data-pressed:text-foreground data-pressed:shadow-sm/5 dark:data-pressed:bg-input",
-      "[:has(>[data-slot=segmented-control-indicator]:not([hidden]))>&]:bg-transparent! [:has(>[data-slot=segmented-control-indicator]:not([hidden]))>&]:shadow-none!",
+      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base text-muted-foreground outline-none transition-colors hover:bg-transparent hover:text-foreground focus-outline-inset disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm",
+      "data-checked:bg-accent data-checked:text-foreground dark:data-checked:bg-input/64",
+      "aria-[current=page]:bg-accent aria-[current=page]:text-foreground dark:aria-[current=page]:bg-input/64",
+      "data-pressed:bg-accent data-pressed:text-foreground dark:data-pressed:bg-input/64",
+      "[:has(>[data-slot=segmented-control-indicator]:not([hidden]))>&]:bg-transparent!",
       segmentedControlItemLayoutClassName,
       segmentedControlItemTouchClassName,
       segmentedControlItemSizeClassNames[resolvedSize],

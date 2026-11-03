@@ -33,7 +33,11 @@
   /* Kiro purple-500 (#9046ff, kiro.dev --cta-primary): white text on it is 4.6:1. */
   --primary: #9046ff;
   --primary-foreground: var(--color-white);
-  --secondary: var(--color-zinc-50);
+  /*
+   * zinc-100, not t3code's zinc-50: a secondary button's zinc-50 fill all but vanished on the
+   * zinc-25 page. It now matches the accent (hover and highlight) fill.
+   */
+  --secondary: var(--color-zinc-100);
   --secondary-foreground: var(--color-zinc-800);
   --muted: var(--color-zinc-50);
   --muted-foreground: var(--color-zinc-500);
@@ -90,7 +94,8 @@
   --popover: color-mix(in srgb, var(--color-neutral-950) 98.5%, var(--color-white));
   --popover-foreground: var(--color-neutral-100);
   --primary: #9046ff;
-  --secondary: --alpha(var(--color-white) / 3%);
+  /* 6%, not 3%: a secondary button stays visible on the black page and on cards. */
+  --secondary: --alpha(var(--color-white) / 6%);
   --secondary-foreground: var(--color-neutral-100);
   --muted: --alpha(var(--color-white) / 3%);
   --muted-foreground: var(--color-neutral-400);
@@ -200,7 +205,8 @@
 }
 
 /*
- * Film grain over a solid fill (the sign-in button): the showcase's mid-grey fractal noise
+ * Film grain over a solid fill (the filled buttons, solid pills and the sign-in button, all at
+ * --grain-overlay-opacity 0.1): the showcase's mid-grey fractal noise
  * (auth-showcase.tsx GRAIN; filtered in sRGB, so it averages 50% grey and the overlay blend
  * neither lightens nor darkens the fill) on a ::before layer. The host must be positioned.
  * `isolate` keeps the blend inside the host, and z-index -1 paints the grain over the host's
@@ -436,7 +442,8 @@
   --chart-5: oklch(1 0 0);
   --chart-positive: var(--success);
   --chart-negative: var(--destructive);
-  --chart-background: oklch(0.145 0 0);
+  /* The card the charts sit on, so dot outlines and ring gaps cut cleanly into it. */
+  --chart-background: var(--card);
   --chart-foreground: oklch(0.45 0 0);
   --chart-foreground-muted: oklch(0.65 0.01 260);
   --chart-crosshair: oklch(0.45 0 0);
