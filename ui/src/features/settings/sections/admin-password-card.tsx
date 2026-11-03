@@ -1,16 +1,17 @@
 import { type JSX, useId, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { updateSettings } from "@/lib/api/settings";
 import { reauthenticate } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { useReportDirty } from "../lib/unsaved";
 import { SECTION_ID } from "./sections";
 import {
   FieldErrorText,
   PasswordInput,
   SettingsSection,
+  SubmitButton,
   toastSaveFailed,
 } from "./settings-section";
 
@@ -23,6 +24,8 @@ export function AdminPasswordCard(): JSX.Element {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A typed, unsent password counts as an unsaved change.
+  useReportDirty(SECTION_ID.adminPassword, password !== "");
 
   const onSubmit = async () => {
     if (busy) return;
@@ -71,9 +74,9 @@ export function AdminPasswordCard(): JSX.Element {
     <SettingsSection
       footer={
         <div className="flex w-full justify-end">
-          <Button disabled={busy} type="submit">
+          <SubmitButton blocked={busy} busy={busy}>
             {busy ? t("changingPassword") : t("changePassword")}
-          </Button>
+          </SubmitButton>
         </div>
       }
       hint={t("adminPasswordHint")}

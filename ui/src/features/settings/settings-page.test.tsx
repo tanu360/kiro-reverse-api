@@ -73,7 +73,7 @@ describe("SettingsPage", () => {
     const { user } = await renderPage();
     const usage = section(SECTION_ID.usage);
     const save = within(usage).getByRole("button", { name: "Save" });
-    expect(save).toBeDisabled();
+    expect(save).toHaveAttribute("aria-disabled", "true");
 
     await user.click(within(usage).getByRole("switch", { name: "Allow overage" }));
     await user.click(save);
@@ -194,7 +194,9 @@ describe("SettingsPage", () => {
       expect(sources.map((input) => (input as HTMLInputElement).value)).toEqual(
         defaultModelMappings().map((rule) => rule.key),
       );
-      expect(within(card).getByRole("button", { name: "Save" })).toBeEnabled();
+      expect(within(card).getByRole("button", { name: "Save" })).not.toHaveAttribute(
+        "aria-disabled",
+      );
       expect(await writes()).toEqual([]);
     });
 
@@ -379,7 +381,10 @@ describe("SettingsPage", () => {
     await user.click(within(card).getByRole("button", { name: "Reload" }));
     expect(within(card).getByLabelText("Trigger suffix")).toHaveValue("-server");
     expect(within(card).queryByText("Changed on the server")).not.toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(within(card).getByRole("button", { name: "Save" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("lets a clean card take a refetched server copy", async () => {

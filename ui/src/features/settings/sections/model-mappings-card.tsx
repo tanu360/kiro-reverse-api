@@ -51,6 +51,7 @@ import {
   SectionQuery,
   ServerChangedNotice,
   SettingsSection,
+  TOUCH_INPUT,
   useSectionSave,
 } from "./settings-section";
 
@@ -75,18 +76,31 @@ export function ModelMappingsCard(): JSX.Element {
 function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Element {
   const { t } = useT("settings");
   const queryClient = useQueryClient();
-  const server = useMemo(() => rowsFromRules(data.mappings), [data.mappings]);
+  // Rows of the last render: a server copy of the same rules keeps their ids, so a refetch
+  // after Save does not remount the rows and drop focus.
+  const rowsRef = useRef<readonly MappingRow[]>([]);
+  const server = useMemo(() => rowsFromRules(data.mappings, rowsRef.current), [data.mappings]);
   const draft = useDraft<readonly MappingRow[]>(server, sameMappings);
   const rows = draft.value;
+  rowsRef.current = rows;
   const [errorRowId, setErrorRowId] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
   // Inputs and move buttons by `${rowId}:${target}`, for focus after add, move and errors.
+  // A null rowId means Add mapping (after the last row is removed).
   const controls = useRef(new Map<string, HTMLElement>());
-  const [pendingFocus, setPendingFocus] = useState<{ rowId: string; targets: FocusTarget[] }>();
+  const addButton = useRef<HTMLButtonElement>(null);
+  const [pendingFocus, setPendingFocus] = useState<{
+    rowId: string | null;
+    targets: FocusTarget[];
+  }>();
   useLayoutEffect(() => {
     if (!pendingFocus) return;
     setPendingFocus(undefined);
+    if (pendingFocus.rowId === null) {
+      addButton.current?.focus();
+      return;
+    }
     for (const target of pendingFocus.targets) {
       const element = controls.current.get(`${pendingFocus.rowId}:${target}`);
       if (element && !(element as HTMLButtonElement).disabled) {
@@ -147,9 +161,14 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
     draft.set((prev) => prev.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
   };
 
+  // Focus goes to the next row's Match field, the previous row's when the last row goes, and
+  // Add mapping when the list is empty, so it never drops to the page.
   const removeRow = (rowId: string) => {
     if (rowId === errorRowId) clearError();
+    const index = rows.findIndex((row) => row.id === rowId);
+    const neighbour = rows[index + 1] ?? rows[index - 1];
     draft.set((prev) => prev.filter((row) => row.id !== rowId));
+    setPendingFocus({ rowId: neighbour?.id ?? null, targets: ["key"] });
   };
 
   const move = (from: number, to: number, focus?: FocusTarget[]) => {
@@ -206,7 +225,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
       actions={
         // One row beside the title on a wide card; it wraps under the title on a narrow one.
         <div className="flex flex-wrap items-center gap-2 @md:flex-nowrap">
-          <Button onClick={addRow} size="sm" variant="outline">
+          <Button onClick={addRow} ref={addButton} size="sm" variant="outline">
             <PlusIcon aria-hidden="true" />
             {t("modelMappings.add")}
           </Button>
@@ -214,14 +233,17 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
             <RotateCcwIcon aria-hidden="true" />
             {t("modelMappings.reset")}
           </Button>
-          <SaveButton dirty={draft.dirty} saving={saving} />
         </div>
       }
+      // Save sits in the footer, as on every other card.
       footer={
-        <div className="flex w-full flex-col gap-1 text-muted-foreground text-xs">
-          {draft.serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
-          <p>{t("modelMappings.emptyIgnored")}</p>
-          <p>{t("modelMappings.resetNote")}</p>
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1 text-muted-foreground text-xs">
+            {draft.serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
+            <p>{t("modelMappings.emptyIgnored")}</p>
+            <p>{t("modelMappings.resetNote")}</p>
+          </div>
+          <SaveButton dirty={draft.dirty} saving={saving} />
         </div>
       }
       hint={t("modelMappingsHint")}
@@ -258,7 +280,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
               items={rows.map((row) => row.id)}
               strategy={verticalListSortingStrategy}
             >
-              <ol className="flex flex-col gap-2">
+              <ol className="flex flex-col gap-4 sm:gap-2">
                 {rows.map((row, index) => (
                   <MappingRowItem
                     count={rows.length}
@@ -342,31 +364,52 @@ function MappingRowItem({
       >
         <GripVerticalIcon aria-hidden="true" />
       </Button>
+      {/* On phones the inputs stack, and the header row is hidden: each gets a visible label. */}
       <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-        <Input
-          aria-invalid={(error && !row.key.trim()) || undefined}
-          aria-label={t("modelMappings.match")}
-          className="min-w-0 flex-1 font-mono"
-          onChange={(event) => onChange({ key: event.target.value })}
-          placeholder={t("modelMappings.matchPlaceholder")}
-          ref={register("key")}
-          spellCheck={false}
-          value={row.key}
-        />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <label
+            aria-hidden="true"
+            className="text-muted-foreground text-xs sm:hidden"
+            htmlFor={`${row.id}-key`}
+          >
+            {t("modelMappings.match")}
+          </label>
+          <Input
+            aria-invalid={(error && !row.key.trim()) || undefined}
+            aria-label={t("modelMappings.match")}
+            className={cn("min-w-0 font-mono", TOUCH_INPUT)}
+            onChange={(event) => onChange({ key: event.target.value })}
+            placeholder={t("modelMappings.matchPlaceholder")}
+            id={`${row.id}-key`}
+            ref={register("key")}
+            spellCheck={false}
+            value={row.key}
+          />
+        </div>
         <ArrowRightIcon
           aria-hidden="true"
           className="hidden size-4 shrink-0 text-muted-foreground sm:block"
         />
-        <Input
-          aria-invalid={(error && !row.value.trim()) || undefined}
-          aria-label={t("modelMappings.target")}
-          className="min-w-0 flex-1 font-mono"
-          onChange={(event) => onChange({ value: event.target.value })}
-          placeholder={t("modelMappings.targetPlaceholder")}
-          ref={register("value")}
-          spellCheck={false}
-          value={row.value}
-        />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <label
+            aria-hidden="true"
+            className="text-muted-foreground text-xs sm:hidden"
+            htmlFor={`${row.id}-value`}
+          >
+            {t("modelMappings.target")}
+          </label>
+          <Input
+            aria-invalid={(error && !row.value.trim()) || undefined}
+            aria-label={t("modelMappings.target")}
+            className={cn("min-w-0 font-mono", TOUCH_INPUT)}
+            onChange={(event) => onChange({ value: event.target.value })}
+            placeholder={t("modelMappings.targetPlaceholder")}
+            id={`${row.id}-value`}
+            ref={register("value")}
+            spellCheck={false}
+            value={row.value}
+          />
+        </div>
       </div>
       <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
         <Button

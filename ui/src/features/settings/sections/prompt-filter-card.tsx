@@ -29,6 +29,7 @@ import {
   SectionQuery,
   SettingsSection,
   SwitchField,
+  TOUCH_INPUT,
   useSectionSave,
 } from "./settings-section";
 
@@ -195,10 +196,9 @@ function RuleCard({
         />
         <Input
           aria-label={t("promptFilter.name")}
-          className="min-w-0 flex-1"
+          className={cn("min-w-0 flex-1", TOUCH_INPUT)}
           onChange={(event) => onChange({ name: event.target.value })}
           placeholder={t("promptFilter.unnamed")}
-          size="sm"
           value={rule.name}
         />
         <Badge className="hidden shrink-0 sm:inline-flex" variant="secondary">
@@ -227,7 +227,7 @@ function RuleCard({
           <Input
             aria-describedby={invalid ? `${id}-match-hint` : undefined}
             aria-invalid={invalid || undefined}
-            className="font-mono"
+            className={cn("font-mono", TOUCH_INPUT)}
             id={`${id}-match`}
             onChange={(event) => onChange({ match: event.target.value })}
             placeholder={
@@ -235,7 +235,6 @@ function RuleCard({
                 ? t("promptFilter.matchPlaceholderRegex")
                 : t("promptFilter.matchPlaceholderContains")
             }
-            size="sm"
             spellCheck={false}
             value={rule.match}
           />
@@ -252,11 +251,10 @@ function RuleCard({
               {t("promptFilter.replace")}
             </Label>
             <Input
-              className="font-mono"
+              className={cn("font-mono", TOUCH_INPUT)}
               id={`${id}-replace`}
               onChange={(event) => onChange({ replace: event.target.value })}
               placeholder={t("promptFilter.emptyRemove")}
-              size="sm"
               spellCheck={false}
               value={rule.replace ?? ""}
             />

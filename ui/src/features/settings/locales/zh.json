@@ -14,6 +14,12 @@
   "remove": "删除",
   "showPassword": "显示密码",
   "hidePassword": "隐藏密码",
+  "loadFailed": "无法加载设置",
+  "unsavedMark": "（有未保存的更改）",
+  "discardTitle": "放弃未保存的更改？",
+  "discardBody": "部分设置卡片有尚未保存的更改。离开此页面会放弃这些更改。",
+  "discardAction": "放弃更改",
+  "keepEditing": "继续编辑",
 
   "usageSettings": "用量",
   "allowOverUsage": "允许超额用量",
