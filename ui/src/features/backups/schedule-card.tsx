@@ -34,8 +34,13 @@ import {
   KEEP_MIN,
   keepSentenceParts,
   type ScheduleForm,
+  scheduleDirty,
   scheduleForm,
 } from "./backup-model";
+
+function seedKey(form: ScheduleForm): string {
+  return `${form.enabled}-${form.cadence}-${form.keep}`;
+}
 
 function ScheduleFields({ initial }: { initial: ScheduleForm }): JSX.Element {
   const { t, lang } = useT("backups");
@@ -44,6 +49,18 @@ function ScheduleFields({ initial }: { initial: ScheduleForm }): JSX.Element {
   const [enabled, setEnabled] = useState(initial.enabled);
   const [cadence, setCadence] = useState<BackupCadence>(initial.cadence);
   const [keep, setKeep] = useState<number | null>(initial.keep);
+
+  // New server values (after a save or a restore) re-seed the fields in place. The form is not
+  // remounted, so focus stays on Save after a save.
+  const [seed, setSeed] = useState(() => seedKey(initial));
+  if (seed !== seedKey(initial)) {
+    setSeed(seedKey(initial));
+    setEnabled(initial.enabled);
+    setCadence(initial.cadence);
+    setKeep(initial.keep);
+  }
+
+  const dirty = scheduleDirty(initial, { enabled, cadence, keep });
 
   const save = useMutation({
     mutationFn: () => {
@@ -66,7 +83,7 @@ function ScheduleFields({ initial }: { initial: ScheduleForm }): JSX.Element {
       className="grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(11rem,1fr)_minmax(10rem,12rem)_auto_auto] lg:items-end"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!save.isPending) save.mutate();
+        if (dirty && !save.isPending) save.mutate();
       }}
     >
       <div className="flex min-h-10 items-center lg:min-h-9">
@@ -118,7 +135,13 @@ function ScheduleFields({ initial }: { initial: ScheduleForm }): JSX.Element {
         <span aria-hidden="true">{after}</span>
       </div>
 
-      <Button className="w-full sm:w-auto" disabled={save.isPending} type="submit">
+      {/* aria-disabled, not disabled: a clean or saving form keeps Save focusable. */}
+      <Button
+        aria-busy={save.isPending || undefined}
+        aria-disabled={!dirty || save.isPending || undefined}
+        className="w-full aria-disabled:pointer-events-none aria-disabled:opacity-64 sm:w-auto"
+        type="submit"
+      >
         {save.isPending ? <Spinner aria-hidden="true" /> : null}
         {save.isPending ? t("common:actions.saving") : t("common:actions.save")}
       </Button>
@@ -152,11 +175,7 @@ export function ScheduleCard(): JSX.Element {
       title={t("schedule.title")}
     >
       {initial ? (
-        // Server values re-seed the form when they change (after a save or a restore).
-        <ScheduleFields
-          initial={initial}
-          key={`${initial.enabled}-${initial.cadence}-${initial.keep}`}
-        />
+        <ScheduleFields initial={initial} />
       ) : query.isError ? (
         <ErrorState
           compact

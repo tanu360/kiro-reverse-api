@@ -4,11 +4,13 @@ import { type Lang, type TParams, translate } from "@/lib/i18n";
 import {
   accountsCell,
   clampKeep,
+  isNotABackupMessage,
   keepSentenceParts,
   kindLabel,
   kindTone,
   manualNote,
   noteText,
+  scheduleDirty,
   scheduleForm,
 } from "./backup-model";
 
@@ -142,5 +144,39 @@ describe("keepSentenceParts", () => {
     expect(keepSentenceParts(t, "en", 20)).toEqual(["Keep latest", "backups"]);
     expect(keepSentenceParts(t, "en", 1)).toEqual(["Keep latest", "backup"]);
     expect(keepSentenceParts(tFor("zh"), "zh", 1)).toEqual(["保留最新", "份备份"]);
+  });
+});
+
+describe("isNotABackupMessage", () => {
+  it("matches the server's parse and format errors for an uploaded file", () => {
+    expect(isNotABackupMessage("backup content is not valid JSON")).toBe(true);
+    expect(isNotABackupMessage("unsupported backup format: expected kiro-proxy-backup")).toBe(true);
+    expect(isNotABackupMessage("unsupported backup version: 7")).toBe(true);
+    expect(isNotABackupMessage("backup schema mismatch: missing password")).toBe(true);
+    expect(isNotABackupMessage(" backup JSON parse failed: unexpected end ")).toBe(true);
+    expect(isNotABackupMessage("credential 2 missing id")).toBe(true);
+  });
+
+  it("leaves other failures alone", () => {
+    expect(isNotABackupMessage("pre-restore snapshot failed: disk full")).toBe(false);
+    expect(isNotABackupMessage("backup not found: abc")).toBe(false);
+    expect(isNotABackupMessage("")).toBe(false);
+  });
+});
+
+describe("scheduleDirty", () => {
+  const initial = { enabled: true, cadence: "daily" as const, keep: 14 };
+
+  it("is clean when nothing would change", () => {
+    expect(scheduleDirty(initial, { ...initial })).toBe(false);
+    // 14.2 is saved as 14.
+    expect(scheduleDirty(initial, { ...initial, keep: 14.2 })).toBe(false);
+  });
+
+  it("is dirty for any change, and for an emptied keep field", () => {
+    expect(scheduleDirty(initial, { ...initial, enabled: false })).toBe(true);
+    expect(scheduleDirty(initial, { ...initial, cadence: "weekly" })).toBe(true);
+    expect(scheduleDirty(initial, { ...initial, keep: 15 })).toBe(true);
+    expect(scheduleDirty(initial, { ...initial, keep: null })).toBe(true);
   });
 });
