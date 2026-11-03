@@ -38,7 +38,7 @@
 1. Pools multiple Kiro accounts and load-balances requests with round-robin.
 2. Translates Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, and OpenAI `/v1/responses` calls to and from Kiro upstream.
 3. Refreshes access tokens automatically and streams Server-Sent Events end-to-end.
-4. Ships with a React admin panel, embedded in the binary, for account management, observability, and request audit.
+4. Ships with a React admin panel, embedded in the binary, for account management, observability, and request audit, in English, 简体中文, Tiếng Việt, and Português (Brasil).
 
 > [!IMPORTANT]
 > Single-binary local proxy. **Not** a hosted service, **not** affiliated with Amazon, AWS, or Kiro. You must own or be authorized to use every account you add to the pool.
@@ -56,14 +56,14 @@ If this project helps you, a Star would mean a lot.
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/login-dark.webp">
         <img alt="Login" src="screenshots/login-light.webp" width="100%">
       </picture>
-      <br><sub><b>Login</b> — minimal, theme-aware sign-in</sub>
+      <br><sub><b>Login</b> — sign-in with theme and language switches</sub>
     </td>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/monitor-dark.webp">
-        <img alt="Overview" src="screenshots/monitor-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/overview-dark.webp">
+        <img alt="Overview" src="screenshots/overview-light.webp" width="100%">
       </picture>
-      <br><sub><b>Overview</b> — live traffic, model mix and account health</sub>
+      <br><sub><b>Overview</b> — live traffic, credits and errors across accounts</sub>
     </td>
   </tr>
   <tr>
@@ -72,14 +72,14 @@ If this project helps you, a Star would mean a lot.
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/accounts-dark.webp">
         <img alt="Accounts" src="screenshots/accounts-light.webp" width="100%">
       </picture>
-      <br><sub><b>Accounts</b> — batch actions, detail, test and export</sub>
+      <br><sub><b>Accounts</b> — plan credits, status filters, batch actions and export</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/requests-dark.webp">
         <img alt="Requests" src="screenshots/requests-light.webp" width="100%">
       </picture>
-      <br><sub><b>Requests</b> — search, filters, sorting and a detail view</sub>
+      <br><sub><b>Requests</b> — search, status filters, sorting and a detail view</sub>
     </td>
   </tr>
   <tr>
@@ -88,7 +88,7 @@ If this project helps you, a Star would mean a lot.
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/api-dark.webp">
         <img alt="API" src="screenshots/api-light.webp" width="100%">
       </picture>
-      <br><sub><b>API</b> — endpoints, API keys and client setup</sub>
+      <br><sub><b>API</b> — API access, per-client keys with limits, client setup</sub>
     </td>
     <td width="50%" align="center">
       <picture>
@@ -111,7 +111,7 @@ If this project helps you, a Star would mean a lot.
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/settings-dark.webp">
         <img alt="Settings" src="screenshots/settings-light.webp" width="100%">
       </picture>
-      <br><sub><b>Settings</b> — thinking, model mappings, prompt filter, admin password</sub>
+      <br><sub><b>Settings</b> — usage, routing, auto-continue, thinking, model mappings</sub>
     </td>
   </tr>
 </table>
@@ -143,7 +143,7 @@ If this project helps you, a Star would mean a lot.
 - Requests log with search, status and API-key filters, sorting, a detail view, masked API keys, and SQLite-backed history.
 - API page with client API key management (optional custom key values, enable/disable, per-key token and credit limits, usage reset) and client setup snippets for curl, Claude Code, Codex, and the OpenAI SDK.
 - Settings for thinking, model mappings, outbound proxy, and more; Backups with a schedule and one-click restore.
-- Light, dark, and system theme; English and 简体中文.
+- Light, dark, and system theme; four UI languages: English, 简体中文, Tiếng Việt, and Português (Brasil).
 - Works from phones to desktops.
 
 ### 🌐 Networking

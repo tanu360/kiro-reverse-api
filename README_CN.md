@@ -38,7 +38,7 @@
 1. 多账号池化，按轮询方式分发请求。
 2. 在 Anthropic `/v1/messages`、OpenAI `/v1/chat/completions` 与 OpenAI `/v1/responses` 与 Kiro 上游之间双向翻译。
 3. 自动刷新访问令牌，端到端转发 Server-Sent Events 流。
-4. 自带内嵌于二进制文件的 React 管理面板，提供账号管理、可观测性与请求审计。
+4. 自带内嵌于二进制文件的 React 管理面板，提供账号管理、可观测性与请求审计，界面支持 English、简体中文、Tiếng Việt 与 Português (Brasil)。
 
 > [!IMPORTANT]
 > 单二进制本地代理。**非**托管服务，**不**隶属于 Amazon、AWS 或 Kiro。账号必须由你本人持有或经过合法授权方可加入账号池。
@@ -56,14 +56,14 @@
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/login-dark.webp">
         <img alt="登录" src="screenshots/login-light.webp" width="100%">
       </picture>
-      <br><sub><b>登录</b> — 简洁、随主题切换</sub>
+      <br><sub><b>登录</b> — 登录页可切换主题与界面语言</sub>
     </td>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/monitor-dark.webp">
-        <img alt="概览" src="screenshots/monitor-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/overview-dark.webp">
+        <img alt="概览" src="screenshots/overview-light.webp" width="100%">
       </picture>
-      <br><sub><b>概览</b> — 实时流量、模型分布与账号健康状况</sub>
+      <br><sub><b>概览</b> — 各账号的实时流量、Credits 与错误</sub>
     </td>
   </tr>
   <tr>
@@ -72,14 +72,14 @@
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/accounts-dark.webp">
         <img alt="账号" src="screenshots/accounts-light.webp" width="100%">
       </picture>
-      <br><sub><b>账号</b> — 批量操作、详情、测试与导出</sub>
+      <br><sub><b>账号</b> — 套餐 Credits、状态筛选、批量操作与导出</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/requests-dark.webp">
         <img alt="请求" src="screenshots/requests-light.webp" width="100%">
       </picture>
-      <br><sub><b>请求</b> — 搜索、筛选、排序与详情视图</sub>
+      <br><sub><b>请求</b> — 搜索、状态筛选、排序与详情视图</sub>
     </td>
   </tr>
   <tr>
@@ -88,7 +88,7 @@
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/api-dark.webp">
         <img alt="接口" src="screenshots/api-light.webp" width="100%">
       </picture>
-      <br><sub><b>接口</b> — 接口地址、API Key 与客户端配置</sub>
+      <br><sub><b>接口</b> — API 访问控制、带限额的客户端 Key 与接入配置</sub>
     </td>
     <td width="50%" align="center">
       <picture>
@@ -111,7 +111,7 @@
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/settings-dark.webp">
         <img alt="设置" src="screenshots/settings-light.webp" width="100%">
       </picture>
-      <br><sub><b>设置</b> — 思考、模型映射、提示词过滤、管理员密码</sub>
+      <br><sub><b>设置</b> — 用量、账号路由、自动续写、思考、模型映射</sub>
     </td>
   </tr>
 </table>
@@ -143,7 +143,7 @@
 - 请求日志支持搜索、状态/API Key 筛选、排序、详情视图、脱敏 API Key，SQLite 持久化存档。
 - 接口页管理客户端 API Key（可自定义 Key 值、启用/禁用、独立 Token/Credits 限额、重置用量），并提供 curl、Claude Code、Codex 与 OpenAI SDK 的接入示例。
 - 设置页涵盖思考、模型映射、出站代理等；备份页支持定时备份与一键恢复。
-- 浅色 / 深色 / 跟随系统主题；支持英文与简体中文。
+- 浅色 / 深色 / 跟随系统主题；界面支持四种语言：English、简体中文、Tiếng Việt 与 Português (Brasil)。
 - 从手机到桌面均可流畅使用。
 
 ### 🌐 网络
