@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
         </a>
         <AppSidebar />
         <div
-          className="relative flex w-full min-w-0 flex-1 flex-col overflow-x-clip bg-background"
+          className="relative flex w-full min-w-0 flex-1 flex-col overflow-x-clip bg-background surface-grain"
           data-slot="sidebar-inset"
         >
           <SiteHeader />

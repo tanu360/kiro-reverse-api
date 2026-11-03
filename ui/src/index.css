@@ -23,6 +23,8 @@
   );
   --sidebar-row-content-inset: 0.625rem;
   --background: var(--color-zinc-25);
+  /* t3code paints html and body with the chrome background, which is the canvas. */
+  --app-chrome-background: var(--background);
   --foreground: var(--color-zinc-900);
   --card: var(--color-white);
   --card-foreground: var(--color-zinc-900);
@@ -177,6 +179,23 @@
 
 @theme {
   --color-zinc-25: oklch(99.2% 0 0);
+}
+
+/*
+ * t3code's app-chrome grain (index.css `--surface-grain`): fractal noise at 3.5% in a 256 px
+ * tile. It is baked into each chrome surface's own background (body, sidebar, main inset), not a
+ * fixed overlay, so it costs nothing per frame; surfaces that sit over the body opt in with the
+ * `surface-grain` utility, which layers it over their background colour.
+ */
+:root {
+  --surface-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  --surface-grain-size: 256px 256px;
+}
+
+@utility surface-grain {
+  background-image: var(--surface-grain);
+  background-repeat: repeat;
+  background-size: var(--surface-grain-size);
 }
 
 @theme inline {
@@ -451,8 +470,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    background-color: var(--app-chrome-background);
+  }
+  body {
+    @apply text-foreground font-sans antialiased;
+    background-image: var(--surface-grain);
+    background-repeat: repeat;
+    background-size: var(--surface-grain-size);
   }
   code,
   kbd,

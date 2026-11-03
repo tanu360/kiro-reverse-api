@@ -15,7 +15,7 @@ export function AuthLayout({ children }: { children: ReactNode }): JSX.Element {
   const { t: tShared } = useT();
 
   return (
-    <div className="flex min-h-svh bg-background text-foreground lg:gap-3 lg:p-3">
+    <div className="flex min-h-svh bg-background surface-grain text-foreground lg:gap-3 lg:p-3">
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 items-center justify-between gap-2 px-6 sm:px-10 lg:h-20">
           <div className="flex min-w-0 items-center gap-2.5">

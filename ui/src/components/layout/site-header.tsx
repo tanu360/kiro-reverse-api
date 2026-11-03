@@ -12,7 +12,11 @@ import { ThemeSwitch } from "./theme-switch";
 import { UpdateIndicator } from "./update-indicator";
 import { UserMenu } from "./user-menu";
 
-/** Port of the Studio Admin dashboard header: sticky, 48 px, blurred. */
+/**
+ * Port of the Studio Admin dashboard header: sticky and 48 px, painted like t3code's page headers
+ * (solid `bg-background` as in ChatView's `data-chat-header`, with the `h-12 border-b` of its
+ * settings content header) rather than a translucent blur.
+ */
 export function SiteHeader(): JSX.Element {
   const { t } = useT();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -20,7 +24,7 @@ export function SiteHeader(): JSX.Element {
   const toggleLabel = t("shell.toggleSidebar");
 
   return (
-    <header className="sticky top-0 z-40 flex h-12 shrink-0 items-center border-b bg-background/50 backdrop-blur-md">
+    <header className="sticky top-0 z-40 flex h-12 shrink-0 items-center border-b bg-background">
       <div className="flex w-full min-w-0 items-center justify-between gap-2 px-2 sm:px-4 lg:px-6">
         <div className="flex min-w-0 items-center gap-1 lg:gap-2">
           <Tooltip>
