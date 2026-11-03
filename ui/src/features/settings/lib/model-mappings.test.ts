@@ -86,4 +86,25 @@ describe("rowsFromRules and sameMappings", () => {
     expect(sameMappings(first, [...second].reverse())).toBe(false);
     expect(sameMappings(first, second.slice(1))).toBe(false);
   });
+
+  it("reuses the id of a previous row with the same rule at the same position", () => {
+    const previous = [
+      row("a", "GPT-5", "claude-opus-5"),
+      row("b", "gpt-4", "x"),
+      row("c", "o3", "y"),
+    ];
+    const rows = rowsFromRules(
+      [
+        { key: "gpt-5", value: "claude-opus-5" },
+        { key: "gpt-4", value: "changed" },
+        { key: "o3", value: "y" },
+        { key: "new", value: "z" },
+      ],
+      previous,
+    );
+    expect(rows[0]).toEqual({ id: "a", key: "gpt-5", value: "claude-opus-5" });
+    expect(rows[1].id).not.toBe("b");
+    expect(rows[2].id).toBe("c");
+    expect(["a", "b", "c"]).not.toContain(rows[3].id);
+  });
 });

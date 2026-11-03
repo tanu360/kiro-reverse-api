@@ -14,7 +14,7 @@ export function StreamIntegrityCard(): JSX.Element {
   const { t } = useT("settings");
   const query = useQuery(settingsQuery());
   return (
-    <SectionQuery id={SECTION_ID.streamIntegrity} query={query} title={t("streamIntegrity")}>
+    <SectionQuery id={SECTION_ID.streamIntegrity} query={query} shared title={t("streamIntegrity")}>
       {(settings) => <StreamIntegrityForm settings={settings} />}
     </SectionQuery>
   );

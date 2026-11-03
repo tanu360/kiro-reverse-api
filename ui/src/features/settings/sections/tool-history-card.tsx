@@ -12,7 +12,7 @@ export function ToolHistoryCard(): JSX.Element {
   const { t } = useT("settings");
   const query = useQuery(settingsQuery());
   return (
-    <SectionQuery id={SECTION_ID.toolHistory} query={query} title={t("toolHistory")}>
+    <SectionQuery id={SECTION_ID.toolHistory} query={query} shared title={t("toolHistory")}>
       {(settings) => <ToolHistoryForm settings={settings} />}
     </SectionQuery>
   );

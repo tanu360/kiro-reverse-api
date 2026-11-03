@@ -1,6 +1,16 @@
 import { type UseQueryResult, useMutation } from "@tanstack/react-query";
 import { EyeIcon, EyeOffIcon, InfoIcon, TriangleAlertIcon } from "lucide-react";
-import { type FormEvent, Fragment, type JSX, type ReactNode, useId, useState } from "react";
+import {
+  createContext,
+  type FormEvent,
+  Fragment,
+  type JSX,
+  type MouseEvent,
+  type ReactNode,
+  useContext,
+  useId,
+  useState,
+} from "react";
 import { ErrorState } from "@/components/shared/error-state";
 import { CardSkeleton } from "@/components/shared/loading-state";
 import { SectionCard } from "@/components/shared/section-card";
@@ -14,6 +24,14 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { type TFunction, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { useReportDirty } from "../lib/unsaved";
+
+/** The id of the settings card a control sits in, so Save can report its card as dirty. */
+const SectionIdContext = createContext<string | undefined>(undefined);
+
+/** On a touch screen, an input grows to the 40 px touch-target height (36 px + borders). */
+export const TOUCH_INPUT =
+  "pointer-coarse:*:data-[slot=input]:h-9.5 pointer-coarse:*:data-[slot=input]:leading-9.5";
 
 /** "Could not save settings: {reason}"; error toasts stay until dismissed. */
 export function toastSaveFailed(error: unknown, t: TFunction): string {
@@ -101,12 +119,42 @@ export function SaveFooter({
   );
 }
 
+/**
+ * A card's submit button. While `blocked` it stays focusable (aria-disabled, not disabled), so
+ * focus does not drop to the page when a save starts or the card turns clean; the click, and
+ * the form's implicit Enter submission that clicks it, are cancelled instead.
+ */
+export function SubmitButton({
+  blocked,
+  busy = false,
+  children,
+}: {
+  blocked: boolean;
+  busy?: boolean;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <Button
+      aria-busy={busy || undefined}
+      aria-disabled={blocked || undefined}
+      className="aria-disabled:pointer-events-none aria-disabled:opacity-64 aria-disabled:shadow-none aria-disabled:inset-shadow-none"
+      onClick={(event: MouseEvent<HTMLButtonElement>) => {
+        if (blocked) event.preventDefault();
+      }}
+      type="submit"
+    >
+      {children}
+    </Button>
+  );
+}
+
 export function SaveButton({ dirty, saving }: { dirty: boolean; saving: boolean }): JSX.Element {
   const { t } = useT("settings");
+  useReportDirty(useContext(SectionIdContext), dirty);
   return (
-    <Button disabled={!dirty || saving} type="submit">
+    <SubmitButton blocked={!dirty || saving} busy={saving}>
       {saving ? t("saving") : t("save")}
-    </Button>
+    </SubmitButton>
   );
 }
 
@@ -170,37 +218,45 @@ export function SettingsSection({
     ) : undefined;
 
   return (
-    <form
-      noValidate
-      onSubmit={(event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        onSubmit?.();
-      }}
-    >
-      <SectionCard
-        actions={headerActions}
-        className="scroll-mt-16"
-        description={description}
-        footer={footer}
-        id={id}
-        title={title}
+    <SectionIdContext.Provider value={id}>
+      <form
+        noValidate
+        onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          onSubmit?.();
+        }}
       >
-        {children}
-      </SectionCard>
-    </form>
+        <SectionCard
+          actions={headerActions}
+          className="scroll-mt-16"
+          description={description}
+          footer={footer}
+          id={id}
+          title={title}
+        >
+          {children}
+        </SectionCard>
+      </form>
+    </SectionIdContext.Provider>
   );
 }
 
-/** Skeleton while the card's query loads, an error card with Retry when it fails. */
+/**
+ * Skeleton while the card's query loads, an error card with Retry when it fails. A card built on
+ * the shared GET /settings query (`shared`) shows no error of its own: the page shows one for
+ * all of them, and the card leaves only a hidden anchor (the nav then goes to the page error).
+ */
 export function SectionQuery<T>({
   id,
   title,
   query,
+  shared = false,
   children,
 }: {
   id: string;
   title: string;
   query: UseQueryResult<T>;
+  shared?: boolean;
   children: (data: T) => ReactNode;
 }): JSX.Element {
   if (query.isPending) {
@@ -209,6 +265,9 @@ export function SectionQuery<T>({
         <CardSkeleton lines={3} />
       </div>
     );
+  }
+  if (query.isError && shared) {
+    return <div hidden id={id} />;
   }
   if (query.isError) {
     return (
@@ -238,29 +297,28 @@ export function SwitchField({
   className?: string;
 }): JSX.Element {
   const id = useId();
+  // The label row is at least 40 px tall, so the label is a full-size touch target for the
+  // switch. The hint sits under the label, in the second column.
   return (
-    <div className={cn("flex items-start gap-3", className)}>
+    <div className={cn("grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3", className)}>
       <Switch
         aria-describedby={hint ? `${id}-hint` : undefined}
         aria-labelledby={`${id}-label`}
         checked={checked}
-        className="mt-0.5"
         id={id}
         onCheckedChange={(next) => onCheckedChange(next)}
       />
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <Label className="cursor-pointer" htmlFor={id} id={`${id}-label`}>
-            {label}
-          </Label>
-          {extra}
-        </div>
-        {hint ? (
-          <p className="text-muted-foreground text-xs" id={`${id}-hint`}>
-            {hint}
-          </p>
-        ) : null}
+      <div className="flex min-h-10 min-w-0 flex-wrap items-center gap-x-2">
+        <Label className="min-h-10 cursor-pointer" htmlFor={id} id={`${id}-label`}>
+          {label}
+        </Label>
+        {extra}
       </div>
+      {hint ? (
+        <p className="col-start-2 -mt-1.5 text-muted-foreground text-xs" id={`${id}-hint`}>
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }

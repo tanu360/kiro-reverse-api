@@ -14,8 +14,22 @@ export function newRowId(): string {
   return `mapping-${nextRowId}`;
 }
 
-export function rowsFromRules(rules: readonly ModelMappingRule[]): MappingRow[] {
-  return rules.map((rule) => ({ id: newRowId(), key: rule.key, value: rule.value }));
+/**
+ * Editable rows for the server's rules. A row of `previous` at the same position with the same
+ * rule (the server lowercases keys) lends its id, so re-reading a saved list keeps rows mounted.
+ */
+export function rowsFromRules(
+  rules: readonly ModelMappingRule[],
+  previous: readonly MappingRow[] = [],
+): MappingRow[] {
+  return rules.map((rule, i) => {
+    const before = previous[i];
+    const same =
+      before !== undefined &&
+      before.key.toLowerCase() === rule.key.toLowerCase() &&
+      before.value === rule.value;
+    return { id: same ? before.id : newRowId(), key: rule.key, value: rule.value };
+  });
 }
 
 /** Same rules in the same order; row ids do not count. */

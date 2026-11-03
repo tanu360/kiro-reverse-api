@@ -12,7 +12,7 @@ export function RoutingCard(): JSX.Element {
   const { t } = useT("settings");
   const query = useQuery(settingsQuery());
   return (
-    <SectionQuery id={SECTION_ID.routing} query={query} title={t("routing")}>
+    <SectionQuery id={SECTION_ID.routing} query={query} shared title={t("routing")}>
       {(settings) => <RoutingForm settings={settings} />}
     </SectionQuery>
   );

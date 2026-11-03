@@ -12,7 +12,7 @@ export function UsageCard(): JSX.Element {
   const { t } = useT("settings");
   const query = useQuery(settingsQuery());
   return (
-    <SectionQuery id={SECTION_ID.usage} query={query} title={t("usageSettings")}>
+    <SectionQuery id={SECTION_ID.usage} query={query} shared title={t("usageSettings")}>
       {(settings) => <UsageForm settings={settings} />}
     </SectionQuery>
   );

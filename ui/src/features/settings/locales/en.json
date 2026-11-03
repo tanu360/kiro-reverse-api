@@ -14,6 +14,12 @@
   "remove": "Remove",
   "showPassword": "Show password",
   "hidePassword": "Hide password",
+  "loadFailed": "Could not load settings",
+  "unsavedMark": "(unsaved changes)",
+  "discardTitle": "Discard unsaved changes?",
+  "discardBody": "Some settings cards have changes that are not saved. Leaving this page discards them.",
+  "discardAction": "Discard changes",
+  "keepEditing": "Keep editing",
 
   "usageSettings": "Usage",
   "allowOverUsage": "Allow overage",

@@ -29,7 +29,7 @@ export function AutoContinueCard(): JSX.Element {
   const { t } = useT("settings");
   const query = useQuery(settingsQuery());
   return (
-    <SectionQuery id={SECTION_ID.autoContinue} query={query} title={t("autoContinue")}>
+    <SectionQuery id={SECTION_ID.autoContinue} query={query} shared title={t("autoContinue")}>
       {(settings) => <AutoContinueForm settings={settings} />}
     </SectionQuery>
   );
