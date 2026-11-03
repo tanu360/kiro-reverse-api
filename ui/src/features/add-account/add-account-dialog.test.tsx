@@ -345,7 +345,9 @@ describe("IAM Identity Center", () => {
     await user.type(callback, "http://127.0.0.1/oauth/callback?error=denied");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
 
-    await expectToast("Could not add the account: 无效的回调 URL");
+    await expectToast(
+      "Could not add the account: The callback URL is not valid. Copy the full address again.",
+    );
     expect(
       screen.getByRole("dialog", { name: "IAM Identity Center (Enterprise SSO)" }),
     ).toBeVisible();
@@ -487,7 +489,9 @@ describe("Focus after a failed submit or a step change", () => {
 
     await user.type(callback, "http://127.0.0.1/oauth/callback?error=denied");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
-    await expectToast("Could not add the account: 无效的回调 URL");
+    await expectToast(
+      "Could not add the account: The callback URL is not valid. Copy the full address again.",
+    );
     await waitFor(() => expect(callback).toHaveFocus());
     expect(callback).toBeEnabled();
   });
