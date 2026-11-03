@@ -10,6 +10,8 @@ async function signIn(page: Page): Promise<void> {
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.locator('button[type="submit"]').click();
   await page.waitForURL(/\/admin\/?$/);
+  // The URL changes before the lazy shell mounts; wait for it so keyboard shortcuts are bound.
+  await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
 }
 
 test.describe("app shell", () => {
