@@ -1,9 +1,9 @@
 import { type LucideIcon, MinusIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import type { JSX, ReactNode } from "react";
-import { numberFormat } from "@/lib/format";
-import type { Lang } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { numberFormat } from "@/lib/format";
+import type { Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { InfoHint } from "./info-hint";
 import { StatCardSkeleton } from "./loading-state";
