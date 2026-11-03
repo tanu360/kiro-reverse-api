@@ -15,12 +15,18 @@ import type {
   ThinkingConfig,
 } from "@/lib/api/types";
 import {
+  buildModelMix,
   defaultEndpoint,
   defaultModelMappings,
   defaultPromptFilter,
-  defaultProxy,
   defaultSettings,
   defaultThinking,
+  makeAccountFull,
+  seedAccounts,
+  seedApiKeys,
+  seedBackups,
+  seedErrors,
+  seedRequests,
 } from "./fixtures";
 
 export interface MockDb {
@@ -59,27 +65,51 @@ export function mockNowUnix(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-// Skeleton: Task 3 seeds realistic data. Until then every list is empty.
+const SEED_REQUEST_COUNT = 320;
+
 function seedDb(): MockDb {
+  const now = mockNowUnix();
+  const accounts = seedAccounts();
+  const requests = seedRequests(now, SEED_REQUEST_COUNT);
   return {
     adminPassword: "12345678",
     firstRunPending: true,
     failedLogins: 0,
-    accounts: [],
-    secrets: {},
-    apiKeys: [],
-    requests: [],
-    errors: [],
-    modelMix: [],
-    backups: [],
-    schedule: {},
+    accounts,
+    secrets: Object.fromEntries(accounts.map((account) => [account.id, makeAccountFull(account)])),
+    apiKeys: seedApiKeys(),
+    requests,
+    errors: seedErrors(requests),
+    modelMix: buildModelMix(requests),
+    backups: seedBackups(now),
+    schedule: { enabled: true, cadence: "daily", keep: 14, lastRun: now - 6 * 3600 },
     settings: defaultSettings(),
     thinking: defaultThinking(),
     modelMappings: defaultModelMappings(),
     endpoint: defaultEndpoint(),
-    proxy: defaultProxy(),
-    promptFilter: defaultPromptFilter(),
-    startedAt: mockNowUnix(),
+    proxy: { proxyURL: "socks5://user:p%40ss@127.0.0.1:1080" },
+    promptFilter: {
+      ...defaultPromptFilter(),
+      rules: [
+        {
+          id: "rule-1761900000000",
+          name: "Hide internal hostnames",
+          type: "regex",
+          match: "\\b[a-z0-9-]+\\.corp\\.northwind-labs\\.com\\b",
+          replace: "internal-host",
+          enabled: true,
+        },
+        {
+          id: "rule-1761900060000",
+          name: "Drop telemetry lines",
+          type: "lines-containing",
+          match: "telemetry-session-id",
+          enabled: true,
+        },
+      ],
+    },
+    // The process "started" before the oldest seeded request, so every request counts.
+    startedAt: now - 26 * 3600,
     version: "2.1.0",
     pending: { iam: {}, microsoft: {}, builderId: {} },
   };
