@@ -1,7 +1,6 @@
-import { AlertCircleIcon, ExternalLinkIcon, Loader2Icon } from "lucide-react";
-import type { JSX, ReactNode } from "react";
+import { ExternalLinkIcon, Loader2Icon } from "lucide-react";
+import { type JSX, type ReactNode, type Ref, useEffect, useRef } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -71,12 +70,14 @@ export function RegionField({
   error,
   hint,
   disabled,
+  inputRef,
 }: {
   value: string;
   onChange: (value: string) => void;
   error?: string | null;
   hint?: string;
   disabled?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
 }): JSX.Element {
   const { t } = useT("add-account");
   return (
@@ -88,6 +89,7 @@ export function RegionField({
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         placeholder="us-east-1"
+        ref={inputRef}
         spellCheck={false}
         value={value}
       />
@@ -95,17 +97,11 @@ export function RegionField({
   );
 }
 
-/** Validation problems that are not tied to one field. */
-export function FormAlert({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <Alert variant="error">
-      <AlertCircleIcon aria-hidden="true" />
-      <AlertDescription className="text-foreground">{children}</AlertDescription>
-    </Alert>
-  );
-}
-
-/** A submit button that shows a spinner and a progress label while busy. */
+/**
+ * The flow's submit button. While busy it stays focusable (`aria-disabled`, not `disabled`) and
+ * takes focus from the fields that are disabled during the request, so keyboard focus never falls
+ * to `<body>`. The flow's submit handler ignores a submit while busy.
+ */
 export function SubmitButton({
   formId,
   busy,
@@ -117,8 +113,26 @@ export function SubmitButton({
   label: string;
   busyLabel: string;
 }): JSX.Element {
+  const ref = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!busy) return;
+    const active = document.activeElement;
+    const form = document.getElementById(formId);
+    if (!active || active === document.body || form?.contains(active)) ref.current?.focus();
+  }, [busy, formId]);
+
   return (
-    <Button className="h-10 sm:h-8" disabled={busy} form={formId} type="submit">
+    <Button
+      aria-disabled={busy || undefined}
+      className="h-10 aria-disabled:cursor-progress aria-disabled:opacity-64 sm:h-8"
+      form={formId}
+      onClick={(event) => {
+        if (busy) event.preventDefault();
+      }}
+      ref={ref}
+      type="submit"
+    >
       {busy ? <Loader2Icon aria-hidden="true" className="animate-spin" /> : null}
       {busy ? busyLabel : label}
     </Button>

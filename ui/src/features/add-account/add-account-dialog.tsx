@@ -15,6 +15,7 @@ import { IamFlow } from "./flows/iam-flow";
 import { LocalCacheFlow } from "./flows/local-cache-flow";
 import { MicrosoftFlow } from "./flows/microsoft-flow";
 import { SsoTokenFlow } from "./flows/sso-token-flow";
+import { firstStepControl } from "./focus";
 import { MethodList } from "./method-list";
 
 export type AddAccountMethod =
@@ -32,6 +33,10 @@ export interface AddAccountDialogProps {
   onOpenChange: (open: boolean) => void;
   initialMethod?: AddAccountMethod;
   onAdded?: (accountIds: string[]) => void;
+}
+
+function footerSubmit(footer: HTMLElement | null): HTMLElement | null {
+  return footer?.querySelector<HTMLElement>('button[type="submit"]') ?? null;
 }
 
 const FLOWS: Record<AddAccountMethod, () => JSX.Element> = {
@@ -64,6 +69,10 @@ export function AddAccountDialog({
   const [flowKey, setFlowKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // Set when the user moves between the list and a flow: the clicked control unmounts, so focus
+  // must move into the new step. "list:<method>" returns to the method that was open.
+  const focusNext = useRef<string | null>(null);
 
   // Each time the dialog opens, start over at the requested method (or the list).
   const [wasOpen, setWasOpen] = useState(open);
@@ -120,17 +129,39 @@ export function AddAccountDialog({
   const selectMethod = useCallback(
     (next: AddAccountMethod) => {
       sessions.reset();
+      focusNext.current = "flow";
       setMethod(next);
       setFlowKey((key) => key + 1);
     },
     [sessions],
   );
 
+  const methodRef = useRef(method);
+  methodRef.current = method;
   const back = useCallback(() => {
     sessions.reset();
+    focusNext.current = `list:${methodRef.current ?? ""}`;
     setMethod(null);
     setBusy(false);
   }, [sessions]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the step changes.
+  useEffect(() => {
+    const next = focusNext.current;
+    const body = bodyRef.current;
+    focusNext.current = null;
+    if (!next || !body) return;
+    if (next.startsWith("list:")) {
+      const button = body.querySelector<HTMLElement>(`[data-method="${next.slice(5)}"]`);
+      (button ?? body.querySelector<HTMLElement>("[data-method]"))?.focus();
+      return;
+    }
+    // On touch screens a focused text field opens the keyboard over the drawer, so focus the
+    // step itself there; the next swipe or Tab reaches its first field.
+    const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+    const target = coarse ? body : (firstStepControl(body) ?? footerSubmit(footer) ?? body);
+    target.focus();
+  }, [method, flowKey]);
 
   const cancel = useCallback(() => handleOpenChange(false), [handleOpenChange]);
 
@@ -162,9 +193,11 @@ export function AddAccountDialog({
       size="lg"
       title={method ? t(`methods.${method}.title`) : t("title")}
     >
-      <FlowProvider value={context}>
-        {Flow ? <Flow key={flowKey} /> : <MethodList onSelect={selectMethod} />}
-      </FlowProvider>
+      <div className="outline-none" ref={bodyRef} tabIndex={-1}>
+        <FlowProvider value={context}>
+          {Flow ? <Flow key={flowKey} /> : <MethodList onSelect={selectMethod} />}
+        </FlowProvider>
+      </div>
     </ResponsiveDialog>
   );
 }

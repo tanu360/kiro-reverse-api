@@ -1,5 +1,5 @@
 import { UploadIcon } from "lucide-react";
-import { type ChangeEvent, type FormEvent, type JSX, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, type JSX, type Ref, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -14,14 +14,16 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { Code, FormAlert, FormField, HelpText, SubmitButton } from "../fields";
+import { Code, FormField, HelpText, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { useFocusAfter } from "../focus";
 import {
   buildLocalCachePayload,
   isSocialProvider,
   LOCAL_PROVIDERS,
   type LocalCacheError,
   type LocalProvider,
+  localCacheErrorField,
 } from "../lib/local-cache";
 
 /** A JSON textarea with an Upload button that reads a .json file into it. */
@@ -30,11 +32,15 @@ function JsonFileInput({
   value,
   onChange,
   disabled,
+  placeholder,
+  textareaRef,
 }: {
   file: string;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
+  placeholder: string;
+  textareaRef: Ref<HTMLTextAreaElement>;
 }): JSX.Element {
   const { t } = useT("add-account");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -53,7 +59,8 @@ function JsonFileInput({
         className="font-mono"
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={t("local.pasteOrUpload")}
+        placeholder={placeholder}
+        ref={textareaRef}
         spellCheck={false}
         value={value}
       />
@@ -92,6 +99,10 @@ export function LocalCacheFlow(): JSX.Element {
   const [problem, setProblem] = useState<LocalCacheError | null>(null);
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
+  const focusAfter = useFocusAfter(pending);
+  const tokenRef = useRef<HTMLTextAreaElement>(null);
+  const clientRef = useRef<HTMLTextAreaElement>(null);
+  const showClient = !isSocialProvider(provider);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -99,6 +110,9 @@ export function LocalCacheFlow(): JSX.Element {
     const built = buildLocalCachePayload({ provider, tokenJson, clientJson });
     if (!built.ok) {
       setProblem(built.error);
+      focusAfter(
+        localCacheErrorField(built.error.key, showClient) === "client" ? clientRef : tokenRef,
+      );
       return;
     }
     setProblem(null);
@@ -112,13 +126,18 @@ export function LocalCacheFlow(): JSX.Element {
     } catch (error) {
       if (sessions.isCurrent(generation)) {
         toast.error(t("failed", { error: errorMessage(error, t) }));
+        focusAfter(tokenRef);
       }
     } finally {
       setPending(false);
     }
   };
 
-  const showClient = !isSocialProvider(provider);
+  // The message goes under the textarea it is about, so it shows next to the focused field.
+  const problemField = problem ? localCacheErrorField(problem.key, showClient) : null;
+  const problemText = problem
+    ? `${t(`local.${problem.key}`, problem.params)}${problem.hint ? ` ${t(`local.${problem.hint}`)}` : ""}`
+    : null;
   const items = LOCAL_PROVIDERS.map((value) => ({
     value,
     label: t(`local.providers.${value}`),
@@ -141,7 +160,9 @@ export function LocalCacheFlow(): JSX.Element {
           disabled={pending}
           items={items}
           onValueChange={(value) => {
-            if (value) setProvider(value as LocalProvider);
+            if (!value) return;
+            setProvider(value as LocalProvider);
+            setProblem(null);
           }}
           value={provider}
         >
@@ -158,6 +179,8 @@ export function LocalCacheFlow(): JSX.Element {
         </Select>
       </FormField>
       <FormField
+        error={problemField === "token" ? problemText : null}
+        hint={t("local.pasteOrUpload")}
         label={
           <>
             <span className="font-mono">{t("local.tokenFile")}</span>
@@ -171,11 +194,15 @@ export function LocalCacheFlow(): JSX.Element {
           disabled={pending}
           file={t("local.tokenFile")}
           onChange={setTokenJson}
+          placeholder='{"refreshToken": "…"}'
+          textareaRef={tokenRef}
           value={tokenJson}
         />
       </FormField>
       {showClient ? (
         <FormField
+          error={problemField === "client" ? problemText : null}
+          hint={t("local.pasteOrUpload")}
           label={
             <>
               <span className="font-mono">{t("local.clientFile")}</span>
@@ -191,15 +218,11 @@ export function LocalCacheFlow(): JSX.Element {
             disabled={pending}
             file={t("local.clientFile")}
             onChange={setClientJson}
+            placeholder='{"clientId": "…", "clientSecret": "…"}'
+            textareaRef={clientRef}
             value={clientJson}
           />
         </FormField>
-      ) : null}
-      {problem ? (
-        <FormAlert>
-          {t(`local.${problem.key}`, problem.params)}
-          {problem.hint ? ` ${t(`local.${problem.hint}`)}` : null}
-        </FormAlert>
       ) : null}
       <FlowFooter>
         <SubmitButton busy={pending} busyLabel={t("adding")} formId={formId} label={t("add")} />

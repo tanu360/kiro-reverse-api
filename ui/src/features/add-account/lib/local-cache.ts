@@ -34,6 +34,24 @@ export interface LocalCacheError {
   hint?: "microsoftChoiceHint";
 }
 
+/**
+ * The textarea a validation message belongs under: kiro-auth-token.json ("token") or
+ * {hash}.json ("client"). A client-file problem goes under the token file when the client
+ * field is hidden (social providers), since that is the only file on screen.
+ */
+export function localCacheErrorField(
+  key: LocalCacheErrorKey,
+  clientShown: boolean,
+): "token" | "client" {
+  const client =
+    key === "clientInvalid" ||
+    key === "clientSecretMissing" ||
+    key === "clientMissing" ||
+    key === "clientMissingNamed" ||
+    key === "microsoftClientIdMissing";
+  return client && clientShown ? "client" : "token";
+}
+
 export type LocalCacheResult =
   | { ok: true; payload: CredentialsImportRequest }
   | { ok: false; error: LocalCacheError };

@@ -1,4 +1,4 @@
-import { type FormEvent, type JSX, useState } from "react";
+import { type FormEvent, type JSX, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { importSsoToken } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { Code, FormField, HelpText, RegionField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
 import { showBatchResult } from "../result-toast";
 
@@ -19,6 +20,9 @@ export function SsoTokenFlow(): JSX.Element {
   const [errors, setErrors] = useState<{ tokens?: string; region?: string }>({});
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
+  const focusAfter = useFocusAfter(pending);
+  const tokensRef = useRef<HTMLTextAreaElement>(null);
+  const regionRef = useRef<HTMLInputElement>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -29,7 +33,10 @@ export function SsoTokenFlow(): JSX.Element {
       region: parsed.ok ? undefined : t("regionInvalid"),
     };
     setErrors(nextErrors);
-    if (nextErrors.tokens || !parsed.ok) return;
+    if (nextErrors.tokens || !parsed.ok) {
+      focusAfter(nextErrors.tokens ? tokensRef : regionRef);
+      return;
+    }
     const generation = sessions.generation;
     setPending(true);
     try {
@@ -40,6 +47,7 @@ export function SsoTokenFlow(): JSX.Element {
     } catch (error) {
       if (sessions.isCurrent(generation)) {
         toast.error(t("failed", { error: errorMessage(error, t) }));
+        focusAfter(tokensRef);
       }
     } finally {
       setPending(false);
@@ -66,11 +74,18 @@ export function SsoTokenFlow(): JSX.Element {
           className="font-mono"
           disabled={pending}
           onChange={(event) => setTokens(event.target.value)}
+          ref={tokensRef}
           spellCheck={false}
           value={tokens}
         />
       </FormField>
-      <RegionField disabled={pending} error={errors.region} onChange={setRegion} value={region} />
+      <RegionField
+        disabled={pending}
+        error={errors.region}
+        inputRef={regionRef}
+        onChange={setRegion}
+        value={region}
+      />
       <HelpText className="text-xs">{t("sso.slowHint")}</HelpText>
       <FlowFooter>
         <SubmitButton

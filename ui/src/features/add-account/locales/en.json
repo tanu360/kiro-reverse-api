@@ -63,6 +63,7 @@
   "microsoft.profileLabel": "Kiro profile",
   "microsoft.selectProfile": "Use profile",
   "microsoft.profileRequired": "Choose a Kiro profile first.",
+  "microsoft.unnamedProfile": "Unnamed profile",
 
   "sso.howToGet": "How to get the token",
   "sso.step1": "Sign in at",

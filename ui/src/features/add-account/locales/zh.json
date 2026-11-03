@@ -60,6 +60,7 @@
   "microsoft.profileLabel": "Kiro Profile",
   "microsoft.selectProfile": "使用此 Profile",
   "microsoft.profileRequired": "请先选择 Kiro Profile。",
+  "microsoft.unnamedProfile": "未命名 Profile",
 
   "sso.howToGet": "如何获取 Token",
   "sso.step1": "在浏览器中登录",
