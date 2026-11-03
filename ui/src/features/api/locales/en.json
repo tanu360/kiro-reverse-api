@@ -8,6 +8,10 @@
   "access.stateOff": "Any client can call the proxy",
   "access.enabledApiKeyRequired": "Create and enable at least one API key before you require one.",
   "access.loadFailed": "Could not load API access",
+  "access.discardTitle": "Discard unsaved changes?",
+  "access.discardBody": "Your API access change is not saved yet. Leave this page anyway?",
+  "access.discard": "Discard",
+  "access.keepEditing": "Keep editing",
   "keys.title": "API keys",
   "keys.description": "Create a key per client. Set token or credit limits; 0 means unlimited.",
   "keys.create": "Create API key",
@@ -97,5 +101,6 @@
   "snippets.sdkLanguage": "SDK language",
   "snippets.python": "Python",
   "snippets.typescript": "TypeScript",
-  "snippets.copy": "Copy {name} snippet"
+  "snippets.copy": "Copy {name} snippet",
+  "snippets.codeRegion": "{name} code"
 }
