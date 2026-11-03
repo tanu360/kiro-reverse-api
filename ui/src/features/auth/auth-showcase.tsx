@@ -1,21 +1,11 @@
-import "@fontsource-variable/caveat";
-import "@fontsource/patrick-hand/latin.css";
-import "@fontsource/patrick-hand/vietnamese.css";
-import {
-  CircleAlertIcon,
-  CircleCheckIcon,
-  ClockIcon,
-  type LucideIcon,
-  MessagesSquareIcon,
-  SparkleIcon,
-  SquareTerminalIcon,
-} from "lucide-react";
-import type { CSSProperties, JSX } from "react";
+import { CircleAlertIcon, CircleCheckIcon, ClockIcon, type LucideIcon } from "lucide-react";
+import { type CSSProperties, type JSX, useId } from "react";
 import { NAV_ITEMS } from "@/components/layout/nav-items";
+import { AppIcon } from "@/components/shared/app-icon";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
-import type { Lang } from "@/lib/i18n";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { ClaudeLogo, CodexLogo, OpenAILogo } from "./brand-logos";
 
 /**
  * Grainy purple mesh: deep violet pooling at the left and lower right, lavender glowing across
@@ -25,8 +15,11 @@ import { cn } from "@/lib/utils";
 const MESH: CSSProperties = {
   backgroundColor: "#c697e3",
   backgroundImage: [
-    // A deeper wash behind the product line, so white text keeps AA on every panel size.
-    "radial-gradient(70% 26% at 22% 13%, rgb(91 43 191 / 0.62) 0%, rgb(91 43 191 / 0.4) 45%, rgb(91 43 191 / 0) 100%)",
+    // A deeper wash behind the product line (two lines wide), so white text keeps AA on every
+    // panel size.
+    "radial-gradient(92% 21% at 34% 11%, rgb(91 43 191 / 0.66) 0%, rgb(91 43 191 / 0.48) 50%, rgb(91 43 191 / 0) 100%)",
+    // A lavender glow across the middle, between the stickers and the preview.
+    "radial-gradient(36% 19% at 45% 35%, rgb(206 162 236 / 0.95) 0%, rgb(206 162 236 / 0.7) 55%, rgb(206 162 236 / 0) 100%)",
     "radial-gradient(62% 36% at 12% 38%, #6634b2 0%, rgb(102 52 178 / 0.85) 35%, rgb(102 52 178 / 0) 100%)",
     "radial-gradient(20% 20% at 0% 62%, #8657c4 0%, rgb(134 87 196 / 0) 100%)",
     "radial-gradient(50% 30% at 12% 2%, #7343ba 0%, rgb(115 67 186 / 0) 100%)",
@@ -50,48 +43,14 @@ const GRAIN: CSSProperties = {
 };
 
 /**
- * Handwriting per script: Caveat has no Vietnamese tone marks, so Vietnamese uses Patrick Hand,
- * and Chinese falls back to the system Kai (brush) faces.
+ * Flat sticker labels: a pastel body inside a white die-cut edge, no gloss and no shadow. The
+ * bold text is at least 5.4:1 on its own pastel.
  */
-const HAND_FONT: Record<Lang, string> = {
-  en: '"Caveat Variable", cursive',
-  "pt-BR": '"Caveat Variable", cursive',
-  vi: '"Patrick Hand", cursive',
-  zh: '"Caveat Variable", "Kaiti SC", STKaiti, KaiTi, "BiauKai", "AR PL UKai CN", cursive',
-  pseudo: '"Caveat Variable", cursive',
-};
-
-/** Deep violet ink: at least 5:1 on the lavender glow the note sits on. */
-const INK = "#2a0b5c";
-
-/**
- * Glossy candy labels: a pastel body lit from the top, a slightly darker rim in the same hue, a
- * white highlight along the top edge, a soft inner glow at the bottom and a violet drop shadow.
- * The bold text clears 3:1 (large text) on its own pastel.
- */
-const CANDY = {
-  sky: {
-    background: "linear-gradient(180deg, #eef7ff 0%, #d6eaff 55%, #c4e0ff 100%)",
-    borderColor: "#93c2f4",
-    color: "#2563d9",
-    glow: "rgb(59 130 246 / 0.28)",
-  },
-  lime: {
-    background: "linear-gradient(180deg, #fbfec4 0%, #eef98f 55%, #e2f46a 100%)",
-    borderColor: "#c5da4f",
-    color: "#4d8a07",
-    glow: "rgb(132 204 22 / 0.32)",
-  },
-  mint: {
-    background: "linear-gradient(180deg, #e6fdf0 0%, #c9f6dc 55%, #b3efcd 100%)",
-    borderColor: "#86d9ad",
-    color: "#138a63",
-    glow: "rgb(16 185 129 / 0.28)",
-  },
-} as const satisfies Record<
-  string,
-  { background: string; borderColor: string; color: string; glow: string }
->;
+const STICKER = {
+  claude: { background: "#ffe9de", color: "#a3401c" },
+  openai: { background: "#ecf8b8", color: "#40650f" },
+  codex: { background: "#e4e8ff", color: "#3941d0" },
+} as const satisfies Record<string, { background: string; color: string }>;
 
 type Health = "active" | "outOfCredits" | "expired";
 
@@ -120,13 +79,11 @@ const PREVIEW_NAV = NAV_ITEMS.filter((item) =>
 );
 
 /**
- * Right half of the sign-in pages from `lg` up: a grainy purple mesh with a paper plane looping
- * across it, a handwritten note, the product line, and a cropped preview of the Accounts page
- * that the plane takes off from. The drawings and the preview are hidden from assistive tech.
+ * Right half of the sign-in pages from `lg` up: a grainy purple mesh with the product line, three
+ * "works with" stickers, and a paper plane looping up from a preview of the Accounts page. The
+ * drawings and the preview are hidden from assistive tech.
  */
 export function AuthShowcase(): JSX.Element {
-  const { t, lang } = useT("auth");
-
   return (
     <aside
       className="relative isolate hidden overflow-hidden rounded-3xl text-white lg:flex lg:w-[52%] lg:flex-col xl:w-[56%]"
@@ -137,108 +94,156 @@ export function AuthShowcase(): JSX.Element {
         className="pointer-events-none absolute inset-0 -z-10 opacity-[0.22] mix-blend-overlay"
         style={GRAIN}
       />
-      <div className="relative z-10 p-12 xl:p-14">
-        <p className="max-w-[24rem] text-balance font-heading font-semibold text-3xl leading-tight tracking-tight">
-          {t("tagline")}
-        </p>
+      <div className="relative z-10 px-12 pt-9 xl:px-14 xl:pt-10">
+        <Tagline />
       </div>
+      {/* In flow under the product line, so they follow it down if it wraps. */}
+      <StickerLabels />
 
       <FlightPath />
       <PaperPlane />
-      <CandyLabels />
-      <p
-        className="absolute top-[75%] left-[5%] z-10 max-w-[25%] -rotate-[5deg] text-balance text-[1.625rem] leading-[1.05] xl:text-[1.875rem]"
-        style={{ color: INK, fontFamily: HAND_FONT[lang] }}
-      >
-        {t("showcaseNote")}
-      </p>
 
-      <AccountsPreview />
+      {/* The preview hangs from the bottom right corner. */}
+      <div className="absolute right-0 bottom-0 left-[7%] z-10">
+        <AccountsPreview />
+      </div>
     </aside>
   );
 }
 
+/** The brands the product line names, each shown as its mark on a sticker-coloured chip. */
+const TAGLINE_BRANDS = {
+  openai: { name: "OpenAI", Logo: OpenAILogo, hue: STICKER.openai, tilt: -8 },
+  anthropic: { name: "Anthropic", Logo: ClaudeLogo, hue: STICKER.claude, tilt: 7 },
+} as const;
+type TaglineBrand = keyof typeof TAGLINE_BRANDS;
+
 /**
- * Three stacked candy labels for the APIs the proxy speaks, tilted in alternating directions and
- * overlapping a little past their text. Each one is wider than the space to the panel's right edge, so it runs
- * off the panel like a sticker, while its icon and text stay in view.
+ * The product line, across the panel's full width. The locale string names the brands with
+ * {openai} and {anthropic}; each becomes its logo on a small tilted chip in its sticker's colour
+ * (the Claude mark stands for Anthropic, as on the Claude sticker), so the sentence keeps each
+ * language's word order. The chips are images named after the brand, so it reads as a sentence.
  */
-function CandyLabels(): JSX.Element {
+function Tagline(): JSX.Element {
+  const { t } = useT("auth");
+  const [lead = "", ...rest] = t("tagline").split(/\{(openai|anthropic)\}/);
+  // The chips, the words between them and the word before the first one never break apart: a
+  // narrow panel wraps before that word, not after a chip or an "&".
+  const cut = lead.trimEnd().lastIndexOf(" ") + 1;
+  return (
+    <p className="text-pretty font-heading font-semibold text-2xl leading-snug xl:text-3xl">
+      {lead.slice(0, cut)}
+      <span className="whitespace-nowrap">
+        {lead.slice(cut)}
+        {rest.map((part, index) =>
+          index % 2 === 1 ? part : <BrandChip brand={part as TaglineBrand} key={part} />,
+        )}
+      </span>
+    </p>
+  );
+}
+
+/**
+ * A logo chip centred on the line's capitals. It is an inline-block that clips (overflow-hidden),
+ * so its baseline is its own bottom edge, not the logo's; sitting 0.3em under the text baseline
+ * puts its middle 0.35em above it, the middle of the capitals.
+ */
+function BrandChip({ brand }: { brand: TaglineBrand }): JSX.Element {
+  const { name, Logo, hue, tilt } = TAGLINE_BRANDS[brand];
+  return (
+    <span
+      aria-label={name}
+      className="mx-[0.06em] inline-block size-[1.3em] overflow-hidden rounded-[0.32em] border-[0.09em] border-white align-[-0.3em]"
+      role="img"
+      style={{ background: hue.background, rotate: `${tilt}deg` }}
+    >
+      <span className="grid size-full place-items-center">
+        <Logo className="size-[0.72em]" />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Three sticker labels for the APIs the proxy speaks, each with the brand's mark upright on a
+ * small white chip inside the label, then the name and, smaller in mono, the endpoint it serves
+ * (code, so it is not translated). They sit 28 px apart: neighbours tilt opposite ways, so
+ * their facing corners close in by about 12 px and the narrowest gap still stays clear.
+ */
+function StickerLabels(): JSX.Element {
   const { t } = useT("auth");
   const labels = [
     {
       id: "claude",
       text: t("labelClaude"),
-      icon: SparkleIcon,
-      hue: CANDY.sky,
-      tilt: 3,
-      inset: "0%",
+      Logo: ClaudeLogo,
+      endpoint: "/v1/messages",
+      hue: STICKER.claude,
+      tilt: -4,
+      inset: "0em",
     },
     {
       id: "openai",
       text: t("labelOpenAI"),
-      icon: MessagesSquareIcon,
-      hue: CANDY.lime,
-      tilt: -4,
-      inset: "9%",
+      Logo: OpenAILogo,
+      endpoint: "/v1/chat/completions",
+      hue: STICKER.openai,
+      tilt: 3,
+      inset: "1.6em",
     },
     {
       id: "codex",
       text: t("labelCodex"),
-      icon: SquareTerminalIcon,
-      hue: CANDY.mint,
-      tilt: 2.5,
-      inset: "-4%",
+      Logo: CodexLogo,
+      endpoint: "/v1/responses",
+      hue: STICKER.codex,
+      tilt: -2,
+      inset: "0.5em",
     },
   ];
   return (
     <ul
       aria-label={t("worksWith")}
-      className="absolute top-[37%] right-0 left-[41%] z-10 flex select-none flex-col gap-3.5"
+      className="relative z-10 ms-[7%] mt-10 flex select-none flex-col items-start self-start gap-7 font-bold text-base leading-tight xl:text-[clamp(1.125rem,1.25vw,1.5rem)]"
     >
-      {labels.map((label, index) => {
-        const Icon = label.icon;
-        return (
-          <li
-            className="relative flex w-[calc(100%+4rem)] items-center gap-3 overflow-hidden rounded-[1.1rem] border-2 px-5 py-2 font-bold text-[clamp(1.75rem,2.6vw,2.5rem)] leading-tight tracking-tight"
-            key={label.id}
-            style={{
-              background: label.hue.background,
-              borderColor: label.hue.borderColor,
-              color: label.hue.color,
-              marginInlineStart: label.inset,
-              rotate: `${label.tilt}deg`,
-              // Pivot near the words, so neighbours meet (and overlap) only past the text.
-              transformOrigin: "12rem 50%",
-              zIndex: labels.length - index,
-              boxShadow: [
-                "inset 0 2px 0 rgb(255 255 255 / 0.9)",
-                `inset 0 -4px 10px ${label.hue.glow}`,
-                "0 2px 4px rgb(42 11 92 / 0.12)",
-                "0 16px 28px -10px rgb(42 11 92 / 0.5)",
-              ].join(","),
-              textShadow: "0 1px 0 rgb(255 255 255 / 0.7)",
-            }}
+      {labels.map(({ id, text, Logo, endpoint, hue, tilt, inset }) => (
+        <li
+          // The logo chip keeps a pastel margin inside the white edge, wider at the start.
+          className="flex items-center gap-2 rounded-xl border-[3px] border-white py-1.5 pr-4 pl-2"
+          key={id}
+          style={{
+            background: hue.background,
+            color: hue.color,
+            marginInlineStart: inset,
+            rotate: `${tilt}deg`,
+          }}
+        >
+          <span
+            aria-hidden="true"
+            className="grid size-[1.5em] shrink-0 place-items-center rounded-[0.45em] bg-white"
           >
-            {/* The gloss: a soft white sheen over the top half. */}
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-3 top-1 h-[42%] rounded-full bg-linear-to-b from-white/70 to-white/0"
-            />
-            <Icon aria-hidden="true" className="relative size-[1em] shrink-0" strokeWidth={2.25} />
-            <span className="relative">{label.text}</span>
-          </li>
-        );
-      })}
+            <Logo className="size-[1em]" />
+          </span>
+          {text}
+          <span className="ms-1 font-medium font-mono text-[0.62em] opacity-75">{endpoint}</span>
+        </li>
+      ))}
     </ul>
   );
 }
 
 /**
  * The dashed flight path, drawn in panel percentages (the SVG stretches with the panel and the
- * stroke keeps its width), from the preview's corner, round one loop, to the plane's tail.
+ * stroke keeps its width). It is drawn from the plane back: it starts exactly at the plane's tip
+ * (FLIGHT_END), leaving it opposite to the way the plane points, then goes round one loop and
+ * down to well under the preview's top edge (75%, below the edge at every zoom step). The dash
+ * pattern starts at the tip; the dashes stay still (a drifting pattern made the trail look as if
+ * it slid off the tip). It does not run on into the plane: in panel percentages a lead-in would
+ * follow the keel's edge outside the plane on some panel shapes. Both ends fade into the
+ * background (the stroke's gradient), so neither shows a cut end.
  */
 function FlightPath(): JSX.Element {
+  const fadeId = `flight-fade-${useId().replace(/[^\w-]/g, "")}`;
   return (
     <svg
       aria-hidden="true"
@@ -247,13 +252,30 @@ function FlightPath(): JSX.Element {
       preserveAspectRatio="none"
       viewBox="0 0 100 100"
     >
+      <defs>
+        {/*
+         * Both ends melt into the background: clear at the plane's tail, full strength from 4%
+         * below it, then clear again by 47%, just above the preview's top edge on most screens.
+         */}
+        <linearGradient
+          gradientUnits="userSpaceOnUse"
+          id={fadeId}
+          x1="0"
+          x2="0"
+          y1={FLIGHT_END.y}
+          y2="47"
+        >
+          <stop offset="0" stopColor="white" stopOpacity="0" />
+          <stop offset="0.2" stopColor="white" stopOpacity="0.85" />
+          <stop offset="0.62" stopColor="white" stopOpacity="0.85" />
+          <stop offset="1" stopColor="white" stopOpacity="0" />
+        </linearGradient>
+      </defs>
       <path
-        className="motion-safe:animate-flight-dash"
-        d="M 33 70 C 24 68, 13 62, 14 53 C 15 45, 26 43, 28 50 C 30 57, 18 59, 17 50 C 16 39, 32 31, 49 29 C 59 28, 66 25, 72 21.5"
-        stroke="white"
+        d={`M ${FLIGHT_END.x} ${FLIGHT_END.y} C 74.5 31, 75.5 36, 74 39 C 72 43, 67 41, 68 37.5 C 69 34, 74.2 36, 75 41 C 76 48, 76 60, 76 75`}
+        stroke={`url(#${fadeId})`}
         strokeDasharray="7 9"
         strokeLinecap="round"
-        strokeOpacity="0.85"
         strokeWidth="2.25"
         vectorEffect="non-scaling-stroke"
       />
@@ -261,38 +283,44 @@ function FlightPath(): JSX.Element {
   );
 }
 
-/** A folded paper plane in Kiro lavender, outlined in ink a touch off-register like a sketch. */
+/** Where the flight path meets the plane's tip, in panel percentages. */
+const FLIGHT_END = { x: 79.5, y: 27.5 } as const;
+
+/**
+ * A flat paper plane in Kiro lavender, four facets and no outline. Shape: "Paper plane" from the
+ * Small Flat Vectors pack (svgrepo.com/svg/362134), CC0 1.0 (public domain); recoloured, and its
+ * 24-unit grid moved to the origin.
+ *
+ * It hangs by its tip, the lowest point of its keel (7, 24 of 24: 29.17% and 100% of the box):
+ * that point is pinned to the flight path's end whatever the panel's size, and the plane turns
+ * and rocks about it, so the dashed trail always runs out of the tip.
+ */
 function PaperPlane(): JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute top-[20%] left-[80%] w-[clamp(5.5rem,11vw,8.5rem)] -translate-x-1/2 -translate-y-1/2"
+      className="pointer-events-none absolute w-[clamp(5rem,8vw,8rem)] origin-[29.17%_100%] -translate-x-[29.17%] -translate-y-full rotate-[14deg]"
+      style={{ left: `${FLIGHT_END.x}%`, top: `${FLIGHT_END.y}%` }}
     >
       <svg
         aria-hidden="true"
-        className="w-full overflow-visible drop-shadow-[0_14px_18px_rgb(42_11_92/0.28)] motion-safe:animate-plane-float"
-        fill="none"
-        viewBox="0 0 120 92"
+        className="w-full origin-[29.17%_100%] overflow-visible motion-safe:animate-plane-float"
+        viewBox="0 0 24 24"
       >
-        <path d="M118 4 L4 44 L46 57 Z" fill="#ffffff" />
-        <path d="M118 4 L46 57 L64 88 Z" fill="#ead9fc" />
-        <path d="M46 57 L40 78 L56 70 Z" fill="#b48de6" />
-        <g
-          stroke={INK}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2.4"
-          transform="translate(1.4 1.1)"
-        >
-          <path d="M117 4 C 80 17, 40 31, 4 44 C 18 48, 32 53, 46 57 C 52 67, 58 78, 64 88 C 82 60, 100 32, 117 4" />
-          <path d="M117 5 C 94 22, 70 40, 46 57" />
-          <path d="M46 57 C 44 64, 42 71, 40 78 C 45 75, 50 73, 56 70" />
-        </g>
+        <path d="M24 0 18 24 8.61 19.3Z" fill="#ffffff" />
+        <path d="M24 0 6 18 0 15Z" fill="#ead9fc" />
+        <path d="M6 18 7 24 8.674 19.3 24 0Z" fill="#8a5cd0" />
+        <path d="M7 24 10 20 8.661 19.3Z" fill="#5b2bbf" />
       </svg>
     </div>
   );
 }
 
+/**
+ * The Accounts page in miniature: nav, stat tiles and four rows. It is laid out at its real size,
+ * then zoomed to the panel, the smaller of a width step and a height step, so the whole of it
+ * shows on common laptop screens and it grows on large ones.
+ */
 function AccountsPreview(): JSX.Element {
   const { t: tShared, lang } = useT();
   const { t: tAccounts } = useT("accounts");
@@ -310,12 +338,22 @@ function AccountsPreview(): JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="absolute right-0 bottom-0 h-[30%] w-[68%] select-none overflow-hidden rounded-tl-2xl border-white/25 border-t border-l bg-card text-card-foreground shadow-2xl shadow-[#2a0b5c]/40"
+      // Dark theme: true black like the page, not the grey-black card surface.
+      className="select-none overflow-hidden rounded-tl-2xl border-white/30 border-t border-l bg-card text-card-foreground dark:bg-background"
     >
-      <div className="flex min-w-[40rem] flex-col gap-5 p-6">
+      <div
+        className={cn(
+          "flex min-w-[40rem] flex-col gap-5 p-6",
+          // Width steps (the panel is 52% of the window, 56% from xl).
+          "[--zoom-w:0.76] min-[1280px]:[--zoom-w:1] min-[1400px]:[--zoom-w:1.1] min-[1800px]:[--zoom-w:1.3]",
+          // Height steps, as ranges so their order in the stylesheet cannot matter.
+          "[--zoom-h:0.8] [@media(min-height:760px)_and_(max-height:799.98px)]:[--zoom-h:0.9] [@media(min-height:800px)_and_(max-height:879.98px)]:[--zoom-h:1] [@media(min-height:880px)_and_(max-height:999.98px)]:[--zoom-h:1.12] [@media(min-height:1000px)]:[--zoom-h:1.3]",
+        )}
+        style={{ zoom: "min(var(--zoom-w), var(--zoom-h))" }}
+      >
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <img alt="" className="size-6" height={24} src="/admin/icon.webp" width={24} />
+            <AppIcon className="size-6" size={24} />
             <span className="font-semibold text-sm">{tShared("shell.appName")}</span>
           </div>
           <ul className="flex items-center gap-1 text-sm">
@@ -340,7 +378,10 @@ function AccountsPreview(): JSX.Element {
 
         <dl className="grid grid-cols-4 gap-3">
           {stats.map((stat) => (
-            <div className="rounded-xl border bg-background/60 px-3.5 py-3" key={stat.label}>
+            <div
+              className="rounded-xl border bg-background/60 px-3.5 py-3 dark:bg-white/[0.03]"
+              key={stat.label}
+            >
               <dt className="truncate text-muted-foreground text-xs">{stat.label}</dt>
               <dd className="mt-1 font-semibold text-lg tabular-nums">{stat.value}</dd>
             </div>

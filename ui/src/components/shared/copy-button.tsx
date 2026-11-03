@@ -15,10 +15,13 @@ export function CopyButton({
   variant = "ghost",
   size = "icon",
   showLabel = false,
+  copiedMessage,
   className,
 }: {
   value: string | (() => Promise<string>);
   label: string;
+  /** The success toast, when it can say what was copied; defaults to "Copied to clipboard". */
+  copiedMessage?: string;
   variant?: "ghost" | "outline";
   size?: "icon" | "sm";
   showLabel?: boolean;
@@ -42,7 +45,7 @@ export function CopyButton({
       toast.error(t("toast.copyFailed"));
       return;
     }
-    toast.success(t("toast.copied"));
+    toast.success(copiedMessage ?? t("toast.copied"));
     setCopied(true);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {

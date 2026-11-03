@@ -229,6 +229,9 @@ importers:
       react-dom:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
+      skullet:
+        specifier: 0.0.3
+        version: 0.0.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       tailwind-merge:
         specifier: ^3.7.0
         version: 3.7.0
@@ -1816,6 +1819,23 @@ packages:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
 
+  skullet@0.0.3:
+    resolution: {integrity: sha512-YPKHasYQxuZTQ6Tf6ap61lseIjdAklQlScg48HMKJW/AiGg8HaVdbfzg5XW/j6OdRuJbITpwsG5vJ8LAapmMJA==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+      svelte: '>=5'
+      vue: '>=3'
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
@@ -3328,6 +3348,11 @@ snapshots:
   set-cookie-parser@3.2.2: {}
 
   signal-exit@4.1.0: {}
+
+  skullet@0.0.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
+    optionalDependencies:
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
 
   source-map-js@1.2.2: {}
 

@@ -1,6 +1,9 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
+import { http } from "msw";
 import { describe, expect, it } from "vitest";
 import { clearSession } from "@/lib/auth/session";
+import { apiUrl, jsonError } from "@/lib/mocks/http";
+import { mockServer } from "@/lib/mocks/node";
 import { renderApp } from "@/test/render";
 
 // Mock first-run is pending on a fresh mock database (password 12345678).
@@ -15,31 +18,43 @@ describe("SetupPage", () => {
     ).toBeInTheDocument();
     expect(await screen.findByText(PASSWORD)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy password" })).toBeInTheDocument();
-    expect(screen.getByText("It is shown until the first successful sign-in.")).toBeInTheDocument();
   });
 
-  it("hides and shows the generated password, and copies it either way", async () => {
-    const { user } = await renderApp("/setup", { authed: false });
-    await screen.findByText(PASSWORD);
-    expect(screen.getByText("Admin password")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Hide admin password" }));
-    expect(screen.queryByText(PASSWORD)).not.toBeInTheDocument();
-    expect(screen.getByText("••••••••")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy password" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show admin password" }));
-    expect(screen.getByText(PASSWORD)).toBeInTheDocument();
+  it("shows the generated password as a line of text, not a second input box", async () => {
+    await renderApp("/setup", { authed: false });
+    const section = await screen.findByRole("region", { name: "First-run admin password" });
+    expect(within(section).getByText("Generated password")).toBeInTheDocument();
+    expect(within(section).getByText(PASSWORD)).toBeInTheDocument();
+    // Copy is the only control: no info button.
+    expect(
+      within(section)
+        .getAllByRole("button")
+        .map((button) => button.ariaLabel),
+    ).toEqual(["Copy password"]);
+    expect(section.querySelector("input")).toBeNull();
+    // The sign-in password field is the page's only input box.
+    expect(document.querySelectorAll('[data-slot="input-group"]')).toHaveLength(1);
   });
 
-  it("does not fill the password into the field", async () => {
+  it("fills the generated password into the field", async () => {
     await renderApp("/setup", { authed: false });
     await screen.findByText(PASSWORD);
+    expect(screen.getByLabelText("Password")).toHaveValue(PASSWORD);
+    expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
+  });
+
+  it("offers a retry when the generated password cannot load", async () => {
+    mockServer.use(http.get(apiUrl("/first-run"), () => jsonError(500, "boom")));
+    await renderApp("/setup", { authed: false });
+    expect(await screen.findByText("Could not load the first-run password.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toHaveValue("");
   });
 
   it("signs in with the generated password, lands on Overview and points to Settings", async () => {
     const { user, router } = await renderApp("/setup", { authed: false });
     await screen.findByText(PASSWORD);
-    await user.type(screen.getByLabelText("Password"), PASSWORD);
+    // Prefilled: one click signs in.
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
     // The toast follows the Overview navigation, which can take over a second under a busy run.
@@ -62,7 +77,6 @@ describe("SetupPage", () => {
   it("drops the change-password toast when the session ends", async () => {
     const { user, router } = await renderApp("/setup", { authed: false });
     await screen.findByText(PASSWORD);
-    await user.type(screen.getByLabelText("Password"), PASSWORD);
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
     expect(

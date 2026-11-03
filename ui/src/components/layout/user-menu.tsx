@@ -140,7 +140,7 @@ function SidebarUserMenu(): JSX.Element {
       >
         <span className="relative shrink-0">
           <AdminAvatar />
-          {latest ? <UpdateDot className="-top-0.5 -right-0.5 ring-sidebar" /> : null}
+          {latest ? <UpdateDot className="-top-0.5 -right-0.5 outline-sidebar" /> : null}
         </span>
         <span className="grid flex-1 text-left text-sm leading-tight">
           <span className="truncate font-medium text-sidebar-foreground">{t("shell.admin")}</span>

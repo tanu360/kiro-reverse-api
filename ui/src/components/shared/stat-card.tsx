@@ -109,7 +109,7 @@ export function StatCard({
         <div className="flex flex-wrap items-center gap-2">
           <div
             className={cn(
-              "font-medium text-3xl leading-none tracking-tight tabular-nums",
+              "font-medium text-3xl leading-none tabular-nums",
               danger && "text-destructive-foreground",
             )}
           >

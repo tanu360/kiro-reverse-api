@@ -38,7 +38,7 @@ export function MethodList({
         {METHODS.map(({ id, icon: Icon }) => (
           <li key={id}>
             <button
-              className="flex w-full min-h-14 cursor-pointer items-center gap-3 rounded-xl border bg-card px-3 py-3 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+              className="flex w-full min-h-14 cursor-pointer items-center gap-3 rounded-xl border bg-card px-3 py-3 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:border-ring"
               data-method={id}
               onClick={() => onSelect(id)}
               type="button"

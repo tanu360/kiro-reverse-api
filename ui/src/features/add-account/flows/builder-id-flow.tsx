@@ -113,7 +113,7 @@ export function BuilderIdFlow(): JSX.Element {
       <div className="flex flex-col gap-5">
         {/* The code is the new step's main content, so it takes focus when the step opens. */}
         <div
-          className="flex flex-col items-center gap-2 rounded-xl border bg-muted/40 px-4 py-5 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+          className="flex flex-col items-center gap-2 rounded-xl border bg-muted/40 px-4 py-5 text-center outline-none focus-visible:border-ring"
           ref={codeRef}
           tabIndex={-1}
         >

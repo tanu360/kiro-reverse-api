@@ -86,7 +86,8 @@
   --foreground: var(--color-neutral-100);
   --card: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
   --card-foreground: var(--color-neutral-100);
-  --popover: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
+  /* A shade under the card: menus and lists read near-black, not grey. */
+  --popover: color-mix(in srgb, var(--color-neutral-950) 98.5%, var(--color-white));
   --popover-foreground: var(--color-neutral-100);
   --primary: #9046ff;
   --secondary: --alpha(var(--color-white) / 3%);
@@ -199,6 +200,58 @@
 }
 
 /*
+ * Film grain over a solid fill (the sign-in button): the showcase's mid-grey fractal noise
+ * (auth-showcase.tsx GRAIN; filtered in sRGB, so it averages 50% grey and the overlay blend
+ * neither lightens nor darkens the fill) on a ::before layer. The host must be positioned.
+ * `isolate` keeps the blend inside the host, and z-index -1 paints the grain over the host's
+ * background but under its content, so the label keeps its contrast. Set
+ * --grain-overlay-opacity on the host to tune the strength.
+ */
+:root {
+  --grain-overlay: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.6' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@utility grain-overlay {
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: var(--grain-overlay);
+    background-size: 200px 200px;
+    mix-blend-mode: overlay;
+    opacity: var(--grain-overlay-opacity, 0.2);
+  }
+}
+
+/*
+ * The keyboard focus cue. The UI is flat: bordered fields (input, select, textarea…) show focus
+ * by their border colour alone, with no halo. Controls without a visible border (ghost and icon
+ * buttons, links, tabs, rows, checkboxes) get this thin outline in the ring colour instead.
+ * :focus-visible does not match a mouse click on a button, so pointer users never see it.
+ * The rule sets outline-style itself: Tailwind's outline-none/outline-hidden zero
+ * --tw-outline-style, which would leave `focus-visible:outline-1` invisible.
+ * `focus-outline` sits 2 px off the edge; `focus-outline-inset` sits on the inner edge, for
+ * rows, cells and items packed in a track or a scrolling box that would clip an outer outline.
+ */
+@utility focus-outline {
+  &:focus-visible {
+    outline: 1px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+@utility focus-outline-inset {
+  &:focus-visible {
+    outline: 1px solid var(--color-ring);
+    outline-offset: -1px;
+  }
+}
+
+/*
  * Pill disc icons (components/ui/badge.tsx): a circled lucide icon (CircleCheck, CircleX,
  * Clock…) becomes a filled circle in the tone colour with its glyph knocked out, a little
  * heavier so it holds up at 12-14 px. The colours come from the pill's --badge-dot/--badge-glyph.
@@ -276,23 +329,15 @@
   /* coss ui: skeleton animation (merged by the shadcn CLI). */
   --animate-skeleton: skeleton 2s -1s infinite linear;
 
-  /* Sign-in showcase: the paper plane bobs and its dashed trail drifts (motion-safe only). */
+  /* Sign-in showcase: the paper plane rocks about its tip, so it stays on its trail. */
   --animate-plane-float: plane-float 5s ease-in-out infinite alternate;
-  --animate-flight-dash: flight-dash 2.4s linear infinite;
 
   @keyframes plane-float {
     from {
-      translate: 0 0;
-      rotate: 0deg;
+      rotate: 2deg;
     }
     to {
-      translate: 6px -8px;
-      rotate: -3deg;
-    }
-  }
-  @keyframes flight-dash {
-    to {
-      stroke-dashoffset: -16;
+      rotate: -4deg;
     }
   }
 
@@ -418,7 +463,7 @@
 
 /*
  * Notch toaster (components/ui/notch-toaster.tsx), styles adapted from notch-toast 0.2.0 (MIT).
- * One dark island in both themes. In the app it hangs from the bottom edge of the sticky
+ * The island inverts the page: dark on the light theme, light on the dark theme. In the app it hangs from the bottom edge of the sticky
  * header, centred on the header, so it never covers the header's buttons; on pages without a
  * header (sign-in) it hangs from the top of the window. It sits above dialogs and sheets
  * (z-50); on phones those open from the bottom, so a top toast cannot hide their buttons.
@@ -434,17 +479,30 @@
   --notch-info: #c59eff;
   --notch-warning: var(--color-amber-400);
   --notch-shadow: 0 12px 28px -12px --alpha(var(--color-zinc-950) / 45%);
+  /* An optional hairline edge round the island; neither theme draws one now. */
+  --notch-edge: transparent;
   --notch-radius: 16px;
   --notch-offset-top: 0px;
   --notch-offset-left: 0px;
   --notch-gutter: 16px;
 }
 
+/*
+ * Dark: a light island (zinc-50) on the black page, the mirror of the light theme's dark one, so
+ * a toast stands out without a frame. On it the text is 16:1 and the muted text 4.6:1; the status
+ * icons take their 600 shades (3:1 or more, the non-text minimum).
+ */
 .dark {
-  --notch: var(--color-neutral-800);
-  --notch-foreground: var(--color-neutral-50);
-  --notch-muted-foreground: var(--color-neutral-400);
-  --notch-shadow: 0 14px 32px -10px --alpha(var(--color-black) / 80%);
+  --notch: var(--color-zinc-50);
+  --notch-foreground: var(--color-zinc-900);
+  --notch-muted-foreground: var(--color-zinc-500);
+  --notch-hover: --alpha(var(--color-black) / 6%);
+  --notch-success: var(--color-emerald-600);
+  --notch-error: var(--color-red-600);
+  --notch-info: var(--color-violet-600);
+  --notch-warning: var(--color-amber-600);
+  --notch-edge: transparent;
+  --notch-shadow: 0 10px 24px -12px --alpha(var(--color-black) / 60%);
 }
 
 /* The 48 px header is border-box: hang 1 px up so the island joins its bottom border. */
@@ -512,20 +570,38 @@
   box-shadow: var(--notch-shadow);
   will-change: width, height, filter, opacity, transform;
 
+  /*
+   * The hairline is drawn inside the island (inset), on every side but the one it hangs from,
+   * so it never doubles the header's own border.
+   */
   [data-mode="floating"] & {
     border-radius: 20px;
     transform-origin: center;
+    box-shadow:
+      inset 0 0 0 1px var(--notch-edge),
+      var(--notch-shadow);
   }
   [data-mode="attached"][data-position="top-center"] & {
     border-radius: 0 0 var(--notch-radius) var(--notch-radius);
     transform-origin: top center;
+    box-shadow:
+      inset 1px 0 0 var(--notch-edge),
+      inset -1px 0 0 var(--notch-edge),
+      inset 0 -1px 0 var(--notch-edge),
+      var(--notch-shadow);
   }
   [data-mode="attached"][data-position="bottom-center"] & {
     border-radius: var(--notch-radius) var(--notch-radius) 0 0;
     transform-origin: bottom center;
+    box-shadow:
+      inset 1px 0 0 var(--notch-edge),
+      inset -1px 0 0 var(--notch-edge),
+      inset 0 1px 0 var(--notch-edge),
+      var(--notch-shadow);
   }
 
-  /* The inverse corners that join the island to the edge it hangs from. */
+  /* The inverse corners that join the island to the edge it hangs from, the hairline following
+     their curve. */
   [data-mode="attached"] &::before,
   [data-mode="attached"] &::after {
     content: "";
@@ -545,6 +621,13 @@
       transparent calc(var(--notch-radius) - 0.5px),
       #000 calc(var(--notch-radius) + 0.5px)
     );
+    background-image: radial-gradient(
+      circle at 0 100%,
+      transparent calc(var(--notch-radius) - 0.5px),
+      var(--notch-edge) calc(var(--notch-radius) - 0.5px),
+      var(--notch-edge) calc(var(--notch-radius) + 1px),
+      transparent calc(var(--notch-radius) + 1px)
+    );
   }
   [data-mode="attached"][data-position="top-center"] &::after {
     top: 0;
@@ -553,6 +636,13 @@
       circle at 100% 100%,
       transparent calc(var(--notch-radius) - 0.5px),
       #000 calc(var(--notch-radius) + 0.5px)
+    );
+    background-image: radial-gradient(
+      circle at 100% 100%,
+      transparent calc(var(--notch-radius) - 0.5px),
+      var(--notch-edge) calc(var(--notch-radius) - 0.5px),
+      var(--notch-edge) calc(var(--notch-radius) + 1px),
+      transparent calc(var(--notch-radius) + 1px)
     );
   }
   [data-mode="attached"][data-position="bottom-center"] &::before {
@@ -563,6 +653,13 @@
       transparent calc(var(--notch-radius) - 0.5px),
       #000 calc(var(--notch-radius) + 0.5px)
     );
+    background-image: radial-gradient(
+      circle at 0 0,
+      transparent calc(var(--notch-radius) - 0.5px),
+      var(--notch-edge) calc(var(--notch-radius) - 0.5px),
+      var(--notch-edge) calc(var(--notch-radius) + 1px),
+      transparent calc(var(--notch-radius) + 1px)
+    );
   }
   [data-mode="attached"][data-position="bottom-center"] &::after {
     bottom: 0;
@@ -571,6 +668,13 @@
       circle at 100% 0,
       transparent calc(var(--notch-radius) - 0.5px),
       #000 calc(var(--notch-radius) + 0.5px)
+    );
+    background-image: radial-gradient(
+      circle at 100% 0,
+      transparent calc(var(--notch-radius) - 0.5px),
+      var(--notch-edge) calc(var(--notch-radius) - 0.5px),
+      var(--notch-edge) calc(var(--notch-radius) + 1px),
+      transparent calc(var(--notch-radius) + 1px)
     );
   }
 }
@@ -716,7 +820,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   html,
   body {
@@ -724,6 +828,8 @@
   }
   body {
     @apply text-foreground font-sans antialiased;
+    /* Geist sets tight by default; a hair of tracking keeps letters from packing together. */
+    letter-spacing: 0.01em;
     background-image: var(--surface-grain);
     background-repeat: repeat;
     background-size: var(--surface-grain-size);

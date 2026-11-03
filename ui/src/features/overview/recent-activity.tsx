@@ -24,8 +24,7 @@ const PREVIEW_ROWS = 10;
 // Below the table width the cards pair up once the card is 36rem wide.
 const CARD_GRID = "@xl:grid-cols-2";
 // The panel is a tab stop (its first content is not focusable), so it shows where focus is.
-const PANEL_CLASS =
-  "mt-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
+const PANEL_CLASS = "mt-2 rounded-lg outline-none focus-outline";
 type ActivityTab = "errors" | "requests";
 
 /** Go sends "-" for an unknown model; empty cells show the copy guide's em dash. */

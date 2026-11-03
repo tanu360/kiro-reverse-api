@@ -32,7 +32,7 @@ export function VersionBadge({ className }: { className?: string }): JSX.Element
             aria-busy={checking || undefined}
             aria-label={t("shell.version.label", { version, status: tooltip })}
             className={cn(
-              "relative inline-flex h-6 items-center gap-1.5 rounded-md border bg-background px-2 font-mono text-xs tabular-nums outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-64",
+              "relative inline-flex h-6 items-center gap-1.5 rounded-md border bg-background px-2 font-mono text-xs tabular-nums outline-none hover:bg-accent focus-visible:border-ring disabled:opacity-64",
               className,
             )}
             disabled={checking}
@@ -46,7 +46,7 @@ export function VersionBadge({ className }: { className?: string }): JSX.Element
         {hasUpdate ? (
           <span
             aria-hidden="true"
-            className="absolute -top-1 -right-1 size-2 rounded-full bg-warning ring-2 ring-sidebar"
+            className="absolute -top-1 -right-1 size-2 rounded-full bg-warning outline-2 outline-sidebar"
             data-slot="update-dot"
           />
         ) : null}

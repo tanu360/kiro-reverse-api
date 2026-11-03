@@ -41,10 +41,29 @@ describe("LoginPage", () => {
       within(labels)
         .getAllByRole("listitem")
         .map((item) => item.textContent),
-    ).toEqual(["Claude API", "OpenAI API", "Codex"]);
-    expect(screen.getByText("Self-hosted · No telemetry")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Language: English" })).toHaveTextContent("EN");
-    expect(screen.getByRole("button", { name: /^Theme:/ })).toBeInTheDocument();
+    ).toEqual(["Claude API/v1/messages", "OpenAI API/v1/chat/completions", "Codex/v1/responses"]);
+    expect(screen.getByRole("contentinfo")).toHaveTextContent(
+      `© ${new Date().getFullYear()}·Kiro Proxy`,
+    );
+    expect(screen.queryByText("Self-hosted · No telemetry")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("contentinfo")).getByText(
+        "Not affiliated with Amazon, AWS, or Kiro.",
+      ),
+    ).toBeInTheDocument();
+    // Language and theme are separate controls at the top; the footer holds only text, and the
+    // app icon sits over the heading.
+    expect(screen.getByRole("combobox", { name: "Language: English" })).toHaveTextContent(
+      "English",
+    );
+    const theme = screen.getByRole("group", { name: "Theme" });
+    expect(
+      within(theme)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual(["System", "Light", "Dark"]);
+    expect(within(screen.getByRole("contentinfo")).queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(screen.queryByText(PASSWORD)).not.toBeInTheDocument();
   });
 
@@ -86,6 +105,18 @@ describe("LoginPage", () => {
     await user.type(passwordInput(), PASSWORD);
     await user.click(submitButton());
     expect(await screen.findByText("Could not connect to the proxy.")).toBeInTheDocument();
+  });
+
+  it("shows the connection error, not the status text, for a gateway error", async () => {
+    // A reverse proxy in front of Kiro Proxy answers 502 with only its status text.
+    mockServer.use(
+      http.post(apiUrl("/session"), () => new HttpResponse("Bad Gateway", { status: 502 })),
+    );
+    const { user } = await renderApp("/login", { authed: false });
+    await user.type(passwordInput(), PASSWORD);
+    await user.click(submitButton());
+    expect(await screen.findByText("Could not connect to the proxy.")).toBeInTheDocument();
+    expect(screen.queryByText("Bad Gateway")).not.toBeInTheDocument();
   });
 
   describe("rate limit", () => {

@@ -27,7 +27,7 @@ export function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         className={cn(
-          "h-full rounded-[inherit] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+          "h-full rounded-[inherit] outline-none transition-shadow focus-outline-inset",
           overscrollContain &&
             "data-has-overflow-y:overscroll-y-contain data-has-overflow-x:overscroll-x-contain",
           scrollFade &&

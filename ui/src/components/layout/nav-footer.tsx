@@ -33,7 +33,7 @@ export function NavFooter(): JSX.Element {
             {t("shell.running")}
           </span>
           <a
-            className="ms-auto inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring max-lg:min-h-10 max-lg:px-2"
+            className="ms-auto inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-outline max-lg:min-h-10 max-lg:px-2"
             href={GITHUB_URL}
             rel="noopener"
             target="_blank"
@@ -64,7 +64,7 @@ export function NavFooter(): JSX.Element {
           >
             <InfoIcon aria-hidden="true" />
             <span>{t("shell.about")}</span>
-            {latest ? <UpdateDot className="top-1 right-1 ring-sidebar" /> : null}
+            {latest ? <UpdateDot className="top-1 right-1 outline-sidebar" /> : null}
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

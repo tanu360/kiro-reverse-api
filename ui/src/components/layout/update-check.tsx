@@ -132,7 +132,10 @@ export function UpdateDot({ className }: { className?: string }): JSX.Element {
   return (
     <span
       aria-hidden="true"
-      className={cn("absolute size-2 rounded-full bg-warning ring-2 ring-background", className)}
+      className={cn(
+        "absolute size-2 rounded-full bg-warning outline-2 outline-background",
+        className,
+      )}
       data-slot="update-dot"
     />
   );

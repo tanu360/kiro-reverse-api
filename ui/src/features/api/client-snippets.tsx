@@ -40,7 +40,7 @@ function CodeBlock({
       {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: the label is set only with role="region". */}
       <pre
         aria-label={scrolls ? t("snippets.codeRegion", { name: title }) : undefined}
-        className="max-w-full overflow-x-auto rounded-b-lg p-3 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        className="max-w-full overflow-x-auto rounded-b-lg p-3 font-mono text-xs leading-relaxed outline-none focus-outline-inset"
         ref={preRef}
         role={scrolls ? "region" : undefined}
         tabIndex={scrolls ? 0 : undefined}

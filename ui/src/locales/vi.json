@@ -39,7 +39,7 @@
   "table.selectAll": "Chọn tất cả",
   "table.selectRow": "Chọn {label}",
   "toast.saved": "Đã lưu cài đặt",
-  "toast.copied": "Đã sao chép",
+  "toast.copied": "Đã sao chép vào bộ nhớ tạm",
   "toast.copyFailed": "Không thể sao chép",
   "unlimited": "Không giới hạn",
   "none": "—",

@@ -39,7 +39,7 @@
   "table.selectAll": "Select all",
   "table.selectRow": "Select {label}",
   "toast.saved": "Settings saved",
-  "toast.copied": "Copied",
+  "toast.copied": "Copied to clipboard",
   "toast.copyFailed": "Could not copy",
   "unlimited": "Unlimited",
   "none": "—",

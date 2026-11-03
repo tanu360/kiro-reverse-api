@@ -13,7 +13,7 @@ export function Switch({
       className={cn(
         // The off track carries an inset edge in --switch-border so it meets 3:1 non-text contrast.
         // On touch screens an ::after box widens the target to 44 px around the track.
-        "relative inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 items-center rounded-full p-px outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(5)] pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background data-disabled:cursor-not-allowed data-checked:bg-primary data-unchecked:bg-switch-track data-unchecked:inset-ring data-unchecked:inset-ring-switch-border data-disabled:opacity-64 sm:[--thumb-size:--spacing(4)]",
+        "relative inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 items-center rounded-full p-px outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(5)] pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 focus-outline data-disabled:cursor-not-allowed data-checked:bg-primary data-unchecked:bg-switch-track data-unchecked:inset-ring data-unchecked:inset-ring-switch-border data-disabled:opacity-64 sm:[--thumb-size:--spacing(4)]",
         className,
       )}
       data-slot="switch"

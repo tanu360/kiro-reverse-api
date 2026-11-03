@@ -254,7 +254,7 @@ export function DataTable<T>({
                     <button
                       // Fills the 40 px header height so the whole header cell is the target.
                       className={cn(
-                        "-mx-1 inline-flex h-10 items-center gap-1 rounded-md px-1 font-medium outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                        "-mx-1 inline-flex h-10 items-center gap-1 rounded-md px-1 font-medium outline-none hover:text-foreground focus-outline-inset",
                         active && "text-foreground",
                         column.align === "end" && "flex-row-reverse",
                       )}
@@ -300,7 +300,7 @@ export function DataTable<T>({
               <TableRow
                 className={cn(
                   onRowClick &&
-                    "cursor-pointer outline-none focus-visible:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                    "cursor-pointer outline-none focus-visible:bg-accent/50 focus-outline-inset",
                 )}
                 data-state={isSelected ? "selected" : undefined}
                 key={row.id}

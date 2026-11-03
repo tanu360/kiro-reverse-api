@@ -39,7 +39,7 @@
   "table.selectAll": "全选",
   "table.selectRow": "选择 {label}",
   "toast.saved": "设置已保存",
-  "toast.copied": "已复制",
+  "toast.copied": "已复制到剪贴板",
   "toast.copyFailed": "复制失败",
   "unlimited": "不限",
   "none": "—",

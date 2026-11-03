@@ -99,7 +99,7 @@ function HintText({
       <PopoverTrigger
         aria-label={t("a11y.labelWithDetail", { label, detail: hint })}
         className={cn(
-          "cursor-default rounded-sm text-left underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "cursor-default rounded-sm text-left underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 outline-none focus-outline",
           TOUCH_HIT_AREA,
           className,
         )}

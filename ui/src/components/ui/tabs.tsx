@@ -87,7 +87,7 @@ export function TabsTab({
   return (
     <TabsPrimitive.Tab
       className={cn(
-        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64 sm:text-sm",
+        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-outline-inset data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64 sm:text-sm",
         segmentedControlItemLayoutClassName,
         segmentedControlItemTouchClassName,
         segmentedControlItemSizeClassNames[resolvedSize],
@@ -106,9 +106,9 @@ export function TabsPanel({
 }: TabsPrimitive.Panel.Props): React.ReactElement {
   return (
     <TabsPrimitive.Panel
-      // The panel is a tab stop (Base UI sets tabIndex 0), so it shows the same ring as tabs.
+      // The panel is a tab stop (Base UI sets tabIndex 0), so it shows a focus outline like the tabs.
       className={cn(
-        "flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "flex-1 rounded-lg outline-none focus-outline",
         className,
       )}
       data-slot="tabs-content"

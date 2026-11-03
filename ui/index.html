@@ -4,9 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kiro Proxy</title>
+    <meta
+      name="description"
+      content="Admin panel for Kiro Proxy: turn Kiro accounts into an OpenAI- and Anthropic-compatible API."
+    />
+    <!-- A self-hosted admin panel: keep it out of search results. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="application-name" content="Kiro Proxy" />
+    <meta name="apple-mobile-web-app-title" content="Kiro Proxy" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Browser chrome follows the page: the light theme's zinc-25 page, the dark theme's black. -->
+    <meta name="theme-color" content="#fcfcfc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <!-- Link previews (chat apps, social). No og:image: the panel's own host is not known here. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Kiro Proxy" />
+    <meta property="og:title" content="Kiro Proxy" />
+    <meta
+      property="og:description"
+      content="Turn Kiro accounts into an OpenAI- and Anthropic-compatible API."
+    />
+    <meta name="twitter:card" content="summary" />
+    <!-- Icons: the multi-size .ico (16-256 px) for tabs, PNGs for touch screens and installs. -->
     <link rel="icon" href="/admin/favicon.ico" sizes="any" />
-    <link rel="icon" type="image/png" href="/admin/icon.png" />
-    <link rel="apple-touch-icon" href="/admin/icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/admin/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/admin/apple-touch-icon.png" />
+    <link rel="manifest" href="/admin/manifest.json" />
     <script>
       // Pre-paint boot: apply theme and language before CSS loads, so there is no flash.
       (() => {

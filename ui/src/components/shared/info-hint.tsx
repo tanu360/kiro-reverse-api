@@ -22,7 +22,7 @@ export function InfoHint({
     <Popover>
       <PopoverTrigger
         className={cn(
-          "relative inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm text-left text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-popup-open:text-foreground",
+          "relative inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm text-left text-muted-foreground outline-none hover:text-foreground focus-outline data-popup-open:text-foreground",
           "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:top-1/2 pointer-coarse:after:h-11 pointer-coarse:after:min-w-11 pointer-coarse:after:-translate-y-1/2",
           className,
         )}

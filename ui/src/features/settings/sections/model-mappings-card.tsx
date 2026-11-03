@@ -348,8 +348,8 @@ function MappingRowItem({
       aria-label={t("modelMappings.rowLabel", { n: index + 1 })}
       className={cn(
         "relative flex items-start gap-2 rounded-lg bg-card sm:items-center",
-        isDragging && "z-10 shadow-lg ring-1 ring-border",
-        error && "rounded-lg ring-2 ring-destructive/60 ring-offset-2 ring-offset-card",
+        isDragging && "z-10 shadow-lg outline-1 outline-border",
+        error && "rounded-lg outline-1 outline-destructive/60 outline-offset-2",
       )}
       data-error={error || undefined}
       ref={setNodeRef}

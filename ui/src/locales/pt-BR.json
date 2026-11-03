@@ -39,7 +39,7 @@
   "table.selectAll": "Selecionar tudo",
   "table.selectRow": "Selecionar {label}",
   "toast.saved": "Configurações salvas",
-  "toast.copied": "Copiado",
+  "toast.copied": "Copiado para a área de transferência",
   "toast.copyFailed": "Não foi possível copiar",
   "unlimited": "Ilimitado",
   "none": "—",

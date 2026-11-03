@@ -52,7 +52,7 @@ function HintLabel({ label, hint }: { label: string; hint: string }): JSX.Elemen
   return (
     <Popover>
       <PopoverTrigger
-        className="relative inline-flex max-w-full items-center gap-1 rounded-sm text-left text-muted-foreground text-sm outline-none after:absolute after:top-1/2 after:left-1/2 after:size-full after:-translate-x-1/2 after:-translate-y-1/2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11"
+        className="relative inline-flex max-w-full items-center gap-1 rounded-sm text-left text-muted-foreground text-sm outline-none after:absolute after:top-1/2 after:left-1/2 after:size-full after:-translate-x-1/2 after:-translate-y-1/2 hover:text-foreground focus-outline pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11"
         data-slot="hint-trigger"
         delay={200}
         openOnHover
@@ -110,7 +110,7 @@ export function LiveTiles(): JSX.Element {
         {labels(t).map((tile) => (
           <Card className={TILE_CLASS} data-slot="live-tile" data-tile={tile.id} key={tile.id}>
             <TileLabel tile={tile} />
-            <dd className="mt-auto truncate font-medium text-2xl leading-tight tracking-tight tabular-nums">
+            <dd className="mt-auto truncate font-medium text-2xl leading-tight tabular-nums">
               {shown[tile.id] ?? EMPTY}
             </dd>
           </Card>

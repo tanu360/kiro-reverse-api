@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { JSX } from "react";
+import { AppIcon } from "@/components/shared/app-icon";
 import {
   Sidebar,
   SidebarContent,
@@ -40,13 +41,7 @@ export function AppSidebar(): JSX.Element {
               render={<Link to="/" />}
               tooltip={t("shell.appName")}
             >
-              <img
-                alt=""
-                className="size-5 shrink-0 rounded-sm"
-                height={20}
-                src="/admin/icon.webp"
-                width={20}
-              />
+              <AppIcon className="size-5 shrink-0 rounded-sm" size={20} />
               <span className="font-semibold text-base text-sidebar-foreground">
                 {t("shell.appName")}
               </span>

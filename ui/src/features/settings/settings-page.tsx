@@ -185,7 +185,7 @@ function SectionNav(): JSX.Element {
               <a
                 aria-current={current ? "true" : undefined}
                 className={cn(
-                  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border bg-background px-3 text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:min-h-8 lg:w-full lg:rounded-md lg:border-transparent lg:bg-transparent lg:px-2 lg:pointer-coarse:min-h-10",
+                  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border bg-background px-3 text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline lg:min-h-8 lg:w-full lg:rounded-md lg:border-transparent lg:bg-transparent lg:px-2 lg:pointer-coarse:min-h-10",
                   current &&
                     "border-foreground/24 bg-accent font-medium text-foreground lg:border-transparent lg:bg-accent",
                 )}

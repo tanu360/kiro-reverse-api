@@ -40,13 +40,13 @@ describe("Tabs", () => {
     }
   });
 
-  it("shows a focus ring on the tab panel, which is a tab stop", async () => {
+  it("shows a focus outline on the tab panel, which is a tab stop", async () => {
     const { user } = renderTabs();
     screen.getByRole("tab", { name: "Recent errors" }).focus();
     await user.tab();
     const panel = screen.getByRole("tabpanel");
     expect(document.activeElement).toBe(panel);
-    expect(panel.className).toContain("focus-visible:ring-2");
+    expect(panel.className).toContain("focus-outline");
   });
 });
 
