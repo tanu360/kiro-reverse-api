@@ -15,6 +15,7 @@
   "compatOpenAI": "Compatível com OpenAI",
   "compatAnthropic": "Compatível com Anthropic",
   "tagline": "Transforme contas Kiro em uma API compatível com OpenAI e Anthropic.",
+  "showcaseNote": "Várias contas entram, um só endpoint sai.",
   "secureHint": "Auto-hospedado. Sessão local criptografada. Sem telemetria.",
   "setupTitle": "Boas-vindas ao Kiro Proxy",
   "firstRunPassword": "Esta é a senha de administrador inicial. Entre com ela e depois altere-a em Configurações.",

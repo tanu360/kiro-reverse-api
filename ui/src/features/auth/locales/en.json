@@ -15,6 +15,7 @@
   "compatOpenAI": "OpenAI-compatible",
   "compatAnthropic": "Anthropic-compatible",
   "tagline": "Turn Kiro accounts into an OpenAI- and Anthropic-compatible API.",
+  "showcaseNote": "Many accounts in, one endpoint out.",
   "secureHint": "Self-hosted. Encrypted local session. No telemetry.",
   "setupTitle": "Welcome to Kiro Proxy",
   "firstRunPassword": "This is the first-run admin password. Sign in with it, then change it in Settings.",

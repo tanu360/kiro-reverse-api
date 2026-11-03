@@ -245,6 +245,26 @@
   --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
   --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
 
+  /* Sign-in showcase: the paper plane bobs and its dashed trail drifts (motion-safe only). */
+  --animate-plane-float: plane-float 5s ease-in-out infinite alternate;
+  --animate-flight-dash: flight-dash 2.4s linear infinite;
+
+  @keyframes plane-float {
+    from {
+      translate: 0 0;
+      rotate: 0deg;
+    }
+    to {
+      translate: 6px -8px;
+      rotate: -3deg;
+    }
+  }
+  @keyframes flight-dash {
+    to {
+      stroke-dashoffset: -16;
+    }
+  }
+
   @keyframes skeleton {
     to {
       background-position: -200% 0;

@@ -15,6 +15,7 @@
   "compatOpenAI": "Tương thích OpenAI",
   "compatAnthropic": "Tương thích Anthropic",
   "tagline": "Biến tài khoản Kiro thành API tương thích OpenAI và Anthropic.",
+  "showcaseNote": "Nhiều tài khoản vào, một endpoint ra.",
   "secureHint": "Tự host. Phiên cục bộ được mã hóa. Không có telemetry.",
   "setupTitle": "Chào mừng đến với Kiro Proxy",
   "firstRunPassword": "Đây là mật khẩu quản trị lần đầu. Đăng nhập bằng mật khẩu này, sau đó đổi trong Cài đặt.",

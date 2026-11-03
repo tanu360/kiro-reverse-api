@@ -15,6 +15,7 @@
   "compatOpenAI": "兼容 OpenAI",
   "compatAnthropic": "兼容 Anthropic",
   "tagline": "将 Kiro 账号转换为兼容 OpenAI 和 Anthropic 的 API。",
+  "showcaseNote": "多个账号进，一个端点出。",
   "secureHint": "自托管。本地加密会话。无遥测。",
   "setupTitle": "欢迎使用 Kiro Proxy",
   "firstRunPassword": "这是首次运行的管理员密码。请用它登录，然后在设置中修改。",
