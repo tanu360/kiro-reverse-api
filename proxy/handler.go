@@ -404,11 +404,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
 
 	case path == "/admin" || path == "/admin/":
-		h.serveAdminPage(w, r)
+		defaultAdminUI().ServeHTTP(w, r)
 	case strings.HasPrefix(path, "/admin/api/"):
 		h.handleAdminAPI(w, r)
 	case strings.HasPrefix(path, "/admin/"):
-		h.serveStaticFile(w, r)
+		defaultAdminUI().ServeHTTP(w, r)
 
 	case path == "/health" || path == "/":
 		h.handleHealth(w, r)
@@ -3920,21 +3920,6 @@ func (h *Handler) apiGetAccountModelsCached(w http.ResponseWriter, _ *http.Reque
 		"success": true,
 		"models":  models,
 	})
-}
-
-func (h *Handler) serveAdminPage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, "web/index.html")
-}
-
-func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/admin/")
-	if strings.HasPrefix(path, "vendor/") || path == "favicon.ico" {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	} else {
-		w.Header().Set("Cache-Control", "no-cache")
-	}
-	http.ServeFile(w, r, "web/"+path)
 }
 
 func (h *Handler) apiGetThinkingConfig(w http.ResponseWriter, _ *http.Request) {
