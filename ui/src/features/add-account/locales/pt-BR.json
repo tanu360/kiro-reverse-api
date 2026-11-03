@@ -47,7 +47,7 @@
   "builderid.userCode": "Seu código",
   "builderid.verifyUrl": "URL de verificação",
   "builderid.waiting": "Aguardando autorização…",
-  "builderid.reconnecting": "Conexão perdida. Tentando de novo…",
+  "builderid.reconnecting": "Conexão perdida. Tentando novamente…",
 
   "iam.startUrl": "URL inicial",
   "iam.startUrlPlaceholder": "https://xxx.awsapps.com/start",
@@ -56,8 +56,8 @@
   "iam.completeLogin": "Conclua o login no navegador e cole a URL de callback.",
   "iam.callbackUrlPlaceholder": "http://127.0.0.1:xxx/?code=...",
 
-  "microsoft.portalStep": "Passo 1: entre no portal do Kiro",
-  "microsoft.providerStep": "Passo 2: entre com a Microsoft",
+  "microsoft.portalStep": "Etapa 1: entre no portal do Kiro",
+  "microsoft.providerStep": "Etapa 2: entre com a Microsoft",
   "microsoft.callbackInstructions": "Abra o link e entre. Depois o navegador mostra uma página que não carrega em http://localhost:3128. Isso é esperado. Copie o endereço completo da barra de endereços e cole abaixo.",
   "microsoft.selectProfileDesc": "Esta conta tem mais de um perfil do Kiro. Escolha o que este proxy deve usar.",
   "microsoft.profileLabel": "Perfil do Kiro",
