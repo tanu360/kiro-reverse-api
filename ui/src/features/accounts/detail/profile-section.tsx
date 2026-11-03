@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { ScanSearchIcon } from "lucide-react";
+import { CircleCheckIcon, ScanSearchIcon } from "lucide-react";
 import { type JSX, useState } from "react";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
 import { Badge } from "@/components/ui/badge";
@@ -120,7 +120,9 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
                     <span className="flex flex-wrap items-center gap-2 font-medium text-sm">
                       <span className="break-all">{profile.name || profile.arn}</span>
                       {profile.current ? (
-                        <Badge variant="success">{t("detail.profileCurrent")}</Badge>
+                        <Badge icon={CircleCheckIcon} tone="success">
+                          {t("detail.profileCurrent")}
+                        </Badge>
                       ) : null}
                     </span>
                     <span className="text-muted-foreground text-xs">{profile.region}</span>

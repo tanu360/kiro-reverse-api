@@ -1,4 +1,15 @@
-import { DownloadIcon, EllipsisVerticalIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
+import {
+  ArchiveIcon,
+  CalendarClockIcon,
+  DownloadIcon,
+  EllipsisVerticalIcon,
+  HandIcon,
+  HistoryIcon,
+  type LucideIcon,
+  RotateCcwIcon,
+  SaveIcon,
+  Trash2Icon,
+} from "lucide-react";
 import {
   type JSX,
   type ReactNode,
@@ -120,10 +131,17 @@ function TimeCell({ entry }: { entry: BackupEntry }): JSX.Element {
   );
 }
 
+const KIND_ICONS: Record<string, LucideIcon> = {
+  manual: HandIcon,
+  scheduled: CalendarClockIcon,
+  auto: SaveIcon,
+  "pre-restore": HistoryIcon,
+};
+
 function KindBadge({ kind, t }: { kind: string; t: TFunction }): JSX.Element {
   const tone = kindTone(kind);
   return (
-    <Badge data-tone={tone} variant={tone}>
+    <Badge data-tone={tone} icon={KIND_ICONS[kind] ?? ArchiveIcon} iconStyle="line" tone={tone}>
       {kindLabel(kind, t)}
     </Badge>
   );

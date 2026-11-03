@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
+import { NetworkIcon } from "lucide-react";
 import {
   type JSX,
   type MouseEvent,
@@ -51,7 +52,7 @@ function ListeningOn(): JSX.Element | null {
   if (!data?.port) return null;
   const host = data.host?.includes(":") ? `[${data.host}]` : data.host || "0.0.0.0";
   return (
-    <Badge className="font-mono font-normal" variant="outline">
+    <Badge className="font-mono font-normal" icon={NetworkIcon} iconStyle="line" variant="outline">
       {t("listeningOn", { address: `${host}:${data.port}` })}
     </Badge>
   );

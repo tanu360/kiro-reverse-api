@@ -1,3 +1,4 @@
+import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 import { type JSX, useMemo } from "react";
 import type { DataTableColumn } from "@/components/shared/data-table";
 import { DisplayEmail } from "@/components/shared/display-email";
@@ -18,9 +19,15 @@ function Muted({ children = EMPTY }: { children?: string }): JSX.Element {
 
 export function StatusBadge({ record }: { record: RequestRecord }): JSX.Element {
   const { t } = useT("requests");
-  if (record.success) return <Badge variant="success">{t("ok")}</Badge>;
+  if (record.success) {
+    return (
+      <Badge icon={CircleCheckIcon} tone="success">
+        {t("ok")}
+      </Badge>
+    );
+  }
   return (
-    <Badge variant="error">
+    <Badge className="tabular-nums" icon={CircleXIcon} tone="destructive">
       {t("fail")}
       {record.status ? ` ${record.status}` : ""}
     </Badge>

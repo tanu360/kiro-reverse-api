@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlusIcon, XIcon } from "lucide-react";
+import { PlusIcon, RegexIcon, TextSearchIcon, XIcon } from "lucide-react";
 import { type JSX, useId } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -178,6 +178,7 @@ function RuleCard({
   const invalid = regex && regexFails(rule.match);
   const ruleLabel = t("promptFilter.ruleLabel", { n: index + 1 });
   const typeLabel = regex ? t("promptFilter.typeRegex") : t("promptFilter.typeContains");
+  const TypeIcon = regex ? RegexIcon : TextSearchIcon;
 
   return (
     <li
@@ -201,7 +202,12 @@ function RuleCard({
           placeholder={t("promptFilter.unnamed")}
           value={rule.name}
         />
-        <Badge className="hidden shrink-0 sm:inline-flex" variant="secondary">
+        <Badge
+          className="hidden shrink-0 sm:inline-flex"
+          icon={TypeIcon}
+          iconStyle="line"
+          tone="neutral"
+        >
           {typeLabel}
         </Badge>
         <Button
@@ -216,7 +222,7 @@ function RuleCard({
         </Button>
       </div>
       {/* On phones the type moves under the header so the name keeps its width. */}
-      <Badge className="self-start sm:hidden" variant="secondary">
+      <Badge className="self-start sm:hidden" icon={TypeIcon} iconStyle="line" tone="neutral">
         {typeLabel}
       </Badge>
       <div className={cn("grid gap-3", regex && "sm:grid-cols-2")}>

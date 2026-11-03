@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon, CircleCheckIcon, ListIcon } from "lucide-react";
+import { ArrowRightIcon, CircleCheckIcon, CircleXIcon, ListIcon } from "lucide-react";
 import { type JSX, type ReactNode, useMemo, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { DisplayEmail } from "@/components/shared/display-email";
@@ -92,7 +92,7 @@ function MobileCard({
 function ErrorStatus({ row }: { row: ObserveError }): JSX.Element {
   if (!row.status) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
-    <Badge className="tabular-nums" variant="error">
+    <Badge className="tabular-nums" icon={CircleXIcon} tone="destructive">
       {row.status}
     </Badge>
   );
@@ -196,9 +196,15 @@ function ErrorsPanel(): JSX.Element {
 
 function RequestStatus({ row }: { row: RequestRecord }): JSX.Element {
   const { t } = useT("overview");
-  if (row.success) return <Badge variant="success">{t("activity.succeeded")}</Badge>;
+  if (row.success) {
+    return (
+      <Badge icon={CircleCheckIcon} tone="success">
+        {t("activity.succeeded")}
+      </Badge>
+    );
+  }
   return (
-    <Badge className="tabular-nums" variant="error">
+    <Badge className="tabular-nums" icon={CircleXIcon} tone="destructive">
       {t("activity.failed")}
       {row.status ? ` ${row.status}` : ""}
     </Badge>

@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  CircleAlertIcon,
   CircleCheckIcon,
-  CircleOffIcon,
+  CircleSlashIcon,
   EllipsisIcon,
-  GaugeIcon,
   KeyRoundIcon,
   PencilIcon,
   PlusIcon,
@@ -20,7 +20,7 @@ import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
-import { Badge, badgeVariants } from "@/components/ui/badge";
+import { Badge, BadgeIcon, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
@@ -370,13 +370,11 @@ function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       {apiKey.enabled ? (
-        <Badge variant="success">
-          <CircleCheckIcon aria-hidden="true" />
+        <Badge icon={CircleCheckIcon} tone="success">
           {t("common:status.enabled")}
         </Badge>
       ) : (
-        <Badge variant="secondary">
-          <CircleOffIcon aria-hidden="true" />
+        <Badge icon={CircleSlashIcon} tone="neutral">
           {t("common:status.disabled")}
         </Badge>
       )}
@@ -390,14 +388,14 @@ function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
             render={
               <button
                 className={cn(
-                  badgeVariants({ variant: "warning" }),
-                  "cursor-pointer pointer-coarse:after:absolute pointer-coarse:after:min-h-10 pointer-coarse:after:min-w-10 relative",
+                  badgeVariants({ tone: "warning" }),
+                  "pointer-coarse:after:min-h-10 pointer-coarse:after:min-w-10",
                 )}
                 type="button"
               />
             }
           >
-            <GaugeIcon aria-hidden="true" />
+            <BadgeIcon icon={CircleAlertIcon} />
             {t("keys.limitReached")}
           </PopoverTrigger>
           <PopoverPopup className="max-w-64 text-sm" tooltipStyle>

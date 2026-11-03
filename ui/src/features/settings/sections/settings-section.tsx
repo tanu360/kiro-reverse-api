@@ -1,5 +1,12 @@
 import { type UseQueryResult, useMutation } from "@tanstack/react-query";
-import { EyeIcon, EyeOffIcon, InfoIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  EyeIcon,
+  EyeOffIcon,
+  InfoIcon,
+  ToggleLeftIcon,
+  ToggleRightIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import {
   createContext,
   type FormEvent,
@@ -89,7 +96,12 @@ export function LearnMore({ children }: { children: ReactNode }): JSX.Element {
 export function DefaultTag({ on }: { on: boolean }): JSX.Element {
   const { t } = useT("settings");
   return (
-    <Badge className="font-normal text-muted-foreground" variant="outline">
+    <Badge
+      className="font-normal text-muted-foreground"
+      icon={on ? ToggleRightIcon : ToggleLeftIcon}
+      iconStyle="line"
+      variant="outline"
+    >
       {on ? t("defaultOn") : t("defaultOff")}
     </Badge>
   );

@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowDownLeftIcon,
+  ArrowUpRightIcon,
   ChartColumnIcon,
   CodeIcon,
+  GlobeIcon,
   KeyRoundIcon,
   LayersIcon,
   type LucideIcon,
@@ -100,7 +103,11 @@ export function EndpointsCard(): JSX.Element {
 
   return (
     <SectionCard
-      actions={<Badge variant="outline">{t("endpoints.protocolHttp")}</Badge>}
+      actions={
+        <Badge icon={GlobeIcon} iconStyle="line" variant="outline">
+          {t("endpoints.protocolHttp")}
+        </Badge>
+      }
       description={t("endpoints.description")}
       footer={
         <p className="flex items-start gap-2 text-muted-foreground text-sm">
@@ -129,7 +136,10 @@ export function EndpointsCard(): JSX.Element {
                 <span className="min-w-0 truncate font-medium text-sm">{t(endpoint.titleKey)}</span>
                 <Badge
                   className="ms-auto font-mono"
-                  variant={endpoint.method === "POST" ? "info" : "success"}
+                  icon={endpoint.method === "POST" ? ArrowUpRightIcon : ArrowDownLeftIcon}
+                  iconStyle="line"
+                  tone={endpoint.method === "POST" ? "primary" : "success"}
+                  variant="soft-outline"
                 >
                   {endpoint.method === "POST"
                     ? t("endpoints.methodPost")

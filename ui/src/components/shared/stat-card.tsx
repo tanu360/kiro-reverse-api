@@ -50,14 +50,12 @@ function DeltaBadge({ delta }: { delta: NonNullable<StatCardProps["delta"]> }): 
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <Badge
-        className={cn(
-          "h-5 gap-1 rounded-full px-2 tabular-nums",
-          tone === "bad" && "bg-destructive/10 text-destructive-foreground dark:bg-destructive/20",
-        )}
+        className="tabular-nums"
         data-tone={tone}
-        variant={tone === "good" ? "default" : tone === "bad" ? "error" : "secondary"}
+        icon={Icon}
+        iconStyle="line"
+        tone={tone === "good" ? "success" : tone === "bad" ? "destructive" : "neutral"}
       >
-        <Icon aria-hidden="true" className="size-3" />
         {formatDelta(delta.value)}
       </Badge>
       <span className="text-muted-foreground text-xs">{delta.label}</span>

@@ -1,10 +1,16 @@
 import "@fontsource-variable/caveat";
 import "@fontsource/patrick-hand/latin.css";
 import "@fontsource/patrick-hand/vietnamese.css";
-import { PlugIcon } from "lucide-react";
+import {
+  CircleAlertIcon,
+  CircleCheckIcon,
+  ClockIcon,
+  type LucideIcon,
+  PlugIcon,
+} from "lucide-react";
 import type { CSSProperties, JSX } from "react";
 import { NAV_ITEMS } from "@/components/layout/nav-items";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
 import type { Lang } from "@/lib/i18n";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -72,11 +78,11 @@ const SAMPLE_ACCOUNTS: readonly {
   { email: "team***@company.dev", plan: "pro", health: "active", used: 48, requests: 7204 },
 ];
 
-const HEALTH_VARIANT = {
-  active: "success",
-  outOfCredits: "warning",
-  expired: "error",
-} as const satisfies Record<Health, "success" | "warning" | "error">;
+const HEALTH_PILL = {
+  active: { tone: "success", icon: CircleCheckIcon },
+  outOfCredits: { tone: "warning", icon: CircleAlertIcon },
+  expired: { tone: "warning", icon: ClockIcon },
+} as const satisfies Record<Health, { tone: BadgeTone; icon: LucideIcon }>;
 
 const PREVIEW_NAV = NAV_ITEMS.filter((item) =>
   ["overview", "accounts", "requests"].includes(item.id),
@@ -258,13 +264,13 @@ function AccountsPreview(): JSX.Element {
                 <td className="py-3 pr-4">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{row.email}</span>
-                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
+                    <Badge tone={row.plan === "free" ? "neutral" : "primary"}>
                       {tAccounts(`subscription.${row.plan}`)}
-                    </span>
+                    </Badge>
                   </div>
                 </td>
                 <td className="py-3 pr-4">
-                  <Badge variant={HEALTH_VARIANT[row.health]}>
+                  <Badge icon={HEALTH_PILL[row.health].icon} tone={HEALTH_PILL[row.health].tone}>
                     {tAccounts(`health.${row.health}`)}
                   </Badge>
                 </td>

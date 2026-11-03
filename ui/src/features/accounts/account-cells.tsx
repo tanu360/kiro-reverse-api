@@ -1,6 +1,24 @@
+import {
+  CircleAlertIcon,
+  CircleCheckIcon,
+  CircleDashedIcon,
+  CircleMinusIcon,
+  CirclePauseIcon,
+  CircleSlashIcon,
+  CircleXIcon,
+  ClockIcon,
+  HourglassIcon,
+  KeyRoundIcon,
+  type LucideIcon,
+  SparklesIcon,
+  StarIcon,
+  TagIcon,
+  WeightIcon,
+  ZapIcon,
+} from "lucide-react";
 import type { JSX } from "react";
 import { DisplayEmail } from "@/components/shared/display-email";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeTone, type BadgeVariant } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterLabel, MeterTrack } from "@/components/ui/meter";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
@@ -13,6 +31,7 @@ import {
   creditTone,
   formatCreditAmount,
   formatTokenExpiry,
+  type HealthKind,
   healthBadges,
   type SubscriptionTier,
   subscriptionLabel,
@@ -22,11 +41,24 @@ import {
   usagePercent,
 } from "./account-model";
 
-const TIER_VARIANT: Record<SubscriptionTier, "default" | "info" | "secondary" | "outline"> = {
-  power: "default",
-  proPlus: "info",
-  pro: "secondary",
-  free: "outline",
+/** Plans climb from a plain outline (Free) to a solid purple pill (Power). */
+const TIER_PILL: Record<
+  SubscriptionTier,
+  { tone: BadgeTone; variant: BadgeVariant; icon: LucideIcon }
+> = {
+  power: { tone: "primary", variant: "solid", icon: ZapIcon },
+  proPlus: { tone: "primary", variant: "soft-outline", icon: SparklesIcon },
+  pro: { tone: "primary", variant: "soft", icon: StarIcon },
+  free: { tone: "neutral", variant: "outline", icon: CircleDashedIcon },
+};
+
+const HEALTH_PILL: Record<HealthKind, { tone: BadgeTone; icon: LucideIcon }> = {
+  active: { tone: "success", icon: CircleCheckIcon },
+  banned: { tone: "destructive", icon: CircleXIcon },
+  suspended: { tone: "warning", icon: CirclePauseIcon },
+  noToken: { tone: "destructive", icon: CircleMinusIcon },
+  expired: { tone: "warning", icon: ClockIcon },
+  outOfCredits: { tone: "warning", icon: CircleAlertIcon },
 };
 
 /** Email (masked under privacy) with the nickname as a muted second line. */
@@ -54,16 +86,26 @@ export function AccountBadges({
   const { t } = useT("accounts");
   const tier = subscriptionTier(account.subscriptionType);
   const overage = (account.overageStatus ?? "").toUpperCase();
+  const pill = tier ? TIER_PILL[tier] : null;
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
-      <Badge variant={tier ? TIER_VARIANT[tier] : "outline"}>
+      <Badge
+        icon={pill?.icon ?? TagIcon}
+        iconStyle="line"
+        tone={pill?.tone ?? "neutral"}
+        variant={pill?.variant ?? "outline"}
+      >
         {subscriptionLabel(account.subscriptionType, t)}
       </Badge>
       {account.trialStatus === "ACTIVE" && account.trialUsageLimit > 0 ? (
-        <Badge variant="info">{t("trial")}</Badge>
+        <Badge icon={HourglassIcon} iconStyle="line" tone="info">
+          {t("trial")}
+        </Badge>
       ) : null}
       {account.weight >= 2 ? (
-        <Badge variant="warning">{t("weightShort", { weight: account.weight })}</Badge>
+        <Badge icon={WeightIcon} iconStyle="line" tone="warning">
+          {t("weightShort", { weight: account.weight })}
+        </Badge>
       ) : null}
       {overage === "ENABLED" || overage === "DISABLED" ? (
         <Tooltip>
@@ -72,7 +114,9 @@ export function AccountBadges({
             render={
               <Badge
                 className={cn(overage === "DISABLED" && "text-muted-foreground")}
-                variant={overage === "ENABLED" ? "success" : "outline"}
+                icon={overage === "ENABLED" ? CircleCheckIcon : CircleSlashIcon}
+                tone={overage === "ENABLED" ? "success" : "neutral"}
+                variant={overage === "ENABLED" ? "soft" : "outline"}
               />
             }
           >
@@ -84,7 +128,9 @@ export function AccountBadges({
           <TooltipPopup>{overage === "ENABLED" ? t("overageOn") : t("overageOff")}</TooltipPopup>
         </Tooltip>
       ) : null}
-      <Badge variant="outline">{authLabel(account, t)}</Badge>
+      <Badge icon={KeyRoundIcon} iconStyle="line" variant="outline">
+        {authLabel(account, t)}
+      </Badge>
     </div>
   );
 }
@@ -96,7 +142,11 @@ export function HealthBadges({ account }: { account: Account }): JSX.Element {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {badges.map((badge) => (
-        <Badge key={badge.kind} variant={badge.tone}>
+        <Badge
+          icon={HEALTH_PILL[badge.kind].icon}
+          key={badge.kind}
+          tone={HEALTH_PILL[badge.kind].tone}
+        >
           {t(`health.${badge.kind}`)}
         </Badge>
       ))}

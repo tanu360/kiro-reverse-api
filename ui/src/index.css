@@ -198,6 +198,22 @@
   background-size: var(--surface-grain-size);
 }
 
+/*
+ * Pill disc icons (components/ui/badge.tsx): a circled lucide icon (CircleCheck, CircleX,
+ * Clock…) becomes a filled circle in the tone colour with its glyph knocked out, a little
+ * heavier so it holds up at 12-14 px. The colours come from the pill's --badge-dot/--badge-glyph.
+ */
+[data-badge-icon="disc"] {
+  stroke-width: 2.5;
+}
+[data-badge-icon="disc"] > circle[r="10"] {
+  fill: var(--badge-dot);
+  stroke: var(--badge-dot);
+}
+[data-badge-icon="disc"] > :not(circle[r="10"]) {
+  stroke: var(--badge-glyph);
+}
+
 @theme inline {
   --font-sans:
     "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;

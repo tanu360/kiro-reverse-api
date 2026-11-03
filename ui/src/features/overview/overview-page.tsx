@@ -24,7 +24,7 @@ import { TrafficHeatmap } from "./traffic-heatmap";
 function LiveBadge(): JSX.Element {
   const { t } = useT();
   const status = useAdminEventsStatus();
-  const variant = status === "open" ? "success" : status === "connecting" ? "warning" : "secondary";
+  const tone = status === "open" ? "success" : status === "connecting" ? "warning" : "neutral";
   const label =
     status === "open"
       ? t("status.live")
@@ -32,14 +32,14 @@ function LiveBadge(): JSX.Element {
         ? t("status.reconnecting")
         : t("status.offline");
   return (
-    <Badge aria-live="polite" data-status={status} variant={variant}>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "size-1.5 rounded-full bg-current",
-          status === "open" && "motion-safe:animate-pulse",
-        )}
-      />
+    <Badge aria-live="polite" className="ps-1.5" data-status={status} tone={tone}>
+      {/* A dot in the disc colour; while live, a ring pings out of it. */}
+      <span aria-hidden="true" className="relative flex size-2">
+        {status === "open" ? (
+          <span className="absolute inset-0 rounded-full bg-(--badge-dot) opacity-60 motion-safe:animate-ping" />
+        ) : null}
+        <span className="relative size-2 rounded-full bg-(--badge-dot)" />
+      </span>
       {label}
     </Badge>
   );
