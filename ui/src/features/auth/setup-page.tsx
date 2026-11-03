@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { firstRunQuery } from "@/lib/api/session";
-import { isAuthenticated } from "@/lib/auth/session";
+import { isAuthenticated, subscribeSession } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { AuthLayout } from "./auth-layout";
@@ -35,9 +35,17 @@ export function SetupPage(): JSX.Element {
   }, [password, navigate]);
 
   const onSignedIn = () => {
-    toast.info(t("changePasswordToast"), {
+    const id = toast.info(t("changePasswordToast"), {
       duration: CHANGE_PASSWORD_TOAST_MS,
       action: { label: t("openSettings"), onClick: () => void navigate({ to: "/settings" }) },
+    });
+    // The hint only makes sense while signed in. When this session ends (sign-out, expiry,
+    // restore) it goes too, so it never sits on the sign-in page pointing at Settings. The
+    // listener removes itself then; dismissing a toast that already timed out does nothing.
+    const stop = subscribeSession((session) => {
+      if (session) return;
+      toast.dismiss(id);
+      stop();
     });
   };
 
