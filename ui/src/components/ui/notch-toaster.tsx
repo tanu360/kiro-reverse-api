@@ -29,6 +29,8 @@
  * - Kiro patch: Escape inside a dialog or menu closes that first, not the toast.
  * - Kiro patch: an always-mounted live region announces toasts (a region added together with
  *   its text is often not read), and the styles live in index.css, not an injected <style>.
+ *   It also keeps the toaster readable while a modal dialog is open: Base UI aria-hides the
+ *   page outside a modal popup but skips [aria-live] subtrees present when the popup opens.
  */
 
 import {
@@ -385,7 +387,8 @@ export function NotchToaster({
     >
       {/*
         Always mounted, so a toast added inside is announced (a live region that arrives with
-        its text often is not). Errors interrupt; everything else waits its turn.
+        its text often is not). Errors interrupt; everything else waits its turn. Being mounted
+        before any dialog opens is also what keeps it out of the dialog's aria-hidden.
       */}
       <div aria-live={record?.type === "error" ? "assertive" : "polite"}>
         <AnimatePresence initial={false}>

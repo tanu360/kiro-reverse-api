@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { JSX } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+import { Dialog, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { I18nProvider, useLanguage } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { AppToaster } from "./app-toasts";
@@ -139,5 +140,43 @@ describe("AppToaster", () => {
     (document.activeElement as HTMLElement).blur();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByText("Save failed")).toBeNull());
+  });
+
+  it("stays exposed to assistive tech while a modal dialog hides the page behind it", async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nProvider initialLang="en">
+        <main>
+          <button type="button">behind</button>
+        </main>
+        <Dialog defaultOpen>
+          <DialogPopup>
+            <DialogTitle>Add account</DialogTitle>
+            <button type="button">inside</button>
+          </DialogPopup>
+        </Dialog>
+        <AppToaster />
+      </I18nProvider>,
+    );
+    await screen.findByRole("dialog");
+    // The modal hides the page from assistive tech; the toaster's always-mounted live region
+    // is one of the nodes it keeps (Base UI's markOthers skips [aria-live] subtrees).
+    await waitFor(() => expect(screen.queryByRole("button", { name: "behind" })).toBeNull());
+    act(() => {
+      toast.error("Sign-in failed");
+    });
+    expect(await screen.findByText("Sign-in failed")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Notifications" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dismiss notification" })).toBeInTheDocument();
+    expect(screen.getByText("Sign-in failed").closest('[aria-hidden="true"]')).toBeNull();
+
+    // The dialog keeps Tab inside it, so the keyboard path is Escape for the dialog, then
+    // Escape again (or Tab) for the toast, which stays until then.
+    screen.getByRole("button", { name: "inside" }).focus();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByText("Sign-in failed")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByText("Sign-in failed")).toBeNull());
   });
 });
