@@ -53,7 +53,7 @@ function Copyright(): JSX.Element {
   const name = t("shell.appName");
   const at = line.lastIndexOf(name);
   return (
-    <p className="text-center text-muted-foreground text-sm tabular-nums">
+    <p className="text-center text-[13px] text-muted-foreground tabular-nums">
       {at < 0 ? (
         line
       ) : (
