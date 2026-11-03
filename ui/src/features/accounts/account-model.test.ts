@@ -7,10 +7,13 @@ import {
   creditTone,
   filterAccounts,
   formatAuthMethod,
+  formatCreditAmount,
+  formatResetDate,
   healthBadges,
   isBanned,
   isValidMachineId,
   isValidProxyUrl,
+  planLabel,
   sortModels,
   statusCounts,
   subscriptionLabel,
@@ -295,5 +298,44 @@ describe("sortModels", () => {
       "claude-sonnet-4.6",
       "claude-opus-5",
     ]);
+  });
+});
+
+describe("formatCreditAmount", () => {
+  it("groups thousands and keeps at most one decimal", () => {
+    expect(formatCreditAmount(1488.92, "en")).toBe("1,488.9");
+    expect(formatCreditAmount(9200, "en")).toBe("9,200");
+    expect(formatCreditAmount(312.48, "en")).toBe("312.5");
+    expect(formatCreditAmount(0, "en")).toBe("0");
+  });
+
+  it("treats a non-number as zero", () => {
+    expect(formatCreditAmount(Number.NaN, "en")).toBe("0");
+  });
+});
+
+describe("formatResetDate", () => {
+  it("formats a calendar day as a medium date, in UTC", () => {
+    expect(formatResetDate("2026-12-01", "en")).toBe("Dec 1, 2026");
+  });
+
+  it("shows a dash for an empty date and keeps unparsable text", () => {
+    expect(formatResetDate("", "en")).toBe("—");
+    expect(formatResetDate("soon", "en")).toBe("soon");
+  });
+});
+
+describe("planLabel", () => {
+  it("uses the list badge label for a known plan, not the raw server title", () => {
+    const account = {
+      subscriptionType: "Q_DEVELOPER_STANDALONE_PRO",
+      subscriptionTitle: "KIRO PRO",
+    };
+    expect(planLabel(account, t)).toBe("subscription.pro");
+  });
+
+  it("falls back to the server title for an unknown plan", () => {
+    const account = { subscriptionType: "ENTERPRISE_X", subscriptionTitle: "Kiro Team" };
+    expect(planLabel(account, t)).toBe("Kiro Team");
   });
 });

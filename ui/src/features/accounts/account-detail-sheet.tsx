@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { JSX } from "react";
+import { type JSX, useRef } from "react";
 import {
   Sheet,
   SheetDescription,
@@ -12,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-media-query";
 import { accountsQuery } from "@/lib/api/accounts";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
+import { cn } from "@/lib/utils";
 import { isApiKeyAccount } from "./account-model";
 import { BasicSection } from "./detail/basic-section";
 import { MachineIdSection } from "./detail/machine-id-section";
@@ -41,12 +42,17 @@ export function AccountDetailSheet({
   const displayEmail = useDisplayEmail();
   const { data } = useQuery(accountsQuery());
   const account = data?.find((item) => item.id === accountId);
+  const popupRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open && account !== undefined}>
+      {/* Focus starts on the sheet itself, not the Nickname field: an input would open the
+          on-screen keyboard over half the sheet on phones. Tab still reaches the first field. */}
       <SheetPopup
-        className={isMobile ? "h-full" : "max-w-none sm:max-w-xl"}
+        className={cn("outline-none", isMobile ? "h-full" : "max-w-none sm:max-w-xl")}
         closeProps={{ "aria-label": tc("actions.close") }}
+        initialFocus={popupRef}
+        ref={popupRef}
         side={isMobile ? "bottom" : "right"}
       >
         <SheetHeader>

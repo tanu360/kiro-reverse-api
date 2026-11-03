@@ -1,8 +1,8 @@
-// Pure helpers for the Accounts page. Rules follow the old UI (web/app.js) unless noted.
+// Pure helpers for the Accounts page. Rules keep the old admin panel's behaviour unless noted.
 
 import type { Account, AccountFull, ExportData, ModelInfo } from "@/lib/api/types";
 import { EMPTY } from "@/lib/format";
-import type { TFunction } from "@/lib/i18n";
+import type { Lang, TFunction } from "@/lib/i18n";
 import type { AccountStatusFilter } from "@/routes/-search";
 
 const DAY_MS = 86_400_000;
@@ -147,6 +147,49 @@ export function usagePercent(fraction: number): number {
   const pct = Number(fraction) * 100;
   if (!Number.isFinite(pct)) return 0;
   return Math.min(100, Math.max(0, pct));
+}
+
+function intlLocale(lang?: Lang): string {
+  return lang === "zh" ? "zh-CN" : "en-US";
+}
+
+/** Grouped credits with at most one decimal ("1,488.9", "9,200"), like every other count. */
+export function formatCreditAmount(value: number, lang?: Lang): string {
+  const n = Number(value);
+  return new Intl.NumberFormat(intlLocale(lang), { maximumFractionDigits: 1 }).format(
+    Number.isFinite(n) ? n : 0,
+  );
+}
+
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A reset date as a medium date in the active language. A bare `YYYY-MM-DD` is a calendar day,
+ * so it is formatted in UTC and never shifts with the viewer's time zone. Unparsable text is kept.
+ */
+export function formatResetDate(value: string, lang?: Lang): string {
+  const text = (value ?? "").trim();
+  if (!text) return EMPTY;
+  const dateOnly = DATE_ONLY_PATTERN.exec(text);
+  const date = dateOnly
+    ? new Date(Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])))
+    : new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+  return new Intl.DateTimeFormat(intlLocale(lang), {
+    dateStyle: "medium",
+    ...(dateOnly ? { timeZone: "UTC" } : {}),
+  }).format(date);
+}
+
+/** Plan name as the list badge shows it; an unknown type falls back to the server's title. */
+export function planLabel(
+  account: Pick<Account, "subscriptionType" | "subscriptionTitle">,
+  t: TFunction,
+): string {
+  if (subscriptionTier(account.subscriptionType)) {
+    return subscriptionLabel(account.subscriptionType, t);
+  }
+  return account.subscriptionTitle || account.subscriptionType || EMPTY;
 }
 
 export type CreditTone = "default" | "warning" | "destructive";

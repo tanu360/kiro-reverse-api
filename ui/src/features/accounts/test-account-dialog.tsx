@@ -30,6 +30,21 @@ interface LogLine {
   time: string;
   type: LogType;
   text: string;
+  /** A model id inside `text` that must not wrap at its hyphens ("claude-" / "sonnet-4.6"). */
+  keep?: string;
+}
+
+/** The line text with its `keep` part (first match) on one line; the rest wraps as usual. */
+function LogText({ text, keep }: { text: string; keep?: string }): JSX.Element {
+  const at = keep ? text.indexOf(keep) : -1;
+  if (!keep || at < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, at)}
+      <span className="whitespace-nowrap">{keep}</span>
+      {text.slice(at + keep.length)}
+    </>
+  );
 }
 
 const LOG_CLASS: Record<LogType, string> = {
@@ -88,12 +103,13 @@ export function TestAccountDialog({
     if (log) log.scrollTop = log.scrollHeight;
   }, [lines]);
 
-  const append = (type: LogType, text: string) => {
+  const append = (type: LogType, text: string, keep?: string) => {
     const line: LogLine = {
       id: nextIdRef.current++,
       time: new Date().toLocaleTimeString(),
       type,
       text,
+      keep,
     };
     setLines((current) => [...current, line].slice(-MAX_LOG_LINES));
   };
@@ -105,7 +121,7 @@ export function TestAccountDialog({
     const email = displayEmail(account.email, account.id);
     const proxy = account.proxyURL || t("test.globalProxy");
     const target = modelValue.trim() || DEFAULT_TEST_MODEL;
-    append("info", t("testLog.start", { email, model: target, proxy }));
+    append("info", t("testLog.start", { email, model: target, proxy }), target);
     const started = Date.now();
     const seconds = () => ((Date.now() - started) / 1000).toFixed(1);
     try {
@@ -201,6 +217,7 @@ export function TestAccountDialog({
               placeholder={t("test.modelPlaceholder")}
               showTrigger={models.length > 0}
               spellCheck={false}
+              triggerProps={{ "aria-label": t("test.showModels") }}
             />
             <AutocompletePopup>
               <AutocompleteEmpty>{t("test.noModelMatches")}</AutocompleteEmpty>
@@ -252,7 +269,7 @@ export function TestAccountDialog({
                   key={line.id}
                 >
                   <span className="me-2 text-muted-foreground">{line.time}</span>
-                  {line.text}
+                  <LogText keep={line.keep} text={line.text} />
                 </li>
               ))}
             </ol>

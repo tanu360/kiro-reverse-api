@@ -10,6 +10,7 @@ import {
   authLabel,
   type CreditTone,
   creditTone,
+  formatCreditAmount,
   formatTokenExpiry,
   healthBadges,
   type SubscriptionTier,
@@ -65,17 +66,19 @@ export function AccountBadges({
       ) : null}
       {overage === "ENABLED" || overage === "DISABLED" ? (
         <Tooltip>
+          {/* Not a tab stop: the tooltip is a hover hint, and the state is in the sr-only text. */}
           <TooltipTrigger
             render={
               <Badge
-                aria-label={overage === "ENABLED" ? t("overageOn") : t("overageOff")}
                 className={cn(overage === "DISABLED" && "text-muted-foreground")}
-                tabIndex={0}
                 variant={overage === "ENABLED" ? "success" : "outline"}
               />
             }
           >
-            {t("overage")}
+            <span aria-hidden="true">{t("overage")}</span>
+            <span className="sr-only">
+              {overage === "ENABLED" ? t("overageOn") : t("overageOff")}
+            </span>
           </TooltipTrigger>
           <TooltipPopup>{overage === "ENABLED" ? t("overageOn") : t("overageOff")}</TooltipPopup>
         </Tooltip>
@@ -108,39 +111,55 @@ const TONE_CLASS: Record<CreditTone, string> = {
 
 function CreditMeter({
   label,
+  hideLabel = false,
   hint,
   current,
   limit,
   fraction,
 }: {
   label: string;
+  /** Keeps the label for screen readers only, when a column header already names it. */
+  hideLabel?: boolean;
   hint?: string;
   current: number;
   limit: number;
   fraction: number;
 }): JSX.Element {
+  const { lang } = useT("accounts");
   const pct = usagePercent(fraction);
   return (
     <Meter className="min-w-36 gap-1" max={100} min={0} value={pct}>
       <div className="flex items-baseline justify-between gap-2 text-xs">
-        <MeterLabel className="font-normal text-muted-foreground text-xs">
+        <MeterLabel
+          className={cn("font-normal text-muted-foreground text-xs", hideLabel && "sr-only")}
+        >
           {label}
           {hint ? <span className="ms-1 text-warning-foreground">{hint}</span> : null}
         </MeterLabel>
-        <span className="text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+        <span className="ms-auto text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
       </div>
       <MeterTrack className="h-1.5 rounded-full">
         <MeterIndicator className={cn("rounded-full", TONE_CLASS[creditTone(pct)])} />
       </MeterTrack>
       <span className="text-xs tabular-nums">
-        {Number(current).toFixed(1)} / {Number(limit).toFixed(0)}
+        {formatCreditAmount(current, lang)} / {formatCreditAmount(limit, lang)}
       </span>
     </Meter>
   );
 }
 
-/** Plan credits, and trial credits when the account has a trial allowance. */
-export function CreditMeters({ account }: { account: Account }): JSX.Element | null {
+/**
+ * Plan credits, and trial credits when the account has a trial allowance. `compact` (the table,
+ * whose column header already says "Plan credits") hides the plan label unless a trial meter
+ * sits under it.
+ */
+export function CreditMeters({
+  account,
+  compact = false,
+}: {
+  account: Account;
+  compact?: boolean;
+}): JSX.Element | null {
   const { t } = useT("accounts");
   const hasPlan = account.usageLimit > 0;
   const hasTrial = account.trialUsageLimit > 0;
@@ -160,6 +179,7 @@ export function CreditMeters({ account }: { account: Account }): JSX.Element | n
         <CreditMeter
           current={account.usageCurrent}
           fraction={account.usagePercent}
+          hideLabel={compact && !hasTrial}
           label={t("planCredits")}
           limit={account.usageLimit}
         />

@@ -12,7 +12,7 @@ import { EMPTY, formatDateTime, formatUsd } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { overageCapable, overageEnabled } from "../account-model";
-import { DetailSection } from "./detail-section";
+import { DetailSection, TOUCH_BUTTON } from "./detail-section";
 
 /** Merges an overage snapshot (not a full Account) into the cached list row. */
 function useMergeOverage(accountId: string): (snapshot: OverageResponse) => void {
@@ -90,7 +90,13 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
   return (
     <DetailSection
       actions={
-        <Button loading={sync.isPending} onClick={() => sync.mutate()} size="sm" variant="outline">
+        <Button
+          loading={sync.isPending}
+          onClick={() => sync.mutate()}
+          className={TOUCH_BUTTON}
+          size="sm"
+          variant="outline"
+        >
           <CloudDownloadIcon aria-hidden="true" />
           {t("detail.overageRefresh")}
         </Button>

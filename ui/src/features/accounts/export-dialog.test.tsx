@@ -61,4 +61,14 @@ describe("ExportDialog", () => {
     expect(filename).toMatch(/^kiro-accounts-\d{4}-\d{2}-\d{2}\.json$/);
     expect((data as { accounts: unknown[] }).accounts).toHaveLength(mockDb.accounts.length);
   });
+
+  it("focuses the JSON once Show JSON renders it, so it is in view on phones", async () => {
+    const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
+    const { dialog, user } = await openExport();
+    await user.click(within(dialog).getByRole("button", { name: "Show JSON" }));
+    const json = await within(dialog).findByRole("textbox", { name: "Export JSON" });
+    await waitFor(() => expect(json).toHaveFocus());
+    expect(scrolled.mock.contexts).toContain(json);
+    scrolled.mockRestore();
+  });
 });

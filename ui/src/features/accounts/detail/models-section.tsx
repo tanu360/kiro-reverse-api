@@ -8,7 +8,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { modelRate, sortModels } from "../account-model";
-import { DetailSection } from "./detail-section";
+import { DetailSection, TOUCH_BUTTON } from "./detail-section";
 
 /** Live model list (GET /models updates the server cache) and a route-cache refresh. */
 export function ModelsSection({ accountId }: { accountId: string }): JSX.Element {
@@ -44,6 +44,7 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
           <Button
             loading={load.isPending}
             onClick={() => load.mutate()}
+            className={TOUCH_BUTTON}
             size="sm"
             variant="outline"
           >
@@ -53,6 +54,7 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
           <Button
             loading={refresh.isPending}
             onClick={() => refresh.mutate()}
+            className={TOUCH_BUTTON}
             size="sm"
             variant="outline"
           >

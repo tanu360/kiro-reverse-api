@@ -8,8 +8,9 @@ import { generateMachineId } from "@/lib/api/system";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { isValidMachineId } from "../account-model";
-import { DetailSection, useSaveAccountField } from "./detail-section";
+import { DetailSection, TOUCH_BUTTON, TOUCH_INPUT, useSaveAccountField } from "./detail-section";
 
 export function MachineIdSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
@@ -47,7 +48,7 @@ export function MachineIdSection({ account }: { account: Account }): JSX.Element
           <div className="flex w-full flex-col gap-2 sm:flex-row">
             <Input
               autoComplete="off"
-              className="font-mono"
+              className={cn("font-mono", TOUCH_INPUT)}
               onChange={(event) => {
                 setValue(event.target.value);
                 if (error) setError(null);
@@ -58,7 +59,7 @@ export function MachineIdSection({ account }: { account: Account }): JSX.Element
             />
             <div className="flex gap-2">
               <Button
-                className="flex-1"
+                className={cn("flex-1", TOUCH_BUTTON)}
                 loading={generate.isPending}
                 onClick={() => generate.mutate()}
                 variant="outline"
@@ -66,7 +67,12 @@ export function MachineIdSection({ account }: { account: Account }): JSX.Element
                 <WandSparklesIcon aria-hidden="true" />
                 {t("detail.generate")}
               </Button>
-              <Button className="flex-1" loading={save.isPending} type="submit" variant="outline">
+              <Button
+                className={cn("flex-1", TOUCH_BUTTON)}
+                loading={save.isPending}
+                type="submit"
+                variant="outline"
+              >
                 {t("detail.save")}
               </Button>
             </div>

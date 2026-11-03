@@ -150,4 +150,26 @@ describe("AccountDetailSheet", () => {
     expect(items[1]).toHaveTextContent("claude-haiku-4.5");
     expect(items[1]).toHaveTextContent("0.4x credit");
   });
+
+  it("starts focus on the sheet, not an input that would open the phone keyboard", async () => {
+    const { sheet } = await openSheet(dana());
+    await waitFor(() => expect(sheet).toHaveFocus());
+    expect(document.activeElement?.tagName).not.toBe("INPUT");
+  });
+
+  it("shows the plan as the list does and the reset date and credits in the UI locale", async () => {
+    const account = dana();
+    const { sheet } = await openSheet(account);
+    const subscription = section(sheet, "Subscription");
+    expect(within(subscription).getByText("Pro")).toBeInTheDocument();
+    expect(within(subscription).queryByText("KIRO PRO")).not.toBeInTheDocument();
+    const [year, month, day] = account.nextResetDate.split("-").map(Number);
+    const reset = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(
+      new Date(Date.UTC(year, month - 1, day)),
+    );
+    expect(within(subscription).getByText(reset)).toBeInTheDocument();
+    expect(within(subscription).getByText("450 / 1,000")).toBeInTheDocument();
+    // Same one-decimal credits as the list ("312.5", not "312.48").
+    expect(within(section(sheet, "Statistics")).getByText("312.5")).toBeInTheDocument();
+  });
 });
