@@ -20,6 +20,13 @@ import type { ListLayout } from "./use-list-layout";
 
 const SKELETON_CARDS = 4;
 
+/**
+ * Low-priority columns show only when the list is FULL_TABLE_WIDTH (1,100 px) wide or more. The
+ * `accounts` container is the list wrapper in accounts-page.tsx. The detail sheet and the cards
+ * still show these values.
+ */
+const WIDE_ONLY = "hidden @[1100px]/accounts:table-cell";
+
 interface AccountsTableProps extends RowActionHandlers {
   accounts: Account[];
   /** From the list container's width (see useListLayout). */
@@ -30,7 +37,10 @@ interface AccountsTableProps extends RowActionHandlers {
   emptyState: ReactNode;
 }
 
-/** A table when the list has room for every column, cards otherwise. Server order, no paging. */
+/**
+ * A table from the `md` width of the list up (low-priority columns only from 1,100 px), cards
+ * below. Server order, no paging.
+ */
 export function AccountsTable(props: AccountsTableProps): JSX.Element {
   return props.layout === "cards" ? <AccountCards {...props} /> : <AccountsDataTable {...props} />;
 }
@@ -75,6 +85,8 @@ function AccountsDataTable({
       {
         id: "requests",
         header: t("columns.requests"),
+        className: WIDE_ONLY,
+        headerClassName: WIDE_ONLY,
         align: "end",
         cell: (account) => (
           <span className="tabular-nums">{formatNumber(account.requestCount, lang)}</span>
@@ -83,6 +95,8 @@ function AccountsDataTable({
       {
         id: "tokens",
         header: t("columns.tokens"),
+        className: WIDE_ONLY,
+        headerClassName: WIDE_ONLY,
         align: "end",
         cell: (account) => (
           <span className="tabular-nums">{formatCompact(account.totalTokens)}</span>
@@ -91,6 +105,8 @@ function AccountsDataTable({
       {
         id: "credits",
         header: t("columns.credits"),
+        className: WIDE_ONLY,
+        headerClassName: WIDE_ONLY,
         align: "end",
         cell: (account) => (
           <span className="tabular-nums">{formatCreditAmount(account.totalCredits, lang)}</span>
@@ -99,6 +115,8 @@ function AccountsDataTable({
       {
         id: "expiry",
         header: t("columns.expiry"),
+        className: WIDE_ONLY,
+        headerClassName: WIDE_ONLY,
         cell: (account) => <TokenExpiryText account={account} />,
       },
       {
@@ -110,6 +128,8 @@ function AccountsDataTable({
         id: "actions",
         header: <span className="sr-only">{tc("table.actions")}</span>,
         align: "end",
+        // Pinned, so the row actions stay in reach if a long translation makes the table scroll.
+        sticky: "end",
         cell: (account) => (
           <AccountRowActions account={account} onDetails={onDetails} onTest={onTest} />
         ),

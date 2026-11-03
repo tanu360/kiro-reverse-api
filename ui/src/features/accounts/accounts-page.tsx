@@ -305,7 +305,8 @@ export function AccountsPage(): JSX.Element {
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-col gap-4 md:gap-6" ref={listRef}>
+      {/* The accounts container hides low-priority table columns on narrower lists. */}
+      <div className="@container/accounts flex min-w-0 flex-col gap-4 md:gap-6" ref={listRef}>
         {query.isError && !query.data ? (
           <Card>
             <ErrorState

@@ -206,8 +206,6 @@ export function DataTable<T>({
     );
   }
 
-  const columnCount = columns.length + (selection ? 1 : 0);
-
   // The empty state sits under the table, outside its horizontal scroller, so it stays centred
   // in the visible width instead of across the full scroll width of a wide table.
   return (
@@ -282,9 +280,14 @@ export function DataTable<T>({
             ? Array.from({ length: SKELETON_ROWS }, (_, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
                 <TableRow aria-hidden="true" className="hover:bg-transparent" key={index}>
-                  {Array.from({ length: columnCount }, (_, cell) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cells never reorder.
-                    <TableCell key={cell}>
+                  {selection ? (
+                    <TableCell className="w-px">
+                      <Skeleton className="size-4" />
+                    </TableCell>
+                  ) : null}
+                  {/* Column classes too, so a column hidden by a breakpoint stays hidden here. */}
+                  {columns.map((column) => (
+                    <TableCell className={column.className} key={column.id}>
                       <Skeleton className="h-4 w-full max-w-32" />
                     </TableCell>
                   ))}

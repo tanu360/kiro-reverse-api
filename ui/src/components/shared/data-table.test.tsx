@@ -252,6 +252,26 @@ describe("DataTable", () => {
     expect(screen.getByRole("columnheader", { name: "Name" }).className).toContain("left-0");
   });
 
+  it("gives loading rows one cell per column, with each column's classes", () => {
+    const columns = [COLUMNS[0], { ...COLUMNS[1], className: "hidden wide:table-cell" }];
+    const { container } = renderWithProviders(
+      <DataTable
+        columns={columns}
+        data={[]}
+        getRowId={(row) => row.id}
+        loading
+        selection={{ selected: new Set(), onChange: () => {}, rowLabel: (row) => row.name }}
+      />,
+    );
+    const row = container.querySelector('tbody tr[aria-hidden="true"]') as HTMLElement;
+    const cells = row.querySelectorAll("td");
+    // The selection cell, then one per column; a column hidden by a breakpoint stays hidden.
+    expect(cells).toHaveLength(3);
+    expect(cells[0]).toHaveClass("w-px");
+    expect(cells[2]).toHaveClass("hidden", "wide:table-cell");
+    expect(cells[1]).not.toHaveClass("hidden");
+  });
+
   it("leaves rows unfocusable without onRowClick", () => {
     renderWithProviders(<DataTable columns={COLUMNS} data={ROWS} getRowId={(row) => row.id} />);
     expect(screen.getByRole("row", { name: /Alpha/ })).not.toHaveAttribute("tabindex");

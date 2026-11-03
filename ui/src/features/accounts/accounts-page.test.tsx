@@ -211,10 +211,29 @@ describe("AccountsPage", () => {
 });
 
 describe("AccountsPage layout", () => {
-  it("shows cards when the list is narrower than the table, even on a wide viewport", async () => {
-    mockElementWidth(900);
+  it("shows cards when the list is narrower than md, even on a wide viewport", async () => {
+    mockElementWidth(700);
     await renderCards();
     expect(screen.queryByRole("table", { name: "Accounts" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the table on a laptop-width list (1366 px window, sidebar open)", async () => {
+    mockElementWidth(976);
+    const { table } = await renderAccounts();
+    expect(screen.queryByRole("list", { name: "Accounts" })).not.toBeInTheDocument();
+    // jsdom has no container queries, so check the classes that hide the columns under 1,100 px.
+    const header = (name: string) => within(table).getByRole("columnheader", { name });
+    for (const name of ["Requests", "Tokens", "Credits", "Token expiry"]) {
+      expect(header(name)).toHaveClass("hidden", "@[1100px]/accounts:table-cell");
+    }
+    for (const name of ["Account", "Status", "Plan credits", "Enabled"]) {
+      expect(header(name)).not.toHaveClass("hidden");
+    }
+    // The list is the query container those classes name.
+    expect(table.closest(".\\@container\\/accounts")).not.toBeNull();
+    // Row actions stay pinned to the right edge.
+    const actions = within(bodyRows(table)[0]).getAllByRole("cell").at(-1) as HTMLElement;
+    expect(actions).toHaveClass("sticky", "right-0");
   });
 
   it("shows the table when the list has room for every column", async () => {
