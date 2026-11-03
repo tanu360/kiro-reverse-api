@@ -192,8 +192,9 @@ async function mockDbStrings(page: Page): Promise<string[]> {
 }
 
 async function expectAllTranslated(page: Page, serverStrings: Set<string>, label: string) {
-  // Charts and lists render after their queries settle.
-  await page.waitForLoadState("networkidle");
+  // Charts and lists render after their queries settle. Live polling can keep the network
+  // busy, so networkidle is a bounded wait.
+  await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
   await page.waitForTimeout(500);
   for (const value of await mockDbStrings(page)) serverStrings.add(value);
   const leaks = await page.evaluate(collectLeaks, { open: OPEN, close: CLOSE });
@@ -218,6 +219,8 @@ async function signIn(page: Page): Promise<void> {
 
 test.describe("pseudo locale", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
+  // Nine pages or seven overlays, each checked after its data loads.
+  test.setTimeout(120_000);
 
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -317,7 +320,7 @@ test.describe("pseudo locale", () => {
 
     // Requests: request detail sheet.
     await page.goto("/admin/requests");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
     // Enter on a focused row opens it (a click may land on a cell's own control).
     await page.locator('main#main tbody tr[tabindex="0"]').first().press("Enter");
     await expect(page.getByRole("dialog")).toBeVisible();
