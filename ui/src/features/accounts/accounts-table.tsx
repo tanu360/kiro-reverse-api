@@ -68,6 +68,8 @@ function AccountsDataTable({
       {
         id: "credits-plan",
         header: t("columns.planCredits"),
+        // Lets a long translated header wrap instead of widening the meter column.
+        headerClassName: "whitespace-normal leading-tight",
         cell: (account) => <CreditMeters account={account} compact />,
       },
       {

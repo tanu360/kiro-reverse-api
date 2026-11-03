@@ -130,12 +130,15 @@ function CreditMeter({
   const pct = usagePercent(fraction);
   return (
     <Meter className="min-w-36 gap-1" max={100} min={0} value={pct}>
-      <div className="flex items-baseline justify-between gap-2 text-xs">
+      {/* Wraps inside the table's nowrap cells, so a long translated label does not widen the column. */}
+      <div className="flex items-baseline justify-between gap-2 whitespace-normal text-xs leading-snug">
         <MeterLabel
           className={cn("font-normal text-muted-foreground text-xs", hideLabel && "sr-only")}
         >
           {label}
-          {hint ? <span className="ms-1 text-warning-foreground">{hint}</span> : null}
+          {/* A real space, not a margin, so the hint can move to its own line. */}
+          {hint ? " " : null}
+          {hint ? <span className="whitespace-nowrap text-warning-foreground">{hint}</span> : null}
         </MeterLabel>
         <span className="ms-auto text-muted-foreground tabular-nums">
           {formatFraction(pct / 100, 1)}
