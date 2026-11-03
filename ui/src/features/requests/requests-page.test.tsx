@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { formatDateTime, formatTime } from "@/lib/format";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
@@ -8,6 +9,7 @@ import { maskEmail, maskEmailsInText } from "@/lib/privacy";
 import { toastError } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 import { inMemoryRequestsHandler } from "./mocks";
+import { formatRowDate } from "./request-model";
 
 vi.mock("@/lib/toast", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/toast")>();
@@ -193,6 +195,52 @@ describe("RequestsPage", () => {
     expect(within(dialog).getByText("2 of 25 on this page")).toBeInTheDocument();
   });
 
+  it("focuses the sheet itself on open, so one Escape closes it", async () => {
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    const row = bodyRows()[0];
+    row.focus();
+    await user.keyboard("{Enter}");
+    const dialog = await screen.findByRole("dialog");
+    // The first tabbable control is a copy button with a tooltip; it must not take focus.
+    await waitFor(() => expect(dialog).toHaveFocus());
+    expect(within(dialog).getByRole("button", { name: "Copy account ID" })).not.toHaveFocus();
+    expect(document.querySelector("[data-slot=tooltip-popup]")).toBeNull();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(row).toHaveFocus();
+  });
+
+  it("focuses the sheet, not a copy button, when a row is clicked", async () => {
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    await user.click(within(bodyRows()[0]).getAllByRole("cell")[4]);
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialog).toHaveFocus());
+  });
+
+  it("opens the search hint on click, so a tap works on touch screens", async () => {
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    expect(screen.queryByText(/Search also matches the full API key/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "About search" }));
+    expect(await screen.findByText(/Search also matches the full API key/)).toBeVisible();
+  });
+
+  it("shows the time over a short date and keeps the full date in the title", async () => {
+    await renderApp("/requests");
+    await waitForRows();
+    const record = mockDb.requests[0];
+    const timeCell = within(bodyRows()[0]).getAllByRole("cell")[0];
+    expect(timeCell).toHaveTextContent(formatTime(record.ts, "en"));
+    expect(timeCell).toHaveTextContent(formatRowDate(record.ts, "en"));
+    expect(timeCell.querySelector("[title]")).toHaveAttribute(
+      "title",
+      formatDateTime(record.ts, "en"),
+    );
+  });
+
   it("masks emails when privacy mode is on", async () => {
     await renderApp("/requests", { privacy: true });
     await waitForRows();
@@ -239,7 +287,9 @@ describe("RequestsPage", () => {
   it("shows No matches with a Clear filters action", async () => {
     const { user, router } = await renderApp("/requests?search=no-such-request&status=failed");
     expect(await screen.findByText("No matches")).toBeInTheDocument();
-    expect(screen.getByText("0–0 of 0")).toBeInTheDocument();
+    // Nothing to page through, so no "0–0 of 0" footer and no disabled Previous/Next.
+    expect(screen.queryByText("0–0 of 0")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(router.state.location.search).toEqual({}));
     await waitForRows();
@@ -253,6 +303,8 @@ describe("RequestsPage", () => {
     expect(
       screen.getByText("Requests appear here once a client calls the proxy."),
     ).toBeInTheDocument();
+    expect(screen.queryByText("0–0 of 0")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
   });
 
   it("offers the first page when the page is out of range", async () => {

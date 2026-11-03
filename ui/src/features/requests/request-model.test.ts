@@ -3,6 +3,7 @@ import type { RequestRecord } from "@/lib/api/types";
 import {
   cleanSearch,
   errorTypeTone,
+  formatRowDate,
   normalizeApiKeyMask,
   rowKey,
   toQueryParams,
@@ -139,5 +140,22 @@ describe("cleanSearch", () => {
 
   it("keeps the sort and its order together when either differs from the default", () => {
     expect(cleanSearch({ sort: "model", order: "desc" })).toEqual({ sort: "model", order: "desc" });
+  });
+});
+
+describe("formatRowDate", () => {
+  // 2026-11-03 12:00 local time, and the same day a year earlier.
+  const thisYear = new Date(2026, 10, 3, 12).getTime() / 1000;
+  const lastYear = new Date(2025, 10, 3, 12).getTime() / 1000;
+  const now = new Date(2026, 10, 4, 9);
+
+  it("drops the year for rows from the current year", () => {
+    expect(formatRowDate(thisYear, "en", now)).toBe("Nov 3");
+    expect(formatRowDate(thisYear, "zh", now)).toBe("11月3日");
+  });
+
+  it("keeps the year for older rows", () => {
+    expect(formatRowDate(lastYear, "en", now)).toBe("Nov 3, 2025");
+    expect(formatRowDate(lastYear, "zh", now)).toBe("2025年11月3日");
   });
 });
