@@ -1,0 +1,88 @@
+import { type FormEvent, type JSX, useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { importCredentials } from "@/lib/api/auth-flows";
+import { errorMessage } from "@/lib/api/server-errors";
+import type { AddedAccountRef } from "@/lib/api/types";
+import { useT } from "@/lib/i18n";
+import { toast } from "@/lib/toast";
+import { FormField, HelpText, RegionField, SubmitButton } from "../fields";
+import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
+import { parseApiKeyLines } from "../lib/api-key-lines";
+import { parseRegion } from "../lib/region";
+import { showBatchResult } from "../result-toast";
+
+/** Kiro CLI API keys, one per line, imported one request at a time. */
+export function ApiKeyFlow(): JSX.Element {
+  const { t } = useT("add-account");
+  const { sessions, finishAdd } = useFlow();
+  const formId = useFormId();
+  const [keys, setKeys] = useState("");
+  const [region, setRegion] = useState("us-east-1");
+  const [errors, setErrors] = useState<{ keys?: string; region?: string }>({});
+  const [pending, setPending] = useState(false);
+  useReportBusy(pending);
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (pending) return;
+    // The server checks that the region is one Kiro API keys support.
+    const parsed = parseRegion(region);
+    const requests = parseApiKeyLines(keys, parsed.ok ? parsed.region : "");
+    const nextErrors = {
+      keys: requests.length ? undefined : t("apikey.keyMissing"),
+      region: parsed.ok ? undefined : t("regionInvalid"),
+    };
+    setErrors(nextErrors);
+    if (nextErrors.keys || !parsed.ok) return;
+    const generation = sessions.generation;
+    setPending(true);
+    const added: AddedAccountRef[] = [];
+    const failures: string[] = [];
+    try {
+      for (const request of requests) {
+        try {
+          const res = await importCredentials(request);
+          added.push(res.account);
+        } catch (caught) {
+          failures.push(errorMessage(caught, t));
+        }
+        if (!sessions.isCurrent(generation)) return;
+      }
+      if (added.length === 0) {
+        toast.error(t("failed", { error: failures[0] ?? "" }));
+        return;
+      }
+      showBatchResult(t, added.length, failures);
+      finishAdd(added);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
+      <HelpText>{t("apikey.help")}</HelpText>
+      <FormField error={errors.keys} hint={t("apikey.keysHint")} label={t("apikey.keysLabel")}>
+        <Textarea
+          autoComplete="off"
+          className="font-mono"
+          disabled={pending}
+          onChange={(event) => setKeys(event.target.value)}
+          placeholder={"ksk_...\nksk_...|eu-central-1"}
+          spellCheck={false}
+          value={keys}
+        />
+      </FormField>
+      <RegionField
+        disabled={pending}
+        error={errors.region}
+        hint={t("apikey.regionHint")}
+        onChange={setRegion}
+        value={region}
+      />
+      <FlowFooter>
+        <SubmitButton busy={pending} busyLabel={t("adding")} formId={formId} label={t("add")} />
+      </FlowFooter>
+    </form>
+  );
+}
