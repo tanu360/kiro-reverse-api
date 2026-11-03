@@ -18,6 +18,18 @@ describe("SetupPage", () => {
     expect(screen.getByText("It is shown until the first successful sign-in.")).toBeInTheDocument();
   });
 
+  it("hides and shows the generated password, and copies it either way", async () => {
+    const { user } = await renderApp("/setup", { authed: false });
+    await screen.findByText(PASSWORD);
+    expect(screen.getByText("Admin password")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Hide admin password" }));
+    expect(screen.queryByText(PASSWORD)).not.toBeInTheDocument();
+    expect(screen.getByText("••••••••")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy password" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show admin password" }));
+    expect(screen.getByText(PASSWORD)).toBeInTheDocument();
+  });
+
   it("does not fill the password into the field", async () => {
     await renderApp("/setup", { authed: false });
     await screen.findByText(PASSWORD);
