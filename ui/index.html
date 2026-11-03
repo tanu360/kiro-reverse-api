@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kiro Proxy</title>
+    <link rel="icon" href="/admin/favicon.ico" />
+    <script>
+      // Pre-paint boot: apply theme and language before CSS loads, so there is no flash.
+      (() => {
+        const root = document.documentElement;
+        const read = (key) => {
+          try {
+            return localStorage.getItem(key);
+          } catch {
+            return null;
+          }
+        };
+        const storedTheme = read("kiro_theme");
+        const theme =
+          storedTheme === "light" || storedTheme === "dark" || storedTheme === "system"
+            ? storedTheme
+            : "system";
+        let dark = theme === "dark";
+        if (theme === "system") {
+          try {
+            dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          } catch {
+            dark = false;
+          }
+        }
+        root.classList.toggle("dark", dark);
+        root.style.colorScheme = dark ? "dark" : "light";
+        const storedLang = read("kiro_lang");
+        const navLang = (navigator.language || "").toLowerCase();
+        root.lang =
+          storedLang === "en" || storedLang === "zh"
+            ? storedLang
+            : navLang.startsWith("zh")
+              ? "zh"
+              : "en";
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

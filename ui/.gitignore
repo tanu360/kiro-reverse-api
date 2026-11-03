@@ -1,0 +1,7 @@
+node_modules
+dist/*
+!dist/.keep
+test-results
+playwright-report
+e2e/.output
+*.local
