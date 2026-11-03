@@ -102,14 +102,16 @@ func TestAdminRejectsNewAPIKeyAccountOutsideKiroRegions(t *testing.T) {
 }
 
 func TestAdminUILocalizesRegionErrors(t *testing.T) {
-	data, err := os.ReadFile("../web/app.js")
+	const path = "../ui/src/lib/api/server-errors.ts"
+	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read app.js: %v", err)
+		t.Fatalf("read server-errors.ts: %v", err)
 	}
-	//! localizedError matches server messages verbatim, so a reworded error would silently lose its translation.
+	src := string(data)
+	//! SERVER_ERROR_KEYS matches server messages verbatim, so a reworded error would silently lose its translation.
 	for _, msg := range []string{config.ErrInvalidRegion.Error(), config.ErrUnsupportedKiroAPIKeyRegion.Error()} {
-		if !strings.Contains(string(data), "'"+msg+"'") {
-			t.Errorf("web/app.js localizedError has no entry for %q", msg)
+		if !strings.Contains(src, "'"+msg+"'") && !strings.Contains(src, `"`+msg+`"`) {
+			t.Errorf("%s SERVER_ERROR_KEYS has no entry for %q", path, msg)
 		}
 	}
 }

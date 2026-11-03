@@ -38,7 +38,7 @@
 1. Pools multiple Kiro accounts and load-balances requests with round-robin.
 2. Translates Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, and OpenAI `/v1/responses` calls to and from Kiro upstream.
 3. Refreshes access tokens automatically and streams Server-Sent Events end-to-end.
-4. Ships with a polished web admin panel for account management, observability, and request audit.
+4. Ships with a React admin panel, embedded in the binary, for account management, observability, and request audit.
 
 > [!IMPORTANT]
 > Single-binary local proxy. **Not** a hosted service, **not** affiliated with Amazon, AWS, or Kiro. You must own or be authorized to use every account you add to the pool.
@@ -61,57 +61,57 @@ If this project helps you, a Star would mean a lot.
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/monitor-dark.webp">
-        <img alt="Live Monitor" src="screenshots/monitor-light.webp" width="100%">
+        <img alt="Overview" src="screenshots/monitor-light.webp" width="100%">
       </picture>
-      <br><sub><b>Live Monitor</b> — RPM, error rate, traffic heatmap</sub>
+      <br><sub><b>Overview</b> — live traffic, model mix and account health</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/accounts-dark.webp">
-        <img alt="Account Pool" src="screenshots/accounts-light.webp" width="100%">
+        <img alt="Accounts" src="screenshots/accounts-light.webp" width="100%">
       </picture>
-      <br><sub><b>Account Pool</b> — multi-account, round-robin, auto-refresh</sub>
+      <br><sub><b>Accounts</b> — batch actions, detail, test and export</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/requests-dark.webp">
-        <img alt="Request Log" src="screenshots/requests-light.webp" width="100%">
+        <img alt="Requests" src="screenshots/requests-light.webp" width="100%">
       </picture>
-      <br><sub><b>Request Log</b> — paginated search, filters, full audit</sub>
+      <br><sub><b>Requests</b> — search, filters, sorting and a detail view</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/api-dark.webp">
-        <img alt="API Playground" src="screenshots/api-light.webp" width="100%">
+        <img alt="API" src="screenshots/api-light.webp" width="100%">
       </picture>
-      <br><sub><b>API Playground</b> — test endpoints inside the panel</sub>
+      <br><sub><b>API</b> — endpoints, API keys and client setup</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/backups-dark.webp">
         <img alt="Backups" src="screenshots/backups-light.webp" width="100%">
       </picture>
-      <br><sub><b>Backups</b> — snapshots, schedules, one-click restore</sub>
+      <br><sub><b>Backups</b> — manual and scheduled backups, one-click restore</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/proxy-dark.webp">
-        <img alt="Outbound Proxy" src="screenshots/proxy-light.webp" width="100%">
+        <img alt="Outbound proxy" src="screenshots/proxy-light.webp" width="100%">
       </picture>
-      <br><sub><b>Outbound Proxy</b> — SOCKS5 / HTTP, hot-swap without restart</sub>
+      <br><sub><b>Outbound proxy</b> — SOCKS5 or HTTP, applied without a restart</sub>
     </td>
     <td width="50%" align="center">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="screenshots/settings-dark.webp">
         <img alt="Settings" src="screenshots/settings-light.webp" width="100%">
       </picture>
-      <br><sub><b>Settings</b> — thinking mode, theme, i18n, admin</sub>
+      <br><sub><b>Settings</b> — thinking, model mappings, prompt filter, admin password</sub>
     </td>
   </tr>
 </table>
@@ -137,14 +137,14 @@ If this project helps you, a Star would mean a lot.
 
 ### 🛡 Admin panel
 
-- Live observability: RPM, error rate, model mix, traffic heatmap.
-- Request log with paginated search, status/API-key filters, masked API-key column, sorting, and SQLite-backed history.
-- Managed client API keys with optional custom key values, enable/disable, per-key token and credit limits, and usage reset.
-- Dashboard cards split Kiro account quota usage from proxy/app request usage.
-- In-panel API playground for testing endpoints without leaving the UI.
-- Snapshots and scheduled backups with one-click restore.
-- Theme-aware UI (light / dark / system) with cache-friendly headers.
-- i18n: English and 简体中文 ship in-tree.
+- React single-page app embedded in the binary; no separate web server to run.
+- Overview dashboard with charts: traffic over time, model mix, and a per-account heatmap. Its cards keep Kiro account credit usage apart from proxy request usage.
+- Accounts with batch actions, a detail view, connection tests, and export.
+- Requests log with search, status and API-key filters, sorting, a detail view, masked API keys, and SQLite-backed history.
+- API page with client API key management (optional custom key values, enable/disable, per-key token and credit limits, usage reset) and client setup snippets for curl, Claude Code, Codex, and the OpenAI SDK.
+- Settings for thinking, model mappings, outbound proxy, and more; Backups with a schedule and one-click restore.
+- Light, dark, and system theme; English and 简体中文.
+- Works from phones to desktops.
 
 ### 🌐 Networking
 
@@ -164,6 +164,7 @@ If this project helps you, a Star would mean a lot.
 | Component | Version              |
 | --------- | -------------------- |
 | Go        | 1.25 +               |
+| Node.js   | 22 + with pnpm (only to build the admin UI from source) |
 | OS        | Linux / macOS        |
 | Container | Docker 24+ optional  |
 | Storage   | Local volume on disk |
@@ -197,9 +198,23 @@ docker run -d \
 ```bash
 git clone https://github.com/tanu360/kiro-reverse-api.git
 cd kiro-reverse-api
+cd ui && pnpm install && pnpm build && cd ..
 go build -o kiro-proxy .
 ./kiro-proxy
 ```
+
+The admin UI needs Node.js 22+ and pnpm to build. `go build` embeds whatever is in `ui/dist`: without the UI build, `/admin` shows a "UI not built" page while the API keeps working. The Docker image builds both.
+
+### 🎨 Admin UI development
+
+Run these from `ui/`:
+
+| Command         | What it does                                                                    |
+| --------------- | ------------------------------------------------------------------------------- |
+| `pnpm dev`      | Dev server on `http://localhost:5173/admin/`; proxies `/admin/api` and `/v1` to `127.0.0.1:8080` |
+| `pnpm dev:mock` | Dev server with mock data and no backend; sign in with password `12345678`       |
+| `pnpm test`     | Unit and component tests (Vitest)                                               |
+| `pnpm test:e2e` | Browser smoke tests against mock mode (Playwright)                              |
 
 > [!TIP]
 > `kiro.db` is auto-created on first launch. Set `DATA_DIR` to store it somewhere else; Docker uses `/app/state`. Set `ADMIN_PASSWORD` to choose the admin password. Otherwise, the first launch generates a random 8-digit password, saves it, and prints it once in the startup logs. The login page shows it until the first successful sign-in. Docker users can read it with `docker compose logs kiro-proxy`. Restarts retain the saved password. An unclaimed 48-character password from an older version is replaced once with an 8-digit password; passwords already used to sign in or explicitly configured are preserved.
@@ -258,13 +273,13 @@ curl http://localhost:8080/v1/responses \
 | `DELETE` | `/v1/responses/{id}`            | Delete a stored response                      |
 | `GET`    | `/v1/models`                    | List available models                         |
 | `GET`    | `/v1/stats`                     | Aggregate proxy usage statistics              |
-| `GET`    | `/admin`                        | Web admin panel                               |
+| `GET`    | `/admin`                        | Web admin panel (embedded SPA; deep links under `/admin/*` fall back to the app) |
 
 ---
 
 ## 🔑 Managed API Keys
 
-Enable API key verification from **Settings → API Settings**. You can create multiple client keys with independent limits:
+Require API keys from the **API** page (**API access → Require an API key**). You can create multiple client keys with independent limits:
 
 - Leave **Custom Key** blank to auto-generate a secure `sk-...` key, or enter your own key value.
 - Lists and request logs show masked keys such as `sk-clb****e4yo`; the full key remains stored for authentication and copying from key detail.
@@ -299,13 +314,13 @@ Claude-compatible requests that include a top-level `thinking` config also enabl
 { "type": "adaptive" }
 ```
 
-Output format is configured in **Settings → Thinking Mode** in the admin panel.
+Output format is configured in **Settings → Thinking** in the admin panel.
 
 ---
 
 ## 🛰 Outbound Proxy
 
-For users in restricted network regions, configure an outbound proxy in the admin panel under **Settings → Outbound Proxy Settings**.
+For users in restricted network regions, configure an outbound proxy in the admin panel under **Settings → Outbound proxy**.
 
 | Type     | Example                       |
 | -------- | ----------------------------- |
@@ -337,6 +352,8 @@ For users in restricted network regions, configure an outbound proxy in the admi
 ## 🙏 Project Credits
 
 This project is a continuation of [Quorinex/Kiro-Go](https://github.com/Quorinex/Kiro-Go). Due credit for the original work belongs to the original author; I am continuing and maintaining it forward.
+
+The admin UI builds on open-source work from [Studio Admin](https://github.com/arhamkhnz/next-shadcn-admin-dashboard), [t3code](https://github.com/pingdotgg/t3code), [coss ui](https://github.com/cosscom/ui), [Bklit UI](https://github.com/bklit/bklit-ui) and [openstatus data-table-filters](https://github.com/openstatusHQ/data-table-filters). See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for their licenses.
 
 ---
 
