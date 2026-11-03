@@ -54,7 +54,7 @@ async function renderPage() {
   const result = renderWithProviders(<SettingsPage />);
   // The last card to load is enough: every query resolves in the same tick in tests.
   await screen.findByRole("switch", { name: "Allow overage" });
-  await screen.findAllByRole("textbox", { name: "Match contains" });
+  await screen.findAllByRole("textbox", { name: "Model name contains" });
   await screen.findByLabelText("Trigger suffix");
   await screen.findByRole("button", { name: "Add regex rule" });
   await screen.findByText("Preferred endpoint");
@@ -125,12 +125,12 @@ describe("SettingsPage", () => {
     it("adds an empty row at the top and focuses it", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.modelMappings);
-      const before = within(card).getAllByRole("textbox", { name: "Match contains" });
+      const before = within(card).getAllByRole("textbox", { name: "Model name contains" });
       expect(before).toHaveLength(9);
 
       await user.click(within(card).getByRole("button", { name: "Add mapping" }));
 
-      const after = within(card).getAllByRole("textbox", { name: "Match contains" });
+      const after = within(card).getAllByRole("textbox", { name: "Model name contains" });
       expect(after).toHaveLength(10);
       expect(after[0]).toHaveValue("");
       expect(after[1]).toHaveValue("claude-sonnet-4-20250514");
@@ -144,7 +144,7 @@ describe("SettingsPage", () => {
       await user.click(within(card).getByRole("button", { name: "Add mapping" }));
       // A blank row stays blank: it is dropped before sending, so indexes shift.
       await user.click(within(card).getByRole("button", { name: "Add mapping" }));
-      const sources = within(card).getAllByRole("textbox", { name: "Match contains" });
+      const sources = within(card).getAllByRole("textbox", { name: "Model name contains" });
       const targets = within(card).getAllByRole("textbox", { name: "Map to" });
       await user.type(sources[1], "GPT-5");
       await user.type(targets[1], "claude-opus-5");
@@ -165,7 +165,7 @@ describe("SettingsPage", () => {
       // Sent index 7 is the built-in gpt-5 row, local row 8 after the two added rows.
       const rows = within(card).getAllByRole("listitem");
       expect(rows[8]).toHaveAttribute("data-error", "true");
-      const offending = within(rows[8]).getByRole("textbox", { name: "Match contains" });
+      const offending = within(rows[8]).getByRole("textbox", { name: "Model name contains" });
       expect(offending).toHaveValue("gpt-5");
       await waitFor(() => expect(offending).toHaveFocus());
     });
@@ -184,13 +184,13 @@ describe("SettingsPage", () => {
       );
       const { user } = renderWithProviders(<SettingsPage />);
       await waitFor(() =>
-        expect(screen.getAllByRole("textbox", { name: "Match contains" })).toHaveLength(2),
+        expect(screen.getAllByRole("textbox", { name: "Model name contains" })).toHaveLength(2),
       );
       const card = section(SECTION_ID.modelMappings);
 
       await user.click(within(card).getByRole("button", { name: "Reset to defaults" }));
 
-      const sources = within(card).getAllByRole("textbox", { name: "Match contains" });
+      const sources = within(card).getAllByRole("textbox", { name: "Model name contains" });
       expect(sources.map((input) => (input as HTMLInputElement).value)).toEqual(
         defaultModelMappings().map((rule) => rule.key),
       );

@@ -27,7 +27,6 @@
   "stats.exhausted": "Sem créditos",
   "stats.unavailable": "Indisponíveis",
   "stats.sinceReset": "Desde a última redefinição de estatísticas",
-  "stats.inRotation": "Contas atendendo requisições agora",
   "stats.vsPreviousHour": "vs. hora anterior",
   "live.label": "Tráfego ao vivo",
   "live.rpm": "Requisições/min",

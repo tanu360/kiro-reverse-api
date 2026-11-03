@@ -106,7 +106,7 @@ describe("AccountDetailSheet", () => {
     expect(
       within(overage).getByRole("switch", { name: "Enable overage upstream" }),
     ).toHaveAttribute("data-disabled");
-    expect(within(overage).getByText("Not overage capable")).toBeInTheDocument();
+    expect(within(overage).getByText("Not available for this account")).toBeInTheDocument();
   });
 
   it("hides the Kiro profile section for API key accounts", async () => {
@@ -120,7 +120,7 @@ describe("AccountDetailSheet", () => {
     const pins = capture("post", "/accounts/:id/profile");
     const { sheet, user, queryClient } = await openSheet(account);
     const profile = section(sheet, "Kiro profile");
-    await user.click(within(profile).getByRole("button", { name: "Load profiles" }));
+    await user.click(within(profile).getByRole("button", { name: "Load Kiro profiles" }));
     const sandbox = await within(profile).findByRole("radio", { name: /Fabrikam Sandbox/ });
     // The current profile is selected first.
     expect(within(profile).getByRole("radio", { name: /Fabrikam Engineering/ })).toBeChecked();
@@ -143,12 +143,12 @@ describe("AccountDetailSheet", () => {
   it("lists the live models with auto first", async () => {
     const { sheet, user } = await openSheet(dana());
     const models = section(sheet, "Available models");
-    await user.click(within(models).getByRole("button", { name: "Load" }));
+    await user.click(within(models).getByRole("button", { name: "Load models" }));
     const list = await within(models).findByRole("list", { name: "Available models" });
     const items = within(list).getAllByRole("listitem");
     expect(items[0]).toHaveTextContent("auto");
     expect(items[1]).toHaveTextContent("claude-haiku-4.5");
-    expect(items[1]).toHaveTextContent("0.4x credit");
+    expect(items[1]).toHaveTextContent("0.4× credits");
   });
 
   it("starts focus on the sheet, not an input that would open the phone keyboard", async () => {

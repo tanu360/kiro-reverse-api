@@ -4,7 +4,6 @@
   "numberField.decrease": "Giảm",
   "numberField.increase": "Tăng",
   "numberField.roleDescription": "Trường số",
-  "hint.more": "Thêm thông tin",
   "sparkline.empty": "Không có dữ liệu",
   "sparkline.summary_other": "{count} điểm, từ {first} đến {last}",
   "sparkline.summaryUp_other": "{count} điểm, từ {first} đến {last}, tăng {change}%",

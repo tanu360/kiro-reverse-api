@@ -311,7 +311,11 @@ describe("BackupsPage", () => {
     const [first] = newestFirst();
     await rowAction(user, dataRows()[0], "Delete");
     expect(within(dialog()).getByText("Delete this backup?")).toBeInTheDocument();
-    expect(within(dialog()).getByText("This cannot be undone.")).toBeInTheDocument();
+    expect(
+      within(dialog()).getByText(
+        "The backup file is removed from the server. This cannot be undone.",
+      ),
+    ).toBeInTheDocument();
     await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
     expect(await findToast("Backup deleted")).toBeInTheDocument();
     await waitFor(() => expect(dataRows()).toHaveLength(5));

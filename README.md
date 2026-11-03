@@ -281,7 +281,7 @@ curl http://localhost:8080/v1/responses \
 
 Require API keys from the **API** page (**API access → Require an API key**). You can create multiple client keys with independent limits:
 
-- Leave **Custom Key** blank to auto-generate a secure `sk-...` key, or enter your own key value.
+- Leave **Custom key (optional)** blank to auto-generate a secure `sk-...` key, or enter your own key value.
 - Lists and request logs show masked keys such as `sk-clb****e4yo`; the full key remains stored for authentication and copying from key detail.
 - Token and credit quota checks use exact raw values. Rounded or compact UI labels are display-only.
 - A token or credit limit of `0` means unlimited for that dimension.
@@ -290,14 +290,14 @@ Require API keys from the **API** page (**API access → Require an API key**). 
 
 ## 📊 Stats Semantics
 
-Dashboard and account cards intentionally answer different questions:
+The Overview page and the Accounts page intentionally answer different questions:
 
 - **Accounts card**: current configured Kiro accounts, using Kiro server quota fields (`usage_current / usage_limit`).
 - **Requests card**: app/proxy history from SQLite `requests` rows: `COUNT(*)`, `SUM(total_tokens)`, and `SUM(credits)`.
-- **Success / Failed cards**: final proxy request outcomes from the same `requests` table.
+- **Succeeded / Failed cards**: final proxy request outcomes from the same `requests` table.
 - **Account cards**: current visible account counters saved on the account record (`requestCount`, `totalTokens`, `totalCredits`).
 
-If an old/deleted account still has rows in `requests`, dashboard app credits can be higher than the visible account-card credit sum. Use **Reset Statistics** or a one-time DB cleanup if you want historical request rows cleared.
+If an old/deleted account still has rows in `requests`, the Overview's **Proxy credits** can be higher than the visible account credit sum. Use **Settings → Danger zone → Reset statistics** or a one-time DB cleanup if you want historical request rows cleared.
 
 Token labels may display compactly (`54.5M`, `476.5K`), but backend math and quota checks use raw numbers.
 

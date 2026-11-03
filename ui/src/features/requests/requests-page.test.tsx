@@ -155,7 +155,7 @@ describe("RequestsPage", () => {
     expect(cells[1]).toHaveTextContent("Failed 401");
     expect(cells[2]).toHaveTextContent(/^—$/);
     expect(cells[5]).toHaveTextContent(/^—$/);
-    expect(within(cells[9]).getByText("Auth")).toBeInTheDocument();
+    expect(within(cells[9]).getByText("Authentication")).toBeInTheDocument();
   });
 
   it("opens the detail sheet with the full message on row click", async () => {

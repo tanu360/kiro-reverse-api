@@ -4,7 +4,7 @@ import { type FormEvent, type JSX, useId, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   NumberField,
@@ -187,12 +187,12 @@ export function ApiKeyFormDialog({
             autoCorrect="off"
             className="font-mono"
             onValueChange={(value) => set("key", value)}
-            placeholder={
-              editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder")
-            }
             spellCheck={false}
             value={values.key}
           />
+          <FieldDescription>
+            {editing ? t("form.customKeyEditPlaceholder") : t("form.customKeyPlaceholder")}
+          </FieldDescription>
         </Field>
         {mutation.isError ? (
           <Alert variant="error">

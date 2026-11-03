@@ -32,7 +32,7 @@ function section(id: string): HTMLElement {
 async function renderPage() {
   const result = renderWithProviders(<SettingsPage />);
   await screen.findByRole("switch", { name: "Allow overage" });
-  await screen.findAllByRole("textbox", { name: "Match contains" });
+  await screen.findAllByRole("textbox", { name: "Model name contains" });
   await screen.findByRole("button", { name: "Add regex rule" });
   await screen.findByText("Proxy type");
   return result;
@@ -107,7 +107,7 @@ describe("settings focus", () => {
 
       await user.click(within(rows[0]).getByRole("button", { name: "Remove" }));
 
-      const sources = within(card).getAllByRole("textbox", { name: "Match contains" });
+      const sources = within(card).getAllByRole("textbox", { name: "Model name contains" });
       expect(sources).toHaveLength(8);
       await waitFor(() => expect(sources[0]).toHaveFocus());
     });
@@ -126,12 +126,12 @@ describe("settings focus", () => {
       );
       const { user } = renderWithProviders(<SettingsPage />);
       await waitFor(() =>
-        expect(screen.getAllByRole("textbox", { name: "Match contains" })).toHaveLength(2),
+        expect(screen.getAllByRole("textbox", { name: "Model name contains" })).toHaveLength(2),
       );
       const card = section(SECTION_ID.modelMappings);
 
       await user.click(within(card).getAllByRole("button", { name: "Remove" })[1]);
-      const [first] = within(card).getAllByRole("textbox", { name: "Match contains" });
+      const [first] = within(card).getAllByRole("textbox", { name: "Model name contains" });
       await waitFor(() => expect(first).toHaveFocus());
 
       await user.click(within(card).getByRole("button", { name: "Remove" }));
@@ -143,7 +143,7 @@ describe("settings focus", () => {
     it("keeps a focused row mounted when the saved list comes back from the server", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.modelMappings);
-      const [source] = within(card).getAllByRole("textbox", { name: "Match contains" });
+      const [source] = within(card).getAllByRole("textbox", { name: "Model name contains" });
 
       await user.clear(source);
       await user.type(source, "GPT-X");
@@ -152,11 +152,11 @@ describe("settings focus", () => {
       await screen.findByText("Settings saved");
       // The server lowercases keys; the refetched copy replaces the clean draft in place.
       await waitFor(() =>
-        expect(within(card).getAllByRole("textbox", { name: "Match contains" })[0]).toHaveValue(
-          "gpt-x",
-        ),
+        expect(
+          within(card).getAllByRole("textbox", { name: "Model name contains" })[0],
+        ).toHaveValue("gpt-x"),
       );
-      expect(within(card).getAllByRole("textbox", { name: "Match contains" })[0]).toBe(source);
+      expect(within(card).getAllByRole("textbox", { name: "Model name contains" })[0]).toBe(source);
       expect(source).toHaveFocus();
     });
 
@@ -164,9 +164,9 @@ describe("settings focus", () => {
       await renderPage();
       const card = section(SECTION_ID.modelMappings);
       const [row] = within(card).getAllByRole("listitem");
-      const [source] = within(row).getAllByRole("textbox", { name: "Match contains" });
+      const [source] = within(row).getAllByRole("textbox", { name: "Model name contains" });
       const label = row.querySelector(`label[for="${source.id}"]`);
-      expect(label).toHaveTextContent("Match contains");
+      expect(label).toHaveTextContent("Model name contains");
       expect(label).toHaveClass("sm:hidden");
     });
   });

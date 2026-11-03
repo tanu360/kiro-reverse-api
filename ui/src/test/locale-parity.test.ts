@@ -1,44 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { intlLocale, LANGS, pluralCategory, type SupportedLang } from "@/lib/i18n";
+import { baseKey, catalog, type Dict, namespaces, pluralSuffix } from "./locale-catalog";
 
-type Dict = Record<string, string>;
-
-// The same three globs lib/i18n loads, keyed by namespace.
-const sources: [Record<string, Dict>, (segments: string[]) => string][] = [
-  [
-    import.meta.glob<Dict>("/src/locales/*.json", { eager: true, import: "default" }),
-    () => "common",
-  ],
-  [
-    import.meta.glob<Dict>("/src/locales/*/*.json", { eager: true, import: "default" }),
-    (segments) => segments[segments.length - 2],
-  ],
-  [
-    import.meta.glob<Dict>("/src/features/*/locales/*.json", { eager: true, import: "default" }),
-    (segments) => segments[segments.length - 3],
-  ],
-];
-
-const catalog: Record<string, Partial<Record<string, Dict>>> = {};
-for (const [modules, namespaceOf] of sources) {
-  for (const [path, dict] of Object.entries(modules)) {
-    const segments = path.split("/");
-    const lang = segments[segments.length - 1].replace(/\.json$/, "");
-    const ns = namespaceOf(segments);
-    catalog[ns] = { ...catalog[ns], [lang]: dict };
-  }
-}
-
-const namespaces = Object.keys(catalog).sort();
-const PLURAL = /_(zero|one|two|few|many|other)$/;
-
-function base(key: string): string {
-  return key.replace(PLURAL, "");
-}
-
-function suffix(key: string): string | undefined {
-  return PLURAL.exec(key)?.[1];
-}
+const base = baseKey;
+const suffix = pluralSuffix;
 
 function baseKeys(dict: Dict): string[] {
   return [...new Set(Object.keys(dict).map(base))].sort();

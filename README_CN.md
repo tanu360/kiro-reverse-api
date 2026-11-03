@@ -277,7 +277,7 @@ curl http://localhost:8080/v1/responses \
 
 可在「**接口**」页面（「**API 访问 → 要求 API Key**」）中要求客户端使用 API Key。每个客户端 Key 都可以单独设置限额：
 
-- **自定义 Key** 留空时自动生成安全的 `sk-...` Key；也可以手动输入自己的 Key 值。
+- **自定义 API Key（可选）** 留空时自动生成安全的 `sk-...` Key；也可以手动输入自己的 Key 值。
 - 列表与请求日志中会显示脱敏格式，例如 `sk-clb****e4yo`；完整 Key 仍会用于鉴权，并可在详情中复制。
 - Token 与 Credit 限额检查使用原始精确数值；界面上的四舍五入或 K/M/B 仅用于显示。
 - Token 或 Credit 限额为 `0` 表示该维度不限制。
@@ -286,14 +286,14 @@ curl http://localhost:8080/v1/responses \
 
 ## 📊 统计口径
 
-仪表盘与账号卡片回答的是不同问题：
+「概览」页面与「账号」页面回答的是不同问题：
 
 - **账号卡片**：当前配置的 Kiro 账号，使用 Kiro 服务器返回的配额字段（`usage_current / usage_limit`）。
 - **请求卡片**：本代理的 SQLite `requests` 历史：`COUNT(*)`、`SUM(total_tokens)`、`SUM(credits)`。
 - **成功 / 失败卡片**：同一个 `requests` 表中的最终代理请求结果。
 - **账号列表卡片**：当前可见账号记录里保存的计数器（`requestCount`、`totalTokens`、`totalCredits`）。
 
-如果旧账号或已删除账号在 `requests` 表中仍有历史行，仪表盘的 App Credits 可能高于当前可见账号卡片的 Credit 总和。需要清空历史时，可使用「重置统计」或进行一次性数据库清理。
+如果旧账号或已删除账号在 `requests` 表中仍有历史行，「概览」页的「代理 Credits」可能高于当前可见账号的 Credits 总和。需要清空历史时，可使用「**设置 → 危险操作 → 重置统计**」或进行一次性数据库清理。
 
 Token 标签可能显示为紧凑格式（如 `54.5M`、`476.5K`），但后端计算与限额检查始终使用原始数值。
 

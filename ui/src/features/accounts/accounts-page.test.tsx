@@ -121,9 +121,9 @@ describe("AccountsPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete selected" }));
     const dialog = await screen.findByRole("alertdialog");
-    expect(within(dialog).getByText("Delete accounts")).toBeInTheDocument();
+    expect(within(dialog).getByText(`Delete ${ids.length} accounts?`)).toBeInTheDocument();
     expect(
-      within(dialog).getByText(`Delete ${ids.length} selected accounts? This cannot be undone.`),
+      within(dialog).getByText("Usage history is removed as well. This cannot be undone."),
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
@@ -154,9 +154,7 @@ describe("AccountsPage", () => {
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByText("Delete this account?")).toBeInTheDocument();
     expect(
-      within(dialog).getByText(
-        "The account and its usage history are removed. This cannot be undone.",
-      ),
+      within(dialog).getByText("Usage history is removed as well. This cannot be undone."),
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());

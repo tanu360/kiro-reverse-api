@@ -180,7 +180,11 @@ describe("ApiPage", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     const confirm = await screen.findByRole("alertdialog");
     expect(within(confirm).getByText("Delete this API key?")).toBeInTheDocument();
-    expect(within(confirm).getByText("Clients using it stop working.")).toBeInTheDocument();
+    expect(
+      within(confirm).getByText(
+        "Clients that use it can no longer call the proxy. This cannot be undone.",
+      ),
+    ).toBeInTheDocument();
     expect(sent("DELETE", `/api-keys/${teamA?.id}`)).toHaveLength(0);
     await user.click(within(confirm).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(sent("DELETE", `/api-keys/${teamA?.id}`)).toHaveLength(1));
@@ -195,7 +199,7 @@ describe("ApiPage", () => {
     await user.click(screen.getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     const confirm = await screen.findByRole("alertdialog");
-    expect(within(confirm).getByText(/every client is locked out/)).toBeInTheDocument();
+    expect(within(confirm).getByText(/Every client is locked out/)).toBeInTheDocument();
   });
 
   it("refuses to require an API key while no key is enabled", async () => {

@@ -1,6 +1,6 @@
 {
   "title": "登录",
-  "subtitle": "输入管理密码以继续。",
+  "subtitle": "输入管理员密码以继续。",
   "password": "密码",
   "passwordPlaceholder": "密码",
   "showPassword": "显示密码",

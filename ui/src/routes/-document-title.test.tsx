@@ -17,6 +17,6 @@ describe("document title", () => {
   it("names the first-run page", async () => {
     // Mock mode has a pending first run, so signed-out visits land on /setup.
     await renderApp("/login", { authed: false });
-    await waitFor(() => expect(document.title).toBe("Set up · Kiro Proxy"));
+    await waitFor(() => expect(document.title).toBe("Setup · Kiro Proxy"));
   });
 });

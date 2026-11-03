@@ -65,8 +65,8 @@ export function BatchBar({
     if (running || count === 0) return;
     const ids = [...selectedIds];
     const ok = await confirm({
-      title: action === "delete" ? t("batch.deleteTitle") : t("batch.confirmTitle"),
-      description: t(CONFIRM_KEYS[action], { count: ids.length }),
+      title: t(CONFIRM_KEYS[action], { count: ids.length }),
+      description: action === "delete" ? t("confirmDelete.body") : undefined,
       confirmLabel: t(`batch.verb.${action}`),
       variant: action === "disable" || action === "delete" ? "danger" : "default",
     });

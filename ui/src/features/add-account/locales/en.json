@@ -41,7 +41,7 @@
   "methods.cookie.title": "Kiro web cookie",
   "methods.cookie.description": "Add an account with the refresh token from your Kiro web cookie.",
   "methods.apikey.title": "Kiro API key",
-  "methods.apikey.description": "Add a headless account with a Kiro CLI API key (ksk_...).",
+  "methods.apikey.description": "Add a headless account with a Kiro CLI API key (ksk_…).",
 
   "builderid.verifyCode": "Enter this code at the link below.",
   "builderid.userCode": "Your code",
@@ -50,11 +50,11 @@
   "builderid.reconnecting": "Connection lost. Retrying…",
 
   "iam.startUrl": "Start URL",
-  "iam.startUrlPlaceholder": "https://xxx.awsapps.com/start",
+  "iam.startUrlPlaceholder": "https://d-1234567890.awsapps.com/start",
   "iam.startUrlRequired": "Enter a start URL.",
   "iam.loginUrl": "Sign-in URL",
   "iam.completeLogin": "Complete sign-in in your browser, then paste the callback URL.",
-  "iam.callbackUrlPlaceholder": "http://127.0.0.1:xxx/?code=...",
+  "iam.callbackUrlPlaceholder": "http://127.0.0.1:52341/?code=…",
 
   "microsoft.portalStep": "Step 1: sign in to the Kiro portal",
   "microsoft.providerStep": "Step 2: sign in with Microsoft",
@@ -126,7 +126,7 @@
 
   "apikey.help": "Kiro API keys never expire and skip OAuth refresh. Requests go to the Kiro CLI runtime in the key's region.",
   "apikey.keysLabel": "Kiro API keys",
-  "apikey.keysHint": "One per line. Add a region with ksk_...|eu-central-1.",
-  "apikey.regionHint": "Used for keys without |region.",
+  "apikey.keysHint": "One per line. Add a region with ksk_…|eu-central-1.",
+  "apikey.regionHint": "Used for keys without a |region suffix.",
   "apikey.keyMissing": "Enter at least one Kiro API key."
 }

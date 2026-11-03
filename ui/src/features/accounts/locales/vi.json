@@ -79,8 +79,6 @@
   "batch.enableShort": "Bật",
   "batch.disableShort": "Tắt",
   "batch.more": "Thêm thao tác hàng loạt",
-  "batch.confirmTitle": "Xác nhận",
-  "batch.deleteTitle": "Xóa tài khoản",
   "batch.confirmEnable_other": "Bật {count} tài khoản?",
   "batch.confirmDisable_other": "Tắt {count} tài khoản?",
   "batch.confirmRefresh_other": "Làm mới {count} tài khoản?",

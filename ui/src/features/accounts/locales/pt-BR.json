@@ -80,8 +80,6 @@
   "batch.enableShort": "Habilitar",
   "batch.disableShort": "Desabilitar",
   "batch.more": "Mais ações em lote",
-  "batch.confirmTitle": "Confirmar",
-  "batch.deleteTitle": "Excluir contas",
   "batch.confirmEnable_one": "Habilitar {count} conta?",
   "batch.confirmEnable_other": "Habilitar {count} contas?",
   "batch.confirmDisable_one": "Desabilitar {count} conta?",

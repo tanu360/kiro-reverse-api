@@ -27,7 +27,6 @@
   "stats.exhausted": "Out of credits",
   "stats.unavailable": "Unavailable",
   "stats.sinceReset": "Since the last statistics reset",
-  "stats.inRotation": "Accounts serving requests now",
   "stats.vsPreviousHour": "vs previous hour",
   "live.label": "Live traffic",
   "live.rpm": "Requests/min",

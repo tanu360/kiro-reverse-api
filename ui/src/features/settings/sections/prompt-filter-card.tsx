@@ -251,13 +251,16 @@ function RuleCard({
               {t("promptFilter.replace")}
             </Label>
             <Input
+              aria-describedby={`${id}-replace-hint`}
               className={cn("font-mono", TOUCH_INPUT)}
               id={`${id}-replace`}
               onChange={(event) => onChange({ replace: event.target.value })}
-              placeholder={t("promptFilter.emptyRemove")}
               spellCheck={false}
               value={rule.replace ?? ""}
             />
+            <p className="text-muted-foreground text-xs" id={`${id}-replace-hint`}>
+              {t("promptFilter.emptyRemove")}
+            </p>
           </div>
         ) : null}
       </div>
