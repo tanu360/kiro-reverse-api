@@ -3,13 +3,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { type JSX, useEffect } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { Button } from "@/components/ui/button";
-import { CardDescription, CardHeader, CardPanel, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { firstRunQuery } from "@/lib/api/session";
 import { isAuthenticated, subscribeSession } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { AuthLayout } from "./auth-layout";
+import { AuthHeader, AuthLayout } from "./auth-layout";
 import { SignInForm } from "./sign-in-form";
 
 // Long enough to reach the toast's "Open settings" action.
@@ -51,11 +50,8 @@ export function SetupPage(): JSX.Element {
 
   return (
     <AuthLayout>
-      <CardHeader>
-        <CardTitle render={(props) => <h1 {...props} />}>{t("setupTitle")}</CardTitle>
-        <CardDescription>{t("firstRunPassword")}</CardDescription>
-      </CardHeader>
-      <CardPanel className="flex flex-col gap-5">
+      <AuthHeader description={t("firstRunPassword")} title={t("setupTitle")} />
+      <div className="flex flex-col gap-5">
         <section
           aria-label={t("firstRunPasswordLabel")}
           className="flex flex-col gap-2 rounded-xl border bg-muted/40 p-3"
@@ -82,7 +78,7 @@ export function SetupPage(): JSX.Element {
           <p className="text-muted-foreground text-xs">{t("firstRunNote")}</p>
         </section>
         <SignInForm onSignedIn={onSignedIn} />
-      </CardPanel>
+      </div>
     </AuthLayout>
   );
 }
