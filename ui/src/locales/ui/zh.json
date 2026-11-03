@@ -12,6 +12,7 @@
   "chart.total": "合计",
   "spinner.loading": "正在加载…",
   "toast.dismiss": "关闭",
+  "toast.region": "通知",
   "sidebar.toggle": "切换侧边栏",
   "sidebar.title": "侧边栏",
   "sidebar.description": "显示移动端侧边栏。",

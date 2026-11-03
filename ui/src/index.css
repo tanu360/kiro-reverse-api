@@ -238,78 +238,12 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
 
-  /* coss ui: skeleton and toast animations (merged by the shadcn CLI). */
+  /* coss ui: skeleton animation (merged by the shadcn CLI). */
   --animate-skeleton: skeleton 2s -1s infinite linear;
-  --animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
 
   @keyframes skeleton {
     to {
       background-position: -200% 0;
-    }
-  }
-  @keyframes toast-success-odd {
-    0% {
-      scale: 1;
-    }
-    30% {
-      scale: 1.025;
-    }
-    60% {
-      scale: 0.99;
-    }
-    100% {
-      scale: 1;
-    }
-  }
-  @keyframes toast-success-even {
-    0% {
-      scale: 1;
-    }
-    30% {
-      scale: 1.025;
-    }
-    60% {
-      scale: 0.99;
-    }
-    100% {
-      scale: 1;
-    }
-  }
-  @keyframes toast-error-odd {
-    0% {
-      translate: 0 0;
-    }
-    25% {
-      translate: -3px 0;
-    }
-    50% {
-      translate: 3px 0;
-    }
-    75% {
-      translate: -3px 0;
-    }
-    100% {
-      translate: 0 0;
-    }
-  }
-  @keyframes toast-error-even {
-    0% {
-      translate: 0 0;
-    }
-    25% {
-      translate: -3px 0;
-    }
-    50% {
-      translate: 3px 0;
-    }
-    75% {
-      translate: -3px 0;
-    }
-    100% {
-      translate: 0 0;
     }
   }
 }
@@ -425,6 +359,304 @@
   --chart-marker-badge-foreground: oklch(0.15 0 0);
   --chart-segment-background: oklch(0.41 0.0127 248.14 / 0.25);
   --chart-segment-line: oklch(1 0 0 / 0.25);
+}
+
+/*
+ * Notch toaster (components/ui/notch-toaster.tsx), styles adapted from notch-toast 0.2.0 (MIT).
+ * One dark island in both themes. In the app it hangs from the bottom edge of the sticky
+ * header, centred on the header, so it never covers the header's buttons; on pages without a
+ * header (sign-in) it hangs from the top of the window. It sits above dialogs and sheets
+ * (z-50); on phones those open from the bottom, so a top toast cannot hide their buttons.
+ */
+:root {
+  --notch: var(--color-zinc-900);
+  --notch-foreground: var(--color-zinc-50);
+  --notch-muted-foreground: var(--color-zinc-400);
+  --notch-hover: --alpha(var(--color-white) / 10%);
+  --notch-success: var(--color-emerald-400);
+  --notch-error: var(--color-red-400);
+  /* Kiro purple-300, as the dark-theme info text. */
+  --notch-info: #c59eff;
+  --notch-warning: var(--color-amber-400);
+  --notch-shadow: 0 12px 28px -12px --alpha(var(--color-zinc-950) / 45%);
+  --notch-radius: 16px;
+  --notch-offset-top: 0px;
+  --notch-offset-left: 0px;
+  --notch-gutter: 16px;
+}
+
+.dark {
+  --notch: var(--color-neutral-800);
+  --notch-foreground: var(--color-neutral-50);
+  --notch-muted-foreground: var(--color-neutral-400);
+  --notch-shadow: 0 14px 32px -10px --alpha(var(--color-black) / 80%);
+}
+
+/* The 48 px header is border-box: hang 1 px up so the island joins its bottom border. */
+:root:has([data-slot="site-header"]) {
+  --notch-offset-top: calc(--spacing(12) - 1px);
+}
+
+/* Centre on the header, not the window, while the desktop sidebar takes the left edge. */
+@media (min-width: 64rem) {
+  :root:has([data-slot="sidebar"][data-state="expanded"]) {
+    --notch-offset-left: 16rem;
+  }
+  :root:has([data-slot="sidebar"][data-state="collapsed"]) {
+    --notch-offset-left: 3rem;
+  }
+}
+
+/*
+ * A modal (dialog, sheet, drawer) dims the header, so the island hangs from the top of the
+ * window instead, centred like the dialog: on phones it then stays above a drawer's title.
+ * The selectors match the specificity of the rules above, and win by coming later.
+ */
+:root:has([data-slot="site-header"]):has([data-slot$="-backdrop"]) {
+  --notch-offset-top: 0px;
+}
+:root:has([data-slot="sidebar"]):has([data-slot$="-backdrop"]) {
+  --notch-offset-left: 0px;
+}
+
+.notch-toaster {
+  pointer-events: none;
+  position: fixed;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  padding-inline: calc(var(--notch-gutter) + var(--notch-offset-left)) var(--notch-gutter);
+  transition:
+    top 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &[data-position="top-center"] {
+    top: var(--notch-offset-top);
+  }
+  &[data-position="bottom-center"] {
+    bottom: 0;
+  }
+  &[data-mode="floating"][data-position="top-center"] {
+    top: calc(var(--notch-offset-top) + 12px);
+  }
+  &[data-mode="floating"][data-position="bottom-center"] {
+    bottom: 16px;
+  }
+}
+
+.notch-shell {
+  pointer-events: auto;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  background: var(--notch);
+  color: var(--notch-foreground);
+  box-shadow: var(--notch-shadow);
+  will-change: width, height, filter, opacity, transform;
+
+  [data-mode="floating"] & {
+    border-radius: 20px;
+    transform-origin: center;
+  }
+  [data-mode="attached"][data-position="top-center"] & {
+    border-radius: 0 0 var(--notch-radius) var(--notch-radius);
+    transform-origin: top center;
+  }
+  [data-mode="attached"][data-position="bottom-center"] & {
+    border-radius: var(--notch-radius) var(--notch-radius) 0 0;
+    transform-origin: bottom center;
+  }
+
+  /* The inverse corners that join the island to the edge it hangs from. */
+  [data-mode="attached"] &::before,
+  [data-mode="attached"] &::after {
+    content: "";
+    position: absolute;
+    width: var(--notch-radius);
+    height: var(--notch-radius);
+    background: inherit;
+    pointer-events: none;
+    mask-repeat: no-repeat;
+    mask-size: 100% 100%;
+  }
+  [data-mode="attached"][data-position="top-center"] &::before {
+    top: 0;
+    left: calc(-1 * var(--notch-radius) + 0.5px);
+    mask-image: radial-gradient(
+      circle at 0 100%,
+      transparent calc(var(--notch-radius) - 0.5px),
+      #000 calc(var(--notch-radius) + 0.5px)
+    );
+  }
+  [data-mode="attached"][data-position="top-center"] &::after {
+    top: 0;
+    right: calc(-1 * var(--notch-radius) + 0.5px);
+    mask-image: radial-gradient(
+      circle at 100% 100%,
+      transparent calc(var(--notch-radius) - 0.5px),
+      #000 calc(var(--notch-radius) + 0.5px)
+    );
+  }
+  [data-mode="attached"][data-position="bottom-center"] &::before {
+    bottom: 0;
+    left: calc(-1 * var(--notch-radius) + 0.5px);
+    mask-image: radial-gradient(
+      circle at 0 0,
+      transparent calc(var(--notch-radius) - 0.5px),
+      #000 calc(var(--notch-radius) + 0.5px)
+    );
+  }
+  [data-mode="attached"][data-position="bottom-center"] &::after {
+    bottom: 0;
+    right: calc(-1 * var(--notch-radius) + 0.5px);
+    mask-image: radial-gradient(
+      circle at 100% 0,
+      transparent calc(var(--notch-radius) - 0.5px),
+      #000 calc(var(--notch-radius) + 0.5px)
+    );
+  }
+}
+
+.notch-viewport {
+  display: flex;
+  /* Not stretched: the content keeps its own size, which the shell measures and morphs to. */
+  align-items: flex-start;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.notch-content {
+  display: flex;
+  flex: none;
+  width: max-content;
+  max-width: min(28rem, calc(100vw - var(--notch-offset-left) - 2 * var(--notch-gutter)));
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 16px 12px;
+  font-size: var(--text-sm);
+  line-height: 1.25rem;
+
+  &:has(.notch-buttons) {
+    padding-inline-end: 8px;
+  }
+}
+
+.notch-icon {
+  display: grid;
+  height: 1.25rem;
+  flex: none;
+  place-items: center;
+
+  & svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  [data-type="success"] & {
+    color: var(--notch-success);
+  }
+  [data-type="error"] & {
+    color: var(--notch-error);
+  }
+  [data-type="warning"] & {
+    color: var(--notch-warning);
+  }
+  [data-type="info"] & {
+    color: var(--notch-info);
+  }
+  [data-type="loading"] & {
+    color: var(--notch-muted-foreground);
+  }
+}
+
+.notch-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.notch-title {
+  font-weight: 500;
+}
+
+.notch-description {
+  margin-top: 2px;
+  color: var(--notch-muted-foreground);
+}
+
+.notch-buttons {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin-block: -4px;
+}
+
+.notch-action,
+.notch-close {
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  font: inherit;
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--notch-foreground);
+    outline-offset: 1px;
+  }
+}
+
+.notch-action {
+  height: 1.75rem;
+  padding-inline: 10px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+
+  &:hover {
+    background: color-mix(in srgb, var(--primary) 88%, var(--color-white));
+  }
+}
+
+.notch-close {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  color: var(--notch-muted-foreground);
+
+  & svg {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+  &:hover {
+    background: var(--notch-hover);
+    color: var(--notch-foreground);
+  }
+
+  /* Phones: a 40 px tap target without making the island taller. */
+  @media (max-width: 39.99rem) {
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: -6px;
+    }
+  }
+}
+
+.notch-shell[data-type="loading"] .notch-icon svg {
+  animation: notch-spin 0.8s linear infinite;
+}
+
+@keyframes notch-spin {
+  to {
+    transform: rotate(1turn);
+  }
 }
 
 @layer base {

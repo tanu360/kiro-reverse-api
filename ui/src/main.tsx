@@ -5,7 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { AppToastProvider } from "@/components/layout/app-toasts";
+import { AppToaster } from "@/components/layout/app-toasts";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,13 +30,12 @@ async function bootstrap(): Promise<void> {
         <I18nProvider>
           <PrivacyProvider>
             <QueryClientProvider client={queryClient}>
-              <AppToastProvider>
-                <TooltipProvider>
-                  <ConfirmProvider>
-                    <RouterProvider router={router} />
-                  </ConfirmProvider>
-                </TooltipProvider>
-              </AppToastProvider>
+              <TooltipProvider>
+                <ConfirmProvider>
+                  <RouterProvider router={router} />
+                </ConfirmProvider>
+              </TooltipProvider>
+              <AppToaster />
             </QueryClientProvider>
           </PrivacyProvider>
         </I18nProvider>

@@ -15,6 +15,7 @@
   "chart.total": "Total",
   "spinner.loading": "Loading…",
   "toast.dismiss": "Dismiss",
+  "toast.region": "Notifications",
   "sidebar.toggle": "Toggle sidebar",
   "sidebar.title": "Sidebar",
   "sidebar.description": "Displays the mobile sidebar.",
