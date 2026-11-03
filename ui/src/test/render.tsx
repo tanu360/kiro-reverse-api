@@ -12,7 +12,7 @@ import userEvent, { type UserEvent } from "@testing-library/user-event";
 import type { ReactElement, ReactNode } from "react";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
-import { ToastProvider } from "@/components/ui/toast";
+import { NotchToaster } from "@/components/ui/notch-toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { setSession } from "@/lib/auth/session";
 import { I18nProvider, type Lang } from "@/lib/i18n";
@@ -60,11 +60,10 @@ function Providers({
       <I18nProvider initialLang={lang}>
         <PrivacyProvider initialEnabled={privacy}>
           <QueryClientProvider client={queryClient}>
-            <ToastProvider limit={5}>
-              <TooltipProvider>
-                <ConfirmProvider>{children}</ConfirmProvider>
-              </TooltipProvider>
-            </ToastProvider>
+            <TooltipProvider>
+              <ConfirmProvider>{children}</ConfirmProvider>
+            </TooltipProvider>
+            <NotchToaster />
           </QueryClientProvider>
         </PrivacyProvider>
       </I18nProvider>

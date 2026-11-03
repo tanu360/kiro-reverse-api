@@ -83,14 +83,14 @@ function lastAccountId(): string {
   return mockDb.accounts[mockDb.accounts.length - 1].id;
 }
 
-/** Toasts are dialogs too, so look for the dialog popup itself. */
+/** Looks for the dialog popup itself, not any element with a dialog role. */
 async function expectClosed(): Promise<void> {
   await waitFor(() =>
     expect(document.querySelector('[data-slot="dialog-popup"]')).not.toBeInTheDocument(),
   );
 }
 
-/** A toast's text can also sit in its live-region announcement. */
+/** The toast island shows the text; the page may repeat it, so any match counts. */
 async function expectToast(text: string | RegExp): Promise<void> {
   expect((await screen.findAllByText(text)).length).toBeGreaterThan(0);
 }
@@ -132,6 +132,9 @@ describe("Builder ID", () => {
   });
 
   afterEach(() => {
+    // Fire the frames still queued on the fake clock first: Motion (the toast island) waits
+    // for one, and would stall every later animation in this file without it.
+    vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 
@@ -521,6 +524,7 @@ describe("Focus after a failed submit or a step change", () => {
       await expectToast("Could not add the account: authorization expired");
       await waitFor(() => expect(screen.getByRole("textbox", { name: "Region" })).toHaveFocus());
     } finally {
+      vi.runOnlyPendingTimers(); // queued Motion frames, see the Builder ID block
       vi.useRealTimers();
     }
   });

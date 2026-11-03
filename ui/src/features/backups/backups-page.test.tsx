@@ -70,10 +70,10 @@ async function renderPage() {
   return view;
 }
 
-/** The toast title; a live region may repeat the text, so the toast itself is picked. */
+/** The toast title element, so text elsewhere on the page with the same words never matches. */
 async function findToast(text: string): Promise<HTMLElement> {
   const matches = await screen.findAllByText(text);
-  const title = matches.find((node) => node.getAttribute("data-slot") === "toast-title");
+  const title = matches.find((node) => node.getAttribute("data-slot") === "notch-toast-title");
   if (!title) throw new Error(`no toast titled "${text}"`);
   return title;
 }

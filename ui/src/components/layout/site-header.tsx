@@ -24,7 +24,10 @@ export function SiteHeader(): JSX.Element {
   const toggleLabel = t("shell.toggleSidebar");
 
   return (
-    <header className="sticky top-0 z-40 flex h-12 shrink-0 items-center border-b bg-background">
+    <header
+      className="sticky top-0 z-40 flex h-12 shrink-0 items-center border-b bg-background"
+      data-slot="site-header"
+    >
       <div className="flex w-full min-w-0 items-center justify-between gap-2 px-2 sm:px-4 lg:px-6">
         <div className="flex min-w-0 items-center gap-1 lg:gap-2">
           <Tooltip>
