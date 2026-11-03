@@ -55,6 +55,25 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=
 
+      # Build linux/amd64 into the runner's Docker first and check that the image serves the
+      # embedded admin UI. This runs on pull requests too, where nothing is pushed, so the
+      # Node/pnpm UI stage of the Dockerfile is proven before a merge.
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: kiro-proxy:smoke
+          cache-from: type=gha
+          provenance: false
+
+      - name: Smoke test admin UI
+        run: |
+          docker run -d --name kiro-smoke -p 127.0.0.1:8080:8080 kiro-proxy:smoke
+          trap 'docker logs kiro-smoke; docker rm -f kiro-smoke >/dev/null' EXIT
+          .github/scripts/admin-ui-smoke.sh http://127.0.0.1:8080
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
