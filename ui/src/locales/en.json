@@ -99,5 +99,11 @@
   "shell.update.viewRelease": "View release",
   "shell.notFound.title": "Page not found",
   "shell.notFound.description": "This address does not match any page.",
-  "shell.notFound.action": "Go to Overview"
+  "shell.notFound.action": "Go to Overview",
+  "shell.sheetDescription": "Pages, Add account and the Admin menu.",
+  "shell.notifications": "Notifications",
+  "shell.toast.dismiss": "Dismiss notification",
+  "shell.documentTitle": "{page} · Kiro Proxy",
+  "shell.page.login": "Sign in",
+  "shell.page.setup": "Set up"
 }

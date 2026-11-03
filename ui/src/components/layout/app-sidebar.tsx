@@ -23,7 +23,13 @@ export function AppSidebar(): JSX.Element {
   const { isMobile, setOpenMobile } = useSidebar();
 
   return (
-    <Sidebar collapsible="icon" data-app-sidebar="" variant="sidebar">
+    <Sidebar
+      collapsible="icon"
+      data-app-sidebar=""
+      sheetDescription={t("shell.sheetDescription")}
+      sheetTitle={t("shell.navigation")}
+      variant="sidebar"
+    >
       <SidebarHeader className="h-12 justify-center py-0">
         <SidebarMenu>
           <SidebarMenuItem>

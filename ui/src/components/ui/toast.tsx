@@ -7,6 +7,7 @@ import {
   InfoIcon,
   LoaderCircleIcon,
   TriangleAlertIcon,
+  XIcon,
 } from "lucide-react";
 import type React from "react";
 import { cn } from "@/lib/utils";
@@ -66,9 +67,15 @@ function upsertReplayClassName(toast: {
 function Toasts({
   position,
   portalProps,
+  viewportLabel,
+  viewportClassName,
+  closeLabel,
 }: {
   position: ToastPosition;
   portalProps?: React.ComponentProps<typeof Toast.Portal>;
+  viewportLabel?: string;
+  viewportClassName?: string;
+  closeLabel?: string;
 }): React.ReactElement {
   const { toasts } = Toast.useToastManager();
   const swipeDirection = getSwipeDirection(position);
@@ -79,13 +86,17 @@ function Toasts({
         className={cn(
           "fixed z-60 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] sm:[--toast-inset:--spacing(8)]",
           // Vertical positioning
-          "data-[position*=top]:top-(--toast-inset)",
+          // Kiro patch: --toast-offset-top keeps top toasts clear of a sticky header.
+          "data-[position*=top]:top-[calc(var(--toast-inset)+var(--toast-offset-top,0px))]",
           "data-[position*=bottom]:bottom-(--toast-inset)",
           // Horizontal positioning
           "data-[position*=left]:left-(--toast-inset)",
           "data-[position*=right]:right-(--toast-inset)",
           "data-[position*=center]:left-1/2 data-[position*=center]:-translate-x-1/2",
+          viewportClassName,
         )}
+        // Kiro patch: translated region name (Base UI defaults to "Notifications").
+        aria-label={viewportLabel}
         data-position={position}
         data-slot="toast-viewport"
       >
@@ -170,14 +181,27 @@ function Toasts({
                     />
                   </div>
                 </div>
-                {toast.actionProps && (
-                  <Toast.Action
-                    className={buttonVariants({ size: "xs" })}
-                    data-slot="toast-action"
+                <div className="flex shrink-0 items-center gap-1">
+                  {toast.actionProps && (
+                    <Toast.Action
+                      className={buttonVariants({ size: "xs" })}
+                      data-slot="toast-action"
+                    >
+                      {toast.actionProps.children}
+                    </Toast.Action>
+                  )}
+                  {/* Kiro patch: every toast can be dismissed; error toasts never time out. */}
+                  <Toast.Close
+                    aria-label={closeLabel ?? "Dismiss"}
+                    className={cn(
+                      buttonVariants({ size: "icon-xs", variant: "ghost" }),
+                      "-me-1.5 text-muted-foreground hover:text-foreground max-sm:-me-2 max-sm:size-10",
+                    )}
+                    data-slot="toast-close"
                   >
-                    {toast.actionProps.children}
-                  </Toast.Action>
-                )}
+                    <XIcon aria-hidden="true" />
+                  </Toast.Close>
+                </div>
               </Toast.Content>
             </Toast.Root>
           );
@@ -295,18 +319,33 @@ export type ToastPosition =
 export interface ToastProviderProps extends Toast.Provider.Props {
   position?: ToastPosition;
   portalProps?: React.ComponentProps<typeof Toast.Portal>;
+  /** Kiro patch: accessible name of the toast region (translated by the caller). */
+  viewportLabel?: string;
+  /** Kiro patch: accessible name of each toast's close button. */
+  closeLabel?: string;
+  /** Kiro patch: extra classes for the viewport, for example a --toast-offset-top value. */
+  viewportClassName?: string;
 }
 
 export function ToastProvider({
   children,
   position = "bottom-right",
   portalProps,
+  viewportLabel,
+  closeLabel,
+  viewportClassName,
   ...props
 }: ToastProviderProps): React.ReactElement {
   return (
     <Toast.Provider toastManager={toastManager} {...props}>
       {children}
-      <Toasts portalProps={portalProps} position={position} />
+      <Toasts
+        closeLabel={closeLabel}
+        portalProps={portalProps}
+        position={position}
+        viewportClassName={viewportClassName}
+        viewportLabel={viewportLabel}
+      />
     </Toast.Provider>
   );
 }

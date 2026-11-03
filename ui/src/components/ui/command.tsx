@@ -208,7 +208,8 @@ export function CommandItem({
 }: React.ComponentProps<typeof AutocompleteItem>): React.ReactElement {
   return (
     <AutocompleteItem
-      className={cn("py-1.5", className)}
+      // Kiro patch: an 8 px icon gap (as in the other menus) and 40 px rows on touch-size screens.
+      className={cn("gap-2 py-1.5 max-md:min-h-10", className)}
       data-slot="command-item"
       {...props}
     />

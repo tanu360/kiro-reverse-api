@@ -49,14 +49,75 @@ export function serverErrorKey(message: string): string | null {
 }
 
 /**
+ * Chinese messages from the AWS sign-in code (auth/iam_sso.go, auth/sso_token.go) -> key.
+ * They can be wrapped ("token 1: token 验证失败: 401 Unauthorized"), so each is found inside
+ * the message. The text after "<phrase>:" is passed as {detail}. Longest phrase first, so
+ * "批准授权失败" wins over "授权失败".
+ */
+// biome-ignore format: keys are the exact server phrases; keep them one per line.
+export const SERVER_ERROR_PHRASES: Readonly<Record<string, string>> = {
+  '会话不存在或已过期': "errors:serverError.ssoSessionExpired",
+  '会话已过期': "errors:serverError.ssoSessionExpired",
+  '无效的回调 URL': "errors:serverError.invalidCallbackUrl",
+  '状态不匹配，可能存在安全风险': "errors:serverError.ssoStateMismatch",
+  '未收到授权码': "errors:serverError.ssoNoCode",
+  '授权超时': "errors:serverError.ssoTimeout",
+  '授权失败': "errors:serverError.ssoDenied",
+  '授权错误': "errors:serverError.ssoDenied",
+  '注册客户端失败': "errors:serverError.ssoRegisterFailed",
+  '设备授权失败': "errors:serverError.ssoRegisterFailed",
+  'token 验证失败': "errors:serverError.ssoTokenRejected",
+  '获取设备会话失败': "errors:serverError.ssoTokenFlowFailed",
+  '接受用户代码失败': "errors:serverError.ssoTokenFlowFailed",
+  '批准授权失败': "errors:serverError.ssoTokenFlowFailed",
+  '获取 Token 失败': "errors:serverError.ssoTokenFlowFailed",
+};
+
+const phrases = Object.entries(SERVER_ERROR_PHRASES).sort(([a], [b]) => b.length - a.length);
+
+/** Key and {detail} for a message that contains one of SERVER_ERROR_PHRASES, else null. */
+export function serverErrorPhrase(message: string): { key: string; detail: string } | null {
+  const text = String(message ?? "").trim();
+  for (const [phrase, key] of phrases) {
+    const index = text.toLowerCase().indexOf(phrase.toLowerCase());
+    if (index === -1) continue;
+    const detail = text
+      .slice(index + phrase.length)
+      .replace(/^\s*[:：]\s*/, "")
+      .trim();
+    return { key, detail };
+  }
+  return null;
+}
+
+/** One server message (or one "; "-joined part of it) in the UI language, or null. */
+function translateServerMessage(message: string, t: TFunction): string | null {
+  const key = serverErrorKey(message);
+  if (key) return t(key);
+  const phrase = serverErrorPhrase(message);
+  if (!phrase) return null;
+  const text = t(phrase.key);
+  return phrase.detail
+    ? `${text} ${t("errors:serverError.detail", { detail: phrase.detail })}`
+    : text;
+}
+
+/**
  * User-facing message for any thrown value: the network message for status 0, the translation
  * of a known server message, an unknown server message verbatim, else the fallback.
  */
 export function errorMessage(error: unknown, t: TFunction, fallbackKey = "errors:generic"): string {
   if (!isApiError(error)) return t(fallbackKey);
   if (error.status === 0) return t("errors:network");
-  const key = serverErrorKey(error.serverMessage);
-  if (key) return t(key);
   const message = error.serverMessage.trim();
-  return message || t(fallbackKey);
+  if (!message) return t(fallbackKey);
+  const exact = serverErrorKey(message);
+  if (exact) return t(exact);
+  // SSO token import joins one error per token with "; ".
+  const parts = message.split("; ");
+  const translated = parts.map((part) => translateServerMessage(part, t));
+  if (translated.some((part) => part !== null)) {
+    return translated.map((part, index) => part ?? parts[index]).join(" ");
+  }
+  return message;
 }

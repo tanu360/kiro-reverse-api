@@ -1,7 +1,10 @@
+import { useRouterState } from "@tanstack/react-router";
 import type { CSSProperties, JSX, ReactNode } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useT } from "@/lib/i18n";
 import { AppSidebar } from "./app-sidebar";
+import { activeNavItem } from "./nav-items";
 import { SiteHeader } from "./site-header";
 import { UpdateCheckProvider } from "./update-check";
 
@@ -10,6 +13,9 @@ const SIDEBAR_STYLE = { "--sidebar-width": "calc(var(--spacing) * 68)" } as CSSP
 
 export function AppShell({ children }: { children: ReactNode }): JSX.Element {
   const { t } = useT();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const active = activeNavItem(pathname);
+  useDocumentTitle(active ? t(active.labelKey) : null);
   return (
     <UpdateCheckProvider>
       <SidebarProvider style={SIDEBAR_STYLE}>

@@ -32,5 +32,15 @@
   "serverError.tokenLimitNegative": "The token limit must be 0 or more.",
   "serverError.creditLimitNegative": "The credit limit must be 0 or more.",
   "serverError.microsoftCanceled": "The Microsoft sign-in was canceled. Start again.",
-  "serverError.microsoftDuplicate": "This Microsoft account is already added."
+  "serverError.microsoftDuplicate": "This Microsoft account is already added.",
+  "serverError.ssoSessionExpired": "The sign-in session expired. Start again.",
+  "serverError.invalidCallbackUrl": "The callback URL is not valid. Copy the full address again.",
+  "serverError.ssoStateMismatch": "The callback URL belongs to another sign-in. Start again and use the new link.",
+  "serverError.ssoNoCode": "The callback URL has no authorization code. Copy the full address again.",
+  "serverError.ssoTimeout": "The sign-in timed out. Start again.",
+  "serverError.ssoDenied": "AWS did not authorize the sign-in. Start again.",
+  "serverError.ssoRegisterFailed": "Could not start the AWS sign-in. Check the region and try again.",
+  "serverError.ssoTokenRejected": "AWS did not accept the SSO token. Copy a fresh token and try again.",
+  "serverError.ssoTokenFlowFailed": "Could not finish the AWS sign-in with this token. Copy a fresh token and try again.",
+  "serverError.detail": "(Details: {detail})"
 }

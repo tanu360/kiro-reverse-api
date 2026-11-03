@@ -1,7 +1,10 @@
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router";
+import type { JSX } from "react";
 import { SetupPage } from "@/features/auth/setup-page";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { firstRunQuery } from "@/lib/api/session";
 import { isAuthenticated } from "@/lib/auth/session";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: () => {
@@ -17,5 +20,11 @@ export const Route = createFileRoute("/setup")({
       // A network error still renders the page and its sign-in form.
     }
   },
-  component: SetupPage,
+  component: SetupPageRoute,
 });
+
+function SetupPageRoute(): JSX.Element {
+  const { t } = useT();
+  useDocumentTitle(t("shell.page.setup"));
+  return <SetupPage />;
+}

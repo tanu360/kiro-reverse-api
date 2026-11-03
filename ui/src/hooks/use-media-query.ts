@@ -84,6 +84,17 @@ export function useMediaQuery(query: BreakpointQuery | MediaQueryInput | (string
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
+/** Phone layout (below md): dialogs become drawers, tables become cards. */
 export function useIsMobile(): boolean {
   return useMediaQuery("max-md");
+}
+
+/**
+ * Below lg (1024 px) the sidebar is an off-canvas sheet; from lg up it is persistent. This is
+ * wider than useIsMobile, because at 768 a persistent sidebar leaves the pages too little room.
+ */
+export const SIDEBAR_SHEET_QUERY = "max-lg";
+
+export function useSidebarIsSheet(): boolean {
+  return useMediaQuery(SIDEBAR_SHEET_QUERY);
 }

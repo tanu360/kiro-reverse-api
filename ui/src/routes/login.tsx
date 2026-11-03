@@ -1,7 +1,10 @@
 import { createFileRoute, isRedirect, redirect } from "@tanstack/react-router";
+import type { JSX } from "react";
 import { LoginPage } from "@/features/auth/login-page";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { firstRunQuery } from "@/lib/api/session";
 import { isAuthenticated } from "@/lib/auth/session";
+import { useT } from "@/lib/i18n";
 import { redirectTarget, validateLoginSearch } from "./-search";
 
 export const Route = createFileRoute("/login")({
@@ -22,5 +25,11 @@ export const Route = createFileRoute("/login")({
       // A network error still renders the sign-in page.
     }
   },
-  component: LoginPage,
+  component: LoginPageRoute,
 });
+
+function LoginPageRoute(): JSX.Element {
+  const { t } = useT();
+  useDocumentTitle(t("shell.page.login"));
+  return <LoginPage />;
+}

@@ -99,5 +99,11 @@
   "shell.update.viewRelease": "查看发布",
   "shell.notFound.title": "页面不存在",
   "shell.notFound.description": "此地址没有对应的页面。",
-  "shell.notFound.action": "前往概览"
+  "shell.notFound.action": "前往概览",
+  "shell.sheetDescription": "页面、添加账号和管理员菜单。",
+  "shell.notifications": "通知",
+  "shell.toast.dismiss": "关闭通知",
+  "shell.documentTitle": "{page} · Kiro Proxy",
+  "shell.page.login": "登录",
+  "shell.page.setup": "初始设置"
 }

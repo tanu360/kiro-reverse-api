@@ -88,15 +88,28 @@ function eventsHandlers(): HttpHandler[] {
         return;
       }
       client.send({ event: "hello", data: "{}" });
+      let open = true;
+      const stop = () => {
+        open = false;
+        clearInterval(timer);
+      };
       const timer = setInterval(() => {
-        if (request.signal.aborted) {
-          clearInterval(timer);
+        if (!open || request.signal.aborted) {
+          stop();
           return;
         }
         appendSyntheticRequests();
         client.send({ event: "observe_tick", data: JSON.stringify({ type: "observe_tick" }) });
       }, TICK_MS);
-      request.signal.addEventListener("abort", () => clearInterval(timer), { once: true });
+      request.signal.addEventListener("abort", stop, { once: true });
+      // When the app closes its EventSource (sign-out), MSW cancels the stream and calls
+      // client.close(), but the request signal does not abort in the browser worker. Without
+      // this, the timer keeps writing to the closed stream and MSW logs an error every tick.
+      const close = client.close.bind(client);
+      client.close = () => {
+        stop();
+        close();
+      };
     }),
   ];
 }

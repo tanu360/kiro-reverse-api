@@ -14,11 +14,13 @@ import { compareVersions, fetchRemoteVersion, versionQuery } from "@/lib/api/sys
 import type { RemoteVersionJson } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { stripV, UpdateDialog } from "./update-dialog";
 
 /** The silent check waits this long after the shell mounts (old UI: 2 s after sign-in). */
 export const SILENT_CHECK_DELAY_MS = 2000;
 const AVAILABLE_TOAST_MS = 5200;
+const AVAILABLE_TOAST_ID = "update-available";
 const UP_TO_DATE_TOAST_MS = 3600;
 
 interface UpdateCheckValue {
@@ -44,6 +46,11 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
   const [checking, setChecking] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const busyRef = useRef(false);
+  // The update toast would cover the dialog's footer (a bottom drawer on phones).
+  const openDialog = useCallback(() => {
+    toast.dismiss(AVAILABLE_TOAST_ID);
+    setDialogOpen(true);
+  }, []);
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -66,12 +73,9 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
         .then(({ newer }) => {
           if (cancelled || !newer) return;
           toast.warning(tRef.current("shell.update.available", { latest: stripV(newer.version) }), {
-            id: "update-available",
+            id: AVAILABLE_TOAST_ID,
             duration: AVAILABLE_TOAST_MS,
-            action: {
-              label: tRef.current("shell.update.view"),
-              onClick: () => setDialogOpen(true),
-            },
+            action: { label: tRef.current("shell.update.view"), onClick: openDialog },
           });
         })
         // The silent check never reports errors.
@@ -81,7 +85,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [lookUp]);
+  }, [lookUp, openDialog]);
 
   const checkNow = useCallback(() => {
     if (busyRef.current) return;
@@ -90,7 +94,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
     lookUp()
       .then(({ newer }) => {
         if (newer) {
-          setDialogOpen(true);
+          openDialog();
           return;
         }
         toast.success(tRef.current("shell.update.upToDate"), { duration: UP_TO_DATE_TOAST_MS });
@@ -104,9 +108,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
         busyRef.current = false;
         setChecking(false);
       });
-  }, [lookUp]);
-
-  const openDialog = useCallback(() => setDialogOpen(true), []);
+  }, [lookUp, openDialog]);
   const value = useMemo(
     () => ({ latest, checking, checkNow, openDialog }),
     [latest, checking, checkNow, openDialog],
@@ -122,6 +124,17 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
         open={dialogOpen && latest !== null}
       />
     </UpdateCheckContext.Provider>
+  );
+}
+
+/** The small dot that marks a newer release on the badge, the rail and the header button. */
+export function UpdateDot({ className }: { className?: string }): JSX.Element {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("absolute size-2 rounded-full bg-warning ring-2 ring-background", className)}
+      data-slot="update-dot"
+    />
   );
 }
 

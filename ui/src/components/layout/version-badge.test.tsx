@@ -32,7 +32,7 @@ vi.mock("@/lib/api/system", () => {
   };
 });
 vi.mock("@/lib/toast", () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), dismiss: vi.fn() },
 }));
 
 const fetchRemote = vi.mocked(fetchRemoteVersion);
