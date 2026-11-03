@@ -1,29 +1,40 @@
-import type { JSX } from "react";
+import { Fragment, type JSX } from "react";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCompact, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 export function TokenCell({
   inTokens,
   outTokens,
   cacheReadTokens = 0,
   cacheWriteTokens = 0,
+  detailClassName,
 }: {
   inTokens: number;
   outTokens: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
+  /** Merged into the breakdown line, e.g. a narrower width floor for a crowded table. */
+  detailClassName?: string;
 }): JSX.Element {
   const { t, lang } = useT();
   const total = inTokens + outTokens;
   const hasCache = cacheReadTokens > 0 || cacheWriteTokens > 0;
 
-  let detail = `${t("tokens.in")} ${formatCompact(inTokens)} · ${t("tokens.out")} ${formatCompact(outTokens)}`;
+  // The breakdown wraps only between its parts ("In 14.5K", "Out 688", "Cache read 9.9K, write
+  // 0"), never inside one, so a narrow column never strands a word such as "Cache".
+  const parts = [
+    `${t("tokens.in")} ${formatCompact(inTokens)}`,
+    `${t("tokens.out")} ${formatCompact(outTokens)}`,
+  ];
   if (hasCache) {
-    detail += ` · ${t("tokens.cacheDetail", {
-      read: formatCompact(cacheReadTokens),
-      write: formatCompact(cacheWriteTokens),
-    })}`;
+    parts.push(
+      t("tokens.cacheDetail", {
+        read: formatCompact(cacheReadTokens),
+        write: formatCompact(cacheWriteTokens),
+      }),
+    );
   }
 
   const rows: [string, number][] = [
@@ -45,8 +56,18 @@ export function TokenCell({
         }
       >
         <span className="font-medium tabular-nums">{total === 0 ? "0" : formatCompact(total)}</span>
-        <span className="min-w-48 max-w-60 whitespace-normal text-muted-foreground text-xs tabular-nums leading-snug">
-          {detail}
+        <span
+          className={cn(
+            "min-w-48 max-w-60 whitespace-normal text-muted-foreground text-xs tabular-nums leading-snug",
+            detailClassName,
+          )}
+        >
+          {parts.map((part, index) => (
+            <Fragment key={part}>
+              {index > 0 ? " · " : null}
+              <span className="whitespace-nowrap">{part}</span>
+            </Fragment>
+          ))}
         </span>
       </TooltipTrigger>
       <TooltipPopup>

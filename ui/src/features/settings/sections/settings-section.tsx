@@ -79,7 +79,9 @@ export function LearnMore({ children }: { children: ReactNode }): JSX.Element {
       <PopoverTrigger
         render={
           <Button
-            className="h-auto px-0 align-baseline text-muted-foreground text-sm underline underline-offset-4 hover:text-foreground"
+            // Baseline-aligned on its text, not on the icon (a flex box takes its baseline from
+            // its first baseline item), so the link does not push its line taller than the rest.
+            className="h-auto items-baseline px-0 align-baseline text-muted-foreground text-sm underline underline-offset-4 hover:text-foreground [&_svg]:self-center"
             size="xs"
             variant="link"
           />

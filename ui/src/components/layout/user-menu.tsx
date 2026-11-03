@@ -23,6 +23,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { signOut } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { HEADER_ICON_BUTTON } from "./header-button";
 import { UpdateDot, useUpdateCheck } from "./update-check";
 import { stripV } from "./update-dialog";
 
@@ -100,7 +101,7 @@ export function UserMenu({ variant = "sidebar" }: { variant?: "sidebar" | "heade
                 render={
                   <Button
                     aria-label={t("shell.userMenu")}
-                    className="size-10 md:size-8"
+                    className={HEADER_ICON_BUTTON}
                     size="icon"
                     variant="ghost"
                   />

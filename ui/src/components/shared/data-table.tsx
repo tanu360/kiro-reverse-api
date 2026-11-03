@@ -57,7 +57,17 @@ export interface DataTableProps<T> {
   emptyState?: ReactNode;
   caption?: string;
   className?: string;
+  /**
+   * The table runs edge to edge in a SectionCard: it cancels the card's side padding and pads
+   * its first and last columns by the same amount, so the row hairlines reach the card's border
+   * and the first column lines up with the card title.
+   */
+  bleed?: boolean;
 }
+
+const BLEED_WRAPPER = "-mx-4 sm:-mx-5";
+const BLEED_TABLE =
+  "[&_tr>*:first-child]:ps-4 [&_tr>*:last-child]:pe-4 sm:[&_tr>*:first-child]:ps-5 sm:[&_tr>*:last-child]:pe-5";
 
 // Row-level click and key handlers ignore events that start inside these.
 const INTERACTIVE_SELECTOR =
@@ -71,6 +81,9 @@ function fromInteractiveChild(event: { target: EventTarget; currentTarget: Event
 }
 
 const ALIGN_CLASS = { start: "text-left", center: "text-center", end: "text-right" } as const;
+// Column headers sit a step under the 14 px cells: 13 px, regular weight, muted (the sort
+// button turns the sorted column's header to the text colour).
+const HEAD_CLASS = "font-normal text-[13px]";
 // Sticky cells need an opaque background; they repeat the row's hover and selected tints so a
 // pinned cell does not read as a separate block.
 const STICKY_BASE =
@@ -105,6 +118,7 @@ export function DataTable<T>({
   emptyState,
   caption,
   className,
+  bleed = false,
 }: DataTableProps<T>): JSX.Element {
   const { t } = useT();
   const isMobile = useIsMobile();
@@ -209,13 +223,13 @@ export function DataTable<T>({
   // The empty state sits under the table, outside its horizontal scroller, so it stays centred
   // in the visible width instead of across the full scroll width of a wide table.
   return (
-    <div className="min-w-0" data-slot="data-table">
-      <Table aria-busy={loading || undefined} className={className}>
+    <div className={cn("min-w-0", bleed && BLEED_WRAPPER)} data-slot="data-table">
+      <Table aria-busy={loading || undefined} className={cn(bleed && BLEED_TABLE, className)}>
         {caption ? <TableCaption className="sr-only">{caption}</TableCaption> : null}
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             {selection ? (
-              <TableHead className="w-px">
+              <TableHead className={cn(HEAD_CLASS, "w-px")}>
                 <Checkbox
                   aria-label={t("table.selectAll")}
                   checked={allSelected}
@@ -243,6 +257,7 @@ export function DataTable<T>({
                 <TableHead
                   aria-sort={ariaSort}
                   className={cn(
+                    HEAD_CLASS,
                     ALIGN_CLASS[column.align ?? "start"],
                     stickyClass(column.sticky),
                     column.headerClassName,
@@ -254,7 +269,7 @@ export function DataTable<T>({
                     <button
                       // Fills the 40 px header height so the whole header cell is the target.
                       className={cn(
-                        "-mx-1 inline-flex h-10 items-center gap-1 rounded-md px-1 font-medium outline-none hover:text-foreground focus-outline-inset",
+                        "-mx-1 inline-flex h-10 cursor-pointer items-center gap-1 rounded-md px-1 outline-none transition-colors hover:text-foreground focus-outline-inset",
                         active && "text-foreground",
                         column.align === "end" && "flex-row-reverse",
                       )}

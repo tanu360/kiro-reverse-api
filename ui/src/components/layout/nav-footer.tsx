@@ -10,9 +10,10 @@ import { VersionBadge } from "./version-badge";
 export const GITHUB_URL = "https://github.com/tanu360/kiro-reverse-api";
 
 /**
- * Old footer items: version badge with update notice, "Running" status, GitHub link,
- * tagline and copyright, then the Admin user row. In the icon rail they collapse into one
- * info tooltip.
+ * Old footer items: version badge with update notice, "Running" status, GitHub link and the
+ * copyright, then the Admin user row. In the icon rail they collapse into one info tooltip.
+ * Quiet like the sign-in footer: 12 px meta in one row, then the copyright line as the sign-in
+ * pages draw it (13 px, a middle dot, the app name a step quieter).
  */
 export function NavFooter(): JSX.Element {
   const { t } = useT();
@@ -25,15 +26,15 @@ export function NavFooter(): JSX.Element {
 
   return (
     <>
-      <div className="flex flex-col gap-2 px-2 pb-1 text-xs group-data-[collapsible=icon]:hidden">
+      <div className="flex flex-col gap-2.5 px-2 pb-1 text-xs group-data-[collapsible=icon]:hidden">
         <div className="flex flex-wrap items-center gap-2">
           <VersionBadge className="max-lg:h-10 max-lg:px-3" />
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-            <span aria-hidden="true" className="size-2 rounded-full bg-success" />
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
             {t("shell.running")}
           </span>
           <a
-            className="ms-auto inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-outline max-lg:min-h-10 max-lg:px-2"
+            className="ms-auto inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline max-lg:min-h-10 max-lg:px-2"
             href={GITHUB_URL}
             rel="noopener"
             target="_blank"
@@ -42,10 +43,7 @@ export function NavFooter(): JSX.Element {
             <ExternalLinkIcon aria-hidden="true" className="size-3" />
           </a>
         </div>
-        <p className="text-muted-foreground leading-snug">{t("shell.tagline")}</p>
-        <p className="text-muted-foreground">
-          {copyright} · {t("shell.builtFor")}
-        </p>
+        <FooterCopyright line={copyright} />
       </div>
       <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
         <SidebarMenuItem>
@@ -58,7 +56,7 @@ export function NavFooter(): JSX.Element {
             }
             className="relative"
             onClick={latest ? openDialog : undefined}
-            tooltip={[updateLabel, `${t("shell.running")} · ${copyright} · ${t("shell.builtFor")}`]
+            tooltip={[updateLabel, `${t("shell.running")} · ${copyright}`]
               .filter(Boolean)
               .join(" · ")}
           >
@@ -74,5 +72,32 @@ export function NavFooter(): JSX.Element {
         </SidebarMenuItem>
       </SidebarMenu>
     </>
+  );
+}
+
+/**
+ * "© 2026 · Kiro Proxy", as on the sign-in pages: the year in the muted text colour, a middle
+ * dot, the name a step quieter. The line is split at the app name, so a locale keeps its own word
+ * order; the dot is decoration and hidden from screen readers.
+ */
+function FooterCopyright({ line }: { line: string }): JSX.Element {
+  const { t } = useT();
+  const name = t("shell.appName");
+  const at = line.lastIndexOf(name);
+  return (
+    <p className="text-[13px] text-muted-foreground tabular-nums">
+      {at < 0 ? (
+        line
+      ) : (
+        <>
+          {line.slice(0, at).trimEnd()}
+          <span aria-hidden="true" className="mx-1.5">
+            ·
+          </span>
+          <span className="text-muted-foreground/70">{name}</span>
+          {line.slice(at + name.length)}
+        </>
+      )}
+    </p>
   );
 }

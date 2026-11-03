@@ -89,8 +89,9 @@ export function StatCard({
 
   const danger = tone === "danger";
   return (
+    // Flat, like the sign-in pages: the card's border and fill only, no gradient or shadow.
     <Card
-      className="min-w-0 gap-4 bg-linear-to-t from-primary/5 to-card p-4 shadow-xs dark:bg-card dark:from-card"
+      className="min-w-0 gap-4 p-4 shadow-none before:hidden sm:p-5"
       data-slot="stat-card"
       data-tone={tone}
     >
@@ -103,13 +104,13 @@ export function StatCard({
         >
           <Icon aria-hidden="true" className="size-4" />
         </div>
-        <p className="text-muted-foreground text-sm">{label}</p>
+        <p className="text-[13px] text-muted-foreground">{label}</p>
       </div>
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <div
             className={cn(
-              "font-medium text-3xl leading-none tabular-nums",
+              "font-heading font-semibold text-[1.75rem] leading-none tabular-nums",
               danger && "text-destructive-foreground",
             )}
           >
@@ -117,7 +118,7 @@ export function StatCard({
           </div>
           {delta ? <DeltaBadge delta={delta} /> : null}
         </div>
-        {caption ? <div className="text-muted-foreground text-sm">{caption}</div> : null}
+        {caption ? <div className="text-[13px] text-muted-foreground">{caption}</div> : null}
       </div>
       {sparkline ? (
         <div aria-hidden="true" className="-mx-1 h-10 min-w-0">

@@ -1,6 +1,13 @@
 import type { JSX, ReactNode } from "react";
-import { Card, CardDescription, CardFooter, CardPanel } from "@/components/ui/card";
+import { Card, CardDescription } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+
+/**
+ * A titled card section. One spacing rhythm on every page: 16 px of padding on phones and 20 px
+ * from sm up, 16 px from the title block to the content, and a slim footer (12 px top and
+ * bottom) under a hairline. The panel and footer are plain slots rather than CardPanel and
+ * CardFooter, whose own paddings change with the card's other children.
+ */
 
 export function SectionCard({
   id,
@@ -29,23 +36,33 @@ export function SectionCard({
     >
       {/* Actions wrap below the title on narrow cards instead of clipping beside it. */}
       <div
-        className="flex flex-col gap-3 p-4 pb-3 sm:p-5 sm:pb-3 @md:flex-row @md:items-start @md:justify-between"
+        className="flex flex-col gap-3 p-4 sm:p-5 sm:pb-4 @md:flex-row @md:items-start @md:justify-between"
         data-slot="card-header"
       >
         <div className="flex min-w-0 flex-col gap-1">
           <h2
-            className="font-heading font-medium text-base leading-snug"
+            className="font-heading font-semibold text-[0.9375rem] leading-snug"
             data-slot="card-title"
             id={headingId}
           >
             {title}
           </h2>
-          {description ? <CardDescription>{description}</CardDescription> : null}
+          {description ? (
+            <CardDescription className="text-pretty leading-relaxed">{description}</CardDescription>
+          ) : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        ) : null}
       </div>
-      <CardPanel className="min-w-0 p-4 sm:p-5">{children}</CardPanel>
-      {footer ? <CardFooter className="border-t p-4 sm:p-5">{footer}</CardFooter> : null}
+      <div className="min-w-0 flex-1 px-4 pb-4 sm:px-5 sm:pb-5" data-slot="card-panel">
+        {children}
+      </div>
+      {footer ? (
+        <div className="flex items-center border-t px-4 py-3 sm:px-5" data-slot="card-footer">
+          {footer}
+        </div>
+      ) : null}
     </Card>
   );
 }

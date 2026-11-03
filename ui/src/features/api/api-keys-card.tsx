@@ -331,6 +331,7 @@ export function ApiKeysCard(): JSX.Element {
           />
         ) : (
           <DataTable
+            bleed
             caption={t("keys.caption")}
             columns={columns}
             data={list}

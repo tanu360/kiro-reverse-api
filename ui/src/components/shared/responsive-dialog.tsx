@@ -69,7 +69,7 @@ export function ResponsiveDialog({
       >
         <DrawerPopup className="max-h-[90dvh]" initialFocus={initialFocus} showBar>
           <DrawerHeader>
-            <DrawerTitle className="font-medium text-lg">{title}</DrawerTitle>
+            <DrawerTitle className="font-heading font-semibold text-lg">{title}</DrawerTitle>
             {description ? <DrawerDescription>{description}</DrawerDescription> : null}
           </DrawerHeader>
           <DrawerPanel className="min-h-0">{children}</DrawerPanel>
@@ -87,7 +87,7 @@ export function ResponsiveDialog({
         showCloseButton={dismissible}
       >
         <DialogHeader>
-          <DialogTitle className="font-medium text-lg">{title}</DialogTitle>
+          <DialogTitle className="font-heading font-semibold text-lg">{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
         <DialogPanel>{children}</DialogPanel>

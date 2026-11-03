@@ -149,7 +149,6 @@ export function RequestsPage(): JSX.Element {
           <Button
             disabled={query.isFetching}
             onClick={() => void query.refetch()}
-            size="sm"
             variant="outline"
           >
             <RotateCwIcon

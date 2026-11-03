@@ -74,7 +74,11 @@ export function TableSkeleton({
 
 export function StatCardSkeleton(): JSX.Element {
   return (
-    <Card aria-hidden="true" className="gap-4 p-4" data-slot="stat-card-skeleton">
+    <Card
+      aria-hidden="true"
+      className="gap-4 p-4 shadow-none before:hidden sm:p-5"
+      data-slot="stat-card-skeleton"
+    >
       <Skeleton className="size-7 rounded-lg" />
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-8 w-1/2" />

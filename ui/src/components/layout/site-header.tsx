@@ -15,7 +15,8 @@ import { UserMenu } from "./user-menu";
 /**
  * Port of the Studio Admin dashboard header: sticky and 48 px, painted like t3code's page headers
  * (solid `bg-background` as in ChatView's `data-chat-header`, with the `h-12 border-b` of its
- * settings content header) rather than a translucent blur.
+ * settings content header) rather than a translucent blur. It carries the page's film grain, so
+ * the bar and the page under it read as one surface.
  */
 export function SiteHeader(): JSX.Element {
   const { t } = useT();
@@ -25,7 +26,7 @@ export function SiteHeader(): JSX.Element {
 
   return (
     <header
-      className="sticky top-0 z-40 flex h-12 shrink-0 items-center border-b bg-background"
+      className="sticky top-0 z-40 flex h-12 shrink-0 items-center border-b bg-background surface-grain"
       data-slot="site-header"
     >
       <div className="flex w-full min-w-0 items-center justify-between gap-2 px-2 sm:px-4 lg:px-6">

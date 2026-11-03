@@ -24,7 +24,7 @@ export function KeyValueGrid({
           )}
           key={item.label}
         >
-          <dt className="text-muted-foreground text-xs">{item.label}</dt>
+          <dt className="text-[13px] text-muted-foreground">{item.label}</dt>
           <dd className={cn("min-w-0 break-words", item.mono && "font-mono text-[0.8125rem]")}>
             {item.value}
           </dd>

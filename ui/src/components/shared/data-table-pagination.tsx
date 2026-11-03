@@ -34,7 +34,7 @@ export function DataTablePagination({
   const showSizes = Boolean(pageSizeOptions?.length && onPageSizeChange);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-3 text-[13px]">
       <p aria-live="polite" className="text-muted-foreground tabular-nums">
         {t("table.pageInfo", {
           start: formatNumber(start, lang),

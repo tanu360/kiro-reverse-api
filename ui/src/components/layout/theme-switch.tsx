@@ -14,6 +14,7 @@ import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmente
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { HEADER_ICON_BUTTON } from "./header-button";
 import { THEMES, type Theme, useTheme } from "./theme-provider";
 
 export const THEME_ICONS = { system: MonitorIcon, light: SunIcon, dark: MoonIcon } as const;
@@ -91,7 +92,7 @@ export function ThemeSwitch({
                 render={
                   <Button
                     aria-label={label}
-                    className="size-10 md:size-8"
+                    className={HEADER_ICON_BUTTON}
                     size="icon"
                     variant="ghost"
                   />
@@ -131,7 +132,7 @@ export function ThemeSwitch({
         render={
           <Button
             aria-label={label}
-            className={cn("size-10 md:size-8", className)}
+            className={cn(HEADER_ICON_BUTTON, className)}
             data-theme-mode={theme}
             onClick={() => setTheme(nextTheme(theme))}
             size="icon"

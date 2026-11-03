@@ -154,8 +154,24 @@ describe("RequestsPage", () => {
     const cells = within(row).getAllByRole("cell");
     expect(cells[1]).toHaveTextContent("Failed 401");
     expect(cells[2]).toHaveTextContent(/^—$/);
-    expect(cells[5]).toHaveTextContent(/^—$/);
+    // The model cell's first line; the endpoint rides under it as a meta line (ModelCell).
+    expect(within(cells[5]).getByText("—")).toBeInTheDocument();
+    expect(cells[5]).toHaveTextContent(/^—/);
     expect(within(cells[9]).getByText("Authentication")).toBeInTheDocument();
+  });
+
+  it("folds the API key and endpoint columns into their neighbours on narrower lists", async () => {
+    await renderApp("/requests");
+    await waitForRows();
+    // Ten columns overflowed a 1440 px desktop: the key moves under the account below a 68rem
+    // container, the endpoint under the model below a 7xl one.
+    const header = (name: string) => screen.getByRole("columnheader", { name: new RegExp(name) });
+    expect(header("API key")).toHaveClass("hidden", "@[68rem]/requests:table-cell");
+    expect(header("Endpoint")).toHaveClass("hidden", "@7xl/requests:table-cell");
+    const row = bodyRows().find((candidate) => within(candidate).queryAllByText(/^sk-/).length);
+    if (!row) throw new Error("no row with an API key");
+    const cells = within(row).getAllByRole("cell");
+    expect(within(cells[2]).getByText(/^sk-/)).toHaveClass("@[68rem]/requests:hidden");
   });
 
   it("opens the detail sheet with the full message on row click", async () => {

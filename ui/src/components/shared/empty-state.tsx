@@ -32,8 +32,13 @@ export function EmptyState({
             <Icon aria-hidden="true" />
           </EmptyMedia>
         ) : null}
-        <EmptyTitle className={cn(compact && "text-base")}>{title}</EmptyTitle>
-        {description ? <EmptyDescription>{description}</EmptyDescription> : null}
+        {/* The card-title step of the type scale, not the primitive's bold 20 px. */}
+        <EmptyTitle className={cn("font-semibold text-base", compact && "text-[0.9375rem]")}>
+          {title}
+        </EmptyTitle>
+        {description ? (
+          <EmptyDescription className="text-pretty leading-relaxed">{description}</EmptyDescription>
+        ) : null}
       </EmptyHeader>
       {action ? <EmptyContent>{action}</EmptyContent> : null}
     </Empty>

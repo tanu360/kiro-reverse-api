@@ -15,6 +15,7 @@ import { Select, SelectPopup, SelectPrimitive } from "@/components/ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { LANGUAGES, type SupportedLang, useLanguage, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { HEADER_ICON_BUTTON } from "./header-button";
 
 /** Language names are shown in their own script, whatever the active language. */
 export const LANGUAGE_NAMES: Record<SupportedLang, string> = Object.fromEntries(
@@ -67,7 +68,7 @@ export function LanguageSwitch({
               render={
                 <Button
                   aria-label={triggerLabel}
-                  className={cn(pill ? "h-10 gap-1.5 px-3 md:h-8" : "size-10 md:size-8", className)}
+                  className={cn(pill ? "h-10 gap-1.5 px-3 md:h-8" : HEADER_ICON_BUTTON, className)}
                   size={pill ? "sm" : "icon"}
                   variant="ghost"
                 />

@@ -420,6 +420,7 @@ export function BackupsTable({
         <BackupCards actions={actions} emptyState={emptyState} loading={loading} rows={rows} />
       ) : (
         <DataTable
+          bleed
           caption={t("list.caption")}
           columns={columns}
           data={rows}
