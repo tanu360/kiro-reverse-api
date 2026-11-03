@@ -1,6 +1,7 @@
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  clearSession,
   getToken,
   type SessionChangeReason,
   setSession,
@@ -45,6 +46,11 @@ function recordReasons(): SessionChangeReason[] {
   return reasons;
 }
 
+// Authenticated requests need a session; tests that need another token sign in again.
+beforeEach(() => {
+  signIn("token-default");
+});
+
 afterEach(() => {
   for (const unsubscribe of unsubscribers.splice(0)) unsubscribe();
 });
@@ -66,10 +72,14 @@ describe("apiRequest headers", () => {
     expect(seen[0].has("X-Admin-Password")).toBe(false);
   });
 
-  it("sends no token when signed out", async () => {
+  it("sends nothing and fails with 401 when signed out", async () => {
+    clearSession("signout");
     const seen = captureHeaders("/probe");
-    await apiRequest("/probe");
-    expect(seen[0].has("X-Admin-Token")).toBe(false);
+    const reasons = recordReasons();
+    const error = await rejection(apiRequest("/probe"));
+    expect(error.status).toBe(401);
+    expect(reasons).toEqual([]);
+    expect(seen).toHaveLength(0);
   });
 
   it("sends JSON bodies as application/json", async () => {

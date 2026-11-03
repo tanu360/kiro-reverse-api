@@ -74,6 +74,9 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   const headers = new Headers();
   // The admin password is never sent from here: only POST /session carries it, in the body.
   const token = auth ? getToken() : null;
+  // Without a session the server can only answer 401, so nothing is sent. This also keeps a
+  // page that is still mounted during the redirect to /login from firing requests.
+  if (auth && !token) throw new ApiError({ status: 401, serverMessage: "Unauthorized" });
   if (token) headers.set("X-Admin-Token", token);
 
   let payload: BodyInit | undefined;
