@@ -145,8 +145,9 @@ export function SignInForm({
       {/* A quiet option: 16 px box, 14 px muted text at every size. */}
       <Label className="min-h-10 cursor-pointer self-start font-normal text-muted-foreground text-sm/5">
         <Checkbox
-          // Flat sign-in pages: no drop shadow (the ::before layer only draws one).
-          className="size-4 shadow-none before:hidden"
+          // Flat sign-in pages: no drop shadow (the ::before layer only draws one). Unchecked,
+          // the password field's soft fill and hairline border; checked stays solid purple.
+          className="size-4 shadow-none before:hidden not-data-checked:border-foreground/[0.14] not-data-checked:bg-foreground/[0.035] dark:not-data-checked:border-white/[0.12] dark:not-data-checked:bg-white/[0.045]"
           checked={remember}
           onCheckedChange={(checked) => setRemember(checked === true)}
         />
@@ -167,13 +168,13 @@ export function SignInForm({
       ) : null}
       {/*
        * The primary button with a faint film grain (index.css grain-overlay, at half its default
-       * strength) that gives the fill some texture, under the label. It keeps the coss lift the
-       * app buttons dropped (a soft primary shadow and a 1 px inner highlight), its icon at 80 %,
-       * and no scale layer (will-change), which would re-rasterise the label.
+       * strength) that gives the fill some texture, under the label. No drop shadow (flat, like
+       * the field); only a 1 px inner highlight along the top edge, its icon at 80 %, and no
+       * scale layer (will-change), which would re-rasterise the label.
        */}
       <Button
         // 44 px on phones and touch screens, 40 px from sm up: the password field's height.
-        className="grain-overlay h-11 w-full shadow-primary/24 shadow-xs not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [--grain-overlay-opacity:0.1] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [:disabled,:active,[data-pressed]]:shadow-none sm:h-10 pointer-coarse:h-11 [&:not([aria-haspopup]):not(:disabled):not([aria-disabled=true])]:will-change-auto [&_svg:not([class*='opacity-'])]:opacity-80"
+        className="grain-overlay h-11 w-full shadow-none not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [--grain-overlay-opacity:0.1] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] sm:h-10 pointer-coarse:h-11 [&:not([aria-haspopup]):not(:disabled):not([aria-disabled=true])]:will-change-auto [&_svg:not([class*='opacity-'])]:opacity-80"
         disabled={pending || locked}
         size="lg"
         type="submit"

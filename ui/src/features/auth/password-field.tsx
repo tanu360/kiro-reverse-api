@@ -35,12 +35,16 @@ export function PasswordField({
       <FieldLabel className="sr-only">{t("password")}</FieldLabel>
       {/*
        * Flat sign-in pages: no drop shadow (the ::before layer only draws one) and focus shown
-       * by the border colour alone, without the app fields' 3 px ring. The field is 44 px tall
-       * on phones and touch screens and 40 px from sm up (42 / 38 px of input inside the 1 px
-       * border), the submit button's height.
+       * by the border colour alone, without the app fields' 3 px ring. A soft filled field, not
+       * an outlined one: a faint foreground tint on the page with a hairline border barely
+       * darker than the fill; hover deepens the tint a step, and focus turns the border a soft
+       * purple. Invalid keeps the group's red border (its :has() selectors outrank these).
+       * The field is 44 px tall on phones and touch screens and 40 px from sm up (42 / 38 px of
+       * input inside the 1 px border), the submit button's height.
        */}
-      <InputGroup className="shadow-none before:hidden has-[input:focus-visible,textarea:focus-visible]:ring-0 [&_[data-slot=input]]:h-10.5 [&_[data-slot=input]]:leading-10.5 sm:[&_[data-slot=input]]:h-9.5 sm:[&_[data-slot=input]]:leading-9.5 pointer-coarse:[&_[data-slot=input]]:h-10.5 pointer-coarse:[&_[data-slot=input]]:leading-10.5">
-        <InputGroupAddon>
+      <InputGroup className="shadow-none before:hidden border-foreground/[0.08] bg-foreground/[0.035] transition-[background-color,border-color] duration-150 hover:bg-foreground/[0.05] has-[input:focus-visible,textarea:focus-visible]:border-primary/55 has-[input:focus-visible,textarea:focus-visible]:bg-foreground/[0.02] has-[input:focus-visible,textarea:focus-visible]:ring-0 dark:border-white/[0.07] dark:bg-white/[0.045] dark:hover:bg-white/[0.06] dark:has-[input:focus-visible,textarea:focus-visible]:border-primary/70 dark:has-[input:focus-visible,textarea:focus-visible]:bg-white/[0.05] [&_[data-slot=input]]:h-10.5 [&_[data-slot=input]]:leading-10.5 sm:[&_[data-slot=input]]:h-9.5 sm:[&_[data-slot=input]]:leading-9.5 pointer-coarse:[&_[data-slot=input]]:h-10.5 pointer-coarse:[&_[data-slot=input]]:leading-10.5">
+        {/* The lock in the muted text colour, like the placeholder, so the typed text leads. */}
+        <InputGroupAddon className="text-muted-foreground">
           <LockIcon aria-hidden="true" />
         </InputGroupAddon>
         <InputGroupInput
