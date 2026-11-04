@@ -46,7 +46,7 @@ export function createRng(seed: number): () => number {
   };
 }
 
-type Rng = () => number;
+export type Rng = () => number;
 
 // Factories called at runtime (handlers creating new rows) share one stream.
 const factoryRng = createRng(0x5eed);
@@ -55,15 +55,15 @@ function nowUnix(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-function int(rng: Rng, min: number, max: number): number {
+export function int(rng: Rng, min: number, max: number): number {
   return min + Math.floor(rng() * (max - min + 1));
 }
 
-function pick<T>(rng: Rng, items: readonly T[]): T {
+export function pick<T>(rng: Rng, items: readonly T[]): T {
   return items[Math.floor(rng() * items.length)];
 }
 
-function weighted<T>(rng: Rng, items: ReadonlyArray<readonly [T, number]>): T {
+export function weighted<T>(rng: Rng, items: ReadonlyArray<readonly [T, number]>): T {
   const total = items.reduce((sum, [, weight]) => sum + weight, 0);
   let roll = rng() * total;
   for (const [item, weight] of items) {
@@ -73,20 +73,20 @@ function weighted<T>(rng: Rng, items: ReadonlyArray<readonly [T, number]>): T {
   return items[items.length - 1][0];
 }
 
-function hex(rng: Rng, length: number): string {
+export function hex(rng: Rng, length: number): string {
   let out = "";
   for (let i = 0; i < length; i++) out += Math.floor(rng() * 16).toString(16);
   return out;
 }
 
-function base64ish(rng: Rng, length: number): string {
+export function base64ish(rng: Rng, length: number): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   let out = "";
   for (let i = 0; i < length; i++) out += alphabet[Math.floor(rng() * alphabet.length)];
   return out;
 }
 
-function uuid(rng: Rng): string {
+export function uuid(rng: Rng): string {
   const h = hex(rng, 32).split("");
   h[12] = "4";
   h[16] = ((Number.parseInt(h[16], 16) & 0x3) | 0x8).toString(16);
@@ -95,7 +95,7 @@ function uuid(rng: Rng): string {
 }
 
 /** FNV-1a, to derive a stable seed from an id. */
-function hashSeed(text: string): number {
+export function hashSeed(text: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i);
@@ -104,22 +104,22 @@ function hashSeed(text: string): number {
   return h >>> 0;
 }
 
-function round(value: number, digits: number): number {
+export function round(value: number, digits: number): number {
   const f = 10 ** digits;
   return Math.round(value * f) / f;
 }
 
-function pad(n: number, width = 2): string {
+export function pad(n: number, width = 2): string {
   return String(n).padStart(width, "0");
 }
 
-function nextResetDate(): string {
+export function nextResetDate(): string {
   const d = new Date();
   const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
   return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-01`;
 }
 
-function maskKey(key: string): string {
+export function maskKey(key: string): string {
   return key.length > 10 ? `${key.slice(0, 6)}****${key.slice(-4)}` : key;
 }
 
@@ -259,9 +259,11 @@ export function makeAccountFull(account: Account): AccountFull {
   };
 }
 
-const MS_PROFILE_PRIMARY = "arn:aws:codewhisperer:eu-central-1:381492027763:profile/QK7M2XRZ9PLA";
-const MS_PROFILE_SANDBOX = "arn:aws:codewhisperer:us-east-1:381492027763:profile/HV4N8TQW2JDE";
-const DEFAULT_PROFILE = "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK";
+export const MS_PROFILE_PRIMARY =
+  "arn:aws:codewhisperer:eu-central-1:381492027763:profile/QK7M2XRZ9PLA";
+export const MS_PROFILE_SANDBOX =
+  "arn:aws:codewhisperer:us-east-1:381492027763:profile/HV4N8TQW2JDE";
+export const DEFAULT_PROFILE = "arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK";
 
 /** Kiro profiles offered to an account: none for API keys, two for the Microsoft account. */
 export function makeProfiles(account: Account): AccountProfile[] {
@@ -1090,7 +1092,7 @@ export function buildStatus(db: MockDb): StatusResponse {
 // Backups and export
 // ---------------------------------------------------------------------------
 
-function backupId(createdAt: number, rng: Rng): string {
+export function backupId(createdAt: number, rng: Rng): string {
   const d = new Date(createdAt * 1000);
   const date = `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
   const time = `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
@@ -1098,7 +1100,7 @@ function backupId(createdAt: number, rng: Rng): string {
 }
 
 /** The note the UI writes for a manual backup: local time `YYYY-MM-DD HH:MM:SS`. */
-function manualNote(createdAt: number): string {
+export function manualNote(createdAt: number): string {
   const d = new Date(createdAt * 1000);
   return `manual backup ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(
     d.getHours(),

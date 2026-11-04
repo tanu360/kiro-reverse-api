@@ -28,6 +28,15 @@ import {
   seedErrors,
   seedRequests,
 } from "./fixtures";
+import { seedFullDataset } from "./fixtures-full";
+
+/**
+ * Which dataset the mock serves. `small` is the unit-test seed (8 accounts, 320 requests);
+ * `full` is the large browser dataset with every value the server can send; `empty` is a fresh
+ * install. Unit tests always run `small`; the browser picks one in scenario.ts.
+ */
+export type MockScenario = "full" | "small" | "empty";
+export const MOCK_SCENARIOS: readonly MockScenario[] = ["full", "small", "empty"];
 
 export interface MockDb {
   /** 8 random digits, as the real first-run password (12345678 in unit tests) */
@@ -54,6 +63,8 @@ export interface MockDb {
   startedAt: number;
   /** '2.1.0' */
   version: string;
+  /** What the update check (version.json on GitHub) answers. */
+  remoteVersion: { version: string; changelog: string };
   pending: {
     iam: Record<string, unknown>;
     microsoft: Record<string, unknown>;
@@ -94,14 +105,72 @@ function mockAdminPassword(): string {
   return password;
 }
 
-function seedDb(): MockDb {
-  const now = mockNowUnix();
-  const accounts = seedAccounts();
-  const requests = seedRequests(now, SEED_REQUEST_COUNT);
+const REMOTE_CHANGELOG = [
+  "🧭 Requests can be filtered by API key, endpoint and error type, and the filters stay in the URL.",
+  "📈 The Overview heatmap groups quiet accounts so a pool of 100+ accounts stays readable.",
+  "🔁 Failover now skips accounts whose overage cap is reached instead of retrying them first.",
+  "🌍 New: per-account proxy URLs accept socks5h:// with credentials.",
+  "🛠️ Fixed: a restore from a backup without credentials no longer clears refresh tokens.",
+].join("\n");
+
+/** The common fields every scenario shares. */
+function baseDb(): Pick<
+  MockDb,
+  "adminPassword" | "firstRunPending" | "failedLogins" | "version" | "remoteVersion" | "pending"
+> {
   return {
     adminPassword: mockAdminPassword(),
     firstRunPending: true,
     failedLogins: 0,
+    version: "2.1.0",
+    // Same as the running version: no update notice in tests, screenshots or axe runs.
+    remoteVersion: { version: "2.1.0", changelog: "" },
+    pending: { iam: {}, microsoft: {}, builderId: {} },
+  };
+}
+
+/** Large and varied: every union value, extremes and 30 days of traffic (fixtures-full.ts). */
+function seedFullDb(now: number): MockDb {
+  const data = seedFullDataset(now);
+  return {
+    ...baseDb(),
+    ...data,
+    modelMix: buildModelMix(data.requests),
+    // An update is out, so the update notice shows.
+    remoteVersion: { version: "2.2.0", changelog: REMOTE_CHANGELOG },
+  };
+}
+
+/** A fresh install: nothing configured, nothing served, just started. */
+function seedEmptyDb(now: number): MockDb {
+  return {
+    ...baseDb(),
+    accounts: [],
+    secrets: {},
+    apiKeys: [],
+    requests: [],
+    errors: [],
+    modelMix: [],
+    backups: [],
+    schedule: {},
+    settings: defaultSettings(),
+    thinking: defaultThinking(),
+    modelMappings: [],
+    endpoint: defaultEndpoint(),
+    proxy: { proxyURL: "" },
+    promptFilter: defaultPromptFilter(),
+    startedAt: now - 42,
+  };
+}
+
+function seedDb(scenario: MockScenario): MockDb {
+  const now = mockNowUnix();
+  if (scenario === "full") return seedFullDb(now);
+  if (scenario === "empty") return seedEmptyDb(now);
+  const accounts = seedAccounts();
+  const requests = seedRequests(now, SEED_REQUEST_COUNT);
+  return {
+    ...baseDb(),
     accounts,
     secrets: Object.fromEntries(accounts.map((account) => [account.id, makeAccountFull(account)])),
     apiKeys: seedApiKeys(),
@@ -137,14 +206,23 @@ function seedDb(): MockDb {
     },
     // The process "started" before the oldest seeded request, so every request counts.
     startedAt: now - 26 * 3600,
-    version: "2.1.0",
-    pending: { iam: {}, microsoft: {}, builderId: {} },
   };
 }
 
-export const mockDb: MockDb = seedDb();
+let scenario: MockScenario = "small";
 
-/** Re-seeds in place, so imported references stay valid. */
-export function resetMockDb(): void {
-  Object.assign(mockDb, seedDb());
+export const mockDb: MockDb = seedDb(scenario);
+
+/** The dataset the mock serves now. */
+export function mockScenario(): MockScenario {
+  return scenario;
+}
+
+/**
+ * Re-seeds in place, so imported references stay valid. Without an argument it keeps the current
+ * scenario, so the unit-test reset after each test stays on the small seed.
+ */
+export function resetMockDb(next: MockScenario = scenario): void {
+  scenario = next;
+  Object.assign(mockDb, seedDb(next));
 }

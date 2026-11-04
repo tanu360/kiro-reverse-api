@@ -1,8 +1,10 @@
 import { type HttpHandler, HttpResponse, http, sse } from "msw";
 import { REMOTE_VERSION_URL } from "@/lib/api/system";
-import type { RequestRecord } from "@/lib/api/types";
-import { mockDb, mockNowUnix } from "./db";
+import type { AdminEventType, RequestRecord } from "@/lib/api/types";
+import { mockDb, mockNowUnix, mockScenario } from "./db";
+import { onMockEvent } from "./events";
 import { buildModelMix, buildStatus, makeObserveError, makeRequestRecord } from "./fixtures";
+import { makeLiveRequest } from "./fixtures-full";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "./http";
 
 const SESSION_TTL_MS = 12 * 3600 * 1000;
@@ -27,8 +29,59 @@ function retryAfterSeconds(): number {
   return Math.max(1, Math.ceil((lockedSince + LOGIN_LOCK_MS - Date.now()) / 1000));
 }
 
+const MAX_RECENT_ERRORS = 100;
+
+/** The error event a failed request leaves in the recent-errors ring. */
+function errorEvent(record: RequestRecord) {
+  return makeObserveError({
+    ts: record.ts,
+    accountId: record.accountId,
+    email: record.email,
+    model: record.model || undefined,
+    status: record.status,
+    message: record.message?.slice(0, 240),
+  });
+}
+
+/**
+ * The full dataset's tick: 0-3 requests drawn like the seeded ones (every endpoint, model, key and
+ * error type), so the live tiles, sparklines and heatmap keep moving at the seeded rate.
+ */
+function appendFullRequests(): void {
+  const count = Math.floor(Math.random() * 4);
+  if (count === 0 || mockDb.accounts.length === 0) return;
+  const now = mockNowUnix();
+  let nextId = (mockDb.requests[0]?.id ?? 0) + 1;
+  for (let i = 0; i < count; i++) {
+    const record = makeLiveRequest(mockDb.accounts, mockDb.apiKeys, now, nextId++);
+    mockDb.requests.unshift(record);
+    if (!record.success) mockDb.errors.unshift(errorEvent(record));
+    const account = mockDb.accounts.find((a) => a.id === record.accountId);
+    if (account) {
+      account.lastUsed = now;
+      account.requestCount += 1;
+      if (!record.success) account.errorCount += 1;
+      account.totalTokens += record.totalTokens;
+      account.totalCredits = Math.round((account.totalCredits + record.credits) * 1e4) / 1e4;
+    }
+    const key = mockDb.apiKeys.find((k) => k.id === record.apiKeyId);
+    if (key) {
+      key.lastUsedAt = now;
+      key.requestsCount += 1;
+      key.tokensUsed += record.totalTokens;
+      key.creditsUsed = Math.round((key.creditsUsed + record.credits) * 1e4) / 1e4;
+    }
+  }
+  mockDb.errors.length = Math.min(mockDb.errors.length, MAX_RECENT_ERRORS);
+  mockDb.modelMix = buildModelMix(mockDb.requests);
+}
+
 /** Adds 0-3 synthetic requests (newest first) so live views move in mock mode. */
 function appendSyntheticRequests(): void {
+  if (mockScenario() === "full") {
+    appendFullRequests();
+    return;
+  }
   const serving = mockDb.accounts.filter(
     (a) => a.enabled && a.hasToken && (a.banStatus === "" || a.banStatus === "ACTIVE"),
   );
@@ -81,7 +134,7 @@ function appendSyntheticRequests(): void {
 function eventsHandlers(): HttpHandler[] {
   if (typeof EventSource === "undefined") return [];
   return [
-    sse<{ hello: string; observe_tick: string }>(apiUrl("/events"), ({ client, request }) => {
+    sse<Record<AdminEventType, string>>(apiUrl("/events"), ({ client, request }) => {
       const ticket = new URL(request.url).searchParams.get("ticket") ?? "";
       if (!ticket.startsWith("mock-ticket-")) {
         client.error();
@@ -89,9 +142,14 @@ function eventsHandlers(): HttpHandler[] {
       }
       client.send({ event: "hello", data: "{}" });
       let open = true;
+      // Backup events from the handlers, as the Go broadcaster sends them.
+      const unsubscribe = onMockEvent((type, payload) => {
+        if (open) client.send({ event: type, data: JSON.stringify({ type, payload }) });
+      });
       const stop = () => {
         open = false;
         clearInterval(timer);
+        unsubscribe();
       };
       const timer = setInterval(() => {
         if (!open || request.signal.aborted) {
@@ -186,12 +244,12 @@ export const coreHandlers: HttpHandler[] = [
     return HttpResponse.json({ version: `v${mockDb.version}` });
   }),
 
-  // The update check answers with the running version, so no update notice appears in tests,
-  // screenshots or axe runs. MSW matches without the ?t= cache buster.
+  // The update check answers with the running version (small and empty datasets), so no update
+  // notice appears in tests, screenshots or axe runs; the full dataset announces a newer one.
+  // MSW matches without the ?t= cache buster.
   http.get(REMOTE_VERSION_URL, () =>
     HttpResponse.json({
-      version: mockDb.version,
-      changelog: "",
+      ...mockDb.remoteVersion,
       download: "https://github.com/tanu360/kiro-reverse-api/releases/latest",
     }),
   ),

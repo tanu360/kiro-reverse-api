@@ -52,10 +52,18 @@ function normalizeQuery(url: URL): NormalizedQuery {
   };
 }
 
+// id -> raw key, rebuilt once per request: a linear lookup per row and comparison is too slow for
+// the full dataset's ~12k rows.
+let keyIndex = new Map<string, string>();
+
+function indexKeys(): void {
+  keyIndex = new Map(mockDb.apiKeys.map((key) => [key.id, key.key]));
+}
+
 /** The raw key behind a row: the server searches and sorts by it but never sends it. */
 function rawKey(record: RequestRecord): string {
   if (!record.apiKeyId) return "";
-  return mockDb.apiKeys.find((key) => key.id === record.apiKeyId)?.key ?? "";
+  return keyIndex.get(record.apiKeyId) ?? "";
 }
 
 function matches(record: RequestRecord, query: NormalizedQuery): boolean {
@@ -148,6 +156,7 @@ export function inMemoryRequestsHandler(): HttpHandler {
     if (denied) return denied;
     await mockDelay();
     const query = normalizeQuery(new URL(request.url));
+    indexKeys();
     const ring = mockDb.requests.slice(0, MEMORY_RING_SIZE).map(({ id: _id, ...rest }) => rest);
     const filtered = ring.filter((record) => matches(record, query));
     return page(
@@ -164,6 +173,7 @@ export const handlers: HttpHandler[] = [
     if (denied) return denied;
     await mockDelay();
     const query = normalizeQuery(new URL(request.url));
+    indexKeys();
     const filtered = mockDb.requests.filter((record) => matches(record, query));
     return page(
       sortRecords(filtered, query, (a, b) => sign(a.id ?? 0, b.id ?? 0)),

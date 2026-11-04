@@ -4,7 +4,7 @@ import { createSession, getFirstRun } from "@/lib/api/session";
 import { compareVersions, fetchRemoteVersion, getStatus, getVersion } from "@/lib/api/system";
 import type { RequestErrorType } from "@/lib/api/types";
 import { setSession } from "@/lib/auth/session";
-import { mockDb, mockNowUnix, resetMockDb } from "./db";
+import { mockDb, mockNowUnix, mockScenario, resetMockDb } from "./db";
 import {
   buildHeatmap,
   buildModelMix,
@@ -14,6 +14,7 @@ import {
   seedAccounts,
   seedRequests,
 } from "./fixtures";
+import { seedFullDataset } from "./fixtures-full";
 
 const ERROR_TYPES: RequestErrorType[] = [
   "client_closed",
@@ -218,5 +219,216 @@ describe("core handlers", () => {
     const remote = await fetchRemoteVersion();
     expect(local.version).toBe("v2.1.0");
     expect(compareVersions(local.version, remote.version)).toBe(0);
+  });
+});
+
+/** proxy/request_trace.go classifyRequestError, to check that seeded messages match their type. */
+function classify(status: number, message: string): RequestErrorType {
+  const lower = message.toLowerCase();
+  const has = (...markers: string[]) => markers.some((m) => lower.includes(m));
+  if (status === 499) return "client_closed";
+  if (status === 429 && has("limit exceeded")) return "api_key_limit";
+  if (has("402") && has("overage")) return "overage";
+  if (
+    /(^|[^A-Za-z0-9])429([^A-Za-z0-9]|$)/.test(message) ||
+    has("quota", "monthly", "usage limit")
+  ) {
+    return "quota";
+  }
+  if (has("temporarily_suspended", "temporarily is suspended", "account suspended")) {
+    return "suspended";
+  }
+  if (has("no available kiro profile")) return "profile";
+  if (
+    has("http 401", "http 403", "unauthorized", "forbidden", "authentication failed") ||
+    has("token invalid", "token expired", "invalid_grant") ||
+    status === 401
+  ) {
+    return "auth";
+  }
+  if (has("upstream stream ended", "upstream truncated response", "upstream event stream")) {
+    return "stream";
+  }
+  if (has("no available accounts")) return "no_accounts";
+  if (status === 400 || status === 405) return "invalid_request";
+  if (status === 429) return "rate_limit";
+  if (has("timeout", "deadline exceeded")) return "timeout";
+  if (status >= 500 || status === 0) return "upstream";
+  return "unknown";
+}
+
+describe("full dataset (the browser default)", () => {
+  const now = mockNowUnix();
+  const started = performance.now();
+  const full = seedFullDataset(now);
+  const elapsed = performance.now() - started;
+  const values = <T>(rows: T[], pick: (row: T) => unknown) => new Set(rows.map(pick));
+
+  it("is large, quick and the same on every load", () => {
+    expect(full.accounts.length).toBeGreaterThanOrEqual(80);
+    expect(full.accounts.length).toBeLessThanOrEqual(150);
+    expect(full.requests.length).toBeGreaterThanOrEqual(8_000);
+    expect(full.requests.length).toBeLessThanOrEqual(15_000);
+    expect(full.apiKeys.length).toBeGreaterThanOrEqual(25);
+    expect(full.backups.length).toBeGreaterThanOrEqual(40);
+    expect(full.errors).toHaveLength(100);
+    expect(elapsed).toBeLessThan(600);
+    const again = seedFullDataset(now);
+    expect(again.accounts.map((a) => a.id)).toEqual(full.accounts.map((a) => a.id));
+    expect(again.requests.slice(0, 50)).toEqual(full.requests.slice(0, 50));
+    expect(new Set(full.accounts.map((a) => a.id)).size).toBe(full.accounts.length);
+  });
+
+  it("covers every account state", () => {
+    const accounts = full.accounts;
+    const authMethods = values(accounts, (a) => a.authMethod);
+    for (const method of [
+      "idc",
+      "social",
+      "builderid",
+      "external_idp",
+      "api_key",
+      "apikey",
+      "github",
+      "google",
+      "",
+      "saml",
+    ]) {
+      expect(authMethods).toContain(method);
+    }
+    for (const provider of [
+      "Enterprise",
+      "BuilderId",
+      "Google",
+      "Github",
+      "APIKey",
+      "AzureAD",
+      "",
+    ]) {
+      expect(values(accounts, (a) => a.provider)).toContain(provider);
+    }
+    for (const ban of ["", "ACTIVE", "BANNED", "SUSPENDED", "DISABLED"]) {
+      expect(values(accounts, (a) => a.banStatus)).toContain(ban);
+    }
+    for (const overage of ["", "ENABLED", "DISABLED", "enabled"]) {
+      expect(values(accounts, (a) => a.overageStatus)).toContain(overage);
+    }
+    for (const capability of ["", "OVERAGE_CAPABLE", "NOT_OVERAGE_CAPABLE"]) {
+      expect(values(accounts, (a) => a.overageCapability)).toContain(capability);
+    }
+    const plans = values(accounts, (a) => a.subscriptionType);
+    for (const plan of ["", "FREE", "PRO", "PRO_PLUS", "POWER", "Q_DEVELOPER_ENTERPRISE_CUSTOM"]) {
+      expect(plans).toContain(plan);
+    }
+    for (const tier of ["FREE", "PRO", "PRO_PLUS", "POWER"]) {
+      expect(plans).toContain(`Q_DEVELOPER_STANDALONE_${tier}`);
+    }
+    for (const trial of ["", "ACTIVE", "EXPIRED"]) {
+      expect(values(accounts, (a) => a.trialStatus)).toContain(trial);
+    }
+    for (const region of [
+      "us-east-1",
+      "eu-central-1",
+      "us-west-2",
+      "ap-southeast-2",
+      "eu-west-1",
+    ]) {
+      expect(values(accounts, (a) => a.region)).toContain(region);
+    }
+    const some = (predicate: (a: (typeof accounts)[number]) => boolean) =>
+      expect(accounts.some(predicate)).toBe(true);
+    some((a) => !a.enabled && a.banStatus === "");
+    some((a) => a.silent && a.silentReason.length > 100);
+    some((a) => !a.hasToken);
+    some((a) => a.expiresAt === 0);
+    some((a) => a.expiresAt > now && a.expiresAt < now + 60);
+    some((a) => a.expiresAt > now + 30 * 86_400);
+    some((a) => a.expiresAt > 0 && a.expiresAt < now - 365 * 86_400);
+    some((a) => a.usageLimit > 0 && a.usagePercent === 0);
+    some((a) => a.usagePercent === 1);
+    some((a) => a.usagePercent > 1);
+    some((a) => a.currentOverages > a.overageCap && a.overageCap > 0);
+    some((a) => a.email === "" && a.hasToken);
+    some((a) => a.email.length > 90);
+    some((a) => /[^\x20-\x7e]/.test(a.email));
+    some((a) => /[؀-ۿ]/.test(a.nickname));
+    some((a) => a.requestCount === 0 && a.lastUsed === 0);
+    some((a) => a.totalTokens > 100_000_000_000);
+    some((a) => a.totalCredits > 0 && a.totalCredits < 0.001);
+    some((a) => a.profileArnPinned);
+    some((a) => a.proxyURL !== "");
+    some((a) => a.weight >= 100);
+    some((a) => a.trialExpiresAt > now && a.trialExpiresAt < now + 86_400);
+  });
+
+  it("covers every request shape, with types the server would classify the same way", () => {
+    const requests = full.requests;
+    for (let i = 1; i < requests.length; i++) {
+      expect(requests[i].ts).toBeLessThanOrEqual(requests[i - 1].ts);
+      expect(requests[i].id).toBe((requests[i - 1].id ?? 0) - 1);
+    }
+    expect(requests.at(-1)?.ts).toBeLessThan(now - 29 * 86_400);
+    expect(requests.filter((r) => r.ts > now - 3600).length).toBeGreaterThan(500);
+    expect(values(requests, (r) => r.endpoint)).toEqual(
+      new Set(["claude", "openai", "responses", undefined]),
+    );
+    expect(values(requests, (r) => r.model).size).toBeGreaterThanOrEqual(14);
+    const failures = requests.filter((r) => !r.success);
+    expect(values(failures, (r) => r.errorType)).toEqual(new Set(ERROR_TYPES));
+    for (const r of failures) {
+      expect(classify(r.status ?? 0, r.message ?? "")).toBe(r.errorType);
+    }
+    expect(requests.some((r) => r.status === undefined && !r.success)).toBe(true);
+    expect(requests.some((r) => r.durationMs === undefined)).toBe(true);
+    expect(requests.some((r) => (r.message?.length ?? 0) === 500)).toBe(true);
+    expect(requests.some((r) => r.accountId === "" && r.model === "")).toBe(true);
+    expect(requests.some((r) => r.inTokens >= 990_000)).toBe(true);
+    expect(requests.some((r) => r.cacheReadTokens > 0 && r.cacheWriteTokens > 0)).toBe(true);
+    expect(requests.some((r) => r.model.endsWith("-thinking"))).toBe(true);
+    expect(requests.some((r) => !r.success && r.credits > 0)).toBe(true);
+    const keyIds = new Set(full.apiKeys.map((k) => k.id));
+    expect(requests.some((r) => r.apiKeyId && !keyIds.has(r.apiKeyId))).toBe(true);
+    const accountIds = new Set(full.accounts.map((a) => a.id));
+    expect(requests.some((r) => r.accountId && !accountIds.has(r.accountId))).toBe(true);
+    expect(full.errors.every((e) => (e.message?.length ?? 0) <= 240)).toBe(true);
+  });
+
+  it("seeds valid model mappings and every settings variant", () => {
+    const keys = full.modelMappings.map((m) => m.key);
+    expect(keys.length).toBeGreaterThanOrEqual(40);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const { key, value } of full.modelMappings) {
+      expect(key).toBe(key.toLowerCase());
+      expect(new TextEncoder().encode(key).length).toBeLessThanOrEqual(256);
+      expect(keys).not.toContain(value.toLowerCase());
+    }
+    expect(values(full.promptFilter.rules, (r) => r.type)).toEqual(
+      new Set(["regex", "lines-containing", "contains"]),
+    );
+    expect(values(full.promptFilter.rules, (r) => r.enabled)).toEqual(new Set([true, false]));
+    expect(values(full.backups, (b) => b.kind)).toEqual(
+      new Set(["manual", "scheduled", "auto", "pre-restore", "legacy-import"]),
+    );
+    expect(full.backups.some((b) => b.accountCnt === undefined)).toBe(true);
+    expect(full.backups.some((b) => b.includesCredentials === false)).toBe(true);
+    expect(full.apiKeys.some((k) => !k.enabled)).toBe(true);
+    expect(full.apiKeys.some((k) => !k.lastUsedAt)).toBe(true);
+    expect(full.apiKeys.some((k) => k.key.length <= 10)).toBe(true);
+  });
+
+  it("switches the served dataset and keeps the small seed for tests", () => {
+    try {
+      resetMockDb("empty");
+      expect(mockScenario()).toBe("empty");
+      expect(mockDb.accounts).toEqual([]);
+      resetMockDb();
+      expect(mockScenario()).toBe("empty");
+      resetMockDb("full");
+      expect(mockDb.accounts.length).toBe(full.accounts.length);
+      expect(mockDb.remoteVersion.version).not.toBe(mockDb.version);
+    } finally {
+      resetMockDb("small");
+    }
+    expect(mockDb.accounts).toHaveLength(8);
   });
 });

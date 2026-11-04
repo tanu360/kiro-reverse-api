@@ -16,10 +16,19 @@ export default defineConfig({
   use: {
     baseURL: `${origin}/admin/`,
     // The browser mock draws a random 8-digit first-run password, as the server does
-    // (src/lib/mocks/db.ts); the specs pin the known one through the key it reads.
+    // (src/lib/mocks/db.ts); the specs pin the known one through the key it reads. They also pin
+    // the small dataset (src/lib/mocks/scenario.ts): the dev server defaults to the full one.
     storageState: {
       cookies: [],
-      origins: [{ origin, localStorage: [{ name: "kiro_mock_password", value: "12345678" }] }],
+      origins: [
+        {
+          origin,
+          localStorage: [
+            { name: "kiro_mock_password", value: "12345678" },
+            { name: "kiro_mock_scenario", value: "small" },
+          ],
+        },
+      ],
     },
     // Kept only for failed tests; CI uploads test-results/ when the job fails.
     trace: "retain-on-failure",

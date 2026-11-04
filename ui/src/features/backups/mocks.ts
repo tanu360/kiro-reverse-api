@@ -7,6 +7,7 @@ import type {
   BackupScheduleUpdate,
 } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { publishMockEvent } from "@/lib/mocks/events";
 import { makeBackupEntry } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
@@ -159,6 +160,7 @@ export const handlers: HttpHandler[] = [
     const parsed = parseBackup(text);
     if ("error" in parsed) return jsonError(500, parsed.error);
     restoreFrom(note, parsed.accounts);
+    publishMockEvent("backup_restored", "upload");
     return HttpResponse.json({ success: true });
   }),
 
@@ -182,6 +184,7 @@ export const handlers: HttpHandler[] = [
       kind: typeof kind === "string" && kind ? kind : "manual",
       note: typeof note === "string" && note ? note : undefined,
     });
+    publishMockEvent("backup_created", backup.id);
     return HttpResponse.json({ backup });
   }),
 
@@ -210,6 +213,7 @@ export const handlers: HttpHandler[] = [
     // Every restore failure is a 500, an unknown id included.
     if (!backup) return jsonError(500, `backup not found: ${id}`);
     restoreFrom(`auto before restore ${id}`, backup.accountCnt ?? 0);
+    publishMockEvent("backup_restored", id);
     return HttpResponse.json({ success: true });
   }),
 
