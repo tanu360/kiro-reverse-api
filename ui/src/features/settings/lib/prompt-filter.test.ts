@@ -21,10 +21,14 @@ describe("newRule", () => {
 });
 
 describe("regexFails", () => {
-  it("flags patterns JavaScript cannot compile", () => {
+  it("flags patterns Go cannot compile, not JavaScript", () => {
     expect(regexFails("(")).toBe(true);
     expect(regexFails("\\bsecret\\b")).toBe(false);
     expect(regexFails("")).toBe(false);
+    // Go accepts inline flags and rejects lookarounds and backreferences; JavaScript the reverse.
+    expect(regexFails("(?i)secret")).toBe(false);
+    expect(regexFails("(?=secret)")).toBe(true);
+    expect(regexFails("(a)\\1")).toBe(true);
   });
 });
 

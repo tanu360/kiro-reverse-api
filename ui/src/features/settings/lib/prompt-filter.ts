@@ -1,5 +1,6 @@
 import type { PromptFilterConfig, PromptFilterRule } from "@/lib/api/types";
 import { isEqual } from "./dirty";
+import { compilesInGo } from "./go-regex";
 
 /** The two rule kinds the UI creates; the server also reads `contains` as a line filter. */
 export type RuleKind = "regex" | "lines-containing";
@@ -23,16 +24,11 @@ export function newRule(
 }
 
 /**
- * True when `match` does not compile as a JavaScript regex. The proxy compiles with Go's RE2
- * and skips a rule that fails, so this is a hint only and never blocks saving.
+ * True when Go's `regexp.Compile` rejects `match`: the proxy compiles rules with it and skips one
+ * that fails. A hint only; it never blocks saving.
  */
 export function regexFails(match: string): boolean {
-  try {
-    new RegExp(match);
-    return false;
-  } catch {
-    return true;
-  }
+  return !compilesInGo(match);
 }
 
 function normalized(config: PromptFilterConfig): PromptFilterConfig {
