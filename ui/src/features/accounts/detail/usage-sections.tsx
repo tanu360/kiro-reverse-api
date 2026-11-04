@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { CreditAmount } from "@/components/shared/credit-amount";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
 import type { Account } from "@/lib/api/types";
 import { EMPTY, formatCompact, formatDateTime, formatNumber } from "@/lib/format";
@@ -55,7 +56,13 @@ export function StatisticsSection({ account }: { account: Account }): JSX.Elemen
           { label: t("detail.totalTokens"), value: formatCompact(account.totalTokens) },
           {
             label: t("detail.totalCredits"),
-            value: formatCreditAmount(account.totalCredits, lang),
+            value: (
+              <CreditAmount
+                digits={1}
+                format={(value) => formatCreditAmount(value, lang)}
+                value={account.totalCredits}
+              />
+            ),
           },
         ]}
       />

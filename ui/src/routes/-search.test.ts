@@ -18,9 +18,49 @@ describe("validateAccountsSearch", () => {
     expect(validateAccountsSearch({ add: true })).toEqual({ add: true });
   });
 
+  it("keeps the Needs attention group as a status", () => {
+    expect(validateAccountsSearch({ status: "attention" })).toEqual({ status: "attention" });
+  });
+
   it("drops an invalid status", () => {
     expect(validateAccountsSearch({ status: "bogus" })).toEqual({});
     expect(validateAccountsSearch({ status: "all" })).toEqual({});
+  });
+
+  it("reads the old status=enabled link as the Enabled filter", () => {
+    expect(validateAccountsSearch({ status: "enabled" })).toEqual({ enabled: "on" });
+    expect(validateAccountsSearch({ status: "enabled", enabled: "off" })).toEqual({
+      enabled: "off",
+    });
+  });
+
+  it("keeps valid filters, sort and page, and drops invalid ones", () => {
+    expect(
+      validateAccountsSearch({
+        status: "outOfCredits",
+        plan: "pro",
+        auth: "builderId",
+        region: "eu-west-1",
+        enabled: "off",
+        sort: "usage",
+        order: "desc",
+        page: "3",
+        pageSize: 50,
+      }),
+    ).toEqual({
+      status: "outOfCredits",
+      plan: "pro",
+      auth: "builderId",
+      region: "eu-west-1",
+      enabled: "off",
+      sort: "usage",
+      order: "desc",
+      page: 3,
+      pageSize: 50,
+    });
+    expect(
+      validateAccountsSearch({ enabled: "yes", sort: "tokens", order: "up", page: 0, pageSize: 7 }),
+    ).toEqual({});
   });
 });
 

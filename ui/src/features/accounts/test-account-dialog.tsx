@@ -15,7 +15,7 @@ import { getAccountModelsCached, testAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
-import { formatClockTime, formatCredits } from "@/lib/format";
+import { formatClockTime, formatDecimal } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
@@ -124,7 +124,7 @@ export function TestAccountDialog({
     const target = modelValue.trim() || DEFAULT_TEST_MODEL;
     append("info", t("testLog.start", { email, model: target, proxy }), target);
     const started = Date.now();
-    const seconds = () => formatCredits((Date.now() - started) / 1000, 1);
+    const seconds = () => formatDecimal((Date.now() - started) / 1000, 1);
     try {
       const result = await testAccount(account.id, { model: target });
       append("ok", t("testLog.success", { email, seconds: seconds(), reply: result.reply }));
@@ -135,7 +135,7 @@ export function TestAccountDialog({
           input: result.inputTokens,
           output: result.outputTokens,
           credits: result.credits,
-          context: formatCredits(Number(result.contextUsage), 1),
+          context: formatDecimal(Number(result.contextUsage), 1),
         }),
       );
       if (!result.stopReason) append("warn", t("testLog.noStopReasonHint"));

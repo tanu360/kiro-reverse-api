@@ -7,11 +7,54 @@ export interface OverviewSearch {
   range?: OverviewRange;
 }
 
-export type AccountStatusFilter = "all" | "enabled" | "disabled" | "banned";
+/**
+ * The one status an account row shows, worst first (account-model.ts accountStatus). The list
+ * filters on the same value, so a filter always matches the pill a row shows.
+ */
+export const ACCOUNT_STATUSES = [
+  "banned",
+  "suspended",
+  "noToken",
+  "outOfCredits",
+  "expired",
+  "disabled",
+  "active",
+] as const;
+export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
+
+/**
+ * The `status` filter: one row status, or `attention` for every status that needs a look
+ * (banned, suspended, no token, out of credits, token expired). The status tabs set active,
+ * attention or disabled; a single problem status (an old link, or the Issue select) still works.
+ */
+export const ACCOUNT_STATUS_FILTERS = [...ACCOUNT_STATUSES, "attention"] as const;
+export type AccountStatusFilter = (typeof ACCOUNT_STATUS_FILTERS)[number];
+
+/** Sortable Accounts columns; the ids match the table's column ids. */
+export const ACCOUNT_SORTS = [
+  "account",
+  "status",
+  "usage",
+  "requests",
+  "lastUsed",
+  "expiry",
+] as const;
+export type AccountSort = (typeof ACCOUNT_SORTS)[number];
+
 export interface AccountsSearch {
   add?: true;
-  status?: Exclude<AccountStatusFilter, "all">;
   q?: string;
+  status?: AccountStatusFilter;
+  /** A plan tier (power, proPlus, pro, free) or an unknown raw subscription type. */
+  plan?: string;
+  /** A canonical auth method (account-model.ts authKey). */
+  auth?: string;
+  region?: string;
+  enabled?: "on" | "off";
+  sort?: AccountSort;
+  order?: "asc" | "desc";
+  page?: number;
+  pageSize?: 25 | 50 | 100;
 }
 
 /** Matches research RequestSort and the Requests table column ids. */
@@ -41,11 +84,6 @@ export interface LoginSearch {
 }
 
 const OVERVIEW_RANGES: readonly OverviewRange[] = ["1h", "6h", "24h"];
-const ACCOUNT_STATUSES: readonly Exclude<AccountStatusFilter, "all">[] = [
-  "enabled",
-  "disabled",
-  "banned",
-];
 const PAGE_SIZES: readonly NonNullable<RequestsSearch["pageSize"]>[] = [25, 50, 100];
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
@@ -74,24 +112,41 @@ export function validateOverviewSearch(input: Record<string, unknown>): Overview
   return { range: oneOf(input.range, OVERVIEW_RANGES) };
 }
 
+function pageNumber(value: unknown): number | undefined {
+  const n = integer(value);
+  return n !== undefined && n >= 1 ? n : undefined;
+}
+
+function pageSize(value: unknown): RequestsSearch["pageSize"] {
+  const n = integer(value);
+  return n !== undefined && (PAGE_SIZES as readonly number[]).includes(n)
+    ? (n as RequestsSearch["pageSize"])
+    : undefined;
+}
+
 export function validateAccountsSearch(input: Record<string, unknown>): AccountsSearch {
   const add = input.add === true || input.add === 1 || input.add === "1" || input.add === "true";
+  // `status=enabled` was the old status segment; it is the Enabled filter now.
+  const legacyEnabled = input.status === "enabled" ? "on" : undefined;
   return {
     add: add ? true : undefined,
-    status: oneOf(input.status, ACCOUNT_STATUSES),
     q: text(input.q),
+    status: oneOf(input.status, ACCOUNT_STATUS_FILTERS),
+    plan: text(input.plan),
+    auth: text(input.auth),
+    region: text(input.region),
+    enabled: oneOf(input.enabled, ["on", "off"] as const) ?? legacyEnabled,
+    sort: oneOf(input.sort, ACCOUNT_SORTS),
+    order: oneOf(input.order, ["asc", "desc"] as const),
+    page: pageNumber(input.page),
+    pageSize: pageSize(input.pageSize),
   };
 }
 
 export function validateRequestsSearch(input: Record<string, unknown>): RequestsSearch {
-  const page = integer(input.page);
-  const pageSize = integer(input.pageSize);
   return {
-    page: page !== undefined && page >= 1 ? page : undefined,
-    pageSize:
-      pageSize !== undefined && (PAGE_SIZES as readonly number[]).includes(pageSize)
-        ? (pageSize as RequestsSearch["pageSize"])
-        : undefined,
+    page: pageNumber(input.page),
+    pageSize: pageSize(input.pageSize),
     search: text(input.search),
     status: oneOf(input.status, ["success", "failed"] as const),
     sort: oneOf(input.sort, REQUEST_SORTS),

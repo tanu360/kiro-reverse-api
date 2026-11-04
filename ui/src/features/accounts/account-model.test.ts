@@ -2,20 +2,25 @@ import { describe, expect, it } from "vitest";
 import type { AccountFull, ExportData, ModelInfo } from "@/lib/api/types";
 import { makeAccount, makeAccountFull, makeModelInfo } from "@/lib/mocks/fixtures";
 import {
+  accountStatus,
+  authKey,
   buildCopyJson,
   buildExportCopy,
   creditTone,
   filterAccounts,
+  filterOptions,
   formatAuthMethod,
   formatCreditAmount,
   formatResetDate,
-  healthBadges,
   isBanned,
+  isHeld,
   isValidMachineId,
   isValidProxyUrl,
   planLabel,
+  sortAccounts,
   sortModels,
-  statusCounts,
+  statusFilterGroup,
+  statusGroup,
   subscriptionLabel,
   subscriptionTier,
   tokenExpiry,
@@ -70,73 +75,149 @@ describe("formatAuthMethod", () => {
   });
 });
 
-describe("healthBadges", () => {
-  const kinds = (overrides: Parameters<typeof makeAccount>[0]) =>
-    healthBadges(makeAccount(overrides), NOW_SEC).map((badge) => badge.kind);
+describe("accountStatus", () => {
+  const status = (overrides: Parameters<typeof makeAccount>[0]) =>
+    accountStatus(makeAccount({ expiresAt: 0, ...overrides }), NOW_SEC);
 
-  it("shows Banned or Suspended for banned accounts and nothing for other ban values", () => {
-    expect(kinds({ banStatus: "BANNED", enabled: false })).toEqual(["banned"]);
-    expect(kinds({ banStatus: "SUSPENDED", enabled: false })).toEqual(["suspended"]);
-    expect(kinds({ banStatus: "LOCKED", enabled: false })).toEqual([]);
+  it("shows Banned or Suspended first, and counts an unknown ban value as banned", () => {
+    expect(status({ banStatus: "BANNED", enabled: false })).toBe("banned");
+    expect(status({ banStatus: "SUSPENDED", enabled: false })).toBe("suspended");
+    expect(status({ banStatus: "LOCKED" })).toBe("banned");
+    expect(status({ banStatus: "BANNED", usageLimit: 50, usageCurrent: 60 })).toBe("banned");
   });
 
-  it("shows No token, Expired or Active for healthy accounts", () => {
-    expect(kinds({ hasToken: false })).toEqual(["noToken"]);
-    expect(kinds({ expiresAt: NOW_SEC - 1 })).toEqual(["expired"]);
-    expect(kinds({ expiresAt: 0 })).toEqual(["active"]);
-    expect(kinds({ expiresAt: NOW_SEC + 60, banStatus: "ACTIVE" })).toEqual(["active"]);
-  });
-
-  it("adds Out of credits exactly like the server", () => {
-    expect(kinds({ expiresAt: 0, usageLimit: 50, usageCurrent: 50 })).toEqual([
-      "active",
+  it("then No token, Out of credits (the server's rule) and an expired token", () => {
+    expect(status({ hasToken: false, usageLimit: 50, usageCurrent: 60 })).toBe("noToken");
+    expect(status({ usageLimit: 50, usageCurrent: 50, expiresAt: NOW_SEC - 1 })).toBe(
       "outOfCredits",
-    ]);
-    expect(kinds({ expiresAt: 0, usageLimit: 50, usageCurrent: 49.9 })).toEqual(["active"]);
-    expect(kinds({ expiresAt: 0, usageLimit: 0, usageCurrent: 10 })).toEqual(["active"]);
-    expect(kinds({ banStatus: "BANNED", usageLimit: 50, usageCurrent: 60 })).toEqual([
-      "banned",
-      "outOfCredits",
-    ]);
+    );
+    expect(status({ usageLimit: 50, usageCurrent: 49.9 })).toBe("active");
+    expect(status({ usageLimit: 0, usageCurrent: 10 })).toBe("active");
+    expect(status({ expiresAt: NOW_SEC - 1, enabled: false })).toBe("expired");
   });
 
-  it("gives each badge a tone", () => {
-    const badges = healthBadges(makeAccount({ hasToken: false }), NOW_SEC);
-    expect(badges[0]).toEqual({ kind: "noToken", tone: "error" });
+  it("shows Disabled only for an otherwise healthy account, else Active", () => {
+    expect(status({ enabled: false })).toBe("disabled");
+    expect(status({ expiresAt: NOW_SEC + 60, banStatus: "ACTIVE" })).toBe("active");
+  });
+
+  it("reads the server's DISABLED ban status as Disabled, not as a ban", () => {
+    // config.SetAccountEnabled writes it when an account is switched off.
+    expect(status({ banStatus: "DISABLED", enabled: false })).toBe("disabled");
+    expect(status({ banStatus: "DISABLED", enabled: true })).toBe("disabled");
+    // It keeps its place in the order: a missing token still wins.
+    expect(status({ banStatus: "DISABLED", enabled: false, hasToken: false })).toBe("noToken");
   });
 });
 
-describe("filterAccounts / statusCounts", () => {
+describe("filterAccounts / filterOptions", () => {
   const accounts = [
-    makeAccount({ id: "a", email: "Dana@Example.com", nickname: "Primary", enabled: true }),
-    makeAccount({ id: "b", email: "bob@example.com", nickname: "", enabled: false }),
+    makeAccount({
+      id: "a",
+      email: "Dana@Example.com",
+      nickname: "Primary",
+      enabled: true,
+      expiresAt: 0,
+      subscriptionType: "Q_DEVELOPER_STANDALONE_PRO",
+      authMethod: "idc",
+      provider: "",
+      region: "eu-west-1",
+    }),
+    makeAccount({
+      id: "b",
+      email: "bob@example.com",
+      nickname: "",
+      enabled: false,
+      expiresAt: 0,
+      subscriptionType: "FREE",
+      authMethod: "social",
+      provider: "Enterprise",
+      region: "",
+    }),
     makeAccount({ id: "c", email: "carol@example.com", enabled: false, banStatus: "BANNED" }),
-    makeAccount({ id: "d", email: "dave@example.com", enabled: false, banStatus: "ACTIVE" }),
-    makeAccount({ id: "e", email: "eve@example.com", enabled: false, banStatus: "SUSPENDED" }),
+    makeAccount({ id: "d", email: "dave@example.com", enabled: false, banStatus: "SUSPENDED" }),
+    makeAccount({
+      id: "e",
+      email: "erin@example.com",
+      enabled: false,
+      expiresAt: 0,
+      banStatus: "DISABLED",
+    }),
   ];
   const ids = (list: { id: string }[]) => list.map((a) => a.id);
 
-  it("filters by status; banned is excluded from disabled", () => {
-    expect(ids(filterAccounts(accounts, undefined, undefined))).toEqual(["a", "b", "c", "d", "e"]);
-    expect(ids(filterAccounts(accounts, "enabled", undefined))).toEqual(["a"]);
-    expect(ids(filterAccounts(accounts, "disabled", undefined))).toEqual(["b", "d"]);
-    expect(ids(filterAccounts(accounts, "banned", undefined))).toEqual(["c", "e"]);
+  it("matches every set filter against the value the row shows", () => {
+    expect(ids(filterAccounts(accounts, {}, NOW_SEC))).toEqual(["a", "b", "c", "d", "e"]);
+    expect(ids(filterAccounts(accounts, { enabled: "on" }, NOW_SEC))).toEqual(["a"]);
+    expect(ids(filterAccounts(accounts, { status: "disabled" }, NOW_SEC))).toEqual(["b", "e"]);
+    expect(ids(filterAccounts(accounts, { status: "banned" }, NOW_SEC))).toEqual(["c"]);
+    // Needs attention takes every problem status: banned and suspended here.
+    expect(ids(filterAccounts(accounts, { status: "attention" }, NOW_SEC))).toEqual(["c", "d"]);
+    expect(ids(filterAccounts(accounts, { plan: "pro" }, NOW_SEC))).toEqual(["a"]);
+    // The provider wins over the auth method, and both names of a method share one id.
+    expect(ids(filterAccounts(accounts, { auth: "enterprise" }, NOW_SEC))).toEqual(["a", "b"]);
+    expect(ids(filterAccounts(accounts, { region: "us-east-1", enabled: "off" }, NOW_SEC))).toEqual(
+      ["b", "c", "d", "e"],
+    );
   });
 
   it("searches email or nickname, case-insensitively", () => {
-    expect(ids(filterAccounts(accounts, undefined, "dana@"))).toEqual(["a"]);
-    expect(ids(filterAccounts(accounts, undefined, "PRIM"))).toEqual(["a"]);
-    expect(ids(filterAccounts(accounts, undefined, "  bob  "))).toEqual(["b"]);
-    expect(ids(filterAccounts(accounts, "enabled", "bob"))).toEqual([]);
+    expect(ids(filterAccounts(accounts, { q: "dana@" }, NOW_SEC))).toEqual(["a"]);
+    expect(ids(filterAccounts(accounts, { q: "PRIM" }, NOW_SEC))).toEqual(["a"]);
+    expect(ids(filterAccounts(accounts, { q: "  bob  " }, NOW_SEC))).toEqual(["b"]);
+    expect(ids(filterAccounts(accounts, { q: "bob", enabled: "on" }, NOW_SEC))).toEqual([]);
   });
 
-  it("counts every filter", () => {
-    expect(statusCounts(accounts)).toEqual({ all: 5, enabled: 1, disabled: 2, banned: 2 });
+  it("lists each value once with its count, statuses worst first", () => {
+    expect(filterOptions(accounts, "status", t, NOW_SEC)).toEqual([
+      { value: "banned", label: "health.banned", count: 1 },
+      { value: "suspended", label: "health.suspended", count: 1 },
+      { value: "disabled", label: "health.disabled", count: 2 },
+      { value: "active", label: "health.active", count: 1 },
+    ]);
+    expect(filterOptions(accounts, "enabled", t, NOW_SEC).map((o) => [o.value, o.count])).toEqual([
+      ["on", 1],
+      ["off", 4],
+    ]);
   });
 
-  it("knows which accounts are banned", () => {
+  it("gives every name of an auth method one id", () => {
+    expect(authKey({ provider: "", authMethod: "idc" })).toBe("enterprise");
+    expect(authKey({ provider: "BuilderId", authMethod: "social" })).toBe("builderId");
+    expect(authKey({ provider: "Okta", authMethod: "external_idp" })).toBe("okta");
+  });
+
+  it("knows which accounts are banned, and that DISABLED is not a ban", () => {
     expect(isBanned(accounts[2])).toBe(true);
-    expect(isBanned(accounts[3])).toBe(false);
+    expect(isBanned(accounts[3])).toBe(true);
+    expect(isBanned(accounts[0])).toBe(false);
+    expect(isBanned(accounts[4])).toBe(false);
+    expect(isHeld(accounts[4])).toBe(true);
+  });
+});
+
+describe("sortAccounts", () => {
+  const accounts = [
+    makeAccount({ id: "a", email: "b@x.com", requestCount: 5, lastUsed: 0, expiresAt: 0 }),
+    makeAccount({ id: "b", email: "a@x.com", requestCount: 9, lastUsed: 100, usageLimit: 0 }),
+    makeAccount({ id: "c", email: "c@x.com", requestCount: 5, lastUsed: 300, banStatus: "BANNED" }),
+  ];
+  const ids = (list: { id: string }[]) => list.map((a) => a.id);
+
+  it("keeps the server order without a sort", () => {
+    expect(sortAccounts(accounts, undefined, false, NOW_SEC)).toBe(accounts);
+  });
+
+  it("sorts both ways and keeps ties in server order", () => {
+    expect(ids(sortAccounts(accounts, "account", false, NOW_SEC))).toEqual(["b", "a", "c"]);
+    expect(ids(sortAccounts(accounts, "requests", true, NOW_SEC))).toEqual(["b", "a", "c"]);
+    expect(ids(sortAccounts(accounts, "requests", false, NOW_SEC))).toEqual(["a", "c", "b"]);
+    expect(ids(sortAccounts(accounts, "status", false, NOW_SEC))[0]).toBe("c");
+  });
+
+  it("keeps missing values last in both directions", () => {
+    expect(ids(sortAccounts(accounts, "lastUsed", true, NOW_SEC))).toEqual(["c", "b", "a"]);
+    expect(ids(sortAccounts(accounts, "lastUsed", false, NOW_SEC))).toEqual(["b", "c", "a"]);
   });
 });
 
@@ -311,6 +392,12 @@ describe("formatCreditAmount", () => {
     expect(formatCreditAmount(0, "en")).toBe("0");
   });
 
+  it("shows a tiny non-zero amount as <0.1, not as 0", () => {
+    expect(formatCreditAmount(0.0001, "en")).toBe("<0.1");
+    expect(formatCreditAmount(0.04, "pt-BR")).toBe("<0,1");
+    expect(formatCreditAmount(0.05, "en")).toBe("0.1");
+  });
+
   it("treats a non-number as zero", () => {
     expect(formatCreditAmount(Number.NaN, "en")).toBe("0");
   });
@@ -339,5 +426,22 @@ describe("planLabel", () => {
   it("falls back to the server title for an unknown plan", () => {
     const account = { subscriptionType: "ENTERPRISE_X", subscriptionTitle: "Kiro Team" };
     expect(planLabel(account, t)).toBe("Kiro Team");
+  });
+});
+
+describe("statusGroup / statusFilterGroup", () => {
+  it("puts every problem status under attention and keeps active and disabled apart", () => {
+    expect(statusGroup("active")).toBe("active");
+    expect(statusGroup("disabled")).toBe("disabled");
+    for (const status of ["banned", "suspended", "noToken", "outOfCredits", "expired"] as const) {
+      expect(statusGroup(status)).toBe("attention");
+    }
+  });
+
+  it("maps a status filter to its tab, so an old single-status link opens Needs attention", () => {
+    expect(statusFilterGroup(undefined)).toBeUndefined();
+    expect(statusFilterGroup("attention")).toBe("attention");
+    expect(statusFilterGroup("expired")).toBe("attention");
+    expect(statusFilterGroup("active")).toBe("active");
   });
 });

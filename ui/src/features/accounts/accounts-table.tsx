@@ -1,33 +1,41 @@
 import { type JSX, type ReactNode, useMemo } from "react";
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
-import { DisplayEmail } from "@/components/shared/display-email";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableSort,
+} from "@/components/shared/data-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Account } from "@/lib/api/types";
-import { formatCompact, formatNumber } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
+import { ACCOUNT_SORTS, type AccountSort } from "@/routes/-search";
 import {
-  AccountBadges,
   AccountIdentity,
-  CreditMeters,
-  HealthBadges,
+  LastUsedText,
+  StatusPill,
   TokenExpiryText,
+  UsageMeter,
 } from "./account-cells";
-import { formatCreditAmount } from "./account-model";
+import { defaultSortDesc } from "./account-model";
 import { AccountRowActions, EnabledSwitch, type RowActionHandlers } from "./account-row-actions";
 import type { ListLayout } from "./use-list-layout";
 
 const SKELETON_CARDS = 4;
 
 /**
- * Low-priority columns show only when the list is FULL_TABLE_WIDTH (1,100 px) wide or more. The
- * `accounts` container is the list wrapper in accounts-page.tsx. The detail sheet and the cards
- * still show these values.
+ * Low-priority columns show only when the list is wide enough for them: Requests from 900 px,
+ * Last used and Token expiry from FULL_TABLE_WIDTH (1,100 px). The `accounts` container is the
+ * list wrapper in accounts-page.tsx. The detail sheet and the cards still show these values.
  */
+const MEDIUM_UP = "hidden @[900px]/accounts:table-cell";
 const WIDE_ONLY = "hidden @[1100px]/accounts:table-cell";
 
+const SORTABLE = new Set<string>(ACCOUNT_SORTS);
+
 interface AccountsTableProps extends RowActionHandlers {
+  /** The rows of the current page, already filtered and sorted. */
   accounts: Account[];
   /** From the list container's width (see useListLayout). */
   layout: ListLayout;
@@ -35,11 +43,14 @@ interface AccountsTableProps extends RowActionHandlers {
   selected: ReadonlySet<string>;
   onSelectionChange: (next: Set<string>) => void;
   emptyState: ReactNode;
+  sort: AccountSort | undefined;
+  desc: boolean;
+  onSortChange: (sort: AccountSort, desc: boolean) => void;
 }
 
 /**
- * A table from the `md` width of the list up (low-priority columns only from 1,100 px), cards
- * below. Server order, no paging.
+ * A table from the `md` width of the list up (low-priority columns only on wider lists), cards
+ * below. Sorting, filtering and paging happen in the page; this renders the rows it is given.
  */
 export function AccountsTable(props: AccountsTableProps): JSX.Element {
   return props.layout === "cards" ? <AccountCards {...props} /> : <AccountsDataTable {...props} />;
@@ -53,6 +64,9 @@ function AccountsDataTable({
   emptyState,
   onTest,
   onDetails,
+  sort,
+  desc,
+  onSortChange,
 }: AccountsTableProps): JSX.Element {
   const { t, lang } = useT("accounts");
   const { t: tc } = useT();
@@ -63,58 +77,47 @@ function AccountsDataTable({
       {
         id: "account",
         header: t("columns.account"),
-        cell: (account) => (
-          <div className="flex min-w-56 flex-col gap-1.5">
-            <AccountIdentity account={account} />
-            <AccountBadges account={account} />
-          </div>
-        ),
+        sortable: true,
+        // A fixed measure, so a long address truncates (with a tooltip) instead of widening
+        // the column.
+        cell: (account) => <AccountIdentity account={account} className="w-52 xl:w-64" />,
       },
       {
         id: "status",
         header: t("columns.status"),
-        cell: (account) => <HealthBadges account={account} />,
+        sortable: true,
+        cell: (account) => <StatusPill account={account} />,
       },
       {
-        id: "credits-plan",
-        header: t("columns.planCredits"),
-        // Lets a long translated header wrap instead of widening the meter column.
-        headerClassName: "whitespace-normal leading-tight",
-        cell: (account) => <CreditMeters account={account} compact />,
+        id: "usage",
+        header: t("columns.usage"),
+        sortable: true,
+        className: "w-48",
+        cell: (account) => <UsageMeter account={account} />,
       },
       {
         id: "requests",
         header: t("columns.requests"),
-        className: WIDE_ONLY,
-        headerClassName: WIDE_ONLY,
+        sortable: true,
+        className: MEDIUM_UP,
+        headerClassName: MEDIUM_UP,
         align: "end",
         cell: (account) => (
           <span className="tabular-nums">{formatNumber(account.requestCount, lang)}</span>
         ),
       },
       {
-        id: "tokens",
-        header: t("columns.tokens"),
+        id: "lastUsed",
+        header: t("columns.lastUsed"),
+        sortable: true,
         className: WIDE_ONLY,
         headerClassName: WIDE_ONLY,
-        align: "end",
-        cell: (account) => (
-          <span className="tabular-nums">{formatCompact(account.totalTokens)}</span>
-        ),
-      },
-      {
-        id: "credits",
-        header: t("columns.credits"),
-        className: WIDE_ONLY,
-        headerClassName: WIDE_ONLY,
-        align: "end",
-        cell: (account) => (
-          <span className="tabular-nums">{formatCreditAmount(account.totalCredits, lang)}</span>
-        ),
+        cell: (account) => <LastUsedText account={account} />,
       },
       {
         id: "expiry",
         header: t("columns.expiry"),
+        sortable: true,
         className: WIDE_ONLY,
         headerClassName: WIDE_ONLY,
         cell: (account) => <TokenExpiryText account={account} />,
@@ -138,19 +141,29 @@ function AccountsDataTable({
     [t, tc, lang, onDetails, onTest],
   );
 
+  const tableSort: DataTableSort | null = sort ? { id: sort, desc } : null;
+
   return (
     <DataTable
       caption={t("table.caption")}
+      // Roomier rows than the shared default: two-line cells need the air.
+      className="[&_tbody_td]:py-3"
       columns={columns}
       data={accounts}
+      defaultSortDesc={defaultSortDesc}
       emptyState={emptyState}
       getRowId={(account) => account.id}
       loading={loading}
+      onRowClick={onDetails}
+      onSortChange={(next) => {
+        if (SORTABLE.has(next.id)) onSortChange(next.id as AccountSort, next.desc);
+      }}
       selection={{
         selected,
         onChange: onSelectionChange,
         rowLabel: (account) => displayEmail(account.email, account.id),
       }}
+      sort={tableSort}
     />
   );
 }
@@ -215,12 +228,15 @@ function SkeletonCard(): JSX.Element {
     <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card/40 p-3">
       <div className="flex items-center gap-3">
         <Skeleton className="size-5 rounded" />
-        <Skeleton className="h-4 flex-1" />
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
         <Skeleton className="h-5 w-9 rounded-full" />
       </div>
-      <Skeleton className="h-2 w-full rounded-full" />
-      <div className="grid grid-cols-4 gap-2">
-        <Skeleton className="h-3" />
+      <Skeleton className="h-6 w-20 rounded-full" />
+      <Skeleton className="h-1 w-full rounded-full" />
+      <div className="grid grid-cols-3 gap-2">
         <Skeleton className="h-3" />
         <Skeleton className="h-3" />
         <Skeleton className="h-3" />
@@ -229,7 +245,7 @@ function SkeletonCard(): JSX.Element {
   );
 }
 
-/** Card: select, email, health and switch; credits; badges and stats; kebab menu. */
+/** Card: select, identity, switch and menu; the status pill; usage; three quiet stats. */
 function AccountCard({
   account,
   selected,
@@ -249,46 +265,36 @@ function AccountCard({
       className="flex w-full min-w-0 flex-col gap-3 rounded-xl border border-border/60 bg-card/40 p-3 data-selected:border-ring"
       data-selected={selected || undefined}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-1">
         {/* The whole 40 px square toggles the checkbox, not only its 18 px box. */}
         {/* biome-ignore lint/a11y/noLabelWithoutControl: the Base UI control inside is the input. */}
         <label className="flex size-10 shrink-0 cursor-pointer items-center justify-center">
           <Checkbox aria-label={selectLabel} checked={selected} onCheckedChange={toggleSelected} />
         </label>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <DisplayEmail className="block font-medium" email={account.email} id={account.id} />
-          {account.nickname ? (
-            <span className="truncate text-muted-foreground text-xs">{account.nickname}</span>
-          ) : null}
-          <HealthBadges account={account} />
-        </div>
-        <span className="flex h-10 shrink-0 items-center">
+        <AccountIdentity account={account} className="flex-1 pt-2.5" />
+        <span className="flex h-10 shrink-0 items-center px-1">
           <EnabledSwitch account={account} />
         </span>
         <AccountRowActions account={account} onDetails={onDetails} onTest={onTest} variant="menu" />
       </div>
-      <CreditMeters account={account} />
-      <div className="mt-auto flex flex-col gap-2">
-        <AccountBadges account={account} />
-        <dl className="grid grid-cols-4 gap-2 text-xs">
-          <Stat label={t("columns.requests")} value={formatNumber(account.requestCount, lang)} />
-          <Stat label={t("columns.tokens")} value={formatCompact(account.totalTokens)} />
-          <Stat
-            label={t("columns.credits")}
-            value={formatCreditAmount(account.totalCredits, lang)}
-          />
-          <Stat label={t("columns.expiry")} value={<TokenExpiryText account={account} />} />
-        </dl>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 ps-11">
+        <StatusPill account={account} />
+        <UsageMeter account={account} />
       </div>
+      <dl className="mt-auto grid grid-cols-3 gap-2 border-border/50 border-t ps-11 pt-3 text-xs">
+        <Stat label={t("columns.requests")} value={formatNumber(account.requestCount, lang)} />
+        <Stat label={t("columns.lastUsed")} value={<LastUsedText account={account} />} />
+        <Stat label={t("columns.expiry")} value={<TokenExpiryText account={account} />} />
+      </dl>
     </article>
   );
 }
 
 function Stat({ label, value }: { label: string; value: ReactNode }): JSX.Element {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-1">
       <dt className="truncate text-muted-foreground">{label}</dt>
-      <dd className="truncate font-medium tabular-nums">{value}</dd>
+      <dd className="truncate tabular-nums">{value}</dd>
     </div>
   );
 }

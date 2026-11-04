@@ -1,9 +1,15 @@
 // Pure helpers for the Accounts page. Rules keep the old admin panel's behaviour unless noted.
 
 import type { Account, AccountFull, ExportData, ModelInfo } from "@/lib/api/types";
-import { dateTimeFormat, EMPTY, numberFormat } from "@/lib/format";
+import { belowStep, dateTimeFormat, EMPTY, numberFormat, roundsToZero } from "@/lib/format";
 import type { Lang, TFunction } from "@/lib/i18n";
-import type { AccountStatusFilter } from "@/routes/-search";
+import {
+  ACCOUNT_STATUSES,
+  type AccountSort,
+  type AccountStatus,
+  type AccountStatusFilter,
+  type AccountsSearch,
+} from "@/routes/-search";
 
 const DAY_MS = 86_400_000;
 
@@ -61,9 +67,20 @@ export function isApiKeyAccount(account: Pick<Account, "authMethod">): boolean {
 // Health and filters
 // ---------------------------------------------------------------------------
 
-/** banStatus is set and not ACTIVE. */
-export function isBanned(account: Pick<Account, "banStatus">): boolean {
+/**
+ * The banStatus the server writes when an account is switched off, by the admin or by the pool
+ * (config.SetAccountEnabled, pool DisableAccount). It reads as Disabled, not as a ban.
+ */
+export const DISABLED_BAN_STATUS = "DISABLED";
+
+/** banStatus is set and not ACTIVE: the server holds the account back (config.go). */
+export function isHeld(account: Pick<Account, "banStatus">): boolean {
   return Boolean(account.banStatus) && account.banStatus !== "ACTIVE";
+}
+
+/** Banned or suspended upstream: held back for any reason but the admin's own DISABLED. */
+export function isBanned(account: Pick<Account, "banStatus">): boolean {
+  return isHeld(account) && account.banStatus !== DISABLED_BAN_STATUS;
 }
 
 /** Same rule as the server's exhausted check (pool/account.go). */
@@ -71,72 +88,240 @@ export function isOutOfCredits(account: Pick<Account, "usageLimit" | "usageCurre
   return account.usageLimit > 0 && account.usageCurrent >= account.usageLimit;
 }
 
-export type HealthKind = "banned" | "suspended" | "noToken" | "expired" | "active" | "outOfCredits";
-export type HealthTone = "error" | "warning" | "success";
-export interface HealthBadge {
-  kind: HealthKind;
-  tone: HealthTone;
+/**
+ * The one status a row shows: the worst state of the account, in the order of ACCOUNT_STATUSES
+ * (banned, suspended, no token, out of credits, expired token, disabled by the admin, active).
+ * An unknown ban status that is not ACTIVE counts as banned; DISABLED is the admin's switch.
+ */
+export function accountStatus(account: Account, nowSec: number): AccountStatus {
+  if (isBanned(account)) return account.banStatus === "SUSPENDED" ? "suspended" : "banned";
+  if (!account.hasToken) return "noToken";
+  if (isOutOfCredits(account)) return "outOfCredits";
+  if (account.expiresAt && account.expiresAt < nowSec) return "expired";
+  if (!account.enabled || account.banStatus === DISABLED_BAN_STATUS) return "disabled";
+  return "active";
 }
 
-/** Health badges, separate from the admin enabled switch. */
-export function healthBadges(account: Account, nowSec: number): HealthBadge[] {
-  const badges: HealthBadge[] = [];
-  if (isBanned(account)) {
-    if (account.banStatus === "BANNED") badges.push({ kind: "banned", tone: "error" });
-    else if (account.banStatus === "SUSPENDED") badges.push({ kind: "suspended", tone: "warning" });
-  } else if (!account.hasToken) {
-    badges.push({ kind: "noToken", tone: "error" });
-  } else if (account.expiresAt && account.expiresAt < nowSec) {
-    badges.push({ kind: "expired", tone: "warning" });
-  } else {
-    badges.push({ kind: "active", tone: "success" });
-  }
-  if (isOutOfCredits(account)) badges.push({ kind: "outOfCredits", tone: "warning" });
-  return badges;
+/** 0 for the worst status, rising to `active`. */
+export function statusRank(status: AccountStatus): number {
+  return ACCOUNT_STATUSES.indexOf(status);
 }
 
-function matchesStatus(account: Account, status: AccountStatusFilter): boolean {
-  switch (status) {
+/** The status tabs past All: working, needs a look, switched off by the admin. */
+export type StatusGroup = "active" | "attention" | "disabled";
+export const STATUS_GROUPS: readonly StatusGroup[] = ["active", "attention", "disabled"];
+
+/** Banned, suspended, no token, out of credits and token expired all need a look. */
+export function statusGroup(status: AccountStatus): StatusGroup {
+  return status === "active" || status === "disabled" ? status : "attention";
+}
+
+/** The tab a `status` filter belongs to; undefined is All. */
+export function statusFilterGroup(
+  filter: AccountStatusFilter | undefined,
+): StatusGroup | undefined {
+  if (!filter) return undefined;
+  return filter === "attention" ? "attention" : statusGroup(filter);
+}
+
+/** Whether a row status passes the `status` filter; `attention` takes the whole group. */
+export function matchesStatus(status: AccountStatus, filter: AccountStatusFilter): boolean {
+  return filter === "attention" ? statusGroup(status) === "attention" : status === filter;
+}
+
+/** Canonical auth method ids: one per label, so a filter never lists Enterprise twice. */
+const AUTH_IDS: Readonly<Record<string, string>> = {
+  idc: "enterprise",
+  enterprise: "enterprise",
+  external_idp: "microsoft",
+  azuread: "microsoft",
+  microsoft: "microsoft",
+  apikey: "apiKey",
+  api_key: "apiKey",
+  social: "social",
+  builderid: "builderId",
+  github: "github",
+  google: "google",
+};
+
+/** `provider || authMethod` as a canonical id; an unknown value is kept, lowercased. */
+export function authKey(account: Pick<Account, "provider" | "authMethod">): string {
+  const raw = (account.provider || account.authMethod || "").toLowerCase();
+  return AUTH_IDS[raw] ?? raw;
+}
+
+/** A plan tier, or the raw subscription type when the tier is unknown. */
+export function planKey(account: Pick<Account, "subscriptionType">): string {
+  return subscriptionTier(account.subscriptionType) ?? account.subscriptionType;
+}
+
+/** The OAuth region; an empty one is us-east-1, as the detail sheet shows it. */
+export function regionKey(account: Pick<Account, "region">): string {
+  return account.region || "us-east-1";
+}
+
+export type FilterDimension = "status" | "plan" | "auth" | "region" | "enabled";
+export const FILTER_DIMENSIONS: readonly FilterDimension[] = [
+  "status",
+  "plan",
+  "auth",
+  "region",
+  "enabled",
+];
+export type AccountFilters = Pick<AccountsSearch, "q" | FilterDimension>;
+
+function dimensionValue(account: Account, dimension: FilterDimension, nowSec: number): string {
+  switch (dimension) {
+    case "status":
+      return accountStatus(account, nowSec);
+    case "plan":
+      return planKey(account);
+    case "auth":
+      return authKey(account);
+    case "region":
+      return regionKey(account);
     case "enabled":
-      return account.enabled;
-    case "disabled":
-      return !account.enabled && !isBanned(account);
-    case "banned":
-      return isBanned(account);
-    default:
-      return true;
+      return account.enabled ? "on" : "off";
   }
 }
 
-/** Status filter plus a case-insensitive substring search over email or nickname. */
+/**
+ * Every set filter must match; the query is a case-insensitive substring of email or nickname.
+ * A status filter of `attention` matches any problem status.
+ */
 export function filterAccounts(
   accounts: Account[],
-  status: AccountStatusFilter | undefined,
-  query: string | undefined,
+  filters: AccountFilters,
+  nowSec: number,
 ): Account[] {
-  const needle = (query ?? "").trim().toLowerCase();
+  const needle = (filters.q ?? "").trim().toLowerCase();
+  const active = FILTER_DIMENSIONS.filter((dimension) => filters[dimension] !== undefined);
   return accounts.filter(
     (account) =>
-      matchesStatus(account, status ?? "all") &&
+      active.every((dimension) => {
+        const value = dimensionValue(account, dimension, nowSec);
+        const filter = filters[dimension] as string;
+        return dimension === "status"
+          ? matchesStatus(value as AccountStatus, filter as AccountStatusFilter)
+          : value === filter;
+      }) &&
       (!needle ||
         account.email.toLowerCase().includes(needle) ||
         account.nickname.toLowerCase().includes(needle)),
   );
 }
 
-export function statusCounts(accounts: Account[]): Record<AccountStatusFilter, number> {
-  const counts: Record<AccountStatusFilter, number> = {
-    all: accounts.length,
-    enabled: 0,
-    disabled: 0,
-    banned: 0,
-  };
+export interface FilterOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
+/**
+ * The values of one dimension across the whole list, with how many accounts have each. Statuses
+ * keep their worst-first order and enabled is On, Off; the rest are sorted by label.
+ */
+export function filterOptions(
+  accounts: Account[],
+  dimension: FilterDimension,
+  t: TFunction,
+  nowSec: number,
+): FilterOption[] {
+  const options = new Map<string, FilterOption>();
   for (const account of accounts) {
-    if (matchesStatus(account, "enabled")) counts.enabled++;
-    if (matchesStatus(account, "disabled")) counts.disabled++;
-    if (matchesStatus(account, "banned")) counts.banned++;
+    const value = dimensionValue(account, dimension, nowSec);
+    const option = options.get(value);
+    if (option) {
+      option.count++;
+      continue;
+    }
+    options.set(value, { value, label: optionLabel(account, dimension, value, t), count: 1 });
   }
-  return counts;
+  const list = [...options.values()];
+  if (dimension === "status") {
+    return list.sort(
+      (a, b) => statusRank(a.value as AccountStatus) - statusRank(b.value as AccountStatus),
+    );
+  }
+  if (dimension === "enabled")
+    return list.sort((a, b) => (a.value === "on" ? -1 : b.value === "on" ? 1 : 0));
+  return list.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function optionLabel(
+  account: Account,
+  dimension: FilterDimension,
+  value: string,
+  t: TFunction,
+): string {
+  switch (dimension) {
+    case "status":
+      return t(`health.${value}`);
+    case "plan":
+      return planLabel(account, t);
+    case "auth":
+      return authLabel(account, t);
+    case "region":
+      return value;
+    case "enabled":
+      return value === "on" ? t("filter.enabledOn") : t("filter.enabledOff");
+  }
+}
+
+/** The usage fraction a row shows: plan credits, else trial credits; -1 without either. */
+export function usageFraction(account: Account): number {
+  if (account.usageLimit > 0) return Number(account.usagePercent) || 0;
+  if (account.trialUsageLimit > 0) return Number(account.trialUsagePercent) || 0;
+  return -1;
+}
+
+/** The order a column sorts in on its first click: big numbers and recent use first. */
+export function defaultSortDesc(column: string): boolean {
+  return column === "usage" || column === "requests" || column === "lastUsed";
+}
+
+/**
+ * Sorted copy of the list. Missing values (no usage limit, never used, no token expiry) stay at
+ * the end in both directions, and ties keep the server order.
+ */
+export function sortAccounts(
+  accounts: Account[],
+  sort: AccountSort | undefined,
+  desc: boolean,
+  nowSec: number,
+): Account[] {
+  if (!sort) return accounts;
+  const key = (account: Account): number | string | null => {
+    switch (sort) {
+      case "account":
+        return (account.email || account.id).toLowerCase();
+      case "status":
+        return statusRank(accountStatus(account, nowSec));
+      case "usage": {
+        const fraction = usageFraction(account);
+        return fraction < 0 ? null : fraction;
+      }
+      case "requests":
+        return account.requestCount;
+      case "lastUsed":
+        return account.lastUsed || null;
+      case "expiry":
+        return account.expiresAt || null;
+    }
+  };
+  const keyed = accounts.map((account, index) => ({ account, index, key: key(account) }));
+  keyed.sort((a, b) => {
+    if (a.key === null || b.key === null) {
+      if (a.key === b.key) return a.index - b.index;
+      return a.key === null ? 1 : -1;
+    }
+    const order =
+      typeof a.key === "string" && typeof b.key === "string"
+        ? a.key.localeCompare(b.key)
+        : (a.key as number) - (b.key as number);
+    return (desc ? -order : order) || a.index - b.index;
+  });
+  return keyed.map((entry) => entry.account);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,9 +335,13 @@ export function usagePercent(fraction: number): number {
   return Math.min(100, Math.max(0, pct));
 }
 
-/** Grouped credits with at most one decimal ("1,488.9", "9,200"), like every other count. */
+/**
+ * Grouped credits with at most one decimal ("1,488.9", "9,200"), like every other count. A tiny
+ * non-zero amount reads "<0.1", never "0".
+ */
 export function formatCreditAmount(value: number, lang?: Lang): string {
   const n = Number(value);
+  if (roundsToZero(n, 1)) return belowStep(1, lang);
   return numberFormat(lang, { maximumFractionDigits: 1 }).format(Number.isFinite(n) ? n : 0);
 }
 

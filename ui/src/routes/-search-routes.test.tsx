@@ -20,8 +20,16 @@ describe("validators return every key they own", () => {
     expect(validateOverviewSearch({ range: "7d" })).toStrictEqual({ range: undefined });
     expect(validateAccountsSearch({ status: "x" })).toStrictEqual({
       add: undefined,
-      status: undefined,
       q: undefined,
+      status: undefined,
+      plan: undefined,
+      auth: undefined,
+      region: undefined,
+      enabled: undefined,
+      sort: undefined,
+      order: undefined,
+      page: undefined,
+      pageSize: undefined,
     });
     expect(
       validateRequestsSearch({ page: -3, pageSize: 7, sort: "bogus", status: "x", order: "up" }),

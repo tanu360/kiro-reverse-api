@@ -2,25 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   DownloadIcon,
-  EllipsisVerticalIcon,
+  EllipsisIcon,
   LayersIcon,
   PlusIcon,
-  RotateCwIcon,
-  SearchIcon,
   SearchXIcon,
   UsersRoundIcon,
 } from "lucide-react";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { PageHeader } from "@/components/shared/page-header";
+import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu";
-import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { AddAccountDialog } from "@/features/add-account/add-account-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { accountsQuery, refreshAllModels } from "@/lib/api/accounts";
@@ -28,17 +24,25 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import type { AccountStatusFilter } from "@/routes/-search";
+import type { AccountSort, AccountsSearch } from "@/routes/-search";
 import { AccountDetailSheet } from "./account-detail-sheet";
-import { filterAccounts, statusCounts } from "./account-model";
+import {
+  type AccountFilters,
+  defaultSortDesc,
+  FILTER_DIMENSIONS,
+  filterAccounts,
+  sortAccounts,
+} from "./account-model";
 import { AccountsTable } from "./accounts-table";
+import { AccountsToolbar } from "./accounts-toolbar";
 import { BatchBar } from "./batch-bar";
 import { ExportDialog } from "./export-dialog";
 import { TestAccountDialog } from "./test-account-dialog";
 import { useListLayout } from "./use-list-layout";
 
 const NO_ACCOUNTS: Account[] = [];
-const STATUS_FILTERS: readonly AccountStatusFilter[] = ["all", "enabled", "disabled", "banned"];
+const PAGE_SIZES = [25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 
 /** Keeps the last target after close, so a dialog's content stays during its exit animation. */
 interface DialogTarget {
@@ -67,14 +71,14 @@ export function AccountsPage(): JSX.Element {
   const { t: tc } = useT();
   const search = useSearch({ from: "/_app/accounts" });
   const navigate = useNavigate({ from: "/accounts" });
-  const isPhone = useMediaQuery("max-sm");
   const confirm = useConfirm();
   const listRef = useRef<HTMLDivElement | null>(null);
   const layout = useListLayout(listRef);
+  // Phones fold Export and Refresh all models into a ⋯ menu, so the header fits 360 px.
+  const isPhone = useMediaQuery("max-sm");
 
   const query = useQuery(accountsQuery());
   const accounts = query.data ?? NO_ACCOUNTS;
-  const status = search.status ?? "all";
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [exportOpen, setExportOpen] = useState(false);
@@ -91,30 +95,52 @@ export function AccountsPage(): JSX.Element {
     });
   }, [query.data]);
 
-  const filtered = useMemo(
-    () => filterAccounts(accounts, search.status, search.q),
-    [accounts, search.status, search.q],
+  // Filter, sort and page all live in the URL, so a reload or a shared link keeps the view.
+  const { q, status, plan, auth, region, enabled } = search;
+  const filters = useMemo<AccountFilters>(
+    () => ({ q, status, plan, auth, region, enabled }),
+    [q, status, plan, auth, region, enabled],
   );
-  const counts = useMemo(() => (query.data ? statusCounts(query.data) : null), [query.data]);
+  const sort = search.sort;
+  const desc = search.order ? search.order === "desc" : sort ? defaultSortDesc(sort) : false;
+  // One clock per fetch, so the token-expiry status does not change between filter and sort.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: dataUpdatedAt is the clock tick.
+  const nowSec = useMemo(() => Math.floor(Date.now() / 1000), [query.dataUpdatedAt]);
+  const filtered = useMemo(
+    () => filterAccounts(accounts, filters, nowSec),
+    [accounts, filters, nowSec],
+  );
+  const sorted = useMemo(
+    () => sortAccounts(filtered, sort, desc, nowSec),
+    [filtered, sort, desc, nowSec],
+  );
+  const pageSize = search.pageSize ?? DEFAULT_PAGE_SIZE;
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const page = Math.min(search.page ?? 1, pageCount);
+  const pageRows = useMemo(
+    () => sorted.slice((page - 1) * pageSize, page * pageSize),
+    [sorted, page, pageSize],
+  );
 
-  const setSearchText = (value: string) => {
-    void navigate({ search: (prev) => ({ ...prev, q: value || undefined }), replace: true });
+  const updateSearch = (patch: Partial<AccountsSearch>, replace = true) => {
+    void navigate({ search: (prev) => ({ ...prev, ...patch }), replace });
   };
-  const setStatus = (next: AccountStatusFilter) => {
-    void navigate({
-      search: (prev) => ({ ...prev, status: next === "all" ? undefined : next }),
-      replace: true,
+  // Any filter change starts over at page 1.
+  const setFilters = (patch: Partial<AccountFilters>) =>
+    updateSearch({ ...patch, page: undefined });
+  const clearFilters = () =>
+    setFilters(
+      Object.fromEntries(
+        ["q", ...FILTER_DIMENSIONS].map((key) => [key, undefined]),
+      ) as Partial<AccountFilters>,
+    );
+  const setSort = (next: AccountSort | undefined, nextDesc: boolean) =>
+    updateSearch({
+      sort: next,
+      order: next ? (nextDesc ? "desc" : "asc") : undefined,
+      page: undefined,
     });
-  };
-  const clearFilters = () => {
-    void navigate({
-      search: (prev) => ({ ...prev, status: undefined, q: undefined }),
-      replace: true,
-    });
-  };
-  const setAddOpen = (open: boolean) => {
-    void navigate({ search: (prev) => ({ ...prev, add: open ? true : undefined }) });
-  };
+  const setAddOpen = (open: boolean) => updateSearch({ add: open ? true : undefined }, false);
 
   const onRefreshAllModels = async () => {
     const ok = await confirm({
@@ -147,7 +173,8 @@ export function AccountsPage(): JSX.Element {
   const onTest = useCallback((account: Account) => openTest(account.id), [openTest]);
   const onDetails = useCallback((account: Account) => openDetail(account.id), [openDetail]);
 
-  const hasFilters = Boolean(search.q) || status !== "all";
+  const hasFilters =
+    Boolean(filters.q) || FILTER_DIMENSIONS.some((dimension) => filters[dimension] !== undefined);
   const emptyState =
     accounts.length === 0 ? (
       <EmptyState
@@ -181,14 +208,17 @@ export function AccountsPage(): JSX.Element {
 
   const table = (
     <AccountsTable
-      accounts={filtered}
+      accounts={pageRows}
+      desc={desc}
       emptyState={emptyState}
       layout={layout}
       loading={query.isPending}
       onDetails={onDetails}
       onSelectionChange={setSelected}
+      onSortChange={setSort}
       onTest={onTest}
       selected={selected}
+      sort={sort}
     />
   );
 
@@ -196,49 +226,28 @@ export function AccountsPage(): JSX.Element {
     <>
       <PageHeader
         actions={
+          // Quiet to loud, one height: Refresh (an icon), Refresh all models (outline), Export
+          // (a purple tint) and Add account, the only solid button.
           <>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-busy={query.isFetching || undefined}
-                    aria-label={t("actions.refreshList")}
-                    className="size-10 sm:size-8"
-                    onClick={() => void query.refetch()}
-                    size="icon"
-                    variant="outline"
-                  />
-                }
-              >
-                <RotateCwIcon
-                  aria-hidden="true"
-                  className={query.isFetching ? "motion-safe:animate-spin" : undefined}
-                />
-              </TooltipTrigger>
-              <TooltipPopup>{t("actions.refreshList")}</TooltipPopup>
-            </Tooltip>
+            <RefreshButton
+              fetching={query.isFetching}
+              onRefresh={() => void query.refetch()}
+              variant="icon"
+            />
             {isPhone ? (
-              // On phones the secondary actions share one menu, so Add account stays on the
-              // first row next to Refresh.
               <Menu>
                 <MenuTrigger
-                  render={
-                    <Button
-                      aria-label={t("actions.moreList")}
-                      className="size-10"
-                      size="icon"
-                      variant="outline"
-                    />
-                  }
+                  aria-label={t("actions.moreList")}
+                  render={<Button size="icon" variant="quiet" />}
                 >
-                  <EllipsisVerticalIcon aria-hidden="true" />
+                  <EllipsisIcon aria-hidden="true" />
                 </MenuTrigger>
                 <MenuPopup align="end">
-                  <MenuItem className="min-h-10" onClick={onExport}>
-                    <DownloadIcon aria-hidden="true" />
+                  <MenuItem onClick={onExport}>
+                    <DownloadIcon aria-hidden="true" className="text-info-foreground" />
                     {t("actions.export")}
                   </MenuItem>
-                  <MenuItem className="min-h-10" onClick={() => void onRefreshAllModels()}>
+                  <MenuItem onClick={() => void onRefreshAllModels()}>
                     <LayersIcon aria-hidden="true" />
                     {t("models.refreshAll")}
                   </MenuItem>
@@ -246,17 +255,17 @@ export function AccountsPage(): JSX.Element {
               </Menu>
             ) : (
               <>
-                <Button onClick={onExport} variant="outline">
-                  <DownloadIcon aria-hidden="true" />
-                  {t("actions.export")}
-                </Button>
                 <Button onClick={() => void onRefreshAllModels()} variant="outline">
                   <LayersIcon aria-hidden="true" />
                   {t("models.refreshAll")}
                 </Button>
+                <Button onClick={onExport} variant="soft">
+                  <DownloadIcon aria-hidden="true" />
+                  {t("actions.export")}
+                </Button>
               </>
             )}
-            <Button className="max-sm:h-10" onClick={() => setAddOpen(true)}>
+            <Button onClick={() => setAddOpen(true)}>
               <PlusIcon aria-hidden="true" />
               {t("actions.add")}
             </Button>
@@ -265,48 +274,22 @@ export function AccountsPage(): JSX.Element {
         title={t("title")}
       />
 
-      {/* Lays out from the page's own width (a container query), so the open sidebar counts. */}
-      <div className="@container">
-        <div className="flex min-w-0 flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
-          <InputGroup className="w-full @3xl:max-w-80">
-            <InputGroupInput
-              aria-label={t("filter.search")}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder={t("filter.search")}
-              type="search"
-              value={search.q ?? ""}
-            />
-            <InputGroupAddon>
-              <SearchIcon aria-hidden="true" />
-            </InputGroupAddon>
-          </InputGroup>
-          <div className="-mx-4 min-w-0 overflow-x-auto px-4 md:mx-0 md:px-0">
-            <SegmentedControl aria-label={t("filter.status")} role="group">
-              {STATUS_FILTERS.map((value) => {
-                const active = status === value;
-                return (
-                  <SegmentedControlItem
-                    aria-pressed={active}
-                    className="max-md:h-10"
-                    data-pressed={active ? "" : undefined}
-                    key={value}
-                    onClick={() => setStatus(value)}
-                  >
-                    {t(`filter.${value}`)}
-                    {/* No counts until the list loads: zeros would read as an empty fleet. */}
-                    {counts ? (
-                      <span className="text-muted-foreground tabular-nums">{counts[value]}</span>
-                    ) : null}
-                  </SegmentedControlItem>
-                );
-              })}
-            </SegmentedControl>
-          </div>
-        </div>
-      </div>
+      {query.isError && !query.data ? null : (
+        <AccountsToolbar
+          accounts={accounts}
+          desc={desc}
+          filters={filters}
+          loading={query.isPending}
+          onClearFilters={clearFilters}
+          onFiltersChange={setFilters}
+          onSortChange={setSort}
+          shown={sorted.length}
+          sort={sort}
+        />
+      )}
 
       {/* The accounts container hides low-priority table columns on narrower lists. */}
-      <div className="@container/accounts flex min-w-0 flex-col gap-4 md:gap-6" ref={listRef}>
+      <div className="@container/accounts flex min-w-0 flex-col gap-4" ref={listRef}>
         {query.isError && !query.data ? (
           <Card>
             <ErrorState
@@ -320,6 +303,22 @@ export function AccountsPage(): JSX.Element {
         ) : (
           <Card className="min-w-0 overflow-hidden py-0">{table}</Card>
         )}
+        {sorted.length > PAGE_SIZES[0] ? (
+          <DataTablePagination
+            onPageChange={(next) => updateSearch({ page: next > 1 ? next : undefined }, false)}
+            onPageSizeChange={(size) =>
+              updateSearch({
+                pageSize:
+                  size === DEFAULT_PAGE_SIZE ? undefined : (size as AccountsSearch["pageSize"]),
+                page: undefined,
+              })
+            }
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZES}
+            total={sorted.length}
+          />
+        ) : null}
         {selected.size > 0 ? (
           <BatchBar onClear={() => setSelected(new Set())} selectedIds={[...selected]} />
         ) : null}

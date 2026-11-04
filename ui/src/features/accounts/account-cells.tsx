@@ -1,82 +1,178 @@
 import {
   CircleAlertIcon,
   CircleCheckIcon,
-  CircleDashedIcon,
   CircleMinusIcon,
   CirclePauseIcon,
   CircleSlashIcon,
   CircleXIcon,
   ClockIcon,
   HourglassIcon,
-  KeyRoundIcon,
   type LucideIcon,
-  SparklesIcon,
-  StarIcon,
-  TagIcon,
   WeightIcon,
   ZapIcon,
 } from "lucide-react";
-import type { JSX } from "react";
-import { DisplayEmail } from "@/components/shared/display-email";
-import { Badge, type BadgeTone, type BadgeVariant } from "@/components/ui/badge";
+import { type JSX, type ReactNode, useRef, useState } from "react";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterLabel, MeterTrack } from "@/components/ui/meter";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
-import { formatFraction } from "@/lib/format";
+import { EMPTY, formatDateTime, formatFraction, formatRelativeTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
+import type { AccountStatus } from "@/routes/-search";
 import {
+  accountStatus,
   authLabel,
   type CreditTone,
   creditTone,
   formatCreditAmount,
   formatTokenExpiry,
-  type HealthKind,
-  healthBadges,
-  type SubscriptionTier,
-  subscriptionLabel,
-  subscriptionTier,
+  isHeld,
+  overageEnabled,
+  planLabel,
   tokenExpiry,
   trialExpiry,
   usagePercent,
 } from "./account-model";
 
-/** Plans climb from a plain outline (Free) to a solid purple pill (Power). */
-const TIER_PILL: Record<
-  SubscriptionTier,
-  { tone: BadgeTone; variant: BadgeVariant; icon: LucideIcon }
-> = {
-  power: { tone: "primary", variant: "solid", icon: ZapIcon },
-  proPlus: { tone: "primary", variant: "soft-outline", icon: SparklesIcon },
-  pro: { tone: "primary", variant: "soft", icon: StarIcon },
-  free: { tone: "neutral", variant: "outline", icon: CircleDashedIcon },
-};
-
-const HEALTH_PILL: Record<HealthKind, { tone: BadgeTone; icon: LucideIcon }> = {
-  active: { tone: "success", icon: CircleCheckIcon },
+/**
+ * The one coloured pill of a row. Colour carries the meaning: red stops the account, orange
+ * needs attention, grey is the admin's own switch, green is healthy.
+ */
+export const STATUS_PILL: Record<AccountStatus, { tone: BadgeTone; icon: LucideIcon }> = {
   banned: { tone: "destructive", icon: CircleXIcon },
   suspended: { tone: "warning", icon: CirclePauseIcon },
   noToken: { tone: "destructive", icon: CircleMinusIcon },
-  expired: { tone: "warning", icon: ClockIcon },
   outOfCredits: { tone: "warning", icon: CircleAlertIcon },
+  expired: { tone: "warning", icon: ClockIcon },
+  disabled: { tone: "neutral", icon: CircleSlashIcon },
+  active: { tone: "success", icon: CircleCheckIcon },
 };
 
-/** Email (masked under privacy) with the nickname as a muted second line. */
-export function AccountIdentity({ account }: { account: Account }): JSX.Element {
+function nowSec(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
+/**
+ * The row's status pill; a ban reason, when the server sent one, is its tooltip. `plain` drops
+ * the tooltip where the reason is already written next to the pill (the detail sheet).
+ */
+export function StatusPill({
+  account,
+  plain = false,
+}: {
+  account: Account;
+  plain?: boolean;
+}): JSX.Element {
+  const { t } = useT("accounts");
+  const status = accountStatus(account, nowSec());
+  const pill = STATUS_PILL[status];
+  // The pool also writes a reason when it switches an account off (banStatus DISABLED).
+  const held = status === "banned" || status === "suspended" || status === "disabled";
+  const reason = !plain && held && isHeld(account) ? account.banReason : "";
+  const label = t(`health.${status}`);
+  if (!reason) {
+    return (
+      <Badge data-status={status} icon={pill.icon} tone={pill.tone}>
+        {label}
+      </Badge>
+    );
+  }
   return (
-    <div className="flex min-w-0 flex-col">
-      <DisplayEmail className="block max-w-64 font-medium" email={account.email} id={account.id} />
-      {account.nickname ? (
-        <span className="block max-w-64 truncate text-muted-foreground text-xs">
-          {account.nickname}
-        </span>
-      ) : null}
-    </div>
+    <Tooltip>
+      {/* Not a tab stop: the reason is also in the detail sheet. */}
+      <TooltipTrigger render={<Badge data-status={status} icon={pill.icon} tone={pill.tone} />}>
+        {label}
+      </TooltipTrigger>
+      <TooltipPopup>{reason}</TooltipPopup>
+    </Tooltip>
   );
 }
 
-/** Subscription, trial, weight, overage and auth badges, in that order. */
-export function AccountBadges({
+/**
+ * The email, truncated to its column, with the full (or masked, under privacy) text as a
+ * tooltip only when it is cut off.
+ */
+function TruncatedEmail({ account, className }: { account: Account; className?: string }) {
+  const displayEmail = useDisplayEmail();
+  const text = displayEmail(account.email, account.id);
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <Tooltip
+      onOpenChange={(next) => {
+        const element = ref.current;
+        setOpen(next && element !== null && element.scrollWidth > element.clientWidth);
+      }}
+      open={open}
+    >
+      <TooltipTrigger
+        render={<span className={cn("block min-w-0 truncate font-medium", className)} ref={ref} />}
+      >
+        {text}
+      </TooltipTrigger>
+      <TooltipPopup>{text}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/** A small muted icon with its meaning as a tooltip and as screen reader text. */
+function Flag({ icon: Icon, label }: { icon: LucideIcon; label: string }): JSX.Element {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex shrink-0 text-muted-foreground" />}>
+        <Icon aria-hidden="true" className="size-3.5" />
+        <span className="sr-only">{label}</span>
+      </TooltipTrigger>
+      <TooltipPopup>{label}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+function trialHint(account: Account, t: ReturnType<typeof useT>["t"]): string | undefined {
+  const expiry = trialExpiry(account.trialExpiresAt, Date.now());
+  if (expiry?.kind === "expired") return t("trialExpired");
+  if (expiry?.kind === "today") return t("trialToday");
+  if (expiry?.kind === "days") return t("trialDays", { days: expiry.days });
+  return undefined;
+}
+
+/** Weight, an active trial and overage, as quiet icons after the email. Nothing when plain. */
+function AccountFlags({ account }: { account: Account }): JSX.Element | null {
+  const { t } = useT("accounts");
+  const flags: ReactNode[] = [];
+  if (account.weight >= 2) {
+    flags.push(
+      <Flag icon={WeightIcon} key="weight" label={t("weightShort", { weight: account.weight })} />,
+    );
+  }
+  if (account.trialStatus === "ACTIVE" && account.trialUsageLimit > 0) {
+    const hint = trialHint(account, t);
+    flags.push(
+      <Flag
+        icon={HourglassIcon}
+        key="trial"
+        label={hint ? `${t("trial")} · ${hint}` : t("trial")}
+      />,
+    );
+  }
+  if (overageEnabled(account)) {
+    flags.push(<Flag icon={ZapIcon} key="overage" label={t("overageOn")} />);
+  }
+  if (flags.length === 0) return null;
+  return <span className="flex shrink-0 items-center gap-1.5">{flags}</span>;
+}
+
+/** Plan and sign-in method as one muted line ("Team primary · Pro · Builder ID"). */
+export function accountMeta(account: Account, t: ReturnType<typeof useT>["t"]): string {
+  return [account.nickname, planLabel(account, t), authLabel(account, t)]
+    .filter((part) => part && part !== EMPTY)
+    .join(" · ");
+}
+
+/** Email (masked under privacy) with flags, over a muted nickname, plan and auth line. */
+export function AccountIdentity({
   account,
   className,
 }: {
@@ -84,181 +180,89 @@ export function AccountBadges({
   className?: string;
 }): JSX.Element {
   const { t } = useT("accounts");
-  const tier = subscriptionTier(account.subscriptionType);
-  const overage = (account.overageStatus ?? "").toUpperCase();
-  const pill = tier ? TIER_PILL[tier] : null;
   return (
-    <div className={cn("flex flex-wrap items-center gap-1", className)}>
-      <Badge
-        icon={pill?.icon ?? TagIcon}
-        iconStyle="line"
-        tone={pill?.tone ?? "neutral"}
-        variant={pill?.variant ?? "outline"}
-      >
-        {subscriptionLabel(account.subscriptionType, t)}
-      </Badge>
-      {account.trialStatus === "ACTIVE" && account.trialUsageLimit > 0 ? (
-        <Badge icon={HourglassIcon} iconStyle="line" tone="info">
-          {t("trial")}
-        </Badge>
-      ) : null}
-      {account.weight >= 2 ? (
-        <Badge icon={WeightIcon} iconStyle="line" tone="warning">
-          {t("weightShort", { weight: account.weight })}
-        </Badge>
-      ) : null}
-      {overage === "ENABLED" || overage === "DISABLED" ? (
-        <Tooltip>
-          {/* Not a tab stop: the tooltip is a hover hint, and the state is in the sr-only text. */}
-          <TooltipTrigger
-            render={
-              <Badge
-                className={cn(overage === "DISABLED" && "text-muted-foreground")}
-                icon={overage === "ENABLED" ? CircleCheckIcon : CircleSlashIcon}
-                tone={overage === "ENABLED" ? "success" : "neutral"}
-                variant={overage === "ENABLED" ? "soft" : "outline"}
-              />
-            }
-          >
-            <span aria-hidden="true">{t("overage")}</span>
-            <span className="sr-only">
-              {overage === "ENABLED" ? t("overageOn") : t("overageOff")}
-            </span>
-          </TooltipTrigger>
-          <TooltipPopup>{overage === "ENABLED" ? t("overageOn") : t("overageOff")}</TooltipPopup>
-        </Tooltip>
-      ) : null}
-      <Badge icon={KeyRoundIcon} iconStyle="line" variant="outline">
-        {authLabel(account, t)}
-      </Badge>
-    </div>
-  );
-}
-
-/** Health badges: Banned/Suspended, else No token/Expired/Active, plus Out of credits. */
-export function HealthBadges({ account }: { account: Account }): JSX.Element {
-  const { t } = useT("accounts");
-  const badges = healthBadges(account, Math.floor(Date.now() / 1000));
-  return (
-    <div className="flex flex-wrap items-center gap-1">
-      {badges.map((badge) => (
-        <Badge
-          icon={HEALTH_PILL[badge.kind].icon}
-          key={badge.kind}
-          tone={HEALTH_PILL[badge.kind].tone}
-        >
-          {t(`health.${badge.kind}`)}
-        </Badge>
-      ))}
+    <div className={cn("flex min-w-0 flex-col gap-1", className)}>
+      <div className="flex min-w-0 items-center gap-2">
+        <TruncatedEmail account={account} />
+        <AccountFlags account={account} />
+      </div>
+      <span className="block truncate text-muted-foreground text-xs leading-tight">
+        {accountMeta(account, t)}
+      </span>
     </div>
   );
 }
 
 const TONE_CLASS: Record<CreditTone, string> = {
   default: "bg-primary",
-  warning: "bg-warning",
-  destructive: "bg-destructive",
+  warning: "bg-(--pill-warning)",
+  destructive: "bg-(--pill-error)",
 };
 
-function CreditMeter({
-  label,
-  hideLabel = false,
-  hint,
-  current,
-  limit,
-  fraction,
-}: {
-  label: string;
-  /** Keeps the label for screen readers only, when a column header already names it. */
-  hideLabel?: boolean;
-  hint?: string;
-  current: number;
-  limit: number;
-  fraction: number;
-}): JSX.Element {
-  const { lang } = useT("accounts");
-  const pct = usagePercent(fraction);
+/**
+ * One usage meter: plan credits, or trial credits for an account with only a trial. The amount
+ * leads, the percent sits at the end, and the bar turns orange over 70 % and red over 90 %. The
+ * plan label is for screen readers only (the column header names it); a trial says so.
+ */
+export function UsageMeter({ account }: { account: Account }): JSX.Element {
+  const { t, lang } = useT("accounts");
+  const hasPlan = account.usageLimit > 0;
+  const hasTrial = account.trialUsageLimit > 0;
+  if (!hasPlan && !hasTrial) return <span className="text-muted-foreground">{EMPTY}</span>;
+  const current = hasPlan ? account.usageCurrent : account.trialUsageCurrent;
+  const limit = hasPlan ? account.usageLimit : account.trialUsageLimit;
+  const pct = usagePercent(hasPlan ? account.usagePercent : account.trialUsagePercent);
   return (
-    <Meter className="min-w-36 gap-1" max={100} min={0} value={pct}>
-      {/* Wraps inside the table's nowrap cells, so a long translated label does not widen the column. */}
-      <div className="flex items-baseline justify-between gap-2 whitespace-normal text-xs leading-snug">
-        <MeterLabel
-          className={cn("font-normal text-muted-foreground text-xs", hideLabel && "sr-only")}
-        >
-          {label}
-          {/* A real space, not a margin, so the hint can move to its own line. */}
-          {hint ? " " : null}
-          {hint ? <span className="whitespace-nowrap text-warning-foreground">{hint}</span> : null}
-        </MeterLabel>
-        <span className="ms-auto text-muted-foreground tabular-nums">
-          {formatFraction(pct / 100, 1)}
+    <Meter className="w-full min-w-32 max-w-48 gap-1.5" max={100} min={0} value={pct}>
+      <div className="flex items-baseline justify-between gap-2 text-xs leading-none">
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          <MeterLabel
+            className={cn(
+              "shrink-0 font-normal text-muted-foreground text-xs",
+              hasPlan && "sr-only",
+            )}
+          >
+            {hasPlan ? t("planCredits") : t("trialCredits")}
+          </MeterLabel>
+          <span className="truncate tabular-nums">
+            {formatCreditAmount(current, lang)} / {formatCreditAmount(limit, lang)}
+          </span>
+        </span>
+        <span className="shrink-0 text-muted-foreground tabular-nums">
+          {formatFraction(pct / 100, 0)}
         </span>
       </div>
-      <MeterTrack className="h-1.5 rounded-full">
+      <MeterTrack className="h-1 rounded-full">
         <MeterIndicator className={cn("rounded-full", TONE_CLASS[creditTone(pct)])} />
       </MeterTrack>
-      <span className="text-xs tabular-nums">
-        {formatCreditAmount(current, lang)} / {formatCreditAmount(limit, lang)}
-      </span>
     </Meter>
   );
 }
 
-/**
- * Plan credits, and trial credits when the account has a trial allowance. `compact` (the table,
- * whose column header already says "Plan credits") hides the plan label unless a trial meter
- * sits under it.
- */
-export function CreditMeters({
-  account,
-  compact = false,
-}: {
-  account: Account;
-  compact?: boolean;
-}): JSX.Element | null {
-  const { t } = useT("accounts");
-  const hasPlan = account.usageLimit > 0;
-  const hasTrial = account.trialUsageLimit > 0;
-  if (!hasPlan && !hasTrial) return null;
-  const expiry = trialExpiry(account.trialExpiresAt, Date.now());
-  const expiryLabel =
-    expiry?.kind === "expired"
-      ? t("trialExpired")
-      : expiry?.kind === "today"
-        ? t("trialToday")
-        : expiry?.kind === "days"
-          ? t("trialDays", { days: expiry.days })
-          : undefined;
-  return (
-    <div className="flex min-w-36 flex-col gap-2">
-      {hasPlan ? (
-        <CreditMeter
-          current={account.usageCurrent}
-          fraction={account.usagePercent}
-          hideLabel={compact && !hasTrial}
-          label={t("planCredits")}
-          limit={account.usageLimit}
-        />
-      ) : null}
-      {hasTrial ? (
-        <CreditMeter
-          current={account.trialUsageCurrent}
-          fraction={account.trialUsagePercent}
-          hint={expiryLabel}
-          label={t("trialCredits")}
-          limit={account.trialUsageLimit}
-        />
-      ) : null}
-    </div>
-  );
-}
-
+/** Time left on the access token, muted: the status pill already flags an expired one. */
 export function TokenExpiryText({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
-  const expiry = tokenExpiry(account.expiresAt, Math.floor(Date.now() / 1000));
+  const expiry = tokenExpiry(account.expiresAt, nowSec());
+  return <span className="text-muted-foreground tabular-nums">{formatTokenExpiry(expiry, t)}</span>;
+}
+
+/** "5 minutes ago" with the full date as a tooltip; a dash when the account was never used. */
+export function LastUsedText({ account }: { account: Account }): JSX.Element {
+  const { lang } = useT("accounts");
+  if (!account.lastUsed) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
-    <span className={cn("tabular-nums", expiry.kind === "expired" && "text-warning-foreground")}>
-      {formatTokenExpiry(expiry, t)}
-    </span>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <time
+            className="whitespace-nowrap tabular-nums"
+            dateTime={new Date(account.lastUsed * 1000).toISOString()}
+          />
+        }
+      >
+        {formatRelativeTime(account.lastUsed, lang)}
+      </TooltipTrigger>
+      <TooltipPopup>{formatDateTime(account.lastUsed, lang)}</TooltipPopup>
+    </Tooltip>
   );
 }

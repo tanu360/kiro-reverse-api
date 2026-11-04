@@ -15,6 +15,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
+import { cn } from "@/lib/utils";
 import { isBanned } from "./account-model";
 import {
   useCopyAccountJson,
@@ -22,6 +23,13 @@ import {
   useRefreshAccount,
   useToggleEnabled,
 } from "./use-account-actions";
+
+/**
+ * Icon buttons in a row: no hover or pressed fill, only the icon moves from muted to full
+ * colour (the sign-in pages' FLAT_ICON_BUTTON_CLASS rule).
+ */
+const FLAT_ICON =
+  "[--control-icon-color:currentColor] text-muted-foreground hover:bg-transparent hover:text-foreground data-pressed:bg-transparent data-pressed:text-foreground [:hover,[data-pressed]]:bg-transparent data-popup-open:text-foreground";
 
 export interface RowActionHandlers {
   onTest: (account: Account) => void;
@@ -64,7 +72,7 @@ function IconAction({
           <Button
             aria-busy={busy || undefined}
             aria-label={label}
-            className="size-10 md:size-8"
+            className={cn("size-10 md:size-8", FLAT_ICON)}
             disabled={busy}
             onClick={onClick}
             size="icon"
@@ -80,8 +88,9 @@ function IconAction({
 }
 
 /**
- * Row actions. `inline` (table): Refresh, Test, Details buttons plus a menu with Copy JSON and
- * Delete. `menu` (mobile card): every action in one kebab menu.
+ * Row actions. `inline` (table): Refresh and Test buttons plus a menu with Details, Copy JSON
+ * and Delete (a click on the row opens Details too). `menu` (mobile card): every action in one
+ * kebab menu.
  */
 export function AccountRowActions({
   account,
@@ -118,7 +127,7 @@ export function AccountRowActions({
             <Button
               aria-busy={refresh.isPending || undefined}
               aria-label={t("actions.more")}
-              className="size-10"
+              className={cn("size-10", FLAT_ICON)}
               size="icon"
               variant="ghost"
             />
@@ -165,9 +174,6 @@ export function AccountRowActions({
       <IconAction label={t("actions.test")} onClick={() => onTest(account)}>
         <FlaskConicalIcon aria-hidden="true" />
       </IconAction>
-      <IconAction label={t("actions.details")} onClick={() => onDetails(account)}>
-        <PanelRightOpenIcon aria-hidden="true" />
-      </IconAction>
       <Menu>
         <Tooltip>
           <TooltipTrigger
@@ -176,7 +182,7 @@ export function AccountRowActions({
                 render={
                   <Button
                     aria-label={t("actions.more")}
-                    className="size-10 md:size-8"
+                    className={cn("size-10 md:size-8", FLAT_ICON)}
                     size="icon"
                     variant="ghost"
                   />
@@ -188,7 +194,13 @@ export function AccountRowActions({
           </TooltipTrigger>
           <TooltipPopup>{t("actions.more")}</TooltipPopup>
         </Tooltip>
-        <MenuPopup align="end">{menuItems}</MenuPopup>
+        <MenuPopup align="end">
+          <MenuItem onClick={() => onDetails(account)}>
+            <PanelRightOpenIcon aria-hidden="true" />
+            {t("actions.details")}
+          </MenuItem>
+          {menuItems}
+        </MenuPopup>
       </Menu>
     </div>
   );

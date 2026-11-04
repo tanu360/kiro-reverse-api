@@ -13,7 +13,8 @@ import { accountsQuery } from "@/lib/api/accounts";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
-import { isApiKeyAccount } from "./account-model";
+import { StatusPill } from "./account-cells";
+import { isApiKeyAccount, isHeld } from "./account-model";
 import { BasicSection } from "./detail/basic-section";
 import { MachineIdSection } from "./detail/machine-id-section";
 import { ModelsSection } from "./detail/models-section";
@@ -58,9 +59,18 @@ export function AccountDetailSheet({
         <SheetHeader>
           <SheetTitle className="font-medium text-lg">{t("detail.title")}</SheetTitle>
           {account ? (
-            <SheetDescription className="truncate">
-              {displayEmail(account.email, account.id)}
-            </SheetDescription>
+            <>
+              <SheetDescription className="truncate">
+                {displayEmail(account.email, account.id)}
+              </SheetDescription>
+              {/* The list's one status pill, and the ban reason in words when there is one. */}
+              <div className="flex min-w-0 flex-wrap items-center gap-2 pt-1">
+                <StatusPill account={account} plain />
+                {account.banReason && isHeld(account) ? (
+                  <span className="min-w-0 text-muted-foreground text-xs">{account.banReason}</span>
+                ) : null}
+              </div>
+            </>
           ) : null}
         </SheetHeader>
         <SheetPanel className="flex flex-col gap-5">

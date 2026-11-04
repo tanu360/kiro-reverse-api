@@ -82,7 +82,19 @@ describe("AccountsPage", () => {
     const { table } = await renderAccounts();
     expect(bodyRows(table)).toHaveLength(mockDb.accounts.length);
     expect(screen.queryByText(DANA)).not.toBeInTheDocument();
-    expect(within(table).getByText("Team primary")).toBeInTheDocument();
+    // Nickname, plan and sign-in method share one quiet line under the email.
+    expect(within(table).getByText("Team primary · Pro · Enterprise")).toBeInTheDocument();
+  });
+
+  it("shows exactly one status pill per row, worst state first", async () => {
+    const { table } = await renderAccounts();
+    for (const row of bodyRows(table)) {
+      expect(row.querySelectorAll("[data-status]")).toHaveLength(1);
+    }
+    // Banned and out of credits: the ban wins.
+    const banned = within(table).getByText("Banned").closest("tr") as HTMLElement;
+    expect(within(banned).queryByText("Out of credits")).not.toBeInTheDocument();
+    expect(within(table).getByText("Token expired")).toBeInTheDocument();
   });
 
   it("filters by nickname as the user types", async () => {
@@ -92,16 +104,91 @@ describe("AccountsPage", () => {
       "overfl",
     );
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
-    expect(within(table).getByText("Overflow")).toBeInTheDocument();
+    expect(within(table).getByText(/^Overflow ·/)).toBeInTheDocument();
   });
 
-  it("shows only banned accounts under Banned and hides their enabled switch", async () => {
-    const { table, user } = await renderAccounts();
-    await user.click(screen.getByRole("button", { name: /^Banned/ }));
-    await waitFor(() => expect(bodyRows(table)).toHaveLength(2));
+  it("filters by the status in the URL and hides a banned account's switch", async () => {
+    await renderApp("/accounts?status=banned");
+    const table = await screen.findByRole("table", { name: "Accounts" });
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
     expect(within(table).getByText("Banned")).toBeInTheDocument();
-    expect(within(table).getByText("Suspended")).toBeInTheDocument();
     expect(within(table).queryByRole("switch")).not.toBeInTheDocument();
+  });
+
+  it("groups the problem statuses under Needs attention and narrows them with Issue", async () => {
+    const { table, user, router } = await renderAccounts();
+    const tabs = screen.getByRole("tablist", { name: "Account status" });
+    expect(within(tabs).getByRole("tab", { name: /^All/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await user.click(within(tabs).getByRole("tab", { name: /^Needs attention/ }));
+    expect(router.state.location.search).toMatchObject({ status: "attention" });
+    await waitFor(() => expect(bodyRows(table).length).toBeLessThan(mockDb.accounts.length));
+    for (const row of bodyRows(table)) {
+      expect(within(row).queryByText("Active")).not.toBeInTheDocument();
+    }
+
+    await user.click(screen.getByRole("button", { name: "Issue: All" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: /^Suspended/ }));
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
+    expect(router.state.location.search).toMatchObject({ status: "suspended" });
+    expect(screen.getByText(`1 of ${mockDb.accounts.length}`)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(mockDb.accounts.length));
+    expect(router.state.location.search).not.toHaveProperty("status");
+  });
+
+  it("opens an old single-status link on the Needs attention tab", async () => {
+    await renderApp("/accounts?status=banned");
+    const tabs = await screen.findByRole("tablist", { name: "Account status" });
+    expect(within(tabs).getByRole("tab", { name: /^Needs attention/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Issue: Banned" })).toBeInTheDocument();
+  });
+
+  it("filters by plan from its Label: Value select and clears it from All", async () => {
+    const { table, user, router } = await renderAccounts();
+    await user.click(screen.getByRole("button", { name: "Plan: All" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: /^Power/ }));
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
+    expect(router.state.location.search).toMatchObject({ plan: "power" });
+    // The first menu must finish closing, or its rows answer the next query.
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Plan: Power" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: /^All/ }));
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(mockDb.accounts.length));
+    expect(router.state.location.search).not.toHaveProperty("plan");
+  });
+
+  it("sorts from the Sort by select as a header click would", async () => {
+    const { table, user, router } = await renderAccounts();
+    await user.click(screen.getByRole("button", { name: "Sort by: Default" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "Requests" }));
+    const header = within(table).getByRole("columnheader", { name: "Requests" });
+    await waitFor(() => expect(header).toHaveAttribute("aria-sort", "descending"));
+    expect(router.state.location.search).toMatchObject({ sort: "requests", order: "desc" });
+    expect(screen.getByRole("button", { name: "Sort by: Requests" })).toBeInTheDocument();
+  });
+
+  it("sorts from a column header, most requests first, and keeps the sort in the URL", async () => {
+    const { table, user, router } = await renderAccounts();
+    const header = within(table).getByRole("columnheader", { name: "Requests" });
+    await user.click(within(header).getByRole("button"));
+    await waitFor(() => expect(header).toHaveAttribute("aria-sort", "descending"));
+    expect(router.state.location.search).toMatchObject({ sort: "requests", order: "desc" });
+    const top = [...mockDb.accounts].sort((a, b) => b.requestCount - a.requestCount)[0];
+    expect(within(bodyRows(table)[0]).getByText(new RegExp(`^${top.nickname} ·`))).toBeVisible();
+  });
+
+  it("opens the details sheet from a click on the row", async () => {
+    const { table, user } = await renderAccounts();
+    const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
+    await user.click(within(row).getAllByRole("cell")[2]);
+    const sheet = await screen.findByRole("dialog", { name: "Account details" });
+    expect(within(sheet).getByText("Active")).toBeInTheDocument();
   });
 
   it("keeps the selection across filters and batch-deletes it after a confirm", async () => {
@@ -172,33 +259,30 @@ describe("AccountsPage", () => {
     await waitFor(() => expect(router.state.location.search).toMatchObject({ add: true }));
   });
 
-  it("shows no status counts while the list loads", async () => {
+  it("offers no filters while the list loads: zero counts would read as an empty fleet", async () => {
     mockServer.use(http.get(apiUrl("/accounts"), () => new Promise<Response>(() => {})));
-    await renderApp("/accounts");
-    const group = await screen.findByRole("group", { name: "Account status" });
-    const labels = within(group)
-      .getAllByRole("button")
-      .map((button) => button.textContent);
-    expect(labels).toEqual(["All", "Enabled", "Disabled", "Banned"]);
+    await renderApp("/accounts?status=banned&plan=power");
+    expect(
+      await screen.findByRole("searchbox", { name: "Search by email or nickname" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Account status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Plan:/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/ of 0$/)).not.toBeInTheDocument();
   });
 
-  it("shows no status counts after the list fails to load", async () => {
+  it("hides the toolbar after the list fails to load", async () => {
     mockServer.use(http.get(apiUrl("/accounts"), () => HttpResponse.json({}, { status: 500 })));
     await renderApp("/accounts");
     expect(await screen.findByText("Could not load accounts")).toBeInTheDocument();
-    const group = screen.getByRole("group", { name: "Account status" });
-    expect(within(group).getByRole("button", { name: "Banned" })).toHaveTextContent(/^Banned$/);
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 
-  it("does not make the overage badge a tab stop", async () => {
+  it("shows weight and overage as quiet icons that are not tab stops", async () => {
     const { table } = await renderAccounts();
-    const badges = within(table).getAllByText("Overage");
-    expect(badges.length).toBeGreaterThan(0);
-    for (const text of badges) {
-      const badge = text.parentElement as HTMLElement;
-      expect(badge).not.toHaveAttribute("tabindex");
-      // The state still reaches screen readers.
-      expect(badge).toHaveTextContent(/Overage (enabled|disabled)/);
+    for (const label of ["Weight 3", "Overage enabled"]) {
+      const text = within(table).getByText(label);
+      expect(text).toHaveClass("sr-only");
+      expect(text.parentElement).not.toHaveAttribute("tabindex");
     }
   });
 
@@ -223,10 +307,11 @@ describe("AccountsPage layout", () => {
     expect(screen.queryByRole("list", { name: "Accounts" })).not.toBeInTheDocument();
     // jsdom has no container queries, so check the classes that hide the columns under 1,100 px.
     const header = (name: string) => within(table).getByRole("columnheader", { name });
-    for (const name of ["Requests", "Tokens", "Credits", "Token expiry"]) {
+    expect(header("Requests")).toHaveClass("hidden", "@[900px]/accounts:table-cell");
+    for (const name of ["Last used", "Token expiry"]) {
       expect(header(name)).toHaveClass("hidden", "@[1100px]/accounts:table-cell");
     }
-    for (const name of ["Account", "Status", "Plan credits", "Enabled"]) {
+    for (const name of ["Account", "Status", "Usage", "Enabled"]) {
       expect(header(name)).not.toHaveClass("hidden");
     }
     // The list is the query container those classes name.
@@ -277,15 +362,28 @@ describe("AccountsPage layout", () => {
     await waitFor(() => expect(bodies).toHaveLength(1));
   });
 
-  it("keeps Refresh and Add account in the phone header and moves the rest to a menu", async () => {
+  it("folds Export and Refresh all models into a ⋯ menu on phones", async () => {
     mockViewport(390);
     const { user } = await renderCards();
     const main = screen.getByRole("main");
-    expect(within(main).getByRole("button", { name: "Refresh list" })).toBeInTheDocument();
+    expect(within(main).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
     expect(within(main).getByRole("button", { name: "Add account" })).toBeInTheDocument();
     expect(within(main).queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
-    await user.click(within(main).getByRole("button", { name: "More list actions" }));
+    // The cards have no headers to click; the Sort by select stands in.
+    expect(within(main).getByRole("button", { name: "Sort by: Default" })).toBeInTheDocument();
+    await user.click(within(main).getByRole("button", { name: "More" }));
     expect(await screen.findByRole("menuitem", { name: "Export" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Refresh all models" })).toBeInTheDocument();
+  });
+
+  it("shows each header action as its own button on wider screens", async () => {
+    await renderAccounts();
+    const main = screen.getByRole("main");
+    const header = main.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
+    const names = within(header)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent);
+    expect(names).toEqual(["Refresh", "Refresh all models", "Export", "Add account"]);
+    expect(within(header).queryByRole("button", { name: "More" })).not.toBeInTheDocument();
   });
 });
