@@ -34,7 +34,7 @@ export function DetailSection({
     <section
       aria-labelledby={headingId}
       className={cn(
-        "flex min-w-0 flex-col gap-3 border-t pt-5 first:border-t-0 first:pt-0",
+        "flex min-w-0 flex-col gap-3 border-border/50 border-t pt-5 first:border-t-0 first:pt-0",
         className,
       )}
     >

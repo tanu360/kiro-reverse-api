@@ -13,7 +13,8 @@ export const GITHUB_URL = "https://github.com/tanu360/kiro-reverse-api";
  * Old footer items: version badge with update notice, "Running" status, GitHub link and the
  * copyright, then the Admin user row. In the icon rail they collapse into one info tooltip.
  * Quiet like the sign-in footer: 12 px meta in one row, then the copyright line as the sign-in
- * pages draw it (13 px, a middle dot, the app name a step quieter).
+ * pages draw it (13 px, a middle dot, the app name a step quieter), in the sidebar's muted text
+ * colour as t3code's sidebar footer.
  */
 export function NavFooter(): JSX.Element {
   const { t } = useT();
@@ -29,12 +30,12 @@ export function NavFooter(): JSX.Element {
       <div className="flex flex-col gap-2.5 px-2 pb-1 text-xs group-data-[collapsible=icon]:hidden">
         <div className="flex flex-wrap items-center gap-2">
           <VersionBadge className="max-lg:h-10 max-lg:px-3" />
-          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 text-sidebar-muted-foreground">
             <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
             {t("shell.running")}
           </span>
           <a
-            className="ms-auto inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline max-lg:min-h-10 max-lg:px-2"
+            className="ms-auto inline-flex items-center gap-1 rounded-sm text-sidebar-muted-foreground outline-none transition-colors hover:text-sidebar-foreground focus-outline max-lg:min-h-10 max-lg:px-2"
             href={GITHUB_URL}
             rel="noopener"
             target="_blank"
@@ -85,7 +86,7 @@ function FooterCopyright({ line }: { line: string }): JSX.Element {
   const name = t("shell.appName");
   const at = line.lastIndexOf(name);
   return (
-    <p className="text-[13px] text-muted-foreground tabular-nums">
+    <p className="text-[13px] text-sidebar-muted-foreground tabular-nums">
       {at < 0 ? (
         line
       ) : (
@@ -94,7 +95,7 @@ function FooterCopyright({ line }: { line: string }): JSX.Element {
           <span aria-hidden="true" className="mx-1.5">
             ·
           </span>
-          <span className="text-muted-foreground/70">{name}</span>
+          <span className="text-sidebar-muted-foreground/70">{name}</span>
           {line.slice(at + name.length)}
         </>
       )}

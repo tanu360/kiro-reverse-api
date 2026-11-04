@@ -16,8 +16,10 @@ import { useGeneralSettingsSave } from "./general-settings";
 import { SECTION_ID } from "./sections";
 import {
   FieldErrorText,
+  ROW_DESCRIPTION,
   SaveFooter,
   SectionQuery,
+  SettingsRow,
   SettingsSection,
   SwitchField,
 } from "./settings-section";
@@ -73,52 +75,58 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
           serverChanged={draft.serverChanged}
         />
       }
-      hint={t("autoContinueHint")}
       id={SECTION_ID.autoContinue}
-      learnMore={t("autoContinueMore")}
       onSubmit={onSubmit}
+      rows
       title={t("autoContinue")}
     >
-      <div className="flex flex-col gap-5">
+      <SettingsRow>
         <SwitchField
           checked={draft.value.autoContinue}
+          hint={t("autoContinueHint")}
           label={t("autoContinueEnable")}
+          learnMore={t("autoContinueMore")}
           onCheckedChange={(autoContinue) => draft.set((prev) => ({ ...prev, autoContinue }))}
         />
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={maxId}>{t("autoContinueMax")}</Label>
-          <NumberField
-            allowOutOfRange
-            className="w-36"
-            id={maxId}
-            max={MAX_CONTINUATIONS}
-            min={1}
-            onValueChange={(value) => {
-              setMaxInvalid(false);
-              draft.set((prev) => ({ ...prev, autoContinueMax: value }));
-            }}
-            step={1}
-            value={draft.value.autoContinueMax}
-          >
-            <NumberFieldGroup>
-              <NumberFieldDecrement />
-              <NumberFieldInput
-                aria-describedby={maxInvalid ? `${maxId}-error ${maxId}-hint` : `${maxId}-hint`}
-                aria-invalid={maxInvalid || undefined}
-              />
-              <NumberFieldIncrement />
-            </NumberFieldGroup>
-          </NumberField>
+      </SettingsRow>
+      {/* t3code's row: the label and hint on the left, the number field at the row's end. */}
+      <SettingsRow className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+        <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
+          <Label className="font-medium text-foreground text-sm" htmlFor={maxId}>
+            {t("autoContinueMax")}
+          </Label>
+          <p className={ROW_DESCRIPTION} id={`${maxId}-hint`}>
+            {t("autoContinueMaxHint")}
+          </p>
           {maxInvalid ? (
             <FieldErrorText id={`${maxId}-error`}>
               {t("autoContinueMaxInvalid", { max: MAX_CONTINUATIONS })}
             </FieldErrorText>
           ) : null}
-          <p className="text-muted-foreground text-xs" id={`${maxId}-hint`}>
-            {t("autoContinueMaxHint")}
-          </p>
         </div>
-      </div>
+        <NumberField
+          allowOutOfRange
+          className="w-36"
+          id={maxId}
+          max={MAX_CONTINUATIONS}
+          min={1}
+          onValueChange={(value) => {
+            setMaxInvalid(false);
+            draft.set((prev) => ({ ...prev, autoContinueMax: value }));
+          }}
+          step={1}
+          value={draft.value.autoContinueMax}
+        >
+          <NumberFieldGroup>
+            <NumberFieldDecrement />
+            <NumberFieldInput
+              aria-describedby={maxInvalid ? `${maxId}-error ${maxId}-hint` : `${maxId}-hint`}
+              aria-invalid={maxInvalid || undefined}
+            />
+            <NumberFieldIncrement />
+          </NumberFieldGroup>
+        </NumberField>
+      </SettingsRow>
     </SettingsSection>
   );
 }

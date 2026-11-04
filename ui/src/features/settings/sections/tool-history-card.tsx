@@ -35,15 +35,15 @@ function ToolHistoryForm({ settings }: { settings: Settings }): JSX.Element {
           serverChanged={draft.serverChanged}
         />
       }
-      hint={t("structuredToolHistoryHint")}
       id={SECTION_ID.toolHistory}
-      learnMore={t("structuredToolHistoryMore")}
       onSubmit={() => save(draft.value)}
       title={t("toolHistory")}
     >
       <SwitchField
         checked={draft.value.structuredToolHistory}
         label={t("structuredToolHistory")}
+        learnMore={t("structuredToolHistoryMore")}
+        hint={t("structuredToolHistoryHint")}
         onCheckedChange={(structuredToolHistory) => draft.set({ structuredToolHistory })}
       />
     </SettingsSection>

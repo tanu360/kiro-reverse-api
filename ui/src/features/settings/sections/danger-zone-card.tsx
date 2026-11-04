@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
-import { SectionCard } from "@/components/shared/section-card";
 import { Button } from "@/components/ui/button";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -9,6 +8,7 @@ import { resetStats } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { SECTION_ID } from "./sections";
+import { ROW_DESCRIPTION, SettingsFrame, SettingsRow } from "./settings-section";
 
 export function DangerZoneCard(): JSX.Element {
   const { t } = useT("settings");
@@ -39,15 +39,15 @@ export function DangerZoneCard(): JSX.Element {
   };
 
   return (
-    <SectionCard
-      className="scroll-mt-16 border-destructive/32"
+    <SettingsFrame
+      className="border-destructive/32"
       id={SECTION_ID.dangerZone}
       title={t("dangerZone")}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <SettingsRow className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
         <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="font-medium text-sm">{t("statistics")}</h3>
-          <p className="text-muted-foreground text-sm">{t("resetStatsHint")}</p>
+          <h3 className="font-medium text-foreground text-sm">{t("statistics")}</h3>
+          <p className={ROW_DESCRIPTION}>{t("resetStatsHint")}</p>
         </div>
         <Button
           className="self-start sm:self-center"
@@ -57,7 +57,7 @@ export function DangerZoneCard(): JSX.Element {
         >
           {t("resetStats")}
         </Button>
-      </div>
-    </SectionCard>
+      </SettingsRow>
+    </SettingsFrame>
   );
 }

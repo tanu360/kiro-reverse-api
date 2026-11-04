@@ -26,8 +26,9 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
           {t("shell.skipToContent")}
         </a>
         <AppSidebar />
+        {/* A plain canvas, no grain: t3code's page reads as flat black (#000) or near-white. */}
         <div
-          className="relative flex w-full min-w-0 flex-1 flex-col overflow-x-clip bg-background surface-grain"
+          className="relative flex w-full min-w-0 flex-1 flex-col overflow-x-clip bg-background"
           data-slot="sidebar-inset"
         >
           <SiteHeader />

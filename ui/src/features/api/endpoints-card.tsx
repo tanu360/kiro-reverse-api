@@ -123,7 +123,7 @@ export function EndpointsCard(): JSX.Element {
       id="api-endpoints"
       title={t("endpoints.title")}
     >
-      <ul aria-label={t("endpoints.title")} className="flex flex-col divide-y">
+      <ul aria-label={t("endpoints.title")} className="flex flex-col divide-y divide-border/50">
         {ENDPOINTS.map((endpoint) => {
           const Icon = endpoint.icon;
           const url = origin + endpoint.path;

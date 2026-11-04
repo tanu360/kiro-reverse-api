@@ -224,8 +224,9 @@ describe("settings focus", () => {
 
   it("gives touch-size targets to switch labels, section chips and rule inputs", async () => {
     const { user } = await renderPage();
+    // A t3code row title on a mouse; 40 px tall on a touch screen.
     const label = within(section(SECTION_ID.usage)).getByText("Allow overage");
-    expect(label).toHaveClass("min-h-10");
+    expect(label).toHaveClass("pointer-coarse:min-h-10");
     expect(within(nav()).getByRole("link", { name: "Usage" })).toHaveClass("min-h-10");
 
     const filter = section(SECTION_ID.promptFilter);

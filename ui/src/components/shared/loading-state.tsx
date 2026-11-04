@@ -54,7 +54,7 @@ export function TableSkeleton({
       </div>
       {Array.from({ length: rows }, (_, r) => (
         <div
-          className="grid gap-4 border-b px-2.5 py-3.5 last:border-b-0"
+          className="grid gap-4 border-border/50 border-b px-2.5 py-3.5 last:border-b-0"
           // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
           key={r}
           style={style}
@@ -74,11 +74,7 @@ export function TableSkeleton({
 
 export function StatCardSkeleton(): JSX.Element {
   return (
-    <Card
-      aria-hidden="true"
-      className="gap-4 p-4 shadow-none before:hidden sm:p-5"
-      data-slot="stat-card-skeleton"
-    >
+    <Card aria-hidden="true" className="gap-4 p-4 sm:p-5" data-slot="stat-card-skeleton">
       <Skeleton className="size-7 rounded-lg" />
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-8 w-1/2" />

@@ -12,7 +12,8 @@ import { type Lang, type TFunction, useT } from "@/lib/i18n";
 // Columns follow the page's content width (@container/main), not the viewport, so labels such
 // as "Output tokens/min" fit: three tiles per row from 36rem, six from 64rem.
 const GRID_CLASS = "grid grid-cols-2 gap-4 @xl/main:grid-cols-3 @5xl/main:grid-cols-6";
-const TILE_CLASS = "min-w-0 gap-1.5 p-4 shadow-xs";
+// The Card is t3code's SettingsGroup surface (border at 60 %, card at 40 %), with no shadow.
+const TILE_CLASS = "min-w-0 gap-1.5 p-4";
 
 interface Tile {
   id: string;

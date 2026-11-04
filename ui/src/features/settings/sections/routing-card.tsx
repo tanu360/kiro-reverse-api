@@ -35,15 +35,15 @@ function RoutingForm({ settings }: { settings: Settings }): JSX.Element {
           serverChanged={draft.serverChanged}
         />
       }
-      hint={t("sessionAffinityHint")}
       id={SECTION_ID.routing}
-      learnMore={t("sessionAffinityMore")}
       onSubmit={() => save(draft.value)}
       title={t("routing")}
     >
       <SwitchField
         checked={draft.value.sessionAffinity}
         label={t("sessionAffinity")}
+        learnMore={t("sessionAffinityMore")}
+        hint={t("sessionAffinityHint")}
         onCheckedChange={(sessionAffinity) => draft.set({ sessionAffinity })}
       />
     </SettingsSection>

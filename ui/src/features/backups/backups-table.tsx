@@ -405,9 +405,12 @@ export function BackupsTable({
         id: "actions",
         header: <span className="sr-only">{t("common:table.actions")}</span>,
         align: "end",
-        // Pinned to the right edge, so the actions stay in view if the table ever scrolls.
-        headerClassName: "sticky right-0 z-[1] bg-card",
-        className: "sticky right-0 z-[1] bg-card py-1",
+        // Pinned to the right edge, so the actions stay in view if the table ever scrolls; opaque
+        // in the panel's own fill (the card at 40 % over the page).
+        headerClassName:
+          "sticky right-0 z-[1] bg-[color-mix(in_srgb,var(--card)_40%,var(--background))]",
+        className:
+          "sticky right-0 z-[1] bg-[color-mix(in_srgb,var(--card)_40%,var(--background))] py-1",
         cell: (entry) => <RowActions actions={actions} entry={entry} />,
       },
     ],

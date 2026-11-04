@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 /**
  * A titled card section. One spacing rhythm on every page: 16 px of padding on phones and 20 px
  * from sm up, 16 px from the title block to the content, and a slim footer (12 px top and
- * bottom) under a hairline. The panel and footer are plain slots rather than CardPanel and
+ * bottom) under t3code's row divider (border at 50 %). The surface is the Card's, t3code's
+ * SettingsGroup. The panel and footer are plain slots rather than CardPanel and
  * CardFooter, whose own paddings change with the card's other children.
  */
 
@@ -59,7 +60,10 @@ export function SectionCard({
         {children}
       </div>
       {footer ? (
-        <div className="flex items-center border-t px-4 py-3 sm:px-5" data-slot="card-footer">
+        <div
+          className="flex items-center border-border/50 border-t px-4 py-3 sm:px-5"
+          data-slot="card-footer"
+        >
           {footer}
         </div>
       ) : null}

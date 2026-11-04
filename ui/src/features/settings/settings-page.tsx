@@ -185,9 +185,9 @@ function SectionNav(): JSX.Element {
               <a
                 aria-current={current ? "true" : undefined}
                 className={cn(
-                  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border bg-background px-3 text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline lg:min-h-8 lg:w-full lg:rounded-md lg:border-transparent lg:bg-transparent lg:px-2 lg:pointer-coarse:min-h-10",
+                  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border bg-background px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline lg:min-h-8 lg:w-full lg:rounded-md lg:border-transparent lg:bg-transparent lg:px-2 lg:pointer-coarse:min-h-10",
                   current &&
-                    "border-foreground/24 bg-accent font-medium text-foreground lg:border-transparent lg:bg-accent",
+                    "border-foreground/24 bg-accent text-foreground lg:border-transparent lg:bg-accent",
                 )}
                 href={`#${section.id}`}
                 onClick={(event) => onClick(event, section.id)}
@@ -243,7 +243,8 @@ function SettingsContent(): JSX.Element {
       <PageHeader meta={<ListeningOn />} title={t("title")} />
       <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-[11rem_minmax(0,48rem)] lg:gap-8">
         <SectionNav />
-        <div className="flex min-w-0 flex-col gap-4 md:gap-6">
+        {/* t3code's settings page: 32 px between sections (24 px on phones). */}
+        <div className="flex min-w-0 flex-col gap-6 md:gap-8">
           <GeneralSettingsError />
           <UsageCard />
           <StreamIntegrityCard />

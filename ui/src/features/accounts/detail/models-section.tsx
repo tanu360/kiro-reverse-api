@@ -78,7 +78,10 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
         ) : models && models.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("detail.noModels")}</p>
         ) : models ? (
-          <ul aria-label={t("detail.models")} className="flex flex-col divide-y rounded-lg border">
+          <ul
+            aria-label={t("detail.models")}
+            className="flex flex-col divide-y divide-border/50 rounded-lg border border-border/60"
+          >
             {models.map((model) => (
               <li className="flex flex-col gap-0.5 px-3 py-2" key={model.modelId}>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">

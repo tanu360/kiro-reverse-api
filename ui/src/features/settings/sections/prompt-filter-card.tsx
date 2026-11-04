@@ -184,7 +184,7 @@ function RuleCard({
     <li
       aria-label={ruleLabel}
       className={cn(
-        "flex flex-col gap-3 rounded-lg border bg-background p-3 transition-opacity",
+        "flex flex-col gap-3 rounded-lg border border-border/60 bg-card/40 p-3 transition-opacity",
         !rule.enabled && "opacity-60",
       )}
       data-rule-index={index}

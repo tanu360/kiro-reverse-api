@@ -209,10 +209,10 @@ function AccountCards({
   );
 }
 
-/** Same outline as a card, so the loading list reads as cards on both themes. */
+/** Same outline as a card (t3code's SettingsGroup), so the loading list reads as cards. */
 function SkeletonCard(): JSX.Element {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-card p-3">
+    <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card/40 p-3">
       <div className="flex items-center gap-3">
         <Skeleton className="size-5 rounded" />
         <Skeleton className="h-4 flex-1" />
@@ -246,7 +246,7 @@ function AccountCard({
   const { t, lang } = useT("accounts");
   return (
     <article
-      className="flex w-full min-w-0 flex-col gap-3 rounded-xl border bg-card p-3 data-selected:border-ring"
+      className="flex w-full min-w-0 flex-col gap-3 rounded-xl border border-border/60 bg-card/40 p-3 data-selected:border-ring"
       data-selected={selected || undefined}
     >
       <div className="flex items-start gap-2">

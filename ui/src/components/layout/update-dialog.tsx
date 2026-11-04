@@ -49,7 +49,7 @@ export function UpdateDialog({
     >
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border bg-muted/40 p-3">
+          <div className="rounded-xl border border-border/60 bg-card/40 p-3">
             <p className="text-muted-foreground text-xs">{t("shell.update.current")}</p>
             <p className="font-medium font-mono text-lg tabular-nums">
               {current ? `v${stripV(current)}` : "—"}

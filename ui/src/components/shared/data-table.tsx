@@ -84,14 +84,20 @@ const ALIGN_CLASS = { start: "text-left", center: "text-center", end: "text-righ
 // Column headers sit a step under the 14 px cells: 13 px, regular weight, muted (the sort
 // button turns the sorted column's header to the text colour).
 const HEAD_CLASS = "font-normal text-[13px]";
-// Sticky cells need an opaque background; they repeat the row's hover and selected tints so a
-// pinned cell does not read as a separate block.
+// Sticky cells need an opaque background: the panel's own (the card at 40 % over the page, as
+// t3code's SettingsGroup), with the row's hover and selected tints (foreground at 2 and 4 %) on
+// top, so a pinned cell does not read as a separate block.
 const STICKY_BASE =
-  "sticky z-[1] bg-card [tr:hover>&]:bg-[color-mix(in_srgb,var(--background),var(--color-black)_2%)] [tr[data-state=selected]>&]:bg-[color-mix(in_srgb,var(--background),var(--color-black)_4%)] dark:[tr:hover>&]:bg-[color-mix(in_srgb,var(--background),var(--color-white)_2%)] dark:[tr[data-state=selected]>&]:bg-[color-mix(in_srgb,var(--background),var(--color-white)_4%)]";
+  "sticky z-[1] [--sticky-bg:color-mix(in_srgb,var(--card)_40%,var(--background))] bg-(--sticky-bg) [tr:hover>&]:bg-[color-mix(in_srgb,var(--sticky-bg),var(--foreground)_2%)] [tr[data-state=selected]>&]:bg-[color-mix(in_srgb,var(--sticky-bg),var(--foreground)_4%)]";
 const STICKY_CLASS = {
   start: cn(STICKY_BASE, "left-0"),
-  end: cn(STICKY_BASE, "right-0 shadow-[inset_1px_0_0_var(--border)]"),
+  end: cn(
+    STICKY_BASE,
+    "right-0 shadow-[inset_1px_0_0_color-mix(in_srgb,var(--border)_50%,transparent)]",
+  ),
 } as const;
+// Body rows are split by t3code's row divider (border at 50 %); the header keeps the full line.
+const ROW_DIVIDERS = "[&_tbody>tr]:border-border/50";
 
 function stickyClass(sticky: DataTableColumn<unknown>["sticky"]): string | undefined {
   if (!sticky) return undefined;
@@ -197,7 +203,7 @@ export function DataTable<T>({
         <div aria-busy="true" className={cn("flex flex-col gap-2", className)}>
           {Array.from({ length: 3 }, (_, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
-            <Skeleton className="h-20 w-full rounded-xl border" key={index} />
+            <Skeleton className="h-20 w-full rounded-xl border border-border/60" key={index} />
           ))}
         </div>
       );
@@ -224,7 +230,10 @@ export function DataTable<T>({
   // in the visible width instead of across the full scroll width of a wide table.
   return (
     <div className={cn("min-w-0", bleed && BLEED_WRAPPER)} data-slot="data-table">
-      <Table aria-busy={loading || undefined} className={cn(bleed && BLEED_TABLE, className)}>
+      <Table
+        aria-busy={loading || undefined}
+        className={cn(ROW_DIVIDERS, bleed && BLEED_TABLE, className)}
+      >
         {caption ? <TableCaption className="sr-only">{caption}</TableCaption> : null}
         <TableHeader>
           <TableRow className="hover:bg-transparent">

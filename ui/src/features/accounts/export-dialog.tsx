@@ -187,7 +187,10 @@ export function ExportDialog({
             {allSelected ? t("export.deselectAll") : t("export.selectAll")}
           </Button>
         </div>
-        <ul aria-label={t("export.list")} className="flex flex-col divide-y rounded-lg border">
+        <ul
+          aria-label={t("export.list")}
+          className="flex flex-col divide-y divide-border/50 rounded-lg border border-border/60"
+        >
           {accounts.map((account) => {
             const email = displayEmail(account.email, account.id);
             return (

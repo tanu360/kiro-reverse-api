@@ -58,8 +58,9 @@ import { useElementWidth } from "./use-element-size";
  * the switch follows the card's own width (sidebar open or not), not the viewport.
  */
 export const KEYS_TABLE_MIN_WIDTH = 880;
-// The actions column stays in view while a narrow table scrolls sideways.
-const STICKY_END = "sticky right-0 z-[1] bg-card";
+// The actions column stays in view while a narrow table scrolls sideways, opaque in the panel's
+// own fill (the card at 40 % over the page).
+const STICKY_END = "sticky right-0 z-[1] bg-[color-mix(in_srgb,var(--card)_40%,var(--background))]";
 
 interface DialogState {
   open: boolean;

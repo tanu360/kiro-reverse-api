@@ -89,16 +89,12 @@ export function StatCard({
 
   const danger = tone === "danger";
   return (
-    // Flat, like the sign-in pages: the card's border and fill only, no gradient or shadow.
-    <Card
-      className="min-w-0 gap-4 p-4 shadow-none before:hidden sm:p-5"
-      data-slot="stat-card"
-      data-tone={tone}
-    >
+    // t3code's SettingsGroup surface: the Card's own border and 40 % fill, no shadow.
+    <Card className="min-w-0 gap-4 p-4 sm:p-5" data-slot="stat-card" data-tone={tone}>
       <div className="flex flex-col gap-1">
         <div
           className={cn(
-            "flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground",
+            "flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground",
             danger && "border-destructive/20 bg-destructive/10 text-destructive-foreground",
           )}
         >
@@ -126,7 +122,7 @@ export function StatCard({
         </div>
       ) : null}
       {metrics && metrics.length > 0 ? (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-3 text-xs">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-border/50 border-t pt-3 text-xs">
           {metrics.map((metric) => (
             <div
               className={cn("flex min-w-0 flex-col gap-0.5", metric.wide && "col-span-2")}

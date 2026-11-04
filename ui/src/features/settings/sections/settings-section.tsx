@@ -19,13 +19,13 @@ import {
   useState,
 } from "react";
 import { ErrorState } from "@/components/shared/error-state";
-import { CardSkeleton } from "@/components/shared/loading-state";
-import { SectionCard } from "@/components/shared/section-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { errorMessage } from "@/lib/api/server-errors";
 import { type TFunction, useT } from "@/lib/i18n";
@@ -35,6 +35,13 @@ import { useReportDirty } from "../lib/unsaved";
 
 /** The id of the settings card a control sits in, so Save can report its card as dirty. */
 const SectionIdContext = createContext<string | undefined>(undefined);
+
+/**
+ * t3code's settings type (settingsLayout.tsx): a row title is 14 px medium in the text colour,
+ * its description 12 px in the muted colour, at most 42rem wide.
+ */
+export const ROW_DESCRIPTION =
+  "max-w-2xl text-balance text-muted-foreground text-xs leading-normal";
 
 /** On a touch screen, an input grows to the 40 px touch-target height (36 px + borders). */
 export const TOUCH_INPUT =
@@ -81,7 +88,7 @@ export function LearnMore({ children }: { children: ReactNode }): JSX.Element {
           <Button
             // Baseline-aligned on its text, not on the icon (a flex box takes its baseline from
             // its first baseline item), so the link does not push its line taller than the rest.
-            className="h-auto items-baseline px-0 align-baseline text-muted-foreground text-sm underline underline-offset-4 hover:text-foreground [&_svg]:self-center"
+            className="h-auto items-baseline px-0 align-baseline text-muted-foreground text-xs underline underline-offset-4 hover:text-foreground [&_svg]:size-3 [&_svg]:self-center"
             size="xs"
             variant="link"
           />
@@ -186,8 +193,71 @@ export function ServerChangedNotice({ onReload }: { onReload: () => void }): JSX
 }
 
 /**
- * A settings card in its own form: Enter in a field submits it, and Save is the submit button.
- * `hint` is at most two sentences; `learnMore` holds the rest behind a popover.
+ * t3code's SettingsSection frame: the heading (16 px semibold, with the "Default" tag and any
+ * actions at its end) sits above the group, outside it, and the group (the Card, t3code's
+ * SettingsGroup) stacks its rows with the row divider (border at 50 %) between them.
+ */
+export function SettingsFrame({
+  id,
+  title,
+  actions,
+  className,
+  children,
+}: {
+  id: string;
+  title: string;
+  actions?: ReactNode;
+  /** On the group. */
+  className?: string;
+  children: ReactNode;
+}): JSX.Element {
+  const headingId = `${id}-title`;
+  return (
+    <section aria-labelledby={headingId} className="flex scroll-mt-16 flex-col gap-2.5" id={id}>
+      <div className="flex min-h-7 flex-wrap items-start justify-between gap-x-4 gap-y-1 px-3 sm:px-4">
+        <h2
+          className="flex min-h-7 items-center font-heading font-semibold text-base text-foreground"
+          id={headingId}
+        >
+          {title}
+        </h2>
+        {actions ? (
+          <div className="flex min-h-7 flex-wrap items-center justify-end gap-2">{actions}</div>
+        ) : null}
+      </div>
+      <Card
+        className={cn("@container min-w-0 [&>*+*]:border-border/50 [&>*+*]:border-t", className)}
+      >
+        {children}
+      </Card>
+    </section>
+  );
+}
+
+/** One row of a settings group: t3code's 12 px block and 12 px (16 px from sm) inline padding. */
+export function SettingsRow({
+  children,
+  className,
+  slot = "settings-row",
+}: {
+  children: ReactNode;
+  className?: string;
+  /** `card-footer` marks the row that holds Save. */
+  slot?: "settings-row" | "card-footer";
+}): JSX.Element {
+  return (
+    <div className={cn("min-w-0 px-3 py-3 sm:px-4", className)} data-slot={slot}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A settings section in its own form: Enter in a field submits it, and Save is the submit button.
+ * `hint` is at most two sentences; `learnMore` holds the rest behind a popover. The hint opens the
+ * first row as t3code's row description; a section with one switch passes its hint to the
+ * SwitchField instead, so the row reads title, description, control as in t3code. Save gets a row
+ * of its own.
  */
 export function SettingsSection({
   id,
@@ -198,6 +268,7 @@ export function SettingsSection({
   actions,
   footer,
   onSubmit,
+  rows = false,
   children,
 }: {
   id: string;
@@ -209,6 +280,8 @@ export function SettingsSection({
   actions?: ReactNode;
   footer?: ReactNode;
   onSubmit?: () => void;
+  /** The children are SettingsRows of their own, placed straight in the group (no hint row). */
+  rows?: boolean;
   children: ReactNode;
 }): JSX.Element {
   const description =
@@ -240,25 +313,31 @@ export function SettingsSection({
           onSubmit?.();
         }}
       >
-        <SectionCard
-          actions={headerActions}
-          className="scroll-mt-16"
-          description={description}
-          footer={footer}
-          id={id}
-          title={title}
-        >
-          {children}
-        </SectionCard>
+        <SettingsFrame actions={headerActions} id={id} title={title}>
+          {rows ? (
+            children
+          ) : (
+            <SettingsRow className="flex flex-col gap-3">
+              {description ? <p className={ROW_DESCRIPTION}>{description}</p> : null}
+              {children}
+            </SettingsRow>
+          )}
+          {footer ? (
+            <SettingsRow className="flex items-center" slot="card-footer">
+              {footer}
+            </SettingsRow>
+          ) : null}
+        </SettingsFrame>
       </form>
     </SectionIdContext.Provider>
   );
 }
 
 /**
- * Skeleton while the card's query loads, an error card with Retry when it fails. A card built on
- * the shared GET /settings query (`shared`) shows no error of its own: the page shows one for
- * all of them, and the card leaves only a hidden anchor (the nav then goes to the page error).
+ * Skeleton while the section's query loads, an error group with Retry when it fails, both under
+ * the section's heading. A section built on the shared GET /settings query (`shared`) shows no
+ * error of its own: the page shows one for all of them, and the section leaves only a hidden
+ * anchor (the nav then goes to the page error).
  */
 export function SectionQuery<T>({
   id,
@@ -275,9 +354,15 @@ export function SectionQuery<T>({
 }): JSX.Element {
   if (query.isPending) {
     return (
-      <div className="scroll-mt-16" id={id}>
-        <CardSkeleton lines={3} />
-      </div>
+      <SettingsFrame id={id} title={title}>
+        <SettingsRow>
+          <div aria-hidden="true" className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-11/12" />
+            <Skeleton className="h-4 w-3/5" />
+            <Skeleton className="mt-1 h-6 w-2/5" />
+          </div>
+        </SettingsRow>
+      </SettingsFrame>
     );
   }
   if (query.isError && shared) {
@@ -285,20 +370,26 @@ export function SectionQuery<T>({
   }
   if (query.isError) {
     return (
-      <SectionCard className="scroll-mt-16" id={id} title={title}>
+      <SettingsFrame id={id} title={title}>
         <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
-      </SectionCard>
+      </SettingsFrame>
     );
   }
   return <>{children(query.data)}</>;
 }
 
-/** A switch with its label and an optional hint under the label. */
+/**
+ * A switch as a t3code settings row: the label (the row title) and an optional hint (the row
+ * description, with `learnMore` after it) on the left, the switch at the row's end. Below 32rem
+ * of row width the switch keeps its place at the end; the text wraps beside it. On a touch
+ * screen the label is at least 40 px tall, so it is a full-size touch target for the switch.
+ */
 export function SwitchField({
   checked,
   onCheckedChange,
   label,
   hint,
+  learnMore,
   extra,
   className,
 }: {
@@ -306,33 +397,45 @@ export function SwitchField({
   onCheckedChange: (checked: boolean) => void;
   label: ReactNode;
   hint?: ReactNode;
+  learnMore?: ReactNode;
   /** Next to the label, for a "Default: on" tag. */
   extra?: ReactNode;
   className?: string;
 }): JSX.Element {
   const id = useId();
-  // The label row is at least 40 px tall, so the label is a full-size touch target for the
-  // switch. The hint sits under the label, in the second column.
+  const described = hint || learnMore;
   return (
-    <div className={cn("grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3", className)}>
+    <div className={cn("flex items-center justify-between gap-x-8", className)}>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2">
+          <Label
+            className="cursor-pointer font-medium text-foreground text-sm pointer-coarse:min-h-10"
+            htmlFor={id}
+            id={`${id}-label`}
+          >
+            {label}
+          </Label>
+          {extra}
+        </div>
+        {described ? (
+          <p className={ROW_DESCRIPTION} id={`${id}-hint`}>
+            {hint}
+            {learnMore ? (
+              <>
+                {" "}
+                <LearnMore>{learnMore}</LearnMore>
+              </>
+            ) : null}
+          </p>
+        ) : null}
+      </div>
       <Switch
-        aria-describedby={hint ? `${id}-hint` : undefined}
+        aria-describedby={described ? `${id}-hint` : undefined}
         aria-labelledby={`${id}-label`}
         checked={checked}
         id={id}
         onCheckedChange={(next) => onCheckedChange(next)}
       />
-      <div className="flex min-h-10 min-w-0 flex-wrap items-center gap-x-2">
-        <Label className="min-h-10 cursor-pointer" htmlFor={id} id={`${id}-label`}>
-          {label}
-        </Label>
-        {extra}
-      </div>
-      {hint ? (
-        <p className="col-start-2 -mt-1.5 text-muted-foreground text-xs" id={`${id}-hint`}>
-          {hint}
-        </p>
-      ) : null}
     </div>
   );
 }

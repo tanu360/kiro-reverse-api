@@ -37,7 +37,6 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
           serverChanged={draft.serverChanged}
         />
       }
-      hint={t("lenientStreamIntegrityHint")}
       id={SECTION_ID.streamIntegrity}
       onSubmit={() => save(draft.value)}
       title={t("streamIntegrity")}
@@ -46,6 +45,7 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
         <SwitchField
           checked={draft.value.lenientStreamIntegrity}
           label={t("lenientStreamIntegrity")}
+          hint={t("lenientStreamIntegrityHint")}
           onCheckedChange={(lenientStreamIntegrity) => draft.set({ lenientStreamIntegrity })}
         />
         <Alert role="note" variant="warning">

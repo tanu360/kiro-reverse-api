@@ -151,7 +151,7 @@ export function LocalCacheFlow(): JSX.Element {
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
       <HelpText>{t("methods.local.description")}</HelpText>
-      <div className="flex flex-col gap-1.5 rounded-lg border bg-muted/40 px-3 py-2.5 text-sm">
+      <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-card/40 px-3 py-2.5 text-sm">
         <span className="font-medium">{t("local.fileLocation")}</span>
         <span className="text-muted-foreground">
           {t("local.windows")}: <Code>%USERPROFILE%\.aws\sso\cache\</Code>

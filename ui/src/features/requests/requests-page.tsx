@@ -163,7 +163,7 @@ export function RequestsPage(): JSX.Element {
 
       {/* The container the toolbar and column widths respond to. */}
       <Card className="@container/requests min-w-0 gap-0 overflow-hidden">
-        <div className="flex flex-col gap-3 border-b p-3 sm:p-4">
+        <div className="flex flex-col gap-3 border-border/50 border-b p-3 sm:p-4">
           <RequestsToolbar
             onPageSizeChange={(next) => updateSearch({ pageSize: next, page: undefined })}
             onSearchChange={(text) =>
@@ -214,7 +214,7 @@ export function RequestsPage(): JSX.Element {
 
         {/* Nothing to page through when the list is empty, filtered to nothing or out of range. */}
         {hasData && total > 0 && !outOfRange && !fatalError ? (
-          <div className="border-t p-3 sm:px-4">
+          <div className="border-border/50 border-t p-3 sm:px-4">
             <DataTablePagination
               onPageChange={(next) => updateSearch({ page: next })}
               page={page}

@@ -35,7 +35,6 @@ function UsageForm({ settings }: { settings: Settings }): JSX.Element {
           serverChanged={draft.serverChanged}
         />
       }
-      hint={t("allowOverUsageHint")}
       id={SECTION_ID.usage}
       onSubmit={() => save(draft.value)}
       title={t("usageSettings")}
@@ -43,6 +42,7 @@ function UsageForm({ settings }: { settings: Settings }): JSX.Element {
       <SwitchField
         checked={draft.value.allowOverUsage}
         label={t("allowOverUsage")}
+        hint={t("allowOverUsageHint")}
         onCheckedChange={(allowOverUsage) => draft.set({ allowOverUsage })}
       />
     </SettingsSection>
