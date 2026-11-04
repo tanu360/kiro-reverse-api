@@ -24,6 +24,7 @@
   "generatedPasswordLabel": "Mật khẩu được tạo",
   "firstRunUnavailable": "Không thể tải mật khẩu lần đầu.",
   "copyPassword": "Sao chép mật khẩu",
+  "clickToCopy": "Nhấn để sao chép",
   "passwordCopied": "Đã sao chép mật khẩu",
   "changePasswordToast": "Đổi mật khẩu được tạo tự động trong Cài đặt.",
   "openSettings": "Mở cài đặt"

@@ -24,6 +24,7 @@
   "generatedPasswordLabel": "Generated password",
   "firstRunUnavailable": "Could not load the first-run password.",
   "copyPassword": "Copy password",
+  "clickToCopy": "Click to copy",
   "passwordCopied": "Password copied to clipboard",
   "changePasswordToast": "Change the generated password in Settings.",
   "openSettings": "Open settings"

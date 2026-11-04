@@ -24,6 +24,7 @@
   "generatedPasswordLabel": "生成的密码",
   "firstRunUnavailable": "无法加载首次运行密码。",
   "copyPassword": "复制密码",
+  "clickToCopy": "点击复制",
   "passwordCopied": "密码已复制到剪贴板",
   "changePasswordToast": "请在设置中修改生成的密码。",
   "openSettings": "打开设置"

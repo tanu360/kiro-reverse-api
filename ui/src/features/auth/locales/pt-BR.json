@@ -24,6 +24,7 @@
   "generatedPasswordLabel": "Senha gerada",
   "firstRunUnavailable": "Não foi possível carregar a senha inicial.",
   "copyPassword": "Copiar senha",
+  "clickToCopy": "Clique para copiar",
   "passwordCopied": "Senha copiada",
   "changePasswordToast": "Altere a senha gerada em Configurações.",
   "openSettings": "Abrir configurações"

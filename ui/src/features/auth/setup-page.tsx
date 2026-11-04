@@ -102,9 +102,30 @@ function GeneratedPassword({
   return (
     <section
       aria-label={t("firstRunPasswordLabel")}
-      className="flex flex-col items-center gap-1 text-center"
+      className="group/pw flex flex-col items-center gap-1 text-center"
     >
-      <p className="text-muted-foreground text-xs">{t("generatedPasswordLabel")}</p>
+      {/*
+       * The label doubles as the copy hint: "Generated password" at rest, "Click to copy" while
+       * the password is hovered or keyboard-focused, then "Copied to clipboard" in green. The
+       * three sit in one grid cell and cross-fade, so the line never changes height.
+       */}
+      <p className="grid text-xs [&>span]:col-start-1 [&>span]:row-start-1 [&>span]:transition-opacity [&>span]:duration-150">
+        <span className="text-muted-foreground group-has-[[data-copied]]/pw:opacity-0 group-has-[[data-copy-password]:focus-visible]/pw:opacity-0 group-has-[[data-copy-password]:hover]/pw:opacity-0">
+          {t("generatedPasswordLabel")}
+        </span>
+        <span
+          aria-hidden="true"
+          className="text-[color-mix(in_oklab,var(--muted-foreground)_55%,var(--primary))] opacity-0 group-has-[[data-copy-password]:not([data-copied]):focus-visible]/pw:opacity-100 group-has-[[data-copy-password]:not([data-copied]):hover]/pw:opacity-100"
+        >
+          {t("clickToCopy")}
+        </span>
+        <span
+          aria-hidden="true"
+          className="text-success-foreground opacity-0 group-has-[[data-copied]]/pw:opacity-100"
+        >
+          {tShared("toast.copied")}
+        </span>
+      </p>
       {unavailable && !password ? (
         // The message, then "Try again" centred on its own line; no hover underline.
         <div className="flex min-h-10 flex-col items-center justify-center">
@@ -142,9 +163,9 @@ function GeneratedPassword({
 
 /**
  * The password itself is the copy control: no separate copy icon. Hovering tints it a little
- * towards the primary purple on a faint fill; a click or tap copies it, toasts, and turns it green
- * for two seconds. No tooltip: it would cover the label above. Its accessible name keeps the
- * password and adds "Copy password".
+ * towards the primary purple (no fill) and the label above reads "Click to copy"; a click or tap
+ * copies it, toasts, and turns it and the label green for two seconds. No tooltip: it would cover
+ * the label. Its accessible name keeps the password and adds "Copy password".
  */
 function CopyablePassword({ value }: { value: string }): JSX.Element {
   const { t } = useT("auth");
@@ -176,11 +197,13 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
   return (
     <button
       className={cn(
-        "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-semibold text-foreground text-xl tracking-[0.18em] transition-colors duration-150",
-        "hover:bg-accent hover:text-[color-mix(in_oklab,var(--foreground)_72%,var(--primary))]",
+        "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-semibold text-foreground text-xl tracking-[0.18em] transition-[color,scale] duration-150 active:scale-[0.98]",
+        // No fill behind the digits: only the colour shifts, a step towards the primary purple.
+        "hover:text-[color-mix(in_oklab,var(--foreground)_60%,var(--primary))]",
         copied && "text-success-foreground hover:text-success-foreground",
       )}
       data-copied={copied ? "" : undefined}
+      data-copy-password=""
       onClick={onClick}
       style={PASSWORD_FONT}
       type="button"
