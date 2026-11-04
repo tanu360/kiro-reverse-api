@@ -41,8 +41,10 @@ function FormNotice({
         // The soft fill the notice was designed with (11 %, 18 % dark), a step over the pills' 8 %.
         "bg-[color-mix(in_oklab,var(--badge-tint)_11%,transparent)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_18%,transparent)]",
         "h-auto min-h-9 w-full items-start justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left font-normal leading-5",
-        // Duotone disc, a touch larger than the text.
-        "[--badge-dot:color-mix(in_oklab,var(--badge-disc)_28%,transparent)] [--badge-glyph:var(--badge-disc)] [&_svg]:mt-px [&_svg:not([class*='size-'])]:size-4.5",
+        // Duotone disc, a touch larger than the text, edged by one thin ring. Both colours are
+        // opaque (mixed with the page background): a see-through fill under a see-through stroke
+        // drew two rings, a darker one where they overlap and a light halo outside it.
+        "[--badge-dot:color-mix(in_oklab,var(--badge-disc)_28%,var(--background))] [--badge-dot-ring:color-mix(in_oklab,var(--badge-disc)_48%,var(--background))] [--badge-dot-ring-width:1.25] [--badge-glyph:var(--badge-disc)] [&_svg]:mt-px [&_svg:not([class*='size-'])]:size-4.5",
         className,
       )}
       role={role}
@@ -60,6 +62,14 @@ function FormNotice({
  */
 const ERROR_RED =
   "[--badge-disc:#ff3638] [--badge-tint:#ff3638] [--badge-fg:#d41d24] dark:[--badge-fg:#ff6b6f]";
+
+/**
+ * The rate-limit notice's amber, pinned to the theme's warning colours: the pills moved to the
+ * --pill-* orange, and the notice keeps the amber it was designed with (amber-800 text, 4.5:1 on
+ * the amber fill; amber-300 on the dark theme's fill).
+ */
+const WARNING_AMBER =
+  "[--badge-disc:var(--warning)] [--badge-tint:var(--warning)] [--badge-fg:var(--color-amber-800)] dark:[--badge-fg:var(--color-amber-300)]";
 
 /**
  * The sign-in form shared by /login and /setup. It never reads the URL: /login passes the
@@ -142,21 +152,10 @@ export function SignInForm({
         }}
         value={password}
       />
-      {/* A quiet option: 16 px box, 14 px muted text at every size. */}
-      <Label className="min-h-10 cursor-pointer self-start font-normal text-muted-foreground text-sm/5">
-        <Checkbox
-          // Flat sign-in pages: no drop shadow (the ::before layer only draws one). Unchecked,
-          // the password field's soft fill and hairline border; checked stays solid purple.
-          className="size-4 shadow-none before:hidden not-data-checked:border-foreground/[0.14] not-data-checked:bg-foreground/[0.035] dark:not-data-checked:border-white/[0.12] dark:not-data-checked:bg-white/[0.045]"
-          checked={remember}
-          onCheckedChange={(checked) => setRemember(checked === true)}
-        />
-        {t("remember")}
-      </Label>
       {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
       <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
         {locked ? (
-          <FormNotice icon={ClockIcon} tone="warning">
+          <FormNotice className={WARNING_AMBER} icon={ClockIcon} tone="warning">
             {t("rateLimited", { seconds: retry.seconds })}
           </FormNotice>
         ) : null}
@@ -182,6 +181,20 @@ export function SignInForm({
         {pending ? <Spinner aria-hidden="true" /> : <LogInIcon aria-hidden="true" />}
         {pending ? t("signingIn") : t("submit")}
       </Button>
+      {/*
+       * A quiet option under the button: 16 px box, 14 px muted text at every size. -mt-3 pulls
+       * it up so the box sits about 16 px under the button, while the row keeps its 40 px target.
+       */}
+      <Label className="-mt-3 min-h-10 cursor-pointer self-start font-normal text-muted-foreground text-sm/5">
+        <Checkbox
+          // Flat sign-in pages: no drop shadow (the ::before layer only draws one). Unchecked,
+          // the password field's soft fill and hairline border; checked stays solid purple.
+          className="size-4 shadow-none before:hidden not-data-checked:border-foreground/[0.14] not-data-checked:bg-foreground/[0.035] dark:not-data-checked:border-white/[0.12] dark:not-data-checked:bg-white/[0.045]"
+          checked={remember}
+          onCheckedChange={(checked) => setRemember(checked === true)}
+        />
+        {t("remember")}
+      </Label>
     </form>
   );
 }

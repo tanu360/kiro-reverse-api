@@ -77,7 +77,7 @@ export function NavFooter(): JSX.Element {
 }
 
 /**
- * "© 2026 · Kiro Proxy", as on the sign-in pages: all in the muted text colour, with a middle
+ * "© {year} · Kiro Proxy", as on the sign-in pages: all in the muted text colour, with a middle
  * dot before the name. The line is split at the app name, so a locale keeps its own word
  * order; the dot is decoration and hidden from screen readers.
  */

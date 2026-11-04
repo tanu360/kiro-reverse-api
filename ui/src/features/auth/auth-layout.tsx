@@ -44,7 +44,7 @@ export function AuthLayout({ children }: { children: ReactNode }): JSX.Element {
 }
 
 /**
- * "© 2026 · Kiro Proxy", centred, all in the muted text colour, with a middle dot before the
+ * "© {year} · Kiro Proxy", centred, all in the muted text colour, with a middle dot before the
  * name. The locale's copyright line is split at the app name, so its own word order is
  * kept; the dot is decoration and hidden from screen readers.
  */
@@ -75,7 +75,7 @@ function Copyright(): JSX.Element {
 function Disclaimer(): JSX.Element {
   const { t } = useT("auth");
   return (
-    <p className="text-balance text-center text-muted-foreground text-xs">{t("disclaimer")}</p>
+    <p className="text-balance text-center text-muted-foreground/80 text-xs">{t("disclaimer")}</p>
   );
 }
 

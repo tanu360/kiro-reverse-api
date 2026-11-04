@@ -5,6 +5,18 @@ import { ChevronRightIcon } from "lucide-react";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+/*
+ * Kiro menu rows: 32 px on desktop, 36 px on phones and 40 px on touch screens, 10 px side
+ * padding, 16 px muted icons and a highlight row in the --menu-highlight tone (index.css), which
+ * reads on the raised menu surface in both themes. Rows keep their text colour when highlighted.
+ */
+const MENU_ROW =
+  "min-h-9 cursor-pointer select-none rounded-sm py-1 text-base text-foreground outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-(--menu-highlight) data-highlighted:text-foreground data-disabled:opacity-64 sm:min-h-8 sm:text-sm pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0";
+
+/** Radio and checkbox rows: a check column, and the chosen row in the accent text colour. */
+const MENU_CHECK_ROW =
+  "grid in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] items-center gap-2 ps-2 pe-4";
+
 export const MenuCreateHandle: typeof MenuPrimitive.createHandle =
   MenuPrimitive.createHandle;
 
@@ -31,8 +43,8 @@ export function MenuTrigger({
 export function MenuPopup({
   children,
   className,
-  sideOffset = 4,
-  align = "center",
+  sideOffset = 6,
+  align = "end",
   alignOffset,
   side = "bottom",
   anchor,
@@ -59,7 +71,8 @@ export function MenuPopup({
       >
         <MenuPrimitive.Popup
           className={cn(
-            "dropdown-glass relative flex max-w-[calc(100vw-2rem)] not-[class*='w-']:min-w-[min(10rem,calc(100vw-2rem))] origin-(--transform-origin) rounded-lg floating-shadow outline-none focus:outline-none",
+            // Kiro: the solid menu-surface sheet (index.css) instead of t3code's dropdown glass.
+            "menu-surface relative flex max-w-[calc(100vw-2rem)] not-[class*='w-']:min-w-[min(11rem,calc(100vw-2rem))] origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[opacity,scale] duration-100 focus:outline-none data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             className,
           )}
           data-slot="menu-popup"
@@ -92,7 +105,8 @@ export function MenuItem({
   return (
     <MenuPrimitive.Item
       className={cn(
-        "[&>svg]:-mx-0.5 flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-inset:ps-8 data-[variant=destructive]:text-destructive-foreground data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&>svg:not([class*='opacity-'])]:opacity-80 [&>svg:not([class*='size-'])]:size-4.5 sm:[&>svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current [&>svg]:pointer-events-none [&>svg]:shrink-0 pointer-coarse:min-h-10",
+        MENU_ROW,
+        "flex items-center gap-2.5 px-2.5 data-inset:ps-9 data-[variant=destructive]:text-destructive-foreground data-[variant=destructive]:data-highlighted:text-destructive-foreground [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current",
         className,
       )}
       data-inset={inset}
@@ -116,7 +130,8 @@ export function MenuLinkItem({
   return (
     <MenuPrimitive.LinkItem
       className={cn(
-        "[&>svg]:-mx-0.5 flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-inset:ps-8 data-[variant=destructive]:text-destructive-foreground data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&>svg:not([class*='opacity-'])]:opacity-80 [&>svg:not([class*='size-'])]:size-4.5 sm:[&>svg:not([class*='size-'])]:size-4 [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current [&>svg]:pointer-events-none [&>svg]:shrink-0 pointer-coarse:min-h-10",
+        MENU_ROW,
+        "flex items-center gap-2.5 px-2.5 data-inset:ps-9 data-[variant=destructive]:text-destructive-foreground data-[variant=destructive]:data-highlighted:text-destructive-foreground [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current",
         className,
       )}
       closeOnClick={closeOnClick}
@@ -141,9 +156,10 @@ export function MenuCheckboxItem({
     <MenuPrimitive.CheckboxItem
       checked={checked}
       className={cn(
-        "grid min-h-8 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer items-center gap-2 rounded-sm py-1 ps-2 text-base text-foreground outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 pointer-coarse:min-h-10",
+        MENU_ROW,
+        MENU_CHECK_ROW,
         variant === "switch"
-          ? "grid-cols-[1fr_auto] gap-4 pe-1.5"
+          ? "grid-cols-[1fr_auto] gap-4 ps-2.5 pe-1.5"
           : // Kiro: a checked row shows its check and the accent text (info-foreground, AA on the
             // popover in both themes), highlighted or not.
             "grid-cols-[1rem_minmax(0,1fr)] pe-4 data-checked:text-info-foreground data-checked:data-highlighted:text-info-foreground",
@@ -203,7 +219,9 @@ export function MenuRadioItem({
       className={cn(
         // t3code's row; Kiro: the chosen option shows a check and the accent text (info-foreground,
         // AA on the popover in both themes), highlighted or not.
-        "grid min-h-8 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 rounded-sm py-1 ps-2 pe-4 text-base text-foreground outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-highlighted:text-accent-foreground data-checked:text-info-foreground data-checked:data-highlighted:text-info-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        MENU_ROW,
+        MENU_CHECK_ROW,
+        "grid-cols-[1rem_minmax(0,1fr)] data-checked:text-info-foreground data-checked:data-highlighted:text-info-foreground",
         className,
       )}
       data-slot="menu-radio-item"
@@ -240,7 +258,7 @@ export function MenuGroupLabel({
   return (
     <MenuPrimitive.GroupLabel
       className={cn(
-        "px-2 py-1.5 font-medium text-muted-foreground text-xs data-inset:ps-9 sm:data-inset:ps-8",
+        "px-2.5 pt-2 pb-1 font-medium text-muted-foreground text-xs data-inset:ps-9",
         className,
       )}
       data-inset={inset}
@@ -256,7 +274,7 @@ export function MenuSeparator({
 }: MenuPrimitive.Separator.Props): React.ReactElement {
   return (
     <MenuPrimitive.Separator
-      className={cn("mx-2 my-1 h-px bg-border", className)}
+      className={cn("-mx-1 my-1 h-px bg-(--menu-border)", className)}
       data-slot="menu-separator"
       {...props}
     />
@@ -296,7 +314,8 @@ export function MenuSubTrigger({
   return (
     <MenuPrimitive.SubmenuTrigger
       className={cn(
-        "[&>svg:not(:last-child)]:-mx-0.5 flex min-h-8 cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none data-disabled:cursor-not-allowed data-disabled:pointer-events-none data-highlighted:bg-accent data-popup-open:bg-accent data-inset:ps-8 data-highlighted:text-accent-foreground data-popup-open:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&>svg:not(:last-child):not([class*='opacity-'])]:opacity-80 [&_svg]:pointer-events-none [&>svg]:shrink-0 pointer-coarse:min-h-10",
+        MENU_ROW,
+        "flex items-center gap-2.5 px-2.5 data-inset:ps-9 data-popup-open:bg-(--menu-highlight) [&_svg:not([class*='text-'])]:text-muted-foreground",
         className,
       )}
       data-inset={inset}
@@ -304,7 +323,7 @@ export function MenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon className="-me-0.5 ms-auto opacity-80" />
+      <ChevronRightIcon aria-hidden="true" className="-me-1 ms-auto size-4" />
     </MenuPrimitive.SubmenuTrigger>
   );
 }

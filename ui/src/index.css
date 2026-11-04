@@ -257,6 +257,31 @@
   }
 }
 
+/*
+ * Menus and select lists: a solid raised sheet, not glass. In the dark theme the popover tone sat
+ * almost on the black page; the menu is a clear step lighter (neutral-900 and a little more), with
+ * a white hairline and a highlight row that reads on it. Light keeps white on the zinc-25 page with
+ * a zinc-200 hairline. One soft drop only, lighter than the floating shadow.
+ */
+:root {
+  --menu-surface: var(--color-white);
+  --menu-border: var(--color-zinc-200);
+  --menu-highlight: var(--color-zinc-100);
+  --menu-shadow: 0 6px 16px -10px rgb(0 0 0 / 14%);
+}
+.dark {
+  --menu-surface: #1b1b1c;
+  --menu-border: rgb(255 255 255 / 10%);
+  --menu-highlight: rgb(255 255 255 / 7%);
+  --menu-shadow: 0 8px 20px -12px rgb(0 0 0 / 70%);
+}
+
+@utility menu-surface {
+  background: var(--menu-surface);
+  border: 1px solid var(--menu-border);
+  box-shadow: var(--menu-shadow);
+}
+
 @utility dialog-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
@@ -347,10 +372,62 @@
 }
 [data-badge-icon="disc"] > circle[r="10"] {
   fill: var(--badge-dot);
-  stroke: var(--badge-dot);
+  /* Optional edge ring in its own colour and width (the sign-in form notices); else none shows. */
+  stroke: var(--badge-dot-ring, var(--badge-dot));
+  stroke-width: var(--badge-dot-ring-width, 2.5);
 }
 [data-badge-icon="disc"] > :not(circle[r="10"]) {
   stroke: var(--badge-glyph);
+}
+
+/*
+ * Status pill colours (components/ui/badge.tsx soft pills), after a reference status set: a very
+ * light tint of the hue (no border, no shadow), a disc in the hue itself, and the label in a
+ * darker step of the same hue. The reference's own label colours miss AA (its orange on cream is
+ * about 2.3:1), so each label is the lightest step of its hue that keeps at least 4.6:1 on the
+ * tint, measured over a selected table row (the darkest surface a pill sits on):
+ *   neutral #3a3a3a 9.5:1, warning #ab5000 4.6:1, success #27793c 4.6:1, error #c92518 4.6:1,
+ *   primary #7a0ecd 6.1:1.
+ * The tints are see-through, so a pill keeps its look on cards, the page and tinted rows.
+ * Dark theme: the tint is the hue at low alpha over near-black, the disc and label lighter
+ * steps of it, and the glyph is knocked out to black (white on a light disc was under 2:1).
+ * Labels there: neutral 8.9:1, warning 7.4:1, success 7.1:1, error 5.9:1, primary 6.2:1.
+ */
+:root {
+  --pill-glyph: var(--color-white);
+  --pill-neutral: #a8a8a8;
+  --pill-neutral-fg: #3a3a3a;
+  --pill-neutral-bg: color-mix(in srgb, var(--pill-neutral) 15%, transparent);
+  --pill-primary: var(--primary);
+  --pill-primary-fg: #7a0ecd;
+  --pill-primary-bg: color-mix(in srgb, var(--pill-primary) 10%, transparent);
+  --pill-success: #3dbe5f;
+  --pill-success-fg: #27793c;
+  --pill-success-bg: color-mix(in srgb, var(--pill-success) 10%, transparent);
+  --pill-warning: #ff9f4a;
+  --pill-warning-fg: #ab5000;
+  --pill-warning-bg: color-mix(in srgb, var(--pill-warning) 11%, transparent);
+  --pill-error: #ea5b50;
+  --pill-error-fg: #c92518;
+  --pill-error-bg: color-mix(in srgb, var(--pill-error) 10.5%, transparent);
+}
+.dark {
+  --pill-glyph: var(--color-black);
+  --pill-neutral: #a3a3a3;
+  --pill-neutral-fg: #d4d4d4;
+  --pill-neutral-bg: color-mix(in srgb, var(--pill-neutral) 16%, transparent);
+  --pill-primary: #a066ff;
+  --pill-primary-fg: #c59eff;
+  --pill-primary-bg: color-mix(in srgb, var(--pill-primary) 20%, transparent);
+  --pill-success: #4cc96d;
+  --pill-success-fg: #6fd68b;
+  --pill-success-bg: color-mix(in srgb, var(--pill-success) 16%, transparent);
+  --pill-warning: #ffa95e;
+  --pill-warning-fg: #ffb87a;
+  --pill-warning-bg: color-mix(in srgb, var(--pill-warning) 16%, transparent);
+  --pill-error: #f06b61;
+  --pill-error-fg: #ff8a80;
+  --pill-error-bg: color-mix(in srgb, var(--pill-error) 18%, transparent);
 }
 
 @theme inline {

@@ -9,9 +9,13 @@ import { cn } from "@/lib/utils";
 
 /*
  * Pills: fully rounded, a leading icon, medium weight (a Kiro design; t3code's badges are square
- * tags). The fills follow t3code's: soft tints at 8% (16% dark), outline on the field colours. Each tone sets five colours as custom
- * properties and each variant paints with them, so tone and variant combine freely:
- *   --badge-tint      the hue the soft fill and border are mixed from
+ * tags). The soft pill follows a reference status set: a very light tint of the hue, no border
+ * and no shadow, a solid disc in the hue with a white glyph, and the label in a darker step of
+ * the same hue (AA on the tint, also on a selected table row). The colours are the --pill-*
+ * tokens in index.css, which switch for the dark theme. Each tone sets six custom properties
+ * and each variant paints with them, so tone and variant combine freely:
+ *   --badge-tint      the hue the hover fill and the soft-outline border are mixed from
+ *   --badge-bg        the soft fill
  *   --badge-fg        text on the soft fill (AA on it in both themes)
  *   --badge-disc      the filled circle behind a disc icon, and an outline pill's icon
  *   --badge-solid     the solid fill (white or dark text on it is AA)
@@ -19,7 +23,7 @@ import { cn } from "@/lib/utils";
  * Variants then set --badge-dot and --badge-glyph (the disc and its knocked-out glyph) and
  * --badge-icon (a line icon).
  * Disc icons (a circled lucide icon such as CircleCheck, CircleX or Clock) are drawn as a filled
- * circle with the glyph knocked out in white; see `[data-badge-icon="disc"]` in index.css.
+ * circle with the glyph knocked out; see `[data-badge-icon="disc"]` in index.css.
  */
 export const badgeVariants = cva(
   "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-transparent font-medium leading-none outline-none transition-[background-color,box-shadow] focus-outline disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-(--badge-icon) [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
@@ -32,33 +36,37 @@ export const badgeVariants = cva(
     variants: {
       size: {
         sm: "h-5 px-1.5 text-[0.6875rem] has-[>svg:first-child]:ps-1 [&_svg:not([class*='size-'])]:size-3",
+        // The disc nearly fills the pill (a 2 px inset), as in the reference; line icons stay a
+        // step smaller so they sit with the 12 px label instead of shouting over it.
         default:
-          "h-5.5 px-2 text-xs has-[>svg:first-child]:ps-1 [&_svg:not([class*='size-'])]:size-3.5",
+          "h-6 px-2.5 text-xs has-[>svg:first-child]:ps-1 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='size-'])[data-badge-icon=line]]:size-3.5 has-[>svg[data-badge-icon=line]:first-child]:ps-2",
         lg: "h-7 gap-1.5 px-2.5 text-sm has-[>svg:first-child]:ps-1.5 [&_svg:not([class*='size-'])]:size-4",
       },
+      // Every tone reads its colours from the --pill-* tokens (index.css), which already switch
+      // for the dark theme. Only the solid fills keep their own Tailwind colours.
       tone: {
         neutral:
-          "[--badge-disc:var(--color-zinc-400)] [--badge-fg:var(--color-zinc-700)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--color-zinc-800)] [--badge-tint:var(--color-zinc-500)] dark:[--badge-disc:var(--color-zinc-500)] dark:[--badge-fg:var(--color-zinc-300)] dark:[--badge-solid-fg:var(--color-zinc-900)] dark:[--badge-solid:var(--color-zinc-100)]",
+          "[--badge-bg:var(--pill-neutral-bg)] [--badge-disc:var(--pill-neutral)] [--badge-fg:var(--pill-neutral-fg)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--color-zinc-800)] [--badge-tint:var(--pill-neutral)] dark:[--badge-solid-fg:var(--color-zinc-900)] dark:[--badge-solid:var(--color-zinc-100)]",
         primary:
-          "[--badge-disc:var(--primary)] [--badge-fg:var(--info-foreground)] [--badge-solid-fg:var(--primary-foreground)] [--badge-solid:var(--primary)] [--badge-tint:var(--primary)]",
-        info: "[--badge-disc:var(--info)] [--badge-fg:var(--info-foreground)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--info)] [--badge-tint:var(--info)]",
+          "[--badge-bg:var(--pill-primary-bg)] [--badge-disc:var(--pill-primary)] [--badge-fg:var(--pill-primary-fg)] [--badge-solid-fg:var(--primary-foreground)] [--badge-solid:var(--primary)] [--badge-tint:var(--pill-primary)]",
+        // Kiro purple, like primary: the app has no blue.
+        info: "[--badge-bg:var(--pill-primary-bg)] [--badge-disc:var(--pill-primary)] [--badge-fg:var(--pill-primary-fg)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--info)] [--badge-tint:var(--pill-primary)]",
         success:
-          "[--badge-disc:var(--success)] [--badge-fg:var(--success-foreground)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--color-emerald-700)] [--badge-tint:var(--success)] dark:[--badge-fg:var(--color-emerald-300)]",
-        // amber-800 text, not the amber-700 token: amber-700 is only 4.5:1 on the amber tint.
+          "[--badge-bg:var(--pill-success-bg)] [--badge-disc:var(--pill-success)] [--badge-fg:var(--pill-success-fg)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--color-emerald-700)] [--badge-tint:var(--pill-success)]",
         warning:
-          "[--badge-disc:var(--warning)] [--badge-fg:var(--color-amber-800)] [--badge-solid-fg:var(--color-amber-950)] [--badge-solid:var(--color-amber-400)] [--badge-tint:var(--warning)] dark:[--badge-fg:var(--color-amber-300)]",
+          "[--badge-bg:var(--pill-warning-bg)] [--badge-disc:var(--pill-warning)] [--badge-fg:var(--pill-warning-fg)] [--badge-solid-fg:var(--color-amber-950)] [--badge-solid:var(--color-amber-400)] [--badge-tint:var(--pill-warning)]",
         destructive:
-          "[--badge-disc:var(--destructive)] [--badge-fg:var(--destructive-foreground)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--destructive)] [--badge-tint:var(--destructive)]",
+          "[--badge-bg:var(--pill-error-bg)] [--badge-disc:var(--pill-error)] [--badge-fg:var(--pill-error-fg)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--destructive)] [--badge-tint:var(--pill-error)]",
       },
       variant: {
-        soft: "bg-[color-mix(in_oklab,var(--badge-tint)_8%,transparent)] text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-fg)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_16%,transparent)] [button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_16%,transparent)] dark:[button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_26%,transparent)]",
+        soft: "bg-(--badge-bg) text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-fg)] [button&,a&]:hover:bg-[color-mix(in_srgb,var(--badge-tint)_20%,transparent)] dark:[button&,a&]:hover:bg-[color-mix(in_srgb,var(--badge-tint)_28%,transparent)]",
         "soft-outline":
-          "border-[color-mix(in_oklab,var(--badge-tint)_28%,transparent)] bg-[color-mix(in_oklab,var(--badge-tint)_9%,transparent)] text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-fg)] dark:border-[color-mix(in_oklab,var(--badge-tint)_36%,transparent)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_15%,transparent)] [button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_16%,transparent)]",
+          "border-[color-mix(in_srgb,var(--badge-tint)_32%,transparent)] bg-(--badge-bg) text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-fg)] dark:border-[color-mix(in_srgb,var(--badge-tint)_36%,transparent)] [button&,a&]:hover:bg-[color-mix(in_srgb,var(--badge-tint)_20%,transparent)]",
         // The buttons' faint film grain (index.css grain-overlay) on the solid fill.
         solid:
           "grain-overlay [--grain-overlay-opacity:0.1] bg-(--badge-solid) text-(--badge-solid-fg) [--badge-dot:var(--badge-solid-fg)] [--badge-glyph:var(--badge-solid)] [--badge-icon:var(--badge-solid-fg)] [button&,a&]:hover:opacity-90",
         outline:
-          "border-input bg-background text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-disc)] dark:bg-input/32 [button&,a&]:hover:bg-accent/50 dark:[button&,a&]:hover:bg-input/48",
+          "border-input bg-background text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-disc)] dark:bg-input/32 [button&,a&]:hover:bg-accent/50 dark:[button&,a&]:hover:bg-input/48",
       },
     },
   },
