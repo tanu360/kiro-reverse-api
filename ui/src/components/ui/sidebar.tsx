@@ -61,12 +61,8 @@ const sidebarMenuButtonVariants = cva(
         sm: "h-7 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-xs",
       },
       variant: {
-        // Kiro patch: full-strength muted text in light (AA 4.5:1 on --sidebar); t3code's
-        // 80 % alpha stays in dark, where it still passes.
-        default:
-          "font-medium text-sidebar-muted-foreground dark:text-sidebar-muted-foreground/80",
-        outline:
-          "bg-sidebar-control-surface font-medium text-sidebar-foreground ring-1 ring-sidebar-border",
+        default: "font-medium text-sidebar-muted-foreground/80",
+        outline: "bg-sidebar-control-surface ring-1 ring-sidebar-border",
       },
     },
   },
@@ -289,14 +285,16 @@ export function Sidebar({
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            : // The edge is painted over the plain sidebar colour, not the grainy page behind, so it
+              // reads as t3code's (white 8% on black: #141414).
+              "bg-sidebar group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
           className,
         )}
         data-slot="sidebar-container"
         {...props}
       >
         <div
-          className="flex h-full w-full flex-col bg-sidebar surface-grain text-sidebar-foreground group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+          className="flex h-full w-full flex-col bg-sidebar surface-grain text-sidebar-foreground group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border"
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
         >
@@ -372,8 +370,8 @@ export function SidebarInset({
   return (
     <main
       className={cn(
-        "relative flex w-full flex-1 flex-col bg-background surface-grain",
-        "lg:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 lg:peer-data-[variant=inset]:m-2 lg:peer-data-[variant=inset]:ms-0 lg:peer-data-[variant=inset]:rounded-xl lg:peer-data-[variant=inset]:shadow-sm/5",
+        "relative flex min-w-0 w-full flex-1 flex-col bg-background surface-grain",
+        "lg:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 lg:peer-data-[variant=inset]:m-2 lg:peer-data-[variant=inset]:ms-0 lg:peer-data-[variant=inset]:rounded-xl",
         className,
       )}
       data-slot="sidebar-inset"

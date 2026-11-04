@@ -7,9 +7,9 @@ export function Skeleton({
 }: React.ComponentProps<"div">): React.ReactElement {
   return (
     <div
-      // Base tint is foreground at 8%: --muted (zinc-50) was nearly invisible on white cards.
+      // t3code's skeleton: muted-foreground at 15%, breathing in opacity (index.css).
       className={cn(
-        "animate-skeleton rounded-sm [--skeleton-highlight:--alpha(var(--color-white)/64%)] [background:linear-gradient(120deg,transparent_40%,var(--skeleton-highlight),transparent_60%)_var(--skeleton-base)_0_0/200%_100%_fixed] [--skeleton-base:color-mix(in_srgb,var(--color-foreground)_8%,transparent)] dark:[--skeleton-highlight:--alpha(var(--color-white)/4%)]",
+        "rounded-sm bg-muted-foreground/15 motion-safe:animate-skeleton",
         className,
       )}
       data-slot="skeleton"

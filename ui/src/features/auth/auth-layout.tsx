@@ -13,8 +13,9 @@ import { AuthShowcase } from "./auth-showcase";
  */
 export function AuthLayout({ children }: { children: ReactNode }): JSX.Element {
   return (
-    // The panel keeps a wider margin above and below than at its side.
-    <div className="flex min-h-svh bg-background surface-grain text-foreground lg:gap-3 lg:px-3 lg:py-6">
+    // The panel keeps a wider margin above and below than at its side. The sign-in pages keep
+    // lucide's 2 px icon stroke; the app shell uses t3code's lighter 1.75 (index.css).
+    <div className="flex min-h-svh bg-background surface-grain text-foreground lg:gap-3 lg:px-3 lg:py-6 [&_svg.lucide[stroke-width='2']]:[stroke-width:2]">
       {/*
        * Three rows: the page settings, the page block, the footer. The outer rows split the
        * spare height equally, so the block sits at the true centre of the column whatever their

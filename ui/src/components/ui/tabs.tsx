@@ -50,7 +50,7 @@ export function TabsList({
         "data-[orientation=vertical]:flex-col",
         variant === "default"
           ? // Full-strength muted text: the coss /72 tint fell to 2.8:1 (light) and 4.1:1 (dark).
-            "rounded-lg border p-px text-muted-foreground"
+            "rounded-lg bg-input/40 p-0.5 text-muted-foreground"
           : "data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:hover:bg-accent",
         className,
       )}

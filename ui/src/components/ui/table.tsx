@@ -93,7 +93,7 @@ export function TableRow({
   return (
     <tr
       className={cn(
-        "relative border-b not-in-data-[variant=card]:hover:bg-foreground/2 not-in-data-[variant=card]:data-[state=selected]:bg-foreground/4",
+        "relative border-b transition-colors not-in-data-[variant=card]:hover:bg-muted/50 not-in-data-[variant=card]:has-aria-expanded:bg-muted/50 not-in-data-[variant=card]:data-[state=selected]:bg-muted",
         className,
       )}
       data-slot="table-row"

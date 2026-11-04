@@ -22,9 +22,16 @@
     var(--sidebar)
   );
   --sidebar-row-content-inset: 0.625rem;
+  --app-scrollbar-thumb: rgb(217 217 217);
+  --app-scrollbar-thumb-hover: rgb(191 191 191);
+  /* Frosted popups (t3code dropdown-glass, dialog-glass): menus, selects, dialogs. */
+  --glass-blur: 12px;
+  --glass-opacity: 80%;
+  --glass-saturation: 1.14;
   --background: var(--color-zinc-25);
   /* t3code paints html and body with the chrome background, which is the canvas. */
   --app-chrome-background: var(--background);
+  --surface-raised: color-mix(in srgb, var(--card) 20%, transparent);
   --foreground: var(--color-zinc-900);
   --card: var(--color-white);
   --card-foreground: var(--color-zinc-900);
@@ -33,11 +40,7 @@
   /* Kiro purple-500 (#9046ff, kiro.dev --cta-primary): white text on it is 4.6:1. */
   --primary: #9046ff;
   --primary-foreground: var(--color-white);
-  /*
-   * zinc-100, not t3code's zinc-50: a secondary button's zinc-50 fill all but vanished on the
-   * zinc-25 page. It now matches the accent (hover and highlight) fill.
-   */
-  --secondary: var(--color-zinc-100);
+  --secondary: var(--color-zinc-50);
   --secondary-foreground: var(--color-zinc-800);
   --muted: var(--color-zinc-50);
   --muted-foreground: var(--color-zinc-500);
@@ -49,9 +52,11 @@
   --border: var(--color-zinc-200);
   --input: var(--color-zinc-300);
   --ring: var(--primary);
-  /* red-600, not t3code's red-500: white button text on red-500 is only 3.8:1 (AA needs 4.5). */
-  --destructive: var(--color-red-600);
-  --destructive-foreground: var(--color-red-700);
+  --error: var(--color-red-500);
+  --error-foreground: var(--color-red-700);
+  --error-surface: color-mix(in srgb, var(--error) 8%, transparent);
+  --destructive: var(--error);
+  --destructive-foreground: var(--error-foreground);
   /* Kiro purple, not blue: purple-700 text is 7.4:1 on white. */
   --info: #9046ff;
   --info-foreground: #7a0ecd;
@@ -59,6 +64,7 @@
   --success-foreground: var(--color-emerald-700);
   --warning: var(--color-amber-500);
   --warning-foreground: var(--color-amber-700);
+  --warning-surface: color-mix(in srgb, var(--warning) 8%, transparent);
   --sidebar: var(--color-zinc-50);
   --sidebar-foreground: var(--foreground);
   --sidebar-muted-foreground: var(--muted-foreground);
@@ -76,26 +82,29 @@
   --code-background: color-mix(in srgb, var(--card) 90%, var(--background));
   --code-foreground: var(--foreground);
   /*
-   * Off switch: a light track with a zinc-500 edge, so the control boundary reaches the 3:1
-   * non-text contrast of WCAG 1.4.11 on white cards and the zinc-25 page (about 4.7:1).
+   * Off switch: t3code's zinc-300 track (the input token) and light thumb, plus a zinc-500 edge
+   * that t3code lacks: it keeps the control boundary at the 3:1 non-text contrast of WCAG 1.4.11
+   * on the zinc-25 page (about 4.7:1), which the bare track (1.4:1) misses.
    */
-  --switch-track: var(--color-zinc-200);
+  --switch-track: var(--input);
   --switch-border: var(--color-zinc-500);
-  --switch-thumb: var(--color-white);
+  --switch-thumb: var(--background);
 }
 
 .dark {
   color-scheme: dark;
+  --app-scrollbar-thumb: rgb(255 255 255 / 8%);
+  --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
   --background: #000;
   --foreground: var(--color-neutral-100);
   --card: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
   --card-foreground: var(--color-neutral-100);
-  /* A shade under the card: menus and lists read near-black, not grey. */
-  --popover: color-mix(in srgb, var(--color-neutral-950) 98.5%, var(--color-white));
+  /* Raised surfaces keep the tone they had over neutral-950, so cards and popovers still lift. */
+  --surface-raised: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
+  --popover: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
   --popover-foreground: var(--color-neutral-100);
   --primary: #9046ff;
-  /* 6%, not 3%: a secondary button stays visible on the black page and on cards. */
-  --secondary: --alpha(var(--color-white) / 6%);
+  --secondary: --alpha(var(--color-white) / 3%);
   --secondary-foreground: var(--color-neutral-100);
   --muted: --alpha(var(--color-white) / 3%);
   --muted-foreground: var(--color-neutral-400);
@@ -103,23 +112,27 @@
   --accent-foreground: var(--color-neutral-100);
   --border: --alpha(var(--color-white) / 8%);
   --input: --alpha(var(--color-white) / 11%);
-  /* Same red-600 as light: the lighter t3code mix put white button text at 3.5:1. */
-  --destructive: var(--color-red-600);
-  --destructive-foreground: var(--color-red-400);
+  --error: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
+  --error-foreground: var(--color-red-400);
+  --error-surface: color-mix(in srgb, var(--error) 16%, transparent);
   /* Kiro purple-300: 9.7:1 on black. */
   --info-foreground: #c59eff;
   --success-foreground: var(--color-emerald-400);
   --warning-foreground: var(--color-amber-400);
+  --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
   --sidebar: var(--card);
   --sidebar-control-surface: var(--muted);
   --sidebar-row-hover: var(--accent);
   --sidebar-row-active: var(--accent);
   --sidebar-row-selected: var(--muted);
   --sidebar-stage-fade: var(--card);
-  /* neutral-500 edge: about 4:1 on the #111 card and 4.4:1 on the black page; light thumb. */
-  --switch-track: --alpha(var(--color-white) / 8%);
-  --switch-border: var(--color-neutral-500);
-  --switch-thumb: var(--color-neutral-300);
+  /*
+   * t3code's off switch: the input track with a neutral-400 thumb, which alone stands 8:1 off the
+   * black page, so the dark theme needs no extra edge.
+   */
+  --switch-track: var(--input);
+  --switch-border: transparent;
+  --switch-thumb: var(--muted-foreground);
 }
 
 /*
@@ -180,6 +193,7 @@
 :root,
 [data-app-sidebar] {
   --contrast-foreground: var(--foreground);
+  --contrast-muted-foreground: var(--muted-foreground);
   --contrast-sidebar-muted-foreground: var(--sidebar-muted-foreground);
 }
 
@@ -202,6 +216,72 @@
   background-image: var(--surface-grain);
   background-repeat: repeat;
   background-size: var(--surface-grain-size);
+}
+
+/*
+ * Shadows are kept to floating layers (menus, select and combobox lists, popovers, tooltips,
+ * dialogs, sheets), and there one soft drop only: cards, panels, buttons, fields, tabs, switches
+ * and badges have none. Lighter than t3code's 0 16px 40px -18px rgb(0 0 0 / 55%) by request.
+ */
+:root {
+  --floating-shadow: 0 8px 24px -12px rgb(0 0 0 / 16%);
+}
+.dark {
+  --floating-shadow: 0 8px 24px -12px rgb(0 0 0 / 60%);
+}
+
+@utility floating-shadow {
+  box-shadow: var(--floating-shadow);
+}
+
+/*
+ * t3code's frosted popup surfaces (index.css dropdown-glass, dialog-glass, dialog-backdrop): the
+ * popover tone at 80% under a 12 px blur, a foreground-tinted hairline, and a solid fallback
+ * where backdrop-filter is missing. Menus, selects, comboboxes and popovers use dropdown-glass;
+ * dialogs use dialog-glass over the dialog-backdrop, with the floating shadow instead of
+ * t3code's deeper one and its inset top highlight.
+ */
+@utility dropdown-glass {
+  background: color-mix(
+    in srgb,
+    var(--popover) 18%,
+    color-mix(in srgb, var(--popover) var(--glass-opacity), transparent)
+  );
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  border: 1px solid color-mix(in srgb, var(--contrast-foreground) 10%, transparent);
+
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    /* biome-ignore lint/complexity/noImportantStyles: the fallback must beat the glass mix. */
+    background: var(--popover) !important;
+  }
+}
+
+@utility dialog-glass {
+  background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  border-color: color-mix(in srgb, var(--contrast-foreground) 10%, transparent);
+  box-shadow: var(--floating-shadow);
+
+  @variant dark {
+    border-color: color-mix(in srgb, var(--color-white) 8%, transparent);
+  }
+
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    /* biome-ignore lint/complexity/noImportantStyles: the fallback must beat the glass mix. */
+    background: var(--popover) !important;
+  }
+}
+
+@utility dialog-backdrop {
+  background: color-mix(in srgb, var(--background) 60%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+
+  @variant dark {
+    background: color-mix(in srgb, var(--background) 64%, transparent);
+  }
 }
 
 /*
@@ -300,6 +380,11 @@
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-error: var(--error);
+  --color-error-foreground: var(--error-foreground);
+  --color-error-surface: var(--error-surface);
+  --color-warning-surface: var(--warning-surface);
+  --color-surface-raised: var(--surface-raised);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-success: var(--success);
@@ -332,8 +417,8 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
 
-  /* coss ui: skeleton animation (merged by the shadcn CLI). */
-  --animate-skeleton: skeleton 2s -1s infinite linear;
+  /* t3code's skeleton: one stepped opacity breath per bar. */
+  --animate-skeleton: skeleton 2.4s infinite;
 
   /* Sign-in showcase: the paper plane rocks about its tip, so it stays on its trail. */
   --animate-plane-float: plane-float 5s ease-in-out infinite alternate;
@@ -348,8 +433,18 @@
   }
 
   @keyframes skeleton {
-    to {
-      background-position: -200% 0;
+    0%,
+    42% {
+      opacity: 1;
+      animation-timing-function: steps(4);
+    }
+    50%,
+    92% {
+      opacity: 0.55;
+      animation-timing-function: steps(4);
+    }
+    100% {
+      opacity: 1;
     }
   }
 }
@@ -828,6 +923,10 @@
 @layer base {
   * {
     @apply border-border outline-ring;
+  }
+  /* t3code's lighter default icon stroke. In the base layer so stroke-* utilities still win. */
+  :where(svg.lucide[stroke-width="2"]) {
+    stroke-width: 1.75;
   }
   html,
   body {

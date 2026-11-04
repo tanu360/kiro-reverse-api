@@ -38,6 +38,8 @@ function FormNotice({
     <div
       className={cn(
         badgeVariants({ size: "lg", tone, variant: "soft" }),
+        // The soft fill the notice was designed with (11 %, 18 % dark), a step over the pills' 8 %.
+        "bg-[color-mix(in_oklab,var(--badge-tint)_11%,transparent)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_18%,transparent)]",
         "h-auto min-h-9 w-full items-start justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left font-normal leading-5",
         // Duotone disc, a touch larger than the text.
         "[--badge-dot:color-mix(in_oklab,var(--badge-disc)_28%,transparent)] [--badge-glyph:var(--badge-disc)] [&_svg]:mt-px [&_svg:not([class*='size-'])]:size-4.5",
@@ -164,12 +166,14 @@ export function SignInForm({
         </FormNotice>
       ) : null}
       {/*
-       * The standard primary button, plus a faint film grain (index.css grain-overlay, at half
-       * its default strength) that gives the fill some texture, under the label.
+       * The primary button with a faint film grain (index.css grain-overlay, at half its default
+       * strength) that gives the fill some texture, under the label. It keeps the coss lift the
+       * app buttons dropped (a soft primary shadow and a 1 px inner highlight), its icon at 80 %,
+       * and no scale layer (will-change), which would re-rasterise the label.
        */}
       <Button
         // 44 px on phones and touch screens, 40 px from sm up: the password field's height.
-        className="grain-overlay h-11 w-full [--grain-overlay-opacity:0.1] sm:h-10 pointer-coarse:h-11"
+        className="grain-overlay h-11 w-full shadow-primary/24 shadow-xs not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [--grain-overlay-opacity:0.1] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [:disabled,:active,[data-pressed]]:shadow-none sm:h-10 pointer-coarse:h-11 [&:not([aria-haspopup]):not(:disabled):not([aria-disabled=true])]:will-change-auto [&_svg:not([class*='opacity-'])]:opacity-80"
         disabled={pending || locked}
         size="lg"
         type="submit"

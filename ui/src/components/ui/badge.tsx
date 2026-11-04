@@ -8,7 +8,8 @@ import type React from "react";
 import { cn } from "@/lib/utils";
 
 /*
- * Pills: fully rounded, a leading icon, medium weight. Each tone sets five colours as custom
+ * Pills: fully rounded, a leading icon, medium weight (a Kiro design; t3code's badges are square
+ * tags). The fills follow t3code's: soft tints at 8% (16% dark), outline on the field colours. Each tone sets five colours as custom
  * properties and each variant paints with them, so tone and variant combine freely:
  *   --badge-tint      the hue the soft fill and border are mixed from
  *   --badge-fg        text on the soft fill (AA on it in both themes)
@@ -50,14 +51,14 @@ export const badgeVariants = cva(
           "[--badge-disc:var(--destructive)] [--badge-fg:var(--destructive-foreground)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--destructive)] [--badge-tint:var(--destructive)]",
       },
       variant: {
-        soft: "bg-[color-mix(in_oklab,var(--badge-tint)_11%,transparent)] text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-fg)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_18%,transparent)] [button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_18%,transparent)] dark:[button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_26%,transparent)]",
+        soft: "bg-[color-mix(in_oklab,var(--badge-tint)_8%,transparent)] text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-fg)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_16%,transparent)] [button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_16%,transparent)] dark:[button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_26%,transparent)]",
         "soft-outline":
           "border-[color-mix(in_oklab,var(--badge-tint)_28%,transparent)] bg-[color-mix(in_oklab,var(--badge-tint)_9%,transparent)] text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-fg)] dark:border-[color-mix(in_oklab,var(--badge-tint)_36%,transparent)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_15%,transparent)] [button&,a&]:hover:bg-[color-mix(in_oklab,var(--badge-tint)_16%,transparent)]",
         // The buttons' faint film grain (index.css grain-overlay) on the solid fill.
         solid:
           "grain-overlay [--grain-overlay-opacity:0.1] bg-(--badge-solid) text-(--badge-solid-fg) [--badge-dot:var(--badge-solid-fg)] [--badge-glyph:var(--badge-solid)] [--badge-icon:var(--badge-solid-fg)] [button&,a&]:hover:opacity-90",
         outline:
-          "border-border bg-background text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-disc)] dark:border-input dark:bg-input/16 [button&,a&]:hover:bg-accent",
+          "border-input bg-background text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--color-white)] [--badge-icon:var(--badge-disc)] dark:bg-input/32 [button&,a&]:hover:bg-accent/50 dark:[button&,a&]:hover:bg-input/48",
       },
     },
   },
