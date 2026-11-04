@@ -15,6 +15,12 @@ export default defineConfig({
   reporter: CI ? [["github"], ["list"]] : "list",
   use: {
     baseURL: `${origin}/admin/`,
+    // The browser mock draws a random 8-digit first-run password, as the server does
+    // (src/lib/mocks/db.ts); the specs pin the known one through the key it reads.
+    storageState: {
+      cookies: [],
+      origins: [{ origin, localStorage: [{ name: "kiro_mock_password", value: "12345678" }] }],
+    },
     // Kept only for failed tests; CI uploads test-results/ when the job fails.
     trace: "retain-on-failure",
   },

@@ -30,7 +30,7 @@ import {
 } from "./fixtures";
 
 export interface MockDb {
-  /** '12345678' */
+  /** 8 random digits, as the real first-run password (12345678 in unit tests) */
   adminPassword: string;
   /** true until the first successful sign-in */
   firstRunPending: boolean;
@@ -67,12 +67,39 @@ export function mockNowUnix(): number {
 
 const SEED_REQUEST_COUNT = 320;
 
+/** Where the browser mock keeps its generated password, so it survives reloads like the real one. */
+const MOCK_PASSWORD_KEY = "kiro_mock_password";
+
+/**
+ * The first-run password as config/admin_password.go makes it: 8 crypto-random digits,
+ * zero-padded ("%08d"). It is drawn once and kept in localStorage, so it stays the same across
+ * reloads, as the real one does until it is claimed; setting that key pins a known one (e2e).
+ * Unit tests keep the fixed 12345678.
+ */
+function mockAdminPassword(): string {
+  if (import.meta.env.MODE === "test") return "12345678";
+  try {
+    const stored = localStorage.getItem(MOCK_PASSWORD_KEY);
+    if (stored) return stored;
+  } catch {
+    // No storage (private mode): a fresh password per load is fine.
+  }
+  const [random] = crypto.getRandomValues(new Uint32Array(1));
+  const password = String(random % 100_000_000).padStart(8, "0");
+  try {
+    localStorage.setItem(MOCK_PASSWORD_KEY, password);
+  } catch {
+    // As above.
+  }
+  return password;
+}
+
 function seedDb(): MockDb {
   const now = mockNowUnix();
   const accounts = seedAccounts();
   const requests = seedRequests(now, SEED_REQUEST_COUNT);
   return {
-    adminPassword: "12345678",
+    adminPassword: mockAdminPassword(),
     firstRunPending: true,
     failedLogins: 0,
     accounts,

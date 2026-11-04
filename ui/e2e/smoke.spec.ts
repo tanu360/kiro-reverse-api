@@ -6,7 +6,8 @@ test("serves the admin app shell", async ({ page }) => {
   await expect(page.locator("#root")).toBeAttached();
 });
 
-// Mock mode (pnpm dev:mock): first-run is pending on every fresh load, with password 12345678.
+// Mock mode (pnpm dev:mock): first-run is pending on every fresh load; playwright.config.ts pins
+// the mock's otherwise random password to 12345678.
 test("first visit goes to setup, signs in with the first-run password and stays signed in", async ({
   page,
 }) => {
