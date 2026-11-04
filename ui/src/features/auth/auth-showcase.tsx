@@ -61,12 +61,46 @@ const SAMPLE_ACCOUNTS: readonly {
   health: Health;
   used: number;
   requests: number;
+  /** The avatar's tint: a soft fill with the initial in the full colour. */
+  hue: string;
 }[] = [
-  { email: "maya***@gmail.com", plan: "proPlus", health: "active", used: 62, requests: 12480 },
-  { email: "dev.***@outlook.com", plan: "power", health: "active", used: 35, requests: 9912 },
-  { email: "arjun***@gmail.com", plan: "pro", health: "outOfCredits", used: 100, requests: 8301 },
-  { email: "team***@company.dev", plan: "pro", health: "active", used: 48, requests: 7204 },
+  {
+    email: "maya***@gmail.com",
+    plan: "proPlus",
+    health: "active",
+    used: 62,
+    requests: 12480,
+    hue: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
+  },
+  {
+    email: "dev.***@outlook.com",
+    plan: "power",
+    health: "active",
+    used: 35,
+    requests: 9912,
+    hue: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
+  },
+  {
+    email: "arjun***@gmail.com",
+    plan: "pro",
+    health: "outOfCredits",
+    used: 100,
+    requests: 8301,
+    hue: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  },
+  {
+    email: "team***@company.dev",
+    plan: "pro",
+    health: "active",
+    used: 48,
+    requests: 7204,
+    hue: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+  },
 ];
+
+/** Made-up hourly traffic and success rate for the two sparklines (0..1, oldest first). */
+const SPARK_REQUESTS = [0.32, 0.38, 0.3, 0.46, 0.42, 0.55, 0.5, 0.64, 0.6, 0.74, 0.7, 0.9];
+const SPARK_SUCCESS = [0.82, 0.86, 0.84, 0.9, 0.88, 0.92, 0.9, 0.94, 0.95, 0.93, 0.96, 0.97];
 
 const HEALTH_PILL = {
   active: { tone: "success", icon: CircleCheckIcon },
@@ -317,7 +351,8 @@ function PaperPlane(): JSX.Element {
 }
 
 /**
- * The Accounts page in miniature: nav, stat tiles and four rows. It is laid out at its real size,
+ * The Accounts page in miniature: nav, stat tiles (each with a small drawing: avatars, available
+ * bars, two sparklines) and four rows with an initial avatar and the plan's used share. It is laid out at its real size,
  * then zoomed to the panel, the smaller of a width step and a height step, so the whole of it
  * shows on common laptop screens and it grows on large ones.
  */
@@ -328,11 +363,23 @@ function AccountsPreview(): JSX.Element {
   const number = new Intl.NumberFormat(lang);
   const percent = new Intl.NumberFormat(lang, { style: "percent", maximumFractionDigits: 1 });
 
-  const stats = [
-    { label: tOverview("stats.accounts"), value: number.format(7) },
-    { label: tOverview("stats.available"), value: number.format(5) },
-    { label: tOverview("stats.requests"), value: number.format(46034) },
-    { label: tOverview("stats.successRate"), value: percent.format(0.994) },
+  const stats: { label: string; value: string; extra: JSX.Element }[] = [
+    { label: tOverview("stats.accounts"), value: number.format(7), extra: <AvatarStack /> },
+    {
+      label: tOverview("stats.available"),
+      value: number.format(5),
+      extra: <Segments filled={5} of={7} />,
+    },
+    {
+      label: tOverview("stats.requests"),
+      value: number.format(46034),
+      extra: <Sparkline className="text-primary" points={SPARK_REQUESTS} />,
+    },
+    {
+      label: tOverview("stats.successRate"),
+      value: percent.format(0.994),
+      extra: <Sparkline className="text-success" points={SPARK_SUCCESS} />,
+    },
   ];
 
   return (
@@ -378,12 +425,16 @@ function AccountsPreview(): JSX.Element {
 
         <dl className="grid grid-cols-4 gap-3">
           {stats.map((stat) => (
+            // The app's panel look (components/ui/card.tsx): an outline over a faint fill.
             <div
-              className="rounded-xl border bg-background/60 px-3.5 py-3 dark:bg-white/[0.03]"
+              className="rounded-xl border border-border/60 bg-muted/40 px-3.5 py-3 dark:bg-white/[0.03]"
               key={stat.label}
             >
               <dt className="truncate text-muted-foreground text-xs">{stat.label}</dt>
-              <dd className="mt-1 font-semibold text-lg tabular-nums">{stat.value}</dd>
+              <dd className="mt-1 flex items-end justify-between gap-2">
+                <span className="font-semibold text-lg tabular-nums leading-7">{stat.value}</span>
+                {stat.extra}
+              </dd>
             </div>
           ))}
         </dl>
@@ -401,7 +452,15 @@ function AccountsPreview(): JSX.Element {
             {SAMPLE_ACCOUNTS.map((row) => (
               <tr className="border-b last:border-0" key={row.email}>
                 <td className="py-3 pr-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={cn(
+                        "grid size-6 shrink-0 place-items-center rounded-full font-semibold text-[11px] uppercase",
+                        row.hue,
+                      )}
+                    >
+                      {row.email.charAt(0)}
+                    </span>
                     <span className="font-medium">{row.email}</span>
                     <Badge tone={row.plan === "free" ? "neutral" : "primary"}>
                       {tAccounts(`subscription.${row.plan}`)}
@@ -414,14 +473,19 @@ function AccountsPreview(): JSX.Element {
                   </Badge>
                 </td>
                 <td className="py-3 pr-4">
-                  <div className="h-1.5 w-28 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={cn(
-                        "h-full rounded-full",
-                        row.used >= 100 ? "bg-warning" : "bg-primary",
-                      )}
-                      style={{ width: `${row.used}%` }}
-                    />
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn(
+                          "h-full rounded-full",
+                          row.used >= 100 ? "bg-warning" : "bg-primary",
+                        )}
+                        style={{ width: `${row.used}%` }}
+                      />
+                    </div>
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                      {percent.format(row.used / 100)}
+                    </span>
                   </div>
                 </td>
                 <td className="py-3 text-right tabular-nums">{number.format(row.requests)}</td>
@@ -431,5 +495,85 @@ function AccountsPreview(): JSX.Element {
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * A tiny trend line for a stat tile: a 1.5 px stroke in the current colour over a fade of the
+ * same colour. Decoration only (the preview is aria-hidden).
+ */
+function Sparkline({
+  points,
+  className,
+}: {
+  points: readonly number[];
+  className?: string;
+}): JSX.Element {
+  const id = useId();
+  const width = 56;
+  const height = 22;
+  const step = width / (points.length - 1);
+  const line = points
+    .map((value, index) => {
+      const x = (index * step).toFixed(1);
+      const y = (height - 2 - value * (height - 4)).toFixed(1);
+      return `${index === 0 ? "M" : "L"}${x},${y}`;
+    })
+    .join(" ");
+  return (
+    <svg
+      aria-hidden="true"
+      className={cn("shrink-0 overflow-visible", className)}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      width={width}
+    >
+      <defs>
+        <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${line} L${width},${height} L0,${height} Z`} fill={`url(#${id})`} />
+      <path
+        d={line}
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+const AVATAR_TINTS = ["bg-violet-400", "bg-sky-400", "bg-amber-400"] as const;
+
+/** Three overlapping avatar dots, for the Accounts tile. */
+function AvatarStack(): JSX.Element {
+  return (
+    <span className="flex shrink-0 -space-x-1.5 pb-1">
+      {AVATAR_TINTS.map((tint) => (
+        <span
+          className={cn("size-4 rounded-full ring-2 ring-card dark:ring-background", tint)}
+          key={tint}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** "5 of 7" as seven short bars, the available ones in the success colour. */
+function Segments({ filled, of }: { filled: number; of: number }): JSX.Element {
+  const bars = Array.from({ length: of }, (_, position) => ({ position, on: position < filled }));
+  return (
+    <span className="flex shrink-0 gap-0.5 pb-1.5">
+      {bars.map((bar) => (
+        <span
+          className={cn("h-2.5 w-1 rounded-full", bar.on ? "bg-success" : "bg-muted-foreground/25")}
+          key={bar.position}
+        />
+      ))}
+    </span>
   );
 }
