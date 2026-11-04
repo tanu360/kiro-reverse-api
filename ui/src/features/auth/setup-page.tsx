@@ -141,8 +141,8 @@ function GeneratedPassword({
         </div>
       ) : (
         // While it loads (first visit, or after "Try again"), skullet draws the row from a sample
-        // password: a block where each digit tile will be, the same size as the real row, so
-        // nothing moves when it arrives.
+        // password: a bar where the password will be, the same size as the real row, so nothing
+        // moves when it arrives.
         <SkulletProvider mode={resolvedTheme} theme={SKELETON_THEME}>
           <Skeleton
             data={password || null}
@@ -150,7 +150,7 @@ function GeneratedPassword({
             sample={SAMPLE_PASSWORD}
           >
             {(value) => (
-              <div className="flex min-h-12 items-center justify-center">
+              <div className="flex min-h-10 items-center justify-center">
                 <CopyablePassword value={value} />
               </div>
             )}
@@ -161,23 +161,19 @@ function GeneratedPassword({
   );
 }
 
-/** The digits as two groups of four, like a verification code: "1234 5678". */
-const GROUP_SIZE = 4;
-
 /**
- * The password itself is the copy control, drawn as a verification code: one tile per digit in
- * two groups of four. Hovering (or keyboard focus) tints the tiles' edges and digits towards the
- * primary purple, a tile at a time, and the label above reads "Click to copy". A click or tap
- * copies it; the tiles pop one after another and turn green with the label, for two seconds. No
- * toast (the label already says it) and no tooltip (it would cover the label). Screen readers get
- * the password plus "Copy password" as its name and a polite "Password copied" status.
+ * The password itself is the copy control: no separate copy icon, no box, just the digits in bold
+ * mono. Hovering (or keyboard focus) tints them a step towards the primary purple and the label
+ * above reads "Click to copy"; a click or tap copies them and turns the digits and the label green
+ * for two seconds. No toast (the label already says it) and no tooltip (it would cover the label).
+ * Screen readers get the password plus "Copy password" as its name and a polite "Password copied"
+ * status.
  */
 function CopyablePassword({ value }: { value: string }): JSX.Element {
   const { t } = useT("auth");
   const { t: tShared } = useT();
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tilesRef = useRef<HTMLSpanElement>(null);
 
   useEffect(
     () => () => {
@@ -186,24 +182,12 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
     [],
   );
 
-  const pop = () => {
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduced || !tilesRef.current) return;
-    tilesRef.current.querySelectorAll<HTMLElement>("[data-tile]").forEach((tile, index) => {
-      tile.animate?.(
-        [{ transform: "scale(1)" }, { transform: "scale(1.08)" }, { transform: "scale(1)" }],
-        { duration: 260, delay: index * 28, easing: "cubic-bezier(0.2, 0, 0, 1)" },
-      );
-    });
-  };
-
   const onClick = async () => {
     if (!(await copyText(value))) {
       toast.error(tShared("toast.copyFailed"));
       return;
     }
     setCopied(true);
-    pop();
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       setCopied(false);
@@ -211,49 +195,21 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
     }, COPIED_MS);
   };
 
-  // Each group keeps its offset in the password: the keys and the wave delay come from it.
-  const groups: { start: number; digits: string[] }[] = [];
-  for (let start = 0; start < value.length; start += GROUP_SIZE) {
-    groups.push({ start, digits: [...value.slice(start, start + GROUP_SIZE)] });
-  }
-
   return (
     <>
       <button
-        className="group/code focus-outline cursor-pointer rounded-xl p-1 transition-transform duration-150 active:scale-[0.98]"
+        className={cn(
+          "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-bold text-foreground text-xl tracking-[0.18em] transition-[color,scale] duration-150 active:scale-[0.98]",
+          "hover:text-[color-mix(in_oklab,var(--foreground)_55%,var(--primary))] focus-visible:text-[color-mix(in_oklab,var(--foreground)_55%,var(--primary))]",
+          copied && "text-success-foreground hover:text-success-foreground",
+        )}
         data-copied={copied ? "" : undefined}
         data-copy-password=""
         onClick={onClick}
+        style={PASSWORD_FONT}
         type="button"
       >
-        <span aria-hidden="true" className="flex items-center gap-2.5 sm:gap-3" ref={tilesRef}>
-          {groups.map(({ start, digits }) => (
-            <span className="flex gap-1 sm:gap-1.5" key={start}>
-              {digits.map((digit, index) => {
-                const position = start + index;
-                return (
-                  <span
-                    className={cn(
-                      "flex h-10 w-8 items-center justify-center rounded-lg border bg-card/40 font-semibold text-foreground text-lg tabular-nums sm:h-11 sm:w-9 sm:text-xl",
-                      "transition-[border-color,color] duration-200",
-                      copied
-                        ? "border-success/50 text-success-foreground"
-                        : "border-border group-hover/code:border-primary/45 group-hover/code:text-[color-mix(in_oklab,var(--foreground)_55%,var(--primary))] group-focus-visible/code:border-primary/45",
-                    )}
-                    data-tile=""
-                    // A left-to-right wave as the tint comes and goes.
-                    key={`${position}-${digit}`}
-                    style={{ ...PASSWORD_FONT, transitionDelay: `${position * 18}ms` }}
-                  >
-                    {digit}
-                  </span>
-                );
-              })}
-            </span>
-          ))}
-        </span>
-        <span className="sr-only">{value}</span>{" "}
-        <span className="sr-only">{t("copyPassword")}</span>
+        <span>{value}</span> <span className="sr-only">{t("copyPassword")}</span>
       </button>
       <span className="sr-only" role="status">
         {copied ? t("passwordCopied") : ""}
