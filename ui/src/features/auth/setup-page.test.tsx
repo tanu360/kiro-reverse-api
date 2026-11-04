@@ -17,7 +17,15 @@ describe("SetupPage", () => {
       screen.getByRole("heading", { level: 1, name: "Welcome to Kiro Proxy" }),
     ).toBeInTheDocument();
     expect(await screen.findByText(PASSWORD)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy password" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `${PASSWORD} Copy password` })).toBeInTheDocument();
+  });
+
+  it("copies the password when it is clicked, with no separate copy icon", async () => {
+    const { user } = await renderApp("/setup", { authed: false });
+    await screen.findByText(PASSWORD);
+    await user.click(screen.getByRole("button", { name: `${PASSWORD} Copy password` }));
+    expect(await navigator.clipboard.readText()).toBe(PASSWORD);
+    expect(await screen.findByText("Password copied to clipboard")).toBeInTheDocument();
   });
 
   it("shows the generated password as a line of text, not a second input box", async () => {
@@ -25,12 +33,10 @@ describe("SetupPage", () => {
     const section = await screen.findByRole("region", { name: "First-run admin password" });
     expect(within(section).getByText("Generated password")).toBeInTheDocument();
     expect(within(section).getByText(PASSWORD)).toBeInTheDocument();
-    // Copy is the only control: no info button.
-    expect(
-      within(section)
-        .getAllByRole("button")
-        .map((button) => button.ariaLabel),
-    ).toEqual(["Copy password"]);
+    // The password itself is the only control: no copy icon, no info button.
+    const buttons = within(section).getAllByRole("button");
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveAccessibleName(`${PASSWORD} Copy password`);
     expect(section.querySelector("input")).toBeNull();
     // The sign-in password field is the page's only input box.
     expect(document.querySelectorAll('[data-slot="input-group"]')).toHaveLength(1);

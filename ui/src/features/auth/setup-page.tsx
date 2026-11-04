@@ -1,21 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { type JSX, useEffect } from "react";
+import { type JSX, useEffect, useRef, useState } from "react";
 import { Skeleton, SkulletProvider } from "skullet/react";
 import { useTheme } from "@/components/layout/theme-provider";
-import { CopyButton } from "@/components/shared/copy-button";
 import { Button } from "@/components/ui/button";
 import { firstRunQuery } from "@/lib/api/session";
 import { isAuthenticated, subscribeSession } from "@/lib/auth/session";
+import { copyText } from "@/lib/clipboard";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { AuthHeader, AuthLayout } from "./auth-layout";
-import { FLAT_ICON_BUTTON_CLASS } from "./password-field";
 import { SignInForm } from "./sign-in-form";
 
 // Long enough to reach the toast's "Open settings" action.
 const CHANGE_PASSWORD_TOAST_MS = 10_000;
+
+/** How long the password stays green after a copy (components/shared/copy-button.tsx). */
+const COPIED_MS = 2000;
 
 /** The app's mono stack (index.css --font-mono, self-hosted Fira Code). */
 const PASSWORD_FONT = { fontFamily: "var(--font-mono)" };
@@ -127,24 +129,63 @@ function GeneratedPassword({
             sample={SAMPLE_PASSWORD}
           >
             {(value) => (
-              <div className="flex min-h-10 flex-wrap items-center justify-center gap-0.5">
-                <code
-                  className="min-w-0 break-all px-1.5 font-semibold text-foreground text-xl tracking-[0.18em]"
-                  style={PASSWORD_FONT}
-                >
-                  {value}
-                </code>
-                <CopyButton
-                  className={cn("md:size-8", FLAT_ICON_BUTTON_CLASS)}
-                  copiedMessage={t("passwordCopied")}
-                  label={t("copyPassword")}
-                  value={value}
-                />
+              <div className="flex min-h-10 items-center justify-center">
+                <CopyablePassword value={value} />
               </div>
             )}
           </Skeleton>
         </SkulletProvider>
       )}
     </section>
+  );
+}
+
+/**
+ * The password itself is the copy control: no separate copy icon. Hovering tints it a little
+ * towards the primary purple on a faint fill; a click or tap copies it, toasts, and turns it green
+ * for two seconds. No tooltip: it would cover the label above. Its accessible name keeps the
+ * password and adds "Copy password".
+ */
+function CopyablePassword({ value }: { value: string }): JSX.Element {
+  const { t } = useT("auth");
+  const { t: tShared } = useT();
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  const onClick = async () => {
+    if (!(await copyText(value))) {
+      toast.error(tShared("toast.copyFailed"));
+      return;
+    }
+    toast.success(t("passwordCopied"));
+    setCopied(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setCopied(false);
+      timerRef.current = null;
+    }, COPIED_MS);
+  };
+
+  return (
+    <button
+      className={cn(
+        "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-semibold text-foreground text-xl tracking-[0.18em] transition-colors duration-150",
+        "hover:bg-accent hover:text-[color-mix(in_oklab,var(--foreground)_72%,var(--primary))]",
+        copied && "text-success-foreground hover:text-success-foreground",
+      )}
+      data-copied={copied ? "" : undefined}
+      onClick={onClick}
+      style={PASSWORD_FONT}
+      type="button"
+    >
+      <span>{value}</span> <span className="sr-only">{t("copyPassword")}</span>
+    </button>
   );
 }
