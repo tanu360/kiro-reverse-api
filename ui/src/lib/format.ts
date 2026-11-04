@@ -85,9 +85,29 @@ export function formatFraction(fraction: number, digits = 1, lang?: Lang): strin
   }).format(finite(fraction));
 }
 
-/** A plain number with `digits` decimals, without grouping changes: 0.25 → "0.25". */
+/** True when `value` is above zero but would show as zero with `digits` decimals. */
+export function roundsToZero(value: number, digits: number): boolean {
+  const n = finite(value);
+  return n > 0 && n < 0.5 * 10 ** -digits;
+}
+
+/** "<0.01" for `digits` 2: the smallest step at that precision, for an amount below it. */
+export function belowStep(digits: number, lang?: Lang): string {
+  return `<${formatDecimal(10 ** -digits, digits, lang)}`;
+}
+
+/**
+ * Credits with `digits` decimals: 0.25 → "0.25". An amount above zero that would round to zero
+ * reads "<0.01" instead, so a tiny charge never looks free; zero stays "0.00".
+ */
 export function formatCredits(value: number, digits = 2, lang?: Lang): string {
+  if (roundsToZero(value, digits)) return belowStep(digits, lang);
   return formatDecimal(value, digits, lang);
+}
+
+/** The exact amount behind a "<0.01", to six significant digits: 0.0001234 → "0.0001234". */
+export function formatCreditsExact(value: number, lang?: Lang): string {
+  return numberFormat(lang, { maximumSignificantDigits: 6 }).format(finite(value));
 }
 
 export function formatUsd(value: number, lang?: Lang): string {

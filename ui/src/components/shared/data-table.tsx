@@ -76,8 +76,12 @@ const INTERACTIVE_SELECTOR =
 function fromInteractiveChild(event: { target: EventTarget; currentTarget: EventTarget }): boolean {
   const target = event.target as HTMLElement | null;
   if (!target || target === event.currentTarget) return false;
+  const row = event.currentTarget as HTMLElement;
+  // A row's menu or dialog renders in a portal, outside the row, but React still bubbles its
+  // clicks to the row's handler. Those never count as a click on the row.
+  if (!row.contains(target)) return true;
   const hit = target.closest(INTERACTIVE_SELECTOR);
-  return hit !== null && (event.currentTarget as HTMLElement).contains(hit);
+  return hit !== null && row.contains(hit);
 }
 
 const ALIGN_CLASS = { start: "text-left", center: "text-center", end: "text-right" } as const;

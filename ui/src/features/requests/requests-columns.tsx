@@ -1,12 +1,13 @@
 import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 import { type JSX, useMemo } from "react";
+import { CreditAmount } from "@/components/shared/credit-amount";
 import type { DataTableColumn } from "@/components/shared/data-table";
 import { DisplayEmail } from "@/components/shared/display-email";
 import { TokenCell } from "@/components/shared/token-cell";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RequestRecord } from "@/lib/api/types";
-import { EMPTY, formatCredits, formatDateTime, formatDurationMs, formatTime } from "@/lib/format";
+import { EMPTY, formatDateTime, formatDurationMs, formatTime } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
@@ -112,7 +113,8 @@ function ModelCell({ record }: { record: RequestRecord }): JSX.Element {
   return (
     <span className="flex min-w-0 flex-col items-start gap-1">
       {record.model ? (
-        <span className="block max-w-32 truncate @7xl/requests:max-w-none" title={record.model}>
+        // Capped on wide containers too: a long model id would push the table sideways.
+        <span className="block max-w-32 truncate @7xl/requests:max-w-64" title={record.model}>
           {record.model}
         </span>
       ) : (
@@ -225,7 +227,7 @@ export function useRequestColumns(): DataTableColumn<RequestRecord>[] {
           sortable: true,
           align: "end",
           className: "tabular-nums",
-          cell: (row) => formatCredits(row.credits),
+          cell: (row) => <CreditAmount value={row.credits} />,
         },
         {
           id: "duration",

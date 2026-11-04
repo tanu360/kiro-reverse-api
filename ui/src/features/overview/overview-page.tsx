@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, RotateCwIcon } from "lucide-react";
 import { type JSX, useState } from "react";
-import { PageHeader } from "@/components/shared/page-header";
+import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,15 +105,7 @@ export function OverviewPage(): JSX.Element {
   return (
     <div className="@container/main flex flex-col gap-4 md:gap-6">
       <PageHeader
-        actions={
-          <Button disabled={refreshing} onClick={() => void refresh()} size="sm" variant="outline">
-            <RotateCwIcon
-              aria-hidden="true"
-              className={cn(refreshing && "motion-safe:animate-spin")}
-            />
-            {tc("actions.refresh")}
-          </Button>
-        }
+        actions={<RefreshButton fetching={refreshing} onRefresh={() => void refresh()} />}
         description={t("description")}
         meta={<LiveBadge />}
         title={t("title")}

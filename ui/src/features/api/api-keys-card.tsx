@@ -9,7 +9,6 @@ import {
   PlusIcon,
   PowerIcon,
   PowerOffIcon,
-  RefreshCwIcon,
   RotateCcwIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -19,7 +18,9 @@ import { CopyButton } from "@/components/shared/copy-button";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { RefreshButton } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge, BadgeIcon, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -243,10 +244,13 @@ export function ApiKeysCard(): JSX.Element {
     {
       id: "name",
       header: t("keys.name"),
+      // Takes the width the other columns leave and cuts a long name, so the table never
+      // scrolls sideways (w-full with max-w-0 lets the cell shrink below its text).
+      className: "w-full max-w-0",
       cell: (apiKey) => (
-        <span className={cn("font-medium", !apiKey.name && "text-muted-foreground")}>
+        <TruncatedText className={cn("font-medium", !apiKey.name && "text-muted-foreground")}>
           {keyName(apiKey, t)}
-        </span>
+        </TruncatedText>
       ),
     },
     {
@@ -276,10 +280,7 @@ export function ApiKeysCard(): JSX.Element {
 
   const headerActions = (
     <>
-      <Button disabled={keys.isFetching} onClick={() => void keys.refetch()} variant="outline">
-        <RefreshCwIcon aria-hidden="true" className={cn(keys.isFetching && "animate-spin")} />
-        {t("common:actions.refresh")}
-      </Button>
+      <RefreshButton fetching={keys.isFetching} onRefresh={() => void keys.refetch()} />
       <Button onClick={openCreate} ref={createRef}>
         <PlusIcon aria-hidden="true" />
         {t("keys.create")}
@@ -609,9 +610,9 @@ function KeyCard({ apiKey, actions }: { apiKey: ApiKey; actions: JSX.Element }):
     <Card className="h-full gap-3 p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <span className={cn("truncate font-medium", !apiKey.name && "text-muted-foreground")}>
+          <TruncatedText className={cn("font-medium", !apiKey.name && "text-muted-foreground")}>
             {keyName(apiKey, t)}
-          </span>
+          </TruncatedText>
           <KeyStatus apiKey={apiKey} />
         </div>
         {actions}

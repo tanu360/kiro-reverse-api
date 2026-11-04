@@ -111,10 +111,26 @@ describe("accountsCell", () => {
     ).toBe("Rollback point saved 1 account before the restore.");
   });
 
-  it("shows the account count otherwise, 0 when omitted", () => {
+  it("shows the account count otherwise, grouped, and a dash when omitted", () => {
     expect(accountsCell(entry({ accountCnt: 8 }), t)).toEqual({ text: "8" });
-    expect(accountsCell(entry({ accountCnt: undefined }), t)).toEqual({ text: "0" });
+    expect(accountsCell(entry({ accountCnt: 9400 }), t, "en")).toEqual({ text: "9,400" });
+    expect(accountsCell(entry({ accountCnt: 9400 }), t, "pt-BR")).toEqual({ text: "9.400" });
+    expect(accountsCell(entry({ accountCnt: 0 }), t)).toEqual({ text: "0" });
+    expect(accountsCell(entry({ accountCnt: undefined }), t)).toEqual({ text: "—" });
     expect(accountsCell(entry({ kind: "pre-restore", accountCnt: 3 }), t)).toEqual({ text: "3" });
+  });
+
+  it("groups the restored and saved counts of a rollback point", () => {
+    expect(
+      accountsCell(
+        entry({ kind: "pre-restore", accountCnt: 9400, restoredAccountCnt: 1200 }),
+        t,
+        "en",
+      ),
+    ).toEqual({
+      text: "1,200 restored",
+      hint: "Rollback point saved 9,400 accounts before the restore.",
+    });
   });
 });
 

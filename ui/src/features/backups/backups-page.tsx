@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArchiveIcon, FileUpIcon, PlusIcon, RefreshCwIcon } from "lucide-react";
+import { ArchiveIcon, FileUpIcon, PlusIcon } from "lucide-react";
 import {
   type ChangeEvent,
   type JSX,
@@ -12,7 +12,7 @@ import {
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { PageHeader } from "@/components/shared/page-header";
+import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -32,7 +32,6 @@ import { clearSession } from "@/lib/auth/session";
 import { saveBlob } from "@/lib/download";
 import { useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 import { isNotABackupMessage, MAX_UPLOAD_BYTES, manualNote } from "./backup-model";
 import { type BackupRowActions, BackupsTable, ROW_FOCUS_ATTR } from "./backups-table";
 import { ScheduleCard } from "./schedule-card";
@@ -279,21 +278,10 @@ export function BackupsPage(): JSX.Element {
               </TooltipTrigger>
               <TooltipPopup>{t("uploadHint")}</TooltipPopup>
             </Tooltip>
-            <Button
-              aria-busy={list.isFetching || undefined}
-              aria-disabled={list.isFetching || undefined}
-              className={BUSY_BUTTON}
-              onClick={() => {
-                if (!list.isFetching) void invalidate();
-              }}
-              variant="outline"
-            >
-              <RefreshCwIcon
-                aria-hidden="true"
-                className={cn(list.isFetching && !list.isPending && "animate-spin")}
-              />
-              {t("common:actions.refresh")}
-            </Button>
+            <RefreshButton
+              fetching={list.isFetching && !list.isPending}
+              onRefresh={() => void invalidate()}
+            />
             {createButton(false)}
           </>
         }

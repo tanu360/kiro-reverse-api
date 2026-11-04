@@ -1,6 +1,7 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { type JSX, type ReactNode, useRef } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
+import { CreditAmount } from "@/components/shared/credit-amount";
 import { DisplayEmail } from "@/components/shared/display-email";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { RequestRecord } from "@/lib/api/types";
-import { EMPTY, formatCredits, formatDateTime, formatDurationMs, formatNumber } from "@/lib/format";
+import { EMPTY, formatDateTime, formatDurationMs, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { ErrorTypeBadge } from "./error-type-badge";
@@ -89,7 +90,7 @@ export function RequestDetailSheet({
                   label: t("duration"),
                   value: formatDurationMs(record.durationMs, Boolean(record.endpoint)),
                 },
-                { label: t("credits"), value: formatCredits(record.credits, 4) },
+                { label: t("credits"), value: <CreditAmount digits={4} value={record.credits} /> },
                 {
                   label: t("account"),
                   value: <DisplayEmail email={record.email} id={record.accountId} />,

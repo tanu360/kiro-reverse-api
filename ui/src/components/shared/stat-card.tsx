@@ -13,6 +13,11 @@ export interface StatMetric {
   value: ReactNode;
   tone?: "default" | "danger" | "muted";
   wide?: boolean;
+  /**
+   * Lets a long value wrap at its spaces instead of being cut off with an ellipsis: "a / b"
+   * breaks after the slash in a narrow card.
+   */
+  wrap?: boolean;
   /** Explains the label in a popup that opens on hover, click or tap (info icon on the label). */
   hint?: string;
 }
@@ -131,7 +136,8 @@ export function StatCard({
               <MetricLabel metric={metric} />
               <dd
                 className={cn(
-                  "truncate font-medium text-sm tabular-nums",
+                  "font-medium text-sm tabular-nums",
+                  metric.wrap ? "break-words" : "truncate",
                   metric.tone === "danger" && "text-destructive-foreground",
                   metric.tone === "muted" && "text-muted-foreground",
                 )}

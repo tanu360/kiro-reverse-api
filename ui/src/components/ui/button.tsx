@@ -15,6 +15,8 @@ import { Spinner } from "@/components/ui/spinner";
  * that every button already has. ::after stays free for the touch hit area. A caller that adds
  * grain-overlay again (the sign-in button) lands on the same layer, so the grain never doubles.
  * Icons take --control-icon-color: the label colour, or muted on outline and ghost.
+ * Kiro adds `soft` (a purple tint for a secondary action that needs colour) and `quiet` (an icon
+ * button that changes only its colour on hover).
  */
 export const buttonVariants = cva(
   "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[var(--control-radius)] border font-medium text-base outline-none transition-[box-shadow,scale] [&:not([aria-haspopup]):not(:disabled):not([aria-disabled=true])]:will-change-[scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--control-radius)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:cursor-not-allowed aria-disabled:opacity-64 data-loading:select-none data-loading:text-transparent sm:text-sm [&_svg:not([class*='text-']):not([data-slot=button-loading-indicator])]:text-[var(--control-icon-color)] [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0",
@@ -50,6 +52,12 @@ export const buttonVariants = cva(
         link: "border-transparent text-foreground underline-offset-4 *:data-[slot=button-loading-indicator]:text-foreground [:hover,[data-pressed]]:underline",
         outline:
           "[--control-icon-color:var(--contrast-muted-foreground)] border-input bg-popover not-dark:bg-clip-padding text-foreground *:data-[slot=button-loading-indicator]:text-foreground dark:bg-input/32 [:hover,[data-pressed]]:bg-accent/50 dark:[:hover,[data-pressed]]:bg-input/64",
+        // Kiro: a tinted purple action (Export) that sits between outline and the solid primary.
+        // The label and icon share the accent text colour, AA on the tint in both themes.
+        soft: "[--control-icon-color:currentColor] border-transparent bg-info/10 text-info-foreground *:data-[slot=button-loading-indicator]:text-info-foreground dark:bg-info/16 [:hover,[data-pressed]]:bg-info/16 dark:[:hover,[data-pressed]]:bg-info/24",
+        // Kiro: an icon button that only changes its colour on hover, with no fill behind it.
+        quiet:
+          "[--control-icon-color:currentColor] border-transparent text-muted-foreground *:data-[slot=button-loading-indicator]:text-foreground data-popup-open:text-foreground [:hover,[data-pressed]]:text-foreground",
         secondary:
           "border-transparent bg-secondary text-secondary-foreground *:data-[slot=button-loading-indicator]:text-secondary-foreground [:active,[data-pressed]]:bg-secondary/80 [:hover,[data-pressed]]:bg-secondary/90",
       },

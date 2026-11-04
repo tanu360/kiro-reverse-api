@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-media-query";
 import type { BackupEntry } from "@/lib/api/types";
-import { formatBytes, formatDateTime, formatRelativeTime } from "@/lib/format";
+import { EMPTY, formatBytes, formatDateTime, formatRelativeTime } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
@@ -148,8 +148,13 @@ function KindBadge({ kind, t }: { kind: string; t: TFunction }): JSX.Element {
 }
 
 function AccountsCell({ entry, t }: { entry: BackupEntry; t: TFunction }): JSX.Element {
-  const { text, hint } = accountsCell(entry, t);
-  if (!hint) return <span className="tabular-nums">{text}</span>;
+  const { lang } = useT();
+  const { text, hint } = accountsCell(entry, t, lang);
+  if (!hint) {
+    return (
+      <span className={cn("tabular-nums", text === EMPTY && "text-muted-foreground")}>{text}</span>
+    );
+  }
   return (
     <HintText className="tabular-nums" hint={hint} label={text}>
       {text}

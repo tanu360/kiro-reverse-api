@@ -1,5 +1,5 @@
 import type { BackupCadence, BackupEntry, BackupSchedule } from "@/lib/api/types";
-import { EMPTY } from "@/lib/format";
+import { EMPTY, formatNumber } from "@/lib/format";
 import { type Lang, pluralCategory, type TFunction } from "@/lib/i18n";
 
 /** The server caps every request body at 32 MiB and answers a larger one with a plain 413. */
@@ -113,15 +113,27 @@ export function noteText(
   return mask(note) || EMPTY;
 }
 
-/** "Accounts in backup": a rollback point counts what the restore brought in. */
-export function accountsCell(entry: BackupEntry, t: TFunction): { text: string; hint?: string } {
+/**
+ * "Accounts in backup": a rollback point counts what the restore brought in. A row without a
+ * count shows "—", not 0. (The server omits a zero count, so an empty backup reads "—" too.)
+ */
+export function accountsCell(
+  entry: BackupEntry,
+  t: TFunction,
+  lang?: Lang,
+): { text: string; hint?: string } {
   if (entry.kind === "pre-restore" && typeof entry.restoredAccountCnt === "number") {
+    const saved = entry.accountCnt ?? 0;
     return {
-      text: t("restoredAccountCount", { count: entry.restoredAccountCnt }),
-      hint: t("preRestoreSavedHint", { count: entry.accountCnt ?? 0 }),
+      text: t("restoredAccountCount", {
+        count: entry.restoredAccountCnt,
+        n: formatNumber(entry.restoredAccountCnt, lang),
+      }),
+      hint: t("preRestoreSavedHint", { count: saved, n: formatNumber(saved, lang) }),
     };
   }
-  return { text: String(entry.accountCnt || 0) };
+  if (typeof entry.accountCnt !== "number") return { text: EMPTY };
+  return { text: formatNumber(entry.accountCnt, lang) };
 }
 
 // Server messages (config/backup.go parseBackupData) for a file that is not a usable backup.

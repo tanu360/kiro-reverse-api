@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { InboxIcon, InfoIcon, RotateCwIcon, SearchXIcon } from "lucide-react";
+import { InboxIcon, InfoIcon, SearchXIcon } from "lucide-react";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableSort } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { PageHeader } from "@/components/shared/page-header";
+import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { recentRequestsQuery } from "@/lib/api/requests";
@@ -146,17 +146,7 @@ export function RequestsPage(): JSX.Element {
     <>
       <PageHeader
         actions={
-          <Button
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
-            variant="outline"
-          >
-            <RotateCwIcon
-              aria-hidden="true"
-              className={cn(query.isFetching && "motion-safe:animate-spin")}
-            />
-            {t("common:actions.refresh")}
-          </Button>
+          <RefreshButton fetching={query.isFetching} onRefresh={() => void query.refetch()} />
         }
         title={t("title")}
       />

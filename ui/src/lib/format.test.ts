@@ -3,6 +3,7 @@ import {
   formatBytes,
   formatCompact,
   formatCredits,
+  formatCreditsExact,
   formatDurationMs,
   formatFraction,
   formatNumber,
@@ -62,6 +63,18 @@ describe("other formatters", () => {
     expect(formatCredits(1.2)).toBe("1.20");
     expect(formatCredits(1.25, 1)).toBe("1.3");
     expect(formatUsd(1.2)).toBe("$1.20");
+  });
+
+  it("shows a tiny non-zero credit amount as below the smallest step, never as zero", () => {
+    expect(formatCredits(0.0001)).toBe("<0.01");
+    expect(formatCredits(0.004)).toBe("<0.01");
+    expect(formatCredits(0.005)).toBe("0.01");
+    expect(formatCredits(0.00001, 4)).toBe("<0.0001");
+    expect(formatCredits(0.0001, 4)).toBe("0.0001");
+    expect(formatCredits(0.0001, 2, "pt-BR")).toBe("<0,01");
+    expect(formatCredits(0)).toBe("0.00");
+    expect(formatCreditsExact(0.0001)).toBe("0.0001");
+    expect(formatCreditsExact(0.000123456789)).toBe("0.000123457");
   });
 
   it("formats uptime", () => {

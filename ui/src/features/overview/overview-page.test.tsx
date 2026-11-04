@@ -59,6 +59,26 @@ describe("OverviewPage", () => {
     expect(await statCard("Succeeded")).toBeInTheDocument();
   });
 
+  it("shows no success or failure rate, and no error red, before any request", async () => {
+    mockServer.use(
+      http.get(apiUrl("/status"), () =>
+        HttpResponse.json({
+          ...buildStatus(mockDb),
+          totalRequests: 0,
+          successRequests: 0,
+          failedRequests: 0,
+        }),
+      ),
+    );
+    await renderApp("/");
+    const failed = await statCard("Failed");
+    expect(metricValue(failed, "Failure rate")).toBe("—");
+    const rate = within(failed).getByText("Failure rate").closest("div")?.querySelector("dd");
+    expect(rate).toHaveClass("text-muted-foreground");
+    expect(rate).not.toHaveClass("text-destructive-foreground");
+    expect(metricValue(await statCard("Succeeded"), "Success rate")).toBe("—");
+  });
+
   it("shows the SSE state in the live badge", async () => {
     await renderApp("/");
     // Vitest has no EventSource, so the events provider stays closed.

@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { useDisplayEmail, usePrivacy } from "@/lib/privacy";
+import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 
 export function DisplayEmail({
@@ -12,11 +12,12 @@ export function DisplayEmail({
   className?: string;
 }): JSX.Element {
   const display = useDisplayEmail();
-  const { enabled } = usePrivacy();
-  // The full address goes in the title only when privacy mode is off.
+  const text = display(email, id);
+  // The title repeats the shown text, so a cut-off address can be read: the full address, or
+  // the masked one under privacy mode (the real address never reaches the title then).
   return (
-    <span className={cn("truncate", className)} title={!enabled && email ? email : undefined}>
-      {display(email, id)}
+    <span className={cn("truncate", className)} title={email ? text : undefined}>
+      {text}
     </span>
   );
 }

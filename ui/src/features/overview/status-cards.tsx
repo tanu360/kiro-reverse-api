@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleCheckIcon, CircleXIcon, RouteIcon, UsersIcon } from "lucide-react";
 import { type JSX, lazy, Suspense, useMemo } from "react";
 import { StatCardSkeleton } from "@/components/shared/loading-state";
-import { StatCard, type StatCardProps } from "@/components/shared/stat-card";
+import { StatCard, type StatCardProps, type StatMetric } from "@/components/shared/stat-card";
 import { heatmapQuery } from "@/lib/api/observe";
 import { statusQuery } from "@/lib/api/system";
 import type { HeatmapCell, StatusResponse } from "@/lib/api/types";
@@ -61,13 +61,23 @@ function ratio(part: number, total: number, lang: Lang): string {
   return `${formatNumber(part, lang)} / ${formatNumber(total, lang)}`;
 }
 
+/** A rate of all requests; with no requests yet there is no rate, so a muted dash. */
+function requestRate(
+  part: number,
+  total: number,
+  tone: StatMetric["tone"] = "default",
+): Pick<StatMetric, "value" | "tone"> {
+  if (total <= 0) return { value: EMPTY, tone: "muted" };
+  return { value: formatPercent(part, total), tone };
+}
+
 function accountsCard(s: StatusResponse, t: TFunction, lang: Lang): StatCardProps {
   return {
     icon: UsersIcon,
     label: t("stats.accounts"),
     value: formatNumber(s.accounts, lang),
     metrics: [
-      { label: t("stats.available"), value: ratio(s.available, s.accounts, lang) },
+      { label: t("stats.available"), value: ratio(s.available, s.accounts, lang), wrap: true },
       {
         label: t("stats.capacityUsed"),
         value: formatPercent(s.accountCreditsUsed, s.accountCreditsLimit),
@@ -77,6 +87,7 @@ function accountsCard(s: StatusResponse, t: TFunction, lang: Lang): StatCardProp
         value: `${formatCredits(s.accountCreditsUsed, 1, lang)} / ${formatCredits(s.accountCreditsLimit, 1, lang)}`,
         hint: t("stats.accountCreditsHint"),
         wide: true,
+        wrap: true,
       },
       {
         label: t("stats.otherCredits"),
@@ -120,9 +131,13 @@ function succeededCard(s: StatusResponse, t: TFunction, lang: Lang): StatCardPro
     metrics: [
       {
         label: t("stats.successRate"),
-        value: formatPercent(s.successRequests, s.totalRequests),
+        ...requestRate(s.successRequests, s.totalRequests),
       },
-      { label: t("stats.completed"), value: ratio(s.successRequests, s.totalRequests, lang) },
+      {
+        label: t("stats.completed"),
+        value: ratio(s.successRequests, s.totalRequests, lang),
+        wrap: true,
+      },
       { label: t("stats.inputTokens"), value: formatCompact(s.successInTokens) },
       { label: t("stats.outputTokens"), value: formatCompact(s.successOutTokens) },
     ],
@@ -139,8 +154,7 @@ function failedCard(s: StatusResponse, t: TFunction, lang: Lang): StatCardProps 
     metrics: [
       {
         label: t("stats.failedRate"),
-        value: formatPercent(s.failedRequests, s.totalRequests),
-        tone: "danger",
+        ...requestRate(s.failedRequests, s.totalRequests, "danger"),
       },
       { label: t("stats.errorEvents"), value: formatNumber(s.totalErrorEvents, lang) },
       { label: t("stats.exhausted"), value: formatNumber(s.totalExhausted, lang) },
