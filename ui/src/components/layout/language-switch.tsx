@@ -35,8 +35,10 @@ function CheckedDot(): JSX.Element {
   );
 }
 
+// The current language's row also turns purple, as in every other dropdown (menu.tsx,
+// select.tsx): data-checked for the header menu's radio items, data-selected for the select.
 const ROW =
-  "flex min-h-10 cursor-default items-center gap-2.5 rounded-md px-2 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-disabled:opacity-64 sm:min-h-8";
+  "flex min-h-10 cursor-default items-center gap-2.5 rounded-md px-2 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-checked:text-info-foreground data-selected:text-info-foreground data-disabled:opacity-64 sm:min-h-8";
 
 /**
  * `icon`: a bare icon button that opens a menu (the app header). `pill`: a globe and the current
