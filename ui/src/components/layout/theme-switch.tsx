@@ -1,5 +1,5 @@
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
-import type { JSX } from "react";
+import { type JSX, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Menu,
@@ -40,6 +40,8 @@ export function ThemeSwitch({
   const { theme, setTheme } = useTheme();
   const label = t("shell.theme.label", { mode: t(`shell.theme.${theme}`) });
   const Icon = THEME_ICONS[theme];
+  // The menu variant's button: the reveal grows from it, as the menu item is gone by then.
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   if (variant === "segmented") {
     return (
@@ -68,7 +70,7 @@ export function ThemeSwitch({
                     // the segmented control's own 18 / 16 px icons.
                     className="size-10 rounded-full p-0 data-pressed:bg-accent data-pressed:shadow-none sm:size-10 md:size-8 pointer-coarse:size-10"
                     data-pressed={active ? "" : undefined}
-                    onClick={() => setTheme(mode)}
+                    onClick={(event) => setTheme(mode, event.currentTarget)}
                   />
                 }
               >
@@ -93,6 +95,7 @@ export function ThemeSwitch({
                   <Button
                     aria-label={label}
                     className={HEADER_ICON_BUTTON}
+                    ref={menuTriggerRef}
                     size="icon"
                     variant="ghost"
                   />
@@ -107,7 +110,10 @@ export function ThemeSwitch({
         <MenuPopup align="end">
           <MenuGroup>
             <MenuGroupLabel>{t("shell.theme.title")}</MenuGroupLabel>
-            <MenuRadioGroup onValueChange={(value) => setTheme(value as Theme)} value={theme}>
+            <MenuRadioGroup
+              onValueChange={(value) => setTheme(value as Theme, menuTriggerRef.current)}
+              value={theme}
+            >
               {THEMES.map((mode) => {
                 const ModeIcon = THEME_ICONS[mode];
                 return (
@@ -134,7 +140,7 @@ export function ThemeSwitch({
             aria-label={label}
             className={cn(HEADER_ICON_BUTTON, className)}
             data-theme-mode={theme}
-            onClick={() => setTheme(nextTheme(theme))}
+            onClick={(event) => setTheme(nextTheme(theme), event.currentTarget)}
             size="icon"
             variant="ghost"
           />

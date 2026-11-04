@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 import "./theme-transitions.css";
 
 export type Theme = "system" | "light" | "dark";
@@ -18,12 +19,21 @@ export const THEME_STORAGE_KEY = "kiro_theme";
 export const THEMES: readonly Theme[] = ["system", "light", "dark"];
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const NO_TRANSITIONS_CLASS = "no-transitions";
+/** On <html> while the reveal runs, so theme-transitions.css only restyles this transition. */
+const REVEAL_CLASS = "theme-reveal";
+const REVEAL_MS = 400;
 
 interface ThemeContextValue {
   theme: Theme;
   resolvedTheme: ResolvedTheme;
-  setTheme: (theme: Theme) => void;
+  /**
+   * `origin` is the control that was used: when the page actually changes between light and
+   * dark, the new theme grows over the old one as a circle from its centre (the viewport centre
+   * without one).
+   */
+  setTheme: (theme: Theme, origin?: Element | null) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -48,6 +58,44 @@ function systemPrefersDark(): boolean {
   } catch {
     return false;
   }
+}
+
+/** View transitions are supported and the user has not asked for reduced motion. */
+function canReveal(): boolean {
+  if (typeof document.startViewTransition !== "function") return false;
+  try {
+    return !window.matchMedia(REDUCED_MOTION_QUERY).matches;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Runs `update` (which must change the DOM synchronously) inside a view transition and grows
+ * the new page as a circle from (x, y) until it covers the farthest corner.
+ */
+function revealFrom(x: number, y: number, update: () => void): void {
+  const root = document.documentElement;
+  root.classList.add(REVEAL_CLASS);
+  const transition = document.startViewTransition(update);
+  transition.ready
+    .then(() => {
+      const radius = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y),
+      );
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        {
+          duration: REVEAL_MS,
+          easing: "ease-in-out",
+          pseudoElement: "::view-transition-new(root)",
+        },
+      );
+    })
+    // Skipped (another theme change started first): the update has still run.
+    .catch(() => {});
+  void transition.finished.finally(() => root.classList.remove(REVEAL_CLASS));
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }): JSX.Element {
@@ -83,9 +131,21 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     };
   }, [resolvedTheme]);
 
-  const setTheme = useCallback((next: Theme) => {
+  const setTheme = useCallback((next: Theme, origin?: Element | null) => {
     writeStoredTheme(next);
-    setThemeState(next);
+    // The <html> class is the theme on screen right now.
+    const nextDark = next === "dark" || (next === "system" && systemPrefersDark());
+    const changes = nextDark !== document.documentElement.classList.contains("dark");
+    if (!changes || !canReveal()) {
+      setThemeState(next);
+      return;
+    }
+    // Measured now, before the transition starts, in case the control unmounts (a menu item).
+    const rect = origin?.getBoundingClientRect();
+    const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+    const y = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+    // flushSync: the layout effect above flips the .dark class inside the transition's update.
+    revealFrom(x, y, () => flushSync(() => setThemeState(next)));
   }, []);
 
   const value = useMemo(

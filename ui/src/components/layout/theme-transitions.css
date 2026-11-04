@@ -6,3 +6,14 @@
   /* biome-ignore lint/complexity/noImportantStyles: must beat every component transition. */
   transition: none !important;
 }
+
+/*
+ * The theme reveal (ThemeProvider): the new theme grows over the old one as a circle, so the
+ * browser's default cross-fade and blend are turned off. Scoped to the reveal's class, so any
+ * other view transition keeps the defaults.
+ */
+.theme-reveal::view-transition-old(root),
+.theme-reveal::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}

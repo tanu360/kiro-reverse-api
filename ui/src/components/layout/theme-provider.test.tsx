@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { THEME_STORAGE_KEY, ThemeProvider, useTheme } from "./theme-provider";
 
 function Probe() {
@@ -103,5 +103,38 @@ describe("ThemeProvider", () => {
 
     act(() => setSystemDark(false));
     expect(document.documentElement).not.toHaveClass("dark");
+  });
+
+  it("reveals a light/dark change as a circle through a view transition", async () => {
+    mockColorScheme(false);
+    const startViewTransition = vi.fn((update: () => void) => {
+      update();
+      return { ready: Promise.resolve(), finished: Promise.resolve() };
+    });
+    const animate = vi.fn();
+    Object.assign(document, { startViewTransition });
+    document.documentElement.animate = animate;
+    onTestFinished(() => {
+      Reflect.deleteProperty(document, "startViewTransition");
+      Reflect.deleteProperty(document.documentElement, "animate");
+    });
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    // system (light) -> system: nothing on screen changes, so no transition.
+    await user.click(screen.getByRole("button", { name: "system" }));
+    expect(startViewTransition).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "dark" }));
+    expect(startViewTransition).toHaveBeenCalledTimes(1);
+    expect(document.documentElement).toHaveClass("dark");
+    await vi.waitFor(() => expect(animate).toHaveBeenCalledTimes(1));
+    expect(animate.mock.calls[0]?.[1]).toMatchObject({
+      pseudoElement: "::view-transition-new(root)",
+    });
   });
 });
