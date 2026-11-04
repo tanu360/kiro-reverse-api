@@ -13,7 +13,7 @@ export const GITHUB_URL = "https://github.com/tanu360/kiro-reverse-api";
  * Old footer items: version badge with update notice, "Running" status, GitHub link and the
  * copyright, then the Admin user row. In the icon rail they collapse into one info tooltip.
  * Quiet like the sign-in footer: 12 px meta in one row, then the copyright line as the sign-in
- * pages draw it (13 px, a middle dot, the app name a step quieter), in the sidebar's muted text
+ * pages draw it (13 px, a middle dot before the app name), in the sidebar's muted text
  * colour as t3code's sidebar footer.
  */
 export function NavFooter(): JSX.Element {
@@ -77,8 +77,8 @@ export function NavFooter(): JSX.Element {
 }
 
 /**
- * "© 2026 · Kiro Proxy", as on the sign-in pages: the year in the muted text colour, a middle
- * dot, the name a step quieter. The line is split at the app name, so a locale keeps its own word
+ * "© 2026 · Kiro Proxy", as on the sign-in pages: all in the muted text colour, with a middle
+ * dot before the name. The line is split at the app name, so a locale keeps its own word
  * order; the dot is decoration and hidden from screen readers.
  */
 function FooterCopyright({ line }: { line: string }): JSX.Element {
@@ -95,7 +95,7 @@ function FooterCopyright({ line }: { line: string }): JSX.Element {
           <span aria-hidden="true" className="mx-1.5">
             ·
           </span>
-          <span className="text-sidebar-muted-foreground/70">{name}</span>
+          <span>{name}</span>
           {line.slice(at + name.length)}
         </>
       )}
