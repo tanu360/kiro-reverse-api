@@ -25,7 +25,11 @@ describe("SetupPage", () => {
     await screen.findByText(PASSWORD);
     await user.click(screen.getByRole("button", { name: `${PASSWORD} Copy password` }));
     expect(await navigator.clipboard.readText()).toBe(PASSWORD);
-    expect(await screen.findByText("Password copied to clipboard")).toBeInTheDocument();
+    // Confirmed in place (the label and a status for screen readers), not with a toast.
+    expect(await screen.findByRole("status")).toHaveTextContent("Password copied to clipboard");
+    expect(
+      screen.queryByText("Password copied to clipboard", { selector: "[data-slot*=toast] *" }),
+    ).toBeNull();
   });
 
   it("shows the generated password as a line of text, not a second input box", async () => {
