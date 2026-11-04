@@ -100,7 +100,7 @@ export function RequestsToolbar({
                   inputRef.current?.focus();
                 }}
                 size="icon-xs"
-                variant="ghost"
+                variant="quiet"
               >
                 <XIcon aria-hidden="true" />
               </Button>
@@ -109,7 +109,7 @@ export function RequestsToolbar({
             <Popover>
               <PopoverTrigger
                 openOnHover
-                render={<Button aria-label={t("searchHintLabel")} size="icon-xs" variant="ghost" />}
+                render={<Button aria-label={t("searchHintLabel")} size="icon-xs" variant="quiet" />}
               >
                 <InfoIcon aria-hidden="true" />
               </PopoverTrigger>

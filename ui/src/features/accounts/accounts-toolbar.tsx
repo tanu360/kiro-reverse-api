@@ -1,4 +1,4 @@
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, SearchIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, SearchIcon } from "lucide-react";
 import { type JSX, type ReactNode, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@/components/ui/menu";
+import { SelectButton } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
@@ -36,8 +37,8 @@ import {
 } from "./account-model";
 
 /** The dimensions with a "Label: Value" select; status has the tabs (and the Issue select). */
-type PillDimension = Exclude<FilterDimension, "status">;
-const PILL_DIMENSIONS: readonly PillDimension[] = ["plan", "auth", "region", "enabled"];
+type FilterSelectDimension = Exclude<FilterDimension, "status">;
+const SELECT_DIMENSIONS: readonly FilterSelectDimension[] = ["plan", "auth", "region", "enabled"];
 
 /** The radio value of "All" in a select, and of the All tab. */
 const ALL = "all";
@@ -45,19 +46,11 @@ const ALL = "all";
 const DEFAULT_SORT = "default";
 
 /**
- * A "Label: Value" select trigger: a fully rounded hairline pill, the label muted and the value
- * in the text colour. A set filter tints the border and the value with the accent. Touch screens
- * get a real 40 px height rather than an ::after hit area, because the phone row scrolls and
- * would clip an overflowing box.
+ * A "Label: Value" trigger: the select trigger (components/ui/select.tsx SelectButton), the label
+ * muted and the value in the text colour, or the accent once a filter is set. It opens a menu of
+ * radio rows, so the trigger stays a button and the rows menu items.
  */
-function pillTriggerClass(active: boolean): string {
-  return cn(
-    "relative inline-flex h-9 shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-transparent ps-3 pe-2.5 text-base text-foreground outline-none transition-colors hover:bg-accent focus-visible:border-ring data-popup-open:bg-accent sm:h-8 sm:text-sm pointer-coarse:h-10 dark:border-input [&_svg]:pointer-events-none [&_svg]:shrink-0",
-    active && "border-info/40 dark:border-info/50",
-  );
-}
-
-function PillText({
+function FilterTrigger({
   label,
   value,
   active = false,
@@ -69,40 +62,16 @@ function PillText({
   after?: ReactNode;
 }): JSX.Element {
   return (
-    <>
+    <MenuTrigger render={<SelectButton className="w-auto min-w-0 shrink-0" />}>
       <span className="text-muted-foreground">{label}:</span>{" "}
-      <span className={cn("max-w-40 truncate", active && "text-info-foreground")}>{value}</span>
+      <span className={cn(active && "text-info-foreground")}>{value}</span>
       {after}
-      <ChevronDownIcon aria-hidden="true" className="-me-0.5 size-3.5 text-muted-foreground" />
-    </>
-  );
-}
-
-/** A radio row with its count right-aligned and muted. A pick closes the menu, as in a select. */
-function CountItem({
-  value,
-  label,
-  count,
-}: {
-  value: string;
-  label: string;
-  count: number;
-}): JSX.Element {
-  const { lang } = useT();
-  return (
-    <MenuRadioItem closeOnClick value={value}>
-      <span className="flex min-w-36 items-center gap-4">
-        <span className="flex-1 truncate">{label}</span>
-        <span className="text-muted-foreground text-xs tabular-nums">
-          {formatNumber(count, lang)}
-        </span>
-      </span>
-    </MenuRadioItem>
+    </MenuTrigger>
   );
 }
 
 /** One filter as "Label: Value ▾", with All and each value (and its count) in the menu. */
-function PillSelect({
+function FilterSelect({
   label,
   options,
   value,
@@ -117,30 +86,33 @@ function PillSelect({
   total: number;
   onValueChange: (value: string | undefined) => void;
 }): JSX.Element {
-  const { t } = useT("accounts");
+  const { t, lang } = useT("accounts");
   const current =
     value === undefined
       ? t("filter.all")
       : (options.find((option) => option.value === value)?.label ?? value);
+  // Each row shows its count; a pick closes the menu, as in a select.
   return (
     <Menu>
-      <MenuTrigger className={pillTriggerClass(value !== undefined)}>
-        <PillText active={value !== undefined} label={label} value={current} />
-      </MenuTrigger>
+      <FilterTrigger active={value !== undefined} label={label} value={current} />
       <MenuPopup align="start">
         <MenuRadioGroup
           onValueChange={(next) => onValueChange(next === ALL ? undefined : String(next))}
           value={value ?? ALL}
         >
-          <CountItem count={total} label={t("filter.all")} value={ALL} />
+          <MenuRadioItem closeOnClick meta={formatNumber(total, lang)} value={ALL}>
+            {t("filter.all")}
+          </MenuRadioItem>
           <MenuSeparator />
           {options.map((option) => (
-            <CountItem
-              count={option.count}
+            <MenuRadioItem
+              closeOnClick
               key={option.value}
-              label={option.label}
+              meta={formatNumber(option.count, lang)}
               value={option.value}
-            />
+            >
+              {option.label}
+            </MenuRadioItem>
           ))}
         </MenuRadioGroup>
       </MenuPopup>
@@ -162,20 +134,18 @@ function SortSelect({
   const DirectionIcon = desc ? ArrowDownIcon : ArrowUpIcon;
   return (
     <Menu>
-      <MenuTrigger className={pillTriggerClass(false)}>
-        <PillText
-          after={
-            sort ? (
-              <DirectionIcon
-                aria-hidden="true"
-                className="-ms-0.5 size-3.5 text-muted-foreground"
-              />
-            ) : null
-          }
-          label={t("sort.by")}
-          value={sort ? t(`columns.${sort}`) : t("sort.default")}
-        />
-      </MenuTrigger>
+      <FilterTrigger
+        after={
+          sort ? (
+            <DirectionIcon
+              aria-hidden="true"
+              className="ms-1 inline size-3.5 align-[-0.125em] text-muted-foreground"
+            />
+          ) : null
+        }
+        label={t("sort.by")}
+        value={sort ? t(`columns.${sort}`) : t("sort.default")}
+      />
       <MenuPopup align="start">
         <MenuRadioGroup
           onValueChange={(value) => {
@@ -244,13 +214,9 @@ function StatusTabs({
     <Tabs onValueChange={(next) => onValueChange(next as StatusTab)} value={value}>
       {/* Phones scroll the tabs sideways; the hairline spans the full row either way. */}
       <div className="-mb-px overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <TabsList
-          aria-label={t("filter.status")}
-          className="w-max min-w-full justify-start gap-x-1 border-border border-b"
-          variant="underline"
-        >
+        <TabsList aria-label={t("filter.status")} className="w-max min-w-full" variant="underline">
           {tabs.map((tab) => (
-            <TabsTab className="grow-0 gap-2 px-2.5" key={tab} value={tab}>
+            <TabsTab key={tab} value={tab}>
               {label[tab]}
               <Badge
                 className="min-w-5 tabular-nums"
@@ -331,7 +297,7 @@ export function AccountsToolbar({
   const issue = filters.status === "attention" ? undefined : filters.status;
   const showIssue = tab === "attention" && (issueOptions.length > 1 || issue !== undefined);
 
-  const pillDimensions = PILL_DIMENSIONS.filter(
+  const selectDimensions = SELECT_DIMENSIONS.filter(
     (dimension) => options[dimension].length > 1 || filters[dimension] !== undefined,
   );
   const hasFilters =
@@ -374,7 +340,7 @@ export function AccountsToolbar({
             {showSort ? <SortSelect desc={desc} onChange={onSortChange} sort={sort} /> : null}
 
             {showIssue ? (
-              <PillSelect
+              <FilterSelect
                 label={t("filter.dim.issue")}
                 onValueChange={(value) =>
                   onFiltersChange({ status: (value as AccountStatus | undefined) ?? "attention" })
@@ -385,8 +351,8 @@ export function AccountsToolbar({
               />
             ) : null}
 
-            {pillDimensions.map((dimension) => (
-              <PillSelect
+            {selectDimensions.map((dimension) => (
+              <FilterSelect
                 key={dimension}
                 label={t(`filter.dim.${dimension}`)}
                 onValueChange={(value) => onFiltersChange({ [dimension]: value })}
@@ -410,7 +376,7 @@ export function AccountsToolbar({
             {hasFilters ? (
               <span
                 aria-live="polite"
-                className="ms-auto shrink-0 whitespace-nowrap ps-1 text-[13px] text-muted-foreground tabular-nums"
+                className="ms-auto shrink-0 whitespace-nowrap ps-1 text-meta text-muted-foreground tabular-nums"
               >
                 {t("filter.results", {
                   shown: formatNumber(shown, lang),

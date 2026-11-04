@@ -135,7 +135,7 @@ export function AlertDialogTitle({
 }: AlertDialogPrimitive.Title.Props): React.ReactElement {
   return (
     <AlertDialogPrimitive.Title
-      className={cn("wrap-anywhere shrink-0 font-semibold font-heading text-xl leading-snug", className)}
+      className={cn("wrap-anywhere shrink-0 font-semibold text-lg leading-snug", className)}
       data-slot="alert-dialog-title"
       {...props}
     />

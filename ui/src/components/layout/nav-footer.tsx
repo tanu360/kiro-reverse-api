@@ -86,7 +86,7 @@ function FooterCopyright({ line }: { line: string }): JSX.Element {
   const name = t("shell.appName");
   const at = line.lastIndexOf(name);
   return (
-    <p className="text-[13px] text-sidebar-muted-foreground tabular-nums">
+    <p className="text-meta text-sidebar-muted-foreground tabular-nums">
       {at < 0 ? (
         line
       ) : (

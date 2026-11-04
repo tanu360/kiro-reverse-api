@@ -3,6 +3,14 @@
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { ChevronsUpDownIcon, XIcon } from "lucide-react";
 import * as React from "react";
+import {
+  CheckedDot,
+  POPUP_CHECK_ROW_CLASS,
+  POPUP_GROUP_LABEL_CLASS,
+  POPUP_INDICATOR_CLASS,
+  POPUP_ROW_CLASS,
+  POPUP_SEPARATOR_CLASS,
+} from "@/components/ui/popup-row";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -189,7 +197,7 @@ export function ComboboxPopup({
       >
         <span
           className={cn(
-            "dropdown-glass relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg floating-shadow transition-[scale,opacity]",
+            "popup-surface relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg transition-[scale,opacity]",
             className,
           )}
         >
@@ -213,34 +221,17 @@ export function ComboboxItem({
 }: ComboboxPrimitive.Item.Props): React.ReactElement {
   return (
     <ComboboxPrimitive.Item
-      className={cn(
-        // t3code's row; Kiro: the selected option shows a check and the accent text (info-foreground,
-        // AA on the popover in both themes), highlighted or not.
-        "grid min-h-8 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 rounded-sm py-1 ps-2 pe-4 text-base outline-none not-data-disabled:hover:bg-foreground/[0.09] data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-foreground/[0.09] data-highlighted:text-accent-foreground data-selected:text-info-foreground data-selected:data-highlighted:text-info-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-        className,
-      )}
+      // The select row (popup-row.tsx): the chosen option ends in the CheckedDot.
+      className={cn(POPUP_ROW_CLASS, POPUP_CHECK_ROW_CLASS, className)}
       data-slot="combobox-item"
       {...props}
     >
-      <ComboboxPrimitive.ItemIndicator className="col-start-1">
-        <svg
-          aria-hidden="true"
-          fill="none"
-          height="24"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          width="24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
-        </svg>
-      </ComboboxPrimitive.ItemIndicator>
-      <div className="wrap-anywhere col-start-2 flex min-w-0 items-center gap-2 [&_svg:not([class*='text-'])]:text-muted-foreground">
+      <div className="wrap-anywhere flex min-w-0 items-center gap-2.5 [&_svg:not([class*='text-'])]:text-muted-foreground">
         {children}
       </div>
+      <ComboboxPrimitive.ItemIndicator className={POPUP_INDICATOR_CLASS}>
+        <CheckedDot />
+      </ComboboxPrimitive.ItemIndicator>
     </ComboboxPrimitive.Item>
   );
 }
@@ -251,7 +242,7 @@ export function ComboboxSeparator({
 }: ComboboxPrimitive.Separator.Props): React.ReactElement {
   return (
     <ComboboxPrimitive.Separator
-      className={cn("mx-2 my-1 h-px bg-border last:hidden", className)}
+      className={cn(POPUP_SEPARATOR_CLASS, "last:hidden", className)}
       data-slot="combobox-separator"
       {...props}
     />
@@ -278,7 +269,7 @@ export function ComboboxGroupLabel({
   return (
     <ComboboxPrimitive.GroupLabel
       className={cn(
-        "px-2 py-1.5 font-medium text-muted-foreground text-xs",
+        POPUP_GROUP_LABEL_CLASS,
         className,
       )}
       data-slot="combobox-group-label"
@@ -382,7 +373,7 @@ export function ComboboxChips({
   return (
     <ComboboxPrimitive.Chips
       className={cn(
-        "relative inline-flex min-h-9 w-full flex-wrap gap-1 rounded-lg border border-input bg-background not-dark:bg-clip-padding p-[calc(--spacing(1)-1px)] text-base outline-none ring-ring/24 transition-shadow *:min-h-7 focus-within:ring-[3px] focus-within:ring-inset before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] focus-within:border-ring has-disabled:pointer-events-none has-data-[size=lg]:min-h-10 has-data-[size=sm]:min-h-8 has-aria-invalid:border-destructive/36 has-disabled:opacity-64 focus-within:has-aria-invalid:border-destructive/64 has-data-[size=lg]:*:min-h-8 has-data-[size=sm]:*:min-h-6 sm:min-h-8 sm:text-sm sm:has-data-[size=lg]:min-h-9 sm:has-data-[size=sm]:min-h-7 sm:*:min-h-6 sm:has-data-[size=lg]:*:min-h-7 sm:has-data-[size=sm]:*:min-h-5 dark:not-has-disabled:bg-input/32",
+        "relative inline-flex min-h-9 w-full flex-wrap gap-1 rounded-lg border border-field-border bg-field p-[calc(--spacing(1)-1px)] text-base outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover *:min-h-7 focus-within:border-field-border-focus focus-within:bg-field-focus has-disabled:pointer-events-none has-data-[size=lg]:min-h-10 has-data-[size=sm]:min-h-8 has-aria-invalid:border-destructive/36 has-disabled:opacity-64 focus-within:has-aria-invalid:border-destructive/64 has-data-[size=lg]:*:min-h-8 has-data-[size=sm]:*:min-h-6 sm:min-h-8 sm:text-sm sm:has-data-[size=lg]:min-h-9 sm:has-data-[size=sm]:min-h-7 sm:*:min-h-6 sm:has-data-[size=lg]:*:min-h-7 sm:has-data-[size=sm]:*:min-h-5",
         className,
       )}
       data-slot="combobox-chips"

@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
-import { CircleXIcon, ClockIcon, LogInIcon, type LucideIcon } from "lucide-react";
-import { type FormEvent, type JSX, type ReactNode, useEffect, useState } from "react";
-import { BadgeIcon, type BadgeTone, badgeVariants } from "@/components/ui/badge";
+import { CircleXIcon, ClockIcon, LogInIcon } from "lucide-react";
+import { type FormEvent, type JSX, useEffect, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -10,66 +10,9 @@ import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
 import { getRememberPreference, signIn } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { redirectTarget } from "@/routes/-search";
 import { PasswordField } from "./password-field";
 import { retrySeconds, useRetryCountdown } from "./rate-limit";
-
-/**
- * A form notice in the style of a soft tag: the submit button's width and corner radius (full
- * width, rounded-lg, so the two line up), the tone's light fill (badgeVariants soft), regular
- * weight text in the tone, and a duotone disc icon (a light circle in the tone with the glyph in
- * the full tone colour, not knocked out in white). A long message wraps inside it.
- */
-function FormNotice({
-  tone,
-  icon,
-  role,
-  className,
-  children,
-}: {
-  tone: BadgeTone;
-  icon: LucideIcon;
-  role?: "alert";
-  className?: string;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <div
-      className={cn(
-        badgeVariants({ size: "lg", tone, variant: "soft" }),
-        // The soft fill the notice was designed with (11 %, 18 % dark), a step over the pills' 8 %.
-        "bg-[color-mix(in_oklab,var(--badge-tint)_11%,transparent)] dark:bg-[color-mix(in_oklab,var(--badge-tint)_18%,transparent)]",
-        "h-auto min-h-9 w-full items-start justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left font-normal leading-5",
-        // Duotone disc, a touch larger than the text, edged by one thin ring. Both colours are
-        // opaque (mixed with the page background): a see-through fill under a see-through stroke
-        // drew two rings, a darker one where they overlap and a light halo outside it.
-        "[--badge-dot:color-mix(in_oklab,var(--badge-disc)_28%,var(--background))] [--badge-dot-ring:color-mix(in_oklab,var(--badge-disc)_48%,var(--background))] [--badge-dot-ring-width:1.25] [--badge-glyph:var(--badge-disc)] [&_svg]:mt-px [&_svg:not([class*='size-'])]:size-4.5",
-        className,
-      )}
-      role={role}
-    >
-      <BadgeIcon icon={icon} />
-      <span>{children}</span>
-    </div>
-  );
-}
-
-/**
- * The error notice's red, a vivid tag red (after a reference design): the pink fill and the icon
- * use #ff3638 itself; the text is #d41d24, the nearest red that keeps 4.5:1 on that fill (#ff3638
- * text would be 3.1:1), and #ff6b6f on the dark theme's fill (6.5:1).
- */
-const ERROR_RED =
-  "[--badge-disc:#ff3638] [--badge-tint:#ff3638] [--badge-fg:#d41d24] dark:[--badge-fg:#ff6b6f]";
-
-/**
- * The rate-limit notice's amber, pinned to the theme's warning colours: the pills moved to the
- * --pill-* orange, and the notice keeps the amber it was designed with (amber-800 text, 4.5:1 on
- * the amber fill; amber-300 on the dark theme's fill).
- */
-const WARNING_AMBER =
-  "[--badge-disc:var(--warning)] [--badge-tint:var(--warning)] [--badge-fg:var(--color-amber-800)] dark:[--badge-fg:var(--color-amber-300)]";
 
 /**
  * The sign-in form shared by /login and /setup. It never reads the URL: /login passes the
@@ -155,29 +98,21 @@ export function SignInForm({
       {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
       <div aria-atomic="true" aria-live="polite" className="empty:-mb-4">
         {locked ? (
-          <FormNotice className={WARNING_AMBER} icon={ClockIcon} tone="warning">
-            {t("rateLimited", { seconds: retry.seconds })}
-          </FormNotice>
+          // No role: the live region round it announces the countdown politely.
+          <Alert role="none" variant="warning">
+            <ClockIcon aria-hidden="true" />
+            <AlertDescription>{t("rateLimited", { seconds: retry.seconds })}</AlertDescription>
+          </Alert>
         ) : null}
       </div>
       {formError ? (
-        <FormNotice className={ERROR_RED} icon={CircleXIcon} role="alert" tone="destructive">
-          {formError}
-        </FormNotice>
+        <Alert variant="error">
+          <CircleXIcon aria-hidden="true" />
+          <AlertDescription>{formError}</AlertDescription>
+        </Alert>
       ) : null}
-      {/*
-       * The primary button with a faint film grain (index.css grain-overlay, at half its default
-       * strength) that gives the fill some texture, under the label. No drop shadow (flat, like
-       * the field); only a 1 px inner highlight along the top edge, its icon at 80 %, and no
-       * scale layer (will-change), which would re-rasterise the label.
-       */}
-      <Button
-        // 44 px on phones and touch screens, 40 px from sm up: the password field's height.
-        className="grain-overlay h-11 w-full shadow-none not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [--grain-overlay-opacity:0.1] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] sm:h-10 pointer-coarse:h-11 [&:not([aria-haspopup]):not(:disabled):not([aria-disabled=true])]:will-change-auto [&_svg:not([class*='opacity-'])]:opacity-80"
-        disabled={pending || locked}
-        size="lg"
-        type="submit"
-      >
+      {/* The primary button (components/ui/button.tsx lg): the field's height, full width. */}
+      <Button className="w-full" disabled={pending || locked} size="lg" type="submit">
         {pending ? <Spinner aria-hidden="true" /> : <LogInIcon aria-hidden="true" />}
         {pending ? t("signingIn") : t("submit")}
       </Button>
@@ -186,13 +121,7 @@ export function SignInForm({
        * it up so the box sits about 16 px under the button, while the row keeps its 40 px target.
        */}
       <Label className="-mt-3 min-h-10 cursor-pointer self-start font-normal text-muted-foreground text-sm/5">
-        <Checkbox
-          // Flat sign-in pages: no drop shadow (the ::before layer only draws one). Unchecked,
-          // the password field's soft fill and hairline border; checked stays solid purple.
-          className="size-4 shadow-none before:hidden not-data-checked:border-foreground/[0.14] not-data-checked:bg-foreground/[0.035] dark:not-data-checked:border-white/[0.12] dark:not-data-checked:bg-white/[0.045]"
-          checked={remember}
-          onCheckedChange={(checked) => setRemember(checked === true)}
-        />
+        <Checkbox checked={remember} onCheckedChange={(checked) => setRemember(checked === true)} />
         {t("remember")}
       </Label>
     </form>

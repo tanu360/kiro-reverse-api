@@ -182,7 +182,7 @@ export function SheetTitle({
 }: SheetPrimitive.Title.Props): React.ReactElement {
   return (
     <SheetPrimitive.Title
-      className={cn("font-semibold font-heading text-xl leading-snug", className)}
+      className={cn("font-semibold text-lg leading-snug", className)}
       data-slot="sheet-title"
       {...props}
     />

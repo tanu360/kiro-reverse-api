@@ -133,7 +133,7 @@ export function TrafficCard(): JSX.Element {
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               {/* Backdrop so the message does not sit on the gridlines: the panel's own fill (the
                   card at 40 % over the page) at 80 %. */}
-              <div className="rounded-xl bg-[color-mix(in_srgb,color-mix(in_srgb,var(--card)_40%,var(--background))_80%,transparent)] backdrop-blur-[1px]">
+              <div className="rounded-xl bg-surface-inset/80 backdrop-blur-[1px]">
                 <EmptyState
                   description={t("traffic.noTrafficBody")}
                   icon={ActivityIcon}

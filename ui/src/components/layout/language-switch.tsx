@@ -1,4 +1,4 @@
-import { CheckIcon, ChevronDownIcon, GlobeIcon, LanguagesIcon } from "lucide-react";
+import { ChevronDownIcon, GlobeIcon, LanguagesIcon } from "lucide-react";
 import type { JSX } from "react";
 import { FlagIcon } from "@/components/shared/flag-icon";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,11 @@ import {
   MenuGroup,
   MenuGroupLabel,
   MenuPopup,
-  MenuPrimitive,
   MenuRadioGroup,
+  MenuRadioItem,
   MenuTrigger,
 } from "@/components/ui/menu";
-import { Select, SelectPopup, SelectPrimitive } from "@/components/ui/select";
+import { Select, SelectItem, SelectPopup, SelectPrimitive } from "@/components/ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { LANGUAGES, type SupportedLang, useLanguage, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -21,24 +21,6 @@ import { HEADER_ICON_BUTTON } from "./header-button";
 export const LANGUAGE_NAMES: Record<SupportedLang, string> = Object.fromEntries(
   LANGUAGES.map((option) => [option.code, option.nativeLabel]),
 ) as Record<SupportedLang, string>;
-
-/**
- * One language as a single-line row: its flag, its name in its own script, and a checked dot
- * (CheckedDot) at the end on the current one. 40 px on phones, 32 px from sm up.
- */
-/** The current language's mark: a white check in a filled Kiro-purple circle. */
-function CheckedDot(): JSX.Element {
-  return (
-    <span className="grid size-4.5 place-items-center rounded-full bg-primary text-primary-foreground">
-      <CheckIcon aria-hidden="true" className="size-3" strokeWidth={3} />
-    </span>
-  );
-}
-
-// The current language's row also turns purple, as in every other dropdown (menu.tsx,
-// select.tsx): data-checked for the header menu's radio items, data-selected for the select.
-const ROW =
-  "flex min-h-10 cursor-default items-center gap-2.5 rounded-md px-2 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-checked:text-info-foreground data-selected:text-info-foreground data-disabled:opacity-64 sm:min-h-8";
 
 /**
  * `icon`: a bare icon button that opens a menu (the app header). `pill`: a globe and the current
@@ -72,7 +54,7 @@ export function LanguageSwitch({
                   aria-label={triggerLabel}
                   className={cn(pill ? "h-10 gap-1.5 px-3 md:h-8" : HEADER_ICON_BUTTON, className)}
                   size={pill ? "sm" : "icon"}
-                  variant="ghost"
+                  variant="quiet"
                 />
               }
             />
@@ -94,19 +76,10 @@ export function LanguageSwitch({
           <MenuGroupLabel>{label}</MenuGroupLabel>
           <MenuRadioGroup onValueChange={(value) => setLang(value as SupportedLang)} value={lang}>
             {LANGUAGES.map((option) => (
-              <MenuPrimitive.RadioItem
-                className={ROW}
-                data-slot="menu-radio-item"
-                key={option.code}
-                lang={option.code}
-                value={option.code}
-              >
+              <MenuRadioItem key={option.code} lang={option.code} value={option.code}>
                 <FlagIcon code={option.code} />
                 {option.nativeLabel}
-                <MenuPrimitive.RadioItemIndicator className="ms-auto">
-                  <CheckedDot />
-                </MenuPrimitive.RadioItemIndicator>
-              </MenuPrimitive.RadioItem>
+              </MenuRadioItem>
             ))}
           </MenuRadioGroup>
         </MenuGroup>
@@ -158,21 +131,12 @@ function LanguageSelect({ className }: { className?: string }): JSX.Element {
         <TooltipPopup>{triggerLabel}</TooltipPopup>
       </Tooltip>
       <SelectPopup>
+        {/* Single-line rows (popup-row.tsx): flag, name, and the CheckedDot on the current one. */}
         {LANGUAGES.map((option) => (
-          <SelectPrimitive.Item
-            className={cn(ROW, "pe-2.5")}
-            key={option.code}
-            lang={option.code}
-            value={option.code}
-          >
-            <SelectPrimitive.ItemText className="flex items-center gap-2.5">
-              <FlagIcon code={option.code} />
-              {option.nativeLabel}
-            </SelectPrimitive.ItemText>
-            <SelectPrimitive.ItemIndicator className="ms-auto ps-3">
-              <CheckedDot />
-            </SelectPrimitive.ItemIndicator>
-          </SelectPrimitive.Item>
+          <SelectItem key={option.code} lang={option.code} value={option.code}>
+            <FlagIcon code={option.code} />
+            {option.nativeLabel}
+          </SelectItem>
         ))}
       </SelectPopup>
     </Select>

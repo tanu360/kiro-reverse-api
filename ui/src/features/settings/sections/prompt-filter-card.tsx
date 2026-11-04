@@ -216,7 +216,7 @@ function RuleCard({
           onClick={onRemove}
           size="icon-sm"
           title={t("remove")}
-          variant="ghost"
+          variant="quiet"
         >
           <XIcon aria-hidden="true" />
         </Button>
@@ -227,9 +227,7 @@ function RuleCard({
       </Badge>
       <div className={cn("grid gap-3", regex && "sm:grid-cols-2")}>
         <div className="flex min-w-0 flex-col gap-1.5">
-          <Label className="text-xs" htmlFor={`${id}-match`}>
-            {t("promptFilter.match")}
-          </Label>
+          <Label htmlFor={`${id}-match`}>{t("promptFilter.match")}</Label>
           <Input
             aria-describedby={invalid ? `${id}-match-hint` : undefined}
             aria-invalid={invalid || undefined}
@@ -253,9 +251,7 @@ function RuleCard({
         </div>
         {regex ? (
           <div className="flex min-w-0 flex-col gap-1.5">
-            <Label className="text-xs" htmlFor={`${id}-replace`}>
-              {t("promptFilter.replace")}
-            </Label>
+            <Label htmlFor={`${id}-replace`}>{t("promptFilter.replace")}</Label>
             <Input
               aria-describedby={`${id}-replace-hint`}
               className={cn("font-mono", TOUCH_INPUT)}

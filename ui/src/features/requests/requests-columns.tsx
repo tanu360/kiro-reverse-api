@@ -45,7 +45,7 @@ export function ApiKeyCode({
   const masked = normalizeApiKeyMask(value);
   if (!masked) return <Muted />;
   return (
-    <code className={cn("font-mono text-[0.8125rem]", className)} title={masked}>
+    <code className={cn("font-mono text-meta", className)} title={masked}>
       {masked}
     </code>
   );

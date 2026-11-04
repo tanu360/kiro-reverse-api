@@ -349,7 +349,7 @@ function MappingRowItem({
     <li
       aria-label={t("modelMappings.rowLabel", { n: index + 1 })}
       className={cn(
-        "relative flex items-start gap-2 rounded-lg bg-[color-mix(in_srgb,var(--card)_40%,var(--background))] sm:items-center",
+        "relative flex items-start gap-2 rounded-lg bg-surface-inset sm:items-center",
         isDragging && "z-10 shadow-lg outline-1 outline-border",
         error && "rounded-lg outline-1 outline-destructive/60 outline-offset-2",
       )}
@@ -363,7 +363,7 @@ function MappingRowItem({
         ref={setActivatorNodeRef}
         size="icon-sm"
         title={t("modelMappings.drag")}
-        variant="ghost"
+        variant="quiet"
         {...attributes}
         {...listeners}
       >
@@ -424,7 +424,7 @@ function MappingRowItem({
           ref={register("up")}
           size="icon-sm"
           title={t("modelMappings.moveUp")}
-          variant="ghost"
+          variant="quiet"
         >
           <ArrowUpIcon aria-hidden="true" />
         </Button>
@@ -435,7 +435,7 @@ function MappingRowItem({
           ref={register("down")}
           size="icon-sm"
           title={t("modelMappings.moveDown")}
-          variant="ghost"
+          variant="quiet"
         >
           <ArrowDownIcon aria-hidden="true" />
         </Button>
@@ -444,7 +444,7 @@ function MappingRowItem({
           onClick={onRemove}
           size="icon-sm"
           title={t("remove")}
-          variant="ghost"
+          variant="quiet"
         >
           <XIcon aria-hidden="true" />
         </Button>

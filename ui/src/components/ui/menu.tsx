@@ -3,19 +3,24 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { ChevronRightIcon } from "lucide-react";
 import type * as React from "react";
+import {
+  CheckedDot,
+  POPUP_CHECK_ROW_CLASS,
+  POPUP_GROUP_LABEL_CLASS,
+  POPUP_INDICATOR_CLASS,
+  POPUP_ROW_CLASS,
+  POPUP_ROW_META_CLASS,
+  POPUP_SEPARATOR_CLASS,
+} from "@/components/ui/popup-row";
 import { cn } from "@/lib/utils";
 
 /*
- * Kiro menu rows: 32 px on desktop, 36 px on phones and 40 px on touch screens, 10 px side
- * padding, 16 px muted icons and a highlight row in the --menu-highlight tone (index.css), which
- * reads on the raised menu surface in both themes. Rows keep their text colour when highlighted.
+ * Menu rows are the select rows (popup-row.tsx, after the sign-in language picker) on the same
+ * popup-surface sheet. Action rows lead with a 16 px muted icon; radio and checkbox rows mark the
+ * chosen one with the CheckedDot at the row's end and the accent text colour.
  */
-const MENU_ROW =
-  "min-h-9 cursor-pointer select-none rounded-sm py-1 text-base text-foreground outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-(--menu-highlight) data-highlighted:text-foreground data-disabled:opacity-64 sm:min-h-8 sm:text-sm pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0";
-
-/** Radio and checkbox rows: a check column, and the chosen row in the accent text colour. */
-const MENU_CHECK_ROW =
-  "grid in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] items-center gap-2 ps-2 pe-4";
+const MENU_ACTION_ROW =
+  "data-inset:ps-8.5 data-[variant=destructive]:text-destructive-foreground [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current";
 
 export const MenuCreateHandle: typeof MenuPrimitive.createHandle =
   MenuPrimitive.createHandle;
@@ -71,8 +76,8 @@ export function MenuPopup({
       >
         <MenuPrimitive.Popup
           className={cn(
-            // Kiro: the solid menu-surface sheet (index.css) instead of t3code's dropdown glass.
-            "menu-surface relative flex max-w-[calc(100vw-2rem)] not-[class*='w-']:min-w-[min(11rem,calc(100vw-2rem))] origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[opacity,scale] duration-100 focus:outline-none data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            // Kiro: the one popup sheet (index.css popup-surface) instead of t3code's dropdown glass.
+            "popup-surface relative flex max-w-[calc(100vw-2rem)] not-[class*='w-']:min-w-[min(11rem,calc(100vw-2rem))] origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[opacity,scale] duration-100 focus:outline-none data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             className,
           )}
           data-slot="menu-popup"
@@ -105,8 +110,8 @@ export function MenuItem({
   return (
     <MenuPrimitive.Item
       className={cn(
-        MENU_ROW,
-        "flex items-center gap-2.5 px-2.5 data-inset:ps-9 data-[variant=destructive]:text-destructive-foreground data-[variant=destructive]:data-highlighted:text-destructive-foreground [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current",
+        POPUP_ROW_CLASS,
+        MENU_ACTION_ROW,
         className,
       )}
       data-inset={inset}
@@ -130,8 +135,8 @@ export function MenuLinkItem({
   return (
     <MenuPrimitive.LinkItem
       className={cn(
-        MENU_ROW,
-        "flex items-center gap-2.5 px-2.5 data-inset:ps-9 data-[variant=destructive]:text-destructive-foreground data-[variant=destructive]:data-highlighted:text-destructive-foreground [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current",
+        POPUP_ROW_CLASS,
+        MENU_ACTION_ROW,
         className,
       )}
       closeOnClick={closeOnClick}
@@ -156,13 +161,10 @@ export function MenuCheckboxItem({
     <MenuPrimitive.CheckboxItem
       checked={checked}
       className={cn(
-        MENU_ROW,
-        MENU_CHECK_ROW,
+        POPUP_ROW_CLASS,
         variant === "switch"
-          ? "grid-cols-[1fr_auto] gap-4 ps-2.5 pe-1.5"
-          : // Kiro: a checked row shows its check and the accent text (info-foreground, AA on the
-            // popover in both themes), highlighted or not.
-            "grid-cols-[1rem_minmax(0,1fr)] pe-4 data-checked:text-info-foreground data-checked:data-highlighted:text-info-foreground",
+          ? "justify-between gap-4 pe-1.5 data-checked:text-foreground"
+          : POPUP_CHECK_ROW_CLASS,
         className,
       )}
       data-slot="menu-checkbox-item"
@@ -170,7 +172,7 @@ export function MenuCheckboxItem({
     >
       {variant === "switch" ? (
         <>
-          <span className="col-start-1">{children}</span>
+          <span className="min-w-0">{children}</span>
           <MenuPrimitive.CheckboxItemIndicator
             className="inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 items-center rounded-full p-px outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(4)] focus-outline data-checked:bg-primary data-unchecked:bg-input data-disabled:opacity-64 sm:[--thumb-size:--spacing(3)]"
             keepMounted
@@ -180,23 +182,10 @@ export function MenuCheckboxItem({
         </>
       ) : (
         <>
-          <MenuPrimitive.CheckboxItemIndicator className="col-start-1">
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="24"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
-            </svg>
+          <span className="flex min-w-0 items-center gap-2.5">{children}</span>
+          <MenuPrimitive.CheckboxItemIndicator className={POPUP_INDICATOR_CLASS}>
+            <CheckedDot />
           </MenuPrimitive.CheckboxItemIndicator>
-          <span className="col-start-2">{children}</span>
         </>
       )}
     </MenuPrimitive.CheckboxItem>
@@ -209,41 +198,38 @@ export function MenuRadioGroup(
   return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />;
 }
 
+/**
+ * A radio row: the label, then the CheckedDot on the chosen one. `meta` adds muted trailing text
+ * such as a count; with it the dot's place is kept on every row, so the counts line up.
+ */
 export function MenuRadioItem({
   className,
   children,
+  meta,
   ...props
-}: MenuPrimitive.RadioItem.Props): React.ReactElement {
+}: MenuPrimitive.RadioItem.Props & { meta?: React.ReactNode }): React.ReactElement {
   return (
     <MenuPrimitive.RadioItem
-      className={cn(
-        // t3code's row; Kiro: the chosen option shows a check and the accent text (info-foreground,
-        // AA on the popover in both themes), highlighted or not.
-        MENU_ROW,
-        MENU_CHECK_ROW,
-        "grid-cols-[1rem_minmax(0,1fr)] data-checked:text-info-foreground data-checked:data-highlighted:text-info-foreground",
-        className,
-      )}
+      className={cn(POPUP_ROW_CLASS, POPUP_CHECK_ROW_CLASS, className)}
       data-slot="menu-radio-item"
       {...props}
     >
-      <MenuPrimitive.RadioItemIndicator className="col-start-1">
-        <svg
-          aria-hidden="true"
-          fill="none"
-          height="24"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          width="24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
-        </svg>
-      </MenuPrimitive.RadioItemIndicator>
-      <span className="col-start-2 min-w-0">{children}</span>
+      <span className="flex min-w-0 items-center gap-2.5">{children}</span>
+      {meta === undefined ? (
+        <MenuPrimitive.RadioItemIndicator className={POPUP_INDICATOR_CLASS}>
+          <CheckedDot />
+        </MenuPrimitive.RadioItemIndicator>
+      ) : (
+        <>
+          <span className={POPUP_ROW_META_CLASS}>{meta}</span>
+          <MenuPrimitive.RadioItemIndicator
+            className="invisible ps-3 in-data-checked:visible"
+            keepMounted
+          >
+            <CheckedDot />
+          </MenuPrimitive.RadioItemIndicator>
+        </>
+      )}
     </MenuPrimitive.RadioItem>
   );
 }
@@ -258,7 +244,8 @@ export function MenuGroupLabel({
   return (
     <MenuPrimitive.GroupLabel
       className={cn(
-        "px-2.5 pt-2 pb-1 font-medium text-muted-foreground text-xs data-inset:ps-9",
+        POPUP_GROUP_LABEL_CLASS,
+        "data-inset:ps-8.5",
         className,
       )}
       data-inset={inset}
@@ -274,7 +261,7 @@ export function MenuSeparator({
 }: MenuPrimitive.Separator.Props): React.ReactElement {
   return (
     <MenuPrimitive.Separator
-      className={cn("-mx-1 my-1 h-px bg-(--menu-border)", className)}
+      className={cn(POPUP_SEPARATOR_CLASS, className)}
       data-slot="menu-separator"
       {...props}
     />
@@ -314,8 +301,8 @@ export function MenuSubTrigger({
   return (
     <MenuPrimitive.SubmenuTrigger
       className={cn(
-        MENU_ROW,
-        "flex items-center gap-2.5 px-2.5 data-inset:ps-9 data-popup-open:bg-(--menu-highlight) [&_svg:not([class*='text-'])]:text-muted-foreground",
+        POPUP_ROW_CLASS,
+        "data-inset:ps-8.5 data-popup-open:bg-accent [&_svg:not([class*='text-'])]:text-muted-foreground",
         className,
       )}
       data-inset={inset}

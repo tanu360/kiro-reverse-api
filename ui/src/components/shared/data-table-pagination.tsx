@@ -2,6 +2,13 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { type JSX, useId } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+} from "@/components/ui/pagination";
+import {
   Select,
   SelectItem,
   SelectPopup,
@@ -18,7 +25,9 @@ export function DataTablePagination({
   onPageChange,
   pageSizeOptions,
   onPageSizeChange,
+  variant = "default",
 }: {
+  variant?: "default" | "circle";
   page: number;
   pageSize: number;
   total: number;
@@ -33,8 +42,12 @@ export function DataTablePagination({
   const end = Math.min(total, page * pageSize);
   const showSizes = Boolean(pageSizeOptions?.length && onPageSizeChange);
 
+  const pages = [...new Set([1, page - 1, page, page + 1, pageCount])]
+    .filter((n) => n >= 1 && n <= pageCount)
+    .sort((a, b) => a - b);
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-[13px]">
+    <div className="flex flex-wrap items-center justify-between gap-3 text-meta">
       <p aria-live="polite" className="text-muted-foreground tabular-nums">
         {t("table.pageInfo", {
           start: formatNumber(start, lang),
@@ -71,24 +84,77 @@ export function DataTablePagination({
             </Select>
           </div>
         ) : null}
-        <Button
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-          size="sm"
-          variant="outline"
-        >
-          <ChevronLeftIcon aria-hidden="true" />
-          {t("table.previous")}
-        </Button>
-        <Button
-          disabled={page >= pageCount}
-          onClick={() => onPageChange(page + 1)}
-          size="sm"
-          variant="outline"
-        >
-          {t("table.next")}
-          <ChevronRightIcon aria-hidden="true" />
-        </Button>
+        {variant === "circle" ? (
+          <Pagination className="mx-0 w-auto">
+            <PaginationContent>
+              <PaginationItem>
+                <Button
+                  className="rounded-full"
+                  disabled={page <= 1}
+                  onClick={() => onPageChange(page - 1)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <ChevronLeftIcon aria-hidden="true" />
+                  <span className="max-sm:sr-only">{t("table.previous")}</span>
+                </Button>
+              </PaginationItem>
+              {pages.map((n, index) => (
+                <PaginationItem className="flex items-center gap-1" key={n}>
+                  {index > 0 && n - pages[index - 1] > 1 ? <PaginationEllipsis /> : null}
+                  <PaginationLink
+                    isActive={n === page}
+                    className="rounded-full"
+                    render={
+                      <Button
+                        aria-label={formatNumber(n, lang)}
+                        onClick={() => onPageChange(n)}
+                        size="icon"
+                        variant={n === page ? "outline" : "ghost"}
+                        className="rounded-full"
+                      />
+                    }
+                  >
+                    {formatNumber(n, lang)}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <Button
+                  className="rounded-full"
+                  disabled={page >= pageCount}
+                  onClick={() => onPageChange(page + 1)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <span className="max-sm:sr-only">{t("table.next")}</span>
+                  <ChevronRightIcon aria-hidden="true" />
+                </Button>
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        ) : (
+          <>
+            <Button
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+              size="sm"
+              variant="outline"
+            >
+              <ChevronLeftIcon aria-hidden="true" />
+              {t("table.previous")}
+            </Button>
+            <Button
+              disabled={page >= pageCount}
+              onClick={() => onPageChange(page + 1)}
+              size="sm"
+              variant="outline"
+            >
+              {t("table.next")}
+              <ChevronRightIcon aria-hidden="true" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

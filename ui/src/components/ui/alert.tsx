@@ -2,8 +2,15 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+/*
+ * The one notice, after the sign-in form's: a soft tag in the tone's light fill (the --pill-*
+ * tokens, as the status pills), no border, the text in the tone's readable step, and a duotone
+ * disc icon (index.css `[data-slot="alert"]`): a light circle in the tone with the glyph in the
+ * full tone. Non-circled icons (a triangle) simply take the tone. 8 px corners like the controls;
+ * a long message wraps.
+ */
 const alertVariants = cva(
-  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-xl border px-3.5 py-3 text-card-foreground text-sm has-[>svg]:has-data-[slot=alert-action]:grid-cols-[calc(var(--spacing)*4)_1fr_auto] has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] has-[>svg]:gap-x-2 [&>svg]:h-lh [&>svg]:w-4",
+  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-lg bg-(--badge-bg) px-3 py-2 text-(--badge-fg) text-sm leading-5 has-[>svg]:has-data-[slot=alert-action]:grid-cols-[calc(var(--spacing)*4.5)_1fr_auto] has-[>svg]:grid-cols-[calc(var(--spacing)*4.5)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] [&>svg]:mt-px [&>svg]:size-4.5 [&>svg]:text-(--badge-disc)",
   {
     defaultVariants: {
       variant: "default",
@@ -11,17 +18,20 @@ const alertVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-transparent dark:bg-input/32 [&>svg]:text-muted-foreground",
+          "[--badge-bg:var(--pill-neutral-bg)] [--badge-disc:var(--pill-neutral)] [--badge-fg:var(--pill-neutral-fg)]",
         error:
-          "border-error/32 bg-error-surface text-error-foreground [&_[data-slot=alert-description]]:text-error-foreground/80 [&>svg]:text-error",
-        info: "border-info/32 bg-info/4 [&>svg]:text-info",
-        success: "border-success/32 bg-success/4 [&>svg]:text-success",
+          "[--badge-bg:var(--pill-error-bg)] [--badge-disc:var(--pill-error)] [--badge-fg:var(--pill-error-fg)]",
+        info: "[--badge-bg:var(--pill-primary-bg)] [--badge-disc:var(--pill-primary)] [--badge-fg:var(--pill-primary-fg)]",
+        success:
+          "[--badge-bg:var(--pill-success-bg)] [--badge-disc:var(--pill-success)] [--badge-fg:var(--pill-success-fg)]",
         warning:
-          "border-warning/32 bg-warning-surface text-warning-foreground [&_[data-slot=alert-description]]:text-warning-foreground/80 [&>svg]:text-warning",
+          "[--badge-bg:var(--pill-warning-bg)] [--badge-disc:var(--pill-warning)] [--badge-fg:var(--pill-warning-fg)]",
       },
     },
   },
 );
+
+export type AlertVariant = NonNullable<VariantProps<typeof alertVariants>["variant"]>;
 
 export function Alert({
   className,
@@ -59,7 +69,7 @@ export function AlertDescription({
   return (
     <div
       className={cn(
-        "flex flex-col gap-2.5 text-muted-foreground [svg~&]:col-start-2",
+        "flex flex-col gap-2.5 [svg~&]:col-start-2",
         className,
       )}
       data-slot="alert-description"

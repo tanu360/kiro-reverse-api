@@ -103,7 +103,7 @@ export function UserMenu({ variant = "sidebar" }: { variant?: "sidebar" | "heade
                     aria-label={t("shell.userMenu")}
                     className={HEADER_ICON_BUTTON}
                     size="icon"
-                    variant="ghost"
+                    variant="quiet"
                   />
                 }
               />

@@ -24,7 +24,6 @@ import type { AccountStatus } from "@/routes/-search";
 import {
   accountStatus,
   authLabel,
-  type CreditTone,
   creditTone,
   formatCreditAmount,
   formatTokenExpiry,
@@ -193,12 +192,6 @@ export function AccountIdentity({
   );
 }
 
-const TONE_CLASS: Record<CreditTone, string> = {
-  default: "bg-primary",
-  warning: "bg-(--pill-warning)",
-  destructive: "bg-(--pill-error)",
-};
-
 /**
  * One usage meter: plan credits, or trial credits for an account with only a trial. The amount
  * leads, the percent sits at the end, and the bar turns orange over 70 % and red over 90 %. The
@@ -232,8 +225,8 @@ export function UsageMeter({ account }: { account: Account }): JSX.Element {
           {formatFraction(pct / 100, 0)}
         </span>
       </div>
-      <MeterTrack className="h-1 rounded-full">
-        <MeterIndicator className={cn("rounded-full", TONE_CLASS[creditTone(pct)])} />
+      <MeterTrack>
+        <MeterIndicator tone={creditTone(pct)} />
       </MeterTrack>
     </Meter>
   );

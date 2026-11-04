@@ -23,7 +23,8 @@ export function Textarea({
       className={
         cn(
           !unstyled &&
-            "relative inline-grid w-full rounded-lg border border-input bg-background not-dark:bg-clip-padding text-base text-foreground ring-ring/24 transition-shadow before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] has-focus-visible:has-aria-invalid:border-destructive/64 has-focus-visible:has-aria-invalid:ring-destructive/16 has-aria-invalid:border-destructive/36 has-focus-visible:border-ring has-disabled:opacity-64 has-focus-visible:ring-[3px] has-focus-visible:ring-inset sm:text-sm dark:bg-input/32 dark:has-aria-invalid:ring-destructive/24",
+            // The input's soft field fill (index.css --field-*), no focus ring.
+            "relative inline-grid w-full rounded-lg border border-field-border bg-field text-base text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover has-focus-visible:border-field-border-focus has-focus-visible:bg-field-focus has-aria-invalid:border-destructive/36 has-focus-visible:has-aria-invalid:border-destructive/64 has-disabled:opacity-64 sm:text-sm",
           className,
         ) || undefined
       }

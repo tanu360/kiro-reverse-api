@@ -97,7 +97,7 @@ export function LearnMore({ children }: { children: ReactNode }): JSX.Element {
         <InfoIcon aria-hidden="true" />
         {t("learnMore")}
       </PopoverTrigger>
-      <PopoverPopup className="max-w-xs text-sm">{children}</PopoverPopup>
+      <PopoverPopup className="max-w-xs">{children}</PopoverPopup>
     </Popover>
   );
 }
@@ -105,12 +105,7 @@ export function LearnMore({ children }: { children: ReactNode }): JSX.Element {
 export function DefaultTag({ on }: { on: boolean }): JSX.Element {
   const { t } = useT("settings");
   return (
-    <Badge
-      className="font-normal text-muted-foreground"
-      icon={on ? ToggleRightIcon : ToggleLeftIcon}
-      iconStyle="line"
-      variant="outline"
-    >
+    <Badge icon={on ? ToggleRightIcon : ToggleLeftIcon} iconStyle="line" tone="neutral">
       {on ? t("defaultOn") : t("defaultOff")}
     </Badge>
   );
@@ -158,7 +153,7 @@ export function SubmitButton({
     <Button
       aria-busy={busy || undefined}
       aria-disabled={blocked || undefined}
-      className="aria-disabled:pointer-events-none aria-disabled:opacity-64 aria-disabled:shadow-none aria-disabled:inset-shadow-none"
+      className="aria-disabled:pointer-events-none"
       onClick={(event: MouseEvent<HTMLButtonElement>) => {
         if (blocked) event.preventDefault();
       }}
@@ -216,7 +211,7 @@ export function SettingsFrame({
     <section aria-labelledby={headingId} className="flex scroll-mt-16 flex-col gap-2.5" id={id}>
       <div className="flex min-h-7 flex-wrap items-start justify-between gap-x-4 gap-y-1 px-3 sm:px-4">
         <h2
-          className="flex min-h-7 items-center font-heading font-semibold text-base text-foreground"
+          className="flex min-h-7 items-center font-semibold text-foreground text-heading"
           id={headingId}
         >
           {title}
@@ -408,11 +403,7 @@ export function SwitchField({
     <div className={cn("flex items-center justify-between gap-x-8", className)}>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2">
-          <Label
-            className="cursor-pointer font-medium text-foreground text-sm pointer-coarse:min-h-10"
-            htmlFor={id}
-            id={`${id}-label`}
-          >
+          <Label className="cursor-pointer pointer-coarse:min-h-10" htmlFor={id} id={`${id}-label`}>
             {label}
           </Label>
           {extra}
@@ -451,11 +442,7 @@ export function fillNodes(template: string, nodes: Record<string, ReactNode>): R
 }
 
 export function Code({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em] text-foreground">
-      {children}
-    </code>
-  );
+  return <code className="inline-code text-foreground">{children}</code>;
 }
 
 /** A password input with a show/hide toggle. */
@@ -501,7 +488,7 @@ export function PasswordInput({
           onClick={() => setVisible((shown) => !shown)}
           size="icon-xs"
           title={label}
-          variant="ghost"
+          variant="quiet"
         >
           {visible ? <EyeOffIcon aria-hidden="true" /> : <EyeIcon aria-hidden="true" />}
         </Button>

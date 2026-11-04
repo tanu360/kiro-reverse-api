@@ -27,14 +27,16 @@ export const segmentedControlItemLayoutClassName =
   "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0";
 
 /**
- * t3code's segmented toggle group (toggle-group.tsx `segmented`, toggle.tsx `segmented`): a tinted
- * track (input at 40%) with 2 px padding and a highlight in the page tone (light) or the input tone
- * (dark), without t3code's shadow (the project keeps shadows to floating layers). The 2 px padding
- * keeps each size the height of the matching field and button: 36 / 32 px by default, 40 / 36 lg,
- * 32 / 28 sm.
+ * The sign-in theme toggle is the segmented control: a hairline pill frame with no track fill,
+ * 1 px inside it, and a round highlight in the accent tone with no shadow. The 1 px padding and
+ * the 1 px border keep each size the height of the matching field and button: 36 / 32 px by
+ * default, 40 / 36 lg, 32 / 28 sm.
  */
-export const segmentedControlIndicatorSurfaceClassName =
-  "rounded-md bg-background dark:bg-input/72";
+export const segmentedControlIndicatorSurfaceClassName = "rounded-full bg-accent";
+
+/** The frame round the segments (and the default tabs list). */
+export const segmentedControlTrackClassName =
+  "relative z-0 flex w-fit items-center justify-center gap-0 rounded-full border bg-transparent p-px";
 
 const SegmentedControlContext: React.Context<SegmentedControlSize> =
   React.createContext<SegmentedControlSize>("default");
@@ -56,7 +58,7 @@ export function SegmentedControl({
       </>
     ),
     className: cn(
-      "relative z-0 flex w-fit items-center justify-center gap-0.5 rounded-lg bg-input/40 p-0.5",
+      segmentedControlTrackClassName,
       className,
     ),
     "data-size": size,
@@ -89,10 +91,10 @@ export function SegmentedControlItem({
 
   const defaultProps = {
     className: cn(
-      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base text-muted-foreground outline-none transition-colors hover:bg-background/55 hover:text-foreground focus-outline-inset dark:hover:bg-input/32 disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm",
-      "data-checked:bg-background data-checked:text-foreground dark:data-checked:bg-input/72",
-      "aria-[current=page]:bg-background aria-[current=page]:text-foreground dark:aria-[current=page]:bg-input/72",
-      "data-pressed:bg-background data-pressed:text-foreground dark:data-pressed:bg-input/72",
+      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium text-base text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline-inset disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm",
+      "data-checked:bg-accent data-checked:text-foreground",
+      "aria-[current=page]:bg-accent aria-[current=page]:text-foreground",
+      "data-pressed:bg-accent data-pressed:text-foreground",
       "[:has(>[data-slot=segmented-control-indicator]:not([hidden]))>&]:bg-transparent!",
       segmentedControlItemLayoutClassName,
       segmentedControlItemTouchClassName,

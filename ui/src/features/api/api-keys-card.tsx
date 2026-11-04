@@ -61,7 +61,7 @@ import { useElementWidth } from "./use-element-size";
 export const KEYS_TABLE_MIN_WIDTH = 880;
 // The actions column stays in view while a narrow table scrolls sideways, opaque in the panel's
 // own fill (the card at 40 % over the page).
-const STICKY_END = "sticky right-0 z-[1] bg-[color-mix(in_srgb,var(--card)_40%,var(--background))]";
+const STICKY_END = "sticky right-0 z-[1] bg-surface-inset";
 
 interface DialogState {
   open: boolean;
@@ -401,7 +401,7 @@ function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
             <BadgeIcon icon={CircleAlertIcon} />
             {t("keys.limitReached")}
           </PopoverTrigger>
-          <PopoverPopup className="max-w-64 text-sm" tooltipStyle>
+          <PopoverPopup className="max-w-64" tooltipStyle>
             {t("keys.limitReachedHint")}
           </PopoverPopup>
         </Popover>
@@ -441,8 +441,8 @@ function UsageLine({
           min={0}
           value={Math.min(used, limit)}
         >
-          <MeterTrack className="h-1 rounded-full">
-            <MeterIndicator className={cn("rounded-full", reached && "bg-warning")} />
+          <MeterTrack>
+            <MeterIndicator tone={reached ? "warning" : "default"} />
           </MeterTrack>
         </Meter>
       ) : null}
@@ -540,7 +540,7 @@ function KeyActions({
             className="size-10 md:size-8"
             ref={triggerRef}
             size="icon"
-            variant="ghost"
+            variant="quiet"
           />
         }
       >

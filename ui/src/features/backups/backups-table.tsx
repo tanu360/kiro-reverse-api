@@ -184,7 +184,7 @@ function RowMenu({
             className="size-10 sm:size-8"
             data-row-focus={entry.id}
             size="icon"
-            variant="ghost"
+            variant="quiet"
           />
         }
       >
@@ -237,14 +237,14 @@ function RowIconButton({
             aria-label={label}
             className={cn(
               BUSY_CLASS,
-              destructive && "text-destructive-foreground hover:bg-destructive/8",
+              destructive && "[:hover,[data-pressed]]:text-destructive-foreground",
             )}
             data-row-focus={focusId}
             onClick={() => {
               if (!busy) onClick();
             }}
             size="icon"
-            variant="ghost"
+            variant="quiet"
           />
         }
       >
@@ -412,10 +412,8 @@ export function BackupsTable({
         align: "end",
         // Pinned to the right edge, so the actions stay in view if the table ever scrolls; opaque
         // in the panel's own fill (the card at 40 % over the page).
-        headerClassName:
-          "sticky right-0 z-[1] bg-[color-mix(in_srgb,var(--card)_40%,var(--background))]",
-        className:
-          "sticky right-0 z-[1] bg-[color-mix(in_srgb,var(--card)_40%,var(--background))] py-1",
+        headerClassName: "sticky right-0 z-[1] bg-surface-inset",
+        className: "sticky right-0 z-[1] bg-surface-inset py-1",
         cell: (entry) => <RowActions actions={actions} entry={entry} />,
       },
     ],

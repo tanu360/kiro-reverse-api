@@ -24,7 +24,7 @@
   --sidebar-row-content-inset: 0.625rem;
   --app-scrollbar-thumb: rgb(217 217 217);
   --app-scrollbar-thumb-hover: rgb(191 191 191);
-  /* Frosted popups (t3code dropdown-glass, dialog-glass): menus, selects, dialogs. */
+  /* Frosted dialogs (t3code dialog-glass). */
   --glass-blur: 12px;
   --glass-opacity: 80%;
   --glass-saturation: 1.14;
@@ -199,6 +199,27 @@
 
 @theme {
   --color-zinc-25: oklch(99.2% 0 0);
+
+  /*
+   * The type scale, set by the sign-in pages. Body copy is text-sm (14 px) and small labels
+   * text-xs (12 px); these add the steps between and above them:
+   *   display  28 px  the sign-in h1 (from sm up) and a stat card's number
+   *   title    22 px  a page's h1 (from sm up)
+   *   heading  15 px  section, card, empty and error state titles
+   *   meta     13 px  footer lines, stat captions, table heads, key labels, mono values
+   *   2xs      11 px  small pills
+   * Line heights follow the page's 1.5 unless the step is a title.
+   */
+  --text-display: 1.75rem;
+  --text-display--line-height: 1.25;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.25;
+  --text-heading: 0.9375rem;
+  --text-heading--line-height: 1.5;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.5;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
 }
 
 /*
@@ -235,53 +256,81 @@
 }
 
 /*
- * t3code's frosted popup surfaces (index.css dropdown-glass, dialog-glass, dialog-backdrop): the
- * popover tone at 80% under a 12 px blur, a foreground-tinted hairline, and a solid fallback
- * where backdrop-filter is missing. Menus, selects, comboboxes and popovers use dropdown-glass;
- * dialogs use dialog-glass over the dialog-backdrop, with the floating shadow instead of
- * t3code's deeper one and its inset top highlight.
+ * Every dropdown (select, menu, combobox, autocomplete, popover) is one popup: the sign-in
+ * language picker's solid raised sheet, not glass. White on the zinc-25 page with a zinc-200
+ * hairline in light; in dark a clear step lighter than the black page (neutral-900 and a little
+ * more) with a white hairline. One soft drop only, lighter than the floating shadow. Rows inside
+ * use the accent tone for their highlight (components/ui/popup-row.tsx).
  */
-@utility dropdown-glass {
-  background: color-mix(
-    in srgb,
-    var(--popover) 18%,
-    color-mix(in srgb, var(--popover) var(--glass-opacity), transparent)
-  );
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  border: 1px solid color-mix(in srgb, var(--contrast-foreground) 10%, transparent);
+:root {
+  --popup: var(--color-white);
+  --popup-border: var(--color-zinc-200);
+  --popup-shadow: 0 6px 16px -10px rgb(0 0 0 / 14%);
+}
+.dark {
+  --popup: #1b1b1c;
+  --popup-border: rgb(255 255 255 / 10%);
+  --popup-shadow: 0 8px 20px -12px rgb(0 0 0 / 70%);
+}
 
-  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-    /* biome-ignore lint/complexity/noImportantStyles: the fallback must beat the glass mix. */
-    background: var(--popover) !important;
-  }
+@utility popup-surface {
+  background: var(--popup);
+  border: 1px solid var(--popup-border);
+  box-shadow: var(--popup-shadow);
 }
 
 /*
- * Menus and select lists: a solid raised sheet, not glass. In the dark theme the popover tone sat
- * almost on the black page; the menu is a clear step lighter (neutral-900 and a little more), with
- * a white hairline and a highlight row that reads on it. Light keeps white on the zinc-25 page with
- * a zinc-200 hairline. One soft drop only, lighter than the floating shadow.
+ * Form fields (input, textarea, select trigger, number field, input group) and the outline
+ * button: the sign-in password field's soft fill. A faint foreground tint with a hairline border
+ * barely darker than it; hover deepens the tint a step, focus turns the border a soft purple and
+ * lightens the fill. No focus ring. Checkboxes and radios take the same fill with a firmer edge
+ * (--field-border-strong), so the box still reads at 16 px.
  */
 :root {
-  --menu-surface: var(--color-white);
-  --menu-border: var(--color-zinc-200);
-  --menu-highlight: var(--color-zinc-100);
-  --menu-shadow: 0 6px 16px -10px rgb(0 0 0 / 14%);
+  --field: color-mix(in oklab, var(--foreground) 3.5%, transparent);
+  --field-hover: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --field-focus: color-mix(in oklab, var(--foreground) 2%, transparent);
+  --field-border: color-mix(in oklab, var(--foreground) 8%, transparent);
+  --field-border-strong: color-mix(in oklab, var(--foreground) 14%, transparent);
+  --field-border-focus: color-mix(in oklab, var(--primary) 55%, transparent);
 }
 .dark {
-  --menu-surface: #1b1b1c;
-  --menu-border: rgb(255 255 255 / 10%);
-  --menu-highlight: rgb(255 255 255 / 7%);
-  --menu-shadow: 0 8px 20px -12px rgb(0 0 0 / 70%);
+  --field: color-mix(in oklab, var(--color-white) 4.5%, transparent);
+  --field-hover: color-mix(in oklab, var(--color-white) 6%, transparent);
+  --field-focus: color-mix(in oklab, var(--color-white) 5%, transparent);
+  --field-border: color-mix(in oklab, var(--color-white) 7%, transparent);
+  --field-border-strong: color-mix(in oklab, var(--color-white) 12%, transparent);
+  --field-border-focus: color-mix(in oklab, var(--primary) 70%, transparent);
 }
 
-@utility menu-surface {
-  background: var(--menu-surface);
-  border: 1px solid var(--menu-border);
-  box-shadow: var(--menu-shadow);
+/*
+ * Inset panels (t3code's SettingsGroup fill): the card at 40 % over the page, for a list panel,
+ * a sticky table cell or a backdrop on a chart. Rows tint a surface with the foreground at 2 %
+ * on hover and 4 % when selected; the opaque -hover / -selected steps are for sticky cells and
+ * card rows, which must hide what scrolls under them.
+ */
+:root {
+  --surface-inset: color-mix(in srgb, var(--card) 40%, var(--background));
+  --surface-inset-hover: color-mix(in srgb, var(--surface-inset), var(--foreground) 2%);
+  --surface-inset-selected: color-mix(in srgb, var(--surface-inset), var(--foreground) 4%);
+  --card-hover: color-mix(in srgb, var(--card), var(--foreground) 2%);
+  --card-selected: color-mix(in srgb, var(--card), var(--foreground) 4%);
 }
 
+/* Inline code in running text: mono, a touch smaller than the line, on a muted chip. */
+@utility inline-code {
+  border-radius: 0.25rem;
+  background-color: var(--muted);
+  padding: 0.125rem 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+/*
+ * t3code's frosted dialog surface (index.css dialog-glass, dialog-backdrop): the background tone
+ * at 80% under a 12 px blur, a foreground-tinted hairline, and a solid fallback where
+ * backdrop-filter is missing, with the floating shadow instead of t3code's deeper one.
+ */
 @utility dialog-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
@@ -367,17 +416,31 @@
  * Clock…) becomes a filled circle in the tone colour with its glyph knocked out, a little
  * heavier so it holds up at 12-14 px. The colours come from the pill's --badge-dot/--badge-glyph.
  */
-[data-badge-icon="disc"] {
+[data-badge-icon="disc"],
+[data-slot="alert"] > svg:has(> circle[r="10"]) {
   stroke-width: 2.5;
 }
-[data-badge-icon="disc"] > circle[r="10"] {
+[data-badge-icon="disc"] > circle[r="10"],
+[data-slot="alert"] > svg > circle[r="10"] {
   fill: var(--badge-dot);
-  /* Optional edge ring in its own colour and width (the sign-in form notices); else none shows. */
+  /* Optional edge ring in its own colour and width (the notices); else none shows. */
   stroke: var(--badge-dot-ring, var(--badge-dot));
   stroke-width: var(--badge-dot-ring-width, 2.5);
 }
-[data-badge-icon="disc"] > :not(circle[r="10"]) {
+[data-badge-icon="disc"] > :not(circle[r="10"]),
+[data-slot="alert"] > svg:has(> circle[r="10"]) > :not(circle[r="10"]) {
   stroke: var(--badge-glyph);
+}
+/*
+ * Notices (components/ui/alert.tsx): the disc is a light step of the tone edged by one thin
+ * ring, both opaque (mixed with the page background, so a see-through fill under a see-through
+ * stroke cannot draw two rings), and the glyph is the full tone rather than knocked out.
+ */
+[data-slot="alert"] {
+  --badge-dot: color-mix(in oklab, var(--badge-disc) 28%, var(--background));
+  --badge-dot-ring: color-mix(in oklab, var(--badge-disc) 48%, var(--background));
+  --badge-dot-ring-width: 1.25;
+  --badge-glyph: var(--badge-disc);
 }
 
 /*
@@ -486,6 +549,22 @@
   --color-switch-track: var(--switch-track);
   --color-switch-border: var(--switch-border);
   --color-switch-thumb: var(--switch-thumb);
+  --color-popup: var(--popup);
+  --color-popup-border: var(--popup-border);
+  --color-field: var(--field);
+  --color-field-hover: var(--field-hover);
+  --color-field-focus: var(--field-focus);
+  --color-field-border: var(--field-border);
+  --color-field-border-strong: var(--field-border-strong);
+  --color-field-border-focus: var(--field-border-focus);
+  --color-surface-inset: var(--surface-inset);
+  /* The inverted island (the notch toaster's palette): dark on light, light on dark. */
+  --color-inverse: var(--notch);
+  --color-inverse-foreground: var(--notch-foreground);
+  --color-surface-inset-hover: var(--surface-inset-hover);
+  --color-surface-inset-selected: var(--surface-inset-selected);
+  --color-card-hover: var(--card-hover);
+  --color-card-selected: var(--card-selected);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -584,7 +663,7 @@
   --chart-crosshair: #5e17ab;
   --chart-grid: oklch(0.9 0 0);
   --chart-brush-border: var(--chart-grid);
-  --chart-tooltip-background: var(--popover);
+  --chart-tooltip-background: var(--popup);
   --chart-tooltip-foreground: var(--popover-foreground);
   --chart-tooltip-muted: var(--muted-foreground);
   --chart-marker-background: oklch(0.97 0.005 260);
@@ -1046,5 +1125,69 @@
     animation-duration: 0.01ms !important;
     /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat every transition. */
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Spreadsheet treatment is local to Accounts; other data tables keep their layout. */
+.accounts-grid {
+  --sticky-bg: var(--card);
+  font-size: 0.8125rem;
+
+  & :is(th, td) {
+    border-inline-end: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
+    padding-inline: 0.625rem;
+  }
+  & :is(th, td):last-child {
+    border-inline-end: 0;
+  }
+  & thead {
+    background: color-mix(in oklch, var(--muted) 45%, var(--card));
+  }
+  & th {
+    font-weight: 500;
+  }
+  & tbody td {
+    padding-block: 0.65rem;
+  }
+  & tr > :first-child {
+    min-inline-size: 2.75rem;
+    inline-size: 2.75rem;
+    text-align: center;
+  }
+  & .row-checkbox {
+    position: absolute;
+    opacity: 0;
+  }
+  & tr[data-state="selected"] .row-number {
+    display: none;
+  }
+  & tr[data-state="selected"] .row-checkbox,
+  & tr:focus-within .row-checkbox {
+    position: relative;
+    opacity: 1;
+    display: inline-flex;
+  }
+  & tr:focus-within .row-number {
+    display: none;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .accounts-grid tbody tr:hover .row-number {
+    display: none;
+  }
+  .accounts-grid tbody tr:hover .row-checkbox {
+    position: relative;
+    opacity: 1;
+    display: inline-flex;
+  }
+}
+@media (pointer: coarse) {
+  .accounts-grid .row-number {
+    display: none;
+  }
+  .accounts-grid .row-checkbox {
+    position: relative;
+    opacity: 1;
+    display: inline-flex;
   }
 }

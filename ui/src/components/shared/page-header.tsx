@@ -36,7 +36,7 @@ export function PageHeader({
             actions ? "min-h-8" : undefined,
           )}
         >
-          <h1 className="text-balance font-heading font-semibold text-xl leading-tight sm:text-[1.375rem]">
+          <h1 className="text-balance font-semibold text-xl leading-tight sm:text-title">
             {title}
           </h1>
           {meta}

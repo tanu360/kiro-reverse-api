@@ -105,13 +105,13 @@ export function StatCard({
         >
           <Icon aria-hidden="true" className="size-4" />
         </div>
-        <p className="text-[13px] text-muted-foreground">{label}</p>
+        <p className="text-meta text-muted-foreground">{label}</p>
       </div>
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <div
             className={cn(
-              "font-heading font-semibold text-[1.75rem] leading-none tabular-nums",
+              "font-semibold text-display leading-none tabular-nums",
               danger && "text-destructive-foreground",
             )}
           >
@@ -119,7 +119,7 @@ export function StatCard({
           </div>
           {delta ? <DeltaBadge delta={delta} /> : null}
         </div>
-        {caption ? <div className="text-[13px] text-muted-foreground">{caption}</div> : null}
+        {caption ? <div className="text-meta text-muted-foreground">{caption}</div> : null}
       </div>
       {sparkline ? (
         <div aria-hidden="true" className="-mx-1 h-10 min-w-0">

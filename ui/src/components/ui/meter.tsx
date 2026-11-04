@@ -44,20 +44,31 @@ export function MeterTrack({
 }: MeterPrimitive.Track.Props): React.ReactElement {
   return (
     <MeterPrimitive.Track
-      className={cn("block h-2 w-full overflow-hidden bg-input", className)}
+      // A thin rounded bar: 4 px, fully rounded, on the input tone.
+      className={cn("block h-1 w-full overflow-hidden rounded-full bg-input", className)}
       data-slot="meter-track"
       {...props}
     />
   );
 }
 
+/** The fill in the primary purple, or a status pill colour (index.css --pill-*) as it fills up. */
+const METER_TONE = {
+  default: "bg-primary",
+  warning: "bg-(--pill-warning)",
+  destructive: "bg-(--pill-error)",
+} as const;
+
+export type MeterTone = keyof typeof METER_TONE;
+
 export function MeterIndicator({
   className,
+  tone = "default",
   ...props
-}: MeterPrimitive.Indicator.Props): React.ReactElement {
+}: MeterPrimitive.Indicator.Props & { tone?: MeterTone }): React.ReactElement {
   return (
     <MeterPrimitive.Indicator
-      className={cn("bg-primary transition-all duration-500", className)}
+      className={cn("rounded-full transition-all duration-500", METER_TONE[tone], className)}
       data-slot="meter-indicator"
       {...props}
     />

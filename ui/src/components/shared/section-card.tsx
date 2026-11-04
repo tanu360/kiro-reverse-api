@@ -42,15 +42,13 @@ export function SectionCard({
       >
         <div className="flex min-w-0 flex-col gap-1">
           <h2
-            className="font-heading font-semibold text-[0.9375rem] leading-snug"
+            className="font-semibold text-heading leading-snug"
             data-slot="card-title"
             id={headingId}
           >
             {title}
           </h2>
-          {description ? (
-            <CardDescription className="text-pretty leading-relaxed">{description}</CardDescription>
-          ) : null}
+          {description ? <CardDescription>{description}</CardDescription> : null}
         </div>
         {actions ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>

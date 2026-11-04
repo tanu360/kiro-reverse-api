@@ -22,11 +22,11 @@ export function UpdateIndicator(): JSX.Element | null {
         render={
           <Button
             aria-label={label}
-            className="relative size-10 text-warning-foreground md:size-8"
+            className="relative size-10 text-warning-foreground md:size-8 [:hover,[data-pressed]]:text-warning-foreground"
             data-slot="update-indicator"
             onClick={openDialog}
             size="icon"
-            variant="ghost"
+            variant="quiet"
           />
         }
       >

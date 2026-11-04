@@ -25,7 +25,7 @@ function IdValue({ value, copyLabel }: { value?: string; copyLabel: string }): J
   if (!value) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
     <span className="flex min-w-0 items-center gap-1">
-      <code className="min-w-0 break-all font-mono text-[0.8125rem]">{value}</code>
+      <code className="min-w-0 break-all font-mono text-meta">{value}</code>
       <CopyButton className="shrink-0" label={copyLabel} value={value} />
     </span>
   );
@@ -34,7 +34,7 @@ function IdValue({ value, copyLabel }: { value?: string; copyLabel: string }): J
 function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">{title}</h3>
+      <h3 className="font-medium text-sm">{title}</h3>
       {children}
     </section>
   );
@@ -151,7 +151,7 @@ export function RequestDetailSheet({
                       label: t("detail.message"),
                       value: (
                         <pre
-                          className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/40 p-3 font-mono text-[0.8125rem]"
+                          className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/40 p-3 font-mono text-meta"
                           data-testid="request-message"
                         >
                           {maskText(record.message) ||

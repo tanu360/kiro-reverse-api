@@ -19,16 +19,26 @@ const CHANGE_PASSWORD_TOAST_MS = 10_000;
 /** How long the password stays green after a copy (components/shared/copy-button.tsx). */
 const COPIED_MS = 2000;
 
-/** The app's mono stack (index.css --font-mono, self-hosted Fira Code). */
-const PASSWORD_FONT = { fontFamily: "var(--font-mono)" };
-
 /** Stands in for the password while it loads, so the skeleton has its exact width. */
 const SAMPLE_PASSWORD = "00000000";
 
-/** The app's own skeleton tints (components/ui/skeleton.tsx): foreground at 8%, a soft sheen. */
+/** The app's mono stack (index.css --font-mono, self-hosted Fira Code). */
+const PASSWORD_FONT = { fontFamily: "var(--font-mono)" };
+
+/**
+ * The app's own skeleton tint (components/ui/skeleton.tsx: muted-foreground at 15%) with a soft
+ * sheen of the page colour, as theme tokens, so skullet's bar matches every other skeleton.
+ */
+const SKELETON_BASE = "color-mix(in srgb, var(--muted-foreground) 15%, transparent)";
 const SKELETON_THEME = {
-  light: { base: "rgb(24 24 27 / 0.08)", highlight: "rgb(255 255 255 / 0.64)" },
-  dark: { base: "rgb(255 255 255 / 0.08)", highlight: "rgb(255 255 255 / 0.04)" },
+  light: {
+    base: SKELETON_BASE,
+    highlight: "color-mix(in srgb, var(--background) 64%, transparent)",
+  },
+  dark: {
+    base: SKELETON_BASE,
+    highlight: "color-mix(in srgb, var(--foreground) 4%, transparent)",
+  },
   radius: "6px",
 };
 
@@ -115,7 +125,7 @@ function GeneratedPassword({
         </span>
         <span
           aria-hidden="true"
-          className="text-[color-mix(in_oklab,var(--muted-foreground)_55%,var(--primary))] opacity-0 group-has-[[data-copy-password]:not([data-copied]):focus-visible]/pw:opacity-100 group-has-[[data-copy-password]:not([data-copied]):hover]/pw:opacity-100"
+          className="text-info-foreground opacity-0 group-has-[[data-copy-password]:not([data-copied]):focus-visible]/pw:opacity-100 group-has-[[data-copy-password]:not([data-copied]):hover]/pw:opacity-100"
         >
           {t("clickToCopy")}
         </span>
@@ -163,7 +173,7 @@ function GeneratedPassword({
 
 /**
  * The password itself is the copy control: no separate copy icon, no box, just the digits in bold
- * mono. Hovering (or keyboard focus) tints them a step towards the primary purple and the label
+ * mono. Hovering (or keyboard focus) turns them the accent text purple and the label
  * above reads "Click to copy"; a click or tap copies them and turns the digits and the label green
  * for two seconds. No toast (the label already says it) and no tooltip (it would cover the label).
  * Screen readers get the password plus "Copy password" as its name and a polite "Password copied"
@@ -200,7 +210,7 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
       <button
         className={cn(
           "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-bold text-foreground text-xl tracking-[0.18em] transition-[color,scale] duration-150 active:scale-[0.98]",
-          "hover:text-[color-mix(in_oklab,var(--foreground)_55%,var(--primary))] focus-visible:text-[color-mix(in_oklab,var(--foreground)_55%,var(--primary))]",
+          "hover:text-info-foreground focus-visible:text-info-foreground",
           copied && "text-success-foreground hover:text-success-foreground",
         )}
         data-copied={copied ? "" : undefined}

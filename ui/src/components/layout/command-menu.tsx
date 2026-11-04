@@ -153,13 +153,13 @@ export function CommandMenu(): JSX.Element {
         aria-keyshortcuts="Meta+K Control+K"
         aria-label={t("shell.search")}
         // Icon-only and 40x40 below sm; with its label from sm up.
-        className="size-10 gap-2 px-2 font-normal text-muted-foreground sm:w-auto md:h-8"
+        className="size-10 gap-2 px-2 font-normal sm:w-auto md:h-8"
         onClick={() => setOpen(true)}
-        variant="ghost"
+        variant="quiet"
       >
         <SearchIcon aria-hidden="true" />
         <span className="hidden sm:inline">{t("shell.search")}</span>
-        <Kbd aria-hidden="true" className="hidden border sm:inline-flex">
+        <Kbd aria-hidden="true" className="hidden sm:inline-flex">
           {isMac() ? "⌘" : "Ctrl"} K
         </Kbd>
       </Button>

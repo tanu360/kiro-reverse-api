@@ -15,7 +15,6 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
-import { cn } from "@/lib/utils";
 import { isBanned } from "./account-model";
 import {
   useCopyAccountJson,
@@ -23,13 +22,6 @@ import {
   useRefreshAccount,
   useToggleEnabled,
 } from "./use-account-actions";
-
-/**
- * Icon buttons in a row: no hover or pressed fill, only the icon moves from muted to full
- * colour (the sign-in pages' FLAT_ICON_BUTTON_CLASS rule).
- */
-const FLAT_ICON =
-  "[--control-icon-color:currentColor] text-muted-foreground hover:bg-transparent hover:text-foreground data-pressed:bg-transparent data-pressed:text-foreground [:hover,[data-pressed]]:bg-transparent data-popup-open:text-foreground";
 
 export interface RowActionHandlers {
   onTest: (account: Account) => void;
@@ -72,11 +64,11 @@ function IconAction({
           <Button
             aria-busy={busy || undefined}
             aria-label={label}
-            className={cn("size-10 md:size-8", FLAT_ICON)}
+            className="size-10 md:size-8"
             disabled={busy}
             onClick={onClick}
             size="icon"
-            variant="ghost"
+            variant="quiet"
           />
         }
       >
@@ -127,9 +119,9 @@ export function AccountRowActions({
             <Button
               aria-busy={refresh.isPending || undefined}
               aria-label={t("actions.more")}
-              className={cn("size-10", FLAT_ICON)}
+              className="size-10"
               size="icon"
-              variant="ghost"
+              variant="quiet"
             />
           }
         >
@@ -182,9 +174,9 @@ export function AccountRowActions({
                 render={
                   <Button
                     aria-label={t("actions.more")}
-                    className={cn("size-10 md:size-8", FLAT_ICON)}
+                    className="size-10 md:size-8"
                     size="icon"
-                    variant="ghost"
+                    variant="quiet"
                   />
                 }
               />

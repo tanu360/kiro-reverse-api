@@ -3,6 +3,11 @@
 import { Autocomplete as AutocompletePrimitive } from "@base-ui/react/autocomplete";
 import { ChevronsUpDownIcon, XIcon } from "lucide-react";
 import type React from "react";
+import {
+  POPUP_GROUP_LABEL_CLASS,
+  POPUP_ROW_CLASS,
+  POPUP_SEPARATOR_CLASS,
+} from "@/components/ui/popup-row";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { useUiT } from "@/components/ui/messages";
@@ -121,7 +126,7 @@ export function AutocompletePopup({
       >
         <span
           className={cn(
-            "relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg border bg-popover not-dark:bg-clip-padding floating-shadow transition-[scale,opacity]",
+            "popup-surface relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg transition-[scale,opacity]",
             className,
           )}
         >
@@ -146,7 +151,9 @@ export function AutocompleteItem({
   return (
     <AutocompletePrimitive.Item
       className={cn(
-        "flex min-h-8 cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-base outline-none hover:bg-accent data-disabled:pointer-events-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-selected:text-info-foreground data-selected:data-highlighted:text-info-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm pointer-coarse:min-h-10 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        // The select row (popup-row.tsx); suggestions have no chosen state, so no CheckedDot.
+        POPUP_ROW_CLASS,
+        "[&_svg:not([class*='text-'])]:text-muted-foreground",
         className,
       )}
       data-slot="autocomplete-item"
@@ -163,7 +170,7 @@ export function AutocompleteSeparator({
 }: AutocompletePrimitive.Separator.Props): React.ReactElement {
   return (
     <AutocompletePrimitive.Separator
-      className={cn("mx-2 my-1 h-px bg-border last:hidden", className)}
+      className={cn(POPUP_SEPARATOR_CLASS, "last:hidden", className)}
       data-slot="autocomplete-separator"
       {...props}
     />
@@ -190,7 +197,7 @@ export function AutocompleteGroupLabel({
   return (
     <AutocompletePrimitive.GroupLabel
       className={cn(
-        "px-2 py-1.5 font-medium text-muted-foreground text-xs",
+        POPUP_GROUP_LABEL_CLASS,
         className,
       )}
       data-slot="autocomplete-group-label"

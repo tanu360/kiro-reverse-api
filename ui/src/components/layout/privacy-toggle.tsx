@@ -21,7 +21,7 @@ export function PrivacyToggle(): JSX.Element {
             className={HEADER_ICON_BUTTON}
             onClick={toggle}
             size="icon"
-            variant="ghost"
+            variant="quiet"
           />
         }
       >

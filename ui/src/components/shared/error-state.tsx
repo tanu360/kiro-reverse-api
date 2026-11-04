@@ -29,9 +29,7 @@ export function ErrorState({
     >
       <CircleAlertIcon aria-hidden="true" className="size-5 text-destructive-foreground" />
       <div className="flex max-w-md flex-col gap-1">
-        <p className="font-heading font-semibold text-[0.9375rem]">
-          {title ?? t("state.errorTitle")}
-        </p>
+        <p className="font-semibold text-heading">{title ?? t("state.errorTitle")}</p>
         {message ? (
           <p className="break-words text-muted-foreground text-sm leading-relaxed">{message}</p>
         ) : null}

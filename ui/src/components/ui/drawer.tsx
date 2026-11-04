@@ -304,7 +304,7 @@ export function DrawerTitle({
 }: DrawerPrimitive.Title.Props): React.ReactElement {
   return (
     <DrawerPrimitive.Title
-      className={cn("font-bold font-heading text-xl leading-none", className)}
+      className={cn("font-semibold text-lg leading-snug", className)}
       data-slot="drawer-title"
       {...props}
     />

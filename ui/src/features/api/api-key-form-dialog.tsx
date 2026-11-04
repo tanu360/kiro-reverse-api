@@ -197,7 +197,7 @@ export function ApiKeyFormDialog({
         {mutation.isError ? (
           <Alert variant="error">
             <CircleAlertIcon aria-hidden="true" />
-            <AlertDescription className="break-words text-foreground">
+            <AlertDescription className="break-words">
               {errorMessage(mutation.error, t)}
             </AlertDescription>
           </Alert>

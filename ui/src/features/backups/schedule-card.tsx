@@ -139,7 +139,7 @@ function ScheduleFields({ initial }: { initial: ScheduleForm }): JSX.Element {
       <Button
         aria-busy={save.isPending || undefined}
         aria-disabled={!dirty || save.isPending || undefined}
-        className="w-full aria-disabled:pointer-events-none aria-disabled:opacity-64 sm:w-auto"
+        className="w-full aria-disabled:pointer-events-none sm:w-auto"
         type="submit"
       >
         {save.isPending ? <Spinner aria-hidden="true" /> : null}

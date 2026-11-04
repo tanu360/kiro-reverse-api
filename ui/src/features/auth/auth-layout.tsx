@@ -54,7 +54,7 @@ function Copyright(): JSX.Element {
   const name = t("shell.appName");
   const at = line.lastIndexOf(name);
   return (
-    <p className="text-center text-[13px] text-muted-foreground tabular-nums">
+    <p className="text-center text-meta text-muted-foreground tabular-nums">
       {at < 0 ? (
         line
       ) : (
@@ -93,7 +93,7 @@ export function AuthHeader({
   return (
     <div className="flex flex-col items-center text-center">
       <AppIcon className="mb-6 size-16 shrink-0" size={64} />
-      <h1 className="text-balance font-heading font-semibold text-2xl leading-tight sm:text-[1.75rem]">
+      <h1 className="text-balance font-heading font-semibold text-2xl leading-tight sm:text-display">
         {title}
       </h1>
       <p className="mt-2.5 text-balance text-muted-foreground text-sm leading-relaxed">

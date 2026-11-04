@@ -21,10 +21,7 @@ export function CodeText({
     if (value === undefined) continue;
     parts.push(text.slice(last, match.index));
     parts.push(
-      <code
-        className="whitespace-nowrap rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]"
-        key={match.index}
-      >
+      <code className="inline-code whitespace-nowrap" key={match.index}>
         {value}
       </code>,
     );

@@ -92,9 +92,7 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
       {/* t3code's row: the label and hint on the left, the number field at the row's end. */}
       <SettingsRow className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-          <Label className="font-medium text-foreground text-sm" htmlFor={maxId}>
-            {t("autoContinueMax")}
-          </Label>
+          <Label htmlFor={maxId}>{t("autoContinueMax")}</Label>
           <p className={ROW_DESCRIPTION} id={`${maxId}-hint`}>
             {t("autoContinueMaxHint")}
           </p>

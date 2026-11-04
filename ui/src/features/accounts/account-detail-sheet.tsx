@@ -57,7 +57,7 @@ export function AccountDetailSheet({
         side={isMobile ? "bottom" : "right"}
       >
         <SheetHeader>
-          <SheetTitle className="font-medium text-lg">{t("detail.title")}</SheetTitle>
+          <SheetTitle>{t("detail.title")}</SheetTitle>
           {account ? (
             <>
               <SheetDescription className="truncate">

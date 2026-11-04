@@ -208,6 +208,7 @@ export function AccountsPage(): JSX.Element {
 
   const table = (
     <AccountsTable
+      rowNumberOffset={(page - 1) * pageSize}
       accounts={pageRows}
       desc={desc}
       emptyState={emptyState}
@@ -274,51 +275,58 @@ export function AccountsPage(): JSX.Element {
         title={t("title")}
       />
 
-      {query.isError && !query.data ? null : (
-        <AccountsToolbar
-          accounts={accounts}
-          desc={desc}
-          filters={filters}
-          loading={query.isPending}
-          onClearFilters={clearFilters}
-          onFiltersChange={setFilters}
-          onSortChange={setSort}
-          shown={sorted.length}
-          sort={sort}
-        />
-      )}
-
       {/* The accounts container hides low-priority table columns on narrower lists. */}
       <div className="@container/accounts flex min-w-0 flex-col gap-4" ref={listRef}>
-        {query.isError && !query.data ? (
-          <Card>
-            <ErrorState
-              error={query.error}
-              onRetry={() => void query.refetch()}
-              title={t("loadError")}
-            />
-          </Card>
-        ) : layout === "cards" ? (
-          table
-        ) : (
-          <Card className="min-w-0 overflow-hidden py-0">{table}</Card>
-        )}
-        {sorted.length > PAGE_SIZES[0] ? (
-          <DataTablePagination
-            onPageChange={(next) => updateSearch({ page: next > 1 ? next : undefined }, false)}
-            onPageSizeChange={(size) =>
-              updateSearch({
-                pageSize:
-                  size === DEFAULT_PAGE_SIZE ? undefined : (size as AccountsSearch["pageSize"]),
-                page: undefined,
-              })
-            }
-            page={page}
-            pageSize={pageSize}
-            pageSizeOptions={PAGE_SIZES}
-            total={sorted.length}
-          />
-        ) : null}
+        <div className="min-w-0 overflow-clip rounded-xl border border-border/70 bg-card">
+          {query.isError && !query.data ? null : (
+            <div className="border-b border-border/60 p-3 sm:p-4">
+              <AccountsToolbar
+                accounts={accounts}
+                desc={desc}
+                filters={filters}
+                loading={query.isPending}
+                onClearFilters={clearFilters}
+                onFiltersChange={setFilters}
+                onSortChange={setSort}
+                shown={sorted.length}
+                sort={sort}
+              />
+            </div>
+          )}
+
+          {query.isError && !query.data ? (
+            <Card>
+              <ErrorState
+                error={query.error}
+                onRetry={() => void query.refetch()}
+                title={t("loadError")}
+              />
+            </Card>
+          ) : layout === "cards" ? (
+            <div className="p-3">{table}</div>
+          ) : (
+            table
+          )}
+          {!query.isPending && (!query.isError || query.data) ? (
+            <div className="border-t border-border/60 px-3 py-3 sm:px-4">
+              <DataTablePagination
+                variant="circle"
+                onPageChange={(next) => updateSearch({ page: next > 1 ? next : undefined }, false)}
+                onPageSizeChange={(size) =>
+                  updateSearch({
+                    pageSize:
+                      size === DEFAULT_PAGE_SIZE ? undefined : (size as AccountsSearch["pageSize"]),
+                    page: undefined,
+                  })
+                }
+                page={page}
+                pageSize={pageSize}
+                pageSizeOptions={PAGE_SIZES}
+                total={sorted.length}
+              />
+            </div>
+          ) : null}
+        </div>
         {selected.size > 0 ? (
           <BatchBar onClear={() => setSelected(new Set())} selectedIds={[...selected]} />
         ) : null}

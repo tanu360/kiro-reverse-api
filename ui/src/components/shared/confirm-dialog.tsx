@@ -83,9 +83,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }): JSX.Elem
             portalProps={{ onClick: onPortalClick }}
           >
             <AlertDialogHeader>
-              <AlertDialogTitle className="font-heading font-semibold text-lg">
-                {options.title}
-              </AlertDialogTitle>
+              <AlertDialogTitle>{options.title}</AlertDialogTitle>
               {options.description ? (
                 <AlertDialogDescription>{options.description}</AlertDialogDescription>
               ) : null}

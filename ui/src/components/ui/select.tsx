@@ -9,31 +9,44 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import type * as React from "react";
+import {
+  CheckedDot,
+  POPUP_CHECK_ROW_CLASS,
+  POPUP_GROUP_LABEL_CLASS,
+  POPUP_INDICATOR_CLASS,
+  POPUP_ROW_CLASS,
+  POPUP_ROW_META_CLASS,
+  POPUP_SEPARATOR_CLASS,
+} from "@/components/ui/popup-row";
 import { cn } from "@/lib/utils";
 
 export const Select: typeof SelectPrimitive.Root = SelectPrimitive.Root;
 
 /*
- * Class strings from t3code apps/web/src/components/ui/select.tsx. Kiro difference: the trigger
- * keeps a 44 px touch hit area (the ::after layer, coarse pointers only).
+ * The trigger is a form field (index.css --field-*, the sign-in password field's soft fill): a
+ * faint tint, a hairline border, a deeper tint on hover and while open, and a soft purple border
+ * on keyboard focus, with no ring. Sizes match the input and the button: 36 / 32 px by default,
+ * 44 / 40 px lg (the sign-in field), 32 / 28 px sm. Coarse pointers keep a 44 px hit area (the
+ * ::after layer).
  */
 export const selectTriggerVariants = cva(
-  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 border rounded-lg text-left text-base outline-none transition-[color,box-shadow,background-color] data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 w-full min-w-36 border-input bg-background not-dark:bg-clip-padding text-foreground ring-ring/24 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-inset aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 focus-visible:aria-invalid:ring-destructive/16 dark:bg-input/32 dark:aria-invalid:ring-destructive/24 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='text-'])]:text-icon-muted",
+  "relative inline-flex w-full min-w-36 cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-base text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 sm:text-sm pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
       size: "default",
     },
     variants: {
       size: {
-        default: "min-h-9 px-[calc(--spacing(3)-1px)] sm:min-h-8",
-        lg: "min-h-10 px-[calc(--spacing(3)-1px)] sm:min-h-9",
-        sm: "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:min-h-7",
+        // Touch screens get a real 40 px trigger, as the input (pointer-coarse sorts after sm:).
+        default: "min-h-9 px-[calc(--spacing(3)-1px)] sm:min-h-8 pointer-coarse:min-h-10",
+        lg: "min-h-11 px-[calc(--spacing(3)-1px)] sm:min-h-10 pointer-coarse:min-h-11",
+        sm: "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:min-h-7 pointer-coarse:min-h-10",
       },
     },
   },
 );
 
-export const selectTriggerIconClassName = "-me-1 size-3.5 shrink-0 opacity-70";
+export const selectTriggerIconClassName = "-me-0.5 size-4 shrink-0";
 
 export interface SelectButtonProps extends useRender.ComponentProps<"button"> {
   size?: VariantProps<typeof selectTriggerVariants>["size"];
@@ -145,13 +158,13 @@ export function SelectPopup({
           {...props}
         >
           <SelectPrimitive.ScrollUpArrow
-            className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50% before:from-(--menu-surface)"
+            className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50% before:from-popup"
             data-slot="select-scroll-up-arrow"
           >
             <ChevronUpIcon className="relative size-4.5 sm:size-4" />
           </SelectPrimitive.ScrollUpArrow>
-          {/* Kiro: the solid menu-surface sheet (index.css), the same as menus. */}
-          <div className="menu-surface relative h-full min-w-(--anchor-width) rounded-lg">
+          {/* The one popup sheet (index.css popup-surface), the same as menus. */}
+          <div className="popup-surface relative h-full min-w-(--anchor-width) rounded-lg">
             <SelectPrimitive.List
               className={cn(
                 "max-h-(--available-height) overflow-y-auto p-1",
@@ -163,7 +176,7 @@ export function SelectPopup({
             </SelectPrimitive.List>
           </div>
           <SelectPrimitive.ScrollDownArrow
-            className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50% before:from-(--menu-surface)"
+            className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50% before:from-popup"
             data-slot="select-scroll-down-arrow"
           >
             <ChevronDownIcon className="relative size-4.5 sm:size-4" />
@@ -174,41 +187,41 @@ export function SelectPopup({
   );
 }
 
+/**
+ * One option as the sign-in language picker draws it: the label (icons inline before it), then,
+ * on the chosen option, a CheckedDot at the row's end. `meta` adds muted trailing text such as a
+ * count; with it the dot's place is kept on every row, so the counts line up.
+ */
 export function SelectItem({
   className,
   children,
+  meta,
   ...props
-}: SelectPrimitive.Item.Props): React.ReactElement {
+}: SelectPrimitive.Item.Props & { meta?: React.ReactNode }): React.ReactElement {
   return (
     <SelectPrimitive.Item
-      className={cn(
-        // t3code's row; Kiro: the selected option shows a check and the accent text (info-foreground,
-        // AA on the popover in both themes), highlighted or not.
-        "grid min-h-9 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-pointer grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 rounded-sm py-1 ps-2 pe-4 text-base outline-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-highlighted:bg-(--menu-highlight) data-highlighted:text-foreground data-selected:text-info-foreground data-selected:data-highlighted:text-info-foreground data-disabled:opacity-64 sm:min-h-8 sm:text-sm pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-        className,
-      )}
+      className={cn(POPUP_ROW_CLASS, POPUP_CHECK_ROW_CLASS, className)}
       data-slot="select-item"
       {...props}
     >
-      <SelectPrimitive.ItemIndicator className="col-start-1">
-        <svg
-          aria-hidden="true"
-          fill="none"
-          height="24"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          width="24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
-        </svg>
-      </SelectPrimitive.ItemIndicator>
-      <SelectPrimitive.ItemText className="wrap-anywhere col-start-2 min-w-0 [&_svg:not([class*='text-'])]:text-muted-foreground">
+      <SelectPrimitive.ItemText className="flex min-w-0 items-center gap-2.5 [&_svg:not([class*='text-'])]:text-muted-foreground">
         {children}
       </SelectPrimitive.ItemText>
+      {meta === undefined ? (
+        <SelectPrimitive.ItemIndicator className={POPUP_INDICATOR_CLASS}>
+          <CheckedDot />
+        </SelectPrimitive.ItemIndicator>
+      ) : (
+        <>
+          <span className={POPUP_ROW_META_CLASS}>{meta}</span>
+          <SelectPrimitive.ItemIndicator
+            className="invisible ps-3 in-data-selected:visible"
+            keepMounted
+          >
+            <CheckedDot />
+          </SelectPrimitive.ItemIndicator>
+        </>
+      )}
     </SelectPrimitive.Item>
   );
 }
@@ -219,7 +232,7 @@ export function SelectSeparator({
 }: SelectPrimitive.Separator.Props): React.ReactElement {
   return (
     <SelectPrimitive.Separator
-      className={cn("-mx-1 my-1 h-px bg-(--menu-border)", className)}
+      className={cn(POPUP_SEPARATOR_CLASS, className)}
       data-slot="select-separator"
       {...props}
     />
@@ -253,7 +266,7 @@ export function SelectGroupLabel(
 ): React.ReactElement {
   return (
     <SelectPrimitive.GroupLabel
-      className="px-2.5 pt-2 pb-1 font-medium text-muted-foreground text-xs"
+      className={POPUP_GROUP_LABEL_CLASS}
       data-slot="select-group-label"
       {...props}
     />

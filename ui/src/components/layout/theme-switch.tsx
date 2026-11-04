@@ -47,11 +47,7 @@ export function ThemeSwitch({
     return (
       <SegmentedControl
         aria-label={t("shell.theme.title")}
-        // Flat: a hairline frame, no track fill, and a shadowless round highlight.
-        className={cn(
-          "gap-0 rounded-full border bg-transparent p-px *:data-[slot=segmented-control-indicator]:rounded-full *:data-[slot=segmented-control-indicator]:bg-accent *:data-[slot=segmented-control-indicator]:shadow-none dark:*:data-[slot=segmented-control-indicator]:bg-accent",
-          className,
-        )}
+        className={className}
         role="group"
         size="sm"
       >
@@ -68,7 +64,7 @@ export function ThemeSwitch({
                     aria-pressed={active}
                     // 40 px below md and on touch screens (touch rule), 32 px from md up, with
                     // the segmented control's own 18 / 16 px icons.
-                    className="size-10 rounded-full p-0 data-pressed:bg-accent data-pressed:shadow-none sm:size-10 md:size-8 pointer-coarse:size-10"
+                    className="size-10 p-0 sm:size-10 md:size-8 pointer-coarse:size-10"
                     data-pressed={active ? "" : undefined}
                     onClick={(event) => setTheme(mode, event.currentTarget)}
                   />
@@ -97,7 +93,7 @@ export function ThemeSwitch({
                     className={HEADER_ICON_BUTTON}
                     ref={menuTriggerRef}
                     size="icon"
-                    variant="ghost"
+                    variant="quiet"
                   />
                 }
               />
@@ -142,7 +138,7 @@ export function ThemeSwitch({
             data-theme-mode={theme}
             onClick={(event) => setTheme(nextTheme(theme), event.currentTarget)}
             size="icon"
-            variant="ghost"
+            variant="quiet"
           />
         }
       >

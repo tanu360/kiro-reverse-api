@@ -178,7 +178,7 @@ const DateTickerCompact = memo(function DateTickerCompact({
   useActiveItemWidth(stackRef, labelItems, 0, width, reduceMotion, label);
 
   return (
-    <div className="overflow-hidden rounded-full bg-zinc-900 px-4 py-1 text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
+    <div className="overflow-hidden rounded-full bg-inverse px-4 py-1 text-inverse-foreground floating-shadow">
       <m.div className="relative h-6" style={{ width }}>
         <m.div
           className="absolute top-0 left-1/2 flex h-6 items-center"
@@ -268,7 +268,7 @@ const DateTickerInner = memo(function DateTickerInner({
   }, [currentMonthIndex, monthY, reduceMotion]);
 
   return (
-    <div className="overflow-hidden rounded-full bg-zinc-900 px-4 py-1 text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
+    <div className="overflow-hidden rounded-full bg-inverse px-4 py-1 text-inverse-foreground floating-shadow">
       <div className="relative h-6 overflow-hidden">
         <div className="flex items-center justify-center gap-1">
           {/* Month stack */}

@@ -63,6 +63,7 @@ export interface DataTableProps<T> {
    * and the first column lines up with the card title.
    */
   bleed?: boolean;
+  rowNumberOffset?: number;
 }
 
 const BLEED_WRAPPER = "-mx-4 sm:-mx-5";
@@ -87,12 +88,12 @@ function fromInteractiveChild(event: { target: EventTarget; currentTarget: Event
 const ALIGN_CLASS = { start: "text-left", center: "text-center", end: "text-right" } as const;
 // Column headers sit a step under the 14 px cells: 13 px, regular weight, muted (the sort
 // button turns the sorted column's header to the text colour).
-const HEAD_CLASS = "font-normal text-[13px]";
+const HEAD_CLASS = "font-normal text-meta";
 // Sticky cells need an opaque background: the panel's own (the card at 40 % over the page, as
 // t3code's SettingsGroup), with the row's hover and selected tints (foreground at 2 and 4 %) on
 // top, so a pinned cell does not read as a separate block.
 const STICKY_BASE =
-  "sticky z-[1] [--sticky-bg:color-mix(in_srgb,var(--card)_40%,var(--background))] bg-(--sticky-bg) [tr:hover>&]:bg-[color-mix(in_srgb,var(--sticky-bg),var(--foreground)_2%)] [tr[data-state=selected]>&]:bg-[color-mix(in_srgb,var(--sticky-bg),var(--foreground)_4%)]";
+  "sticky z-[1] bg-surface-inset [tr:hover>&]:bg-surface-inset-hover [tr[data-state=selected]>&]:bg-surface-inset-selected";
 const STICKY_CLASS = {
   start: cn(STICKY_BASE, "left-0"),
   end: cn(
@@ -129,6 +130,7 @@ export function DataTable<T>({
   caption,
   className,
   bleed = false,
+  rowNumberOffset,
 }: DataTableProps<T>): JSX.Element {
   const { t } = useT();
   const isMobile = useIsMobile();
@@ -337,8 +339,17 @@ export function DataTable<T>({
                 tabIndex={onRowClick ? 0 : undefined}
               >
                 {selection ? (
-                  <TableCell className="w-px">
+                  <TableCell className="group/row-number w-px">
+                    {rowNumberOffset !== undefined ? (
+                      <span
+                        aria-hidden="true"
+                        className="row-number block text-center text-xs text-muted-foreground tabular-nums group-hover/row-number:hidden group-focus-within/row-number:hidden"
+                      >
+                        {rowNumberOffset + row.index + 1}
+                      </span>
+                    ) : null}
                     <Checkbox
+                      className={rowNumberOffset !== undefined ? "row-checkbox" : undefined}
                       aria-label={t("table.selectRow", { label: selection.rowLabel(row.original) })}
                       checked={isSelected}
                       onCheckedChange={() => toggleOne(row.id)}

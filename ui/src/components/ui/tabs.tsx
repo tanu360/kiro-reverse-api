@@ -9,6 +9,7 @@ import {
   segmentedControlItemLayoutClassName,
   segmentedControlItemSizeClassNames,
   segmentedControlItemTouchClassName,
+  segmentedControlTrackClassName,
 } from "@/components/ui/segmented-control";
 
 type TabsVariant = "default" | "underline";
@@ -49,9 +50,10 @@ export function TabsList({
         "relative z-0 flex w-fit items-center justify-center gap-x-0.5 text-muted-foreground",
         "data-[orientation=vertical]:flex-col",
         variant === "default"
-          ? // Full-strength muted text: the coss /72 tint fell to 2.8:1 (light) and 4.1:1 (dark).
-            "rounded-lg bg-input/40 p-0.5 text-muted-foreground"
-          : "data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:hover:bg-accent",
+          ? // The segmented control's frame (the sign-in theme toggle): round tabs in a hairline pill.
+            cn(segmentedControlTrackClassName, "*:data-[slot=tabs-tab]:rounded-full")
+          : // Page-level tabs: left-aligned over a full-width hairline, the active one underlined.
+            "justify-start gap-x-1 data-[orientation=horizontal]:border-b data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:grow-0 *:data-[slot=tabs-tab]:hover:bg-accent",
         className,
       )}
       data-size={size}

@@ -58,10 +58,12 @@ export function PopoverPopup({
       >
         <PopoverPrimitive.Popup
           className={cn(
-            "dropdown-glass relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) rounded-lg text-popover-foreground outline-none transition-[width,height,scale,opacity] has-data-[slot=calendar]:rounded-xl data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-popover-foreground outline-none transition-[width,height,scale,opacity] has-data-[slot=calendar]:rounded-xl data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            // A tooltip-style popover is drawn as the tooltip (tooltip.tsx); any other is the one
+            // popup sheet (index.css popup-surface), as menus and selects.
             tooltipStyle
-              ? "w-fit text-balance rounded-md text-xs floating-shadow"
-              : "floating-shadow",
+              ? "w-fit text-balance rounded-md border bg-popover not-dark:bg-clip-padding text-xs floating-shadow"
+              : "popup-surface rounded-lg text-sm",
             className,
           )}
           data-slot="popover-popup"

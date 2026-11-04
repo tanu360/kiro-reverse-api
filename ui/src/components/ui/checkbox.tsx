@@ -11,7 +11,9 @@ export function Checkbox({
   return (
     <CheckboxPrimitive.Root
       className={cn(
-        "relative inline-flex size-4.5 shrink-0 items-center justify-center rounded-[.25rem] border border-input bg-background not-dark:bg-clip-padding outline-none transition-shadow before:pointer-events-none before:absolute before:inset-0 before:rounded-[3px] focus-outline aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 data-disabled:cursor-not-allowed data-disabled:opacity-64 sm:size-4 dark:not-data-checked:bg-input/32",
+        // The sign-in checkbox: a flat 16 px box in the field fill with a firmer hairline
+        // (index.css --field-border-strong) while unchecked, solid purple once checked.
+        "relative inline-flex size-4 shrink-0 items-center justify-center rounded-[.25rem] border border-field-border-strong bg-field outline-none focus-outline aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 data-disabled:cursor-not-allowed data-disabled:opacity-64 data-checked:border-primary",
         className,
       )}
       data-slot="checkbox"
@@ -28,7 +30,7 @@ export function Checkbox({
             {state.indeterminate ? (
               <svg
                 aria-hidden="true"
-                className="size-3.5 sm:size-3"
+                className="size-3"
                 fill="none"
                 height="24"
                 stroke="currentColor"
@@ -44,7 +46,7 @@ export function Checkbox({
             ) : (
               <svg
                 aria-hidden="true"
-                className="size-3.5 sm:size-3"
+                className="size-3"
                 fill="none"
                 height="24"
                 stroke="currentColor"

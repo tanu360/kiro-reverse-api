@@ -39,7 +39,7 @@ export function DetailSection({
       )}
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <h3 className="font-heading font-medium text-sm" id={headingId}>
+        <h3 className="font-medium text-sm" id={headingId}>
           {title}
         </h3>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

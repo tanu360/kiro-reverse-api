@@ -25,9 +25,11 @@ export function Input({
     "h-8.5 w-full min-w-0 rounded-[inherit] px-[calc(--spacing(3)-1px)] text-foreground leading-8.5 outline-none [transition:background-color_5000000s_ease-in-out_0s] placeholder:text-placeholder sm:h-7.5 sm:leading-7.5 autofill:[-webkit-text-fill-color:var(--foreground)]",
     size === "sm" &&
       "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
-    size === "lg" && "h-9.5 leading-9.5 sm:h-8.5 sm:leading-8.5",
-    // Touch screens get a 40 px field whatever the size (pointer-coarse sorts after sm:).
-    "pointer-coarse:h-10 pointer-coarse:leading-10",
+    // lg is the sign-in password field: 44 px on phones and touch screens, 40 px from sm up.
+    size === "lg"
+      ? "h-10.5 leading-10.5 sm:h-9.5 sm:leading-9.5 pointer-coarse:h-10.5 pointer-coarse:leading-10.5"
+      : // Touch screens get a 40 px field whatever the size (pointer-coarse sorts after sm:).
+        "pointer-coarse:h-10 pointer-coarse:leading-10",
     props.type === "search" &&
       "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none",
     props.type === "number" &&
@@ -41,7 +43,9 @@ export function Input({
       className={
         cn(
           !unstyled &&
-            "relative inline-flex w-full rounded-lg border border-input bg-background not-dark:bg-clip-padding text-base text-foreground ring-ring/24 transition-shadow before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] has-focus-visible:has-aria-invalid:border-destructive/64 has-focus-visible:has-aria-invalid:ring-destructive/16 has-aria-invalid:border-destructive/36 has-focus-visible:border-ring has-autofill:bg-foreground/4 has-disabled:opacity-64 has-focus-visible:ring-[3px] has-focus-visible:ring-inset sm:text-sm dark:bg-input/32 dark:has-autofill:bg-foreground/8 dark:has-aria-invalid:ring-destructive/24",
+            // The sign-in password field's soft fill (index.css --field-*); focus shows by the
+            // border colour alone.
+            "relative inline-flex w-full rounded-lg border border-field-border bg-field text-base text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover has-focus-visible:border-field-border-focus has-focus-visible:bg-field-focus has-aria-invalid:border-destructive/36 has-focus-visible:has-aria-invalid:border-destructive/64 has-autofill:bg-foreground/4 has-disabled:opacity-64 sm:text-sm dark:has-autofill:bg-foreground/8",
           className,
         ) || undefined
       }

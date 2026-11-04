@@ -35,7 +35,7 @@ export const badgeVariants = cva(
     },
     variants: {
       size: {
-        sm: "h-5 px-1.5 text-[0.6875rem] has-[>svg:first-child]:ps-1 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-5 px-1.5 text-2xs has-[>svg:first-child]:ps-1 [&_svg:not([class*='size-'])]:size-3",
         // The disc nearly fills the pill (a 2 px inset), as in the reference; line icons stay a
         // step smaller so they sit with the 12 px label instead of shouting over it.
         default:
@@ -66,7 +66,8 @@ export const badgeVariants = cva(
         solid:
           "grain-overlay [--grain-overlay-opacity:0.1] bg-(--badge-solid) text-(--badge-solid-fg) [--badge-dot:var(--badge-solid-fg)] [--badge-glyph:var(--badge-solid)] [--badge-icon:var(--badge-solid-fg)] [button&,a&]:hover:opacity-90",
         outline:
-          "border-input bg-background text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-disc)] dark:bg-input/32 [button&,a&]:hover:bg-accent/50 dark:[button&,a&]:hover:bg-input/48",
+          // The field fill and hairline (index.css --field-*), as the outline button.
+          "border-field-border bg-field text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-disc)] [button&,a&]:hover:bg-field-hover",
       },
     },
   },
