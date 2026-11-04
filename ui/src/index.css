@@ -928,6 +928,19 @@
   :where(svg.lucide[stroke-width="2"]) {
     stroke-width: 1.75;
   }
+  /*
+   * Selected text in Kiro purple instead of the browser's blue, and the text turns white on it,
+   * as on a filled button: solid purple in light (4.7:1 for white text), a step deeper in dark
+   * (the purple at 80 % over the black page), so a selection reads as one highlighted strip.
+   */
+  ::selection {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .dark ::selection {
+    background-color: color-mix(in oklab, var(--primary) 80%, transparent);
+    color: var(--primary-foreground);
+  }
   html,
   body {
     background-color: var(--app-chrome-background);
