@@ -33,7 +33,7 @@
   "serverError.creditLimitNegative": "Credits 限额必须大于或等于 0。",
   "serverError.microsoftCanceled": "Microsoft 登录已取消，请重新开始。",
   "serverError.microsoftDuplicate": "该 Microsoft 账号已添加。",
-  "serverError.apiKeyLockout": "必须使用 API Key，但不会有任何 Key 保持启用，所有客户端都会被拒绝。",
+  "serverError.apiKeyLockout": "必须使用 API Key，但不会有任何 API Key 保持启用，所有客户端都会被拒绝。",
   "serverError.ssoSessionExpired": "登录会话已过期，请重新开始。",
   "serverError.invalidCallbackUrl": "回调 URL 无效，请重新复制完整地址。",
   "serverError.ssoStateMismatch": "该回调 URL 属于另一次登录，请重新开始并使用新链接。",
