@@ -8,6 +8,7 @@ import { clearSession, setSession } from "@/lib/auth/session";
 import {
   type AdminEvent,
   AdminEventsProvider,
+  CHANGE_DEBOUNCE_MS,
   type EventSourceLike,
   useAdminEvent,
   useAdminEventsStatus,
@@ -214,6 +215,72 @@ describe("AdminEventsProvider", () => {
       expect.objectContaining({ queryKey: queryKeys.backups.all }),
     );
     expect(seen).toEqual([{ type: "backup_created", payload: "b-1" }]);
+  });
+});
+
+describe("change events", () => {
+  async function invalidatedAfterBurst(type: string, count = 1) {
+    const client = renderProvider();
+    await flush();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    for (let i = 0; i < count; i++) {
+      act(() => latest().emit(type, JSON.stringify({ type, payload: `id-${i}` })));
+    }
+    await advance(CHANGE_DEBOUNCE_MS - 1);
+    expect(invalidate).not.toHaveBeenCalled();
+    await advance(1);
+    return invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+  }
+
+  it("refetches the account list and status once for a burst of accounts_changed", async () => {
+    const keys = await invalidatedAfterBurst("accounts_changed", 5);
+    expect(keys).toEqual([queryKeys.accounts.list(), queryKeys.status]);
+  });
+
+  it("refetches API keys on api_keys_changed", async () => {
+    expect(await invalidatedAfterBurst("api_keys_changed")).toEqual([queryKeys.apiKeys.all]);
+  });
+
+  it("refetches settings on settings_changed", async () => {
+    expect(await invalidatedAfterBurst("settings_changed")).toEqual([queryKeys.settings.all]);
+  });
+
+  it("refetches status, observe and requests on stats_reset", async () => {
+    expect(await invalidatedAfterBurst("stats_reset")).toEqual([
+      queryKeys.status,
+      queryKeys.observe.all,
+      queryKeys.requests.all,
+    ]);
+  });
+
+  it("refetches backups on backup_deleted", async () => {
+    expect(await invalidatedAfterBurst("backup_deleted", 3)).toEqual([queryKeys.backups.all]);
+  });
+
+  it("debounces each event type on its own timer", async () => {
+    const client = renderProvider();
+    await flush();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    act(() => latest().emit("accounts_changed"));
+    await advance(CHANGE_DEBOUNCE_MS / 2);
+    act(() => latest().emit("api_keys_changed"));
+    await advance(CHANGE_DEBOUNCE_MS / 2);
+    expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([
+      queryKeys.accounts.list(),
+      queryKeys.status,
+    ]);
+    await advance(CHANGE_DEBOUNCE_MS / 2);
+    expect(invalidate).toHaveBeenLastCalledWith({ queryKey: queryKeys.apiKeys.all });
+  });
+
+  it("drops pending refetches when the stream closes", async () => {
+    const client = renderProvider();
+    await flush();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    act(() => latest().emit("settings_changed"));
+    act(() => clearSession("signout"));
+    await advance(CHANGE_DEBOUNCE_MS * 2);
+    expect(invalidate).not.toHaveBeenCalled();
   });
 });
 

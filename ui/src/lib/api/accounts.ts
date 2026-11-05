@@ -42,6 +42,10 @@ export function deleteAccount(id: string): Promise<SuccessResponse> {
   return apiRequest(accountPath(id), { method: "DELETE" });
 }
 
+/**
+ * Every action answers with per-id `results`. refresh and refreshModels run 8 accounts at a
+ * time on the server; unknown ids count as failed with status "not_found".
+ */
 export function batchAccounts(req: BatchAccountsRequest): Promise<BatchAccountsResponse> {
   return apiRequest("/accounts/batch", { method: "POST", body: req });
 }
@@ -73,6 +77,7 @@ export function refreshAccountModels(id: string): Promise<RefreshAccountModelsRe
   return apiRequest(accountPath(id, "/models/refresh"), { method: "POST" });
 }
 
+/** `refreshed` and `failed` count accounts; `models` is the cached model count. */
 export function refreshAllModels(): Promise<RefreshAllModelsResponse> {
   return apiRequest("/accounts/models/refresh", { method: "POST" });
 }

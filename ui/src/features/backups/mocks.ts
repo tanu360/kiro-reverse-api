@@ -13,6 +13,42 @@ import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
 const BACKUP_FORMAT = "kiro-proxy-backup";
 const BODY_LIMIT = 32 * 1024 * 1024;
+const KEEP_MIN = 1;
+const KEEP_MAX = 200;
+/** What PruneScheduled keeps when keep was never set. */
+const KEEP_DEFAULT = 50;
+/** The Go scheduler checks every 5 minutes, on wall-clock multiples. */
+const TICK_SECONDS = 300;
+const INTERVAL_SECONDS: Record<BackupCadence, number> = {
+  hourly: 3600,
+  daily: 86400,
+  weekly: 604800,
+};
+
+function isCadence(value: unknown): value is BackupCadence {
+  return typeof value === "string" && Object.hasOwn(INTERVAL_SECONDS, value);
+}
+
+/** max(lastRun + interval, now) rounded up to the next tick; undefined while off. */
+function nextRun(schedule: BackupSchedule): number | undefined {
+  if (!schedule.enabled || !isCadence(schedule.cadence)) return undefined;
+  const now = mockNowUnix();
+  const due = schedule.lastRun
+    ? Math.max(schedule.lastRun + INTERVAL_SECONDS[schedule.cadence], now)
+    : now;
+  return Math.ceil(due / TICK_SECONDS) * TICK_SECONDS;
+}
+
+/** Keeps the newest `keep` scheduled backups, like config.PruneScheduled. */
+function pruneScheduled(keep: number): void {
+  const scheduled = sortBackups(mockDb.backups.filter((row) => row.kind === "scheduled"));
+  const drop = new Set(scheduled.slice(keep).map((row) => row.id));
+  mockDb.backups = mockDb.backups.filter((row) => !drop.has(row.id));
+}
+
+function notFound(id: string): Response {
+  return jsonError(404, `backup not found: ${id}`, { code: "backup_not_found" });
+}
 
 /** Server order: createdAt DESC, id DESC. */
 function sortBackups(rows: BackupEntry[]): BackupEntry[] {
@@ -58,6 +94,8 @@ function wireSchedule(schedule: BackupSchedule): BackupSchedule {
   if (schedule.cadence) out.cadence = schedule.cadence;
   if (schedule.keep) out.keep = schedule.keep;
   if (schedule.lastRun) out.lastRun = schedule.lastRun;
+  const next = nextRun(schedule);
+  if (next) out.nextRun = next;
   return out;
 }
 
@@ -76,21 +114,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Validates backup bytes like config.parseBackupData and returns the number of accounts the
- * restore brings in, or the server's 500 message.
+ * restore brings in, or the server's 400 message and code.
  */
-function parseBackup(text: string): { accounts: number } | { error: string } {
+function parseBackup(text: string): { accounts: number } | { error: string; code: string } {
   let data: unknown;
   try {
     data = JSON.parse(text);
   } catch {
-    return { error: "backup content is not valid JSON" };
+    return { error: "backup content is not valid JSON", code: "backup_invalid_json" };
   }
   if (!isRecord(data) || data.format !== BACKUP_FORMAT) {
-    return { error: `unsupported backup format: expected ${BACKUP_FORMAT}` };
+    return {
+      error: `unsupported backup format: expected ${BACKUP_FORMAT}`,
+      code: "backup_unsupported_format",
+    };
   }
-  if (data.version !== 1) return { error: `unsupported backup version: ${String(data.version)}` };
+  if (data.version !== 1) {
+    return {
+      error: `unsupported backup version: ${String(data.version)}`,
+      code: "backup_unsupported_version",
+    };
+  }
   const config = isRecord(data.config) ? data.config : null;
-  if (!config?.password) return { error: "backup schema mismatch: missing password" };
+  if (!config?.password) {
+    return { error: "backup schema mismatch: missing password", code: "backup_schema_mismatch" };
+  }
   const credentials = Array.isArray(data.credentials) ? data.credentials : null;
   const accounts = Array.isArray(config.accounts) ? config.accounts : [];
   return { accounts: (credentials ?? accounts).length };
@@ -118,14 +166,28 @@ export const handlers: HttpHandler[] = [
     const body = await readJson(request);
     if (!body.ok || !isRecord(body.value)) return jsonError(400, "Invalid JSON");
     const update = body.value as Partial<BackupScheduleUpdate>;
-    // No server validation of cadence or keep; lastRun is preserved.
+    if (!isCadence(update.cadence)) {
+      return jsonError(400, "cadence must be hourly, daily or weekly", { code: "invalid_cadence" });
+    }
+    const keep = update.keep;
+    if (typeof keep !== "number" || !Number.isInteger(keep) || keep < KEEP_MIN || keep > KEEP_MAX) {
+      return jsonError(400, `keep must be between ${KEEP_MIN} and ${KEEP_MAX}`, {
+        code: "invalid_keep",
+      });
+    }
+    const previousKeep = mockDb.schedule.keep || KEEP_DEFAULT;
+    // lastRun is preserved.
     mockDb.schedule = {
       lastRun: mockDb.schedule.lastRun,
       enabled: Boolean(update.enabled),
-      cadence: update.cadence as BackupCadence | undefined,
-      keep: Number(update.keep) || 0,
+      cadence: update.cadence,
+      keep,
     };
-    return HttpResponse.json({ success: true });
+    if (keep < previousKeep) {
+      pruneScheduled(keep);
+      publishMockEvent("backup_deleted", "*");
+    }
+    return HttpResponse.json({ schedule: wireSchedule(mockDb.schedule) });
   }),
 
   http.post(apiUrl("/backups/restore"), async ({ request }) => {
@@ -158,7 +220,7 @@ export const handlers: HttpHandler[] = [
       note = "upload uploaded";
     }
     const parsed = parseBackup(text);
-    if ("error" in parsed) return jsonError(500, parsed.error);
+    if ("error" in parsed) return jsonError(400, parsed.error, { code: parsed.code });
     restoreFrom(note, parsed.accounts);
     publishMockEvent("backup_restored", "upload");
     return HttpResponse.json({ success: true });
@@ -194,7 +256,7 @@ export const handlers: HttpHandler[] = [
     await mockDelay();
     const id = String(params.id);
     const backup = findBackup(id);
-    if (!backup) return jsonError(404, `backup not found: ${id}`);
+    if (!backup) return notFound(id);
     const bytes = JSON.stringify(backupFile(backup), null, 2);
     return new HttpResponse(bytes, {
       headers: {
@@ -210,8 +272,7 @@ export const handlers: HttpHandler[] = [
     await mockDelay();
     const id = String(params.id);
     const backup = findBackup(id);
-    // Every restore failure is a 500, an unknown id included.
-    if (!backup) return jsonError(500, `backup not found: ${id}`);
+    if (!backup) return notFound(id);
     restoreFrom(`auto before restore ${id}`, backup.accountCnt ?? 0);
     publishMockEvent("backup_restored", id);
     return HttpResponse.json({ success: true });
@@ -222,8 +283,9 @@ export const handlers: HttpHandler[] = [
     if (denied) return denied;
     await mockDelay();
     const id = String(params.id);
-    if (!findBackup(id)) return jsonError(500, `backup not found: ${id}`);
+    if (!findBackup(id)) return notFound(id);
     mockDb.backups = mockDb.backups.filter((row) => row.id !== id);
+    publishMockEvent("backup_deleted", id);
     return HttpResponse.json({ success: true });
   }),
 ];

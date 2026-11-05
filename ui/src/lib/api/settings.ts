@@ -25,7 +25,10 @@ export function settingsQuery() {
   return queryOptions({ queryKey: queryKeys.settings.general(), queryFn: getSettings });
 }
 
-/** Patch semantics. A non-empty `password` revokes every admin session, including this one. */
+/**
+ * Patch semantics. A non-empty `password` revokes every admin session, including this one.
+ * 409 `api_key_lockout` when it turns requireApiKey on while no API key is enabled.
+ */
 export function updateSettings(patch: SettingsPatch): Promise<SuccessResponse> {
   return apiRequest("/settings", { method: "POST", body: patch });
 }

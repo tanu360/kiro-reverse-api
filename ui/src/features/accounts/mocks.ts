@@ -1,12 +1,14 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
 import type {
   Account,
+  AccountActionResult,
   AccountFull,
   AccountInfo,
   BatchAction,
   UpdateAccountRequest,
 } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { publishMockEvent } from "@/lib/mocks/events";
 import {
   makeCachedModelIds,
   makeExport,
@@ -19,7 +21,38 @@ import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
 // Accounts endpoints over mockDb, with the Go server's semantics (research area-accounts §1).
 
-const BATCH_ACTIONS: readonly BatchAction[] = ["enable", "disable", "refresh", "delete"];
+const BATCH_ACTIONS: readonly BatchAction[] = [
+  "enable",
+  "disable",
+  "refresh",
+  "refreshModels",
+  "delete",
+];
+
+/** accounts_changed after every account write, as the Go config hook sends it. */
+function accountsChanged(id = "*"): void {
+  publishMockEvent("accounts_changed", id);
+}
+
+/**
+ * One result per distinct requested id in request order, like Go's matchAccounts: unknown ids
+ * fail with status "not_found", known ones get `act`'s outcome.
+ */
+function eachRequested(
+  ids: string[],
+  act: (account: Account) => Omit<AccountActionResult, "id">,
+): AccountActionResult[] {
+  return [...new Set(ids)].map((id) => {
+    const account = findAccount(id);
+    if (!account) return { id, ok: false, error: "Account not found", status: "not_found" };
+    return { id, ...act(account) };
+  });
+}
+
+function countOk(results: AccountActionResult[]): { ok: number; failed: number } {
+  const ok = results.filter((result) => result.ok).length;
+  return { ok, failed: results.length - ok };
+}
 
 function findAccount(id: string): Account | undefined {
   return mockDb.accounts.find((account) => account.id === id);
@@ -156,10 +189,8 @@ export const handlers: HttpHandler[] = [
     const action = body.action as BatchAction;
     if (!BATCH_ACTIONS.includes(action)) return jsonError(400, `Invalid action: ${body.action}`);
     await mockDelay();
-    const idSet = new Set(ids);
     if (action === "enable" || action === "disable") {
-      for (const account of mockDb.accounts) {
-        if (!idSet.has(account.id)) continue;
+      const results = eachRequested(ids, (account) => {
         if (action === "enable") {
           enableAccount(account);
           account.silent = false;
@@ -168,37 +199,52 @@ export const handlers: HttpHandler[] = [
         } else {
           account.enabled = false;
         }
-      }
-      // count echoes the requested ids, not the matched ones.
-      return HttpResponse.json({ success: true, count: ids.length });
+        return { ok: true };
+      });
+      accountsChanged();
+      const { ok, failed } = countOk(results);
+      return HttpResponse.json({ success: true, count: ok, failed, results });
     }
     if (action === "refresh") {
-      let refreshed = 0;
-      let failed = 0;
-      for (const id of ids) {
-        const account = findAccount(id);
-        if (!account) {
-          failed++;
-          continue;
+      const results = eachRequested(ids, (account) => {
+        // The suspended branch marks the account instead of failing it.
+        if (account.banStatus === "SUSPENDED") {
+          account.enabled = false;
+          return { ok: true, status: "suspended" };
         }
         account.lastRefresh = mockNowUnix();
-        refreshed++;
-      }
-      return HttpResponse.json({ success: true, refreshed, failed });
+        return { ok: true };
+      });
+      accountsChanged();
+      const suspended = results.filter((result) => result.status === "suspended").length;
+      const { ok, failed } = countOk(results);
+      return HttpResponse.json({
+        success: true,
+        refreshed: ok - suspended,
+        suspended,
+        failed,
+        results,
+      });
     }
-    let deleted = 0;
-    let failed = 0;
-    for (const id of ids) {
-      const index = mockDb.accounts.findIndex((account) => account.id === id);
-      if (index === -1) {
-        failed++;
-        continue;
-      }
-      mockDb.accounts.splice(index, 1);
-      delete mockDb.secrets[id];
-      deleted++;
+    if (action === "refreshModels") {
+      const results = eachRequested(ids, () => ({ ok: true }));
+      const { ok, failed } = countOk(results);
+      return HttpResponse.json({
+        success: true,
+        refreshed: ok,
+        failed,
+        models: liveModels().length,
+        results,
+      });
     }
-    return HttpResponse.json({ success: true, deleted, failed });
+    const results = eachRequested(ids, (account) => {
+      mockDb.accounts = mockDb.accounts.filter((row) => row.id !== account.id);
+      delete mockDb.secrets[account.id];
+      return { ok: true };
+    });
+    accountsChanged();
+    const { ok, failed } = countOk(results);
+    return HttpResponse.json({ success: true, deleted: ok, failed, results });
   }),
 
   // Registered before /accounts/:id/... so "models" is never read as an account id.
@@ -206,7 +252,18 @@ export const handlers: HttpHandler[] = [
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
-    return HttpResponse.json({ success: true, refreshed: liveModels().length, failed: 0 });
+    // One sweep over the enabled accounts; `refreshed` and `failed` count accounts.
+    const results: AccountActionResult[] = mockDb.accounts
+      .filter((account) => account.enabled)
+      .map((account) => ({ id: account.id, ok: true }));
+    return HttpResponse.json({
+      success: true,
+      accounts: results.length,
+      refreshed: results.length,
+      failed: 0,
+      models: liveModels().length,
+      results,
+    });
   }),
 
   http.post(apiUrl("/accounts/:id/models/refresh"), async ({ request, params }) => {
@@ -226,9 +283,11 @@ export const handlers: HttpHandler[] = [
     // The suspended branch marks the account and answers without `info`.
     if (account.banStatus === "SUSPENDED") {
       account.enabled = false;
+      accountsChanged(account.id);
       return HttpResponse.json({ success: true, message: "Account status updated" });
     }
     account.lastRefresh = mockNowUnix();
+    accountsChanged(account.id);
     return HttpResponse.json({ success: true, info: accountInfo(account) });
   }),
 
@@ -357,6 +416,7 @@ export const handlers: HttpHandler[] = [
     if (!account) return jsonError(404, "Account not found");
     await mockDelay();
     applyUpdate(account, body);
+    accountsChanged(account.id);
     return HttpResponse.json({ success: true });
   }),
 
@@ -368,6 +428,7 @@ export const handlers: HttpHandler[] = [
     const id = accountId(params);
     mockDb.accounts = mockDb.accounts.filter((account) => account.id !== id);
     delete mockDb.secrets[id];
+    accountsChanged(id);
     return HttpResponse.json({ success: true });
   }),
 

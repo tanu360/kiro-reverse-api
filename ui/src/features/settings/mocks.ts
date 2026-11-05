@@ -7,6 +7,7 @@ import type {
   ThinkingFormat,
 } from "@/lib/api/types";
 import { claimMockPassword, mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { publishMockEvent } from "@/lib/mocks/events";
 import { defaultModelMappings } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
@@ -14,6 +15,12 @@ import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 // validation order, error strings and patch semantics.
 
 const OK = { success: true } as const;
+
+/** A saved settings write: other tabs refetch on settings_changed, as Go sends it. */
+function saved(): Response {
+  publishMockEvent("settings_changed");
+  return HttpResponse.json(OK);
+}
 const MAX_AUTO_CONTINUE = 10;
 const MIN_PASSWORD_RUNES = 8;
 const MAX_MAPPINGS = 200;
@@ -197,6 +204,14 @@ export const handlers: HttpHandler[] = [
     if (patch.password && [...patch.password].length < MIN_PASSWORD_RUNES) {
       return jsonError(400, "Password must be at least 8 characters");
     }
+    // Turning the requirement on with no enabled key would lock every client out.
+    if (
+      patch.requireApiKey === true &&
+      !mockDb.settings.requireApiKey &&
+      !mockDb.apiKeys.some((key) => key.enabled)
+    ) {
+      return jsonError(409, "would lock out every client", { code: "api_key_lockout" });
+    }
     const { password, ...rest } = patch;
     // An empty password is ignored, like Go. A real one would also revoke every admin session;
     // mock tokens stay valid, so only the next POST /session sees the new password.
@@ -204,7 +219,7 @@ export const handlers: HttpHandler[] = [
       claimMockPassword(password);
     }
     Object.assign(mockDb.settings, rest);
-    return HttpResponse.json(OK);
+    return saved();
   }),
 
   http.get(apiUrl("/thinking"), async ({ request }) => {
@@ -243,7 +258,7 @@ export const handlers: HttpHandler[] = [
       openaiFormat: (openaiFormat ?? "") as ThinkingFormat,
       claudeFormat: (claudeFormat ?? "") as ThinkingFormat,
     };
-    return HttpResponse.json(OK);
+    return saved();
   }),
 
   http.get(apiUrl("/model-mappings"), async ({ request }) => {
@@ -263,7 +278,7 @@ export const handlers: HttpHandler[] = [
     const result = normalizeMappings(input);
     if (!result.ok) return jsonError(400, result.error, { index: result.index });
     mockDb.modelMappings = result.rules;
-    return HttpResponse.json(OK);
+    return saved();
   }),
 
   http.get(apiUrl("/endpoint"), async ({ request }) => {
@@ -289,7 +304,7 @@ export const handlers: HttpHandler[] = [
       preferredEndpoint: preferred as PreferredEndpoint,
       endpointFallback: fallback ?? mockDb.endpoint.endpointFallback,
     };
-    return HttpResponse.json(OK);
+    return saved();
   }),
 
   http.get(apiUrl("/proxy"), async ({ request }) => {
@@ -311,7 +326,7 @@ export const handlers: HttpHandler[] = [
       return jsonError(400, "proxyURL must start with http://, https://, socks5://, or socks5h://");
     }
     mockDb.proxy = { proxyURL: url };
-    return HttpResponse.json(OK);
+    return saved();
   }),
 
   http.get(apiUrl("/prompt-filter"), async ({ request }) => {
@@ -340,7 +355,7 @@ export const handlers: HttpHandler[] = [
       next.rules = rules;
     }
     mockDb.promptFilter = next;
-    return HttpResponse.json(OK);
+    return saved();
   }),
 
   http.post(apiUrl("/stats/reset"), async ({ request }) => {
@@ -351,6 +366,7 @@ export const handlers: HttpHandler[] = [
     mockDb.errors = [];
     mockDb.modelMix = [];
     mockDb.startedAt = mockNowUnix();
+    publishMockEvent("stats_reset");
     return HttpResponse.json(OK);
   }),
 ];

@@ -1,5 +1,23 @@
 import type { TFunction } from "@/lib/i18n";
 import { isApiError } from "./errors";
+import type { ServerErrorCode } from "./types";
+
+/**
+ * ApiErrorBody.code -> translation key. A code wins over the message, so the server can reword
+ * its English text without breaking the UI.
+ */
+export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string>>> = {
+  api_key_lockout: "api:keys.lockoutWarning",
+};
+
+/** The `code` of an ApiError's JSON body, or null. */
+export function serverErrorCode(error: unknown): string | null {
+  if (!isApiError(error)) return null;
+  const body = error.body;
+  if (typeof body !== "object" || body === null) return null;
+  const code = (body as { code?: unknown }).code;
+  return typeof code === "string" && code ? code : null;
+}
 
 /** Exact server error message -> 'errors:<key>'. The server sends English text with no codes. */
 // biome-ignore format: keys are the exact server strings; keep them single-quoted, one per line.
@@ -112,6 +130,9 @@ function translateServerMessage(message: string, t: TFunction): string | null {
 export function errorMessage(error: unknown, t: TFunction, fallbackKey = "errors:generic"): string {
   if (!isApiError(error)) return t(fallbackKey);
   if (error.status === 0) return t("errors:network");
+  const code = serverErrorCode(error);
+  const codeKey = code ? SERVER_ERROR_CODES[code as ServerErrorCode] : undefined;
+  if (codeKey) return t(codeKey);
   const message = error.serverMessage.trim();
   if (!message) return t(fallbackKey);
   const exact = serverErrorKey(message);

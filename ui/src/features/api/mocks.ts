@@ -1,6 +1,7 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
 import type { ApiKey } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { publishMockEvent } from "@/lib/mocks/events";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
 // /admin/api/api-keys, as proxy/admin_apikeys.go answers it. The settings endpoints belong to the
@@ -72,6 +73,19 @@ function findKey(id: string): StoredKey | undefined {
   return mockDb.apiKeys.find((k) => k.id === id);
 }
 
+/**
+ * Go's removingKeyLocksOut: disabling or deleting `stored` while keys are required would leave
+ * no enabled key, so every client would get 401.
+ */
+function removingLocksOut(stored: StoredKey | undefined): boolean {
+  if (!stored?.enabled || !mockDb.settings.requireApiKey) return false;
+  return mockDb.apiKeys.filter((k) => k.enabled).length <= 1;
+}
+
+function lockout(): Response {
+  return jsonError(409, "would lock out every client", { code: "api_key_lockout" });
+}
+
 export const handlers: HttpHandler[] = [
   http.get(apiUrl("/api-keys"), async ({ request }) => {
     const denied = requireAuth(request);
@@ -116,6 +130,7 @@ export const handlers: HttpHandler[] = [
       requestsCount: 0,
     };
     mockDb.apiKeys.push(stored);
+    publishMockEvent("api_keys_changed", stored.id);
     return HttpResponse.json({ success: true, id: stored.id, key, apiKey: view(stored) });
   }),
 
@@ -138,12 +153,14 @@ export const handlers: HttpHandler[] = [
         return jsonError(400, "api key value collides with existing entry");
       }
     }
+    if (body.enabled === false && removingLocksOut(stored)) return lockout();
     if (typeof body.name === "string") stored.name = body.name.trim() || undefined;
     if (typeof body.enabled === "boolean") stored.enabled = body.enabled;
     if (typeof body.tokenLimit === "number") stored.tokenLimit = body.tokenLimit;
     if (typeof body.creditLimit === "number") stored.creditLimit = body.creditLimit;
     stored.key = nextKey;
     stored.keyMasked = maskKey(nextKey);
+    publishMockEvent("api_keys_changed", stored.id);
     return HttpResponse.json({ success: true, apiKey: view(stored) });
   }),
 
@@ -152,7 +169,10 @@ export const handlers: HttpHandler[] = [
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
-    mockDb.apiKeys = mockDb.apiKeys.filter((k) => k.id !== String(params.id));
+    const id = String(params.id);
+    if (removingLocksOut(findKey(id))) return lockout();
+    mockDb.apiKeys = mockDb.apiKeys.filter((k) => k.id !== id);
+    publishMockEvent("api_keys_changed", id);
     return HttpResponse.json({ success: true });
   }),
 
@@ -166,6 +186,7 @@ export const handlers: HttpHandler[] = [
     stored.tokensUsed = 0;
     stored.creditsUsed = 0;
     stored.requestsCount = 0;
+    publishMockEvent("api_keys_changed", stored.id);
     return HttpResponse.json({ success: true, apiKey: view(stored) });
   }),
 ];

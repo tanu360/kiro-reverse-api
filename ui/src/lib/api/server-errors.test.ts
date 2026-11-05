@@ -5,8 +5,10 @@ import zh from "@/locales/errors/zh.json";
 import { ApiError } from "./errors";
 import {
   errorMessage,
+  SERVER_ERROR_CODES,
   SERVER_ERROR_KEYS,
   SERVER_ERROR_PHRASES,
+  serverErrorCode,
   serverErrorKey,
   serverErrorPhrase,
 } from "./server-errors";
@@ -130,5 +132,49 @@ describe("errorMessage", () => {
     expect(errorMessage(new Error("boom"), t, "settings:saveFailed")).toBe(
       "t(settings:saveFailed)",
     );
+  });
+});
+
+describe("server error codes", () => {
+  const lockout = () =>
+    new ApiError({
+      status: 409,
+      serverMessage: "would lock out every client",
+      body: { error: "would lock out every client", code: "api_key_lockout" },
+    });
+
+  it("reads the code from the JSON body", () => {
+    expect(serverErrorCode(lockout())).toBe("api_key_lockout");
+    expect(
+      serverErrorCode(new ApiError({ status: 500, serverMessage: "x", body: "x" })),
+    ).toBeNull();
+    expect(serverErrorCode(new Error("boom"))).toBeNull();
+  });
+
+  it("translates api_key_lockout by its code, whatever the message says", () => {
+    expect(errorMessage(lockout(), t)).toBe("t(api:keys.lockoutWarning)");
+    const reworded = new ApiError({
+      status: 409,
+      serverMessage: "no client could authenticate",
+      body: { code: "api_key_lockout" },
+    });
+    expect(errorMessage(reworded, t)).toBe("t(api:keys.lockoutWarning)");
+  });
+
+  it("shows real text in every language for each mapped code", () => {
+    for (const key of Object.values(SERVER_ERROR_CODES)) {
+      for (const lang of ["en", "zh", "vi", "pt-BR"] as const) {
+        expect(translate(lang, "common", key), `${lang} ${key}`).not.toBe(key);
+      }
+    }
+  });
+
+  it("keeps an unmapped code's message", () => {
+    const error = new ApiError({
+      status: 404,
+      serverMessage: "backup not found: abc",
+      body: { error: "backup not found: abc", code: "backup_not_found" },
+    });
+    expect(errorMessage(error, t)).toBe("backup not found: abc");
   });
 });

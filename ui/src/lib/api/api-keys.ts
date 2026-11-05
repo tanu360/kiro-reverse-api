@@ -37,10 +37,12 @@ export function createApiKey(req: ApiKeyCreateRequest): Promise<ApiKeyCreateResp
   return apiRequest("/api-keys", { method: "POST", body: req });
 }
 
+/** 409 `api_key_lockout` when it disables the last enabled key while keys are required. */
 export function updateApiKey(id: string, req: ApiKeyUpdateRequest): Promise<ApiKeyUpdateResponse> {
   return apiRequest(keyPath(id), { method: "PUT", body: req });
 }
 
+/** 409 `api_key_lockout` when it deletes the last enabled key while keys are required. */
 export function deleteApiKey(id: string): Promise<SuccessResponse> {
   return apiRequest(keyPath(id), { method: "DELETE" });
 }

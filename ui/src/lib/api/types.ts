@@ -9,6 +9,8 @@
 /** Error body of every non-2xx admin response. `index` comes with model-mapping 400s. */
 export interface ApiErrorBody {
   error: string;
+  /** Stable machine code on some errors (see ServerErrorCode); match on it, not on `error`. */
+  code?: ServerErrorCode | (string & {});
   /** 0-based index in the submitted model-mapping array; -1 = the whole list. */
   index?: number;
   success?: false;
@@ -17,6 +19,23 @@ export interface ApiErrorBody {
 export interface SuccessResponse {
   success: true;
 }
+
+/**
+ * Codes the server sends in ApiErrorBody.code.
+ * - api_key_lockout (409): the change would leave requireApiKey on with no enabled key.
+ * - backup_not_found (404): unknown backup id.
+ * - backup_* (400): an upload or stored backup the restore cannot read.
+ * - invalid_cadence / invalid_keep (400): POST /backups/schedule out of range.
+ */
+export type ServerErrorCode =
+  | "api_key_lockout"
+  | "backup_not_found"
+  | "backup_invalid_json"
+  | "backup_unsupported_format"
+  | "backup_unsupported_version"
+  | "backup_schema_mismatch"
+  | "invalid_cadence"
+  | "invalid_keep";
 
 // ---------------------------------------------------------------------------
 // Session and first run
@@ -46,8 +65,22 @@ export interface FirstRunResponse {
 // SSE (/admin/api/events)
 // ---------------------------------------------------------------------------
 
-/** Events the server emits. The dead `account_updated` / `accounts_refreshed` are dropped. */
-export type AdminEventType = "hello" | "observe_tick" | "backup_created" | "backup_restored";
+/**
+ * Events the server emits. The dead `account_updated` / `accounts_refreshed` are dropped.
+ * Change events carry the changed row's id as `payload`, or "*" for many (none for settings
+ * and stats): accounts_changed comes from every account write, background bans and cooldowns
+ * included; backup_deleted also fires with "*" when lowering `keep` prunes scheduled backups.
+ */
+export type AdminEventType =
+  | "hello"
+  | "observe_tick"
+  | "backup_created"
+  | "backup_restored"
+  | "backup_deleted"
+  | "accounts_changed"
+  | "api_keys_changed"
+  | "settings_changed"
+  | "stats_reset";
 export interface AdminEventData {
   type: AdminEventType;
   payload?: string;
@@ -373,28 +406,57 @@ export interface UpdateAccountRequest {
 }
 
 /** POST /accounts/batch */
-export type BatchAction = "enable" | "disable" | "refresh" | "delete";
+export type BatchAction = "enable" | "disable" | "refresh" | "refreshModels" | "delete";
 export interface BatchAccountsRequest {
   ids: string[];
   action: BatchAction;
 }
+/**
+ * One requested id's outcome, in request order (duplicates dropped). `status` is "not_found"
+ * for an unknown id, and "suspended" (with ok:true) when a refresh found the account suspended
+ * and marked it.
+ */
+export interface AccountActionResult {
+  id: string;
+  ok: boolean;
+  error?: string;
+  status?: "not_found" | "suspended";
+}
 export interface BatchEnableDisableResponse {
   success: true;
+  /** accounts saved; unknown ids are not counted */
   count: number;
+  /** unknown ids plus save failures */
+  failed: number;
+  results: AccountActionResult[];
 }
 export interface BatchRefreshResponse {
   success: true;
   refreshed: number;
+  /** marked suspended instead of refreshed */
+  suspended: number;
   failed: number;
+  results: AccountActionResult[];
+}
+export interface BatchRefreshModelsResponse {
+  success: true;
+  /** accounts whose model list was refreshed */
+  refreshed: number;
+  failed: number;
+  /** distinct models cached across all accounts afterwards */
+  models: number;
+  results: AccountActionResult[];
 }
 export interface BatchDeleteResponse {
   success: true;
   deleted: number;
   failed: number;
+  results: AccountActionResult[];
 }
 export type BatchAccountsResponse =
   | BatchEnableDisableResponse
   | BatchRefreshResponse
+  | BatchRefreshModelsResponse
   | BatchDeleteResponse;
 
 /** POST /accounts/{id}/refresh. PascalCase: the Go struct has no json tags. */
@@ -458,11 +520,17 @@ export interface RefreshAccountModelsResponse {
   success: true;
   count: number;
 }
+/** POST /accounts/models/refresh: one sweep over every enabled account. */
 export interface RefreshAllModelsResponse {
   success: true;
-  /** model count */
+  /** enabled accounts the sweep visited */
+  accounts: number;
+  /** accounts whose model list was refreshed */
   refreshed: number;
-  failed: 0;
+  failed: number;
+  /** distinct models cached afterwards */
+  models: number;
+  results: AccountActionResult[];
 }
 
 // Overage
@@ -920,10 +988,17 @@ export interface BackupSchedule {
   keep?: number;
   /** unix seconds, read-only */
   lastRun?: number;
+  /**
+   * unix seconds, read-only: when the scheduler takes the next backup, max(lastRun + cadence,
+   * now) rounded up to its 5-minute tick. Omitted while disabled.
+   */
+  nextRun?: number;
 }
+/** GET and POST /backups/schedule */
 export interface BackupScheduleResponse {
   schedule: BackupSchedule;
 }
+/** 400 unless cadence is hourly|daily|weekly and keep is 1..200. Lowering keep prunes at once. */
 export interface BackupScheduleUpdate {
   enabled: boolean;
   cadence: BackupCadence;

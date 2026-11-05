@@ -34,8 +34,13 @@ export function backupScheduleQuery() {
   return queryOptions({ queryKey: queryKeys.backups.schedule(), queryFn: getBackupSchedule });
 }
 
-export function updateBackupSchedule(body: BackupScheduleUpdate): Promise<SuccessResponse> {
-  return apiRequest("/backups/schedule", { method: "POST", body });
+/** Answers with the saved schedule, `nextRun` included. */
+export async function updateBackupSchedule(body: BackupScheduleUpdate): Promise<BackupSchedule> {
+  const res = await apiRequest<BackupScheduleResponse>("/backups/schedule", {
+    method: "POST",
+    body,
+  });
+  return res.schedule ?? {};
 }
 
 /** Always sends a JSON body: the server answers an empty body with 400 Invalid JSON. */
@@ -49,18 +54,27 @@ export async function downloadBackup(id: string): Promise<{ blob: Blob; filename
   return { blob, filename: filename ?? `kiro-backup-${id}.json` };
 }
 
-/** Revokes every admin session server-side on success. */
+/**
+ * Revokes every admin session server-side on success. 404 `backup_not_found` for an unknown id,
+ * 400 with a `backup_*` code for a stored file the restore cannot read.
+ */
 export function restoreBackup(id: string): Promise<SuccessResponse> {
   return apiRequest(backupPath(id, "/restore"), { method: "POST" });
 }
 
-/** multipart field 'file'. Revokes every admin session server-side on success. */
+/**
+ * multipart field 'file'. Revokes every admin session server-side on success. A file that is not
+ * JSON, not a kiro-proxy backup, of another version or missing required fields answers 400 with
+ * code backup_invalid_json, backup_unsupported_format, backup_unsupported_version or
+ * backup_schema_mismatch; the message is unchanged.
+ */
 export function restoreBackupUpload(file: File): Promise<SuccessResponse> {
   const form = new FormData();
   form.append("file", file, file.name);
   return apiRequest("/backups/restore", { method: "POST", body: form });
 }
 
+/** 404 `backup_not_found` for an unknown id. */
 export function deleteBackup(id: string): Promise<SuccessResponse> {
   return apiRequest(backupPath(id), { method: "DELETE" });
 }

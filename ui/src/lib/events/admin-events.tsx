@@ -36,9 +36,39 @@ const EVENT_TYPES: readonly AdminEventType[] = [
   "observe_tick",
   "backup_created",
   "backup_restored",
+  "backup_deleted",
+  "accounts_changed",
+  "api_keys_changed",
+  "settings_changed",
+  "stats_reset",
 ];
 
 const OBSERVE_DEBOUNCE_MS = 1200;
+/** A batch action or a background sweep sends one change event per row; refetch once. */
+export const CHANGE_DEBOUNCE_MS = 300;
+
+type ChangeEventType =
+  | "backup_deleted"
+  | "accounts_changed"
+  | "api_keys_changed"
+  | "settings_changed"
+  | "stats_reset";
+
+/**
+ * What each change event refetches. Account events refresh the list only: the detail queries
+ * under accounts.all call AWS, and a background sweep changes every account.
+ */
+const CHANGE_INVALIDATIONS: Record<ChangeEventType, ReadonlyArray<readonly unknown[]>> = {
+  accounts_changed: [queryKeys.accounts.list(), queryKeys.status],
+  api_keys_changed: [queryKeys.apiKeys.all],
+  settings_changed: [queryKeys.settings.all],
+  stats_reset: [queryKeys.status, queryKeys.observe.all, queryKeys.requests.all],
+  backup_deleted: [queryKeys.backups.all],
+};
+
+function isChangeEvent(type: AdminEventType): type is ChangeEventType {
+  return Object.hasOwn(CHANGE_INVALIDATIONS, type);
+}
 
 type Handler = (event: AdminEvent) => void;
 type Registry = Map<AdminEventType, Set<{ current: Handler }>>;
@@ -95,8 +125,21 @@ export function AdminEventsProvider(props: {
     let source: EventSourceLike | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let observeTimer: ReturnType<typeof setTimeout> | null = null;
+    const changeTimers = new Map<ChangeEventType, ReturnType<typeof setTimeout>>();
 
     const react = (event: AdminEvent) => {
+      if (isChangeEvent(event.type) && !changeTimers.has(event.type)) {
+        const type = event.type;
+        changeTimers.set(
+          type,
+          setTimeout(() => {
+            changeTimers.delete(type);
+            for (const queryKey of CHANGE_INVALIDATIONS[type]) {
+              void queryClient.invalidateQueries({ queryKey });
+            }
+          }, CHANGE_DEBOUNCE_MS),
+        );
+      }
       switch (event.type) {
         case "hello":
           setStatus("open");
@@ -183,6 +226,8 @@ export function AdminEventsProvider(props: {
       disposed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (observeTimer) clearTimeout(observeTimer);
+      for (const timer of changeTimers.values()) clearTimeout(timer);
+      changeTimers.clear();
       source?.close();
       source = null;
     };
