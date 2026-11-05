@@ -158,15 +158,12 @@ export function TrafficCard(): JSX.Element {
           </div>
           {empty ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              {/* The card's own fill under the message, so it does not sit on the gridlines. */}
-              <div className="rounded-xl bg-card/90">
-                <EmptyState
-                  description={t("traffic.noTrafficBody")}
-                  icon={Pulse01Icon}
-                  title={t("traffic.noTraffic")}
-                  variant="compact"
-                />
-              </div>
+              <EmptyState
+                description={t("traffic.noTrafficBody")}
+                icon={Pulse01Icon}
+                title={t("traffic.noTraffic")}
+                variant="compact"
+              />
             </div>
           ) : null}
         </div>

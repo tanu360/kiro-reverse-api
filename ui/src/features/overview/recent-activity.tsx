@@ -73,15 +73,23 @@ function ActivityTime({ ts, lang }: { ts: number; lang: Lang }): JSX.Element {
   );
 }
 
-/** One line, cut to the cell with an ellipsis; the full text is a tooltip only when it is cut. */
+/**
+ * One line, cut at the cell's edge with an ellipsis (the column takes the row's spare width);
+ * the full text is a tooltip only when it is cut.
+ */
 function MessageText({ text }: { text: string }): JSX.Element {
   if (!text) return <span className="text-muted-foreground">{EMPTY}</span>;
-  return <TruncatedText className="max-w-80">{text}</TruncatedText>;
+  return <TruncatedText>{text}</TruncatedText>;
 }
 
-/** An error status: the neutral pill with the red dot (red stays the alert accent). */
+/**
+ * An error status: the neutral pill with the red dot (red stays the alert accent). A missing
+ * status is the muted dash on a line as tall as the pill, so every row keeps one height.
+ */
 function ErrorStatus({ row }: { row: ObserveError }): JSX.Element {
-  if (!row.status) return <span className="text-muted-foreground">{EMPTY}</span>;
+  if (!row.status) {
+    return <span className="inline-flex h-6 items-center text-muted-foreground">{EMPTY}</span>;
+  }
   return (
     <Badge dot tone="destructive" variant="outline">
       {row.status}
@@ -162,6 +170,8 @@ function ErrorsPanel(): JSX.Element {
         id: "message",
         header: t("activity.message"),
         cell: (row) => <MessageText text={mask(row.message)} />,
+        // The rest of the row, so a message is cut at the cell edge, not at a fixed width.
+        className: "w-full max-w-0",
       },
     ],
     [t, lang, mask],
@@ -248,15 +258,18 @@ function RequestsPanel(): JSX.Element {
       {
         id: "tokens",
         header: t("activity.tokens"),
+        // Two lines tall even without the cache line, so every row is one height.
         cell: (row) => (
-          <TokenCell
-            cacheReadTokens={row.cacheReadTokens}
-            cacheWriteTokens={row.cacheWriteTokens}
-            detailClassName="min-w-48"
-            inTokens={row.inTokens}
-            muteZero={!row.success}
-            outTokens={row.outTokens}
-          />
+          <div className="flex min-h-8 items-center">
+            <TokenCell
+              cacheReadTokens={row.cacheReadTokens}
+              cacheWriteTokens={row.cacheWriteTokens}
+              detailClassName="min-w-48"
+              inTokens={row.inTokens}
+              muteZero={!row.success}
+              outTokens={row.outTokens}
+            />
+          </div>
         ),
       },
       {
@@ -299,6 +312,8 @@ function RequestsPanel(): JSX.Element {
         cardsBelow="4xl"
         columns={columns}
         data={rows}
+        // Comfortable rows fit the two-line token cells.
+        density="comfortable"
         emptyState={empty}
         getRowId={rowId}
         inset
@@ -354,8 +369,8 @@ export function RecentActivity(): JSX.Element {
         actions={
           <>
             <TabsList aria-label={t("activity.tabs")} size="sm">
-              <TabsTab value="errors">{t("activity.errors")}</TabsTab>
-              <TabsTab value="requests">{t("activity.requests")}</TabsTab>
+              <TabsTab value="errors">{t("activity.errorsTab")}</TabsTab>
+              <TabsTab value="requests">{t("activity.requestsTab")}</TabsTab>
             </TabsList>
             <ViewAllLink tab={tab} />
           </>

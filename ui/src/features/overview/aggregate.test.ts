@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { AccountHeatmap, HeatmapCell, HeatmapData, ModelMixEntry } from "@/lib/api/types";
+import type { HeatmapCell, ModelMixEntry } from "@/lib/api/types";
 import {
   bucketGlobal,
   heatFailure,
   heatLevel,
   hourDelta,
+  mergeCells,
   modelSlices,
   peakCount,
   RANGE_WINDOWS,
   sparklineBuckets,
-  topAccounts,
   windowCells,
   withPreviousWindow,
 } from "./aggregate";
@@ -21,10 +21,6 @@ function cells(values: Array<[reqs: number, failures: number]>): HeatmapCell[] {
 
 function zeros(count: number): HeatmapCell[] {
   return Array.from({ length: count }, (_, offset) => ({ offset, reqs: 0, failures: 0 }));
-}
-
-function account(accountId: string, values: Array<[number, number]>): AccountHeatmap {
-  return { accountId, email: `${accountId}@example.com`, cells: cells(values) };
 }
 
 function model(name: string, credits: number, reqs: number): ModelMixEntry {
@@ -161,51 +157,6 @@ describe("sparklineBuckets", () => {
   });
 });
 
-describe("topAccounts", () => {
-  const heatmap: HeatmapData = {
-    windowMin: 3,
-    nowUnix: 0,
-    global: { accountId: "_global_", cells: zeros(3) },
-    accounts: [
-      account("a", [
-        [1, 0],
-        [0, 0],
-        [0, 0],
-      ]),
-      account("b", [
-        [2, 2],
-        [1, 0],
-        [0, 0],
-      ]),
-      account("c", [
-        [0, 0],
-        [3, 0],
-        [0, 0],
-      ]),
-      account("d", [
-        [0, 0],
-        [0, 0],
-        [0, 0],
-      ]),
-    ],
-  };
-
-  it("orders by reqs + failures and returns the rest count", () => {
-    const { rows, rest } = topAccounts(heatmap, 2);
-    expect(rows.map((row) => row.accountId)).toEqual(["b", "c"]);
-    // "a" has traffic but did not fit; "d" has none and is not counted.
-    expect(rest).toBe(1);
-  });
-
-  it("only scores cells inside the window", () => {
-    const { rows } = topAccounts(heatmap, 1, 1);
-    expect(rows.map((row) => row.accountId)).toEqual(["b"]);
-    const { rows: firstMinute, rest } = topAccounts(heatmap, 5, 1);
-    expect(firstMinute.map((row) => row.accountId)).toEqual(["b", "a"]);
-    expect(rest).toBe(0);
-  });
-});
-
 describe("modelSlices", () => {
   it("keeps the top models and puts the remainder into Other", () => {
     const models = [
@@ -291,6 +242,24 @@ describe("windowCells", () => {
       { offset: 1, reqs: 0, failures: 0 },
       { offset: 0, reqs: 1, failures: 0 },
     ]);
+  });
+});
+
+describe("mergeCells", () => {
+  it("sums oldest-first cells in groups cut from the newest end", () => {
+    const input: HeatmapCell[] = [
+      { offset: 4, reqs: 1, failures: 0 },
+      { offset: 3, reqs: 2, failures: 1 },
+      { offset: 2, reqs: 3, failures: 0 },
+      { offset: 1, reqs: 4, failures: 2 },
+      { offset: 0, reqs: 5, failures: 0 },
+    ];
+    expect(mergeCells(input, 2)).toEqual([
+      { offset: 4, reqs: 1, failures: 0 },
+      { offset: 2, reqs: 5, failures: 1 },
+      { offset: 0, reqs: 9, failures: 2 },
+    ]);
+    expect(mergeCells(windowCells(input, 60), 2)).toHaveLength(30);
   });
 });
 

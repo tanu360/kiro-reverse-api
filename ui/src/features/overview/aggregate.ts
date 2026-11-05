@@ -1,4 +1,4 @@
-import type { AccountHeatmap, HeatmapCell, HeatmapData, ModelMixEntry } from "@/lib/api/types";
+import type { HeatmapCell, ModelMixEntry } from "@/lib/api/types";
 import type { OverviewRange } from "@/routes/-search";
 
 /**
@@ -120,33 +120,6 @@ export function sparklineBuckets(
   return buckets;
 }
 
-function score(row: AccountHeatmap, windowMin: number): number {
-  let total = 0;
-  for (const cell of row.cells) {
-    if (cell.offset >= 0 && cell.offset < windowMin) total += cell.reqs + cell.failures;
-  }
-  return total;
-}
-
-/**
- * The busiest accounts by Σ(reqs + failures) over offsets below `windowMin`. Accounts without
- * traffic in the window are left out; `rest` counts the busy ones that did not fit.
- */
-export function topAccounts(
-  heatmap: Pick<HeatmapData, "accounts">,
-  limit: number,
-  windowMin: number = Number.POSITIVE_INFINITY,
-): { rows: AccountHeatmap[]; rest: number } {
-  const busy = heatmap.accounts
-    .map((row) => ({ row, score: score(row, windowMin) }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score);
-  return {
-    rows: busy.slice(0, limit).map((entry) => entry.row),
-    rest: Math.max(0, busy.length - limit),
-  };
-}
-
 export interface ModelSlice {
   label: string;
   value: number;
@@ -203,4 +176,23 @@ export function windowCells(cells: readonly HeatmapCell[], windowMin: number): H
     const cell = byOffset.get(offset);
     return { offset, reqs: cell?.reqs ?? 0, failures: cell?.failures ?? 0 };
   });
+}
+
+/**
+ * Oldest-first cells merged `size` at a time, still oldest first: counts summed, `offset` the
+ * newest minute of each group. Groups are cut from the newest end, so the current minute always
+ * shares the last group.
+ */
+export function mergeCells(cells: readonly HeatmapCell[], size: number): HeatmapCell[] {
+  const step = Math.max(1, Math.floor(size));
+  const merged: HeatmapCell[] = [];
+  for (let end = cells.length; end > 0; end -= step) {
+    const group = cells.slice(Math.max(0, end - step), end);
+    merged.unshift({
+      offset: Math.min(...group.map((cell) => cell.offset)),
+      reqs: group.reduce((sum, cell) => sum + cell.reqs, 0),
+      failures: group.reduce((sum, cell) => sum + cell.failures, 0),
+    });
+  }
+  return merged;
 }

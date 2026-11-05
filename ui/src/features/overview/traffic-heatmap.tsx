@@ -14,7 +14,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { TooltipContent, TooltipHeader } from "@/components/charts/tooltip/tooltip-content";
+import { TooltipContent } from "@/components/charts/tooltip/tooltip-content";
 import { DisplayEmail } from "@/components/shared/display-email";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -23,11 +23,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { heatmapQuery } from "@/lib/api/observe";
 import type { HeatmapCell } from "@/lib/api/types";
-import { formatNumber, formatTime } from "@/lib/format";
+import { dateTimeFormat, formatNumber, formatTime, unixToDate } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
-import { HOUR, heatFailure, heatLevel, windowCells } from "./aggregate";
+import { HOUR, heatFailure, heatLevel, mergeCells, windowCells } from "./aggregate";
 import { FAILED_COLOR, SUCCEEDED_COLOR } from "./colors";
 import { useTotalsFailed } from "./status-cards";
 
@@ -58,17 +58,14 @@ function HeatTooltip({
       x={hover.x}
       y={hover.y}
     >
-      <TooltipHeader className="flex items-baseline gap-2">
-        <span className="font-mono">{hover.time}</span>
-        <span className="min-w-0 truncate font-normal text-chart-tooltip-muted text-meta">
-          {hover.label}
-        </span>
-      </TooltipHeader>
       <TooltipContent
+        meta={hover.label}
+        mono
         rows={[
           { color: SUCCEEDED_COLOR, label: labels.requests, value: hover.requests },
           { color: FAILED_COLOR, label: labels.errors, value: hover.errors },
         ]}
+        title={hover.time}
       />
     </TooltipBox>
   );
@@ -78,11 +75,19 @@ const TOP_ACCOUNTS = 5;
 /*
  * Sized by the card (SectionCard is a container). Narrow cards put the label and the row total
  * on one line above the cells, so the 60 cells get the full width and nothing scrolls sideways;
- * from 28rem the label, the cells and the total sit side by side.
+ * from 28rem the label, the cells and the total sit side by side, and from 48rem the label
+ * column widens so an email is not cut while the cells have room to spare.
  */
 const ROW_GRID =
-  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 @md:grid-cols-[10rem_minmax(0,1fr)_3.5rem]";
+  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 @md:grid-cols-[10rem_minmax(0,1fr)_3.5rem] @3xl:grid-cols-[14rem_minmax(0,1fr)_3.5rem]";
 const CELLS_PLACEMENT = "order-last col-span-2 @md:order-none @md:col-span-1";
+/*
+ * Cards under 56rem draw 30 two-minute cells, wider ones the 60 minutes: either way a cell stays
+ * about 9 to 16 px, a small square tile rather than a thin stripe. CSS picks the grid.
+ */
+const NARROW_GRID = "grid grid-cols-[repeat(30,minmax(0,1fr))] gap-px @md:gap-0.5 @4xl:hidden";
+const WIDE_GRID = "hidden grid-cols-[repeat(60,minmax(0,1fr))] gap-0.5 @4xl:grid";
+const NARROW_SPAN = 2;
 // The volume ramp (index.css chart-scale-01..05), written out so Tailwind sees every class.
 const LEVEL_CLASS = {
   1: "bg-chart-scale-01",
@@ -100,6 +105,8 @@ interface HeatRow {
   /** Plain text for the row's screen-reader summary and tooltip (masked like the label). */
   text: string;
   cells: HeatmapCell[];
+  /** The same minutes in two-minute cells, for narrow cards. */
+  pairs: HeatmapCell[];
   total: number;
 }
 
@@ -138,38 +145,36 @@ function counts(
   };
 }
 
-/** One row's 60 cells. Memoised, so a hover elsewhere does not redraw them. */
-const HeatCells = memo(function HeatCells({
-  row,
+/**
+ * One grid of a row's cells (one per `span` minutes), each as tall as it is wide up to 16 px.
+ * Memoised, so a hover elsewhere does not redraw them.
+ */
+const HeatGrid = memo(function HeatGrid({
+  cells,
+  span,
   rowIndex,
   maxReq,
-  summary,
+  className,
 }: {
-  row: HeatRow;
+  cells: readonly HeatmapCell[];
+  span: number;
   rowIndex: number;
   maxReq: number;
-  summary: string;
+  className: string;
 }): JSX.Element {
   return (
-    <div
-      aria-label={summary}
-      className={cn(
-        "grid h-4 grid-cols-[repeat(60,minmax(0,1fr))] gap-px @md:gap-0.5",
-        CELLS_PLACEMENT,
-      )}
-      role="img"
-    >
-      {row.cells.map((cell) => {
+    <div className={className}>
+      {cells.map((cell) => {
         const empty = cell.reqs === 0 && cell.failures === 0;
         const failure = heatFailure(cell.reqs, cell.failures);
         return (
           <span
             className={cn(
-              "rounded-xs hover:outline hover:outline-1 hover:-outline-offset-1 hover:outline-foreground/40",
+              "aspect-square max-h-4 rounded-xs hover:outline hover:-outline-offset-1 hover:outline-border-strong",
               failure === "alert" ? "bg-chart-negative" : LEVEL_CLASS[heatLevel(cell.reqs, maxReq)],
               failure === "some" && "heat-fail",
             )}
-            data-cell={`${rowIndex}:${cell.offset}`}
+            data-cell={`${rowIndex}:${span}:${cell.offset}`}
             data-empty={empty || undefined}
             data-failed={failure === "none" ? undefined : failure}
             key={cell.offset}
@@ -180,10 +185,42 @@ const HeatCells = memo(function HeatCells({
   );
 });
 
+/** A row's cells as one image with its summary; the card's width picks the grid. */
+function HeatCells({
+  row,
+  rowIndex,
+  maxReq,
+  summary,
+}: {
+  row: HeatRow;
+  rowIndex: number;
+  maxReq: { minute: number; pair: number };
+  summary: string;
+}): JSX.Element {
+  return (
+    <div aria-label={summary} className={CELLS_PLACEMENT} role="img">
+      <HeatGrid
+        cells={row.pairs}
+        className={NARROW_GRID}
+        maxReq={maxReq.pair}
+        rowIndex={rowIndex}
+        span={NARROW_SPAN}
+      />
+      <HeatGrid
+        cells={row.cells}
+        className={WIDE_GRID}
+        maxReq={maxReq.minute}
+        rowIndex={rowIndex}
+        span={1}
+      />
+    </div>
+  );
+}
+
 /**
  * Per-minute requests for all accounts and the five busiest ones over the last hour. The server
  * sends only those five (top=5) and counts the other busy accounts in `restCount`, which the
- * header shows as "Top 5 of N" beside the All link.
+ * header subtitle shows as "Top 5 of N".
  */
 export function TrafficHeatmap(): JSX.Element {
   const { t, lang } = useT("overview");
@@ -207,17 +244,24 @@ export function TrafficHeatmap(): JSX.Element {
         label: <span className="font-medium">{t("heatmap.global")}</span>,
         text: t("heatmap.global"),
         cells: windowCells(data.global.cells, HOUR),
-        total: 0,
       },
       ...busiest.map((account) => ({
         key: account.accountId,
         label: <DisplayEmail email={account.email} id={account.accountId} />,
         text: display(account.email, account.accountId),
         cells: windowCells(account.cells, HOUR),
-        total: 0,
       })),
-    ].map((row) => ({ ...row, total: sum(row.cells).requests }));
-    const maxReq = Math.max(1, ...rows.flatMap((row) => row.cells.map((cell) => cell.reqs)));
+    ].map((row) => ({
+      ...row,
+      pairs: mergeCells(row.cells, NARROW_SPAN),
+      total: sum(row.cells).requests,
+    }));
+    const busiestCell = (pick: (row: HeatRow) => HeatmapCell[]) =>
+      Math.max(1, ...rows.flatMap((row) => pick(row).map((cell) => cell.reqs)));
+    const maxReq = {
+      minute: busiestCell((row) => row.cells),
+      pair: busiestCell((row) => row.pairs),
+    };
     return {
       rows,
       maxReq,
@@ -228,30 +272,45 @@ export function TrafficHeatmap(): JSX.Element {
     };
   }, [data, t, display]);
 
-  // One listener for every cell: the tooltip follows the cell under the pointer.
+  // One listener for every cell: the tooltip follows the cell under the pointer, or (touch) the
+  // tapped cell, where it stays until the next tap.
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const box = containerRef.current;
-    const target = (event.target as HTMLElement).closest<HTMLElement>("[data-cell]");
+    // A tap can be retargeted to a nearby label (touch adjustment); the point itself is exact.
+    const target =
+      (event.target as HTMLElement).closest<HTMLElement>("[data-cell]") ??
+      document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-cell]");
     if (!view || !box || !target) {
       if (hover) setHover(null);
       return;
     }
     const key = target.dataset.cell ?? "";
     if (hover?.key === key) return;
-    const [rowIndex, offset] = key.split(":").map(Number);
+    // rowIndex:span:offset, the offset being the cell's newest minute.
+    const [rowIndex, span, offset] = key.split(":").map(Number);
     const row = view.rows[rowIndex];
-    const cell = row?.cells.find((c) => c.offset === offset);
-    if (!row || !cell) return;
+    if (!row) return;
+    const minutes = row.cells.filter((c) => c.offset >= offset && c.offset < offset + span);
+    if (minutes.length === 0) return;
+    const total = sum(minutes);
+    const newest = view.nowUnix - offset * 60;
     const cellBox = target.getBoundingClientRect();
     const outer = box.getBoundingClientRect();
     setHover({
       key,
       x: cellBox.left + cellBox.width / 2 - outer.left,
       y: cellBox.top + cellBox.height / 2 - outer.top,
-      time: formatTime(view.nowUnix - cell.offset * 60, lang),
+      // "11:52 – 11:53 AM": the range in the language's own short form.
+      time:
+        span > 1
+          ? dateTimeFormat(lang, { timeStyle: "short" }).formatRange(
+              unixToDate(newest - (span - 1) * 60),
+              unixToDate(newest),
+            )
+          : formatTime(newest, lang),
       label: row.text,
-      requests: formatNumber(cell.reqs, lang),
-      errors: formatNumber(cell.failures, lang),
+      requests: formatNumber(total.requests, lang),
+      errors: formatNumber(total.errors, lang),
     });
   };
 
@@ -290,7 +349,10 @@ export function TrafficHeatmap(): JSX.Element {
         ) : (
           <div
             className="relative flex flex-col gap-3 @md:gap-2"
-            onPointerLeave={() => setHover(null)}
+            onPointerDown={onPointerMove}
+            onPointerLeave={(event) => {
+              if (event.pointerType === "mouse") setHover(null);
+            }}
             onPointerMove={onPointerMove}
             ref={containerRef}
           >
@@ -364,18 +426,18 @@ export function TrafficHeatmap(): JSX.Element {
           <HugeiconsIcon icon={ArrowUpRight01Icon} aria-hidden="true" />
         </Button>
       }
-      description={t("heatmap.description")}
-      descriptionVariant="inline"
-      icon={GridViewIcon}
-      id="overview-heatmap"
-      meta={
+      description={
+        // One subtitle, "Top 5 of 73 · last 60 min", not two muted runs side by side.
         view && view.rest > 0
-          ? t("heatmap.topOf", {
+          ? t("heatmap.descriptionTop", {
               shown: formatNumber(view.shown, lang),
               total: formatNumber(view.shown + view.rest, lang),
             })
-          : undefined
+          : t("heatmap.description")
       }
+      descriptionVariant="inline"
+      icon={GridViewIcon}
+      id="overview-heatmap"
       title={t("heatmap.title")}
     >
       {body}

@@ -1,15 +1,11 @@
 import { curveMonotoneX } from "d3-shape";
-import { type JSX, useMemo } from "react";
+import { type JSX, useMemo, useRef } from "react";
 import { Area, AreaChart } from "@/components/charts/area-chart";
 import { Grid } from "@/components/charts/grid";
-import {
-  ChartTooltip,
-  TooltipContent,
-  TooltipHeader,
-  type TooltipRow,
-} from "@/components/charts/tooltip";
-import { XAxis } from "@/components/charts/x-axis";
+import { ChartTooltip, TooltipContent, type TooltipRow } from "@/components/charts/tooltip";
+import { roundTimeTicks, XAxis } from "@/components/charts/x-axis";
 import { niceTicks, YAxis } from "@/components/charts/y-axis";
+import { useElementWidth } from "@/hooks/use-element-width";
 import { formatNumber, formatTime } from "@/lib/format";
 import type { Lang } from "@/lib/i18n";
 import { peakCount, type TrafficPoint } from "./aggregate";
@@ -28,26 +24,23 @@ export interface TrafficChartLabels {
   bucket: string;
 }
 
+/** Round-time steps in minutes, finest first; each range starts at its own finest step. */
+const TICK_STEPS = [15, 30, 60, 120, 180, 240, 360, 480, 720] as const;
+/** Tick-to-tick distance a time label needs ("11:30 AM" is about 55 px) plus clear space. */
+const MIN_TICK_GAP = 80;
+
 /**
- * The x-axis labels: a time only where a bucket holds a round boundary (every 15 min for the
- * 1 h view, every hour for 6 h, every 4 h for 24 h), an empty label everywhere else and at the
- * plot's two ends.
+ * The x-axis step: the finest round time (from every 15 min for the 1 h view, every hour for
+ * 6 h, every 4 h for 24 h) whose labels sit at least MIN_TICK_GAP apart across the plot, so a
+ * phone gets every 30 min, 2 h or 8 h instead of labels running into each other.
  */
-function roundTimeLabels(points: readonly TrafficPoint[], bucketMin: number, lang: Lang): string[] {
-  const step = bucketMin <= 2 ? 15 : bucketMin <= 5 ? 60 : 240;
-  // The plot starts at the card's padding, so a label on the first few buckets would be cut in
-  // half at the card's edge; the last ones would run into the y labels.
-  const edge = Math.ceil(points.length * 0.05);
-  return points.map((point, index) => {
-    if (index < edge || index >= points.length - edge) return "";
-    for (let minute = 0; minute < bucketMin; minute += 1) {
-      const at = new Date(point.date.getTime() + minute * 60_000);
-      if ((at.getHours() * 60 + at.getMinutes()) % step === 0) {
-        return formatTime(at.getTime() / 1000, lang);
-      }
-    }
-    return "";
-  });
+function tickStep(bucketMin: number, spanMin: number, plotWidth: number): number {
+  const finest = bucketMin <= 2 ? 15 : bucketMin <= 5 ? 60 : 240;
+  const steps = TICK_STEPS.filter((step) => step >= finest);
+  if (!(plotWidth > 0 && spanMin > 0)) return finest;
+  return (
+    steps.find((step) => (plotWidth * step) / spanMin >= MIN_TICK_GAP) ?? steps.at(-1) ?? finest
+  );
 }
 
 /**
@@ -86,9 +79,16 @@ export default function TrafficChart({
   // Whole-number ticks whose top is the domain top, so the highest label sits on a gridline.
   const ticks = useMemo(() => niceTicks(peakCount(points), 4, { integer: true }), [points]);
   const top = ticks.at(-1) ?? 1;
-  const tickLabels = useMemo(
-    () => roundTimeLabels(points, bucketMin, lang),
-    [points, bucketMin, lang],
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const plotWidth = useElementWidth(boxRef) - MARGIN.left - MARGIN.right;
+  const first = points.at(0)?.date;
+  const last = points.at(-1)?.date;
+  const span = first && last ? (last.getTime() - first.getTime()) / 60_000 : 0;
+  const step = tickStep(bucketMin, span, plotWidth);
+  // Ticks on the round times themselves (not the bucket holding them), so they space evenly.
+  const timeTicks = useMemo(
+    () => (first && last ? roundTimeTicks(first, last, step) : []),
+    [first, last, step],
   );
   const timeLabels = useMemo(
     () => points.map((p) => formatTime(p.date.getTime() / 1000, lang)),
@@ -97,86 +97,87 @@ export default function TrafficChart({
   const quiet = empty ? "muted" : "area";
 
   return (
-    <AreaChart
-      animationDuration={reducedMotion ? 0 : undefined}
-      aspectRatio="auto"
-      className={PLOT_HEIGHT}
-      data={data}
-      margin={MARGIN}
-      status={status}
-      yDomain={[0, top]}
-    >
-      <Grid horizontal rowTickValues={ticks} />
-      <YAxis side="right" tickValues={ticks} />
-      {/* Monotone curves never overshoot between buckets, so a 1 -> 0 step cannot dip
+    <div ref={boxRef}>
+      <AreaChart
+        animationDuration={reducedMotion ? 0 : undefined}
+        aspectRatio="auto"
+        className={PLOT_HEIGHT}
+        data={data}
+        margin={MARGIN}
+        status={status}
+        yDomain={[0, top]}
+      >
+        <Grid horizontal rowTickValues={ticks} />
+        <YAxis side="right" tickValues={ticks} />
+        {/* Monotone curves never overshoot between buckets, so a 1 -> 0 step cannot dip
           below the zero baseline. Series order matches the header legend (hover links them). */}
-      <Area
-        animate={!reducedMotion}
-        curve={curveMonotoneX}
-        dataKey="succeeded"
-        fill={SUCCEEDED_COLOR}
-        fillOpacity={0.16}
-        strokeWidth={1.5}
-        variant={quiet}
-      />
-      <Area
-        animate={!reducedMotion}
-        curve={curveMonotoneX}
-        dataKey="failed"
-        fill={FAILED_COLOR}
-        fillOpacity={0}
-        strokeWidth={1.5}
-        variant={quiet}
-      />
-      {hasPrevious ? (
         <Area
           animate={!reducedMotion}
           curve={curveMonotoneX}
-          dataKey="previous"
-          stroke={PREVIOUS_COLOR}
-          variant="line-dash"
+          dataKey="succeeded"
+          fill={SUCCEEDED_COLOR}
+          fillOpacity={0.16}
+          strokeWidth={1.5}
+          variant={quiet}
         />
-      ) : null}
-      {/* Every row is a candidate, so only the round times (the non-empty labels) show. */}
-      <XAxis labels={tickLabels} numTicks={Math.max(2, points.length)} />
-      <ChartTooltip
-        content={({ point }) => {
-          const start = (point.date as Date).getTime() / 1000;
-          const rows: TooltipRow[] = [
-            {
-              color: SUCCEEDED_COLOR,
-              label: labels.succeeded,
-              value: formatNumber(Number(point.succeeded), lang),
-            },
-            {
-              color: FAILED_COLOR,
-              label: labels.failed,
-              value: formatNumber(Number(point.failed), lang),
-            },
-          ];
-          if (hasPrevious) {
-            rows.push({
-              color: PREVIOUS_COLOR,
-              label: labels.previous,
-              value: formatNumber(Number(point.previous ?? 0), lang),
-            });
-          }
-          return (
-            <div>
-              <TooltipHeader className="flex items-baseline gap-2">
-                <span className="font-mono">
-                  {`${formatTime(start, lang)}–${formatTime(start + bucketMin * 60, lang)}`}
-                </span>
-                <span className="font-normal text-chart-tooltip-muted text-meta">
-                  {labels.bucket}
-                </span>
-              </TooltipHeader>
-              <TooltipContent rows={rows} />
-            </div>
-          );
-        }}
-        dateLabels={timeLabels}
-      />
-    </AreaChart>
+        <Area
+          animate={!reducedMotion}
+          curve={curveMonotoneX}
+          dataKey="failed"
+          fill={FAILED_COLOR}
+          fillOpacity={0}
+          strokeWidth={1.5}
+          variant={quiet}
+        />
+        {hasPrevious ? (
+          <Area
+            animate={!reducedMotion}
+            curve={curveMonotoneX}
+            dataKey="previous"
+            stroke={PREVIOUS_COLOR}
+            variant="line-dash"
+          />
+        ) : null}
+        {/* "plot" keeps the end labels inside the plot, clear of the y labels on the right. */}
+        <XAxis
+          clamp="plot"
+          formatTick={(date) => formatTime(date.getTime() / 1000, lang)}
+          tickValues={timeTicks}
+        />
+        <ChartTooltip
+          content={({ point }) => {
+            const start = (point.date as Date).getTime() / 1000;
+            const rows: TooltipRow[] = [
+              {
+                color: SUCCEEDED_COLOR,
+                label: labels.succeeded,
+                value: formatNumber(Number(point.succeeded), lang),
+              },
+              {
+                color: FAILED_COLOR,
+                label: labels.failed,
+                value: formatNumber(Number(point.failed), lang),
+              },
+            ];
+            if (hasPrevious) {
+              rows.push({
+                color: PREVIOUS_COLOR,
+                label: labels.previous,
+                value: formatNumber(Number(point.previous ?? 0), lang),
+              });
+            }
+            return (
+              <TooltipContent
+                meta={labels.bucket}
+                mono
+                rows={rows}
+                title={`${formatTime(start, lang)}–${formatTime(start + bucketMin * 60, lang)}`}
+              />
+            );
+          }}
+          dateLabels={timeLabels}
+        />
+      </AreaChart>
+    </div>
   );
 }

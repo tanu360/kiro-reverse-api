@@ -241,10 +241,9 @@ describe("OverviewPage", () => {
     );
     await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    expect(await within(heatmap).findByText("Top 5 of 8")).toHaveAttribute(
-      "data-slot",
-      "card-meta",
-    );
+    // One subtitle, not a separate meta run beside the description.
+    expect(await within(heatmap).findByText("Top 5 of 8 · last 60 min")).toBeInTheDocument();
+    expect(heatmap.querySelector('[data-slot="card-meta"]')).toBeNull();
   });
 
   it("lists at most 10 recent errors", async () => {
@@ -460,7 +459,7 @@ describe("OverviewPage", () => {
 
   it("formats a failed request's badge like the Requests page", async () => {
     const { user } = await renderApp("/");
-    await user.click(await screen.findByRole("tab", { name: "Recent requests" }));
+    await user.click(await screen.findByRole("tab", { name: "Requests" }));
     const table = await screen.findByRole("table", { name: "Recent requests" });
     const failed = mockDb.requests.slice(0, 10).find((r) => !r.success && r.status);
     if (!failed) throw new Error("fixture has no failed request in the first 10");

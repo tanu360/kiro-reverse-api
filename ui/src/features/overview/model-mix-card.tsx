@@ -1,6 +1,7 @@
 import { AiBrain01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, lazy, type PointerEvent, Suspense, useMemo, useState } from "react";
+import { type JSX, lazy, type ReactNode, Suspense, useMemo, useState } from "react";
+import { ShareBar } from "@/components/charts/share-bar";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -8,7 +9,6 @@ import { ListCard } from "@/components/shared/list-card";
 import { TableSkeleton } from "@/components/shared/loading-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { TokenCell } from "@/components/shared/token-cell";
-import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { modelMixQuery } from "@/lib/api/observe";
 import type { ModelMixEntry } from "@/lib/api/types";
@@ -44,17 +44,6 @@ function ColorDot({ color }: { color: string }): JSX.Element {
   );
 }
 
-/** The model's share as a thin bar in its ring colour: the ranked-list look. Decorative. */
-function ShareBar({ row }: { row: MixRow }): JSX.Element {
-  return (
-    <Meter aria-hidden="true" className="max-w-40" max={1} min={0} value={row.share}>
-      <MeterTrack>
-        <MeterIndicator style={{ backgroundColor: row.color }} />
-      </MeterTrack>
-    </Meter>
-  );
-}
-
 function ModelName({ row }: { row: MixRow }): JSX.Element {
   return (
     <span className="flex min-w-0 items-center gap-2">
@@ -62,16 +51,6 @@ function ModelName({ row }: { row: MixRow }): JSX.Element {
       <span className="min-w-0 truncate">{row.entry.model}</span>
     </span>
   );
-}
-
-/** The index of the table row or card under the pointer (its position in the list), or null. */
-function hoveredRow(event: PointerEvent<HTMLElement>): number | null {
-  const target = event.target as HTMLElement;
-  const tr = target.closest<HTMLTableRowElement>("tbody tr");
-  if (tr) return tr.sectionRowIndex;
-  const item = target.closest("li");
-  if (item?.parentElement) return Array.prototype.indexOf.call(item.parentElement.children, item);
-  return null;
 }
 
 /**
@@ -104,58 +83,69 @@ export function ModelMixCard(): JSX.Element {
     return { ring, metric, rows, rest: Math.max(0, sorted.length - TABLE_ROWS) };
   }, [models, otherLabel]);
 
-  const columns = useMemo<DataTableColumn<MixRow>[]>(
-    () => [
+  const columns = useMemo<DataTableColumn<MixRow>[]>(() => {
+    // While a ring or row is hovered, every cell of the other rows dims, as the ring does.
+    const focus = (index: number, className: string | undefined, children: ReactNode) => (
+      <div
+        className={cn(
+          "transition-opacity motion-reduce:transition-none",
+          hovered !== null && hovered !== index && "opacity-50",
+          className,
+        )}
+      >
+        {children}
+      </div>
+    );
+    return [
       {
         id: "model",
         header: t("modelMix.model"),
-        cell: (row, index) => (
-          <span
-            className={cn(
-              "flex min-w-0 flex-col gap-1.5 transition-opacity motion-reduce:transition-none",
-              hovered !== null && hovered !== index && "opacity-50",
-            )}
-          >
-            <ModelName row={row} />
-            <ShareBar row={row} />
-          </span>
-        ),
+        cell: (row, index) =>
+          focus(
+            index,
+            "flex min-w-0 flex-col gap-1.5",
+            <>
+              <ModelName row={row} />
+              <ShareBar className="max-w-40" color={row.color} value={row.share} />
+            </>,
+          ),
         className: "w-2/5 max-w-64",
       },
       {
         id: "reqs",
         header: t("modelMix.requests"),
         align: "end",
-        cell: (row) => (
-          <span className="text-muted-foreground">{formatNumber(row.entry.reqs, lang)}</span>
-        ),
+        cell: (row, index) =>
+          focus(index, "text-muted-foreground", formatNumber(row.entry.reqs, lang)),
       },
       {
         id: "tokens",
         header: t("modelMix.tokens"),
-        cell: (row) => (
-          <TokenCell
-            cacheReadTokens={row.entry.cacheReadTokens}
-            cacheWriteTokens={row.entry.cacheWriteTokens}
-            detailClassName="min-w-48"
-            inTokens={row.entry.inTokens}
-            outTokens={row.entry.outTokens}
-          />
-        ),
+        cell: (row, index) =>
+          focus(
+            index,
+            undefined,
+            <TokenCell
+              cacheReadTokens={row.entry.cacheReadTokens}
+              cacheWriteTokens={row.entry.cacheWriteTokens}
+              detailClassName="min-w-48"
+              inTokens={row.entry.inTokens}
+              outTokens={row.entry.outTokens}
+            />,
+          ),
       },
       {
         id: "credits",
         header: t("modelMix.credits"),
         align: "end",
-        cell: (row) => <span className="font-medium">{formatCredits(row.entry.credits)}</span>,
+        cell: (row, index) => focus(index, "font-medium", formatCredits(row.entry.credits)),
       },
-    ],
-    [t, lang, hovered],
-  );
+    ];
+  }, [t, lang, hovered]);
 
   const renderCard = (row: MixRow) => (
     <ListCard title={<ModelName row={row} />} variant="row">
-      <ShareBar row={row} />
+      <ShareBar className="max-w-40" color={row.color} value={row.share} />
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-meta">
         <div className="flex min-w-0 flex-col gap-0.5">
           <dt className="text-muted-foreground">{t("modelMix.requests")}</dt>
@@ -236,11 +226,7 @@ export function ModelMixCard(): JSX.Element {
             </Suspense>
           </figure>
           {/* Hover only mirrors the ring; the rows carry the data. */}
-          <div
-            className="min-w-0 flex-1"
-            onPointerLeave={() => setHovered(null)}
-            onPointerOver={(event) => setHovered(hoveredRow(event))}
-          >
+          <div className="min-w-0 flex-1">
             <DataTable
               caption={t("modelMix.title")}
               cardLayout="divided"
@@ -250,6 +236,7 @@ export function ModelMixCard(): JSX.Element {
               density="comfortable"
               getRowId={(row) => row.entry.model}
               inset
+              onRowHover={(row) => setHovered(row ? mix.rows.indexOf(row) : null)}
               renderCard={renderCard}
             />
           </div>
