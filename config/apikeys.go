@@ -135,6 +135,22 @@ func DeleteApiKey(id string) error {
 	return nil
 }
 
+// CountEnabledApiKeys is how many keys a client can authenticate with right now.
+func CountEnabledApiKeys() int {
+	cfgLock.RLock()
+	defer cfgLock.RUnlock()
+	if cfg == nil {
+		return 0
+	}
+	n := 0
+	for _, entry := range cfg.ApiKeys {
+		if entry.Enabled {
+			n++
+		}
+	}
+	return n
+}
+
 func FindApiKeyByValue(key string) *ApiKeyEntry {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()

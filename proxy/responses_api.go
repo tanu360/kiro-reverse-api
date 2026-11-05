@@ -218,7 +218,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
-			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			response, storedMessages := buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
 			addResponsesCacheUsage(response, cacheDetails)
@@ -645,7 +645,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
-			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			//! Reasoning recovered from inline <thinking> tags never streamed, so announce
 			//! it now and replay it as one delta before closing the item.

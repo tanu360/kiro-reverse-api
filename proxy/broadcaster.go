@@ -3,7 +3,29 @@ package proxy
 import (
 	"sync"
 	"sync/atomic"
+
+	"kiro-proxy/config"
 )
+
+// Admin events. Each one tells open admin pages which data to refetch; the
+// payload names the changed row, or "*" for many.
+const (
+	eventAccountsChanged = "accounts_changed"
+	eventAPIKeysChanged  = "api_keys_changed"
+	eventSettingsChanged = "settings_changed"
+	eventStatsReset      = "stats_reset"
+	eventBackupCreated   = "backup_created"
+	eventBackupRestored  = "backup_restored"
+	eventBackupDeleted   = "backup_deleted"
+)
+
+func init() {
+	//! Every account write goes through config, including background bans and
+	//! usage refreshes, so the hook is where no change can be missed.
+	config.SetAccountsChangedHook(func(id string) {
+		publishEvent(eventAccountsChanged, id)
+	})
+}
 
 type Event struct {
 	Type    string `json:"type"`
@@ -62,4 +84,8 @@ func (b *broadcaster) Publish(evt Event) {
 
 func publishObserveTick() {
 	getBroadcaster().Publish(Event{Type: "observe_tick"})
+}
+
+func publishEvent(eventType, payload string) {
+	getBroadcaster().Publish(Event{Type: eventType, Payload: payload})
 }

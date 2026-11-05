@@ -1120,3 +1120,83 @@ func TestFinalizeUsageTokensRemovesTheAnswerFromKiroContext(t *testing.T) {
 		t.Fatalf("input=%d output=%d, want the reported output removed from the context", in, out)
 	}
 }
+
+func TestAccountsListKeepsStatsForAccountsOutOfRotation(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{
+		ID: "off", Enabled: false, BanStatus: "DISABLED",
+		RequestCount: 12, ErrorCount: 3, TotalTokens: 900, TotalCredits: 1.5, LastUsed: 1_700_000_000,
+	}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+	p := accountpool.GetPool()
+	p.Reload()
+	h := &Handler{pool: p}
+
+	rec := httptest.NewRecorder()
+	h.apiGetAccounts(rec, httptest.NewRequest(http.MethodGet, "/admin/api/accounts", nil))
+	var list []map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list) != 1 {
+		t.Fatalf("decode list: %v %s", err, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	h.apiGetAccountFull(rec, httptest.NewRequest(http.MethodGet, "/admin/api/accounts/off/full", nil), "off")
+	var full map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &full); err != nil {
+		t.Fatalf("decode full: %v", err)
+	}
+	for name, row := range map[string]map[string]interface{}{"list": list[0], "full": full} {
+		if row["requestCount"] != float64(12) || row["errorCount"] != float64(3) || row["totalTokens"] != float64(900) ||
+			row["totalCredits"] != 1.5 || row["lastUsed"] != float64(1_700_000_000) {
+			t.Fatalf("%s stats for disabled account = %v", name, row)
+		}
+	}
+}
+
+func TestFinalRequestCountsErrorsOnTheAccount(t *testing.T) {
+	resetObservePersistenceForTest(t)
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "acc", Enabled: true}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+	p := accountpool.GetPool()
+	p.Reload()
+	account := p.GetByID("acc")
+
+	ctx := httptest.NewRequest(http.MethodPost, "/v1/messages", nil).Context()
+	recordFinalRequestWithAPIKey(ctx, "", "", account, "m", 0, 0, 0, false, http.StatusBadGateway, "upstream failed")
+	recordFinalRequestWithAPIKey(ctx, "", "", account, "m", 10, 5, 0.2, true, http.StatusOK, "")
+	recordFinalRequestWithAPIKey(ctx, "", "", nil, "m", 0, 0, 0, false, http.StatusUnauthorized, "no key")
+
+	got := config.GetAccounts()[0]
+	if got.RequestCount != 2 || got.ErrorCount != 1 || got.TotalTokens != 15 || got.TotalCredits != 0.2 {
+		t.Fatalf("stored stats = req %d err %d tokens %d credits %v", got.RequestCount, got.ErrorCount, got.TotalTokens, got.TotalCredits)
+	}
+}
+
+func TestAccountWritesPublishAccountsChanged(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	id, ch := getBroadcaster().Subscribe()
+	defer getBroadcaster().Unsubscribe(id)
+
+	if err := config.AddAccount(config.Account{ID: "new", Enabled: true}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+	if evt := waitForEvent(t, ch, eventAccountsChanged); evt.Payload != "new" {
+		t.Fatalf("payload = %q, want new", evt.Payload)
+	}
+	if err := config.DeleteAccount("new"); err != nil {
+		t.Fatalf("delete account: %v", err)
+	}
+	waitForEvent(t, ch, eventAccountsChanged)
+
+	rec := httptest.NewRecorder()
+	(&Handler{}).apiResetStats(rec, httptest.NewRequest(http.MethodPost, "/admin/api/stats/reset", nil))
+	waitForEvent(t, ch, eventStatsReset)
+}

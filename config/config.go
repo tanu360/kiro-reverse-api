@@ -395,7 +395,12 @@ func GetEnabledAccounts() []Account {
 	return accounts
 }
 
-func AddAccount(account Account) error {
+func AddAccount(account Account) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(account.ID)
+		}
+	}()
 	if IsAPIKeyAccount(&account) {
 		if err := NormalizeAPIKeyAccount(&account); err != nil {
 			return err
@@ -419,7 +424,12 @@ func AddAccount(account Account) error {
 	return Save()
 }
 
-func UpdateAccount(id string, account Account) error {
+func UpdateAccount(id string, account Account) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 
 	if CredentialsLoaded() {
 		return UpdateCredential(account)
@@ -495,7 +505,12 @@ func DisableAccountOverage(id string) error {
 	return UpdateAccountOverageStatus(id, "DISABLED", "", 0, 0, 0, time.Now().Unix())
 }
 
-func SetAccountEnabled(id string, enabled bool) error {
+func SetAccountEnabled(id string, enabled bool) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 	if CredentialsLoaded() {
 		acc := GetCredentialByID(id)
 		if acc == nil {
@@ -524,7 +539,12 @@ func SetAccountEnabled(id string, enabled bool) error {
 	return nil
 }
 
-func SetAccountBanStatus(id, status, reason string) error {
+func SetAccountBanStatus(id, status, reason string) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 	if CredentialsLoaded() {
 		acc := GetCredentialByID(id)
 		if acc == nil {
@@ -596,7 +616,12 @@ func PinAccountProfileArn(id, profileArn string) error {
 	return fmt.Errorf("account not found: %s", id)
 }
 
-func DeleteAccount(id string) error {
+func DeleteAccount(id string) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 
 	if CredentialsLoaded() {
 		return RemoveCredential(id)
@@ -691,7 +716,12 @@ func UpdateAccountStats(id string, requestCount, errorCount, totalTokens int, to
 	return nil
 }
 
-func UpdateAccountInfo(id string, info AccountInfo) error {
+func UpdateAccountInfo(id string, info AccountInfo) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 
 	if CredentialsLoaded() {
 

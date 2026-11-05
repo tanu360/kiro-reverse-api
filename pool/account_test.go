@@ -538,3 +538,39 @@ func TestOffersModelCountsOverLimitAccountsOutOfRotation(t *testing.T) {
 		t.Fatal("a model no enabled account lists must not be offered")
 	}
 }
+
+func TestRecordOutcomeCountsRequestsAndErrorsAndPersists(t *testing.T) {
+	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "live", Enabled: true, Weight: 2}); err != nil {
+		t.Fatalf("add live account: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "off", Enabled: false, RequestCount: 4, ErrorCount: 1, TotalTokens: 40}); err != nil {
+		t.Fatalf("add disabled account: %v", err)
+	}
+	p := &AccountPool{cooldowns: map[string]time.Time{}, errorCounts: map[string]int{}, modelLists: map[string]map[string]bool{}}
+	p.Reload()
+
+	p.RecordOutcome("live", true, 30, 0.5)
+	p.RecordOutcome("live", false, 0, 0)
+	//! Disabled mid-request: the request still counts, on the stored row.
+	p.RecordOutcome("off", false, 5, 0)
+	p.RecordOutcome("", true, 1, 1)
+
+	for _, acc := range p.GetAllAccounts() {
+		if acc.ID == "live" && (acc.RequestCount != 2 || acc.ErrorCount != 1 || acc.TotalTokens != 30 || acc.TotalCredits != 0.5 || acc.LastUsed == 0) {
+			t.Fatalf("pool copy of live = %+v", acc)
+		}
+	}
+	stored := map[string]config.Account{}
+	for _, acc := range config.GetAccounts() {
+		stored[acc.ID] = acc
+	}
+	if got := stored["live"]; got.RequestCount != 2 || got.ErrorCount != 1 || got.TotalTokens != 30 {
+		t.Fatalf("persisted live = %+v", got)
+	}
+	if got := stored["off"]; got.RequestCount != 5 || got.ErrorCount != 2 || got.TotalTokens != 45 || got.LastUsed == 0 {
+		t.Fatalf("persisted off = %+v", got)
+	}
+}

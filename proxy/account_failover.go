@@ -184,6 +184,10 @@ func (h *Handler) handleBackgroundAccountFailure(account *config.Account, err er
 		return
 	}
 	h.handleAccountFailure(account, err)
+	//! A cooldown lives only in the pool, never in config, so the config hook misses it.
+	if account != nil {
+		publishEvent(eventAccountsChanged, account.ID)
+	}
 }
 
 func (h *Handler) handleAccountFailure(account *config.Account, err error) {

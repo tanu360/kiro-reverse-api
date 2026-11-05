@@ -72,6 +72,36 @@ type parsedBackup struct {
 
 var backupMu sync.Mutex
 
+// ErrBackupNotFound is returned for a backup ID with no stored row.
+var ErrBackupNotFound = errors.New("backup not found")
+
+// Stable codes for a backup file the restore cannot use.
+const (
+	BackupCodeInvalidJSON        = "backup_invalid_json"
+	BackupCodeUnsupportedFormat  = "backup_unsupported_format"
+	BackupCodeUnsupportedVersion = "backup_unsupported_version"
+	BackupCodeSchemaMismatch     = "backup_schema_mismatch"
+)
+
+// BackupFileError reports a backup whose content is unreadable or from another
+// format or version. The message is unchanged; Code lets clients tell the
+// cases apart without parsing it.
+type BackupFileError struct {
+	Code string
+	Err  error
+}
+
+func (e *BackupFileError) Error() string { return e.Err.Error() }
+func (e *BackupFileError) Unwrap() error { return e.Err }
+
+func backupFileError(code string, err error) error {
+	return &BackupFileError{Code: code, Err: err}
+}
+
+func backupNotFound(id string) error {
+	return fmt.Errorf("%w: %s", ErrBackupNotFound, id)
+}
+
 func sha8(s string) string { return s[:8] }
 
 func makeID(now time.Time, sum string) string {
@@ -198,7 +228,7 @@ func setRestoredAccountCnt(id string, count int) error {
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("backup not found: %s", id)
+		return backupNotFound(id)
 	}
 	return nil
 }
@@ -332,7 +362,7 @@ FROM backup_entries WHERE id=?`, id)
 	var includes int
 	err = row.Scan(&e.ID, &e.CreatedAt, &e.Kind, &note, &e.Size, &e.Sha256, &e.AccountCnt, &restored, &e.Version, &e.Format, &includes)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("backup not found: %s", id)
+		return nil, backupNotFound(id)
 	}
 	if err != nil {
 		return nil, err
@@ -378,44 +408,44 @@ func DeleteBackup(id string) error {
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("backup not found: %s", id)
+		return backupNotFound(id)
 	}
 	return nil
 }
 
 func parseBackupData(data []byte) (*parsedBackup, error) {
 	if !json.Valid(data) {
-		return nil, fmt.Errorf("backup content is not valid JSON")
+		return nil, backupFileError(BackupCodeInvalidJSON, fmt.Errorf("backup content is not valid JSON"))
 	}
 
 	var envelope struct {
 		Format string `json:"format"`
 	}
 	if err := json.Unmarshal(data, &envelope); err != nil {
-		return nil, fmt.Errorf("backup JSON parse failed: %w", err)
+		return nil, backupFileError(BackupCodeInvalidJSON, fmt.Errorf("backup JSON parse failed: %w", err))
 	}
 
 	if envelope.Format != backupFormat {
-		return nil, fmt.Errorf("unsupported backup format: expected %s", backupFormat)
+		return nil, backupFileError(BackupCodeUnsupportedFormat, fmt.Errorf("unsupported backup format: expected %s", backupFormat))
 	}
 
 	var payload backupPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, fmt.Errorf("backup envelope parse failed: %w", err)
+		return nil, backupFileError(BackupCodeInvalidJSON, fmt.Errorf("backup envelope parse failed: %w", err))
 	}
 	if payload.Version != backupVersion {
-		return nil, fmt.Errorf("unsupported backup version: %d", payload.Version)
+		return nil, backupFileError(BackupCodeUnsupportedVersion, fmt.Errorf("unsupported backup version: %d", payload.Version))
 	}
 	if payload.Config.Accounts == nil {
 		payload.Config.Accounts = []Account{}
 	}
 	if err := validateRestoredConfig(payload.Config); err != nil {
-		return nil, err
+		return nil, backupFileError(BackupCodeSchemaMismatch, err)
 	}
 	if payload.CredentialsLoaded {
 		for i, acc := range payload.Credentials {
 			if acc.ID == "" {
-				return nil, fmt.Errorf("credential %d missing id", i)
+				return nil, backupFileError(BackupCodeSchemaMismatch, fmt.Errorf("credential %d missing id", i))
 			}
 		}
 	}
@@ -543,7 +573,7 @@ FROM backup_entries WHERE id=?`, id)
 	var includes int
 	err = row.Scan(&e.ID, &e.CreatedAt, &e.Kind, &note, &e.Size, &e.Sha256, &e.AccountCnt, &restored, &e.Version, &e.Format, &includes)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, fmt.Errorf("backup not found: %s", id)
+		return nil, nil, backupNotFound(id)
 	}
 	if err != nil {
 		return nil, nil, err

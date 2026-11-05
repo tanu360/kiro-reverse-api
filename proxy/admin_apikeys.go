@@ -22,6 +22,21 @@ type apiKeyView struct {
 	RequestsCount int64   `json:"requestsCount"`
 }
 
+// apiKeyLockoutCode marks a 409 for a change that would leave a proxy that
+// requires API keys with no enabled key, so every client gets 401.
+const apiKeyLockoutCode = "api_key_lockout"
+
+func writeAPIKeyLockout(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusConflict)
+	json.NewEncoder(w).Encode(map[string]string{"error": "would lock out every client", "code": apiKeyLockoutCode})
+}
+
+// removingKeyLocksOut reports whether disabling or deleting entry would leave
+// no enabled key while keys are required.
+func removingKeyLocksOut(entry *config.ApiKeyEntry) bool {
+	return entry != nil && entry.Enabled && config.IsApiKeyRequired() && config.CountEnabledApiKeys() <= 1
+}
+
 func toApiKeyView(entry config.ApiKeyEntry) apiKeyView {
 	return apiKeyView{
 		ID:            entry.ID,
@@ -101,6 +116,7 @@ func (h *Handler) apiCreateApiKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	publishEvent(eventAPIKeysChanged, entry.ID)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"id":      entry.ID,
@@ -148,6 +164,10 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 	if req.CreditLimit != nil {
 		patch.CreditLimit = *req.CreditLimit
 	}
+	if !patch.Enabled && removingKeyLocksOut(existing) {
+		writeAPIKeyLockout(w)
+		return
+	}
 
 	if err := config.UpdateApiKey(id, patch); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -160,6 +180,7 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 		json.NewEncoder(w).Encode(map[string]string{"error": "failed to reload API key"})
 		return
 	}
+	publishEvent(eventAPIKeysChanged, id)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"apiKey":  toApiKeyView(*updated),
@@ -167,11 +188,16 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 }
 
 func (h *Handler) apiDeleteApiKey(w http.ResponseWriter, _ *http.Request, id string) {
+	if removingKeyLocksOut(config.GetApiKeyEntry(id)) {
+		writeAPIKeyLockout(w)
+		return
+	}
 	if err := config.DeleteApiKey(id); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+	publishEvent(eventAPIKeysChanged, id)
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -181,6 +207,7 @@ func (h *Handler) apiResetApiKeyUsage(w http.ResponseWriter, _ *http.Request, id
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+	publishEvent(eventAPIKeysChanged, id)
 	updated := config.GetApiKeyEntry(id)
 	if updated == nil {
 		json.NewEncoder(w).Encode(map[string]bool{"success": true})

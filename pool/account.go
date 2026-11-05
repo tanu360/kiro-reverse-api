@@ -486,39 +486,73 @@ func (p *AccountPool) AvailableCount() int {
 	return count
 }
 
-func (p *AccountPool) UpdateStats(id string, tokens int, credits float64) {
+// RecordOutcome counts one finished client request against the account that
+// served it: RequestCount always, ErrorCount when it failed. It is called once
+// per final request, never per retry, so the account's numbers match the
+// request log. An account out of rotation (disabled mid-request, over its
+// limit) is counted on its persisted row instead of being dropped.
+func (p *AccountPool) RecordOutcome(id string, success bool, tokens int, credits float64) {
+	if id == "" {
+		return
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	var updated bool
-	var requestCount, errorCount, totalTokens int
-	var totalCredits float64
-	var lastUsed int64
-	for i := range p.accounts {
-		if p.accounts[i].ID == id {
-			if !updated {
-				p.accounts[i].RequestCount++
-				p.accounts[i].TotalTokens += tokens
-				p.accounts[i].TotalCredits += credits
-				p.accounts[i].LastUsed = time.Now().Unix()
 
-				requestCount = p.accounts[i].RequestCount
-				errorCount = p.accounts[i].ErrorCount
-				totalTokens = p.accounts[i].TotalTokens
-				totalCredits = p.accounts[i].TotalCredits
-				lastUsed = p.accounts[i].LastUsed
-				updated = true
-				continue
-			}
-			p.accounts[i].RequestCount = requestCount
-			p.accounts[i].ErrorCount = errorCount
-			p.accounts[i].TotalTokens = totalTokens
-			p.accounts[i].TotalCredits = totalCredits
-			p.accounts[i].LastUsed = lastUsed
+	var stats *config.Account
+	for i := range p.accounts {
+		if p.accounts[i].ID != id {
+			continue
+		}
+		if stats == nil {
+			applyOutcome(&p.accounts[i], success, tokens, credits)
+			stats = &p.accounts[i]
+			continue
+		}
+		//! Weighted accounts appear several times in rotation; every copy carries the same numbers.
+		copyStats(&p.accounts[i], stats)
+	}
+	if stats == nil {
+		stored := findConfigAccount(id)
+		if stored == nil {
+			return
+		}
+		applyOutcome(stored, success, tokens, credits)
+		stats = stored
+	}
+	_ = config.UpdateAccountStats(id, stats.RequestCount, stats.ErrorCount, stats.TotalTokens, stats.TotalCredits, stats.LastUsed)
+}
+
+// UpdateStats is kept for callers that have not moved to RecordOutcome yet.
+//
+// Deprecated: per-round counting double-counted requests; the final request
+// is recorded once through RecordOutcome. This no longer changes any stats.
+func (p *AccountPool) UpdateStats(id string, tokens int, credits float64) {}
+
+func applyOutcome(acc *config.Account, success bool, tokens int, credits float64) {
+	acc.RequestCount++
+	if !success {
+		acc.ErrorCount++
+	}
+	acc.TotalTokens += max(tokens, 0)
+	acc.TotalCredits += max(credits, 0)
+	acc.LastUsed = time.Now().Unix()
+}
+
+func copyStats(dst, src *config.Account) {
+	dst.RequestCount = src.RequestCount
+	dst.ErrorCount = src.ErrorCount
+	dst.TotalTokens = src.TotalTokens
+	dst.TotalCredits = src.TotalCredits
+	dst.LastUsed = src.LastUsed
+}
+
+func findConfigAccount(id string) *config.Account {
+	for _, acc := range config.GetAccounts() {
+		if acc.ID == id {
+			return &acc
 		}
 	}
-	if updated {
-		_ = config.UpdateAccountStats(id, requestCount, errorCount, totalTokens, totalCredits, lastUsed)
-	}
+	return nil
 }
 
 func (p *AccountPool) GetAllAccounts() []config.Account {

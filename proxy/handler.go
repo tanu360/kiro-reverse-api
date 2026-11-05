@@ -38,6 +38,8 @@ type Handler struct {
 	modelsCacheMu   sync.RWMutex
 	modelsCacheTime int64
 	modelsSweep     sweepGroup
+	// lastModelsSweep holds each account's outcome from the latest models sweep; guarded by modelsCacheMu.
+	lastModelsSweep []accountResult
 	promptCache     *promptCacheTracker
 	affinity        *sessionAffinity
 	adminSessions   *adminSessionStore
@@ -618,20 +620,29 @@ func (h *Handler) refreshModelsCache() {
 
 func (h *Handler) sweepModelsCache() {
 	accounts := config.GetEnabledAccounts()
+	results := make([]accountResult, len(accounts))
+	defer func() {
+		h.modelsCacheMu.Lock()
+		h.lastModelsSweep = results
+		h.modelsCacheMu.Unlock()
+	}()
 	if len(accounts) == 0 {
 		return
 	}
 
 	listed := make([][]ModelInfo, len(accounts))
 	forEachAccount(accounts, backgroundRefreshWorkers, func(i int, account *config.Account) {
+		results[i] = accountResult{ID: account.ID}
 		if err := h.ensureValidToken(account); err != nil {
 			logger.Warnf("[ModelsCache] Skip %s token refresh failed: %v", account.Email, err)
 			h.handleBackgroundAccountFailure(account, err)
+			results[i].Error = "token refresh failed: " + err.Error()
 			return
 		}
 
 		models, err := ListAvailableModels(account)
 		if err != nil {
+			results[i].Error = err.Error()
 			//! Listing models is housekeeping on a timer, not traffic. Disabling or
 			//! cooling an account here takes it out of rotation over a request no
 			//! client made; real requests decide account health.
@@ -645,6 +656,7 @@ func (h *Handler) sweepModelsCache() {
 		}
 		h.pool.SetModelList(account.ID, modelIDs)
 		listed[i] = models
+		results[i].OK = true
 	})
 
 	//! Merge in account order, not completion order, so /v1/models lists the
@@ -701,12 +713,7 @@ func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, _ *http.Request
 		return
 	}
 
-	if latest := h.pool.GetByID(id); latest != nil {
-		account.AccessToken = latest.AccessToken
-		account.RefreshToken = latest.RefreshToken
-		account.ExpiresAt = latest.ExpiresAt
-		account.ProfileArn = latest.ProfileArn
-	}
+	h.useLatestToken(account)
 	if err := h.fetchAndCacheAccountModels(account); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -718,15 +725,31 @@ func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, _ *http.Request
 	})
 }
 
+// useLatestToken copies the pool's newer token onto a config snapshot; the
+// pool sees a refreshed token before config does.
+func (h *Handler) useLatestToken(account *config.Account) {
+	if latest := h.pool.GetByID(account.ID); latest != nil {
+		account.AccessToken = latest.AccessToken
+		account.RefreshToken = latest.RefreshToken
+		account.ExpiresAt = latest.ExpiresAt
+		account.ProfileArn = latest.ProfileArn
+	}
+}
+
 func (h *Handler) apiRefreshAllAccountsModels(w http.ResponseWriter, _ *http.Request) {
 	h.refreshModelsCache()
 	h.modelsCacheMu.RLock()
 	cachedLen := len(h.cachedModels)
+	results := append([]accountResult{}, h.lastModelsSweep...)
 	h.modelsCacheMu.RUnlock()
+	refreshed, failed := countResults(results)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":   true,
-		"refreshed": cachedLen,
-		"failed":    0,
+		"accounts":  len(results),
+		"refreshed": refreshed,
+		"failed":    failed,
+		"models":    cachedLen,
+		"results":   results,
 	})
 }
 
@@ -1360,7 +1383,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
-			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
 
 			stopReason := mapClaudeStopReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
@@ -1458,9 +1481,15 @@ func recordFinalRequestForApiKey(ctx context.Context, apiKeyReservation *apiKeyU
 	recordFinalRequestWithAPIKey(ctx, apiKeyReservation.apiKeyID(), apiKeyReservation.apiKeyValue(), account, model, inTokens, outTokens, credits, success, status, message)
 }
 
+// recordFinalRequestWithAPIKey logs a request's final outcome and counts it
+// against the account that answered last. Success paths that log through
+// recordObservedSuccess count with pool.RecordOutcome themselves.
 func recordFinalRequestWithAPIKey(ctx context.Context, apiKeyID, apiKey string, account *config.Account, model string, inTokens, outTokens int, credits float64, success bool, status int, message string) {
 	accountID, email := accountIdentity(account)
 	getObserveStore().RecordTracedRequest(requestTraceFromContext(ctx), accountID, apiKeyID, apiKey, email, model, inTokens, outTokens, credits, success, status, message)
+	if accountID != "" {
+		pool.GetPool().RecordOutcome(accountID, success, inTokens+outTokens, credits)
+	}
 }
 
 func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, payload *KiroPayload, model string, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, cacheProfile *promptCacheProfile, apiKeyReservation *apiKeyUsageReservation) {
@@ -1574,7 +1603,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
-			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
 
 			responseThinkingContent := rawThinkingContent
@@ -2101,7 +2130,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
-			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			finishReason := mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolCalls))
 
@@ -2238,7 +2267,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
 			h.rememberAccount(payload, account)
-			h.pool.UpdateStats(account.ID, inputTokens+outputTokens, credits)
+			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			thinkingFormat := config.GetThinkingConfig().OpenAIFormat
 			resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
@@ -2524,8 +2553,7 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 
 	result := make([]map[string]interface{}, len(accounts))
 	for i, a := range accounts {
-
-		stats := statsMap[a.ID]
+		stats := accountStats(statsMap, a)
 
 		result[i] = map[string]interface{}{
 			"id":                a.ID,
@@ -2577,6 +2605,16 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	json.NewEncoder(w).Encode(result)
+}
+
+// accountStats picks the live pool copy of an account's counters, else the
+// persisted row. The pool holds only routable accounts; disabled, banned,
+// suspended and over-limit ones keep their history in config.
+func accountStats(poolStats map[string]config.Account, stored config.Account) config.Account {
+	if stats, ok := poolStats[stored.ID]; ok {
+		return stats
+	}
+	return stored
 }
 
 func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
@@ -2814,114 +2852,200 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 
 	switch req.Action {
 	case "enable", "disable":
-		enabled := req.Action == "enable"
-		accounts := config.GetAccounts()
-		idSet := make(map[string]bool)
-		for _, id := range req.IDs {
-			idSet[id] = true
-		}
-		var toRefreshModels []config.Account
-		for _, a := range accounts {
-			if idSet[a.ID] {
-
-				if enabled && !a.Enabled && a.AccessToken != "" {
-					toRefreshModels = append(toRefreshModels, a)
-				}
-				a.Enabled = enabled
-				if enabled && a.BanStatus != "" && a.BanStatus != "ACTIVE" {
-					a.BanStatus = "ACTIVE"
-					a.BanReason = ""
-					a.BanTime = 0
-				}
-				if enabled {
-					a.Silent = false
-					a.SilentReason = ""
-					a.SilentTime = 0
-				}
-				config.UpdateAccount(a.ID, a)
-			}
-		}
-		h.pool.Reload()
-
-		for _, acc := range toRefreshModels {
-			go func(a config.Account) {
-				a.Enabled = true
-				if err := h.fetchAndCacheAccountModels(&a); err != nil {
-					logger.Warnf("[ModelsCache] Auto-refresh failed for batch-enabled account %s: %v", a.Email, err)
-				}
-			}(acc)
-		}
-		json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "count": len(req.IDs)})
-
+		h.batchSetEnabled(w, req.IDs, req.Action == "enable")
 	case "refresh":
-		successCount := 0
-		failCount := 0
-		for _, id := range req.IDs {
-			accounts := config.GetAccounts()
-			var account *config.Account
-			for i := range accounts {
-				if accounts[i].ID == id {
-					account = &accounts[i]
-					break
-				}
-			}
-			if account == nil {
-				failCount++
-				continue
-			}
-
-			if account.RefreshToken != "" {
-				if err := refreshStoredAccount(r.Context(), account, true); err != nil {
-					failCount++
-					continue
-				}
-			}
-
-			info, err := RefreshAccountInfo(account)
-			if err != nil {
-				failCount++
-				continue
-			}
-			config.UpdateAccountInfo(id, *info)
-			successCount++
-		}
-		h.pool.Reload()
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success":   true,
-			"refreshed": successCount,
-			"failed":    failCount,
-		})
-
+		h.batchRefresh(w, r, req.IDs)
+	case "refreshModels":
+		h.batchRefreshModels(w, req.IDs)
 	case "delete":
-		successCount := 0
-		failCount := 0
-		existing := make(map[string]bool)
-		for _, account := range config.GetAccounts() {
-			existing[account.ID] = true
-		}
-		for _, id := range req.IDs {
-			if !existing[id] {
-				failCount++
-				continue
-			}
-			if err := config.DeleteAccount(id); err != nil {
-				failCount++
-				continue
-			}
-			delete(existing, id)
-			successCount++
-		}
-		h.pool.Reload()
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"deleted": successCount,
-			"failed":  failCount,
-		})
-
+		h.batchDelete(w, req.IDs)
 	default:
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid action: " + req.Action})
 	}
+}
+
+// accountResult is one account's outcome in a batch or sweep response.
+type accountResult struct {
+	ID     string `json:"id"`
+	OK     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
+	Status string `json:"status,omitempty"`
+}
+
+const (
+	// accountStatusNotFound marks a requested ID with no stored account.
+	accountStatusNotFound = "not_found"
+	// accountStatusSuspended marks an account the refresh found suspended and marked as such.
+	accountStatusSuspended = "suspended"
+)
+
+func notFoundResult(id string) accountResult {
+	return accountResult{ID: id, Error: "Account not found", Status: accountStatusNotFound}
+}
+
+func countResults(results []accountResult) (ok, failed int) {
+	for _, res := range results {
+		if res.OK {
+			ok++
+		} else {
+			failed++
+		}
+	}
+	return ok, failed
+}
+
+// matchAccounts returns the stored accounts for ids in request order, without
+// duplicates, and a slot index per account into a results slice that has one
+// entry per distinct requested id. Unknown ids already hold a not_found result.
+func matchAccounts(ids []string) ([]config.Account, []int, []accountResult) {
+	byID := make(map[string]config.Account)
+	for _, a := range config.GetAccounts() {
+		byID[a.ID] = a
+	}
+	seen := make(map[string]bool, len(ids))
+	var matched []config.Account
+	var slots []int
+	results := make([]accountResult, 0, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		account, ok := byID[id]
+		if !ok {
+			results = append(results, notFoundResult(id))
+			continue
+		}
+		matched = append(matched, account)
+		slots = append(slots, len(results))
+		results = append(results, accountResult{ID: id})
+	}
+	return matched, slots, results
+}
+
+func (h *Handler) batchSetEnabled(w http.ResponseWriter, ids []string, enabled bool) {
+	matched, slots, results := matchAccounts(ids)
+	var toRefreshModels []config.Account
+	for i, a := range matched {
+		wasEnabled := a.Enabled
+		a.Enabled = enabled
+		if enabled {
+			if a.BanStatus != "" && a.BanStatus != "ACTIVE" {
+				a.BanStatus = "ACTIVE"
+				a.BanReason = ""
+				a.BanTime = 0
+			}
+			a.Silent = false
+			a.SilentReason = ""
+			a.SilentTime = 0
+		}
+		if err := config.UpdateAccount(a.ID, a); err != nil {
+			results[slots[i]].Error = err.Error()
+			continue
+		}
+		results[slots[i]].OK = true
+		if enabled && !wasEnabled && a.AccessToken != "" {
+			toRefreshModels = append(toRefreshModels, a)
+		}
+	}
+	h.pool.Reload()
+
+	for _, acc := range toRefreshModels {
+		go func(a config.Account) {
+			if err := h.fetchAndCacheAccountModels(&a); err != nil {
+				logger.Warnf("[ModelsCache] Auto-refresh failed for batch-enabled account %s: %v", a.Email, err)
+			}
+		}(acc)
+	}
+	count, failed := countResults(results)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"count":   count,
+		"failed":  failed,
+		"results": results,
+	})
+}
+
+func (h *Handler) batchRefresh(w http.ResponseWriter, r *http.Request, ids []string) {
+	matched, slots, results := matchAccounts(ids)
+	//! Concurrent like the background sweep: dozens of accounts one at a time outlast a reverse proxy's timeout.
+	forEachAccount(matched, backgroundRefreshWorkers, func(i int, account *config.Account) {
+		res := &results[slots[i]]
+		_, suspended, err := h.refreshAccountNow(r.Context(), account)
+		switch {
+		case err != nil:
+			res.Error = err.Error()
+		case suspended:
+			res.OK = true
+			res.Status = accountStatusSuspended
+		default:
+			res.OK = true
+		}
+	})
+	h.pool.Reload()
+
+	refreshed, failed, suspended := 0, 0, 0
+	for _, res := range results {
+		switch {
+		case !res.OK:
+			failed++
+		case res.Status == accountStatusSuspended:
+			suspended++
+		default:
+			refreshed++
+		}
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"refreshed": refreshed,
+		"suspended": suspended,
+		"failed":    failed,
+		"results":   results,
+	})
+}
+
+func (h *Handler) batchRefreshModels(w http.ResponseWriter, ids []string) {
+	matched, slots, results := matchAccounts(ids)
+	forEachAccount(matched, backgroundRefreshWorkers, func(i int, account *config.Account) {
+		h.useLatestToken(account)
+		res := &results[slots[i]]
+		if err := h.fetchAndCacheAccountModels(account); err != nil {
+			res.Error = err.Error()
+			return
+		}
+		res.OK = true
+	})
+	refreshed, failed := countResults(results)
+	h.modelsCacheMu.RLock()
+	models := len(h.cachedModels)
+	h.modelsCacheMu.RUnlock()
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"refreshed": refreshed,
+		"failed":    failed,
+		"models":    models,
+		"results":   results,
+	})
+}
+
+func (h *Handler) batchDelete(w http.ResponseWriter, ids []string) {
+	matched, slots, results := matchAccounts(ids)
+	for i, a := range matched {
+		if err := config.DeleteAccount(a.ID); err != nil {
+			results[slots[i]].Error = err.Error()
+			continue
+		}
+		results[slots[i]].OK = true
+	}
+	h.pool.Reload()
+	deleted, failed := countResults(results)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"deleted": deleted,
+		"failed":  failed,
+		"results": results,
+	})
 }
 
 func (h *Handler) apiStartIamSso(w http.ResponseWriter, r *http.Request) {
@@ -3474,6 +3598,7 @@ func (h *Handler) apiUpdatePromptFilter(w http.ResponseWriter, r *http.Request) 
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+	publishEvent(eventSettingsChanged, "")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -3504,6 +3629,7 @@ func (h *Handler) apiUpdateModelMappings(w http.ResponseWriter, r *http.Request)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
+	publishEvent(eventSettingsChanged, "")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -3533,6 +3659,12 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if req.Password != "" && utf8.RuneCountInString(req.Password) < config.MinAdminPasswordLength {
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Password must be at least %d characters", config.MinAdminPasswordLength)})
+		return
+	}
+
+	//! The server, not only the UI, refuses a state where no client can authenticate.
+	if req.RequireApiKey != nil && *req.RequireApiKey && !config.IsApiKeyRequired() && config.CountEnabledApiKeys() == 0 {
+		writeAPIKeyLockout(w)
 		return
 	}
 
@@ -3596,6 +3728,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	publishEvent(eventSettingsChanged, "")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -3610,6 +3743,7 @@ func (h *Handler) apiResetStats(w http.ResponseWriter, _ *http.Request) {
 		_, _ = d.Exec(`DELETE FROM requests`)
 		_, _ = d.Exec(`DELETE FROM errors`)
 	}
+	publishEvent(eventStatsReset, "")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -3701,15 +3835,7 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 }
 
 func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id string) {
-	accounts := config.GetAccounts()
-	var account *config.Account
-	for i := range accounts {
-		if accounts[i].ID == id {
-			account = &accounts[i]
-			break
-		}
-	}
-
+	account := findAccountByID(id)
 	if account == nil {
 		w.WriteHeader(404)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
@@ -3717,73 +3843,73 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id s
 	}
 
 	defer h.pool.Reload()
+	info, suspended, err := h.refreshAccountNow(r.Context(), account)
+	if err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	if suspended {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "Account status updated",
+		})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"info":    info,
+	})
+}
+
+// refreshAccountNow reloads one stored account's subscription and usage, for
+// the row refresh and the batch refresh alike. It refreshes the token first
+// when it is about to expire and once more after an auth error. A suspended
+// account is marked as such and reported with suspended=true and no info.
+func (h *Handler) refreshAccountNow(ctx context.Context, account *config.Account) (*config.AccountInfo, bool, error) {
 	refreshTokenIfNeeded := func() error {
 		if account.RefreshToken == "" {
 			return nil
 		}
-		return refreshStoredAccount(r.Context(), account, true)
+		return refreshStoredAccount(ctx, account, true)
+	}
+	isSuspended := func(err error) bool {
+		msg := err.Error()
+		return strings.Contains(msg, "TEMPORARILY_SUSPENDED") || strings.Contains(strings.ToLower(msg), "account suspended")
 	}
 
 	if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {
 		if err := refreshTokenIfNeeded(); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Token refresh failed: " + err.Error()})
-			return
+			return nil, false, fmt.Errorf("Token refresh failed: %w", err)
 		}
 	}
 
 	info, err := refreshAccountInfo(account, false)
 	if err != nil {
-
-		errMsg := err.Error()
-		errMsgLower := strings.ToLower(errMsg)
-		if strings.Contains(errMsg, "TEMPORARILY_SUSPENDED") || strings.Contains(errMsgLower, "account suspended") {
+		if isSuspended(err) {
 			h.handleBackgroundAccountFailure(account, err)
-
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": true,
-				"message": "Account status updated",
-			})
-			return
+			return nil, true, nil
 		}
-
+		errMsg := err.Error()
 		if strings.Contains(errMsg, "403") || strings.Contains(errMsg, "401") || strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "expired") {
 			if refreshErr := refreshTokenIfNeeded(); refreshErr == nil {
-
 				info, err = refreshAccountInfo(account, false)
-				if err != nil {
-
-					retryErrMsg := err.Error()
-					if strings.Contains(retryErrMsg, "TEMPORARILY_SUSPENDED") || strings.Contains(strings.ToLower(retryErrMsg), "account suspended") {
-						h.handleBackgroundAccountFailure(account, err)
-						json.NewEncoder(w).Encode(map[string]interface{}{
-							"success": true,
-							"message": "Account status updated",
-						})
-						return
-					}
+				if err != nil && isSuspended(err) {
+					h.handleBackgroundAccountFailure(account, err)
+					return nil, true, nil
 				}
 			}
 		}
-
 		if err != nil {
 			h.handleBackgroundAccountFailure(account, err)
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-			return
+			return nil, false, err
 		}
 	}
 
-	if err := config.UpdateAccountInfo(id, *info); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-		return
+	if err := config.UpdateAccountInfo(account.ID, *info); err != nil {
+		return nil, false, err
 	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"info":    info,
-	})
+	return info, false, nil
 }
 
 func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id string) {
@@ -3804,13 +3930,11 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		return
 	}
 
-	var stats config.Account
+	statsMap := make(map[string]config.Account, len(poolAccounts))
 	for _, a := range poolAccounts {
-		if a.ID == id {
-			stats = a
-			break
-		}
+		statsMap[a.ID] = a
 	}
+	stats := accountStats(statsMap, *account)
 
 	result := map[string]interface{}{
 		"id":                account.ID,
@@ -3961,6 +4085,7 @@ func (h *Handler) apiUpdateThinkingConfig(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	publishEvent(eventSettingsChanged, "")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -3999,6 +4124,7 @@ func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request
 		config.UpdateEndpointFallback(*req.EndpointFallback)
 	}
 
+	publishEvent(eventSettingsChanged, "")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
@@ -4042,6 +4168,7 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 
 	applyProxyConfig(req.ProxyURL)
 
+	publishEvent(eventSettingsChanged, "")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
