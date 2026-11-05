@@ -1,4 +1,5 @@
-import { type LucideIcon, MinusIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
+import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -23,7 +24,7 @@ export interface StatMetric {
 }
 
 export interface StatCardProps {
-  icon: LucideIcon;
+  icon: IconSvgElement;
   label: string;
   value: ReactNode;
   tone?: "default" | "danger";
@@ -103,7 +104,7 @@ export function StatCard({
             danger && "border-destructive/20 bg-destructive/10 text-destructive-foreground",
           )}
         >
-          <Icon aria-hidden="true" className="size-4" />
+          <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-4" />
         </div>
         <p className="text-meta text-muted-foreground">{label}</p>
       </div>

@@ -1,4 +1,5 @@
-import { ExternalLinkIcon, Loader2Icon } from "lucide-react";
+import { ExternalLinkIcon, LoaderCircleIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, type Ref, useEffect, useRef } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ export function UrlBox({ label, url }: { label: string; url: string }): JSX.Elem
           size="sm"
           variant="outline"
         >
-          <ExternalLinkIcon aria-hidden="true" />
+          <HugeiconsIcon icon={ExternalLinkIcon} aria-hidden="true" />
           {t("open")}
         </Button>
         <CopyButton
@@ -133,7 +134,9 @@ export function SubmitButton({
       ref={ref}
       type="submit"
     >
-      {busy ? <Loader2Icon aria-hidden="true" className="animate-spin" /> : null}
+      {busy ? (
+        <HugeiconsIcon icon={LoaderCircleIcon} aria-hidden="true" className="animate-spin" />
+      ) : null}
       {busy ? busyLabel : label}
     </Button>
   );

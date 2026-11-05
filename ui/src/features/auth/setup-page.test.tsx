@@ -20,6 +20,15 @@ describe("SetupPage", () => {
     expect(screen.getByRole("button", { name: `${PASSWORD} Copy password` })).toBeInTheDocument();
   });
 
+  it("returns to the requested Accounts page after first-run sign-in", async () => {
+    const { user, router } = await renderApp("/accounts?plan=pro", { authed: false });
+    expect(router.state.location.pathname).toBe("/setup");
+    await screen.findByText(PASSWORD);
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/accounts"));
+    expect(router.state.location.search).toMatchObject({ plan: "pro" });
+  });
+
   it("copies the password when it is clicked, with no separate copy icon", async () => {
     const { user } = await renderApp("/setup", { authed: false });
     await screen.findByText(PASSWORD);

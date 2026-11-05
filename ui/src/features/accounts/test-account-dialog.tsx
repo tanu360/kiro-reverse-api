@@ -1,5 +1,6 @@
+import { PlayIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { PlayIcon } from "lucide-react";
 import { type JSX, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import {
@@ -180,7 +181,7 @@ export function TestAccountDialog({
             disabled={cached.isPending || running}
             onClick={() => void run()}
           >
-            <PlayIcon aria-hidden="true" />
+            <HugeiconsIcon icon={PlayIcon} aria-hidden="true" />
             {running ? t("test.running") : t("test.run")}
           </Button>
         </>

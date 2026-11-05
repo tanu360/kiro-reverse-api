@@ -32,9 +32,9 @@ function section(id: string): HTMLElement {
 async function renderPage() {
   const result = renderWithProviders(<SettingsPage />);
   await screen.findByRole("switch", { name: "Allow overage" });
-  await screen.findAllByRole("textbox", { name: "Model name contains" });
-  await screen.findByRole("button", { name: "Add regex rule" });
-  await screen.findByText("Proxy type");
+  await screen.findByRole("button", { name: "Mapping 1 actions" });
+  await screen.findByRole("button", { name: "Add rule" });
+  await screen.findByText("127.0.0.1:1080");
   return result;
 }
 
@@ -100,19 +100,20 @@ describe("settings focus", () => {
       expect(footer).toContainElement(save);
     });
 
-    it("moves focus to the next row's Match field after Remove", async () => {
+    it("moves focus to the next row's menu after Delete", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.modelMappings);
-      const rows = within(card).getAllByRole("listitem");
 
-      await user.click(within(rows[0]).getByRole("button", { name: "Remove" }));
+      await user.click(within(card).getByRole("button", { name: "Mapping 1 actions" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Delete mapping" }));
 
-      const sources = within(card).getAllByRole("textbox", { name: "Model name contains" });
-      expect(sources).toHaveLength(8);
-      await waitFor(() => expect(sources[0]).toHaveFocus());
+      expect(within(card).getAllByRole("listitem")).toHaveLength(8);
+      await waitFor(() =>
+        expect(within(card).getByRole("button", { name: "Mapping 1 actions" })).toHaveFocus(),
+      );
     });
 
-    it("moves focus to the previous row after removing the last, then to Add mapping", async () => {
+    it("moves focus to the previous row after deleting the last, then to Add mapping", async () => {
       mockServer.use(
         http.get(apiUrl("/model-mappings"), () =>
           HttpResponse.json({
@@ -125,49 +126,40 @@ describe("settings focus", () => {
         ),
       );
       const { user } = renderWithProviders(<SettingsPage />);
-      await waitFor(() =>
-        expect(screen.getAllByRole("textbox", { name: "Model name contains" })).toHaveLength(2),
-      );
+      await user.click(await screen.findByRole("button", { name: "Mapping 2 actions" }));
       const card = section(SECTION_ID.modelMappings);
+      await user.click(await screen.findByRole("menuitem", { name: "Delete mapping" }));
+      await waitFor(() =>
+        expect(within(card).getByRole("button", { name: "Mapping 1 actions" })).toHaveFocus(),
+      );
 
-      await user.click(within(card).getAllByRole("button", { name: "Remove" })[1]);
-      const [first] = within(card).getAllByRole("textbox", { name: "Model name contains" });
-      await waitFor(() => expect(first).toHaveFocus());
-
-      await user.click(within(card).getByRole("button", { name: "Remove" }));
+      await user.click(within(card).getByRole("button", { name: "Mapping 1 actions" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Delete mapping" }));
       await waitFor(() =>
         expect(within(card).getByRole("button", { name: "Add mapping" })).toHaveFocus(),
       );
     });
 
-    it("keeps a focused row mounted when the saved list comes back from the server", async () => {
+    it("keeps an edited row mounted when the saved list comes back from the server", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.modelMappings);
-      const [source] = within(card).getAllByRole("textbox", { name: "Model name contains" });
+      const [row] = within(card).getAllByRole("listitem");
 
+      await user.click(within(card).getByRole("button", { name: "Mapping 1 actions" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Edit mapping" }));
+      const dialog = await screen.findByRole("dialog", { name: "Edit mapping" });
+      const source = within(dialog).getByLabelText("Model name contains");
       await user.clear(source);
-      await user.type(source, "GPT-X");
-      await user.keyboard("{Enter}");
+      await user.type(source, "GPT-X{Enter}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      await user.click(within(card).getByRole("button", { name: "Save" }));
 
       await screen.findByText("Settings saved");
       // The server lowercases keys; the refetched copy replaces the clean draft in place.
       await waitFor(() =>
-        expect(
-          within(card).getAllByRole("textbox", { name: "Model name contains" })[0],
-        ).toHaveValue("gpt-x"),
+        expect(within(card).getAllByRole("listitem")[0]).toHaveTextContent("gpt-x"),
       );
-      expect(within(card).getAllByRole("textbox", { name: "Model name contains" })[0]).toBe(source);
-      expect(source).toHaveFocus();
-    });
-
-    it("labels the stacked inputs on phones", async () => {
-      await renderPage();
-      const card = section(SECTION_ID.modelMappings);
-      const [row] = within(card).getAllByRole("listitem");
-      const [source] = within(row).getAllByRole("textbox", { name: "Model name contains" });
-      const label = row.querySelector(`label[for="${source.id}"]`);
-      expect(label).toHaveTextContent("Model name contains");
-      expect(label).toHaveClass("sm:hidden");
+      expect(within(card).getAllByRole("listitem")[0]).toBe(row);
     });
   });
 
@@ -230,9 +222,11 @@ describe("settings focus", () => {
     expect(within(nav()).getByRole("link", { name: "Usage" })).toHaveClass("min-h-10");
 
     const filter = section(SECTION_ID.promptFilter);
-    await user.click(within(filter).getByRole("button", { name: "Add regex rule" }));
-    const [rule] = within(filter).getAllByRole("listitem");
-    for (const input of within(rule).getAllByRole("textbox")) {
+    await user.click(within(filter).getByRole("button", { name: "Add rule" }));
+    const editor = await screen.findByRole("dialog", { name: "Add rule" });
+    await user.click(within(editor).getByRole("combobox", { name: "Type" }));
+    await user.click(await screen.findByRole("option", { name: "Regex" }));
+    for (const input of within(editor).getAllByRole("textbox")) {
       const control = input.closest('[data-slot="input-control"]');
       expect(control).toHaveAttribute("data-size", "default");
       expect(control?.className).toContain("pointer-coarse:*:data-[slot=input]:h-9.5");
@@ -248,7 +242,7 @@ describe("settings focus", () => {
     renderWithProviders(<SettingsPage />);
 
     expect(await screen.findByText("Could not load settings")).toBeInTheDocument();
-    await screen.findByText("Proxy type");
+    await screen.findByText("127.0.0.1:1080");
     expect(screen.queryByText("Could not load this data")).not.toBeInTheDocument();
     expect(screen.queryByRole("switch", { name: "Allow overage" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);

@@ -1,22 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
-  DownloadIcon,
-  EllipsisIcon,
-  LayersIcon,
+  Download01Icon,
+  Layers01Icon,
   PlusIcon,
   SearchXIcon,
   UsersRoundIcon,
-} from "lucide-react";
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { PageHeader, RefreshButton } from "@/components/shared/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@/components/ui/menu";
 import { AddAccountDialog } from "@/features/add-account/add-account-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { accountsQuery, refreshAllModels } from "@/lib/api/accounts";
@@ -74,7 +73,7 @@ export function AccountsPage(): JSX.Element {
   const confirm = useConfirm();
   const listRef = useRef<HTMLDivElement | null>(null);
   const layout = useListLayout(listRef);
-  // Phones fold Export and Refresh all models into a ⋯ menu, so the header fits 360 px.
+  // Phones show Refresh models as an icon, so the header fits 360 px.
   const isPhone = useMediaQuery("max-sm");
 
   const query = useQuery(accountsQuery());
@@ -180,7 +179,7 @@ export function AccountsPage(): JSX.Element {
       <EmptyState
         action={
           <Button onClick={() => setAddOpen(true)}>
-            <PlusIcon aria-hidden="true" />
+            <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
             {t("actions.add")}
           </Button>
         }
@@ -206,9 +205,15 @@ export function AccountsPage(): JSX.Element {
 
   const testAccount = test ? accounts.find((account) => account.id === test.id) : undefined;
 
+  // The page size sits at the end of the filter row; a new size starts again at page 1.
+  const onPageSizeChange = (size: number) =>
+    updateSearch({
+      pageSize: size === DEFAULT_PAGE_SIZE ? undefined : (size as AccountsSearch["pageSize"]),
+      page: undefined,
+    });
+
   const table = (
     <AccountsTable
-      rowNumberOffset={(page - 1) * pageSize}
       accounts={pageRows}
       desc={desc}
       emptyState={emptyState}
@@ -227,47 +232,27 @@ export function AccountsPage(): JSX.Element {
     <>
       <PageHeader
         actions={
-          // Quiet to loud, one height: Refresh (an icon), Refresh all models (outline), Export
-          // (a purple tint) and Add account, the only solid button.
+          // One refresh only: Refresh models (periwinkle), then Add account (purple). The list
+          // itself refetches on focus and after every action, so it needs no refresh button of
+          // its own next to a second one. Export sits at the end of the status tab row.
           <>
-            <RefreshButton
-              fetching={query.isFetching}
-              onRefresh={() => void query.refetch()}
-              variant="icon"
-            />
             {isPhone ? (
-              <Menu>
-                <MenuTrigger
-                  aria-label={t("actions.moreList")}
-                  render={<Button size="icon" variant="quiet" />}
-                >
-                  <EllipsisIcon aria-hidden="true" />
-                </MenuTrigger>
-                <MenuPopup align="end">
-                  <MenuItem onClick={onExport}>
-                    <DownloadIcon aria-hidden="true" className="text-info-foreground" />
-                    {t("actions.export")}
-                  </MenuItem>
-                  <MenuItem onClick={() => void onRefreshAllModels()}>
-                    <LayersIcon aria-hidden="true" />
-                    {t("models.refreshAll")}
-                  </MenuItem>
-                </MenuPopup>
-              </Menu>
+              <Button
+                aria-label={t("models.refreshAll")}
+                onClick={() => void onRefreshAllModels()}
+                size="icon"
+                variant="periwinkle"
+              >
+                <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
+              </Button>
             ) : (
-              <>
-                <Button onClick={() => void onRefreshAllModels()} variant="outline">
-                  <LayersIcon aria-hidden="true" />
-                  {t("models.refreshAll")}
-                </Button>
-                <Button onClick={onExport} variant="soft">
-                  <DownloadIcon aria-hidden="true" />
-                  {t("actions.export")}
-                </Button>
-              </>
+              <Button onClick={() => void onRefreshAllModels()} variant="periwinkle">
+                <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
+                {t("models.refreshAll")}
+              </Button>
             )}
             <Button onClick={() => setAddOpen(true)}>
-              <PlusIcon aria-hidden="true" />
+              <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
               {t("actions.add")}
             </Button>
           </>
@@ -277,9 +262,19 @@ export function AccountsPage(): JSX.Element {
 
       {/* The accounts container hides low-priority table columns on narrower lists. */}
       <div className="@container/accounts flex min-w-0 flex-col gap-4" ref={listRef}>
-        <div className="min-w-0 overflow-clip rounded-xl border border-border/70 bg-card">
-          {query.isError && !query.data ? null : (
-            <div className="border-b border-border/60 p-3 sm:p-4">
+        {query.isError && !query.data ? (
+          <Card>
+            <ErrorState
+              error={query.error}
+              onRetry={() => void query.refetch()}
+              title={t("loadError")}
+            />
+          </Card>
+        ) : (
+          // One box: the status tabs and filters head the table's own card, over a hairline,
+          // so they read as part of the table rather than a separate strip above it.
+          <Card className="min-w-0 overflow-hidden">
+            <div className="border-border/60 border-b p-3 sm:p-4">
               <AccountsToolbar
                 accounts={accounts}
                 desc={desc}
@@ -287,46 +282,32 @@ export function AccountsPage(): JSX.Element {
                 loading={query.isPending}
                 onClearFilters={clearFilters}
                 onFiltersChange={setFilters}
+                onPageSizeChange={onPageSizeChange}
                 onSortChange={setSort}
-                shown={sorted.length}
-                sort={sort}
-              />
-            </div>
-          )}
-
-          {query.isError && !query.data ? (
-            <Card>
-              <ErrorState
-                error={query.error}
-                onRetry={() => void query.refetch()}
-                title={t("loadError")}
-              />
-            </Card>
-          ) : layout === "cards" ? (
-            <div className="p-3">{table}</div>
-          ) : (
-            table
-          )}
-          {!query.isPending && (!query.isError || query.data) ? (
-            <div className="border-t border-border/60 px-3 py-3 sm:px-4">
-              <DataTablePagination
-                variant="circle"
-                onPageChange={(next) => updateSearch({ page: next > 1 ? next : undefined }, false)}
-                onPageSizeChange={(size) =>
-                  updateSearch({
-                    pageSize:
-                      size === DEFAULT_PAGE_SIZE ? undefined : (size as AccountsSearch["pageSize"]),
-                    page: undefined,
-                  })
-                }
-                page={page}
                 pageSize={pageSize}
                 pageSizeOptions={PAGE_SIZES}
-                total={sorted.length}
+                shown={sorted.length}
+                sort={sort}
+                tabActions={
+                  // A quiet icon and label, like the tabs beside it; icon-only on phones.
+                  <Button className="hover:bg-accent" onClick={onExport} size="sm" variant="quiet">
+                    <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+                    <span className="max-sm:sr-only">{t("actions.export")}</span>
+                  </Button>
+                }
               />
             </div>
-          ) : null}
-        </div>
+            {layout === "cards" ? <div className="p-3">{table}</div> : table}
+          </Card>
+        )}
+        {sorted.length > PAGE_SIZES[0] ? (
+          <DataTablePagination
+            onPageChange={(next) => updateSearch({ page: next > 1 ? next : undefined }, false)}
+            page={page}
+            pageSize={pageSize}
+            total={sorted.length}
+          />
+        ) : null}
         {selected.size > 0 ? (
           <BatchBar onClear={() => setSelected(new Set())} selectedIds={[...selected]} />
         ) : null}

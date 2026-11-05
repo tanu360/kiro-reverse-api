@@ -1,5 +1,6 @@
+import { ArchiveIcon, FileUpIcon, PlusIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArchiveIcon, FileUpIcon, PlusIcon } from "lucide-react";
 import {
   type ChangeEvent,
   type JSX,
@@ -241,7 +242,11 @@ export function BackupsPage(): JSX.Element {
       data-empty-focus={inEmptyState ? "" : undefined}
       onClick={startCreate}
     >
-      {create.isPending ? <Spinner aria-hidden="true" /> : <PlusIcon aria-hidden="true" />}
+      {create.isPending ? (
+        <Spinner aria-hidden="true" />
+      ) : (
+        <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+      )}
       {create.isPending ? t("creating") : t("create")}
     </Button>
   );
@@ -273,7 +278,11 @@ export function BackupsPage(): JSX.Element {
                   />
                 }
               >
-                {uploading ? <Spinner aria-hidden="true" /> : <FileUpIcon aria-hidden="true" />}
+                {uploading ? (
+                  <Spinner aria-hidden="true" />
+                ) : (
+                  <HugeiconsIcon icon={FileUpIcon} aria-hidden="true" />
+                )}
                 {t("upload")}
               </TooltipTrigger>
               <TooltipPopup>{t("uploadHint")}</TooltipPopup>

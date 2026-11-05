@@ -4,7 +4,7 @@ export type ProxyScheme = "socks5" | "socks5h" | "http" | "https";
 /** The outbound proxy form, split from and joined back into `proxyURL`. */
 export interface ProxyModel {
   type: ProxyType;
-  /** Kept through a round trip, so socks5h and https are not lost. */
+  /** Kept through a round trip, so socks5h is not lost; http or https is picked in the form. */
   scheme: ProxyScheme;
   /** Without IPv6 brackets */
   host: string;

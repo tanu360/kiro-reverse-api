@@ -1,6 +1,6 @@
+import { Pulse01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { ActivityIcon } from "lucide-react";
 import { type JSX, lazy, Suspense, useMemo } from "react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -136,7 +136,7 @@ export function TrafficCard(): JSX.Element {
               <div className="rounded-xl bg-surface-inset/80 backdrop-blur-[1px]">
                 <EmptyState
                   description={t("traffic.noTrafficBody")}
-                  icon={ActivityIcon}
+                  icon={Pulse01Icon}
                   title={t("traffic.noTraffic")}
                   variant="compact"
                 />

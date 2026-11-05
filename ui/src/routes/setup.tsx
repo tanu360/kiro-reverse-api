@@ -5,16 +5,22 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { firstRunQuery } from "@/lib/api/session";
 import { isAuthenticated } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
+import { redirectTarget, validateLoginSearch } from "./-search";
 
 export const Route = createFileRoute("/setup")({
-  beforeLoad: () => {
-    if (isAuthenticated()) throw redirect({ to: "/" });
+  validateSearch: validateLoginSearch,
+  beforeLoad: ({ search }) => {
+    if (isAuthenticated()) {
+      const target = redirectTarget(search.redirect);
+      throw redirect({ to: target.to, search: () => target.search });
+    }
   },
-  loader: async ({ context }) => {
+  loaderDeps: ({ search }) => ({ redirect: search.redirect }),
+  loader: async ({ context, deps }) => {
     try {
       // Fetched fresh on every visit: someone else may have signed in since.
       const { password } = await context.queryClient.fetchQuery(firstRunQuery());
-      if (!password) throw redirect({ to: "/login" });
+      if (!password) throw redirect({ to: "/login", search: { redirect: deps.redirect } });
     } catch (error) {
       if (isRedirect(error)) throw error;
       // A network error still renders the page and its sign-in form.

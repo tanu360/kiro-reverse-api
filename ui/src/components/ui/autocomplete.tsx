@@ -1,7 +1,8 @@
 "use client";
 
 import { Autocomplete as AutocompletePrimitive } from "@base-ui/react/autocomplete";
-import { ChevronsUpDownIcon, XIcon } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { UnfoldMoreIcon, XIcon } from "@hugeicons/core-free-icons";
 import type React from "react";
 import {
   POPUP_GROUP_LABEL_CLASS,
@@ -75,7 +76,7 @@ export function AutocompleteInput({
           {...triggerProps}
         >
           <AutocompletePrimitive.Icon data-slot="autocomplete-icon">
-            <ChevronsUpDownIcon />
+            <HugeiconsIcon icon={UnfoldMoreIcon} />
           </AutocompletePrimitive.Icon>
         </AutocompleteTrigger>
       )}
@@ -88,7 +89,7 @@ export function AutocompleteInput({
           aria-label={t("autocomplete.clear")}
           {...clearProps}
         >
-          <XIcon />
+          <HugeiconsIcon icon={XIcon} />
         </AutocompleteClear>
       )}
     </AutocompletePrimitive.InputGroup>
@@ -126,7 +127,7 @@ export function AutocompletePopup({
       >
         <span
           className={cn(
-            "popup-surface relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg transition-[scale,opacity]",
+            "popup-surface popup-width relative flex max-h-full origin-(--transform-origin) rounded-lg transition-[scale,opacity]",
             className,
           )}
         >
@@ -246,7 +247,7 @@ export function AutocompleteList({
     <ScrollArea overscrollContain scrollbarGutter scrollFade>
       <AutocompletePrimitive.List
         className={cn(
-          "not-empty:scroll-py-1 not-empty:p-1 in-data-has-overflow-y:pe-3",
+          "not-empty:scroll-py-1 not-empty:p-1",
           className,
         )}
         data-slot="autocomplete-list"
@@ -271,7 +272,7 @@ export function AutocompleteClear({
       data-slot="autocomplete-clear"
       {...props}
     >
-      <XIcon />
+      <HugeiconsIcon icon={XIcon} />
     </AutocompletePrimitive.Clear>
   );
 }

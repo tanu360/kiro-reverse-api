@@ -1,5 +1,6 @@
+import { CloudDownloadIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CloudDownloadIcon } from "lucide-react";
 import { type JSX, useId, useState } from "react";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
 import { Button } from "@/components/ui/button";
@@ -97,7 +98,7 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
           size="sm"
           variant="outline"
         >
-          <CloudDownloadIcon aria-hidden="true" />
+          <HugeiconsIcon icon={CloudDownloadIcon} aria-hidden="true" />
           {t("detail.overageRefresh")}
         </Button>
       }

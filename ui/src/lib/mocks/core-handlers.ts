@@ -1,13 +1,13 @@
 import { type HttpHandler, HttpResponse, http, sse } from "msw";
 import { REMOTE_VERSION_URL } from "@/lib/api/system";
 import type { AdminEventType, RequestRecord } from "@/lib/api/types";
-import { mockDb, mockNowUnix, mockScenario } from "./db";
+import { claimMockPassword, mockDb, mockNowUnix, mockScenario } from "./db";
 import { onMockEvent } from "./events";
 import { buildModelMix, buildStatus, makeObserveError, makeRequestRecord } from "./fixtures";
 import { makeLiveRequest } from "./fixtures-full";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "./http";
 
-const SESSION_TTL_MS = 12 * 3600 * 1000;
+const SESSION_TTL_MS = (import.meta.env.VITE_MOCK === "1" ? 30 * 24 : 12) * 3600 * 1000;
 const TICKET_TTL_MS = 30 * 1000;
 const LOGIN_FAILURE_LIMIT = 5;
 const LOGIN_LOCK_MS = 60 * 1000;
@@ -198,7 +198,7 @@ export const coreHandlers: HttpHandler[] = [
     }
     // A valid password refunds the failure budget and claims the first-run password.
     mockDb.failedLogins = 0;
-    mockDb.firstRunPending = false;
+    claimMockPassword();
     return HttpResponse.json({
       token: `mock-${randomHex(48)}`,
       expiresAt: Date.now() + SESSION_TTL_MS,

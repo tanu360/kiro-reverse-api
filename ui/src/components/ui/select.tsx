@@ -4,10 +4,8 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-} from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ChevronDownIcon, ChevronUpIcon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
 import {
   CheckedDot,
@@ -18,6 +16,7 @@ import {
   POPUP_ROW_META_CLASS,
   POPUP_SEPARATOR_CLASS,
 } from "@/components/ui/popup-row";
+import { withMarqueeText } from "@/components/ui/marquee-text";
 import { cn } from "@/lib/utils";
 
 export const Select: typeof SelectPrimitive.Root = SelectPrimitive.Root;
@@ -68,7 +67,7 @@ export function SelectButton({
         <span className="min-w-0 flex-1 truncate text-left in-data-placeholder:text-placeholder">
           {children}
         </span>
-        <ChevronDownIcon aria-hidden="true" className={selectTriggerIconClassName} />
+        <HugeiconsIcon icon={ChevronDownIcon} aria-hidden="true" className={selectTriggerIconClassName} />
       </>
     ),
     className: cn(selectTriggerVariants({ size }), "min-w-0", className),
@@ -98,7 +97,7 @@ export function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon data-slot="select-icon">
-        <ChevronDownIcon className={selectTriggerIconClassName} />
+        <HugeiconsIcon icon={ChevronDownIcon} className={selectTriggerIconClassName} />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -130,9 +129,16 @@ export function SelectPopup({
   alignItemWithTrigger = true,
   anchor,
   portalProps,
+  fit = "field",
   ...props
 }: SelectPrimitive.Popup.Props & {
   portalProps?: SelectPrimitive.Portal.Props;
+  /**
+   * Kiro: "field" (default) makes the list exactly as wide as its field-like trigger; "content"
+   * lets it grow past a narrow, flat trigger (a bare label such as the sign-in language picker)
+   * to fit its options, as menus do (index.css popup-width).
+   */
+  fit?: "field" | "content";
   side?: SelectPrimitive.Positioner.Props["side"];
   sideOffset?: SelectPrimitive.Positioner.Props["sideOffset"];
   align?: SelectPrimitive.Positioner.Props["align"];
@@ -161,13 +167,21 @@ export function SelectPopup({
             className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50% before:from-popup"
             data-slot="select-scroll-up-arrow"
           >
-            <ChevronUpIcon className="relative size-4.5 sm:size-4" />
+            <HugeiconsIcon icon={ChevronUpIcon} className="relative size-4.5 sm:size-4" />
           </SelectPrimitive.ScrollUpArrow>
           {/* The one popup sheet (index.css popup-surface), the same as menus. */}
-          <div className="popup-surface relative h-full min-w-(--anchor-width) rounded-lg">
+          {/* Exactly as wide as the trigger (index.css popup-width-field, or popup-width with
+              fit="content") and at most 22rem tall, fading at an edge it can still scroll past; a
+              longer label slides when its row is highlighted. */}
+          <div
+            className={cn(
+              "popup-surface relative h-full rounded-lg",
+              fit === "field" ? "popup-width-field" : "popup-width",
+            )}
+          >
             <SelectPrimitive.List
               className={cn(
-                "max-h-(--available-height) overflow-y-auto p-1",
+                "scroll-fade-y max-h-[min(var(--available-height),22rem)] overflow-y-auto p-1",
                 className,
               )}
               data-slot="select-list"
@@ -179,7 +193,7 @@ export function SelectPopup({
             className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50% before:from-popup"
             data-slot="select-scroll-down-arrow"
           >
-            <ChevronDownIcon className="relative size-4.5 sm:size-4" />
+            <HugeiconsIcon icon={ChevronDownIcon} className="relative size-4.5 sm:size-4" />
           </SelectPrimitive.ScrollDownArrow>
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
@@ -205,7 +219,7 @@ export function SelectItem({
       {...props}
     >
       <SelectPrimitive.ItemText className="flex min-w-0 items-center gap-2.5 [&_svg:not([class*='text-'])]:text-muted-foreground">
-        {children}
+        {withMarqueeText(children)}
       </SelectPrimitive.ItemText>
       {meta === undefined ? (
         <SelectPrimitive.ItemIndicator className={POPUP_INDICATOR_CLASS}>

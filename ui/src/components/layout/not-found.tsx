@@ -1,22 +1,39 @@
-import { Link } from "@tanstack/react-router";
-import { CompassIcon } from "lucide-react";
+import { ArrowLeft01Icon, LayoutDashboardIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Link, useRouter } from "@tanstack/react-router";
 import type { JSX } from "react";
-import { EmptyState } from "@/components/shared/empty-state";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
-import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useT } from "@/lib/i18n";
+import { StatusPage } from "./status-page";
 
+/** Any address no route matches. "Go back" only appears when this tab has a page to go back to. */
 export function NotFound(): JSX.Element {
   const { t } = useT();
-  useDocumentTitle(t("shell.notFound.title"));
+  const router = useRouter();
+  const canGoBack = router.history.canGoBack();
+
   return (
-    <main className="flex min-h-svh items-center justify-center p-4" id="main">
-      <EmptyState
-        action={<Button render={<Link to="/" />}>{t("shell.notFound.action")}</Button>}
-        description={t("shell.notFound.description")}
-        icon={CompassIcon}
-        title={t("shell.notFound.title")}
-      />
-    </main>
+    <StatusPage
+      description={t("shell.notFound.description")}
+      eyebrow={t("shell.errorCode", { code: 404 })}
+      title={t("shell.notFound.title")}
+    >
+      <Button className="w-full" render={<Link to="/" />} size="lg">
+        <AnimatedIcon icon={LayoutDashboardIcon} aria-hidden="true" />
+        {t("shell.notFound.action")}
+      </Button>
+      {canGoBack ? (
+        <Button
+          className="w-full"
+          onClick={() => router.history.back()}
+          size="lg"
+          variant="outline"
+        >
+          <HugeiconsIcon icon={ArrowLeft01Icon} aria-hidden="true" />
+          {t("shell.notFound.back")}
+        </Button>
+      ) : null}
+    </StatusPage>
   );
 }

@@ -1,4 +1,5 @@
-import { KeyRoundIcon } from "lucide-react";
+import { KeyRoundIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -19,7 +20,7 @@ export function CreatedKeyPanel({
   const { t } = useT("api");
   return (
     <Alert className="mb-4" data-testid="created-key-panel" variant="success">
-      <KeyRoundIcon aria-hidden="true" />
+      <HugeiconsIcon icon={KeyRoundIcon} aria-hidden="true" />
       <AlertTitle>{t("created.title")}</AlertTitle>
       <AlertDescription>
         <p>{t("created.body")}</p>

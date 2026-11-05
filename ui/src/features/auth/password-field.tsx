@@ -1,5 +1,7 @@
-import { EyeIcon, EyeOffIcon, LockIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, SquareLock02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useState } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -28,7 +30,7 @@ export function PasswordField({
       {/* The lg field (components/ui/input.tsx): 44 px on phones and touch screens, 40 px from sm up. */}
       <InputGroup>
         <InputGroupAddon>
-          <LockIcon aria-hidden="true" />
+          <HugeiconsIcon icon={SquareLock02Icon} aria-hidden="true" />
         </InputGroupAddon>
         <InputGroupInput
           autoComplete="current-password"
@@ -52,7 +54,7 @@ export function PasswordField({
             size="icon-sm"
             variant="quiet"
           >
-            <ToggleIcon aria-hidden="true" />
+            <AnimatedIcon icon={ToggleIcon} aria-hidden="true" />
           </Button>
         </InputGroupAddon>
       </InputGroup>

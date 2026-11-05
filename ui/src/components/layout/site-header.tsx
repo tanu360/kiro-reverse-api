@@ -10,7 +10,6 @@ import { activeNavItem } from "./nav-items";
 import { PrivacyToggle } from "./privacy-toggle";
 import { ThemeSwitch } from "./theme-switch";
 import { UpdateIndicator } from "./update-indicator";
-import { UserMenu } from "./user-menu";
 
 /**
  * Port of the Studio Admin dashboard header: sticky and 48 px, painted like t3code's page headers
@@ -29,7 +28,8 @@ export function SiteHeader(): JSX.Element {
       className="sticky top-0 z-40 flex h-12 shrink-0 items-center border-b bg-background"
       data-slot="site-header"
     >
-      <div className="flex w-full min-w-0 items-center justify-between gap-2 px-2 sm:px-4 lg:px-6">
+      {/* Three columns, the search pill centred in the middle one (up to 320 px wide). */}
+      <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-2 px-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,20rem)_minmax(max-content,1fr)] sm:px-4 lg:px-6">
         <div className="flex min-w-0 items-center gap-1 lg:gap-2">
           <Tooltip>
             <TooltipTrigger
@@ -45,16 +45,15 @@ export function SiteHeader(): JSX.Element {
               {t(active.labelKey)}
             </span>
           ) : null}
+        </div>
+        <div className="flex min-w-0 justify-center">
           <CommandMenu />
         </div>
-        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+        <div className="flex shrink-0 items-center justify-end gap-0.5 sm:gap-1">
           <UpdateIndicator />
           <PrivacyToggle />
           <LanguageSwitch />
           <ThemeSwitch />
-          <div className="hidden sm:flex">
-            <UserMenu variant="header" />
-          </div>
         </div>
       </div>
     </header>

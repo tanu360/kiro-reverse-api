@@ -1,6 +1,7 @@
+import { InboxIcon, InfoIcon, SearchXIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { InboxIcon, InfoIcon, SearchXIcon } from "lucide-react";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableSort } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -166,7 +167,11 @@ export function RequestsPage(): JSX.Element {
           />
           {data?.persistent === false ? (
             <p className="flex items-start gap-2 text-muted-foreground text-sm">
-              <InfoIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <HugeiconsIcon
+                icon={InfoIcon}
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0"
+              />
               {t("memoryNote")}
             </p>
           ) : null}

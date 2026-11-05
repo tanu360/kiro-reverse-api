@@ -6,7 +6,7 @@ import type {
   SettingsPatch,
   ThinkingFormat,
 } from "@/lib/api/types";
-import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { claimMockPassword, mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { defaultModelMappings } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
@@ -201,8 +201,7 @@ export const handlers: HttpHandler[] = [
     // An empty password is ignored, like Go. A real one would also revoke every admin session;
     // mock tokens stay valid, so only the next POST /session sees the new password.
     if (password) {
-      mockDb.adminPassword = password;
-      mockDb.firstRunPending = false;
+      claimMockPassword(password);
     }
     Object.assign(mockDb.settings, rest);
     return HttpResponse.json(OK);

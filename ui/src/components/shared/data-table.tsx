@@ -1,5 +1,6 @@
+import { ArrowDown02Icon, ArrowUp02Icon, ArrowUpDownIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type ColumnDef, tableFeatures, useTable } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from "lucide-react";
 import { type JSX, type KeyboardEvent, type MouseEvent, type ReactNode, useMemo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,7 +64,6 @@ export interface DataTableProps<T> {
    * and the first column lines up with the card title.
    */
   bleed?: boolean;
-  rowNumberOffset?: number;
 }
 
 const BLEED_WRAPPER = "-mx-4 sm:-mx-5";
@@ -90,10 +90,11 @@ const ALIGN_CLASS = { start: "text-left", center: "text-center", end: "text-righ
 // button turns the sorted column's header to the text colour).
 const HEAD_CLASS = "font-normal text-meta";
 // Sticky cells need an opaque background: the panel's own (the card at 40 % over the page, as
-// t3code's SettingsGroup), with the row's hover and selected tints (foreground at 2 and 4 %) on
-// top, so a pinned cell does not read as a separate block.
+// t3code's SettingsGroup) with the row's tint already mixed in (index.css --surface-inset-*):
+// the header band, hover, an open row menu, selected and selected-hovered. So a pinned cell
+// matches its row exactly instead of reading as a separate block.
 const STICKY_BASE =
-  "sticky z-[1] bg-surface-inset [tr:hover>&]:bg-surface-inset-hover [tr[data-state=selected]>&]:bg-surface-inset-selected";
+  "sticky z-[1] bg-surface-inset [thead_&]:bg-(--surface-inset-head) [tr:hover>&]:bg-(--surface-inset-hover) [tr:has([aria-expanded=true])>&]:bg-(--surface-inset-hover) [tr[data-state=selected]>&]:bg-(--surface-inset-selected) [tr[data-state=selected]:hover>&]:bg-(--surface-inset-selected-hover)";
 const STICKY_CLASS = {
   start: cn(STICKY_BASE, "left-0"),
   end: cn(
@@ -130,7 +131,6 @@ export function DataTable<T>({
   caption,
   className,
   bleed = false,
-  rowNumberOffset,
 }: DataTableProps<T>): JSX.Element {
   const { t } = useT();
   const isMobile = useIsMobile();
@@ -265,8 +265,8 @@ export function DataTable<T>({
                 : undefined;
               const SortIcon = active
                 ? sort?.desc
-                  ? ArrowDownIcon
-                  : ArrowUpIcon
+                  ? ArrowDown02Icon
+                  : ArrowUp02Icon
                 : ArrowUpDownIcon;
               return (
                 <TableHead
@@ -284,7 +284,7 @@ export function DataTable<T>({
                     <button
                       // Fills the 40 px header height so the whole header cell is the target.
                       className={cn(
-                        "-mx-1 inline-flex h-10 cursor-pointer items-center gap-1 rounded-md px-1 outline-none transition-colors hover:text-foreground focus-outline-inset",
+                        "group/sort -mx-1 inline-flex h-10 cursor-pointer items-center gap-1 rounded-md px-1 outline-none transition-colors hover:text-foreground focus-outline-inset",
                         active && "text-foreground",
                         column.align === "end" && "flex-row-reverse",
                       )}
@@ -292,9 +292,16 @@ export function DataTable<T>({
                       type="button"
                     >
                       {column.header}
-                      <SortIcon
+                      <HugeiconsIcon
+                        icon={SortIcon}
                         aria-hidden="true"
-                        className={cn("size-3.5 shrink-0", !active && "opacity-50")}
+                        // Only the sorted column shows its arrow; the others reveal theirs on hover or
+                        // focus, in place (no shift), so the header row stays quiet.
+                        className={cn(
+                          "size-3.5 shrink-0 transition-opacity",
+                          !active &&
+                            "opacity-0 group-hover/sort:opacity-60 group-focus-visible/sort:opacity-60",
+                        )}
                       />
                     </button>
                   ) : (
@@ -339,17 +346,8 @@ export function DataTable<T>({
                 tabIndex={onRowClick ? 0 : undefined}
               >
                 {selection ? (
-                  <TableCell className="group/row-number w-px">
-                    {rowNumberOffset !== undefined ? (
-                      <span
-                        aria-hidden="true"
-                        className="row-number block text-center text-xs text-muted-foreground tabular-nums group-hover/row-number:hidden group-focus-within/row-number:hidden"
-                      >
-                        {rowNumberOffset + row.index + 1}
-                      </span>
-                    ) : null}
+                  <TableCell className="w-px">
                     <Checkbox
-                      className={rowNumberOffset !== undefined ? "row-checkbox" : undefined}
                       aria-label={t("table.selectRow", { label: selection.rowLabel(row.original) })}
                       checked={isSelected}
                       onCheckedChange={() => toggleOne(row.id)}

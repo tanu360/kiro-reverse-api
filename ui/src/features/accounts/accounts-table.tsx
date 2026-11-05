@@ -37,7 +37,6 @@ const SORTABLE = new Set<string>(ACCOUNT_SORTS);
 interface AccountsTableProps extends RowActionHandlers {
   /** The rows of the current page, already filtered and sorted. */
   accounts: Account[];
-  rowNumberOffset?: number;
   /** From the list container's width (see useListLayout). */
   layout: ListLayout;
   loading: boolean;
@@ -59,7 +58,6 @@ export function AccountsTable(props: AccountsTableProps): JSX.Element {
 
 function AccountsDataTable({
   accounts,
-  rowNumberOffset = 0,
   loading,
   selected,
   onSelectionChange,
@@ -149,8 +147,7 @@ function AccountsDataTable({
     <DataTable
       caption={t("table.caption")}
       // Roomier rows than the shared default: two-line cells need the air.
-      className="accounts-grid"
-      rowNumberOffset={rowNumberOffset}
+      className="[&_tbody_td]:py-3"
       columns={columns}
       data={accounts}
       defaultSortDesc={defaultSortDesc}

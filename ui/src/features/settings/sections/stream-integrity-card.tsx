@@ -1,14 +1,20 @@
+import { TriangleAlertIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { TriangleAlertIcon } from "lucide-react";
 import type { JSX } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import { SaveFooter, SectionQuery, SettingsSection, SwitchField } from "./settings-section";
+import {
+  SaveFooter,
+  SectionQuery,
+  SettingsRow,
+  SettingsSection,
+  SwitchField,
+} from "./settings-section";
 
 export function StreamIntegrityCard(): JSX.Element {
   const { t } = useT("settings");
@@ -28,7 +34,6 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
 
   return (
     <SettingsSection
-      defaultOn={false}
       footer={
         <SaveFooter
           dirty={draft.dirty}
@@ -39,20 +44,30 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
       }
       id={SECTION_ID.streamIntegrity}
       onSubmit={() => save(draft.value)}
+      rows
       title={t("streamIntegrity")}
     >
-      <div className="flex flex-col gap-4">
+      <SettingsRow>
         <SwitchField
           checked={draft.value.lenientStreamIntegrity}
           label={t("lenientStreamIntegrity")}
-          hint={t("lenientStreamIntegrityHint")}
+          hint={
+            <>
+              {t("lenientStreamIntegrityHint")}
+              {/* The risk as a warning line under the description, not a box across the row. */}
+              <span className="mt-2 flex gap-1.5 text-warning-foreground" role="note">
+                <HugeiconsIcon
+                  icon={TriangleAlertIcon}
+                  aria-hidden="true"
+                  className="mt-px size-3.5 shrink-0"
+                />
+                <span>{t("lenientStreamIntegrityRisk")}</span>
+              </span>
+            </>
+          }
           onCheckedChange={(lenientStreamIntegrity) => draft.set({ lenientStreamIntegrity })}
         />
-        <Alert role="note" variant="warning">
-          <TriangleAlertIcon aria-hidden="true" />
-          <AlertDescription>{t("lenientStreamIntegrityRisk")}</AlertDescription>
-        </Alert>
-      </div>
+      </SettingsRow>
     </SettingsSection>
   );
 }

@@ -1,5 +1,6 @@
-import { EyeIcon, EyeOffIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon } from "@hugeicons/core-free-icons";
 import type { JSX } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
@@ -25,7 +26,7 @@ export function PrivacyToggle(): JSX.Element {
           />
         }
       >
-        <Icon aria-hidden="true" />
+        <AnimatedIcon icon={Icon} aria-hidden="true" />
       </TooltipTrigger>
       <TooltipPopup>{t("shell.privacy.tooltip")}</TooltipPopup>
     </Tooltip>

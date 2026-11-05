@@ -1,4 +1,5 @@
-import { UploadIcon } from "lucide-react";
+import { Upload01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type ChangeEvent, type FormEvent, type JSX, type Ref, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,7 +81,7 @@ function JsonFileInput({
         size="sm"
         variant="outline"
       >
-        <UploadIcon aria-hidden="true" />
+        <HugeiconsIcon icon={Upload01Icon} aria-hidden="true" />
         {t("local.upload")}
       </Button>
     </div>

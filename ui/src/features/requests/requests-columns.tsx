@@ -1,4 +1,4 @@
-import { CircleCheckIcon, CircleXIcon } from "lucide-react";
+import { CircleCheckIcon, CircleXIcon } from "@hugeicons/core-free-icons";
 import { type JSX, useMemo } from "react";
 import { CreditAmount } from "@/components/shared/credit-amount";
 import type { DataTableColumn } from "@/components/shared/data-table";

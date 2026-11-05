@@ -3,7 +3,7 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
-import type { LucideIcon } from "lucide-react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type React from "react";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
  *   --badge-solid-fg  text on the solid fill
  * Variants then set --badge-dot and --badge-glyph (the disc and its knocked-out glyph) and
  * --badge-icon (a line icon).
- * Disc icons (a circled lucide icon such as CircleCheck, CircleX or Clock) are drawn as a filled
+ * Disc icons (a circled Hugeicons icon such as CircleCheck, CircleX or Clock01) are drawn as a filled
  * circle with the glyph knocked out; see `[data-badge-icon="disc"]` in index.css.
  */
 export const badgeVariants = cva(
@@ -80,8 +80,8 @@ export interface BadgeProps extends useRender.ComponentProps<"span"> {
   tone?: BadgeTone;
   variant?: BadgeVariant;
   size?: VariantProps<typeof badgeVariants>["size"];
-  /** Leading icon. Circled lucide icons read best as `disc` (the default). */
-  icon?: LucideIcon;
+  /** Leading icon (Hugeicons). Circled icons read best as `disc` (the default). */
+  icon?: IconSvgElement;
   /** `disc`: a filled colour circle with a white glyph. `line`: a plain icon in the text colour. */
   iconStyle?: "disc" | "line";
 }
@@ -91,10 +91,10 @@ export function BadgeIcon({
   icon: Icon,
   iconStyle = "disc",
 }: {
-  icon: LucideIcon;
+  icon: IconSvgElement;
   iconStyle?: "disc" | "line";
 }): React.ReactElement {
-  return <Icon aria-hidden="true" data-badge-icon={iconStyle} />;
+  return <HugeiconsIcon icon={Icon} aria-hidden="true" data-badge-icon={iconStyle} />;
 }
 
 export function Badge({

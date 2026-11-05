@@ -1,5 +1,6 @@
+import { AlertCircleIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlertIcon, RotateCwIcon } from "lucide-react";
 import { type JSX, useState } from "react";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -61,7 +62,7 @@ function TotalsErrorBanner(): JSX.Element | null {
   const retrying = failed.some((query) => query.isFetching);
   return (
     <Alert data-slot="totals-error" variant="error">
-      <CircleAlertIcon aria-hidden="true" />
+      <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
       <AlertTitle>{t("errors.totals")}</AlertTitle>
       <AlertDescription>{errorMessage(first.error, tc)}</AlertDescription>
       <AlertAction>
@@ -73,7 +74,11 @@ function TotalsErrorBanner(): JSX.Element | null {
           size="sm"
           variant="outline"
         >
-          <RotateCwIcon aria-hidden="true" className={cn(retrying && "motion-safe:animate-spin")} />
+          <HugeiconsIcon
+            icon={Refresh01Icon}
+            aria-hidden="true"
+            className={cn(retrying && "motion-safe:animate-spin")}
+          />
           {tc("actions.retry")}
         </Button>
       </AlertAction>

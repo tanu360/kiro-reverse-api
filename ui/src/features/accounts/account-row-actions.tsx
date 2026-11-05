@@ -1,11 +1,12 @@
 import {
-  CopyIcon,
+  Copy01Icon,
+  Delete02Icon,
   EllipsisVerticalIcon,
   FlaskConicalIcon,
   PanelRightOpenIcon,
-  RotateCwIcon,
-  Trash2Icon,
-} from "lucide-react";
+  Refresh01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
@@ -100,12 +101,12 @@ export function AccountRowActions({
   const menuItems = (
     <>
       <MenuItem className={itemClass} onClick={() => void copyJson(account.id)}>
-        <CopyIcon aria-hidden="true" />
+        <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
         {t("actions.copyJson")}
       </MenuItem>
       <MenuSeparator />
       <MenuItem className={itemClass} onClick={() => void remove(account.id)} variant="destructive">
-        <Trash2Icon aria-hidden="true" />
+        <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
         {t("actions.delete")}
       </MenuItem>
     </>
@@ -128,7 +129,7 @@ export function AccountRowActions({
           {refresh.isPending ? (
             <Spinner aria-hidden="true" />
           ) : (
-            <EllipsisVerticalIcon aria-hidden="true" />
+            <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
           )}
         </MenuTrigger>
         <MenuPopup align="end">
@@ -137,15 +138,15 @@ export function AccountRowActions({
             disabled={refresh.isPending}
             onClick={() => refresh.mutate()}
           >
-            <RotateCwIcon aria-hidden="true" />
+            <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
             {t("actions.refresh")}
           </MenuItem>
           <MenuItem className={itemClass} onClick={() => onTest(account)}>
-            <FlaskConicalIcon aria-hidden="true" />
+            <HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />
             {t("actions.test")}
           </MenuItem>
           <MenuItem className={itemClass} onClick={() => onDetails(account)}>
-            <PanelRightOpenIcon aria-hidden="true" />
+            <HugeiconsIcon icon={PanelRightOpenIcon} aria-hidden="true" />
             {t("actions.details")}
           </MenuItem>
           {menuItems}
@@ -161,10 +162,10 @@ export function AccountRowActions({
         label={t("actions.refresh")}
         onClick={() => refresh.mutate()}
       >
-        <RotateCwIcon aria-hidden="true" />
+        <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
       </IconAction>
       <IconAction label={t("actions.test")} onClick={() => onTest(account)}>
-        <FlaskConicalIcon aria-hidden="true" />
+        <HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />
       </IconAction>
       <Menu>
         <Tooltip>
@@ -182,13 +183,13 @@ export function AccountRowActions({
               />
             }
           >
-            <EllipsisVerticalIcon aria-hidden="true" />
+            <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
           </TooltipTrigger>
           <TooltipPopup>{t("actions.more")}</TooltipPopup>
         </Tooltip>
         <MenuPopup align="end">
           <MenuItem onClick={() => onDetails(account)}>
-            <PanelRightOpenIcon aria-hidden="true" />
+            <HugeiconsIcon icon={PanelRightOpenIcon} aria-hidden="true" />
             {t("actions.details")}
           </MenuItem>
           {menuItems}

@@ -26,7 +26,6 @@ function UsageForm({ settings }: { settings: Settings }): JSX.Element {
 
   return (
     <SettingsSection
-      defaultOn={false}
       footer={
         <SaveFooter
           dirty={draft.dirty}

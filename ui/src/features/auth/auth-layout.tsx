@@ -9,13 +9,19 @@ import { AuthShowcase } from "./auth-showcase";
  * Full-page frame for the signed-out pages: the form column on the left (the page settings at
  * the top, the centred page block, the footer) and, from `lg` up, the purple showcase panel on
  * the right. The column is flat: borders and colour only, no shadows. The app icon sits over the
- * heading.
+ * heading. The full-page status screens (404, a route that failed) drop the showcase: the column
+ * then fills the page.
  */
-export function AuthLayout({ children }: { children: ReactNode }): JSX.Element {
+export function AuthLayout({
+  children,
+  showcase = true,
+}: {
+  children: ReactNode;
+  showcase?: boolean;
+}): JSX.Element {
   return (
-    // The panel keeps a wider margin above and below than at its side. The sign-in pages keep
-    // lucide's 2 px icon stroke; the app shell uses t3code's lighter 1.75 (index.css).
-    <div className="flex min-h-svh bg-background surface-grain text-foreground lg:gap-3 lg:px-3 lg:py-6 [&_svg.lucide[stroke-width='2']]:[stroke-width:2]">
+    // The panel keeps a wider margin above and below than at its side.
+    <div className="flex min-h-svh bg-background surface-grain text-foreground lg:gap-3 lg:px-3 lg:py-6">
       {/*
        * Three rows: the page settings, the page block, the footer. The outer rows split the
        * spare height equally, so the block sits at the true centre of the column whatever their
@@ -38,7 +44,7 @@ export function AuthLayout({ children }: { children: ReactNode }): JSX.Element {
           <Disclaimer />
         </footer>
       </div>
-      <AuthShowcase />
+      {showcase ? <AuthShowcase /> : null}
     </div>
   );
 }
@@ -81,18 +87,23 @@ function Disclaimer(): JSX.Element {
 
 /**
  * The top of a signed-out page, centred as one block: the app icon, one h1 and a line of help
- * under it.
+ * under it. An optional eyebrow (a status code such as "Error 404") sits between icon and h1.
  */
 export function AuthHeader({
   title,
   description,
+  eyebrow,
 }: {
   title: string;
   description: ReactNode;
+  eyebrow?: string;
 }): JSX.Element {
   return (
     <div className="flex flex-col items-center text-center">
       <AppIcon className="mb-6 size-16 shrink-0" size={64} />
+      {eyebrow ? (
+        <p className="mb-2 font-medium text-meta text-muted-foreground tabular-nums">{eyebrow}</p>
+      ) : null}
       <h1 className="text-balance font-heading font-semibold text-2xl leading-tight sm:text-display">
         {title}
       </h1>

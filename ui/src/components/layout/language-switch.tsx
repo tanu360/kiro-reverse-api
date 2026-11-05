@@ -1,5 +1,6 @@
-import { ChevronDownIcon, GlobeIcon, LanguagesIcon } from "lucide-react";
+import { ChevronDownIcon, Globe02Icon, LanguagesIcon } from "@hugeicons/core-free-icons";
 import type { JSX } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { FlagIcon } from "@/components/shared/flag-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,16 +63,16 @@ export function LanguageSwitch({
         >
           {pill ? (
             <>
-              <GlobeIcon aria-hidden="true" />
+              <AnimatedIcon icon={Globe02Icon} aria-hidden="true" />
               <span className="font-medium text-xs tracking-wide">{current.shortLabel}</span>
             </>
           ) : (
-            <LanguagesIcon aria-hidden="true" />
+            <AnimatedIcon icon={LanguagesIcon} aria-hidden="true" />
           )}
         </TooltipTrigger>
         <TooltipPopup>{triggerLabel}</TooltipPopup>
       </Tooltip>
-      <MenuPopup align="end" className="min-w-48">
+      <MenuPopup align="end">
         <MenuGroup>
           <MenuGroupLabel>{label}</MenuGroupLabel>
           <MenuRadioGroup onValueChange={(value) => setLang(value as SupportedLang)} value={lang}>
@@ -125,12 +126,13 @@ function LanguageSelect({ className }: { className?: string }): JSX.Element {
             )}
           </SelectPrimitive.Value>
           <SelectPrimitive.Icon className="flex">
-            <ChevronDownIcon aria-hidden="true" className="size-4" />
+            <AnimatedIcon icon={ChevronDownIcon} aria-hidden="true" className="size-4" />
           </SelectPrimitive.Icon>
         </TooltipTrigger>
         <TooltipPopup>{triggerLabel}</TooltipPopup>
       </Tooltip>
-      <SelectPopup>
+      {/* The trigger is a bare label, as narrow as the current name, so the list fits its rows. */}
+      <SelectPopup fit="content">
         {/* Single-line rows (popup-row.tsx): flag, name, and the CheckedDot on the current one. */}
         {LANGUAGES.map((option) => (
           <SelectItem key={option.code} lang={option.code} value={option.code}>

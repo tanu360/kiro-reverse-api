@@ -1,4 +1,5 @@
-import { CircleAlertIcon, RotateCwIcon } from "lucide-react";
+import { AlertCircleIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -27,7 +28,11 @@ export function ErrorState({
       )}
       role="alert"
     >
-      <CircleAlertIcon aria-hidden="true" className="size-5 text-destructive-foreground" />
+      <HugeiconsIcon
+        icon={AlertCircleIcon}
+        aria-hidden="true"
+        className="size-5 text-destructive-foreground"
+      />
       <div className="flex max-w-md flex-col gap-1">
         <p className="font-semibold text-heading">{title ?? t("state.errorTitle")}</p>
         {message ? (
@@ -36,7 +41,7 @@ export function ErrorState({
       </div>
       {onRetry ? (
         <Button onClick={onRetry} variant="outline">
-          <RotateCwIcon aria-hidden="true" />
+          <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
           {t("actions.retry")}
         </Button>
       ) : null}

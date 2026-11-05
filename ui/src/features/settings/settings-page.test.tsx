@@ -54,19 +54,28 @@ async function renderPage() {
   const result = renderWithProviders(<SettingsPage />);
   // The last card to load is enough: every query resolves in the same tick in tests.
   await screen.findByRole("switch", { name: "Allow overage" });
-  await screen.findAllByRole("textbox", { name: "Model name contains" });
+  await screen.findByRole("button", { name: "Mapping 1 actions" });
   await screen.findByLabelText("Trigger suffix");
-  await screen.findByRole("button", { name: "Add regex rule" });
+  await screen.findByRole("button", { name: "Add rule" });
   await screen.findByText("Preferred endpoint");
-  await screen.findByText("Proxy type");
+  await screen.findByText("127.0.0.1:1080");
   return result;
 }
 
 describe("SettingsPage", () => {
   it("shows the read-only listen address", async () => {
     await renderPage();
-    expect(screen.getByText("Listening on 0.0.0.0:8080")).toBeInTheDocument();
+    // The fixture listens on every interface: an amber "open" badge.
+    expect(screen.getByText("Open to network")).toBeInTheDocument();
+    expect(screen.getByText("0.0.0.0:8080")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
+  });
+
+  it("marks a loopback listen address as local only", async () => {
+    mockDb.settings.host = "127.0.0.1";
+    await renderPage();
+    expect(screen.getByText("Local only")).toBeInTheDocument();
+    expect(screen.getByText("127.0.0.1:8080")).toBeInTheDocument();
   });
 
   it("sends only the Usage field on its Save", async () => {
@@ -122,19 +131,44 @@ describe("SettingsPage", () => {
   });
 
   describe("model mappings", () => {
-    it("adds an empty row at the top and focuses it", async () => {
+    /** The text of each mapping row, "key → value" without the number. */
+    function mappingTexts(card: HTMLElement): string[] {
+      return within(card)
+        .getAllByRole("listitem")
+        .map((row) =>
+          [...row.querySelectorAll("code")].map((code) => code.textContent).join(" -> "),
+        );
+    }
+
+    async function openRowMenu(
+      user: Awaited<ReturnType<typeof renderPage>>["user"],
+      card: HTMLElement,
+      n: number,
+    ) {
+      await user.click(within(card).getByRole("button", { name: `Mapping ${n} actions` }));
+    }
+
+    it("adds a mapping at the top through the editor", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.modelMappings);
-      const before = within(card).getAllByRole("textbox", { name: "Model name contains" });
-      expect(before).toHaveLength(9);
+      expect(within(card).getAllByRole("listitem")).toHaveLength(9);
 
       await user.click(within(card).getByRole("button", { name: "Add mapping" }));
+      const dialog = await screen.findByRole("dialog", { name: "Add mapping" });
+      const apply = within(dialog).getByRole("button", { name: "Add mapping" });
+      // Both sides are needed.
+      expect(apply).toBeDisabled();
+      await user.type(within(dialog).getByLabelText("Model name contains"), "my-model");
+      expect(apply).toBeDisabled();
+      await user.type(within(dialog).getByLabelText("Map to"), "claude-opus-5");
+      await user.click(apply);
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-      const after = within(card).getAllByRole("textbox", { name: "Model name contains" });
-      expect(after).toHaveLength(10);
-      expect(after[0]).toHaveValue("");
-      expect(after[1]).toHaveValue("claude-sonnet-4-20250514");
-      await waitFor(() => expect(after[0]).toHaveFocus());
+      const texts = mappingTexts(card);
+      expect(texts).toHaveLength(10);
+      expect(texts[0]).toBe("my-model -> claude-opus-5");
+      expect(texts[1]).toBe("claude-sonnet-4-20250514 -> claude-sonnet-5");
+      expect(await writes()).toEqual([]);
     });
 
     it("maps the server's index back to the offending row and focuses it", async () => {
@@ -142,12 +176,10 @@ describe("SettingsPage", () => {
       const card = section(SECTION_ID.modelMappings);
 
       await user.click(within(card).getByRole("button", { name: "Add mapping" }));
-      // A blank row stays blank: it is dropped before sending, so indexes shift.
-      await user.click(within(card).getByRole("button", { name: "Add mapping" }));
-      const sources = within(card).getAllByRole("textbox", { name: "Model name contains" });
-      const targets = within(card).getAllByRole("textbox", { name: "Map to" });
-      await user.type(sources[1], "GPT-5");
-      await user.type(targets[1], "claude-opus-5");
+      const dialog = await screen.findByRole("dialog", { name: "Add mapping" });
+      await user.type(within(dialog).getByLabelText("Model name contains"), "GPT-5");
+      await user.type(within(dialog).getByLabelText("Map to"), "claude-opus-5{Enter}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
       await user.click(within(card).getByRole("button", { name: "Save" }));
 
       const reason = 'source "gpt-5" is mapped more than once';
@@ -162,12 +194,13 @@ describe("SettingsPage", () => {
       expect(sent).toHaveLength(10);
       expect(sent[0]).toEqual({ key: "GPT-5", value: "claude-opus-5" });
 
-      // Sent index 7 is the built-in gpt-5 row, local row 8 after the two added rows.
+      // Sent index 7 is the built-in gpt-5 row, local row 7 after the added one.
       const rows = within(card).getAllByRole("listitem");
-      expect(rows[8]).toHaveAttribute("data-error", "true");
-      const offending = within(rows[8]).getByRole("textbox", { name: "Model name contains" });
-      expect(offending).toHaveValue("gpt-5");
-      await waitFor(() => expect(offending).toHaveFocus());
+      expect(rows[7]).toHaveAttribute("data-error", "true");
+      expect(rows[7]).toHaveTextContent("gpt-5");
+      await waitFor(() =>
+        expect(within(rows[7]).getByRole("button", { name: "Mapping 8 actions" })).toHaveFocus(),
+      );
     });
 
     it("resets to the nine defaults without a request", async () => {
@@ -184,15 +217,14 @@ describe("SettingsPage", () => {
       );
       const { user } = renderWithProviders(<SettingsPage />);
       await waitFor(() =>
-        expect(screen.getAllByRole("textbox", { name: "Model name contains" })).toHaveLength(2),
+        expect(screen.getByRole("button", { name: "Mapping 2 actions" })).toBeInTheDocument(),
       );
       const card = section(SECTION_ID.modelMappings);
 
       await user.click(within(card).getByRole("button", { name: "Reset to defaults" }));
 
-      const sources = within(card).getAllByRole("textbox", { name: "Model name contains" });
-      expect(sources.map((input) => (input as HTMLInputElement).value)).toEqual(
-        defaultModelMappings().map((rule) => rule.key),
+      expect(mappingTexts(card)).toEqual(
+        defaultModelMappings().map((rule) => `${rule.key} -> ${rule.value}`),
       );
       expect(within(card).getByRole("button", { name: "Save" })).not.toHaveAttribute(
         "aria-disabled",
@@ -200,16 +232,16 @@ describe("SettingsPage", () => {
       expect(await writes()).toEqual([]);
     });
 
-    it("saves the order changed with the keyboard through Move down", async () => {
+    it("saves the order changed through Move down", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.modelMappings);
-      const [moveDown] = within(card).getAllByRole("button", { name: "Move down" });
 
-      moveDown.focus();
-      await user.keyboard("{Enter}");
-      await waitFor(() =>
-        expect(within(card).getAllByRole("button", { name: "Move down" })[1]).toHaveFocus(),
+      await openRowMenu(user, card, 1);
+      expect(await screen.findByRole("menuitem", { name: "Move up" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
       );
+      await user.click(screen.getByRole("menuitem", { name: "Move down" }));
       await user.click(within(card).getByRole("button", { name: "Save" }));
 
       await screen.findByText("Settings saved");
@@ -220,6 +252,30 @@ describe("SettingsPage", () => {
         defaults[0],
         ...defaults.slice(2),
       ]);
+    });
+
+    it("filters the list by either side and keeps each row's number", async () => {
+      mockServer.use(
+        http.get(apiUrl("/model-mappings"), () =>
+          HttpResponse.json({
+            mappings: defaultModelMappings(),
+            defaults: defaultModelMappings(),
+          }),
+        ),
+      );
+      const { user } = await renderPage();
+      const card = section(SECTION_ID.modelMappings);
+      const defaults = defaultModelMappings();
+      const needle = defaults[3].value;
+
+      await user.type(within(card).getByRole("searchbox", { name: "Filter mappings" }), needle);
+
+      const expected = defaults.filter(
+        (rule) => rule.key.includes(needle) || rule.value.includes(needle),
+      );
+      expect(mappingTexts(card)).toEqual(expected.map((rule) => `${rule.key} -> ${rule.value}`));
+      // No reordering while filtered.
+      expect(within(card).queryByRole("button", { name: "Drag to reorder" })).toBeNull();
     });
   });
 
@@ -268,29 +324,39 @@ describe("SettingsPage", () => {
   });
 
   describe("outbound proxy", () => {
-    it("requires a host for SOCKS5", async () => {
+    async function openEditor(user: Awaited<ReturnType<typeof renderPage>>["user"]) {
+      const card = section(SECTION_ID.outboundProxy);
+      await user.click(within(card).getByRole("button", { name: "Edit" }));
+      return screen.findByRole("dialog", { name: "Edit proxy" });
+    }
+
+    it("shows the saved route and requires a host and port before it saves", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.outboundProxy);
+      expect(within(card).getByText("Via SOCKS5")).toBeInTheDocument();
+      expect(within(card).getByText("Signs in as user")).toBeInTheDocument();
 
-      await user.clear(within(card).getByLabelText("Host"));
-      await user.click(within(card).getByRole("button", { name: "Save" }));
+      const dialog = await openEditor(user);
+      await user.clear(within(dialog).getByLabelText("Host"));
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-      expect(within(card).getByText("Enter a proxy host and port.")).toBeInTheDocument();
+      expect(within(dialog).getByText("Enter a proxy host and port.")).toBeInTheDocument();
       expect(await writes()).toEqual([]);
     });
 
-    it("sends the encoded URL", async () => {
+    it("sends the encoded URL from the editor and shows the new route", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.outboundProxy);
-      expect(within(card).getByLabelText("Password")).toHaveValue("p@ss");
+      const dialog = await openEditor(user);
+      expect(within(dialog).getByLabelText("Password")).toHaveValue("p@ss");
 
-      await user.clear(within(card).getByLabelText("Host"));
-      await user.type(within(card).getByLabelText("Host"), "proxy.example");
-      await user.clear(within(card).getByLabelText("Username"));
-      await user.type(within(card).getByLabelText("Username"), "us@r");
-      await user.clear(within(card).getByLabelText("Password"));
-      await user.type(within(card).getByLabelText("Password"), "p:ss");
-      await user.click(within(card).getByRole("button", { name: "Save" }));
+      await user.clear(within(dialog).getByLabelText("Host"));
+      await user.type(within(dialog).getByLabelText("Host"), "proxy.example");
+      await user.clear(within(dialog).getByLabelText("Username"));
+      await user.type(within(dialog).getByLabelText("Username"), "us@r");
+      await user.clear(within(dialog).getByLabelText("Password"));
+      await user.type(within(dialog).getByLabelText("Password"), "p:ss");
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
       await screen.findByText("Settings saved");
       expect(await writes()).toEqual([
@@ -300,21 +366,51 @@ describe("SettingsPage", () => {
           body: { proxyURL: "socks5://us%40r:p%3Ass@proxy.example:1080" },
         },
       ]);
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(within(card).getByText("proxy.example:1080")).toBeInTheDocument();
+      expect(within(card).getByText("Signs in as us@r")).toBeInTheDocument();
+    });
+
+    it("removes the proxy after confirmation", async () => {
+      const { user } = await renderPage();
+      const card = section(SECTION_ID.outboundProxy);
+
+      await user.click(within(card).getByRole("button", { name: "Remove proxy" }));
+      const confirm = await screen.findByRole("alertdialog");
+      await user.click(within(confirm).getByRole("button", { name: "Remove proxy" }));
+
+      await screen.findByText("Settings saved");
+      expect(await writes()).toEqual([{ method: "POST", path: "/proxy", body: { proxyURL: "" } }]);
+      expect(await within(card).findByText("Direct connection")).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Set up proxy" })).toBeInTheDocument();
     });
   });
 
-  it("appends a rule, hints at a bad regex and still saves it", async () => {
+  it("adds a rule in the editor, hints at a bad regex and still saves it", async () => {
     const { user } = await renderPage();
     const card = section(SECTION_ID.promptFilter);
     expect(within(card).getAllByRole("listitem")).toHaveLength(2);
 
-    await user.click(within(card).getByRole("button", { name: "Add regex rule" }));
+    await user.click(within(card).getByRole("button", { name: "Add rule" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add rule" });
+    const apply = within(dialog).getByRole("button", { name: "Add rule" });
+    // Nothing to match yet: an empty line filter would drop every line.
+    expect(apply).toBeDisabled();
+    await user.click(within(dialog).getByRole("combobox", { name: "Type" }));
+    await user.click(await screen.findByRole("option", { name: "Regex" }));
+    await user.type(within(dialog).getByLabelText("Match"), "(");
+    expect(
+      within(dialog).getByText("This regex does not compile; the proxy skips it."),
+    ).toBeInTheDocument();
+    await user.click(apply);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // Applying writes the draft only; Save sends it.
+    expect(await writes("/prompt-filter")).toHaveLength(0);
+
     const rules = within(card).getAllByRole("listitem");
     expect(rules).toHaveLength(3);
     const added = rules[2];
     expect(added).toHaveAccessibleName("Rule 3");
-    await user.type(within(added).getByLabelText("Match"), "(");
-
     expect(
       within(added).getByText("This regex does not compile; the proxy skips it."),
     ).toBeInTheDocument();
@@ -339,6 +435,46 @@ describe("SettingsPage", () => {
       name: "",
     });
     expect(body.rules[2].id).toMatch(/^rule-\d+$/);
+  });
+
+  it("edits and deletes a rule from its menu, and switches every filter at once", async () => {
+    const { user } = await renderPage();
+    const card = section(SECTION_ID.promptFilter);
+    const [first] = within(card).getAllByRole("listitem");
+
+    await user.click(
+      within(first).getByRole("button", { name: "Rule actions: Hide internal hostnames" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Edit rule" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit rule" });
+    const name = within(dialog).getByLabelText("Rule name");
+    await user.clear(name);
+    await user.type(name, "Hosts{Enter}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(card).getAllByRole("listitem")[0]).toHaveTextContent("Hosts");
+
+    await user.click(
+      within(card).getByRole("button", { name: "Rule actions: Drop telemetry lines" }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Delete rule" }));
+    expect(within(card).getAllByRole("listitem")).toHaveLength(1);
+
+    // The fixture has the built-ins off and its rule on: mixed, so the switch reads off.
+    const all = within(card).getByRole("switch", { name: "All filters and rules" });
+    expect(all).toHaveAccessibleDescription("1 of 4 filters on");
+    expect(all).not.toBeChecked();
+    await user.click(all);
+    for (const control of within(card).getAllByRole("switch")) expect(control).toBeChecked();
+    await user.click(within(card).getByRole("button", { name: "Save" }));
+
+    await screen.findByText("Settings saved");
+    const [write] = await writes("/prompt-filter");
+    expect(write.body).toMatchObject({
+      filterClaudeCode: true,
+      filterEnvNoise: true,
+      filterStripBoundaries: true,
+      rules: [{ name: "Hosts", enabled: true }],
+    });
   });
 
   it("resets statistics after confirmation and refreshes request views", async () => {

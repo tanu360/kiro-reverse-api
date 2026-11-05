@@ -7,6 +7,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { resetStats } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { SECTION_ID } from "./sections";
 import { ROW_DESCRIPTION, SettingsFrame, SettingsRow } from "./settings-section";
 
@@ -40,20 +41,22 @@ export function DangerZoneCard(): JSX.Element {
 
   return (
     <SettingsFrame
-      className="border-destructive/32"
+      className="border-destructive/40 bg-destructive/4"
       id={SECTION_ID.dangerZone}
       title={t("dangerZone")}
     >
       <SettingsRow className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
         <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="font-medium text-foreground text-sm">{t("statistics")}</h3>
-          <p className={ROW_DESCRIPTION}>{t("resetStatsHint")}</p>
+          <h3 className="font-medium text-destructive-foreground text-sm">{t("statistics")}</h3>
+          <p className={cn(ROW_DESCRIPTION, "text-destructive-foreground/80")}>
+            {t("resetStatsHint")}
+          </p>
         </div>
         <Button
           className="self-start sm:self-center"
           disabled={reset.isPending}
           onClick={() => void onReset()}
-          variant="destructive"
+          variant="danger"
         >
           {t("resetStats")}
         </Button>

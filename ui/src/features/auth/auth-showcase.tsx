@@ -1,11 +1,12 @@
-import { CircleAlertIcon, CircleCheckIcon, ClockIcon, type LucideIcon } from "lucide-react";
+import { AlertCircleIcon, CircleCheckIcon, Clock01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type CSSProperties, type JSX, useId } from "react";
 import { NAV_ITEMS } from "@/components/layout/nav-items";
 import { AppIcon } from "@/components/shared/app-icon";
+import { ClaudeLogo, CodexLogo, OpenAILogo } from "@/components/shared/brand-logos";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { ClaudeLogo, CodexLogo, OpenAILogo } from "./brand-logos";
 
 /**
  * Grainy purple mesh: deep violet pooling at the left and lower right, lavender glowing across
@@ -47,9 +48,9 @@ const GRAIN: CSSProperties = {
  * bold text is at least 5.4:1 on its own pastel.
  */
 const STICKER = {
-  claude: { background: "#ffe9de", color: "#a3401c" },
-  openai: { background: "#ecf8b8", color: "#40650f" },
-  codex: { background: "#e4e8ff", color: "#3941d0" },
+  claude: { background: "var(--sticker-claude)", color: "var(--sticker-claude-fg)" },
+  openai: { background: "var(--sticker-openai)", color: "var(--sticker-openai-fg)" },
+  codex: { background: "var(--sticker-codex)", color: "var(--sticker-codex-fg)" },
 } as const satisfies Record<string, { background: string; color: string }>;
 
 type Health = "active" | "outOfCredits" | "expired";
@@ -104,9 +105,9 @@ const SPARK_SUCCESS = [0.82, 0.86, 0.84, 0.9, 0.88, 0.92, 0.9, 0.94, 0.95, 0.93,
 
 const HEALTH_PILL = {
   active: { tone: "success", icon: CircleCheckIcon },
-  outOfCredits: { tone: "warning", icon: CircleAlertIcon },
-  expired: { tone: "warning", icon: ClockIcon },
-} as const satisfies Record<Health, { tone: BadgeTone; icon: LucideIcon }>;
+  outOfCredits: { tone: "warning", icon: AlertCircleIcon },
+  expired: { tone: "warning", icon: Clock01Icon },
+} as const satisfies Record<Health, { tone: BadgeTone; icon: IconSvgElement }>;
 
 const PREVIEW_NAV = NAV_ITEMS.filter((item) =>
   ["overview", "accounts", "requests"].includes(item.id),
@@ -415,7 +416,7 @@ function AccountsPreview(): JSX.Element {
                   )}
                   key={item.id}
                 >
-                  <Icon className="size-3.5" />
+                  <HugeiconsIcon icon={Icon} className="size-3.5" />
                   {tShared(item.labelKey)}
                 </li>
               );

@@ -8,8 +8,9 @@ import { activeNavItem } from "./nav-items";
 import { SiteHeader } from "./site-header";
 import { UpdateCheckProvider } from "./update-check";
 
-// 272 px sidebar, as in Studio Admin.
-const SIDEBAR_STYLE = { "--sidebar-width": "calc(var(--spacing) * 68)" } as CSSProperties;
+// 232 px sidebar: the narrowest that keeps the English footer (version, status, GitHub) on one
+// line; every nav row, the longest tree row "Needs attention" included, fits with room to spare.
+const SIDEBAR_STYLE = { "--sidebar-width": "calc(var(--spacing) * 58)" } as CSSProperties;
 
 export function AppShell({ children }: { children: ReactNode }): JSX.Element {
   const { t } = useT();

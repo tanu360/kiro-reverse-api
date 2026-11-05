@@ -190,6 +190,12 @@ importers:
       '@fontsource/patrick-hand':
         specifier: ^5.3.0
         version: 5.3.0
+      '@hugeicons/core-free-icons':
+        specifier: ^4.4.0
+        version: 4.4.0
+      '@hugeicons/react':
+        specifier: ^1.1.10
+        version: 1.1.10(react@19.3.1)
       '@number-flow/react':
         specifier: ^0.6.2
         version: 0.6.2(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -217,9 +223,6 @@ importers:
       d3-shape:
         specifier: ^3.2.0
         version: 3.2.0
-      lucide-react:
-        specifier: ^1.66.0
-        version: 1.66.0(@types/react@19.3.0)(react@19.3.1)
       motion:
         specifier: ^14.9.0
         version: 14.9.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -592,6 +595,14 @@ packages:
 
   '@fontsource/patrick-hand@5.3.0':
     resolution: {integrity: sha512-V8C38IlIFfdWg0Xtri3F7sLCVpm069rUwn6w4n+oyn38gt7H4arOJmuReg3tAw1Q6jHqZp89wTnAAJagq4Atxw==}
+
+  '@hugeicons/core-free-icons@4.4.0':
+    resolution: {integrity: sha512-7Mz8bmGoY6tZ6l3C2TXwNMLVSr0I8HPwjjFIERAuJFj3rWwLxdF2ZLkDqdrVuEE1dx5b/VXyIsP4WoSU6Q40KQ==}
+
+  '@hugeicons/react@1.1.10':
+    resolution: {integrity: sha512-9tAsd92yMVVGP+E+d8cM+wc0VnXuYZHNbWQi7TOe8k2neawmhiaFmVFbzyruejhOMa197/LbgvSED32ayUo3ZA==}
+    peerDependencies:
+      react: '>=16.0.0'
 
   '@inquirer/ansi@2.0.10':
     resolution: {integrity: sha512-dwrc+1aqVZpHNkNDswXGtn1typ+Pxpo5FHZRyBw1le7onEJUkPUkYOY1FIFC1LvFMYUqqLuWBwElhAmencL7MQ==}
@@ -1628,15 +1639,6 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
-  lucide-react@1.66.0:
-    resolution: {integrity: sha512-8zjbi/Us+ETXqfBwmXF/FHrWGIqOdE6zT1yUdRJLQVoptomSkB0zdFWVIM667t9K8djWDaXdkBkqi2qVTuDNiw==}
-    peerDependencies:
-      '@types/react': '*'
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
@@ -2382,6 +2384,12 @@ snapshots:
   '@fontsource-variable/geist@5.3.0': {}
 
   '@fontsource/patrick-hand@5.3.0': {}
+
+  '@hugeicons/core-free-icons@4.4.0': {}
+
+  '@hugeicons/react@1.1.10(react@19.3.1)':
+    dependencies:
+      react: 19.3.1
 
   '@inquirer/ansi@2.0.10': {}
 
@@ -3184,12 +3192,6 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
-
-  lucide-react@1.66.0(@types/react@19.3.0)(react@19.3.1):
-    dependencies:
-      react: 19.3.1
-    optionalDependencies:
-      '@types/react': 19.3.0
 
   lz-string@1.5.0: {}
 

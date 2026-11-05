@@ -1,5 +1,6 @@
-import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
+import { MonitorIcon, Moon02Icon, Sun03Icon } from "@hugeicons/core-free-icons";
 import { type JSX, useRef } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
 import {
   Menu,
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { HEADER_ICON_BUTTON } from "./header-button";
 import { THEMES, type Theme, useTheme } from "./theme-provider";
 
-export const THEME_ICONS = { system: MonitorIcon, light: SunIcon, dark: MoonIcon } as const;
+export const THEME_ICONS = { system: MonitorIcon, light: Sun03Icon, dark: Moon02Icon } as const;
 
 /** Same order as the old UI: system, light, dark. */
 function nextTheme(theme: Theme): Theme {
@@ -70,7 +71,7 @@ export function ThemeSwitch({
                   />
                 }
               >
-                <ModeIcon aria-hidden="true" />
+                <AnimatedIcon icon={ModeIcon} aria-hidden="true" />
               </TooltipTrigger>
               <TooltipPopup>{modeLabel}</TooltipPopup>
             </Tooltip>
@@ -99,7 +100,7 @@ export function ThemeSwitch({
               />
             }
           >
-            <Icon aria-hidden="true" />
+            <AnimatedIcon icon={Icon} aria-hidden="true" />
           </TooltipTrigger>
           <TooltipPopup>{label}</TooltipPopup>
         </Tooltip>
@@ -115,7 +116,7 @@ export function ThemeSwitch({
                 return (
                   <MenuRadioItem key={mode} value={mode}>
                     <span className="flex items-center gap-2">
-                      <ModeIcon aria-hidden="true" />
+                      <AnimatedIcon icon={ModeIcon} aria-hidden="true" />
                       {t(`shell.theme.${mode}`)}
                     </span>
                   </MenuRadioItem>
@@ -142,7 +143,7 @@ export function ThemeSwitch({
           />
         }
       >
-        <Icon aria-hidden="true" />
+        <AnimatedIcon icon={Icon} aria-hidden="true" />
       </TooltipTrigger>
       <TooltipPopup>{label}</TooltipPopup>
     </Tooltip>

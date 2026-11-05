@@ -1,5 +1,5 @@
+import { Pulse01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { ActivityIcon } from "lucide-react";
 import { type JSX, type ReactNode, useMemo } from "react";
 import { DisplayEmail } from "@/components/shared/display-email";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -155,7 +155,7 @@ export function TrafficHeatmap(): JSX.Element {
         {view.total.requests === 0 ? (
           <EmptyState
             description={t("traffic.noTrafficBody")}
-            icon={ActivityIcon}
+            icon={Pulse01Icon}
             title={t("traffic.noTraffic")}
             variant="compact"
           />

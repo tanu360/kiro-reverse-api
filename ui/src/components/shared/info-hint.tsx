@@ -1,4 +1,5 @@
-import { InfoIcon } from "lucide-react";
+import { InfoIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,7 @@ export function InfoHint({
         openOnHover
       >
         <span className="line-clamp-2 text-pretty">{children}</span>
-        <InfoIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" />
+        <HugeiconsIcon icon={InfoIcon} aria-hidden="true" className="size-3 shrink-0 opacity-70" />
       </PopoverTrigger>
       <PopoverPopup className="max-w-72" side="top" tooltipStyle>
         {hint}

@@ -2,7 +2,8 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { ChevronRight, MoreHorizontal } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ChevronRightIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 import { useUiT } from "@/components/ui/messages";
@@ -87,7 +88,7 @@ export function BreadcrumbSeparator({
       role="presentation"
       {...props}
     >
-      {children ?? <ChevronRight />}
+      {children ?? <HugeiconsIcon icon={ChevronRightIcon} />}
     </li>
   );
 }
@@ -105,7 +106,7 @@ export function BreadcrumbEllipsis({
       role="presentation"
       {...props}
     >
-      <MoreHorizontal className="size-4" />
+      <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
       <span className="sr-only">{t("breadcrumb.more")}</span>
     </span>
   );

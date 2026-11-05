@@ -6,7 +6,7 @@ import type {
   BackupSchedule,
   BackupScheduleUpdate,
 } from "@/lib/api/types";
-import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { claimMockPassword, mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { publishMockEvent } from "@/lib/mocks/events";
 import { makeBackupEntry } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
@@ -99,7 +99,7 @@ function parseBackup(text: string): { accounts: number } | { error: string } {
 /** Creates the rollback point, then "swaps" the config (the mock keeps its own data). */
 function restoreFrom(note: string, restoredAccountCnt: number): void {
   addBackup({ kind: "pre-restore", note, restoredAccountCnt });
-  mockDb.firstRunPending = false;
+  claimMockPassword();
 }
 
 export const handlers: HttpHandler[] = [

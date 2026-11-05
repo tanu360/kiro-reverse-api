@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
 import {
   Empty,
@@ -17,7 +17,7 @@ export function EmptyState({
   action,
   variant = "default",
 }: {
-  icon?: LucideIcon;
+  icon?: IconSvgElement;
   title: string;
   description?: string;
   action?: ReactNode;
@@ -29,7 +29,7 @@ export function EmptyState({
       <EmptyHeader>
         {Icon ? (
           <EmptyMedia className={cn(compact && "mb-3")} variant="icon">
-            <Icon aria-hidden="true" />
+            <HugeiconsIcon icon={Icon} aria-hidden="true" />
           </EmptyMedia>
         ) : null}
         {/* Compact (inside a card): the card-title step of the type scale. */}

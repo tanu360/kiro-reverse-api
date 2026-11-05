@@ -1,4 +1,5 @@
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, useRef } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { CreditAmount } from "@/components/shared/credit-amount";
@@ -178,7 +179,7 @@ export function RequestDetailSheet({
               size="icon"
               variant="outline"
             >
-              <ChevronLeftIcon aria-hidden="true" />
+              <HugeiconsIcon icon={ChevronLeftIcon} aria-hidden="true" />
             </Button>
             <Button
               aria-label={t("detail.next")}
@@ -188,7 +189,7 @@ export function RequestDetailSheet({
               size="icon"
               variant="outline"
             >
-              <ChevronRightIcon aria-hidden="true" />
+              <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" />
             </Button>
           </div>
         </SheetFooter>

@@ -1,6 +1,12 @@
+import {
+  ArrowRight02Icon,
+  CircleCheckIcon,
+  CircleXIcon,
+  ListIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon, CircleCheckIcon, CircleXIcon, ListIcon } from "lucide-react";
 import { type JSX, type ReactNode, useMemo, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { DisplayEmail } from "@/components/shared/display-email";
@@ -63,7 +69,7 @@ function ViewAllLink({ children, failedOnly }: { children: ReactNode; failedOnly
       variant="outline"
     >
       {children}
-      <ArrowRightIcon aria-hidden="true" />
+      <HugeiconsIcon icon={ArrowRight02Icon} aria-hidden="true" />
     </Button>
   );
 }

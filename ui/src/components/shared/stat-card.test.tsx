@@ -1,5 +1,5 @@
+import { UsersIcon } from "@hugeicons/core-free-icons";
 import { screen } from "@testing-library/react";
-import { UsersIcon } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { formatDelta, StatCard } from "./stat-card";

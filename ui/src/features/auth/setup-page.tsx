@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type JSX, useEffect, useRef, useState } from "react";
 import { Skeleton, SkulletProvider } from "skullet/react";
 import { useTheme } from "@/components/layout/theme-provider";
@@ -50,6 +50,7 @@ const SKELETON_THEME = {
 export function SetupPage(): JSX.Element {
   const { t } = useT("auth");
   const navigate = useNavigate();
+  const { redirect } = useSearch({ from: "/setup" });
   // staleTime 0: fetched again each time the page shows, so a claimed password never lingers.
   const firstRun = useQuery(firstRunQuery());
   const password = firstRun.data?.password;
@@ -57,9 +58,9 @@ export function SetupPage(): JSX.Element {
   useEffect(() => {
     // Someone signed in elsewhere since the route loaded: the password is gone.
     if (password === "" && !isAuthenticated()) {
-      void navigate({ to: "/login", replace: true });
+      void navigate({ to: "/login", search: { redirect }, replace: true });
     }
-  }, [password, navigate]);
+  }, [password, navigate, redirect]);
 
   const onSignedIn = () => {
     const id = toast.info(t("changePasswordToast"), {
@@ -86,7 +87,11 @@ export function SetupPage(): JSX.Element {
           // Only once nothing is loading: while "Try again" fetches, the skeleton shows instead.
           unavailable={firstRun.isError && !firstRun.isFetching}
         />
-        <SignInForm defaultPassword={password || undefined} onSignedIn={onSignedIn} />
+        <SignInForm
+          redirect={redirect}
+          defaultPassword={password || undefined}
+          onSignedIn={onSignedIn}
+        />
       </div>
     </AuthLayout>
   );

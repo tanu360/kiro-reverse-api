@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { act, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { fetchRemoteVersion } from "@/lib/api/system";
 import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
@@ -29,7 +30,9 @@ function renderHeader() {
   return renderWithProviders(
     <UpdateCheckProvider>
       <UpdateIndicator />
-      <UserMenu variant="header" />
+      <SidebarProvider>
+        <UserMenu />
+      </SidebarProvider>
     </UpdateCheckProvider>,
   );
 }

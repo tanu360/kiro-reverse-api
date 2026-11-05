@@ -1,17 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowDownLeftIcon,
-  ArrowUpRightIcon,
+  ArrowDownLeft01Icon,
+  ArrowUpRight01Icon,
   ChartColumnIcon,
   CodeIcon,
-  GlobeIcon,
+  Globe02Icon,
   KeyRoundIcon,
-  LayersIcon,
-  type LucideIcon,
+  Layers01Icon,
   MessageSquareIcon,
   WandSparklesIcon,
   ZapIcon,
-} from "lucide-react";
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { SectionCard } from "@/components/shared/section-card";
@@ -22,7 +22,7 @@ import { CodeText } from "./code-text";
 
 interface Endpoint {
   id: string;
-  icon: LucideIcon;
+  icon: IconSvgElement;
   titleKey: string;
   copyKey: string;
   method: "POST" | "GET";
@@ -57,7 +57,7 @@ const ENDPOINTS: readonly Endpoint[] = [
   },
   {
     id: "models",
-    icon: LayersIcon,
+    icon: Layers01Icon,
     titleKey: "endpoints.modelList",
     copyKey: "endpoints.copyModels",
     method: "GET",
@@ -104,14 +104,18 @@ export function EndpointsCard(): JSX.Element {
   return (
     <SectionCard
       actions={
-        <Badge icon={GlobeIcon} iconStyle="line" variant="outline">
+        <Badge icon={Globe02Icon} iconStyle="line" variant="outline">
           {t("endpoints.protocolHttp")}
         </Badge>
       }
       description={t("endpoints.description")}
       footer={
         <p className="flex items-start gap-2 text-muted-foreground text-sm">
-          <KeyRoundIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <HugeiconsIcon
+            icon={KeyRoundIcon}
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0"
+          />
           <span data-testid="endpoints-auth-hint">
             <CodeText
               code={{ bearer: "Authorization: Bearer <key>", xApiKey: "X-Api-Key: <key>" }}
@@ -131,12 +135,12 @@ export function EndpointsCard(): JSX.Element {
             <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0" key={endpoint.id}>
               <div className="flex items-center gap-2">
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
-                  <Icon aria-hidden="true" className="size-3.5" />
+                  <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-3.5" />
                 </span>
                 <span className="min-w-0 truncate font-medium text-sm">{t(endpoint.titleKey)}</span>
                 <Badge
                   className="ms-auto font-mono"
-                  icon={endpoint.method === "POST" ? ArrowUpRightIcon : ArrowDownLeftIcon}
+                  icon={endpoint.method === "POST" ? ArrowUpRight01Icon : ArrowDownLeft01Icon}
                   iconStyle="line"
                   tone={endpoint.method === "POST" ? "primary" : "success"}
                   variant="soft-outline"

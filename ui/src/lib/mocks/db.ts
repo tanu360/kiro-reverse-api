@@ -80,6 +80,29 @@ const SEED_REQUEST_COUNT = 320;
 
 /** Where the browser mock keeps its generated password, so it survives reloads like the real one. */
 const MOCK_PASSWORD_KEY = "kiro_mock_password";
+const MOCK_FIRST_RUN_KEY = "kiro_mock_first_run_done";
+
+function mockFirstRunPending(): boolean {
+  if (import.meta.env.VITE_MOCK !== "1") return true;
+  try {
+    return localStorage.getItem(MOCK_FIRST_RUN_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+/** The mock's server-side auth state must survive a page reload, just like its password. */
+export function claimMockPassword(password = mockDb.adminPassword): void {
+  mockDb.adminPassword = password;
+  mockDb.firstRunPending = false;
+  if (import.meta.env.VITE_MOCK !== "1") return;
+  try {
+    localStorage.setItem(MOCK_PASSWORD_KEY, password);
+    localStorage.setItem(MOCK_FIRST_RUN_KEY, "1");
+  } catch {
+    /* Storage may be unavailable in a sandboxed preview. */
+  }
+}
 
 /**
  * The first-run password as config/admin_password.go makes it: 8 crypto-random digits,
@@ -120,7 +143,7 @@ function baseDb(): Pick<
 > {
   return {
     adminPassword: mockAdminPassword(),
-    firstRunPending: true,
+    firstRunPending: mockFirstRunPending(),
     failedLogins: 0,
     version: "2.1.0",
     // Same as the running version: no update notice in tests, screenshots or axe runs.

@@ -1,5 +1,6 @@
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CircleAlertIcon } from "lucide-react";
 import { type FormEvent, type JSX, useId, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -196,7 +197,7 @@ export function ApiKeyFormDialog({
         </Field>
         {mutation.isError ? (
           <Alert variant="error">
-            <CircleAlertIcon aria-hidden="true" />
+            <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
             <AlertDescription className="break-words">
               {errorMessage(mutation.error, t)}
             </AlertDescription>

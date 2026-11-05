@@ -1,7 +1,8 @@
 "use client";
 
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
-import { ChevronsUpDownIcon, XIcon } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { UnfoldMoreIcon, XIcon } from "@hugeicons/core-free-icons";
 import * as React from "react";
 import {
   CheckedDot,
@@ -128,7 +129,7 @@ export function ComboboxInput({
           {...triggerProps}
         >
           <ComboboxPrimitive.Icon data-slot="combobox-icon">
-            <ChevronsUpDownIcon />
+            <HugeiconsIcon icon={UnfoldMoreIcon} />
           </ComboboxPrimitive.Icon>
         </ComboboxTrigger>
       )}
@@ -140,7 +141,7 @@ export function ComboboxInput({
           )}
           {...clearProps}
         >
-          <XIcon />
+          <HugeiconsIcon icon={XIcon} />
         </ComboboxClear>
       )}
     </ComboboxPrimitive.InputGroup>
@@ -197,7 +198,7 @@ export function ComboboxPopup({
       >
         <span
           className={cn(
-            "popup-surface relative flex max-h-full min-w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg transition-[scale,opacity]",
+            "popup-surface popup-width relative flex max-h-full origin-(--transform-origin) rounded-lg transition-[scale,opacity]",
             className,
           )}
         >
@@ -318,7 +319,7 @@ export function ComboboxList({
     <ScrollArea overscrollContain scrollbarGutter scrollFade>
       <ComboboxPrimitive.List
         className={cn(
-          "not-empty:scroll-py-1 not-empty:px-1 not-empty:py-1 in-data-has-overflow-y:pe-3",
+          "not-empty:scroll-py-1 not-empty:px-1 not-empty:py-1",
           className,
         )}
         data-slot="combobox-list"
@@ -422,7 +423,7 @@ export function ComboboxChipRemove(
       data-slot="combobox-chip-remove"
       {...props}
     >
-      <XIcon />
+      <HugeiconsIcon icon={XIcon} />
     </ComboboxPrimitive.ChipRemove>
   );
 }

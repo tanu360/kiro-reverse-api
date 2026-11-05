@@ -362,28 +362,33 @@ describe("AccountsPage layout", () => {
     await waitFor(() => expect(bodies).toHaveLength(1));
   });
 
-  it("folds Export and Refresh all models into a ⋯ menu on phones", async () => {
+  it("shows Refresh models and Export as icons on phones", async () => {
     mockViewport(390);
-    const { user } = await renderCards();
+    await renderCards();
     const main = screen.getByRole("main");
-    expect(within(main).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
-    expect(within(main).getByRole("button", { name: "Add account" })).toBeInTheDocument();
-    expect(within(main).queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
+    const header = main.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
+    // One refresh only (Refresh models); the list refetches on its own.
+    const names = within(header)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent);
+    expect(names).toEqual(["Refresh models", "Add account"]);
     // The cards have no headers to click; the Sort by select stands in.
     expect(within(main).getByRole("button", { name: "Sort by: Default" })).toBeInTheDocument();
-    await user.click(within(main).getByRole("button", { name: "More" }));
-    expect(await screen.findByRole("menuitem", { name: "Export" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Refresh all models" })).toBeInTheDocument();
+    expect(within(main).getByRole("button", { name: "Export" })).toBeInTheDocument();
   });
 
-  it("shows each header action as its own button on wider screens", async () => {
+  it("puts Export at the end of the status tab row, not in the header", async () => {
     await renderAccounts();
     const main = screen.getByRole("main");
     const header = main.querySelector('[data-slot="page-header-actions"]') as HTMLElement;
     const names = within(header)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label") ?? button.textContent);
-    expect(names).toEqual(["Refresh", "Refresh all models", "Export", "Add account"]);
-    expect(within(header).queryByRole("button", { name: "More" })).not.toBeInTheDocument();
+    expect(names).toEqual(["Refresh models", "Add account"]);
+    const toolbar = main.querySelector('[data-slot="accounts-toolbar"]') as HTMLElement;
+    const exportButton = await within(toolbar).findByRole("button", { name: "Export" });
+    // Outside the tablist, so the tabs keep their arrow-key order.
+    expect(within(screen.getByRole("tablist")).queryByRole("button")).not.toBeInTheDocument();
+    expect(exportButton).toBeInTheDocument();
   });
 });

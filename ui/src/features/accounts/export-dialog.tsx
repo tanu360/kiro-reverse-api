@@ -1,4 +1,5 @@
-import { CopyIcon, DownloadIcon, FileJsonIcon } from "lucide-react";
+import { Copy01Icon, Download01Icon, FileBracesIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useEffect, useId, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Button } from "@/components/ui/button";
@@ -143,7 +144,7 @@ export function ExportDialog({
               onClick={() => void onShow()}
               variant="outline"
             >
-              <FileJsonIcon aria-hidden="true" />
+              <HugeiconsIcon icon={FileBracesIcon} aria-hidden="true" />
               {t("export.showJson")}
             </Button>
             <Button
@@ -152,7 +153,7 @@ export function ExportDialog({
               onClick={onCopy}
               variant="outline"
             >
-              <CopyIcon aria-hidden="true" />
+              <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
               {t("export.copyJson")}
             </Button>
           </div>
@@ -161,7 +162,7 @@ export function ExportDialog({
             disabled={busy !== null}
             onClick={() => void onDownload()}
           >
-            <DownloadIcon aria-hidden="true" />
+            <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
             {t("export.downloadJson")}
           </Button>
         </>

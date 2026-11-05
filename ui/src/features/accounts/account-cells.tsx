@@ -1,16 +1,16 @@
 import {
-  CircleAlertIcon,
+  AlertCircleIcon,
   CircleCheckIcon,
   CircleMinusIcon,
-  CirclePauseIcon,
   CircleSlashIcon,
   CircleXIcon,
-  ClockIcon,
+  Clock01Icon,
   HourglassIcon,
-  type LucideIcon,
+  PauseCircleIcon,
   WeightIcon,
   ZapIcon,
-} from "lucide-react";
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type JSX, type ReactNode, useRef, useState } from "react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterLabel, MeterTrack } from "@/components/ui/meter";
@@ -39,12 +39,12 @@ import {
  * The one coloured pill of a row. Colour carries the meaning: red stops the account, orange
  * needs attention, grey is the admin's own switch, green is healthy.
  */
-export const STATUS_PILL: Record<AccountStatus, { tone: BadgeTone; icon: LucideIcon }> = {
+export const STATUS_PILL: Record<AccountStatus, { tone: BadgeTone; icon: IconSvgElement }> = {
   banned: { tone: "destructive", icon: CircleXIcon },
-  suspended: { tone: "warning", icon: CirclePauseIcon },
+  suspended: { tone: "warning", icon: PauseCircleIcon },
   noToken: { tone: "destructive", icon: CircleMinusIcon },
-  outOfCredits: { tone: "warning", icon: CircleAlertIcon },
-  expired: { tone: "warning", icon: ClockIcon },
+  outOfCredits: { tone: "warning", icon: AlertCircleIcon },
+  expired: { tone: "warning", icon: Clock01Icon },
   disabled: { tone: "neutral", icon: CircleSlashIcon },
   active: { tone: "success", icon: CircleCheckIcon },
 };
@@ -117,11 +117,11 @@ function TruncatedEmail({ account, className }: { account: Account; className?: 
 }
 
 /** A small muted icon with its meaning as a tooltip and as screen reader text. */
-function Flag({ icon: Icon, label }: { icon: LucideIcon; label: string }): JSX.Element {
+function Flag({ icon: Icon, label }: { icon: IconSvgElement; label: string }): JSX.Element {
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="inline-flex shrink-0 text-muted-foreground" />}>
-        <Icon aria-hidden="true" className="size-3.5" />
+        <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-3.5" />
         <span className="sr-only">{label}</span>
       </TooltipTrigger>
       <TooltipPopup>{label}</TooltipPopup>

@@ -19,7 +19,7 @@
  *
  * The package renders one island that morphs between toasts. It is copied in, like the other
  * components in this folder, because the package has no hooks for what the app needs:
- * - Kiro patch: lucide icons per type instead of the package's drawn glyphs.
+ * - Kiro patch: Hugeicons icons per type instead of the package's drawn glyphs.
  * - Kiro patch: translated close and region labels (the package hardcodes English).
  * - Kiro patch: an optional description line, and titles that wrap instead of being clipped.
  * - Kiro patch: colours come from the --notch-* tokens in index.css (light and dark).
@@ -33,14 +33,8 @@
  *   page outside a modal popup but skips [aria-live] subtrees present when the popup opens.
  */
 
-import {
-  CircleCheckIcon,
-  CircleXIcon,
-  InfoIcon,
-  LoaderCircleIcon,
-  TriangleAlertIcon,
-  XIcon,
-} from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { CircleCheckIcon, CircleXIcon, InfoIcon, LoaderCircleIcon, TriangleAlertIcon, XIcon } from "@hugeicons/core-free-icons";
 import { AnimatePresence, motion, type Transition, useReducedMotion } from "motion/react";
 import {
   type ReactElement,
@@ -469,7 +463,7 @@ export function NotchToaster({
                             reduceMotion ? { duration: 0 } : { ...CONTENT_TRANSITION, delay: 0.08 }
                           }
                         >
-                          <Icon aria-hidden="true" />
+                          <HugeiconsIcon icon={Icon} aria-hidden="true" />
                         </motion.span>
                       </span>
                     ) : null}
@@ -508,7 +502,7 @@ export function NotchToaster({
                             onClick={() => dismiss(record.id)}
                             type="button"
                           >
-                            <XIcon aria-hidden="true" />
+                            <HugeiconsIcon icon={XIcon} aria-hidden="true" />
                           </button>
                         ) : null}
                       </div>

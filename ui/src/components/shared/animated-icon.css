@@ -1,0 +1,32 @@
+/*
+ * The CSS fallback for icons the hugeicons-animated registry lacks (animated-icon.tsx): the whole
+ * glyph moves while the control holding it is hovered. Same trigger list as use-icon-animation.ts.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .animated-icon {
+    transform-origin: center;
+    transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :is(
+        a[href],
+        button,
+        [role="button"],
+        [role^="menuitem"],
+        [role="option"],
+        [role="tab"],
+        [role="combobox"]
+      ):not(:disabled, [aria-disabled="true"], [data-disabled]):hover {
+      .animated-icon[data-icon-motion="lift"] {
+        transform: translateY(-2px);
+      }
+      .animated-icon[data-icon-motion="turn"] {
+        transform: rotate(30deg);
+      }
+      .animated-icon[data-icon-motion="tilt"] {
+        transform: rotate(-10deg);
+      }
+    }
+  }
+}

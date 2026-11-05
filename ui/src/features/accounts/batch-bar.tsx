@@ -1,12 +1,13 @@
 import {
   CircleCheckIcon,
   CircleOffIcon,
+  Delete02Icon,
   EllipsisVerticalIcon,
-  LayersIcon,
-  RotateCwIcon,
-  Trash2Icon,
+  Layers01Icon,
+  Refresh01Icon,
   XIcon,
-} from "lucide-react";
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -32,8 +33,24 @@ type BarAction = BatchAction | "refreshModels";
  * it, so the actions stay in reach after selecting a card far down the page. The page renders
  * it after the list, so it rests below the last row once the list ends.
  */
-const BAR_CLASS =
-  "sticky bottom-[calc(env(safe-area-inset-bottom,0px)+--spacing(3))] z-20 flex flex-col gap-2 rounded-xl border bg-background/95 p-2 shadow-lg/5 backdrop-blur-sm";
+const BAR_CLASS = cn(
+  "sticky bottom-[calc(env(safe-area-inset-bottom,0px)+--spacing(3))] z-20 flex rounded-xl",
+  // The purple main-button finish (grain and a white top highlight) on the whole bar, lifted
+  // off the list; the focus outline turns white so it still shows on the purple.
+  "grain-overlay [--grain-overlay-opacity:0.1] border border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/25 inset-shadow-[0_1px_--theme(--color-white/16%)] [--color-ring:var(--color-white)]",
+);
+
+/** A ghost button on the purple bar: white label and icon, a white wash on hover. */
+const ON_BAR =
+  "border-transparent text-primary-foreground [--control-icon-color:currentColor] *:data-[slot=button-loading-indicator]:text-primary-foreground [:hover,[data-pressed]]:bg-white/14";
+
+/** The same on phones, where the buttons are filled so they read as buttons at a glance. */
+const ON_BAR_FILLED = cn(ON_BAR, "bg-white/12");
+
+/** A hairline between the bar's groups: the selection, the actions, delete. */
+function BarDivider(): JSX.Element {
+  return <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-white/24" />;
+}
 
 const CONFIRM_KEYS: Record<BarAction, string> = {
   enable: "batch.confirmEnable",
@@ -120,32 +137,33 @@ export function BatchBar({
     // Two rows of 40 px controls: the common actions stay visible, the rest sit in a menu.
     const menuAction = running === "refresh" || running === "refreshModels" || running === "delete";
     return (
-      <section aria-label={t("batch.label")} className={BAR_CLASS}>
+      <section aria-label={t("batch.label")} className={cn(BAR_CLASS, "flex-col gap-2 p-2")}>
         <div className="flex items-center justify-between gap-2">
           {countLabel}
-          <Button className="h-10" disabled={busy} onClick={onClear} variant="ghost">
-            <XIcon aria-hidden="true" />
+          <Button className={cn("h-10", ON_BAR)} disabled={busy} onClick={onClear} variant="ghost">
+            <HugeiconsIcon icon={XIcon} aria-hidden="true" />
             {t("batch.clear")}
           </Button>
         </div>
         <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
           <Button
-            className="h-10"
+            className={cn("h-10", ON_BAR_FILLED)}
             disabled={busy}
             loading={running === "enable"}
             onClick={() => void run("enable")}
+            variant="ghost"
           >
-            <CircleCheckIcon aria-hidden="true" />
+            <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
             {t("batch.enableShort")}
           </Button>
           <Button
-            className="h-10"
+            className={cn("h-10", ON_BAR_FILLED)}
             disabled={busy}
             loading={running === "disable"}
             onClick={() => void run("disable")}
-            variant="outline"
+            variant="ghost"
           >
-            <CircleOffIcon aria-hidden="true" />
+            <HugeiconsIcon icon={CircleOffIcon} aria-hidden="true" />
             {t("batch.disableShort")}
           </Button>
           <Menu>
@@ -153,23 +171,23 @@ export function BatchBar({
               render={
                 <Button
                   aria-label={t("batch.more")}
-                  className="size-10"
+                  className={cn("size-10", ON_BAR_FILLED)}
                   disabled={busy}
                   loading={menuAction}
                   size="icon"
-                  variant="outline"
+                  variant="ghost"
                 />
               }
             >
-              <EllipsisVerticalIcon aria-hidden="true" />
+              <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
             </MenuTrigger>
             <MenuPopup align="end">
               <MenuItem className="min-h-10" onClick={() => void run("refresh")}>
-                <RotateCwIcon aria-hidden="true" />
+                <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
                 {t("batch.refresh")}
               </MenuItem>
               <MenuItem className="min-h-10" onClick={() => void run("refreshModels")}>
-                <LayersIcon aria-hidden="true" />
+                <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
                 {t("batch.refreshModels")}
               </MenuItem>
               <MenuSeparator />
@@ -178,7 +196,7 @@ export function BatchBar({
                 onClick={() => void run("delete")}
                 variant="destructive"
               >
-                <Trash2Icon aria-hidden="true" />
+                <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
                 {t("batch.delete")}
               </MenuItem>
             </MenuPopup>
@@ -188,58 +206,94 @@ export function BatchBar({
     );
   }
 
+  // One row centred over the list: the count with its clear button, the actions (their full
+  // names stay the accessible names), and delete set apart with a rose icon and a red hover.
   return (
     <section
       aria-label={t("batch.label")}
-      className={cn(BAR_CLASS, "md:flex-row md:flex-wrap md:items-center")}
+      className={cn(
+        BAR_CLASS,
+        "max-w-full flex-wrap items-center justify-center gap-1 self-center p-1.5",
+      )}
     >
-      {countLabel}
-      <div className="flex flex-wrap items-center gap-1.5 md:ms-auto">
-        <Button disabled={busy} loading={running === "enable"} onClick={() => void run("enable")}>
-          <CircleCheckIcon aria-hidden="true" />
-          {t("batch.enable")}
-        </Button>
+      <div className="flex items-center gap-0.5 ps-1.5">
+        {countLabel}
         <Button
+          aria-label={t("batch.clear")}
           disabled={busy}
-          loading={running === "disable"}
-          onClick={() => void run("disable")}
-          variant="outline"
+          onClick={onClear}
+          className={cn(ON_BAR, "text-primary-foreground/72 hover:text-primary-foreground")}
+          size="icon-sm"
+          title={t("batch.clear")}
+          variant="ghost"
         >
-          <CircleOffIcon aria-hidden="true" />
-          {t("batch.disable")}
-        </Button>
-        <Button
-          disabled={busy}
-          loading={running === "refresh"}
-          onClick={() => void run("refresh")}
-          variant="outline"
-        >
-          <RotateCwIcon aria-hidden="true" />
-          {t("batch.refresh")}
-        </Button>
-        <Button
-          disabled={busy}
-          loading={running === "refreshModels"}
-          onClick={() => void run("refreshModels")}
-          variant="outline"
-        >
-          <LayersIcon aria-hidden="true" />
-          {t("batch.refreshModels")}
-        </Button>
-        <Button
-          disabled={busy}
-          loading={running === "delete"}
-          onClick={() => void run("delete")}
-          variant="destructive-outline"
-        >
-          <Trash2Icon aria-hidden="true" />
-          {t("batch.delete")}
-        </Button>
-        <Button disabled={busy} onClick={onClear} variant="ghost">
-          <XIcon aria-hidden="true" />
-          {t("batch.clear")}
+          <HugeiconsIcon icon={XIcon} aria-hidden="true" />
         </Button>
       </div>
+      <BarDivider />
+      <Button
+        aria-label={t("batch.enable")}
+        className={ON_BAR}
+        disabled={busy}
+        loading={running === "enable"}
+        onClick={() => void run("enable")}
+        size="sm"
+        variant="ghost"
+      >
+        <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
+        {t("batch.enableShort")}
+      </Button>
+      <Button
+        aria-label={t("batch.disable")}
+        className={ON_BAR}
+        disabled={busy}
+        loading={running === "disable"}
+        onClick={() => void run("disable")}
+        size="sm"
+        variant="ghost"
+      >
+        <HugeiconsIcon icon={CircleOffIcon} aria-hidden="true" />
+        {t("batch.disableShort")}
+      </Button>
+      <Button
+        className={ON_BAR}
+        disabled={busy}
+        loading={running === "refresh"}
+        onClick={() => void run("refresh")}
+        size="sm"
+        variant="ghost"
+      >
+        <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
+        {t("batch.refresh")}
+      </Button>
+      <Button
+        className={ON_BAR}
+        disabled={busy}
+        loading={running === "refreshModels"}
+        onClick={() => void run("refreshModels")}
+        size="sm"
+        variant="ghost"
+      >
+        <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
+        {t("batch.refreshModels")}
+      </Button>
+      <BarDivider />
+      <Button
+        aria-label={t("batch.delete")}
+        className={cn(
+          ON_BAR,
+          // Hover, press and click turn it solid red with a white label and icon, in both themes.
+          "[--control-icon-color:var(--color-rose-200)] [:hover,[data-pressed]]:bg-red-600 [:hover,[data-pressed]]:text-white [:hover,[data-pressed]]:[--control-icon-color:var(--color-white)] active:bg-red-600 active:text-white active:[--control-icon-color:var(--color-white)]",
+        )}
+        disabled={busy}
+        loading={running === "delete"}
+        onClick={() => void run("delete")}
+        size="sm"
+        variant="ghost"
+      >
+        <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
+        {t("batch.verb.delete")}
+      </Button>
     </section>
   );
 }

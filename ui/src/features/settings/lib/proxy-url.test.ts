@@ -82,6 +82,12 @@ describe("buildProxyUrl", () => {
     );
   });
 
+  it("keeps https for the HTTP type", () => {
+    expect(buildProxyUrl({ ...base, type: "http", scheme: "https" })).toBe(
+      "https://127.0.0.1:1080",
+    );
+  });
+
   it("does not bracket an already bracketed IPv6 host twice", () => {
     expect(buildProxyUrl({ ...base, host: "[fe80::1]" })).toBe("socks5://[fe80::1]:1080");
   });

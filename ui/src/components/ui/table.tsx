@@ -22,14 +22,18 @@ export function Table({
     children: (
       <table
         className={cn(
-          "w-full caption-bottom in-data-[variant=card]:border-separate in-data-[variant=card]:border-spacing-0 text-sm",
+          // Column dividers, so the table reads as a grid of boxes: a 1 px inset line on the left
+          // of every cell but the first, in the row divider's colour (border at 50 %). An inset
+          // shadow, not a border, so it matches the sticky end column's own edge instead of
+          // doubling it. The cell after a row's checkbox gets none: the box belongs to the row.
+          "w-full caption-bottom in-data-[variant=card]:border-separate in-data-[variant=card]:border-spacing-0 text-sm [&_tr>*:not(:has([role=checkbox]))+*]:shadow-[inset_1px_0_0_color-mix(in_srgb,var(--border)_50%,transparent)]",
           className,
         )}
         data-slot="table"
         {...props}
       />
     ),
-    className: "relative w-full overflow-x-auto",
+    className: "scrollbar-x relative w-full overflow-x-auto",
     "data-slot": "table-container",
     "data-variant": variant,
   };
@@ -47,7 +51,7 @@ export function TableHeader({
 }: React.ComponentProps<"thead">): React.ReactElement {
   return (
     <thead
-      className={cn("[&_tr]:border-b", className)}
+      className={cn("not-in-data-[variant=card]:bg-(--row-head) [&_tr]:border-b", className)}
       data-slot="table-header"
       {...props}
     />
@@ -93,7 +97,7 @@ export function TableRow({
   return (
     <tr
       className={cn(
-        "relative border-b transition-colors not-in-data-[variant=card]:hover:bg-muted/50 not-in-data-[variant=card]:has-aria-expanded:bg-muted/50 not-in-data-[variant=card]:data-[state=selected]:bg-muted",
+        "relative border-b transition-colors not-in-data-[variant=card]:hover:bg-(--row-hover) not-in-data-[variant=card]:has-aria-expanded:bg-(--row-hover) not-in-data-[variant=card]:data-[state=selected]:bg-(--row-selected) not-in-data-[variant=card]:data-[state=selected]:hover:bg-(--row-selected-hover)",
         className,
       )}
       data-slot="table-row"

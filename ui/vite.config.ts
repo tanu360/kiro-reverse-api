@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const goTarget = "http://127.0.0.1:8080";
@@ -34,6 +34,18 @@ function serveMockWorker(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const pathname = (req.url ?? "").split("?")[0];
+        // A missing/restarting MSW client must never send mock tokens to the real backend.
+        if (pathname.startsWith("/admin/api/")) {
+          res.statusCode = 503;
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(
+            JSON.stringify({
+              error: "Mock worker is not handling this request. Reload the preview.",
+            }),
+          );
+          return;
+        }
         if (req.method !== "GET" || pathname !== "/admin/mockServiceWorker.js") {
           next();
           return;
@@ -53,49 +65,56 @@ function serveMockWorker(): Plugin {
   };
 }
 
-export default defineConfig({
-  base: "/admin/",
-  plugins: [
-    tanstackRouter({
-      target: "react",
-      autoCodeSplitting: true,
-      routesDirectory: "src/routes",
-      generatedRouteTree: "src/routeTree.gen.ts",
-    }),
-    react(),
-    tailwindcss(),
-    keepDistPlaceholder(),
-    serveMockWorker(),
-  ],
-  resolve: {
-    alias: { "@": path.resolve(rootDir, "src") },
-  },
-  optimizeDeps: {
-    // Route chunks load lazily, so the dependency scan from index.html misses what only a page
-    // imports (dnd-kit in Settings, for example). Vite would find those on first visit and
-    // reload the page, which drops toasts and breaks e2e runs on a cold cache.
-    entries: ["index.html", "src/{features,components,routes}/**/*.tsx", "!src/**/*.test.tsx"],
-  },
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-  },
-  server: {
-    port: 5173,
-    strictPort: true,
-    proxy: {
-      // Regex key: a plain '/admin/api' string would prefix-match the SPA page /admin/api.
-      // Timeouts are off so the SSE stream at /admin/api/events is never cut or buffered.
-      "^/admin/api/": { target: goTarget, proxyTimeout: 0, timeout: 0 },
-      "/v1": { target: goTarget },
+export default defineConfig(({ mode }) => {
+  const isMock = loadEnv(mode, rootDir, "VITE_").VITE_MOCK === "1";
+  return {
+    // Simultaneous mock/live servers must not overwrite each other's optimized dependencies.
+    cacheDir: path.resolve(rootDir, `node_modules/.vite-${isMock ? "mock" : "live"}`),
+    base: "/admin/",
+    plugins: [
+      tanstackRouter({
+        target: "react",
+        autoCodeSplitting: true,
+        routesDirectory: "src/routes",
+        generatedRouteTree: "src/routeTree.gen.ts",
+      }),
+      react(),
+      tailwindcss(),
+      keepDistPlaceholder(),
+      ...(isMock ? [serveMockWorker()] : []),
+    ],
+    resolve: {
+      alias: { "@": path.resolve(rootDir, "src") },
     },
-  },
-  test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}"],
-    css: false,
-    restoreMocks: true,
-  },
+    optimizeDeps: {
+      // Route chunks load lazily, so the dependency scan from index.html misses what only a page
+      // imports (dnd-kit in Settings, for example). Vite would find those on first visit and
+      // reload the page, which drops toasts and breaks e2e runs on a cold cache.
+      entries: ["index.html", "src/{features,components,routes}/**/*.tsx", "!src/**/*.test.tsx"],
+    },
+    build: {
+      outDir: "dist",
+      emptyOutDir: true,
+    },
+    server: {
+      port: 5173,
+      strictPort: true,
+      proxy: isMock
+        ? undefined
+        : {
+            // Regex key: a plain '/admin/api' string would prefix-match the SPA page /admin/api.
+            // Timeouts are off so the SSE stream at /admin/api/events is never cut or buffered.
+            "^/admin/api/": { target: goTarget, proxyTimeout: 0, timeout: 0 },
+            "/v1": { target: goTarget },
+          },
+    },
+    test: {
+      environment: "jsdom",
+      globals: true,
+      setupFiles: ["src/test/setup.ts"],
+      include: ["src/**/*.test.{ts,tsx}"],
+      css: false,
+      restoreMocks: true,
+    },
+  };
 });

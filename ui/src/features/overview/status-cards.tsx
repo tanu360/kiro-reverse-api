@@ -1,5 +1,5 @@
+import { CircleCheckIcon, CircleXIcon, Route01Icon, UsersIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { CircleCheckIcon, CircleXIcon, RouteIcon, UsersIcon } from "lucide-react";
 import { type JSX, lazy, Suspense, useMemo } from "react";
 import { StatCardSkeleton } from "@/components/shared/loading-state";
 import { StatCard, type StatCardProps, type StatMetric } from "@/components/shared/stat-card";
@@ -20,7 +20,7 @@ const GRID_CLASS = "grid grid-cols-1 gap-4 @2xl/main:grid-cols-2 @5xl/main:grid-
 /** Titles kept on the cards while /status has failed; the page shows one error banner. */
 const PLACEHOLDERS: readonly (Pick<StatCardProps, "icon" | "tone"> & { label: string })[] = [
   { icon: UsersIcon, label: "stats.accounts" },
-  { icon: RouteIcon, label: "stats.requests" },
+  { icon: Route01Icon, label: "stats.requests" },
   { icon: CircleCheckIcon, label: "stats.success" },
   { icon: CircleXIcon, label: "stats.failed", tone: "danger" },
 ];
@@ -102,7 +102,7 @@ function accountsCard(s: StatusResponse, t: TFunction, lang: Lang): StatCardProp
 function requestsCard(s: StatusResponse, t: TFunction, lang: Lang): StatCardProps {
   const total = s.totalRequests;
   return {
-    icon: RouteIcon,
+    icon: Route01Icon,
     label: t("stats.requests"),
     value: formatNumber(total, lang),
     caption: t("stats.sinceReset"),

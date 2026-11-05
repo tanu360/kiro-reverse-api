@@ -1,4 +1,10 @@
-import { ArrowDownIcon, ArrowUpIcon, SearchIcon } from "lucide-react";
+import {
+  ArrowDown02Icon,
+  ArrowUp02Icon,
+  ChevronDownIcon,
+  Search01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +17,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@/components/ui/menu";
-import { SelectButton } from "@/components/ui/select";
+import { selectTriggerIconClassName, selectTriggerVariants } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
@@ -61,11 +67,28 @@ function FilterTrigger({
   active?: boolean;
   after?: ReactNode;
 }): JSX.Element {
+  // Two segments in one field, split by its hairline: the muted label, then the value and the
+  // chevron. The segments are flex boxes, so the name is spelled out to read "Plan: All".
   return (
-    <MenuTrigger render={<SelectButton className="w-auto min-w-0 shrink-0" />}>
-      <span className="text-muted-foreground">{label}:</span>{" "}
-      <span className={cn(active && "text-info-foreground")}>{value}</span>
-      {after}
+    <MenuTrigger
+      aria-label={`${label}: ${value}`}
+      className={cn(
+        selectTriggerVariants(),
+        "w-auto min-w-0 shrink-0 justify-start gap-0 overflow-hidden px-0",
+      )}
+    >
+      <span className="flex items-center self-stretch border-field-border border-e px-2.5 text-muted-foreground">
+        {label}
+      </span>
+      <span className="flex min-w-0 items-center gap-1.5 ps-2.5 pe-2">
+        <span className={cn("truncate", active && "text-info-foreground")}>{value}</span>
+        {after}
+        <HugeiconsIcon
+          aria-hidden="true"
+          className={cn(selectTriggerIconClassName, "text-muted-foreground")}
+          icon={ChevronDownIcon}
+        />
+      </span>
     </MenuTrigger>
   );
 }
@@ -131,15 +154,16 @@ function SortSelect({
   onChange: (sort: AccountSort | undefined, desc: boolean) => void;
 }): JSX.Element {
   const { t } = useT("accounts");
-  const DirectionIcon = desc ? ArrowDownIcon : ArrowUpIcon;
+  const DirectionIcon = desc ? ArrowDown02Icon : ArrowUp02Icon;
   return (
     <Menu>
       <FilterTrigger
         after={
           sort ? (
-            <DirectionIcon
+            <HugeiconsIcon
+              icon={DirectionIcon}
               aria-hidden="true"
-              className="ms-1 inline size-3.5 align-[-0.125em] text-muted-foreground"
+              className="size-3.5 shrink-0 text-muted-foreground"
             />
           ) : null
         }
@@ -188,19 +212,52 @@ function SortSelect({
   );
 }
 
+/** "Rows: 25": the page size, as a filter-style select at the end of the filter row. */
+function PageSizeSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: number;
+  options: readonly number[];
+  onChange: (size: number) => void;
+}): JSX.Element {
+  const { t, lang } = useT();
+  return (
+    <Menu>
+      <FilterTrigger label={t("table.rowsShort")} value={formatNumber(value, lang)} />
+      {/* Only short numbers: as wide as its trigger, not the 11rem a menu starts at. */}
+      <MenuPopup align="end">
+        <MenuRadioGroup onValueChange={(next) => onChange(Number(next))} value={String(value)}>
+          {options.map((size) => (
+            <MenuRadioItem closeOnClick key={size} value={String(size)}>
+              {formatNumber(size, lang)}
+            </MenuRadioItem>
+          ))}
+        </MenuRadioGroup>
+      </MenuPopup>
+    </Menu>
+  );
+}
+
 type StatusTab = typeof ALL | StatusGroup;
 
-/** All, Active, Needs attention and Disabled, each with its count, over a hairline. */
+/**
+ * All, Active, Needs attention and Disabled, each with its count, over a hairline. `end` sits at
+ * the right of the same row, on the same hairline (outside the tablist).
+ */
 function StatusTabs({
   value,
   counts,
   total,
   onValueChange,
+  end,
 }: {
   value: StatusTab;
   counts: Record<StatusGroup, number>;
   total: number;
   onValueChange: (value: StatusTab) => void;
+  end?: ReactNode;
 }): JSX.Element {
   const { t, lang } = useT("accounts");
   const label: Record<StatusTab, string> = {
@@ -211,25 +268,37 @@ function StatusTabs({
   };
   const tabs: StatusTab[] = [ALL, ...STATUS_GROUPS];
   return (
-    <Tabs onValueChange={(next) => onValueChange(next as StatusTab)} value={value}>
-      {/* Phones scroll the tabs sideways; the hairline spans the full row either way. */}
-      <div className="-mb-px overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <TabsList aria-label={t("filter.status")} className="w-max min-w-full" variant="underline">
-          {tabs.map((tab) => (
-            <TabsTab key={tab} value={tab}>
-              {label[tab]}
-              <Badge
-                className="min-w-5 tabular-nums"
-                size="sm"
-                tone={tab === value ? "primary" : "neutral"}
-              >
-                {formatNumber(tab === ALL ? total : counts[tab], lang)}
-              </Badge>
-            </TabsTab>
-          ))}
-        </TabsList>
-      </div>
-    </Tabs>
+    // The tabs and `end` stretch to one height, so their two hairlines meet in one line.
+    <div className="-mb-px flex min-w-0 items-stretch">
+      <Tabs
+        className="min-w-0 flex-1"
+        onValueChange={(next) => onValueChange(next as StatusTab)}
+        value={value}
+      >
+        {/* Phones scroll the tabs sideways; the hairline spans the full row either way. */}
+        <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList
+            aria-label={t("filter.status")}
+            className="w-max min-w-full"
+            variant="underline"
+          >
+            {tabs.map((tab) => (
+              <TabsTab key={tab} value={tab}>
+                {label[tab]}
+                <Badge
+                  className="min-w-5 tabular-nums"
+                  size="sm"
+                  tone={tab === value ? "primary" : "neutral"}
+                >
+                  {formatNumber(tab === ALL ? total : counts[tab], lang)}
+                </Badge>
+              </TabsTab>
+            ))}
+          </TabsList>
+        </div>
+      </Tabs>
+      {end ? <div className="flex shrink-0 items-center border-b ps-2">{end}</div> : null}
+    </div>
   );
 }
 
@@ -250,6 +319,12 @@ export interface AccountsToolbarProps {
   desc: boolean;
   /** Mirrors a click on a column header; undefined goes back to the server order. */
   onSortChange: (sort: AccountSort | undefined, desc: boolean) => void;
+  /** The page size, picked at the end of the filter row (the pager below only pages). */
+  pageSize?: number;
+  pageSizeOptions?: readonly number[];
+  onPageSizeChange?: (size: number) => void;
+  /** List-wide actions (Export) at the right end of the status tab row. */
+  tabActions?: ReactNode;
 }
 
 /**
@@ -268,6 +343,10 @@ export function AccountsToolbar({
   sort,
   desc,
   onSortChange,
+  pageSize,
+  pageSizeOptions,
+  onPageSizeChange,
+  tabActions,
 }: AccountsToolbarProps): JSX.Element {
   const { t, lang } = useT("accounts");
   const { t: tc } = useT();
@@ -304,12 +383,20 @@ export function AccountsToolbar({
     Boolean(filters.q) || FILTER_DIMENSIONS.some((dimension) => filters[dimension] !== undefined);
   const showTabs = !loading && (accounts.length > 0 || filters.status !== undefined);
   const showSort = accounts.length > 1 || sort !== undefined;
+  // The page size closes the filter row, on its right.
+  const pageSizeControl =
+    pageSize !== undefined && pageSizeOptions?.length && onPageSizeChange ? (
+      <PageSizeSelect onChange={onPageSizeChange} options={pageSizeOptions} value={pageSize} />
+    ) : null;
 
   return (
-    <div className="flex min-w-0 flex-col gap-3" data-slot="accounts-toolbar">
+    // The gap under the tab hairline matches the padding under the filter row (the card's p-3 /
+    // sm:p-4), so the filter row sits centred between the hairline and the table.
+    <div className="flex min-w-0 flex-col gap-3 sm:gap-4" data-slot="accounts-toolbar">
       {showTabs ? (
         <StatusTabs
           counts={groupCounts}
+          end={tabActions}
           onValueChange={(next) =>
             onFiltersChange({ status: next === ALL ? undefined : (next as AccountStatusFilter) })
           }
@@ -319,9 +406,10 @@ export function AccountsToolbar({
       ) : null}
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <InputGroup className="w-full sm:w-64">
+        {/* The search gives way (down to 160 px) so the selects and the page size share one row. */}
+        <InputGroup className="w-full sm:w-auto sm:min-w-40 sm:max-w-64 sm:flex-1">
           <InputGroupAddon>
-            <SearchIcon aria-hidden="true" />
+            <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
           </InputGroupAddon>
           <InputGroupInput
             aria-label={t("filter.search")}
@@ -373,17 +461,21 @@ export function AccountsToolbar({
               </Button>
             ) : null}
 
-            {hasFilters ? (
-              <span
-                aria-live="polite"
-                className="ms-auto shrink-0 whitespace-nowrap ps-1 text-meta text-muted-foreground tabular-nums"
-              >
-                {t("filter.results", {
-                  shown: formatNumber(shown, lang),
-                  total: formatNumber(accounts.length, lang),
-                })}
-              </span>
-            ) : null}
+            {/* The result count and the page size share the row's end. */}
+            <div className="ms-auto flex shrink-0 items-center gap-2">
+              {hasFilters ? (
+                <span
+                  aria-live="polite"
+                  className="whitespace-nowrap ps-1 text-meta text-muted-foreground tabular-nums"
+                >
+                  {t("filter.results", {
+                    shown: formatNumber(shown, lang),
+                    total: formatNumber(accounts.length, lang),
+                  })}
+                </span>
+              ) : null}
+              {pageSizeControl}
+            </div>
           </div>
         )}
       </div>

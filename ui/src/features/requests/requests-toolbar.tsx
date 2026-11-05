@@ -1,4 +1,5 @@
-import { InfoIcon, SearchIcon, XIcon } from "lucide-react";
+import { InfoIcon, Search01Icon, XIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -73,7 +74,7 @@ export function RequestsToolbar({
       <div className="flex flex-col gap-2 @[38rem]/toolbar:grid @[38rem]/toolbar:grid-cols-[minmax(16rem,1fr)_auto_auto] @[38rem]/toolbar:items-center">
         <InputGroup>
           <InputGroupAddon>
-            <SearchIcon aria-hidden="true" />
+            <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
           </InputGroupAddon>
           <InputGroupInput
             aria-label={t("search")}
@@ -102,7 +103,7 @@ export function RequestsToolbar({
                 size="icon-xs"
                 variant="quiet"
               >
-                <XIcon aria-hidden="true" />
+                <HugeiconsIcon icon={XIcon} aria-hidden="true" />
               </Button>
             ) : null}
             {/* A popover, not a tooltip: a tap opens it on touch screens, hover still works. */}
@@ -111,7 +112,7 @@ export function RequestsToolbar({
                 openOnHover
                 render={<Button aria-label={t("searchHintLabel")} size="icon-xs" variant="quiet" />}
               >
-                <InfoIcon aria-hidden="true" />
+                <HugeiconsIcon icon={InfoIcon} aria-hidden="true" />
               </PopoverTrigger>
               <PopoverPopup className="max-w-xs" tooltipStyle>
                 {t("searchHint")}

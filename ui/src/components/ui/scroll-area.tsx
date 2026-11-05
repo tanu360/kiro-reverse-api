@@ -32,8 +32,7 @@ export function ScrollArea({
             "data-has-overflow-y:overscroll-y-contain data-has-overflow-x:overscroll-x-contain",
           scrollFade &&
             "mask-t-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-start)))] mask-b-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-end)))] mask-l-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-x-start)))] mask-r-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-x-end)))] [--fade-size:1.5rem]",
-          scrollbarGutter &&
-            "data-has-overflow-y:pe-2.5 data-has-overflow-x:pb-2.5",
+          scrollbarGutter && "data-has-overflow-x:pb-2.5",
         )}
         data-slot="scroll-area-viewport"
       >
@@ -45,7 +44,7 @@ export function ScrollArea({
           {children}
         </ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar orientation="vertical" />
+      {/* Kiro: no vertical bar, ever (see the scrollbar rules in index.css); only the sideways one. */}
       <ScrollBar orientation="horizontal" />
       <ScrollAreaPrimitive.Corner data-slot="scroll-area-corner" />
     </ScrollAreaPrimitive.Root>

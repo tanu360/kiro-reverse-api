@@ -15,11 +15,12 @@ export const Route = createFileRoute("/login")({
       throw redirect({ to, search: () => targetSearch });
     }
   },
-  loader: async ({ context }) => {
+  loaderDeps: ({ search }) => ({ redirect: search.redirect }),
+  loader: async ({ context, deps }) => {
     try {
       const { password } = await context.queryClient.fetchQuery(firstRunQuery());
       // A pending first run shows its generated password on /setup instead.
-      if (password) throw redirect({ to: "/setup" });
+      if (password) throw redirect({ to: "/setup", search: { redirect: deps.redirect } });
     } catch (error) {
       if (isRedirect(error)) throw error;
       // A network error still renders the sign-in page.

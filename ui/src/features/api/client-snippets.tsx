@@ -40,7 +40,7 @@ function CodeBlock({
       {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: the label is set only with role="region". */}
       <pre
         aria-label={scrolls ? t("snippets.codeRegion", { name: title }) : undefined}
-        className="max-w-full overflow-x-auto rounded-b-lg p-3 font-mono text-xs leading-relaxed outline-none focus-outline-inset"
+        className="scrollbar-x max-w-full overflow-x-auto rounded-b-lg p-3 font-mono text-xs leading-relaxed outline-none focus-outline-inset"
         ref={preRef}
         role={scrolls ? "region" : undefined}
         tabIndex={scrolls ? 0 : undefined}
@@ -82,7 +82,7 @@ export function ClientSnippetsCard(): JSX.Element {
       title={t("snippets.title")}
     >
       <Tabs className="min-w-0 gap-4" defaultValue="curl">
-        <div className="max-w-full overflow-x-auto">
+        <div className="scrollbar-x max-w-full overflow-x-auto">
           <TabsList>
             <TabsTab className={TAB_CLASS} value="curl">
               {t("snippets.curl")}

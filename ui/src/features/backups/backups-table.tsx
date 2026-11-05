@@ -1,15 +1,15 @@
 import {
   ArchiveIcon,
   CalendarClockIcon,
-  DownloadIcon,
+  Delete02Icon,
+  Download01Icon,
   EllipsisVerticalIcon,
   HandIcon,
   HistoryIcon,
-  type LucideIcon,
-  RotateCcwIcon,
   SaveIcon,
-  Trash2Icon,
-} from "lucide-react";
+  Undo02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
   type JSX,
   type ReactNode,
@@ -131,7 +131,7 @@ function TimeCell({ entry }: { entry: BackupEntry }): JSX.Element {
   );
 }
 
-const KIND_ICONS: Record<string, LucideIcon> = {
+const KIND_ICONS: Record<string, IconSvgElement> = {
   manual: HandIcon,
   scheduled: CalendarClockIcon,
   auto: SaveIcon,
@@ -188,20 +188,20 @@ function RowMenu({
           />
         }
       >
-        <EllipsisVerticalIcon aria-hidden="true" />
+        <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
       </MenuTrigger>
-      <MenuPopup align="end" className="min-w-44">
+      <MenuPopup align="end">
         <MenuItem disabled={busy} onClick={() => actions.onDownload(entry)}>
-          <DownloadIcon aria-hidden="true" />
+          <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
           {t("download")}
         </MenuItem>
         <MenuItem disabled={busy} onClick={() => actions.onRestore(entry)}>
-          <RotateCcwIcon aria-hidden="true" />
+          <HugeiconsIcon icon={Undo02Icon} aria-hidden="true" />
           {t("restore")}
         </MenuItem>
         <MenuSeparator />
         <MenuItem disabled={busy} onClick={() => actions.onDelete(entry)} variant="destructive">
-          <Trash2Icon aria-hidden="true" />
+          <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
           {t("delete")}
         </MenuItem>
       </MenuPopup>
@@ -221,7 +221,7 @@ function RowIconButton({
 }: {
   label: string;
   hint?: string;
-  icon: typeof DownloadIcon;
+  icon: typeof Download01Icon;
   busy: boolean;
   destructive?: boolean;
   focusId?: string;
@@ -248,7 +248,7 @@ function RowIconButton({
           />
         }
       >
-        <Icon aria-hidden="true" />
+        <HugeiconsIcon icon={Icon} aria-hidden="true" />
       </TooltipTrigger>
       <TooltipPopup className="max-w-64">
         {hint ? (
@@ -279,20 +279,20 @@ function RowActions({
         busy={busy}
         focusId={entry.id}
         hint={t("downloadHint")}
-        icon={DownloadIcon}
+        icon={Download01Icon}
         label={t("download")}
         onClick={() => actions.onDownload(entry)}
       />
       <RowIconButton
         busy={busy}
-        icon={RotateCcwIcon}
+        icon={Undo02Icon}
         label={t("restore")}
         onClick={() => actions.onRestore(entry)}
       />
       <RowIconButton
         busy={busy}
         destructive
-        icon={Trash2Icon}
+        icon={Delete02Icon}
         label={t("delete")}
         onClick={() => actions.onDelete(entry)}
       />

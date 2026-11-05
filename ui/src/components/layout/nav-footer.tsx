@@ -1,5 +1,6 @@
-import { ExternalLinkIcon, InfoIcon } from "lucide-react";
+import { ExternalLinkIcon, InfoIcon } from "@hugeicons/core-free-icons";
 import type { JSX } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { useT } from "@/lib/i18n";
 import { UpdateDot, useUpdateCheck } from "./update-check";
@@ -41,7 +42,7 @@ export function NavFooter(): JSX.Element {
             target="_blank"
           >
             {t("shell.github")}
-            <ExternalLinkIcon aria-hidden="true" className="size-3" />
+            <AnimatedIcon icon={ExternalLinkIcon} aria-hidden="true" className="size-3" />
           </a>
         </div>
         <FooterCopyright line={copyright} />
@@ -61,7 +62,7 @@ export function NavFooter(): JSX.Element {
               .filter(Boolean)
               .join(" · ")}
           >
-            <InfoIcon aria-hidden="true" />
+            <AnimatedIcon icon={InfoIcon} aria-hidden="true" />
             <span>{t("shell.about")}</span>
             {latest ? <UpdateDot className="top-1 right-1 outline-sidebar" /> : null}
           </SidebarMenuButton>
@@ -69,7 +70,7 @@ export function NavFooter(): JSX.Element {
       </SidebarMenu>
       <SidebarMenu>
         <SidebarMenuItem>
-          <UserMenu variant="sidebar" />
+          <UserMenu />
         </SidebarMenuItem>
       </SidebarMenu>
     </>

@@ -1,3 +1,5 @@
+import { LoaderCircleIcon, LockPasswordIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useId, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Label } from "@/components/ui/label";
@@ -10,6 +12,8 @@ import { SECTION_ID } from "./sections";
 import {
   FieldErrorText,
   PasswordInput,
+  ROW_DESCRIPTION,
+  SettingsRow,
   SettingsSection,
   SubmitButton,
   toastSaveFailed,
@@ -68,13 +72,19 @@ export function AdminPasswordCard(): JSX.Element {
     setBusy(false);
   };
 
-  const describedBy = error ? `${inputId}-error` : undefined;
+  const describedBy = error ? `${inputId}-hint ${inputId}-error` : `${inputId}-hint`;
 
   return (
     <SettingsSection
       footer={
         <div className="flex w-full justify-end">
-          <SubmitButton blocked={busy} busy={busy}>
+          {/* Quiet until a password is typed, like Save; it stays clickable to say one is missing. */}
+          <SubmitButton blocked={busy} busy={busy} primary={password !== "" || busy}>
+            <HugeiconsIcon
+              aria-hidden="true"
+              className={busy ? "animate-spin" : undefined}
+              icon={busy ? LoaderCircleIcon : LockPasswordIcon}
+            />
             {busy ? t("changingPassword") : t("changePassword")}
           </SubmitButton>
         </div>
@@ -82,27 +92,34 @@ export function AdminPasswordCard(): JSX.Element {
       hint={t("adminPasswordHint")}
       id={SECTION_ID.adminPassword}
       onSubmit={() => void onSubmit()}
+      rows
       title={t("adminPassword")}
     >
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={inputId}>{t("newPassword")}</Label>
+      {/* A settings row: the name on the left, the field at the end. */}
+      <SettingsRow className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+        <div className="flex min-w-0 flex-1 basis-40 flex-col gap-1">
+          <Label htmlFor={inputId}>{t("newPassword")}</Label>
+          <p className={ROW_DESCRIPTION} id={`${inputId}-hint`}>
+            {t("newPasswordHint")}
+          </p>
+        </div>
         {/* Lets password managers file the new password under the admin account. */}
         <input autoComplete="username" hidden name="username" readOnly value="admin" />
-        <PasswordInput
-          autoComplete="new-password"
-          className="sm:max-w-sm"
-          describedBy={describedBy}
-          id={inputId}
-          invalid={error !== null}
-          onChange={(value) => {
-            setPassword(value);
-            setError(null);
-          }}
-          placeholder={t("newPasswordPlaceholder")}
-          value={password}
-        />
-        {error ? <FieldErrorText id={`${inputId}-error`}>{error}</FieldErrorText> : null}
-      </div>
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-64">
+          <PasswordInput
+            autoComplete="new-password"
+            describedBy={describedBy}
+            id={inputId}
+            invalid={error !== null}
+            onChange={(value) => {
+              setPassword(value);
+              setError(null);
+            }}
+            value={password}
+          />
+          {error ? <FieldErrorText id={`${inputId}-error`}>{error}</FieldErrorText> : null}
+        </div>
+      </SettingsRow>
     </SettingsSection>
   );
 }

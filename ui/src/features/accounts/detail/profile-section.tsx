@@ -1,5 +1,6 @@
+import { CircleCheckIcon, ScanSearchIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
-import { CircleCheckIcon, ScanSearchIcon } from "lucide-react";
 import { type JSX, useState } from "react";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
 import { Badge } from "@/components/ui/badge";
@@ -73,7 +74,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
           size="sm"
           variant="outline"
         >
-          <ScanSearchIcon aria-hidden="true" />
+          <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
           {t("detail.profileLoad")}
         </Button>
       }

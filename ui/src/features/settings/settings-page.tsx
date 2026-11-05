@@ -1,6 +1,12 @@
+import {
+  CircleCheckIcon,
+  CircleSlashIcon,
+  ComputerIcon,
+  Globe02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
-import { NetworkIcon } from "lucide-react";
 import {
   type JSX,
   type MouseEvent,
@@ -15,7 +21,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { settingsQuery } from "@/lib/api/settings";
+import { endpointQuery, proxyQuery, settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsaved";
@@ -27,7 +33,7 @@ import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
 import { RoutingCard } from "./sections/routing-card";
-import { SETTINGS_SECTIONS } from "./sections/sections";
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "./sections/sections";
 import { StreamIntegrityCard } from "./sections/stream-integrity-card";
 import { ThinkingCard } from "./sections/thinking-card";
 import { ToolHistoryCard } from "./sections/tool-history-card";
@@ -45,15 +51,36 @@ function isShown(element: HTMLElement): boolean {
   return !element.hidden;
 }
 
-/** Read-only: no endpoint can change the listen address. */
+/** Loopback addresses: only this machine can connect. */
+function isLoopback(host: string): boolean {
+  return host === "localhost" || host === "::1" || /^127\./.test(host);
+}
+
+/**
+ * The listen address, read-only (LISTEN_HOST sets it). Green when only this machine can
+ * connect; amber when every interface is open, so other machines can reach the admin panel.
+ */
 function ListeningOn(): JSX.Element | null {
   const { t } = useT("settings");
   const { data } = useQuery(settingsQuery());
   if (!data?.port) return null;
-  const host = data.host?.includes(":") ? `[${data.host}]` : data.host || "0.0.0.0";
+  const raw = data.host || "127.0.0.1";
+  const local = isLoopback(raw);
+  const host = raw.includes(":") ? `[${raw}]` : raw;
   return (
-    <Badge className="font-mono font-normal" icon={NetworkIcon} iconStyle="line" variant="outline">
-      {t("listeningOn", { address: `${host}:${data.port}` })}
+    <Badge
+      icon={local ? ComputerIcon : Globe02Icon}
+      iconStyle="line"
+      tone={local ? "success" : "warning"}
+      variant="soft-outline"
+    >
+      {local ? t("listenLocal") : t("listenOpen")}
+      <span aria-hidden="true" className="opacity-40">
+        ·
+      </span>
+      <span className="font-mono font-normal" translate="no">
+        {host}:{data.port}
+      </span>
     </Badge>
   );
 }
@@ -147,8 +174,22 @@ function useActiveSection(): [SectionId, (id: SectionId) => void] {
 function SectionNav(): JSX.Element {
   const { t } = useT("settings");
   const unsaved = useUnsavedChanges();
+  const settings = useQuery(settingsQuery()).data;
+  const endpoint = useQuery(endpointQuery()).data;
+  const proxy = useQuery(proxyQuery()).data;
+  // A section that is one switch shows its saved state as a pill in its nav row, so the page
+  // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
+  const switchState: Partial<Record<SectionId, boolean | undefined>> = {
+    "settings-usage": settings?.allowOverUsage,
+    "settings-stream-integrity": settings?.lenientStreamIntegrity,
+    "settings-routing": settings?.sessionAffinity,
+    "settings-auto-continue": settings?.autoContinue,
+    "settings-tool-history": settings?.structuredToolHistory,
+    "settings-endpoint": endpoint?.endpointFallback,
+    "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,
+  };
   const [active, pin] = useActiveSection();
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // In the chip row, scroll the active chip into view without scrolling the page.
   useLayoutEffect(() => {
@@ -172,41 +213,90 @@ function SectionNav(): JSX.Element {
   };
 
   return (
-    <nav aria-label={t("sections")} className="min-w-0 lg:sticky lg:top-16 lg:self-start">
-      <ul
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:-mx-6 md:px-6 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:p-0"
+    <nav aria-label={t("sections")} className="min-w-0 lg:sticky lg:top-20 lg:self-start">
+      {/* Below lg one scrolling chip row; from lg a column of labelled groups, as the app sidebar. */}
+      <div
+        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:-mx-6 md:px-6 lg:mx-0 lg:flex-col lg:gap-6 lg:overflow-visible lg:p-0"
         ref={listRef}
       >
-        {SETTINGS_SECTIONS.map((section) => {
-          const current = section.id === active;
-          const dirty = unsaved?.dirty.has(section.id) ?? false;
+        {SETTINGS_GROUPS.map((group) => {
+          const labelId = `settings-nav-${group}`;
           return (
-            <li className="shrink-0" key={section.id}>
-              <a
-                aria-current={current ? "true" : undefined}
-                className={cn(
-                  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border bg-background px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline lg:min-h-8 lg:w-full lg:rounded-md lg:border-transparent lg:bg-transparent lg:px-2 lg:pointer-coarse:min-h-10",
-                  current &&
-                    "border-foreground/24 bg-accent text-foreground lg:border-transparent lg:bg-accent",
-                )}
-                href={`#${section.id}`}
-                onClick={(event) => onClick(event, section.id)}
+            <div className="flex shrink-0 lg:flex-col" key={group}>
+              <p
+                className="hidden h-7 items-center px-2.5 pb-1 font-medium text-muted-foreground text-xs lg:flex"
+                id={labelId}
               >
-                {t(section.titleKey)}
-                {dirty ? (
-                  <>
-                    <span
-                      aria-hidden="true"
-                      className="size-1.5 shrink-0 rounded-full bg-warning"
-                    />
-                    <span className="sr-only">{t("unsavedMark")}</span>
-                  </>
-                ) : null}
-              </a>
-            </li>
+                {t(`groups.${group}`)}
+              </p>
+              <ul aria-labelledby={labelId} className="flex gap-2 lg:flex-col lg:gap-1">
+                {SETTINGS_SECTIONS.filter((section) => section.group === group).map((section) => {
+                  const current = section.id === active;
+                  const dirty = unsaved?.dirty.has(section.id) ?? false;
+                  const on = switchState[section.id];
+                  const danger = "tone" in section && section.tone === "danger";
+                  return (
+                    <li className="shrink-0" key={section.id}>
+                      <a
+                        aria-current={current ? "true" : undefined}
+                        className={cn(
+                          "group/nav inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border bg-background px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline lg:min-h-9 lg:w-full lg:rounded-[var(--control-radius)] lg:border-transparent lg:bg-transparent lg:px-2.5 lg:pointer-coarse:min-h-10",
+                          current &&
+                            "border-foreground/20 bg-sidebar-row-selected text-foreground hover:bg-sidebar-row-selected hover:text-foreground active:bg-sidebar-row-selected lg:hover:bg-sidebar-row-selected lg:border-transparent lg:bg-sidebar-row-selected",
+                          // Danger: red text (a light red tint when current), and a solid bright
+                          // red row (red-600, as the destructive buttons) with white text on hover,
+                          // press or keyboard focus, whatever the theme.
+                          danger &&
+                            "text-destructive-foreground hover:border-red-600 hover:bg-red-600 hover:text-white active:border-red-600 active:bg-red-600 active:text-white focus-visible:border-red-600 focus-visible:bg-red-600 focus-visible:text-white lg:hover:bg-red-600 lg:active:bg-red-600 lg:focus-visible:bg-red-600",
+                          danger &&
+                            current &&
+                            "border-destructive/32 bg-(--pill-error-bg) text-destructive-foreground lg:bg-(--pill-error-bg)",
+                        )}
+                        href={`#${section.id}`}
+                        onClick={(event) => onClick(event, section.id)}
+                      >
+                        <HugeiconsIcon
+                          aria-hidden="true"
+                          className={cn(
+                            "size-4 shrink-0 text-muted-foreground transition-colors group-hover/nav:text-foreground",
+                            current && "text-foreground",
+                            danger &&
+                              "text-current group-hover/nav:text-white group-active/nav:text-white group-focus-visible/nav:text-white",
+                          )}
+                          icon={section.icon}
+                        />
+                        <span className="min-w-0 flex-1 truncate">{t(section.titleKey)}</span>
+                        {dirty ? (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="size-1.5 shrink-0 rounded-full bg-warning"
+                            />
+                            <span className="sr-only">{t("unsavedMark")}</span>
+                          </>
+                        ) : null}
+                        {on === undefined ? null : (
+                          // Visual only: the link keeps the section name, and the card's switch
+                          // announces the state.
+                          <Badge
+                            aria-hidden="true"
+                            className="shrink-0"
+                            icon={on ? CircleCheckIcon : CircleSlashIcon}
+                            size="sm"
+                            tone={on ? "success" : "neutral"}
+                          >
+                            {on ? t("stateOn") : t("stateOff")}
+                          </Badge>
+                        )}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           );
         })}
-      </ul>
+      </div>
     </nav>
   );
 }
@@ -241,10 +331,9 @@ function SettingsContent(): JSX.Element {
   return (
     <div className="flex min-w-0 flex-col gap-4 md:gap-6">
       <PageHeader meta={<ListeningOn />} title={t("title")} />
-      <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-[11rem_minmax(0,48rem)] lg:gap-8">
+      <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
         <SectionNav />
-        {/* t3code's settings page: 32 px between sections (24 px on phones). */}
-        <div className="flex min-w-0 flex-col gap-6 md:gap-8">
+        <div className="flex min-w-0 max-w-4xl flex-col gap-5">
           <GeneralSettingsError />
           <UsageCard />
           <StreamIntegrityCard />

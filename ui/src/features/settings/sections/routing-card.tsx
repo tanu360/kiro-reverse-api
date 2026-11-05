@@ -26,7 +26,6 @@ function RoutingForm({ settings }: { settings: Settings }): JSX.Element {
 
   return (
     <SettingsSection
-      defaultOn
       footer={
         <SaveFooter
           dirty={draft.dirty}

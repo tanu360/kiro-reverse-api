@@ -1,6 +1,7 @@
+import { CircleXIcon, Clock01Icon, LogInIcon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
-import { CircleXIcon, ClockIcon, LogInIcon } from "lucide-react";
 import { type FormEvent, type JSX, useEffect, useState } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,7 +17,7 @@ import { retrySeconds, useRetryCountdown } from "./rate-limit";
 
 /**
  * The sign-in form shared by /login and /setup. It never reads the URL: /login passes the
- * validated `redirect`, /setup passes nothing (Overview). The password lives only in this
+ * validated `redirect`, and /setup carries that same destination. The password lives only in this
  * component's state; signIn stores the token, never the password.
  */
 export function SignInForm({
@@ -33,7 +34,9 @@ export function SignInForm({
   const { t } = useT("auth");
   const navigate = useNavigate();
   const [password, setPassword] = useState(defaultPassword ?? "");
-  const [remember, setRemember] = useState(getRememberPreference);
+  const [remember, setRemember] = useState(
+    () => import.meta.env.VITE_MOCK === "1" || getRememberPreference(),
+  );
   const [pending, setPending] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -100,20 +103,24 @@ export function SignInForm({
         {locked ? (
           // No role: the live region round it announces the countdown politely.
           <Alert role="none" variant="warning">
-            <ClockIcon aria-hidden="true" />
+            <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
             <AlertDescription>{t("rateLimited", { seconds: retry.seconds })}</AlertDescription>
           </Alert>
         ) : null}
       </div>
       {formError ? (
         <Alert variant="error">
-          <CircleXIcon aria-hidden="true" />
+          <AnimatedIcon icon={CircleXIcon} aria-hidden="true" playOnMount />
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
       ) : null}
       {/* The primary button (components/ui/button.tsx lg): the field's height, full width. */}
       <Button className="w-full" disabled={pending || locked} size="lg" type="submit">
-        {pending ? <Spinner aria-hidden="true" /> : <LogInIcon aria-hidden="true" />}
+        {pending ? (
+          <Spinner aria-hidden="true" />
+        ) : (
+          <AnimatedIcon icon={LogInIcon} aria-hidden="true" />
+        )}
         {pending ? t("signingIn") : t("submit")}
       </Button>
       {/*

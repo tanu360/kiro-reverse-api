@@ -1,5 +1,8 @@
+import { AiMagicIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId } from "react";
+import { type JSX, type ReactNode, useId } from "react";
+import { AmazonQLogo, AwsLogo, KiroLogo } from "@/components/shared/brand-logos";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -15,9 +18,10 @@ import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { SECTION_ID } from "./sections";
 import {
-  DefaultTag,
+  ROW_DESCRIPTION,
   SaveFooter,
   SectionQuery,
+  SettingsRow,
   SettingsSection,
   SwitchField,
   useSectionSave,
@@ -28,6 +32,18 @@ const ENDPOINT_LABEL_KEYS: Record<PreferredEndpoint, string> = {
   kiro: "endpointKiro",
   codewhisperer: "endpointCodeWhisperer",
   amazonq: "endpointAmazonQ",
+};
+
+/**
+ * Each endpoint's mark, in the menu rows and the trigger. Automatic has no brand, so it takes a
+ * muted icon. The AWS wordmark is pinned to the text colour (`text-foreground`): the rows and
+ * the trigger otherwise mute an svg, and a picked row turns its text purple.
+ */
+const ENDPOINT_ICONS: Record<PreferredEndpoint, ReactNode> = {
+  auto: <HugeiconsIcon aria-hidden="true" icon={AiMagicIcon} />,
+  kiro: <KiroLogo className="rounded-[3px]" />,
+  codewhisperer: <AwsLogo className="text-foreground" />,
+  amazonq: <AmazonQLogo />,
 };
 
 export function EndpointCard(): JSX.Element {
@@ -75,49 +91,60 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
       hint={t("endpointSettingsHint")}
       id={SECTION_ID.endpoint}
       onSubmit={() => save(draft.value)}
+      rows
       title={t("endpointSettings")}
     >
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
+      {/* A settings row like a switch's: name and hint on the left, the select at the end. */}
+      <SettingsRow className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
           <Label id={`${selectId}-label`}>{t("preferredEndpoint")}</Label>
-          <Select
-            items={items}
-            onValueChange={(value) => {
-              if (value) {
-                draft.set((prev) => ({ ...prev, preferredEndpoint: value as PreferredEndpoint }));
-              }
-            }}
-            value={draft.value.preferredEndpoint}
-          >
-            <SelectTrigger
-              aria-describedby={`${selectId}-hint`}
-              aria-labelledby={`${selectId}-label`}
-              className="w-full sm:max-w-xs"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup>
-              {items.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-          <p className="text-muted-foreground text-xs" id={`${selectId}-hint`}>
+          <p className={ROW_DESCRIPTION} id={`${selectId}-hint`}>
             {t("endpointHint")}
           </p>
         </div>
+        <Select
+          items={items}
+          onValueChange={(value) => {
+            if (value) {
+              draft.set((prev) => ({ ...prev, preferredEndpoint: value as PreferredEndpoint }));
+            }
+          }}
+          value={draft.value.preferredEndpoint}
+        >
+          <SelectTrigger
+            aria-describedby={`${selectId}-hint`}
+            aria-labelledby={`${selectId}-label`}
+            className="w-full sm:w-64"
+          >
+            <SelectValue className="flex min-w-0 items-center gap-2">
+              {(value: PreferredEndpoint) => (
+                <>
+                  {ENDPOINT_ICONS[value]}
+                  <span className="truncate">{t(ENDPOINT_LABEL_KEYS[value])}</span>
+                </>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectPopup>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {ENDPOINT_ICONS[item.value]}
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      </SettingsRow>
+      <SettingsRow>
         <SwitchField
           checked={draft.value.endpointFallback}
-          extra={<DefaultTag on />}
           hint={t("endpointFallbackHint")}
           label={t("endpointFallback")}
           onCheckedChange={(endpointFallback) =>
             draft.set((prev) => ({ ...prev, endpointFallback }))
           }
         />
-      </div>
+      </SettingsRow>
     </SettingsSection>
   );
 }

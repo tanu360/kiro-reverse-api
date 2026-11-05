@@ -1,4 +1,5 @@
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useId } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,7 +96,7 @@ export function DataTablePagination({
                   size="sm"
                   variant="ghost"
                 >
-                  <ChevronLeftIcon aria-hidden="true" />
+                  <HugeiconsIcon icon={ChevronLeftIcon} aria-hidden="true" />
                   <span className="max-sm:sr-only">{t("table.previous")}</span>
                 </Button>
               </PaginationItem>
@@ -128,7 +129,7 @@ export function DataTablePagination({
                   variant="ghost"
                 >
                   <span className="max-sm:sr-only">{t("table.next")}</span>
-                  <ChevronRightIcon aria-hidden="true" />
+                  <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" />
                 </Button>
               </PaginationItem>
             </PaginationContent>
@@ -141,7 +142,7 @@ export function DataTablePagination({
               size="sm"
               variant="outline"
             >
-              <ChevronLeftIcon aria-hidden="true" />
+              <HugeiconsIcon icon={ChevronLeftIcon} aria-hidden="true" />
               {t("table.previous")}
             </Button>
             <Button
@@ -151,7 +152,7 @@ export function DataTablePagination({
               variant="outline"
             >
               {t("table.next")}
-              <ChevronRightIcon aria-hidden="true" />
+              <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" />
             </Button>
           </>
         )}

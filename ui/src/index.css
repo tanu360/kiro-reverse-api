@@ -29,13 +29,14 @@
   --glass-opacity: 80%;
   --glass-saturation: 1.14;
   --background: var(--color-zinc-25);
+  --surface-solid: #fcfcfc;
   /* t3code paints html and body with the chrome background, which is the canvas. */
   --app-chrome-background: var(--background);
   --surface-raised: color-mix(in srgb, var(--card) 20%, transparent);
   --foreground: var(--color-zinc-900);
-  --card: var(--color-white);
+  --card: var(--surface-solid);
   --card-foreground: var(--color-zinc-900);
-  --popover: var(--color-white);
+  --popover: var(--surface-solid);
   --popover-foreground: var(--color-zinc-900);
   /* Kiro purple-500 (#9046ff, kiro.dev --cta-primary): white text on it is 4.6:1. */
   --primary: #9046ff;
@@ -69,9 +70,9 @@
   --sidebar-foreground: var(--foreground);
   --sidebar-muted-foreground: var(--muted-foreground);
   --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: var(--color-zinc-25);
-  --sidebar-row-active: var(--color-white);
-  --sidebar-row-selected: var(--color-white);
+  --sidebar-row-hover: color-mix(in srgb, var(--sidebar), var(--foreground) 3%);
+  --sidebar-row-active: color-mix(in srgb, var(--sidebar), var(--foreground) 8%);
+  --sidebar-row-selected: color-mix(in srgb, var(--sidebar), var(--foreground) 5.5%);
   --sidebar-stage-fade: var(--sidebar);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
@@ -81,14 +82,8 @@
   --sidebar-ring: var(--ring);
   --code-background: color-mix(in srgb, var(--card) 90%, var(--background));
   --code-foreground: var(--foreground);
-  /*
-   * Off switch: t3code's zinc-300 track (the input token) and light thumb, plus a zinc-500 edge
-   * that t3code lacks: it keeps the control boundary at the 3:1 non-text contrast of WCAG 1.4.11
-   * on the zinc-25 page (about 4.7:1), which the bare track (1.4:1) misses.
-   */
-  --switch-track: var(--input);
-  --switch-border: var(--color-zinc-500);
-  --switch-thumb: var(--background);
+  --switch-track: var(--color-zinc-500);
+  --switch-thumb: var(--color-white);
 }
 
 .dark {
@@ -96,12 +91,12 @@
   --app-scrollbar-thumb: rgb(255 255 255 / 8%);
   --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
   --background: #000;
+  --surface-solid: #0c0c0c;
   --foreground: var(--color-neutral-100);
-  --card: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
+  --card: var(--surface-solid);
   --card-foreground: var(--color-neutral-100);
-  /* Raised surfaces keep the tone they had over neutral-950, so cards and popovers still lift. */
-  --surface-raised: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
-  --popover: color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white));
+  --surface-raised: var(--surface-solid);
+  --popover: var(--surface-solid);
   --popover-foreground: var(--color-neutral-100);
   --primary: #9046ff;
   --secondary: --alpha(var(--color-white) / 3%);
@@ -122,28 +117,19 @@
   --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
   --sidebar: var(--card);
   --sidebar-control-surface: var(--muted);
-  --sidebar-row-hover: var(--accent);
-  --sidebar-row-active: var(--accent);
-  --sidebar-row-selected: var(--muted);
+  --sidebar-row-hover: color-mix(in srgb, var(--sidebar), var(--foreground) 4%);
+  --sidebar-row-active: color-mix(in srgb, var(--sidebar), var(--foreground) 10%);
+  --sidebar-row-selected: color-mix(in srgb, var(--sidebar), var(--foreground) 7%);
   --sidebar-stage-fade: var(--card);
-  /*
-   * t3code's off switch: the input track with a neutral-400 thumb, which alone stands 8:1 off the
-   * black page, so the dark theme needs no extra edge.
-   */
-  --switch-track: var(--input);
-  --switch-border: transparent;
-  --switch-thumb: var(--muted-foreground);
+  --switch-track: var(--color-neutral-500);
+  --switch-thumb: var(--color-white);
 }
 
-/*
- * t3code's sidebar-scoped palette (index.css `[data-app-sidebar]`): zinc-50 navigation, zinc-25
- * hover and white selected rows in light; true black with foreground-tinted rows in dark. The
- * attribute sits on the desktop sidebar container and on the mobile sheet popup.
- */
+/* Keep navigation states consistent in the desktop sidebar and mobile sheet. */
 [data-app-sidebar] {
   --background: var(--color-zinc-25);
   --foreground: var(--color-zinc-900);
-  --card: var(--color-white);
+  --card: var(--surface-solid);
   --card-foreground: var(--color-zinc-900);
   --accent: var(--color-zinc-100);
   --accent-foreground: var(--color-zinc-900);
@@ -155,9 +141,9 @@
   --sidebar-foreground: var(--color-zinc-900);
   --sidebar-muted-foreground: var(--color-zinc-500);
   --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: var(--color-zinc-25);
-  --sidebar-row-active: var(--color-white);
-  --sidebar-row-selected: var(--color-white);
+  --sidebar-row-hover: color-mix(in srgb, var(--sidebar), var(--foreground) 3%);
+  --sidebar-row-active: color-mix(in srgb, var(--sidebar), var(--foreground) 8%);
+  --sidebar-row-selected: color-mix(in srgb, var(--sidebar), var(--foreground) 5.5%);
   --sidebar-border: var(--color-zinc-200);
   --sidebar-stage-fade: var(--sidebar);
 
@@ -176,9 +162,9 @@
     --sidebar-foreground: var(--foreground);
     --sidebar-muted-foreground: var(--muted-foreground);
     --sidebar-control-surface: var(--muted);
-    --sidebar-row-hover: color-mix(in srgb, var(--contrast-foreground) 8%, transparent);
-    --sidebar-row-active: color-mix(in srgb, var(--contrast-foreground) 11%, transparent);
-    --sidebar-row-selected: color-mix(in srgb, var(--contrast-foreground) 7%, transparent);
+    --sidebar-row-hover: color-mix(in srgb, var(--sidebar), var(--foreground) 4%);
+    --sidebar-row-active: color-mix(in srgb, var(--sidebar), var(--foreground) 10%);
+    --sidebar-row-selected: color-mix(in srgb, var(--sidebar), var(--foreground) 7%);
     --sidebar-border: var(--border);
     --sidebar-stage-fade: var(--card);
     /* Row metadata sits a step below read titles (75% white). */
@@ -195,6 +181,65 @@
   --contrast-foreground: var(--foreground);
   --contrast-muted-foreground: var(--muted-foreground);
   --contrast-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+}
+
+/*
+ * The sidebar's stage artwork (sidebar-stage.tsx): neutral stars on the sidebar's own colour,
+ * grey on the light sidebar and white on the dark one.
+ */
+:root {
+  --stage-star: var(--color-zinc-400);
+  --stage-sparkle: var(--color-zinc-500);
+}
+
+.dark {
+  --stage-star: var(--color-white);
+  --stage-sparkle: var(--color-white);
+}
+
+/* The stars thin out from just under the header row and are gone by the first row. */
+.sidebar-stage-backdrop {
+  -webkit-mask-image: linear-gradient(#000 0% 40%, #0000 80%);
+  mask-image: linear-gradient(#000 0% 40%, #0000 80%);
+}
+
+/* Twinkle: a star dims and comes back; four-point stars also shrink a little. */
+.sidebar-stage-twinkle {
+  animation: sidebar-stage-twinkle 4s ease-in-out infinite;
+}
+
+.sidebar-stage-sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: sidebar-stage-sparkle;
+}
+
+@keyframes sidebar-stage-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@keyframes sidebar-stage-sparkle {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-stage-twinkle {
+    animation: none;
+  }
 }
 
 @theme {
@@ -257,20 +302,17 @@
 
 /*
  * Every dropdown (select, menu, combobox, autocomplete, popover) is one popup: the sign-in
- * language picker's solid raised sheet, not glass. White on the zinc-25 page with a zinc-200
- * hairline in light; in dark a clear step lighter than the black page (neutral-900 and a little
- * more) with a white hairline. One soft drop only, lighter than the floating shadow. Rows inside
+ * language picker's solid raised sheet, not glass. Off-white on the zinc-25 page with a zinc-200
+ * hairline in light; near-black on the black page with a white hairline in dark. No shadow. Rows inside
  * use the accent tone for their highlight (components/ui/popup-row.tsx).
  */
 :root {
-  --popup: var(--color-white);
+  --popup: var(--surface-solid);
   --popup-border: var(--color-zinc-200);
-  --popup-shadow: 0 6px 16px -10px rgb(0 0 0 / 14%);
+  --popup-shadow: none;
 }
 .dark {
-  --popup: #1b1b1c;
   --popup-border: rgb(255 255 255 / 10%);
-  --popup-shadow: 0 8px 20px -12px rgb(0 0 0 / 70%);
 }
 
 @utility popup-surface {
@@ -280,8 +322,32 @@
 }
 
 /*
- * Form fields (input, textarea, select trigger, number field, input group) and the outline
- * button: the sign-in password field's soft fill. A faint foreground tint with a hairline border
+ * Dropdown width, the one rule for menus, selects and comboboxes: a popup opened from a field or
+ * a text button is as wide as that trigger (Base UI's --anchor-width). It grows past it only when
+ * its items need the room (a label beside a count and a check mark), up to 14rem; a longer label
+ * truncates and slides when highlighted. A popup from an icon button (under 4rem wide) is at
+ * least 11rem. The `* 1000` term turns that floor on in CSS alone: far above 11rem when the
+ * trigger is under 4rem, zero or below otherwise. Never wider than the viewport less 1rem a side.
+ */
+@utility popup-width {
+  --popup-anchor: var(--anchor-width, 0px);
+  --popup-icon-floor: min(11rem, calc((4rem - var(--popup-anchor)) * 1000));
+  min-width: min(max(var(--popup-anchor), var(--popup-icon-floor)), calc(100vw - 2rem));
+  max-width: min(max(var(--popup-anchor), 14rem), calc(100vw - 2rem));
+}
+
+/*
+ * A select's list: exactly as wide as its field, never wider. A select trigger is always a
+ * field showing the chosen option, so the options fit it; a longer one truncates and slides
+ * when highlighted.
+ */
+@utility popup-width-field {
+  width: min(var(--anchor-width, 11rem), calc(100vw - 2rem));
+}
+
+/*
+ * Form fields (input, textarea, select trigger, number field, input group): the sign-in
+ * password field's soft fill. A faint foreground tint with a hairline border
  * barely darker than it; hover deepens the tint a step, focus turns the border a soft purple and
  * lightens the fill. No focus ring. Checkboxes and radios take the same fill with a firmer edge
  * (--field-border-strong), so the box still reads at 16 px.
@@ -304,15 +370,39 @@
 }
 
 /*
+ * The neutral button (components/ui/button.tsx `outline`): the field's see-through tint a step
+ * deeper, so it takes the colour of the card, dialog or page under it with a slight lift, and a
+ * step deeper again on hover or press.
+ */
+:root {
+  --neutral-button: color-mix(in oklab, var(--foreground) 4.5%, transparent);
+  --neutral-button-hover: color-mix(in oklab, var(--foreground) 7.5%, transparent);
+  --neutral-button-border: color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.dark {
+  --neutral-button: color-mix(in oklab, var(--color-white) 6%, transparent);
+  --neutral-button-hover: color-mix(in oklab, var(--color-white) 9%, transparent);
+  --neutral-button-border: color-mix(in oklab, var(--color-white) 9%, transparent);
+}
+
+/*
  * Inset panels (t3code's SettingsGroup fill): the card at 40 % over the page, for a list panel,
- * a sticky table cell or a backdrop on a chart. Rows tint a surface with the foreground at 2 %
- * on hover and 4 % when selected; the opaque -hover / -selected steps are for sticky cells and
- * card rows, which must hide what scrolls under them.
+ * a sticky table cell or a backdrop on a chart. Table rows (components/ui/table.tsx) lay a see-
+ * through tint over that panel: the foreground at 3 % on hover, Kiro purple at 9 % when
+ * selected (12 % hovered), and the header row a 2.5 % foreground band. The opaque
+ * --surface-inset-* steps are the same tints already mixed into the panel, for sticky cells,
+ * which must hide what scrolls under them, so a pinned cell matches its row exactly.
  */
 :root {
   --surface-inset: color-mix(in srgb, var(--card) 40%, var(--background));
-  --surface-inset-hover: color-mix(in srgb, var(--surface-inset), var(--foreground) 2%);
-  --surface-inset-selected: color-mix(in srgb, var(--surface-inset), var(--foreground) 4%);
+  --row-head: color-mix(in srgb, var(--foreground) 2.5%, transparent);
+  --row-hover: color-mix(in srgb, var(--foreground) 3%, transparent);
+  --row-selected: color-mix(in srgb, var(--primary) 9%, transparent);
+  --row-selected-hover: color-mix(in srgb, var(--primary) 12%, transparent);
+  --surface-inset-head: color-mix(in srgb, var(--surface-inset), var(--foreground) 2.5%);
+  --surface-inset-hover: color-mix(in srgb, var(--surface-inset), var(--foreground) 3%);
+  --surface-inset-selected: color-mix(in srgb, var(--surface-inset), var(--primary) 9%);
+  --surface-inset-selected-hover: color-mix(in srgb, var(--surface-inset), var(--primary) 12%);
   --card-hover: color-mix(in srgb, var(--card), var(--foreground) 2%);
   --card-selected: color-mix(in srgb, var(--card), var(--foreground) 4%);
 }
@@ -356,6 +446,196 @@
   @variant dark {
     background: color-mix(in srgb, var(--background) 64%, transparent);
   }
+}
+
+/*
+ * Scrollbars, after claude-guest-pass (which hides the page's): a vertical scrollbar never shows,
+ * on the page or in any panel, list or field, though everything still scrolls by wheel, touch and
+ * keys. A horizontal one stays: a 6 px round thumb in --app-scrollbar-thumb (a step darker on
+ * hover) on a clear track, the same bar as ScrollArea's. Chromium and Safari take this from
+ * ::-webkit-scrollbar, where width sizes the vertical bar and height the horizontal one. Never set
+ * scrollbar-width or scrollbar-color in those browsers: either one switches these rules off for
+ * that element. Firefox has no per-axis control, so there every scrollbar hides, except on a
+ * `scrollbar-x` scroller (sideways only, no vertical overflow), which keeps a thin one.
+ */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 10px;
+    background: transparent;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: var(--app-scrollbar-thumb) padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--app-scrollbar-thumb-hover);
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: none;
+    }
+  }
+}
+
+@utility scrollbar-x {
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-scrollbar-thumb) transparent;
+  }
+}
+
+/*
+ * A vertical scroller that fades its content out at an edge it can still scroll past: 20 px at
+ * the top once it has scrolled down, 20 px at the bottom until it reaches the end (the menu and
+ * select lists). The fades follow the scroll position through a scroll-driven animation of two
+ * registered lengths, so a list that does not scroll, or a browser without scroll timelines,
+ * shows no fade.
+ */
+@property --scroll-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --scroll-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes scroll-fade-y {
+  from {
+    --scroll-fade-top: 0px;
+    --scroll-fade-bottom: 20px;
+  }
+  8% {
+    --scroll-fade-top: 20px;
+  }
+  92% {
+    --scroll-fade-bottom: 20px;
+  }
+  to {
+    --scroll-fade-top: 20px;
+    --scroll-fade-bottom: 0px;
+  }
+}
+@utility scroll-fade-y {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--scroll-fade-top),
+    #000 calc(100% - var(--scroll-fade-bottom)),
+    transparent
+  );
+  animation: scroll-fade-y linear both;
+  animation-timeline: scroll(self block);
+}
+
+/*
+ * A popup row's one-line label (components/ui/marquee-text.tsx): an ellipsis when it is wider than
+ * the row, and while the row is highlighted it slides left by --marquee-distance to show the rest,
+ * pausing at each end, then back. Reduced motion wraps the label instead of moving it.
+ */
+@keyframes marquee-text {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  85%,
+  100% {
+    transform: translateX(calc(-1 * var(--marquee-distance, 0px)));
+  }
+}
+@layer components {
+  .marquee-text {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  :is([data-highlighted], :hover) > .marquee-text[data-overflow],
+  :is([data-highlighted], :hover) > * > .marquee-text[data-overflow] {
+    text-overflow: clip;
+    & > span {
+      display: inline-block;
+      animation: marquee-text var(--marquee-duration, 3s) ease-in-out infinite alternate;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      white-space: normal;
+      & > span {
+        display: inline;
+        animation: none;
+      }
+    }
+  }
+}
+
+/*
+ * The ⌘K command menu (components/ui/command.tsx), a Raycast-style palette: 40 px slots (a row,
+ * or a group title with its gap) under a 60 px search row, and a floating foot that the list
+ * scrolls behind. It hangs 8 px under the header trigger, centred on it (--command-x and
+ * --command-y, set when it opens), and kept 16 px inside the window; without them it sits
+ * centred 12vh down. Phones pin it 16 px from the top. Shorter windows drop whole slots, so
+ * the last row in view ends 8 px over the foot.
+ */
+@utility command-palette {
+  --command-w: min(640px, calc(100vw - 32px));
+  --command-top: var(--command-y, 12vh);
+  position: absolute;
+  top: var(--command-top);
+  left: clamp(
+    16px,
+    calc(var(--command-x, 50vw) - var(--command-w) / 2),
+    calc(100vw - 16px - var(--command-w))
+  );
+  width: var(--command-w);
+  max-height: min(470px, calc(100dvh - var(--command-top) - 16px));
+  max-height: min(470px, calc(70px + round(down, 100dvh - var(--command-top) - 86px, 40px)));
+
+  @media (width < 40rem) {
+    --command-top: 16px;
+  }
+}
+
+/* Rows fade behind the foot; the right inset, where the scrollbar runs, fades out above it. */
+@utility command-list-fade {
+  -webkit-mask-image:
+    linear-gradient(
+      #000 calc(100% - var(--command-foot)),
+      rgb(0 0 0 / 35%) calc(100% - var(--command-foot) + 12px),
+      transparent
+    ),
+    linear-gradient(
+      #000 calc(100% - var(--command-foot) - 12px),
+      transparent calc(100% - var(--command-foot))
+    );
+  mask-image:
+    linear-gradient(
+      #000 calc(100% - var(--command-foot)),
+      rgb(0 0 0 / 35%) calc(100% - var(--command-foot) + 12px),
+      transparent
+    ),
+    linear-gradient(
+      #000 calc(100% - var(--command-foot) - 12px),
+      transparent calc(100% - var(--command-foot))
+    );
+  -webkit-mask-size:
+    calc(100% - 8px) 100%,
+    auto;
+  mask-size:
+    calc(100% - 8px) 100%,
+    auto;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 /*
@@ -412,23 +692,26 @@
 }
 
 /*
- * Pill disc icons (components/ui/badge.tsx): a circled lucide icon (CircleCheck, CircleX,
- * Clock…) becomes a filled circle in the tone colour with its glyph knocked out, a little
+ * Pill disc icons (components/ui/badge.tsx): a circled Hugeicons icon (CircleCheck, CircleX,
+ * Clock01…) becomes a filled circle in the tone colour with its glyph knocked out, a little
  * heavier so it holds up at 12-14 px. The colours come from the pill's --badge-dot/--badge-glyph.
+ * The circle is the icon's first element (a <circle> or a closed <path>). Hugeicons set the
+ * stroke width on every element, so these rules style the elements, not the <svg>. A notice
+ * only takes the disc when its icon starts with a <circle> (a triangle simply takes the tone).
  */
-[data-badge-icon="disc"],
-[data-slot="alert"] > svg:has(> circle[r="10"]) {
+[data-badge-icon="disc"] > *,
+[data-slot="alert"] > svg:has(> circle:first-child) > * {
   stroke-width: 2.5;
 }
-[data-badge-icon="disc"] > circle[r="10"],
-[data-slot="alert"] > svg > circle[r="10"] {
+[data-badge-icon="disc"] > :first-child,
+[data-slot="alert"] > svg > circle:first-child {
   fill: var(--badge-dot);
   /* Optional edge ring in its own colour and width (the notices); else none shows. */
   stroke: var(--badge-dot-ring, var(--badge-dot));
   stroke-width: var(--badge-dot-ring-width, 2.5);
 }
-[data-badge-icon="disc"] > :not(circle[r="10"]),
-[data-slot="alert"] > svg:has(> circle[r="10"]) > :not(circle[r="10"]) {
+[data-badge-icon="disc"] > :not(:first-child),
+[data-slot="alert"] > svg:has(> circle:first-child) > :not(:first-child) {
   stroke: var(--badge-glyph);
 }
 /*
@@ -441,6 +724,21 @@
   --badge-dot-ring: color-mix(in oklab, var(--badge-disc) 48%, var(--background));
   --badge-dot-ring-width: 1.25;
   --badge-glyph: var(--badge-disc);
+}
+
+/*
+ * Sticker colours: the pastel API stickers of the sign-in showcase (features/auth/auth-showcase.tsx),
+ * reused as the solid supporting buttons (components/ui/button.tsx lime, periwinkle, peach). Each
+ * label is at least 5.4:1 on its pastel. The pastels stay the same in the dark theme, where they
+ * stand out on the black page like the stickers on the purple panel.
+ */
+:root {
+  --sticker-claude: #ffe9de;
+  --sticker-claude-fg: #a3401c;
+  --sticker-openai: #ecf8b8;
+  --sticker-openai-fg: #40650f;
+  --sticker-codex: #e4e8ff;
+  --sticker-codex-fg: #3941d0;
 }
 
 /*
@@ -547,7 +845,6 @@
   --color-code: var(--code-background);
   --color-code-foreground: var(--code-foreground);
   --color-switch-track: var(--switch-track);
-  --color-switch-border: var(--switch-border);
   --color-switch-thumb: var(--switch-thumb);
   --color-popup: var(--popup);
   --color-popup-border: var(--popup-border);
@@ -655,7 +952,7 @@
   --chart-5: oklch(0 0 0);
   --chart-positive: var(--success);
   --chart-negative: var(--destructive);
-  --chart-background: oklch(1 0 0);
+  --chart-background: var(--card);
   --chart-foreground: oklch(0.145 0.004 285);
   --chart-foreground-muted: oklch(0.55 0.014 260);
   --chart-line-primary: var(--chart-1);
@@ -1080,9 +1377,14 @@
   * {
     @apply border-border outline-ring;
   }
-  /* t3code's lighter default icon stroke. In the base layer so stroke-* utilities still win. */
-  :where(svg.lucide[stroke-width="2"]) {
-    stroke-width: 1.75;
+  /*
+   * Every icon is a Hugeicons <HugeiconsIcon> (its <svg> carries a `color` attribute), drawn at
+   * one 2 px stroke app-wide; the set ships at 1.5. Hugeicons write the width on each element,
+   * so this styles the elements. An icon given its own strokeWidth (which <HugeiconsIcon> also
+   * writes on the <svg>) keeps it, and later rules such as the pill discs still win.
+   */
+  :where(svg[color]:not([stroke-width])) > :where([stroke-width]) {
+    stroke-width: 2;
   }
   /*
    * Selected text in Kiro purple instead of the browser's blue, and the text turns white on it,
@@ -1125,69 +1427,5 @@
     animation-duration: 0.01ms !important;
     /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat every transition. */
     transition-duration: 0.01ms !important;
-  }
-}
-
-/* Spreadsheet treatment is local to Accounts; other data tables keep their layout. */
-.accounts-grid {
-  --sticky-bg: var(--card);
-  font-size: 0.8125rem;
-
-  & :is(th, td) {
-    border-inline-end: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-    padding-inline: 0.625rem;
-  }
-  & :is(th, td):last-child {
-    border-inline-end: 0;
-  }
-  & thead {
-    background: color-mix(in oklch, var(--muted) 45%, var(--card));
-  }
-  & th {
-    font-weight: 500;
-  }
-  & tbody td {
-    padding-block: 0.65rem;
-  }
-  & tr > :first-child {
-    min-inline-size: 2.75rem;
-    inline-size: 2.75rem;
-    text-align: center;
-  }
-  & .row-checkbox {
-    position: absolute;
-    opacity: 0;
-  }
-  & tr[data-state="selected"] .row-number {
-    display: none;
-  }
-  & tr[data-state="selected"] .row-checkbox,
-  & tr:focus-within .row-checkbox {
-    position: relative;
-    opacity: 1;
-    display: inline-flex;
-  }
-  & tr:focus-within .row-number {
-    display: none;
-  }
-}
-@media (hover: hover) and (pointer: fine) {
-  .accounts-grid tbody tr:hover .row-number {
-    display: none;
-  }
-  .accounts-grid tbody tr:hover .row-checkbox {
-    position: relative;
-    opacity: 1;
-    display: inline-flex;
-  }
-}
-@media (pointer: coarse) {
-  .accounts-grid .row-number {
-    display: none;
-  }
-  .accounts-grid .row-checkbox {
-    position: relative;
-    opacity: 1;
-    display: inline-flex;
   }
 }

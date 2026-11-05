@@ -1,17 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CircleAlertIcon,
+  AlertCircleIcon,
   CircleCheckIcon,
   CircleSlashIcon,
+  Delete02Icon,
   EllipsisIcon,
   KeyRoundIcon,
-  PencilIcon,
+  PencilEdit01Icon,
   PlusIcon,
   PowerIcon,
   PowerOffIcon,
-  RotateCcwIcon,
-  Trash2Icon,
-} from "lucide-react";
+  Undo02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
@@ -282,7 +283,7 @@ export function ApiKeysCard(): JSX.Element {
     <>
       <RefreshButton fetching={keys.isFetching} onRefresh={() => void keys.refetch()} />
       <Button onClick={openCreate} ref={createRef}>
-        <PlusIcon aria-hidden="true" />
+        <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
         {t("keys.create")}
       </Button>
     </>
@@ -292,7 +293,7 @@ export function ApiKeysCard(): JSX.Element {
     <EmptyState
       action={
         <Button onClick={openCreate}>
-          <PlusIcon aria-hidden="true" />
+          <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
           {t("keys.create")}
         </Button>
       }
@@ -398,7 +399,7 @@ function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
               />
             }
           >
-            <BadgeIcon icon={CircleAlertIcon} />
+            <BadgeIcon icon={AlertCircleIcon} />
             {t("keys.limitReached")}
           </PopoverTrigger>
           <PopoverPopup className="max-w-64" tooltipStyle>
@@ -544,24 +545,28 @@ function KeyActions({
           />
         }
       >
-        <EllipsisIcon aria-hidden="true" />
+        <HugeiconsIcon icon={EllipsisIcon} aria-hidden="true" />
       </MenuTrigger>
-      <MenuPopup align="end" className="min-w-44">
+      <MenuPopup align="end">
         <MenuItem disabled={editing} onClick={onEdit}>
-          <PencilIcon aria-hidden="true" />
+          <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
           {t("common:actions.edit")}
         </MenuItem>
         <MenuItem disabled={busy} onClick={onToggle}>
-          {apiKey.enabled ? <PowerOffIcon aria-hidden="true" /> : <PowerIcon aria-hidden="true" />}
+          {apiKey.enabled ? (
+            <HugeiconsIcon icon={PowerOffIcon} aria-hidden="true" />
+          ) : (
+            <HugeiconsIcon icon={PowerIcon} aria-hidden="true" />
+          )}
           {apiKey.enabled ? t("common:actions.disable") : t("common:actions.enable")}
         </MenuItem>
         <MenuItem disabled={busy} onClick={onReset}>
-          <RotateCcwIcon aria-hidden="true" />
+          <HugeiconsIcon icon={Undo02Icon} aria-hidden="true" />
           {t("keys.resetUsage")}
         </MenuItem>
         <MenuSeparator />
         <MenuItem disabled={busy} onClick={onDelete} variant="destructive">
-          <Trash2Icon aria-hidden="true" />
+          <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
           {t("common:actions.delete")}
         </MenuItem>
       </MenuPopup>

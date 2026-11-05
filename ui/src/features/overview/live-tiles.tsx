@@ -1,5 +1,6 @@
+import { InfoIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { InfoIcon } from "lucide-react";
 import type { JSX } from "react";
 import { Card } from "@/components/ui/card";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
@@ -59,7 +60,7 @@ function HintLabel({ label, hint }: { label: string; hint: string }): JSX.Elemen
         openOnHover
       >
         <span className="line-clamp-2 text-pretty leading-snug">{label}</span>
-        <InfoIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" />
+        <HugeiconsIcon icon={InfoIcon} aria-hidden="true" className="size-3 shrink-0 opacity-70" />
       </PopoverTrigger>
       <PopoverPopup className="max-w-72" side="top" tooltipStyle>
         {hint}

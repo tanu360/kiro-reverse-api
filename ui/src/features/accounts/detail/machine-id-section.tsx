@@ -1,5 +1,6 @@
+import { WandSparklesIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
-import { WandSparklesIcon } from "lucide-react";
 import { type FormEvent, type JSX, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -64,7 +65,7 @@ export function MachineIdSection({ account }: { account: Account }): JSX.Element
                 onClick={() => generate.mutate()}
                 variant="outline"
               >
-                <WandSparklesIcon aria-hidden="true" />
+                <HugeiconsIcon icon={WandSparklesIcon} aria-hidden="true" />
                 {t("detail.generate")}
               </Button>
               <Button

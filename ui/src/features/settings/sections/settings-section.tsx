@@ -1,12 +1,13 @@
-import { type UseQueryResult, useMutation } from "@tanstack/react-query";
 import {
   EyeIcon,
   EyeOffIcon,
+  FloppyDiskIcon,
   InfoIcon,
-  ToggleLeftIcon,
-  ToggleRightIcon,
+  LoaderCircleIcon,
   TriangleAlertIcon,
-} from "lucide-react";
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { type UseQueryResult, useMutation } from "@tanstack/react-query";
 import {
   createContext,
   type FormEvent,
@@ -19,7 +20,6 @@ import {
   useState,
 } from "react";
 import { ErrorState } from "@/components/shared/error-state";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -32,6 +32,7 @@ import { type TFunction, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useReportDirty } from "../lib/unsaved";
+import { SETTINGS_SECTIONS } from "./sections";
 
 /** The id of the settings card a control sits in, so Save can report its card as dirty. */
 const SectionIdContext = createContext<string | undefined>(undefined);
@@ -40,8 +41,7 @@ const SectionIdContext = createContext<string | undefined>(undefined);
  * t3code's settings type (settingsLayout.tsx): a row title is 14 px medium in the text colour,
  * its description 12 px in the muted colour, at most 42rem wide.
  */
-export const ROW_DESCRIPTION =
-  "max-w-2xl text-balance text-muted-foreground text-xs leading-normal";
+export const ROW_DESCRIPTION = "max-w-2xl text-pretty text-muted-foreground text-xs leading-normal";
 
 /** On a touch screen, an input grows to the 40 px touch-target height (36 px + borders). */
 export const TOUCH_INPUT =
@@ -85,29 +85,26 @@ export function LearnMore({ children }: { children: ReactNode }): JSX.Element {
     <Popover>
       <PopoverTrigger
         render={
-          <Button
-            // Baseline-aligned on its text, not on the icon (a flex box takes its baseline from
-            // its first baseline item), so the link does not push its line taller than the rest.
-            className="h-auto items-baseline px-0 align-baseline text-muted-foreground text-xs underline underline-offset-4 hover:text-foreground [&_svg]:size-3 [&_svg]:self-center"
-            size="xs"
-            variant="link"
+          // Sits in a hint's line as text: baseline-aligned on its label (the icon centres on
+          // the line), the line's own size and colour, and a thin dotted underline close under
+          // the label only (it opens a note, not a page), solid in the text colour on hover.
+          <button
+            className="group/learn inline-flex cursor-pointer items-baseline gap-1 whitespace-nowrap rounded-sm align-baseline text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground"
+            type="button"
           />
         }
       >
-        <InfoIcon aria-hidden="true" />
-        {t("learnMore")}
+        <HugeiconsIcon
+          aria-hidden="true"
+          className="size-[1.15em] shrink-0 self-center"
+          icon={InfoIcon}
+        />
+        <span className="underline decoration-current/45 decoration-dotted underline-offset-[3px] group-hover/learn:decoration-solid group-data-popup-open/learn:decoration-solid">
+          {t("learnMore")}
+        </span>
       </PopoverTrigger>
       <PopoverPopup className="max-w-xs">{children}</PopoverPopup>
     </Popover>
-  );
-}
-
-export function DefaultTag({ on }: { on: boolean }): JSX.Element {
-  const { t } = useT("settings");
-  return (
-    <Badge icon={on ? ToggleRightIcon : ToggleLeftIcon} iconStyle="line" tone="neutral">
-      {on ? t("defaultOn") : t("defaultOff")}
-    </Badge>
   );
 }
 
@@ -125,11 +122,20 @@ export function SaveFooter({
   onReload: () => void;
   note?: ReactNode;
 }): JSX.Element {
+  const { t } = useT("settings");
+  let status: ReactNode = note;
+  if (serverChanged) status = <ServerChangedNotice onReload={onReload} />;
+  else if (dirty) {
+    status = (
+      <span className="inline-flex items-center gap-2 text-foreground">
+        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />
+        {t("unsavedChanges")}
+      </span>
+    );
+  }
   return (
     <div className="flex w-full flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0 flex-1 text-muted-foreground text-xs">
-        {serverChanged ? <ServerChangedNotice onReload={onReload} /> : note}
-      </div>
+      <div className="min-w-0 flex-1 text-muted-foreground text-xs">{status}</div>
       <SaveButton dirty={dirty} saving={saving} />
     </div>
   );
@@ -143,10 +149,16 @@ export function SaveFooter({
 export function SubmitButton({
   blocked,
   busy = false,
+  primary,
   children,
 }: {
   blocked: boolean;
   busy?: boolean;
+  /**
+   * Whether it shows as the primary button; by default while it can submit. A button that stays
+   * clickable to report a missing value passes false until there is one.
+   */
+  primary?: boolean;
   children: ReactNode;
 }): JSX.Element {
   return (
@@ -154,6 +166,9 @@ export function SubmitButton({
       aria-busy={busy || undefined}
       aria-disabled={blocked || undefined}
       className="aria-disabled:pointer-events-none"
+      size="sm"
+      // Only a card with something to save shows the primary button; a clean one stays quiet.
+      variant={(primary ?? (!blocked || busy)) ? "default" : "outline"}
       onClick={(event: MouseEvent<HTMLButtonElement>) => {
         if (blocked) event.preventDefault();
       }}
@@ -169,6 +184,12 @@ export function SaveButton({ dirty, saving }: { dirty: boolean; saving: boolean 
   useReportDirty(useContext(SectionIdContext), dirty);
   return (
     <SubmitButton blocked={!dirty || saving} busy={saving}>
+      {/* The disk while idle, a spinner while it saves (the label already says so). */}
+      {saving ? (
+        <HugeiconsIcon className="animate-spin" icon={LoaderCircleIcon} aria-hidden="true" />
+      ) : (
+        <HugeiconsIcon icon={FloppyDiskIcon} aria-hidden="true" />
+      )}
       {saving ? t("saving") : t("save")}
     </SubmitButton>
   );
@@ -178,7 +199,11 @@ export function ServerChangedNotice({ onReload }: { onReload: () => void }): JSX
   const { t } = useT("settings");
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1" role="status">
-      <TriangleAlertIcon aria-hidden="true" className="size-3.5 text-warning" />
+      <HugeiconsIcon
+        icon={TriangleAlertIcon}
+        aria-hidden="true"
+        className="size-3.5 text-warning"
+      />
       <span className="text-foreground">{t("serverChanged")}</span>
       <Button className="h-auto px-0 text-xs underline" onClick={onReload} size="xs" variant="link">
         {t("reload")}
@@ -188,46 +213,84 @@ export function ServerChangedNotice({ onReload }: { onReload: () => void }): JSX
 }
 
 /**
- * t3code's SettingsSection frame: the heading (16 px semibold, with the "Default" tag and any
- * actions at its end) sits above the group, outside it, and the group (the Card, t3code's
- * SettingsGroup) stacks its rows with the row divider (border at 50 %) between them.
+ * A settings section: the group (the Card, t3code's SettingsGroup) whose rows are split by the
+ * row divider (border at 50 %). Every group opens with a header row: the title, as the section
+ * nav names it, then the description and any actions. The title is 16 px semibold, a step above
+ * the 14 px row titles, and the description 12 px muted, so a jump from the nav lands on a
+ * heading that reads as the start of that section. The title carries the section's nav icon
+ * (red for the danger zone, as in the nav), so a card matches its nav row at a glance. A group of
+ * one setting shows its title alone in a slimmer header.
  */
 export function SettingsFrame({
   id,
   title,
+  badge,
+  description,
   actions,
   className,
   children,
 }: {
   id: string;
   title: string;
+  /** After the title, outside the heading: a count or a state. */
+  badge?: ReactNode;
+  description?: ReactNode;
   actions?: ReactNode;
   /** On the group. */
   className?: string;
   children: ReactNode;
 }): JSX.Element {
   const headingId = `${id}-title`;
+  const full = description || actions;
+  const section = SETTINGS_SECTIONS.find((item) => item.id === id);
+  const danger = section !== undefined && "tone" in section && section.tone === "danger";
   return (
-    <section aria-labelledby={headingId} className="flex scroll-mt-16 flex-col gap-2.5" id={id}>
-      <div className="flex min-h-7 flex-wrap items-start justify-between gap-x-4 gap-y-1 px-3 sm:px-4">
-        <h2
-          className="flex min-h-7 items-center font-semibold text-foreground text-heading"
-          id={headingId}
-        >
-          {title}
-        </h2>
-        {actions ? (
-          <div className="flex min-h-7 flex-wrap items-center justify-end gap-2">{actions}</div>
-        ) : null}
-      </div>
+    <section aria-labelledby={headingId} className="scroll-mt-20" id={id}>
       <Card
         className={cn("@container min-w-0 [&>*+*]:border-border/50 [&>*+*]:border-t", className)}
       >
+        <div
+          className={cn(
+            "flex flex-wrap items-start justify-between gap-x-6 gap-y-3 px-4 sm:px-5",
+            full ? "py-4" : "py-3",
+          )}
+          data-slot="card-header"
+        >
+          <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
+            <div className="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1">
+              <h2
+                className={cn(
+                  "flex items-center gap-2 font-semibold text-base leading-6 outline-none",
+                  danger ? "text-destructive-foreground" : "text-foreground",
+                )}
+                id={headingId}
+              >
+                {section ? (
+                  <HugeiconsIcon
+                    aria-hidden="true"
+                    className={cn(
+                      "size-4.5 shrink-0",
+                      danger ? "text-current" : "text-muted-foreground",
+                    )}
+                    icon={section.icon}
+                  />
+                ) : null}
+                {title}
+              </h2>
+              {badge}
+            </div>
+            {description ? <p className={ROW_DESCRIPTION}>{description}</p> : null}
+          </div>
+          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        </div>
         {children}
       </Card>
     </section>
   );
 }
+
+/** A settings row's inline padding, for a row element that is not a SettingsRow (a list item). */
+export const SETTINGS_ROW_X = "min-w-0 px-4 sm:px-5";
 
 /** One row of a settings group: t3code's 12 px block and 12 px (16 px from sm) inline padding. */
 export function SettingsRow({
@@ -241,7 +304,10 @@ export function SettingsRow({
   slot?: "settings-row" | "card-footer";
 }): JSX.Element {
   return (
-    <div className={cn("min-w-0 px-3 py-3 sm:px-4", className)} data-slot={slot}>
+    <div
+      className={cn(SETTINGS_ROW_X, slot === "card-footer" ? "py-2.5" : "py-4", className)}
+      data-slot={slot}
+    >
       {children}
     </div>
   );
@@ -249,17 +315,17 @@ export function SettingsRow({
 
 /**
  * A settings section in its own form: Enter in a field submits it, and Save is the submit button.
- * `hint` is at most two sentences; `learnMore` holds the rest behind a popover. The hint opens the
- * first row as t3code's row description; a section with one switch passes its hint to the
- * SwitchField instead, so the row reads title, description, control as in t3code. Save gets a row
- * of its own.
+ * `hint` is at most two sentences; `learnMore` holds the rest behind a popover. The hint goes in
+ * the group's header under the title, with any `actions` at its end; a section with one switch
+ * passes its hint to the SwitchField instead, so the row reads title, description, control as in
+ * t3code. Save gets a row of its own.
  */
 export function SettingsSection({
   id,
   title,
+  badge,
   hint,
   learnMore,
-  defaultOn,
   actions,
   footer,
   onSubmit,
@@ -268,10 +334,10 @@ export function SettingsSection({
 }: {
   id: string;
   title: string;
+  /** After the title in the group's header (see SettingsFrame). */
+  badge?: ReactNode;
   hint?: ReactNode;
   learnMore?: ReactNode;
-  /** Shows the "Default: on/off" tag. */
-  defaultOn?: boolean;
   actions?: ReactNode;
   footer?: ReactNode;
   onSubmit?: () => void;
@@ -291,14 +357,6 @@ export function SettingsSection({
         ) : null}
       </>
     ) : undefined;
-  const headerActions =
-    defaultOn !== undefined || actions ? (
-      <>
-        {defaultOn !== undefined ? <DefaultTag on={defaultOn} /> : null}
-        {actions}
-      </>
-    ) : undefined;
-
   return (
     <SectionIdContext.Provider value={id}>
       <form
@@ -308,15 +366,14 @@ export function SettingsSection({
           onSubmit?.();
         }}
       >
-        <SettingsFrame actions={headerActions} id={id} title={title}>
-          {rows ? (
-            children
-          ) : (
-            <SettingsRow className="flex flex-col gap-3">
-              {description ? <p className={ROW_DESCRIPTION}>{description}</p> : null}
-              {children}
-            </SettingsRow>
-          )}
+        <SettingsFrame
+          actions={actions}
+          badge={badge}
+          description={description}
+          id={id}
+          title={title}
+        >
+          {rows ? children : <SettingsRow className="flex flex-col gap-4">{children}</SettingsRow>}
           {footer ? (
             <SettingsRow className="flex items-center" slot="card-footer">
               {footer}
@@ -393,7 +450,7 @@ export function SwitchField({
   label: ReactNode;
   hint?: ReactNode;
   learnMore?: ReactNode;
-  /** Next to the label, for a "Default: on" tag. */
+  /** Next to the label, for a short tag. */
   extra?: ReactNode;
   className?: string;
 }): JSX.Element {
@@ -490,7 +547,11 @@ export function PasswordInput({
           title={label}
           variant="quiet"
         >
-          {visible ? <EyeOffIcon aria-hidden="true" /> : <EyeIcon aria-hidden="true" />}
+          {visible ? (
+            <HugeiconsIcon icon={EyeOffIcon} aria-hidden="true" />
+          ) : (
+            <HugeiconsIcon icon={EyeIcon} aria-hidden="true" />
+          )}
         </Button>
       </InputGroupAddon>
     </InputGroup>

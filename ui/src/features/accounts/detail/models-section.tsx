@@ -1,5 +1,6 @@
+import { ListRestartIcon, ScanSearchIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
-import { ListRestartIcon, ScanSearchIcon } from "lucide-react";
 import type { JSX } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -48,7 +49,7 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
             size="sm"
             variant="outline"
           >
-            <ScanSearchIcon aria-hidden="true" />
+            <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
             {t("detail.loadModels")}
           </Button>
           <Button
@@ -58,7 +59,7 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
             size="sm"
             variant="outline"
           >
-            <ListRestartIcon aria-hidden="true" />
+            <HugeiconsIcon icon={ListRestartIcon} aria-hidden="true" />
             {t("detail.refreshModelCache")}
           </Button>
         </>

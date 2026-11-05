@@ -13,18 +13,25 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { thinkingQuery, updateThinkingConfig } from "@/lib/api/settings";
 import type { ThinkingConfig, ThinkingFormat } from "@/lib/api/types";
 import { type TFunction, useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { useDraft } from "../lib/dirty";
 import { SECTION_ID } from "./sections";
 import {
   Code,
   fillNodes,
+  ROW_DESCRIPTION,
   SaveFooter,
   SectionQuery,
+  SettingsRow,
   SettingsSection,
+  TOUCH_INPUT,
   useSectionSave,
 } from "./settings-section";
 
 const DEFAULT_SUFFIX = "-thinking";
+
+/** A row with its control at the end; the control drops under the text on a narrow card. */
+const ROW_WITH_CONTROL = "flex flex-wrap items-center justify-between gap-x-8 gap-y-3";
 
 function formatLabel(format: ThinkingFormat, t: TFunction): string {
   switch (format) {
@@ -47,13 +54,16 @@ export function ThinkingCard(): JSX.Element {
   );
 }
 
+/** A select as a settings row: name and hint on the left, the select at the end. */
 function FormatSelect({
   label,
+  hint,
   value,
   options,
   onChange,
 }: {
   label: string;
+  hint: string;
   value: ThinkingFormat;
   options: readonly ThinkingFormat[];
   onChange: (value: ThinkingFormat) => void;
@@ -64,8 +74,13 @@ function FormatSelect({
   const shown = options.includes(value) ? options : [...options, value];
   const items = shown.map((format) => ({ value: format, label: formatLabel(format, t) }));
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <Label id={`${id}-label`}>{label}</Label>
+    <SettingsRow className={ROW_WITH_CONTROL}>
+      <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
+        <Label id={`${id}-label`}>{label}</Label>
+        <p className={ROW_DESCRIPTION} id={`${id}-hint`}>
+          {hint}
+        </p>
+      </div>
       <Select
         items={items}
         onValueChange={(next) => {
@@ -73,7 +88,11 @@ function FormatSelect({
         }}
         value={value}
       >
-        <SelectTrigger aria-labelledby={`${id}-label`} className="w-full">
+        <SelectTrigger
+          aria-describedby={`${id}-hint`}
+          aria-labelledby={`${id}-label`}
+          className="w-full sm:w-64"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectPopup>
@@ -84,7 +103,7 @@ function FormatSelect({
           ))}
         </SelectPopup>
       </Select>
-    </div>
+    </SettingsRow>
   );
 }
 
@@ -126,45 +145,46 @@ function ThinkingForm({ config }: { config: ThinkingConfig }): JSX.Element {
           claudeFormat: draft.value.claudeFormat,
         })
       }
+      rows
       title={t("thinkingSettings")}
     >
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
+      <SettingsRow className={ROW_WITH_CONTROL}>
+        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
           <Label htmlFor={suffixId}>{t("thinkingSuffix")}</Label>
-          <Input
-            aria-describedby={`${suffixId}-hint`}
-            autoComplete="off"
-            className="max-w-xs"
-            id={suffixId}
-            onChange={(event) => {
-              const suffix = event.target.value;
-              draft.set((prev) => ({ ...prev, suffix }));
-            }}
-            placeholder={DEFAULT_SUFFIX}
-            spellCheck={false}
-            value={draft.value.suffix}
-          />
-          <p className="text-muted-foreground text-xs" id={`${suffixId}-hint`}>
+          <p className={ROW_DESCRIPTION} id={`${suffixId}-hint`}>
             {fillNodes(t("thinkingSuffixHint"), {
               example: <Code>claude-sonnet-4.5-thinking</Code>,
             })}
           </p>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <FormatSelect
-            label={t("openaiFormat")}
-            onChange={(openaiFormat) => draft.set((prev) => ({ ...prev, openaiFormat }))}
-            options={["reasoning_content", "thinking", "think"]}
-            value={draft.value.openaiFormat}
-          />
-          <FormatSelect
-            label={t("claudeFormat")}
-            onChange={(claudeFormat) => draft.set((prev) => ({ ...prev, claudeFormat }))}
-            options={["thinking", "think"]}
-            value={draft.value.claudeFormat}
-          />
-        </div>
-      </div>
+        <Input
+          aria-describedby={`${suffixId}-hint`}
+          autoComplete="off"
+          className={cn("w-full font-mono sm:w-64", TOUCH_INPUT)}
+          id={suffixId}
+          onChange={(event) => {
+            const suffix = event.target.value;
+            draft.set((prev) => ({ ...prev, suffix }));
+          }}
+          placeholder={DEFAULT_SUFFIX}
+          spellCheck={false}
+          value={draft.value.suffix}
+        />
+      </SettingsRow>
+      <FormatSelect
+        hint={t("openaiFormatHint")}
+        label={t("openaiFormat")}
+        onChange={(openaiFormat) => draft.set((prev) => ({ ...prev, openaiFormat }))}
+        options={["reasoning_content", "thinking", "think"]}
+        value={draft.value.openaiFormat}
+      />
+      <FormatSelect
+        hint={t("claudeFormatHint")}
+        label={t("claudeFormat")}
+        onChange={(claudeFormat) => draft.set((prev) => ({ ...prev, claudeFormat }))}
+        options={["thinking", "think"]}
+        value={draft.value.claudeFormat}
+      />
     </SettingsSection>
   );
 }

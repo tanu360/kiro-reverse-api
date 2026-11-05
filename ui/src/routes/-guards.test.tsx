@@ -99,6 +99,19 @@ describe("route guards", () => {
     expect(router.state.location.pathname).toBe("/setup");
   });
 
+  it("keeps the requested page through first-run setup", async () => {
+    firstRun.mockResolvedValue({ password: "12345678" });
+    const { router } = await renderApp("/accounts?plan=pro", { authed: false });
+    expect(router.state.location.pathname).toBe("/setup");
+    expect(router.state.location.search).toEqual({ redirect: "/accounts?plan=pro" });
+  });
+
+  it("keeps the return path when a claimed setup sends the user to login", async () => {
+    const { router } = await renderApp("/setup?redirect=%2Faccounts", { authed: false });
+    expect(router.state.location.pathname).toBe("/login");
+    expect(router.state.location.search).toEqual({ redirect: "/accounts" });
+  });
+
   it("still renders /login when first-run cannot be fetched", async () => {
     firstRun.mockRejectedValue(new Error("network"));
     const { router } = await renderApp("/login", { authed: false });
@@ -128,6 +141,7 @@ describe("route guards", () => {
       for (const listener of sessionListeners) listener(null, "expired");
     });
     await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+    expect(router.state.location.search).toEqual({ redirect: "/accounts" });
     expect(toast.warning).toHaveBeenCalledTimes(1);
     expect(vi.mocked(toast.warning).mock.calls[0]?.[1]).toEqual({ id: "session-expired" });
   });

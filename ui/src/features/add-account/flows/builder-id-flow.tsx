@@ -1,4 +1,5 @@
-import { Loader2Icon } from "lucide-react";
+import { LoaderCircleIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type FormEvent, type JSX, useEffect, useRef, useState } from "react";
 import { pollBuilderId, startBuilderId } from "@/lib/api/auth-flows";
 import { isApiError } from "@/lib/api/errors";
@@ -129,7 +130,11 @@ export function BuilderIdFlow(): JSX.Element {
           className="flex items-center justify-center gap-2 text-muted-foreground text-sm"
           role="status"
         >
-          <Loader2Icon aria-hidden="true" className="size-4 animate-spin" />
+          <HugeiconsIcon
+            icon={LoaderCircleIcon}
+            aria-hidden="true"
+            className="size-4 animate-spin"
+          />
           {reconnecting ? t("builderid.reconnecting") : t("builderid.waiting")}
         </p>
         <FlowFooter />

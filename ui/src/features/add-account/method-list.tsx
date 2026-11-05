@@ -1,24 +1,24 @@
 import {
-  Building2Icon,
+  Building06Icon,
   ChevronRightIcon,
   CodeIcon,
   CookieIcon,
   FolderOpenIcon,
   IdCardIcon,
   KeyRoundIcon,
-  type LucideIcon,
   ShieldHalfIcon,
   TerminalIcon,
-} from "lucide-react";
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { JSX } from "react";
 import { useT } from "@/lib/i18n";
 import type { AddAccountMethod } from "./add-account-dialog";
 import { FlowFooter } from "./flow-context";
 
-export const METHODS: ReadonlyArray<{ id: AddAccountMethod; icon: LucideIcon }> = [
+export const METHODS: ReadonlyArray<{ id: AddAccountMethod; icon: IconSvgElement }> = [
   { id: "builderid", icon: IdCardIcon },
   { id: "iam", icon: KeyRoundIcon },
-  { id: "microsoft", icon: Building2Icon },
+  { id: "microsoft", icon: Building06Icon },
   { id: "sso", icon: ShieldHalfIcon },
   { id: "local", icon: FolderOpenIcon },
   { id: "credentials", icon: CodeIcon },
@@ -44,7 +44,7 @@ export function MethodList({
               type="button"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <Icon aria-hidden="true" className="size-4.5" />
+                <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-4.5" />
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="font-medium text-sm">{t(`methods.${id}.title`)}</span>
@@ -52,7 +52,8 @@ export function MethodList({
                   {t(`methods.${id}.description`)}
                 </span>
               </span>
-              <ChevronRightIcon
+              <HugeiconsIcon
+                icon={ChevronRightIcon}
                 aria-hidden="true"
                 className="size-4 shrink-0 text-muted-foreground"
               />

@@ -16,19 +16,37 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDownIcon,
-  ArrowRightIcon,
-  ArrowUpIcon,
+  ArrowDown02Icon,
+  ArrowRight02Icon,
+  ArrowUp02Icon,
+  Delete02Icon,
+  EllipsisIcon,
   GripVerticalIcon,
+  InformationCircleIcon,
+  PencilEdit01Icon,
   PlusIcon,
-  RotateCcwIcon,
-  XIcon,
-} from "lucide-react";
-import { type JSX, useLayoutEffect, useMemo, useRef, useState } from "react";
+  Search01Icon,
+  Undo02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type JSX, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
+import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { isApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import { modelMappingsQuery, updateModelMappings } from "@/lib/api/settings";
@@ -50,12 +68,28 @@ import {
   SaveButton,
   SectionQuery,
   ServerChangedNotice,
+  SettingsRow,
   SettingsSection,
   TOUCH_INPUT,
   useSectionSave,
 } from "./settings-section";
 
-type FocusTarget = "key" | "value" | "up" | "down";
+/** A list this long gets a filter field. */
+const FILTER_FROM = 8;
+
+/** The columns every row shares (a subgrid): grip, number, match, arrow, target, menu. */
+const LIST_COLUMNS =
+  "grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto]";
+const ROW_GRID = "col-span-full grid grid-cols-subgrid items-center px-4 sm:px-5";
+
+/** The mapping being added (`rowId` null) or edited; `session` remounts the form per open. */
+interface EditorState {
+  open: boolean;
+  rowId: string | null;
+  key: string;
+  value: string;
+  session: number;
+}
 
 interface SaveRequest {
   mappings: ModelMappingRule[];
@@ -86,33 +120,21 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
   const [errorRowId, setErrorRowId] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // Inputs and move buttons by `${rowId}:${target}`, for focus after add, move and errors.
-  // A null rowId means Add mapping (after the last row is removed).
-  const controls = useRef(new Map<string, HTMLElement>());
+  // Each row's menu button by row id, for focus after a delete and on a save error. A pending
+  // null row id means Add mapping (after the last row is deleted).
+  const menuButtons = useRef(new Map<string, HTMLElement>());
   const addButton = useRef<HTMLButtonElement>(null);
-  const [pendingFocus, setPendingFocus] = useState<{
-    rowId: string | null;
-    targets: FocusTarget[];
-  }>();
+  const [pendingFocus, setPendingFocus] = useState<{ rowId: string | null }>();
   useLayoutEffect(() => {
     if (!pendingFocus) return;
     setPendingFocus(undefined);
-    if (pendingFocus.rowId === null) {
-      addButton.current?.focus();
-      return;
-    }
-    for (const target of pendingFocus.targets) {
-      const element = controls.current.get(`${pendingFocus.rowId}:${target}`);
-      if (element && !(element as HTMLButtonElement).disabled) {
-        element.focus();
-        return;
-      }
-    }
+    if (pendingFocus.rowId === null) addButton.current?.focus();
+    else menuButtons.current.get(pendingFocus.rowId)?.focus();
   }, [pendingFocus]);
 
-  const register = (rowId: string, target: FocusTarget) => (element: HTMLElement | null) => {
-    if (element) controls.current.set(`${rowId}:${target}`, element);
-    else controls.current.delete(`${rowId}:${target}`);
+  const register = (rowId: string) => (element: HTMLElement | null) => {
+    if (element) menuButtons.current.set(rowId, element);
+    else menuButtons.current.delete(rowId);
   };
 
   const clearError = () => {
@@ -140,12 +162,8 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
         const row = sentFrom[local];
         setErrorRowId(row.id);
         setServerError(error.serverMessage);
-        const firstEmpty: FocusTarget[] = !row.key.trim()
-          ? ["key"]
-          : !row.value.trim()
-            ? ["value"]
-            : [];
-        setPendingFocus({ rowId: row.id, targets: [...firstEmpty, "key"] });
+        setFilter("");
+        setPendingFocus({ rowId: row.id });
       },
     },
   );
@@ -156,37 +174,65 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
     save({ mappings, rowIndexes, rows });
   };
 
-  const updateRow = (rowId: string, patch: Partial<Pick<MappingRow, "key" | "value">>) => {
-    if (rowId === errorRowId) clearError();
-    draft.set((prev) => prev.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
-  };
-
-  // Focus goes to the next row's Match field, the previous row's when the last row goes, and
-  // Add mapping when the list is empty, so it never drops to the page.
+  // Focus goes to the next row's menu, the previous row's when the last row goes, and Add
+  // mapping when the list is empty, so it never drops to the page.
   const removeRow = (rowId: string) => {
     if (rowId === errorRowId) clearError();
     const index = rows.findIndex((row) => row.id === rowId);
     const neighbour = rows[index + 1] ?? rows[index - 1];
     draft.set((prev) => prev.filter((row) => row.id !== rowId));
-    setPendingFocus({ rowId: neighbour?.id ?? null, targets: ["key"] });
+    setPendingFocus({ rowId: neighbour?.id ?? null });
   };
 
-  const move = (from: number, to: number, focus?: FocusTarget[]) => {
-    const rowId = rows[from]?.id;
+  // The menu hands focus back to its button, which moves with its row.
+  const move = (from: number, to: number) => {
     draft.set((prev) => moveRow(prev, from, to));
-    if (rowId && focus) setPendingFocus({ rowId, targets: focus });
   };
 
-  // New rows go on top (parity) and take focus.
-  const addRow = () => {
-    const row: MappingRow = { id: newRowId(), key: "", value: "" };
-    draft.set((prev) => [row, ...prev]);
-    setPendingFocus({ rowId: row.id, targets: ["key"] });
+  // Adding and editing happen in a dialog; Apply writes the draft, and Save sends it.
+  const [editor, setEditor] = useState<EditorState>({
+    open: false,
+    rowId: null,
+    key: "",
+    value: "",
+    session: 0,
+  });
+  const openEditor = (row: MappingRow | null) =>
+    setEditor((prev) => ({
+      open: true,
+      rowId: row?.id ?? null,
+      key: row?.key ?? "",
+      value: row?.value ?? "",
+      session: prev.session + 1,
+    }));
+  // New rows go on top (parity).
+  const applyEditor = (key: string, value: string) => {
+    const { rowId } = editor;
+    if (rowId === null) {
+      draft.set((prev) => [{ id: newRowId(), key, value }, ...prev]);
+    } else {
+      if (rowId === errorRowId) clearError();
+      draft.set((prev) => prev.map((row) => (row.id === rowId ? { ...row, key, value } : row)));
+    }
+    setEditor((prev) => ({ ...prev, open: false }));
   };
+
+  // A long list can be filtered by either side; reordering waits until the filter is cleared.
+  const [filter, setFilter] = useState("");
+  const needle = filter.trim().toLowerCase();
+  const shown = rows
+    .map((row, index) => ({ row, index }))
+    .filter(
+      ({ row }) =>
+        !needle ||
+        row.key.toLowerCase().includes(needle) ||
+        row.value.toLowerCase().includes(needle),
+    );
 
   // Local only until Save.
   const resetToDefaults = () => {
     clearError();
+    setFilter("");
     draft.set(rowsFromRules(data.defaults));
   };
 
@@ -223,24 +269,28 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
   return (
     <SettingsSection
       actions={
-        // One row beside the title on a wide card; it wraps under the title on a narrow one.
-        <div className="flex flex-wrap items-center gap-2 @md:flex-nowrap">
-          <Button onClick={addRow} ref={addButton} size="sm" variant="outline">
-            <PlusIcon aria-hidden="true" />
+        // Beside the title on a narrow page; under the description once the heading has a column.
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => openEditor(null)} ref={addButton} size="sm" variant="outline">
+            <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
             {t("modelMappings.add")}
           </Button>
           <Button onClick={resetToDefaults} size="sm" variant="outline">
-            <RotateCcwIcon aria-hidden="true" />
+            <HugeiconsIcon icon={Undo02Icon} aria-hidden="true" />
             {t("modelMappings.reset")}
           </Button>
         </div>
+      }
+      badge={
+        <Badge className="tabular-nums" size="sm" tone="neutral">
+          {rows.length}
+        </Badge>
       }
       // Save sits in the footer, as on every other card.
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1 text-muted-foreground text-xs">
             {draft.serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
-            <p>{t("modelMappings.emptyIgnored")}</p>
             <p>{t("modelMappings.resetNote")}</p>
           </div>
           <SaveButton dirty={draft.dirty} saving={saving} />
@@ -249,23 +299,53 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
       hint={t("modelMappingsHint")}
       id={SECTION_ID.modelMappings}
       onSubmit={onSubmit}
+      rows
       title={t("modelMappings")}
     >
+      {rows.length > FILTER_FROM ? (
+        <SettingsRow className="py-3">
+          <InputGroup className="sm:max-w-xs">
+            <InputGroupAddon>
+              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label={t("modelMappings.filter")}
+              onChange={(event) => setFilter(event.target.value)}
+              placeholder={t("modelMappings.filter")}
+              spellCheck={false}
+              type="search"
+              value={filter}
+            />
+          </InputGroup>
+        </SettingsRow>
+      ) : null}
+
       {rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
-          {t("modelMappings.noRules")}
-        </p>
+        <SettingsRow>
+          <p className="text-center text-muted-foreground text-sm">{t("modelMappings.noRules")}</p>
+        </SettingsRow>
+      ) : shown.length === 0 ? (
+        <SettingsRow>
+          <p className="text-center text-muted-foreground text-sm">
+            {t("modelMappings.noMatches", { filter: filter.trim() })}
+          </p>
+        </SettingsRow>
       ) : (
-        <div className="flex flex-col gap-2">
+        // One grid for the column labels and every row, so the columns line up down the list.
+        <div className={cn(LIST_COLUMNS, "pt-2")}>
           <div
             aria-hidden="true"
-            className="hidden items-center gap-2 px-px font-medium text-muted-foreground text-xs sm:flex"
+            className={cn(
+              ROW_GRID,
+              "hidden pb-1 font-medium text-muted-foreground text-xs sm:grid",
+            )}
           >
-            <span className="w-7 shrink-0" />
-            <span className="min-w-0 flex-1">{t("modelMappings.match")}</span>
-            <span className="w-4 shrink-0" />
-            <span className="min-w-0 flex-1">{t("modelMappings.target")}</span>
-            <span className="w-[5.75rem] shrink-0" />
+            <span />
+            <span className="text-end">#</span>
+            <span>{t("modelMappings.match")}</span>
+            <span />
+            <span>{t("modelMappings.target")}</span>
+            <span />
           </div>
           <DndContext
             accessibility={{
@@ -277,20 +357,21 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
             sensors={sensors}
           >
             <SortableContext
-              items={rows.map((row) => row.id)}
+              items={shown.map(({ row }) => row.id)}
               strategy={verticalListSortingStrategy}
             >
-              <ol className="flex flex-col gap-4 sm:gap-2">
-                {rows.map((row, index) => (
+              <ol className="col-span-full grid grid-cols-subgrid [&>li+li]:border-border/50 [&>li+li]:border-t">
+                {shown.map(({ row, index }) => (
                   <MappingRowItem
                     count={rows.length}
-                    error={row.id === errorRowId}
+                    error={row.id === errorRowId ? (serverError ?? "") : null}
+                    filtering={needle !== ""}
                     index={index}
                     key={row.id}
-                    onChange={(patch) => updateRow(row.id, patch)}
-                    onMove={(to, focus) => move(index, to, focus)}
-                    onRemove={() => removeRow(row.id)}
-                    register={(target) => register(row.id, target)}
+                    onDelete={() => removeRow(row.id)}
+                    onEdit={() => openEditor(row)}
+                    onMove={(to) => move(index, to)}
+                    register={register(row.id)}
                     row={row}
                   />
                 ))}
@@ -299,33 +380,52 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
           </DndContext>
         </div>
       )}
-      {serverError ? (
-        <p className="mt-3 break-words text-destructive-foreground text-sm" role="alert">
-          {serverError}
-        </p>
-      ) : null}
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) setEditor((prev) => ({ ...prev, open: false }));
+        }}
+        open={editor.open}
+      >
+        <MappingEditor
+          initialKey={editor.key}
+          initialValue={editor.value}
+          isNew={editor.rowId === null}
+          key={editor.session}
+          onApply={applyEditor}
+        />
+      </Dialog>
     </SettingsSection>
   );
 }
 
+/**
+ * One mapping as a row of the card: its drag grip, its place in the order (the first match
+ * wins), what it matches and what that becomes, and its menu (Edit, Move up, Move down, Delete).
+ * On phones the target sits under the match.
+ */
 function MappingRowItem({
   row,
   index,
   count,
   error,
-  onChange,
+  filtering,
+  onEdit,
   onMove,
-  onRemove,
+  onDelete,
   register,
 }: {
   row: MappingRow;
   index: number;
   count: number;
-  error: boolean;
-  onChange: (patch: Partial<Pick<MappingRow, "key" | "value">>) => void;
-  onMove: (to: number, focus: FocusTarget[]) => void;
-  onRemove: () => void;
-  register: (target: FocusTarget) => (element: HTMLElement | null) => void;
+  /** The server's reason when this row stopped the save; null otherwise. */
+  error: string | null;
+  /** While the list is filtered, rows cannot be reordered. */
+  filtering: boolean;
+  onEdit: () => void;
+  onMove: (to: number) => void;
+  onDelete: () => void;
+  register: (element: HTMLElement | null) => void;
 }): JSX.Element {
   const { t } = useT("settings");
   const {
@@ -338,117 +438,207 @@ function MappingRowItem({
     isDragging,
   } = useSortable({
     id: row.id,
+    disabled: filtering,
     attributes: { roleDescription: t("modelMappings.roleDescription") },
   });
-  const isFirst = index === 0;
-  const isLast = index === count - 1;
+  const n = index + 1;
 
-  // Opaque in the panel's own fill (the card at 40 % over the page), so a dragged row covers
-  // the rows it passes.
   return (
     <li
-      aria-label={t("modelMappings.rowLabel", { n: index + 1 })}
+      aria-label={t("modelMappings.rowLabel", { n })}
       className={cn(
-        "relative flex items-start gap-2 rounded-lg bg-surface-inset sm:items-center",
-        isDragging && "z-10 shadow-lg outline-1 outline-border",
-        error && "rounded-lg outline-1 outline-destructive/60 outline-offset-2",
+        ROW_GRID,
+        "relative py-1",
+        // Opaque while dragged, so it covers the rows it passes.
+        isDragging && "z-10 rounded-lg bg-background shadow-lg outline-1 outline-border",
+        error !== null && "bg-destructive/6",
       )}
-      data-error={error || undefined}
+      data-error={error !== null || undefined}
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
     >
-      <Button
-        aria-label={t("modelMappings.drag")}
-        className="mt-0.5 shrink-0 cursor-grab touch-none active:cursor-grabbing sm:mt-0"
-        ref={setActivatorNodeRef}
-        size="icon-sm"
-        title={t("modelMappings.drag")}
-        variant="quiet"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVerticalIcon aria-hidden="true" />
-      </Button>
-      {/* On phones the inputs stack, and the header row is hidden: each gets a visible label. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <label
+      {filtering ? (
+        <span aria-hidden="true" className="size-8 sm:size-7" />
+      ) : (
+        <Button
+          aria-label={t("modelMappings.drag")}
+          className="cursor-grab touch-none active:cursor-grabbing"
+          ref={setActivatorNodeRef}
+          size="icon-sm"
+          title={t("modelMappings.drag")}
+          variant="quiet"
+          {...attributes}
+          {...listeners}
+        >
+          <HugeiconsIcon icon={GripVerticalIcon} aria-hidden="true" />
+        </Button>
+      )}
+      <span className="hidden text-end text-muted-foreground text-xs tabular-nums sm:block">
+        {n}
+      </span>
+      {/* One cell on phones (match over target), three columns from sm. */}
+      <div className="flex min-w-0 flex-col gap-0.5 sm:contents">
+        <code className="truncate font-mono text-foreground text-sm" title={row.key} translate="no">
+          {row.key}
+        </code>
+        <span className="flex min-w-0 items-center gap-1.5 sm:contents">
+          <HugeiconsIcon
+            icon={ArrowRight02Icon}
             aria-hidden="true"
-            className="text-muted-foreground text-xs sm:hidden"
-            htmlFor={`${row.id}-key`}
-          >
-            {t("modelMappings.match")}
-          </label>
-          <Input
-            aria-invalid={(error && !row.key.trim()) || undefined}
-            aria-label={t("modelMappings.match")}
-            className={cn("min-w-0 font-mono", TOUCH_INPUT)}
-            onChange={(event) => onChange({ key: event.target.value })}
-            placeholder={t("modelMappings.matchPlaceholder")}
-            id={`${row.id}-key`}
-            ref={register("key")}
-            spellCheck={false}
-            value={row.key}
+            className="size-3.5 shrink-0 text-muted-foreground sm:size-4"
           />
-        </div>
-        <ArrowRightIcon
-          aria-hidden="true"
-          className="hidden size-4 shrink-0 text-muted-foreground sm:block"
-        />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <label
-            aria-hidden="true"
-            className="text-muted-foreground text-xs sm:hidden"
-            htmlFor={`${row.id}-value`}
+          <code
+            className="truncate font-mono text-muted-foreground text-sm sm:text-foreground"
+            title={row.value}
+            translate="no"
           >
-            {t("modelMappings.target")}
-          </label>
-          <Input
-            aria-invalid={(error && !row.value.trim()) || undefined}
-            aria-label={t("modelMappings.target")}
-            className={cn("min-w-0 font-mono", TOUCH_INPUT)}
-            onChange={(event) => onChange({ value: event.target.value })}
-            placeholder={t("modelMappings.targetPlaceholder")}
-            id={`${row.id}-value`}
-            ref={register("value")}
-            spellCheck={false}
-            value={row.value}
-          />
-        </div>
+            {row.value}
+          </code>
+        </span>
       </div>
-      <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
-        <Button
-          aria-label={t("modelMappings.moveUp")}
-          disabled={isFirst}
-          onClick={() => onMove(index - 1, ["up", "down"])}
-          ref={register("up")}
-          size="icon-sm"
-          title={t("modelMappings.moveUp")}
-          variant="quiet"
+      <Menu>
+        <MenuTrigger
+          render={
+            <Button
+              aria-label={t("modelMappings.rowActions", { n })}
+              className="size-10 md:size-8"
+              ref={register}
+              size="icon"
+              variant="quiet"
+            />
+          }
         >
-          <ArrowUpIcon aria-hidden="true" />
-        </Button>
-        <Button
-          aria-label={t("modelMappings.moveDown")}
-          disabled={isLast}
-          onClick={() => onMove(index + 1, ["down", "up"])}
-          ref={register("down")}
-          size="icon-sm"
-          title={t("modelMappings.moveDown")}
-          variant="quiet"
+          <HugeiconsIcon icon={EllipsisIcon} aria-hidden="true" />
+        </MenuTrigger>
+        <MenuPopup align="end" className="min-w-44">
+          <MenuItem onClick={onEdit}>
+            <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
+            {t("modelMappings.edit")}
+          </MenuItem>
+          <MenuItem disabled={filtering || index === 0} onClick={() => onMove(index - 1)}>
+            <HugeiconsIcon icon={ArrowUp02Icon} aria-hidden="true" />
+            {t("modelMappings.moveUp")}
+          </MenuItem>
+          <MenuItem disabled={filtering || index === count - 1} onClick={() => onMove(index + 1)}>
+            <HugeiconsIcon icon={ArrowDown02Icon} aria-hidden="true" />
+            {t("modelMappings.moveDown")}
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem onClick={onDelete} variant="destructive">
+            <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
+            {t("modelMappings.delete")}
+          </MenuItem>
+        </MenuPopup>
+      </Menu>
+      {error ? (
+        <p
+          className="col-span-full pt-1 pb-1 text-destructive-foreground text-xs sm:col-start-3"
+          role="alert"
         >
-          <ArrowDownIcon aria-hidden="true" />
-        </Button>
-        <Button
-          aria-label={t("remove")}
-          onClick={onRemove}
-          size="icon-sm"
-          title={t("remove")}
-          variant="quiet"
-        >
-          <XIcon aria-hidden="true" />
-        </Button>
-      </div>
+          {error}
+        </p>
+      ) : null}
     </li>
+  );
+}
+
+/**
+ * The mapping editor: the text to look for in the client's model name and the Kiro model ID it
+ * becomes, side by side. Both are needed. Apply hands them back to the draft.
+ */
+function MappingEditor({
+  initialKey,
+  initialValue,
+  isNew,
+  onApply,
+}: {
+  initialKey: string;
+  initialValue: string;
+  isNew: boolean;
+  onApply: (key: string, value: string) => void;
+}): JSX.Element {
+  const { t } = useT("settings");
+  const id = useId();
+  const [key, setKey] = useState(initialKey);
+  const [value, setValue] = useState(initialValue);
+  const ready = key.trim() !== "" && value.trim() !== "";
+
+  return (
+    <DialogPopup className="sm:max-w-xl">
+      <form
+        className="flex min-h-0 flex-col"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          // The dialog is portalled but still inside the card's form in React: keep this submit
+          // from saving the card.
+          event.stopPropagation();
+          if (ready) onApply(key.trim(), value.trim());
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>{isNew ? t("modelMappings.add") : t("modelMappings.edit")}</DialogTitle>
+        </DialogHeader>
+        <DialogPanel className="flex flex-col gap-5">
+          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-end sm:gap-3">
+            <div className="flex min-w-0 flex-col gap-2">
+              <Label htmlFor={`${id}-key`}>{t("modelMappings.match")}</Label>
+              <Input
+                autoComplete="off"
+                className={cn("font-mono", TOUCH_INPUT)}
+                id={`${id}-key`}
+                onChange={(event) => setKey(event.target.value)}
+                placeholder={t("modelMappings.matchPlaceholder")}
+                spellCheck={false}
+                value={key}
+              />
+            </div>
+            <HugeiconsIcon
+              icon={ArrowRight02Icon}
+              aria-hidden="true"
+              className="mb-2 hidden size-4 text-muted-foreground sm:block"
+            />
+            <div className="flex min-w-0 flex-col gap-2">
+              <Label htmlFor={`${id}-value`}>{t("modelMappings.target")}</Label>
+              <Input
+                autoComplete="off"
+                className={cn("font-mono", TOUCH_INPUT)}
+                id={`${id}-value`}
+                onChange={(event) => setValue(event.target.value)}
+                placeholder={t("modelMappings.targetPlaceholder")}
+                spellCheck={false}
+                value={value}
+              />
+            </div>
+          </div>
+          <ul className="flex flex-col gap-2 text-muted-foreground text-xs leading-normal">
+            <li className="flex gap-2">
+              <HugeiconsIcon
+                icon={InformationCircleIcon}
+                aria-hidden="true"
+                className="mt-px size-3.5 shrink-0"
+              />
+              <span className="text-pretty">{t("modelMappings.matchHint")}</span>
+            </li>
+            <li className="flex gap-2">
+              <HugeiconsIcon
+                icon={ArrowRight02Icon}
+                aria-hidden="true"
+                className="mt-px size-3.5 shrink-0"
+              />
+              <span className="text-pretty">{t("modelMappings.targetHint")}</span>
+            </li>
+          </ul>
+        </DialogPanel>
+        <DialogFooter>
+          <DialogClose render={<Button variant="ghost" />}>
+            {t("common:actions.cancel")}
+          </DialogClose>
+          <Button disabled={!ready} type="submit">
+            {isNew ? t("modelMappings.add") : t("modelMappings.apply")}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogPopup>
   );
 }

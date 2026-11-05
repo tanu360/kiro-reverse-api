@@ -1,5 +1,6 @@
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { type JSX, useEffect, useRef, useState } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
@@ -55,7 +56,7 @@ export function CopyButton({
   };
 
   const iconOnly = !showLabel || size === "icon";
-  const Icon = copied ? CheckIcon : CopyIcon;
+  const Icon = copied ? CheckIcon : Copy01Icon;
   const button = (
     <Button
       aria-label={iconOnly ? label : undefined}
@@ -65,7 +66,13 @@ export function CopyButton({
       size={size}
       variant={variant}
     >
-      <Icon aria-hidden="true" className={cn(copied && "text-success-foreground")} />
+      <AnimatedIcon
+        icon={Icon}
+        aria-hidden="true"
+        className={cn(copied && "text-success-foreground")}
+        // The tick plays when it lands; the copy icon coming back two seconds later stays still.
+        playOnSwap={copied}
+      />
       {iconOnly ? null : <span>{copied ? t("toast.copied") : label}</span>}
     </Button>
   );

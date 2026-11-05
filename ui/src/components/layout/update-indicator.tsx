@@ -1,5 +1,6 @@
-import { CircleArrowUpIcon } from "lucide-react";
+import { CircleArrowUp02Icon } from "@hugeicons/core-free-icons";
 import type { JSX } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
@@ -30,7 +31,7 @@ export function UpdateIndicator(): JSX.Element | null {
           />
         }
       >
-        <CircleArrowUpIcon aria-hidden="true" />
+        <AnimatedIcon icon={CircleArrowUp02Icon} aria-hidden="true" />
         <UpdateDot className="top-2 right-2 md:top-1 md:right-1" />
       </TooltipTrigger>
       <TooltipPopup>{label}</TooltipPopup>

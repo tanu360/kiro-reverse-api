@@ -1,4 +1,5 @@
-import { RotateCwIcon } from "lucide-react";
+import { Refresh01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
@@ -92,7 +93,11 @@ export function RefreshButton({
       size={iconOnly ? "icon" : "default"}
       variant={iconOnly ? "quiet" : "outline"}
     >
-      <RotateCwIcon aria-hidden="true" className={cn(fetching && "motion-safe:animate-spin")} />
+      <HugeiconsIcon
+        icon={Refresh01Icon}
+        aria-hidden="true"
+        className={cn(fetching && "motion-safe:animate-spin")}
+      />
       {iconOnly ? null : text}
     </Button>
   );

@@ -1,8 +1,10 @@
 "use client";
 
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
-import { ChevronRightIcon } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ChevronRightIcon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
+import { withMarqueeText } from "@/components/ui/marquee-text";
 import {
   CheckedDot,
   POPUP_CHECK_ROW_CLASS,
@@ -77,13 +79,15 @@ export function MenuPopup({
         <MenuPrimitive.Popup
           className={cn(
             // Kiro: the one popup sheet (index.css popup-surface) instead of t3code's dropdown glass.
-            "popup-surface relative flex max-w-[calc(100vw-2rem)] not-[class*='w-']:min-w-[min(11rem,calc(100vw-2rem))] origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[opacity,scale] duration-100 focus:outline-none data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            "popup-surface popup-width relative flex origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[opacity,scale] duration-100 focus:outline-none data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             className,
           )}
           data-slot="menu-popup"
           {...props}
         >
-          <div className="max-h-(--available-height) w-full overflow-y-auto p-1">
+          {/* At most 22rem tall (a part row shows there is more), fading at an edge it can still
+              scroll past; a label wider than the popup (index.css popup-width) slides when its row is highlighted. */}
+          <div className="scroll-fade-y max-h-[min(var(--available-height),22rem)] w-full overflow-y-auto p-1">
             {children}
           </div>
         </MenuPrimitive.Popup>
@@ -102,6 +106,7 @@ export function MenuItem({
   className,
   inset,
   variant = "default",
+  children,
   ...props
 }: MenuPrimitive.Item.Props & {
   inset?: boolean;
@@ -118,7 +123,9 @@ export function MenuItem({
       data-slot="menu-item"
       data-variant={variant}
       {...props}
-    />
+    >
+      {withMarqueeText(children)}
+    </MenuPrimitive.Item>
   );
 }
 
@@ -177,12 +184,12 @@ export function MenuCheckboxItem({
             className="inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 items-center rounded-full p-px outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(4)] focus-outline data-checked:bg-primary data-unchecked:bg-input data-disabled:opacity-64 sm:[--thumb-size:--spacing(3)]"
             keepMounted
           >
-            <span className="pointer-events-none block aspect-square h-full in-[[data-slot=menu-checkbox-item][data-checked]]:origin-[var(--thumb-size)_50%] origin-left in-[[data-slot=menu-checkbox-item][data-checked]]:translate-x-[calc(var(--thumb-size)-4px)] in-[[data-slot=menu-checkbox-item]:active]:not-data-disabled:scale-x-110 in-[[data-slot=menu-checkbox-item]:active]:rounded-[var(--thumb-size)/calc(var(--thumb-size)*1.10)] rounded-(--thumb-size) bg-background will-change-transform [transition:translate_.15s,border-radius_.15s,scale_.1s_.1s,transform-origin_.15s] rtl:in-[[data-slot=menu-checkbox-item][data-checked]]:origin-left rtl:origin-right rtl:in-[[data-slot=menu-checkbox-item][data-checked]]:-translate-x-[calc(var(--thumb-size)-4px)]" />
+            <span className="pointer-events-none block aspect-square h-full in-[[data-slot=menu-checkbox-item][data-checked]]:origin-[var(--thumb-size)_50%] origin-left in-[[data-slot=menu-checkbox-item][data-checked]]:translate-x-[calc(var(--thumb-size)-4px)] in-[[data-slot=menu-checkbox-item]:active]:not-data-disabled:scale-x-110 in-[[data-slot=menu-checkbox-item]:active]:rounded-[var(--thumb-size)/calc(var(--thumb-size)*1.10)] rounded-(--thumb-size) bg-background in-[[data-slot=menu-checkbox-item][data-checked]]:bg-primary-foreground will-change-transform [transition:translate_.15s,border-radius_.15s,scale_.1s_.1s,transform-origin_.15s] rtl:in-[[data-slot=menu-checkbox-item][data-checked]]:origin-left rtl:origin-right rtl:in-[[data-slot=menu-checkbox-item][data-checked]]:-translate-x-[calc(var(--thumb-size)-4px)]" />
           </MenuPrimitive.CheckboxItemIndicator>
         </>
       ) : (
         <>
-          <span className="flex min-w-0 items-center gap-2.5">{children}</span>
+          <span className="flex min-w-0 items-center gap-2.5">{withMarqueeText(children)}</span>
           <MenuPrimitive.CheckboxItemIndicator className={POPUP_INDICATOR_CLASS}>
             <CheckedDot />
           </MenuPrimitive.CheckboxItemIndicator>
@@ -214,7 +221,7 @@ export function MenuRadioItem({
       data-slot="menu-radio-item"
       {...props}
     >
-      <span className="flex min-w-0 items-center gap-2.5">{children}</span>
+      <span className="flex min-w-0 items-center gap-2.5">{withMarqueeText(children)}</span>
       {meta === undefined ? (
         <MenuPrimitive.RadioItemIndicator className={POPUP_INDICATOR_CLASS}>
           <CheckedDot />
@@ -310,7 +317,7 @@ export function MenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon aria-hidden="true" className="-me-1 ms-auto size-4" />
+      <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" className="-me-1 ms-auto size-4" />
     </MenuPrimitive.SubmenuTrigger>
   );
 }

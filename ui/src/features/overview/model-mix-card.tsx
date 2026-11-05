@@ -1,5 +1,5 @@
+import { BoxesIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { BoxesIcon } from "lucide-react";
 import { type JSX, lazy, Suspense, useMemo } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";

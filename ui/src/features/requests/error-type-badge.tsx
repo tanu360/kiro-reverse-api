@@ -1,4 +1,5 @@
-import { InfoIcon, type LucideIcon, OctagonXIcon, TriangleAlertIcon } from "lucide-react";
+import { InfoIcon, OctagonXIcon, TriangleAlertIcon } from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@hugeicons/react";
 import type { JSX } from "react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { useT } from "@/lib/i18n";
@@ -10,7 +11,7 @@ const TONE_PILL = {
   muted: { tone: "neutral", icon: InfoIcon },
   warning: { tone: "warning", icon: TriangleAlertIcon },
   destructive: { tone: "destructive", icon: OctagonXIcon },
-} as const satisfies Record<ErrorTone, { tone: BadgeTone; icon: LucideIcon }>;
+} as const satisfies Record<ErrorTone, { tone: BadgeTone; icon: IconSvgElement }>;
 
 /** Error category pill: muted, warning or destructive, like the old UI's three tiers. */
 export function ErrorTypeBadge({

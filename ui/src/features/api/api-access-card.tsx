@@ -1,6 +1,11 @@
+import {
+  LockKeyholeIcon,
+  LockKeyholeOpenIcon,
+  TriangleAlertIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
-import { LockKeyholeIcon, LockKeyholeOpenIcon, TriangleAlertIcon } from "lucide-react";
 import { type JSX, useEffect, useId, useRef, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
@@ -148,7 +153,7 @@ export function ApiAccessCard(): JSX.Element {
                 data-testid="api-access-state"
                 id={stateId}
               >
-                <StateIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                <HugeiconsIcon icon={StateIcon} aria-hidden="true" className="size-3.5 shrink-0" />
                 {saved ? t("access.stateOn") : t("access.stateOff")}
               </p>
             )}
@@ -156,7 +161,7 @@ export function ApiAccessCard(): JSX.Element {
         </div>
         {showKeyWarning ? (
           <Alert variant="warning">
-            <TriangleAlertIcon aria-hidden="true" />
+            <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
             <AlertDescription>{t("access.enabledApiKeyRequired")}</AlertDescription>
           </Alert>
         ) : null}

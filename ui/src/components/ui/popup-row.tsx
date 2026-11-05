@@ -1,4 +1,5 @@
-import { CheckIcon } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { CheckIcon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +39,7 @@ export function CheckedDot({ className }: { className?: string }): React.ReactEl
       )}
       data-slot="checked-dot"
     >
-      <CheckIcon aria-hidden="true" className="size-3" strokeWidth={3} />
+      <HugeiconsIcon icon={CheckIcon} aria-hidden="true" className="size-3" strokeWidth={3} />
     </span>
   );
 }
