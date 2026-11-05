@@ -14,7 +14,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
-import { Code } from "@/components/shared/code";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
@@ -309,7 +308,7 @@ export function ApiKeysCard(): JSX.Element {
   const renderCard = (apiKey: ApiKey) => (
     <ListCard
       action={actions(apiKey)}
-      badge={<KeyStatus apiKey={apiKey} />}
+      badge={<StatusBadge apiKey={apiKey} />}
       footer={<MaskedKey apiKey={apiKey} />}
       meta={
         <span className="flex flex-wrap gap-x-3 gap-y-1">
@@ -333,14 +332,23 @@ export function ApiKeysCard(): JSX.Element {
         </TruncatedText>
       }
     >
-      <KeyUsage apiKey={apiKey} />
+      {/* The limit badge sits in the body, so the title keeps the header width beside one badge. */}
+      <div className="flex flex-col items-start gap-2">
+        {isLimitReached(apiKey) ? <LimitBadge /> : null}
+        <KeyUsage apiKey={apiKey} />
+      </div>
     </ListCard>
   );
 
   const headerActions = (
     <>
-      <RefreshButton fetching={keys.isFetching} onRefresh={() => void keys.refetch()} />
-      <Button onClick={openCreate} ref={createRef}>
+      <RefreshButton
+        fetching={keys.isFetching}
+        onRefresh={() => void keys.refetch()}
+        size="sm"
+        variant="icon"
+      />
+      <Button onClick={openCreate} ref={createRef} size="sm">
         <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
         {t("keys.create")}
       </Button>
@@ -351,7 +359,7 @@ export function ApiKeysCard(): JSX.Element {
   const emptyState = (
     <EmptyState
       action={
-        <Button onClick={openCreate} variant="outline">
+        <Button onClick={openCreate} size="sm" variant="outline">
           <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
           {t("keys.create")}
         </Button>
@@ -438,7 +446,7 @@ function MaskedKey({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const { t } = useT("api");
   return (
     <span className="inline-flex min-w-0 items-center gap-1">
-      <Code>{apiKey.keyMasked}</Code>
+      <TruncatedText className="font-mono text-meta">{apiKey.keyMasked}</TruncatedText>
       <CopyButton
         label={t("keys.copyKey", { name: keyName(apiKey, t) })}
         size="icon"
@@ -450,37 +458,45 @@ function MaskedKey({ apiKey }: { apiKey: ApiKey }): JSX.Element {
 }
 
 function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
-  const { t } = useT("api");
-  const limited = isLimitReached(apiKey);
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      {apiKey.enabled ? (
-        <Badge icon={CircleCheckIcon} tone="success">
-          {t("common:status.enabled")}
-        </Badge>
-      ) : (
-        <Badge icon={CircleSlashIcon} tone="neutral">
-          {t("common:status.disabled")}
-        </Badge>
-      )}
-      {limited ? (
-        // A popover, not a tooltip: a tap opens it too, so touch users can read the hint.
-        <Popover>
-          <PopoverTrigger
-            closeDelay={100}
-            delay={200}
-            openOnHover
-            render={<button className={badgeVariants({ tone: "warning" })} type="button" />}
-          >
-            <BadgeIcon icon={AlertCircleIcon} />
-            {t("keys.limitReached")}
-          </PopoverTrigger>
-          <PopoverPopup className="max-w-64" tooltipStyle>
-            {t("keys.limitReachedHint")}
-          </PopoverPopup>
-        </Popover>
-      ) : null}
+      <StatusBadge apiKey={apiKey} />
+      {isLimitReached(apiKey) ? <LimitBadge /> : null}
     </span>
+  );
+}
+
+function StatusBadge({ apiKey }: { apiKey: ApiKey }): JSX.Element {
+  const { t } = useT("api");
+  return apiKey.enabled ? (
+    <Badge icon={CircleCheckIcon} tone="success">
+      {t("common:status.enabled")}
+    </Badge>
+  ) : (
+    <Badge icon={CircleSlashIcon} tone="neutral">
+      {t("common:status.disabled")}
+    </Badge>
+  );
+}
+
+function LimitBadge(): JSX.Element {
+  const { t } = useT("api");
+  return (
+    // A popover, not a tooltip: a tap opens it too, so touch users can read the hint.
+    <Popover>
+      <PopoverTrigger
+        closeDelay={100}
+        delay={200}
+        openOnHover
+        render={<button className={badgeVariants({ tone: "warning" })} type="button" />}
+      >
+        <BadgeIcon icon={AlertCircleIcon} />
+        {t("keys.limitReached")}
+      </PopoverTrigger>
+      <PopoverPopup className="max-w-64" tooltipStyle>
+        {t("keys.limitReachedHint")}
+      </PopoverPopup>
+    </Popover>
   );
 }
 

@@ -2,7 +2,6 @@ import { KeyRoundIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
 import { CopyField } from "@/components/shared/code-field";
-import { CopyButton } from "@/components/shared/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
@@ -25,15 +24,13 @@ export function CreatedKeyPanel({
       <AlertTitle>{t("created.title")}</AlertTitle>
       <AlertDescription>
         <p>{t("created.body")}</p>
-        <CopyField label={t("created.title")} multiline value={apiKey} />
+        <CopyField
+          copyLabel={t("created.copy")}
+          label={t("created.title")}
+          multiline
+          value={apiKey}
+        />
         <div className="flex flex-wrap items-center gap-2">
-          <CopyButton
-            label={t("created.copy")}
-            showLabel
-            size="sm"
-            value={apiKey}
-            variant="outline"
-          />
           <Button onClick={onDismiss} size="sm" variant="ghost">
             {t("created.dismiss")}
           </Button>
