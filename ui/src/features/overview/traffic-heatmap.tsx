@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type RefObject,
   Suspense,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -38,6 +39,38 @@ const TooltipBox = lazy(() =>
   })),
 );
 
+/** TooltipBox's gap between the cell and a panel beside it, and its inset from the sides. */
+const SIDE_OFFSET = 16;
+const EDGE_GAP = 8;
+/** Gap between the row and a panel above or below it. */
+const ROW_GAP = 8;
+
+interface PanelSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * Where the panel goes when it cannot sit beside the cell (a narrow card) or the cell was tapped
+ * (the finger is on it): above the row, or below it when the card has no room above, centred on
+ * the cell and kept inside the card. The cell and its row label stay in view.
+ */
+function stackedPosition(
+  hover: Hover,
+  panel: PanelSize,
+  containerWidth: number,
+): { left: number; top: number } | null {
+  const fitsRight = hover.x + SIDE_OFFSET + panel.width <= containerWidth - EDGE_GAP;
+  const fitsLeft = hover.x - SIDE_OFFSET - panel.width >= EDGE_GAP;
+  if (!hover.touch && (fitsRight || fitsLeft)) return null;
+  const above = hover.top - ROW_GAP - panel.height;
+  const maxLeft = Math.max(EDGE_GAP, containerWidth - panel.width - EDGE_GAP);
+  return {
+    left: Math.min(Math.max(hover.x - panel.width / 2, EDGE_GAP), maxLeft),
+    top: above >= 0 ? above : hover.bottom + ROW_GAP,
+  };
+}
+
 /** One cell's minute, row and counts in the charts' tooltip panel. */
 function HeatTooltip({
   hover,
@@ -49,24 +82,49 @@ function HeatTooltip({
   labels: { requests: string; errors: string };
 }): JSX.Element {
   const box = containerRef.current;
+  const containerWidth = box?.clientWidth ?? 0;
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [panel, setPanel] = useState<PanelSize | null>(null);
+  // The panel's size, read before paint after every render (the content changes per cell): the
+  // box is portalled into the container, so the panel is the content's ancestor that is the
+  // container's direct child.
+  useLayoutEffect(() => {
+    let node = contentRef.current?.parentElement ?? null;
+    while (node && node.parentElement !== box) node = node.parentElement;
+    if (!node) return;
+    const next = { width: node.offsetWidth, height: node.offsetHeight };
+    setPanel((prev) => (prev?.width === next.width && prev.height === next.height ? prev : next));
+  });
+  const stacked = panel ? stackedPosition(hover, panel, containerWidth) : null;
   return (
     <TooltipBox
+      // Its own width wherever it sits: an absolute box near the card's edge would otherwise
+      // shrink to the room left there, and the side and the stacking are picked from that width.
+      className="w-max max-w-full"
       containerHeight={box?.clientHeight ?? 0}
       containerRef={containerRef}
-      containerWidth={box?.clientWidth ?? 0}
+      containerWidth={containerWidth}
+      // A new box when the panel moves between beside and stacked, so it opens in place.
+      key={stacked ? "stacked" : "beside"}
+      flipped={stacked ? false : undefined}
+      left={stacked?.left}
+      replayOnFlip={!stacked}
+      top={stacked?.top}
       visible
       x={hover.x}
       y={hover.y}
     >
-      <TooltipContent
-        meta={hover.label}
-        mono
-        rows={[
-          { color: SUCCEEDED_COLOR, label: labels.requests, value: hover.requests },
-          { color: FAILED_COLOR, label: labels.errors, value: hover.errors },
-        ]}
-        title={hover.time}
-      />
+      <div ref={contentRef}>
+        <TooltipContent
+          meta={hover.label}
+          mono
+          rows={[
+            { color: SUCCEEDED_COLOR, label: labels.requests, value: hover.requests },
+            { color: FAILED_COLOR, label: labels.errors, value: hover.errors },
+          ]}
+          title={hover.time}
+        />
+      </div>
     </TooltipBox>
   );
 }
@@ -112,8 +170,14 @@ interface HeatRow {
 
 interface Hover {
   key: string;
+  /** The cell's centre, in container px. */
   x: number;
   y: number;
+  /** The top and bottom of the cell's row (its label included), in container px. */
+  top: number;
+  bottom: number;
+  /** Tapped rather than pointed at: the panel goes above or below the row, clear of the finger. */
+  touch: boolean;
   time: string;
   label: string;
   requests: string;
@@ -295,11 +359,17 @@ export function TrafficHeatmap(): JSX.Element {
     const total = sum(minutes);
     const newest = view.nowUnix - offset * 60;
     const cellBox = target.getBoundingClientRect();
+    const rowBox = (
+      target.closest<HTMLElement>("[data-heat-row]") ?? target
+    ).getBoundingClientRect();
     const outer = box.getBoundingClientRect();
     setHover({
       key,
       x: cellBox.left + cellBox.width / 2 - outer.left,
       y: cellBox.top + cellBox.height / 2 - outer.top,
+      top: rowBox.top - outer.top,
+      bottom: rowBox.bottom - outer.top,
+      touch: event.pointerType === "touch",
       // "11:52 – 11:53 AM": the range in the language's own short form.
       time:
         span > 1
@@ -357,7 +427,7 @@ export function TrafficHeatmap(): JSX.Element {
             ref={containerRef}
           >
             {view.rows.map((row, rowIndex) => (
-              <div className={ROW_GRID} key={row.key}>
+              <div className={ROW_GRID} data-heat-row key={row.key}>
                 <div className="min-w-0 truncate text-sm">{row.label}</div>
                 <HeatCells
                   maxReq={view.maxReq}
