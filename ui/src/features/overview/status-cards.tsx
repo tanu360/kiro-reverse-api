@@ -54,7 +54,7 @@ const HIGHLIGHT_BARS = 3;
 type TrendKey = "requests" | "succeeded" | "failed";
 type Trends = Record<TrendKey, Pick<StatTileProps, "delta" | "trend">>;
 
-/** The hour-over-hour change from the cached two-hour heatmap ("+6.8% vs previous hour"). */
+/** The hour-over-hour change from the cached two-hour heatmap ("+6.8% vs last hour"). */
 function deltaFor(
   cells: readonly HeatmapCell[] | undefined,
   value: CellValue,
@@ -246,7 +246,7 @@ export function StatusCards(): JSX.Element {
   const cells = heatmap.data?.global.cells;
   const overview = live.data;
   const livePending = live.isPending;
-  const label = t("stats.vsPreviousHour");
+  const label = t("stats.vsLastHour");
 
   // Rebuilt only when the heatmap or a live tick brings new numbers, so the bars morph in place
   // instead of re-entering on every render.

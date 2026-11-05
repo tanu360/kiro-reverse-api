@@ -181,7 +181,11 @@ function ErrorsPanel(): JSX.Element {
     return totalsFailed ? (
       <ErrorState notLoaded />
     ) : (
-      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      <ErrorState
+        error={query.error}
+        onRetry={() => void query.refetch()}
+        title={t("errors.activityErrors")}
+      />
     );
   }
 
@@ -198,7 +202,12 @@ function ErrorsPanel(): JSX.Element {
   return (
     <>
       {query.data && query.isError && !totalsFailed ? (
-        <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
+        <ErrorState
+          compact
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          title={t("errors.activityErrors")}
+        />
       ) : null}
       <DataTable
         caption={t("activity.errors")}
@@ -286,7 +295,11 @@ function RequestsPanel(): JSX.Element {
     return totalsFailed ? (
       <ErrorState notLoaded />
     ) : (
-      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      <ErrorState
+        error={query.error}
+        onRetry={() => void query.refetch()}
+        title={t("errors.activityRequests")}
+      />
     );
   }
 
@@ -304,7 +317,12 @@ function RequestsPanel(): JSX.Element {
   return (
     <>
       {query.data && query.isError && !totalsFailed ? (
-        <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
+        <ErrorState
+          compact
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          title={t("errors.activityRequests")}
+        />
       ) : null}
       <DataTable
         caption={t("activity.requests")}

@@ -177,7 +177,11 @@ export function ModelMixCard(): JSX.Element {
       body = totalsFailed ? (
         <ErrorState notLoaded />
       ) : (
-        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+        <ErrorState
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          title={t("errors.modelMix")}
+        />
       );
     } else {
       body = (
@@ -203,7 +207,12 @@ export function ModelMixCard(): JSX.Element {
     body = (
       <>
         {query.isError && !totalsFailed ? (
-          <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
+          <ErrorState
+            compact
+            error={query.error}
+            onRetry={() => void query.refetch()}
+            title={t("errors.modelMix")}
+          />
         ) : null}
         {/* Ring beside the table only when the card fits both (56rem); otherwise stacked. */}
         <div className="flex min-w-0 flex-col @4xl:flex-row @4xl:items-center">

@@ -228,7 +228,7 @@ describe("OverviewPage", () => {
       expect(node).not.toBeNull();
       return node;
     });
-    expect(delta?.textContent).toMatch(/^[+-−]?\d[\d.,]*%\s+vs previous hour$/);
+    expect(delta?.textContent).toMatch(/^[+-−]?\d[\d.,]*%\s+vs last hour$/);
   });
 
   it("asks for the global row only, except for the top five accounts in the heatmap", async () => {
@@ -345,6 +345,7 @@ describe("OverviewPage", () => {
     await renderApp("/");
     const modelMix = await screen.findByRole("region", { name: "Model mix" });
     expect(await within(modelMix).findByRole("alert")).toBeInTheDocument();
+    expect(within(modelMix).getByText("Could not load the model mix")).toBeInTheDocument();
     expect(within(modelMix).getByRole("button", { name: "Try again" })).toBeInTheDocument();
 
     expect(await statCard("Accounts")).toBeInTheDocument();

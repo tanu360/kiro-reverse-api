@@ -390,7 +390,11 @@ export function TrafficHeatmap(): JSX.Element {
       body = totalsFailed ? (
         <ErrorState notLoaded />
       ) : (
-        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+        <ErrorState
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          title={t("errors.heatmap")}
+        />
       );
     } else {
       body = (
@@ -406,7 +410,12 @@ export function TrafficHeatmap(): JSX.Element {
     body = (
       <div className="flex flex-col gap-3">
         {query.isError && !totalsFailed ? (
-          <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
+          <ErrorState
+            compact
+            error={query.error}
+            onRetry={() => void query.refetch()}
+            title={t("errors.heatmap")}
+          />
         ) : null}
         <p className="sr-only">{t("heatmap.summary", counts(t, lang, view.total))}</p>
         {view.total.requests === 0 ? (

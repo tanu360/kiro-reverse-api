@@ -169,7 +169,11 @@ export function TrafficCard(): JSX.Element {
       body = totalsFailed ? (
         <ErrorState notLoaded />
       ) : (
-        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+        <ErrorState
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          title={t("errors.traffic")}
+        />
       );
     } else {
       body = (
@@ -185,7 +189,12 @@ export function TrafficCard(): JSX.Element {
     body = (
       <div className="flex flex-col gap-3">
         {query.isError && !totalsFailed ? (
-          <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
+          <ErrorState
+            compact
+            error={query.error}
+            onRetry={() => void query.refetch()}
+            title={t("errors.traffic")}
+          />
         ) : null}
         <p className="sr-only">
           {t("traffic.summary", {
