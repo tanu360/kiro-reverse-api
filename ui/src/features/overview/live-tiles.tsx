@@ -7,7 +7,7 @@ import {
   UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, lazy, type ReactNode, Suspense, useMemo } from "react";
+import { type JSX, type ReactNode, useMemo } from "react";
 import {
   StatGroup,
   StatTile,
@@ -19,10 +19,10 @@ import { observeOverviewQuery } from "@/lib/api/observe";
 import type { ObserveOverview, ObserveSeries } from "@/lib/api/types";
 import { EMPTY, formatCredits, formatFraction, formatNumber } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
+import { type Bars, rateBars, sumBars } from "./aggregate";
 import { FAILED_COLOR } from "./colors";
+import { LazySparkline } from "./lazy-sparkline";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
-
-const StatSparkline = lazy(() => import("./stat-sparkline"));
 
 type TileId = "rpm" | "errRate" | "inTpm" | "outTpm" | "credits60" | "activeAccounts";
 
@@ -60,37 +60,6 @@ function values(o: ObserveOverview, lang: Lang): Record<TileId, string> {
   };
 }
 
-/**
- * Minutes per sparkline bar: the 30 per-minute points become 15 bars, wide enough to read in
- * the 48 to 96 px trend slot. Bars are cut from the newest end, so the last one always holds the
- * current (partial) minute.
- */
-const BAR_MINUTES = 2;
-
-type Bars = { value: number }[];
-
-/** Sums `values` (oldest first) into BAR_MINUTES-wide bars, oldest first. */
-function sumBars(values: readonly number[]): Bars {
-  const bars: Bars = [];
-  for (let end = values.length; end > 0; end -= BAR_MINUTES) {
-    let sum = 0;
-    for (let index = Math.max(0, end - BAR_MINUTES); index < end; index += 1) {
-      sum += values[index] ?? 0;
-    }
-    bars.unshift({ value: sum });
-  }
-  return bars;
-}
-
-/** The error rate per bar: failures over requests across its minutes (0 for an empty bar). */
-function rateBars(rpm: readonly number[], errRate: readonly number[]): Bars {
-  const requests = sumBars(rpm);
-  const failures = sumBars(rpm.map((reqs, index) => reqs * (errRate[index] ?? 0)));
-  return requests.map((bar, index) => ({
-    value: bar.value > 0 ? failures[index].value / bar.value : 0,
-  }));
-}
-
 /** Older servers send no series; every tile then shows the flat empty stubs. */
 const NO_SERIES: ObserveSeries = { rpm: [], errRate: [], inTpm: [], outTpm: [], credits: [] };
 
@@ -100,9 +69,7 @@ function trends(o: ObserveOverview, animate: boolean): Record<TileId, ReactNode>
   const last = errRate.at(-1)?.value ?? 0;
   const before = errRate.at(-2)?.value ?? 0;
   const sparkline = (data: Bars, color?: string) => (
-    <Suspense fallback={null}>
-      <StatSparkline animate={animate} color={color} data={data} />
-    </Suspense>
+    <LazySparkline animate={animate} color={color} data={data} />
   );
   // Active accounts has no series: a meter of the active share of the available accounts.
   const available = Math.max(0, o.availableAccts ?? 0);

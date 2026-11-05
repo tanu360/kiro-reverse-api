@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { HttpResponse, http } from "msw";
+import { delay, HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
 import { buildStatus } from "@/lib/mocks/fixtures";
@@ -190,6 +190,42 @@ describe("OverviewPage", () => {
     const errors = within(live).getByText("Errors (5 min)").closest('[data-slot="stat-tile"]');
     expect(errors).toHaveAttribute("data-tone", "danger");
     expect(errors?.querySelector('[data-slot="stat-value"]')).toHaveClass("text-foreground");
+  });
+
+  it("draws the totals' last half hour as bars from the live series, Accounts as a meter", async () => {
+    // The heatmap never answers: the bars must come from the live series alone.
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), async () => {
+        await delay("infinite");
+        return HttpResponse.json({});
+      }),
+    );
+    await renderApp("/");
+    const trend = (tile: HTMLElement) => tile.querySelector('[data-slot="stat-trend"]');
+    for (const label of ["Requests", "Succeeded", "Failed"]) {
+      const tile = await statCard(label);
+      // The lazy sparkline replaces the loading placeholder in the reserved 28 px slot. jsdom
+      // has no layout, so the sparkline draws its box without the svg.
+      await waitFor(() => {
+        expect(trend(tile)?.childElementCount).toBe(1);
+        expect(trend(tile)?.querySelector('[data-slot="skeleton"]')).toBeNull();
+      });
+      // No heatmap yet, so no hour-over-hour delta; the bars do not wait for it.
+      expect(tile.querySelector('[data-slot="stat-delta"]')).toBeNull();
+    }
+    const accounts = await statCard("Accounts");
+    expect(trend(accounts)?.querySelector('[data-slot="meter-indicator"]')).not.toBeNull();
+  });
+
+  it("puts the hour-over-hour delta on the totals' delta line", async () => {
+    await renderApp("/");
+    const requests = await statCard("Requests");
+    const delta = await waitFor(() => {
+      const node = requests.querySelector('[data-slot="stat-delta"]');
+      expect(node).not.toBeNull();
+      return node;
+    });
+    expect(delta?.textContent).toMatch(/^[+-−]?\d[\d.,]*%\s+vs previous hour$/);
   });
 
   it("asks for the global row only, except for the top five accounts in the heatmap", async () => {

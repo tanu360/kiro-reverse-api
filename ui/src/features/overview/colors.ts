@@ -8,7 +8,8 @@ export const PREVIOUS_COLOR = "var(--chart-comparison)";
 
 /**
  * Model-mix ring and table dots: the top five models on the purple-to-grey ramp, then "Other"
- * in the muted text grey. Never green or red: a model's share is not good or bad news.
+ * in the quietest step, below chart-5. Never green or red: a model's share is not good or bad
+ * news.
  */
 export const MODEL_COLORS = [
   "var(--chart-1)",
@@ -17,4 +18,4 @@ export const MODEL_COLORS = [
   "var(--chart-4)",
   "var(--chart-5)",
 ] as const;
-export const OTHER_MODEL_COLOR = "var(--muted-foreground)";
+export const OTHER_MODEL_COLOR = "var(--chart-other)";

@@ -1,7 +1,8 @@
 import { CircleCheckIcon, CircleXIcon, Route01Icon, UsersIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, lazy, type ReactNode, Suspense, useMemo } from "react";
+import { type JSX, type ReactNode, useMemo } from "react";
 import {
+  type StatDelta,
   StatGroup,
   type StatMetric,
   StatTile,
@@ -9,17 +10,15 @@ import {
   StatTileSkeleton,
 } from "@/components/shared/stat-card";
 import { Meter, MeterIndicator, type MeterTone, MeterTrack } from "@/components/ui/meter";
-import { Skeleton } from "@/components/ui/skeleton";
 import { heatmapQuery, observeOverviewQuery } from "@/lib/api/observe";
 import { statusQuery } from "@/lib/api/system";
-import type { HeatmapCell, StatusResponse } from "@/lib/api/types";
+import type { HeatmapCell, ObserveSeries, StatusResponse } from "@/lib/api/types";
 import { EMPTY, formatCompact, formatCredits, formatNumber, formatPercent } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
-import { type CellValue, HOUR_PAIR_WINDOW, hourDelta, sparklineBuckets } from "./aggregate";
+import { type Bars, type CellValue, HOUR_PAIR_WINDOW, hourDelta, outcomeBars } from "./aggregate";
 import { FAILED_COLOR } from "./colors";
+import { LazySparkline, TrendPlaceholder } from "./lazy-sparkline";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
-
-const StatSparkline = lazy(() => import("./stat-sparkline"));
 
 /**
  * True while /status or /observe/overview has failed: the page shows one error banner with the
@@ -45,34 +44,44 @@ const succeeded: CellValue = (cell) => Math.max(0, cell.reqs - cell.failures);
 const failures: CellValue = (cell) => cell.failures;
 const requests: CellValue = (cell) => cell.reqs;
 
-type Trend = Pick<StatTileProps, "delta" | "trend">;
+/**
+ * The newest bars drawn in the series colour: three 2-minute bars, about the last five minutes
+ * (the reference strip's bright tail). The older bars are the idle grey.
+ */
+const HIGHLIGHT_BARS = 3;
 
-function trendFor(
-  cells: readonly HeatmapCell[],
+type TrendKey = "requests" | "succeeded" | "failed";
+type Trends = Record<TrendKey, Pick<StatTileProps, "delta" | "trend">>;
+
+/** The hour-over-hour change from the cached two-hour heatmap ("+6.8% vs previous hour"). */
+function deltaFor(
+  cells: readonly HeatmapCell[] | undefined,
   value: CellValue,
-  options: { goodWhen: "up" | "down"; label: string; animate: boolean },
-): Trend {
-  const { current, previous, delta } = hourDelta(cells, value);
-  // The newest bar turns red only on the Failed tile, and only when failures are up.
-  const alert = options.goodWhen === "down" && current > previous;
-  return {
-    delta:
-      delta === null ? null : { value: delta, label: options.label, goodWhen: options.goodWhen },
-    trend: (
-      <Suspense fallback={null}>
-        <StatSparkline
-          animate={options.animate}
-          color={alert ? FAILED_COLOR : undefined}
-          data={sparklineBuckets(cells, value)}
-        />
-      </Suspense>
-    ),
-  };
+  goodWhen: StatDelta["goodWhen"],
+  label: string,
+): StatDelta | null {
+  if (!cells) return null;
+  const { delta } = hourDelta(cells, value);
+  return delta === null ? null : { value: delta, label, goodWhen };
 }
 
-/** While the heatmap loads, the trend slot holds its 28 px with a placeholder. */
-const PENDING_TREND: Trend = { delta: null, trend: <Skeleton className="h-7 w-full" /> };
-const NO_TREND: Trend = { delta: null, trend: undefined };
+/**
+ * The trend slots: 15 two-minute bars of the last half hour from the live series (shared with
+ * the live tiles, so no extra request). The Failed bars are red, and only while the newest ones
+ * hold failures; otherwise they all stay grey.
+ */
+function barTrends(series: Partial<ObserveSeries>, animate: boolean): Record<TrendKey, ReactNode> {
+  const bars = outcomeBars(series.rpm ?? [], series.errRate ?? []);
+  const failing = bars.failed.slice(-HIGHLIGHT_BARS).some((bar) => bar.value > 0);
+  const sparkline = (data: Bars, color?: string, highlight = HIGHLIGHT_BARS) => (
+    <LazySparkline animate={animate} color={color} data={data} highlight={highlight} />
+  );
+  return {
+    requests: sparkline(bars.requests),
+    succeeded: sparkline(bars.succeeded),
+    failed: sparkline(bars.failed, FAILED_COLOR, failing ? HIGHLIGHT_BARS : 0),
+  };
+}
 
 function ratio(part: number, total: number, lang: Lang): string {
   return `${formatNumber(part, lang)} / ${formatNumber(total, lang)}`;
@@ -209,8 +218,10 @@ function failedTile(s: StatusResponse, t: TFunction, lang: Lang): StatTileProps 
 }
 
 /**
- * The four /status totals as one joined KPI strip. Requests, Succeeded and Failed add an
- * hour-over-hour delta and a bar sparkline; Accounts shows the plan capacity used.
+ * The four /status totals as one joined KPI strip, like the reference's top row: icon and label,
+ * the big number, a delta line and a small bar sparkline at its end. Requests, Succeeded and
+ * Failed compare this hour with the previous one and draw the last half hour as bars; Accounts
+ * shows the plan capacity used as a meter in the same slot.
  */
 export function StatusCards(): JSX.Element {
   const { t, lang } = useT("overview");
@@ -218,23 +229,33 @@ export function StatusCards(): JSX.Element {
   // Only the global row is read, so the accounts stay off the wire. Shared with the traffic
   // chart's 1 h view (same key), so this costs no extra request.
   const heatmap = useQuery(heatmapQuery(HOUR_PAIR_WINDOW, { scope: "global" }));
+  // The live series behind the bars; same key as the live tiles, so no extra request.
+  const live = useQuery(observeOverviewQuery());
   const animate = !usePrefersReducedMotion();
   const cells = heatmap.data?.global.cells;
-  const pending = heatmap.isPending;
+  const overview = live.data;
+  const livePending = live.isPending;
   const label = t("stats.vsPreviousHour");
 
-  // Recomputed only when the heatmap changes, so the sparklines do not re-animate on polls.
-  const trends = useMemo(() => {
-    if (!cells) {
-      const fallback = pending ? PENDING_TREND : NO_TREND;
-      return { requests: fallback, succeeded: fallback, failed: fallback };
+  // Rebuilt only when the heatmap or a live tick brings new numbers, so the bars morph in place
+  // instead of re-entering on every render.
+  const trends = useMemo<Trends>(() => {
+    let nodes: Partial<Record<TrendKey, ReactNode>> = {};
+    if (overview) {
+      // An older server sends no series: the bars then draw as the flat empty stubs.
+      nodes = barTrends(overview.series ?? {}, animate);
+    } else if (livePending) {
+      // Until the series loads, the 28 px slot holds a placeholder, so nothing shifts.
+      const pending = <TrendPlaceholder />;
+      nodes = { requests: pending, succeeded: pending, failed: pending };
     }
+    // A failed load leaves the slots empty; the page banner reports it.
     return {
-      requests: trendFor(cells, requests, { goodWhen: "up", label, animate }),
-      succeeded: trendFor(cells, succeeded, { goodWhen: "up", label, animate }),
-      failed: trendFor(cells, failures, { goodWhen: "down", label, animate }),
+      requests: { delta: deltaFor(cells, requests, "up", label), trend: nodes.requests },
+      succeeded: { delta: deltaFor(cells, succeeded, "up", label), trend: nodes.succeeded },
+      failed: { delta: deltaFor(cells, failures, "down", label), trend: nodes.failed },
     };
-  }, [cells, pending, label, animate]);
+  }, [cells, overview, livePending, label, animate]);
 
   const data = status.data;
   let strip: JSX.Element;

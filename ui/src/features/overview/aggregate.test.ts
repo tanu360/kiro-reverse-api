@@ -7,9 +7,11 @@ import {
   hourDelta,
   mergeCells,
   modelSlices,
+  outcomeBars,
   peakCount,
   RANGE_WINDOWS,
-  sparklineBuckets,
+  rateBars,
+  sumBars,
   windowCells,
   withPreviousWindow,
 } from "./aggregate";
@@ -142,18 +144,40 @@ describe("hourDelta", () => {
   });
 });
 
-describe("sparklineBuckets", () => {
-  it("sums the current hour into 12 oldest-first 5-minute buckets", () => {
-    const input = zeros(120);
-    input[0].reqs = 2;
-    input[4].reqs = 3;
-    input[55].reqs = 7;
-    input[90].reqs = 100; // previous hour, ignored
-    const buckets = sparklineBuckets(input, (cell) => cell.reqs);
-    expect(buckets).toHaveLength(12);
-    expect(buckets[0]).toEqual({ value: 7 });
-    expect(buckets[11]).toEqual({ value: 5 });
-    expect(buckets.reduce((sum, b) => sum + b.value, 0)).toBe(12);
+describe("sumBars", () => {
+  it("sums 30 oldest-first minutes into 15 two-minute bars, the newest minute last", () => {
+    const minutes = Array.from({ length: 30 }, (_, index) => index);
+    const bars = sumBars(minutes);
+    expect(bars).toHaveLength(15);
+    expect(bars[0]).toEqual({ value: 0 + 1 });
+    expect(bars[14]).toEqual({ value: 28 + 29 });
+  });
+
+  it("pads a short or missing series with empty minutes at the old end", () => {
+    expect(sumBars([])).toEqual(Array.from({ length: 15 }, () => ({ value: 0 })));
+    const bars = sumBars([5, 1, 2]);
+    expect(bars).toHaveLength(15);
+    expect(bars.at(-1)).toEqual({ value: 3 });
+    expect(bars.at(-2)).toEqual({ value: 5 });
+    expect(bars.slice(0, -2).every((bar) => bar.value === 0)).toBe(true);
+  });
+});
+
+describe("rateBars", () => {
+  it("weights each minute's error rate by its requests, 0 for an empty bar", () => {
+    const bars = rateBars([10, 30, 0, 0], [0.5, 0.1, 0, 0]);
+    expect(bars.at(-2)?.value).toBeCloseTo((5 + 3) / 40);
+    expect(bars.at(-1)).toEqual({ value: 0 });
+  });
+});
+
+describe("outcomeBars", () => {
+  it("splits each bar's requests into succeeded and failed by the error rate", () => {
+    const { requests, succeeded, failed } = outcomeBars([10, 30, 4, 0], [0.5, 0.1, 0.25, 0]);
+    expect(requests.slice(-2)).toEqual([{ value: 40 }, { value: 4 }]);
+    expect(failed.slice(-2)).toEqual([{ value: 8 }, { value: 1 }]);
+    expect(succeeded.slice(-2)).toEqual([{ value: 32 }, { value: 3 }]);
+    expect(requests).toHaveLength(15);
   });
 });
 

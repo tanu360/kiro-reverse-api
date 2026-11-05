@@ -153,6 +153,7 @@ function ErrorsPanel(): JSX.Element {
         header: t("activity.time"),
         cell: (row) => <ActivityTime lang={lang} ts={row.ts} />,
       },
+      { id: "status", header: t("activity.status"), cell: (row) => <ErrorStatus row={row} /> },
       {
         id: "account",
         header: t("activity.account"),
@@ -165,7 +166,6 @@ function ErrorsPanel(): JSX.Element {
         header: t("activity.model"),
         cell: (row) => <ModelName model={row.model} />,
       },
-      { id: "status", header: t("activity.status"), cell: (row) => <ErrorStatus row={row} /> },
       {
         id: "message",
         header: t("activity.message"),

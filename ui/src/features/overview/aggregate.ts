@@ -105,19 +105,64 @@ export function hourDelta(cells: readonly HeatmapCell[], value: CellValue = requ
   return { current, previous, delta: previous === 0 ? null : (current - previous) / previous };
 }
 
-/** The current hour as 12 oldest-first 5-minute buckets, for the stat-card sparklines. */
-export function sparklineBuckets(
-  cells: readonly HeatmapCell[],
-  value: CellValue = requests,
-): { value: number }[] {
-  const bucketMin = 5;
-  const count = HOUR / bucketMin;
-  const buckets = Array.from({ length: count }, () => ({ value: 0 }));
-  for (const cell of cells) {
-    if (cell.offset < 0 || cell.offset >= HOUR) continue;
-    buckets[count - 1 - Math.floor(cell.offset / bucketMin)].value += value(cell);
+/** Minutes in the live series (/observe/overview `series`): the last half hour, oldest first. */
+export const SERIES_MINUTES = 30;
+
+/**
+ * Minutes per sparkline bar: the 30 per-minute points become 15 bars, wide enough to read in
+ * the 48 to 96 px trend slot. Bars are cut from the newest end, so the last one always holds the
+ * current (partial) minute.
+ */
+export const BAR_MINUTES = 2;
+
+export type Bars = { value: number }[];
+
+/**
+ * Sums per-minute `values` (oldest first) into BAR_MINUTES-wide bars, oldest first. A short
+ * or missing series is padded with empty minutes at the old end, so there are always 15 bars.
+ */
+export function sumBars(values: readonly number[]): Bars {
+  const length = Math.max(values.length, SERIES_MINUTES);
+  const missing = length - values.length;
+  const bars: Bars = [];
+  for (let end = length; end > 0; end -= BAR_MINUTES) {
+    let sum = 0;
+    for (let index = Math.max(0, end - BAR_MINUTES); index < end; index += 1) {
+      sum += values[index - missing] ?? 0;
+    }
+    bars.unshift({ value: sum });
   }
-  return buckets;
+  return bars;
+}
+
+/** Failed requests per minute: requests times that minute's error rate (0..1). */
+function failuresPerMinute(rpm: readonly number[], errRate: readonly number[]): number[] {
+  return rpm.map((reqs, index) => Math.min(reqs, Math.round(reqs * (errRate[index] ?? 0))));
+}
+
+/** The error rate per bar: failures over requests across its minutes (0 for an empty bar). */
+export function rateBars(rpm: readonly number[], errRate: readonly number[]): Bars {
+  const requests = sumBars(rpm);
+  const failures = sumBars(rpm.map((reqs, index) => reqs * (errRate[index] ?? 0)));
+  return requests.map((bar, index) => ({
+    value: bar.value > 0 ? failures[index].value / bar.value : 0,
+  }));
+}
+
+/**
+ * The KPI strip's bars from the live series: all requests, the ones that succeeded and the ones
+ * that failed (requests times the error rate), per bar.
+ */
+export function outcomeBars(
+  rpm: readonly number[],
+  errRate: readonly number[],
+): { requests: Bars; succeeded: Bars; failed: Bars } {
+  const failed = failuresPerMinute(rpm, errRate);
+  return {
+    requests: sumBars(rpm),
+    succeeded: sumBars(rpm.map((reqs, index) => Math.max(0, reqs - failed[index]))),
+    failed: sumBars(failed),
+  };
 }
 
 export interface ModelSlice {
