@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -82,8 +83,10 @@ func (b *broadcaster) Publish(evt Event) {
 	}
 }
 
-func publishObserveTick() {
-	getBroadcaster().Publish(Event{Type: "observe_tick"})
+// publishObserveTick says observe data changed; the payload is the store's
+// change counter, so a client can tell a new tick from a repeat.
+func publishObserveTick(seq uint64) {
+	getBroadcaster().Publish(Event{Type: "observe_tick", Payload: strconv.FormatUint(seq, 10)})
 }
 
 func publishEvent(eventType, payload string) {

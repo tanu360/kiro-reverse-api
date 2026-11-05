@@ -3,6 +3,7 @@ package proxy
 import (
 	"database/sql"
 	"strings"
+	"time"
 
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
@@ -236,6 +237,115 @@ FROM errors ORDER BY ts DESC, id DESC LIMIT ?`, limit)
 	return out, rows.Err()
 }
 
+// minuteRow is one minute of one account's traffic, summed from SQLite.
+type minuteRow struct {
+	minute    int64
+	accountID string
+	bucket    minuteBucket
+}
+
+// loadMinuteRowsFromDB sums the requests and retries (the errors table holds
+// one row per failed upstream attempt) of every minute from sinceMin on, per
+// account. The ts index keeps both scans to the window.
+func loadMinuteRowsFromDB(sinceMin int64) ([]minuteRow, error) {
+	d, err := db.Get()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := d.Query(`SELECT ts/60 AS m, account_id, COUNT(*),
+COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0),
+COALESCE(SUM(in_tokens), 0), COALESCE(SUM(out_tokens), 0),
+COALESCE(SUM(cache_read_tokens), 0), COALESCE(SUM(cache_write_tokens), 0),
+COALESCE(SUM(credits), 0)
+FROM requests WHERE ts >= ? GROUP BY m, account_id`, sinceMin*60)
+	if err != nil {
+		return nil, err
+	}
+	var out []minuteRow
+	for rows.Next() {
+		var r minuteRow
+		b := &r.bucket
+		if err := rows.Scan(&r.minute, &r.accountID, &b.Reqs, &b.Failures, &b.InTokens, &b.OutTokens, &b.CacheReadTokens, &b.CacheWriteTokens, &b.Credits); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		b.Successes = b.Reqs - b.Failures
+		out = append(out, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	rows, err = d.Query(`SELECT ts/60 AS m, account_id, COUNT(*) FROM errors WHERE ts >= ? GROUP BY m, account_id`, sinceMin*60)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r minuteRow
+		if err := rows.Scan(&r.minute, &r.accountID, &r.bucket.Retries); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// loadModelStatsFromDB sums every logged request and retry per model, so the
+// model mix covers everything since the last stats reset.
+func loadModelStatsFromDB() (map[string]*modelStat, error) {
+	d, err := db.Get()
+	if err != nil {
+		return nil, err
+	}
+	stats := make(map[string]*modelStat)
+	rows, err := d.Query(`SELECT model, COUNT(*),
+COALESCE(SUM(in_tokens), 0), COALESCE(SUM(out_tokens), 0),
+COALESCE(SUM(cache_read_tokens), 0), COALESCE(SUM(cache_write_tokens), 0),
+COALESCE(SUM(credits), 0), COALESCE(MAX(ts), 0)
+FROM requests WHERE model != '' GROUP BY model`)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var model string
+		ms := &modelStat{}
+		if err := rows.Scan(&model, &ms.Reqs, &ms.InTokens, &ms.OutTokens, &ms.CacheReadTokens, &ms.CacheWriteTokens, &ms.Credits, &ms.LastUsed); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		stats[model] = ms
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	rows, err = d.Query(`SELECT model, COUNT(*) FROM errors WHERE model != '' GROUP BY model`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var model string
+		var retries int64
+		if err := rows.Scan(&model, &retries); err != nil {
+			return nil, err
+		}
+		ms, ok := stats[model]
+		if !ok {
+			ms = &modelStat{}
+			stats[model] = ms
+		}
+		ms.Retries = retries
+	}
+	return stats, rows.Err()
+}
+
+// LoadFromDB rebuilds the store from SQLite: the last day of minute rings, the
+// model mix and the recent request and error lists. It replaces what the store
+// held, so calling it twice counts nothing twice.
 func (s *observeStore) LoadFromDB() error {
 	if s == nil {
 		return nil
@@ -248,10 +358,19 @@ func (s *observeStore) LoadFromDB() error {
 	if err != nil {
 		return err
 	}
+	_, curMin := curSlot(time.Now().Unix())
+	sinceMin := curMin - observeMinuteSlots + 1
+	minutes, err := loadMinuteRowsFromDB(sinceMin)
+	if err != nil {
+		return err
+	}
+	models, err := loadModelStatsFromDB()
+	if err != nil {
+		return err
+	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	s.resetLocked()
 	for i := len(reqs) - 1; i >= 0; i-- {
 		s.recentRequests[s.recentReqIdx] = reqs[i]
 		s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
@@ -260,6 +379,33 @@ func (s *observeStore) LoadFromDB() error {
 		s.recentErrors[s.recentErrIdx] = errs[i]
 		s.recentErrIdx = (s.recentErrIdx + 1) % observeRecentErrs
 	}
-	logger.Infof("[Observe] Warmed %d requests, %d errors from db", len(reqs), len(errs))
+	for _, row := range minutes {
+		//! Rows past the current minute (a clock step back) would overwrite live slots.
+		if row.minute < sinceMin || row.minute > curMin {
+			continue
+		}
+		slot := int(row.minute % observeMinuteSlots)
+		addMinute(touchBucket(&s.globalRing, slot, row.minute), row.bucket)
+		if ring := s.getOrCreateAccountRing(row.accountID); ring != nil {
+			addMinute(touchBucket(ring, slot, row.minute), row.bucket)
+		}
+	}
+	s.modelStats = models
+	s.mu.Unlock()
+	s.seq.Add(1)
+
+	logger.Infof("[Observe] Warmed %d requests, %d errors, %d minute rows, %d models from db", len(reqs), len(errs), len(minutes), len(models))
 	return nil
+}
+
+func addMinute(dst *minuteBucket, src minuteBucket) {
+	dst.Reqs += src.Reqs
+	dst.Successes += src.Successes
+	dst.Failures += src.Failures
+	dst.Retries += src.Retries
+	dst.InTokens += src.InTokens
+	dst.OutTokens += src.OutTokens
+	dst.CacheReadTokens += src.CacheReadTokens
+	dst.CacheWriteTokens += src.CacheWriteTokens
+	dst.Credits += src.Credits
 }

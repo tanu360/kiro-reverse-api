@@ -368,7 +368,6 @@ func (h *Handler) handleClaudeDirectWebSearch(w http.ResponseWriter, r *http.Req
 	inputTokens := estimatedInputTokens
 	outputTokens := estimateWebSearchContentTokens(content)
 	h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, 0)
-	getObserveStore().RecordSuccess(account.ID, model, inputTokens, outputTokens, 0)
 	recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, 0, true, 200, "")
 
 	h.writeClaudeWebSearchResponse(w, stream, model, content, "end_turn", inputTokens, outputTokens, 1)
@@ -414,9 +413,8 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 		credits += round.credits
 		outputTokens += round.outputTokens
 		inputTokens += round.inputTokens
-		getObserveStore().RecordSuccess(account.ID, req.Model, round.inputTokens, round.outputTokens, round.credits)
+		//! The client request is counted once, by recordFinalRequestForApiKey after the last round.
 		h.pool.RecordSuccess(account.ID)
-		h.pool.UpdateStats(account.ID, round.inputTokens+round.outputTokens, round.credits)
 
 		searchUses, clientUses := splitWebSearchToolUses(round.toolUses)
 		if len(searchUses) > 0 && len(clientUses) == 0 && roundIdx <= maxUses {

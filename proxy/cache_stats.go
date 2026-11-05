@@ -33,11 +33,10 @@ func cacheTokensFromOpenAIDetails(details *OpenAITokenDetails) cacheTokenCounts 
 	return cacheTokenCounts{Read: details.CachedTokens, Write: details.CacheWriteTokens}
 }
 
-// recordObservedSuccess records a successful request in the observe buckets,
-// model stats and request log, including its cache-read and cache-write share.
+// recordObservedSuccess records a successful request in the request log,
+// which also counts it once in the observe buckets and model stats, including
+// its cache-read and cache-write share.
 func recordObservedSuccess(ctx context.Context, apiKeyReservation *apiKeyUsageReservation, account *config.Account, model string, inTokens, outTokens int, credits float64, cache cacheTokenCounts) {
 	accountID, email := accountIdentity(account)
-	store := getObserveStore()
-	store.RecordSuccessWithCache(accountID, model, inTokens, outTokens, credits, cache)
-	store.RecordTracedRequestWithCache(requestTraceFromContext(ctx), accountID, apiKeyReservation.apiKeyID(), apiKeyReservation.apiKeyValue(), email, model, inTokens, outTokens, credits, true, 200, "", cache)
+	getObserveStore().RecordTracedRequestWithCache(requestTraceFromContext(ctx), accountID, apiKeyReservation.apiKeyID(), apiKeyReservation.apiKeyValue(), email, model, inTokens, outTokens, credits, true, 200, "", cache)
 }

@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"kiro-proxy/config"
@@ -14,6 +15,10 @@ const (
 	observeMinuteSlots = 1440
 	observeRecentErrs  = 100
 	observeRecentReqs  = 200
+	// observeSeriesMin is how many minutes the overview series carry.
+	observeSeriesMin = 30
+	// observeTopRankMin is the window, in minutes, that ranks accounts for top=N.
+	observeTopRankMin = 60
 )
 
 // cacheTokenCounts splits out the prompt-cache share of a request's input
@@ -23,11 +28,16 @@ type cacheTokenCounts struct {
 	Write int
 }
 
+// minuteBucket holds one minute of traffic. Reqs, Successes and Failures count
+// final client requests, the same rows the request log keeps. Retries counts
+// upstream attempts that failed, so one request that failed over twice and
+// then succeeded is Reqs 1, Successes 1, Retries 2.
 type minuteBucket struct {
 	WindowMin        int64
 	Reqs             int
 	Successes        int
 	Failures         int
+	Retries          int
 	InTokens         int64
 	OutTokens        int64
 	CacheReadTokens  int64
@@ -37,6 +47,7 @@ type minuteBucket struct {
 
 type modelStat struct {
 	Reqs             int64
+	Retries          int64
 	InTokens         int64
 	OutTokens        int64
 	CacheReadTokens  int64
@@ -108,6 +119,8 @@ type observeStore struct {
 	recentReqIdx   int
 	maxAccountRing int
 	accountTouched map[string]int64
+	// seq goes up on every change to the store, so the tick can skip idle seconds.
+	seq atomic.Uint64
 }
 
 var (
@@ -173,45 +186,61 @@ func (s *observeStore) getOrCreateAccountRing(accountID string) *[observeMinuteS
 	return ring
 }
 
+// Seq is the store's change counter. It moves on every Record* call and Reset.
+func (s *observeStore) Seq() uint64 {
+	if s == nil {
+		return 0
+	}
+	return s.seq.Load()
+}
+
+// RecordSuccess counts a success in the rings and model stats without logging
+// a request.
+//
+// Deprecated: production paths record once per client request through
+// RecordTracedRequestWithCache, which updates the rings itself. Calling both
+// counts the request twice.
 func (s *observeStore) RecordSuccess(accountID, model string, inTokens, outTokens int, credits float64) {
 	s.RecordSuccessWithCache(accountID, model, inTokens, outTokens, credits, cacheTokenCounts{})
 }
 
+// RecordSuccessWithCache is RecordSuccess with the prompt-cache share.
+//
+// Deprecated: see RecordSuccess.
 func (s *observeStore) RecordSuccessWithCache(accountID, model string, inTokens, outTokens int, credits float64, cache cacheTokenCounts) {
 	if s == nil {
 		return
 	}
 	now := time.Now().Unix()
-	slot, curMin := curSlot(now)
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.countRequestLocked(now, accountID, model, true, inTokens, outTokens, credits, cache)
+	s.mu.Unlock()
+	s.seq.Add(1)
+}
 
-	g := touchBucket(&s.globalRing, slot, curMin)
-	g.Reqs++
-	g.Successes++
-	g.InTokens += int64(inTokens)
-	g.OutTokens += int64(outTokens)
-	g.CacheReadTokens += int64(cache.Read)
-	g.CacheWriteTokens += int64(cache.Write)
-	g.Credits += credits
-
-	if ring := s.getOrCreateAccountRing(accountID); ring != nil {
-		b := touchBucket(ring, slot, curMin)
+// countRequestLocked adds one final client request to the global ring, the
+// account's ring (skipped when accountID is empty) and the model's stats.
+func (s *observeStore) countRequestLocked(now int64, accountID, model string, success bool, inTokens, outTokens int, credits float64, cache cacheTokenCounts) {
+	slot, curMin := curSlot(now)
+	add := func(b *minuteBucket) {
 		b.Reqs++
-		b.Successes++
+		if success {
+			b.Successes++
+		} else {
+			b.Failures++
+		}
 		b.InTokens += int64(inTokens)
 		b.OutTokens += int64(outTokens)
 		b.CacheReadTokens += int64(cache.Read)
 		b.CacheWriteTokens += int64(cache.Write)
 		b.Credits += credits
 	}
-
+	add(touchBucket(&s.globalRing, slot, curMin))
+	if ring := s.getOrCreateAccountRing(accountID); ring != nil {
+		add(touchBucket(ring, slot, curMin))
+	}
 	if model != "" {
-		ms, ok := s.modelStats[model]
-		if !ok {
-			ms = &modelStat{}
-			s.modelStats[model] = ms
-		}
+		ms := s.modelStatLocked(model)
 		ms.Reqs++
 		ms.InTokens += int64(inTokens)
 		ms.OutTokens += int64(outTokens)
@@ -222,6 +251,18 @@ func (s *observeStore) RecordSuccessWithCache(accountID, model string, inTokens,
 	}
 }
 
+func (s *observeStore) modelStatLocked(model string) *modelStat {
+	ms, ok := s.modelStats[model]
+	if !ok {
+		ms = &modelStat{}
+		s.modelStats[model] = ms
+	}
+	return ms
+}
+
+// RecordFailure counts one failed upstream attempt as a retry. The client
+// request it belongs to is counted once, when RecordTracedRequestWithCache
+// logs its final outcome.
 func (s *observeStore) RecordFailure(accountID, model string) {
 	if s == nil {
 		return
@@ -229,27 +270,15 @@ func (s *observeStore) RecordFailure(accountID, model string) {
 	now := time.Now().Unix()
 	slot, curMin := curSlot(now)
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	g := touchBucket(&s.globalRing, slot, curMin)
-	g.Reqs++
-	g.Failures++
-
+	touchBucket(&s.globalRing, slot, curMin).Retries++
 	if ring := s.getOrCreateAccountRing(accountID); ring != nil {
-		b := touchBucket(ring, slot, curMin)
-		b.Reqs++
-		b.Failures++
+		touchBucket(ring, slot, curMin).Retries++
 	}
-
 	if model != "" {
-		ms, ok := s.modelStats[model]
-		if !ok {
-			ms = &modelStat{}
-			s.modelStats[model] = ms
-		}
-		ms.Reqs++
-		ms.LastUsed = now
+		s.modelStatLocked(model).Retries++
 	}
+	s.mu.Unlock()
+	s.seq.Add(1)
 }
 
 func (s *observeStore) RecordError(accountID, email, model string, status int, message string) {
@@ -271,6 +300,7 @@ func (s *observeStore) RecordError(accountID, email, model string, status int, m
 	s.recentErrors[s.recentErrIdx] = rec
 	s.recentErrIdx = (s.recentErrIdx + 1) % observeRecentErrs
 	s.mu.Unlock()
+	s.seq.Add(1)
 
 	if err := persistErrorRecord(rec); err != nil {
 		logger.Warnf("[Observe] Persist error failed: %v", err)
@@ -289,6 +319,9 @@ func (s *observeStore) RecordTracedRequest(trace *requestTrace, accountID, apiKe
 	s.RecordTracedRequestWithCache(trace, accountID, apiKeyID, apiKey, email, model, inTokens, outTokens, credits, success, status, message, cacheTokenCounts{})
 }
 
+// RecordTracedRequestWithCache logs one final client request and counts it
+// once in the rings and model stats, success or failure. An empty accountID
+// (rejected before an account was picked) counts in the global row only.
 func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, accountID, apiKeyID, apiKey, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string, cache cacheTokenCounts) {
 	if s == nil {
 		return
@@ -321,7 +354,9 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 	s.mu.Lock()
 	s.recentRequests[s.recentReqIdx] = rec
 	s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
+	s.countRequestLocked(rec.TS, accountID, model, success, inTokens, outTokens, credits, cache)
 	s.mu.Unlock()
+	s.seq.Add(1)
 
 	enqueuePersistRequestRecord(rec)
 }
@@ -338,6 +373,16 @@ func requestAPIKeyMasked(apiKeyID, apiKey string) string {
 	return config.MaskApiKey(apiKey)
 }
 
+// OverviewSeries holds one value per minute for the last observeSeriesMin
+// minutes, oldest first; the last entry is the current, partial minute.
+type OverviewSeries struct {
+	RPM     []int     `json:"rpm"`
+	ErrRate []float64 `json:"errRate"`
+	InTPM   []int64   `json:"inTpm"`
+	OutTPM  []int64   `json:"outTpm"`
+	Credits []float64 `json:"credits"`
+}
+
 type OverviewSnapshot struct {
 	StartedAt   int64   `json:"startedAt"`
 	NowUnix     int64   `json:"nowUnix"`
@@ -350,9 +395,14 @@ type OverviewSnapshot struct {
 	Credits60   float64 `json:"credits60"`
 	Errors60    int     `json:"errors60"`
 	Successes60 int     `json:"successes60"`
+	Retries60   int     `json:"retries60"`
 	ActiveAccts int     `json:"activeAccts"`
 	TotalAccts  int     `json:"totalAccts"`
 	TotalModels int     `json:"totalModels"`
+	// EnabledAccts and AvailableAccts come from config; the API fills them.
+	EnabledAccts   int            `json:"enabledAccts"`
+	AvailableAccts int            `json:"availableAccts"`
+	Series         OverviewSeries `json:"series"`
 }
 
 func (s *observeStore) Overview() OverviewSnapshot {
@@ -364,8 +414,15 @@ func (s *observeStore) Overview() OverviewSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var rpm1, rpm5Total, errs5, succ5, errs60, succ60 int
+	var rpm1, rpm5Total, errs5, succ5, errs60, succ60, retries60 int
 	var inTok5, outTok5, credits5, credits60 float64
+	series := OverviewSeries{
+		RPM:     make([]int, observeSeriesMin),
+		ErrRate: make([]float64, observeSeriesMin),
+		InTPM:   make([]int64, observeSeriesMin),
+		OutTPM:  make([]int64, observeSeriesMin),
+		Credits: make([]float64, observeSeriesMin),
+	}
 
 	for i := 0; i < 60; i++ {
 		idx := (curSlotIdx - i + observeMinuteSlots) % observeMinuteSlots
@@ -384,8 +441,19 @@ func (s *observeStore) Overview() OverviewSnapshot {
 			outTok5 += float64(b.OutTokens)
 			credits5 += b.Credits
 		}
+		if i < observeSeriesMin {
+			at := observeSeriesMin - 1 - i
+			series.RPM[at] = b.Reqs
+			if b.Reqs > 0 {
+				series.ErrRate[at] = float64(b.Failures) / float64(b.Reqs)
+			}
+			series.InTPM[at] = b.InTokens
+			series.OutTPM[at] = b.OutTokens
+			series.Credits[at] = b.Credits
+		}
 		errs60 += b.Failures
 		succ60 += b.Successes
+		retries60 += b.Retries
 		credits60 += b.Credits
 	}
 
@@ -418,17 +486,45 @@ func (s *observeStore) Overview() OverviewSnapshot {
 		Credits60:   credits60,
 		Errors60:    errs60,
 		Successes60: succ60,
+		Retries60:   retries60,
 		ActiveAccts: activeAccts,
 		TotalAccts:  len(s.accountRings),
 		TotalModels: len(s.modelStats),
+		Series:      series,
 	}
+}
+
+// accountAvailability counts enabled accounts and the ones among them that can
+// take traffic: not banned, not suspended and not over their usage limit
+// (unless overage is on for the account or over-usage is allowed).
+func accountAvailability(accounts []config.Account, allowOverUsage bool) (enabled, available int) {
+	for _, a := range accounts {
+		if !a.Enabled {
+			continue
+		}
+		enabled++
+		if a.Silent || (a.BanStatus != "" && a.BanStatus != "ACTIVE") {
+			continue
+		}
+		overLimit := a.UsageLimit > 0 && a.UsageCurrent >= a.UsageLimit
+		if overLimit && !allowOverUsage && !strings.EqualFold(a.OverageStatus, "ENABLED") {
+			continue
+		}
+		available++
+	}
+	return enabled, available
 }
 
 type HeatmapCell struct {
 	Offset   int     `json:"offset"`
 	Reqs     int     `json:"reqs"`
 	Failures int     `json:"failures"`
+	Retries  int     `json:"retries,omitempty"`
 	Credits  float64 `json:"credits,omitempty"`
+}
+
+func (c HeatmapCell) empty() bool {
+	return c.Reqs == 0 && c.Failures == 0 && c.Retries == 0 && c.Credits == 0
 }
 
 type AccountHeatmap struct {
@@ -438,38 +534,85 @@ type AccountHeatmap struct {
 
 type HeatmapResponse struct {
 	WindowMin int              `json:"windowMin"`
+	BucketMin int              `json:"bucketMin"`
 	NowUnix   int64            `json:"nowUnix"`
 	Global    AccountHeatmap   `json:"global"`
 	Accounts  []AccountHeatmap `json:"accounts"`
+	// RestCount is set with Top: busy accounts left out of Accounts.
+	RestCount *int `json:"restCount,omitempty"`
+}
+
+// HeatmapOptions shapes a heatmap. The zero value (bar WindowMin) is the
+// original dense, per-minute, every-account response.
+type HeatmapOptions struct {
+	WindowMin int
+	// BucketMin sums this many minutes per cell; offset N then means N buckets ago.
+	BucketMin int
+	// GlobalOnly leaves Accounts nil.
+	GlobalOnly bool
+	// Top keeps the Top accounts with the most requests and retries over the
+	// last observeTopRankMin minutes, busiest first, and drops idle ones.
+	Top int
+	// Sparse leaves out cells with no traffic.
+	Sparse bool
 }
 
 func (s *observeStore) Heatmap(windowMin int) HeatmapResponse {
+	return s.HeatmapWith(HeatmapOptions{WindowMin: windowMin})
+}
+
+func (s *observeStore) HeatmapWith(opts HeatmapOptions) HeatmapResponse {
 	if s == nil {
 		return HeatmapResponse{}
 	}
+	windowMin := opts.WindowMin
 	if windowMin <= 0 {
 		windowMin = 60
 	}
 	if windowMin > observeMinuteSlots {
 		windowMin = observeMinuteSlots
 	}
+	bucketMin := opts.BucketMin
+	if bucketMin <= 0 {
+		bucketMin = 1
+	}
+	if bucketMin > windowMin {
+		bucketMin = windowMin
+	}
+	buckets := (windowMin + bucketMin - 1) / bucketMin
 	now := time.Now().Unix()
 	curSlotIdx, curMin := curSlot(now)
 
 	collect := func(ring *[observeMinuteSlots]minuteBucket) []HeatmapCell {
-		cells := make([]HeatmapCell, windowMin)
-		for i := 0; i < windowMin; i++ {
-			idx := (curSlotIdx - i + observeMinuteSlots) % observeMinuteSlots
-			b := ring[idx]
-			cell := HeatmapCell{Offset: i}
-			if b.WindowMin == curMin-int64(i) {
-				cell.Reqs = b.Reqs
-				cell.Failures = b.Failures
-				cell.Credits = b.Credits
+		cells := make([]HeatmapCell, 0, buckets)
+		for n := 0; n < buckets; n++ {
+			cell := HeatmapCell{Offset: n}
+			for i := n * bucketMin; i < (n+1)*bucketMin && i < windowMin; i++ {
+				b := ring[(curSlotIdx-i+observeMinuteSlots)%observeMinuteSlots]
+				if b.WindowMin != curMin-int64(i) {
+					continue
+				}
+				cell.Reqs += b.Reqs
+				cell.Failures += b.Failures
+				cell.Retries += b.Retries
+				cell.Credits += b.Credits
 			}
-			cells[i] = cell
+			if opts.Sparse && cell.empty() {
+				continue
+			}
+			cells = append(cells, cell)
 		}
 		return cells
+	}
+	rank := func(ring *[observeMinuteSlots]minuteBucket) int {
+		total := 0
+		for i := 0; i < observeTopRankMin; i++ {
+			b := ring[(curSlotIdx-i+observeMinuteSlots)%observeMinuteSlots]
+			if b.WindowMin == curMin-int64(i) {
+				total += b.Reqs + b.Retries
+			}
+		}
+		return total
 	}
 
 	s.mu.RLock()
@@ -477,22 +620,54 @@ func (s *observeStore) Heatmap(windowMin int) HeatmapResponse {
 
 	resp := HeatmapResponse{
 		WindowMin: windowMin,
+		BucketMin: bucketMin,
 		NowUnix:   now,
 		Global:    AccountHeatmap{AccountID: "_global_", Cells: collect(&s.globalRing)},
 	}
-	for id, ring := range s.accountRings {
-		resp.Accounts = append(resp.Accounts, AccountHeatmap{AccountID: id, Cells: collect(ring)})
+	if opts.GlobalOnly {
+		return resp
 	}
 
-	sort.Slice(resp.Accounts, func(i, j int) bool {
-		return resp.Accounts[i].AccountID < resp.Accounts[j].AccountID
-	})
+	ids := make([]string, 0, len(s.accountRings))
+	for id := range s.accountRings {
+		ids = append(ids, id)
+	}
+	if opts.Top > 0 {
+		scores := make(map[string]int, len(ids))
+		busy := ids[:0]
+		for _, id := range ids {
+			if score := rank(s.accountRings[id]); score > 0 {
+				scores[id] = score
+				busy = append(busy, id)
+			}
+		}
+		sort.Slice(busy, func(i, j int) bool {
+			if scores[busy[i]] != scores[busy[j]] {
+				return scores[busy[i]] > scores[busy[j]]
+			}
+			return busy[i] < busy[j]
+		})
+		rest := 0
+		if len(busy) > opts.Top {
+			rest = len(busy) - opts.Top
+			busy = busy[:opts.Top]
+		}
+		ids = busy
+		resp.RestCount = &rest
+	} else {
+		sort.Strings(ids)
+	}
+	resp.Accounts = make([]AccountHeatmap, 0, len(ids))
+	for _, id := range ids {
+		resp.Accounts = append(resp.Accounts, AccountHeatmap{AccountID: id, Cells: collect(s.accountRings[id])})
+	}
 	return resp
 }
 
 type ModelMixEntry struct {
 	Model            string  `json:"model"`
 	Reqs             int64   `json:"reqs"`
+	Retries          int64   `json:"retries"`
 	InTokens         int64   `json:"inTokens"`
 	OutTokens        int64   `json:"outTokens"`
 	CacheReadTokens  int64   `json:"cacheReadTokens"`
@@ -512,6 +687,7 @@ func (s *observeStore) ModelMix() []ModelMixEntry {
 		out = append(out, ModelMixEntry{
 			Model:            m,
 			Reqs:             st.Reqs,
+			Retries:          st.Retries,
 			InTokens:         st.InTokens,
 			OutTokens:        st.OutTokens,
 			CacheReadTokens:  st.CacheReadTokens,
@@ -703,7 +879,14 @@ func (s *observeStore) Reset() {
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.resetLocked()
+	s.startedAt = time.Now().Unix()
+	s.mu.Unlock()
+	s.seq.Add(1)
+}
+
+// resetLocked empties every ring, model stat and recent list.
+func (s *observeStore) resetLocked() {
 	for i := range s.globalRing {
 		s.globalRing[i] = minuteBucket{}
 	}
@@ -714,18 +897,59 @@ func (s *observeStore) Reset() {
 	s.recentErrIdx = 0
 	s.recentRequests = make([]requestRecord, observeRecentReqs)
 	s.recentReqIdx = 0
-	s.startedAt = time.Now().Unix()
 }
 
+// pruneAccountRings drops the rings of accounts that are no longer configured,
+// so deleted accounts leave the heatmap and the totals.
+func (s *observeStore) pruneAccountRings(accounts []config.Account) int {
+	if s == nil {
+		return 0
+	}
+	keep := make(map[string]bool, len(accounts))
+	for _, a := range accounts {
+		keep[a.ID] = true
+	}
+	s.mu.Lock()
+	removed := 0
+	for id := range s.accountRings {
+		if !keep[id] {
+			delete(s.accountRings, id)
+			delete(s.accountTouched, id)
+			removed++
+		}
+	}
+	s.mu.Unlock()
+	if removed > 0 {
+		s.seq.Add(1)
+	}
+	return removed
+}
+
+const (
+	observeTickInterval = time.Second
+	// observePruneEvery is how many ticks pass between account-ring prunes.
+	observePruneEvery = 30
+)
+
+// backgroundObserveTick tells admin pages that observe data changed. It sends
+// at most one observe_tick per second, and none while the store is idle.
 func (h *Handler) backgroundObserveTick() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(observeTickInterval)
 	defer ticker.Stop()
-	for {
+	store := getObserveStore()
+	lastSeq := store.Seq()
+	for tick := 0; ; tick++ {
 		select {
 		case <-h.stopStatsSaver:
 			return
 		case <-ticker.C:
-			publishObserveTick()
+			if tick%observePruneEvery == 0 {
+				store.pruneAccountRings(config.GetAccounts())
+			}
+			if seq := store.Seq(); seq != lastSeq {
+				lastSeq = seq
+				publishObserveTick(seq)
+			}
 		}
 	}
 }
