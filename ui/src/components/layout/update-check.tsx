@@ -27,8 +27,12 @@ interface UpdateCheckValue {
   /** Set once a check found a newer release. */
   latest: RemoteVersionJson | null;
   checking: boolean;
-  /** Manual check: spinner while busy, toast when up to date or failed, dialog when newer. */
-  checkNow: () => void;
+  /**
+   * Manual check: spinner while busy, toast when up to date or failed, dialog when newer.
+   * `onSettled` runs once the answer is in, just before that toast or dialog shows (the Admin
+   * menu closes there, so its spinner row stays up while the check runs).
+   */
+  checkNow: (onSettled?: () => void) => void;
   openDialog: () => void;
 }
 
@@ -87,28 +91,37 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
     };
   }, [lookUp, openDialog]);
 
-  const checkNow = useCallback(() => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setChecking(true);
-    lookUp()
-      .then(({ newer }) => {
-        if (newer) {
-          openDialog();
-          return;
-        }
-        toast.success(tRef.current("shell.update.upToDate"), { duration: UP_TO_DATE_TOAST_MS });
-      })
-      .catch(() => {
-        toast.error(tRef.current("shell.update.checkFailed"), {
-          description: tRef.current("shell.update.checkFailedDetail"),
+  const checkNow = useCallback(
+    (onSettled?: () => void) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      setChecking(true);
+      lookUp()
+        .then(
+          ({ newer }) => {
+            onSettled?.();
+            if (newer) {
+              openDialog();
+              return;
+            }
+            toast.success(tRef.current("shell.update.upToDate"), {
+              duration: UP_TO_DATE_TOAST_MS,
+            });
+          },
+          () => {
+            onSettled?.();
+            toast.error(tRef.current("shell.update.checkFailed"), {
+              description: tRef.current("shell.update.checkFailedDetail"),
+            });
+          },
+        )
+        .finally(() => {
+          busyRef.current = false;
+          setChecking(false);
         });
-      })
-      .finally(() => {
-        busyRef.current = false;
-        setChecking(false);
-      });
-  }, [lookUp, openDialog]);
+    },
+    [lookUp, openDialog],
+  );
   const value = useMemo(
     () => ({ latest, checking, checkNow, openDialog }),
     [latest, checking, checkNow, openDialog],

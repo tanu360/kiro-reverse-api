@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX, Ref } from "react";
 import { PasswordInput } from "@/components/shared/password-input";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { useT } from "@/lib/i18n";
@@ -12,10 +12,13 @@ export function PasswordField({
   value,
   onChange,
   error,
+  ref,
 }: {
   value: string;
   onChange: (value: string) => void;
   error?: string | null;
+  /** The input itself, so the form can focus and select it after a wrong password. */
+  ref?: Ref<HTMLInputElement>;
 }): JSX.Element {
   const { t } = useT("auth");
   return (
@@ -29,6 +32,7 @@ export function PasswordField({
         name="password"
         onChange={onChange}
         placeholder={t("passwordPlaceholder")}
+        ref={ref}
         size="lg"
         value={value}
       />

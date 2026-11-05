@@ -1,3 +1,11 @@
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { JSX } from "react";
@@ -5,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Dialog, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { I18nProvider, useLanguage } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { AppToaster } from "./app-toasts";
+import { AppToaster, useToastPathSync } from "./app-toasts";
 
 function LanguageButton(): JSX.Element {
   const { lang, setLang } = useLanguage();
@@ -23,6 +31,12 @@ function renderToasts(lang: "en" | "zh" = "en") {
       <AppToaster />
     </I18nProvider>,
   );
+}
+
+/** A stand-in for the app shell: syncs toasts with the path, renders the page. */
+function PathSyncShell(): JSX.Element {
+  useToastPathSync();
+  return <Outlet />;
 }
 
 /** The visible title; Base UI also renders a hidden announcer copy of urgent toasts. */
@@ -202,6 +216,39 @@ describe("AppToaster", () => {
     expect(document.querySelector('[data-slot="toast-viewport"]')).toHaveAttribute(
       "data-position",
       "bottom-right",
+    );
+  });
+});
+
+describe("useToastPathSync", () => {
+  it("closes a toast with hideOnPath once the app reaches that page", async () => {
+    const rootRoute = createRootRoute({ component: PathSyncShell });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([
+        createRoute({ getParentRoute: () => rootRoute, path: "/", component: () => null }),
+        createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: () => null }),
+      ]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+    render(
+      <I18nProvider initialLang="en">
+        <RouterProvider router={router} />
+        <AppToaster />
+      </I18nProvider>,
+    );
+    await act(async () => {
+      await router.load();
+    });
+    act(() => {
+      toast.info("Change the generated password in Settings.", { hideOnPath: "/settings" });
+    });
+    expect(await findTitle("Change the generated password in Settings.")).toBeInTheDocument();
+
+    await act(async () => {
+      await router.navigate({ to: "/settings" });
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("Change the generated password in Settings.")).toBeNull(),
     );
   });
 });

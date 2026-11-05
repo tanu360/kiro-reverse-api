@@ -121,7 +121,9 @@ const PREVIEW_NAV = NAV_ITEMS.filter((item) =>
 export function AuthShowcase(): JSX.Element {
   return (
     <aside
-      className="relative isolate hidden overflow-hidden rounded-3xl text-white lg:flex lg:w-[52%] lg:flex-col xl:w-[56%]"
+      // The clip-path rounds the background and the children in one pass, so the preview's
+      // corner leaves no 1px fringe of the mesh behind it (overflow-hidden alone clips them apart).
+      className="relative isolate hidden overflow-hidden rounded-3xl text-white [clip-path:inset(0_round_var(--radius-3xl))] lg:flex lg:w-[52%] lg:flex-col xl:w-[56%]"
       style={MESH}
     >
       <div

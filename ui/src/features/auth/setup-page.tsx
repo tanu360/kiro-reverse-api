@@ -61,6 +61,8 @@ export function SetupPage(): JSX.Element {
     const id = toast.info(t("changePasswordToast"), {
       duration: CHANGE_PASSWORD_TOAST_MS,
       action: { label: t("openSettings"), onClick: () => void navigate({ to: "/settings" }) },
+      // Not shown on Settings, and closed once the app gets there: it has nothing to add there.
+      hideOnPath: "/settings",
     });
     // The hint only makes sense while signed in. When this session ends (sign-out, expiry,
     // restore) it goes too, so it never sits on the sign-in page pointing at Settings. The
@@ -163,7 +165,7 @@ function GeneratedPassword({
             sample={SAMPLE_PASSWORD}
           >
             {(value) => (
-              <div className="flex min-h-10 items-center justify-center">
+              <div className="flex min-h-10 items-center justify-center pointer-coarse:min-h-11">
                 <CopyablePassword value={value} />
               </div>
             )}
@@ -212,7 +214,7 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
     <>
       <button
         className={cn(
-          "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-bold font-mono text-foreground text-xl tabular-nums tracking-widest transition-[color,scale] duration-150 active:scale-[0.98]",
+          "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-bold font-mono text-foreground text-xl tabular-nums tracking-widest transition-[color,scale] duration-150 active:scale-[0.98] pointer-coarse:py-2",
           "hover:text-info-foreground focus-visible:text-info-foreground",
           copied && "text-success-foreground hover:text-success-foreground",
         )}

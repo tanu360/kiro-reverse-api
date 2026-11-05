@@ -1,6 +1,6 @@
 import { CircleXIcon, Clock01Icon, LogInIcon } from "@hugeicons/core-free-icons";
 import { useNavigate } from "@tanstack/react-router";
-import { type FormEvent, type JSX, useEffect, useState } from "react";
+import { type FormEvent, type JSX, useEffect, useRef, useState } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export function SignInForm({
   const [formError, setFormError] = useState<string | null>(null);
   const retry = useRetryCountdown();
   const locked = retry.seconds > 0;
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // The default can arrive after the form mounts (a slow first-run fetch). Fill it in then,
@@ -62,8 +63,13 @@ export function SignInForm({
       await signIn(password, remember);
     } catch (error) {
       setPending(false);
-      if (isApiError(error) && error.status === 401) setFieldError(t("error"));
-      else if (isApiError(error) && error.status === 429) retry.start(retrySeconds(error));
+      if (isApiError(error) && error.status === 401) {
+        setFieldError(t("error"));
+        // Back in the field with the wrong text selected, so retyping replaces it (and a phone
+        // brings its keyboard back) without deleting hidden characters first.
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      } else if (isApiError(error) && error.status === 429) retry.start(retrySeconds(error));
       // No answer, or a gateway in front of the proxy answering for it (502 / 503 / 504, whose
       // body is only the status text, e.g. "Bad Gateway"): the proxy cannot be reached.
       else if (
@@ -95,6 +101,7 @@ export function SignInForm({
           setPassword(next);
           if (fieldError) setFieldError(null);
         }}
+        ref={inputRef}
         value={password}
       />
       {/* Always rendered, so the notice is announced; empty, it takes back the form's gap. */}
@@ -115,11 +122,14 @@ export function SignInForm({
       ) : null}
       {/*
        * The primary button (components/ui/button.tsx lg): the field's height, full width. While
-       * it signs in, the Button's spinner takes the icon's place and it stays focusable.
+       * it signs in, the Button's spinner takes the icon's place and it stays focusable. While
+       * the rate limit holds, aria-disabled (not native disabled) dims it and keeps focus on it,
+       * so a click that set off the lock does not drop focus to the page; onSubmit returns early.
+       * `pending` is repeated because the prop replaces the one the Button sets while loading.
        */}
       <Button
+        aria-disabled={locked || pending || undefined}
         className="w-full"
-        disabled={locked}
         loading={pending}
         loadingText={t("signingIn")}
         size="lg"

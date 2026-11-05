@@ -99,6 +99,16 @@ describe("LoginPage", () => {
     expect(router.state.location.pathname).toBe("/login");
   });
 
+  it("puts focus back in the field with the wrong password selected after a click", async () => {
+    const { user } = await renderApp("/login", { authed: false });
+    await user.type(passwordInput(), "wrong-password");
+    await user.click(submitButton());
+    expect(await screen.findByText("Incorrect password.")).toBeInTheDocument();
+    const input = passwordInput();
+    expect(input).toHaveFocus();
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, "wrong-password".length]);
+  });
+
   it("shows the connection error when the proxy cannot be reached", async () => {
     mockServer.use(http.post(apiUrl("/session"), () => HttpResponse.error()));
     const { user } = await renderApp("/login", { authed: false });
@@ -127,7 +137,7 @@ describe("LoginPage", () => {
       vi.useRealTimers();
     });
 
-    it("counts down Retry-After and keeps Sign in disabled until 0", async () => {
+    it("counts down Retry-After and keeps Sign in aria-disabled until 0", async () => {
       mockServer.use(
         http.post(apiUrl("/session"), () =>
           jsonError(429, "Too many admin password attempts; try again later", undefined, {
@@ -141,18 +151,20 @@ describe("LoginPage", () => {
 
       const notice = await screen.findByText("Too many attempts. Try again in 3 s.");
       expect(notice.closest("[aria-live='polite']")).not.toBeNull();
-      expect(submitButton()).toBeDisabled();
+      // aria-disabled, not native disabled: the clicked button keeps focus while locked.
+      expect(submitButton()).toHaveAttribute("aria-disabled", "true");
+      expect(submitButton()).toHaveFocus();
 
       await act(async () => {
         vi.advanceTimersByTime(1_000);
       });
       expect(screen.getByText("Too many attempts. Try again in 2 s.")).toBeInTheDocument();
-      expect(submitButton()).toBeDisabled();
+      expect(submitButton()).toHaveAttribute("aria-disabled", "true");
 
       await act(async () => {
         vi.advanceTimersByTime(2_000);
       });
-      await waitFor(() => expect(submitButton()).toBeEnabled());
+      await waitFor(() => expect(submitButton()).not.toHaveAttribute("aria-disabled"));
       expect(screen.queryByText(/Too many attempts/)).not.toBeInTheDocument();
     });
   });

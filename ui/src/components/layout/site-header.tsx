@@ -76,7 +76,11 @@ export function SiteHeader(): JSX.Element {
             <CommandMenuTrigger className="sm:hidden" variant="icon" />
             <UpdateIndicator />
             <PrivacyToggle />
-            <LanguageSwitch />
+            {/*
+             * Phones: hidden, to leave the page title room beside five touch icons while an
+             * update is known. Language stays one tap away in the ⌘K palette (its Language group).
+             */}
+            <LanguageSwitch className="max-sm:hidden" />
             <ThemeSwitch variant="menu" />
           </div>
         </div>

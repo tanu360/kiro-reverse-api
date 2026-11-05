@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { RemoteVersionJson } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 
-/** "v2.1.0" and "2.1.0" both display as "2.1.0"; the UI adds its own "v". */
+/** "v2.1.0" and "2.1.0" both display as "2.1.0", the one format the shell shows. */
 export function stripV(version: string): string {
   return version.trim().replace(/^v/i, "");
 }
@@ -126,7 +126,7 @@ export function UpdateDialog({
   );
 }
 
-/** "Current" over "v2.1.0": a muted label over the version, purple for the new one. */
+/** "Current" over "2.1.0": a muted label over the version, purple for the new one. */
 function VersionCell({
   label,
   value,
@@ -150,7 +150,7 @@ function VersionCell({
             : "truncate font-semibold text-base"
         }
       >
-        {value ? `v${stripV(value)}` : "—"}
+        {value ? stripV(value) : "—"}
       </span>
     </div>
   );

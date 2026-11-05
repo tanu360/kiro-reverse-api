@@ -115,6 +115,37 @@ describe("UserMenu", () => {
   });
 });
 
+describe("UserMenu manual check", () => {
+  it("keeps the menu open with a busy row while it checks, then closes it", async () => {
+    let answer: (value: { version: string }) => void = () => {};
+    fetchRemote.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const { user } = renderMenu();
+    await screen.findByText("2.1.0");
+    await user.click(screen.getByRole("button", { name: "Admin menu" }));
+    const item = await screen.findByRole("menuitem", { name: "Check for updates" });
+    await user.click(item);
+    // Still open, same label, marked busy, and a status says it is checking.
+    expect(screen.getByRole("menuitem", { name: "Check for updates" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Checking…");
+
+    await act(async () => {
+      answer({ version: "2.1.0" });
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(toast.success).toHaveBeenCalledWith(expect.any(String), { duration: 3600 });
+    await vi.waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(screen.getByRole("status")).toHaveTextContent("");
+  });
+});
+
 describe("UserMenu links", () => {
   it("opens GitHub in a new tab from the Admin menu", async () => {
     fetchRemote.mockResolvedValue({ version: "2.1.0" });

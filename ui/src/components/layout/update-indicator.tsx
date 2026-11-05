@@ -23,7 +23,9 @@ export function UpdateIndicator(): JSX.Element | null {
         render={
           <Button
             aria-label={label}
-            className="relative text-warning-foreground"
+            // The quiet variant turns its text foreground on hover, press and while the tooltip
+            // is open (data-popup-open); the same variants keep the amber here.
+            className="relative text-warning-foreground hover:text-warning-foreground data-popup-open:text-warning-foreground data-pressed:text-warning-foreground"
             data-slot="update-indicator"
             onClick={openDialog}
             size="icon"

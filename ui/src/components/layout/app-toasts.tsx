@@ -1,8 +1,9 @@
+import { useRouterState } from "@tanstack/react-router";
 import { type JSX, useEffect, useRef } from "react";
 import { ToastProvider } from "@/components/ui/toast";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useT } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
+import { syncToastPath, toast } from "@/lib/toast";
 
 /** Phones (below sm): toasts drop in at the top, clear of bottom sheets, the nav and the batch bar. */
 const PHONE_TOAST_QUERY = "(max-width: 639px)";
@@ -24,4 +25,15 @@ export function AppToaster(): JSX.Element {
   }, [lang]);
 
   return <ToastProvider position={isPhone ? "top-center" : "bottom-right"} />;
+}
+
+/**
+ * Closes the toasts that point at the page the app just reached (ToastOptions.hideOnPath), on
+ * every navigation. AppToaster sits outside the router, so the app shell calls this inside it.
+ */
+export function useToastPathSync(): void {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  useEffect(() => {
+    syncToastPath(pathname);
+  }, [pathname]);
 }
