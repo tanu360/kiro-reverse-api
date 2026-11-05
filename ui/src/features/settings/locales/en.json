@@ -1,7 +1,5 @@
 {
   "title": "Settings",
-  "listenLocal": "Local only",
-  "listenOpen": "Open to network",
   "groups.requests": "Requests & responses",
   "groups.server": "Server & access",
   "groups.safety": "Safety & maintenance",

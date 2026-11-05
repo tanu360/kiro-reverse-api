@@ -1,7 +1,5 @@
 {
   "title": "Cài đặt",
-  "listenLocal": "Chỉ máy này",
-  "listenOpen": "Mở ra mạng",
   "groups.requests": "Yêu cầu và phản hồi",
   "groups.server": "Máy chủ và truy cập",
   "groups.safety": "An toàn và bảo trì",

@@ -1,9 +1,4 @@
-import {
-  CircleCheckIcon,
-  CircleSlashIcon,
-  ComputerIcon,
-  Globe02Icon,
-} from "@hugeicons/core-free-icons";
+import { CircleCheckIcon, CircleSlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
@@ -49,40 +44,6 @@ const GENERAL_ERROR_ID = "settings-general-error";
 /** A card that failed with the shared settings query leaves only a hidden anchor. */
 function isShown(element: HTMLElement): boolean {
   return !element.hidden;
-}
-
-/** Loopback addresses: only this machine can connect. */
-function isLoopback(host: string): boolean {
-  return host === "localhost" || host === "::1" || /^127\./.test(host);
-}
-
-/**
- * The listen address, read-only (LISTEN_HOST sets it). Green when only this machine can
- * connect; amber when every interface is open, so other machines can reach the admin panel.
- */
-function ListeningOn(): JSX.Element | null {
-  const { t } = useT("settings");
-  const { data } = useQuery(settingsQuery());
-  if (!data?.port) return null;
-  const raw = data.host || "127.0.0.1";
-  const local = isLoopback(raw);
-  const host = raw.includes(":") ? `[${raw}]` : raw;
-  return (
-    <Badge
-      icon={local ? ComputerIcon : Globe02Icon}
-      iconStyle="line"
-      tone={local ? "success" : "warning"}
-      variant="soft-outline"
-    >
-      {local ? t("listenLocal") : t("listenOpen")}
-      <span aria-hidden="true" className="opacity-40">
-        ·
-      </span>
-      <span className="font-mono font-normal" translate="no">
-        {host}:{data.port}
-      </span>
-    </Badge>
-  );
 }
 
 /**
@@ -330,7 +291,7 @@ function SettingsContent(): JSX.Element {
   useLeaveGuard();
   return (
     <div className="flex min-w-0 flex-col gap-4 md:gap-6">
-      <PageHeader meta={<ListeningOn />} title={t("title")} />
+      <PageHeader title={t("title")} />
       <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
         <SectionNav />
         <div className="flex min-w-0 max-w-4xl flex-col gap-5">

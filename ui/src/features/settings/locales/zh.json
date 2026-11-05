@@ -1,7 +1,5 @@
 {
   "title": "设置",
-  "listenLocal": "仅本机",
-  "listenOpen": "对网络开放",
   "groups.requests": "请求与响应",
   "groups.server": "服务器与访问",
   "groups.safety": "安全与维护",

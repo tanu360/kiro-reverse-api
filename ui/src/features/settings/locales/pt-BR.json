@@ -1,7 +1,5 @@
 {
   "title": "Configurações",
-  "listenLocal": "Só esta máquina",
-  "listenOpen": "Aberto à rede",
   "groups.requests": "Solicitações e respostas",
   "groups.server": "Servidor e acesso",
   "groups.safety": "Segurança e manutenção",

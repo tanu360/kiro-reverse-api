@@ -63,19 +63,9 @@ async function renderPage() {
 }
 
 describe("SettingsPage", () => {
-  it("shows the read-only listen address", async () => {
+  it("shows the section nav", async () => {
     await renderPage();
-    // The fixture listens on every interface: an amber "open" badge.
-    expect(screen.getByText("Open to network")).toBeInTheDocument();
-    expect(screen.getByText("0.0.0.0:8080")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
-  });
-
-  it("marks a loopback listen address as local only", async () => {
-    mockDb.settings.host = "127.0.0.1";
-    await renderPage();
-    expect(screen.getByText("Local only")).toBeInTheDocument();
-    expect(screen.getByText("127.0.0.1:8080")).toBeInTheDocument();
   });
 
   it("sends only the Usage field on its Save", async () => {
