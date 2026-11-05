@@ -11,7 +11,7 @@ import { resetStats } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { SECTION_ID } from "./sections";
-import { SettingsGroup } from "./settings-section";
+import { RowAction, SettingsGroup } from "./settings-section";
 
 export function DangerZoneCard(): JSX.Element {
   const { t } = useT("settings");
@@ -46,19 +46,22 @@ export function DangerZoneCard(): JSX.Element {
     <SettingsGroup id={SECTION_ID.dangerZone} title={t("dangerZone")}>
       <SettingsRow
         control={
-          // Its own name: the row would otherwise name it after the row title ("Statistics").
-          <Button
-            aria-label={t("resetStats")}
-            loading={reset.isPending}
-            onClick={() => void onReset()}
-            size="sm"
-            variant="danger"
-          >
-            <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
-            {t("resetStats")}
-          </Button>
+          // Under the description on a phone, so the description keeps the row's width.
+          <RowAction>
+            {/* Its own name: the row would otherwise name it after the row title ("Statistics"). */}
+            <Button
+              aria-label={t("resetStats")}
+              loading={reset.isPending}
+              onClick={() => void onReset()}
+              size="sm"
+              variant="danger"
+            >
+              <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
+              {t("resetStats")}
+            </Button>
+          </RowAction>
         }
-        controlWidth="auto"
+        controlWidth="field"
         description={t("resetStatsHint")}
         title={t("statistics")}
         tone="danger"

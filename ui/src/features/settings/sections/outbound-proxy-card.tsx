@@ -145,8 +145,9 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
     >
       <SettingsRow
         control={
-          // A group named by the row: the route, then its actions.
-          <fieldset className="flex min-w-0 flex-wrap items-center gap-2">
+          // A group named by the row: the route, then its actions. Under the route on a narrow
+          // row, so a long host keeps the row's width; at the row's end on a wide one.
+          <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
             <Button
               onClick={() => setEditor((prev) => ({ open: true, session: prev.session + 1 }))}
               size="sm"
@@ -169,7 +170,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
             )}
           </fieldset>
         }
-        controlWidth="auto"
+        controlWidth="field"
         description={
           direct ? t("proxyNoneHint") : user ? t("proxyAuthAs", { user }) : t("proxyAuthNone")
         }
@@ -177,8 +178,8 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
           direct ? (
             t("proxyDirectTitle")
           ) : (
-            // A long host wraps instead of pushing the actions off the row.
-            <span className="break-all" translate="no">
+            // A long host wraps at its dots and colon first, mid-label only when it must.
+            <span className="wrap-anywhere font-mono text-meta" translate="no">
               {address(server)}
             </span>
           )

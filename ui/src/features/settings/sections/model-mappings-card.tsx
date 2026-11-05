@@ -328,7 +328,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
             aria-hidden="true"
             className={cn(
               ROW_GRID,
-              "hidden pb-1 font-medium text-muted-foreground text-xs tabular-nums sm:grid",
+              "hidden pb-1 text-meta text-muted-foreground tabular-nums sm:grid",
             )}
           >
             <span />
@@ -472,7 +472,7 @@ function MappingRowItem({
           <TooltipPopup>{t("modelMappings.drag")}</TooltipPopup>
         </Tooltip>
       )}
-      <span className="hidden text-end text-muted-foreground text-xs tabular-nums sm:block">
+      <span className="hidden text-end text-meta text-muted-foreground tabular-nums sm:block">
         {n}
       </span>
       {/* One cell on phones (match over target), three columns from sm. */}
@@ -480,7 +480,7 @@ function MappingRowItem({
         {/* Each name with the mark of the company behind it. */}
         <span className="flex min-w-0 items-center gap-2">
           <ModelLogo model={row.key} />
-          <code className="min-w-0 text-foreground text-sm" translate="no">
+          <code className="min-w-0 text-foreground text-meta" translate="no">
             <TruncatedText>{row.key}</TruncatedText>
           </code>
         </span>
@@ -493,7 +493,7 @@ function MappingRowItem({
           <span className="flex min-w-0 items-center gap-2">
             <ModelLogo model={row.value} />
             <code
-              className="min-w-0 text-muted-foreground text-sm sm:text-foreground"
+              className="min-w-0 text-meta text-muted-foreground sm:text-foreground"
               translate="no"
             >
               <TruncatedText>{row.value}</TruncatedText>

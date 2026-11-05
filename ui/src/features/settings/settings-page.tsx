@@ -299,9 +299,9 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   return (
     <nav
       aria-label={t("sections")}
-      className="sticky top-12 z-30 -mx-4 bg-background/95 py-2 md:-mx-6"
+      className="sticky top-12 z-30 -mx-4 bg-background/95 pt-2 md:-mx-6"
     >
-      <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
+      <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade scrollbarGutter>
         <div className="flex w-max gap-2 px-4 md:px-6" ref={listRef}>
           {groups.map(({ group, labelId, entries }) => (
             <div className="flex shrink-0" key={group}>
@@ -368,7 +368,8 @@ function SettingsContent(): JSX.Element {
       <PageHeader description={t("description")} title={t("title")} />
       <div className="flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-10">
         <SectionNav wide={wide} />
-        <div className="flex min-w-0 flex-col gap-4 md:gap-6">
+        {/* Capped, so on a wide screen a row's control stays near its label. */}
+        <div className="flex min-w-0 max-w-5xl flex-col gap-4 md:gap-6">
           <GeneralSettingsError />
           <UsageCard />
           <StreamIntegrityCard />

@@ -296,6 +296,27 @@ export function FieldControl({
   );
 }
 
+/**
+ * A row's button laid out as a field control (SettingsRow `controlWidth="field"`): under the
+ * text on a narrow row, so the description keeps the row's width, and at the row's end beside
+ * the text on a wide one. The row's description reaches the button; the button keeps its own
+ * name (its label), so the row title is not put on it.
+ */
+export function RowAction({
+  children,
+  "aria-describedby": describedBy,
+}: AriaProps & {
+  children: ReactElement<AriaProps>;
+}): JSX.Element {
+  return (
+    <div className="flex @xl/settings-row:justify-end">
+      {cloneElement(children, {
+        "aria-describedby": joinIds(children.props["aria-describedby"], describedBy),
+      })}
+    </div>
+  );
+}
+
 /** Fills `{name}` placeholders of a translated template with React nodes (code spans). */
 export function fillNodes(template: string, nodes: Record<string, ReactNode>): ReactNode[] {
   return template.split(/(\{\w+\})/).map((part, index) => {

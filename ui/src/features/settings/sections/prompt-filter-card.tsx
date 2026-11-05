@@ -60,6 +60,7 @@ import {
 import { SECTION_ID } from "./sections";
 import {
   fillNodes,
+  RowAction,
   SaveFooter,
   SectionQuery,
   SettingsSection,
@@ -238,19 +239,22 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
 
       <SettingsRow
         control={
-          // Its own name: the row would otherwise name it after the row title.
-          <Button
-            aria-label={t("promptFilter.addRule")}
-            onClick={() => openEditor(null)}
-            ref={addButton}
-            size="sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
-            {t("promptFilter.addRule")}
-          </Button>
+          // Under the description on a phone, so the description keeps the row's width.
+          <RowAction>
+            {/* Its own name: the row would otherwise name it after the row title. */}
+            <Button
+              aria-label={t("promptFilter.addRule")}
+              onClick={() => openEditor(null)}
+              ref={addButton}
+              size="sm"
+              variant="outline"
+            >
+              <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
+              {t("promptFilter.addRule")}
+            </Button>
+          </RowAction>
         }
-        controlWidth="auto"
+        controlWidth="field"
         description={fillNodes(t("customRulesHint"), { group: <Code>$1</Code> })}
         status={
           <Badge size="sm" tone="neutral">
@@ -504,8 +508,9 @@ function RuleEditor({
           <div className="flex flex-col gap-2">
             <Label htmlFor={`${id}-match`}>{t("promptFilter.match")}</Label>
             <Input
+              // Not aria-invalid: a regex that does not compile is the amber hint under the
+              // field (the proxy skips the rule), not an error, so the field keeps its border.
               aria-describedby={`${id}-match-hint`}
-              aria-invalid={invalid || undefined}
               id={`${id}-match`}
               onChange={(event) => set({ match: event.target.value })}
               placeholder={
