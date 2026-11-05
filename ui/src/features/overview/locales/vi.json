@@ -82,6 +82,7 @@
   "heatmap.newest": "Bây giờ",
   "heatmap.tooltipRequests": "Yêu cầu",
   "heatmap.tooltipErrors": "Lỗi",
+  "heatmap.tooltipRetries": "Thử lại",
   "heatmap.requests_other": "{n} yêu cầu",
   "heatmap.errors_other": "{n} lỗi",
   "heatmap.summary": "60 phút qua: {requests}, {errors}.",

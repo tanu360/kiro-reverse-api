@@ -82,6 +82,7 @@
   "heatmap.newest": "现在",
   "heatmap.tooltipRequests": "请求",
   "heatmap.tooltipErrors": "错误",
+  "heatmap.tooltipRetries": "重试",
   "heatmap.requests_other": "{n} 个请求",
   "heatmap.errors_other": "{n} 个错误",
   "heatmap.summary": "最近 60 分钟：{requests}，{errors}。",

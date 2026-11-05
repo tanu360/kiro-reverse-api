@@ -82,7 +82,7 @@ function HeatTooltip({
   hover: Hover;
   tip: CellTip;
   containerRef: RefObject<HTMLDivElement | null>;
-  labels: { requests: string; errors: string };
+  labels: { requests: string; errors: string; retries: string };
 }): JSX.Element {
   const box = containerRef.current;
   const containerWidth = box?.clientWidth ?? 0;
@@ -124,6 +124,10 @@ function HeatTooltip({
           rows={[
             { color: SUCCEEDED_COLOR, label: labels.requests, value: tip.requests },
             { color: FAILED_COLOR, label: labels.errors, value: tip.errors },
+            // Retries only when the cell has some, so most cells keep the two-row panel.
+            ...(tip.retries === null
+              ? []
+              : [{ color: FAILED_COLOR, label: labels.retries, value: tip.retries }]),
           ]}
           title={tip.time}
         />
@@ -209,6 +213,8 @@ interface CellTip {
   label: string;
   requests: string;
   errors: string;
+  /** Null when the cell had no retries. */
+  retries: string | null;
 }
 
 interface HeatView {
@@ -242,16 +248,18 @@ function describeCell(view: HeatView, hover: Hover, lang: Lang): CellTip | null 
     label: row.text,
     requests: formatNumber(total.requests, lang),
     errors: formatNumber(total.errors, lang),
+    retries: total.retries > 0 ? formatNumber(total.retries, lang) : null,
   };
 }
 
-function sum(cells: readonly HeatmapCell[]): { requests: number; errors: number } {
+function sum(cells: readonly HeatmapCell[]): { requests: number; errors: number; retries: number } {
   return cells.reduce(
     (total, cell) => ({
       requests: total.requests + cell.reqs,
       errors: total.errors + cell.failures,
+      retries: total.retries + (cell.retries ?? 0),
     }),
-    { requests: 0, errors: 0 },
+    { requests: 0, errors: 0, retries: 0 },
   );
 }
 
@@ -603,6 +611,7 @@ export function TrafficHeatmap(): JSX.Element {
                   labels={{
                     requests: t("heatmap.tooltipRequests"),
                     errors: t("heatmap.tooltipErrors"),
+                    retries: t("heatmap.tooltipRetries"),
                   }}
                 />
               </Suspense>

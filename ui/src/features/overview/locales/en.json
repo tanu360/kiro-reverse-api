@@ -83,6 +83,7 @@
   "heatmap.newest": "Now",
   "heatmap.tooltipRequests": "Requests",
   "heatmap.tooltipErrors": "Errors",
+  "heatmap.tooltipRetries": "Retries",
   "heatmap.requests_one": "{n} request",
   "heatmap.requests_other": "{n} requests",
   "heatmap.errors_one": "{n} error",
