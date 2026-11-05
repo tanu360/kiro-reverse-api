@@ -250,9 +250,10 @@ function BackupCard({
     <ListCard
       action={<RowMenu actions={actions} entry={entry} label={t("rowActions", { time })} />}
       footer={
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        // One line: a long count wraps in its own column, so every card's badge sits bottom-left.
+        <div className="flex items-end justify-between gap-3">
           <KindBadge kind={entry.kind} t={t} />
-          <span className="text-meta text-muted-foreground">
+          <span className="min-w-0 text-end text-meta text-muted-foreground">
             {t("accountsInBackup")}: <AccountsCell entry={entry} t={t} />
           </span>
         </div>
@@ -298,7 +299,13 @@ export function BackupsTable({
       },
       {
         id: "accounts",
-        header: t("accountsInBackup"),
+        // The short name until the table has room for the long one (with the size column).
+        header: (
+          <>
+            <span className="@5xl/data-table:hidden">{t("accountsShort")}</span>
+            <span className="hidden @5xl/data-table:inline">{t("accountsInBackup")}</span>
+          </>
+        ),
         align: "end",
         cell: (entry) => <AccountsCell entry={entry} t={t} />,
       },
@@ -329,8 +336,9 @@ export function BackupsTable({
     <DataTable
       caption={t("list.caption")}
       cardLayout="grid"
-      // Below 56rem the five columns squeeze the note; two columns of cards read better there.
-      cardsBelow="4xl"
+      // Cards on a phone, the table from 42rem as on Accounts and Requests. With the short
+      // Accounts header its five columns fit the 744 px a 1024 px window leaves, unscrolled.
+      cardsBelow="2xl"
       columns={columns}
       data={rows}
       density="comfortable"

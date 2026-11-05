@@ -248,7 +248,7 @@ export function BackupsPage(): JSX.Element {
       toast.error(t("fileTooLarge"));
       return;
     }
-    if (!(await restoreConfirm(t("confirmUpload")))) return;
+    if (!(await restoreConfirm(t("confirmUpload", { name: file.name }), file.name))) return;
     setUploading(true);
     try {
       await restoreBackupUpload(file);
@@ -266,7 +266,6 @@ export function BackupsPage(): JSX.Element {
     <Button
       data-empty-focus={inEmptyState ? "" : undefined}
       loading={create.isPending}
-      loadingText={t("creating")}
       onClick={startCreate}
       size="sm"
       variant={inEmptyState ? "outline" : "default"}
@@ -318,6 +317,7 @@ export function BackupsPage(): JSX.Element {
             <RefreshButton
               fetching={list.isFetching && !list.isPending}
               onRefresh={() => void invalidate()}
+              size="sm"
               variant="icon"
             />
             {createButton(false)}
@@ -326,7 +326,11 @@ export function BackupsPage(): JSX.Element {
         footer={
           rows.length > PAGE_SIZE ? (
             <DataTablePagination
-              onPageChange={setPage}
+              onPageChange={(next) => {
+                setPage(next);
+                // The next page starts at its first backup, not where the last one was scrolled.
+                document.getElementById("backup-list")?.scrollIntoView({ block: "start" });
+              }}
               page={currentPage}
               pageSize={PAGE_SIZE}
               total={rows.length}
@@ -335,7 +339,8 @@ export function BackupsPage(): JSX.Element {
         }
         icon={ArchiveIcon}
         id="backup-list"
-        meta={list.data ? listMeta(rows, t, lang) : undefined}
+        // Nothing to count with no backups: the empty state under it says so.
+        meta={list.data && rows.length > 0 ? listMeta(rows, t, lang) : undefined}
         slim
         title={t("list.title")}
       >

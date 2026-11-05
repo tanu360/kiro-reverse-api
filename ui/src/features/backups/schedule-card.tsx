@@ -137,16 +137,27 @@ function RunTime({ messageKey, value }: { messageKey: string; value: number }): 
   );
 }
 
-/** The scheduler's state under the switch: the last run (or none yet) and the next one. */
+/**
+ * The scheduler's state under the switch: the last run (or none yet) and the next one. Each part
+ * keeps to one line, so a narrow row breaks the text only at the separator.
+ */
 function RunTimes({ schedule }: { schedule: BackupSchedule }): JSX.Element {
   const { t } = useT("backups");
   return (
     <>
-      {schedule.lastRun ? <RunTime messageKey="lastRun" value={schedule.lastRun} /> : t("neverRun")}
+      <span className="whitespace-nowrap">
+        {schedule.lastRun ? (
+          <RunTime messageKey="lastRun" value={schedule.lastRun} />
+        ) : (
+          t("neverRun")
+        )}
+      </span>
       {schedule.nextRun ? (
         <>
           {" · "}
-          <RunTime messageKey="nextRun" value={schedule.nextRun} />
+          <span className="whitespace-nowrap">
+            <RunTime messageKey="nextRun" value={schedule.nextRun} />
+          </span>
         </>
       ) : null}
     </>
@@ -278,6 +289,91 @@ function ScheduleFormCard({
   );
 }
 
+/** A text line's placeholder: a bar centred in the line's height, `line` and `bar` sized. */
+function LineSkeleton({
+  line,
+  bar,
+  className,
+}: {
+  line: string;
+  bar: string;
+  /** Layout only. */
+  className?: string;
+}): JSX.Element {
+  return (
+    <div className={cn("flex items-center", line, className)}>
+      <Skeleton className={bar} />
+    </div>
+  );
+}
+
+/**
+ * A placeholder shaped like the SettingsRow it stands for: the title (and description) line, and
+ * the control beside it once the row has room or under it before that, so the card keeps its
+ * height when the schedule arrives.
+ */
+function RowSkeleton({
+  titleWidth,
+  description = false,
+  control,
+  nowrap = false,
+  wrapsNarrow = false,
+}: {
+  titleWidth: string;
+  description?: boolean;
+  control: JSX.Element;
+  nowrap?: boolean;
+  /** The description takes a second line in a narrow row (a phone's). */
+  wrapsNarrow?: boolean;
+}): JSX.Element {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        SETTINGS_ROW_X,
+        "@container/settings-row flex items-center justify-between gap-x-8 gap-y-3 py-4",
+        nowrap ? "flex-nowrap" : "flex-wrap",
+      )}
+    >
+      <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
+        <LineSkeleton bar={cn("h-3.5", titleWidth)} line="h-5" />
+        {description ? <LineSkeleton bar="h-3 w-56 max-w-full" line="h-4.5" /> : null}
+        {description && wrapsNarrow ? (
+          <LineSkeleton bar="h-3 w-28" className="-mt-1 @sm/settings-row:hidden" line="h-4.5" />
+        ) : null}
+      </div>
+      {control}
+    </div>
+  );
+}
+
+/** A field's placeholder at the field's height on every pointer. */
+const FIELD_SKELETON = "h-9 w-full sm:h-8 pointer-coarse:h-10";
+
+/** The three rows (switch, frequency, keep) and the Save button, before the schedule loads. */
+function ScheduleSkeleton(): JSX.Element {
+  return (
+    <>
+      <RowSkeleton
+        control={<Skeleton className="h-5.5 w-9.5 shrink-0 rounded-full sm:h-4.5 sm:w-7.5" />}
+        description
+        nowrap
+        titleWidth="w-32"
+        wrapsNarrow
+      />
+      <RowSkeleton
+        control={<Skeleton className={cn(FIELD_SKELETON, "@xl/settings-row:w-72")} />}
+        titleWidth="w-20"
+      />
+      <RowSkeleton
+        control={<Skeleton className={cn(FIELD_SKELETON, "@md/settings-row:w-36")} />}
+        description
+        titleWidth="w-24"
+      />
+    </>
+  );
+}
+
 export function ScheduleCard(): JSX.Element {
   const { t } = useT("backups");
   const query = useQuery(backupScheduleQuery());
@@ -288,6 +384,11 @@ export function ScheduleCard(): JSX.Element {
   return (
     <SettingsFrame
       description={t("schedule.description")}
+      footer={
+        query.isError ? undefined : (
+          <Skeleton aria-hidden="true" className="ms-auto h-8 w-18 sm:h-7 pointer-coarse:h-9" />
+        )
+      }
       icon={TimeScheduleIcon}
       id="backup-schedule"
       title={t("schedule.title")}
@@ -300,17 +401,7 @@ export function ScheduleCard(): JSX.Element {
           title={t("scheduleLoadError")}
         />
       ) : (
-        Array.from({ length: 3 }, (_, index) => (
-          <div
-            aria-hidden="true"
-            className={cn(SETTINGS_ROW_X, "flex items-center justify-between gap-8 py-4")}
-            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders never reorder.
-            key={index}
-          >
-            <Skeleton className="h-4 w-full max-w-40" />
-            <Skeleton className="h-8 w-full max-w-72" />
-          </div>
-        ))
+        <ScheduleSkeleton />
       )}
     </SettingsFrame>
   );

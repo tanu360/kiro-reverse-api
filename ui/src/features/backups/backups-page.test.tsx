@@ -247,7 +247,9 @@ describe("BackupsPage", () => {
     const file = new File(["not json at all"], "broken.json", { type: "application/json" });
     await user.upload(input, file);
     expect(input.value).toBe("");
-    expect(within(dialog()).getByText("Restore from this file?")).toBeInTheDocument();
+    expect(
+      within(dialog()).getByRole("heading", { name: "Restore from broken.json?" }),
+    ).toBeInTheDocument();
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
     expect(await findToast("Could not restore from this file")).toBeInTheDocument();
     expect(
@@ -415,8 +417,11 @@ describe("BackupsPage focus", () => {
       }),
     );
     const { user } = await renderPage();
-    await user.click(screen.getByRole("button", { name: "Create backup" }));
-    const pending = await screen.findByRole("button", { name: "Creating…" });
+    const pending = screen.getByRole("button", { name: "Create backup" });
+    await user.click(pending);
+    // The label stays while it works; only the spinner and aria-busy say so.
+    await waitFor(() => expect(pending).toHaveAttribute("aria-busy", "true"));
+    expect(pending).toHaveAccessibleName("Create backup");
     expect(pending).not.toBeDisabled();
     expect(pending).toHaveAttribute("aria-disabled", "true");
     expect(pending).toHaveFocus();
