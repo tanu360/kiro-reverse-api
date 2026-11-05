@@ -58,5 +58,7 @@
   "empty": "Chưa có bản sao lưu",
   "emptyBody": "Tạo bản sao lưu trước khi thay đổi tài khoản.",
   "loadError": "Không thể tải bản sao lưu",
-  "scheduleLoadError": "Không thể tải lịch sao lưu"
+  "scheduleLoadError": "Không thể tải lịch sao lưu",
+  "invalidCadence": "Chọn Hằng giờ, Hằng ngày hoặc Hằng tuần.",
+  "invalidKeep": "Nhập một số nguyên từ {min} đến {max}."
 }

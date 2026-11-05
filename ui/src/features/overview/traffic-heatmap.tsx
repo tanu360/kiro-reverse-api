@@ -27,14 +27,7 @@ import { formatNumber, formatTime } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
-import {
-  HOUR,
-  HOUR_PAIR_WINDOW,
-  heatFailure,
-  heatLevel,
-  topAccounts,
-  windowCells,
-} from "./aggregate";
+import { HOUR, heatFailure, heatLevel, windowCells } from "./aggregate";
 import { FAILED_COLOR, SUCCEEDED_COLOR } from "./colors";
 import { useTotalsFailed } from "./status-cards";
 
@@ -187,11 +180,15 @@ const HeatCells = memo(function HeatCells({
   );
 });
 
-/** Per-minute requests for all accounts and the five busiest ones over the last hour. */
+/**
+ * Per-minute requests for all accounts and the five busiest ones over the last hour. The server
+ * sends only those five (top=5) and counts the other busy accounts in `restCount`, which the
+ * header shows as "Top 5 of N" beside the All link.
+ */
 export function TrafficHeatmap(): JSX.Element {
   const { t, lang } = useT("overview");
   const display = useDisplayEmail();
-  const query = useQuery(heatmapQuery(HOUR_PAIR_WINDOW));
+  const query = useQuery(heatmapQuery(HOUR, { top: TOP_ACCOUNTS }));
   const totalsFailed = useTotalsFailed();
   const data = query.data;
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -199,7 +196,11 @@ export function TrafficHeatmap(): JSX.Element {
 
   const view = useMemo(() => {
     if (!data) return null;
-    const { rows: busiest } = topAccounts(data, TOP_ACCOUNTS, HOUR);
+    // The server sends the busiest first (by requests, failures included); a row without
+    // traffic in the hour is left out, should one come.
+    const busiest = data.accounts
+      .filter((account) => account.cells.some((cell) => cell.offset < HOUR && cell.reqs > 0))
+      .slice(0, TOP_ACCOUNTS);
     const rows: HeatRow[] = [
       {
         key: data.global.accountId,
@@ -217,7 +218,14 @@ export function TrafficHeatmap(): JSX.Element {
       })),
     ].map((row) => ({ ...row, total: sum(row.cells).requests }));
     const maxReq = Math.max(1, ...rows.flatMap((row) => row.cells.map((cell) => cell.reqs)));
-    return { rows, maxReq, nowUnix: data.nowUnix, total: sum(rows[0].cells) };
+    return {
+      rows,
+      maxReq,
+      nowUnix: data.nowUnix,
+      total: sum(rows[0].cells),
+      shown: busiest.length,
+      rest: Math.max(0, data.restCount ?? 0),
+    };
   }, [data, t, display]);
 
   // One listener for every cell: the tooltip follows the cell under the pointer.
@@ -360,6 +368,14 @@ export function TrafficHeatmap(): JSX.Element {
       descriptionVariant="inline"
       icon={GridViewIcon}
       id="overview-heatmap"
+      meta={
+        view && view.rest > 0
+          ? t("heatmap.topOf", {
+              shown: formatNumber(view.shown, lang),
+              total: formatNumber(view.shown + view.rest, lang),
+            })
+          : undefined
+      }
       title={t("heatmap.title")}
     >
       {body}

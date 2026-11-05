@@ -58,5 +58,7 @@
   "empty": "暂无备份",
   "emptyBody": "更改账号前，请先创建一个备份。",
   "loadError": "无法加载备份",
-  "scheduleLoadError": "无法加载定时备份设置"
+  "scheduleLoadError": "无法加载定时备份设置",
+  "invalidCadence": "请选择每小时、每天或每周。",
+  "invalidKeep": "请输入 {min} 到 {max} 之间的整数。"
 }

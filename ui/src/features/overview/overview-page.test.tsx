@@ -139,6 +139,114 @@ describe("OverviewPage", () => {
     expect(errRate?.querySelector('[data-slot="stat-value"]')?.textContent).toMatch(/^\d+\.\d%$/);
   });
 
+  it("draws the live series as bar sparklines and active accounts against available ones", async () => {
+    const flat = (value: number) => Array.from({ length: 30 }, () => value);
+    // The error rate doubles in the newest minutes: its newest bar and icon turn red.
+    const errRate = [...flat(0.1).slice(2), 0.2, 0.2];
+    mockServer.use(
+      http.get(apiUrl("/observe/overview"), () =>
+        HttpResponse.json({
+          startedAt: 1_700_000_000,
+          nowUnix: 1_700_003_600,
+          rpm1: 12,
+          rpm5Avg: 10,
+          errRate5: 0.12,
+          inTpm5: 4000,
+          outTpm5: 900,
+          credits5: 1,
+          credits60: 7.5,
+          errors60: 3,
+          successes60: 40,
+          retries60: 1,
+          activeAccts: 2,
+          totalAccts: 9,
+          totalModels: 3,
+          enabledAccts: 6,
+          availableAccts: 4,
+          series: {
+            rpm: flat(10),
+            errRate,
+            inTpm: flat(4000),
+            outTpm: flat(900),
+            credits: flat(1),
+          },
+        }),
+      ),
+    );
+    const { container } = await renderApp("/");
+    const live = await screen.findByRole("region", { name: "Live traffic" });
+    await waitFor(() => expect(liveTiles(container)).toHaveLength(6));
+    const tiles = [...liveTiles(container)];
+    // Every tile fills its trend slot: bars for the five series (lazy chart code), a meter for
+    // Active accounts. jsdom has no layout, so the sparkline draws its box without the svg.
+    await waitFor(() => {
+      for (const tile of tiles) {
+        expect(tile.querySelector('[data-slot="stat-trend"]')?.childElementCount).toBe(1);
+      }
+    });
+    const active = within(live).getByText("Active accounts").closest('[data-slot="stat-tile"]');
+    expect(active?.querySelector('[data-slot="stat-value"]')?.textContent).toBe("2 / 4");
+    expect(active?.querySelector('[data-slot="meter-indicator"]')).not.toBeNull();
+    const errors = within(live).getByText("Errors (5 min)").closest('[data-slot="stat-tile"]');
+    expect(errors).toHaveAttribute("data-tone", "danger");
+    expect(errors?.querySelector('[data-slot="stat-value"]')).toHaveClass("text-foreground");
+  });
+
+  it("asks for the global row only, except for the top five accounts in the heatmap", async () => {
+    const urls: URL[] = [];
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
+        urls.push(new URL(request.url));
+        return undefined;
+      }),
+    );
+    await renderApp("/");
+    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
+    await within(heatmap).findByText("All accounts");
+    await waitFor(() => expect(urls.length).toBeGreaterThanOrEqual(2));
+    const shapes = urls.map((url) => ({
+      windowMin: url.searchParams.get("windowMin"),
+      scope: url.searchParams.get("scope"),
+      top: url.searchParams.get("top"),
+    }));
+    // The status-card trends and the 1 h chart share one global-only two-hour request.
+    expect(shapes).toContainEqual({ windowMin: "120", scope: "global", top: null });
+    expect(shapes).toContainEqual({ windowMin: "60", scope: null, top: "5" });
+    // Nothing asks for every account's row any more.
+    expect(shapes.filter((shape) => shape.scope === null && shape.top === null)).toEqual([]);
+  });
+
+  it("counts the busy accounts beyond the top five beside the heatmap title", async () => {
+    const busy = (offset: number) => [{ offset, reqs: 3, failures: 0 }];
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        const windowMin = Number(params.get("windowMin") ?? 60);
+        const global = { accountId: "_global_", cells: busy(1) };
+        if (params.get("scope") === "global") {
+          return HttpResponse.json({ windowMin, nowUnix: 1_700_000_000, global });
+        }
+        return HttpResponse.json({
+          windowMin,
+          nowUnix: 1_700_000_000,
+          global,
+          accounts: Array.from({ length: 5 }, (_, index) => ({
+            accountId: `acct-${index}`,
+            email: `user${index}@example.com`,
+            cells: busy(index + 1),
+          })),
+          restCount: 3,
+        });
+      }),
+    );
+    await renderApp("/");
+    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
+    expect(await within(heatmap).findByText("Top 5 of 8")).toHaveAttribute(
+      "data-slot",
+      "card-meta",
+    );
+  });
+
   it("lists at most 10 recent errors", async () => {
     await renderApp("/");
     const table = await errorsTable();

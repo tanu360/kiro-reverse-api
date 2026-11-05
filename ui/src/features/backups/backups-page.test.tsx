@@ -154,6 +154,28 @@ describe("BackupsPage", () => {
     expect(body).toEqual({ enabled: true, cadence: "daily", keep: 200 });
   });
 
+  it("marks the Keep field when the server rejects keep, without a toast", async () => {
+    mockServer.use(
+      http.post(apiUrl("/backups/schedule"), () =>
+        HttpResponse.json(
+          { error: "keep must be between 1 and 200", code: "invalid_keep" },
+          { status: 400 },
+        ),
+      ),
+    );
+    const { user } = await renderPage();
+    const keep = await screen.findByRole("textbox", { name: "Keep latest" });
+    await user.clear(keep);
+    await user.type(keep, "30");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Enter a whole number from 1 to 200.")).toBeInTheDocument();
+    expect(keep).toHaveAttribute("aria-invalid", "true");
+    expect(document.querySelector('[data-slot="toast-title"]')).toBeNull();
+    // Editing the value clears the mark.
+    await user.type(keep, "1");
+    expect(screen.queryByText("Enter a whole number from 1 to 200.")).toBeNull();
+  });
+
   it("downloads a backup through saveBlob with the server file name", async () => {
     const { user } = await renderPage();
     const [first] = newestFirst();

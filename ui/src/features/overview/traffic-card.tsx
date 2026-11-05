@@ -48,10 +48,13 @@ export function TrafficCard(): JSX.Element {
   const totalsFailed = useTotalsFailed();
   const { windowMin, bucketMin } = RANGE_WINDOWS[range];
   const hourView = range === "1h";
-  // The 1 h view reads the two-hour heatmap the status cards and the account heatmap already
-  // share (no extra request), and takes its older hour as the dashed comparison. It follows SSE
-  // ticks; the longer ranges poll every 60 s.
-  const query = useQuery(heatmapQuery(hourView ? HOUR_PAIR_WINDOW : windowMin, { live: hourView }));
+  // Only the global row is read (scope=global: no per-account rows on the wire). The 1 h view
+  // reads the two-hour heatmap the status cards already load (same key, no extra request), and
+  // takes its older hour as the dashed comparison. It follows SSE ticks; the longer ranges poll
+  // every 60 s.
+  const query = useQuery(
+    heatmapQuery(hourView ? HOUR_PAIR_WINDOW : windowMin, { live: hourView, scope: "global" }),
+  );
   const data = query.data;
 
   const points = useMemo(() => {

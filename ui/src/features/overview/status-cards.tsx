@@ -215,8 +215,9 @@ function failedTile(s: StatusResponse, t: TFunction, lang: Lang): StatTileProps 
 export function StatusCards(): JSX.Element {
   const { t, lang } = useT("overview");
   const status = useQuery(statusQuery());
-  // Shared with the account heatmap (same key), so this costs no extra request.
-  const heatmap = useQuery(heatmapQuery(HOUR_PAIR_WINDOW));
+  // Only the global row is read, so the accounts stay off the wire. Shared with the traffic
+  // chart's 1 h view (same key), so this costs no extra request.
+  const heatmap = useQuery(heatmapQuery(HOUR_PAIR_WINDOW, { scope: "global" }));
   const animate = !usePrefersReducedMotion();
   const cells = heatmap.data?.global.cells;
   const pending = heatmap.isPending;

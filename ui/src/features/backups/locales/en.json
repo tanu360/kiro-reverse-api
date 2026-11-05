@@ -60,5 +60,7 @@
   "empty": "No backups yet",
   "emptyBody": "Create a backup before you change accounts.",
   "loadError": "Could not load backups",
-  "scheduleLoadError": "Could not load the backup schedule"
+  "scheduleLoadError": "Could not load the backup schedule",
+  "invalidCadence": "Choose Hourly, Daily or Weekly.",
+  "invalidKeep": "Enter a whole number from {min} to {max}."
 }

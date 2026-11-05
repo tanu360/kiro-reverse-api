@@ -61,5 +61,7 @@
   "empty": "Nenhum backup por enquanto",
   "emptyBody": "Crie um backup antes de alterar as contas.",
   "loadError": "Não foi possível carregar os backups",
-  "scheduleLoadError": "Não foi possível carregar o agendamento de backups"
+  "scheduleLoadError": "Não foi possível carregar o agendamento de backups",
+  "invalidCadence": "Escolha Por hora, Diária ou Semanal.",
+  "invalidKeep": "Informe um número inteiro de {min} a {max}."
 }

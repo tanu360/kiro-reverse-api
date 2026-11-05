@@ -11,6 +11,7 @@ import {
   SwitchField,
 } from "@/components/shared/settings-rows";
 import { useDraftGuard } from "@/components/shared/use-draft-guard";
+import { Field, FieldError } from "@/components/ui/field";
 import {
   NumberField,
   NumberFieldDecrement,
@@ -28,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { backupScheduleQuery, updateBackupSchedule } from "@/lib/api/backups";
 import { queryKeys } from "@/lib/api/query-keys";
+import { serverErrorCode } from "@/lib/api/server-errors";
 import type { BackupCadence, BackupSchedule } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
@@ -48,6 +50,13 @@ interface RowAria {
   "aria-labelledby"?: string;
   "aria-describedby"?: string;
 }
+
+/** The field a 400 from POST /backups/schedule points at, from its `code`. */
+type InvalidField = "cadence" | "keep";
+const INVALID_FIELDS: Readonly<Record<string, InvalidField>> = {
+  invalid_cadence: "cadence",
+  invalid_keep: "keep",
+};
 
 function seedKey(form: ScheduleForm): string {
   return `${form.enabled}-${form.cadence}-${form.keep}`;
@@ -157,6 +166,8 @@ function ScheduleFormCard({
   const [enabled, setEnabled] = useState(initial.enabled);
   const [cadence, setCadence] = useState<BackupCadence>(initial.cadence);
   const [keep, setKeep] = useState<number | null>(initial.keep);
+  // A rejected value is marked on its row (the server's 400 names it by code), not toasted.
+  const [invalid, setInvalid] = useState<InvalidField | null>(null);
 
   // New server values (after a save or a restore) re-seed the fields in place. The form is not
   // remounted, so focus stays on Save after a save.
@@ -166,6 +177,7 @@ function ScheduleFormCard({
     setEnabled(initial.enabled);
     setCadence(initial.cadence);
     setKeep(initial.keep);
+    setInvalid(null);
   }
 
   const dirty = scheduleDirty(initial, { enabled, cadence, keep });
@@ -193,7 +205,11 @@ function ScheduleFormCard({
       }
       void queryClient.invalidateQueries({ queryKey: queryKeys.backups.all });
     },
-    onError: (error) => toastError(error, t),
+    onError: (error) => {
+      const field = INVALID_FIELDS[serverErrorCode(error) ?? ""];
+      if (field) setInvalid(field);
+      else toastError(error, t);
+    },
   });
 
   return (
@@ -217,17 +233,46 @@ function ScheduleFormCard({
           onCheckedChange={setEnabled}
           title={t("scheduleEnabled")}
         />
-        <SettingsRow
-          control={<FrequencySelect onValueChange={setCadence} value={cadence} />}
-          title={t("frequency")}
-        />
-        <SettingsRow
-          control={<KeepField id={keepId} onValueChange={setKeep} value={keep} />}
-          controlWidth="number"
-          description={t("keepHint")}
-          htmlFor={keepId}
-          title={t("keepTitle")}
-        />
+        {/* One Field round each row: it marks the control invalid and adds the error, which
+            sits under the description, to the control's description. */}
+        <Field className="items-stretch" invalid={invalid === "cadence"}>
+          <SettingsRow
+            control={
+              <FrequencySelect
+                onValueChange={(value) => {
+                  if (invalid === "cadence") setInvalid(null);
+                  setCadence(value);
+                }}
+                value={cadence}
+              />
+            }
+            title={t("frequency")}
+          >
+            {invalid === "cadence" ? <FieldError match>{t("invalidCadence")}</FieldError> : null}
+          </SettingsRow>
+        </Field>
+        <Field className="items-stretch" invalid={invalid === "keep"}>
+          <SettingsRow
+            control={
+              <KeepField
+                id={keepId}
+                onValueChange={(value) => {
+                  if (invalid === "keep") setInvalid(null);
+                  setKeep(value);
+                }}
+                value={keep}
+              />
+            }
+            controlWidth="number"
+            description={t("keepHint")}
+            htmlFor={keepId}
+            title={t("keepTitle")}
+          >
+            {invalid === "keep" ? (
+              <FieldError match>{t("invalidKeep", { min: KEEP_MIN, max: KEEP_MAX })}</FieldError>
+            ) : null}
+          </SettingsRow>
+        </Field>
       </SettingsFrame>
     </form>
   );

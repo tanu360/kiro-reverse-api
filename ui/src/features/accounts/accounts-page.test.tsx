@@ -342,19 +342,38 @@ describe("AccountsPage layout", () => {
   });
 
   it("refreshes the selection's models in one batch call and reports the result", async () => {
+    // The third account fails upstream: the toast counts it and names it with the reason.
+    mockServer.use(
+      http.post(apiUrl("/accounts/batch"), async ({ request }) => {
+        const { ids } = (await request.clone().json()) as { ids: string[] };
+        return HttpResponse.json({
+          success: true,
+          refreshed: ids.length - 1,
+          failed: 1,
+          models: 12,
+          results: ids.map((id, index) =>
+            index === ids.length - 1 ? { id, ok: false, error: "upstream 500" } : { id, ok: true },
+          ),
+        });
+      }),
+    );
     const bodies = captureBodies("post", "/accounts/batch");
     const { table, user } = await renderAccounts();
-    const rows = bodyRows(table).slice(0, 2);
+    const rows = bodyRows(table).slice(0, 3);
     for (const row of rows) await user.click(within(row).getAllByRole("checkbox")[0]);
     const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
     await user.click(within(bar).getByRole("button", { name: "Refresh models" }));
     const dialog = await screen.findByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: "Refresh models" }));
-    expect(
-      await screen.findByText("Refreshed models for 2 accounts, 0 failed."),
-    ).toBeInTheDocument();
+    const title = await screen.findByText("Refreshed models for 2 accounts, 1 failed.");
+    const toastRoot = title.closest<HTMLElement>('[data-slot="toast"]');
+    expect(toastRoot).toHaveAttribute("data-type", "warning");
+    expect(toastRoot?.querySelector('[data-slot="toast-description"]')?.textContent).toMatch(
+      /: upstream 500$/,
+    );
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({ action: "refreshModels" });
+    expect((bodies[0] as { ids: string[] }).ids).toHaveLength(3);
   });
 
   it("exports the selection from the batch toolbar with only those accounts checked", async () => {
