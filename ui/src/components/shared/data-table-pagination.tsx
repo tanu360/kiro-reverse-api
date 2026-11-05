@@ -19,6 +19,14 @@ import {
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 
+/*
+ * The prev/next chevrons: round, in the topbar search pill's surface (command-menu.tsx: the
+ * --field tint and the --input hairline), so they read on the page in both themes. Disabled keeps
+ * the circle and only dims the chevron.
+ */
+const CHEVRON =
+  "size-9 rounded-full border-input bg-(--field) text-foreground [--control-radius:9999px] [:hover,[data-pressed]]:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
+
 export function DataTablePagination({
   page,
   pageSize,
@@ -26,7 +34,6 @@ export function DataTablePagination({
   onPageChange,
   pageSizeOptions,
   onPageSizeChange,
-  variant = "default",
 }: {
   variant?: "default" | "circle";
   page: number;
@@ -49,7 +56,7 @@ export function DataTablePagination({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 text-meta">
-      <p aria-live="polite" className="text-muted-foreground tabular-nums">
+      <p aria-live="polite" className="text-muted-foreground">
         {t("table.pageInfo", {
           start: formatNumber(start, lang),
           end: formatNumber(end, lang),
@@ -85,77 +92,63 @@ export function DataTablePagination({
             </Select>
           </div>
         ) : null}
-        {variant === "circle" ? (
-          <Pagination className="mx-0 w-auto">
-            <PaginationContent>
-              <PaginationItem>
-                <Button
-                  className="rounded-full"
-                  disabled={page <= 1}
-                  onClick={() => onPageChange(page - 1)}
-                  size="sm"
-                  variant="ghost"
-                >
-                  <HugeiconsIcon icon={ChevronLeftIcon} aria-hidden="true" />
-                  <span className="max-sm:sr-only">{t("table.previous")}</span>
-                </Button>
-              </PaginationItem>
-              {pages.map((n, index) => (
-                <PaginationItem className="flex items-center gap-1" key={n}>
-                  {index > 0 && n - pages[index - 1] > 1 ? <PaginationEllipsis /> : null}
-                  <PaginationLink
-                    isActive={n === page}
-                    className="rounded-full"
-                    render={
-                      <Button
-                        aria-label={formatNumber(n, lang)}
-                        onClick={() => onPageChange(n)}
-                        size="icon"
-                        variant={n === page ? "outline" : "ghost"}
-                        className="rounded-full"
-                      />
-                    }
-                  >
-                    {formatNumber(n, lang)}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <Button
-                  className="rounded-full"
-                  disabled={page >= pageCount}
-                  onClick={() => onPageChange(page + 1)}
-                  size="sm"
-                  variant="ghost"
-                >
-                  <span className="max-sm:sr-only">{t("table.next")}</span>
-                  <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" />
-                </Button>
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        ) : (
-          <>
-            <Button
-              disabled={page <= 1}
-              onClick={() => onPageChange(page - 1)}
-              size="sm"
-              variant="outline"
-            >
-              <HugeiconsIcon icon={ChevronLeftIcon} aria-hidden="true" />
-              {t("table.previous")}
-            </Button>
-            <Button
-              disabled={page >= pageCount}
-              onClick={() => onPageChange(page + 1)}
-              size="sm"
-              variant="outline"
-            >
-              {t("table.next")}
-              <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" />
-            </Button>
-          </>
-        )}
+        <Pagination className="mx-0 w-auto max-w-full">
+          <PaginationContent className="gap-2">
+            <PaginationItem>
+              <Button
+                aria-label={t("table.previous")}
+                className={CHEVRON}
+                disabled={page <= 1}
+                onClick={() => onPageChange(page - 1)}
+                size="icon"
+                variant="quiet"
+              >
+                <HugeiconsIcon icon={ChevronLeftIcon} aria-hidden="true" />
+              </Button>
+            </PaginationItem>
+            <PaginationItem>
+              <ol className="flex items-center gap-0.5 p-1">
+                {pages.map((n, index) => (
+                  <PaginationItem className="flex items-center gap-0.5" key={n}>
+                    {index > 0 && n - pages[index - 1] > 1 ? (
+                      <PaginationEllipsis className="min-w-4 text-muted-foreground" />
+                    ) : null}
+                    <PaginationLink
+                      isActive={n === page}
+                      render={
+                        <Button
+                          aria-label={formatNumber(n, lang)}
+                          onClick={() => onPageChange(n)}
+                          size="icon"
+                          variant="quiet"
+                          className={
+                            n === page
+                              ? "size-8 font-semibold text-foreground [--control-radius:9999px]"
+                              : "size-8 [--control-radius:9999px]"
+                          }
+                        />
+                      }
+                    >
+                      {formatNumber(n, lang)}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+              </ol>
+            </PaginationItem>
+            <PaginationItem>
+              <Button
+                aria-label={t("table.next")}
+                className={CHEVRON}
+                disabled={page >= pageCount}
+                onClick={() => onPageChange(page + 1)}
+                size="icon"
+                variant="quiet"
+              >
+                <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" />
+              </Button>
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
   );

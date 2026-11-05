@@ -3,18 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { DataTablePagination } from "./data-table-pagination";
 
-describe("circle pagination", () => {
+describe("table pagination", () => {
   it("jumps to numbered pages and marks the current page", async () => {
     const onPageChange = vi.fn();
     const { user } = renderWithProviders(
-      <DataTablePagination
-        variant="circle"
-        page={5}
-        pageSize={25}
-        total={250}
-        onPageChange={onPageChange}
-      />,
+      <DataTablePagination page={5} pageSize={25} total={250} onPageChange={onPageChange} />,
     );
+    expect(screen.getByRole("button", { name: "Previous" }).textContent).toBe("");
+    expect(screen.getByRole("button", { name: "Next" }).textContent).toBe("");
     expect(screen.getByRole("button", { name: "5" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("button", { name: "2" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "10" }));

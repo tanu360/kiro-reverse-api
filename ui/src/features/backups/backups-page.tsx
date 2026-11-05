@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
@@ -36,6 +37,8 @@ import { toast, toastError } from "@/lib/toast";
 import { isNotABackupMessage, MAX_UPLOAD_BYTES, manualNote } from "./backup-model";
 import { type BackupRowActions, BackupsTable, ROW_FOCUS_ATTR } from "./backups-table";
 import { ScheduleCard } from "./schedule-card";
+
+const PAGE_SIZE = 25;
 
 /**
  * Tracks which rows have a request in flight. A second action on a busy row is ignored: the
@@ -185,6 +188,15 @@ export function BackupsPage(): JSX.Element {
   );
 
   const rows = list.data ?? [];
+  // 25 rows a page, as on Accounts; the pager shows only past one page. A page that empties
+  // (its last backup deleted) falls back to the new last page.
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = useMemo(
+    () => rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [rows, currentPage],
+  );
 
   // After a delete, focus goes to the row that took the deleted one's place (or the one above
   // it, or the empty state's Create backup), not to <body> with the removed row.
@@ -320,11 +332,19 @@ export function BackupsPage(): JSX.Element {
                 />
               }
               loading={list.isPending}
-              rows={rows}
+              rows={pageRows}
             />
           </div>
         )}
       </SectionCard>
+      {rows.length > PAGE_SIZE ? (
+        <DataTablePagination
+          onPageChange={setPage}
+          page={currentPage}
+          pageSize={PAGE_SIZE}
+          total={rows.length}
+        />
+      ) : null}
     </div>
   );
 }

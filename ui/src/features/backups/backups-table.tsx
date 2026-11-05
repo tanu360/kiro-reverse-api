@@ -122,7 +122,7 @@ function TimeCell({ entry }: { entry: BackupEntry }): JSX.Element {
   const absolute = formatDateTime(entry.createdAt, lang);
   return (
     <HintText
-      className="whitespace-nowrap no-underline tabular-nums"
+      className="whitespace-nowrap no-underline"
       hint={formatRelativeTime(entry.createdAt, lang)}
       label={absolute}
     >
@@ -151,12 +151,10 @@ function AccountsCell({ entry, t }: { entry: BackupEntry; t: TFunction }): JSX.E
   const { lang } = useT();
   const { text, hint } = accountsCell(entry, t, lang);
   if (!hint) {
-    return (
-      <span className={cn("tabular-nums", text === EMPTY && "text-muted-foreground")}>{text}</span>
-    );
+    return <span className={cn(text === EMPTY && "text-muted-foreground")}>{text}</span>;
   }
   return (
-    <HintText className="tabular-nums" hint={hint} label={text}>
+    <HintText hint={hint} label={text}>
       {text}
     </HintText>
   );
@@ -322,7 +320,7 @@ function BackupCard({
           <span>
             {t("accountsInBackup")}: <AccountsCell entry={entry} t={t} />
           </span>
-          <span className="tabular-nums">{formatBytes(entry.size, lang)}</span>
+          <span>{formatBytes(entry.size, lang)}</span>
         </p>
       </div>
       <RowMenu actions={actions} entry={entry} label={t("rowActions", { time })} />
@@ -403,17 +401,17 @@ export function BackupsTable({
         id: "size",
         header: t("size"),
         align: "end",
-        className: "whitespace-nowrap tabular-nums text-muted-foreground",
+        className: "whitespace-nowrap text-muted-foreground",
         cell: (entry) => formatBytes(entry.size, lang),
       },
       {
         id: "actions",
         header: <span className="sr-only">{t("common:table.actions")}</span>,
         align: "end",
-        // Pinned to the right edge, so the actions stay in view if the table ever scrolls; opaque
-        // in the panel's own fill (the card at 40 % over the page).
-        headerClassName: "sticky right-0 z-[1] bg-surface-inset",
-        className: "sticky right-0 z-[1] bg-surface-inset py-1",
+        // Pinned to the right edge as on Accounts, so the actions stay in view if the table ever
+        // scrolls. The shared sticky style keeps the header band and the row's hover tint on it.
+        sticky: "end",
+        className: "py-1",
         cell: (entry) => <RowActions actions={actions} entry={entry} />,
       },
     ],
