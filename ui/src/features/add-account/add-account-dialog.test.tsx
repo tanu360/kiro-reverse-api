@@ -222,12 +222,17 @@ describe("Microsoft SSO", () => {
     const onAdded = vi.fn();
     const { user } = renderWithProviders(<Harness initialMethod="microsoft" onAdded={onAdded} />);
 
-    await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
-    expect(await screen.findByText("Step 1: sign in to the Kiro portal")).toBeInTheDocument();
+    expect(await screen.findByText("How sign-in works")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start sign-in" }));
+    // The idle guide repeats the step labels, so wait for the step's own field.
+    const callback = await screen.findByRole("textbox", { name: "Callback URL" });
+    expect(screen.getByText("Step 1: sign in to the Kiro portal")).toBeInTheDocument();
+    expect(screen.queryByText("How sign-in works")).not.toBeInTheDocument();
 
-    const callback = screen.getByRole("textbox", { name: "Callback URL" });
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     expect(await screen.findByText("Paste the callback URL first.")).toBeInTheDocument();
+    // The paste instructions are a step note, so the error does not replace them.
+    expect(screen.getByText(/fails to load at http:\/\/localhost:3128/)).toBeInTheDocument();
 
     await user.type(callback, "http://localhost:3128/signin/callback?login_option=external_idp");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
@@ -275,7 +280,7 @@ describe("Microsoft SSO", () => {
     const { user } = renderWithProviders(<Harness initialMethod="microsoft" />);
 
     await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
-    await screen.findByText("Step 1: sign in to the Kiro portal");
+    await screen.findByRole("textbox", { name: "Callback URL" });
     const [sessionId] = Object.keys(mockDb.pending.microsoft);
     expect(sessionId).toBeTruthy();
 
@@ -291,7 +296,7 @@ describe("Microsoft SSO", () => {
     const { user } = renderWithProviders(<Harness initialMethod="microsoft" onAdded={onAdded} />);
 
     await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
-    await screen.findByText("Step 1: sign in to the Kiro portal");
+    await screen.findByRole("textbox", { name: "Callback URL" });
     const [sessionId] = Object.keys(mockDb.pending.microsoft);
 
     const late = deferred("/auth/microsoft-sso/complete", {
@@ -326,7 +331,7 @@ describe("Microsoft SSO", () => {
     const cancels = logRequests("/auth/microsoft-sso/cancel");
     const { user, unmount } = renderWithProviders(<Harness initialMethod="microsoft" />);
     await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
-    await screen.findByText("Step 1: sign in to the Kiro portal");
+    await screen.findByRole("textbox", { name: "Callback URL" });
     const [sessionId] = Object.keys(mockDb.pending.microsoft);
     unmount();
     await waitFor(() => expect(cancels.bodies).toEqual([{ sessionId, selectionId: "" }]));
@@ -455,6 +460,12 @@ describe("Credentials JSON", () => {
     await user.type(await screen.findByRole("textbox", { name: "Credentials JSON" }), "nope");
     await user.click(screen.getByRole("button", { name: "Add" }));
     expect(await screen.findByText("The text is not valid JSON.")).toBeInTheDocument();
+  });
+
+  it("asks for the JSON when the field is empty", async () => {
+    const { user } = renderWithProviders(<Harness initialMethod="credentials" />);
+    await user.click(await screen.findByRole("button", { name: "Add" }));
+    expect(await screen.findByText("Paste the credentials JSON.")).toBeInTheDocument();
   });
 });
 

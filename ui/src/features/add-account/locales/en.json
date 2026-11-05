@@ -42,6 +42,7 @@
   "methods.apikey.title": "Kiro API key",
   "methods.apikey.description": "Add a headless account with a Kiro CLI API key (ksk_…).",
 
+  "builderid.startNote": "You get a code to enter on the AWS page.",
   "builderid.verifyCode": "Enter this code at the link below.",
   "builderid.userCode": "Your code",
   "builderid.verifyUrl": "Verification URL",
@@ -56,8 +57,10 @@
   "iam.summary": "Signing in to {url} in {region}.",
   "iam.callbackUrlPlaceholder": "http://127.0.0.1:52341/?code=…",
 
+  "microsoft.guideTitle": "How sign-in works",
   "microsoft.portalStep": "Step 1: sign in to the Kiro portal",
   "microsoft.providerStep": "Step 2: sign in with Microsoft",
+  "microsoft.pasteStep": "After each sign-in, paste the address your browser lands on. It starts with",
   "microsoft.callbackInstructions": "Open the link and sign in. Your browser then shows a page that fails to load at http://localhost:3128. That is expected. Copy the full address from the address bar and paste it below.",
   "microsoft.selectProfileDesc": "This account has more than one Kiro profile. Choose the one this proxy should use.",
   "microsoft.profileLabel": "Kiro profile",
@@ -108,6 +111,7 @@
   "credentials.required": "Required: refreshToken, or kiroApiKey for API key accounts.",
   "credentials.optional": "Optional: provider (BuilderId, Enterprise, GitHub, Google), clientId, clientSecret, region.",
   "credentials.parseError": "The text is not valid JSON.",
+  "credentials.empty": "Paste the credentials JSON.",
   "credentials.noItems": "The JSON has no accounts.",
   "credentials.missingRefreshToken": "no refreshToken",
   "credentials.failureItem": "Item {index}: {reason}",

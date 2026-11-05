@@ -106,7 +106,9 @@ export function IamFlow(): JSX.Element {
             </TruncatedText>
           </FlowNote>
           <UrlBox label={t("iam.loginUrl")} url={authorizeUrl} />
-          <FormField error={errors.callback} hint={t("iam.completeLogin")} label={t("callbackUrl")}>
+          {/* A step note, not the field hint: it stays in view while the field shows an error. */}
+          <FlowNote>{t("iam.completeLogin")}</FlowNote>
+          <FormField error={errors.callback} label={t("callbackUrl")}>
             <Input
               autoCapitalize="off"
               autoComplete="off"

@@ -1,5 +1,6 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
 import { ChoiceCard } from "@/components/shared/choice-card";
+import { Code } from "@/components/shared/code";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
@@ -14,7 +15,7 @@ import type { KiroProfile, MicrosoftSelectProfileResponse } from "@/lib/api/type
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FormField, SubmitButton, UrlBox } from "../fields";
+import { FlowGuide, FlowNote, FormField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 
@@ -185,7 +186,7 @@ export function MicrosoftFlow(): JSX.Element {
                 key={profile.arn}
                 title={profile.name || t("microsoft.unnamedProfile")}
               >
-                <span className="break-all font-mono text-muted-foreground text-xs">
+                <span className="break-all font-mono text-meta text-muted-foreground">
                   {profile.arn}
                 </span>
               </ChoiceCard>
@@ -199,11 +200,9 @@ export function MicrosoftFlow(): JSX.Element {
             label={stage === "microsoft" ? t("microsoft.providerStep") : t("microsoft.portalStep")}
             url={authorizeUrl}
           />
-          <FormField
-            error={fieldError}
-            hint={t("microsoft.callbackInstructions")}
-            label={t("callbackUrl")}
-          >
+          {/* A step note, not the field hint: it stays in view while the field shows an error. */}
+          <FlowNote>{t("microsoft.callbackInstructions")}</FlowNote>
+          <FormField error={fieldError} label={t("callbackUrl")}>
             <Input
               autoCapitalize="off"
               autoComplete="off"
@@ -217,7 +216,16 @@ export function MicrosoftFlow(): JSX.Element {
             />
           </FormField>
         </>
-      ) : null}
+      ) : (
+        // Before the first request, say what follows: two browser sign-ins and two pastes.
+        <FlowGuide list title={t("microsoft.guideTitle")}>
+          <li>{t("microsoft.portalStep")}</li>
+          <li>{t("microsoft.providerStep")}</li>
+          <li>
+            {t("microsoft.pasteStep")} <Code>http://localhost:3128</Code>
+          </li>
+        </FlowGuide>
+      )}
       <FlowFooter>
         <SubmitButton busy={busy} busyLabel={busyLabel} formId={formId} label={submitLabel} />
       </FlowFooter>

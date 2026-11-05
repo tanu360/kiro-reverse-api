@@ -39,6 +39,7 @@
   "methods.apikey.title": "Kiro API Key",
   "methods.apikey.description": "使用 Kiro CLI API Key（ksk_…）添加无界面账号。",
 
+  "builderid.startNote": "你将获得一个验证码，需在 AWS 页面中输入。",
   "builderid.verifyCode": "请在下方链接中输入此验证码。",
   "builderid.userCode": "验证码",
   "builderid.verifyUrl": "验证链接",
@@ -53,8 +54,10 @@
   "iam.summary": "正在通过 {url}（{region}）登录。",
   "iam.callbackUrlPlaceholder": "http://127.0.0.1:52341/?code=…",
 
+  "microsoft.guideTitle": "登录流程",
   "microsoft.portalStep": "第 1 步：登录 Kiro 门户",
   "microsoft.providerStep": "第 2 步：使用 Microsoft 登录",
+  "microsoft.pasteStep": "每次登录后，粘贴浏览器最终停留的地址，该地址开头为",
   "microsoft.callbackInstructions": "打开链接并完成登录。浏览器随后会显示一个无法打开的 http://localhost:3128 页面，这是正常的。复制地址栏中的完整地址并粘贴到下方。",
   "microsoft.selectProfileDesc": "此账号有多个 Kiro Profile。请选择代理要使用的 Kiro Profile。",
   "microsoft.profileLabel": "Kiro Profile",
@@ -105,6 +108,7 @@
   "credentials.required": "必填：refreshToken；API Key 账号填 kiroApiKey。",
   "credentials.optional": "可选：provider（BuilderId、Enterprise、GitHub、Google）、clientId、clientSecret、region。",
   "credentials.parseError": "内容不是有效的 JSON。",
+  "credentials.empty": "请粘贴凭证 JSON。",
   "credentials.noItems": "JSON 中没有账号。",
   "credentials.missingRefreshToken": "缺少 refreshToken",
   "credentials.failureItem": "第 {index} 项：{reason}",

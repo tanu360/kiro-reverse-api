@@ -30,6 +30,11 @@ export function CredentialsFlow(): JSX.Element {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
+    if (!json.trim()) {
+      setError(t("credentials.empty"));
+      focusAfter(jsonRef);
+      return;
+    }
     let items: CredentialSource[];
     try {
       items = parseCredentialsJson(json);

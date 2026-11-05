@@ -141,6 +141,7 @@ export function BuilderIdFlow(): JSX.Element {
 
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onStart}>
+      <FlowNote>{t("builderid.startNote")}</FlowNote>
       <RegionField
         disabled={starting}
         error={regionError}
