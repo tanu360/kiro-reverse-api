@@ -3676,12 +3676,11 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//! The server, not only the UI, refuses a state where no client can authenticate.
-	if req.RequireApiKey != nil && *req.RequireApiKey && !config.IsApiKeyRequired() && config.CountEnabledApiKeys() == 0 {
-		writeAPIKeyLockout(w)
-		return
-	}
-
-	if err := config.UpdateSettingsPatch(req.RequireApiKey, req.Password); err != nil {
+	if err := config.UpdateSettingsPatchGuarded(req.RequireApiKey, req.Password); err != nil {
+		if errors.Is(err, config.ErrApiKeyLockout) {
+			writeAPIKeyLockout(w)
+			return
+		}
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return

@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+// ErrApiKeyLockout refuses a change that would leave a proxy that requires API
+// keys with no enabled key, so every client would get 401.
+var ErrApiKeyLockout = errors.New("would lock out every client")
+
 func ListApiKeys() []ApiKeyEntry {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -68,6 +72,17 @@ func AddApiKey(entry ApiKeyEntry) (ApiKeyEntry, error) {
 }
 
 func UpdateApiKey(id string, patch ApiKeyEntry) error {
+	return updateApiKey(id, patch, false)
+}
+
+// UpdateApiKeyGuarded is UpdateApiKey that returns ErrApiKeyLockout instead of
+// disabling the last enabled key while keys are required. The check and the
+// write share one lock, so two concurrent changes cannot both pass it.
+func UpdateApiKeyGuarded(id string, patch ApiKeyEntry) error {
+	return updateApiKey(id, patch, true)
+}
+
+func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	if cfg == nil {
@@ -82,6 +97,9 @@ func UpdateApiKey(id string, patch ApiKeyEntry) error {
 	}
 	if idx < 0 {
 		return errors.New("api key not found")
+	}
+	if guard && !patch.Enabled && removingKeyLocksOutLocked(cfg.ApiKeys[idx]) {
+		return ErrApiKeyLockout
 	}
 	if err := validateApiKeyLimits(patch.TokenLimit, patch.CreditLimit); err != nil {
 		return err
@@ -121,6 +139,16 @@ func validateApiKeyLimits(tokenLimit int64, creditLimit float64) error {
 }
 
 func DeleteApiKey(id string) error {
+	return deleteApiKey(id, false)
+}
+
+// DeleteApiKeyGuarded is DeleteApiKey that returns ErrApiKeyLockout instead of
+// deleting the last enabled key while keys are required.
+func DeleteApiKeyGuarded(id string) error {
+	return deleteApiKey(id, true)
+}
+
+func deleteApiKey(id string, guard bool) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	if cfg == nil {
@@ -128,11 +156,20 @@ func DeleteApiKey(id string) error {
 	}
 	for i, entry := range cfg.ApiKeys {
 		if entry.ID == id {
+			if guard && removingKeyLocksOutLocked(entry) {
+				return ErrApiKeyLockout
+			}
 			cfg.ApiKeys = append(cfg.ApiKeys[:i], cfg.ApiKeys[i+1:]...)
 			return Save()
 		}
 	}
 	return nil
+}
+
+// removingKeyLocksOutLocked reports whether disabling or deleting entry would
+// leave no enabled key while keys are required. Caller holds cfgLock.
+func removingKeyLocksOutLocked(entry ApiKeyEntry) bool {
+	return entry.Enabled && cfg.RequireApiKey && countEnabledApiKeysLocked() <= 1
 }
 
 // CountEnabledApiKeys is how many keys a client can authenticate with right now.
@@ -142,6 +179,10 @@ func CountEnabledApiKeys() int {
 	if cfg == nil {
 		return 0
 	}
+	return countEnabledApiKeysLocked()
+}
+
+func countEnabledApiKeysLocked() int {
 	n := 0
 	for _, entry := range cfg.ApiKeys {
 		if entry.Enabled {

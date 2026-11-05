@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"kiro-proxy/config"
@@ -23,18 +24,13 @@ type apiKeyView struct {
 }
 
 // apiKeyLockoutCode marks a 409 for a change that would leave a proxy that
-// requires API keys with no enabled key, so every client gets 401.
+// requires API keys with no enabled key, so every client gets 401. Config
+// checks it under the same lock as the write (config.ErrApiKeyLockout).
 const apiKeyLockoutCode = "api_key_lockout"
 
 func writeAPIKeyLockout(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusConflict)
-	json.NewEncoder(w).Encode(map[string]string{"error": "would lock out every client", "code": apiKeyLockoutCode})
-}
-
-// removingKeyLocksOut reports whether disabling or deleting entry would leave
-// no enabled key while keys are required.
-func removingKeyLocksOut(entry *config.ApiKeyEntry) bool {
-	return entry != nil && entry.Enabled && config.IsApiKeyRequired() && config.CountEnabledApiKeys() <= 1
+	json.NewEncoder(w).Encode(map[string]string{"error": config.ErrApiKeyLockout.Error(), "code": apiKeyLockoutCode})
 }
 
 func toApiKeyView(entry config.ApiKeyEntry) apiKeyView {
@@ -164,12 +160,11 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 	if req.CreditLimit != nil {
 		patch.CreditLimit = *req.CreditLimit
 	}
-	if !patch.Enabled && removingKeyLocksOut(existing) {
-		writeAPIKeyLockout(w)
-		return
-	}
-
-	if err := config.UpdateApiKey(id, patch); err != nil {
+	if err := config.UpdateApiKeyGuarded(id, patch); err != nil {
+		if errors.Is(err, config.ErrApiKeyLockout) {
+			writeAPIKeyLockout(w)
+			return
+		}
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -188,11 +183,11 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 }
 
 func (h *Handler) apiDeleteApiKey(w http.ResponseWriter, _ *http.Request, id string) {
-	if removingKeyLocksOut(config.GetApiKeyEntry(id)) {
-		writeAPIKeyLockout(w)
-		return
-	}
-	if err := config.DeleteApiKey(id); err != nil {
+	if err := config.DeleteApiKeyGuarded(id); err != nil {
+		if errors.Is(err, config.ErrApiKeyLockout) {
+			writeAPIKeyLockout(w)
+			return
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return

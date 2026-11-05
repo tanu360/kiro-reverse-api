@@ -666,8 +666,22 @@ func IsApiKeyRequired() bool {
 }
 
 func UpdateSettingsPatch(requireApiKey *bool, password string) error {
+	return updateSettingsPatch(requireApiKey, password, false)
+}
+
+// UpdateSettingsPatchGuarded is UpdateSettingsPatch that returns
+// ErrApiKeyLockout, and saves nothing, instead of turning requireApiKey on
+// while no key is enabled.
+func UpdateSettingsPatchGuarded(requireApiKey *bool, password string) error {
+	return updateSettingsPatch(requireApiKey, password, true)
+}
+
+func updateSettingsPatch(requireApiKey *bool, password string, guard bool) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
+	if guard && requireApiKey != nil && *requireApiKey && !cfg.RequireApiKey && countEnabledApiKeysLocked() == 0 {
+		return ErrApiKeyLockout
+	}
 	if requireApiKey != nil {
 		cfg.RequireApiKey = *requireApiKey
 	}

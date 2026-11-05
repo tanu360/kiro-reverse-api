@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -163,5 +165,64 @@ func TestApiKeyRequestReservationChecksCreditLimitWithoutBlockingConcurrentReque
 	got = GetApiKeyEntry(created.ID)
 	if got == nil || got.CreditsUsed != 2 || got.RequestsCount != 2 || got.Enabled {
 		t.Fatalf("expected credit limit to disable key after final usage: %#v", got)
+	}
+}
+
+func TestApiKeyLockoutGuardHoldsUnderConcurrentDeletes(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+	var ids []string
+	for _, key := range []string{"sk-one", "sk-two"} {
+		entry, err := AddApiKey(ApiKeyEntry{Key: key, Enabled: true})
+		if err != nil {
+			t.Fatalf("add key: %v", err)
+		}
+		ids = append(ids, entry.ID)
+	}
+	require := true
+	if err := UpdateSettingsPatchGuarded(&require, ""); err != nil {
+		t.Fatalf("require keys: %v", err)
+	}
+
+	errs := make([]error, len(ids))
+	var wg sync.WaitGroup
+	for i, id := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = DeleteApiKeyGuarded(id)
+		}()
+	}
+	wg.Wait()
+	locked := 0
+	for _, err := range errs {
+		if errors.Is(err, ErrApiKeyLockout) {
+			locked++
+		} else if err != nil {
+			t.Fatalf("delete: %v", err)
+		}
+	}
+	if locked != 1 || CountEnabledApiKeys() != 1 {
+		t.Fatalf("lockouts %d, enabled keys left %d; want 1 and 1", locked, CountEnabledApiKeys())
+	}
+
+	last := ListApiKeys()[0]
+	last.Enabled = false
+	if err := UpdateApiKeyGuarded(last.ID, last); !errors.Is(err, ErrApiKeyLockout) {
+		t.Fatalf("disabling the last key: err = %v, want ErrApiKeyLockout", err)
+	}
+	off := false
+	if err := UpdateSettingsPatchGuarded(&off, ""); err != nil {
+		t.Fatalf("stop requiring keys: %v", err)
+	}
+	if err := UpdateApiKeyGuarded(last.ID, last); err != nil {
+		t.Fatalf("disable once keys are optional: %v", err)
+	}
+	if err := UpdateSettingsPatchGuarded(&require, "new-password-1234"); !errors.Is(err, ErrApiKeyLockout) {
+		t.Fatalf("requiring keys with none enabled: err = %v, want ErrApiKeyLockout", err)
+	}
+	if IsApiKeyRequired() || GetPassword() == "new-password-1234" {
+		t.Fatalf("a refused settings patch saved part of itself")
 	}
 }
