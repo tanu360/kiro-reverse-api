@@ -1,17 +1,14 @@
-import {
-  Copy01Icon,
-  Download01Icon,
-  FileBracesIcon,
-  ListViewIcon,
-  Search01Icon,
-} from "@hugeicons/core-free-icons";
+import { Copy01Icon, Download01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChoiceCard } from "@/components/shared/choice-card";
+import { ChoiceCard, ChoiceList } from "@/components/shared/choice-card";
+import { LoadingState } from "@/components/shared/loading-state";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
+import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Textarea } from "@/components/ui/textarea";
 import { exportAccounts } from "@/lib/api/accounts";
 import type { Account, ExportData } from "@/lib/api/types";
@@ -21,6 +18,8 @@ import { useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
 import { accountMeta, useAccountName } from "./account-cells";
 import { buildExportCopy, exportFilename, filterAccounts } from "./account-model";
+
+type ExportView = "list" | "json";
 
 /**
  * Exports the chosen accounts (the list filter does not apply). The JSON holds live secrets:
@@ -45,10 +44,10 @@ export function ExportDialog({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState("");
   const [json, setJson] = useState<string | null>(null);
-  const [showJson, setShowJson] = useState(false);
+  const [view, setView] = useState<ExportView>("list");
   const [busy, setBusy] = useState<"show" | "copy" | "download" | null>(null);
   const jsonRef = useRef<HTMLTextAreaElement | null>(null);
-  const jsonShown = showJson && json !== null;
+  const jsonShown = view === "json" && json !== null;
 
   // The JSON takes the list's place: focus it, so it is ready to select (and in view on phones).
   useEffect(() => {
@@ -67,7 +66,7 @@ export function ExportDialog({
     setSelected(new Set(initialSelection ?? accounts.map((account) => account.id)));
     setQuery("");
     setJson(null);
-    setShowJson(false);
+    setView("list");
   }, [open]);
 
   // The search narrows the list by email or nickname; the selection keeps hidden rows.
@@ -125,17 +124,24 @@ export function ExportDialog({
     }
   };
 
-  // Show JSON fetches the selection and swaps the list for it; the same button goes back.
-  const onToggleJson = () => {
-    if (jsonShown) {
-      setShowJson(false);
+  // JSON fetches the selection afresh and swaps the list for it (a spinner holds its place
+  // meanwhile); a failed fetch or an empty selection stays on the list. Ignored mid-request.
+  const onViewChange = (next: ExportView) => {
+    if (busy || next === view) return;
+    if (next === "list") {
+      setView("list");
       return;
     }
+    if (selectedCount === 0) {
+      toast.warning(t("export.noSelection"));
+      return;
+    }
+    setJson(null);
+    setView("json");
     void withBusy("show", async () => {
       const data = await fetchExport();
-      if (!data) return;
-      setJson(JSON.stringify(data, null, 2));
-      setShowJson(true);
+      if (data) setJson(JSON.stringify(data, null, 2));
+      else setView("list");
     });
   };
 
@@ -177,15 +183,6 @@ export function ExportDialog({
             {tc("actions.cancel")}
           </Button>
           <Button
-            disabled={busy !== null && busy !== "show"}
-            loading={busy === "show"}
-            onClick={onToggleJson}
-            variant="outline"
-          >
-            <HugeiconsIcon icon={jsonShown ? ListViewIcon : FileBracesIcon} aria-hidden="true" />
-            {jsonShown ? t("export.showList") : t("export.showJson")}
-          </Button>
-          <Button
             disabled={busy !== null && busy !== "copy"}
             loading={busy === "copy"}
             onClick={onCopy}
@@ -209,39 +206,69 @@ export function ExportDialog({
       size="xl"
       title={t("export.title")}
     >
-      {jsonShown ? (
-        <div className="flex flex-col gap-2">
-          <label className="font-medium text-sm/5" htmlFor={jsonId}>
-            {t("export.json")}
-          </label>
-          <Textarea
-            id={jsonId}
-            readOnly
-            ref={jsonRef}
-            rows={12}
-            value={json ?? ""}
-            variant="mono"
-            wrap="off"
-          />
+      {/* One fixed height for both views, so the dialog and its footer stay put on a switch. */}
+      <div className="flex h-96 flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <SegmentedControl
+            render={
+              <RadioGroupPrimitive
+                aria-label={t("export.view")}
+                onValueChange={(next) => onViewChange(next as ExportView)}
+                value={view}
+              />
+            }
+            size="sm"
+          >
+            <SegmentedControlItem render={<RadioPrimitive.Root value="list" />}>
+              {t("export.viewList")}
+            </SegmentedControlItem>
+            <SegmentedControlItem render={<RadioPrimitive.Root value="json" />}>
+              {t("export.viewJson")}
+            </SegmentedControlItem>
+          </SegmentedControl>
+          <p aria-live="polite" className="text-meta text-muted-foreground tabular-nums">
+            {t("export.selected", { count: selectedCount })}
+          </p>
         </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <InputGroup>
-            <InputGroupAddon>
-              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t("export.search")}
-              autoComplete="off"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("export.search")}
-              type="search"
-              value={query}
-            />
-          </InputGroup>
-          <div className="flex items-center justify-between gap-3">
+        {view === "json" ? (
+          jsonShown ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <label className="font-medium text-sm/5" htmlFor={jsonId}>
+                {t("export.json")}
+              </label>
+              {/* The field fills the rest of the body; its text scrolls inside it. */}
+              <Textarea
+                className="min-h-0 flex-1 *:h-full *:max-h-none"
+                id={jsonId}
+                readOnly
+                ref={jsonRef}
+                value={json ?? ""}
+                variant="mono"
+                wrap="off"
+              />
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <LoadingState />
+            </div>
+          )
+        ) : (
+          <>
+            <InputGroup>
+              <InputGroupAddon>
+                <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+              </InputGroupAddon>
+              <InputGroupInput
+                aria-label={t("export.search")}
+                autoComplete="off"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("export.search")}
+                type="search"
+                value={query}
+              />
+            </InputGroup>
             {/* biome-ignore lint/a11y/noLabelWithoutControl: the Base UI Checkbox inside is the control. */}
-            <label className="flex cursor-pointer items-center gap-3 font-medium text-sm/5">
+            <label className="flex cursor-pointer items-center gap-3 self-start font-medium text-sm/5">
               <Checkbox
                 checked={allVisible}
                 disabled={visible.length === 0}
@@ -250,41 +277,37 @@ export function ExportDialog({
               />
               {allVisible ? t("export.deselectAll") : t("export.selectAll")}
             </label>
-            <p aria-live="polite" className="text-meta text-muted-foreground tabular-nums">
-              {t("export.selected", { count: selectedCount })}
-            </p>
-          </div>
-          <ul
-            aria-label={t("export.list")}
-            className="scrollbar-y flex max-h-72 flex-col gap-2 overflow-y-auto"
-          >
-            {visible.map((account) => {
-              const name = accountName(account);
-              return (
-                <li key={account.id}>
-                  <ChoiceCard
-                    control={
-                      <Checkbox
-                        checked={selected.has(account.id)}
-                        onCheckedChange={() => toggle(account.id)}
-                      />
-                    }
-                    description={accountMeta(account, t)}
-                    title={
-                      <span className={name.mono ? "font-mono text-meta" : undefined}>
-                        {name.text}
-                      </span>
-                    }
-                  />
-                </li>
-              );
-            })}
-          </ul>
-          {visible.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{tc("state.noMatches")}</p>
-          ) : null}
-        </div>
-      )}
+            {visible.length > 0 ? (
+              // Shrinks to the space left, scrolling inside its card, and to its rows when few.
+              <ChoiceList aria-label={t("export.list")} className="min-h-0" scroll>
+                {visible.map((account) => {
+                  const name = accountName(account);
+                  return (
+                    <ChoiceCard
+                      control={
+                        <Checkbox
+                          checked={selected.has(account.id)}
+                          onCheckedChange={() => toggle(account.id)}
+                        />
+                      }
+                      description={accountMeta(account, t)}
+                      key={account.id}
+                      title={
+                        <span className={name.mono ? "font-mono text-meta" : undefined}>
+                          {name.text}
+                        </span>
+                      }
+                      variant="row"
+                    />
+                  );
+                })}
+              </ChoiceList>
+            ) : (
+              <p className="m-auto text-muted-foreground text-sm">{tc("state.noMatches")}</p>
+            )}
+          </>
+        )}
+      </div>
     </ResponsiveDialog>
   );
 }

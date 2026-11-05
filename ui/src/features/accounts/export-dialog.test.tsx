@@ -83,19 +83,28 @@ describe("ExportDialog", () => {
 
   it("swaps the list for the JSON and back", async () => {
     const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("button", { name: "Show JSON" }));
+    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
     await within(dialog).findByRole("textbox", { name: "Export JSON" });
     expect(
       within(dialog).queryByRole("list", { name: "Accounts to export" }),
     ).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Show accounts" }));
+    await user.click(within(dialog).getByRole("radio", { name: "Accounts" }));
     expect(within(dialog).getByRole("list", { name: "Accounts to export" })).toBeInTheDocument();
   });
 
-  it("focuses the JSON once Show JSON renders it, so it is in view on phones", async () => {
+  it("stays on the list and warns when JSON is picked with nothing selected", async () => {
+    const { dialog, user } = await openExport();
+    await user.click(within(dialog).getByRole("checkbox", { name: "Deselect all" }));
+    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
+    expect(await screen.findByText("Select at least one account.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("radio", { name: "Accounts" })).toBeChecked();
+    expect(within(dialog).getByRole("list", { name: "Accounts to export" })).toBeInTheDocument();
+  });
+
+  it("focuses the JSON once it renders, so it is in view on phones", async () => {
     const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
     const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("button", { name: "Show JSON" }));
+    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
     const json = await within(dialog).findByRole("textbox", { name: "Export JSON" });
     await waitFor(() => expect(json).toHaveFocus());
     expect(scrolled.mock.contexts).toContain(json);
