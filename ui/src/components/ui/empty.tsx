@@ -2,16 +2,27 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type React from "react";
 import { cn } from "@/lib/utils";
 
+/*
+ * The icon tile of an empty or error state: a 36 px rounded tile on the card surface. The empty
+ * state stacks two tilted copies behind it (coss's "pile"); the destructive tone (errors) is a
+ * single red-tinted tile.
+ */
 const emptyMediaVariants = cva(
   "flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
+      tone: "default",
       variant: "default",
     },
+    // `variant` before `tone`, so the tone's colours come last and win the merge.
     variants: {
       variant: {
         default: "bg-transparent",
-        icon: "relative flex size-9 shrink-0 items-center justify-center rounded-md border bg-card not-dark:bg-clip-padding text-foreground before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-md)-1px)] [&_svg:not([class*='size-'])]:size-4.5",
+        icon: "relative size-9 rounded-lg border border-border bg-card text-foreground [&_svg:not([class*='size-'])]:size-4.5",
+      },
+      tone: {
+        default: "",
+        destructive: "border-destructive/24 bg-error-surface text-destructive-foreground",
       },
     },
   },
@@ -52,38 +63,40 @@ export function EmptyHeader({
 export function EmptyMedia({
   className,
   variant = "default",
+  tone = "default",
+  children,
   ...props
 }: React.ComponentProps<"div"> &
   VariantProps<typeof emptyMediaVariants>): React.ReactElement {
+  const pile = variant === "icon" && tone !== "destructive";
   return (
+    // Only this wrapper takes className and props, so a margin passed in lands once.
     <div
       className={cn("relative mb-6", className)}
       data-slot="empty-media"
+      data-tone={tone}
       data-variant={variant}
       {...props}
     >
-      {variant === "icon" && (
+      {pile && (
         <>
           <div
             aria-hidden="true"
             className={cn(
-              emptyMediaVariants({ className, variant }),
-              "pointer-events-none absolute bottom-px origin-bottom-left -translate-x-0.5 -rotate-10 scale-84 shadow-none",
+              emptyMediaVariants({ tone, variant }),
+              "pointer-events-none absolute bottom-px origin-bottom-left -translate-x-0.5 -rotate-10 scale-84",
             )}
           />
           <div
             aria-hidden="true"
             className={cn(
-              emptyMediaVariants({ className, variant }),
-              "pointer-events-none absolute bottom-px origin-bottom-right translate-x-0.5 rotate-10 scale-84 shadow-none",
+              emptyMediaVariants({ tone, variant }),
+              "pointer-events-none absolute bottom-px origin-bottom-right translate-x-0.5 rotate-10 scale-84",
             )}
           />
         </>
       )}
-      <div
-        className={cn(emptyMediaVariants({ className, variant }))}
-        {...props}
-      />
+      <div className={cn(emptyMediaVariants({ tone, variant }))}>{children}</div>
     </div>
   );
 }
@@ -94,7 +107,7 @@ export function EmptyTitle({
 }: React.ComponentProps<"div">): React.ReactElement {
   return (
     <div
-      className={cn("font-semibold text-base", className)}
+      className={cn("font-semibold text-foreground text-heading leading-6", className)}
       data-slot="empty-title"
       {...props}
     />

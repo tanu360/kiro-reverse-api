@@ -1,70 +1,124 @@
-import type { JSX, ReactNode } from "react";
-import { Card, CardDescription } from "@/components/ui/card";
+import type { IconSvgElement } from "@hugeicons/react";
+import { type JSX, type ReactNode, useId } from "react";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardHeading,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 /**
- * A titled card section. One spacing rhythm on every page: 16 px of padding on phones and 20 px
- * from sm up, 16 px from the title block to the content, and a slim footer (12 px top and
- * bottom) under t3code's row divider (border at 50 %). The surface is the Card's, t3code's
- * SettingsGroup. The panel and footer are plain slots rather than CardPanel and
- * CardFooter, whose own paddings change with the card's other children.
+ * The single card shell for page sections (Overview, API, Backups, Settings), built on the Card
+ * slots so every section has the same chrome: an optional icon chip, a 15 px semibold h2, a
+ * description (stacked 12 px hint, or an inline 13 px subtitle on the title's baseline), an
+ * optional meta (a count or state after the title) and the actions on the right. A hairline
+ * separates the header from the content and the content from the footer.
  */
+export interface SectionCardProps {
+  id?: string;
+  icon?: IconSvgElement;
+  title: string;
+  description?: ReactNode;
+  descriptionVariant?: "stacked" | "inline";
+  /** After the title, outside the heading: a count, a size or a state badge. */
+  meta?: ReactNode;
+  actions?: ReactNode;
+  footer?: ReactNode;
+  /** `danger` draws the red-tinted card with a red icon chip and title (Danger zone). */
+  tone?: "default" | "danger";
+  /**
+   * The children sit flush in the card (no panel padding), each one under a hairline: for rows
+   * that bring their own padding (settings rows, lists) and for edge-to-edge tables.
+   */
+  slim?: boolean;
+  /** Layout classes for the panel (flex, grid, gap). Ignored when `slim`. */
+  panelClassName?: string;
+  /** Layout classes for the card (col-span, order, min-h). */
+  className?: string;
+  children: ReactNode;
+}
 
 export function SectionCard({
   id,
+  icon,
   title,
   description,
+  descriptionVariant = "stacked",
+  meta,
   actions,
   footer,
-  children,
+  tone = "default",
+  slim = false,
+  panelClassName,
   className,
-}: {
-  id?: string;
-  title: string;
-  description?: ReactNode;
-  actions?: ReactNode;
-  footer?: ReactNode;
-  children: ReactNode;
-  className?: string;
-}): JSX.Element {
-  const headingId = id ? `${id}-title` : undefined;
+  children,
+}: SectionCardProps): JSX.Element {
+  const fallbackId = useId();
+  const headingId = `${id ?? fallbackId}-title`;
+  const danger = tone === "danger";
   return (
     <Card
       aria-labelledby={headingId}
-      className={cn("@container min-w-0", className)}
+      className={cn("@container min-w-0 scroll-mt-20", className)}
+      data-slot="section-card"
+      divided
       id={id}
       render={<section />}
+      tone={tone}
     >
-      {/* Actions wrap below the title on narrow cards instead of clipping beside it. */}
-      <div
-        className="flex flex-col gap-3 p-4 sm:p-5 sm:pb-4 @md:flex-row @md:items-start @md:justify-between"
-        data-slot="card-header"
-      >
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2
-            className="font-semibold text-heading leading-snug"
-            data-slot="card-title"
-            id={headingId}
-          >
-            {title}
-          </h2>
-          {description ? <CardDescription>{description}</CardDescription> : null}
-        </div>
-        {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
-        ) : null}
-      </div>
-      <div className="min-w-0 flex-1 px-4 pb-4 sm:px-5 sm:pb-5" data-slot="card-panel">
-        {children}
-      </div>
-      {footer ? (
-        <div
-          className="flex items-center border-border/50 border-t px-4 py-3 sm:px-5"
-          data-slot="card-footer"
-        >
-          {footer}
-        </div>
-      ) : null}
+      <CardHeader icon={icon} iconTone={danger ? "danger" : "default"}>
+        <CardHeading>
+          <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <CardTitle
+              className={cn(danger && "text-destructive-foreground")}
+              id={headingId}
+              render={(props) => <h2 {...props} />}
+            >
+              {title}
+            </CardTitle>
+            {meta ? (
+              <span className="text-meta text-muted-foreground tabular-nums" data-slot="card-meta">
+                {meta}
+              </span>
+            ) : null}
+          </div>
+          {description ? (
+            <CardDescription variant={descriptionVariant}>{description}</CardDescription>
+          ) : null}
+        </CardHeading>
+        {actions ? <CardAction>{actions}</CardAction> : null}
+      </CardHeader>
+      {slim ? children : <CardPanel className={panelClassName}>{children}</CardPanel>}
+      {footer ? <CardFooter>{footer}</CardFooter> : null}
     </Card>
+  );
+}
+
+/**
+ * The Settings group: a SectionCard with Settings' defaults (a stacked hint under the title and
+ * flush rows split by hairlines). `badge` is the Settings name for `meta`.
+ */
+export function SettingsFrame({
+  badge,
+  meta,
+  descriptionVariant = "stacked",
+  slim = true,
+  ...props
+}: SectionCardProps & {
+  /** Same as `meta`. */
+  badge?: ReactNode;
+}): JSX.Element {
+  return (
+    <SectionCard
+      descriptionVariant={descriptionVariant}
+      meta={meta ?? badge}
+      slim={slim}
+      {...props}
+    />
   );
 }

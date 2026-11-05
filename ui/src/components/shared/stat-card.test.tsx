@@ -2,7 +2,7 @@ import { UsersIcon } from "@hugeicons/core-free-icons";
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "@/test/render";
-import { formatDelta, StatCard } from "./stat-card";
+import { formatDelta, StatCard, StatGroup, StatTile } from "./stat-card";
 
 describe("StatCard", () => {
   it("renders the label, value and metrics", () => {
@@ -76,9 +76,9 @@ describe("StatCard", () => {
         value="900"
       />,
     );
-    const badge = screen.getByText("-20%").closest('[data-slot="badge"]');
-    expect(badge).toHaveAttribute("data-tone", "bad");
-    expect(badge?.className).toMatch(/destructive/);
+    const delta = screen.getByText("-20%").closest('[data-slot="stat-delta"]');
+    expect(delta).toHaveAttribute("data-tone", "bad");
+    expect(screen.getByText("-20%").className).toMatch(/destructive/);
   });
 
   it("treats a drop as good when down is good", () => {
@@ -90,9 +90,9 @@ describe("StatCard", () => {
         value="12"
       />,
     );
-    const badge = screen.getByText("-20%").closest('[data-slot="badge"]');
-    expect(badge).toHaveAttribute("data-tone", "good");
-    expect(badge?.className).not.toMatch(/destructive/);
+    const delta = screen.getByText("-20%").closest('[data-slot="stat-delta"]');
+    expect(delta).toHaveAttribute("data-tone", "good");
+    expect(screen.getByText("-20%").className).toMatch(/success/);
   });
 
   it("renders the skeleton while loading", () => {
@@ -101,6 +101,80 @@ describe("StatCard", () => {
     );
     expect(container.querySelector('[data-slot="stat-card-skeleton"]')).toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
+  });
+});
+
+describe("StatTile", () => {
+  it("keeps the value in the text colour on a danger tile", () => {
+    renderWithProviders(<StatTile icon={UsersIcon} label="Failed" tone="danger" value="12" />);
+    const value = screen.getByText("12");
+    expect(value).toHaveAttribute("data-slot", "stat-value");
+    expect(value.className).not.toMatch(/destructive/);
+    expect(value.className).toMatch(/tabular-nums/);
+  });
+
+  it("reserves the trend slot and hides it from assistive tech", () => {
+    renderWithProviders(
+      <StatTile icon={UsersIcon} label="Requests" trend={<svg data-testid="bars" />} value="8" />,
+    );
+    const slot = screen.getByTestId("bars").closest('[data-slot="stat-trend"]');
+    expect(slot).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("shows a label hint", async () => {
+    const { user } = renderWithProviders(
+      <StatTile hint="Accounts that served a request" label="Active accounts" value="3 / 8" />,
+    );
+    await user.hover(screen.getByRole("button", { name: /Active accounts/ }));
+    expect(await screen.findByText("Accounts that served a request")).toBeInTheDocument();
+  });
+});
+
+describe("StatGroup", () => {
+  it("joins KPI tiles into one card by default", () => {
+    const { container } = renderWithProviders(
+      <StatGroup aria-label="Totals">
+        <StatTile icon={UsersIcon} label="Accounts" value="8" />
+        <StatTile icon={UsersIcon} label="Requests" value="1,024" />
+      </StatGroup>,
+    );
+    const card = container.querySelector('[data-slot="stat-group-card"]');
+    expect(card).toHaveAttribute("aria-label", "Totals");
+    expect(card?.querySelectorAll('[data-slot="stat-tile"]')).toHaveLength(2);
+    expect(container.querySelector('[data-slot="stat-card"]')).not.toBeInTheDocument();
+  });
+
+  it("draws live tiles as separate cards by default", () => {
+    const { container } = renderWithProviders(
+      <StatGroup columns="live">
+        <StatTile label="Requests/min" size="kpi" value="12" />
+        <StatTile label="Error rate" size="kpi" value="0%" />
+      </StatGroup>,
+    );
+    expect(container.querySelector('[data-slot="stat-group-card"]')).not.toBeInTheDocument();
+    const group = container.querySelector('[data-slot="stat-group"]');
+    expect(group).not.toHaveAttribute("data-joined");
+    expect(group?.querySelectorAll('[data-slot="stat-tile"]')).toHaveLength(2);
+  });
+
+  it("follows an explicit joined switch", () => {
+    const { container } = renderWithProviders(
+      <StatGroup columns="live" joined>
+        <StatTile label="Requests/min" size="kpi" value="12" />
+      </StatGroup>,
+    );
+    expect(container.querySelector('[data-slot="stat-group-card"]')).toBeInTheDocument();
+  });
+
+  it("renders a loading tile in place inside the group", () => {
+    const { container } = renderWithProviders(
+      <StatGroup>
+        <StatTile label="Accounts" loading value="8" />
+      </StatGroup>,
+    );
+    const group = container.querySelector('[data-slot="stat-group"]');
+    expect(group?.querySelector('[data-slot="stat-card-skeleton"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="stat-card"]')).not.toBeInTheDocument();
   });
 });
 
