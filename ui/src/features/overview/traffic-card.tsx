@@ -3,7 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type JSX, lazy, Suspense, useMemo } from "react";
 import { ChartLegendHoverProvider } from "@/components/charts/chart-legend-hover";
-import { Legend, type LegendItemData } from "@/components/charts/legend";
+import {
+  Legend,
+  LegendItem,
+  type LegendItemData,
+  LegendLabel,
+  LegendMarker,
+  LegendValue,
+  useLegendItem,
+} from "@/components/charts/legend";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
@@ -12,6 +20,7 @@ import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmente
 import { heatmapQuery } from "@/lib/api/observe";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { OverviewRange } from "@/routes/-search";
 import {
   bucketGlobal,
@@ -34,9 +43,33 @@ function isRange(value: unknown): value is OverviewRange {
   return typeof value === "string" && (RANGES as readonly string[]).includes(value);
 }
 
+/** The legend key of the dashed previous-hour series, which only the 1 h view draws. */
+const PREVIOUS_KEY = "previous";
+
+/**
+ * A legend entry (marker, label, value). With `reservePrevious` the previous-hour entry keeps its
+ * place but is not shown, so the legend is as wide on 6 h and 24 h as on 1 h and switching the
+ * range moves nothing.
+ */
+function TrafficLegendItem({
+  reservePrevious = false,
+}: {
+  reservePrevious?: boolean;
+}): JSX.Element {
+  const { item } = useLegendItem();
+  return (
+    <LegendItem className={cn(reservePrevious && item.key === PREVIOUS_KEY && "invisible")}>
+      <LegendMarker />
+      <LegendLabel />
+      <LegendValue />
+    </LegendItem>
+  );
+}
+
 /**
  * Port of Studio's performance overview: succeeded and failed requests over 1, 6 or 24 h, with
- * the previous hour dashed under the 1 h view. The legend and the range sit in the header.
+ * the previous hour dashed under the 1 h view. The range sits in the header; the legend joins it
+ * on wide cards and opens the panel on narrower ones, so the header is the same for every range.
  */
 export function TrafficCard(): JSX.Element {
   const { t, lang } = useT("overview");
@@ -90,19 +123,33 @@ export function TrafficCard(): JSX.Element {
     previous: t("traffic.previous"),
     bucket: t("traffic.bucket", { n: formatNumber(bucketMin, lang) }),
   };
-  // Series order, so hovering an item dims the others in the chart.
-  const legend: LegendItemData[] = [
-    { label: labels.succeeded, color: SUCCEEDED_COLOR, marker: "line", value: totals.succeeded },
-    { label: labels.failed, color: FAILED_COLOR, marker: "line", value: totals.failed },
-  ];
-  if (hourView && data) {
-    legend.push({
+  // Series order, so hovering an item dims the others in the chart. The previous hour keeps its
+  // slot outside 1 h (hidden), and the labels stay up while a range loads (the values follow the
+  // data), so switching the range does not move the card.
+  const known = (n: number) => (data ? n : undefined);
+  const legendItems: LegendItemData[] = [
+    {
+      label: labels.succeeded,
+      color: SUCCEEDED_COLOR,
+      marker: "line",
+      value: known(totals.succeeded),
+    },
+    { label: labels.failed, color: FAILED_COLOR, marker: "line", value: known(totals.failed) },
+    {
+      key: PREVIOUS_KEY,
       label: labels.previous,
       color: PREVIOUS_COLOR,
       marker: "dashed",
-      value: totals.previous,
-    });
-  }
+      value: known(totals.previous),
+    },
+  ];
+  const legend = (
+    <Legend aria-label={t("traffic.legend")} items={legendItems}>
+      <TrafficLegendItem reservePrevious={!hourView} />
+    </Legend>
+  );
+  // No legend beside an error that left nothing to draw.
+  const showLegend = data !== undefined || !query.isError;
   const loadingChart = (
     <TrafficChart
       bucketMin={bucketMin}
@@ -126,8 +173,11 @@ export function TrafficCard(): JSX.Element {
       );
     } else {
       body = (
-        <div aria-hidden="true">
-          <Suspense fallback={placeholder}>{loadingChart}</Suspense>
+        <div className="flex flex-col gap-3">
+          <div className="@4xl:hidden">{legend}</div>
+          <div aria-hidden="true">
+            <Suspense fallback={placeholder}>{loadingChart}</Suspense>
+          </div>
         </div>
       );
     }
@@ -143,6 +193,8 @@ export function TrafficCard(): JSX.Element {
             failed: formatNumber(totals.failed, lang),
           })}
         </p>
+        {/* Narrow cards: the legend opens the panel; wide ones carry it in the header. */}
+        <div className="@4xl:hidden">{legend}</div>
         <div className="relative">
           <div aria-hidden="true">
             <Suspense fallback={placeholder}>
@@ -176,7 +228,7 @@ export function TrafficCard(): JSX.Element {
       <SectionCard
         actions={
           <>
-            {data ? <Legend aria-label={t("traffic.legend")} items={legend} /> : null}
+            {showLegend ? <div className="hidden @4xl:flex">{legend}</div> : null}
             {/* A radio group: one tab stop, the arrow keys move the range. */}
             <SegmentedControl
               render={
