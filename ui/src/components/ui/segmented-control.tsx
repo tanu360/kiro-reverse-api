@@ -29,12 +29,6 @@ export const segmentedControlItemSizeClassNames: Record<
   sm: "h-7 px-[calc(--spacing(2)-1px)] sm:h-6 pointer-coarse:h-9",
 };
 
-/**
- * Deprecated: each size in segmentedControlItemSizeClassNames now carries its own coarse-pointer
- * height. This is the default size's (a 40 px track), kept for callers that still add it.
- */
-export const segmentedControlItemTouchClassName = "pointer-coarse:h-9";
-
 export const segmentedControlItemLayoutClassName =
   "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0";
 
