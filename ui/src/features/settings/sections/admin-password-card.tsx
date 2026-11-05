@@ -105,7 +105,7 @@ export function AdminPasswordCard(): JSX.Element {
         </div>
         {/* Lets password managers file the new password under the admin account. */}
         <input autoComplete="username" hidden name="username" readOnly value="admin" />
-        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-64">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-72">
           <PasswordInput
             autoComplete="new-password"
             describedBy={describedBy}

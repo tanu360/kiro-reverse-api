@@ -499,7 +499,8 @@ export function fillNodes(template: string, nodes: Record<string, ReactNode>): R
 }
 
 export function Code({ children }: { children: ReactNode }): JSX.Element {
-  return <code className="inline-code text-foreground">{children}</code>;
+  // Kept on one line: a model name or URL broken at its hyphens reads as two.
+  return <code className="inline-code whitespace-nowrap text-foreground">{children}</code>;
 }
 
 /** A password input with a show/hide toggle. */

@@ -114,7 +114,7 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
           <SelectTrigger
             aria-describedby={`${selectId}-hint`}
             aria-labelledby={`${selectId}-label`}
-            className="w-full sm:w-64"
+            className="w-full sm:w-72"
           >
             <SelectValue className="flex min-w-0 items-center gap-2">
               {(value: PreferredEndpoint) => (
