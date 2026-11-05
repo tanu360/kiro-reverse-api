@@ -56,12 +56,14 @@ type ChangeEventType =
 
 /**
  * What each change event refetches. Account events refresh the list only: the detail queries
- * under accounts.all call AWS, and a background sweep changes every account.
+ * under accounts.all call AWS, and a background sweep changes every account. The overview's
+ * enabled and available counts come from the accounts and allowOverUsage, so account and
+ * settings events refresh it too, at once, without waiting for the server's next observe_tick.
  */
 const CHANGE_INVALIDATIONS: Record<ChangeEventType, ReadonlyArray<readonly unknown[]>> = {
-  accounts_changed: [queryKeys.accounts.list(), queryKeys.status],
+  accounts_changed: [queryKeys.accounts.list(), queryKeys.status, queryKeys.observe.overview()],
   api_keys_changed: [queryKeys.apiKeys.all],
-  settings_changed: [queryKeys.settings.all],
+  settings_changed: [queryKeys.settings.all, queryKeys.observe.overview()],
   stats_reset: [queryKeys.status, queryKeys.observe.all, queryKeys.requests.all],
   backup_deleted: [queryKeys.backups.all],
 };
@@ -143,7 +145,8 @@ export function AdminEventsProvider(props: {
         );
       }
       if (event.type === "observe_tick" && event.payload !== undefined) {
-        // The payload is the store's change counter: a repeat carries no new data.
+        // The payload is the store's change counter: a repeat carries no new data. Every new
+        // one refetches, whether traffic, a minute ending or an account count moved it.
         if (event.payload === observeSeq) return;
         observeSeq = event.payload;
       }

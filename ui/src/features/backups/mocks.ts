@@ -40,10 +40,12 @@ function nextRun(schedule: BackupSchedule): number | undefined {
 }
 
 /** Keeps the newest `keep` scheduled backups, like config.PruneScheduled. */
-function pruneScheduled(keep: number): void {
+/** Go's PruneScheduled: drops the scheduled backups beyond `keep`; returns how many. */
+function pruneScheduled(keep: number): number {
   const scheduled = sortBackups(mockDb.backups.filter((row) => row.kind === "scheduled"));
   const drop = new Set(scheduled.slice(keep).map((row) => row.id));
   mockDb.backups = mockDb.backups.filter((row) => !drop.has(row.id));
+  return drop.size;
 }
 
 function notFound(id: string): Response {
@@ -92,7 +94,8 @@ function wireSchedule(schedule: BackupSchedule): BackupSchedule {
   const out: BackupSchedule = {};
   if (schedule.enabled) out.enabled = true;
   if (schedule.cadence) out.cadence = schedule.cadence;
-  if (schedule.keep) out.keep = schedule.keep;
+  // Like Go's scheduleView: keep is the one applied, so 50 when never set.
+  out.keep = schedule.keep || KEEP_DEFAULT;
   if (schedule.lastRun) out.lastRun = schedule.lastRun;
   const next = nextRun(schedule);
   if (next) out.nextRun = next;
@@ -170,12 +173,17 @@ export const handlers: HttpHandler[] = [
       return jsonError(400, "cadence must be hourly, daily or weekly", { code: "invalid_cadence" });
     }
     const keep = update.keep;
-    if (typeof keep !== "number" || !Number.isInteger(keep) || keep < KEEP_MIN || keep > KEEP_MAX) {
+    // Like Go: a stored legacy keep above the max stays valid while it is sent back unchanged.
+    const legacyKeep = typeof keep === "number" && keep > KEEP_MAX && keep === mockDb.schedule.keep;
+    if (
+      typeof keep !== "number" ||
+      !Number.isInteger(keep) ||
+      ((keep < KEEP_MIN || keep > KEEP_MAX) && !legacyKeep)
+    ) {
       return jsonError(400, `keep must be between ${KEEP_MIN} and ${KEEP_MAX}`, {
         code: "invalid_keep",
       });
     }
-    const previousKeep = mockDb.schedule.keep || KEEP_DEFAULT;
     // lastRun is preserved.
     mockDb.schedule = {
       lastRun: mockDb.schedule.lastRun,
@@ -183,8 +191,8 @@ export const handlers: HttpHandler[] = [
       cadence: update.cadence,
       keep,
     };
-    if (keep < previousKeep) {
-      pruneScheduled(keep);
+    // Like Go: a schedule that is off never prunes; one that is on prunes on every save.
+    if (mockDb.schedule.enabled && pruneScheduled(keep) > 0) {
       publishMockEvent("backup_deleted", "*");
     }
     return HttpResponse.json({ schedule: wireSchedule(mockDb.schedule) });

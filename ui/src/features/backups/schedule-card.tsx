@@ -39,6 +39,7 @@ import {
   clampKeep,
   KEEP_MAX,
   KEEP_MIN,
+  keepMax,
   messageParts,
   type ScheduleForm,
   scheduleDirty,
@@ -95,21 +96,26 @@ function FrequencySelect({
   );
 }
 
-/** How many scheduled backups to keep; `id` is the input's, for the row title's label. */
+/**
+ * How many scheduled backups to keep; `id` is the input's, for the row title's label. `max` is
+ * 200, or a larger legacy keep so the field shows it as stored.
+ */
 function KeepField({
   id,
   value,
+  max,
   onValueChange,
   ...aria
 }: RowAria & {
   id: string;
   value: number | null;
+  max: number;
   onValueChange: (value: number | null) => void;
 }): JSX.Element {
   return (
     <NumberField
       id={id}
-      max={KEEP_MAX}
+      max={max}
       min={KEEP_MIN}
       onValueChange={(next) => onValueChange(next)}
       step={1}
@@ -203,12 +209,21 @@ function ScheduleFormCard({
 
   const save = useMutation({
     mutationFn: () => {
-      const body = { enabled, cadence, keep: clampKeep(keep ?? Number.NaN) };
+      // The stored keep goes back as is, so a legacy keep above 200 is not clamped away.
+      const body = { enabled, cadence, keep: clampKeep(keep ?? Number.NaN, initial.keep) };
       setKeep(body.keep);
       return updateBackupSchedule(body);
     },
-    onSuccess: (saved) => {
-      toast.success(t("scheduleSaved"));
+    onSuccess: ({ schedule: saved, pruneError }) => {
+      // Saved either way; a failed prune leaves extra scheduled backups until the next save of
+      // an enabled schedule, or its next run, retries it.
+      if (pruneError) {
+        toast.warning(t("schedulePruneFailed"), {
+          description: t("schedulePruneFailedBody", { detail: pruneError }),
+        });
+      } else {
+        toast.success(t("scheduleSaved"));
+      }
       // The server answers with the saved schedule (nextRun included): the form re-seeds from
       // it right away. An older server answers without one; the refetch below covers that.
       if (Object.keys(saved).length > 0) {
@@ -267,6 +282,7 @@ function ScheduleFormCard({
             control={
               <KeepField
                 id={keepId}
+                max={keepMax(initial.keep)}
                 onValueChange={(value) => {
                   if (invalid === "keep") setInvalid(null);
                   setKeep(value);

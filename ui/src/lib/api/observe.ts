@@ -83,10 +83,18 @@ export async function getRecentErrors(limit: number): Promise<ObserveError[]> {
   return res.errors ?? [];
 }
 
+/** The SSE poll fallback for the overview: one small JSON a minute, only while the tab is shown. */
+const OVERVIEW_POLL_MS = 60_000;
+
+/**
+ * observe_tick and the account / settings events keep the overview current; the 60 s poll
+ * covers a dropped event stream, so the live tiles never freeze for long.
+ */
 export function observeOverviewQuery() {
   return queryOptions({
     queryKey: queryKeys.observe.overview(),
     queryFn: getObserveOverview,
+    refetchInterval: OVERVIEW_POLL_MS,
   });
 }
 

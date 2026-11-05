@@ -21,6 +21,8 @@
   "nextRun": "下次运行：{time}",
   "neverRun": "尚未运行",
   "scheduleSaved": "定时备份已保存",
+  "schedulePruneFailed": "定时备份已保存，但旧备份尚未删除",
+  "schedulePruneFailedBody": "超出“保留最新”数量的定时备份仍然保留。下次保存或下次定时运行时会重试。详情：{detail}",
   "discardTitle": "放弃未保存的更改？",
   "discardBody": "定时备份有尚未保存的更改。离开此页面将放弃这些更改。",
   "discardAction": "放弃更改",

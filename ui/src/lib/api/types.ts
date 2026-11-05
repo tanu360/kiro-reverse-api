@@ -68,10 +68,14 @@ export interface FirstRunResponse {
 /**
  * Events the server emits. The dead `account_updated` / `accounts_refreshed` are dropped.
  * Change events carry the changed row's id as `payload`, or "*" for many (none for settings
- * and stats): accounts_changed comes from every account write, background bans and cooldowns
- * included; backup_deleted also fires with "*" when lowering `keep` prunes scheduled backups.
- * observe_tick comes at most once a second and only after observe data changed; its payload
- * is the store's change counter as a decimal string.
+ * and stats):
+ * - accounts_changed comes from every account write except the per-request stats counters,
+ *   background bans included, and when a pool cooldown starts, grows or is cleared.
+ * - backup_deleted also fires with "*" whenever a save of an enabled schedule pruned
+ *   scheduled backups (not only when `keep` is lowered).
+ * - observe_tick comes at most once a second, each time with a new payload: the store's change
+ *   counter as a decimal string. It follows a store write, a minute ending while the last 24 h
+ *   hold traffic (every window shifts), and a change in the enabled or available account count.
  */
 export type AdminEventType =
   | "hello"
@@ -1029,7 +1033,10 @@ export interface BackupSchedule {
   enabled?: boolean;
   /** omitted when unset */
   cadence?: BackupCadence;
-  /** omitted when 0; server prune default 50, UI default 20 */
+  /**
+   * The keep the server applies: 50 when never set, and a legacy value above 200 as stored.
+   * Older servers omit it when unset; read that as 50 too.
+   */
   keep?: number;
   /** unix seconds, read-only */
   lastRun?: number;
@@ -1042,8 +1049,17 @@ export interface BackupSchedule {
 /** GET and POST /backups/schedule */
 export interface BackupScheduleResponse {
   schedule: BackupSchedule;
+  /**
+   * POST only, on a 200: the schedule was saved, but pruning old scheduled backups failed. The
+   * next save of an enabled schedule, or its next run, retries the prune.
+   */
+  pruneError?: string;
 }
-/** 400 unless cadence is hourly|daily|weekly and keep is 1..200. Lowering keep prunes at once. */
+/**
+ * 400 unless cadence is hourly|daily|weekly and keep is 1..200, or equals the stored keep (a
+ * legacy value above 200 sent back unchanged). Saving an enabled schedule prunes at once; a
+ * disabled one never prunes.
+ */
 export interface BackupScheduleUpdate {
   enabled: boolean;
   cadence: BackupCadence;

@@ -21,6 +21,8 @@
   "nextRun": "Lần chạy tiếp theo {time}",
   "neverRun": "Chưa chạy",
   "scheduleSaved": "Đã lưu lịch",
+  "schedulePruneFailed": "Đã lưu lịch, nhưng chưa xóa được các bản sao lưu cũ",
+  "schedulePruneFailedBody": "Các bản sao lưu theo lịch vượt quá số lượng “Giữ bản mới nhất” vẫn còn. Lần lưu tiếp theo hoặc lần chạy theo lịch kế tiếp sẽ thử lại. Chi tiết: {detail}",
   "discardTitle": "Bỏ các thay đổi chưa lưu?",
   "discardBody": "Lịch sao lưu có thay đổi chưa được lưu. Rời khỏi trang này sẽ bỏ các thay đổi đó.",
   "discardAction": "Bỏ thay đổi",

@@ -6,6 +6,7 @@ import {
   accountsCell,
   clampKeep,
   isNotABackupMessage,
+  keepMax,
   kindLabel,
   kindTone,
   listMeta,
@@ -138,23 +139,41 @@ describe("accountsCell", () => {
 });
 
 describe("clampKeep", () => {
-  it("clamps to 1..200 and defaults to 20", () => {
+  it("clamps to 1..200 and keeps the stored value for anything not a number", () => {
     expect(clampKeep(0)).toBe(1);
     expect(clampKeep(500)).toBe(200);
-    expect(clampKeep(Number.NaN)).toBe(20);
+    expect(clampKeep(Number.NaN)).toBe(50);
+    expect(clampKeep(Number.NaN, 14)).toBe(14);
     expect(clampKeep(14)).toBe(14);
     expect(clampKeep(7.6)).toBe(8);
+  });
+
+  it("sends a stored legacy keep above 200 back unchanged, and clamps any other", () => {
+    expect(clampKeep(300, 300)).toBe(300);
+    expect(clampKeep(299, 300)).toBe(200);
+    expect(clampKeep(500, 300)).toBe(200);
+  });
+});
+
+describe("keepMax", () => {
+  it("is 200, or a larger stored keep", () => {
+    expect(keepMax(50)).toBe(200);
+    expect(keepMax(300)).toBe(300);
   });
 });
 
 describe("scheduleForm", () => {
-  it("fills the old UI defaults for an unconfigured schedule", () => {
-    expect(scheduleForm({})).toEqual({ enabled: false, cadence: "daily", keep: 20 });
+  it("reads an unset keep as the server's 50", () => {
+    expect(scheduleForm({})).toEqual({ enabled: false, cadence: "daily", keep: 50 });
     expect(scheduleForm({ enabled: true, cadence: "weekly", keep: 5, lastRun: 1 })).toEqual({
       enabled: true,
       cadence: "weekly",
       keep: 5,
     });
+  });
+
+  it("shows the server's keep as is, a legacy value above 200 included", () => {
+    expect(scheduleForm({ keep: 300 }).keep).toBe(300);
   });
 });
 
@@ -207,5 +226,11 @@ describe("scheduleDirty", () => {
     expect(scheduleDirty(initial, { ...initial, cadence: "weekly" })).toBe(true);
     expect(scheduleDirty(initial, { ...initial, keep: 15 })).toBe(true);
     expect(scheduleDirty(initial, { ...initial, keep: null })).toBe(true);
+  });
+
+  it("keeps a legacy keep above 200 clean while it is unchanged", () => {
+    const legacy = { ...initial, keep: 300 };
+    expect(scheduleDirty(legacy, { ...legacy })).toBe(false);
+    expect(scheduleDirty(legacy, { ...legacy, keep: 299 })).toBe(true);
   });
 });

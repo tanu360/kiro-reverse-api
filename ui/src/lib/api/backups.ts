@@ -34,13 +34,21 @@ export function backupScheduleQuery() {
   return queryOptions({ queryKey: queryKeys.backups.schedule(), queryFn: getBackupSchedule });
 }
 
-/** Answers with the saved schedule, `nextRun` included. */
-export async function updateBackupSchedule(body: BackupScheduleUpdate): Promise<BackupSchedule> {
-  const res = await apiRequest<BackupScheduleResponse>("/backups/schedule", {
+/**
+ * Answers with the saved schedule, `nextRun` included (`{}` from an older server that sends
+ * none), and `pruneError` when the schedule was saved but the follow-up prune failed.
+ */
+export async function updateBackupSchedule(
+  body: BackupScheduleUpdate,
+): Promise<{ schedule: BackupSchedule; pruneError?: string }> {
+  const res = await apiRequest<Partial<BackupScheduleResponse>>("/backups/schedule", {
     method: "POST",
     body,
   });
-  return res.schedule ?? {};
+  return {
+    schedule: res.schedule ?? {},
+    ...(res.pruneError ? { pruneError: res.pruneError } : {}),
+  };
 }
 
 /** Always sends a JSON body: the server answers an empty body with 400 Invalid JSON. */

@@ -21,6 +21,8 @@
   "nextRun": "Next run {time}",
   "neverRun": "Not run yet",
   "scheduleSaved": "Schedule saved",
+  "schedulePruneFailed": "Schedule saved, but old backups were not removed",
+  "schedulePruneFailedBody": "Scheduled backups over the Keep latest count are still stored. The next save or scheduled run tries again. Details: {detail}",
   "discardTitle": "Discard unsaved changes?",
   "discardBody": "The schedule has changes that are not saved. Leaving this page discards them.",
   "discardAction": "Discard changes",

@@ -21,6 +21,8 @@
   "nextRun": "Próxima execução {time}",
   "neverRun": "Ainda não executado",
   "scheduleSaved": "Agendamento salvo",
+  "schedulePruneFailed": "Agendamento salvo, mas os backups antigos não foram removidos",
+  "schedulePruneFailedBody": "Os backups agendados acima do limite de “Manter os mais recentes” continuam guardados. O próximo salvamento ou a próxima execução agendada tenta de novo. Detalhes: {detail}",
   "discardTitle": "Descartar alterações não salvas?",
   "discardBody": "O agendamento tem alterações que não foram salvas. Sair desta página as descarta.",
   "discardAction": "Descartar alterações",

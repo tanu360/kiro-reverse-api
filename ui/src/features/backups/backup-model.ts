@@ -7,8 +7,8 @@ export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
 
 export const KEEP_MIN = 1;
 export const KEEP_MAX = 200;
-/** UI default; the server prunes to 50 when keep is unset, so the UI always sends one. */
-export const KEEP_DEFAULT = 20;
+/** The keep the server applies while none was ever set (GET answers it; an older server omits it). */
+export const KEEP_DEFAULT = 50;
 
 export const CADENCES: readonly BackupCadence[] = ["hourly", "daily", "weekly"];
 
@@ -33,22 +33,36 @@ export function manualNote(date: Date): string {
   return `manual backup ${day} ${time}`;
 }
 
-/** Whole number in 1..200; anything that is not a number becomes the default 20. */
-export function clampKeep(value: number): number {
-  if (!Number.isFinite(value)) return KEEP_DEFAULT;
-  return Math.min(KEEP_MAX, Math.max(KEEP_MIN, Math.round(value)));
+/**
+ * The keep to send. The stored keep goes back unchanged, so a legacy value above 200 stays valid
+ * (the server accepts one only when it equals the stored keep); any other value is rounded into
+ * 1..200, and anything that is not a number keeps the stored value.
+ */
+export function clampKeep(value: number, stored: number = KEEP_DEFAULT): number {
+  if (!Number.isFinite(value)) return stored;
+  const whole = Math.round(value);
+  if (whole === stored) return stored;
+  return Math.min(KEEP_MAX, Math.max(KEEP_MIN, whole));
+}
+
+/** The Keep field's max: 200, or a larger legacy keep, so the field can show it as stored. */
+export function keepMax(stored: number): number {
+  return Math.max(KEEP_MAX, stored);
 }
 
 function isCadence(value: unknown): value is BackupCadence {
   return CADENCES.includes(value as BackupCadence);
 }
 
-/** Every schedule field is omitempty on the wire, so `{}` means off, daily, keep 20. */
+/**
+ * Every schedule field is omitempty on the wire, so `{}` means off and daily. Keep is shown as
+ * the server applies it, never clamped: 50 when unset, a legacy value above 200 as stored.
+ */
 export function scheduleForm(schedule: BackupSchedule): ScheduleForm {
   return {
     enabled: Boolean(schedule.enabled),
     cadence: isCadence(schedule.cadence) ? schedule.cadence : "daily",
-    keep: schedule.keep ? clampKeep(schedule.keep) : KEEP_DEFAULT,
+    keep: schedule.keep && schedule.keep > 0 ? schedule.keep : KEEP_DEFAULT,
   };
 }
 
@@ -61,7 +75,7 @@ export function scheduleDirty(
   return (
     current.enabled !== initial.enabled ||
     current.cadence !== initial.cadence ||
-    clampKeep(current.keep) !== initial.keep
+    clampKeep(current.keep, initial.keep) !== initial.keep
   );
 }
 

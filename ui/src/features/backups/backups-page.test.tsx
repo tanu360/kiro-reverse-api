@@ -539,6 +539,53 @@ describe("ScheduleCard", () => {
     expect(keep).toHaveValue("30");
   });
 
+  it("warns, and still re-seeds, when the schedule saved but its prune failed", async () => {
+    mockServer.use(
+      http.post(apiUrl("/backups/schedule"), async ({ request }) => {
+        const body = (await request.json()) as typeof mockDb.schedule;
+        // Saved: the refetch after the save reads it back.
+        mockDb.schedule = { ...mockDb.schedule, ...body };
+        return HttpResponse.json({ schedule: body, pruneError: "remove backup: disk full" });
+      }),
+    );
+    const { user } = await renderPage();
+    const keep = await screen.findByRole("textbox", { name: "Keep latest" });
+    await user.clear(keep);
+    await user.type(keep, "5");
+    const save = screen.getByRole("button", { name: "Save" });
+    await user.click(save);
+    const title = await findToast("Schedule saved, but old backups were not removed");
+    const toastRoot = title.closest('[data-slot="toast"]') ?? title.parentElement;
+    expect(toastRoot).toHaveTextContent(/next save or scheduled run tries again/);
+    expect(toastRoot).toHaveTextContent("remove backup: disk full");
+    expect(screen.queryByText("Schedule saved")).toBeNull();
+    await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
+    expect(keep).toHaveValue("5");
+  });
+
+  it("shows a stored legacy keep above 200 and sends it back unchanged", async () => {
+    let body: unknown = null;
+    mockServer.use(
+      http.get(apiUrl("/backups/schedule"), () =>
+        HttpResponse.json({ schedule: { enabled: true, cadence: "daily", keep: 300 } }),
+      ),
+      http.post(apiUrl("/backups/schedule"), async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ schedule: body });
+      }),
+    );
+    const { user } = await renderPage();
+    const keep = await screen.findByRole("textbox", { name: "Keep latest" });
+    expect(keep).toHaveValue("300");
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getByRole("combobox", { name: "Frequency" }));
+    await user.click(await screen.findByRole("option", { name: "Weekly" }));
+    await user.click(save);
+    expect(await findToast("Schedule saved")).toBeInTheDocument();
+    expect(body).toEqual({ enabled: true, cadence: "weekly", keep: 300 });
+  });
+
   it("shows when the schedule last ran and runs next under the switch", async () => {
     await renderPage();
     const toggle = await screen.findByRole("switch", { name: "Scheduled backup" });

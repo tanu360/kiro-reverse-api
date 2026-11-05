@@ -3,7 +3,13 @@ import { REMOTE_VERSION_URL } from "@/lib/api/system";
 import type { AdminEventType, RequestRecord } from "@/lib/api/types";
 import { claimMockPassword, mockDb, mockNowUnix, mockScenario } from "./db";
 import { onMockEvent } from "./events";
-import { buildModelMix, buildStatus, makeObserveError, makeRequestRecord } from "./fixtures";
+import {
+  buildAvailability,
+  buildModelMix,
+  buildStatus,
+  makeObserveError,
+  makeRequestRecord,
+} from "./fixtures";
 import { makeLiveRequest } from "./fixtures-full";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "./http";
 
@@ -11,7 +17,15 @@ const SESSION_TTL_MS = (import.meta.env.VITE_MOCK === "1" ? 30 * 24 : 12) * 3600
 const TICKET_TTL_MS = 30 * 1000;
 const LOGIN_FAILURE_LIMIT = 5;
 const LOGIN_LOCK_MS = 60 * 1000;
-const TICK_MS = 5000;
+/** Like Go's backgroundObserveTick: the stream checks for observe changes once a second. */
+const TICK_MS = 1000;
+/**
+ * Synthetic traffic lands every 20 s, not on every check, so the overview's other refresh paths
+ * (minute rollover, account and settings events) are what keep it current between bursts.
+ */
+const TRAFFIC_EVERY_TICKS = 20;
+/** Go's observeMinuteSlots: traffic this many minutes back still moves on screen. */
+const OBSERVE_MINUTE_SLOTS = 1440;
 const LIVE_MODELS = ["claude-sonnet-5", "claude-haiku-4.5", "claude-opus-5", "claude-sonnet-4.6"];
 
 // When the 5th wrong password arrived. Like Go, the lock lasts one minute.
@@ -131,6 +145,37 @@ function appendSyntheticRequests(): number {
 // The observe store's change counter, as Go's observe_tick payload carries it.
 let observeSeq = 0;
 
+/** Go's observeTickState: the minute and account counts the counter last reflected. */
+let tickState: { minute: number; enabled: number; available: number } | null = null;
+
+function availabilityNow(): { enabledAccts: number; availableAccts: number } {
+  return buildAvailability(mockDb.accounts, mockDb.settings.allowOverUsage);
+}
+
+/**
+ * Go's observeTickState.advance: moves the counter when a minute ends while the last 24 h hold
+ * traffic (every window shifts), or when the enabled or available account count changes.
+ */
+function advanceObserveSeq(): void {
+  const now = mockNowUnix();
+  const minute = Math.floor(now / 60);
+  const { enabledAccts, availableAccts } = availabilityNow();
+  if (!tickState) {
+    tickState = { minute, enabled: enabledAccts, available: availableAccts };
+    return;
+  }
+  if (minute !== tickState.minute) {
+    tickState.minute = minute;
+    const since = (minute - OBSERVE_MINUTE_SLOTS) * 60;
+    if (mockDb.requests.some((r) => r.ts >= since)) observeSeq += 1;
+  }
+  if (enabledAccts !== tickState.enabled || availableAccts !== tickState.available) {
+    tickState.enabled = enabledAccts;
+    tickState.available = availableAccts;
+    observeSeq += 1;
+  }
+}
+
 // MSW's sse() needs EventSource when the handler is built. jsdom and Node 22 have none, so in
 // tests the stream is not mocked and the events provider stays 'closed'.
 function eventsHandlers(): HttpHandler[] {
@@ -153,14 +198,21 @@ function eventsHandlers(): HttpHandler[] {
         clearInterval(timer);
         unsubscribe();
       };
+      // The counter this stream last sent; like Go, a new stream hears only later changes.
+      advanceObserveSeq();
+      let sentSeq = observeSeq;
+      let ticks = 0;
       const timer = setInterval(() => {
         if (!open || request.signal.aborted) {
           stop();
           return;
         }
+        ticks += 1;
+        if (ticks % TRAFFIC_EVERY_TICKS === 0 && appendSyntheticRequests() > 0) observeSeq += 1;
+        advanceObserveSeq();
         // Like Go: a tick only when observe data changed, carrying the change counter.
-        if (appendSyntheticRequests() === 0) return;
-        observeSeq += 1;
+        if (observeSeq === sentSeq) return;
+        sentSeq = observeSeq;
         client.send({
           event: "observe_tick",
           data: JSON.stringify({ type: "observe_tick", payload: String(observeSeq) }),

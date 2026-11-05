@@ -256,17 +256,26 @@ describe("change events", () => {
     return invalidate.mock.calls.map(([filters]) => filters?.queryKey);
   }
 
-  it("refetches the account list and status once for a burst of accounts_changed", async () => {
+  it("refetches the account list, status and overview once for a burst of accounts_changed", async () => {
     const keys = await invalidatedAfterBurst("accounts_changed", 5);
-    expect(keys).toEqual([queryKeys.accounts.list(), queryKeys.status]);
+    // The overview's enabled / available counts follow the accounts, even with no traffic.
+    expect(keys).toEqual([
+      queryKeys.accounts.list(),
+      queryKeys.status,
+      queryKeys.observe.overview(),
+    ]);
   });
 
   it("refetches API keys on api_keys_changed", async () => {
     expect(await invalidatedAfterBurst("api_keys_changed")).toEqual([queryKeys.apiKeys.all]);
   });
 
-  it("refetches settings on settings_changed", async () => {
-    expect(await invalidatedAfterBurst("settings_changed")).toEqual([queryKeys.settings.all]);
+  it("refetches settings and the overview on settings_changed", async () => {
+    // allowOverUsage changes the overview's available count.
+    expect(await invalidatedAfterBurst("settings_changed")).toEqual([
+      queryKeys.settings.all,
+      queryKeys.observe.overview(),
+    ]);
   });
 
   it("refetches status, observe and requests on stats_reset", async () => {
@@ -292,6 +301,7 @@ describe("change events", () => {
     expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([
       queryKeys.accounts.list(),
       queryKeys.status,
+      queryKeys.observe.overview(),
     ]);
     await advance(CHANGE_DEBOUNCE_MS / 2);
     expect(invalidate).toHaveBeenLastCalledWith({ queryKey: queryKeys.apiKeys.all });
