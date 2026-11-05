@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/components/layout/theme-provider.tsx",
+    "rule": "hex",
+    "match": "#09090a",
+    "reason": "Browser chrome colour for <meta name=theme-color>; it must be a literal and mirrors --background (index.css)."
+  },
+  {
+    "file": "src/components/layout/theme-provider.tsx",
+    "rule": "hex",
+    "match": "#fafafa",
+    "reason": "Browser chrome colour for <meta name=theme-color>; it must be a literal and mirrors --background (index.css)."
+  },
+  {
+    "file": "src/components/shared/data-table.tsx",
+    "rule": "arbitrary-bg",
+    "match": "bg-[linear-gradient(var(--row-head),var(--row-head))]",
+    "reason": "Token-only tint laid over the opaque sticky cell as an image, so pinned cells match their row; no utility exists for it."
+  },
+  {
+    "file": "src/components/shared/data-table.tsx",
+    "rule": "arbitrary-bg",
+    "match": "bg-[linear-gradient(var(--row-hover),var(--row-hover))]",
+    "reason": "Token-only tint laid over the opaque sticky cell as an image, so pinned cells match their row; no utility exists for it."
+  },
+  {
+    "file": "src/components/shared/data-table.tsx",
+    "rule": "arbitrary-bg",
+    "match": "bg-[linear-gradient(var(--row-selected),var(--row-selected))]",
+    "reason": "Token-only tint laid over the opaque sticky cell as an image, so pinned cells match their row; no utility exists for it."
+  },
+  {
+    "file": "src/components/shared/data-table.tsx",
+    "rule": "arbitrary-bg",
+    "match": "bg-[linear-gradient(var(--row-selected-hover),var(--row-selected-hover))]",
+    "reason": "Token-only tint laid over the opaque sticky cell as an image, so pinned cells match their row; no utility exists for it."
+  },
+  {
+    "file": "src/components/shared/data-table.tsx",
+    "rule": "arbitrary-bg",
+    "match": "bg-[linear-gradient(color-mix(in_srgb,var(--row-selected)_50%,transparent),color",
+    "reason": "Token-only tint laid over the opaque sticky cell as an image, so pinned cells match their row; no utility exists for it."
+  }
+]

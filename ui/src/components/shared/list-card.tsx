@@ -18,8 +18,7 @@ import { cn } from "@/lib/utils";
 
 const CARD_OPEN_HOVER = "has-[[data-slot=list-card-open]:hover]:bg-(--card-hover)";
 // The selected tint is laid over the card's own fill as an image, so the card stays opaque.
-const CARD_SELECTED =
-  "border-primary/40 bg-[linear-gradient(var(--row-selected),var(--row-selected))]";
+const CARD_SELECTED = "border-primary/40 bg-linear-to-b from-(--row-selected) to-(--row-selected)";
 const ROW_CLASS = "relative flex min-w-0 flex-col gap-2 px-4 py-3 transition-colors sm:px-5";
 const ROW_OPEN_HOVER = "has-[[data-slot=list-card-open]:hover]:bg-(--row-hover)";
 const ROW_SELECTED = "bg-(--row-selected)";
@@ -80,7 +79,7 @@ export function ListCard({
       */}
       <div className="flex min-w-0 items-start gap-2" data-slot="list-card-header">
         {leading ? (
-          <div className="relative z-[1] flex h-6 shrink-0 items-center">{leading}</div>
+          <div className="relative z-1 flex h-6 shrink-0 items-center">{leading}</div>
         ) : null}
         {/*
           The title and its badges wrap: when both do not fit, the badges drop under the title
@@ -112,7 +111,7 @@ export function ListCard({
         {action ? (
           // One title line tall: a 32 px icon button centres on the title's line and overflows
           // into the padding instead of making the header taller.
-          <div className="relative z-[1] -me-1.5 flex h-6 shrink-0 items-center">{action}</div>
+          <div className="relative z-1 -me-1.5 flex h-6 shrink-0 items-center">{action}</div>
         ) : null}
       </div>
       {meta ? (
@@ -122,7 +121,7 @@ export function ListCard({
       ) : null}
       {children}
       {footer ? (
-        <div className="relative z-[1] mt-auto min-w-0" data-slot="list-card-footer">
+        <div className="relative z-1 mt-auto min-w-0" data-slot="list-card-footer">
           {footer}
         </div>
       ) : null}
