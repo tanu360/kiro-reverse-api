@@ -2,14 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { AccountHeatmap, HeatmapCell, HeatmapData, ModelMixEntry } from "@/lib/api/types";
 import {
   bucketGlobal,
-  cellOpacity,
-  countTicks,
+  heatFailure,
+  heatLevel,
   hourDelta,
   modelSlices,
+  peakCount,
   RANGE_WINDOWS,
   sparklineBuckets,
   topAccounts,
   windowCells,
+  withPreviousWindow,
 } from "./aggregate";
 
 /** Newest-first cells: `values[i]` is offset i. */
@@ -81,6 +83,21 @@ describe("bucketGlobal", () => {
   it("gives 72 points for 6 h and 96 points for 24 h", () => {
     expect(bucketGlobal(zeros(360), now, 5)).toHaveLength(72);
     expect(bucketGlobal(zeros(1440), now, 15)).toHaveLength(96);
+  });
+
+  it("keeps the full time axis without cells and leaves out cells past the window", () => {
+    expect(bucketGlobal([], now, 2, 60)).toHaveLength(30);
+    const points = bucketGlobal(
+      [
+        { offset: 0, reqs: 2, failures: 0 },
+        { offset: 90, reqs: 7, failures: 0 },
+      ],
+      now,
+      2,
+      60,
+    );
+    expect(points).toHaveLength(30);
+    expect(points.reduce((sum, p) => sum + p.succeeded, 0)).toBe(2);
   });
 
   it("orders by offset, not by array position", () => {
@@ -237,16 +254,28 @@ describe("modelSlices", () => {
   });
 });
 
-describe("cellOpacity", () => {
-  it("maps 0 to 0.18 and the maximum to 1", () => {
-    expect(cellOpacity(0, 10)).toBe(0.18);
-    expect(cellOpacity(10, 10)).toBe(1);
-    expect(cellOpacity(5, 10)).toBeCloseTo(0.59);
+describe("heatLevel", () => {
+  it("keeps 1 for an empty minute and steps 2 to 5 by quarters of the busiest", () => {
+    expect(heatLevel(0, 10)).toBe(1);
+    expect(heatLevel(1, 100)).toBe(2);
+    expect(heatLevel(25, 100)).toBe(2);
+    expect(heatLevel(26, 100)).toBe(3);
+    expect(heatLevel(75, 100)).toBe(4);
+    expect(heatLevel(100, 100)).toBe(5);
   });
 
-  it("treats a maximum below 1 as 1 and caps at 1", () => {
-    expect(cellOpacity(1, 0)).toBe(1);
-    expect(cellOpacity(20, 10)).toBe(1);
+  it("treats a maximum below 1 as 1 and caps at 5", () => {
+    expect(heatLevel(1, 0)).toBe(5);
+    expect(heatLevel(20, 10)).toBe(5);
+  });
+});
+
+describe("heatFailure", () => {
+  it("turns a cell red only from a quarter of its requests failing", () => {
+    expect(heatFailure(10, 0)).toBe("none");
+    expect(heatFailure(10, 2)).toBe("some");
+    expect(heatFailure(8, 2)).toBe("alert");
+    expect(heatFailure(0, 3)).toBe("alert");
   });
 });
 
@@ -265,23 +294,47 @@ describe("windowCells", () => {
   });
 });
 
-describe("countTicks", () => {
-  const at = (succeeded: number, failed = 0) => ({ date: new Date(0), succeeded, failed });
+describe("withPreviousWindow", () => {
+  const now = 1_700_000_000;
 
-  it("returns only the zero tick without traffic", () => {
-    expect(countTicks([])).toEqual([0]);
-    expect(countTicks([at(0), at(0)])).toEqual([0]);
+  it("lays the previous hour's succeeded counts under the current hour, bucket for bucket", () => {
+    const input: HeatmapCell[] = [
+      { offset: 0, reqs: 3, failures: 1 },
+      { offset: 59, reqs: 4, failures: 0 },
+      { offset: 60, reqs: 6, failures: 2 },
+      { offset: 119, reqs: 5, failures: 0 },
+    ];
+    const points = withPreviousWindow(input, now, 2, 60);
+    expect(points).toHaveLength(30);
+    // Oldest bucket: offsets 58-59 now, 118-119 an hour earlier.
+    expect(points[0]).toMatchObject({ succeeded: 4, failed: 0, previous: 5 });
+    // Newest bucket: offsets 0-1 now, 60-61 an hour earlier.
+    expect(points[29]).toMatchObject({ succeeded: 2, failed: 1, previous: 4 });
+    expect(points[0].date).toEqual(new Date((now - 59 * 60) * 1000));
   });
 
-  it("never returns fractional ticks for small counts", () => {
-    expect(countTicks([at(1), at(0)])).toEqual([0, 1]);
-    expect(countTicks([at(2), at(0, 3)])).toEqual([0, 1, 2, 3]);
+  it("gives a flat zero comparison without an earlier hour", () => {
+    const points = withPreviousWindow([{ offset: 3, reqs: 1, failures: 0 }], now, 2, 60);
+    expect(points.every((p) => p.previous === 0)).toBe(true);
+  });
+});
+
+describe("peakCount", () => {
+  const at = (succeeded: number, failed = 0, previous?: number) => ({
+    date: new Date(0),
+    succeeded,
+    failed,
+    previous,
   });
 
-  it("uses 1-2-5 steps up to the busiest bucket", () => {
-    expect(countTicks([at(9)])).toEqual([0, 5]);
-    expect(countTicks([at(37)])).toEqual([0, 10, 20, 30]);
-    expect(countTicks([at(1200)])).toEqual([0, 500, 1000]);
+  it("is 0 without traffic", () => {
+    expect(peakCount([])).toBe(0);
+    expect(peakCount([at(0), at(0)])).toBe(0);
+  });
+
+  it("takes the busiest bucket of any series, the comparison included", () => {
+    expect(peakCount([at(2), at(0, 3)])).toBe(3);
+    expect(peakCount([at(9, 1, 12)])).toBe(12);
   });
 });
 

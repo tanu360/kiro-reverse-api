@@ -1,36 +1,33 @@
 import {
-  ArrowRight02Icon,
+  Activity01Icon,
+  ArrowUpRight01Icon,
   CircleCheckIcon,
-  CircleXIcon,
   ListIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type JSX, type ReactNode, useMemo, useState } from "react";
+import { type JSX, useMemo, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { DisplayEmail } from "@/components/shared/display-email";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { ListCard } from "@/components/shared/list-card";
 import { SectionCard } from "@/components/shared/section-card";
 import { TokenCell } from "@/components/shared/token-cell";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { recentErrorsQuery, recentRequestsPreviewQuery } from "@/lib/api/observe";
 import type { ObserveError, RequestRecord } from "@/lib/api/types";
-import { EMPTY, formatDateTime, formatDurationMs } from "@/lib/format";
-import { useT } from "@/lib/i18n";
+import { EMPTY, formatDateTime, formatDurationMs, formatTime } from "@/lib/format";
+import { type Lang, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { cn } from "@/lib/utils";
-import { ResponsiveList } from "./responsive-list";
+import { useTotalsFailed } from "./status-cards";
 
 const PREVIEW_ROWS = 10;
-// Below the table width the cards pair up once the card is 36rem wide.
-const CARD_GRID = "@xl:grid-cols-2";
-// The panel is a tab stop (its first content is not focusable), so it shows where focus is.
-const PANEL_CLASS = "mt-2 rounded-lg outline-none focus-outline";
 type ActivityTab = "errors" | "requests";
 
 /** Go sends "-" for an unknown model; empty cells show the copy guide's em dash. */
@@ -38,71 +35,106 @@ function modelText(model: string | null | undefined): string {
   return !model || model === "-" ? EMPTY : model;
 }
 
-/** Model names are set a step smaller; the empty dash stays full size and muted, like the account column's. */
-function ModelName({ model, className }: { model?: string; className?: string }): JSX.Element {
-  const text = modelText(model);
-  if (text === EMPTY) return <span className="text-muted-foreground">{EMPTY}</span>;
-  return <span className={cn("text-xs", className)}>{text}</span>;
+/** The model in the muted 13 px meta style; a missing one is the muted dash. */
+function ModelName({ model }: { model?: string }): JSX.Element {
+  return <span className="text-meta text-muted-foreground">{modelText(model)}</span>;
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
 /**
- * The message wraps to two lines. It is plain text, not a focusable tooltip trigger, so each
- * row costs no extra tab stop; the full text is on the Requests page and in the title.
+ * Today's rows show the time alone (tabular), older ones the date and time; the full date and
+ * time are in the tooltip either way. Not a tab stop: the tooltip only repeats it in full.
  */
+function ActivityTime({ ts, lang }: { ts: number; lang: Lang }): JSX.Element {
+  const date = new Date(ts * 1000);
+  const full = formatDateTime(ts, lang);
+  const text = sameDay(date, new Date()) ? formatTime(ts, lang) : full;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <time
+            className="whitespace-nowrap text-meta text-muted-foreground tabular-nums"
+            dateTime={date.toISOString()}
+          />
+        }
+      >
+        {text}
+      </TooltipTrigger>
+      <TooltipPopup>{full}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/** One line, cut to the cell with an ellipsis; the full text is a tooltip only when it is cut. */
 function MessageText({ text }: { text: string }): JSX.Element {
   if (!text) return <span className="text-muted-foreground">{EMPTY}</span>;
-  return (
-    <span className="line-clamp-2 whitespace-normal break-words" title={text}>
-      {text}
-    </span>
-  );
+  return <TruncatedText className="max-w-80">{text}</TruncatedText>;
 }
 
-function ViewAllLink({ children, failedOnly }: { children: ReactNode; failedOnly: boolean }) {
-  return (
-    <Button
-      render={<Link search={failedOnly ? { status: "failed" } : {}} to="/requests" />}
-      size="sm"
-      variant="outline"
-    >
-      {children}
-      <HugeiconsIcon icon={ArrowRight02Icon} aria-hidden="true" />
-    </Button>
-  );
-}
-
-function MobileCard({
-  time,
-  status,
-  children,
-}: {
-  time: string;
-  status: ReactNode;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <Card className="min-w-0 gap-1.5 p-3 text-sm">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-muted-foreground text-xs">{time}</span>
-        {status}
-      </div>
-      {children}
-    </Card>
-  );
-}
-
+/** An error status: the neutral pill with the red dot (red stays the alert accent). */
 function ErrorStatus({ row }: { row: ObserveError }): JSX.Element {
   if (!row.status) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
-    <Badge icon={CircleXIcon} tone="destructive">
+    <Badge dot tone="destructive" variant="outline">
       {row.status}
     </Badge>
+  );
+}
+
+function RequestStatus({ row }: { row: RequestRecord }): JSX.Element {
+  const { t } = useT("overview");
+  if (row.success) {
+    return (
+      <Badge dot tone="success" variant="outline">
+        {t("activity.succeeded")}
+      </Badge>
+    );
+  }
+  return (
+    <Badge dot tone="destructive" variant="outline">
+      {t("activity.failed")}
+      {row.status ? ` ${row.status}` : ""}
+    </Badge>
+  );
+}
+
+/** "time · model": the muted meta line of a phone card. */
+function CardMeta({
+  ts,
+  lang,
+  model,
+  extra,
+}: {
+  ts: number;
+  lang: Lang;
+  model?: string;
+  extra?: string;
+}): JSX.Element {
+  const parts = [modelText(model), extra].filter((part) => part && part !== EMPTY);
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <ActivityTime lang={lang} ts={ts} />
+      {parts.map((part) => (
+        <span className="min-w-0 truncate" key={part}>
+          {`· ${part}`}
+        </span>
+      ))}
+    </span>
   );
 }
 
 function ErrorsPanel(): JSX.Element {
   const { t, lang } = useT("overview");
   const mask = useMaskText();
+  const totalsFailed = useTotalsFailed();
   const query = useQuery(recentErrorsQuery(PREVIEW_ROWS));
   const rows = useMemo(() => (query.data ?? []).slice(0, PREVIEW_ROWS), [query.data]);
 
@@ -111,7 +143,7 @@ function ErrorsPanel(): JSX.Element {
       {
         id: "time",
         header: t("activity.time"),
-        cell: (row) => <span>{formatDateTime(row.ts, lang)}</span>,
+        cell: (row) => <ActivityTime lang={lang} ts={row.ts} />,
       },
       {
         id: "account",
@@ -130,14 +162,17 @@ function ErrorsPanel(): JSX.Element {
         id: "message",
         header: t("activity.message"),
         cell: (row) => <MessageText text={mask(row.message)} />,
-        className: "min-w-56 max-w-80",
       },
     ],
     [t, lang, mask],
   );
 
   if (!query.data && query.isError) {
-    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+    return totalsFailed ? (
+      <ErrorState notLoaded />
+    ) : (
+      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   const empty = (
@@ -151,70 +186,42 @@ function ErrorsPanel(): JSX.Element {
   const rowId = (row: ObserveError, index: number) => `${row.ts}-${row.accountId}-${index}`;
 
   return (
-    <div className="flex flex-col gap-3">
-      {query.data && query.isError ? (
+    <>
+      {query.data && query.isError && !totalsFailed ? (
         <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
       ) : null}
-      <ResponsiveList
-        at="4xl"
+      <DataTable
         caption={t("activity.errors")}
+        cardLayout="grid"
+        cardsBelow="4xl"
+        columns={columns}
+        data={rows}
         emptyState={empty}
         getRowId={rowId}
-        listClassName={CARD_GRID}
+        inset
         loading={query.isPending}
         renderCard={(row) => (
-          <MobileCard status={<ErrorStatus row={row} />} time={formatDateTime(row.ts, lang)}>
-            <DisplayEmail className="block font-medium" email={row.email} id={row.accountId} />
-            {modelText(row.model) === EMPTY ? null : (
-              <span className="truncate text-muted-foreground text-xs">{row.model}</span>
-            )}
+          <ListCard
+            badge={row.status ? <ErrorStatus row={row} /> : undefined}
+            meta={<CardMeta lang={lang} model={row.model} ts={row.ts} />}
+            title={<DisplayEmail email={row.email} id={row.accountId} />}
+          >
             {row.message ? (
-              <p className="line-clamp-2 break-words text-muted-foreground text-xs">
+              // wrap-anywhere: a long token (a JSON blob, a URL) breaks instead of widening the card.
+              <p className="line-clamp-2 wrap-anywhere text-meta text-muted-foreground">
                 {mask(row.message)}
               </p>
             ) : null}
-          </MobileCard>
+          </ListCard>
         )}
-        rows={rows}
-        table={
-          <DataTable
-            caption={t("activity.errors")}
-            columns={columns}
-            data={rows}
-            emptyState={empty}
-            getRowId={rowId}
-            loading={query.isPending}
-          />
-        }
       />
-      {rows.length > 0 ? (
-        <div className="flex justify-end">
-          <ViewAllLink failedOnly>{t("activity.viewAllErrors")}</ViewAllLink>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function RequestStatus({ row }: { row: RequestRecord }): JSX.Element {
-  const { t } = useT("overview");
-  if (row.success) {
-    return (
-      <Badge icon={CircleCheckIcon} tone="success">
-        {t("activity.succeeded")}
-      </Badge>
-    );
-  }
-  return (
-    <Badge icon={CircleXIcon} tone="destructive">
-      {t("activity.failed")}
-      {row.status ? ` ${row.status}` : ""}
-    </Badge>
+    </>
   );
 }
 
 function RequestsPanel(): JSX.Element {
   const { t, lang } = useT("overview");
+  const totalsFailed = useTotalsFailed();
   const query = useQuery(recentRequestsPreviewQuery(PREVIEW_ROWS));
   const rows = useMemo(() => (query.data?.requests ?? []).slice(0, PREVIEW_ROWS), [query.data]);
 
@@ -223,7 +230,7 @@ function RequestsPanel(): JSX.Element {
       {
         id: "time",
         header: t("activity.time"),
-        cell: (row) => <span>{formatDateTime(row.ts, lang)}</span>,
+        cell: (row) => <ActivityTime lang={lang} ts={row.ts} />,
       },
       { id: "status", header: t("activity.status"), cell: (row) => <RequestStatus row={row} /> },
       {
@@ -245,7 +252,9 @@ function RequestsPanel(): JSX.Element {
           <TokenCell
             cacheReadTokens={row.cacheReadTokens}
             cacheWriteTokens={row.cacheWriteTokens}
+            detailClassName="min-w-48"
             inTokens={row.inTokens}
+            muteZero={!row.success}
             outTokens={row.outTokens}
           />
         ),
@@ -261,7 +270,11 @@ function RequestsPanel(): JSX.Element {
   );
 
   if (!query.data && query.isError) {
-    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+    return totalsFailed ? (
+      <ErrorState notLoaded />
+    ) : (
+      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+    );
   }
 
   const empty = (
@@ -276,73 +289,92 @@ function RequestsPanel(): JSX.Element {
     row.id === undefined ? `${row.ts}-${index}` : String(row.id);
 
   return (
-    <div className="flex flex-col gap-3">
-      {query.data && query.isError ? (
+    <>
+      {query.data && query.isError && !totalsFailed ? (
         <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
       ) : null}
-      <ResponsiveList
-        at="4xl"
+      <DataTable
         caption={t("activity.requests")}
+        cardLayout="grid"
+        cardsBelow="4xl"
+        columns={columns}
+        data={rows}
         emptyState={empty}
         getRowId={rowId}
-        listClassName={CARD_GRID}
+        inset
         loading={query.isPending}
         renderCard={(row) => (
-          <MobileCard status={<RequestStatus row={row} />} time={formatDateTime(row.ts, lang)}>
-            <DisplayEmail className="block font-medium" email={row.email} id={row.accountId} />
-            <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
-              <ModelName className="truncate" model={row.model} />
-              <span className="shrink-0">
-                {formatDurationMs(row.durationMs, Boolean(row.endpoint))}
-              </span>
-            </div>
-          </MobileCard>
-        )}
-        rows={rows}
-        table={
-          <DataTable
-            caption={t("activity.requests")}
-            columns={columns}
-            data={rows}
-            emptyState={empty}
-            getRowId={rowId}
-            loading={query.isPending}
+          <ListCard
+            badge={<RequestStatus row={row} />}
+            meta={
+              <CardMeta
+                extra={formatDurationMs(row.durationMs, Boolean(row.endpoint))}
+                lang={lang}
+                model={row.model}
+                ts={row.ts}
+              />
+            }
+            title={<DisplayEmail email={row.email} id={row.accountId} />}
           />
-        }
+        )}
       />
-      {rows.length > 0 ? (
-        <div className="flex justify-end">
-          <ViewAllLink failedOnly={false}>{t("activity.viewAllRequests")}</ViewAllLink>
-        </div>
-      ) : null}
-    </div>
+    </>
   );
 }
 
-/** Port of Studio's subscriber overview: recent errors (default) and recent requests. */
+/** The header's "View all ↗": to the failed requests from the errors tab, else to all of them. */
+function ViewAllLink({ tab }: { tab: ActivityTab }): JSX.Element {
+  const { t } = useT("overview");
+  const { t: tc } = useT();
+  const errors = tab === "errors";
+  return (
+    <Button
+      aria-label={t(errors ? "activity.viewAllErrors" : "activity.viewAllRequests")}
+      render={<Link search={errors ? { status: "failed" } : {}} to="/requests" />}
+      size="sm"
+      variant="ghost"
+    >
+      {tc("actions.viewAll")}
+      <HugeiconsIcon icon={ArrowUpRight01Icon} aria-hidden="true" />
+    </Button>
+  );
+}
+
+/**
+ * Port of Studio's subscriber overview: recent errors (default) and recent requests. The tabs
+ * and the "View all" link sit in the header; the table runs edge to edge under it.
+ */
 export function RecentActivity(): JSX.Element {
   const { t } = useT("overview");
   const [tab, setTab] = useState<ActivityTab>("errors");
 
   return (
-    <SectionCard
-      description={t("activity.description")}
-      id="overview-activity"
-      title={t("activity.title")}
-    >
-      <Tabs onValueChange={(value) => setTab(value as ActivityTab)} value={tab}>
-        <TabsList aria-label={t("activity.tabs")} className="max-w-full">
-          <TabsTab value="errors">{t("activity.errors")}</TabsTab>
-          <TabsTab value="requests">{t("activity.requests")}</TabsTab>
-        </TabsList>
+    <Tabs className="min-w-0" onValueChange={(value) => setTab(value as ActivityTab)} value={tab}>
+      <SectionCard
+        actions={
+          <>
+            <TabsList aria-label={t("activity.tabs")} size="sm">
+              <TabsTab value="errors">{t("activity.errors")}</TabsTab>
+              <TabsTab value="requests">{t("activity.requests")}</TabsTab>
+            </TabsList>
+            <ViewAllLink tab={tab} />
+          </>
+        }
+        description={t("activity.description")}
+        descriptionVariant="inline"
+        icon={Activity01Icon}
+        id="overview-activity"
+        slim
+        title={t("activity.title")}
+      >
         {/* Panels mount on demand, so recent requests load only when that tab opens. */}
-        <TabsPanel className={PANEL_CLASS} value="errors">
+        <TabsPanel value="errors">
           <ErrorsPanel />
         </TabsPanel>
-        <TabsPanel className={PANEL_CLASS} value="requests">
+        <TabsPanel value="requests">
           <RequestsPanel />
         </TabsPanel>
-      </Tabs>
-    </SectionCard>
+      </SectionCard>
+    </Tabs>
   );
 }

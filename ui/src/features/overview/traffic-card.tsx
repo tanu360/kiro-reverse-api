@@ -1,55 +1,43 @@
-import { Pulse01Icon } from "@hugeicons/core-free-icons";
+import { ChartLineData02Icon, Pulse01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type JSX, lazy, Suspense, useMemo } from "react";
+import { ChartLegendHoverProvider } from "@/components/charts/chart-legend-hover";
+import { Legend, type LegendItemData } from "@/components/charts/legend";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
+import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { heatmapQuery } from "@/lib/api/observe";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import type { OverviewRange } from "@/routes/-search";
-import { bucketGlobal, RANGE_WINDOWS } from "./aggregate";
-import { FAILED_COLOR, SUCCEEDED_COLOR } from "./colors";
+import {
+  bucketGlobal,
+  HOUR,
+  HOUR_PAIR_WINDOW,
+  RANGE_WINDOWS,
+  withPreviousWindow,
+} from "./aggregate";
+import { FAILED_COLOR, PREVIOUS_COLOR, SUCCEEDED_COLOR } from "./colors";
+import { useTotalsFailed } from "./status-cards";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 const TrafficChart = lazy(() => import("./traffic-chart"));
 
 const RANGES: readonly OverviewRange[] = ["1h", "6h", "24h"];
-// Sized by the card's width (SectionCard is a container), not the viewport.
-const PLOT_HEIGHT = "h-72 @2xl:h-80";
+/** The plot's height, sized by the card's width (SectionCard is a container), not the viewport. */
+export const PLOT_HEIGHT = "h-64 @2xl:h-72";
 
 function isRange(value: unknown): value is OverviewRange {
   return typeof value === "string" && (RANGES as readonly string[]).includes(value);
 }
 
-function LegendChip({
-  color,
-  label,
-  value,
-}: {
-  color: string;
-  label: string;
-  value: string;
-}): JSX.Element {
-  return (
-    <li className="inline-flex items-center gap-1.5">
-      <span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: color }} />
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
-    </li>
-  );
-}
-
-/** Port of Studio's performance overview: succeeded and failed requests over 1, 6 or 24 h. */
+/**
+ * Port of Studio's performance overview: succeeded and failed requests over 1, 6 or 24 h, with
+ * the previous hour dashed under the 1 h view. The legend and the range sit in the header.
+ */
 export function TrafficCard(): JSX.Element {
   const { t, lang } = useT("overview");
   // An unknown `?range=` must not crash the page, even if it slips past the route validator.
@@ -57,26 +45,35 @@ export function TrafficCard(): JSX.Element {
   const range: OverviewRange = isRange(rawRange) ? rawRange : "1h";
   const navigate = useNavigate({ from: "/" });
   const reducedMotion = usePrefersReducedMotion();
+  const totalsFailed = useTotalsFailed();
   const { windowMin, bucketMin } = RANGE_WINDOWS[range];
-  // Only the 1 h view follows SSE ticks; the longer ranges poll every 60 s.
-  const query = useQuery(heatmapQuery(windowMin, { live: range === "1h" }));
+  const hourView = range === "1h";
+  // The 1 h view reads the two-hour heatmap the status cards and the account heatmap already
+  // share (no extra request), and takes its older hour as the dashed comparison. It follows SSE
+  // ticks; the longer ranges poll every 60 s.
+  const query = useQuery(heatmapQuery(hourView ? HOUR_PAIR_WINDOW : windowMin, { live: hourView }));
   const data = query.data;
 
-  const points = useMemo(
-    () => (data ? bucketGlobal(data.global.cells, data.nowUnix, bucketMin) : []),
-    [data, bucketMin],
-  );
+  const points = useMemo(() => {
+    if (!data) return [];
+    return hourView
+      ? withPreviousWindow(data.global.cells, data.nowUnix, bucketMin, HOUR)
+      : bucketGlobal(data.global.cells, data.nowUnix, bucketMin, windowMin);
+  }, [data, hourView, bucketMin, windowMin]);
   const totals = useMemo(
     () =>
       points.reduce(
-        (sum, p) => ({ succeeded: sum.succeeded + p.succeeded, failed: sum.failed + p.failed }),
-        { succeeded: 0, failed: 0 },
+        (sum, p) => ({
+          succeeded: sum.succeeded + p.succeeded,
+          failed: sum.failed + p.failed,
+          previous: sum.previous + (p.previous ?? 0),
+        }),
+        { succeeded: 0, failed: 0, previous: 0 },
       ),
     [points],
   );
   const empty = totals.succeeded + totals.failed === 0;
 
-  const items = RANGES.map((value) => ({ value, label: t(`traffic.range.${value}`) }));
   const setRange = (value: unknown) => {
     if (!isRange(value)) return;
     void navigate({
@@ -84,34 +81,59 @@ export function TrafficCard(): JSX.Element {
     });
   };
 
-  const labels = { succeeded: t("traffic.succeeded"), failed: t("traffic.failed") };
-  const skeleton = <Skeleton aria-hidden="true" className={`${PLOT_HEIGHT} w-full rounded-lg`} />;
+  const labels = {
+    succeeded: t("traffic.succeeded"),
+    failed: t("traffic.failed"),
+    previous: t("traffic.previous"),
+    bucket: t("traffic.bucket", { n: formatNumber(bucketMin, lang) }),
+  };
+  // Series order, so hovering an item dims the others in the chart.
+  const legend: LegendItemData[] = [
+    { label: labels.succeeded, color: SUCCEEDED_COLOR, marker: "line", value: totals.succeeded },
+    { label: labels.failed, color: FAILED_COLOR, marker: "line", value: totals.failed },
+  ];
+  if (hourView && data) {
+    legend.push({
+      label: labels.previous,
+      color: PREVIOUS_COLOR,
+      marker: "dashed",
+      value: totals.previous,
+    });
+  }
+  const loadingChart = (
+    <TrafficChart
+      bucketMin={bucketMin}
+      labels={labels}
+      lang={lang}
+      points={[]}
+      reducedMotion={reducedMotion}
+      status="loading"
+    />
+  );
+  // Until the chart code arrives, an empty box of the plot's height holds the layout.
+  const placeholder = <div aria-hidden="true" className={PLOT_HEIGHT} />;
 
   let body: JSX.Element;
   if (!data) {
-    body = query.isError ? (
-      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
-    ) : (
-      skeleton
-    );
+    if (query.isError) {
+      body = totalsFailed ? (
+        <ErrorState notLoaded />
+      ) : (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      );
+    } else {
+      body = (
+        <div aria-hidden="true">
+          <Suspense fallback={placeholder}>{loadingChart}</Suspense>
+        </div>
+      );
+    }
   } else {
     body = (
       <div className="flex flex-col gap-3">
-        {query.isError ? (
+        {query.isError && !totalsFailed ? (
           <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
         ) : null}
-        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs @md:justify-end">
-          <LegendChip
-            color={SUCCEEDED_COLOR}
-            label={labels.succeeded}
-            value={formatNumber(totals.succeeded, lang)}
-          />
-          <LegendChip
-            color={FAILED_COLOR}
-            label={labels.failed}
-            value={formatNumber(totals.failed, lang)}
-          />
-        </ul>
         <p className="sr-only">
           {t("traffic.summary", {
             succeeded: formatNumber(totals.succeeded, lang),
@@ -120,8 +142,10 @@ export function TrafficCard(): JSX.Element {
         </p>
         <div className="relative">
           <div aria-hidden="true">
-            <Suspense fallback={skeleton}>
+            <Suspense fallback={placeholder}>
               <TrafficChart
+                bucketMin={bucketMin}
+                empty={empty}
                 labels={labels}
                 lang={lang}
                 points={points}
@@ -131,9 +155,8 @@ export function TrafficCard(): JSX.Element {
           </div>
           {empty ? (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              {/* Backdrop so the message does not sit on the gridlines: the panel's own fill (the
-                  card at 40 % over the page) at 80 %. */}
-              <div className="rounded-xl bg-surface-inset/80 backdrop-blur-[1px]">
+              {/* The card's own fill under the message, so it does not sit on the gridlines. */}
+              <div className="rounded-xl bg-card/90">
                 <EmptyState
                   description={t("traffic.noTrafficBody")}
                   icon={Pulse01Icon}
@@ -149,26 +172,38 @@ export function TrafficCard(): JSX.Element {
   }
 
   return (
-    <SectionCard
-      actions={
-        <Select items={items} onValueChange={setRange} value={range}>
-          <SelectTrigger aria-label={t("traffic.range")} className="w-auto min-w-28" size="sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectPopup>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
-      }
-      description={t(`traffic.description.${range}`)}
-      id="overview-traffic"
-      title={t("traffic.title")}
-    >
-      {body}
-    </SectionCard>
+    <ChartLegendHoverProvider>
+      <SectionCard
+        actions={
+          <>
+            {data ? <Legend aria-label={t("traffic.legend")} items={legend} /> : null}
+            {/* A radio group: one tab stop, the arrow keys move the range. */}
+            <SegmentedControl
+              render={
+                <RadioGroupPrimitive
+                  aria-label={t("traffic.range")}
+                  onValueChange={setRange}
+                  value={range}
+                />
+              }
+              size="sm"
+            >
+              {RANGES.map((value) => (
+                <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
+                  {t(`traffic.range.${value}`)}
+                </SegmentedControlItem>
+              ))}
+            </SegmentedControl>
+          </>
+        }
+        description={t(`traffic.description.${range}`)}
+        descriptionVariant="inline"
+        icon={ChartLineData02Icon}
+        id="overview-traffic"
+        title={t("traffic.title")}
+      >
+        {body}
+      </SectionCard>
+    </ChartLegendHoverProvider>
   );
 }

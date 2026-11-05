@@ -1,29 +1,18 @@
-import { InfoIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { Card } from "@/components/ui/card";
-import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
+import { StatGroup, StatTile, StatTileSkeleton } from "@/components/shared/stat-card";
 import { observeOverviewQuery } from "@/lib/api/observe";
 import type { ObserveOverview } from "@/lib/api/types";
 import { EMPTY, formatCredits, formatFraction, formatNumber } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 
-// Columns follow the page's content width (@container/main), not the viewport, so labels such
-// as "Output tokens/min" fit: three tiles per row from 36rem, six from 64rem.
-const GRID_CLASS = "grid grid-cols-2 gap-4 @xl/main:grid-cols-3 @5xl/main:grid-cols-6";
-// The Card is t3code's SettingsGroup surface (border at 60 %, card at 40 %), with no shadow.
-const TILE_CLASS = "min-w-0 gap-1.5 p-4";
-
 interface Tile {
   id: string;
   label: string;
-  value: string;
   hint?: string;
 }
 
-function labels(t: TFunction): Omit<Tile, "value">[] {
+function tiles(t: TFunction): Tile[] {
   return [
     { id: "rpm", label: t("live.rpm") },
     { id: "errRate", label: t("live.errRate") },
@@ -46,45 +35,9 @@ function values(o: ObserveOverview, lang: Lang): Record<string, string> {
 }
 
 /**
- * A label with an explanation. A popover rather than a tooltip, so a tap opens it on touch
- * screens; hover still opens it with a mouse. The trigger's hit area grows to 44 px on coarse
- * pointers without changing the layout.
+ * Six live tiles from /observe/overview, refreshed by SSE observe ticks: separate StatTile cards
+ * with the KPI strip's anatomy (label row, 24 px value, the reserved trend row).
  */
-function HintLabel({ label, hint }: { label: string; hint: string }): JSX.Element {
-  return (
-    <Popover>
-      <PopoverTrigger
-        className="relative inline-flex max-w-full items-center gap-1 rounded-sm text-left text-muted-foreground text-sm outline-none after:absolute after:top-1/2 after:left-1/2 after:size-full after:-translate-x-1/2 after:-translate-y-1/2 hover:text-foreground focus-outline pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11"
-        data-slot="hint-trigger"
-        delay={200}
-        openOnHover
-      >
-        <span className="line-clamp-2 text-pretty leading-snug">{label}</span>
-        <HugeiconsIcon icon={InfoIcon} aria-hidden="true" className="size-3 shrink-0 opacity-70" />
-      </PopoverTrigger>
-      <PopoverPopup className="max-w-72" side="top" tooltipStyle>
-        {hint}
-      </PopoverPopup>
-    </Popover>
-  );
-}
-
-function TileLabel({ tile }: { tile: Omit<Tile, "value"> }): JSX.Element {
-  if (!tile.hint) {
-    return (
-      <dt className="line-clamp-2 text-pretty text-muted-foreground text-sm leading-snug">
-        {tile.label}
-      </dt>
-    );
-  }
-  return (
-    <dt className="min-w-0">
-      <HintLabel hint={tile.hint} label={tile.label} />
-    </dt>
-  );
-}
-
-/** Six live tiles from /observe/overview, refreshed by SSE observe ticks. */
 export function LiveTiles(): JSX.Element {
   const { t, lang } = useT("overview");
   const query = useQuery(observeOverviewQuery());
@@ -92,14 +45,13 @@ export function LiveTiles(): JSX.Element {
 
   if (!data && !query.isError) {
     return (
-      <section aria-busy="true" aria-label={t("live.label")} className={GRID_CLASS}>
-        {Array.from({ length: 6 }, (_, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders never reorder.
-          <Card aria-hidden="true" className={TILE_CLASS} key={index}>
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-7 w-1/2" />
-          </Card>
-        ))}
+      <section aria-busy="true" aria-label={t("live.label")}>
+        <StatGroup aria-hidden="true" columns="live">
+          {Array.from({ length: 6 }, (_, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders never reorder.
+            <StatTileSkeleton key={index} metrics={0} size="kpi" />
+          ))}
+        </StatGroup>
       </section>
     );
   }
@@ -108,16 +60,18 @@ export function LiveTiles(): JSX.Element {
   const shown = data ? values(data, lang) : {};
   return (
     <section aria-label={t("live.label")} data-state={data ? undefined : "error"}>
-      <dl className={GRID_CLASS}>
-        {labels(t).map((tile) => (
-          <Card className={TILE_CLASS} data-slot="live-tile" data-tile={tile.id} key={tile.id}>
-            <TileLabel tile={tile} />
-            <dd className="mt-auto truncate font-medium text-2xl leading-tight">
-              {shown[tile.id] ?? EMPTY}
-            </dd>
-          </Card>
+      <StatGroup columns="live">
+        {tiles(t).map((tile) => (
+          // The delta row stays reserved (28 px) for the per-tile trends the server will send.
+          <StatTile
+            hint={tile.hint}
+            key={tile.id}
+            label={tile.label}
+            size="kpi"
+            value={shown[tile.id] ?? EMPTY}
+          />
         ))}
-      </dl>
+      </StatGroup>
     </section>
   );
 }

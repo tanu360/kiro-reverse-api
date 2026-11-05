@@ -25,12 +25,20 @@ beforeEach(() => {
   );
 });
 
+/** A tile of the joined KPI strip (the four /status totals). */
 async function statCard(label: string): Promise<HTMLElement> {
   const region = await screen.findByRole("region", { name: "Totals" });
   const title = await within(region).findByText(label, { selector: "p" });
-  const card = title.closest<HTMLElement>('[data-slot="stat-card"]');
-  if (!card) throw new Error(`no stat card for ${label}`);
+  const card = title.closest<HTMLElement>('[data-slot="stat-tile"]');
+  if (!card) throw new Error(`no stat tile for ${label}`);
   return card;
+}
+
+/** The six live tiles: separate StatTile cards in the "Live traffic" region. */
+function liveTiles(container: HTMLElement): NodeListOf<HTMLElement> {
+  return container.querySelectorAll<HTMLElement>(
+    'section[aria-label="Live traffic"] [data-slot="stat-tile"]',
+  );
 }
 
 function metricValue(card: HTMLElement, label: string): string {
@@ -57,6 +65,41 @@ describe("OverviewPage", () => {
 
     expect(await statCard("Requests")).toBeInTheDocument();
     expect(await statCard("Succeeded")).toBeInTheDocument();
+  });
+
+  it("keeps the six sections in order, the totals as one joined strip", async () => {
+    const { container } = await renderApp("/");
+    await statCard("Accounts");
+    const order = [
+      "Totals",
+      "Live traffic",
+      "Traffic",
+      "Traffic by account",
+      "Model mix",
+      "Recent activity",
+    ];
+    const names = screen.getAllByRole("region").map((region) => {
+      const labelledBy = region.getAttribute("aria-labelledby");
+      return labelledBy
+        ? document.getElementById(labelledBy)?.textContent
+        : region.getAttribute("aria-label");
+    });
+    expect(names.filter((name) => name && order.includes(name))).toEqual(order);
+    const totals = screen.getByRole("region", { name: "Totals" });
+    expect(totals.querySelectorAll('[data-slot="stat-group-card"]')).toHaveLength(1);
+    await waitFor(() => expect(liveTiles(container)).toHaveLength(6));
+    // The live tiles are separate cards, not a second joined strip.
+    const live = screen.getByRole("region", { name: "Live traffic" });
+    expect(live.querySelector('[data-slot="stat-group-card"]')).toBeNull();
+  });
+
+  it("colours the Failed icon, never its value", async () => {
+    await renderApp("/");
+    const failed = await statCard("Failed");
+    expect(failed).toHaveAttribute("data-tone", "danger");
+    const value = failed.querySelector('[data-slot="stat-value"]');
+    expect(value).toHaveClass("text-foreground");
+    expect(value).not.toHaveClass("text-destructive-foreground");
   });
 
   it("shows no success or failure rate, and no error red, before any request", async () => {
@@ -88,12 +131,12 @@ describe("OverviewPage", () => {
   it("shows six live tiles and the 5-minute error rate as a percentage", async () => {
     const { container } = await renderApp("/");
     await waitFor(() => {
-      expect(container.querySelectorAll('[data-slot="live-tile"]')).toHaveLength(6);
+      expect(liveTiles(container)).toHaveLength(6);
     });
-    const errRate = container.querySelector<HTMLElement>('[data-tile="errRate"]');
+    const live = screen.getByRole("region", { name: "Live traffic" });
+    const errRate = within(live).getByText("Errors (5 min)").closest('[data-slot="stat-tile"]');
     expect(errRate).not.toBeNull();
-    expect(within(errRate as HTMLElement).getByText("Errors (5 min)")).toBeInTheDocument();
-    expect(errRate?.querySelector("dd")?.textContent).toMatch(/^\d+\.\d%$/);
+    expect(errRate?.querySelector('[data-slot="stat-value"]')?.textContent).toMatch(/^\d+\.\d%$/);
   });
 
   it("lists at most 10 recent errors", async () => {
@@ -141,8 +184,8 @@ describe("OverviewPage", () => {
 
   it("writes the traffic range to the router search", async () => {
     const { user, router } = await renderApp("/");
-    await user.click(await screen.findByRole("combobox", { name: "Time range" }));
-    await user.click(await screen.findByRole("option", { name: "6 h" }));
+    const ranges = await screen.findByRole("radiogroup", { name: "Time range" });
+    await user.click(within(ranges).getByRole("radio", { name: "6 h" }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ range: "6h" });
     });
@@ -193,7 +236,7 @@ describe("OverviewPage", () => {
     const { container } = await renderApp("/");
     await screen.findByText("Could not load the totals and live traffic");
     await waitFor(() => {
-      expect(container.querySelectorAll('[data-slot="live-tile"]')).toHaveLength(6);
+      expect(liveTiles(container)).toHaveLength(6);
     });
     const tiles = screen.getByRole("region", { name: "Live traffic" });
     expect(within(tiles).getByText("Requests/min")).toBeInTheDocument();
@@ -207,11 +250,27 @@ describe("OverviewPage", () => {
     expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
   });
 
+  it("quiets the section errors to Not loaded under the totals banner, with one Retry", async () => {
+    mockServer.use(
+      http.get(apiUrl("/status"), () => jsonError(500, "status exploded")),
+      http.get(apiUrl("/observe/model-mix"), () => jsonError(500, "model mix exploded")),
+    );
+    await renderApp("/");
+    await screen.findByText("Could not load the totals and live traffic");
+    const modelMix = screen.getByRole("region", { name: "Model mix" });
+    expect(await within(modelMix).findByText("Not loaded")).toBeInTheDocument();
+    expect(within(modelMix).queryByRole("alert")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
+  });
+
   it("falls back to the 1 h range for an unknown ?range= instead of crashing", async () => {
     await renderApp("/?range=7d");
     const traffic = await screen.findByRole("region", { name: "Traffic" });
     expect(within(traffic).getByText("Requests per 2 min, last hour")).toBeInTheDocument();
-    expect(within(traffic).getByRole("combobox", { name: "Time range" })).toHaveTextContent("1 h");
+    expect(within(traffic).getByRole("radio", { name: "1 h" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     expect(await statCard("Accounts")).toBeInTheDocument();
   });
 
@@ -235,9 +294,14 @@ describe("OverviewPage", () => {
     const quiet = heatmap.querySelectorAll<HTMLElement>("[data-empty]");
     expect(quiet.length).toBeGreaterThan(0);
     for (const cell of quiet) {
-      expect(cell).toHaveClass("bg-muted");
+      expect(cell).toHaveClass("bg-chart-scale-01");
       expect(cell.style.backgroundColor).toBe("");
     }
+    // A row total sits beside each row; the old "N more accounts" footer is gone.
+    expect(within(heatmap).getByRole("link", { name: "View all accounts" })).toHaveAttribute(
+      "href",
+      "/admin/accounts",
+    );
   });
 
   it("shows an empty state in the heatmap without traffic", async () => {
@@ -254,7 +318,9 @@ describe("OverviewPage", () => {
     );
     await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    expect(await within(heatmap).findByText("No traffic yet")).toBeInTheDocument();
+    expect(
+      await within(heatmap).findByText("No account activity in the last hour"),
+    ).toBeInTheDocument();
     expect(within(heatmap).queryByText("All accounts")).toBeNull();
   });
 

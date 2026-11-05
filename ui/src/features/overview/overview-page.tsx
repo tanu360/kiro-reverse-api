@@ -13,7 +13,6 @@ import { statusQuery } from "@/lib/api/system";
 import { useAdminEventsStatus } from "@/lib/events/admin-events";
 import { useT } from "@/lib/i18n";
 import { toastError } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 import { LiveTiles } from "./live-tiles";
 import { ModelMixCard } from "./model-mix-card";
 import { RecentActivity } from "./recent-activity";
@@ -32,15 +31,9 @@ function LiveBadge(): JSX.Element {
       : status === "connecting"
         ? t("status.reconnecting")
         : t("status.offline");
+  // A dot in the disc colour; while live, a ring pings out of it.
   return (
-    <Badge aria-live="polite" className="ps-1.5" data-status={status} tone={tone}>
-      {/* A dot in the disc colour; while live, a ring pings out of it. */}
-      <span aria-hidden="true" className="relative flex size-2">
-        {status === "open" ? (
-          <span className="absolute inset-0 rounded-full bg-(--badge-dot) opacity-60 motion-safe:animate-ping" />
-        ) : null}
-        <span className="relative size-2 rounded-full bg-(--badge-dot)" />
-      </span>
+    <Badge aria-live="polite" data-status={status} dot live={status === "open"} tone={tone}>
       {label}
     </Badge>
   );
@@ -48,18 +41,30 @@ function LiveBadge(): JSX.Element {
 
 /**
  * One banner with one Retry when /status or /observe/overview fails, instead of an error
- * block in each card group. The cards keep their titles (and last values, if any).
+ * block in each card group. The cards keep their titles (and last values, if any), and the
+ * section cards that failed too show a quiet "Not loaded": this Retry reloads every one of them.
  */
 function TotalsErrorBanner(): JSX.Element | null {
   const { t } = useT("overview");
   const { t: tc } = useT();
+  const queryClient = useQueryClient();
+  const [retrying, setRetrying] = useState(false);
   // Same query keys as the cards, so these observers add no requests.
   const status = useQuery(statusQuery());
   const live = useQuery(observeOverviewQuery());
-  const failed = [status, live].filter((query) => query.isError);
-  const first = failed[0];
+  const first = [status, live].find((query) => query.isError);
   if (!first) return null;
-  const retrying = failed.some((query) => query.isFetching);
+  const retry = async () => {
+    setRetrying(true);
+    try {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: queryKeys.status }),
+        queryClient.refetchQueries({ queryKey: queryKeys.observe.all }),
+      ]);
+    } finally {
+      setRetrying(false);
+    }
+  };
   return (
     <Alert data-slot="totals-error" variant="error">
       <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
@@ -67,18 +72,12 @@ function TotalsErrorBanner(): JSX.Element | null {
       <AlertDescription>{errorMessage(first.error, tc)}</AlertDescription>
       <AlertAction>
         <Button
-          disabled={retrying}
-          onClick={() => {
-            for (const query of failed) void query.refetch();
-          }}
+          loading={retrying || status.isFetching || live.isFetching}
+          onClick={() => void retry()}
           size="sm"
           variant="outline"
         >
-          <HugeiconsIcon
-            icon={Refresh01Icon}
-            aria-hidden="true"
-            className={cn(retrying && "motion-safe:animate-spin")}
-          />
+          <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
           {tc("actions.retry")}
         </Button>
       </AlertAction>
@@ -108,7 +107,9 @@ export function OverviewPage(): JSX.Element {
   };
 
   return (
-    <div className="@container/main flex flex-col gap-4 md:gap-6">
+    // One 16 px rhythm at every width, as the dashboard reference: the strips and cards read as
+    // one board rather than separate blocks.
+    <div className="@container/main flex flex-col gap-4">
       <PageHeader
         actions={<RefreshButton fetching={refreshing} onRefresh={() => void refresh()} />}
         description={t("description")}

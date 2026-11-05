@@ -1,28 +1,38 @@
-import { BoxesIcon } from "@hugeicons/core-free-icons";
+import { AiBrain01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, lazy, Suspense, useMemo } from "react";
+import { type JSX, lazy, type PointerEvent, Suspense, useMemo, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { ListCard } from "@/components/shared/list-card";
 import { TableSkeleton } from "@/components/shared/loading-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { TokenCell } from "@/components/shared/token-cell";
-import { Card } from "@/components/ui/card";
+import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { modelMixQuery } from "@/lib/api/observe";
 import type { ModelMixEntry } from "@/lib/api/types";
 import { formatCredits, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { modelSlices } from "./aggregate";
 import { MODEL_COLORS, OTHER_MODEL_COLOR } from "./colors";
 import type { RingSlice } from "./model-mix-ring";
-import { ResponsiveList } from "./responsive-list";
+import { useTotalsFailed } from "./status-cards";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 const ModelMixRing = lazy(() => import("./model-mix-ring"));
 
+/** Five models on the ring (plus "Other") and five rows in the table: the same five. */
 const RING_MODELS = MODEL_COLORS.length;
-const TABLE_ROWS = 5;
+const TABLE_ROWS = RING_MODELS;
+
+interface MixRow {
+  entry: ModelMixEntry;
+  color: string;
+  /** This model's part of the total (credits, or requests before any credits), 0..1. */
+  share: number;
+}
 
 function ColorDot({ color }: { color: string }): JSX.Element {
   return (
@@ -34,183 +44,230 @@ function ColorDot({ color }: { color: string }): JSX.Element {
   );
 }
 
-/** Ring of the top models by credits plus a table, cumulative since start or the last reset. */
+/** The model's share as a thin bar in its ring colour: the ranked-list look. Decorative. */
+function ShareBar({ row }: { row: MixRow }): JSX.Element {
+  return (
+    <Meter aria-hidden="true" className="max-w-40" max={1} min={0} value={row.share}>
+      <MeterTrack>
+        <MeterIndicator style={{ backgroundColor: row.color }} />
+      </MeterTrack>
+    </Meter>
+  );
+}
+
+function ModelName({ row }: { row: MixRow }): JSX.Element {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <ColorDot color={row.color} />
+      <span className="min-w-0 truncate">{row.entry.model}</span>
+    </span>
+  );
+}
+
+/** The index of the table row or card under the pointer (its position in the list), or null. */
+function hoveredRow(event: PointerEvent<HTMLElement>): number | null {
+  const target = event.target as HTMLElement;
+  const tr = target.closest<HTMLTableRowElement>("tbody tr");
+  if (tr) return tr.sectionRowIndex;
+  const item = target.closest("li");
+  if (item?.parentElement) return Array.prototype.indexOf.call(item.parentElement.children, item);
+  return null;
+}
+
+/**
+ * Ring of the top models by credits beside a ranked table, cumulative since start or the last
+ * reset. Hovering a table row lights its ring, and hovering a ring dims the other rows.
+ */
 export function ModelMixCard(): JSX.Element {
   const { t, lang } = useT("overview");
   const query = useQuery(modelMixQuery());
   const reducedMotion = usePrefersReducedMotion();
+  const totalsFailed = useTotalsFailed();
+  const [hovered, setHovered] = useState<number | null>(null);
   const models = query.data;
   const otherLabel = t("modelMix.other");
 
   const mix = useMemo(() => {
     if (!models) return null;
-    const { slices, metric } = modelSlices(models, RING_MODELS, otherLabel);
+    const { slices, metric, total } = modelSlices(models, RING_MODELS, otherLabel);
     const ring: RingSlice[] = slices.map((slice, index) => ({
       ...slice,
       color: index < RING_MODELS ? MODEL_COLORS[index] : OTHER_MODEL_COLOR,
     }));
     const metricOf = (m: ModelMixEntry) => (metric === "credits" ? m.credits : m.reqs);
     const sorted = [...models].sort((a, b) => metricOf(b) - metricOf(a));
-    const colorOf = new Map(
-      sorted.map((m, index) => [
-        m.model,
-        index < RING_MODELS ? MODEL_COLORS[index] : OTHER_MODEL_COLOR,
-      ]),
-    );
-    return {
-      ring,
-      metric,
-      rows: sorted.slice(0, TABLE_ROWS),
-      rest: Math.max(0, sorted.length - TABLE_ROWS),
-      colorOf,
-    };
+    const rows: MixRow[] = sorted.slice(0, TABLE_ROWS).map((entry, index) => ({
+      entry,
+      color: MODEL_COLORS[index] ?? OTHER_MODEL_COLOR,
+      share: total > 0 ? metricOf(entry) / total : 0,
+    }));
+    return { ring, metric, rows, rest: Math.max(0, sorted.length - TABLE_ROWS) };
   }, [models, otherLabel]);
 
-  const columns = useMemo<DataTableColumn<ModelMixEntry>[]>(
+  const columns = useMemo<DataTableColumn<MixRow>[]>(
     () => [
       {
         id: "model",
         header: t("modelMix.model"),
-        cell: (row) => (
-          <span className="flex min-w-0 items-center gap-2">
-            <ColorDot color={mix?.colorOf.get(row.model) ?? OTHER_MODEL_COLOR} />
-            <span className="truncate text-xs">{row.model}</span>
+        cell: (row, index) => (
+          <span
+            className={cn(
+              "flex min-w-0 flex-col gap-1.5 transition-opacity motion-reduce:transition-none",
+              hovered !== null && hovered !== index && "opacity-50",
+            )}
+          >
+            <ModelName row={row} />
+            <ShareBar row={row} />
           </span>
         ),
-        className: "max-w-48",
+        className: "w-2/5 max-w-64",
       },
       {
         id: "reqs",
         header: t("modelMix.requests"),
         align: "end",
-        cell: (row) => <span>{formatNumber(row.reqs, lang)}</span>,
+        cell: (row) => (
+          <span className="text-muted-foreground">{formatNumber(row.entry.reqs, lang)}</span>
+        ),
       },
       {
         id: "tokens",
         header: t("modelMix.tokens"),
         cell: (row) => (
           <TokenCell
-            cacheReadTokens={row.cacheReadTokens}
-            cacheWriteTokens={row.cacheWriteTokens}
-            inTokens={row.inTokens}
-            outTokens={row.outTokens}
+            cacheReadTokens={row.entry.cacheReadTokens}
+            cacheWriteTokens={row.entry.cacheWriteTokens}
+            detailClassName="min-w-48"
+            inTokens={row.entry.inTokens}
+            outTokens={row.entry.outTokens}
           />
         ),
-        // The in/out/cache breakdown wraps instead of pushing Credits out of the card.
-        className: "min-w-36 whitespace-normal",
       },
       {
         id: "credits",
         header: t("modelMix.credits"),
         align: "end",
-        cell: (row) => <span>{formatCredits(row.credits)}</span>,
+        cell: (row) => <span className="font-medium">{formatCredits(row.entry.credits)}</span>,
       },
     ],
-    [t, lang, mix],
+    [t, lang, hovered],
+  );
+
+  const renderCard = (row: MixRow) => (
+    <ListCard title={<ModelName row={row} />} variant="row">
+      <ShareBar row={row} />
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-meta">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <dt className="text-muted-foreground">{t("modelMix.requests")}</dt>
+          <dd className="tabular-nums">{formatNumber(row.entry.reqs, lang)}</dd>
+        </div>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <dt className="text-muted-foreground">{t("modelMix.credits")}</dt>
+          <dd className="tabular-nums">{formatCredits(row.entry.credits)}</dd>
+        </div>
+        <div className="col-span-2 flex min-w-0 flex-col gap-0.5">
+          <dt className="text-muted-foreground">{t("modelMix.tokens")}</dt>
+          <dd className="min-w-0">
+            <TokenCell
+              cacheReadTokens={row.entry.cacheReadTokens}
+              cacheWriteTokens={row.entry.cacheWriteTokens}
+              inTokens={row.entry.inTokens}
+              outTokens={row.entry.outTokens}
+            />
+          </dd>
+        </div>
+      </dl>
+    </ListCard>
   );
 
   let body: JSX.Element;
+  let slim = false;
   if (!models || !mix) {
-    body = query.isError ? (
-      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
-    ) : (
-      <div aria-hidden="true" className="flex flex-col items-center gap-4 @3xl:flex-row">
-        <Skeleton className="size-48 shrink-0 rounded-full" />
-        <TableSkeleton columns={4} rows={4} />
-      </div>
-    );
+    if (query.isError) {
+      body = totalsFailed ? (
+        <ErrorState notLoaded />
+      ) : (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      );
+    } else {
+      body = (
+        <div aria-hidden="true" className="flex flex-col items-center gap-4 @4xl:flex-row">
+          <Skeleton className="aspect-square w-full max-w-56 shrink-0 rounded-full" />
+          <TableSkeleton columns={4} rows={TABLE_ROWS} />
+        </div>
+      );
+    }
   } else if (models.length === 0) {
     body = (
       <EmptyState
         description={t("traffic.noTrafficBody")}
-        icon={BoxesIcon}
-        title={t("traffic.noTraffic")}
+        icon={AiBrain01Icon}
+        title={t("modelMix.empty")}
         variant="compact"
       />
     );
   } else {
+    // The table runs edge to edge (slim card, inset cells); the ring keeps the panel padding.
+    slim = true;
     const credits = mix.metric === "credits";
     body = (
-      <div className="flex flex-col gap-4">
-        {query.isError ? (
+      <>
+        {query.isError && !totalsFailed ? (
           <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
         ) : null}
-        {/* Ring beside the table only when the card fits both (48rem); otherwise stacked. */}
-        <div className="flex flex-col items-center gap-4 @3xl:flex-row @3xl:items-start">
+        {/* Ring beside the table only when the card fits both (56rem); otherwise stacked. */}
+        <div className="flex min-w-0 flex-col @4xl:flex-row @4xl:items-center">
           <figure
             aria-label={t(credits ? "modelMix.chartLabel" : "modelMix.chartLabelRequests")}
-            className="w-full max-w-56 shrink-0"
+            className="w-full max-w-64 shrink-0 self-center px-4 py-4 sm:px-5"
           >
-            <Suspense fallback={<Skeleton className="mx-auto aspect-square w-full rounded-full" />}>
+            <Suspense
+              fallback={<Skeleton className="mx-auto aspect-square w-full max-w-56 rounded-full" />}
+            >
               <ModelMixRing
                 centerLabel={t(credits ? "modelMix.centerCredits" : "modelMix.centerRequests")}
                 fractionDigits={credits ? 2 : 0}
+                hoveredIndex={hovered}
+                onHoverChange={setHovered}
                 reducedMotion={reducedMotion}
+                shareLabel={t("modelMix.share")}
                 slices={mix.ring}
               />
             </Suspense>
           </figure>
-          <div className="flex w-full min-w-0 flex-col gap-2">
-            <ResponsiveList
-              at="lg"
+          {/* Hover only mirrors the ring; the rows carry the data. */}
+          <div
+            className="min-w-0 flex-1"
+            onPointerLeave={() => setHovered(null)}
+            onPointerOver={(event) => setHovered(hoveredRow(event))}
+          >
+            <DataTable
               caption={t("modelMix.title")}
-              getRowId={(row) => row.model}
-              renderCard={(row) => (
-                <Card className="min-w-0 gap-2 p-3 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <ColorDot color={mix.colorOf.get(row.model) ?? OTHER_MODEL_COLOR} />
-                      <span className="truncate text-xs">{row.model}</span>
-                    </span>
-                    <span className="flex shrink-0 items-baseline gap-1.5">
-                      <span className="text-muted-foreground text-xs">{t("modelMix.credits")}</span>
-                      <span className="font-medium">{formatCredits(row.credits)}</span>
-                    </span>
-                  </div>
-                  <dl className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex flex-col gap-0.5">
-                      <dt className="text-muted-foreground">{t("modelMix.requests")}</dt>
-                      <dd>{formatNumber(row.reqs, lang)}</dd>
-                    </div>
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <dt className="text-muted-foreground">{t("modelMix.tokens")}</dt>
-                      <dd className="min-w-0">
-                        <TokenCell
-                          cacheReadTokens={row.cacheReadTokens}
-                          cacheWriteTokens={row.cacheWriteTokens}
-                          inTokens={row.inTokens}
-                          outTokens={row.outTokens}
-                        />
-                      </dd>
-                    </div>
-                  </dl>
-                </Card>
-              )}
-              rows={mix.rows}
-              table={
-                <DataTable
-                  caption={t("modelMix.title")}
-                  columns={columns}
-                  data={mix.rows}
-                  getRowId={(row) => row.model}
-                />
-              }
+              cardLayout="divided"
+              cardsBelow="lg"
+              columns={columns}
+              data={mix.rows}
+              density="comfortable"
+              getRowId={(row) => row.entry.model}
+              inset
+              renderCard={renderCard}
             />
-            {mix.rest > 0 ? (
-              <p className="px-2 text-muted-foreground text-xs">
-                {t("modelMix.moreModels", { count: mix.rest })}
-              </p>
-            ) : null}
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
     <SectionCard
       description={t("modelMix.description")}
+      descriptionVariant="inline"
+      footer={
+        mix && mix.rest > 0 ? <p>{t("modelMix.moreModels", { count: mix.rest })}</p> : undefined
+      }
+      icon={AiBrain01Icon}
       id="overview-model-mix"
+      slim={slim}
       title={t("modelMix.title")}
     >
       {body}

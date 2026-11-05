@@ -21,6 +21,8 @@ export interface TrafficPoint {
   date: Date;
   succeeded: number;
   failed: number;
+  /** Succeeded requests in the same bucket of the previous window (the dashed comparison). */
+  previous?: number;
 }
 
 export type CellValue = (cell: HeatmapCell) => number;
@@ -29,15 +31,18 @@ const requests: CellValue = (cell) => cell.reqs;
 
 /**
  * Sums newest-first per-minute cells into oldest-first buckets of `bucketMin` minutes. A
- * bucket's date is the start of its oldest minute: `nowUnix - offset * 60`.
+ * bucket's date is the start of its oldest minute: `nowUnix - offset * 60`. `windowMin` sets
+ * the number of buckets (default: one per cell), so a window with no cells still has its time
+ * axis, and cells past it are left out.
  */
 export function bucketGlobal(
   cells: readonly HeatmapCell[],
   nowUnix: number,
   bucketMin: number,
+  windowMin: number = cells.length,
 ): TrafficPoint[] {
   const size = Math.max(1, Math.floor(bucketMin));
-  const count = Math.ceil(cells.length / size);
+  const count = Math.ceil(Math.max(0, windowMin) / size);
   const points = Array.from({ length: count }, (_, index) => {
     // index 0 is the oldest bucket; its oldest minute has the largest offset.
     const oldestOffset = (count - index) * size - 1;
@@ -58,18 +63,27 @@ export function bucketGlobal(
 }
 
 /**
- * Whole-number y-axis ticks for request counts: 0 and up to about `target` even steps of 1, 2
- * or 5 x 10^n below the busiest bucket. `[0]` when there is no traffic.
+ * The current window with the previous one laid under it: each point also carries the succeeded
+ * count of the bucket exactly `windowMin` minutes earlier. `cells` must cover both windows
+ * (offsets 0 to 2 x windowMin - 1), as the cached two-hour heatmap does for the 1 h view.
  */
-export function countTicks(points: readonly TrafficPoint[], target = 4): number[] {
-  const max = points.reduce((top, p) => Math.max(top, p.succeeded, p.failed), 0);
-  if (!(max > 0)) return [0];
-  const raw = Math.max(1, max / Math.max(1, target));
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
-  const step = ([1, 2, 5, 10].find((f) => f * magnitude >= raw) ?? 10) * magnitude;
-  const ticks: number[] = [];
-  for (let tick = 0; tick <= max; tick += step) ticks.push(tick);
-  return ticks;
+export function withPreviousWindow(
+  cells: readonly HeatmapCell[],
+  nowUnix: number,
+  bucketMin: number,
+  windowMin: number,
+): TrafficPoint[] {
+  const current = bucketGlobal(cells, nowUnix, bucketMin, windowMin);
+  const earlier = cells
+    .filter((cell) => cell.offset >= windowMin && cell.offset < 2 * windowMin)
+    .map((cell) => ({ ...cell, offset: cell.offset - windowMin }));
+  const previous = bucketGlobal(earlier, nowUnix, bucketMin, windowMin);
+  return current.map((point, index) => ({ ...point, previous: previous[index]?.succeeded ?? 0 }));
+}
+
+/** The busiest bucket of any series (succeeded, failed or previous), for the y-axis ticks. */
+export function peakCount(points: readonly TrafficPoint[]): number {
+  return points.reduce((top, p) => Math.max(top, p.succeeded, p.failed, p.previous ?? 0), 0);
 }
 
 export interface HourDelta {
@@ -161,9 +175,24 @@ export function modelSlices(
   return { slices, total, metric };
 }
 
-/** Heat cell opacity: 0.18 for an empty minute up to 1 for the busiest displayed minute. */
-export function cellOpacity(reqs: number, maxReq: number): number {
-  return 0.18 + Math.min(1, reqs / Math.max(1, maxReq)) * 0.82;
+/**
+ * A heat cell's volume step on the chart-scale ramp: 1 for an empty minute, then 2 to 5 in
+ * quarters of the busiest displayed minute (any traffic is at least 2, so it never reads as
+ * empty).
+ */
+export function heatLevel(reqs: number, maxReq: number): 1 | 2 | 3 | 4 | 5 {
+  if (!(reqs > 0)) return 1;
+  const quarter = Math.ceil(Math.min(1, reqs / Math.max(1, maxReq)) * 4);
+  return (1 + Math.max(1, quarter)) as 2 | 3 | 4 | 5;
+}
+
+/** Share of a minute's requests that failed at which its cell turns red (the alert colour). */
+export const HEAT_FAIL_SHARE = 0.25;
+
+/** How a minute's failures show: none, a thin red bar under the threshold, or a red cell. */
+export function heatFailure(reqs: number, failures: number): "none" | "some" | "alert" {
+  if (!(failures > 0)) return "none";
+  return failures / Math.max(reqs, failures) >= HEAT_FAIL_SHARE ? "alert" : "some";
 }
 
 /** Offsets 0..windowMin-1 oldest-first (oldest on the left); missing minutes are zeros. */
