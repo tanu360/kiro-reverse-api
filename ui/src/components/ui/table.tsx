@@ -3,7 +3,38 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import type React from "react";
+import { useEffect, useRef } from "react";
+import { observeWidth } from "@/hooks/use-element-width";
 import { cn } from "@/lib/utils";
+
+/**
+ * Marks a horizontal scroller with what it hides: `data-overflow-start` once it has scrolled
+ * away from the start, `data-overflow-end` while there is more past the end. Sticky columns
+ * draw their edge from these, so a pinned column shows a divider only while something actually
+ * slides under it. Attributes, not state: scrolling never re-renders the table.
+ */
+function useOverflowEdges(ref: React.RefObject<HTMLDivElement | null>): void {
+  useEffect(() => {
+    const scroller = ref.current;
+    if (!scroller) return;
+    const update = () => {
+      // Right-to-left scrollers count scrollLeft down from 0.
+      const offset = Math.abs(scroller.scrollLeft);
+      const hidden = scroller.scrollWidth - scroller.clientWidth;
+      scroller.toggleAttribute("data-overflow-start", offset > 0.5);
+      scroller.toggleAttribute("data-overflow-end", hidden - offset > 0.5);
+    };
+    update();
+    scroller.addEventListener("scroll", update, { passive: true });
+    const stops = [observeWidth(scroller, update)];
+    const table = scroller.firstElementChild;
+    if (table) stops.push(observeWidth(table, update));
+    return () => {
+      scroller.removeEventListener("scroll", update);
+      for (const stop of stops) stop();
+    };
+  }, [ref]);
+}
 
 export type TableVariant = "default" | "card";
 
@@ -18,15 +49,15 @@ export function Table({
   render,
   ...props
 }: TableProps): React.ReactElement {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  useOverflowEdges(scrollerRef);
   const defaultProps = {
     children: (
       <table
         className={cn(
-          // Column dividers, so the table reads as a grid of boxes: a 1 px inset line on the left
-          // of every cell but the first, in the row divider's colour (border at 50 %). An inset
-          // shadow, not a border, so it matches the sticky end column's own edge instead of
-          // doubling it. The cell after a row's checkbox gets none: the box belongs to the row.
-          "w-full caption-bottom in-data-[variant=card]:border-separate in-data-[variant=card]:border-spacing-0 text-sm [&_tr>*:not(:has([role=checkbox]))+*]:shadow-[inset_1px_0_0_color-mix(in_srgb,var(--border)_50%,transparent)]",
+          // Rows are split by hairlines only (border-subtle), no column dividers. Figures are
+          // tabular, so right-aligned numbers line up on their digits and widths hold on refetch.
+          "w-full caption-bottom in-data-[variant=card]:border-separate in-data-[variant=card]:border-spacing-0 text-sm tabular-nums",
           className,
         )}
         data-slot="table"
@@ -41,6 +72,7 @@ export function Table({
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, {}),
+    ref: scrollerRef,
     render,
   });
 }
@@ -51,7 +83,7 @@ export function TableHeader({
 }: React.ComponentProps<"thead">): React.ReactElement {
   return (
     <thead
-      className={cn("not-in-data-[variant=card]:bg-(--row-head) [&_tr]:border-b", className)}
+      className={cn("not-in-data-[variant=card]:bg-(--row-head) [&_tr]:border-b [&_tr]:border-border-subtle", className)}
       data-slot="table-header"
       {...props}
     />
@@ -97,7 +129,9 @@ export function TableRow({
   return (
     <tr
       className={cn(
-        "relative border-b transition-colors not-in-data-[variant=card]:hover:bg-(--row-hover) not-in-data-[variant=card]:has-aria-expanded:bg-(--row-hover) not-in-data-[variant=card]:data-[state=selected]:bg-(--row-selected) not-in-data-[variant=card]:data-[state=selected]:hover:bg-(--row-selected-hover)",
+        // Hover is the --row-hover tint; a row whose menu is open keeps half the selected tint,
+        // so it is clear which row the menu belongs to.
+        "relative border-border-subtle border-b transition-colors not-in-data-[variant=card]:hover:bg-(--row-hover) not-in-data-[variant=card]:has-aria-expanded:bg-(--row-selected)/50 not-in-data-[variant=card]:data-[state=selected]:bg-(--row-selected) not-in-data-[variant=card]:data-[state=selected]:hover:bg-(--row-selected-hover)",
         className,
       )}
       data-slot="table-row"
@@ -113,7 +147,7 @@ export function TableHead({
   return (
     <th
       className={cn(
-        "h-10 whitespace-nowrap px-2.5 text-left align-middle font-medium text-muted-foreground leading-none has-[[role=checkbox]]:w-px last:has-[[role=checkbox]]:ps-0 first:has-[[role=checkbox]]:pe-0",
+        "h-10 whitespace-nowrap px-2.5 text-left align-middle font-normal text-meta text-muted-foreground leading-none has-[[role=checkbox]]:w-px last:has-[[role=checkbox]]:ps-0 first:has-[[role=checkbox]]:pe-0",
         className,
       )}
       data-slot="table-head"

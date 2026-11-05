@@ -18,14 +18,19 @@ import {
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 /*
  * The prev/next chevrons: round, in the topbar search pill's surface (command-menu.tsx: the
- * --field tint and the --input hairline), so they read on the page in both themes. Disabled keeps
- * the circle and only dims the chevron.
+ * --field tint and the --input hairline), so they read on the page in both themes. Sized by the
+ * Button's `icon` step, like the page numbers. Disabled keeps the circle and only dims the chevron.
  */
 const CHEVRON =
-  "size-9 rounded-full border-input bg-(--field) text-foreground [--control-radius:9999px] [:hover,[data-pressed]]:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
+  "rounded-full border-input bg-(--field) text-foreground [:hover,[data-pressed]]:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
+// The page numbers: round quiet buttons; the current page takes the accent fill, the same
+// surface as a selected segment.
+const PAGE = "rounded-full tabular-nums";
+const PAGE_ACTIVE = "bg-accent text-foreground";
 
 export function DataTablePagination({
   page,
@@ -35,11 +40,11 @@ export function DataTablePagination({
   pageSizeOptions,
   onPageSizeChange,
 }: {
-  variant?: "default" | "circle";
   page: number;
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
+  /** With `onPageSizeChange`, a "Rows" select for the page size (the app's only one). */
   pageSizeOptions?: number[];
   onPageSizeChange?: (size: number) => void;
 }): JSX.Element {
@@ -56,18 +61,19 @@ export function DataTablePagination({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 text-meta">
-      <p aria-live="polite" className="text-muted-foreground">
+      <p aria-live="polite" className="text-muted-foreground tabular-nums">
         {t("table.pageInfo", {
           start: formatNumber(start, lang),
           end: formatNumber(end, lang),
           total: formatNumber(total, lang),
         })}
       </p>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ms-auto keeps the pager on the right when it wraps under the count on a narrow screen. */}
+      <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
         {showSizes ? (
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground" id={sizeLabelId}>
-              {t("table.rowsPerPage")}
+              {t("table.rowsShort")}
             </span>
             <Select
               items={(pageSizeOptions ?? []).map((size) => ({
@@ -79,10 +85,10 @@ export function DataTablePagination({
               }}
               value={String(pageSize)}
             >
-              <SelectTrigger aria-labelledby={sizeLabelId} className="w-20 min-w-20" size="sm">
-                <SelectValue />
+              <SelectTrigger aria-labelledby={sizeLabelId} fit="content" size="sm">
+                <SelectValue className="tabular-nums" />
               </SelectTrigger>
-              <SelectPopup>
+              <SelectPopup fit="content">
                 {(pageSizeOptions ?? []).map((size) => (
                   <SelectItem key={size} value={String(size)}>
                     {size}
@@ -117,15 +123,11 @@ export function DataTablePagination({
                       isActive={n === page}
                       render={
                         <Button
-                          aria-label={formatNumber(n, lang)}
+                          aria-label={t("table.page", { n: formatNumber(n, lang) })}
+                          className={cn(PAGE, n === page && PAGE_ACTIVE)}
                           onClick={() => onPageChange(n)}
                           size="icon"
                           variant="quiet"
-                          className={
-                            n === page
-                              ? "size-8 font-semibold text-foreground [--control-radius:9999px]"
-                              : "size-8 [--control-radius:9999px]"
-                          }
                         />
                       }
                     >

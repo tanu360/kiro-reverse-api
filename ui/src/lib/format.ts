@@ -235,15 +235,33 @@ const RELATIVE_STEPS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number, number
   ["year", 86_400 * 365, Number.POSITIVE_INFINITY],
 ];
 
-/** "5 minutes ago", "yesterday", "in 3 days" (numeric: 'auto'). */
+export type RelativeTimeStyle = "long" | "short" | "narrow";
+
+const relativeFormats = new Map<string, Intl.RelativeTimeFormat>();
+
+function relativeTimeFormat(lang: Lang | undefined, style: RelativeTimeStyle) {
+  const tag = locale(lang);
+  const id = `${tag}|${style}`;
+  let format = relativeFormats.get(id);
+  if (!format) {
+    format = new Intl.RelativeTimeFormat(tag, { numeric: "auto", style });
+    relativeFormats.set(id, format);
+  }
+  return format;
+}
+
+/**
+ * "5 minutes ago", "yesterday", "in 3 days" (numeric: 'auto'). The narrow style is the short
+ * form for tight spots, "5m ago" in English.
+ */
 export function formatRelativeTime(
   unixSec: number,
   lang?: Lang,
   nowMs: number = Date.now(),
+  style: RelativeTimeStyle = "long",
 ): string {
   const diff = finite(unixSec) - nowMs / 1000;
-  const rtf = new Intl.RelativeTimeFormat(locale(lang), { numeric: "auto" });
   const [unit, size] =
     RELATIVE_STEPS.find(([, , limit]) => Math.abs(diff) < limit) ?? RELATIVE_STEPS[0];
-  return rtf.format(Math.round(diff / size), unit);
+  return relativeTimeFormat(lang, style).format(Math.round(diff / size), unit);
 }

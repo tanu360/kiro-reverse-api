@@ -1,7 +1,16 @@
 import { ArrowDown02Icon, ArrowUp02Icon, ArrowUpDownIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ColumnDef, tableFeatures, useTable } from "@tanstack/react-table";
-import { type JSX, type KeyboardEvent, type MouseEvent, type ReactNode, useMemo } from "react";
+import {
+  createContext,
+  type JSX,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useContext,
+  useMemo,
+} from "react";
+import { CARD_GRID_CLASS } from "@/components/shared/list-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -13,7 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useIsMobile } from "@/hooks/use-media-query";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +48,11 @@ export interface DataTableSort {
   desc: boolean;
 }
 
+export interface DataTableCardContext {
+  selected: boolean;
+  toggleSelected: () => void;
+}
+
 export interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];
@@ -53,9 +66,33 @@ export interface DataTableProps<T> {
     rowLabel: (row: T) => string;
   };
   onRowClick?: (row: T) => void;
-  renderMobileCard?: (row: T, ctx: { selected: boolean; toggleSelected: () => void }) => ReactNode;
+  /**
+   * The accessible name of a clickable row ("Open details for …"). With it the row also says it
+   * opens a dialog (aria-haspopup).
+   */
+  rowLabel?: (row: T) => string;
+  /**
+   * Below this container width (DataTable's own, not the viewport) the rows render as cards
+   * through `renderCard`: lg = 32rem, 2xl = 42rem, 4xl = 56rem.
+   */
+  cardsBelow?: CardsBelow;
+  renderCard?: (row: T, ctx: DataTableCardContext) => ReactNode;
+  /**
+   * How the cards sit: a stack, a CardGrid (two columns from @2xl, equal heights), or rows
+   * divided inside the surrounding card (ListCard variant="row").
+   */
+  cardLayout?: "stack" | "grid" | "divided";
+  /** @deprecated Use `cardsBelow` + `renderCard`. Kept as `cardsBelow="lg"` until callers move. */
+  renderMobileCard?: (row: T, ctx: DataTableCardContext) => ReactNode;
   loading?: boolean;
+  /** Rows a full page holds; the loading placeholder shows as many (at most 10). */
+  pageSize?: number;
   emptyState?: ReactNode;
+  /**
+   * A search or filter is active. An empty table then keeps its header, so the columns stay in
+   * view while the filters change; without filters an empty table is only its empty state.
+   */
+  filtered?: boolean;
   caption?: string;
   className?: string;
   /**
@@ -64,11 +101,40 @@ export interface DataTableProps<T> {
    * and the first column lines up with the card title.
    */
   bleed?: boolean;
+  /**
+   * The table already sits edge to edge (DataTableCard turns this on): the first and last cells
+   * take the card's side padding, so cell text lines up with the card title.
+   */
+  inset?: boolean;
+  /** Cell padding: compact 10 px (default), comfortable 12 px for two-line cells. */
+  density?: "compact" | "comfortable";
 }
 
+type CardsBelow = "lg" | "2xl" | "4xl";
+
+/** Set by DataTableCard: a DataTable inside it is inset without the prop. */
+export const DataTableInsetContext = createContext(false);
+
 const BLEED_WRAPPER = "-mx-4 sm:-mx-5";
-const BLEED_TABLE =
-  "[&_tr>*:first-child]:ps-4 [&_tr>*:last-child]:pe-4 sm:[&_tr>*:first-child]:ps-5 sm:[&_tr>*:last-child]:pe-5";
+const INSET_TABLE =
+  "[&_tr>*:first-child]:ps-4 sm:[&_tr>*:first-child]:ps-5 [&_tr>*:last-child]:pe-4 sm:[&_tr>*:last-child]:pe-5";
+const DENSITY_CLASS = { compact: undefined, comfortable: "[&_tbody_td]:py-3" } as const;
+
+// Container-query switch between the cards and the table: both are rendered, CSS shows one.
+// Static strings, so Tailwind sees every class.
+const CARD_SWITCH: Record<CardsBelow, { cards: string; table: string }> = {
+  lg: { cards: "@lg/data-table:hidden", table: "hidden @lg/data-table:block" },
+  "2xl": { cards: "@2xl/data-table:hidden", table: "hidden @2xl/data-table:block" },
+  "4xl": { cards: "@4xl/data-table:hidden", table: "hidden @4xl/data-table:block" },
+};
+const CARD_LIST_CLASS = {
+  stack: "flex flex-col gap-2",
+  grid: CARD_GRID_CLASS,
+  divided: "flex flex-col divide-y divide-border-subtle",
+} as const;
+// Stacked or gridded cards need room around them inside an edge-to-edge table's card (the
+// card's panel padding); divided rows carry their own.
+const CARD_LIST_PAD = { inset: "px-4 py-4 sm:px-5", bleed: "px-4 sm:px-5" } as const;
 
 // Row-level click and key handlers ignore events that start inside these.
 const INTERACTIVE_SELECTOR =
@@ -85,32 +151,40 @@ function fromInteractiveChild(event: { target: EventTarget; currentTarget: Event
   return hit !== null && row.contains(hit);
 }
 
-const ALIGN_CLASS = { start: "text-left", center: "text-center", end: "text-right" } as const;
-// Column headers sit a step under the 14 px cells: 13 px, regular weight, muted (the sort
-// button turns the sorted column's header to the text colour).
-const HEAD_CLASS = "font-normal text-meta";
-// Sticky cells need an opaque background: the panel's own (the card at 40 % over the page, as
-// t3code's SettingsGroup) with the row's tint already mixed in (index.css --surface-inset-*):
-// the header band, hover, an open row menu, selected and selected-hovered. So a pinned cell
-// matches its row exactly instead of reading as a separate block.
-const STICKY_BASE =
-  "sticky z-[1] bg-surface-inset [thead_&]:bg-(--surface-inset-head) [tr:hover>&]:bg-(--surface-inset-hover) [tr:has([aria-expanded=true])>&]:bg-(--surface-inset-hover) [tr[data-state=selected]>&]:bg-(--surface-inset-selected) [tr[data-state=selected]:hover>&]:bg-(--surface-inset-selected-hover)";
-const STICKY_CLASS = {
-  start: cn(STICKY_BASE, "left-0"),
-  end: cn(
-    STICKY_BASE,
-    "right-0 shadow-[inset_1px_0_0_color-mix(in_srgb,var(--border)_50%,transparent)]",
-  ),
+// Column headers come from TableHead: 13 px, regular weight, muted (the sort button turns the
+// sorted column's header to the text colour). Right-aligned columns are figures.
+const ALIGN_CLASS = {
+  start: "text-left",
+  center: "text-center",
+  end: "text-right tabular-nums",
 } as const;
-// Body rows are split by t3code's row divider (border at 50 %); the header keeps the full line.
-const ROW_DIVIDERS = "[&_tbody>tr]:border-border/50";
+// Sticky cells need an opaque background: the card the table sits in, with the row's own tint
+// laid over it as an image (the header band, hover, keyboard focus, an open row menu, selected
+// and selected-hovered). So a pinned cell matches its row exactly on any card fill. A 1 px inset
+// edge on the side facing the scrolling columns shows where they slide under it, only while
+// something is hidden on that side (Table marks its scroller data-overflow-start/-end).
+const STICKY_BASE =
+  "sticky z-[1] bg-card [thead_&]:bg-[linear-gradient(var(--row-head),var(--row-head))] [tr:hover>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tr:focus-visible>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tr:has([aria-expanded=true])>&]:bg-[linear-gradient(color-mix(in_srgb,var(--row-selected)_50%,transparent),color-mix(in_srgb,var(--row-selected)_50%,transparent))] [tr[data-state=selected]>&]:bg-[linear-gradient(var(--row-selected),var(--row-selected))] [tr[data-state=selected]:hover>&]:bg-[linear-gradient(var(--row-selected-hover),var(--row-selected-hover))]";
+const STICKY_CLASS = {
+  start: cn(
+    STICKY_BASE,
+    "left-0 in-data-overflow-start:shadow-[inset_-1px_0_0_var(--border-subtle)]",
+  ),
+  end: cn(STICKY_BASE, "right-0 in-data-overflow-end:shadow-[inset_1px_0_0_var(--border-subtle)]"),
+} as const;
+// A clickable row's keyboard ring is drawn by an ::after layer above the sticky cells (z-[2]),
+// so a pinned column cannot cover part of it.
+const ROW_FOCUS =
+  "cursor-pointer outline-none focus-visible:bg-(--row-hover) focus-visible:after:pointer-events-none focus-visible:after:absolute focus-visible:after:inset-0 focus-visible:after:z-[2] focus-visible:after:outline focus-visible:after:outline-1 focus-visible:after:-outline-offset-1 focus-visible:after:outline-ring";
 
 function stickyClass(sticky: DataTableColumn<unknown>["sticky"]): string | undefined {
   if (!sticky) return undefined;
   return STICKY_CLASS[sticky === "end" ? "end" : "start"];
 }
 const coreFeatures = tableFeatures({});
-const SKELETON_ROWS = 5;
+const DEFAULT_SKELETON_ROWS = 5;
+const MAX_SKELETON_ROWS = 10;
+const SKELETON_CARDS = 3;
 
 interface Boxed<T> {
   value: T;
@@ -125,15 +199,24 @@ export function DataTable<T>({
   defaultSortDesc,
   selection,
   onRowClick,
+  rowLabel,
+  cardsBelow,
+  renderCard,
+  cardLayout = "stack",
   renderMobileCard,
   loading = false,
+  pageSize,
   emptyState,
+  filtered = false,
   caption,
   className,
   bleed = false,
+  inset: insetProp,
+  density = "compact",
 }: DataTableProps<T>): JSX.Element {
   const { t } = useT();
-  const isMobile = useIsMobile();
+  const insetFromCard = useContext(DataTableInsetContext);
+  const inset = insetProp ?? insetFromCard;
 
   // Rows are boxed because TanStack constrains row data to object shapes and T is open.
   const boxed = useMemo(() => data.map((value) => ({ value })), [data]);
@@ -202,175 +285,211 @@ export function DataTable<T>({
   };
 
   const showEmpty = !loading && rows.length === 0;
+  const showSkeleton = loading && rows.length === 0;
+  const skeletonRows = Math.min(pageSize ?? DEFAULT_SKELETON_ROWS, MAX_SKELETON_ROWS);
+  const wrapperClass = cn("@container/data-table min-w-0", bleed && BLEED_WRAPPER);
 
-  if (isMobile && renderMobileCard) {
-    if (loading && rows.length === 0) {
-      return (
-        <div aria-busy="true" className={cn("flex flex-col gap-2", className)}>
-          {Array.from({ length: 3 }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
-            <Skeleton className="h-20 w-full rounded-xl border border-border/60" key={index} />
-          ))}
-        </div>
-      );
-    }
-    if (showEmpty) return <div className={className}>{emptyState}</div>;
+  // An empty table with nothing filtered is only its empty state: no header band over nothing.
+  if (showEmpty && !filtered) {
     return (
-      <ul aria-label={caption} className={cn("flex flex-col gap-2", className)}>
-        {rows.map((row) => {
-          const isSelected = selected?.has(row.id) ?? false;
-          return (
-            <li data-state={isSelected ? "selected" : undefined} key={row.id}>
-              {renderMobileCard(row.original, {
-                selected: isSelected,
-                toggleSelected: () => toggleOne(row.id),
-              })}
-            </li>
-          );
-        })}
-      </ul>
+      <div className={wrapperClass} data-slot="data-table">
+        <div data-slot="data-table-empty">{emptyState}</div>
+      </div>
     );
   }
+
+  const cardRenderer = renderCard ?? renderMobileCard;
+  const cardSwitch = cardRenderer
+    ? CARD_SWITCH[cardsBelow ?? (renderCard ? "2xl" : "lg")]
+    : undefined;
+  const cardListClass = cn(
+    CARD_LIST_CLASS[cardLayout],
+    cardLayout !== "divided" && (bleed ? CARD_LIST_PAD.bleed : inset && CARD_LIST_PAD.inset),
+  );
+
+  const cards =
+    cardRenderer && cardSwitch && !showEmpty ? (
+      <div className={cardSwitch.cards} data-slot="data-table-cards">
+        {showSkeleton ? (
+          <div aria-busy="true" className={cardListClass}>
+            {Array.from({ length: SKELETON_CARDS }, (_, index) =>
+              cardLayout === "divided" ? (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
+                <div className="flex flex-col gap-2 px-4 py-3 sm:px-5" key={index}>
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+              ) : (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
+                <Skeleton className="h-20 w-full rounded-xl" key={index} />
+              ),
+            )}
+          </div>
+        ) : (
+          <ul aria-label={caption} className={cardListClass}>
+            {rows.map((row) => {
+              const isSelected = selected?.has(row.id) ?? false;
+              return (
+                <li data-state={isSelected ? "selected" : undefined} key={row.id}>
+                  {cardRenderer(row.original, {
+                    selected: isSelected,
+                    toggleSelected: () => toggleOne(row.id),
+                  })}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    ) : null;
 
   // The empty state sits under the table, outside its horizontal scroller, so it stays centred
   // in the visible width instead of across the full scroll width of a wide table.
   return (
-    <div className={cn("min-w-0", bleed && BLEED_WRAPPER)} data-slot="data-table">
-      <Table
-        aria-busy={loading || undefined}
-        className={cn(ROW_DIVIDERS, bleed && BLEED_TABLE, className)}
-      >
-        {caption ? <TableCaption className="sr-only">{caption}</TableCaption> : null}
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            {selection ? (
-              <TableHead className={cn(HEAD_CLASS, "w-px")}>
-                <Checkbox
-                  aria-label={t("table.selectAll")}
-                  checked={allSelected}
-                  disabled={rowIds.length === 0}
-                  indeterminate={someSelected}
-                  onCheckedChange={toggleAll}
-                />
-              </TableHead>
-            ) : null}
-            {columns.map((column) => {
-              const active = sort?.id === column.id;
-              const ariaSort = column.sortable
-                ? active
-                  ? sort?.desc
-                    ? "descending"
-                    : "ascending"
-                  : "none"
-                : undefined;
-              const SortIcon = active
-                ? sort?.desc
-                  ? ArrowDown02Icon
-                  : ArrowUp02Icon
-                : ArrowUpDownIcon;
-              return (
-                <TableHead
-                  aria-sort={ariaSort}
-                  className={cn(
-                    HEAD_CLASS,
-                    ALIGN_CLASS[column.align ?? "start"],
-                    stickyClass(column.sticky),
-                    column.headerClassName,
-                  )}
-                  key={column.id}
-                  style={column.width ? { width: column.width } : undefined}
-                >
-                  {column.sortable && onSortChange ? (
-                    <button
-                      // Fills the 40 px header height so the whole header cell is the target.
-                      className={cn(
-                        "group/sort -mx-1 inline-flex h-10 cursor-pointer items-center gap-1 rounded-md px-1 outline-none transition-colors hover:text-foreground focus-outline-inset",
-                        active && "text-foreground",
-                        column.align === "end" && "flex-row-reverse",
-                      )}
-                      onClick={() => sortBy(column)}
-                      type="button"
-                    >
-                      {column.header}
-                      <HugeiconsIcon
-                        icon={SortIcon}
-                        aria-hidden="true"
-                        // Only the sorted column shows its arrow; the others reveal theirs on hover or
-                        // focus, in place (no shift), so the header row stays quiet.
-                        className={cn(
-                          "size-3.5 shrink-0 transition-opacity",
-                          !active &&
-                            "opacity-0 group-hover/sort:opacity-60 group-focus-visible/sort:opacity-60",
-                        )}
-                      />
-                    </button>
-                  ) : (
-                    column.header
-                  )}
+    <div className={wrapperClass} data-slot="data-table">
+      {cards}
+      <div className={cn("min-w-0", cardSwitch?.table)} data-slot="data-table-view">
+        <Table
+          aria-busy={loading || undefined}
+          className={cn((inset || bleed) && INSET_TABLE, DENSITY_CLASS[density], className)}
+        >
+          {caption ? <TableCaption className="sr-only">{caption}</TableCaption> : null}
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              {selection ? (
+                <TableHead className="w-px">
+                  <Checkbox
+                    aria-label={t("table.selectAll")}
+                    checked={allSelected}
+                    disabled={rowIds.length === 0}
+                    indeterminate={someSelected}
+                    onCheckedChange={toggleAll}
+                  />
                 </TableHead>
-              );
-            })}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {loading && rows.length === 0
-            ? Array.from({ length: SKELETON_ROWS }, (_, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
-                <TableRow aria-hidden="true" className="hover:bg-transparent" key={index}>
-                  {selection ? (
-                    <TableCell className="w-px">
-                      <Skeleton className="size-4" />
-                    </TableCell>
-                  ) : null}
-                  {/* Column classes too, so a column hidden by a breakpoint stays hidden here. */}
-                  {columns.map((column) => (
-                    <TableCell className={column.className} key={column.id}>
-                      <Skeleton className="h-4 w-full max-w-32" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            : null}
-          {rows.map((row) => {
-            const isSelected = selected?.has(row.id) ?? false;
-            return (
-              <TableRow
-                className={cn(
-                  onRowClick &&
-                    "cursor-pointer outline-none focus-visible:bg-accent/50 focus-outline-inset",
-                )}
-                data-state={isSelected ? "selected" : undefined}
-                key={row.id}
-                onClick={onRowClick ? onRowClickEvent(row.original) : undefined}
-                onKeyDown={onRowClick ? onRowKeyDown(row.original) : undefined}
-                tabIndex={onRowClick ? 0 : undefined}
-              >
-                {selection ? (
-                  <TableCell className="w-px">
-                    <Checkbox
-                      aria-label={t("table.selectRow", { label: selection.rowLabel(row.original) })}
-                      checked={isSelected}
-                      onCheckedChange={() => toggleOne(row.id)}
-                    />
-                  </TableCell>
-                ) : null}
-                {columns.map((column) => (
-                  <TableCell
+              ) : null}
+              {columns.map((column) => {
+                const active = sort?.id === column.id;
+                const ariaSort = column.sortable
+                  ? active
+                    ? sort?.desc
+                      ? "descending"
+                      : "ascending"
+                    : "none"
+                  : undefined;
+                const SortIcon = active
+                  ? sort?.desc
+                    ? ArrowDown02Icon
+                    : ArrowUp02Icon
+                  : ArrowUpDownIcon;
+                return (
+                  <TableHead
+                    aria-sort={ariaSort}
                     className={cn(
                       ALIGN_CLASS[column.align ?? "start"],
                       stickyClass(column.sticky),
-                      column.className,
+                      column.headerClassName,
                     )}
                     key={column.id}
+                    style={column.width ? { width: column.width } : undefined}
                   >
-                    {column.cell(row.original, row.index)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                    {column.sortable && onSortChange ? (
+                      <button
+                        // Fills the 40 px header height so the whole header cell is the target.
+                        className={cn(
+                          "group/sort -mx-1 inline-flex h-10 cursor-pointer items-center gap-1 rounded-md px-1 outline-none transition-colors hover:text-foreground focus-outline-inset",
+                          active && "text-foreground",
+                          column.align === "end" && "flex-row-reverse",
+                        )}
+                        onClick={() => sortBy(column)}
+                        type="button"
+                      >
+                        {column.header}
+                        <HugeiconsIcon
+                          icon={SortIcon}
+                          aria-hidden="true"
+                          // Only the sorted column shows its arrow; the others reveal theirs on hover or
+                          // focus, in place (no shift), so the header row stays quiet.
+                          className={cn(
+                            "size-3.5 shrink-0 transition-opacity",
+                            !active &&
+                              "opacity-0 group-hover/sort:opacity-60 group-focus-visible/sort:opacity-60",
+                          )}
+                        />
+                      </button>
+                    ) : (
+                      column.header
+                    )}
+                  </TableHead>
+                );
+              })}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {showSkeleton
+              ? Array.from({ length: skeletonRows }, (_, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
+                  <TableRow aria-hidden="true" className="hover:bg-transparent" key={index}>
+                    {selection ? (
+                      <TableCell className="w-px">
+                        <Skeleton className="size-4" />
+                      </TableCell>
+                    ) : null}
+                    {/* Column classes too, so a column hidden by a breakpoint stays hidden here. */}
+                    {columns.map((column) => (
+                      <TableCell className={column.className} key={column.id}>
+                        {/* Two lines, the height of a real two-line row, so nothing jumps. */}
+                        <div className="flex flex-col gap-1">
+                          <Skeleton className="h-3.5 w-3/4 max-w-32" />
+                          <Skeleton className="h-3 w-1/2 max-w-20" />
+                        </div>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : null}
+            {rows.map((row) => {
+              const isSelected = selected?.has(row.id) ?? false;
+              const label = onRowClick && rowLabel ? rowLabel(row.original) : undefined;
+              return (
+                <TableRow
+                  aria-haspopup={label ? "dialog" : undefined}
+                  aria-label={label}
+                  className={cn(onRowClick && ROW_FOCUS)}
+                  data-state={isSelected ? "selected" : undefined}
+                  key={row.id}
+                  onClick={onRowClick ? onRowClickEvent(row.original) : undefined}
+                  onKeyDown={onRowClick ? onRowKeyDown(row.original) : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                >
+                  {selection ? (
+                    <TableCell className="w-px">
+                      <Checkbox
+                        aria-label={t("table.selectRow", {
+                          label: selection.rowLabel(row.original),
+                        })}
+                        checked={isSelected}
+                        onCheckedChange={() => toggleOne(row.id)}
+                      />
+                    </TableCell>
+                  ) : null}
+                  {columns.map((column) => (
+                    <TableCell
+                      className={cn(
+                        ALIGN_CLASS[column.align ?? "start"],
+                        stickyClass(column.sticky),
+                        column.className,
+                      )}
+                      key={column.id}
+                    >
+                      {column.cell(row.original, row.index)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
       {showEmpty ? <div data-slot="data-table-empty">{emptyState}</div> : null}
     </div>
   );

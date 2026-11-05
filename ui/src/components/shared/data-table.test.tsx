@@ -1,8 +1,9 @@
 import { screen, within } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { DataTable, type DataTableColumn, type DataTableSort } from "./data-table";
+import { DataTableCard } from "./data-table-card";
 
 interface Row {
   id: string;
@@ -73,32 +74,12 @@ function SortedTable({ onSortChange }: { onSortChange: (sort: DataTableSort) => 
   );
 }
 
-function mockMatchMedia(matches: (query: string) => boolean) {
-  vi.stubGlobal(
-    "matchMedia",
-    (query: string): MediaQueryList => ({
-      matches: matches(query),
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  );
-}
-
 /** The select-all checkbox is the first one; its label depends on the loaded catalog. */
 function headerCheckbox(): HTMLElement {
   const [first] = screen.getAllByRole("checkbox");
   if (!first) throw new Error("no checkbox rendered");
   return first;
 }
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
 
 describe("DataTable", () => {
   it("renders headers and rows", () => {
@@ -169,9 +150,29 @@ describe("DataTable", () => {
     expect(headerCheckbox()).toHaveAttribute("aria-checked", "mixed");
   });
 
-  it("renders mobile cards under md", () => {
-    mockMatchMedia((query) => query === "(max-width: 767px)");
-    renderWithProviders(
+  it("switches to cards below a container width, by CSS alone", () => {
+    const { container } = renderWithProviders(
+      <DataTable
+        cardsBelow="4xl"
+        columns={COLUMNS}
+        data={ROWS}
+        getRowId={(row) => row.id}
+        renderCard={(row) => <div>Card {row.name}</div>}
+      />,
+    );
+    // Both views render; the data-table container query shows one of them.
+    const root = container.querySelector('[data-slot="data-table"]');
+    expect(root).toHaveClass("@container/data-table");
+    const cards = container.querySelector('[data-slot="data-table-cards"]');
+    expect(cards).toHaveClass("@4xl/data-table:hidden");
+    expect(within(cards as HTMLElement).getByText("Card Bravo")).toBeInTheDocument();
+    const view = container.querySelector('[data-slot="data-table-view"]');
+    expect(view).toHaveClass("hidden", "@4xl/data-table:block");
+    expect(within(view as HTMLElement).getByRole("table")).toBeInTheDocument();
+  });
+
+  it("keeps renderMobileCard working as cards below the lg container width", () => {
+    const { container } = renderWithProviders(
       <DataTable
         columns={COLUMNS}
         data={ROWS}
@@ -179,8 +180,37 @@ describe("DataTable", () => {
         renderMobileCard={(row) => <div>Card {row.name}</div>}
       />,
     );
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.getByText("Card Bravo")).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="data-table-cards"]')).toHaveClass(
+      "@lg/data-table:hidden",
+    );
+    expect(screen.getByText("Card Alpha")).toBeInTheDocument();
+  });
+
+  it("lays cards out in the shared grid and passes the selection to each card", async () => {
+    const onChange = vi.fn();
+    const { container, user } = renderWithProviders(
+      <DataTable
+        cardLayout="grid"
+        cardsBelow="2xl"
+        columns={COLUMNS}
+        data={ROWS}
+        getRowId={(row) => row.id}
+        renderCard={(row, ctx) => (
+          <button onClick={ctx.toggleSelected} type="button">
+            {row.name} {ctx.selected ? "on" : "off"}
+          </button>
+        )}
+        selection={{ selected: new Set(["b"]), onChange, rowLabel: (row) => row.name }}
+      />,
+    );
+    const list = container.querySelector('[data-slot="data-table-cards"] ul');
+    expect(list).toHaveClass("grid", "@2xl:grid-cols-2");
+    expect(screen.getByRole("button", { name: "Bravo on" }).closest("li")).toHaveAttribute(
+      "data-state",
+      "selected",
+    );
+    await user.click(screen.getByRole("button", { name: "Alpha off" }));
+    expect(onChange).toHaveBeenLastCalledWith(new Set(["b", "a"]));
   });
 
   it("opens a focused row with Enter and Space, but not from an inner button", async () => {
@@ -210,7 +240,7 @@ describe("DataTable", () => {
     expect(onRowClick).toHaveBeenLastCalledWith(ROWS[1]);
   });
 
-  it("renders the empty state outside the horizontally scrolling table", () => {
+  it("shows only the empty state, with no header, when nothing is filtered", () => {
     renderWithProviders(
       <DataTable
         columns={COLUMNS}
@@ -219,11 +249,25 @@ describe("DataTable", () => {
         getRowId={(row) => row.id}
       />,
     );
-    const empty = screen.getByText("No requests yet");
+    expect(screen.getByText("No requests yet")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();
+  });
+
+  it("keeps the header over a filtered empty table, with the empty state outside the scroller", () => {
+    renderWithProviders(
+      <DataTable
+        columns={COLUMNS}
+        data={[]}
+        emptyState={<p>No matches</p>}
+        filtered
+        getRowId={(row) => row.id}
+      />,
+    );
+    const empty = screen.getByText("No matches");
     // Inside the table it would be centred across the full scroll width, off-screen on phones.
     expect(empty.closest("table")).toBeNull();
     expect(empty.closest('[data-slot="table-container"]')).toBeNull();
-    // The header row stays, so the columns are still visible.
     expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
   });
 
@@ -270,6 +314,71 @@ describe("DataTable", () => {
     expect(cells[0]).toHaveClass("w-px");
     expect(cells[2]).toHaveClass("hidden", "wide:table-cell");
     expect(cells[1]).not.toHaveClass("hidden");
+  });
+
+  it("draws two-line skeletons, as many as a page holds up to ten", () => {
+    const { container } = renderWithProviders(
+      <DataTable columns={COLUMNS} data={[]} getRowId={(row) => row.id} loading pageSize={25} />,
+    );
+    const placeholders = container.querySelectorAll('tbody tr[aria-hidden="true"]');
+    expect(placeholders).toHaveLength(10);
+    expect(
+      placeholders[0]?.querySelector("td")?.querySelectorAll('[data-slot="skeleton"]'),
+    ).toHaveLength(2);
+  });
+
+  it("names a clickable row and says it opens a dialog", () => {
+    renderWithProviders(
+      <DataTable
+        columns={COLUMNS}
+        data={ROWS}
+        getRowId={(row) => row.id}
+        onRowClick={() => {}}
+        rowLabel={(row) => `Open details for ${row.name}`}
+      />,
+    );
+    const row = screen.getByRole("row", { name: "Open details for Alpha" });
+    expect(row).toHaveAttribute("aria-haspopup", "dialog");
+  });
+
+  it("insets the edge cells inside a DataTableCard and with the inset prop", () => {
+    const { container } = renderWithProviders(
+      <DataTableCard footer={<p>Pager</p>} toolbar={<p>Toolbar</p>}>
+        <DataTable columns={COLUMNS} data={ROWS} getRowId={(row) => row.id} />
+      </DataTableCard>,
+    );
+    expect(container.querySelector("table")?.className).toContain("[&_tr>*:first-child]:ps-4");
+    expect(container.querySelector('[data-slot="data-table-card-toolbar"]')).toHaveTextContent(
+      "Toolbar",
+    );
+    expect(container.querySelector('[data-slot="data-table-card-footer"]')).toHaveTextContent(
+      "Pager",
+    );
+  });
+
+  it("pads comfortable rows and leaves compact rows at the default", () => {
+    const comfortable = renderWithProviders(
+      <DataTable columns={COLUMNS} data={ROWS} density="comfortable" getRowId={(row) => row.id} />,
+    );
+    expect(comfortable.container.querySelector("table")?.className).toContain("[&_tbody_td]:py-3");
+    comfortable.unmount();
+    const compact = renderWithProviders(
+      <DataTable columns={COLUMNS} data={ROWS} getRowId={(row) => row.id} />,
+    );
+    expect(compact.container.querySelector("table")?.className).not.toContain("py-3");
+  });
+
+  it("gives a sticky start column an edge once columns scroll under it", () => {
+    renderWithProviders(
+      <DataTable
+        columns={[{ ...COLUMNS[0], sticky: "start" } as DataTableColumn<Row>, COLUMNS[1]]}
+        data={ROWS}
+        getRowId={(row) => row.id}
+      />,
+    );
+    expect(screen.getByRole("columnheader", { name: "Name" }).className).toContain(
+      "in-data-overflow-start:shadow-[inset_-1px_0_0_var(--border-subtle)]",
+    );
   });
 
   it("leaves rows unfocusable without onRowClick", () => {

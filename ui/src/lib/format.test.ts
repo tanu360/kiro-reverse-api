@@ -92,6 +92,13 @@ describe("other formatters", () => {
     expect(formatRelativeTime(now / 1000 + 3 * 86_400, "en", now)).toBe("in 3 days");
     expect(formatRelativeTime(now / 1000 - 86_400, "en", now)).toBe("yesterday");
   });
+
+  it("formats relative time in the narrow style", () => {
+    const now = 1_800_000_000_000;
+    expect(formatRelativeTime(now / 1000 - 16, "en", now, "narrow")).toBe("16s ago");
+    expect(formatRelativeTime(now / 1000 - 5 * 60, "en", now, "narrow")).toBe("5m ago");
+    expect(formatRelativeTime(now / 1000 - 86_400, "en", now, "narrow")).toBe("yesterday");
+  });
 });
 
 describe("locale-aware formatting", () => {
