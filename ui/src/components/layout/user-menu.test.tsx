@@ -1,11 +1,12 @@
 import { queryOptions } from "@tanstack/react-query";
 import { act, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { fetchRemoteVersion } from "@/lib/api/system";
 import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
 import { SILENT_CHECK_DELAY_MS, UpdateCheckProvider } from "./update-check";
-import { VersionBadge } from "./version-badge";
+import { UserMenu } from "./user-menu";
 
 vi.mock("@/lib/api/system", () => {
   const parts = (v: string) =>
@@ -37,10 +38,12 @@ vi.mock("@/lib/toast", () => ({
 
 const fetchRemote = vi.mocked(fetchRemoteVersion);
 
-function renderBadge() {
+function renderMenu() {
   return renderWithProviders(
     <UpdateCheckProvider>
-      <VersionBadge />
+      <SidebarProvider>
+        <UserMenu />
+      </SidebarProvider>
     </UpdateCheckProvider>,
   );
 }
@@ -54,16 +57,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("VersionBadge", () => {
-  it("shows the server version with one leading v", async () => {
+describe("UserMenu", () => {
+  it("shows the server version under Admin, without a leading v", async () => {
     fetchRemote.mockResolvedValue({ version: "2.1.0" });
-    renderBadge();
-    expect(await screen.findByText("v2.1.0")).toBeInTheDocument();
+    renderMenu();
+    expect(await screen.findByText("2.1.0")).toBeInTheDocument();
   });
 
   it("warns once about a newer release after the silent-check delay", async () => {
     fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "Fixes", download: "https://x" });
-    renderBadge();
+    renderMenu();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS - 100);
     });
@@ -76,24 +79,22 @@ describe("VersionBadge", () => {
     expect(fetchRemote).toHaveBeenCalledTimes(1);
     expect(toast.warning).toHaveBeenCalledTimes(1);
     expect(vi.mocked(toast.warning).mock.calls[0]?.[1]).toMatchObject({ duration: 5200 });
-    expect(document.querySelector('[data-slot="update-dot"]')).toBeInTheDocument();
   });
 
   it("stays silent when the remote version is the same", async () => {
     fetchRemote.mockResolvedValue({ version: "2.1.0" });
-    renderBadge();
+    renderMenu();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS + 100);
     });
     expect(fetchRemote).toHaveBeenCalledTimes(1);
     expect(toast.warning).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
-    expect(document.querySelector('[data-slot="update-dot"]')).not.toBeInTheDocument();
   });
 
   it("stays silent when the silent check fails", async () => {
     fetchRemote.mockRejectedValue(new Error("offline"));
-    renderBadge();
+    renderMenu();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS + 100);
     });
@@ -103,11 +104,24 @@ describe("VersionBadge", () => {
 
   it("a manual check reports an up-to-date version", async () => {
     fetchRemote.mockResolvedValue({ version: "2.1.0" });
-    const { user } = renderBadge();
-    await user.click(await screen.findByRole("button", { name: /v2\.1\.0/ }));
+    const { user } = renderMenu();
+    await screen.findByText("2.1.0");
+    await user.click(screen.getByRole("button", { name: "Admin menu" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Check for updates" }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10);
     });
     expect(toast.success).toHaveBeenCalledWith(expect.any(String), { duration: 3600 });
+  });
+});
+
+describe("UserMenu links", () => {
+  it("opens GitHub in a new tab from the Admin menu", async () => {
+    fetchRemote.mockResolvedValue({ version: "2.1.0" });
+    const { user } = renderMenu();
+    await user.click(screen.getByRole("button", { name: "Admin menu" }));
+    const github = await screen.findByRole("menuitem", { name: "GitHub" });
+    expect(github).toHaveAttribute("href", "https://github.com/tanu360/kiro-reverse-api");
+    expect(github).toHaveAttribute("target", "_blank");
   });
 });

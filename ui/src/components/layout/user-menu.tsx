@@ -3,10 +3,13 @@ import {
   EllipsisVerticalIcon,
   LogOutIcon,
   RefreshCwIcon,
+  UserShield01Icon,
 } from "@hugeicons/core-free-icons";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type JSX, useCallback } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
+import { GithubLogo } from "@/components/shared/brand-logos";
 import {
   Menu,
   MenuGroup,
@@ -18,11 +21,14 @@ import {
 } from "@/components/ui/menu";
 import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
+import { versionQuery } from "@/lib/api/system";
 import { signOut } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { UpdateDot, useUpdateCheck } from "./update-check";
+import { useUpdateCheck } from "./update-check";
 import { stripV } from "./update-dialog";
+
+export const GITHUB_URL = "https://github.com/tanu360/kiro-reverse-api";
 
 /** DELETE /session (errors ignored), then the sign-in page. No confirm (old UI parity). */
 export function useSignOut(): () => Promise<void> {
@@ -67,6 +73,10 @@ function UserMenuItems(): JSX.Element {
             {checking ? t("shell.update.checking") : t("shell.update.check")}
           </MenuItem>
         )}
+        <MenuItem render={<a href={GITHUB_URL} rel="noopener" target="_blank" />}>
+          <GithubLogo className="size-4 text-foreground" />
+          {t("shell.github")}
+        </MenuItem>
       </MenuGroup>
       <MenuSeparator />
       <MenuItem onClick={() => void handleSignOut()}>
@@ -77,21 +87,9 @@ function UserMenuItems(): JSX.Element {
   );
 }
 
-function AdminAvatar(): JSX.Element {
-  const { t } = useT();
-  return (
-    <span
-      aria-hidden="true"
-      className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted font-medium text-muted-foreground text-xs"
-    >
-      {t("shell.avatarInitial")}
-    </span>
-  );
-}
-
 /**
- * The "Admin" user row in the sidebar footer: Check for updates and Sign out. The header has no
- * copy of it; the sidebar row is the one way in.
+ * The "Admin" user row in the sidebar footer, the version number under the name: Check for
+ * updates, GitHub and Sign out. The header has no copy of it; the sidebar row is the one way in.
  */
 export function UserMenu(): JSX.Element {
   return <SidebarUserMenu />;
@@ -100,7 +98,9 @@ export function UserMenu(): JSX.Element {
 function SidebarUserMenu(): JSX.Element {
   const { t } = useT();
   const { isMobile } = useSidebar();
-  const { latest } = useUpdateCheck();
+  const { data } = useQuery(versionQuery());
+  // The bare number (2.1.0), no leading v.
+  const version = data?.version ? stripV(data.version) : null;
   return (
     <Menu>
       <MenuTrigger
@@ -109,17 +109,20 @@ function SidebarUserMenu(): JSX.Element {
             aria-label={t("shell.userMenu")}
             className="data-popup-open:bg-sidebar-row-active data-popup-open:text-sidebar-foreground"
             size="lg"
-            tooltip={t("shell.admin")}
+            tooltip={version ? `${t("shell.admin")} · ${version}` : t("shell.admin")}
           />
         }
       >
-        <span className="relative shrink-0">
-          <AdminAvatar />
-          {latest ? <UpdateDot className="-top-0.5 -right-0.5 outline-sidebar" /> : null}
-        </span>
+        {/*
+         * The admin's mark, bare: no box, as tall as the two lines beside it (17.5 + 15 px). The
+         * icon set's own stroke (1.5 on 24), so it draws 2 px at 32 px and reads as solid.
+         */}
+        <AnimatedIcon icon={UserShield01Icon} aria-hidden="true" className="size-8 shrink-0" />
         <span className="grid flex-1 text-left text-sm leading-tight">
           <span className="truncate font-medium text-sidebar-foreground">{t("shell.admin")}</span>
-          <span className="truncate text-secondary-label text-xs">{t("shell.appName")}</span>
+          {version ? (
+            <span className="truncate text-secondary-label text-xs">{version}</span>
+          ) : null}
         </span>
         <AnimatedIcon icon={EllipsisVerticalIcon} aria-hidden="true" className="ms-auto size-4" />
       </MenuTrigger>
