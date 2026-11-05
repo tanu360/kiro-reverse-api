@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatDateTime, formatTime } from "@/lib/format";
+import { formatTime, unixToDate } from "@/lib/format";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
@@ -101,10 +101,13 @@ describe("RequestsPage", () => {
     const seen = recordRequests();
     const { user, router } = await renderApp("/requests");
     await waitForRows();
-    await user.click(screen.getByRole("button", { name: "Failed" }));
+    // The status filter is a radio group: one tab stop, arrow keys move the choice.
+    expect(screen.getByRole("radiogroup", { name: "Status" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("radio", { name: "Failed" }));
     await waitFor(() => expect(last(seen).get("status")).toBe("failed"));
     expect(router.state.location.search).toEqual({ status: "failed" });
-    expect(screen.getByRole("button", { name: "Failed" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("radio", { name: "Failed" })).toHaveAttribute("aria-checked", "true");
     await waitFor(() => {
       for (const row of bodyRows()) expect(within(row).getByText(/^Failed/)).toBeInTheDocument();
     });
@@ -134,6 +137,20 @@ describe("RequestsPage", () => {
     expect(await screen.findByText("26–50 of 320")).toBeInTheDocument();
   });
 
+  it("changes the page size from the Rows select in the table footer", async () => {
+    const seen = recordRequests();
+    const { user, router } = await renderApp("/requests?page=2");
+    await waitForRows();
+    const rows = screen.getByRole("combobox", { name: "Rows" });
+    expect(rows).toHaveTextContent("25");
+    await user.click(rows);
+    await user.click(await screen.findByRole("option", { name: "50" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ pageSize: 50 }));
+    await waitFor(() => expect(last(seen).get("pageSize")).toBe("50"));
+    expect(last(seen).get("page")).toBe("1");
+    await waitForRows(50);
+  });
+
   it("renders a deep-linked page and page size directly", async () => {
     const seen = recordRequests();
     await renderApp("/requests?page=3&pageSize=50");
@@ -152,7 +169,7 @@ describe("RequestsPage", () => {
     );
     if (!row) throw new Error("auth failure row missing");
     const cells = within(row).getAllByRole("cell");
-    expect(cells[1]).toHaveTextContent("Failed 401");
+    expect(cells[1]).toHaveTextContent(/^Failed 401/);
     expect(cells[2]).toHaveTextContent(/^—$/);
     // The model cell's first line; the endpoint rides under it as a meta line (ModelCell).
     expect(within(cells[5]).getByText("—")).toBeInTheDocument();
@@ -164,14 +181,41 @@ describe("RequestsPage", () => {
     await renderApp("/requests");
     await waitForRows();
     // Ten columns overflowed a 1440 px desktop: the key moves under the account below a 68rem
-    // container, the endpoint under the model below a 7xl one.
+    // container, the endpoint under the model below a 7xl one, and Duration and Error fold under
+    // Credits and Status below a 5xl one.
     const header = (name: string) => screen.getByRole("columnheader", { name: new RegExp(name) });
     expect(header("API key")).toHaveClass("hidden", "@[68rem]/requests:table-cell");
     expect(header("Endpoint")).toHaveClass("hidden", "@7xl/requests:table-cell");
+    expect(header("Duration")).toHaveClass("hidden", "@5xl/requests:table-cell");
+    expect(header("Error")).toHaveClass("hidden", "@5xl/requests:table-cell");
     const row = bodyRows().find((candidate) => within(candidate).queryAllByText(/^sk-/).length);
     if (!row) throw new Error("no row with an API key");
     const cells = within(row).getAllByRole("cell");
     expect(within(cells[2]).getByText(/^sk-/)).toHaveClass("@[68rem]/requests:hidden");
+
+    const failed = mockDb.requests
+      .slice(0, 25)
+      .find((record) => !record.success && record.errorType);
+    if (!failed) throw new Error("no failed row with a category");
+    const failedRow = bodyRows()[mockDb.requests.indexOf(failed)];
+    const status = within(failedRow).getAllByRole("cell")[1];
+    expect(status.querySelector("[data-slot=error-type]")).toHaveClass("@5xl/requests:hidden");
+  });
+
+  it("renders each request as a list row for narrow containers", async () => {
+    await renderApp("/requests");
+    await waitForRows();
+    const list = screen.getByRole("list", { name: "Requests" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(25);
+    const failed = mockDb.requests
+      .slice(0, 25)
+      .find((record) => !record.success && record.message && record.inTokens === 0);
+    if (!failed?.message) throw new Error("no failed row with a message");
+    const item = within(list).getAllByRole("listitem")[mockDb.requests.indexOf(failed)];
+    expect(item).toHaveTextContent(maskEmailsInText(failed.message));
+    expect(item).not.toHaveTextContent(/\btok\b/);
+    const success = mockDb.requests.slice(0, 25).findIndex((record) => record.success);
+    expect(within(list).getAllByRole("listitem")[success]).toHaveTextContent(/\S+ tok · \S+ cr/);
   });
 
   it("opens the detail sheet with the full message on row click", async () => {
@@ -193,6 +237,19 @@ describe("RequestsPage", () => {
     expect(within(dialog).getByTestId("request-message")).toHaveTextContent(masked);
     expect(within(dialog).getByText(String(failed.id))).toBeInTheDocument();
     expect(within(dialog).getByText(failed.accountId)).toBeInTheDocument();
+  });
+
+  it("leads a failed request's sheet with the error and drops the duplicate status code", async () => {
+    const { user } = await renderApp("/requests?status=failed");
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0));
+    await user.click(within(bodyRows()[0]).getAllByRole("cell")[4]);
+    const dialog = await screen.findByRole("dialog");
+    const headings = within(dialog)
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+    expect(headings).toEqual(["Error", "Request", "Tokens", "Account", "IDs"]);
+    expect(within(dialog).queryByText("Status code")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Copy Request ID" })).toBeInTheDocument();
   });
 
   it("opens the sheet with Enter and steps to the next row", async () => {
@@ -220,7 +277,7 @@ describe("RequestsPage", () => {
     const dialog = await screen.findByRole("dialog");
     // The first tabbable control is a copy button with a tooltip; it must not take focus.
     await waitFor(() => expect(dialog).toHaveFocus());
-    expect(within(dialog).getByRole("button", { name: "Copy account ID" })).not.toHaveFocus();
+    expect(within(dialog).getByRole("button", { name: "Copy Account ID" })).not.toHaveFocus();
     expect(document.querySelector("[data-slot=tooltip-popup]")).toBeNull();
 
     await user.keyboard("{Escape}");
@@ -244,17 +301,18 @@ describe("RequestsPage", () => {
     expect(await screen.findByText(/Search also matches the full API key/)).toBeVisible();
   });
 
-  it("shows the time over a short date and keeps the full date in the title", async () => {
+  it("shows the time over a short date in a machine-readable time element", async () => {
     await renderApp("/requests");
     await waitForRows();
     const record = mockDb.requests[0];
     const timeCell = within(bodyRows()[0]).getAllByRole("cell")[0];
     expect(timeCell).toHaveTextContent(formatTime(record.ts, "en"));
     expect(timeCell).toHaveTextContent(formatRowDate(record.ts, "en"));
-    expect(timeCell.querySelector("[title]")).toHaveAttribute(
-      "title",
-      formatDateTime(record.ts, "en"),
+    expect(timeCell.querySelector("time")).toHaveAttribute(
+      "datetime",
+      unixToDate(record.ts).toISOString(),
     );
+    expect(timeCell.querySelector("[title]")).toBeNull();
   });
 
   it("masks emails when privacy mode is on", async () => {
@@ -337,7 +395,7 @@ describe("RequestsPage", () => {
       http.get(RECENT_REQUESTS, () => (fail ? jsonError(500, "database is locked") : undefined)),
     );
     const { user } = await renderApp("/requests");
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load this data");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load requests");
     fail = false;
     await user.click(screen.getByRole("button", { name: "Try again" }));
     await waitForRows();

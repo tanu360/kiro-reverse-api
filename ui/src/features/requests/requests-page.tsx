@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableSort } from "@/components/shared/data-table";
+import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { recentRequestsQuery } from "@/lib/api/requests";
 import type { RequestRecord } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
@@ -25,10 +26,12 @@ import {
   DEFAULT_SORT,
   defaultSortDesc,
   hasFilters,
+  PAGE_SIZES,
+  type PageSize,
   rowKey,
   toQueryParams,
 } from "./request-model";
-import { useRequestColumns } from "./requests-columns";
+import { RequestCard, useRequestColumns } from "./requests-columns";
 import { RequestsToolbar } from "./requests-toolbar";
 
 interface Selection {
@@ -142,6 +145,8 @@ export function RequestsPage(): JSX.Element {
   }
 
   const fatalError = isError && !hasData;
+  // Nothing to page through when the list fits the smallest page, is out of range or failed.
+  const showPager = hasData && total > PAGE_SIZES[0] && !outOfRange && !fatalError;
 
   return (
     <>
@@ -149,36 +154,55 @@ export function RequestsPage(): JSX.Element {
         actions={
           <RefreshButton fetching={query.isFetching} onRefresh={() => void query.refetch()} />
         }
+        description={t("description")}
         title={t("title")}
       />
 
       {/* The container the toolbar and column widths respond to. */}
-      <Card className="@container/requests min-w-0 gap-0 overflow-hidden">
-        <div className="flex flex-col gap-3 border-border/50 border-b p-3 sm:p-4">
-          <RequestsToolbar
-            onPageSizeChange={(next) => updateSearch({ pageSize: next, page: undefined })}
-            onSearchChange={(text) =>
-              updateSearch({ search: text || undefined, page: undefined }, { replace: true })
-            }
-            onStatusChange={(status) => updateSearch({ status, page: undefined })}
-            pageSize={params.pageSize ?? DEFAULT_PAGE_SIZE}
-            search={search.search?.trim() ?? ""}
-            status={search.status}
-          />
-          {data?.persistent === false ? (
-            <p className="flex items-start gap-2 text-muted-foreground text-sm">
-              <HugeiconsIcon
-                icon={InfoIcon}
-                aria-hidden="true"
-                className="mt-0.5 size-4 shrink-0"
-              />
-              {t("memoryNote")}
-            </p>
-          ) : null}
-        </div>
-
+      <DataTableCard
+        className="@container/requests"
+        footer={
+          showPager ? (
+            <DataTablePagination
+              onPageChange={(next) => updateSearch({ page: next })}
+              onPageSizeChange={(next) => {
+                if ((PAGE_SIZES as readonly number[]).includes(next)) {
+                  updateSearch({ pageSize: next as PageSize, page: undefined });
+                }
+              }}
+              page={page}
+              pageSize={pageSize}
+              pageSizeOptions={[...PAGE_SIZES]}
+              total={total}
+            />
+          ) : null
+        }
+        toolbar={
+          <>
+            <RequestsToolbar
+              onSearchChange={(text) =>
+                updateSearch({ search: text || undefined, page: undefined }, { replace: true })
+              }
+              onStatusChange={(status) => updateSearch({ status, page: undefined })}
+              search={search.search?.trim() ?? ""}
+              status={search.status}
+            />
+            {data?.persistent === false ? (
+              <Alert role="note" size="sm" variant="info">
+                <HugeiconsIcon icon={InfoIcon} aria-hidden="true" />
+                <AlertDescription>{t("memoryNote")}</AlertDescription>
+              </Alert>
+            ) : null}
+          </>
+        }
+      >
         {fatalError ? (
-          <ErrorState error={error} onRetry={() => void query.refetch()} />
+          <ErrorState
+            error={error}
+            onRetry={() => void query.refetch()}
+            retrying={query.isFetching}
+            title={t("loadError")}
+          />
         ) : (
           <div
             className={cn(
@@ -188,10 +212,13 @@ export function RequestsPage(): JSX.Element {
           >
             <DataTable<RequestRecord>
               caption={t("table")}
+              cardLayout="divided"
+              cardsBelow="2xl"
               columns={columns}
               data={rows}
               defaultSortDesc={defaultSortDesc}
               emptyState={emptyState}
+              filtered={filtered}
               getRowId={rowKey}
               loading={!hasData && query.isPending}
               onRowClick={openRow}
@@ -202,23 +229,13 @@ export function RequestsPage(): JSX.Element {
                   page: undefined,
                 })
               }
+              pageSize={pageSize}
+              renderCard={(row) => <RequestCard onOpen={() => openRow(row)} record={row} />}
               sort={sort}
             />
           </div>
         )}
-
-        {/* Nothing to page through when the list is empty, filtered to nothing or out of range. */}
-        {hasData && total > 0 && !outOfRange && !fatalError ? (
-          <div className="border-border/50 border-t p-3 sm:px-4">
-            <DataTablePagination
-              onPageChange={(next) => updateSearch({ page: next })}
-              page={page}
-              pageSize={pageSize}
-              total={total}
-            />
-          </div>
-        ) : null}
-      </Card>
+      </DataTableCard>
 
       <RequestDetailSheet
         count={rows.length}

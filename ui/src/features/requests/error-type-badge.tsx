@@ -1,24 +1,27 @@
 import { InfoIcon, OctagonXIcon, TriangleAlertIcon } from "@hugeicons/core-free-icons";
-import type { IconSvgElement } from "@hugeicons/react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { JSX } from "react";
-import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { type ErrorTone, errorTypeTone, isKnownErrorType } from "./request-model";
 
-/** Line icons, so the category reads apart from the disc of the status pill beside it. */
-const TONE_PILL = {
-  muted: { tone: "neutral", icon: InfoIcon },
-  warning: { tone: "warning", icon: TriangleAlertIcon },
-  destructive: { tone: "destructive", icon: OctagonXIcon },
-} as const satisfies Record<ErrorTone, { tone: BadgeTone; icon: IconSvgElement }>;
+/*
+ * Line icons in the tier's colour (the status ramps' disc step, >= 3:1), so the category reads
+ * as a quiet label under or beside the one red "Failed" pill, not as a second pill.
+ */
+const TONE = {
+  muted: { icon: InfoIcon, className: "text-muted-foreground" },
+  warning: { icon: TriangleAlertIcon, className: "text-warning" },
+  destructive: { icon: OctagonXIcon, className: "text-destructive" },
+} as const satisfies Record<ErrorTone, { icon: IconSvgElement; className: string }>;
 
-/** Error category pill: muted, warning or destructive, like the old UI's three tiers. */
-export function ErrorTypeBadge({
+/** Error category: an icon in its tier's colour (muted, warning, destructive) and the label. */
+export function ErrorTypeLabel({
   type,
   className,
 }: {
   type?: string;
+  /** Layout classes only (max-w-full). */
   className?: string;
 }): JSX.Element | null {
   const { t } = useT("requests");
@@ -26,17 +29,17 @@ export function ErrorTypeBadge({
   const label = isKnownErrorType(type) ? t(`errorType.${type}`) : type;
   const tone = errorTypeTone(type);
   return (
-    <Badge
-      className={cn("min-w-0 justify-start", className)}
+    <span
+      className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5", className)}
+      data-slot="error-type"
       data-tone={tone}
-      icon={TONE_PILL[tone].icon}
-      iconStyle="line"
-      title={label}
-      tone={TONE_PILL[tone].tone}
-      variant="soft-outline"
     >
-      {/* Truncates when a narrow column caps the pill's width (the title has the full text). */}
-      <span className="truncate">{label}</span>
-    </Badge>
+      <HugeiconsIcon
+        aria-hidden="true"
+        className={cn("size-3.5 shrink-0", TONE[tone].className)}
+        icon={TONE[tone].icon}
+      />
+      <span className="min-w-0 truncate">{label}</span>
+    </span>
   );
 }
