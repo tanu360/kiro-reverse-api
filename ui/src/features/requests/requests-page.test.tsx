@@ -247,7 +247,8 @@ describe("RequestsPage", () => {
     const headings = within(dialog)
       .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
-    expect(headings).toEqual(["Error", "Request", "Tokens", "Account", "IDs"]);
+    // The first failure used no tokens, so there is no Tokens section (a dash in the table).
+    expect(headings).toEqual(["Error", "Request", "Account", "IDs"]);
     expect(within(dialog).queryByText("Status code")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Copy Request ID" })).toBeInTheDocument();
   });
@@ -379,6 +380,9 @@ describe("RequestsPage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("0–0 of 0")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
+    // Search and the status filter have nothing to narrow yet.
+    expect(screen.queryByRole("searchbox", { name: "Search requests" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
   });
 
   it("offers the first page when the page is out of range", async () => {

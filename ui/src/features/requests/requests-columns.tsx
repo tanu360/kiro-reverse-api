@@ -31,7 +31,9 @@ import { formatRowDate, isKnownEndpoint, normalizeApiKeyMask } from "./request-m
  * the 7xl container step has room for them.
  */
 const NAME_CAP = "max-w-28 @5xl/requests:max-w-32 @7xl/requests:max-w-40";
-const TOKENS_CAP = "max-w-40 @7xl/requests:max-w-none";
+// Model IDs differ only in their version suffix, so the model gets more room than the token line.
+const MODEL_CAP = "max-w-32 @5xl/requests:max-w-40 @7xl/requests:max-w-48";
+const TOKENS_CAP = "max-w-36 @7xl/requests:max-w-none";
 
 function Muted({ children = EMPTY }: { children?: string }): JSX.Element {
   return <span className="text-muted-foreground">{children}</span>;
@@ -93,6 +95,8 @@ function ErrorCell({ record }: { record: RequestRecord }): JSX.Element {
       <Tooltip>
         <TooltipTrigger
           render={
+            // `wrap-anywhere`, not `break-words`: an unbroken token (a JSON body, a URL) would
+            // otherwise set the column's minimum width and scroll the table sideways at 1440 px.
             <span className="line-clamp-2 whitespace-normal text-meta text-muted-foreground leading-snug wrap-anywhere" />
           }
         >
@@ -151,7 +155,7 @@ function ModelCell({ record }: { record: RequestRecord }): JSX.Element {
   return (
     <span className="flex min-w-0 flex-col items-start gap-1">
       {record.model ? (
-        <TruncatedText className={NAME_CAP}>{record.model}</TruncatedText>
+        <TruncatedText className={MODEL_CAP}>{record.model}</TruncatedText>
       ) : (
         <Muted />
       )}

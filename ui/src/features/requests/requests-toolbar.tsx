@@ -64,9 +64,9 @@ export function RequestsToolbar({
       : t("searchPlaceholder");
 
   return (
-    // One row from a phone up; under about 20rem the filter wraps below a full-width search.
+    // One row from the @md container step up; below it each control takes a full-width row.
     <div className="flex min-w-0 flex-wrap items-center gap-2" ref={rootRef}>
-      <InputGroup className="min-w-32 flex-1 @3xl/requests:max-w-md">
+      <InputGroup className="min-w-32 flex-1 basis-full @md/requests:basis-auto @3xl/requests:max-w-md">
         <InputGroupAddon>
           <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
         </InputGroupAddon>
@@ -109,7 +109,7 @@ export function RequestsToolbar({
       </InputGroup>
 
       <SegmentedControl
-        className="ms-auto shrink-0"
+        className="w-full shrink-0 @md/requests:ms-auto @md/requests:w-auto"
         render={
           <RadioGroupPrimitive
             aria-label={t("statusFilter")}
@@ -125,6 +125,7 @@ export function RequestsToolbar({
       >
         {statusOptions.map((option) => (
           <SegmentedControlItem
+            className="flex-1 @md/requests:flex-none"
             key={option.value}
             render={<RadioPrimitive.Root value={option.value} />}
           >

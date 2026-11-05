@@ -19,7 +19,7 @@ import { EMPTY, formatDateTime, formatDurationMs, formatNumber } from "@/lib/for
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { ErrorTypeLabel } from "./error-type-badge";
-import { normalizeApiKeyMask } from "./request-model";
+import { normalizeApiKeyMask, rowKey } from "./request-model";
 import { endpointLabel, StatusBadge } from "./requests-columns";
 
 function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
@@ -114,32 +114,45 @@ export function RequestDetailSheet({
         </Section>
       ) : null;
 
+    // A failure that used no tokens has nothing to break down: the table shows a dash there too.
+    const noUsage =
+      failed &&
+      record.inTokens + record.outTokens === 0 &&
+      !record.cacheReadTokens &&
+      !record.cacheWriteTokens;
+
     body = (
-      <ResponsiveSheetPanel className="flex flex-col gap-6">
+      // Keyed on the record so Previous and Next open each one scrolled to the top.
+      <ResponsiveSheetPanel className="flex flex-col gap-6" key={rowKey(record, position)}>
         {failed ? errorSection : null}
 
         <Section title={t("detail.request")}>
           <KeyValueGrid items={requestItems} />
         </Section>
 
-        <Section title={t("tokens")}>
-          {/* Pairs that read across: input and output, the two cache counts, then the total. */}
-          <KeyValueGrid
-            items={[
-              { label: t("tokens.input"), value: formatNumber(record.inTokens, lang) },
-              { label: t("tokens.output"), value: formatNumber(record.outTokens, lang) },
-              { label: t("tokens.cacheRead"), value: formatNumber(record.cacheReadTokens, lang) },
-              {
-                label: t("tokens.cacheWrite"),
-                value: formatNumber(record.cacheWriteTokens, lang),
-              },
-              {
-                label: t("tokens.total"),
-                value: formatNumber(record.inTokens + record.outTokens, lang),
-              },
-            ]}
-          />
-        </Section>
+        {noUsage ? null : (
+          <Section title={t("tokens")}>
+            {/* Pairs that read across: input and output, the two cache counts, then the total. */}
+            <KeyValueGrid
+              items={[
+                { label: t("tokens.input"), value: formatNumber(record.inTokens, lang) },
+                { label: t("tokens.output"), value: formatNumber(record.outTokens, lang) },
+                {
+                  label: t("tokens.cacheRead"),
+                  value: formatNumber(record.cacheReadTokens, lang),
+                },
+                {
+                  label: t("tokens.cacheWrite"),
+                  value: formatNumber(record.cacheWriteTokens, lang),
+                },
+                {
+                  label: t("tokens.total"),
+                  value: formatNumber(record.inTokens + record.outTokens, lang),
+                },
+              ]}
+            />
+          </Section>
+        )}
 
         <Section title={t("account")}>
           <KeyValueGrid

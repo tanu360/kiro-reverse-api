@@ -145,6 +145,15 @@ export function RequestsPage(): JSX.Element {
   }
 
   const fatalError = isError && !hasData;
+  // Search and the status filter can't narrow an empty log, so they wait for the first request.
+  const showFilters = !hasData || total > 0 || filtered;
+  const memoryNote =
+    data?.persistent === false ? (
+      <Alert role="note" size="sm" variant="info">
+        <HugeiconsIcon icon={InfoIcon} aria-hidden="true" />
+        <AlertDescription>{t("memoryNote")}</AlertDescription>
+      </Alert>
+    ) : null;
   // Nothing to page through when the list fits the smallest page, is out of range or failed.
   const showPager = hasData && total > PAGE_SIZES[0] && !outOfRange && !fatalError;
 
@@ -178,22 +187,21 @@ export function RequestsPage(): JSX.Element {
           ) : null
         }
         toolbar={
-          <>
-            <RequestsToolbar
-              onSearchChange={(text) =>
-                updateSearch({ search: text || undefined, page: undefined }, { replace: true })
-              }
-              onStatusChange={(status) => updateSearch({ status, page: undefined })}
-              search={search.search?.trim() ?? ""}
-              status={search.status}
-            />
-            {data?.persistent === false ? (
-              <Alert role="note" size="sm" variant="info">
-                <HugeiconsIcon icon={InfoIcon} aria-hidden="true" />
-                <AlertDescription>{t("memoryNote")}</AlertDescription>
-              </Alert>
-            ) : null}
-          </>
+          showFilters ? (
+            <>
+              <RequestsToolbar
+                onSearchChange={(text) =>
+                  updateSearch({ search: text || undefined, page: undefined }, { replace: true })
+                }
+                onStatusChange={(status) => updateSearch({ status, page: undefined })}
+                search={search.search?.trim() ?? ""}
+                status={search.status}
+              />
+              {memoryNote}
+            </>
+          ) : (
+            memoryNote
+          )
         }
       >
         {fatalError ? (
