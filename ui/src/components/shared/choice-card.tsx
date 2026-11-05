@@ -124,8 +124,9 @@ export function ChoiceRow({
     <li className="group/choice-row flex">
       <button
         className={cn(
-          // The end rows round with the card, so their focus outline follows its corners.
-          "flex min-h-14 w-full min-w-0 cursor-pointer items-center gap-3 px-4 py-3 text-start outline-none transition-[background-color,scale] hover:bg-accent focus-outline-inset active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64 group-first/choice-row:rounded-t-xl group-last/choice-row:rounded-b-xl",
+          // The end rows round with the card, so their focus outline follows its corners. 52 px
+          // rows (py-2.5), so an eight-row method list fits a 768 px tall screen.
+          "flex min-h-13 w-full min-w-0 cursor-pointer items-center gap-3 px-4 py-2.5 text-start outline-none transition-[background-color,scale] hover:bg-accent focus-outline-inset active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64 group-first/choice-row:rounded-t-xl group-last/choice-row:rounded-b-xl",
           className,
         )}
         type="button"

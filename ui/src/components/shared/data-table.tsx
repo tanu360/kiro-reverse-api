@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { type ColumnDef, tableFeatures, useTable } from "@tanstack/react-table";
 import {
   createContext,
+  Fragment,
   type JSX,
   type KeyboardEvent,
   type MouseEvent,
@@ -10,7 +11,7 @@ import {
   useContext,
   useMemo,
 } from "react";
-import { CARD_GRID_CLASS } from "@/components/shared/list-card";
+import { CARD_GRID_CLASS, ListCardSkeleton } from "@/components/shared/list-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -84,6 +85,12 @@ export interface DataTableProps<T> {
    */
   cardsBelow?: CardsBelow;
   renderCard?: (row: T, ctx: DataTableCardContext) => ReactNode;
+  /**
+   * One card's loading placeholder (a ListCardSkeleton with the real card's parts), repeated
+   * for the rows a page holds. Without it divided rows show a generic ListCard row (title, meta
+   * and two body lines) and stacked or gridded cards a plain block.
+   */
+  renderCardSkeleton?: () => ReactNode;
   /**
    * How the cards sit: a stack, a CardGrid (two columns from @2xl, equal heights), or rows
    * divided inside the surrounding card (ListCard variant="row").
@@ -201,6 +208,7 @@ const SKELETON_ALIGN = {
 } as const;
 const DEFAULT_SKELETON_ROWS = 5;
 const MAX_SKELETON_ROWS = 10;
+// Stacked or gridded cards are tall: three fill a phone screen.
 const SKELETON_CARDS = 3;
 
 interface Boxed<T> {
@@ -220,6 +228,7 @@ export function DataTable<T>({
   rowLabel,
   cardsBelow,
   renderCard,
+  renderCardSkeleton,
   cardLayout = "stack",
   renderMobileCard,
   loading = false,
@@ -334,40 +343,64 @@ export function DataTable<T>({
     cardRenderer && cardSwitch && !showEmpty ? (
       <div className={cardSwitch.cards} data-slot="data-table-cards">
         {showSkeleton ? (
+          // Divided rows are as many as the table's placeholder rows (a page, at most 10), in
+          // a ListCard row's geometry, so the list does not jump when the data arrives.
           <div aria-busy="true" className={cardListClass}>
-            {Array.from({ length: SKELETON_CARDS }, (_, index) =>
-              cardLayout === "divided" ? (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
-                <div className="flex flex-col gap-2 px-4 py-3 sm:px-5" key={index}>
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-3 w-3/4" />
-                </div>
-              ) : (
+            {Array.from(
+              { length: cardLayout === "divided" ? skeletonRows : SKELETON_CARDS },
+              (_, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
-                <Skeleton className="h-20 w-full rounded-xl" key={index} />
+                <Fragment key={index}>
+                  {renderCardSkeleton ? (
+                    renderCardSkeleton()
+                  ) : cardLayout === "divided" ? (
+                    <ListCardSkeleton lines={2} variant="row" />
+                  ) : (
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                  )}
+                </Fragment>
               ),
             )}
           </div>
         ) : (
-          <ul aria-label={caption} className={cardListClass}>
-            {rows.map((row) => {
-              const isSelected = selected?.has(row.id) ?? false;
-              return (
-                <li
-                  data-row-id={row.id}
-                  data-row-index={row.index}
-                  data-state={isSelected ? "selected" : undefined}
-                  key={row.id}
-                  {...hoverProps(row.original)}
-                >
-                  {cardRenderer(row.original, {
-                    selected: isSelected,
-                    toggleSelected: () => toggleOne(row.id),
-                  })}
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            {selection && rows.length > 0 ? (
+              // The table header's select-all, for the cards (they have no header row): one
+              // slim row over the list, its checkbox in line with the cards' own.
+              // biome-ignore lint/a11y/noLabelWithoutControl: the Base UI Checkbox inside is the control.
+              <label
+                className="flex cursor-pointer items-center gap-3 border-border-subtle border-b px-4 py-2.5 text-meta text-muted-foreground transition-colors hover:text-foreground sm:px-5"
+                data-slot="data-table-select-all"
+              >
+                <Checkbox
+                  aria-label={t("table.selectAll")}
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onCheckedChange={toggleAll}
+                />
+                {t("table.selectAll")}
+              </label>
+            ) : null}
+            <ul aria-label={caption} className={cardListClass}>
+              {rows.map((row) => {
+                const isSelected = selected?.has(row.id) ?? false;
+                return (
+                  <li
+                    data-row-id={row.id}
+                    data-row-index={row.index}
+                    data-state={isSelected ? "selected" : undefined}
+                    key={row.id}
+                    {...hoverProps(row.original)}
+                  >
+                    {cardRenderer(row.original, {
+                      selected: isSelected,
+                      toggleSelected: () => toggleOne(row.id),
+                    })}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </div>
     ) : null;
@@ -471,7 +504,10 @@ export function DataTable<T>({
                           14 px meta line: 34 px, the Accounts name cell), so the rows keep
                           their height when data arrives.
                           They sit on the column's side: a figure column's bars end at its
-                          right-aligned header.
+                          right-aligned header. Fixed widths, not fractions of the cell: an
+                          auto-width column then keeps about its data width while loading
+                          instead of shrinking to its header beside a full-width name column.
+                          They still shrink in a column narrower than that (flex items).
                         */}
                         <div className="flex flex-col">
                           <span
@@ -481,7 +517,7 @@ export function DataTable<T>({
                               SKELETON_ALIGN[column.align ?? "start"],
                             )}
                           >
-                            <Skeleton className="h-3.5 w-3/4 max-w-32" />
+                            <Skeleton className="h-3.5 w-24" />
                           </span>
                           <span
                             className={cn(
@@ -490,7 +526,7 @@ export function DataTable<T>({
                               SKELETON_ALIGN[column.align ?? "start"],
                             )}
                           >
-                            <Skeleton className="h-3 w-1/2 max-w-20" />
+                            <Skeleton className="h-3 w-14" />
                           </span>
                         </div>
                       </TableCell>

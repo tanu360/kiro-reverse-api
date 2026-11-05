@@ -24,10 +24,12 @@ import { cn } from "@/lib/utils";
  * The prev/next chevrons: in the topbar search pill's surface (command-menu.tsx: the --field
  * tint and the --input hairline), so they read on the page in both themes, with the 8 px corners
  * of every button. Sized by the Button's `icon` step, like the page numbers. Disabled keeps the
- * box, dimmed like every disabled control, with a muted chevron.
+ * box, dimmed like every disabled control, with a muted chevron. The hover fill is hover-guarded
+ * (Tailwind's `hover:` only applies on a hover-capable pointer), so a tapped chevron does not keep
+ * it on touch; pressed shows it on every pointer.
  */
 export const PAGER_CHEVRON_CLASS =
-  "border-input bg-(--field) text-foreground [:hover,[data-pressed]]:bg-(--field-hover) disabled:text-muted-foreground";
+  "border-input bg-(--field) text-foreground hover:bg-(--field-hover) data-pressed:bg-(--field-hover) disabled:text-muted-foreground";
 // The page numbers: quiet buttons; the current page takes the accent fill, the same surface as
 // a selected segment.
 const PAGE = "tabular-nums";
@@ -127,8 +129,18 @@ export function DataTablePagination({
               }}
               value={String(pageSize)}
             >
-              {/* The default step (36 / 32 / coarse 40) matches the icon buttons beside it. */}
-              <SelectTrigger aria-labelledby={sizeLabelId} fit="content" size="default">
+              {/*
+                The default step (36 / 32 / coarse 40) matches the icon buttons beside it.
+                min-w-16 keeps the trigger at least 4rem wide, past index.css popup-width's
+                icon floor (11rem for narrower anchors), so the list fits its numbers instead of
+                spreading over the pager.
+              */}
+              <SelectTrigger
+                aria-labelledby={sizeLabelId}
+                className="min-w-16"
+                fit="content"
+                size="default"
+              >
                 <SelectValue className="tabular-nums" />
               </SelectTrigger>
               <SelectPopup fit="content">

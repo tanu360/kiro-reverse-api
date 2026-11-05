@@ -32,7 +32,7 @@ export const BODY_PROSE = "text-pretty text-muted-foreground text-sm leading-rel
 /** A row's inline padding (the card's), for a row element that is not a SettingsRow. */
 export const SETTINGS_ROW_X = "min-w-0 px-4 sm:px-5";
 
-type ControlWidth = "field" | "number" | "auto";
+type ControlWidth = "field" | "number" | "actions" | "auto";
 
 /*
  * The control sits beside the text once the row has room for both (the text column's 16rem, the
@@ -42,7 +42,12 @@ type ControlWidth = "field" | "number" | "auto";
 const CONTROL_WIDTH: Record<ControlWidth, string> = {
   field: "w-full @xl/settings-row:w-72",
   number: "w-full @md/settings-row:w-36",
-  auto: "flex shrink-0 justify-end",
+  // Buttons (Edit and Remove): their own width beside the text, so a long title keeps the room
+  // a 18rem field slot would leave empty; under the text on a narrow row, like a field.
+  actions: "w-full @xl/settings-row:w-auto",
+  // A switch or one button, kept on the title's line: a 20 px box (the title's line height) that
+  // the control centres in, overflowing it into the row's padding when taller.
+  auto: "col-start-2 row-start-1 flex h-5 shrink-0 items-center justify-end",
 };
 
 /** A row title: a Label for the control when `htmlFor` is set, red in a danger row. */
@@ -89,9 +94,11 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string; "ari
  * aria-labelledby and aria-describedby, so a control without a visible label of its own is
  * named and described by the row. `children` go under the description (a current value, an
  * error). `controlWidth` sizes the control slot: a text field or select (`field`), a number
- * field (`number`), or the control's own width (`auto`: a switch or a button, kept on the
- * title's line). A Button control keeps its own name (its label, "Add rule"): the row title is
- * not put on it, only the description. `labelControl` overrides that either way.
+ * field (`number`), a group of buttons at their own width (`actions`), or the control's own
+ * width (`auto`: a switch or a button, kept on the title's line at every width, while `children`
+ * such as a warning notice take the row's full width under the description). A Button control
+ * keeps its own name (its label, "Add rule"): the row title is not put on it, only the
+ * description. `labelControl` overrides that either way.
  */
 export function SettingsRow({
   title,
@@ -139,32 +146,61 @@ export function SettingsRow({
       "aria-describedby": joinIds(own["aria-describedby"], hintId),
     });
   }
-  const auto = controlWidth === "auto";
+  const titleRow = (
+    <div className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      <SettingsRowTitle htmlFor={htmlFor} id={titleId} tone={tone}>
+        {title}
+      </SettingsRowTitle>
+      {status}
+    </div>
+  );
+  const hint = description ? (
+    <p className={ROW_DESCRIPTION} id={hintId}>
+      {description}
+    </p>
+  ) : null;
+  const slot = wired ? <div className={CONTROL_WIDTH[controlWidth]}>{wired}</div> : null;
+
+  if (controlWidth === "auto") {
+    // Two columns: the title and description beside the control, which stays on the title's
+    // line however many lines they take; `children` span both columns under them.
+    return (
+      <div
+        className={cn(
+          "@container/settings-row grid gap-x-8 py-4",
+          slot ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1",
+          SETTINGS_ROW_X,
+          className,
+        )}
+        data-slot="settings-row"
+      >
+        <div className="flex min-w-0 flex-col gap-1">
+          {titleRow}
+          {hint}
+        </div>
+        {slot}
+        {children ? (
+          <div className="col-span-full flex min-w-0 flex-col gap-1 pt-1">{children}</div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "@container/settings-row flex items-center justify-between gap-x-8 gap-y-3 py-4",
+        "@container/settings-row flex flex-wrap items-center justify-between gap-x-8 gap-y-3 py-4",
         SETTINGS_ROW_X,
-        auto ? "flex-nowrap" : "flex-wrap",
         className,
       )}
       data-slot="settings-row"
     >
       <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
-        <div className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <SettingsRowTitle htmlFor={htmlFor} id={titleId} tone={tone}>
-            {title}
-          </SettingsRowTitle>
-          {status}
-        </div>
-        {description ? (
-          <p className={ROW_DESCRIPTION} id={hintId}>
-            {description}
-          </p>
-        ) : null}
+        {titleRow}
+        {hint}
         {children}
       </div>
-      {wired ? <div className={CONTROL_WIDTH[controlWidth]}>{wired}</div> : null}
+      {slot}
     </div>
   );
 }

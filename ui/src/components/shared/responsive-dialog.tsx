@@ -57,9 +57,10 @@ export interface ResponsiveDialogProps {
 }
 
 /**
- * The title row: an optional back arrow, then the title. The arrow is the close X's size and is
- * pulled out of the row's height (-my-2), so the title sits on the same line with and without it
- * and does not jump between a flow's first step and the next.
+ * The title row: an optional back arrow, then the title. The arrow is the close X's size, in a
+ * box one title line tall (h-lh at the title's size) that it overflows, so the title sits on the
+ * same line with and without it and does not jump between a flow's first step and the next, and
+ * the arrow stays on the first line when a long title wraps.
  */
 function TitleRow({
   title,
@@ -74,16 +75,18 @@ function TitleRow({
 }): JSX.Element {
   if (!onBack) return <Title>{title}</Title>;
   return (
-    <div className="flex min-w-0 items-center gap-1.5" data-slot="responsive-dialog-title-row">
-      <Button
-        aria-label={backLabel}
-        className="-my-2 -ms-2 shrink-0"
-        onClick={onBack}
-        size="icon"
-        variant="ghost"
-      >
-        <HugeiconsIcon aria-hidden="true" icon={ArrowLeft01Icon} />
-      </Button>
+    <div className="flex min-w-0 items-start gap-1.5" data-slot="responsive-dialog-title-row">
+      <span className="flex h-lh shrink-0 items-center text-subtitle">
+        <Button
+          aria-label={backLabel}
+          className="-ms-2 shrink-0"
+          onClick={onBack}
+          size="icon"
+          variant="ghost"
+        >
+          <HugeiconsIcon aria-hidden="true" icon={ArrowLeft01Icon} />
+        </Button>
+      </span>
       <Title className="min-w-0">{title}</Title>
     </div>
   );

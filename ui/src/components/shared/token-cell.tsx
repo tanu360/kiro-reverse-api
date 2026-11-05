@@ -6,8 +6,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * Token use in two fixed lines, so every row of a table is the same height: the total with
- * "In X · Out Y" beside it, then "Cache read A, write B" when the request used the cache. The
- * cache line never wraps; it truncates, and the tooltip carries every exact count.
+ * "In X · Out Y" beside it, then "Cache read A, write B" when the request used the cache.
+ * Neither line wraps; the breakdown and the cache line truncate, and the tooltip carries every
+ * exact count.
  */
 export function TokenCell({
   inTokens,
@@ -57,9 +58,13 @@ export function TokenCell({
           />
         }
       >
-        <span className="flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="font-medium">{total === 0 ? "0" : formatCompact(total)}</span>
-          <span className="whitespace-nowrap text-meta text-muted-foreground leading-none">
+        {/*
+          One line: the breakdown truncates rather than wrapping under the total, so a narrow
+          column keeps every row two lines tall (the tooltip has the exact counts).
+        */}
+        <span className="flex max-w-full flex-nowrap items-baseline gap-x-2">
+          <span className="shrink-0 font-medium">{total === 0 ? "0" : formatCompact(total)}</span>
+          <span className="min-w-0 truncate whitespace-nowrap text-meta text-muted-foreground leading-none">
             {`${t("tokens.in")} ${formatCompact(inTokens)} · ${t("tokens.out")} ${formatCompact(outTokens)}`}
           </span>
         </span>

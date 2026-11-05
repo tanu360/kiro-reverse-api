@@ -46,7 +46,11 @@ function ConfirmTitle({ title, target }: { title: string; target?: string }): JS
   return (
     <>
       {title.slice(0, at)}
-      <span className="wrap-anywhere" data-slot="confirm-target">
+      {/*
+        An inline block: a date and time moves to the next line whole instead of leaving "PM?"
+        on its own, and a long email or file name still breaks anywhere inside it.
+      */}
+      <span className="inline-block max-w-full wrap-anywhere" data-slot="confirm-target">
         {target}
       </span>
       {title.slice(at + target.length)}

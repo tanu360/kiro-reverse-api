@@ -404,4 +404,54 @@ describe("DataTable", () => {
     await user.unhover(bravo);
     expect(onRowHover).toHaveBeenLastCalledWith(null);
   });
+
+  it("puts a select-all row over the cards, which have no header row", async () => {
+    const onChange = vi.fn();
+    const { container, user } = renderWithProviders(
+      <DataTable
+        cardLayout="divided"
+        columns={COLUMNS}
+        data={ROWS}
+        getRowId={(row) => row.id}
+        renderCard={(row) => <div>Card {row.name}</div>}
+        selection={{ selected: new Set(["b"]), onChange, rowLabel: (row) => row.name }}
+      />,
+    );
+    const cards = container.querySelector('[data-slot="data-table-cards"]') as HTMLElement;
+    const all = within(cards).getByRole("checkbox", { name: "Select all" });
+    expect(all).toHaveAttribute("aria-checked", "mixed");
+    // The row's label text toggles it too, not only the 16 px box.
+    await user.click(within(cards).getByText("Select all"));
+    expect(onChange).toHaveBeenLastCalledWith(new Set(["b", "a", "c"]));
+  });
+
+  it("shows a page of ListCard-shaped placeholder rows while divided cards load", () => {
+    const { container, unmount } = renderWithProviders(
+      <DataTable
+        cardLayout="divided"
+        columns={COLUMNS}
+        data={[]}
+        getRowId={(row) => row.id}
+        loading
+        pageSize={25}
+        renderCard={(row) => <div>Card {row.name}</div>}
+      />,
+    );
+    const cards = container.querySelector('[data-slot="data-table-cards"]') as HTMLElement;
+    expect(cards.querySelectorAll('[data-slot="list-card-skeleton"]')).toHaveLength(10);
+    unmount();
+    renderWithProviders(
+      <DataTable
+        cardLayout="divided"
+        columns={COLUMNS}
+        data={[]}
+        getRowId={(row) => row.id}
+        loading
+        pageSize={4}
+        renderCard={(row) => <div>Card {row.name}</div>}
+        renderCardSkeleton={() => <div data-testid="own-skeleton" />}
+      />,
+    );
+    expect(screen.getAllByTestId("own-skeleton")).toHaveLength(4);
+  });
 });
