@@ -14,7 +14,7 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { TruncatedText } from "@/components/shared/truncated-text";
-import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Badge, type BadgeProps, type BadgeTone } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterLabel, MeterTrack } from "@/components/ui/meter";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
@@ -64,9 +64,12 @@ function nowSec(): number {
 export function StatusPill({
   account,
   plain = false,
+  size,
 }: {
   account: Account;
   plain?: boolean;
+  /** The Badge size; `sm` on the phone cards' meta line. */
+  size?: BadgeProps["size"];
 }): JSX.Element {
   const { t } = useT("accounts");
   const status = accountStatus(account, nowSec());
@@ -77,7 +80,7 @@ export function StatusPill({
   const label = t(`health.${status}`);
   if (!reason) {
     return (
-      <Badge data-status={status} icon={pill.icon} tone={pill.tone}>
+      <Badge data-status={status} icon={pill.icon} size={size} tone={pill.tone}>
         {label}
       </Badge>
     );
@@ -85,7 +88,9 @@ export function StatusPill({
   return (
     <Tooltip>
       {/* Not a tab stop: the reason is also in the detail sheet. */}
-      <TooltipTrigger render={<Badge data-status={status} icon={pill.icon} tone={pill.tone} />}>
+      <TooltipTrigger
+        render={<Badge data-status={status} icon={pill.icon} size={size} tone={pill.tone} />}
+      >
         {label}
       </TooltipTrigger>
       <TooltipPopup>{reason}</TooltipPopup>
@@ -214,11 +219,11 @@ export function UsageMeter({
   const pct = usagePercent(hasPlan ? account.usagePercent : account.trialUsagePercent);
   return (
     <Meter className={cn("w-full min-w-32 gap-1.5", className)} max={100} min={0} value={pct}>
-      <div className="flex items-baseline justify-between gap-2 text-xs leading-none">
+      <div className="flex items-baseline justify-between gap-2 text-meta leading-none">
         <span className="flex min-w-0 items-baseline gap-1.5">
           <MeterLabel
             className={cn(
-              "shrink-0 font-normal text-muted-foreground text-xs",
+              "shrink-0 font-normal text-meta text-muted-foreground",
               hasPlan && "sr-only",
             )}
           >

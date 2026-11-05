@@ -2,7 +2,6 @@ import { PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
-import { Code } from "@/components/shared/code";
 import { ModelLogo } from "@/components/shared/model-logo";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import {
@@ -14,6 +13,14 @@ import {
   AutocompletePopup,
 } from "@/components/ui/autocomplete";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardHeader,
+  CardHeading,
+  CardPanel,
+  CardTitle,
+} from "@/components/ui/card";
 import { getAccountModelsCached, testAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -230,7 +237,7 @@ export function TestAccountDialog({
                 {(item: string) => (
                   <AutocompleteItem key={item} value={item}>
                     <ModelLogo model={item} />
-                    <Code>{item}</Code>
+                    <span className="font-mono text-meta">{item}</span>
                   </AutocompleteItem>
                 )}
               </AutocompleteList>
@@ -247,40 +254,50 @@ export function TestAccountDialog({
           </p>
         </div>
 
-        <div className="flex flex-col rounded-lg border border-border">
-          <div className="flex items-center justify-between gap-2 border-border-subtle border-b px-3 py-2">
-            <h3 className="font-medium text-sm/5">{t("testLog.title")}</h3>
-            <Button
-              disabled={lines.length === 0}
-              onClick={() => setLines([])}
-              size="sm"
-              variant="ghost"
-            >
-              {t("testLog.clear")}
-            </Button>
-          </div>
+        <Card divided>
+          <CardHeader>
+            <CardHeading>
+              <CardTitle render={(props) => <h3 {...props} />}>{t("testLog.title")}</CardTitle>
+            </CardHeading>
+            <CardAction>
+              <Button
+                disabled={lines.length === 0}
+                onClick={() => setLines([])}
+                size="sm"
+                variant="ghost"
+              >
+                {t("testLog.clear")}
+              </Button>
+            </CardAction>
+          </CardHeader>
           {lines.length === 0 ? (
-            <p className="min-h-32 p-3 text-muted-foreground text-sm">{t("testLog.empty")}</p>
+            <CardPanel className="min-h-32 text-muted-foreground text-sm" render={<p />}>
+              {t("testLog.empty")}
+            </CardPanel>
           ) : (
-            <ol
+            <CardPanel
               aria-label={t("testLog.title")}
-              className="scrollbar-y max-h-64 min-h-32 overflow-y-auto p-3 font-mono text-xs tabular-nums leading-relaxed"
+              className="scrollbar-y max-h-64 min-h-32 overflow-y-auto font-mono text-meta tabular-nums leading-relaxed"
               ref={logRef}
+              render={<ol />}
               role="log"
             >
               {lines.map((line) => (
+                // The time is its own column: a long line wraps under its text, not under it.
                 <li
-                  className={cn("break-words", LOG_CLASS[line.type])}
+                  className={cn("flex gap-2", LOG_CLASS[line.type])}
                   data-type={line.type}
                   key={line.id}
                 >
-                  <span className="me-2 text-muted-foreground">{line.time}</span>
-                  <LogText keep={line.keep} text={line.text} />
+                  <span className="shrink-0 text-muted-foreground">{line.time}</span>
+                  <span className="min-w-0 break-words">
+                    <LogText keep={line.keep} text={line.text} />
+                  </span>
                 </li>
               ))}
-            </ol>
+            </CardPanel>
           )}
-        </div>
+        </Card>
       </div>
     </ResponsiveDialog>
   );

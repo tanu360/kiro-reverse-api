@@ -2,7 +2,6 @@ import { BoxesIcon, ListRestartIcon, ScanSearchIcon } from "@hugeicons/core-free
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { Code } from "@/components/shared/code";
 import { ListCard } from "@/components/shared/list-card";
 import { ModelLogo } from "@/components/shared/model-logo";
 import { SectionCard } from "@/components/shared/section-card";
@@ -46,26 +45,24 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
   return (
     <SectionCard
       actions={
-        <>
-          <Button
-            loading={load.isPending}
-            onClick={() => load.mutate()}
-            size="sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
-            {t("detail.loadModels")}
-          </Button>
-          <Button
-            loading={refresh.isPending}
-            onClick={() => refresh.mutate()}
-            size="sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={ListRestartIcon} aria-hidden="true" />
-            {t("detail.refreshModelCache")}
-          </Button>
-        </>
+        <Button loading={load.isPending} onClick={() => load.mutate()} size="sm" variant="outline">
+          <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
+          {t("detail.loadModels")}
+        </Button>
+      }
+      // The route-cache refresh sits in the footer (action on the right), so the header keeps
+      // one row in the sheet's narrow card.
+      footer={
+        <Button
+          className="ms-auto"
+          loading={refresh.isPending}
+          onClick={() => refresh.mutate()}
+          size="sm"
+          variant="outline"
+        >
+          <HugeiconsIcon icon={ListRestartIcon} aria-hidden="true" />
+          {t("detail.refreshModelCache")}
+        </Button>
       }
       icon={BoxesIcon}
       slim
@@ -99,7 +96,7 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
                 leading={<ModelLogo className="size-4" model={model.modelId} />}
                 meta={model.description || undefined}
                 render={<li />}
-                title={<Code>{model.modelId}</Code>}
+                title={<span className="font-mono text-meta">{model.modelId}</span>}
                 variant="row"
               />
             ))}

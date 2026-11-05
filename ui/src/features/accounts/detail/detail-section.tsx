@@ -2,7 +2,6 @@ import { PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
 import { type FormEvent, type JSX, type ReactNode, useId } from "react";
-import { Code } from "@/components/shared/code";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { ROW_DESCRIPTION, SettingsRow } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
@@ -33,10 +32,14 @@ export function useSaveAccountField(accountId: string) {
   });
 }
 
-/** The saved value under a row's title: muted text, or the mono Code chip for an ID or a URL. */
+/** The saved value under a row's title: muted text, set in mono for an ID or a URL. */
 function FieldValue({ value, mono }: { value: string; mono: boolean }): JSX.Element {
   if (mono && value !== "") {
-    return <Code className="block w-fit max-w-full truncate">{value}</Code>;
+    return (
+      <span className="block min-w-0 truncate font-mono text-meta text-muted-foreground">
+        {value}
+      </span>
+    );
   }
   return (
     <span className="block min-w-0 truncate text-muted-foreground text-sm tabular-nums">
@@ -66,7 +69,7 @@ export function EditableFieldRow({
   title: string;
   /** The saved value; empty shows a dash. */
   value: string;
-  /** An ID or a URL: shown in the mono Code chip. */
+  /** An ID or a URL: set in mono. */
   mono?: boolean;
   hint?: ReactNode;
   open: boolean;
@@ -98,6 +101,7 @@ export function EditableFieldRow({
           </Button>
         }
         controlWidth="auto"
+        labelControl
         title={title}
       >
         <FieldValue mono={mono} value={value} />

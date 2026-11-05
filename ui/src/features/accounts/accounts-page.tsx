@@ -16,7 +16,9 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { AddAccountDialog } from "@/features/add-account/add-account-dialog";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { accountsQuery, refreshAllModels } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
@@ -72,6 +74,7 @@ export function AccountsPage(): JSX.Element {
   const navigate = useNavigate({ from: "/accounts" });
   const confirm = useConfirm();
   const displayEmail = useDisplayEmail();
+  const phone = useMediaQuery("max-sm");
 
   const query = useQuery(accountsQuery());
   const accounts = query.data ?? NO_ACCOUNTS;
@@ -236,11 +239,36 @@ export function AccountsPage(): JSX.Element {
         shown={sorted.length}
         sort={sort}
         tabActions={
-          // Quiet, at the end of the tab row; icon-only on phones.
-          <Button onClick={() => onExport()} size="sm" variant="ghost">
-            <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
-            <span className="max-sm:sr-only">{t("actions.export")}</span>
-          </Button>
+          // A neutral secondary action at the end of the tab row; a square icon button with a
+          // tooltip on phones. It waits for the list, so it never exports an empty fleet.
+          phone ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label={t("actions.export")}
+                    disabled={query.isPending}
+                    onClick={() => onExport()}
+                    size="icon-sm"
+                    variant="outline"
+                  />
+                }
+              >
+                <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+              </TooltipTrigger>
+              <TooltipPopup>{t("actions.export")}</TooltipPopup>
+            </Tooltip>
+          ) : (
+            <Button
+              disabled={query.isPending}
+              onClick={() => onExport()}
+              size="sm"
+              variant="outline"
+            >
+              <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+              {t("actions.export")}
+            </Button>
+          )
         }
       />
     );
@@ -264,9 +292,10 @@ export function AccountsPage(): JSX.Element {
         actions={
           // One refresh only: Refresh models, then Add account. The list itself refetches on
           // focus and after every action, so it needs no refresh button of its own. Export sits
-          // at the end of the status tab row.
-          <>
-            {noAccounts ? null : (
+          // at the end of the status tab row. An empty list shows neither: its empty state
+          // carries the one primary Add account, and the header text gets the full width.
+          noAccounts ? undefined : (
+            <>
               <Button
                 aria-label={t("models.refreshAll")}
                 onClick={() => void onRefreshAllModels()}
@@ -276,12 +305,12 @@ export function AccountsPage(): JSX.Element {
                 <span className="sm:hidden">{t("models.refreshShort")}</span>
                 <span className="max-sm:hidden">{t("models.refreshAll")}</span>
               </Button>
-            )}
-            <Button onClick={() => setAddOpen(true)}>
-              <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-              {t("actions.add")}
-            </Button>
-          </>
+              <Button onClick={() => setAddOpen(true)}>
+                <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+                {t("actions.add")}
+              </Button>
+            </>
+          )
         }
         description={t("description")}
         title={t("title")}

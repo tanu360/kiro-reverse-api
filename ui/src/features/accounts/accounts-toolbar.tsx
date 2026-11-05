@@ -5,7 +5,7 @@ import {
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type JSX, type ReactNode, useMemo } from "react";
+import { type JSX, type ReactNode, useEffect, useMemo, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Group, GroupSeparator, GroupText } from "@/components/ui/group";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { selectTriggerIconClassName } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
@@ -203,25 +204,60 @@ function SortSelect({
 
 type StatusTab = typeof ALL | StatusGroup;
 
+/** The scroll box's edge fade (ScrollArea's --fade-size): a tab under it reads as cut off. */
+const TAB_FADE_PX = 24;
+
+/**
+ * Brings the selected tab into the visible part of the scrolling track, centred, when it sits
+ * outside it or under an edge fade: on load (a `?status=` link, a reload) and on every change.
+ * Only the track scrolls, never the page. The first move is instant, later ones glide.
+ */
+function useSelectedTabInView(value: StatusTab) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `value` moves the selected tab.
+  useEffect(() => {
+    const smooth = mountedRef.current;
+    mountedRef.current = true;
+    const tab = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    const viewport = tab?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]');
+    if (!tab || !viewport) return;
+    const box = viewport.getBoundingClientRect();
+    const rect = tab.getBoundingClientRect();
+    if (box.width === 0) return;
+    const hidden = rect.left < box.left + TAB_FADE_PX || rect.right > box.right - TAB_FADE_PX;
+    if (!hidden) return;
+    const left = viewport.scrollLeft + rect.left + rect.width / 2 - (box.left + box.width / 2);
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    viewport.scrollTo?.({ left, behavior: smooth && !reduce ? "smooth" : "auto" });
+  }, [value]);
+  return listRef;
+}
+
 /**
  * All, Active, Needs attention and Disabled, each with its count, as one segmented control that
- * scrolls sideways (fading at the edge) when the row is too narrow. `end` sits at the right of
- * the same row, outside the tablist.
+ * scrolls sideways (fading at the edge) when the row is too narrow; the selected tab is kept in
+ * view. `end` sits at the right of the same row, outside the tablist. While `loading` the tabs
+ * keep their place, disabled, with a placeholder for each count (zero counts would read as an
+ * empty fleet), so the table does not shift when the list arrives.
  */
 function StatusTabs({
   value,
   counts,
   total,
+  loading,
   onValueChange,
   end,
 }: {
   value: StatusTab;
   counts: Record<StatusGroup, number>;
   total: number;
+  loading: boolean;
   onValueChange: (value: StatusTab) => void;
   end?: ReactNode;
 }): JSX.Element {
   const { t, lang } = useT("accounts");
+  const listRef = useSelectedTabInView(value);
   const label: Record<StatusTab, string> = {
     all: t("filter.all"),
     active: t("health.active"),
@@ -230,18 +266,24 @@ function StatusTabs({
   };
   const tabs: StatusTab[] = [ALL, ...STATUS_GROUPS];
   return (
-    <div className="flex min-w-0 items-center gap-2">
+    // Top-aligned: the scrollbar lane under an overflowing track must not push `end` down.
+    <div className="flex min-w-0 items-start gap-2">
       <Tabs
         className="min-w-0 flex-1"
         onValueChange={(next) => onValueChange(next as StatusTab)}
         value={value}
       >
-        <ScrollArea scrollFade>
-          <TabsList aria-label={t("filter.status")} size="sm">
+        {/* The sideways bar gets its own lane under the track instead of crossing the pills. */}
+        <ScrollArea scrollFade scrollbarGutter>
+          <TabsList aria-label={t("filter.status")} ref={listRef} size="sm">
             {tabs.map((tab) => (
-              <TabsTab key={tab} value={tab}>
+              <TabsTab disabled={loading} key={tab} value={tab}>
                 {label[tab]}
-                <Badge size="sm">{formatNumber(tab === ALL ? total : counts[tab], lang)}</Badge>
+                {loading ? (
+                  <Skeleton className="h-4 w-6" />
+                ) : (
+                  <Badge size="sm">{formatNumber(tab === ALL ? total : counts[tab], lang)}</Badge>
+                )}
               </TabsTab>
             ))}
           </TabsList>
@@ -261,8 +303,9 @@ export interface AccountsToolbarProps {
   /** Rows after filtering, for the "12 of 48" count. */
   shown: number;
   /**
-   * The list has not loaded yet: only the search shows, because zero counts and raw filter
-   * values (a URL's `plan=pro`) would read as an empty fleet.
+   * The list has not loaded yet: the search, the status tabs disabled with placeholder counts
+   * and a placeholder for the filter row, because zero counts and raw filter values (a URL's
+   * `plan=pro`) would read as an empty fleet.
    */
   loading: boolean;
   sort: AccountSort | undefined;
@@ -275,10 +318,12 @@ export interface AccountsToolbarProps {
 
 /**
  * Status tabs (All, Active, Needs attention, Disabled, with counts), then a wrapping row: search
- * (a row of its own below a 64rem card), "Sort by", a "Label: Value" select per filter, Clear and
- * the result count. It lives in DataTableCard's toolbar slot. A filter is offered
- * only when the list has two or more values of it (or a filter on it is set). Needs attention
- * groups the problem statuses; once it is picked, an Issue select narrows it to one of them.
+ * (a row of its own below a 64rem card), the filter controls ("Sort by", a "Label: Value" select
+ * per filter), Clear and the result count. Below a 32rem card the filter controls stay on one
+ * row that scrolls sideways, like the tabs, instead of wrapping into a tall stack. It lives in
+ * DataTableCard's toolbar slot. A filter is offered only when the list has two or more values of
+ * it (or a filter on it is set). Needs attention groups the problem statuses; once it is picked,
+ * an Issue select narrows it to one of them.
  */
 export function AccountsToolbar({
   accounts,
@@ -317,16 +362,22 @@ export function AccountsToolbar({
   const issueOptions = options.status.filter(
     (option) => statusGroup(option.value as AccountStatus) === "attention",
   );
-  const issue = filters.status === "attention" ? undefined : filters.status;
+  // One problem status inside Needs attention ("active" and "disabled" are tabs, not issues).
+  const issue = tab === "attention" && filters.status !== "attention" ? filters.status : undefined;
   const showIssue = tab === "attention" && (issueOptions.length > 1 || issue !== undefined);
 
   const selectDimensions = SELECT_DIMENSIONS.filter(
     (dimension) => options[dimension].length > 1 || filters[dimension] !== undefined,
   );
-  const hasFilters =
-    Boolean(filters.q) || FILTER_DIMENSIONS.some((dimension) => filters[dimension] !== undefined);
-  const showTabs = !loading && (accounts.length > 0 || filters.status !== undefined);
+  // A status tab on its own is not a refinement: its badge already gives the count, so Clear
+  // and "34 of 120" show only for a search, a select or an Issue.
+  const refined =
+    Boolean(filters.q) ||
+    SELECT_DIMENSIONS.some((dimension) => filters[dimension] !== undefined) ||
+    issue !== undefined;
+  const showTabs = loading || accounts.length > 0 || filters.status !== undefined;
   const showSort = accounts.length > 1 || sort !== undefined;
+  const hasControls = showSort || showIssue || selectDimensions.length > 0;
 
   return (
     <div className="flex min-w-0 flex-col gap-3" data-slot="accounts-toolbar">
@@ -334,6 +385,7 @@ export function AccountsToolbar({
         <StatusTabs
           counts={groupCounts}
           end={tabActions}
+          loading={loading}
           onValueChange={(next) =>
             onFiltersChange({ status: next === ALL ? undefined : (next as AccountStatusFilter) })
           }
@@ -342,7 +394,7 @@ export function AccountsToolbar({
         />
       ) : null}
 
-      {/* Below a 64rem card the search has a row of its own and the filters wrap under it. */}
+      {/* Below a 64rem card the search has a row of its own and the filters follow under it. */}
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <InputGroup className="@5xl/accounts:w-64">
           <InputGroupAddon>
@@ -358,34 +410,47 @@ export function AccountsToolbar({
           />
         </InputGroup>
 
-        {loading ? null : (
+        {loading ? (
+          // The filter row's height: a control's, plus the scroll lane it has below a 32rem card.
+          <Skeleton className="h-9 w-40 @max-lg/accounts:mb-2.5 sm:h-8 pointer-coarse:h-10" />
+        ) : (
           <>
-            {showSort ? <SortSelect desc={desc} onChange={onSortChange} sort={sort} /> : null}
+            {hasControls ? (
+              // One sideways-scrolling row below a 32rem card; from there up the controls wrap.
+              // The 4 px bleed (-m-1 with p-1 inside) keeps the buttons' focus outline unclipped.
+              <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade scrollbarGutter>
+                <div className="flex w-max items-center gap-2 p-1 @lg/accounts:w-auto @lg/accounts:flex-wrap">
+                  {showSort ? <SortSelect desc={desc} onChange={onSortChange} sort={sort} /> : null}
 
-            {showIssue ? (
-              <FilterSelect
-                label={t("filter.dim.issue")}
-                onValueChange={(value) =>
-                  onFiltersChange({ status: (value as AccountStatus | undefined) ?? "attention" })
-                }
-                options={issueOptions}
-                total={groupCounts.attention}
-                value={issue}
-              />
+                  {showIssue ? (
+                    <FilterSelect
+                      label={t("filter.dim.issue")}
+                      onValueChange={(value) =>
+                        onFiltersChange({
+                          status: (value as AccountStatus | undefined) ?? "attention",
+                        })
+                      }
+                      options={issueOptions}
+                      total={groupCounts.attention}
+                      value={issue}
+                    />
+                  ) : null}
+
+                  {selectDimensions.map((dimension) => (
+                    <FilterSelect
+                      key={dimension}
+                      label={t(`filter.dim.${dimension}`)}
+                      onValueChange={(value) => onFiltersChange({ [dimension]: value })}
+                      options={options[dimension]}
+                      total={accounts.length}
+                      value={filters[dimension]}
+                    />
+                  ))}
+                </div>
+              </ScrollArea>
             ) : null}
 
-            {selectDimensions.map((dimension) => (
-              <FilterSelect
-                key={dimension}
-                label={t(`filter.dim.${dimension}`)}
-                onValueChange={(value) => onFiltersChange({ [dimension]: value })}
-                options={options[dimension]}
-                total={accounts.length}
-                value={filters[dimension]}
-              />
-            ))}
-
-            {hasFilters ? (
+            {refined ? (
               <>
                 <Button
                   aria-label={tc("actions.clearFilters")}

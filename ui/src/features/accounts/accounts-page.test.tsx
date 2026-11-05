@@ -253,9 +253,24 @@ describe("AccountsPage", () => {
     mockServer.use(http.get(apiUrl("/accounts"), () => new Promise<Response>(() => {})));
     await renderApp("/accounts?status=banned&plan=power");
     expect(await screen.findByRole("searchbox", { name: "Search accounts" })).toBeInTheDocument();
-    expect(screen.queryByRole("tablist", { name: "Account status" })).not.toBeInTheDocument();
+    // The tabs hold their place, disabled and without counts, so the table does not shift.
+    const tabs = screen.getByRole("tablist", { name: "Account status" });
+    for (const tab of within(tabs).getAllByRole("tab")) {
+      expect(tab).toHaveAttribute("aria-disabled", "true");
+      expect(tab).not.toHaveTextContent(/\d/);
+    }
     expect(screen.queryByRole("button", { name: /^Plan:/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/ of 0$/)).not.toBeInTheDocument();
+  });
+
+  it("shows Clear and the result count for a refinement, not for a status tab alone", async () => {
+    const { user } = await renderAccounts();
+    const tabs = screen.getByRole("tablist", { name: "Account status" });
+    await user.click(within(tabs).getByRole("tab", { name: /^Active/ }));
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(new RegExp(` of ${mockDb.accounts.length}$`)),
+    ).not.toBeInTheDocument();
   });
 
   it("hides the toolbar after the list fails to load", async () => {

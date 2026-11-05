@@ -80,8 +80,14 @@ export function AccountsTable({
         header: t("columns.account"),
         sortable: true,
         // A fixed measure, so a long address truncates (with a tooltip) instead of widening
-        // the column.
-        cell: (account) => <AccountIdentity account={account} className="w-44 xl:w-64" />,
+        // the column. It steps with the table's width (not the viewport's), so a mid-size table
+        // gives the meta line the room the Status column does not need.
+        cell: (account) => (
+          <AccountIdentity
+            account={account}
+            className="w-44 @3xl/data-table:w-52 @6xl/data-table:w-64"
+          />
+        ),
       },
       {
         id: "status",
@@ -176,9 +182,9 @@ export function AccountsTable({
 }
 
 /**
- * One account as a row of the card list: the checkbox, name and status pill with the switch and
- * menu at the end; the nickname, plan and sign-in line; usage across the full width; three quiet
- * stats. A tap anywhere else opens the details.
+ * One account as a row of the card list: the checkbox and name with the switch and menu at the
+ * end; the status pill leading the nickname, plan and sign-in line; usage across the full width;
+ * three quiet stats. A tap anywhere else opens the details.
  */
 function AccountCard({
   account,
@@ -201,7 +207,6 @@ function AccountCard({
           />
         </span>
       }
-      badge={<StatusPill account={account} />}
       leading={
         <Checkbox
           aria-label={t("selectAccount", { email: name.text })}
@@ -210,7 +215,9 @@ function AccountCard({
         />
       }
       meta={
+        // The status leads the meta line, so the header row leaves the name its width.
         <span className="flex min-w-0 items-center gap-2">
+          <StatusPill account={account} size="sm" />
           <span className="truncate">{accountMeta(account, t)}</span>
           <AccountFlags account={account} />
         </span>
