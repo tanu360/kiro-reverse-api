@@ -5,14 +5,16 @@ import {
   Delete02Icon,
   FloppyDiskIcon,
   InformationCircleIcon,
-  LoaderCircleIcon,
   PencilEdit01Icon,
-  PlusIcon,
+  PlusSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useId, useMemo, useState } from "react";
+import { Code } from "@/components/shared/code";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { PasswordInput } from "@/components/shared/password-input";
+import { SettingsRow } from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +27,8 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -40,26 +44,15 @@ import type { ProxyConfig } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { buildProxyUrl, type ProxyModel, parseProxyUrl, schemeForType } from "../lib/proxy-url";
 import { SECTION_ID } from "./sections";
-import {
-  Code,
-  FieldErrorText,
-  fillNodes,
-  PasswordInput,
-  ROW_DESCRIPTION,
-  SectionQuery,
-  SettingsFrame,
-  SettingsRow,
-  TOUCH_INPUT,
-  useSectionSave,
-} from "./settings-section";
+import { fillNodes, SectionQuery, SettingsGroup, useSectionSave } from "./settings-section";
 
 /** What the editor offers: SOCKS5, or HTTP CONNECT spoken in plain HTTP or over TLS. */
 type ProxyKind = "socks5" | "http" | "https";
 
-const KINDS: readonly { value: ProxyKind; label: string; hint: string }[] = [
-  { value: "socks5", label: "SOCKS5", hint: "proxySocks5Hint" },
-  { value: "http", label: "HTTP", hint: "proxyHttpHint" },
-  { value: "https", label: "HTTPS", hint: "proxyProtocolHint" },
+const KINDS: readonly { value: ProxyKind; labelKey: string; hint: string }[] = [
+  { value: "socks5", labelKey: "proxySocks5", hint: "proxySocks5Hint" },
+  { value: "http", labelKey: "proxyHttp", hint: "proxyHttpHint" },
+  { value: "https", labelKey: "proxyHttps", hint: "proxyProtocolHint" },
 ];
 
 function kindOf(model: ProxyModel): ProxyKind {
@@ -138,59 +131,59 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
     </Badge>
   ) : (
     <Badge icon={CircleCheckIcon} size="sm" tone="success">
-      {t("proxyStatusVia", { type: kind.label })}
+      {t("proxyStatusVia", { type: t(kind.labelKey) })}
     </Badge>
   );
   const user = server.username.trim();
 
   return (
-    <SettingsFrame
+    <SettingsGroup
       badge={status}
       description={t("proxyHint")}
       id={SECTION_ID.outboundProxy}
       title={t("proxySettings")}
     >
-      <SettingsRow className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
-          {direct ? (
-            <>
-              <p className="font-medium text-foreground text-sm">{t("proxyDirectTitle")}</p>
-              <p className={ROW_DESCRIPTION}>{t("proxyNoneHint")}</p>
-            </>
-          ) : (
-            <>
-              <p className="truncate font-medium text-foreground text-sm" translate="no">
-                {address(server)}
-              </p>
-              <p className={ROW_DESCRIPTION}>
-                {user ? t("proxyAuthAs", { user }) : t("proxyAuthNone")}
-              </p>
-            </>
-          )}
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button
-            onClick={() => setEditor((prev) => ({ open: true, session: prev.session + 1 }))}
-            size="sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={direct ? PlusIcon : PencilEdit01Icon} aria-hidden="true" />
-            {direct ? t("proxySetUp") : t("common:actions.edit")}
-          </Button>
-          {direct ? null : (
+      <SettingsRow
+        control={
+          // A group named by the row: the route, then its actions.
+          <fieldset className="flex min-w-0 flex-wrap items-center gap-2">
             <Button
-              aria-label={t("proxyRemove")}
-              disabled={saving}
-              onClick={() => void onRemove()}
+              onClick={() => setEditor((prev) => ({ open: true, session: prev.session + 1 }))}
               size="sm"
-              variant="danger"
+              variant="outline"
             >
-              <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
-              {t("remove")}
+              <HugeiconsIcon icon={direct ? PlusSignIcon : PencilEdit01Icon} aria-hidden="true" />
+              {direct ? t("proxySetUp") : t("common:actions.edit")}
             </Button>
-          )}
-        </div>
-      </SettingsRow>
+            {direct ? null : (
+              <Button
+                aria-label={t("proxyRemove")}
+                loading={saving}
+                onClick={() => void onRemove()}
+                size="sm"
+                variant="danger"
+              >
+                <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
+                {t("remove")}
+              </Button>
+            )}
+          </fieldset>
+        }
+        controlWidth="auto"
+        description={
+          direct ? t("proxyNoneHint") : user ? t("proxyAuthAs", { user }) : t("proxyAuthNone")
+        }
+        title={
+          direct ? (
+            t("proxyDirectTitle")
+          ) : (
+            // A long host wraps instead of pushing the actions off the row.
+            <span className="break-all" translate="no">
+              {address(server)}
+            </span>
+          )
+        }
+      />
 
       <Dialog
         onOpenChange={(open) => {
@@ -200,7 +193,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
       >
         <ProxyEditor initial={server} key={editor.session} onSave={save} saving={saving} />
       </Dialog>
-    </SettingsFrame>
+    </SettingsGroup>
   );
 }
 
@@ -245,11 +238,10 @@ function ProxyEditor({
   const kindHint = KINDS.find((item) => item.value === kind)?.hint ?? "proxySocks5Hint";
   const hostInvalid = addressError && !model.host.trim();
   const portInvalid = addressError && !validPort(model.port.trim());
-  const errorId = `${id}-address-error`;
   const tipId = `${id}-address-tip`;
 
   return (
-    <DialogPopup className="sm:max-w-xl">
+    <DialogPopup size="xl">
       <form
         className="flex min-h-0 flex-col"
         noValidate
@@ -267,98 +259,86 @@ function ProxyEditor({
           <DialogTitle>{isNew ? t("proxySetUp") : t("proxyEdit")}</DialogTitle>
           <DialogDescription>{t("proxyApplyNote")}</DialogDescription>
         </DialogHeader>
-        <DialogPanel className="flex flex-col gap-5">
-          <div className="flex flex-col gap-2">
-            {/* Type, host and port on one line from sm up; stacked on phones. */}
-            <div className="grid gap-5 sm:grid-cols-[8rem_minmax(0,1fr)_6rem] sm:gap-3">
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label id={`${id}-type`}>{t("proxyType")}</Label>
-                <Select
-                  items={KINDS.map((item) => ({ value: item.value, label: item.label }))}
-                  onValueChange={(next) => {
-                    if (next) update(withKind(model, next as ProxyKind));
-                  }}
-                  value={kind}
-                >
-                  <SelectTrigger aria-labelledby={`${id}-type`} className="w-full min-w-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectPopup>
-                    {KINDS.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectPopup>
-                </Select>
-              </div>
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor={`${id}-host`}>{t("proxyHost")}</Label>
-                <Input
-                  aria-describedby={addressError ? `${errorId} ${tipId}` : tipId}
-                  aria-invalid={hostInvalid || undefined}
-                  autoComplete="off"
-                  className={TOUCH_INPUT}
-                  id={`${id}-host`}
-                  onChange={(event) => onHostChange(event.target.value)}
-                  placeholder={t("proxyHostPlaceholder")}
-                  spellCheck={false}
-                  value={model.host}
-                />
-              </div>
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor={`${id}-port`}>{t("proxyPort")}</Label>
-                <Input
-                  aria-describedby={addressError ? errorId : undefined}
-                  aria-invalid={portInvalid || undefined}
-                  autoComplete="off"
-                  className={TOUCH_INPUT}
-                  id={`${id}-port`}
-                  inputMode="numeric"
-                  maxLength={5}
-                  onChange={(event) =>
-                    update({ ...model, port: event.target.value.replace(/\D/g, "") })
-                  }
-                  placeholder={t("proxyPortPlaceholder")}
-                  value={model.port}
-                />
-              </div>
+        <DialogPanel className="grid gap-4">
+          {/* Type, host and port on one line from sm up; stacked on phones. Each field's error
+              sits under it. */}
+          <div className="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)_6rem] sm:gap-3">
+            <div className="flex min-w-0 flex-col gap-2">
+              <Label id={`${id}-type`}>{t("proxyType")}</Label>
+              <Select
+                items={KINDS.map((item) => ({ value: item.value, label: t(item.labelKey) }))}
+                onValueChange={(next) => {
+                  if (next) update(withKind(model, next as ProxyKind));
+                }}
+                value={kind}
+              >
+                <SelectTrigger aria-labelledby={`${id}-type`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectPopup>
+                  {KINDS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {t(item.labelKey)}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
             </div>
-            {addressError ? (
-              <FieldErrorText id={errorId}>{t("proxyHostRequired")}</FieldErrorText>
-            ) : null}
+            <Field className="min-w-0 items-stretch" invalid={hostInvalid}>
+              <FieldLabel>{t("proxyHost")}</FieldLabel>
+              <Input
+                aria-describedby={tipId}
+                autoComplete="off"
+                onChange={(event) => onHostChange(event.target.value)}
+                placeholder={t("proxyHostPlaceholder")}
+                spellCheck={false}
+                value={model.host}
+              />
+              {hostInvalid ? <FieldError match>{t("proxyHostRequired")}</FieldError> : null}
+            </Field>
+            <Field className="min-w-0 items-stretch" invalid={portInvalid}>
+              <FieldLabel>{t("proxyPort")}</FieldLabel>
+              <Input
+                autoComplete="off"
+                inputMode="numeric"
+                maxLength={5}
+                onChange={(event) =>
+                  update({ ...model, port: event.target.value.replace(/\D/g, "") })
+                }
+                placeholder={t("proxyPortPlaceholder")}
+                value={model.port}
+              />
+              {portInvalid ? <FieldError match>{t("proxyPortInvalid")}</FieldError> : null}
+            </Field>
           </div>
 
-          <fieldset className="flex min-w-0 flex-col gap-2">
-            <legend className="mb-2 flex items-center gap-2 font-medium text-sm">
+          <Fieldset className="flex min-w-0 flex-col gap-3">
+            <FieldsetLegend className="flex items-center gap-2">
               {t("proxyAuth")}
               <Badge size="sm" tone="neutral">
                 {t("proxyOptional")}
               </Badge>
-            </legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor={`${id}-username`}>{t("proxyUsername")}</Label>
+            </FieldsetLegend>
+            <div className="grid gap-4 sm:grid-cols-2 sm:gap-3">
+              <Field className="min-w-0 items-stretch">
+                <FieldLabel>{t("proxyUsername")}</FieldLabel>
                 <Input
                   autoComplete="off"
-                  className={TOUCH_INPUT}
-                  id={`${id}-username`}
                   onChange={(event) => update({ ...model, username: event.target.value })}
                   spellCheck={false}
                   value={model.username}
                 />
-              </div>
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor={`${id}-password`}>{t("proxyPassword")}</Label>
+              </Field>
+              <Field className="min-w-0 items-stretch">
+                <FieldLabel>{t("proxyPassword")}</FieldLabel>
                 <PasswordInput
                   autoComplete="new-password"
-                  id={`${id}-password`}
                   onChange={(password) => update({ ...model, password })}
                   value={model.password}
                 />
-              </div>
+              </Field>
             </div>
-          </fieldset>
+          </Fieldset>
 
           {/* Notes under the form: what the chosen type does, and the paste shortcut. */}
           <ul className="flex flex-col gap-2 text-muted-foreground text-xs leading-normal">
@@ -386,13 +366,9 @@ function ProxyEditor({
           <DialogClose render={<Button variant="ghost" />}>
             {t("common:actions.cancel")}
           </DialogClose>
-          <Button aria-busy={saving || undefined} disabled={saving} type="submit">
-            <HugeiconsIcon
-              aria-hidden="true"
-              className={saving ? "animate-spin" : undefined}
-              icon={saving ? LoaderCircleIcon : FloppyDiskIcon}
-            />
-            {saving ? t("saving") : t("save")}
+          <Button loading={saving} loadingText={t("common:actions.saving")} type="submit">
+            <HugeiconsIcon icon={FloppyDiskIcon} aria-hidden="true" />
+            {t("common:actions.save")}
           </Button>
         </DialogFooter>
       </form>

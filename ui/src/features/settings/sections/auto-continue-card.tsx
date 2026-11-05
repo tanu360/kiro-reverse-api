@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, useId, useState } from "react";
-import { Label } from "@/components/ui/label";
+import { Code } from "@/components/shared/code";
+import { SettingsRow, SwitchField } from "@/components/shared/settings-rows";
+import { Field, FieldError } from "@/components/ui/field";
 import {
   NumberField,
   NumberFieldDecrement,
@@ -14,15 +16,7 @@ import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import {
-  FieldErrorText,
-  ROW_DESCRIPTION,
-  SaveFooter,
-  SectionQuery,
-  SettingsRow,
-  SettingsSection,
-  SwitchField,
-} from "./settings-section";
+import { fillNodes, Hint, SaveFooter, SectionQuery, SettingsSection } from "./settings-section";
 
 const MAX_CONTINUATIONS = 10;
 const DEFAULT_CONTINUATIONS = 3;
@@ -34,6 +28,41 @@ export function AutoContinueCard(): JSX.Element {
     <SectionQuery id={SECTION_ID.autoContinue} query={query} shared title={t("autoContinue")}>
       {(settings) => <AutoContinueForm settings={settings} />}
     </SectionQuery>
+  );
+}
+
+type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
+
+/**
+ * The continuations number field. The row's label and description (SettingsRow puts them on its
+ * control) go to the input itself, not to the field's wrapper.
+ */
+function ContinuationsField({
+  id,
+  value,
+  onValueChange,
+  ...aria
+}: AriaProps & {
+  id: string;
+  value: number | null;
+  onValueChange: (value: number | null) => void;
+}): JSX.Element {
+  return (
+    <NumberField
+      allowOutOfRange
+      id={id}
+      max={MAX_CONTINUATIONS}
+      min={1}
+      onValueChange={onValueChange}
+      step={1}
+      value={value}
+    >
+      <NumberFieldGroup>
+        <NumberFieldDecrement />
+        <NumberFieldInput {...aria} />
+        <NumberFieldIncrement />
+      </NumberFieldGroup>
+    </NumberField>
   );
 }
 
@@ -76,54 +105,38 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
       }
       id={SECTION_ID.autoContinue}
       onSubmit={onSubmit}
-      rows
       title={t("autoContinue")}
     >
-      <SettingsRow>
-        <SwitchField
-          checked={draft.value.autoContinue}
-          hint={t("autoContinueHint")}
-          label={t("autoContinueEnable")}
-          learnMore={t("autoContinueMore")}
-          onCheckedChange={(autoContinue) => draft.set((prev) => ({ ...prev, autoContinue }))}
-        />
-      </SettingsRow>
-      {/* t3code's row: the label and hint on the left, the number field at the row's end. */}
-      <SettingsRow className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-        <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-          <Label htmlFor={maxId}>{t("autoContinueMax")}</Label>
-          <p className={ROW_DESCRIPTION} id={`${maxId}-hint`}>
-            {t("autoContinueMaxHint")}
-          </p>
-          {maxInvalid ? (
-            <FieldErrorText id={`${maxId}-error`}>
-              {t("autoContinueMaxInvalid", { max: MAX_CONTINUATIONS })}
-            </FieldErrorText>
-          ) : null}
-        </div>
-        <NumberField
-          allowOutOfRange
-          className="w-36"
-          id={maxId}
-          max={MAX_CONTINUATIONS}
-          min={1}
-          onValueChange={(value) => {
-            setMaxInvalid(false);
-            draft.set((prev) => ({ ...prev, autoContinueMax: value }));
-          }}
-          step={1}
-          value={draft.value.autoContinueMax}
-        >
-          <NumberFieldGroup>
-            <NumberFieldDecrement />
-            <NumberFieldInput
-              aria-describedby={maxInvalid ? `${maxId}-error ${maxId}-hint` : `${maxId}-hint`}
-              aria-invalid={maxInvalid || undefined}
+      <SwitchField
+        checked={draft.value.autoContinue}
+        description={<Hint more={t("autoContinueMore")}>{t("autoContinueHint")}</Hint>}
+        onCheckedChange={(autoContinue) => draft.set((prev) => ({ ...prev, autoContinue }))}
+        title={t("autoContinueEnable")}
+      />
+      {/* One Field round the row: it marks the input invalid and adds the error, which sits
+          under the description, to the input's description. */}
+      <Field className="items-stretch" invalid={maxInvalid}>
+        <SettingsRow
+          control={
+            <ContinuationsField
+              id={maxId}
+              onValueChange={(value) => {
+                setMaxInvalid(false);
+                draft.set((prev) => ({ ...prev, autoContinueMax: value }));
+              }}
+              value={draft.value.autoContinueMax}
             />
-            <NumberFieldIncrement />
-          </NumberFieldGroup>
-        </NumberField>
-      </SettingsRow>
+          }
+          controlWidth="number"
+          description={fillNodes(t("autoContinueMaxHint"), { param: <Code>max_tokens</Code> })}
+          htmlFor={maxId}
+          title={t("autoContinueMax")}
+        >
+          {maxInvalid ? (
+            <FieldError match>{t("autoContinueMaxInvalid", { max: MAX_CONTINUATIONS })}</FieldError>
+          ) : null}
+        </SettingsRow>
+      </Field>
     </SettingsSection>
   );
 }

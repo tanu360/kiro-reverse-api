@@ -3,8 +3,6 @@
   "subtitle": "Enter the admin password to continue.",
   "password": "Password",
   "passwordPlaceholder": "Password",
-  "showPassword": "Show password",
-  "hidePassword": "Hide password",
   "remember": "Stay signed in",
   "submit": "Sign in",
   "signingIn": "Signing in…",

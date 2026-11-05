@@ -330,7 +330,7 @@ describe("SettingsPage", () => {
       await user.clear(within(dialog).getByLabelText("Host"));
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-      expect(within(dialog).getByText("Enter a proxy host and port.")).toBeInTheDocument();
+      expect(within(dialog).getByText("Enter a proxy host.")).toBeInTheDocument();
       expect(await writes()).toEqual([]);
     });
 
@@ -451,11 +451,12 @@ describe("SettingsPage", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Delete rule" }));
     expect(within(card).getAllByRole("listitem")).toHaveLength(1);
 
-    // The fixture has the built-ins off and its rule on: mixed, so the switch reads off.
-    const all = within(card).getByRole("switch", { name: "All filters and rules" });
+    // The fixture has the built-ins off and its rule on: mixed, so the checkbox reads mixed.
+    const all = within(card).getByRole("checkbox", { name: "All filters and rules" });
     expect(all).toHaveAccessibleDescription("1 of 4 filters on");
-    expect(all).not.toBeChecked();
+    expect(all).toHaveAttribute("aria-checked", "mixed");
     await user.click(all);
+    expect(all).toBeChecked();
     for (const control of within(card).getAllByRole("switch")) expect(control).toBeChecked();
     await user.click(within(card).getByRole("button", { name: "Save" }));
 

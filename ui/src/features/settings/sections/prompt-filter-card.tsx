@@ -1,18 +1,28 @@
 import {
   ArrowRight02Icon,
   Delete02Icon,
-  EllipsisIcon,
+  EllipsisVerticalIcon,
   PencilEdit01Icon,
-  PlusIcon,
+  PlusSignIcon,
   RegexIcon,
   TextSearchIcon,
+  Tick02Icon,
   TriangleAlertIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useId, useRef, useState } from "react";
+import { Code } from "@/components/shared/code";
+import {
+  ROW_DESCRIPTION,
+  SETTINGS_ROW_X,
+  SettingsEmptyRow,
+  SettingsRow,
+  SwitchField,
+} from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -49,16 +59,10 @@ import {
 } from "../lib/prompt-filter";
 import { SECTION_ID } from "./sections";
 import {
-  Code,
   fillNodes,
-  ROW_DESCRIPTION,
   SaveFooter,
-  SETTINGS_ROW_X,
   SectionQuery,
-  SettingsRow,
   SettingsSection,
-  SwitchField,
-  TOUCH_INPUT,
   useSectionSave,
 } from "./settings-section";
 
@@ -129,7 +133,7 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
     addButton.current?.focus();
   };
 
-  // Every built-in filter and rule at once; the switch is on only when all of them are.
+  // Every built-in filter and rule at once: checked when all are on, mixed when some are.
   const total = BUILTIN_KEYS.length + rules.length;
   const on =
     BUILTIN_KEYS.filter((key) => draft.value[key]).length +
@@ -190,20 +194,19 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
   return (
     <SettingsSection
       actions={
-        <Switch
-          aria-describedby={allId}
-          aria-label={t("promptFilter.all")}
-          checked={on === total}
-          onCheckedChange={setAll}
-        />
+        <Label variant="option">
+          <Checkbox
+            aria-describedby={allId}
+            checked={total > 0 && on === total}
+            indeterminate={on > 0 && on < total}
+            onCheckedChange={(checked) => setAll(checked)}
+          />
+          {t("promptFilter.all")}
+        </Label>
       }
       badge={
-        // Green when every filter is on, red when none is, plain in between.
-        <Badge
-          id={allId}
-          size="sm"
-          tone={on === total ? "success" : on === 0 ? "destructive" : "neutral"}
-        >
+        // Green when every filter is on; plain otherwise (all off is a valid choice, not an error).
+        <Badge id={allId} size="sm" tone={total > 0 && on === total ? "success" : "neutral"}>
           <span aria-hidden="true">
             {on}/{total}
           </span>
@@ -221,45 +224,47 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
       hint={t("promptFilterHint")}
       id={SECTION_ID.promptFilter}
       onSubmit={() => save(promptFilterBody(draft.value))}
-      rows
       title={t("promptFilter")}
     >
       {builtins.map(({ key, hint }) => (
-        <SettingsRow key={key}>
-          <SwitchField
-            checked={draft.value[key]}
-            hint={hint}
-            label={t(key)}
-            onCheckedChange={(value) => setBuiltin(key, value)}
-          />
-        </SettingsRow>
+        <SwitchField
+          checked={draft.value[key]}
+          description={hint}
+          key={key}
+          onCheckedChange={(value) => setBuiltin(key, value)}
+          title={t(key)}
+        />
       ))}
 
-      <SettingsRow className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
-          <div className="flex min-h-5 items-center gap-2">
-            <h3 className="font-medium text-foreground text-sm">{t("customRules")}</h3>
-            <Badge size="sm" tone="neutral">
-              {rules.length}
-            </Badge>
-          </div>
-          <p className={ROW_DESCRIPTION}>
-            {fillNodes(t("customRulesHint"), { group: <Code>$1</Code> })}
-          </p>
-        </div>
-        <Button onClick={() => openEditor(null)} ref={addButton} size="sm" variant="outline">
-          <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-          {t("promptFilter.addRule")}
-        </Button>
-      </SettingsRow>
+      <SettingsRow
+        control={
+          // Its own name: the row would otherwise name it after the row title.
+          <Button
+            aria-label={t("promptFilter.addRule")}
+            onClick={() => openEditor(null)}
+            ref={addButton}
+            size="sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
+            {t("promptFilter.addRule")}
+          </Button>
+        }
+        controlWidth="auto"
+        description={fillNodes(t("customRulesHint"), { group: <Code>$1</Code> })}
+        status={
+          <Badge size="sm" tone="neutral">
+            {rules.length}
+          </Badge>
+        }
+        title={t("customRules")}
+      />
 
       {/* Each rule is a row of the card, laid out as the built-in rows above. */}
       {rules.length === 0 ? (
-        <SettingsRow>
-          <p className="text-center text-muted-foreground text-sm">{t("promptFilter.noRules")}</p>
-        </SettingsRow>
+        <SettingsEmptyRow>{t("promptFilter.noRules")}</SettingsEmptyRow>
       ) : (
-        <ol className="[&>li+li]:border-border/50 [&>li+li]:border-t">
+        <ol className="[&>li+li]:border-border-subtle [&>li+li]:border-t">
           {rules.map((rule, index) => (
             <RuleRow
               index={index}
@@ -321,7 +326,7 @@ function RuleRow({
       data-rule-index={index}
     >
       {/* A rule that is off dims its text; its menu and switch stay at full strength. */}
-      <div className={cn("flex min-w-0 flex-1 flex-col gap-1", !rule.enabled && "opacity-60")}>
+      <div className={cn("flex min-w-0 flex-1 flex-col gap-1", !rule.enabled && "opacity-64")}>
         {/* A long name wraps (two lines at most) and the pill follows it, onto a line of its own if need be. */}
         <div className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span
@@ -336,7 +341,7 @@ function RuleRow({
             icon={regex ? RegexIcon : TextSearchIcon}
             iconStyle="line"
             size="sm"
-            tone={regex ? "primary" : "warning"}
+            tone={regex ? "primary" : "neutral"}
           >
             {regex ? t("promptFilter.typeRegex") : t("promptFilter.typeContains")}
           </Badge>
@@ -360,13 +365,12 @@ function RuleRow({
             render={
               <Button
                 aria-label={t("promptFilter.ruleActions", { name })}
-                className="size-10 md:size-8"
-                size="icon"
+                size="icon-sm"
                 variant="quiet"
               />
             }
           >
-            <HugeiconsIcon icon={EllipsisIcon} aria-hidden="true" />
+            <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
           </MenuTrigger>
           <MenuPopup align="end">
             <MenuItem onClick={onEdit}>
@@ -381,7 +385,7 @@ function RuleRow({
           </MenuPopup>
         </Menu>
         <Switch
-          aria-label={t("promptFilter.enabled")}
+          aria-label={t("promptFilter.enabledFor", { name })}
           checked={rule.enabled}
           onCheckedChange={onToggle}
         />
@@ -390,23 +394,29 @@ function RuleRow({
   );
 }
 
-/** "match → result" in one line: the replacement, or what happens when there is none. */
+/**
+ * "match → result": the replacement, or what happens when there is none. One line from sm up,
+ * where both sides shrink with their length; on phones the result goes under the match and each
+ * side wraps to two lines, so neither is cut to a few characters.
+ */
 function RuleSummary({ rule }: { rule: PromptFilterRule }): JSX.Element {
   const { t } = useT("settings");
   const regex = isRegexRule(rule);
   const replace = regex ? (rule.replace ?? "") : "";
+  const side = "min-w-0 max-sm:line-clamp-2 max-sm:break-all sm:truncate";
   return (
-    <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs">
-      {/* Both sides shrink with their length, so neither one is squeezed to nothing. */}
-      <code className="min-w-0 truncate">{rule.match}</code>
-      <HugeiconsIcon icon={ArrowRight02Icon} aria-hidden="true" className="size-3 shrink-0" />
-      {replace ? (
-        <code className="min-w-0 truncate">{replace}</code>
-      ) : (
-        <span className="min-w-0 truncate">
-          {regex ? t("promptFilter.deletesMatch") : t("promptFilter.removesLine")}
-        </span>
-      )}
+    <p className="flex min-w-0 flex-col gap-0.5 text-muted-foreground text-xs sm:flex-row sm:items-center sm:gap-1.5">
+      <code className={side}>{rule.match}</code>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <HugeiconsIcon icon={ArrowRight02Icon} aria-hidden="true" className="size-3 shrink-0" />
+        {replace ? (
+          <code className={side}>{replace}</code>
+        ) : (
+          <span className={side}>
+            {regex ? t("promptFilter.deletesMatch") : t("promptFilter.removesLine")}
+          </span>
+        )}
+      </span>
     </p>
   );
 }
@@ -434,7 +444,7 @@ function RuleEditor({
   const ready = rule.match.trim() !== "";
 
   return (
-    <DialogPopup className="sm:max-w-xl">
+    <DialogPopup size="xl">
       <form
         className="flex min-h-0 flex-col"
         noValidate
@@ -451,15 +461,13 @@ function RuleEditor({
             {isNew ? t("promptFilter.addRule") : t("promptFilter.editRule")}
           </DialogTitle>
         </DialogHeader>
-        <DialogPanel className="flex flex-col gap-5">
+        <DialogPanel className="grid gap-4">
           {/* Name (2/3) and type (1/3) side by side, form fields of one height; stacked on phones.
-              A third leaves the type list, which is exactly as wide as its field, room for each
-              option's icon, label and check mark. */}
-          <div className="grid gap-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] sm:gap-4">
+              The type list grows past its field to fit each option's icon, label and check mark. */}
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] sm:gap-3">
             <div className="flex min-w-0 flex-col gap-2">
               <Label htmlFor={`${id}-name`}>{t("promptFilter.name")}</Label>
               <Input
-                className={TOUCH_INPUT}
                 id={`${id}-name`}
                 onChange={(event) => set({ name: event.target.value })}
                 placeholder={t("promptFilter.unnamed")}
@@ -479,7 +487,7 @@ function RuleEditor({
                 value={regex ? "regex" : "lines-containing"}
               >
                 {/* A third of the row: the label alone, the icons stay in the list. */}
-                <SelectTrigger aria-labelledby={`${id}-type`} className="w-full min-w-0">
+                <SelectTrigger aria-labelledby={`${id}-type`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectPopup>
@@ -498,7 +506,6 @@ function RuleEditor({
             <Input
               aria-describedby={`${id}-match-hint`}
               aria-invalid={invalid || undefined}
-              className={TOUCH_INPUT}
               id={`${id}-match`}
               onChange={(event) => set({ match: event.target.value })}
               placeholder={
@@ -533,7 +540,6 @@ function RuleEditor({
               <Label htmlFor={`${id}-replace`}>{t("promptFilter.replace")}</Label>
               <Input
                 aria-describedby={`${id}-replace-hint`}
-                className={TOUCH_INPUT}
                 id={`${id}-replace`}
                 onChange={(event) => set({ replace: event.target.value })}
                 spellCheck={false}
@@ -550,6 +556,7 @@ function RuleEditor({
             {t("common:actions.cancel")}
           </DialogClose>
           <Button disabled={!ready} type="submit">
+            <HugeiconsIcon icon={isNew ? PlusSignIcon : Tick02Icon} aria-hidden="true" />
             {isNew ? t("promptFilter.addRule") : t("promptFilter.apply")}
           </Button>
         </DialogFooter>

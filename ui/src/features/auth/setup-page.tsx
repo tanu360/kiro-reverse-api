@@ -23,20 +23,14 @@ const COPIED_MS = 2000;
 const SAMPLE_PASSWORD = "00000000";
 
 /**
- * The app's own skeleton tint (components/ui/skeleton.tsx: muted-foreground at 15%) with a soft
- * sheen of the page colour, as theme tokens, so skullet's bar matches every other skeleton.
+ * The app's skeleton tokens (index.css --skeleton and --skeleton-highlight, which switch with
+ * the theme) and the md radius, so skullet's bar matches every other skeleton.
  */
-const SKELETON_BASE = "color-mix(in srgb, var(--muted-foreground) 15%, transparent)";
+const SKELETON_COLORS = { base: "var(--skeleton)", highlight: "var(--skeleton-highlight)" };
 const SKELETON_THEME = {
-  light: {
-    base: SKELETON_BASE,
-    highlight: "color-mix(in srgb, var(--background) 64%, transparent)",
-  },
-  dark: {
-    base: SKELETON_BASE,
-    highlight: "color-mix(in srgb, var(--foreground) 4%, transparent)",
-  },
-  radius: "6px",
+  light: SKELETON_COLORS,
+  dark: SKELETON_COLORS,
+  radius: "var(--radius-md)",
 };
 
 /**
@@ -121,7 +115,7 @@ function GeneratedPassword({
        * the password is hovered or keyboard-focused, then "Copied to clipboard" in green. The
        * three sit in one grid cell and cross-fade, so the line never changes height.
        */}
-      <p className="grid text-xs [&>span]:col-start-1 [&>span]:row-start-1 [&>span]:transition-opacity [&>span]:duration-150">
+      <p className="grid text-meta [&>span]:col-start-1 [&>span]:row-start-1 [&>span]:transition-opacity [&>span]:duration-150">
         <span className="text-muted-foreground group-has-[[data-copied]]/pw:opacity-0 group-has-[[data-copy-password]:focus-visible]/pw:opacity-0 group-has-[[data-copy-password]:hover]/pw:opacity-0">
           {t("generatedPasswordLabel")}
         </span>
@@ -139,15 +133,10 @@ function GeneratedPassword({
         </span>
       </p>
       {unavailable && !password ? (
-        // The message, then "Try again" centred on its own line; no hover underline.
+        // The message, then "Try again" centred on its own line.
         <div className="flex min-h-10 flex-col items-center justify-center">
           <span className="text-muted-foreground text-sm">{t("firstRunUnavailable")}</span>
-          <Button
-            className="h-10 px-2 hover:no-underline data-pressed:no-underline sm:h-10 md:h-8"
-            onClick={onRetry}
-            size="sm"
-            variant="link"
-          >
+          <Button onClick={onRetry} size="sm" variant="ghost">
             {tShared("actions.retry")}
           </Button>
         </div>
@@ -211,7 +200,7 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
     <>
       <button
         className={cn(
-          "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-bold text-foreground text-xl tracking-[0.18em] transition-[color,scale] duration-150 active:scale-[0.98]",
+          "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-bold font-mono text-foreground text-xl tabular-nums tracking-widest transition-[color,scale] duration-150 active:scale-[0.98]",
           "hover:text-info-foreground focus-visible:text-info-foreground",
           copied && "text-success-foreground hover:text-success-foreground",
         )}

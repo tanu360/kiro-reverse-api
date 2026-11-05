@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
+import { SwitchField } from "@/components/shared/settings-rows";
 import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import { SaveFooter, SectionQuery, SettingsSection, SwitchField } from "./settings-section";
+import { Hint, SaveFooter, SectionQuery, SettingsSection } from "./settings-section";
 
 export function ToolHistoryCard(): JSX.Element {
   const { t } = useT("settings");
@@ -40,10 +41,11 @@ function ToolHistoryForm({ settings }: { settings: Settings }): JSX.Element {
     >
       <SwitchField
         checked={draft.value.structuredToolHistory}
-        label={t("structuredToolHistory")}
-        learnMore={t("structuredToolHistoryMore")}
-        hint={t("structuredToolHistoryHint")}
+        description={
+          <Hint more={t("structuredToolHistoryMore")}>{t("structuredToolHistoryHint")}</Hint>
+        }
         onCheckedChange={(structuredToolHistory) => draft.set({ structuredToolHistory })}
+        title={t("structuredToolHistory")}
       />
     </SettingsSection>
   );

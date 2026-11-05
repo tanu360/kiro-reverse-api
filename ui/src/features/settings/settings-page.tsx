@@ -14,9 +14,20 @@ import {
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
+import { StatusDot } from "@/components/shared/status-dot";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { endpointQuery, proxyQuery, settingsQuery } from "@/lib/api/settings";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { proxyQuery, settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsaved";
@@ -36,8 +47,12 @@ import { UsageCard } from "./sections/usage-card";
 
 type SectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 
-/** Below the sticky 64 px header, with a little room: a card whose top is above this is "in view". */
+/**
+ * Below the sticky 48 px header, with a little room: a card whose top is above this is "in
+ * view". Below xl the sticky chip row (about 56 px) sits under the header too.
+ */
 const SPY_OFFSET = 96;
+const CHIP_ROW_HEIGHT = 56;
 
 const GENERAL_ERROR_ID = "settings-general-error";
 
@@ -55,7 +70,11 @@ function GeneralSettingsError(): JSX.Element | null {
   const query = useQuery(settingsQuery());
   if (!query.isError) return null;
   return (
-    <Card className="scroll-mt-16 outline-none" id={GENERAL_ERROR_ID} tabIndex={-1}>
+    <Card
+      className="scroll-mt-20 outline-none max-xl:scroll-mt-30"
+      id={GENERAL_ERROR_ID}
+      tabIndex={-1}
+    >
       <ErrorState
         compact
         error={query.error}
@@ -67,7 +86,7 @@ function GeneralSettingsError(): JSX.Element | null {
 }
 
 /** The last card whose top has scrolled under the header; the last card at the page bottom. */
-function sectionInView(): SectionId {
+function sectionInView(offset: number): SectionId {
   const root = document.documentElement;
   if (
     root.scrollHeight > window.innerHeight &&
@@ -79,7 +98,7 @@ function sectionInView(): SectionId {
   for (const section of SETTINGS_SECTIONS) {
     const element = document.getElementById(section.id);
     if (!element || !isShown(element)) continue;
-    if (element.getBoundingClientRect().top > SPY_OFFSET) break;
+    if (element.getBoundingClientRect().top > offset) break;
     current = section.id;
   }
   return current;
@@ -99,7 +118,7 @@ function goToSection(id: SectionId): void {
 }
 
 /** Scroll-spy: the card in view, updated once per frame while the page scrolls. */
-function useActiveSection(): [SectionId, (id: SectionId) => void] {
+function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] {
   const [active, setActive] = useState<SectionId>(SETTINGS_SECTIONS[0].id);
   // A nav click wins over the scroll event its own jump fires.
   const pinnedUntil = useRef(0);
@@ -109,7 +128,7 @@ function useActiveSection(): [SectionId, (id: SectionId) => void] {
     const update = () => {
       frame = 0;
       if (Date.now() < pinnedUntil.current) return;
-      setActive(sectionInView());
+      setActive(sectionInView(offset));
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update);
@@ -122,7 +141,7 @@ function useActiveSection(): [SectionId, (id: SectionId) => void] {
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
-  }, []);
+  }, [offset]);
 
   const pin = useCallback((id: SectionId) => {
     pinnedUntil.current = Date.now() + 400;
@@ -131,12 +150,58 @@ function useActiveSection(): [SectionId, (id: SectionId) => void] {
   return [active, pin];
 }
 
-/** Anchor links to every card: a sticky column on wide screens, a scrolling chip row below. */
-function SectionNav(): JSX.Element {
+/*
+ * A chip of the phone and tablet nav row. The nav is page navigation, not a control kit part,
+ * so its chip look lives here, in theme tokens only: a hairline pill, the surface step and a
+ * firmer edge for the current section, red text and a red tint for the danger zone.
+ */
+const CHIP_CLASS =
+  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline aria-[current=true]:border-border-strong aria-[current=true]:bg-surface-2 aria-[current=true]:text-foreground sm:min-h-9 pointer-coarse:min-h-10 [&_svg]:size-4 [&_svg]:shrink-0";
+const DANGER_CHIP_CLASS =
+  "text-destructive-foreground hover:bg-error-surface hover:text-destructive-foreground aria-[current=true]:border-destructive/32 aria-[current=true]:bg-error-surface aria-[current=true]:text-destructive-foreground";
+
+interface NavEntry {
+  id: SectionId;
+  label: string;
+  icon: (typeof SETTINGS_SECTIONS)[number]["icon"];
+  current: boolean;
+  dirty: boolean;
+  /** The saved state of a one-switch section; undefined for the others and until loaded. */
+  on: boolean | undefined;
+  danger: boolean;
+}
+
+/** The section's saved On/Off, visual only: the link keeps the section name. */
+function StateBadge({ on }: { on: boolean }): JSX.Element {
+  const { t } = useT("settings");
+  return (
+    <Badge
+      aria-hidden="true"
+      icon={on ? CircleCheckIcon : CircleSlashIcon}
+      size="sm"
+      tone={on ? "success" : "neutral"}
+    >
+      {on ? t("stateOn") : t("stateOff")}
+    </Badge>
+  );
+}
+
+/** A warning dot for a card with unsaved edits, named for screen readers in the link. */
+function DirtyMark(): JSX.Element {
+  const { t } = useT("settings");
+  return (
+    <>
+      <StatusDot size="sm" tone="warning" />
+      <span className="sr-only">{t("unsavedMark")}</span>
+    </>
+  );
+}
+
+/** Anchor links to every card: a sticky sidebar column from xl, a sticky chip row below it. */
+function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   const { t } = useT("settings");
   const unsaved = useUnsavedChanges();
   const settings = useQuery(settingsQuery()).data;
-  const endpoint = useQuery(endpointQuery()).data;
   const proxy = useQuery(proxyQuery()).data;
   // A section that is one switch shows its saved state as a pill in its nav row, so the page
   // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
@@ -146,21 +211,20 @@ function SectionNav(): JSX.Element {
     "settings-routing": settings?.sessionAffinity,
     "settings-auto-continue": settings?.autoContinue,
     "settings-tool-history": settings?.structuredToolHistory,
-    "settings-endpoint": endpoint?.endpointFallback,
     "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,
   };
-  const [active, pin] = useActiveSection();
+  const [active, pin] = useActiveSection(wide ? SPY_OFFSET : SPY_OFFSET + CHIP_ROW_HEIGHT);
   const listRef = useRef<HTMLDivElement>(null);
 
   // In the chip row, scroll the active chip into view without scrolling the page.
   useLayoutEffect(() => {
-    const list = listRef.current;
-    const chip = list?.querySelector<HTMLElement>(`a[href="#${active}"]`);
+    const list = listRef.current?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]');
+    const chip = listRef.current?.querySelector<HTMLElement>(`a[href="#${active}"]`);
     if (!list || !chip || list.scrollWidth <= list.clientWidth) return;
     const listBox = list.getBoundingClientRect();
     const chipBox = chip.getBoundingClientRect();
-    if (chipBox.left < listBox.left) list.scrollLeft -= listBox.left - chipBox.left + 16;
-    else if (chipBox.right > listBox.right) list.scrollLeft += chipBox.right - listBox.right + 16;
+    if (chipBox.left < listBox.left) list.scrollLeft -= listBox.left - chipBox.left + 32;
+    else if (chipBox.right > listBox.right) list.scrollLeft += chipBox.right - listBox.right + 32;
   }, [active]);
 
   const onClick = (event: MouseEvent<HTMLAnchorElement>, id: SectionId) => {
@@ -173,91 +237,98 @@ function SectionNav(): JSX.Element {
     goToSection(id);
   };
 
+  const groups = SETTINGS_GROUPS.map((group) => ({
+    group,
+    labelId: `settings-nav-${group}`,
+    entries: SETTINGS_SECTIONS.filter((section) => section.group === group).map(
+      (section): NavEntry => ({
+        id: section.id,
+        label: t(section.titleKey),
+        icon: section.icon,
+        current: section.id === active,
+        dirty: unsaved?.dirty.has(section.id) ?? false,
+        on: switchState[section.id],
+        danger: "tone" in section && section.tone === "danger",
+      }),
+    ),
+  }));
+
+  if (wide) {
+    // From xl: the app sidebar's own rows, one labelled group per nav group.
+    return (
+      <nav aria-label={t("sections")} className="sticky top-20 flex flex-col gap-4 self-start">
+        {groups.map(({ group, labelId, entries }) => (
+          <SidebarGroup className="p-0" key={group}>
+            <SidebarGroupLabel id={labelId}>{t(`groups.${group}`)}</SidebarGroupLabel>
+            <SidebarMenu aria-labelledby={labelId}>
+              {entries.map((entry) => (
+                <SidebarMenuItem key={entry.id}>
+                  <SidebarMenuButton
+                    // Room for the On/Off pill, which sits over the row's end.
+                    className={entry.on === undefined ? undefined : "pe-14"}
+                    isActive={entry.current}
+                    render={
+                      <a
+                        aria-current={entry.current ? "true" : undefined}
+                        href={`#${entry.id}`}
+                        onClick={(event) => onClick(event, entry.id)}
+                      />
+                    }
+                    variant={entry.danger ? "destructive" : "default"}
+                  >
+                    <HugeiconsIcon aria-hidden="true" icon={entry.icon} />
+                    <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                    {entry.dirty ? <DirtyMark /> : null}
+                  </SidebarMenuButton>
+                  {entry.on === undefined ? null : (
+                    <SidebarMenuBadge className="peer-data-[size=default]/menu-button:top-2">
+                      <StateBadge on={entry.on} />
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ))}
+      </nav>
+    );
+  }
+
+  // Below xl: one sticky chip row under the header, bleeding to the page edges; its ends fade
+  // while there are more chips past them.
   return (
-    <nav aria-label={t("sections")} className="min-w-0 lg:sticky lg:top-20 lg:self-start">
-      {/* Below lg one scrolling chip row; from lg a column of labelled groups, as the app sidebar. */}
-      <div
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:-mx-6 md:px-6 lg:mx-0 lg:flex-col lg:gap-6 lg:overflow-visible lg:p-0"
-        ref={listRef}
-      >
-        {SETTINGS_GROUPS.map((group) => {
-          const labelId = `settings-nav-${group}`;
-          return (
-            <div className="flex shrink-0 lg:flex-col" key={group}>
-              <p
-                className="hidden h-7 items-center px-2.5 pb-1 font-medium text-muted-foreground text-xs lg:flex"
-                id={labelId}
-              >
+    <nav
+      aria-label={t("sections")}
+      className="sticky top-12 z-30 -mx-4 bg-background/95 py-2 md:-mx-6"
+    >
+      <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
+        <div className="flex w-max gap-2 px-4 md:px-6" ref={listRef}>
+          {groups.map(({ group, labelId, entries }) => (
+            <div className="flex shrink-0" key={group}>
+              <p className="sr-only" id={labelId}>
                 {t(`groups.${group}`)}
               </p>
-              <ul aria-labelledby={labelId} className="flex gap-2 lg:flex-col lg:gap-1">
-                {SETTINGS_SECTIONS.filter((section) => section.group === group).map((section) => {
-                  const current = section.id === active;
-                  const dirty = unsaved?.dirty.has(section.id) ?? false;
-                  const on = switchState[section.id];
-                  const danger = "tone" in section && section.tone === "danger";
-                  return (
-                    <li className="shrink-0" key={section.id}>
-                      <a
-                        aria-current={current ? "true" : undefined}
-                        className={cn(
-                          "group/nav inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border bg-background px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline lg:min-h-9 lg:w-full lg:rounded-[var(--control-radius)] lg:border-transparent lg:bg-transparent lg:px-2.5 lg:pointer-coarse:min-h-10",
-                          current &&
-                            "border-foreground/20 bg-sidebar-row-selected text-foreground hover:bg-sidebar-row-selected hover:text-foreground active:bg-sidebar-row-selected lg:hover:bg-sidebar-row-selected lg:border-transparent lg:bg-sidebar-row-selected",
-                          // Danger: red text (a light red tint when current), and a solid bright
-                          // red row (red-600, as the destructive buttons) with white text on hover,
-                          // press or keyboard focus, whatever the theme.
-                          danger &&
-                            "text-destructive-foreground hover:border-red-600 hover:bg-red-600 hover:text-white active:border-red-600 active:bg-red-600 active:text-white focus-visible:border-red-600 focus-visible:bg-red-600 focus-visible:text-white lg:hover:bg-red-600 lg:active:bg-red-600 lg:focus-visible:bg-red-600",
-                          danger &&
-                            current &&
-                            "border-destructive/32 bg-(--pill-error-bg) text-destructive-foreground lg:bg-(--pill-error-bg)",
-                        )}
-                        href={`#${section.id}`}
-                        onClick={(event) => onClick(event, section.id)}
-                      >
-                        <HugeiconsIcon
-                          aria-hidden="true"
-                          className={cn(
-                            "size-4 shrink-0 text-muted-foreground transition-colors group-hover/nav:text-foreground",
-                            current && "text-foreground",
-                            danger &&
-                              "text-current group-hover/nav:text-white group-active/nav:text-white group-focus-visible/nav:text-white",
-                          )}
-                          icon={section.icon}
-                        />
-                        <span className="min-w-0 flex-1 truncate">{t(section.titleKey)}</span>
-                        {dirty ? (
-                          <>
-                            <span
-                              aria-hidden="true"
-                              className="size-1.5 shrink-0 rounded-full bg-warning"
-                            />
-                            <span className="sr-only">{t("unsavedMark")}</span>
-                          </>
-                        ) : null}
-                        {on === undefined ? null : (
-                          // Visual only: the link keeps the section name, and the card's switch
-                          // announces the state.
-                          <Badge
-                            aria-hidden="true"
-                            className="shrink-0"
-                            icon={on ? CircleCheckIcon : CircleSlashIcon}
-                            size="sm"
-                            tone={on ? "success" : "neutral"}
-                          >
-                            {on ? t("stateOn") : t("stateOff")}
-                          </Badge>
-                        )}
-                      </a>
-                    </li>
-                  );
-                })}
+              <ul aria-labelledby={labelId} className="flex gap-2">
+                {entries.map((entry) => (
+                  <li className="shrink-0" key={entry.id}>
+                    <a
+                      aria-current={entry.current ? "true" : undefined}
+                      className={cn(CHIP_CLASS, entry.danger && DANGER_CHIP_CLASS)}
+                      href={`#${entry.id}`}
+                      onClick={(event) => onClick(event, entry.id)}
+                    >
+                      <HugeiconsIcon aria-hidden="true" icon={entry.icon} />
+                      {entry.label}
+                      {entry.dirty ? <DirtyMark /> : null}
+                      {entry.on === undefined ? null : <StateBadge on={entry.on} />}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      </ScrollArea>
     </nav>
   );
 }
@@ -289,12 +360,15 @@ function useLeaveGuard(): void {
 function SettingsContent(): JSX.Element {
   const { t } = useT("settings");
   useLeaveGuard();
+  // The nav becomes a column only from xl: at lg the app sidebar is already open, and a third
+  // column would leave the cards too narrow for their rows.
+  const wide = useMediaQuery("xl");
   return (
     <div className="flex min-w-0 flex-col gap-4 md:gap-6">
-      <PageHeader title={t("title")} />
-      <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
-        <SectionNav />
-        <div className="flex min-w-0 max-w-4xl flex-col gap-5">
+      <PageHeader description={t("description")} title={t("title")} />
+      <div className="flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-10">
+        <SectionNav wide={wide} />
+        <div className="flex min-w-0 flex-col gap-4 md:gap-6">
           <GeneralSettingsError />
           <UsageCard />
           <StreamIntegrityCard />

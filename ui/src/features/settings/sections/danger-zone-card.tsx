@@ -1,15 +1,17 @@
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { SettingsRow } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import { resetStats } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 import { SECTION_ID } from "./sections";
-import { ROW_DESCRIPTION, SettingsFrame, SettingsRow } from "./settings-section";
+import { SettingsGroup } from "./settings-section";
 
 export function DangerZoneCard(): JSX.Element {
   const { t } = useT("settings");
@@ -39,28 +41,28 @@ export function DangerZoneCard(): JSX.Element {
     if (confirmed) reset.mutate();
   };
 
+  // The danger tone comes from the section (sections.ts): a red-tinted card and a red row title.
   return (
-    <SettingsFrame
-      className="border-destructive/40 bg-destructive/4"
-      id={SECTION_ID.dangerZone}
-      title={t("dangerZone")}
-    >
-      <SettingsRow className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="font-medium text-destructive-foreground text-sm">{t("statistics")}</h3>
-          <p className={cn(ROW_DESCRIPTION, "text-destructive-foreground/80")}>
-            {t("resetStatsHint")}
-          </p>
-        </div>
-        <Button
-          className="self-start sm:self-center"
-          disabled={reset.isPending}
-          onClick={() => void onReset()}
-          variant="danger"
-        >
-          {t("resetStats")}
-        </Button>
-      </SettingsRow>
-    </SettingsFrame>
+    <SettingsGroup id={SECTION_ID.dangerZone} title={t("dangerZone")}>
+      <SettingsRow
+        control={
+          // Its own name: the row would otherwise name it after the row title ("Statistics").
+          <Button
+            aria-label={t("resetStats")}
+            loading={reset.isPending}
+            onClick={() => void onReset()}
+            size="sm"
+            variant="danger"
+          >
+            <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
+            {t("resetStats")}
+          </Button>
+        }
+        controlWidth="auto"
+        description={t("resetStatsHint")}
+        title={t("statistics")}
+        tone="danger"
+      />
+    </SettingsGroup>
   );
 }

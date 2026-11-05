@@ -3,8 +3,6 @@
   "subtitle": "输入管理员密码以继续。",
   "password": "密码",
   "passwordPlaceholder": "密码",
-  "showPassword": "显示密码",
-  "hidePassword": "隐藏密码",
   "remember": "保持登录状态",
   "submit": "登录",
   "signingIn": "正在登录…",

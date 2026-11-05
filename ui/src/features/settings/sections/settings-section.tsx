@@ -1,32 +1,28 @@
-import {
-  EyeIcon,
-  EyeOffIcon,
-  FloppyDiskIcon,
-  InfoIcon,
-  LoaderCircleIcon,
-  TriangleAlertIcon,
-} from "@hugeicons/core-free-icons";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type UseQueryResult, useMutation } from "@tanstack/react-query";
 import {
+  cloneElement,
   createContext,
   type FormEvent,
   Fragment,
   type JSX,
-  type MouseEvent,
+  type ReactElement,
   type ReactNode,
   useContext,
-  useId,
-  useState,
 } from "react";
 import { ErrorState } from "@/components/shared/error-state";
+import { InfoHint } from "@/components/shared/info-hint";
+import { type SectionCardProps, SettingsFrame } from "@/components/shared/section-card";
+import {
+  SETTINGS_ROW_X,
+  SaveButton as SharedSaveButton,
+  SaveFooter as SharedSaveFooter,
+} from "@/components/shared/settings-rows";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
+import { Field, FieldError } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { errorMessage } from "@/lib/api/server-errors";
 import { type TFunction, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
@@ -34,18 +30,14 @@ import { cn } from "@/lib/utils";
 import { useReportDirty } from "../lib/unsaved";
 import { SETTINGS_SECTIONS } from "./sections";
 
+/*
+ * The Settings page's glue on top of the shared settings kit (components/shared/settings-rows and
+ * section-card): each card's form, its save state reported to the page, its load states and the
+ * hint helpers. The rows, the save footer and the card chrome themselves are the shared ones.
+ */
+
 /** The id of the settings card a control sits in, so Save can report its card as dirty. */
 const SectionIdContext = createContext<string | undefined>(undefined);
-
-/**
- * t3code's settings type (settingsLayout.tsx): a row title is 14 px medium in the text colour,
- * its description 12 px in the muted colour, at most 42rem wide.
- */
-export const ROW_DESCRIPTION = "max-w-2xl text-pretty text-muted-foreground text-xs leading-normal";
-
-/** On a touch screen, an input grows to the 40 px touch-target height (36 px + borders). */
-export const TOUCH_INPUT =
-  "pointer-coarse:*:data-[slot=input]:h-9.5 pointer-coarse:*:data-[slot=input]:leading-9.5";
 
 /** "Could not save settings: {reason}"; error toasts stay until dismissed. */
 export function toastSaveFailed(error: unknown, t: TFunction): string {
@@ -79,246 +71,102 @@ export function useSectionSave<V>(
   return { save: mutation.mutate, saving: mutation.isPending };
 }
 
-export function LearnMore({ children }: { children: ReactNode }): JSX.Element {
+/**
+ * A hint of at most two sentences, with the rest behind the dotted "Learn more" (InfoHint's
+ * link look) at its end.
+ */
+export function Hint({ children, more }: { children: ReactNode; more?: ReactNode }): JSX.Element {
   const { t } = useT("settings");
+  if (!more) return <>{children}</>;
   return (
-    <Popover>
-      <PopoverTrigger
-        render={
-          // Sits in a hint's line as text: baseline-aligned on its label (the icon centres on
-          // the line), the line's own size and colour, and a thin dotted underline close under
-          // the label only (it opens a note, not a page), solid in the text colour on hover.
-          <button
-            className="group/learn inline-flex cursor-pointer items-baseline gap-1 whitespace-nowrap rounded-sm align-baseline text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground"
-            type="button"
-          />
-        }
-      >
-        <HugeiconsIcon
-          aria-hidden="true"
-          className="size-[1.15em] shrink-0 self-center"
-          icon={InfoIcon}
-        />
-        <span className="underline decoration-current/45 decoration-dotted underline-offset-[3px] group-hover/learn:decoration-solid group-data-popup-open/learn:decoration-solid">
-          {t("learnMore")}
-        </span>
-      </PopoverTrigger>
-      <PopoverPopup className="max-w-xs">{children}</PopoverPopup>
-    </Popover>
+    <>
+      {children}{" "}
+      <InfoHint hint={more} variant="link">
+        {t("learnMore")}
+      </InfoHint>
+    </>
   );
 }
 
-/** The card's footer: a server-change notice (or a note) beside the Save button. */
+/** Save that also marks its card as unsaved in the section nav and the leave-page guard. */
+export function SaveButton({ dirty, saving }: { dirty: boolean; saving: boolean }): JSX.Element {
+  useReportDirty(useContext(SectionIdContext), dirty);
+  return <SharedSaveButton dirty={dirty} saving={saving} />;
+}
+
+/**
+ * A card's footer: the shared save state ("Unsaved changes", or the server-changed notice in its
+ * place), an optional note under it, and Save.
+ */
 export function SaveFooter({
   dirty,
   saving,
-  serverChanged,
+  serverChanged = false,
   onReload,
   note,
 }: {
   dirty: boolean;
   saving: boolean;
-  serverChanged: boolean;
+  serverChanged?: boolean;
   onReload: () => void;
   note?: ReactNode;
 }): JSX.Element {
-  const { t } = useT("settings");
-  let status: ReactNode = note;
-  if (serverChanged) status = <ServerChangedNotice onReload={onReload} />;
-  else if (dirty) {
-    status = (
-      <span className="inline-flex items-center gap-2 text-foreground">
-        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />
-        {t("unsavedChanges")}
-      </span>
-    );
-  }
   return (
-    <div className="flex w-full flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0 flex-1 text-muted-foreground text-xs">{status}</div>
-      <SaveButton dirty={dirty} saving={saving} />
-    </div>
+    <SharedSaveFooter
+      action={<SaveButton dirty={dirty} saving={saving} />}
+      dirty={dirty}
+      note={note}
+      status={serverChanged ? <ServerChangedNotice onReload={onReload} /> : undefined}
+    />
   );
 }
 
-/**
- * A card's submit button. While `blocked` it stays focusable (aria-disabled, not disabled), so
- * focus does not drop to the page when a save starts or the card turns clean; the click, and
- * the form's implicit Enter submission that clicks it, are cancelled instead.
- */
-export function SubmitButton({
-  blocked,
-  busy = false,
-  primary,
-  children,
-}: {
-  blocked: boolean;
-  busy?: boolean;
-  /**
-   * Whether it shows as the primary button; by default while it can submit. A button that stays
-   * clickable to report a missing value passes false until there is one.
-   */
-  primary?: boolean;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <Button
-      aria-busy={busy || undefined}
-      aria-disabled={blocked || undefined}
-      className="aria-disabled:pointer-events-none"
-      size="sm"
-      // Only a card with something to save shows the primary button; a clean one stays quiet.
-      variant={(primary ?? (!blocked || busy)) ? "default" : "outline"}
-      onClick={(event: MouseEvent<HTMLButtonElement>) => {
-        if (blocked) event.preventDefault();
-      }}
-      type="submit"
-    >
-      {children}
-    </Button>
-  );
-}
-
-export function SaveButton({ dirty, saving }: { dirty: boolean; saving: boolean }): JSX.Element {
-  const { t } = useT("settings");
-  useReportDirty(useContext(SectionIdContext), dirty);
-  return (
-    <SubmitButton blocked={!dirty || saving} busy={saving}>
-      {/* The disk while idle, a spinner while it saves (the label already says so). */}
-      {saving ? (
-        <HugeiconsIcon className="animate-spin" icon={LoaderCircleIcon} aria-hidden="true" />
-      ) : (
-        <HugeiconsIcon icon={FloppyDiskIcon} aria-hidden="true" />
-      )}
-      {saving ? t("saving") : t("save")}
-    </SubmitButton>
-  );
-}
-
+/** The saved value changed on the server while this card was edited: Reload takes it. */
 export function ServerChangedNotice({ onReload }: { onReload: () => void }): JSX.Element {
   const { t } = useT("settings");
   return (
-    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1" role="status">
-      <HugeiconsIcon
-        icon={TriangleAlertIcon}
-        aria-hidden="true"
-        className="size-3.5 text-warning"
-      />
-      <span className="text-foreground">{t("serverChanged")}</span>
-      <Button className="h-auto px-0 text-xs underline" onClick={onReload} size="xs" variant="link">
-        {t("reload")}
-      </Button>
-    </span>
+    <Alert role="status" size="sm" variant="warning">
+      <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
+      <AlertDescription>{t("serverChanged")}</AlertDescription>
+      <AlertAction>
+        <Button onClick={onReload} variant="link-inline">
+          {t("reload")}
+        </Button>
+      </AlertAction>
+    </Alert>
   );
 }
 
 /**
- * A settings section: the group (the Card, t3code's SettingsGroup) whose rows are split by the
- * row divider (border at 50 %). Every group opens with a header row: the title, as the section
- * nav names it, then the description and any actions. The title is 16 px semibold, a step above
- * the 14 px row titles, and the description 12 px muted, so a jump from the nav lands on a
- * heading that reads as the start of that section. The title carries the section's nav icon
- * (red for the danger zone, as in the nav), so a card matches its nav row at a glance. A group of
- * one setting shows its title alone in a slimmer header.
+ * A Settings card: the shared SettingsFrame with the section's nav icon in its chip, and the
+ * danger tone for the danger zone, both looked up by `id`. Rows go in as direct children.
  */
-export function SettingsFrame({
+export function SettingsGroup({
   id,
-  title,
-  badge,
-  description,
-  actions,
-  className,
-  children,
-}: {
+  ...props
+}: Omit<SectionCardProps, "icon" | "tone" | "id"> & {
   id: string;
-  title: string;
-  /** After the title, outside the heading: a count or a state. */
+  /** After the title: a count or a state. */
   badge?: ReactNode;
-  description?: ReactNode;
-  actions?: ReactNode;
-  /** On the group. */
-  className?: string;
-  children: ReactNode;
 }): JSX.Element {
-  const headingId = `${id}-title`;
-  const full = description || actions;
   const section = SETTINGS_SECTIONS.find((item) => item.id === id);
   const danger = section !== undefined && "tone" in section && section.tone === "danger";
   return (
-    <section aria-labelledby={headingId} className="scroll-mt-20" id={id}>
-      <Card
-        className={cn("@container min-w-0 [&>*+*]:border-border/50 [&>*+*]:border-t", className)}
-      >
-        <div
-          className={cn(
-            "flex flex-wrap items-start justify-between gap-x-6 gap-y-3 px-4 sm:px-5",
-            full ? "py-4" : "py-3",
-          )}
-          data-slot="card-header"
-        >
-          <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
-            <div className="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1">
-              <h2
-                className={cn(
-                  "flex items-center gap-2 font-semibold text-base leading-6 outline-none",
-                  danger ? "text-destructive-foreground" : "text-foreground",
-                )}
-                id={headingId}
-              >
-                {section ? (
-                  <HugeiconsIcon
-                    aria-hidden="true"
-                    className={cn(
-                      "size-4.5 shrink-0",
-                      danger ? "text-current" : "text-muted-foreground",
-                    )}
-                    icon={section.icon}
-                  />
-                ) : null}
-                {title}
-              </h2>
-              {badge}
-            </div>
-            {description ? <p className={ROW_DESCRIPTION}>{description}</p> : null}
-          </div>
-          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-        </div>
-        {children}
-      </Card>
-    </section>
-  );
-}
-
-/** A settings row's inline padding, for a row element that is not a SettingsRow (a list item). */
-export const SETTINGS_ROW_X = "min-w-0 px-4 sm:px-5";
-
-/** One row of a settings group: t3code's 12 px block and 12 px (16 px from sm) inline padding. */
-export function SettingsRow({
-  children,
-  className,
-  slot = "settings-row",
-}: {
-  children: ReactNode;
-  className?: string;
-  /** `card-footer` marks the row that holds Save. */
-  slot?: "settings-row" | "card-footer";
-}): JSX.Element {
-  return (
-    <div
-      className={cn(SETTINGS_ROW_X, slot === "card-footer" ? "py-2.5" : "py-4", className)}
-      data-slot={slot}
-    >
-      {children}
-    </div>
+    <SettingsFrame
+      // Below xl the sticky section chips sit under the header: a jump lands below both.
+      className="max-xl:scroll-mt-30"
+      icon={section?.icon}
+      id={id}
+      tone={danger ? "danger" : "default"}
+      {...props}
+    />
   );
 }
 
 /**
- * A settings section in its own form: Enter in a field submits it, and Save is the submit button.
- * `hint` is at most two sentences; `learnMore` holds the rest behind a popover. The hint goes in
- * the group's header under the title, with any `actions` at its end; a section with one switch
- * passes its hint to the SwitchField instead, so the row reads title, description, control as in
- * t3code. Save gets a row of its own.
+ * A settings section in its own form: Enter in a field submits it, and Save is the submit
+ * button. `hint` is at most two sentences; `learnMore` holds the rest behind a popover. The
+ * children are rows (SettingsRow, SwitchField), each under a hairline; the footer holds Save.
  */
 export function SettingsSection({
   id,
@@ -329,34 +177,18 @@ export function SettingsSection({
   actions,
   footer,
   onSubmit,
-  rows = false,
   children,
 }: {
   id: string;
   title: string;
-  /** After the title in the group's header (see SettingsFrame). */
   badge?: ReactNode;
   hint?: ReactNode;
   learnMore?: ReactNode;
   actions?: ReactNode;
   footer?: ReactNode;
   onSubmit?: () => void;
-  /** The children are SettingsRows of their own, placed straight in the group (no hint row). */
-  rows?: boolean;
   children: ReactNode;
 }): JSX.Element {
-  const description =
-    hint || learnMore ? (
-      <>
-        {hint}
-        {learnMore ? (
-          <>
-            {" "}
-            <LearnMore>{learnMore}</LearnMore>
-          </>
-        ) : null}
-      </>
-    ) : undefined;
   return (
     <SectionIdContext.Provider value={id}>
       <form
@@ -366,30 +198,26 @@ export function SettingsSection({
           onSubmit?.();
         }}
       >
-        <SettingsFrame
+        <SettingsGroup
           actions={actions}
           badge={badge}
-          description={description}
+          description={hint || learnMore ? <Hint more={learnMore}>{hint}</Hint> : undefined}
+          footer={footer}
           id={id}
           title={title}
         >
-          {rows ? children : <SettingsRow className="flex flex-col gap-4">{children}</SettingsRow>}
-          {footer ? (
-            <SettingsRow className="flex items-center" slot="card-footer">
-              {footer}
-            </SettingsRow>
-          ) : null}
-        </SettingsFrame>
+          {children}
+        </SettingsGroup>
       </form>
     </SectionIdContext.Provider>
   );
 }
 
 /**
- * Skeleton while the section's query loads, an error group with Retry when it fails, both under
- * the section's heading. A section built on the shared GET /settings query (`shared`) shows no
- * error of its own: the page shows one for all of them, and the section leaves only a hidden
- * anchor (the nav then goes to the page error).
+ * Skeleton while the section's query loads, an error with Retry when it fails ("Could not load
+ * {section} settings"), both under the section's heading. A section built on the shared GET
+ * /settings query (`shared`) shows no error of its own: the page shows one for all of them, and
+ * the section leaves only a hidden anchor (the nav then goes to the page error).
  */
 export function SectionQuery<T>({
   id,
@@ -404,17 +232,16 @@ export function SectionQuery<T>({
   shared?: boolean;
   children: (data: T) => ReactNode;
 }): JSX.Element {
+  const { t } = useT("settings");
   if (query.isPending) {
     return (
-      <SettingsFrame id={id} title={title}>
-        <SettingsRow>
-          <div aria-hidden="true" className="flex flex-col gap-2">
-            <Skeleton className="h-4 w-11/12" />
-            <Skeleton className="h-4 w-3/5" />
-            <Skeleton className="mt-1 h-6 w-2/5" />
-          </div>
-        </SettingsRow>
-      </SettingsFrame>
+      <SettingsGroup id={id} title={title}>
+        <div aria-hidden="true" className={cn(SETTINGS_ROW_X, "flex flex-col gap-2 py-4")}>
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-4 w-3/5" />
+          <Skeleton className="mt-1 h-6 w-2/5" />
+        </div>
+      </SettingsGroup>
     );
   }
   if (query.isError && shared) {
@@ -422,69 +249,50 @@ export function SectionQuery<T>({
   }
   if (query.isError) {
     return (
-      <SettingsFrame id={id} title={title}>
-        <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
-      </SettingsFrame>
+      <SettingsGroup id={id} title={title}>
+        <ErrorState
+          compact
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
+          title={t("loadSectionFailed", { section: title })}
+        />
+      </SettingsGroup>
     );
   }
   return <>{children(query.data)}</>;
 }
 
+type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
+
+/** Joins id lists for aria-describedby, dropping empty ones. */
+function joinIds(...ids: Array<string | undefined>): string | undefined {
+  const joined = ids.filter(Boolean).join(" ");
+  return joined === "" ? undefined : joined;
+}
+
 /**
- * A switch as a t3code settings row: the label (the row title) and an optional hint (the row
- * description, with `learnMore` after it) on the left, the switch at the row's end. Below 32rem
- * of row width the switch keeps its place at the end; the text wraps beside it. On a touch
- * screen the label is at least 40 px tall, so it is a full-size touch target for the switch.
+ * A row's control with its error under it, as one Base UI Field: the row's label and description
+ * (which SettingsRow puts on its `control`) reach the input, the field marks it invalid, and the
+ * error joins its description.
  */
-export function SwitchField({
-  checked,
-  onCheckedChange,
-  label,
-  hint,
-  learnMore,
-  extra,
-  className,
-}: {
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-  label: ReactNode;
-  hint?: ReactNode;
-  learnMore?: ReactNode;
-  /** Next to the label, for a short tag. */
-  extra?: ReactNode;
-  className?: string;
+export function FieldControl({
+  error,
+  children,
+  "aria-labelledby": labelledBy,
+  "aria-describedby": describedBy,
+}: AriaProps & {
+  error: string | null;
+  children: ReactElement<AriaProps>;
 }): JSX.Element {
-  const id = useId();
-  const described = hint || learnMore;
   return (
-    <div className={cn("flex items-center justify-between gap-x-8", className)}>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2">
-          <Label className="cursor-pointer pointer-coarse:min-h-10" htmlFor={id} id={`${id}-label`}>
-            {label}
-          </Label>
-          {extra}
-        </div>
-        {described ? (
-          <p className={ROW_DESCRIPTION} id={`${id}-hint`}>
-            {hint}
-            {learnMore ? (
-              <>
-                {" "}
-                <LearnMore>{learnMore}</LearnMore>
-              </>
-            ) : null}
-          </p>
-        ) : null}
-      </div>
-      <Switch
-        aria-describedby={described ? `${id}-hint` : undefined}
-        aria-labelledby={`${id}-label`}
-        checked={checked}
-        id={id}
-        onCheckedChange={(next) => onCheckedChange(next)}
-      />
-    </div>
+    <Field className="w-full items-stretch gap-1.5" invalid={error !== null}>
+      {cloneElement(children, {
+        "aria-labelledby": joinIds(children.props["aria-labelledby"], labelledBy),
+        "aria-describedby": joinIds(children.props["aria-describedby"], describedBy),
+      })}
+      {error === null ? null : <FieldError match>{error}</FieldError>}
+    </Field>
   );
 }
 
@@ -496,74 +304,4 @@ export function fillNodes(template: string, nodes: Record<string, ReactNode>): R
     // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one template never reorder.
     return <Fragment key={index}>{node}</Fragment>;
   });
-}
-
-export function Code({ children }: { children: ReactNode }): JSX.Element {
-  // Kept on one line: a model name or URL broken at its hyphens reads as two.
-  return <code className="inline-code whitespace-nowrap text-foreground">{children}</code>;
-}
-
-/** A password input with a show/hide toggle. */
-export function PasswordInput({
-  id,
-  value,
-  onChange,
-  autoComplete,
-  placeholder,
-  invalid,
-  describedBy,
-  className,
-}: {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  autoComplete: string;
-  placeholder?: string;
-  invalid?: boolean;
-  describedBy?: string;
-  className?: string;
-}): JSX.Element {
-  const { t } = useT("settings");
-  const [visible, setVisible] = useState(false);
-  const label = visible ? t("hidePassword") : t("showPassword");
-  return (
-    <InputGroup className={className}>
-      <InputGroupInput
-        aria-describedby={describedBy}
-        aria-invalid={invalid || undefined}
-        autoComplete={autoComplete}
-        id={id}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        spellCheck={false}
-        type={visible ? "text" : "password"}
-        value={value}
-      />
-      <InputGroupAddon align="inline-end">
-        <Button
-          aria-label={label}
-          aria-pressed={visible}
-          onClick={() => setVisible((shown) => !shown)}
-          size="icon-xs"
-          title={label}
-          variant="quiet"
-        >
-          {visible ? (
-            <HugeiconsIcon icon={EyeOffIcon} aria-hidden="true" />
-          ) : (
-            <HugeiconsIcon icon={EyeIcon} aria-hidden="true" />
-          )}
-        </Button>
-      </InputGroupAddon>
-    </InputGroup>
-  );
-}
-
-/** A field error under a control, linked by `id` from the control's aria-describedby. */
-export function FieldErrorText({ id, children }: { id: string; children: ReactNode }): JSX.Element {
-  return (
-    <p className="text-destructive-foreground text-xs" id={id} role="alert">
-      {children}
-    </p>
-  );
 }

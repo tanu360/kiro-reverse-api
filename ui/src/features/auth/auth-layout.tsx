@@ -29,17 +29,17 @@ export function AuthLayout({
        */}
       <div className="grid min-w-0 flex-1 grid-rows-[1fr_auto_1fr]">
         {/*
-         * Language and theme, two separate controls: language at the left (-ms-2 lines its flag
-         * up with the column's edge), theme at the right.
+         * Language and theme, two separate controls of one height: language at the left, theme
+         * at the right, both on the column's 16 px phone gutter.
          */}
-        <div className="row-start-1 flex items-center justify-between gap-2 self-start px-6 pt-4 sm:px-10 lg:pt-0">
-          <LanguageSwitch className="-ms-2" variant="flag" />
+        <div className="row-start-1 flex items-center justify-between gap-2 self-start px-4 pt-4 sm:px-10 lg:pt-0">
+          <LanguageSwitch variant="flag" />
           <ThemeSwitch variant="segmented" />
         </div>
-        <main className="row-start-2 px-6 py-12 sm:px-10" id="main">
-          <div className="mx-auto flex w-full max-w-[22.5rem] flex-col gap-8">{children}</div>
+        <main className="row-start-2 px-4 py-12 sm:px-10" id="main">
+          <div className="mx-auto flex w-full max-w-90 flex-col gap-8">{children}</div>
         </main>
-        <footer className="row-start-3 flex flex-col items-center gap-2 self-end px-6 pb-5 sm:px-10 lg:pb-0">
+        <footer className="row-start-3 flex flex-col items-center gap-2 self-end px-4 pb-5 sm:px-10 lg:pb-0">
           <Copyright />
           <Disclaimer />
         </footer>
@@ -81,7 +81,7 @@ function Copyright(): JSX.Element {
 function Disclaimer(): JSX.Element {
   const { t } = useT("auth");
   return (
-    <p className="text-balance text-center text-muted-foreground/80 text-xs">{t("disclaimer")}</p>
+    <p className="text-balance text-center text-muted-foreground text-xs">{t("disclaimer")}</p>
   );
 }
 

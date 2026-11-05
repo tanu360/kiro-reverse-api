@@ -6,7 +6,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
 import { getRememberPreference, signIn } from "@/lib/auth/session";
@@ -114,20 +113,26 @@ export function SignInForm({
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
       ) : null}
-      {/* The primary button (components/ui/button.tsx lg): the field's height, full width. */}
-      <Button className="w-full" disabled={pending || locked} size="lg" type="submit">
-        {pending ? (
-          <Spinner aria-hidden="true" />
-        ) : (
-          <AnimatedIcon icon={LogInIcon} aria-hidden="true" />
-        )}
-        {pending ? t("signingIn") : t("submit")}
+      {/*
+       * The primary button (components/ui/button.tsx lg): the field's height, full width. While
+       * it signs in, the Button's spinner takes the icon's place and it stays focusable.
+       */}
+      <Button
+        className="w-full"
+        disabled={locked}
+        loading={pending}
+        loadingText={t("signingIn")}
+        size="lg"
+        type="submit"
+      >
+        {pending ? null : <AnimatedIcon icon={LogInIcon} aria-hidden="true" />}
+        {t("submit")}
       </Button>
       {/*
-       * A quiet option under the button: 16 px box, 14 px muted text at every size. -mt-3 pulls
-       * it up so the box sits about 16 px under the button, while the row keeps its 40 px target.
+       * A quiet option under the button (the Label's option look). -mt-3 pulls it up so the box
+       * sits about 16 px under the button, while the row keeps its 40 px target.
        */}
-      <Label className="-mt-3 min-h-10 cursor-pointer self-start font-normal text-muted-foreground text-sm/5">
+      <Label className="-mt-3 self-start" variant="option">
         <Checkbox checked={remember} onCheckedChange={(checked) => setRemember(checked === true)} />
         {t("remember")}
       </Label>

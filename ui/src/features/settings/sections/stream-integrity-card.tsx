@@ -1,20 +1,16 @@
-import { TriangleAlertIcon } from "@hugeicons/core-free-icons";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
+import { SwitchField } from "@/components/shared/settings-rows";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import {
-  SaveFooter,
-  SectionQuery,
-  SettingsRow,
-  SettingsSection,
-  SwitchField,
-} from "./settings-section";
+import { SaveFooter, SectionQuery, SettingsSection } from "./settings-section";
 
 export function StreamIntegrityCard(): JSX.Element {
   const { t } = useT("settings");
@@ -44,30 +40,20 @@ function StreamIntegrityForm({ settings }: { settings: Settings }): JSX.Element 
       }
       id={SECTION_ID.streamIntegrity}
       onSubmit={() => save(draft.value)}
-      rows
       title={t("streamIntegrity")}
     >
-      <SettingsRow>
-        <SwitchField
-          checked={draft.value.lenientStreamIntegrity}
-          label={t("lenientStreamIntegrity")}
-          hint={
-            <>
-              {t("lenientStreamIntegrityHint")}
-              {/* The risk as a warning line under the description, not a box across the row. */}
-              <span className="mt-2 flex gap-1.5 text-warning-foreground" role="note">
-                <HugeiconsIcon
-                  icon={TriangleAlertIcon}
-                  aria-hidden="true"
-                  className="mt-px size-3.5 shrink-0"
-                />
-                <span>{t("lenientStreamIntegrityRisk")}</span>
-              </span>
-            </>
-          }
-          onCheckedChange={(lenientStreamIntegrity) => draft.set({ lenientStreamIntegrity })}
-        />
-      </SettingsRow>
+      <SwitchField
+        checked={draft.value.lenientStreamIntegrity}
+        description={t("lenientStreamIntegrityHint")}
+        onCheckedChange={(lenientStreamIntegrity) => draft.set({ lenientStreamIntegrity })}
+        title={t("lenientStreamIntegrity")}
+      >
+        {/* The risk as a small warning notice under the description, as wide as its text. */}
+        <Alert className="mt-1 w-fit max-w-2xl" role="note" size="sm" variant="warning">
+          <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
+          <AlertDescription>{t("lenientStreamIntegrityRisk")}</AlertDescription>
+        </Alert>
+      </SwitchField>
     </SettingsSection>
   );
 }

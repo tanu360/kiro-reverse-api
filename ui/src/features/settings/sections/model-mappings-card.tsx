@@ -21,32 +21,36 @@ import {
   ArrowRight02Icon,
   ArrowUp02Icon,
   Delete02Icon,
-  EllipsisIcon,
+  EllipsisVerticalIcon,
   GripVerticalIcon,
-  InformationCircleIcon,
   PencilEdit01Icon,
-  PlusIcon,
+  PlusSignIcon,
   Search01Icon,
+  Tick02Icon,
   Undo02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type JSX, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ModelLogo } from "@/components/shared/model-logo";
+import { SETTINGS_ROW_X, SettingsEmptyRow } from "@/components/shared/settings-rows";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogPanel,
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { Label } from "@/components/ui/label";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { isApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import { modelMappingsQuery, updateModelMappings } from "@/lib/api/settings";
@@ -64,14 +68,7 @@ import {
   sameMappings,
 } from "../lib/model-mappings";
 import { SECTION_ID } from "./sections";
-import {
-  SaveButton,
-  SectionQuery,
-  ServerChangedNotice,
-  SettingsRow,
-  SettingsSection,
-  useSectionSave,
-} from "./settings-section";
+import { SaveFooter, SectionQuery, SettingsSection, useSectionSave } from "./settings-section";
 
 /** A list this long gets a filter field. */
 const FILTER_FROM = 8;
@@ -271,7 +268,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
         // Beside the title on a narrow page; under the description once the heading has a column.
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => openEditor(null)} ref={addButton} size="sm" variant="outline">
-            <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+            <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
             {t("modelMappings.add")}
           </Button>
           <Button onClick={resetToDefaults} size="sm" variant="outline">
@@ -285,24 +282,23 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
           {rows.length}
         </Badge>
       }
-      // Save sits in the footer, as on every other card.
+      // Save sits in the footer, as on every other card, with the reset note under the state.
       footer={
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1 text-muted-foreground text-xs">
-            {draft.serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
-            <p>{t("modelMappings.resetNote")}</p>
-          </div>
-          <SaveButton dirty={draft.dirty} saving={saving} />
-        </div>
+        <SaveFooter
+          dirty={draft.dirty}
+          note={t("modelMappings.resetNote")}
+          onReload={reload}
+          saving={saving}
+          serverChanged={draft.serverChanged}
+        />
       }
       hint={t("modelMappingsHint")}
       id={SECTION_ID.modelMappings}
       onSubmit={onSubmit}
-      rows
       title={t("modelMappings")}
     >
       {rows.length > FILTER_FROM ? (
-        <SettingsRow className="py-3">
+        <div className={cn(SETTINGS_ROW_X, "py-3")}>
           <InputGroup className="sm:max-w-xs">
             <InputGroupAddon>
               <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
@@ -316,19 +312,15 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
               value={filter}
             />
           </InputGroup>
-        </SettingsRow>
+        </div>
       ) : null}
 
       {rows.length === 0 ? (
-        <SettingsRow>
-          <p className="text-center text-muted-foreground text-sm">{t("modelMappings.noRules")}</p>
-        </SettingsRow>
+        <SettingsEmptyRow>{t("modelMappings.noRules")}</SettingsEmptyRow>
       ) : shown.length === 0 ? (
-        <SettingsRow>
-          <p className="text-center text-muted-foreground text-sm">
-            {t("modelMappings.noMatches", { filter: filter.trim() })}
-          </p>
-        </SettingsRow>
+        <SettingsEmptyRow>
+          {t("modelMappings.noMatches", { filter: filter.trim() })}
+        </SettingsEmptyRow>
       ) : (
         // One grid for the column labels and every row, so the columns line up down the list.
         <div className={cn(LIST_COLUMNS, "pt-2")}>
@@ -336,7 +328,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
             aria-hidden="true"
             className={cn(
               ROW_GRID,
-              "hidden pb-1 font-medium text-muted-foreground text-xs sm:grid",
+              "hidden pb-1 font-medium text-muted-foreground text-xs tabular-nums sm:grid",
             )}
           >
             <span />
@@ -359,7 +351,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
               items={shown.map(({ row }) => row.id)}
               strategy={verticalListSortingStrategy}
             >
-              <ol className="col-span-full grid grid-cols-subgrid [&>li+li]:border-border/50 [&>li+li]:border-t">
+              <ol className="col-span-full grid grid-cols-subgrid [&>li+li]:border-border-subtle [&>li+li]:border-t">
                 {shown.map(({ row, index }) => (
                   <MappingRowItem
                     count={rows.length}
@@ -450,37 +442,46 @@ function MappingRowItem({
         "relative py-1",
         // Opaque while dragged, so it covers the rows it passes.
         // A barely-there lift: an opaque fill and a hairline, no heavy shadow.
-        isDragging && "z-10 rounded-lg bg-background shadow-xs outline-1 outline-border/60",
-        error !== null && "bg-destructive/6",
+        isDragging && "z-10 rounded-lg bg-background shadow-xs outline-1 outline-border",
+        error !== null && "bg-error-surface",
       )}
       data-error={error !== null || undefined}
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
     >
       {filtering ? (
-        <span aria-hidden="true" className="size-8 sm:size-7" />
+        // The grip's footprint (icon-sm), so the columns keep their place while filtered.
+        <span aria-hidden="true" className="size-8 sm:size-7 pointer-coarse:size-9" />
       ) : (
-        <Button
-          aria-label={t("modelMappings.drag")}
-          className="cursor-grab touch-none active:cursor-grabbing"
-          ref={setActivatorNodeRef}
-          size="icon-sm"
-          title={t("modelMappings.drag")}
-          variant="quiet"
-          {...attributes}
-          {...listeners}
-        >
-          <HugeiconsIcon icon={GripVerticalIcon} aria-hidden="true" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={t("modelMappings.drag")}
+                className="cursor-grab touch-none active:cursor-grabbing"
+                ref={setActivatorNodeRef}
+                size="icon-sm"
+                variant="quiet"
+                {...attributes}
+                {...listeners}
+              />
+            }
+          >
+            <HugeiconsIcon icon={GripVerticalIcon} aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipPopup>{t("modelMappings.drag")}</TooltipPopup>
+        </Tooltip>
       )}
-      <span className="hidden text-end text-muted-foreground text-xs sm:block">{n}</span>
+      <span className="hidden text-end text-muted-foreground text-xs tabular-nums sm:block">
+        {n}
+      </span>
       {/* One cell on phones (match over target), three columns from sm. */}
       <div className="flex min-w-0 flex-col gap-0.5 sm:contents">
         {/* Each name with the mark of the company behind it. */}
         <span className="flex min-w-0 items-center gap-2">
           <ModelLogo model={row.key} />
-          <code className="truncate text-foreground text-sm" title={row.key} translate="no">
-            {row.key}
+          <code className="min-w-0 text-foreground text-sm" translate="no">
+            <TruncatedText>{row.key}</TruncatedText>
           </code>
         </span>
         <span className="flex min-w-0 items-center gap-1.5 sm:contents">
@@ -492,11 +493,10 @@ function MappingRowItem({
           <span className="flex min-w-0 items-center gap-2">
             <ModelLogo model={row.value} />
             <code
-              className="truncate text-muted-foreground text-sm sm:text-foreground"
-              title={row.value}
+              className="min-w-0 text-muted-foreground text-sm sm:text-foreground"
               translate="no"
             >
-              {row.value}
+              <TruncatedText>{row.value}</TruncatedText>
             </code>
           </span>
         </span>
@@ -506,14 +506,13 @@ function MappingRowItem({
           render={
             <Button
               aria-label={t("modelMappings.rowActions", { n })}
-              className="size-10 md:size-8"
               ref={register}
-              size="icon"
+              size="icon-sm"
               variant="quiet"
             />
           }
         >
-          <HugeiconsIcon icon={EllipsisIcon} aria-hidden="true" />
+          <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
         </MenuTrigger>
         <MenuPopup align="end" className="min-w-44">
           <MenuItem onClick={onEdit}>
@@ -563,13 +562,12 @@ function MappingEditor({
   onApply: (key: string, value: string) => void;
 }): JSX.Element {
   const { t } = useT("settings");
-  const id = useId();
   const [key, setKey] = useState(initialKey);
   const [value, setValue] = useState(initialValue);
   const ready = key.trim() !== "" && value.trim() !== "";
 
   return (
-    <DialogPopup className="sm:max-w-xl">
+    <DialogPopup size="xl">
       <form
         className="flex min-h-0 flex-col"
         noValidate
@@ -583,72 +581,54 @@ function MappingEditor({
       >
         <DialogHeader>
           <DialogTitle>{isNew ? t("modelMappings.add") : t("modelMappings.edit")}</DialogTitle>
+          <DialogDescription>{t("modelMappings.editorDescription")}</DialogDescription>
         </DialogHeader>
-        <DialogPanel className="flex flex-col gap-5">
-          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-end sm:gap-3">
-            <div className="flex min-w-0 flex-col gap-2">
-              <Label htmlFor={`${id}-key`}>{t("modelMappings.match")}</Label>
-              {/* The mark follows the name as it is typed. */}
-              <InputGroup>
-                <InputGroupAddon>
-                  <ModelLogo model={key || t("modelMappings.matchPlaceholder")} />
-                </InputGroupAddon>
-                <InputGroupInput
-                  autoComplete="off"
-                  id={`${id}-key`}
-                  onChange={(event) => setKey(event.target.value)}
-                  placeholder={t("modelMappings.matchPlaceholder")}
-                  spellCheck={false}
-                  value={key}
-                />
-              </InputGroup>
-            </div>
-            <HugeiconsIcon
-              icon={ArrowRight02Icon}
-              aria-hidden="true"
-              className="mb-2 hidden size-4 text-muted-foreground sm:block"
-            />
-            <div className="flex min-w-0 flex-col gap-2">
-              <Label htmlFor={`${id}-value`}>{t("modelMappings.target")}</Label>
-              <InputGroup>
-                <InputGroupAddon>
-                  <ModelLogo model={value || t("modelMappings.targetPlaceholder")} />
-                </InputGroupAddon>
-                <InputGroupInput
-                  autoComplete="off"
-                  id={`${id}-value`}
-                  onChange={(event) => setValue(event.target.value)}
-                  placeholder={t("modelMappings.targetPlaceholder")}
-                  spellCheck={false}
-                  value={value}
-                />
-              </InputGroup>
-            </div>
-          </div>
-          <ul className="flex flex-col gap-2 text-muted-foreground text-xs leading-normal">
-            <li className="flex gap-2">
-              <HugeiconsIcon
-                icon={InformationCircleIcon}
-                aria-hidden="true"
-                className="mt-px size-3.5 shrink-0"
+        {/* Side by side from sm up, each field with its own hint; stacked on phones. */}
+        <DialogPanel className="grid gap-4 sm:grid-cols-2 sm:gap-3">
+          <Field className="min-w-0 items-stretch">
+            <FieldLabel>{t("modelMappings.match")}</FieldLabel>
+            {/* The mark follows the name as it is typed. */}
+            <InputGroup>
+              <InputGroupAddon>
+                <ModelLogo model={key || t("modelMappings.matchPlaceholder")} />
+              </InputGroupAddon>
+              <InputGroupInput
+                autoComplete="off"
+                onChange={(event) => setKey(event.target.value)}
+                placeholder={t("modelMappings.matchPlaceholder")}
+                spellCheck={false}
+                value={key}
               />
-              <span className="text-pretty">{t("modelMappings.matchHint")}</span>
-            </li>
-            <li className="flex gap-2">
-              <HugeiconsIcon
-                icon={ArrowRight02Icon}
-                aria-hidden="true"
-                className="mt-px size-3.5 shrink-0"
+            </InputGroup>
+            <FieldDescription className="text-pretty">
+              {t("modelMappings.matchHint")}
+            </FieldDescription>
+          </Field>
+          <Field className="min-w-0 items-stretch">
+            <FieldLabel>{t("modelMappings.target")}</FieldLabel>
+            <InputGroup>
+              <InputGroupAddon>
+                <ModelLogo model={value || t("modelMappings.targetPlaceholder")} />
+              </InputGroupAddon>
+              <InputGroupInput
+                autoComplete="off"
+                onChange={(event) => setValue(event.target.value)}
+                placeholder={t("modelMappings.targetPlaceholder")}
+                spellCheck={false}
+                value={value}
               />
-              <span className="text-pretty">{t("modelMappings.targetHint")}</span>
-            </li>
-          </ul>
+            </InputGroup>
+            <FieldDescription className="text-pretty">
+              {t("modelMappings.targetHint")}
+            </FieldDescription>
+          </Field>
         </DialogPanel>
         <DialogFooter>
           <DialogClose render={<Button variant="ghost" />}>
             {t("common:actions.cancel")}
           </DialogClose>
           <Button disabled={!ready} type="submit">
+            <HugeiconsIcon icon={isNew ? PlusSignIcon : Tick02Icon} aria-hidden="true" />
             {isNew ? t("modelMappings.add") : t("modelMappings.apply")}
           </Button>
         </DialogFooter>

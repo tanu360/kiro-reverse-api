@@ -1,15 +1,12 @@
-import { EyeIcon, EyeOffIcon, SquareLock02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { type JSX, useState } from "react";
-import { AnimatedIcon } from "@/components/shared/animated-icon";
-import { Button } from "@/components/ui/button";
+import type { JSX } from "react";
+import { PasswordInput } from "@/components/shared/password-input";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useT } from "@/lib/i18n";
 
 /**
- * The admin password input with a show/hide toggle. The error text is linked to the input
- * through aria-describedby by the Base UI field.
+ * The admin password field of the sign-in form: the shared PasswordInput in its sign-in size
+ * (lg, with the lock icon and the eye toggle) inside a Base UI field, which links the error text
+ * to the input through aria-describedby.
  */
 export function PasswordField({
   value,
@@ -21,43 +18,20 @@ export function PasswordField({
   error?: string | null;
 }): JSX.Element {
   const { t } = useT("auth");
-  const [visible, setVisible] = useState(false);
-  const ToggleIcon = visible ? EyeOffIcon : EyeIcon;
-
   return (
-    <Field className="w-full" invalid={Boolean(error)}>
+    <Field className="w-full items-stretch" invalid={Boolean(error)}>
       <FieldLabel className="sr-only">{t("password")}</FieldLabel>
-      {/* The lg field (components/ui/input.tsx): 44 px on phones and touch screens, 40 px from sm up. */}
-      <InputGroup>
-        <InputGroupAddon>
-          <HugeiconsIcon icon={SquareLock02Icon} aria-hidden="true" />
-        </InputGroupAddon>
-        <InputGroupInput
-          autoComplete="current-password"
-          autoFocus
-          name="password"
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={t("passwordPlaceholder")}
-          size="lg"
-          type={visible ? "text" : "password"}
-          value={value}
-        />
-        <InputGroupAddon align="inline-end">
-          {/*
-           * A quiet icon button: no fill, only the icon colour moves from muted to full. 40 px on
-           * phones (touch target rule), the compact size from md up.
-           */}
-          <Button
-            aria-label={visible ? t("hidePassword") : t("showPassword")}
-            className="max-md:size-10"
-            onClick={() => setVisible((shown) => !shown)}
-            size="icon-sm"
-            variant="quiet"
-          >
-            <AnimatedIcon icon={ToggleIcon} aria-hidden="true" />
-          </Button>
-        </InputGroupAddon>
-      </InputGroup>
+      <PasswordInput
+        autoComplete="current-password"
+        autoFocus
+        invalid={Boolean(error)}
+        lockIcon
+        name="password"
+        onChange={onChange}
+        placeholder={t("passwordPlaceholder")}
+        size="lg"
+        value={value}
+      />
       {error ? <FieldError match>{error}</FieldError> : null}
     </Field>
   );

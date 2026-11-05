@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
+import { SwitchField } from "@/components/shared/settings-rows";
 import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import { SaveFooter, SectionQuery, SettingsSection, SwitchField } from "./settings-section";
+import { Hint, SaveFooter, SectionQuery, SettingsSection } from "./settings-section";
 
 export function RoutingCard(): JSX.Element {
   const { t } = useT("settings");
@@ -40,10 +41,9 @@ function RoutingForm({ settings }: { settings: Settings }): JSX.Element {
     >
       <SwitchField
         checked={draft.value.sessionAffinity}
-        label={t("sessionAffinity")}
-        learnMore={t("sessionAffinityMore")}
-        hint={t("sessionAffinityHint")}
+        description={<Hint more={t("sessionAffinityMore")}>{t("sessionAffinityHint")}</Hint>}
         onCheckedChange={(sessionAffinity) => draft.set({ sessionAffinity })}
+        title={t("sessionAffinity")}
       />
     </SettingsSection>
   );

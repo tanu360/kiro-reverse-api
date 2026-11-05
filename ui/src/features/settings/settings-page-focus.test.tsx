@@ -214,11 +214,9 @@ describe("settings focus", () => {
     });
   });
 
-  it("gives touch-size targets to switch labels, section chips and rule inputs", async () => {
+  it("gives touch-size targets to section chips and rule inputs", async () => {
     const { user } = await renderPage();
-    // A t3code row title on a mouse; 40 px tall on a touch screen.
-    const label = within(section(SECTION_ID.usage)).getByText("Allow overage");
-    expect(label).toHaveClass("pointer-coarse:min-h-10");
+    // Below xl (and in tests, which match no media query) the nav is the chip row: 40 px chips.
     expect(within(nav()).getByRole("link", { name: "Usage" })).toHaveClass("min-h-10");
 
     const filter = section(SECTION_ID.promptFilter);
@@ -226,10 +224,11 @@ describe("settings focus", () => {
     const editor = await screen.findByRole("dialog", { name: "Add rule" });
     await user.click(within(editor).getByRole("combobox", { name: "Type" }));
     await user.click(await screen.findByRole("option", { name: "Regex" }));
+    // The Input sizes itself for touch (40 px with its border); no call site adds a class.
     for (const input of within(editor).getAllByRole("textbox")) {
       const control = input.closest('[data-slot="input-control"]');
       expect(control).toHaveAttribute("data-size", "default");
-      expect(control?.className).toContain("pointer-coarse:*:data-[slot=input]:h-9.5");
+      expect(input.className).toContain("pointer-coarse:h-9.5");
     }
   });
 
