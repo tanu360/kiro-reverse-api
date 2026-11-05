@@ -5,7 +5,7 @@ import {
   type DataTableColumn,
   type DataTableSort,
 } from "@/components/shared/data-table";
-import { ListCard } from "@/components/shared/list-card";
+import { ListCard, ListCardSkeleton } from "@/components/shared/list-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
@@ -180,6 +180,8 @@ export function AccountsTable({
       renderCard={(account, ctx) => (
         <AccountCard account={account} ctx={ctx} onDetails={onDetails} onTest={onTest} />
       )}
+      // The phone loading rows take the account card's shape and height.
+      renderCardSkeleton={() => <ListCardSkeleton action leading meter stats={3} variant="row" />}
       rowLabel={(account) => t("openDetails", { email: accountName(account).text })}
       selection={{
         selected,

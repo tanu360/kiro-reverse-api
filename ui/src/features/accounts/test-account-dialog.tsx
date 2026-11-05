@@ -233,6 +233,7 @@ export function TestAccountDialog({
               spellCheck={false}
               // Its own name: inside a Field the trigger would take the field's label instead.
               triggerProps={{ "aria-label": t("test.showModels"), "aria-labelledby": undefined }}
+              variant="code"
             />
             <AutocompletePopup>
               <AutocompleteEmpty>{t("test.noModelMatches")}</AutocompleteEmpty>

@@ -297,9 +297,9 @@ export function FieldControl({
 }
 
 /**
- * A row's button laid out as a field control (SettingsRow `controlWidth="field"`): under the
- * text on a narrow row, so the description keeps the row's width, and at the row's end beside
- * the text on a wide one. The row's description reaches the button; the button keeps its own
+ * A row's button laid out as an actions control (SettingsRow `controlWidth="actions"`): under
+ * the text on a narrow row, so the description keeps the row's width, and at the row's end beside
+ * the text, at its own width, on a wide one. The row's description reaches the button; the button keeps its own
  * name (its label), so the row title is not put on it.
  */
 export function RowAction({

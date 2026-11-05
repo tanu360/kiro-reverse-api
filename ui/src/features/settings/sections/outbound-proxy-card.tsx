@@ -170,7 +170,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
             )}
           </fieldset>
         }
-        controlWidth="field"
+        controlWidth="actions"
         description={
           direct ? t("proxyNoneHint") : user ? t("proxyAuthAs", { user }) : t("proxyAuthNone")
         }

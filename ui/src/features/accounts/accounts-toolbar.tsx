@@ -290,8 +290,8 @@ function StatusTabs({
         onValueChange={(next) => onValueChange(next as StatusTab)}
         value={value}
       >
-        {/* The sideways bar gets its own lane under the track instead of crossing the pills. */}
-        <ScrollArea scrollFade scrollbarGutter>
+        {/* The sideways bar sits in the gap under the track instead of crossing the pills. */}
+        <ScrollArea scrollFade scrollbarGutter="overlap">
           <TabsList aria-label={t("filter.status")} ref={listRef} size="sm">
             {tabs.map((tab) => (
               <TabsTab disabled={loading} key={tab} value={tab}>
@@ -429,14 +429,18 @@ export function AccountsToolbar({
         </InputGroup>
 
         {loading ? (
-          // The filter row's height: a control's, plus the scroll lane it has below a 32rem card.
-          <Skeleton className="h-9 w-40 @max-lg/accounts:mb-2.5 sm:h-8 pointer-coarse:h-10" />
+          // The filter row's height: a control's (its scroll bar takes no room of its own).
+          <Skeleton className="h-9 w-40 sm:h-8 pointer-coarse:h-10" />
         ) : (
           <>
             {hasControls ? (
               // One sideways-scrolling row below a 32rem card; from there up the controls wrap.
               // The 4 px bleed (-m-1 with p-1 inside) keeps the buttons' focus outline unclipped.
-              <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade scrollbarGutter>
+              <ScrollArea
+                className="-m-1 h-auto w-auto min-w-0"
+                scrollFade
+                scrollbarGutter="overlap"
+              >
                 <div className="flex w-max items-center gap-2 p-1 @lg/accounts:w-auto @lg/accounts:flex-wrap">
                   {showSort ? <SortSelect desc={desc} onChange={onSortChange} sort={sort} /> : null}
 

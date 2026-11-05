@@ -61,7 +61,7 @@ export function DangerZoneCard(): JSX.Element {
             </Button>
           </RowAction>
         }
-        controlWidth="field"
+        controlWidth="actions"
         description={t("resetStatsHint")}
         title={t("statistics")}
         tone="danger"

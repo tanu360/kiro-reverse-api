@@ -254,7 +254,7 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
             </Button>
           </RowAction>
         }
-        controlWidth="field"
+        controlWidth="actions"
         description={fillNodes(t("customRulesHint"), { group: <Code>$1</Code> })}
         status={
           <Badge size="sm" tone="neutral">
