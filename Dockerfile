@@ -30,6 +30,8 @@ COPY --from=builder /app/kiro-proxy .
 
 EXPOSE 8080
 ENV DATA_DIR=/app/state
+# Inside a container the port mapping decides who can connect, so listen on every interface.
+ENV LISTEN_HOST=0.0.0.0
 VOLUME /app/state
 
 CMD ["./kiro-proxy"]

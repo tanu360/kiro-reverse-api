@@ -231,6 +231,7 @@ Admin password authentication allows five failed attempts per client per minute,
 | ---------------- | ----------------------------------------- | ------------------ |
 | `DATA_DIR`        | Directory for `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)   | —                  |
+| `LISTEN_HOST`    | Address to listen on. The default accepts this machine only; set `0.0.0.0` to accept other machines. The Docker image sets `0.0.0.0` | `127.0.0.1` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 
 > [!WARNING]
@@ -338,6 +339,7 @@ For users in restricted network regions, configure an outbound proxy in the admi
 | ---------------- | ---------------------------------------- | ------------------ |
 | `DATA_DIR`        | Directory for `kiro.db`                  | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)  | —                  |
+| `LISTEN_HOST`    | Address to listen on. The default accepts this machine only; set `0.0.0.0` to accept other machines. The Docker image sets `0.0.0.0` | `127.0.0.1` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 
 ```diff

@@ -47,6 +47,9 @@ func main() {
 	logger.Infof("Admin panel: http://%s/admin", addr)
 	logger.Infof("Claude API: http://%s/v1/messages", addr)
 	logger.Infof("OpenAI API: http://%s/v1/chat/completions", addr)
+	if config.GetHost() == config.DefaultHost {
+		logger.Infof("Only this machine can connect. Set LISTEN_HOST=0.0.0.0 to accept other machines.")
+	}
 
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		logger.Fatalf("Server failed: %v", err)

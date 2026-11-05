@@ -258,7 +258,7 @@ func Load() error {
 			Password:                password,
 			FirstRunPasswordPending: generated,
 			Port:                    8080,
-			Host:                    "0.0.0.0",
+			Host:                    DefaultHost,
 			RequireApiKey:           false,
 			Accounts:                []Account{},
 		}
@@ -345,11 +345,23 @@ func GetPort() int {
 	return cfg.Port
 }
 
+// DefaultHost keeps the proxy and its admin panel reachable from this machine only.
+const DefaultHost = "127.0.0.1"
+
+// legacyDefaultHost is what older versions stored for every new install. No setting could
+// change the host, so a stored 0.0.0.0 is that default, not a choice, and reads as DefaultHost.
+const legacyDefaultHost = "0.0.0.0"
+
+// GetHost is the address to listen on: LISTEN_HOST when set (0.0.0.0 accepts other machines,
+// as Docker needs), else the stored host, else DefaultHost.
 func GetHost() string {
+	if host := strings.TrimSpace(os.Getenv("LISTEN_HOST")); host != "" {
+		return host
+	}
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
-	if cfg.Host == "" {
-		return "127.0.0.1"
+	if cfg.Host == "" || cfg.Host == legacyDefaultHost {
+		return DefaultHost
 	}
 	return cfg.Host
 }
