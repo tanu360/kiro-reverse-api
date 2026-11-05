@@ -26,7 +26,7 @@ function IdValue({ value, copyLabel }: { value?: string; copyLabel: string }): J
   if (!value) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
     <span className="flex min-w-0 items-center gap-1">
-      <code className="min-w-0 break-all font-mono text-meta">{value}</code>
+      <code className="min-w-0 break-all text-meta">{value}</code>
       <CopyButton className="shrink-0" label={copyLabel} value={value} />
     </span>
   );
@@ -83,10 +83,9 @@ export function RequestDetailSheet({
                 {
                   label: t("detail.statusCode"),
                   value: record.status ? String(record.status) : EMPTY,
-                  mono: true,
                 },
                 { label: t("endpoint"), value: endpointLabel(record.endpoint, t) },
-                { label: t("model"), value: record.model || EMPTY, mono: Boolean(record.model) },
+                { label: t("model"), value: record.model || EMPTY },
                 {
                   label: t("duration"),
                   value: formatDurationMs(record.durationMs, Boolean(record.endpoint)),
@@ -152,7 +151,7 @@ export function RequestDetailSheet({
                       label: t("detail.message"),
                       value: (
                         <pre
-                          className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/40 p-3 font-mono text-meta"
+                          className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/40 p-3 text-meta"
                           data-testid="request-message"
                         >
                           {maskText(record.message) ||
@@ -167,7 +166,7 @@ export function RequestDetailSheet({
           </SheetPanel>
         ) : null}
         <SheetFooter className="flex-row items-center justify-between sm:justify-between">
-          <span className="text-muted-foreground text-sm tabular-nums">
+          <span className="text-muted-foreground text-sm">
             {position > 0 ? t("detail.position", { index: position, count }) : null}
           </span>
           <div className="flex items-center gap-2">

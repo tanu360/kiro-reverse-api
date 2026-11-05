@@ -189,9 +189,7 @@ export function MicrosoftFlow(): JSX.Element {
                     {profile.name || t("microsoft.unnamedProfile")}
                   </span>
                   <span className="text-muted-foreground text-xs">{profile.region}</span>
-                  <span className="break-all font-mono text-muted-foreground text-xs">
-                    {profile.arn}
-                  </span>
+                  <span className="break-all text-muted-foreground text-xs">{profile.arn}</span>
                 </span>
               </label>
             ))}

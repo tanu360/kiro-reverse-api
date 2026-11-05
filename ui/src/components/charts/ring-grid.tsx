@@ -177,7 +177,6 @@ export const RingGrid = memo(function RingGrid({
 
   const labels = showLabels ? (
     <g
-      className="font-mono tabular-nums"
       fill={labelColor}
       fontSize={fontSize}
       style={{ fill: labelColor }}

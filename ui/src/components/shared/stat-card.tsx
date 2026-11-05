@@ -56,7 +56,6 @@ function DeltaBadge({ delta }: { delta: NonNullable<StatCardProps["delta"]> }): 
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <Badge
-        className="tabular-nums"
         data-tone={tone}
         icon={Icon}
         iconStyle="line"
@@ -112,7 +111,7 @@ export function StatCard({
         <div className="flex flex-wrap items-center gap-2">
           <div
             className={cn(
-              "font-semibold text-display leading-none tabular-nums",
+              "font-semibold text-display leading-none",
               danger && "text-destructive-foreground",
             )}
           >
@@ -137,7 +136,7 @@ export function StatCard({
               <MetricLabel metric={metric} />
               <dd
                 className={cn(
-                  "font-medium text-sm tabular-nums",
+                  "font-medium text-sm",
                   metric.wrap ? "break-words" : "truncate",
                   metric.tone === "danger" && "text-destructive-foreground",
                   metric.tone === "muted" && "text-muted-foreground",

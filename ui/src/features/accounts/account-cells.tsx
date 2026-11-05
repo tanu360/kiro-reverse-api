@@ -217,13 +217,11 @@ export function UsageMeter({ account }: { account: Account }): JSX.Element {
           >
             {hasPlan ? t("planCredits") : t("trialCredits")}
           </MeterLabel>
-          <span className="truncate tabular-nums">
+          <span className="truncate">
             {formatCreditAmount(current, lang)} / {formatCreditAmount(limit, lang)}
           </span>
         </span>
-        <span className="shrink-0 text-muted-foreground tabular-nums">
-          {formatFraction(pct / 100, 0)}
-        </span>
+        <span className="shrink-0 text-muted-foreground">{formatFraction(pct / 100, 0)}</span>
       </div>
       <MeterTrack>
         <MeterIndicator tone={creditTone(pct)} />
@@ -236,7 +234,7 @@ export function UsageMeter({ account }: { account: Account }): JSX.Element {
 export function TokenExpiryText({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
   const expiry = tokenExpiry(account.expiresAt, nowSec());
-  return <span className="text-muted-foreground tabular-nums">{formatTokenExpiry(expiry, t)}</span>;
+  return <span className="text-muted-foreground">{formatTokenExpiry(expiry, t)}</span>;
 }
 
 /** "5 minutes ago" with the full date as a tooltip; a dash when the account was never used. */
@@ -248,7 +246,7 @@ export function LastUsedText({ account }: { account: Account }): JSX.Element {
       <TooltipTrigger
         render={
           <time
-            className="whitespace-nowrap tabular-nums"
+            className="whitespace-nowrap"
             dateTime={new Date(account.lastUsed * 1000).toISOString()}
           />
         }

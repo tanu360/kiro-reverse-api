@@ -119,7 +119,7 @@ export function BuilderIdFlow(): JSX.Element {
           tabIndex={-1}
         >
           <span className="sr-only">{t("builderid.userCode")}</span>
-          <kbd className="select-all rounded-lg border bg-background px-4 py-2 font-mono font-semibold text-2xl tracking-[0.2em] sm:text-3xl">
+          <kbd className="select-all rounded-lg border bg-background px-4 py-2 font-semibold text-2xl tracking-[0.2em] sm:text-3xl">
             {code.userCode}
           </kbd>
           <HelpText>{t("builderid.verifyCode")}</HelpText>

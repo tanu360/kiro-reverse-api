@@ -4,7 +4,6 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { isValidProxyUrl } from "../account-model";
 import { DetailSection, TOUCH_BUTTON, TOUCH_INPUT, useSaveAccountField } from "./detail-section";
 
@@ -33,7 +32,7 @@ export function ProxySection({ account }: { account: Account }): JSX.Element {
           <div className="flex w-full gap-2">
             <Input
               autoComplete="off"
-              className={cn("font-mono", TOUCH_INPUT)}
+              className={TOUCH_INPUT}
               onChange={(event) => {
                 setValue(event.target.value);
                 if (error) setError(null);

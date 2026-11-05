@@ -174,7 +174,7 @@ export function ExportDialog({
     >
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
-          <p aria-live="polite" className="text-muted-foreground text-sm tabular-nums">
+          <p aria-live="polite" className="text-muted-foreground text-sm">
             {t("export.selected", { count: selected.size })}
           </p>
           <Button

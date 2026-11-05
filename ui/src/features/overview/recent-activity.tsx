@@ -38,14 +38,11 @@ function modelText(model: string | null | undefined): string {
   return !model || model === "-" ? EMPTY : model;
 }
 
-/**
- * Model names are monospace; the empty dash is not, because a monospace em dash is drawn as
- * narrow as an en dash and then differs from the account column's dash.
- */
+/** Model names are set a step smaller; the empty dash stays full size and muted, like the account column's. */
 function ModelName({ model, className }: { model?: string; className?: string }): JSX.Element {
   const text = modelText(model);
   if (text === EMPTY) return <span className="text-muted-foreground">{EMPTY}</span>;
-  return <span className={cn("font-mono text-xs", className)}>{text}</span>;
+  return <span className={cn("text-xs", className)}>{text}</span>;
 }
 
 /**
@@ -86,7 +83,7 @@ function MobileCard({
   return (
     <Card className="min-w-0 gap-1.5 p-3 text-sm">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-muted-foreground text-xs tabular-nums">{time}</span>
+        <span className="text-muted-foreground text-xs">{time}</span>
         {status}
       </div>
       {children}
@@ -97,7 +94,7 @@ function MobileCard({
 function ErrorStatus({ row }: { row: ObserveError }): JSX.Element {
   if (!row.status) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
-    <Badge className="tabular-nums" icon={CircleXIcon} tone="destructive">
+    <Badge icon={CircleXIcon} tone="destructive">
       {row.status}
     </Badge>
   );
@@ -114,7 +111,7 @@ function ErrorsPanel(): JSX.Element {
       {
         id: "time",
         header: t("activity.time"),
-        cell: (row) => <span className="tabular-nums">{formatDateTime(row.ts, lang)}</span>,
+        cell: (row) => <span>{formatDateTime(row.ts, lang)}</span>,
       },
       {
         id: "account",
@@ -169,7 +166,7 @@ function ErrorsPanel(): JSX.Element {
           <MobileCard status={<ErrorStatus row={row} />} time={formatDateTime(row.ts, lang)}>
             <DisplayEmail className="block font-medium" email={row.email} id={row.accountId} />
             {modelText(row.model) === EMPTY ? null : (
-              <span className="truncate font-mono text-muted-foreground text-xs">{row.model}</span>
+              <span className="truncate text-muted-foreground text-xs">{row.model}</span>
             )}
             {row.message ? (
               <p className="line-clamp-2 break-words text-muted-foreground text-xs">
@@ -209,7 +206,7 @@ function RequestStatus({ row }: { row: RequestRecord }): JSX.Element {
     );
   }
   return (
-    <Badge className="tabular-nums" icon={CircleXIcon} tone="destructive">
+    <Badge icon={CircleXIcon} tone="destructive">
       {t("activity.failed")}
       {row.status ? ` ${row.status}` : ""}
     </Badge>
@@ -226,7 +223,7 @@ function RequestsPanel(): JSX.Element {
       {
         id: "time",
         header: t("activity.time"),
-        cell: (row) => <span className="tabular-nums">{formatDateTime(row.ts, lang)}</span>,
+        cell: (row) => <span>{formatDateTime(row.ts, lang)}</span>,
       },
       { id: "status", header: t("activity.status"), cell: (row) => <RequestStatus row={row} /> },
       {
@@ -257,11 +254,7 @@ function RequestsPanel(): JSX.Element {
         id: "duration",
         header: t("activity.duration"),
         align: "end",
-        cell: (row) => (
-          <span className="tabular-nums">
-            {formatDurationMs(row.durationMs, Boolean(row.endpoint))}
-          </span>
-        ),
+        cell: (row) => <span>{formatDurationMs(row.durationMs, Boolean(row.endpoint))}</span>,
       },
     ],
     [t, lang],
@@ -299,7 +292,7 @@ function RequestsPanel(): JSX.Element {
             <DisplayEmail className="block font-medium" email={row.email} id={row.accountId} />
             <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
               <ModelName className="truncate" model={row.model} />
-              <span className="shrink-0 tabular-nums">
+              <span className="shrink-0">
                 {formatDurationMs(row.durationMs, Boolean(row.endpoint))}
               </span>
             </div>

@@ -26,7 +26,7 @@ export function BasicSection({ account }: { account: Account }): JSX.Element {
       <KeyValueGrid
         items={[
           { label: t("detail.email"), value: displayEmail(account.email, account.id) },
-          { label: t("detail.userId"), value: account.userId || EMPTY, mono: true },
+          { label: t("detail.userId"), value: account.userId || EMPTY },
           { label: t("detail.authMethod"), value: authLabel(account, t) },
           { label: t("detail.region"), value: account.region || "us-east-1" },
         ]}

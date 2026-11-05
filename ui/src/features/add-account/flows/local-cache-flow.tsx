@@ -57,7 +57,6 @@ function JsonFileInput({
     <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-start">
       <Textarea
         autoComplete="off"
-        className="font-mono"
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -189,7 +188,7 @@ export function LocalCacheFlow(): JSX.Element {
         hint={t("local.pasteOrUpload")}
         label={
           <>
-            <span className="font-mono">{t("local.tokenFile")}</span>
+            <span>{t("local.tokenFile")}</span>
             <span className="font-normal text-muted-foreground text-xs">
               {t("local.tokenRequired")}
             </span>
@@ -211,7 +210,7 @@ export function LocalCacheFlow(): JSX.Element {
           hint={t("local.pasteOrUpload")}
           label={
             <>
-              <span className="font-mono">{t("local.clientFile")}</span>
+              <span>{t("local.clientFile")}</span>
               <span className="font-normal text-muted-foreground text-xs">
                 {provider === "Microsoft"
                   ? t("local.clientOptionalMicrosoft")

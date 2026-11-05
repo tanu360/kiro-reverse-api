@@ -14,9 +14,7 @@ export function UrlBox({ label, url }: { label: string; url: string }): JSX.Elem
   return (
     <div className="flex flex-col gap-2">
       <span className="font-medium text-sm">{label}</span>
-      <code className="block break-all rounded-lg border bg-muted/50 px-3 py-2 font-mono text-xs">
-        {url}
-      </code>
+      <code className="block break-all rounded-lg border bg-muted/50 px-3 py-2 text-xs">{url}</code>
       <div className="flex gap-2">
         <Button
           className="h-10 flex-1 sm:h-8"
@@ -86,7 +84,6 @@ export function RegionField({
       <Input
         autoCapitalize="off"
         autoComplete="off"
-        className="font-mono"
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         placeholder="us-east-1"
@@ -144,11 +141,7 @@ export function SubmitButton({
 
 /** Inline code for file names, cookie names and hosts in help text. */
 export function Code({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <code className="rounded bg-muted px-1 py-0.5 font-mono text-foreground text-xs">
-      {children}
-    </code>
-  );
+  return <code className="rounded bg-muted px-1 py-0.5 text-foreground text-xs">{children}</code>;
 }
 
 export function HelpText({

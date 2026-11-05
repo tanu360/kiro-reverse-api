@@ -22,9 +22,6 @@ const COPIED_MS = 2000;
 /** Stands in for the password while it loads, so the skeleton has its exact width. */
 const SAMPLE_PASSWORD = "00000000";
 
-/** The app's mono stack (index.css --font-mono, self-hosted Fira Code). */
-const PASSWORD_FONT = { fontFamily: "var(--font-mono)" };
-
 /**
  * The app's own skeleton tint (components/ui/skeleton.tsx: muted-foreground at 15%) with a soft
  * sheen of the page colour, as theme tokens, so skullet's bar matches every other skeleton.
@@ -221,7 +218,6 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
         data-copied={copied ? "" : undefined}
         data-copy-password=""
         onClick={onClick}
-        style={PASSWORD_FONT}
         type="button"
       >
         <span>{value}</span> <span className="sr-only">{t("copyPassword")}</span>

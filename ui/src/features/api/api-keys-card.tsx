@@ -265,7 +265,7 @@ export function ApiKeysCard(): JSX.Element {
       id: "requests",
       header: t("keys.requests"),
       align: "end",
-      cell: (apiKey) => <span className="tabular-nums">{formatNumber(apiKey.requestsCount)}</span>,
+      cell: (apiKey) => <span>{formatNumber(apiKey.requestsCount)}</span>,
     },
     { id: "lastUsed", header: t("keys.lastUsed"), cell: (apiKey) => <LastUsed apiKey={apiKey} /> },
     {
@@ -359,7 +359,7 @@ function MaskedKey({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const { t } = useT("api");
   return (
     <span className="inline-flex items-center gap-1">
-      <code className="whitespace-nowrap font-mono text-xs">{apiKey.keyMasked}</code>
+      <code className="whitespace-nowrap text-xs">{apiKey.keyMasked}</code>
       <CopyButton
         label={t("keys.copyKey", { name: keyName(apiKey, t) })}
         value={() => fetchSecret(apiKey.id)}
@@ -430,7 +430,7 @@ function UsageLine({
     <div className="flex min-w-0 flex-col gap-1">
       <span className="flex items-baseline gap-1.5 whitespace-nowrap text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className={cn("tabular-nums", reached && "text-warning-foreground")}>
+        <span className={cn(reached && "text-warning-foreground")}>
           {format(used)} / {limit > 0 ? format(limit) : t("common:unlimited")}
         </span>
       </span>

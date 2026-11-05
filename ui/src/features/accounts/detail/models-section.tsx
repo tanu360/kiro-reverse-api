@@ -86,8 +86,8 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
             {models.map((model) => (
               <li className="flex flex-col gap-0.5 px-3 py-2" key={model.modelId}>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="break-all font-mono text-sm">{model.modelId}</span>
-                  <span className="text-muted-foreground text-xs tabular-nums">
+                  <span className="break-all text-sm">{model.modelId}</span>
+                  <span className="text-muted-foreground text-xs">
                     {t("detail.creditMultiplier", { ratio: modelRate(model) })}
                   </span>
                 </div>

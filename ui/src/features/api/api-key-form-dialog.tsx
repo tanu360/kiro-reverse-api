@@ -186,7 +186,6 @@ export function ApiKeyFormDialog({
             autoCapitalize="off"
             autoComplete="off"
             autoCorrect="off"
-            className="font-mono"
             onValueChange={(value) => set("key", value)}
             spellCheck={false}
             value={values.key}

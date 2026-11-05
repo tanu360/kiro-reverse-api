@@ -212,7 +212,6 @@ export function TestAccountDialog({
           >
             <AutocompleteInput
               autoComplete="off"
-              className="font-mono"
               disabled={cached.isPending}
               id={fieldId}
               onKeyDown={onKeyDown}
@@ -225,7 +224,7 @@ export function TestAccountDialog({
               <AutocompleteEmpty>{t("test.noModelMatches")}</AutocompleteEmpty>
               <AutocompleteList>
                 {(item: string) => (
-                  <AutocompleteItem className="font-mono" key={item} value={item}>
+                  <AutocompleteItem key={item} value={item}>
                     {item}
                   </AutocompleteItem>
                 )}
@@ -260,7 +259,7 @@ export function TestAccountDialog({
           ) : (
             <ol
               aria-label={t("testLog.title")}
-              className="max-h-64 overflow-y-auto px-3 pb-3 font-mono text-xs leading-relaxed"
+              className="max-h-64 overflow-y-auto px-3 pb-3 text-xs leading-relaxed"
               ref={logRef}
               role="log"
             >

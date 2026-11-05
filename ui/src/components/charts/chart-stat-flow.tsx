@@ -102,7 +102,7 @@ export function ChartStatFlow({
           {icon}
         </div>
       ) : null}
-      <span className={cn("text-foreground tabular-nums", valueClassName)}>
+      <span className={cn("text-foreground", valueClassName)}>
         {numberFlowReady ? (
           <NumberFlow
             format={formatOptions}

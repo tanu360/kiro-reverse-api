@@ -21,7 +21,7 @@ function TrafficYAxis({ ticks }: { ticks: readonly number[] }): JSX.Element {
     <g data-slot="traffic-y-axis">
       {ticks.map((tick) => (
         <text
-          className="fill-chart-label text-xs tabular-nums"
+          className="fill-chart-label text-xs"
           dominantBaseline="middle"
           key={tick}
           textAnchor="end"

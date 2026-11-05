@@ -11,7 +11,7 @@ export function KeyValueGrid({
   items,
   columns = 2,
 }: {
-  items: { label: string; value: ReactNode; mono?: boolean; span?: 1 | 2 }[];
+  items: { label: string; value: ReactNode; span?: 1 | 2 }[];
   columns?: 1 | 2 | 3;
 }): JSX.Element {
   return (
@@ -25,9 +25,7 @@ export function KeyValueGrid({
           key={item.label}
         >
           <dt className="text-meta text-muted-foreground">{item.label}</dt>
-          <dd className={cn("min-w-0 break-words", item.mono && "font-mono text-meta")}>
-            {item.value}
-          </dd>
+          <dd className="min-w-0 break-words">{item.value}</dd>
         </div>
       ))}
     </dl>

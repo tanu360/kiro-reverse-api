@@ -55,10 +55,10 @@ export function TokenCell({
           <span className="inline-flex flex-col items-start gap-0.5 text-left" />
         }
       >
-        <span className="font-medium tabular-nums">{total === 0 ? "0" : formatCompact(total)}</span>
+        <span className="font-medium">{total === 0 ? "0" : formatCompact(total)}</span>
         <span
           className={cn(
-            "min-w-48 max-w-60 whitespace-normal text-muted-foreground text-xs tabular-nums leading-snug",
+            "min-w-48 max-w-60 whitespace-normal text-muted-foreground text-xs leading-snug",
             detailClassName,
           )}
         >
@@ -75,7 +75,7 @@ export function TokenCell({
           {rows.map(([label, value]) => (
             <div className="contents" key={label}>
               <dt className="text-muted-foreground">{label}</dt>
-              <dd className="text-right tabular-nums">{formatNumber(value, lang)}</dd>
+              <dd className="text-right">{formatNumber(value, lang)}</dd>
             </div>
           ))}
         </dl>

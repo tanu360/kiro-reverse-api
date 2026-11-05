@@ -238,7 +238,7 @@ export function CommandItemNote({
 }: React.ComponentProps<"span">): React.ReactElement {
   return (
     <span
-      className={cn("ms-auto shrink-0 ps-2 text-[13px] text-muted-foreground tabular-nums", className)}
+      className={cn("ms-auto shrink-0 ps-2 text-[13px] text-muted-foreground", className)}
       data-slot="command-item-note"
       {...props}
     />

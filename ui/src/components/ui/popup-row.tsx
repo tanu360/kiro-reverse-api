@@ -27,7 +27,7 @@ export const POPUP_GROUP_LABEL_CLASS = "px-2 pt-2 pb-1 font-medium text-muted-fo
 export const POPUP_SEPARATOR_CLASS = "-mx-1 my-1 h-px bg-popup-border";
 
 /** Muted trailing text on a row (a count, a shortcut), before the CheckedDot. */
-export const POPUP_ROW_META_CLASS = "ms-auto ps-4 text-muted-foreground text-xs tabular-nums";
+export const POPUP_ROW_META_CLASS = "ms-auto ps-4 text-muted-foreground text-xs";
 
 /** The chosen row's mark: a white check in a filled Kiro-purple circle. */
 export function CheckedDot({ className }: { className?: string }): React.ReactElement {

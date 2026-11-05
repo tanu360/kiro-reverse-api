@@ -38,7 +38,6 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { proxyQuery, updateProxyConfig } from "@/lib/api/settings";
 import type { ProxyConfig } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { buildProxyUrl, type ProxyModel, parseProxyUrl, schemeForType } from "../lib/proxy-url";
 import { SECTION_ID } from "./sections";
 import {
@@ -160,7 +159,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
             </>
           ) : (
             <>
-              <p className="truncate font-medium font-mono text-foreground text-sm" translate="no">
+              <p className="truncate font-medium text-foreground text-sm" translate="no">
                 {address(server)}
               </p>
               <p className={ROW_DESCRIPTION}>
@@ -299,7 +298,7 @@ function ProxyEditor({
                   aria-describedby={addressError ? `${errorId} ${tipId}` : tipId}
                   aria-invalid={hostInvalid || undefined}
                   autoComplete="off"
-                  className={cn("font-mono", TOUCH_INPUT)}
+                  className={TOUCH_INPUT}
                   id={`${id}-host`}
                   onChange={(event) => onHostChange(event.target.value)}
                   placeholder={t("proxyHostPlaceholder")}
@@ -313,7 +312,7 @@ function ProxyEditor({
                   aria-describedby={addressError ? errorId : undefined}
                   aria-invalid={portInvalid || undefined}
                   autoComplete="off"
-                  className={cn("font-mono", TOUCH_INPUT)}
+                  className={TOUCH_INPUT}
                   id={`${id}-port`}
                   inputMode="numeric"
                   maxLength={5}

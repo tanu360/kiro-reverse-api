@@ -148,8 +148,8 @@ function VersionCell({
       <span
         className={
           highlight
-            ? "truncate font-semibold text-base text-info-foreground tabular-nums"
-            : "truncate font-semibold text-base tabular-nums"
+            ? "truncate font-semibold text-base text-info-foreground"
+            : "truncate font-semibold text-base"
         }
       >
         {value ? `v${stripV(value)}` : "—"}

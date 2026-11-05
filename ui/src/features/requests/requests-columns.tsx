@@ -28,7 +28,7 @@ export function StatusBadge({ record }: { record: RequestRecord }): JSX.Element 
     );
   }
   return (
-    <Badge className="tabular-nums" icon={CircleXIcon} tone="destructive">
+    <Badge icon={CircleXIcon} tone="destructive">
       {t("fail")}
       {record.status ? ` ${record.status}` : ""}
     </Badge>
@@ -45,7 +45,7 @@ export function ApiKeyCode({
   const masked = normalizeApiKeyMask(value);
   if (!masked) return <Muted />;
   return (
-    <code className={cn("font-mono text-meta", className)} title={masked}>
+    <code className={cn("text-meta", className)} title={masked}>
       {masked}
     </code>
   );
@@ -163,7 +163,6 @@ export function useRequestColumns(): DataTableColumn<RequestRecord>[] {
           header: t("time"),
           sortable: true,
           sticky: true,
-          className: "tabular-nums",
           cell: (row) => <TimeCell lang={lang} ts={row.ts} />,
         },
         {
@@ -226,7 +225,6 @@ export function useRequestColumns(): DataTableColumn<RequestRecord>[] {
           header: t("credits"),
           sortable: true,
           align: "end",
-          className: "tabular-nums",
           cell: (row) => <CreditAmount value={row.credits} />,
         },
         {
@@ -234,7 +232,6 @@ export function useRequestColumns(): DataTableColumn<RequestRecord>[] {
           header: t("duration"),
           sortable: true,
           align: "end",
-          className: "tabular-nums",
           cell: (row) => formatDurationMs(row.durationMs, Boolean(row.endpoint)),
         },
         {

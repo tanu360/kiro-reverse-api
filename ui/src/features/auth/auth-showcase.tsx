@@ -260,7 +260,7 @@ function StickerLabels(): JSX.Element {
             <Logo className="size-[1em]" />
           </span>
           {text}
-          <span className="ms-1 font-medium font-mono text-[0.62em] opacity-75">{endpoint}</span>
+          <span className="ms-1 font-medium text-[0.62em] opacity-75">{endpoint}</span>
         </li>
       ))}
     </ul>
@@ -433,7 +433,7 @@ function AccountsPreview(): JSX.Element {
             >
               <dt className="truncate text-muted-foreground text-xs">{stat.label}</dt>
               <dd className="mt-1 flex items-end justify-between gap-2">
-                <span className="font-semibold text-lg tabular-nums leading-7">{stat.value}</span>
+                <span className="font-semibold text-lg leading-7">{stat.value}</span>
                 {stat.extra}
               </dd>
             </div>
@@ -484,12 +484,12 @@ function AccountsPreview(): JSX.Element {
                         style={{ width: `${row.used}%` }}
                       />
                     </div>
-                    <span className="text-muted-foreground text-xs tabular-nums">
+                    <span className="text-muted-foreground text-xs">
                       {percent.format(row.used / 100)}
                     </span>
                   </div>
                 </td>
-                <td className="py-3 text-right tabular-nums">{number.format(row.requests)}</td>
+                <td className="py-3 text-right">{number.format(row.requests)}</td>
               </tr>
             ))}
           </tbody>

@@ -25,9 +25,7 @@ export function CreatedKeyPanel({
       <AlertDescription>
         <p>{t("created.body")}</p>
         <div className="flex min-w-0 items-center gap-1 rounded-lg border bg-background py-1 ps-3 pe-1">
-          <code className="min-w-0 flex-1 break-all font-mono text-foreground text-xs">
-            {apiKey}
-          </code>
+          <code className="min-w-0 flex-1 break-all text-foreground text-xs">{apiKey}</code>
           <CopyButton label={t("created.copy")} value={apiKey} />
         </div>
         <div>

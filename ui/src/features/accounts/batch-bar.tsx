@@ -128,7 +128,7 @@ export function BatchBar({
 
   const busy = running !== null;
   const countLabel = (
-    <p aria-live="polite" className="px-1 font-medium text-sm tabular-nums">
+    <p aria-live="polite" className="px-1 font-medium text-sm">
       {t("batch.selected", { count })}
     </p>
   );

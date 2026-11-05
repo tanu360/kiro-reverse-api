@@ -128,9 +128,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
                     </span>
                     <span className="text-muted-foreground text-xs">{profile.region}</span>
                     {profile.name ? (
-                      <span className="break-all font-mono text-muted-foreground text-xs">
-                        {profile.arn}
-                      </span>
+                      <span className="break-all text-muted-foreground text-xs">{profile.arn}</span>
                     ) : null}
                   </span>
                 </label>

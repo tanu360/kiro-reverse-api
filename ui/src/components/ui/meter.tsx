@@ -81,7 +81,7 @@ export function MeterValue({
 }: MeterPrimitive.Value.Props): React.ReactElement {
   return (
     <MeterPrimitive.Value
-      className={cn("text-foreground text-sm tabular-nums", className)}
+      className={cn("text-foreground text-sm", className)}
       data-slot="meter-value"
       {...props}
     />

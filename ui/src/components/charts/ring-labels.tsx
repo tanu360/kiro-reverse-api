@@ -122,7 +122,7 @@ export const RingLabels = memo(function RingLabels({
   );
 
   return (
-    <g className="font-mono" fontSize={fontSize} pointerEvents="none">
+    <g fontSize={fontSize} pointerEvents="none">
       {data.map((ring, index) => {
         const { innerRadius, outerRadius } = getRingRadii(index);
         const { x, y, transform } = layout.position(

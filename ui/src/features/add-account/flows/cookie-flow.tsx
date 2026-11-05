@@ -118,7 +118,6 @@ export function CookieFlow(): JSX.Element {
       <FormField error={error} label={t("cookie.refreshToken")}>
         <Textarea
           autoComplete="off"
-          className="font-mono"
           disabled={pending}
           onChange={(event) => setRefreshToken(event.target.value)}
           ref={tokenRef}

@@ -64,7 +64,7 @@ export function TooltipContent({ title, rows, children }: TooltipContentProps) {
                       {row.label}
                     </span>
                   </div>
-                  <span className="text-right font-medium text-chart-tooltip-foreground text-sm tabular-nums">
+                  <span className="text-right font-medium text-chart-tooltip-foreground text-sm">
                     {typeof row.value === "number"
                       ? intFmt(row.value)
                       : row.value}

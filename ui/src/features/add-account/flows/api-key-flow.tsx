@@ -73,7 +73,6 @@ export function ApiKeyFlow(): JSX.Element {
       <FormField error={errors.keys} hint={t("apikey.keysHint")} label={t("apikey.keysLabel")}>
         <Textarea
           autoComplete="off"
-          className="font-mono"
           disabled={pending}
           onChange={(event) => setKeys(event.target.value)}
           ref={keysRef}

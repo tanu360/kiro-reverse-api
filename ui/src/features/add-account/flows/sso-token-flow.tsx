@@ -71,7 +71,6 @@ export function SsoTokenFlow(): JSX.Element {
       <FormField error={errors.tokens} hint={t("sso.tokenHint")} label={t("sso.tokenLabel")}>
         <Textarea
           autoComplete="off"
-          className="font-mono"
           disabled={pending}
           onChange={(event) => setTokens(event.target.value)}
           ref={tokensRef}

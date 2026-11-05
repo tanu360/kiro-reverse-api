@@ -200,7 +200,6 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
       badge={
         // Green when every filter is on, red when none is, plain in between.
         <Badge
-          className="tabular-nums"
           id={allId}
           size="sm"
           tone={on === total ? "success" : on === 0 ? "destructive" : "neutral"}
@@ -399,10 +398,10 @@ function RuleSummary({ rule }: { rule: PromptFilterRule }): JSX.Element {
   return (
     <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs">
       {/* Both sides shrink with their length, so neither one is squeezed to nothing. */}
-      <code className="min-w-0 truncate font-mono">{rule.match}</code>
+      <code className="min-w-0 truncate">{rule.match}</code>
       <HugeiconsIcon icon={ArrowRight02Icon} aria-hidden="true" className="size-3 shrink-0" />
       {replace ? (
-        <code className="min-w-0 truncate font-mono">{replace}</code>
+        <code className="min-w-0 truncate">{replace}</code>
       ) : (
         <span className="min-w-0 truncate">
           {regex ? t("promptFilter.deletesMatch") : t("promptFilter.removesLine")}
@@ -499,7 +498,7 @@ function RuleEditor({
             <Input
               aria-describedby={`${id}-match-hint`}
               aria-invalid={invalid || undefined}
-              className={cn("font-mono", TOUCH_INPUT)}
+              className={TOUCH_INPUT}
               id={`${id}-match`}
               onChange={(event) => set({ match: event.target.value })}
               placeholder={
@@ -534,7 +533,7 @@ function RuleEditor({
               <Label htmlFor={`${id}-replace`}>{t("promptFilter.replace")}</Label>
               <Input
                 aria-describedby={`${id}-replace-hint`}
-                className={cn("font-mono", TOUCH_INPUT)}
+                className={TOUCH_INPUT}
                 id={`${id}-replace`}
                 onChange={(event) => set({ replace: event.target.value })}
                 spellCheck={false}

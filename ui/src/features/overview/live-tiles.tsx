@@ -112,7 +112,7 @@ export function LiveTiles(): JSX.Element {
         {labels(t).map((tile) => (
           <Card className={TILE_CLASS} data-slot="live-tile" data-tile={tile.id} key={tile.id}>
             <TileLabel tile={tile} />
-            <dd className="mt-auto truncate font-medium text-2xl leading-tight tabular-nums">
+            <dd className="mt-auto truncate font-medium text-2xl leading-tight">
               {shown[tile.id] ?? EMPTY}
             </dd>
           </Card>

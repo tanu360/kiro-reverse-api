@@ -91,7 +91,6 @@ export function CredentialsFlow(): JSX.Element {
       <FormField error={error} label={t("credentials.label")}>
         <Textarea
           autoComplete="off"
-          className="font-mono"
           disabled={pending}
           onChange={(event) => setJson(event.target.value)}
           ref={jsonRef}

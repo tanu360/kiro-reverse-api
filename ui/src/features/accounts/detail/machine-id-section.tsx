@@ -49,7 +49,7 @@ export function MachineIdSection({ account }: { account: Account }): JSX.Element
           <div className="flex w-full flex-col gap-2 sm:flex-row">
             <Input
               autoComplete="off"
-              className={cn("font-mono", TOUCH_INPUT)}
+              className={TOUCH_INPUT}
               onChange={(event) => {
                 setValue(event.target.value);
                 if (error) setError(null);

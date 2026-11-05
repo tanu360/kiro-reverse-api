@@ -407,12 +407,11 @@
   --card-selected: color-mix(in srgb, var(--card), var(--foreground) 4%);
 }
 
-/* Inline code in running text: mono, a touch smaller than the line, on a muted chip. */
+/* Inline code in running text: the body font, a touch smaller than the line, on a muted chip. */
 @utility inline-code {
   border-radius: 0.25rem;
   background-color: var(--muted);
   padding: 0.125rem 0.25rem;
-  font-family: var(--font-mono);
   font-size: 0.85em;
 }
 
@@ -794,7 +793,7 @@
 @theme inline {
   --font-sans:
     "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Fira Code Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -1410,12 +1409,6 @@
     background-image: var(--surface-grain);
     background-repeat: repeat;
     background-size: var(--surface-grain-size);
-  }
-  code,
-  kbd,
-  samp,
-  pre {
-    font-family: var(--font-mono);
   }
 }
 

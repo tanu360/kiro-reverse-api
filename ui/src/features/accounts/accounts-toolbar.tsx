@@ -285,11 +285,7 @@ function StatusTabs({
             {tabs.map((tab) => (
               <TabsTab key={tab} value={tab}>
                 {label[tab]}
-                <Badge
-                  className="min-w-5 tabular-nums"
-                  size="sm"
-                  tone={tab === value ? "primary" : "neutral"}
-                >
+                <Badge className="min-w-5" size="sm" tone={tab === value ? "primary" : "neutral"}>
                   {formatNumber(tab === ALL ? total : counts[tab], lang)}
                 </Badge>
               </TabsTab>
@@ -466,7 +462,7 @@ export function AccountsToolbar({
               {hasFilters ? (
                 <span
                   aria-live="polite"
-                  className="whitespace-nowrap ps-1 text-meta text-muted-foreground tabular-nums"
+                  className="whitespace-nowrap ps-1 text-meta text-muted-foreground"
                 >
                   {t("filter.results", {
                     shown: formatNumber(shown, lang),

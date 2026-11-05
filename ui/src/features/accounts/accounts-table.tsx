@@ -102,9 +102,7 @@ function AccountsDataTable({
         className: MEDIUM_UP,
         headerClassName: MEDIUM_UP,
         align: "end",
-        cell: (account) => (
-          <span className="tabular-nums">{formatNumber(account.requestCount, lang)}</span>
-        ),
+        cell: (account) => <span>{formatNumber(account.requestCount, lang)}</span>,
       },
       {
         id: "lastUsed",
@@ -294,7 +292,7 @@ function Stat({ label, value }: { label: string; value: ReactNode }): JSX.Elemen
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <dt className="truncate text-muted-foreground">{label}</dt>
-      <dd className="truncate tabular-nums">{value}</dd>
+      <dd className="truncate">{value}</dd>
     </div>
   );
 }

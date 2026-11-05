@@ -87,7 +87,7 @@ function EndpointUrl({ origin, path }: { origin: string; path: string }): JSX.El
   const protocol = match?.[1] ?? "";
   const host = match?.[2] ?? origin;
   return (
-    <code className="min-w-0 flex-1 break-all font-mono text-xs leading-relaxed">
+    <code className="min-w-0 flex-1 break-all text-xs leading-relaxed">
       <span className="text-muted-foreground">{protocol}</span>
       <span className="text-foreground">{host}</span>
       <span className="text-info-foreground">{path}</span>
@@ -139,7 +139,7 @@ export function EndpointsCard(): JSX.Element {
                 </span>
                 <span className="min-w-0 truncate font-medium text-sm">{t(endpoint.titleKey)}</span>
                 <Badge
-                  className="ms-auto font-mono"
+                  className="ms-auto"
                   icon={endpoint.method === "POST" ? ArrowUpRight01Icon : ArrowDownLeft01Icon}
                   iconStyle="line"
                   tone={endpoint.method === "POST" ? "primary" : "success"}

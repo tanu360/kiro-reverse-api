@@ -74,7 +74,7 @@ export function ModelMixCard(): JSX.Element {
         cell: (row) => (
           <span className="flex min-w-0 items-center gap-2">
             <ColorDot color={mix?.colorOf.get(row.model) ?? OTHER_MODEL_COLOR} />
-            <span className="truncate font-mono text-xs">{row.model}</span>
+            <span className="truncate text-xs">{row.model}</span>
           </span>
         ),
         className: "max-w-48",
@@ -83,7 +83,7 @@ export function ModelMixCard(): JSX.Element {
         id: "reqs",
         header: t("modelMix.requests"),
         align: "end",
-        cell: (row) => <span className="tabular-nums">{formatNumber(row.reqs, lang)}</span>,
+        cell: (row) => <span>{formatNumber(row.reqs, lang)}</span>,
       },
       {
         id: "tokens",
@@ -103,7 +103,7 @@ export function ModelMixCard(): JSX.Element {
         id: "credits",
         header: t("modelMix.credits"),
         align: "end",
-        cell: (row) => <span className="tabular-nums">{formatCredits(row.credits)}</span>,
+        cell: (row) => <span>{formatCredits(row.credits)}</span>,
       },
     ],
     [t, lang, mix],
@@ -160,17 +160,17 @@ export function ModelMixCard(): JSX.Element {
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2">
                       <ColorDot color={mix.colorOf.get(row.model) ?? OTHER_MODEL_COLOR} />
-                      <span className="truncate font-mono text-xs">{row.model}</span>
+                      <span className="truncate text-xs">{row.model}</span>
                     </span>
                     <span className="flex shrink-0 items-baseline gap-1.5">
                       <span className="text-muted-foreground text-xs">{t("modelMix.credits")}</span>
-                      <span className="font-medium tabular-nums">{formatCredits(row.credits)}</span>
+                      <span className="font-medium">{formatCredits(row.credits)}</span>
                     </span>
                   </div>
                   <dl className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex flex-col gap-0.5">
                       <dt className="text-muted-foreground">{t("modelMix.requests")}</dt>
-                      <dd className="tabular-nums">{formatNumber(row.reqs, lang)}</dd>
+                      <dd>{formatNumber(row.reqs, lang)}</dd>
                     </div>
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <dt className="text-muted-foreground">{t("modelMix.tokens")}</dt>

@@ -44,7 +44,7 @@ function LegendChip({
     <li className="inline-flex items-center gap-1.5">
       <span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: color }} />
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium tabular-nums">{value}</span>
+      <span className="font-medium">{value}</span>
     </li>
   );
 }
