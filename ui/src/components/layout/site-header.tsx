@@ -47,9 +47,10 @@ export function SiteHeader(): JSX.Element {
       <CommandMenuProvider>
         {/*
          * Phones: the trail, then the icon cluster with search first. From sm up, three columns
-         * with the search field centred in the middle one (up to 320 px wide).
+         * with the search field centred in the middle one (up to 320 px wide). The side columns
+         * never drop below their content, so the search field narrows before the trail truncates.
          */}
-        <div className="mx-auto grid w-full min-w-0 max-w-screen-2xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,20rem)_minmax(max-content,1fr)] md:px-6">
+        <div className="mx-auto grid w-full min-w-0 max-w-screen-2xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 sm:grid-cols-[minmax(max-content,1fr)_minmax(0,20rem)_minmax(max-content,1fr)] md:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <Tooltip>
               <TooltipTrigger
@@ -86,7 +87,8 @@ export function SiteHeader(): JSX.Element {
 
 /**
  * Where the page sits: its sidebar group, the page, and the sidebar view when one is open
- * (Accounts › Needs attention). Phones keep only the last crumb.
+ * (Accounts › Needs attention). Below xl only the current page shows, so the page name never
+ * truncates away behind its parent crumbs on tablet widths.
  */
 function PageTrail({ item, view }: { item: NavItem; view: NavView | undefined }): JSX.Element {
   const { t } = useT();
@@ -94,16 +96,16 @@ function PageTrail({ item, view }: { item: NavItem; view: NavView | undefined })
   return (
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap">
-        <BreadcrumbItem className="shrink-0 max-sm:hidden">
+        <BreadcrumbItem className="shrink-0 max-xl:hidden">
           {t(`nav.group.${item.group}`)}
         </BreadcrumbItem>
-        <BreadcrumbSeparator className="max-sm:hidden">/</BreadcrumbSeparator>
+        <BreadcrumbSeparator className="max-xl:hidden">/</BreadcrumbSeparator>
         {view ? (
           <>
-            <BreadcrumbItem className="shrink-0 max-sm:hidden">
+            <BreadcrumbItem className="shrink-0 max-xl:hidden">
               <BreadcrumbLink render={<Link to={item.to} />}>{page}</BreadcrumbLink>
             </BreadcrumbItem>
-            <BreadcrumbSeparator className="max-sm:hidden">/</BreadcrumbSeparator>
+            <BreadcrumbSeparator className="max-xl:hidden">/</BreadcrumbSeparator>
           </>
         ) : null}
         <BreadcrumbItem className="min-w-0">
