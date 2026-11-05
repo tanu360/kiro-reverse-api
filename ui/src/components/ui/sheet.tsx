@@ -9,6 +9,7 @@ import type React from "react";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { OVERLAY_CLOSE_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -35,7 +36,7 @@ export function SheetBackdrop({
   return (
     <SheetPrimitive.Backdrop
       className={cn(
-        "fixed inset-0 z-50 bg-background/60 backdrop-blur-xs transition-all duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute",
+        "dialog-backdrop fixed inset-0 z-50 transition-all duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute",
         className,
       )}
       data-slot="sheet-backdrop"
@@ -94,9 +95,10 @@ export function SheetPopup({
       <SheetViewport side={side} variant={variant}>
         <SheetPrimitive.Popup
           className={cn(
-            "relative flex max-h-full min-h-0 w-full min-w-0 flex-col bg-popover not-dark:bg-clip-padding text-popover-foreground floating-shadow transition-[opacity,translate] duration-200 ease-in-out will-change-transform before:pointer-events-none before:absolute before:inset-0 data-ending-style:opacity-0 data-starting-style:opacity-0 max-sm:before:hidden",
+            // The frosted modal surface (index.css dialog-glass), as dialogs and drawers.
+            "dialog-glass relative flex max-h-full min-h-0 w-full min-w-0 flex-col text-popover-foreground outline-none transition-[opacity,translate] duration-200 ease-in-out will-change-transform data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
             side === "bottom" &&
-              "row-start-2 border-t data-ending-style:translate-y-8 data-starting-style:translate-y-8",
+              "row-start-2 rounded-t-2xl border-t data-ending-style:translate-y-8 data-starting-style:translate-y-8",
             side === "top" &&
               "border-b data-ending-style:-translate-y-8 data-starting-style:-translate-y-8",
             side === "left" &&
@@ -104,7 +106,7 @@ export function SheetPopup({
             side === "right" &&
               "col-start-2 w-[calc(100%-(--spacing(12)))] max-w-md border-s data-ending-style:translate-x-8 data-starting-style:translate-x-8",
             variant === "inset" &&
-              "before:hidden sm:rounded-2xl sm:border sm:before:rounded-[calc(var(--radius-2xl)-1px)] sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
+              "sm:rounded-2xl sm:border sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
             className,
           )}
           data-slot="sheet-popup"
@@ -118,7 +120,8 @@ export function SheetPopup({
           {showCloseButton && (
             <SheetPrimitive.Close
               aria-label={t("actions.close")}
-              className="absolute end-2 top-2"
+              className={OVERLAY_CLOSE_CLASS}
+              data-slot="sheet-dismiss"
               render={<Button size="icon" variant="ghost" />}
               {...closeProps}
             >
@@ -138,7 +141,7 @@ export function SheetHeader({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "flex flex-col gap-2 p-6 in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pb-3 max-sm:pb-4",
+      "flex flex-col gap-2 p-6 max-sm:px-4 max-sm:pb-4 in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pb-3 in-[[data-slot=sheet-popup]:has(>[data-slot=sheet-dismiss])]:pe-14",
       className,
     ),
     "data-slot": "sheet-header",
@@ -157,12 +160,16 @@ export function SheetFooter({
   render,
   ...props
 }: useRender.ComponentProps<"div"> & {
-  variant?: "default" | "bare";
+  /** `split`: the default bar with its content spread to both ends (a status, then actions). */
+  variant?: "default" | "bare" | "split";
 }): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "flex flex-col-reverse gap-2 px-6 sm:flex-row sm:justify-end",
-      variant === "default" && "border-t bg-muted/72 py-4",
+      "flex gap-2 px-6 max-sm:px-4",
+      variant === "split"
+        ? "flex-row items-center justify-between"
+        : "flex-col-reverse sm:flex-row sm:justify-end",
+      variant !== "bare" && "border-t border-border-subtle bg-surface-inset py-4",
       variant === "bare" &&
         "in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pt-3 pt-4 pb-6",
       className,
@@ -183,7 +190,7 @@ export function SheetTitle({
 }: SheetPrimitive.Title.Props): React.ReactElement {
   return (
     <SheetPrimitive.Title
-      className={cn("font-semibold text-lg leading-snug", className)}
+      className={cn("wrap-anywhere font-semibold text-subtitle", className)}
       data-slot="sheet-title"
       {...props}
     />
@@ -196,7 +203,7 @@ export function SheetDescription({
 }: SheetPrimitive.Description.Props): React.ReactElement {
   return (
     <SheetPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-pretty text-muted-foreground text-sm leading-relaxed", className)}
       data-slot="sheet-description"
       {...props}
     />
@@ -213,7 +220,7 @@ export function SheetPanel({
 }): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "p-6 in-[[data-slot=sheet-popup]:has([data-slot=sheet-header])]:pt-1 in-[[data-slot=sheet-popup]:has([data-slot=sheet-footer]:not(.border-t))]:pb-1",
+      "p-6 max-sm:px-4 in-[[data-slot=sheet-popup]:has([data-slot=sheet-header])]:pt-1 in-[[data-slot=sheet-popup]:has([data-slot=sheet-footer]:not(.border-t))]:pb-1",
       className,
     ),
     "data-slot": "sheet-panel",

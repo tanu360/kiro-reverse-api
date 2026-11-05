@@ -58,11 +58,11 @@ export function PopoverPopup({
       >
         <PopoverPrimitive.Popup
           className={cn(
-            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-popover-foreground outline-none transition-[width,height,scale,opacity] has-data-[slot=calendar]:rounded-xl data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-popover-foreground outline-none transition-[width,height,scale,opacity] duration-100 has-data-[slot=calendar]:rounded-xl data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             // A tooltip-style popover is drawn as the tooltip (tooltip.tsx); any other is the one
             // popup sheet (index.css popup-surface), as menus and selects.
             tooltipStyle
-              ? "w-fit text-balance rounded-md border bg-popover not-dark:bg-clip-padding text-xs floating-shadow"
+              ? "popup-surface w-fit text-balance rounded-lg text-xs"
               : "popup-surface rounded-lg text-sm",
             className,
           )}
@@ -98,7 +98,7 @@ export function PopoverTitle({
 }: PopoverPrimitive.Title.Props): React.ReactElement {
   return (
     <PopoverPrimitive.Title
-      className={cn("font-semibold text-sm leading-none", className)}
+      className={cn("font-semibold text-sm", className)}
       data-slot="popover-title"
       {...props}
     />
@@ -111,7 +111,7 @@ export function PopoverDescription({
 }: PopoverPrimitive.Description.Props): React.ReactElement {
   return (
     <PopoverPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-pretty text-muted-foreground text-sm leading-relaxed", className)}
       data-slot="popover-description"
       {...props}
     />

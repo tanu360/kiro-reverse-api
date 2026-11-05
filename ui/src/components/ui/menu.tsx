@@ -13,6 +13,8 @@ import {
   POPUP_ROW_CLASS,
   POPUP_ROW_META_CLASS,
   POPUP_SEPARATOR_CLASS,
+  POPUP_SWITCH_THUMB_CLASS,
+  POPUP_SWITCH_TRACK_CLASS,
 } from "@/components/ui/popup-row";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +52,7 @@ export function MenuTrigger({
 export function MenuPopup({
   children,
   className,
-  sideOffset = 6,
+  sideOffset = 4,
   align = "end",
   alignOffset,
   side = "bottom",
@@ -180,11 +182,8 @@ export function MenuCheckboxItem({
       {variant === "switch" ? (
         <>
           <span className="min-w-0">{children}</span>
-          <MenuPrimitive.CheckboxItemIndicator
-            className="inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 items-center rounded-full p-px outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(4)] focus-outline data-checked:bg-primary data-unchecked:bg-input data-disabled:opacity-64 sm:[--thumb-size:--spacing(3)]"
-            keepMounted
-          >
-            <span className="pointer-events-none block aspect-square h-full in-[[data-slot=menu-checkbox-item][data-checked]]:origin-[var(--thumb-size)_50%] origin-left in-[[data-slot=menu-checkbox-item][data-checked]]:translate-x-[calc(var(--thumb-size)-4px)] in-[[data-slot=menu-checkbox-item]:active]:not-data-disabled:scale-x-110 in-[[data-slot=menu-checkbox-item]:active]:rounded-[var(--thumb-size)/calc(var(--thumb-size)*1.10)] rounded-(--thumb-size) bg-background in-[[data-slot=menu-checkbox-item][data-checked]]:bg-primary-foreground will-change-transform [transition:translate_.15s,border-radius_.15s,scale_.1s_.1s,transform-origin_.15s] rtl:in-[[data-slot=menu-checkbox-item][data-checked]]:origin-left rtl:origin-right rtl:in-[[data-slot=menu-checkbox-item][data-checked]]:-translate-x-[calc(var(--thumb-size)-4px)]" />
+          <MenuPrimitive.CheckboxItemIndicator className={POPUP_SWITCH_TRACK_CLASS} keepMounted>
+            <span className={POPUP_SWITCH_THUMB_CLASS} />
           </MenuPrimitive.CheckboxItemIndicator>
         </>
       ) : (
@@ -282,7 +281,7 @@ export function MenuShortcut({
   return (
     <kbd
       className={cn(
-        "ms-auto font-medium font-sans text-secondary-label text-xs tracking-widest",
+        "ms-auto font-medium font-sans text-muted-foreground text-xs tracking-normal",
         className,
       )}
       data-slot="menu-shortcut"

@@ -7,9 +7,10 @@ export function Skeleton({
 }: React.ComponentProps<"div">): React.ReactElement {
   return (
     <div
-      // t3code's skeleton: muted-foreground at 15%, breathing in opacity (index.css).
+      // t3code's skeleton: the --skeleton tint (muted-foreground at 15%), breathing in opacity
+      // (index.css animate-skeleton), with 4 px corners.
       className={cn(
-        "rounded-sm bg-muted-foreground/15 motion-safe:animate-skeleton",
+        "rounded-sm bg-skeleton motion-safe:animate-skeleton",
         className,
       )}
       data-slot="skeleton"

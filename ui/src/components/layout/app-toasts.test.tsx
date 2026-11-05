@@ -127,13 +127,81 @@ describe("AppToaster", () => {
     expect(title.closest('[aria-hidden="true"]')).toBeNull();
   });
 
-  it("shows the plain message, without a status icon", async () => {
+  it("marks errors and warnings with an icon and keeps success and info plain", async () => {
     renderToasts("en");
     act(() => {
       toast.success("Saved");
+      toast.info("Heads up");
+    });
+    await findTitle("Heads up");
+    expect(document.querySelector('[data-slot="toast-icon"]')).toBeNull();
+
+    act(() => {
       toast.error("Save failed");
     });
-    await findTitle("Save failed");
-    expect(document.querySelector('[data-slot="toast-icon"]')).toBeNull();
+    const title = await findTitle("Save failed");
+    const root = title.closest('[data-slot="toast"]');
+    expect(root).toHaveAttribute("data-type", "error");
+    expect(root?.querySelector('[data-slot="toast-icon"]')).not.toBeNull();
+  });
+
+  it("drops the loading spinner when the toast settles as a success", async () => {
+    renderToasts("en");
+    let id = "";
+    act(() => {
+      id = toast.loading("Refreshing models…");
+    });
+    const loading = await findTitle("Refreshing models…");
+    expect(loading.closest('[data-slot="toast"]')).toHaveAttribute("data-type", "loading");
+
+    act(() => toast.update(id, { type: "success", title: "Refreshed" }));
+    const settled = await findTitle("Refreshed");
+    expect(settled.closest('[data-slot="toast"]')).not.toHaveAttribute("data-type");
+  });
+
+  it("closes a toast from its close button", async () => {
+    const user = userEvent.setup();
+    renderToasts("en");
+    act(() => {
+      toast.error("Save failed");
+    });
+    const title = await findTitle("Save failed");
+    const close = title
+      .closest('[data-slot="toast"]')
+      ?.querySelector<HTMLElement>('[data-slot="toast-close"]');
+    if (!close) throw new Error("no close button");
+    // Base UI hides it from assistive tech until the stack is expanded or it takes focus.
+    expect(close).toHaveAttribute("aria-label", "Close");
+    await user.click(close);
+    await waitFor(() => expect(screen.queryByText("Save failed")).toBeNull());
+  });
+
+  it("puts toasts at the top centre on phones and the bottom right from sm up", async () => {
+    const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === "(max-width: 639px)",
+          media: query,
+          onchange: null,
+          addListener: () => {},
+          removeListener: () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    const phone = renderToasts("en");
+    expect(document.querySelector('[data-slot="toast-viewport"]')).toHaveAttribute(
+      "data-position",
+      "top-center",
+    );
+    phone.unmount();
+    matchMedia.mockRestore();
+
+    renderToasts("en");
+    expect(document.querySelector('[data-slot="toast-viewport"]')).toHaveAttribute(
+      "data-position",
+      "bottom-right",
+    );
   });
 });

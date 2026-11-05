@@ -14,6 +14,23 @@ import { cn } from "@/lib/utils";
 export const POPUP_ROW_CLASS =
   "flex min-h-10 cursor-default select-none items-center gap-2.5 rounded-md px-2 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-checked:text-info-foreground data-selected:text-info-foreground data-disabled:opacity-64 sm:min-h-8 pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0";
 
+/**
+ * The same row as a plain button (drawer menus, lists outside a Base UI popup): hover takes the
+ * accent and the keyboard gets the inset outline, as rows packed in a scrolling list.
+ */
+export const POPUP_BUTTON_ROW_CLASS =
+  "flex min-h-10 w-full cursor-default select-none items-center gap-2.5 rounded-md px-2 text-start text-foreground text-sm outline-none hover:bg-accent focus-outline-inset disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64 data-checked:text-info-foreground sm:min-h-8 pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0";
+
+/**
+ * A switch drawn inside a row (menu and drawer switch rows), with the Switch's own colours
+ * (switch.tsx): a 30 x 18 track, purple when on and --switch-track when off, and a 16 px thumb.
+ */
+export const POPUP_SWITCH_TRACK_CLASS =
+  "inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 items-center rounded-full p-px transition-[background-color] duration-200 [--thumb-size:--spacing(4)] data-checked:bg-primary data-unchecked:bg-switch-track data-disabled:opacity-64";
+
+export const POPUP_SWITCH_THUMB_CLASS =
+  "pointer-events-none block aspect-square h-full rounded-full bg-switch-thumb transition-transform duration-150 in-data-checked:translate-x-[calc(var(--thumb-size)-4px)] in-data-checked:bg-primary-foreground rtl:in-data-checked:-translate-x-[calc(var(--thumb-size)-4px)]";
+
 /** A row that can be chosen: room at the end for the CheckedDot. */
 export const POPUP_CHECK_ROW_CLASS = "pe-2.5";
 

@@ -75,9 +75,9 @@ export function AlertDialogPopup({
       >
         <AlertDialogPrimitive.Popup
           className={cn(
-            "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 max-w-lg -translate-y-[calc(1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 max-w-lg -translate-y-[calc(1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
             bottomStickOnMobile &&
-              "max-sm:max-w-none max-sm:rounded-none max-sm:border-x-0 max-sm:border-t max-sm:border-b-0 max-sm:opacity-[calc(1-min(var(--nested-dialogs),1))] max-sm:data-ending-style:translate-y-4 max-sm:data-starting-style:translate-y-4",
+              "max-sm:max-w-none max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-t max-sm:border-b-0 max-sm:opacity-[calc(1-min(var(--nested-dialogs),1))] max-sm:data-ending-style:translate-y-4 max-sm:data-starting-style:translate-y-4",
             className,
           )}
           data-slot="alert-dialog-popup"
@@ -99,7 +99,7 @@ export function AlertDialogHeader({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-col gap-2 p-6 text-center max-sm:pb-4 sm:text-left",
+        "flex min-h-0 flex-col gap-2 p-6 text-center max-sm:px-4 max-sm:pb-4 sm:text-left",
         className,
       )}
       data-slot="alert-dialog-header"
@@ -118,8 +118,9 @@ export function AlertDialogFooter({
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 px-6 sm:flex-row sm:justify-end sm:rounded-b-[calc(var(--radius-2xl)-1px)]",
-        variant === "default" && "border-t bg-muted/72 py-4",
+        // Phones: Cancel and the action share one row of two (dialog.tsx DialogFooter).
+        "grid grid-cols-2 gap-2 px-6 max-sm:px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end sm:rounded-b-[calc(var(--radius-2xl)-1px)]",
+        variant === "default" && "border-t border-border-subtle bg-surface-inset py-4",
         variant === "bare" && "pb-6",
         className,
       )}
@@ -135,7 +136,7 @@ export function AlertDialogTitle({
 }: AlertDialogPrimitive.Title.Props): React.ReactElement {
   return (
     <AlertDialogPrimitive.Title
-      className={cn("wrap-anywhere shrink-0 font-semibold text-lg leading-snug", className)}
+      className={cn("wrap-anywhere shrink-0 font-semibold text-subtitle", className)}
       data-slot="alert-dialog-title"
       {...props}
     />
@@ -148,7 +149,7 @@ export function AlertDialogDescription({
 }: AlertDialogPrimitive.Description.Props): React.ReactElement {
   return (
     <AlertDialogPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-pretty text-muted-foreground text-sm leading-relaxed", className)}
       data-slot="alert-dialog-description"
       {...props}
     />

@@ -4,6 +4,11 @@ import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 import type React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * A scroll box with no vertical bar and a thin sideways one. `scrollFade` fades whichever edge
+ * still has content past it, on both axes: the top and bottom of a tall panel, and the start and
+ * end of a row wider than its box (tab strips, chip rows), 24 px at most.
+ */
 export function ScrollArea({
   className,
   children,
@@ -45,7 +50,7 @@ export function ScrollArea({
         </ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
       {/* Kiro: no vertical bar, ever (see the scrollbar rules in index.css); only the sideways one. */}
-      <ScrollBar orientation="horizontal" />
+      <HorizontalScrollBar />
       <ScrollAreaPrimitive.Corner data-slot="scroll-area-corner" />
     </ScrollAreaPrimitive.Root>
   );
@@ -72,6 +77,13 @@ export function ScrollBar({
       />
     </ScrollAreaPrimitive.Scrollbar>
   );
+}
+
+/** The sideways bar on its own: a 6 px round thumb that shows while scrolling or hovered. */
+export function HorizontalScrollBar(
+  props: Omit<ScrollAreaPrimitive.Scrollbar.Props, "orientation">,
+): React.ReactElement {
+  return <ScrollBar orientation="horizontal" {...props} />;
 }
 
 export { ScrollAreaPrimitive };

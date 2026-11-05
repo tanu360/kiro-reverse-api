@@ -13,7 +13,7 @@ export interface ToastOptions {
 type ToastType = "success" | "error" | "warning" | "info" | "loading";
 type SettledType = Exclude<ToastType, "loading">;
 
-// The coss toast has no close button, so every settled toast times out; errors stay longest.
+// Every toast has a close button, and every settled one also times out; errors stay longest.
 // Loading toasts never time out (0) and wait for their update.
 const DEFAULT_DURATION: Record<ToastType, number> = {
   success: 4000,
@@ -23,14 +23,23 @@ const DEFAULT_DURATION: Record<ToastType, number> = {
   loading: 0,
 };
 
+/*
+ * The type the coss toast is given, which picks its icon and colour (components/ui/toast.tsx):
+ * errors and warnings carry the alert icon and colour, loading the spinner. Success and info stay
+ * plain messages, so the alert accent keeps its meaning.
+ */
+function toastType(type: ToastType): "error" | "warning" | "loading" | undefined {
+  return type === "error" || type === "warning" || type === "loading" ? type : undefined;
+}
+
 let idSeed = 0;
 
 function show(type: ToastType, title: string, options: ToastOptions = {}): string {
   const id = options.id ?? `toast-${Date.now()}-${idSeed++}`;
   const { action } = options;
-  // No `type`: the coss toast then shows the plain message, without a status icon or colour.
   manager.add({
     id,
+    type: toastType(type),
     title,
     description: options.description,
     timeout: options.duration ?? DEFAULT_DURATION[type],
@@ -53,7 +62,9 @@ function update(
   id: string,
   next: { type: SettledType; title: string; description?: string; duration?: number },
 ): void {
+  // `type` is always set, even to undefined, so a settled loading toast drops its spinner.
   manager.update(id, {
+    type: toastType(next.type),
     title: next.title,
     description: next.description,
     timeout: next.duration ?? DEFAULT_DURATION[next.type],

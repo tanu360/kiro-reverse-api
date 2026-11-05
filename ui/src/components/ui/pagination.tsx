@@ -60,10 +60,10 @@ export function PaginationLink({
     className: render
       ? className
       : cn(
-          buttonVariants({
-            size,
-            variant: isActive ? "outline" : "ghost",
-          }),
+          // The current page takes the accent fill, as a highlighted popup row.
+          buttonVariants({ size, variant: "ghost" }),
+          "tabular-nums",
+          isActive && "bg-accent text-foreground",
           className,
         ),
     "data-active": isActive,

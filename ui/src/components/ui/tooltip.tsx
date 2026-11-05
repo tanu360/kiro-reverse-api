@@ -46,7 +46,8 @@ export function TooltipPopup({
       >
         <TooltipPrimitive.Popup
           className={cn(
-            "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-balance rounded-md border bg-popover not-dark:bg-clip-padding text-popover-foreground text-xs floating-shadow max-w-80 wrap-anywhere whitespace-normal leading-snug transition-[width,height,scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
+            // The one floating sheet (index.css popup-surface), as menus, selects, popovers and toasts.
+            "popup-surface relative flex h-(--popup-height,auto) w-(--popup-width,auto) max-w-80 origin-(--transform-origin) wrap-anywhere text-balance whitespace-normal rounded-lg text-popover-foreground text-xs leading-snug transition-[width,height,scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
             className,
           )}
           data-slot="tooltip-popup"

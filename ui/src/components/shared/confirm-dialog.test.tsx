@@ -11,10 +11,16 @@ const OPTIONS: ConfirmOptions = {
   variant: "danger",
 };
 
-function Harness({ results }: { results: boolean[] }) {
+function Harness({ results, options = OPTIONS }: { results: boolean[]; options?: ConfirmOptions }) {
   const confirm = useConfirm();
   return (
     <>
+      <button
+        onClick={() => void confirm(options).then((value) => results.push(value))}
+        type="button"
+      >
+        Ask with options
+      </button>
       <button
         onClick={() => void confirm(OPTIONS).then((value) => results.push(value))}
         type="button"
@@ -35,15 +41,51 @@ function Harness({ results }: { results: boolean[] }) {
 }
 
 describe("useConfirm", () => {
-  it("resolves true on confirm and focuses the confirm button", async () => {
+  it("opens a danger confirm on Cancel, so Enter does not run the action", async () => {
     const results: boolean[] = [];
     const { user } = renderWithProviders(<Harness results={results} />);
     await user.click(screen.getByRole("button", { name: "Ask" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(dialog).toHaveTextContent("Delete this account?");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Delete" })).toHaveFocus());
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus());
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(results).toEqual([false]));
+  });
+
+  it("resolves true on confirm", async () => {
+    const results: boolean[] = [];
+    const { user } = renderWithProviders(<Harness results={results} />);
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
     await waitFor(() => expect(results).toEqual([true]));
+  });
+
+  it("opens a default confirm on its confirm button", async () => {
+    const results: boolean[] = [];
+    const { user } = renderWithProviders(
+      <Harness
+        options={{ title: "Sign out?", confirmLabel: "Sign out", variant: "default" }}
+        results={results}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Ask with options" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Sign out" })).toHaveFocus());
+  });
+
+  it("sets the target apart inside the title", async () => {
+    const results: boolean[] = [];
+    const { user } = renderWithProviders(
+      <Harness
+        options={{ ...OPTIONS, title: "Delete ada@example.com?", target: "ada@example.com" }}
+        results={results}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Ask with options" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveAccessibleName("Delete ada@example.com?");
+    expect(dialog.querySelector('[data-slot="confirm-target"]')).toHaveTextContent(
+      "ada@example.com",
+    );
   });
 
   it("resolves false on Cancel", async () => {

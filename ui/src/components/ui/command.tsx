@@ -86,7 +86,7 @@ export function CommandDialogPopup({
       <CommandDialogViewport>
         <CommandDialogPrimitive.Popup
           className={cn(
-            "popup-surface command-palette flex min-w-0 origin-top flex-col overflow-hidden rounded-[20px] text-popover-foreground [--popup-shadow:var(--floating-shadow)] outline-none [--command-foot:--spacing(14)] pointer-coarse:[--command-foot:--spacing(4)]",
+            "popup-surface command-palette flex min-w-0 origin-top flex-col overflow-hidden rounded-2xl text-popover-foreground [--popup-shadow:var(--floating-shadow)] outline-none [--command-foot:--spacing(14)] pointer-coarse:[--command-foot:--spacing(4)]",
             "transition-[opacity,translate,scale] duration-220 data-ending-style:-translate-y-2 data-starting-style:-translate-y-2 data-ending-style:scale-96 data-starting-style:scale-96 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-140 data-ending-style:ease-in motion-reduce:transition-opacity",
             OPEN_EASE,
             className,
@@ -173,7 +173,7 @@ export function CommandEmpty({
   return (
     <AutocompletePrimitive.Empty
       className={cn(
-        "wrap-anywhere text-center text-[13px] text-muted-foreground not-empty:px-3 not-empty:py-7",
+        "wrap-anywhere text-center text-meta text-muted-foreground not-empty:px-3 not-empty:py-7",
         className,
       )}
       data-slot="command-empty"
@@ -214,7 +214,7 @@ export function CommandGroupLabel({
 
 export const CommandCollection = AutocompleteCollection;
 
-/** A 40 px row: 20 px icon, 12 px gap, 14 px label; the highlight takes the popup accent. */
+/** A 40 px row: 20 px icon, 12 px gap, 14 px label, 8 px corners inside the 8 px list inset; the highlight takes the popup accent. */
 export function CommandItem({
   className,
   ...props
@@ -222,7 +222,7 @@ export function CommandItem({
   return (
     <AutocompletePrimitive.Item
       className={cn(
-        "flex h-10 cursor-pointer snap-end select-none items-center gap-3 rounded-[11px] px-3 text-foreground text-sm outline-none data-disabled:cursor-not-allowed data-highlighted:bg-accent data-disabled:opacity-45 [&_svg:not([class*='size-'])]:size-5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-muted-foreground data-highlighted:[&_svg]:text-foreground",
+        "flex h-10 cursor-pointer snap-end select-none items-center gap-3 rounded-lg px-3 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-disabled:opacity-64 [&_svg:not([class*='size-'])]:size-5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-muted-foreground data-highlighted:[&_svg]:text-foreground",
         className,
       )}
       data-slot="command-item"
@@ -238,7 +238,7 @@ export function CommandItemNote({
 }: React.ComponentProps<"span">): React.ReactElement {
   return (
     <span
-      className={cn("ms-auto shrink-0 ps-2 text-[13px] text-muted-foreground", className)}
+      className={cn("ms-auto shrink-0 ps-2 text-meta text-muted-foreground tabular-nums", className)}
       data-slot="command-item-note"
       {...props}
     />
@@ -265,7 +265,7 @@ export function CommandShortcut({
   return (
     <kbd
       className={cn(
-        "ms-auto font-medium font-sans text-muted-foreground/72 text-xs tracking-widest",
+        "ms-auto font-medium font-sans text-muted-foreground text-xs tracking-normal",
         className,
       )}
       data-slot="command-shortcut"

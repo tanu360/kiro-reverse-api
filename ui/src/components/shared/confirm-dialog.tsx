@@ -25,7 +25,29 @@ export interface ConfirmOptions {
   description?: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
+  /** `danger` opens with focus on Cancel, so a stray Enter or Space never runs the action. */
   variant?: "danger" | "default";
+  /**
+   * What the action applies to (an account's email, a backup's time). Callers put it in the
+   * title themselves (`t("confirmDelete.title", { email })`); the dialog marks that part so a
+   * long value breaks anywhere instead of overflowing.
+   */
+  target?: string;
+}
+
+/** The title with its target, when the title contains it, set apart in its own span. */
+function ConfirmTitle({ title, target }: { title: string; target?: string }): JSX.Element {
+  const at = target ? title.indexOf(target) : -1;
+  if (!target || at < 0) return <>{title}</>;
+  return (
+    <>
+      {title.slice(0, at)}
+      <span className="wrap-anywhere" data-slot="confirm-target">
+        {target}
+      </span>
+      {title.slice(at + target.length)}
+    </>
+  );
 }
 
 type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
@@ -39,6 +61,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }): JSX.Elem
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const resolverRef = useRef<((value: boolean) => void) | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
 
   const settle = useCallback((value: boolean) => {
     const resolve = resolverRef.current;
@@ -79,17 +102,19 @@ export function ConfirmProvider({ children }: { children: ReactNode }): JSX.Elem
       >
         {options ? (
           <AlertDialogPopup
-            initialFocus={confirmButtonRef}
+            initialFocus={options.variant === "danger" ? cancelRef : confirmButtonRef}
             portalProps={{ onClick: onPortalClick }}
           >
             <AlertDialogHeader>
-              <AlertDialogTitle>{options.title}</AlertDialogTitle>
+              <AlertDialogTitle>
+                <ConfirmTitle target={options.target} title={options.title} />
+              </AlertDialogTitle>
               {options.description ? (
                 <AlertDialogDescription>{options.description}</AlertDialogDescription>
               ) : null}
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <Button onClick={() => settle(false)} variant="ghost">
+              <Button onClick={() => settle(false)} ref={cancelRef} variant="ghost">
                 {options.cancelLabel ?? t("actions.cancel")}
               </Button>
               <Button
