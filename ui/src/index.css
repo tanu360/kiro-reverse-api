@@ -57,8 +57,6 @@
   /* zinc at L 0.5 (#62626c): 5.9:1 on the page, 5.2:1 on a selected row (zinc-500 was 4.4). */
   --muted-foreground: oklch(0.5 0.016 286);
   --placeholder: var(--muted-foreground);
-  /* Deprecated: an alias of --muted-foreground until menu, sidebar and user-menu move off it. */
-  --secondary-label: var(--muted-foreground);
   /* Model logos without their own colour (components/shared/model-logo.tsx). */
   --icon-muted: var(--muted-foreground);
   --accent: var(--color-zinc-100);
@@ -984,7 +982,6 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-placeholder: var(--placeholder);
-  --color-secondary-label: var(--secondary-label);
   --color-icon-muted: var(--icon-muted);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
