@@ -59,6 +59,27 @@ export function FieldDescription({
   );
 }
 
+/**
+ * A FieldDescription-styled note with no Field around it (Base UI's FieldDescription needs a
+ * Field.Root): a step-level hint in a flow, a note under a group of fields. Same 12 px muted
+ * line, at most 42rem wide.
+ */
+export function FieldHint({
+  className,
+  ...props
+}: React.ComponentProps<"p">): React.ReactElement {
+  return (
+    <p
+      className={cn(
+        "max-w-2xl text-pretty text-muted-foreground text-xs leading-normal",
+        className,
+      )}
+      data-slot="field-hint"
+      {...props}
+    />
+  );
+}
+
 export function FieldError({
   className,
   ...props

@@ -22,7 +22,8 @@ function useScrollsSideways(ref: RefObject<HTMLElement | null>, content: string)
  * A block of code (a config file, a command) with its title and a copy button in a strip above
  * it. The code is mono on the inset well and scrolls sideways inside the block, so long lines
  * never widen the page; while it scrolls, the block is a labelled tab stop so arrow keys can
- * scroll it.
+ * scroll it. `wrap` wraps long lines instead (anywhere, keeping line breaks), for prose-like text
+ * such as an error message.
  */
 export function CodeBlock({
   code,
@@ -30,6 +31,7 @@ export function CodeBlock({
   copyLabel,
   copiedMessage,
   regionLabel,
+  wrap = false,
   className,
 }: {
   code: string;
@@ -38,6 +40,8 @@ export function CodeBlock({
   copiedMessage?: string;
   /** The scrolling region's name; the title by default. */
   regionLabel?: string;
+  /** Wraps long lines (anywhere) instead of scrolling sideways. */
+  wrap?: boolean;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
@@ -66,7 +70,11 @@ export function CodeBlock({
       {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: the label is set only with role="region". */}
       <pre
         aria-label={scrolls ? (regionLabel ?? title) : undefined}
-        className="scrollbar-x max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed outline-none focus-outline-inset"
+        className={cn(
+          "scrollbar-x max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed outline-none focus-outline-inset",
+          wrap && "whitespace-pre-wrap wrap-anywhere",
+        )}
+        data-wrap={wrap ? "" : undefined}
         ref={preRef}
         role={scrolls ? "region" : undefined}
         tabIndex={scrolls ? 0 : undefined}

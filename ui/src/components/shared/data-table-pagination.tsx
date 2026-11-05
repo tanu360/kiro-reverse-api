@@ -23,14 +23,50 @@ import { cn } from "@/lib/utils";
 /*
  * The prev/next chevrons: round, in the topbar search pill's surface (command-menu.tsx: the
  * --field tint and the --input hairline), so they read on the page in both themes. Sized by the
- * Button's `icon` step, like the page numbers. Disabled keeps the circle and only dims the chevron.
+ * Button's `icon` step, like the page numbers. Disabled keeps the circle, dimmed like every
+ * disabled control, with a muted chevron.
  */
-const CHEVRON =
-  "rounded-full border-input bg-(--field) text-foreground [:hover,[data-pressed]]:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
+export const PAGER_CHEVRON_CLASS =
+  "rounded-full border-input bg-(--field) text-foreground [:hover,[data-pressed]]:bg-(--field-hover) disabled:text-muted-foreground";
 // The page numbers: round quiet buttons; the current page takes the accent fill, the same
 // surface as a selected segment.
 const PAGE = "rounded-full tabular-nums";
 const PAGE_ACTIVE = "bg-accent text-foreground";
+
+/**
+ * The pager's round previous/next button, for any prev/next pair that should match the table
+ * pager (a detail sheet stepping through rows). `label` is its accessible name.
+ */
+export function PagerChevronButton({
+  direction,
+  label,
+  onClick,
+  disabled = false,
+  className,
+}: {
+  direction: "previous" | "next";
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  /** Layout only. */
+  className?: string;
+}): JSX.Element {
+  return (
+    <Button
+      aria-label={label}
+      className={cn(PAGER_CHEVRON_CLASS, className)}
+      disabled={disabled}
+      onClick={onClick}
+      size="icon"
+      variant="quiet"
+    >
+      <HugeiconsIcon
+        aria-hidden="true"
+        icon={direction === "previous" ? ChevronLeftIcon : ChevronRightIcon}
+      />
+    </Button>
+  );
+}
 
 export function DataTablePagination({
   page,
@@ -68,8 +104,12 @@ export function DataTablePagination({
           total: formatNumber(total, lang),
         })}
       </p>
-      {/* ms-auto keeps the pager on the right when it wraps under the count on a narrow screen. */}
-      <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
+      {/*
+        ms-auto keeps the pager on the right when it wraps under the count on a narrow screen.
+        Rows and the pager stay on one line: below sm the page numbers collapse to "3 / 13"
+        between the chevrons, so the footer is at most two rows on a phone.
+      */}
+      <div className="ms-auto flex items-center justify-end gap-2">
         {showSizes ? (
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground" id={sizeLabelId}>
@@ -101,18 +141,19 @@ export function DataTablePagination({
         <Pagination className="mx-0 w-auto max-w-full">
           <PaginationContent className="gap-2">
             <PaginationItem>
-              <Button
-                aria-label={t("table.previous")}
-                className={CHEVRON}
+              <PagerChevronButton
+                direction="previous"
                 disabled={page <= 1}
+                label={t("table.previous")}
                 onClick={() => onPageChange(page - 1)}
-                size="icon"
-                variant="quiet"
-              >
-                <HugeiconsIcon icon={ChevronLeftIcon} aria-hidden="true" />
-              </Button>
+              />
             </PaginationItem>
-            <PaginationItem>
+            <PaginationItem className="sm:hidden">
+              <span className="block min-w-10 text-center text-foreground tabular-nums">
+                {formatNumber(page, lang)} / {formatNumber(pageCount, lang)}
+              </span>
+            </PaginationItem>
+            <PaginationItem className="max-sm:hidden">
               <ol className="flex items-center gap-0.5 p-1">
                 {pages.map((n, index) => (
                   <PaginationItem className="flex items-center gap-0.5" key={n}>
@@ -138,16 +179,12 @@ export function DataTablePagination({
               </ol>
             </PaginationItem>
             <PaginationItem>
-              <Button
-                aria-label={t("table.next")}
-                className={CHEVRON}
+              <PagerChevronButton
+                direction="next"
                 disabled={page >= pageCount}
+                label={t("table.next")}
                 onClick={() => onPageChange(page + 1)}
-                size="icon"
-                variant="quiet"
-              >
-                <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" />
-              </Button>
+              />
             </PaginationItem>
           </PaginationContent>
         </Pagination>

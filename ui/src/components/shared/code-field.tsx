@@ -1,5 +1,5 @@
 import { ExternalLinkIcon } from "@hugeicons/core-free-icons";
-import type { JSX } from "react";
+import { Fragment, type JSX, type ReactNode } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { CopyButton } from "@/components/shared/copy-button";
 import { Button } from "@/components/ui/button";
@@ -13,14 +13,37 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 
 /**
+ * The value with a break opportunity after each "/", so a long URL wraps at its path segments.
+ * Chrome does not break after "/" under wrap-anywhere, so it would split a word instead
+ * ("/v1/chat/comp|letions"). The <wbr> adds no text: copying and selection keep the raw value.
+ */
+function breakAtSlashes(value: string): ReactNode {
+  const parts = value.split("/");
+  if (parts.length === 1) return value;
+  return parts.map((part, index) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder.
+    <Fragment key={index}>
+      {part}
+      {index < parts.length - 1 ? (
+        <>
+          /<wbr />
+        </>
+      ) : null}
+    </Fragment>
+  ));
+}
+
+/**
  * A value to copy (a URL, a key, a command) in a read-only field: mono text in the soft field,
  * with a copy button and, for a link, an open button at its end. One line scrolls inside the
  * input (focus selects it all); `multiline` wraps the value anywhere instead, for long URLs.
- * Inside a Base UI Field the input takes the field's label; otherwise pass `label`.
+ * Inside a Base UI Field the input takes the field's label; otherwise pass `label`. The
+ * multiline value is a read-only textbox (a tab stop), named by `label` or by `labelledBy`.
  */
 export function CopyField({
   value,
   label,
+  labelledBy,
   copyLabel,
   copiedMessage,
   multiline = false,
@@ -32,6 +55,8 @@ export function CopyField({
   value: string;
   /** The field's accessible name when no visible label points at it. */
   label?: string;
+  /** The id of a visible label that names the multiline value (in place of `label`). */
+  labelledBy?: string;
   /** The copy button's name; "Copy" by default. */
   copyLabel?: string;
   copiedMessage?: string;
@@ -49,11 +74,16 @@ export function CopyField({
     <InputGroup className={className} data-slot="copy-field">
       {multiline ? (
         <InputGroupText
-          aria-label={label}
-          className="block min-w-0 flex-1 cursor-text select-all whitespace-normal py-2 ps-3 font-mono text-foreground text-meta leading-normal wrap-anywhere"
+          aria-label={labelledBy ? undefined : label}
+          aria-labelledby={labelledBy}
+          aria-multiline="true"
+          aria-readonly="true"
+          className="block min-w-0 flex-1 cursor-text select-all whitespace-normal py-2 ps-3 font-mono text-foreground text-meta leading-normal outline-none wrap-anywhere"
           id={id}
+          role="textbox"
+          tabIndex={0}
         >
-          {value}
+          {breakAtSlashes(value)}
         </InputGroupText>
       ) : (
         <InputGroupInput

@@ -156,10 +156,12 @@ function ListRowShell({ className, render, ...props }: useRender.ComponentProps<
 /**
  * Equal-height cards: one column, two from a 42rem container (@2xl), with an odd last card
  * spanning both so no row is half empty. Each child (an `<li>`) stretches its card to the row.
- * It queries the nearest `@container` (DataTable's own wrapper, or the caller's).
+ * It queries the nearest `@container` (DataTable's own wrapper, or the caller's). The single
+ * column is explicit (minmax(0, 1fr)): an implicit auto track would grow to the min-content of
+ * a long unbreakable title and push every card past its panel.
  */
 export const CARD_GRID_CLASS =
-  "grid gap-2 @2xl:grid-cols-2 *:flex *:*:min-w-0 *:*:flex-1 @2xl:[&>*:last-child:nth-child(odd)]:col-span-2";
+  "grid grid-cols-1 gap-2 @2xl:grid-cols-2 *:flex *:*:min-w-0 *:*:flex-1 @2xl:[&>*:last-child:nth-child(odd)]:col-span-2";
 
 export function CardGrid({ className, render, ...props }: useRender.ComponentProps<"ul">) {
   return useRender({

@@ -84,7 +84,8 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string; "ari
  * named and described by the row. `children` go under the description (a current value, an
  * error). `controlWidth` sizes the control slot: a text field or select (`field`), a number
  * field (`number`), or the control's own width (`auto`: a switch or a button, kept on the
- * title's line).
+ * title's line). A Button control keeps its own name (its label, "Add rule"): the row title is
+ * not put on it, only the description. `labelControl` overrides that either way.
  */
 export function SettingsRow({
   title,
@@ -94,6 +95,7 @@ export function SettingsRow({
   tone = "default",
   control,
   controlWidth = "field",
+  labelControl,
   children,
   className,
 }: {
@@ -106,6 +108,11 @@ export function SettingsRow({
   tone?: "default" | "danger";
   control?: ReactNode;
   controlWidth?: ControlWidth;
+  /**
+   * Whether the row title names the control (aria-labelledby). On by default, off for a Button,
+   * whose own label is its name.
+   */
+  labelControl?: boolean;
   children?: ReactNode;
   /** Layout only. */
   className?: string;
@@ -116,10 +123,13 @@ export function SettingsRow({
   let wired = control;
   if (isValidElement<AriaProps>(control)) {
     const own = control.props;
+    const named = labelControl ?? control.type !== Button;
     wired = cloneElement(control as ReactElement<AriaProps>, {
       // A control with a name of its own keeps it; the row's title names the rest.
       "aria-labelledby":
-        own["aria-label"] === undefined ? joinIds(own["aria-labelledby"], titleId) : undefined,
+        named && own["aria-label"] === undefined
+          ? joinIds(own["aria-labelledby"], titleId)
+          : own["aria-labelledby"],
       "aria-describedby": joinIds(own["aria-describedby"], hintId),
     });
   }

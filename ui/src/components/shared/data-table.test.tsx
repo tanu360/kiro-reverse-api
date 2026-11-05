@@ -385,4 +385,23 @@ describe("DataTable", () => {
     renderWithProviders(<DataTable columns={COLUMNS} data={ROWS} getRowId={(row) => row.id} />);
     expect(screen.getByRole("row", { name: /Alpha/ })).not.toHaveAttribute("tabindex");
   });
+
+  it("reports the hovered row and marks rows with their id and index", async () => {
+    const onRowHover = vi.fn();
+    const { user } = renderWithProviders(
+      <DataTable
+        columns={COLUMNS}
+        data={ROWS}
+        getRowId={(row) => row.id}
+        onRowHover={onRowHover}
+      />,
+    );
+    const bravo = screen.getByRole("row", { name: /Bravo/ });
+    expect(bravo).toHaveAttribute("data-row-id", "b");
+    expect(bravo).toHaveAttribute("data-row-index", "1");
+    await user.hover(bravo);
+    expect(onRowHover).toHaveBeenLastCalledWith(ROWS[1]);
+    await user.unhover(bravo);
+    expect(onRowHover).toHaveBeenLastCalledWith(null);
+  });
 });

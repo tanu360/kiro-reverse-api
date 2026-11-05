@@ -22,7 +22,9 @@ export function FieldsetLegend({
 }: FieldsetPrimitive.Legend.Props): React.ReactElement {
   return (
     <FieldsetPrimitive.Legend
-      className={cn("font-semibold text-foreground", className)}
+      // The field label's scale (field.tsx FieldLabel): 14 px medium, so a group's legend is not
+      // louder than the labels under it.
+      className={cn("font-medium text-foreground text-sm/5", className)}
       data-slot="fieldset-legend"
       {...props}
     />

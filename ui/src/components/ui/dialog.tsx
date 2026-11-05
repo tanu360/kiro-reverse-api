@@ -117,7 +117,11 @@ export function DialogPopup({
   const { t } = useT();
   return (
     <DialogPortal {...portalProps}>
-      <DialogBackdrop />
+      {/*
+        forceRender: a dialog opened from inside another dialog or a sheet (Base UI nesting) draws
+        its own backdrop too, so the parent dims behind it instead of staying at full brightness.
+      */}
+      <DialogBackdrop forceRender />
       <DialogViewport
         anchor={anchor}
         className={cn(

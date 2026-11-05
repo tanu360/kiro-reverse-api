@@ -60,19 +60,23 @@ export function PageHeader({
  * label, the same size as every other header action. `icon` is a quiet icon-only button (its
  * colour changes on hover, no fill) with the label as its name and tooltip, for a header whose
  * other actions carry the colour. While `fetching`, the button's own loading state shows a
- * spinner in place of the icon and clicks are ignored.
+ * spinner in place of the icon and clicks are ignored. `size="sm"` is the card-header step,
+ * beside other small card actions.
  */
 export function RefreshButton({
   fetching,
   onRefresh,
   label,
   variant = "outline",
+  size = "default",
 }: {
   fetching: boolean;
   onRefresh: () => void;
   /** Defaults to the common "Refresh". */
   label?: string;
   variant?: "outline" | "icon";
+  /** `sm` for a card header (Button sm / icon-sm); `default` for a page header. */
+  size?: "default" | "sm";
 }): JSX.Element {
   const { t } = useT();
   const text = label ?? t("actions.refresh");
@@ -85,7 +89,7 @@ export function RefreshButton({
       onClick={() => {
         if (!fetching) onRefresh();
       }}
-      size={iconOnly ? "icon" : "default"}
+      size={iconOnly ? (size === "sm" ? "icon-sm" : "icon") : size}
       variant={iconOnly ? "quiet" : "outline"}
     >
       <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />

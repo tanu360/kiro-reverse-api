@@ -66,7 +66,8 @@ export function AlertDialogPopup({
 }): React.ReactElement {
   return (
     <AlertDialogPortal {...portalProps}>
-      <AlertDialogBackdrop />
+      {/* forceRender: nested in a dialog or sheet, it still dims its parent (dialog.tsx). */}
+      <AlertDialogBackdrop forceRender />
       <AlertDialogViewport
         className={cn(
           bottomStickOnMobile &&

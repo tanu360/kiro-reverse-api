@@ -67,6 +67,10 @@ export const badgeVariants = cva(
         // The buttons' faint film grain (index.css grain-overlay) on the solid fill.
         solid:
           "grain-overlay [--grain-overlay-opacity:0.1] bg-(--badge-solid) text-(--badge-solid-fg) [--badge-dot:var(--badge-solid-fg)] [--badge-glyph:var(--badge-solid)] [--badge-icon:var(--badge-solid-fg)] [button&,a&]:hover:opacity-90",
+        // No fill and no side padding: the tone's dot (or line icon) before a muted label, so a
+        // calm status ("Succeeded") lines up with the text around it. Use with `dot`.
+        quiet:
+          "gap-1.5 bg-transparent px-0 text-muted-foreground has-[>svg:first-child]:ps-0 has-[>svg[data-badge-icon=line]:first-child]:ps-0 has-[>[data-slot=badge-dot]:first-child]:ps-0 [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-disc)] [button&,a&]:hover:text-foreground",
         outline:
           // The field fill and hairline (index.css --field-*), as the outline button.
           "border-field-border bg-field text-foreground [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-disc)] [button&,a&]:hover:bg-field-hover",

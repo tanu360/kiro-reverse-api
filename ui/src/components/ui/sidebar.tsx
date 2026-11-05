@@ -585,7 +585,12 @@ export function SidebarMenuButton({
   isActive?: boolean;
   tooltip?: string | React.ComponentProps<typeof TooltipPopup>;
 } & VariantProps<typeof sidebarMenuButtonVariants>): React.ReactElement {
-  const { isMobile, state } = useSidebar();
+  // Kiro patch: the context only drives the collapsed-rail tooltip, so a button without a
+  // tooltip (or rendered outside a SidebarProvider, as Settings' section nav and tests do) works
+  // without it. No provider means an expanded sidebar: the tooltip stays off.
+  const sidebar = React.useContext(SidebarContext);
+  const isMobile = sidebar?.isMobile ?? false;
+  const state = sidebar?.state ?? "expanded";
 
   const defaultProps = {
     className: cn(sidebarMenuButtonVariants({ size, variant }), className),
@@ -713,9 +718,11 @@ export function SidebarMenuBadge({
       className={cn(
         "pointer-events-none absolute right-1 flex h-5 min-w-5 select-none items-center justify-center rounded-lg px-1 font-medium text-sidebar-foreground text-xs",
         "peer-hover/menu-button:text-sidebar-foreground peer-data-[active=true]/menu-button:text-sidebar-foreground",
+        // Kiro patch: centred on its row (20 px badge): sm 28 px, default 36 px (40 px below
+        // lg), lg 48 px.
         "peer-data-[size=sm]/menu-button:top-1",
-        "peer-data-[size=default]/menu-button:top-1.5",
-        "peer-data-[size=lg]/menu-button:top-2.5",
+        "peer-data-[size=default]/menu-button:top-2 max-lg:peer-data-[size=default]/menu-button:top-2.5",
+        "peer-data-[size=lg]/menu-button:top-3.5",
         "group-data-[collapsible=icon]:hidden",
         className,
       )}

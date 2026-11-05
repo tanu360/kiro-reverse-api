@@ -37,11 +37,15 @@ export interface ResponsiveDialogProps {
    * sm 384, md 448, lg 512 (the default), xl 576, 2xl 672 px.
    */
   size?: DialogSize;
-  /** `top` hangs the dialog from near the top, so a step flow keeps its title in place. */
+  /**
+   * `top` hangs the dialog from near the top, so a step flow keeps its title in place. On phones
+   * the bottom drawer then takes a fixed 90 % of the screen, so its top stays put as steps change
+   * height (the panel scrolls, the footer stays at the bottom).
+   */
   anchor?: DialogAnchor;
   /** Shows a back arrow before the title (a step flow's way back); the footer keeps the actions. */
   onBack?: () => void;
-  /** The back arrow's accessible name; defaults to "Go back". */
+  /** The back arrow's accessible name; defaults to the common "Back". */
   backLabel?: string;
   dismissible?: boolean;
   initialFocus?: RefObject<HTMLElement | null>;
@@ -93,7 +97,7 @@ export function ResponsiveDialog({
 }: ResponsiveDialogProps): JSX.Element {
   const isMobile = useIsMobile();
   const { t } = useT();
-  const back = backLabel ?? t("shell.notFound.back");
+  const back = backLabel ?? t("actions.back");
 
   const handleOpenChange = (next: boolean, details?: { reason?: string }) => {
     // A non-dismissible dialog closes only through its own buttons.
@@ -109,7 +113,11 @@ export function ResponsiveDialog({
         open={open}
         position="bottom"
       >
-        <DrawerPopup className="max-h-[90dvh]" initialFocus={initialFocus} showBar>
+        <DrawerPopup
+          className={anchor === "top" ? "h-[90dvh] max-h-[90dvh]" : "max-h-[90dvh]"}
+          initialFocus={initialFocus}
+          showBar
+        >
           <DrawerHeader>
             <TitleRow backLabel={back} onBack={onBack} title={title} Title={DrawerTitle} />
             {description ? <DrawerDescription>{description}</DrawerDescription> : null}

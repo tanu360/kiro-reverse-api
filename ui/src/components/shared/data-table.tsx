@@ -67,6 +67,12 @@ export interface DataTableProps<T> {
   };
   onRowClick?: (row: T) => void;
   /**
+   * The row (table row or card) under the pointer, or null when it leaves, to link a row to
+   * something outside the table (a chart segment). Every row and card also carries
+   * data-row-id and data-row-index.
+   */
+  onRowHover?: (row: T | null) => void;
+  /**
    * The accessible name of a clickable row ("Open details for …"). With it the row also says it
    * opens a dialog (aria-haspopup).
    */
@@ -199,6 +205,7 @@ export function DataTable<T>({
   defaultSortDesc,
   selection,
   onRowClick,
+  onRowHover,
   rowLabel,
   cardsBelow,
   renderCard,
@@ -277,6 +284,11 @@ export function DataTable<T>({
     onRowClick?.(row);
   };
 
+  const hoverProps = (row: T) =>
+    onRowHover
+      ? { onPointerEnter: () => onRowHover(row), onPointerLeave: () => onRowHover(null) }
+      : undefined;
+
   const onRowKeyDown = (row: T) => (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     if (event.target !== event.currentTarget) return;
@@ -330,7 +342,13 @@ export function DataTable<T>({
             {rows.map((row) => {
               const isSelected = selected?.has(row.id) ?? false;
               return (
-                <li data-state={isSelected ? "selected" : undefined} key={row.id}>
+                <li
+                  data-row-id={row.id}
+                  data-row-index={row.index}
+                  data-state={isSelected ? "selected" : undefined}
+                  key={row.id}
+                  {...hoverProps(row.original)}
+                >
                   {cardRenderer(row.original, {
                     selected: isSelected,
                     toggleSelected: () => toggleOne(row.id),
@@ -455,11 +473,14 @@ export function DataTable<T>({
                   aria-haspopup={label ? "dialog" : undefined}
                   aria-label={label}
                   className={cn(onRowClick && ROW_FOCUS)}
+                  data-row-id={row.id}
+                  data-row-index={row.index}
                   data-state={isSelected ? "selected" : undefined}
                   key={row.id}
                   onClick={onRowClick ? onRowClickEvent(row.original) : undefined}
                   onKeyDown={onRowClick ? onRowKeyDown(row.original) : undefined}
                   tabIndex={onRowClick ? 0 : undefined}
+                  {...hoverProps(row.original)}
                 >
                   {selection ? (
                     <TableCell className="w-px">
