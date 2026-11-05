@@ -7,6 +7,7 @@ import {
   buildCopyJson,
   buildExportCopy,
   creditTone,
+  describeFailures,
   filterAccounts,
   filterOptions,
   formatAuthMethod,
@@ -443,5 +444,33 @@ describe("statusGroup / statusFilterGroup", () => {
     expect(statusFilterGroup("attention")).toBe("attention");
     expect(statusFilterGroup("expired")).toBe("attention");
     expect(statusFilterGroup("active")).toBe("active");
+  });
+});
+
+describe("describeFailures", () => {
+  const tp = (key: string, params?: Record<string, unknown>) =>
+    params ? `${key}:${JSON.stringify(params)}` : key;
+  const nameOf = (id: string) => `name-${id}`;
+
+  it("is empty when nothing failed", () => {
+    expect(describeFailures([{ id: "a", ok: true }], nameOf, tp)).toBe("");
+    expect(describeFailures(undefined, nameOf, tp)).toBe("");
+  });
+
+  it("names the first failures with their reason, then counts the rest", () => {
+    const results = [
+      { id: "a", ok: false, error: "token expired" },
+      { id: "b", ok: true },
+      { id: "c", ok: false, status: "not_found" as const },
+      { id: "d", ok: false },
+      { id: "e", ok: false, error: "x" },
+      { id: "f", ok: false, error: "y" },
+    ];
+    expect(describeFailures(results, nameOf, tp).split("\n")).toEqual([
+      "name-a: token expired",
+      "name-c: batch.notFound",
+      "name-d",
+      'batch.moreFailures:{"count":2}',
+    ]);
   });
 });

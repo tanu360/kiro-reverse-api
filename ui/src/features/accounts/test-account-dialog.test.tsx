@@ -80,7 +80,8 @@ describe("TestAccountDialog", () => {
     // Three lines per successful run: 34 runs write 102 lines.
     for (let i = 0; i < 34; i++) {
       await user.click(run);
-      await waitFor(() => expect(run).toBeEnabled());
+      // The button stays focusable while it runs (loading), so wait for the busy state to end.
+      await waitFor(() => expect(run).not.toHaveAttribute("aria-busy"));
     }
     await waitFor(() => expect(logLines(dialog)).toHaveLength(MAX_LOG_LINES));
     // The oldest lines are dropped: the log now starts with a details line of run 1.

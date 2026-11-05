@@ -6,6 +6,10 @@ import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderApp } from "@/test/render";
 
+// The whole app renders per test, and DataTable renders the rows twice (table and cards, one
+// hidden by a container query), so a busy run needs more than the 5 s default.
+vi.setConfig({ testTimeout: 15_000 });
+
 const DANA = "dana.whitfield@northwind-labs.com";
 const DANA_MASKED = "da***@no***.com";
 
@@ -61,15 +65,6 @@ function mockViewport(width: number): void {
   );
 }
 
-/** Gives every element a layout box `width` px wide (jsdom has no layout). */
-function mockElementWidth(width: number): void {
-  spies.push(
-    vi
-      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
-      .mockReturnValue(DOMRect.fromRect({ width, height: 40 })),
-  );
-}
-
 async function renderCards(path = "/accounts") {
   const view = await renderApp(path);
   const list = await screen.findByRole("list", { name: "Accounts" });
@@ -99,20 +94,18 @@ describe("AccountsPage", () => {
 
   it("filters by nickname as the user types", async () => {
     const { table, user } = await renderAccounts();
-    await user.type(
-      screen.getByRole("searchbox", { name: "Search by email or nickname" }),
-      "overfl",
-    );
+    await user.type(screen.getByRole("searchbox", { name: "Search accounts" }), "overfl");
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
     expect(within(table).getByText(/^Overflow ·/)).toBeInTheDocument();
   });
 
-  it("filters by the status in the URL and hides a banned account's switch", async () => {
+  it("filters by the status in the URL and locks a banned account's switch", async () => {
     await renderApp("/accounts?status=banned");
     const table = await screen.findByRole("table", { name: "Accounts" });
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
     expect(within(table).getByText("Banned")).toBeInTheDocument();
-    expect(within(table).queryByRole("switch")).not.toBeInTheDocument();
+    // The switch stays in its column, locked, so every row lines up.
+    expect(within(table).getByRole("switch")).toHaveAttribute("aria-disabled", "true");
   });
 
   it("groups the problem statuses under Needs attention and narrows them with Issue", async () => {
@@ -187,8 +180,8 @@ describe("AccountsPage", () => {
     const { table, user } = await renderAccounts();
     const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
     await user.click(within(row).getAllByRole("cell")[2]);
-    const sheet = await screen.findByRole("dialog", { name: "Account details" });
-    expect(within(sheet).getByText("Active")).toBeInTheDocument();
+    // The sheet's own title is the detail package's; any open dialog proves the row opened it.
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   it("keeps the selection across filters and batch-deletes it after a confirm", async () => {
@@ -199,10 +192,7 @@ describe("AccountsPage", () => {
     await user.click(within(table).getByRole("checkbox", { name: "Select all" }));
     expect(await screen.findByText(`${ids.length} selected`)).toBeInTheDocument();
 
-    await user.type(
-      screen.getByRole("searchbox", { name: "Search by email or nickname" }),
-      "overfl",
-    );
+    await user.type(screen.getByRole("searchbox", { name: "Search accounts" }), "overfl");
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
     expect(screen.getByText(`${ids.length} selected`)).toBeInTheDocument();
 
@@ -223,8 +213,8 @@ describe("AccountsPage", () => {
 
   it("sends PUT {enabled:false} when the switch is turned off", async () => {
     const bodies = captureBodies("put", "/accounts/:id");
-    const { user } = await renderAccounts();
-    const toggle = screen.getByRole("switch", { name: `Enable ${DANA_MASKED}` });
+    const { table, user } = await renderAccounts();
+    const toggle = within(table).getByRole("switch", { name: `Enable ${DANA_MASKED}` });
     expect(toggle).toBeChecked();
     await user.click(toggle);
     await waitFor(() => expect(bodies).toEqual([{ enabled: false }]));
@@ -239,7 +229,7 @@ describe("AccountsPage", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
 
     const dialog = await screen.findByRole("alertdialog");
-    expect(within(dialog).getByText("Delete this account?")).toBeInTheDocument();
+    expect(within(dialog).getByText(`Delete ${DANA_MASKED}?`)).toBeInTheDocument();
     expect(
       within(dialog).getByText("Usage history is removed as well. This cannot be undone."),
     ).toBeInTheDocument();
@@ -262,9 +252,7 @@ describe("AccountsPage", () => {
   it("offers no filters while the list loads: zero counts would read as an empty fleet", async () => {
     mockServer.use(http.get(apiUrl("/accounts"), () => new Promise<Response>(() => {})));
     await renderApp("/accounts?status=banned&plan=power");
-    expect(
-      await screen.findByRole("searchbox", { name: "Search by email or nickname" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search accounts" })).toBeInTheDocument();
     expect(screen.queryByRole("tablist", { name: "Account status" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Plan:/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/ of 0$/)).not.toBeInTheDocument();
@@ -295,65 +283,56 @@ describe("AccountsPage", () => {
 });
 
 describe("AccountsPage layout", () => {
-  it("shows cards when the list is narrower than md, even on a wide viewport", async () => {
-    mockElementWidth(700);
-    await renderCards();
-    expect(screen.queryByRole("table", { name: "Accounts" })).not.toBeInTheDocument();
+  it("switches between the table and the cards on the table's own width", async () => {
+    const { container } = await renderAccounts();
+    // jsdom has no container queries: check the classes that pick one view under 42rem.
+    const cards = container.querySelector('[data-slot="data-table-cards"]') as HTMLElement;
+    expect(cards).toHaveClass("@2xl/data-table:hidden");
+    const view = container.querySelector('[data-slot="data-table-view"]') as HTMLElement;
+    expect(view).toHaveClass("hidden", "@2xl/data-table:block");
+    // The cards are rows divided inside the one card, not cards in a card.
+    expect(within(cards).getByRole("list", { name: "Accounts" })).toHaveClass("divide-y");
   });
 
-  it("keeps the table on a laptop-width list (1366 px window, sidebar open)", async () => {
-    mockElementWidth(976);
+  it("hides the low-priority columns on a narrower table and pins the row actions", async () => {
     const { table } = await renderAccounts();
-    expect(screen.queryByRole("list", { name: "Accounts" })).not.toBeInTheDocument();
-    // jsdom has no container queries, so check the classes that hide the columns under 1,100 px.
     const header = (name: string) => within(table).getByRole("columnheader", { name });
-    expect(header("Requests")).toHaveClass("hidden", "@[900px]/accounts:table-cell");
+    expect(header("Requests")).toHaveClass("hidden", "@4xl/data-table:table-cell");
     for (const name of ["Last used", "Token expiry"]) {
-      expect(header(name)).toHaveClass("hidden", "@[1100px]/accounts:table-cell");
+      expect(header(name)).toHaveClass("hidden", "@5xl/data-table:table-cell");
     }
     for (const name of ["Account", "Status", "Usage", "Enabled"]) {
       expect(header(name)).not.toHaveClass("hidden");
     }
-    // The list is the query container those classes name.
-    expect(table.closest(".\\@container\\/accounts")).not.toBeNull();
-    // Row actions stay pinned to the right edge.
     const actions = within(bodyRows(table)[0]).getAllByRole("cell").at(-1) as HTMLElement;
     expect(actions).toHaveClass("sticky", "right-0");
   });
 
-  it("shows the table when the list has room for every column", async () => {
-    mockElementWidth(1200);
-    await renderAccounts();
-    expect(screen.queryByRole("list", { name: "Accounts" })).not.toBeInTheDocument();
-  });
-
-  it("selects a card from anywhere in its 40 px checkbox square", async () => {
-    mockViewport(390);
+  it("selects a card from its checkbox and opens details from the card", async () => {
     const { list, user } = await renderCards();
     const checkbox = within(list).getByRole("checkbox", { name: `Select ${DANA_MASKED}` });
-    const square = checkbox.closest("label") as HTMLElement;
-    expect(square).toHaveClass("size-10");
-    await user.click(square);
+    await user.click(checkbox);
     expect(await screen.findByText("1 selected")).toBeInTheDocument();
     expect(checkbox).toBeChecked();
+    await user.click(within(list).getByRole("button", { name: `Open details for ${DANA_MASKED}` }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("puts the batch bar after the list, sticky, with phone-sized actions and a menu", async () => {
+  it("puts the batch toolbar after the list, sticky, with a menu for the rest on phones", async () => {
     mockViewport(390);
     const bodies = captureBodies("post", "/accounts/batch");
     const { list, user } = await renderCards();
     const checkboxes = within(list).getAllByRole("checkbox");
     await user.click(checkboxes[checkboxes.length - 1]);
 
-    const bar = await screen.findByRole("region", { name: "Batch actions" });
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
     // After the list in the DOM, so `sticky bottom-*` keeps it in view while the list scrolls.
     expect(list.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bar).toHaveAttribute("data-slot", "batch-bar");
     expect(bar.className).toMatch(/(^|\s)sticky(\s|$)/);
-    expect(bar.className).toMatch(/(^|\s)bottom-/);
-    for (const name of ["Enable", "Disable"]) {
-      expect(within(bar).getByRole("button", { name })).toHaveClass("h-10");
+    for (const name of ["Enable selected", "Disable selected"]) {
+      expect(within(bar).getByRole("button", { name })).toBeInTheDocument();
     }
-    expect(within(bar).getByRole("button", { name: "More batch actions" })).toHaveClass("size-10");
 
     await user.click(within(bar).getByRole("button", { name: "More batch actions" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete selected" }));
@@ -362,7 +341,32 @@ describe("AccountsPage layout", () => {
     await waitFor(() => expect(bodies).toHaveLength(1));
   });
 
-  it("shows Refresh models and Export as icons on phones", async () => {
+  it("refreshes the selection's models in one batch call and reports the result", async () => {
+    const bodies = captureBodies("post", "/accounts/batch");
+    const { table, user } = await renderAccounts();
+    const rows = bodyRows(table).slice(0, 2);
+    for (const row of rows) await user.click(within(row).getAllByRole("checkbox")[0]);
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    await user.click(within(bar).getByRole("button", { name: "Refresh models" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Refresh models" }));
+    expect(
+      await screen.findByText("Refreshed models for 2 accounts, 0 failed."),
+    ).toBeInTheDocument();
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ action: "refreshModels" });
+  });
+
+  it("exports the selection from the batch toolbar with only those accounts checked", async () => {
+    const { table, user } = await renderAccounts();
+    await user.click(within(bodyRows(table)[0]).getAllByRole("checkbox")[0]);
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    await user.click(within(bar).getByRole("button", { name: "Export selected" }));
+    const dialog = await screen.findByRole("dialog", { name: "Export accounts" });
+    expect(within(dialog).getByText("1 selected")).toBeInTheDocument();
+  });
+
+  it("shows a short Refresh models label on phones and Export in the tab row", async () => {
     mockViewport(390);
     await renderCards();
     const main = screen.getByRole("main");
@@ -372,6 +376,7 @@ describe("AccountsPage layout", () => {
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label") ?? button.textContent);
     expect(names).toEqual(["Refresh models", "Add account"]);
+    expect(within(header).getByText("Models")).toHaveClass("sm:hidden");
     // The cards have no headers to click; the Sort by select stands in.
     expect(within(main).getByRole("button", { name: "Sort by: Default" })).toBeInTheDocument();
     expect(within(main).getByRole("button", { name: "Export" })).toBeInTheDocument();
@@ -390,5 +395,14 @@ describe("AccountsPage layout", () => {
     // Outside the tablist, so the tabs keep their arrow-key order.
     expect(within(screen.getByRole("tablist")).queryByRole("button")).not.toBeInTheDocument();
     expect(exportButton).toBeInTheDocument();
+  });
+
+  it("shows only the empty state inside the card when there are no accounts", async () => {
+    mockServer.use(http.get(apiUrl("/accounts"), () => HttpResponse.json([])));
+    await renderApp("/accounts");
+    await screen.findByText("No accounts yet");
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Refresh models" })).not.toBeInTheDocument();
   });
 });

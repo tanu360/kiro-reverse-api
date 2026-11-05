@@ -2,57 +2,48 @@ import {
   CircleCheckIcon,
   CircleOffIcon,
   Delete02Icon,
+  Download01Icon,
   EllipsisVerticalIcon,
   Layers01Icon,
   Refresh01Icon,
   XIcon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type JSX, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
+import { Toolbar, ToolbarButton, ToolbarGroup, ToolbarSeparator } from "@/components/ui/toolbar";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-media-query";
-import { batchAccounts, refreshAccountModels } from "@/lib/api/accounts";
+import { batchAccounts } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import type {
+  Account,
+  AccountActionResult,
+  BatchAccountsResponse,
   BatchAction,
   BatchDeleteResponse,
   BatchEnableDisableResponse,
+  BatchRefreshModelsResponse,
   BatchRefreshResponse,
 } from "@/lib/api/types";
-import { useT } from "@/lib/i18n";
+import { type TFunction, useT } from "@/lib/i18n";
+import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { describeFailures } from "./account-model";
 import { useInvalidateAccounts } from "./use-account-actions";
-
-type BarAction = BatchAction | "refreshModels";
 
 /**
  * Sticks to the bottom of the viewport (above the home indicator) while the list scrolls under
- * it, so the actions stay in reach after selecting a card far down the page. The page renders
- * it after the list, so it rests below the last row once the list ends.
+ * it, so the actions stay in reach after selecting a row far down the page. The page renders it
+ * after the list, so it rests below the last row once the list ends.
  */
-const BAR_CLASS = cn(
-  "sticky bottom-[calc(env(safe-area-inset-bottom,0px)+--spacing(3))] z-20 flex rounded-xl",
-  // The purple main-button finish (grain and a white top highlight) on the whole bar, lifted
-  // off the list; the focus outline turns white so it still shows on the purple.
-  "grain-overlay [--grain-overlay-opacity:0.1] border border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/25 inset-shadow-[0_1px_--theme(--color-white/16%)] [--color-ring:var(--color-white)]",
-);
+const BAR_POSITION =
+  "sticky bottom-[calc(env(safe-area-inset-bottom,0px)+--spacing(3))] z-20 floating-shadow";
 
-/** A ghost button on the purple bar: white label and icon, a white wash on hover. */
-const ON_BAR =
-  "border-transparent text-primary-foreground [--control-icon-color:currentColor] *:data-[slot=button-loading-indicator]:text-primary-foreground [:hover,[data-pressed]]:bg-white/14";
-
-/** The same on phones, where the buttons are filled so they read as buttons at a glance. */
-const ON_BAR_FILLED = cn(ON_BAR, "bg-white/12");
-
-/** A hairline between the bar's groups: the selection, the actions, delete. */
-function BarDivider(): JSX.Element {
-  return <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-white/24" />;
-}
-
-const CONFIRM_KEYS: Record<BarAction, string> = {
+const CONFIRM_KEYS: Record<BatchAction, string> = {
   enable: "batch.confirmEnable",
   disable: "batch.confirmDisable",
   refresh: "batch.confirmRefresh",
@@ -60,25 +51,46 @@ const CONFIRM_KEYS: Record<BarAction, string> = {
   delete: "batch.confirmDelete",
 };
 
+const ACTION_ICONS: Record<BatchAction, IconSvgElement> = {
+  enable: CircleCheckIcon,
+  disable: CircleOffIcon,
+  refresh: Refresh01Icon,
+  refreshModels: Layers01Icon,
+  delete: Delete02Icon,
+};
+
 /**
- * Batch actions over the selection. Each confirms first, shows a loading toast and replaces it
- * with the result. Batch endpoints answer 200 even when items fail, so `failed` is read.
+ * Batch actions over the selection, on the purple inverted toolbar. Each confirms first, shows a
+ * loading toast and replaces it with the result. Batch endpoints answer 200 even when items
+ * fail, so `failed` and the per-id `results` are read; the failures are named in the toast.
  */
 export function BatchBar({
   selectedIds,
+  accounts,
   onClear,
+  onExport,
 }: {
   selectedIds: string[];
+  /** The whole list, to name failed accounts in a result toast. */
+  accounts: Account[];
   onClear: () => void;
+  /** Opens the export dialog with the selection checked. */
+  onExport: () => void;
 }): JSX.Element {
   const { t } = useT("accounts");
   const confirm = useConfirm();
   const isMobile = useIsMobile();
   const invalidate = useInvalidateAccounts();
-  const [running, setRunning] = useState<BarAction | null>(null);
+  const displayEmail = useDisplayEmail();
+  const [running, setRunning] = useState<BatchAction | null>(null);
   const count = selectedIds.length;
 
-  const run = async (action: BarAction) => {
+  const nameOf = (id: string) => {
+    const account = accounts.find((item) => item.id === id);
+    return account ? displayEmail(account.email, account.id) : id;
+  };
+
+  const run = async (action: BatchAction) => {
     if (running || count === 0) return;
     const ids = [...selectedIds];
     const ok = await confirm({
@@ -97,26 +109,8 @@ export function BatchBar({
           : t("batch.processing"),
     );
     try {
-      if (action === "refreshModels") {
-        // One account at a time, like the old UI; failures are counted, not thrown.
-        let succeeded = 0;
-        let failed = 0;
-        for (const id of ids) {
-          try {
-            await refreshAccountModels(id);
-            succeeded++;
-          } catch {
-            failed++;
-          }
-        }
-        toast.update(toastId, {
-          type: failed > 0 ? "warning" : "success",
-          title: t("batch.refreshModelsResult", { count: succeeded, failed }),
-        });
-      } else {
-        const result = await batchAccounts({ ids, action });
-        toast.update(toastId, resultToast(action, result, ids.length, t));
-      }
+      const result = await batchAccounts({ ids, action });
+      toast.update(toastId, resultToast(action, result, nameOf, t));
       onClear();
     } catch (error) {
       toast.update(toastId, { type: "error", title: errorMessage(error, t) });
@@ -128,200 +122,177 @@ export function BatchBar({
 
   const busy = running !== null;
   const countLabel = (
-    <p aria-live="polite" className="px-1 font-medium text-sm">
+    <p aria-live="polite" className="whitespace-nowrap px-1.5 font-medium text-sm tabular-nums">
       {t("batch.selected", { count })}
     </p>
   );
 
-  if (isMobile) {
-    // Two rows of 40 px controls: the common actions stay visible, the rest sit in a menu.
-    const menuAction = running === "refresh" || running === "refreshModels" || running === "delete";
-    return (
-      <section aria-label={t("batch.label")} className={cn(BAR_CLASS, "flex-col gap-2 p-2")}>
-        <div className="flex items-center justify-between gap-2">
-          {countLabel}
-          <Button className={cn("h-10", ON_BAR)} disabled={busy} onClick={onClear} variant="ghost">
-            <HugeiconsIcon icon={XIcon} aria-hidden="true" />
-            {t("batch.clear")}
-          </Button>
-        </div>
-        <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-          <Button
-            className={cn("h-10", ON_BAR_FILLED)}
+  /** One action as a toolbar button; `label` is the visible text, `name` the full name. */
+  const actionButton = (action: BatchAction, label: string, name?: string, className?: string) => (
+    <ToolbarButton
+      aria-label={name}
+      className={className}
+      disabled={busy && running !== action}
+      key={action}
+      onClick={() => void run(action)}
+      render={
+        <Button
+          loading={running === action}
+          size="sm"
+          variant={action === "delete" ? "on-primary-danger" : "on-primary"}
+        />
+      }
+    >
+      <HugeiconsIcon icon={ACTION_ICONS[action]} aria-hidden="true" />
+      {label}
+    </ToolbarButton>
+  );
+
+  const clearButton = (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <ToolbarButton
+            aria-label={t("batch.clear")}
             disabled={busy}
-            loading={running === "enable"}
-            onClick={() => void run("enable")}
-            variant="ghost"
-          >
-            <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
-            {t("batch.enableShort")}
-          </Button>
-          <Button
-            className={cn("h-10", ON_BAR_FILLED)}
-            disabled={busy}
-            loading={running === "disable"}
-            onClick={() => void run("disable")}
-            variant="ghost"
-          >
-            <HugeiconsIcon icon={CircleOffIcon} aria-hidden="true" />
-            {t("batch.disableShort")}
-          </Button>
+            onClick={onClear}
+            render={<Button size="icon-sm" variant="on-primary" />}
+          />
+        }
+      >
+        <HugeiconsIcon icon={XIcon} aria-hidden="true" />
+      </TooltipTrigger>
+      <TooltipPopup>{t("batch.clear")}</TooltipPopup>
+    </Tooltip>
+  );
+
+  const menuLoading = running === "refresh" || running === "refreshModels" || running === "delete";
+
+  return (
+    <Toolbar
+      aria-label={t("batch.label")}
+      className={cn(
+        BAR_POSITION,
+        "flex-wrap",
+        !isMobile && "max-w-full justify-center self-center",
+      )}
+      data-slot="batch-bar"
+      variant="inverted"
+    >
+      {/* Phones: two rows, the count with its clear button over the actions. */}
+      <ToolbarGroup className={cn(isMobile && "w-full justify-between")}>
+        {countLabel}
+        {clearButton}
+      </ToolbarGroup>
+      {isMobile ? (
+        // The common actions stay on the bar, the rest sit in its menu.
+        <ToolbarGroup className="w-full">
+          {actionButton("enable", t("batch.enableShort"), t("batch.enable"), "flex-1")}
+          {actionButton("disable", t("batch.disableShort"), t("batch.disable"), "flex-1")}
           <Menu>
-            <MenuTrigger
+            <ToolbarButton
+              aria-label={t("batch.more")}
+              disabled={busy && !menuLoading}
               render={
-                <Button
-                  aria-label={t("batch.more")}
-                  className={cn("size-10", ON_BAR_FILLED)}
-                  disabled={busy}
-                  loading={menuAction}
-                  size="icon"
-                  variant="ghost"
+                <MenuTrigger
+                  render={<Button loading={menuLoading} size="icon-sm" variant="on-primary" />}
                 />
               }
             >
               <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
-            </MenuTrigger>
+            </ToolbarButton>
             <MenuPopup align="end">
-              <MenuItem className="min-h-10" onClick={() => void run("refresh")}>
+              <MenuItem onClick={() => void run("refresh")}>
                 <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
                 {t("batch.refresh")}
               </MenuItem>
-              <MenuItem className="min-h-10" onClick={() => void run("refreshModels")}>
+              <MenuItem onClick={() => void run("refreshModels")}>
                 <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
                 {t("batch.refreshModels")}
               </MenuItem>
+              <MenuItem onClick={onExport}>
+                <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+                {t("batch.export")}
+              </MenuItem>
               <MenuSeparator />
-              <MenuItem
-                className="min-h-10"
-                onClick={() => void run("delete")}
-                variant="destructive"
-              >
+              <MenuItem onClick={() => void run("delete")} variant="destructive">
                 <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
                 {t("batch.delete")}
               </MenuItem>
             </MenuPopup>
           </Menu>
-        </div>
-      </section>
-    );
-  }
-
-  // One row centred over the list: the count with its clear button, the actions (their full
-  // names stay the accessible names), and delete set apart with a rose icon and a red hover.
-  return (
-    <section
-      aria-label={t("batch.label")}
-      className={cn(
-        BAR_CLASS,
-        "max-w-full flex-wrap items-center justify-center gap-1 self-center p-1.5",
+        </ToolbarGroup>
+      ) : (
+        <>
+          <ToolbarSeparator orientation="vertical" />
+          <ToolbarGroup>
+            {actionButton("enable", t("batch.enableShort"), t("batch.enable"))}
+            {actionButton("disable", t("batch.disableShort"), t("batch.disable"))}
+            {actionButton("refresh", t("batch.refresh"))}
+            {actionButton("refreshModels", t("batch.refreshModels"))}
+            <ToolbarButton
+              aria-label={t("batch.export")}
+              disabled={busy}
+              onClick={onExport}
+              render={<Button size="sm" variant="on-primary" />}
+            >
+              <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+              {t("actions.export")}
+            </ToolbarButton>
+          </ToolbarGroup>
+          <ToolbarSeparator orientation="vertical" />
+          {actionButton("delete", t("batch.verb.delete"), t("batch.delete"))}
+        </>
       )}
-    >
-      <div className="flex items-center gap-0.5 ps-1.5">
-        {countLabel}
-        <Button
-          aria-label={t("batch.clear")}
-          disabled={busy}
-          onClick={onClear}
-          className={cn(ON_BAR, "text-primary-foreground/72 hover:text-primary-foreground")}
-          size="icon-sm"
-          title={t("batch.clear")}
-          variant="ghost"
-        >
-          <HugeiconsIcon icon={XIcon} aria-hidden="true" />
-        </Button>
-      </div>
-      <BarDivider />
-      <Button
-        aria-label={t("batch.enable")}
-        className={ON_BAR}
-        disabled={busy}
-        loading={running === "enable"}
-        onClick={() => void run("enable")}
-        size="sm"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={CircleCheckIcon} aria-hidden="true" />
-        {t("batch.enableShort")}
-      </Button>
-      <Button
-        aria-label={t("batch.disable")}
-        className={ON_BAR}
-        disabled={busy}
-        loading={running === "disable"}
-        onClick={() => void run("disable")}
-        size="sm"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={CircleOffIcon} aria-hidden="true" />
-        {t("batch.disableShort")}
-      </Button>
-      <Button
-        className={ON_BAR}
-        disabled={busy}
-        loading={running === "refresh"}
-        onClick={() => void run("refresh")}
-        size="sm"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-        {t("batch.refresh")}
-      </Button>
-      <Button
-        className={ON_BAR}
-        disabled={busy}
-        loading={running === "refreshModels"}
-        onClick={() => void run("refreshModels")}
-        size="sm"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
-        {t("batch.refreshModels")}
-      </Button>
-      <BarDivider />
-      <Button
-        aria-label={t("batch.delete")}
-        className={cn(
-          ON_BAR,
-          // Hover, press and click turn it solid red with a white label and icon, in both themes.
-          "[--control-icon-color:var(--color-rose-200)] [:hover,[data-pressed]]:bg-red-600 [:hover,[data-pressed]]:text-white [:hover,[data-pressed]]:[--control-icon-color:var(--color-white)] active:bg-red-600 active:text-white active:[--control-icon-color:var(--color-white)]",
-        )}
-        disabled={busy}
-        loading={running === "delete"}
-        onClick={() => void run("delete")}
-        size="sm"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
-        {t("batch.verb.delete")}
-      </Button>
-    </section>
+    </Toolbar>
   );
 }
 
+type ResultToast = { type: "success" | "warning"; title: string; description?: string };
+
+/** The settled toast of a batch answer: counts in the title, failed accounts named below. */
 function resultToast(
   action: BatchAction,
-  result: unknown,
-  requested: number,
-  t: (key: string, params?: Record<string, string | number>) => string,
-): { type: "success" | "warning"; title: string } {
+  result: BatchAccountsResponse,
+  nameOf: (id: string) => string,
+  t: TFunction,
+): ResultToast {
+  const results: AccountActionResult[] | undefined = result.results;
+  const failedCount = (result as { failed?: number }).failed ?? 0;
+  const description = describeFailures(results, nameOf, t) || undefined;
+  const type = failedCount > 0 ? "warning" : "success";
   if (action === "refresh") {
-    const { refreshed = 0, failed = 0 } = result as Partial<BatchRefreshResponse>;
+    const { refreshed = 0, suspended = 0 } = result as Partial<BatchRefreshResponse>;
     return {
-      type: failed > 0 ? "warning" : "success",
-      title: t("batch.refreshResult", { count: refreshed, failed }),
+      type,
+      title:
+        suspended > 0
+          ? t("batch.refreshSuspendedResult", { count: refreshed, suspended, failed: failedCount })
+          : t("batch.refreshResult", { count: refreshed, failed: failedCount }),
+      description,
+    };
+  }
+  if (action === "refreshModels") {
+    const { refreshed = 0 } = result as Partial<BatchRefreshModelsResponse>;
+    return {
+      type,
+      title: t("batch.refreshModelsResult", { count: refreshed, failed: failedCount }),
+      description,
     };
   }
   if (action === "delete") {
-    const { deleted = 0, failed = 0 } = result as Partial<BatchDeleteResponse>;
+    const { deleted = 0 } = result as Partial<BatchDeleteResponse>;
     return {
-      type: failed > 0 ? "warning" : "success",
-      title: t("batch.deleteResult", { count: deleted, failed }),
+      type,
+      title: t("batch.deleteResult", { count: deleted, failed: failedCount }),
+      description,
     };
   }
-  // `count` echoes the requested ids; fall back to them like the old UI.
-  const count = (result as Partial<BatchEnableDisableResponse>).count || requested;
+  // `count` counts the accounts saved; unknown ids are in `failed`.
+  const { count = 0 } = result as Partial<BatchEnableDisableResponse>;
   return {
-    type: "success",
+    type,
     title: t(action === "enable" ? "batch.enableResult" : "batch.disableResult", { count }),
+    description,
   };
 }

@@ -8,6 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Group, GroupSeparator, GroupText } from "@/components/ui/group";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import {
   Menu,
@@ -17,12 +18,12 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@/components/ui/menu";
-import { selectTriggerIconClassName, selectTriggerVariants } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { selectTriggerIconClassName } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import {
   ACCOUNT_SORTS,
   type AccountSort,
@@ -52,44 +53,36 @@ const ALL = "all";
 const DEFAULT_SORT = "default";
 
 /**
- * A "Label: Value" trigger: the select trigger (components/ui/select.tsx SelectButton), the label
- * muted and the value in the text colour, or the accent once a filter is set. It opens a menu of
- * radio rows, so the trigger stays a button and the rows menu items.
+ * A "Label: Value" control: the muted label as a group segment, then an outline button with the
+ * value and a chevron that opens a menu of radio rows. The button's name spells out "Plan: All",
+ * since the label segment is not part of it.
  */
 function FilterTrigger({
   label,
   value,
-  active = false,
   after,
 }: {
   label: string;
   value: string;
-  active?: boolean;
   after?: ReactNode;
 }): JSX.Element {
-  // Two segments in one field, split by its hairline: the muted label, then the value and the
-  // chevron. The segments are flex boxes, so the name is spelled out to read "Plan: All".
+  const { t } = useT("accounts");
   return (
-    <MenuTrigger
-      aria-label={`${label}: ${value}`}
-      className={cn(
-        selectTriggerVariants(),
-        "w-auto min-w-0 shrink-0 justify-start gap-0 overflow-hidden px-0",
-      )}
-    >
-      <span className="flex items-center self-stretch border-field-border border-e px-2.5 text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex min-w-0 items-center gap-1.5 ps-2.5 pe-2">
-        <span className={cn("truncate", active && "text-info-foreground")}>{value}</span>
+    <Group>
+      <GroupText aria-hidden="true">{label}</GroupText>
+      <GroupSeparator />
+      <MenuTrigger
+        render={<Button aria-label={t("filter.trigger", { label, value })} variant="outline" />}
+      >
+        <span className="max-w-36 truncate">{value}</span>
         {after}
         <HugeiconsIcon
           aria-hidden="true"
-          className={cn(selectTriggerIconClassName, "text-muted-foreground")}
+          className={selectTriggerIconClassName}
           icon={ChevronDownIcon}
         />
-      </span>
-    </MenuTrigger>
+      </MenuTrigger>
+    </Group>
   );
 }
 
@@ -117,7 +110,7 @@ function FilterSelect({
   // Each row shows its count; a pick closes the menu, as in a select.
   return (
     <Menu>
-      <FilterTrigger active={value !== undefined} label={label} value={current} />
+      <FilterTrigger label={label} value={current} />
       <MenuPopup align="start">
         <MenuRadioGroup
           onValueChange={(next) => onValueChange(next === ALL ? undefined : String(next))}
@@ -160,11 +153,7 @@ function SortSelect({
       <FilterTrigger
         after={
           sort ? (
-            <HugeiconsIcon
-              icon={DirectionIcon}
-              aria-hidden="true"
-              className="size-3.5 shrink-0 text-muted-foreground"
-            />
+            <HugeiconsIcon icon={DirectionIcon} aria-hidden="true" className="size-3.5" />
           ) : null
         }
         label={t("sort.by")}
@@ -212,39 +201,12 @@ function SortSelect({
   );
 }
 
-/** "Rows: 25": the page size, as a filter-style select at the end of the filter row. */
-function PageSizeSelect({
-  value,
-  options,
-  onChange,
-}: {
-  value: number;
-  options: readonly number[];
-  onChange: (size: number) => void;
-}): JSX.Element {
-  const { t, lang } = useT();
-  return (
-    <Menu>
-      <FilterTrigger label={t("table.rowsShort")} value={formatNumber(value, lang)} />
-      {/* Only short numbers: as wide as its trigger, not the 11rem a menu starts at. */}
-      <MenuPopup align="end">
-        <MenuRadioGroup onValueChange={(next) => onChange(Number(next))} value={String(value)}>
-          {options.map((size) => (
-            <MenuRadioItem closeOnClick key={size} value={String(size)}>
-              {formatNumber(size, lang)}
-            </MenuRadioItem>
-          ))}
-        </MenuRadioGroup>
-      </MenuPopup>
-    </Menu>
-  );
-}
-
 type StatusTab = typeof ALL | StatusGroup;
 
 /**
- * All, Active, Needs attention and Disabled, each with its count, over a hairline. `end` sits at
- * the right of the same row, on the same hairline (outside the tablist).
+ * All, Active, Needs attention and Disabled, each with its count, as one segmented control that
+ * scrolls sideways (fading at the edge) when the row is too narrow. `end` sits at the right of
+ * the same row, outside the tablist.
  */
 function StatusTabs({
   value,
@@ -268,32 +230,24 @@ function StatusTabs({
   };
   const tabs: StatusTab[] = [ALL, ...STATUS_GROUPS];
   return (
-    // The tabs and `end` stretch to one height, so their two hairlines meet in one line.
-    <div className="-mb-px flex min-w-0 items-stretch">
+    <div className="flex min-w-0 items-center gap-2">
       <Tabs
         className="min-w-0 flex-1"
         onValueChange={(next) => onValueChange(next as StatusTab)}
         value={value}
       >
-        {/* Phones scroll the tabs sideways; the hairline spans the full row either way. */}
-        <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <TabsList
-            aria-label={t("filter.status")}
-            className="w-max min-w-full"
-            variant="underline"
-          >
+        <ScrollArea scrollFade>
+          <TabsList aria-label={t("filter.status")} size="sm">
             {tabs.map((tab) => (
               <TabsTab key={tab} value={tab}>
                 {label[tab]}
-                <Badge className="min-w-5" size="sm" tone={tab === value ? "primary" : "neutral"}>
-                  {formatNumber(tab === ALL ? total : counts[tab], lang)}
-                </Badge>
+                <Badge size="sm">{formatNumber(tab === ALL ? total : counts[tab], lang)}</Badge>
               </TabsTab>
             ))}
           </TabsList>
-        </div>
+        </ScrollArea>
       </Tabs>
-      {end ? <div className="flex shrink-0 items-center border-b ps-2">{end}</div> : null}
+      {end ? <div className="flex shrink-0 items-center">{end}</div> : null}
     </div>
   );
 }
@@ -315,17 +269,14 @@ export interface AccountsToolbarProps {
   desc: boolean;
   /** Mirrors a click on a column header; undefined goes back to the server order. */
   onSortChange: (sort: AccountSort | undefined, desc: boolean) => void;
-  /** The page size, picked at the end of the filter row (the pager below only pages). */
-  pageSize?: number;
-  pageSizeOptions?: readonly number[];
-  onPageSizeChange?: (size: number) => void;
   /** List-wide actions (Export) at the right end of the status tab row. */
   tabActions?: ReactNode;
 }
 
 /**
- * Status tabs (All, Active, Needs attention, Disabled, with counts), then one row: search,
- * "Sort by", a "Label: Value" select per filter, Clear and the result count. A filter is offered
+ * Status tabs (All, Active, Needs attention, Disabled, with counts), then a wrapping row: search
+ * (a row of its own below a 64rem card), "Sort by", a "Label: Value" select per filter, Clear and
+ * the result count. It lives in DataTableCard's toolbar slot. A filter is offered
  * only when the list has two or more values of it (or a filter on it is set). Needs attention
  * groups the problem statuses; once it is picked, an Issue select narrows it to one of them.
  */
@@ -339,9 +290,6 @@ export function AccountsToolbar({
   sort,
   desc,
   onSortChange,
-  pageSize,
-  pageSizeOptions,
-  onPageSizeChange,
   tabActions,
 }: AccountsToolbarProps): JSX.Element {
   const { t, lang } = useT("accounts");
@@ -379,16 +327,9 @@ export function AccountsToolbar({
     Boolean(filters.q) || FILTER_DIMENSIONS.some((dimension) => filters[dimension] !== undefined);
   const showTabs = !loading && (accounts.length > 0 || filters.status !== undefined);
   const showSort = accounts.length > 1 || sort !== undefined;
-  // The page size closes the filter row, on its right.
-  const pageSizeControl =
-    pageSize !== undefined && pageSizeOptions?.length && onPageSizeChange ? (
-      <PageSizeSelect onChange={onPageSizeChange} options={pageSizeOptions} value={pageSize} />
-    ) : null;
 
   return (
-    // The gap under the tab hairline matches the padding under the filter row (the card's p-3 /
-    // sm:p-4), so the filter row sits centred between the hairline and the table.
-    <div className="flex min-w-0 flex-col gap-3 sm:gap-4" data-slot="accounts-toolbar">
+    <div className="flex min-w-0 flex-col gap-3" data-slot="accounts-toolbar">
       {showTabs ? (
         <StatusTabs
           counts={groupCounts}
@@ -401,9 +342,9 @@ export function AccountsToolbar({
         />
       ) : null}
 
+      {/* Below a 64rem card the search has a row of its own and the filters wrap under it. */}
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {/* The search gives way (down to 160 px) so the selects and the page size share one row. */}
-        <InputGroup className="w-full sm:w-auto sm:min-w-40 sm:max-w-64 sm:flex-1">
+        <InputGroup className="@5xl/accounts:w-64">
           <InputGroupAddon>
             <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
           </InputGroupAddon>
@@ -417,10 +358,8 @@ export function AccountsToolbar({
           />
         </InputGroup>
 
-        {/* Phones: the selects scroll sideways in their own row. From sm up the wrapper drops
-            out of the layout and the selects wrap with the search. */}
         {loading ? null : (
-          <div className="flex min-w-0 items-center gap-2 max-sm:w-full max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden sm:contents">
+          <>
             {showSort ? <SortSelect desc={desc} onChange={onSortChange} sort={sort} /> : null}
 
             {showIssue ? (
@@ -447,32 +386,27 @@ export function AccountsToolbar({
             ))}
 
             {hasFilters ? (
-              <Button
-                aria-label={tc("actions.clearFilters")}
-                className="px-2"
-                onClick={onClearFilters}
-                variant="quiet"
-              >
-                {t("filter.clear")}
-              </Button>
-            ) : null}
-
-            {/* The result count and the page size share the row's end. */}
-            <div className="ms-auto flex shrink-0 items-center gap-2">
-              {hasFilters ? (
+              <>
+                <Button
+                  aria-label={tc("actions.clearFilters")}
+                  onClick={onClearFilters}
+                  size="sm"
+                  variant="ghost"
+                >
+                  {t("filter.clear")}
+                </Button>
                 <span
                   aria-live="polite"
-                  className="whitespace-nowrap ps-1 text-meta text-muted-foreground"
+                  className="ms-auto whitespace-nowrap text-meta text-muted-foreground tabular-nums"
                 >
                   {t("filter.results", {
                     shown: formatNumber(shown, lang),
                     total: formatNumber(accounts.length, lang),
                   })}
                 </span>
-              ) : null}
-              {pageSizeControl}
-            </div>
-          </div>
+              </>
+            ) : null}
+          </>
         )}
       </div>
     </div>

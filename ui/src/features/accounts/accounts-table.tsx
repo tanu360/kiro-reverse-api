@@ -1,45 +1,47 @@
 import { type JSX, type ReactNode, useMemo } from "react";
 import {
   DataTable,
+  type DataTableCardContext,
   type DataTableColumn,
   type DataTableSort,
 } from "@/components/shared/data-table";
+import { ListCard } from "@/components/shared/list-card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Skeleton } from "@/components/ui/skeleton";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { useDisplayEmail } from "@/lib/privacy";
 import { ACCOUNT_SORTS, type AccountSort } from "@/routes/-search";
 import {
+  AccountFlags,
   AccountIdentity,
+  accountMeta,
   LastUsedText,
   StatusPill,
   TokenExpiryText,
   UsageMeter,
+  useAccountName,
 } from "./account-cells";
 import { defaultSortDesc } from "./account-model";
 import { AccountRowActions, EnabledSwitch, type RowActionHandlers } from "./account-row-actions";
-import type { ListLayout } from "./use-list-layout";
-
-const SKELETON_CARDS = 4;
 
 /**
- * Low-priority columns show only when the list is wide enough for them: Requests from 900 px,
- * Last used and Token expiry from FULL_TABLE_WIDTH (1,100 px). The `accounts` container is the
- * list wrapper in accounts-page.tsx. The detail sheet and the cards still show these values.
+ * Low-priority columns show only when the table is wide enough for them: Requests from a 56rem
+ * table (@4xl), Last used and Token expiry from 64rem (@5xl). The query container is DataTable's
+ * own wrapper. The detail sheet and the cards still show these values.
  */
-const MEDIUM_UP = "hidden @[900px]/accounts:table-cell";
-const WIDE_ONLY = "hidden @[1100px]/accounts:table-cell";
+const MEDIUM_UP = "hidden @4xl/data-table:table-cell";
+const WIDE_ONLY = "hidden @5xl/data-table:table-cell";
 
 const SORTABLE = new Set<string>(ACCOUNT_SORTS);
 
 interface AccountsTableProps extends RowActionHandlers {
   /** The rows of the current page, already filtered and sorted. */
   accounts: Account[];
-  /** From the list container's width (see useListLayout). */
-  layout: ListLayout;
   loading: boolean;
+  /** Rows a full page holds, for the loading placeholder. */
+  pageSize: number;
+  /** A search or filter is set: an empty result keeps the header. */
+  filtered: boolean;
   selected: ReadonlySet<string>;
   onSelectionChange: (next: Set<string>) => void;
   emptyState: ReactNode;
@@ -49,16 +51,15 @@ interface AccountsTableProps extends RowActionHandlers {
 }
 
 /**
- * A table from the `md` width of the list up (low-priority columns only on wider lists), cards
- * below. Sorting, filtering and paging happen in the page; this renders the rows it is given.
+ * The accounts table, with comfortable two-line rows; below a 42rem table (@2xl) each row is a
+ * card divided inside the surrounding card. Sorting, filtering and paging happen in the page;
+ * this renders the rows it is given.
  */
-export function AccountsTable(props: AccountsTableProps): JSX.Element {
-  return props.layout === "cards" ? <AccountCards {...props} /> : <AccountsDataTable {...props} />;
-}
-
-function AccountsDataTable({
+export function AccountsTable({
   accounts,
   loading,
+  pageSize,
+  filtered,
   selected,
   onSelectionChange,
   emptyState,
@@ -70,7 +71,7 @@ function AccountsDataTable({
 }: AccountsTableProps): JSX.Element {
   const { t, lang } = useT("accounts");
   const { t: tc } = useT();
-  const displayEmail = useDisplayEmail();
+  const accountName = useAccountName();
 
   const columns = useMemo<DataTableColumn<Account>[]>(
     () => [
@@ -80,7 +81,7 @@ function AccountsDataTable({
         sortable: true,
         // A fixed measure, so a long address truncates (with a tooltip) instead of widening
         // the column.
-        cell: (account) => <AccountIdentity account={account} className="w-52 xl:w-64" />,
+        cell: (account) => <AccountIdentity account={account} className="w-44 xl:w-64" />,
       },
       {
         id: "status",
@@ -92,7 +93,7 @@ function AccountsDataTable({
         id: "usage",
         header: t("columns.usage"),
         sortable: true,
-        className: "w-48",
+        className: "w-40",
         cell: (account) => <UsageMeter account={account} />,
       },
       {
@@ -102,7 +103,7 @@ function AccountsDataTable({
         className: MEDIUM_UP,
         headerClassName: MEDIUM_UP,
         align: "end",
-        cell: (account) => <span>{formatNumber(account.requestCount, lang)}</span>,
+        cell: (account) => formatNumber(account.requestCount, lang),
       },
       {
         id: "lastUsed",
@@ -144,153 +145,101 @@ function AccountsDataTable({
   return (
     <DataTable
       caption={t("table.caption")}
-      // Roomier rows than the shared default: two-line cells need the air.
-      className="[&_tbody_td]:py-3"
+      cardLayout="divided"
+      cardsBelow="2xl"
       columns={columns}
       data={accounts}
       defaultSortDesc={defaultSortDesc}
+      density="comfortable"
       emptyState={emptyState}
+      filtered={filtered}
       getRowId={(account) => account.id}
+      inset
       loading={loading}
       onRowClick={onDetails}
       onSortChange={(next) => {
         if (SORTABLE.has(next.id)) onSortChange(next.id as AccountSort, next.desc);
       }}
+      pageSize={pageSize}
+      renderCard={(account, ctx) => (
+        <AccountCard account={account} ctx={ctx} onDetails={onDetails} onTest={onTest} />
+      )}
+      rowLabel={(account) => t("openDetails", { email: accountName(account).text })}
       selection={{
         selected,
         onChange: onSelectionChange,
-        rowLabel: (account) => displayEmail(account.email, account.id),
+        rowLabel: (account) => accountName(account).text,
       }}
       sort={tableSort}
     />
   );
 }
 
-/** Card list: one column on phones, as many 22rem columns as fit on wider lists. */
-function AccountCards({
-  accounts,
-  loading,
-  selected,
-  onSelectionChange,
-  emptyState,
-  onTest,
-  onDetails,
-}: AccountsTableProps): JSX.Element {
-  const { t } = useT("accounts");
-  const displayEmail = useDisplayEmail();
-  const gridClass = "grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-2";
-
-  if (loading && accounts.length === 0) {
-    return (
-      <div aria-busy="true" className={gridClass}>
-        {Array.from({ length: SKELETON_CARDS }, (_, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
-          <SkeletonCard key={index} />
-        ))}
-      </div>
-    );
-  }
-  if (accounts.length === 0) return <div>{emptyState}</div>;
-
-  const toggle = (id: string) => {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    onSelectionChange(next);
-  };
-
-  return (
-    <ul aria-label={t("table.caption")} className={gridClass}>
-      {accounts.map((account) => {
-        const isSelected = selected.has(account.id);
-        return (
-          <li className="flex" data-state={isSelected ? "selected" : undefined} key={account.id}>
-            <AccountCard
-              account={account}
-              onDetails={onDetails}
-              onTest={onTest}
-              selected={isSelected}
-              selectLabel={t("selectAccount", { email: displayEmail(account.email, account.id) })}
-              toggleSelected={() => toggle(account.id)}
-            />
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** Same outline as a card (t3code's SettingsGroup), so the loading list reads as cards. */
-function SkeletonCard(): JSX.Element {
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card/40 p-3">
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-5 rounded" />
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-3 w-1/2" />
-        </div>
-        <Skeleton className="h-5 w-9 rounded-full" />
-      </div>
-      <Skeleton className="h-6 w-20 rounded-full" />
-      <Skeleton className="h-1 w-full rounded-full" />
-      <div className="grid grid-cols-3 gap-2">
-        <Skeleton className="h-3" />
-        <Skeleton className="h-3" />
-        <Skeleton className="h-3" />
-      </div>
-    </div>
-  );
-}
-
-/** Card: select, identity, switch and menu; the status pill; usage; three quiet stats. */
+/**
+ * One account as a row of the card list: the checkbox, name and status pill with the switch and
+ * menu at the end; the nickname, plan and sign-in line; usage across the full width; three quiet
+ * stats. A tap anywhere else opens the details.
+ */
 function AccountCard({
   account,
-  selected,
-  toggleSelected,
-  selectLabel,
+  ctx,
   onTest,
   onDetails,
-}: RowActionHandlers & {
-  account: Account;
-  selected: boolean;
-  toggleSelected: () => void;
-  selectLabel: string;
-}): JSX.Element {
+}: RowActionHandlers & { account: Account; ctx: DataTableCardContext }): JSX.Element {
   const { t, lang } = useT("accounts");
+  const name = useAccountName()(account);
   return (
-    <article
-      className="flex w-full min-w-0 flex-col gap-3 rounded-xl border border-border/60 bg-card/40 p-3 data-selected:border-ring"
-      data-selected={selected || undefined}
-    >
-      <div className="flex items-start gap-1">
-        {/* The whole 40 px square toggles the checkbox, not only its 18 px box. */}
-        {/* biome-ignore lint/a11y/noLabelWithoutControl: the Base UI control inside is the input. */}
-        <label className="flex size-10 shrink-0 cursor-pointer items-center justify-center">
-          <Checkbox aria-label={selectLabel} checked={selected} onCheckedChange={toggleSelected} />
-        </label>
-        <AccountIdentity account={account} className="flex-1 pt-2.5" />
-        <span className="flex h-10 shrink-0 items-center px-1">
+    <ListCard
+      action={
+        <span className="flex items-center gap-2">
           <EnabledSwitch account={account} />
+          <AccountRowActions
+            account={account}
+            onDetails={onDetails}
+            onTest={onTest}
+            variant="menu"
+          />
         </span>
-        <AccountRowActions account={account} onDetails={onDetails} onTest={onTest} variant="menu" />
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 ps-11">
-        <StatusPill account={account} />
-        <UsageMeter account={account} />
-      </div>
-      <dl className="mt-auto grid grid-cols-3 gap-2 border-border/50 border-t ps-11 pt-3 text-xs">
-        <Stat label={t("columns.requests")} value={formatNumber(account.requestCount, lang)} />
-        <Stat label={t("columns.lastUsed")} value={<LastUsedText account={account} />} />
+      }
+      badge={<StatusPill account={account} />}
+      leading={
+        <Checkbox
+          aria-label={t("selectAccount", { email: name.text })}
+          checked={ctx.selected}
+          onCheckedChange={ctx.toggleSelected}
+        />
+      }
+      meta={
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">{accountMeta(account, t)}</span>
+          <AccountFlags account={account} />
+        </span>
+      }
+      onOpen={() => onDetails(account)}
+      openLabel={t("openDetails", { email: name.text })}
+      selected={ctx.selected}
+      title={<span className={name.mono ? "font-mono text-meta" : undefined}>{name.text}</span>}
+      variant="row"
+    >
+      <UsageMeter account={account} />
+      <dl className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-3 text-meta">
+        <Stat
+          label={t("columns.requests")}
+          value={<span className="tabular-nums">{formatNumber(account.requestCount, lang)}</span>}
+        />
+        <Stat
+          label={t("columns.lastUsed")}
+          value={<LastUsedText account={account} style="narrow" />}
+        />
         <Stat label={t("columns.expiry")} value={<TokenExpiryText account={account} />} />
       </dl>
-    </article>
+    </ListCard>
   );
 }
 
 function Stat({ label, value }: { label: string; value: ReactNode }): JSX.Element {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <dt className="truncate text-muted-foreground">{label}</dt>
       <dd className="truncate">{value}</dd>
     </div>

@@ -10,7 +10,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
-import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
@@ -29,18 +28,34 @@ export interface RowActionHandlers {
   onDetails: (account: Account) => void;
 }
 
-/** The admin switch. Hidden for banned accounts; no confirm (old UI parity). */
-export function EnabledSwitch({ account }: { account: Account }): JSX.Element | null {
+/**
+ * The admin switch, with no confirm (old UI parity). A banned or suspended account keeps a
+ * switch, locked, so every row has one in the same place; its tooltip says why it is locked (the
+ * server's reason when it sent one).
+ */
+export function EnabledSwitch({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
   const displayEmail = useDisplayEmail();
   const toggle = useToggleEnabled(account);
-  if (isBanned(account)) return null;
+  const label = t("actions.enableAccount", { email: displayEmail(account.email, account.id) });
+  if (isBanned(account)) {
+    const reason =
+      account.banReason ||
+      t(account.banStatus === "SUSPENDED" ? "lockedSwitch.suspended" : "lockedSwitch.banned");
+    return (
+      <Tooltip>
+        {/* The wrapper takes the hover: a disabled switch does not open a tooltip itself. */}
+        <TooltipTrigger render={<span className="inline-flex" />}>
+          <Switch aria-label={label} checked={account.enabled} disabled />
+        </TooltipTrigger>
+        <TooltipPopup>{reason}</TooltipPopup>
+      </Tooltip>
+    );
+  }
   return (
     <Switch
-      aria-label={t("actions.enableAccount", { email: displayEmail(account.email, account.id) })}
+      aria-label={label}
       checked={account.enabled}
-      // Grows the hit area 10 px on each side: 58x42 around the 38x22 phone track.
-      className="relative after:absolute after:-inset-2.5"
       disabled={toggle.isPending}
       onCheckedChange={(checked) => toggle.mutate(checked)}
     />
@@ -51,7 +66,7 @@ function IconAction({
   label,
   onClick,
   children,
-  busy,
+  busy = false,
 }: {
   label: string;
   onClick: () => void;
@@ -62,18 +77,10 @@ function IconAction({
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button
-            aria-busy={busy || undefined}
-            aria-label={label}
-            className="size-10 md:size-8"
-            disabled={busy}
-            onClick={onClick}
-            size="icon"
-            variant="quiet"
-          />
+          <Button aria-label={label} loading={busy} onClick={onClick} size="icon" variant="quiet" />
         }
       >
-        {busy ? <Spinner aria-hidden="true" /> : children}
+        {children}
       </TooltipTrigger>
       <TooltipPopup>{label}</TooltipPopup>
     </Tooltip>
@@ -81,8 +88,8 @@ function IconAction({
 }
 
 /**
- * Row actions. `inline` (table): Refresh and Test buttons plus a menu with Details, Copy JSON
- * and Delete (a click on the row opens Details too). `menu` (mobile card): every action in one
+ * Row actions. `inline` (table): Refresh token and Test buttons plus a menu with Details, Copy
+ * JSON and Delete (a click on the row opens Details too). `menu` (card): every action in one
  * kebab menu.
  */
 export function AccountRowActions({
@@ -96,16 +103,14 @@ export function AccountRowActions({
   const copyJson = useCopyAccountJson();
   const remove = useDeleteAccount();
 
-  // Menu rows are 40 px tall in the mobile kebab menu (touch targets).
-  const itemClass = variant === "menu" ? "min-h-10" : undefined;
   const menuItems = (
     <>
-      <MenuItem className={itemClass} onClick={() => void copyJson(account.id)}>
+      <MenuItem onClick={() => void copyJson(account.id)}>
         <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
         {t("actions.copyJson")}
       </MenuItem>
       <MenuSeparator />
-      <MenuItem className={itemClass} onClick={() => void remove(account.id)} variant="destructive">
+      <MenuItem onClick={() => void remove(account)} variant="destructive">
         <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
         {t("actions.delete")}
       </MenuItem>
@@ -118,34 +123,25 @@ export function AccountRowActions({
         <MenuTrigger
           render={
             <Button
-              aria-busy={refresh.isPending || undefined}
               aria-label={t("actions.more")}
-              className="size-10"
+              loading={refresh.isPending}
               size="icon"
               variant="quiet"
             />
           }
         >
-          {refresh.isPending ? (
-            <Spinner aria-hidden="true" />
-          ) : (
-            <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
-          )}
+          <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
         </MenuTrigger>
         <MenuPopup align="end">
-          <MenuItem
-            className={itemClass}
-            disabled={refresh.isPending}
-            onClick={() => refresh.mutate()}
-          >
+          <MenuItem disabled={refresh.isPending} onClick={() => refresh.mutate()}>
             <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
-            {t("actions.refresh")}
+            {t("actions.refreshToken")}
           </MenuItem>
-          <MenuItem className={itemClass} onClick={() => onTest(account)}>
+          <MenuItem onClick={() => onTest(account)}>
             <HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />
             {t("actions.test")}
           </MenuItem>
-          <MenuItem className={itemClass} onClick={() => onDetails(account)}>
+          <MenuItem onClick={() => onDetails(account)}>
             <HugeiconsIcon icon={PanelRightOpenIcon} aria-hidden="true" />
             {t("actions.details")}
           </MenuItem>
@@ -159,7 +155,7 @@ export function AccountRowActions({
     <div className="flex items-center justify-end gap-0.5">
       <IconAction
         busy={refresh.isPending}
-        label={t("actions.refresh")}
+        label={t("actions.refreshToken")}
         onClick={() => refresh.mutate()}
       >
         <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
@@ -172,14 +168,7 @@ export function AccountRowActions({
           <TooltipTrigger
             render={
               <MenuTrigger
-                render={
-                  <Button
-                    aria-label={t("actions.more")}
-                    className="size-10 md:size-8"
-                    size="icon"
-                    variant="quiet"
-                  />
-                }
+                render={<Button aria-label={t("actions.more")} size="icon" variant="quiet" />}
               />
             }
           >

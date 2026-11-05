@@ -2,6 +2,8 @@ import { PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import { Code } from "@/components/shared/code";
+import { ModelLogo } from "@/components/shared/model-logo";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import {
   Autocomplete,
@@ -177,15 +179,17 @@ export function TestAccountDialog({
             {tc("actions.close")}
           </Button>
           <Button
-            aria-busy={running || undefined}
-            disabled={cached.isPending || running}
+            disabled={cached.isPending}
+            loading={running}
+            loadingText={t("test.running")}
             onClick={() => void run()}
           >
             <HugeiconsIcon icon={PlayIcon} aria-hidden="true" />
-            {running ? t("test.running") : t("test.run")}
+            {t("test.run")}
           </Button>
         </>
       }
+      anchor="top"
       onOpenChange={onOpenChange}
       open={open}
       size="lg"
@@ -225,7 +229,8 @@ export function TestAccountDialog({
               <AutocompleteList>
                 {(item: string) => (
                   <AutocompleteItem key={item} value={item}>
-                    {item}
+                    <ModelLogo model={item} />
+                    <Code>{item}</Code>
                   </AutocompleteItem>
                 )}
               </AutocompleteList>
@@ -242,9 +247,9 @@ export function TestAccountDialog({
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 rounded-lg border">
-          <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-            <h3 className="font-medium text-sm">{t("testLog.title")}</h3>
+        <div className="flex flex-col rounded-lg border border-border">
+          <div className="flex items-center justify-between gap-2 border-border-subtle border-b px-3 py-2">
+            <h3 className="font-medium text-sm/5">{t("testLog.title")}</h3>
             <Button
               disabled={lines.length === 0}
               onClick={() => setLines([])}
@@ -255,11 +260,11 @@ export function TestAccountDialog({
             </Button>
           </div>
           {lines.length === 0 ? (
-            <p className="px-3 pb-3 text-muted-foreground text-sm">{t("testLog.empty")}</p>
+            <p className="min-h-32 p-3 text-muted-foreground text-sm">{t("testLog.empty")}</p>
           ) : (
             <ol
               aria-label={t("testLog.title")}
-              className="max-h-64 overflow-y-auto px-3 pb-3 text-xs leading-relaxed"
+              className="scrollbar-y max-h-64 min-h-32 overflow-y-auto p-3 font-mono text-xs tabular-nums leading-relaxed"
               ref={logRef}
               role="log"
             >

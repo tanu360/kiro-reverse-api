@@ -7,6 +7,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
 import { useT } from "@/lib/i18n";
+import { useDisplayEmail } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
 import { buildCopyJson } from "./account-model";
 
@@ -56,7 +57,10 @@ export function useRefreshAccount(accountId: string) {
   const invalidate = useInvalidateAccounts();
   return useMutation({
     mutationFn: () => refreshAccount(accountId),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      toast.success(t("refreshSuccess"));
+      return invalidate();
+    },
     onError: (error) => {
       toast.error(t("refreshFailed", { reason: errorMessage(error, t) }));
     },
@@ -83,28 +87,29 @@ export function useCopyAccountJson(): (accountId: string) => Promise<boolean> {
   );
 }
 
-/** Confirms, deletes, toasts and refetches the list and the stat cards. */
-export function useDeleteAccount(): (accountId: string) => Promise<void> {
+/** Confirms (naming the account), deletes, toasts and refetches the list and the stat cards. */
+export function useDeleteAccount(): (account: Account) => Promise<void> {
   const { t } = useT("accounts");
   const confirm = useConfirm();
   const invalidate = useInvalidateAccounts();
+  const displayEmail = useDisplayEmail();
   return useCallback(
-    async (accountId) => {
+    async (account) => {
       const ok = await confirm({
-        title: t("confirmDelete.title"),
+        title: t("confirmDelete.title", { email: displayEmail(account.email, account.id) }),
         description: t("confirmDelete.body"),
         confirmLabel: t("confirmDelete.confirm"),
         variant: "danger",
       });
       if (!ok) return;
       try {
-        await deleteAccount(accountId);
+        await deleteAccount(account.id);
         toast.success(t("deleteSuccess"));
       } catch (error) {
         toastError(error, t);
       }
       await invalidate({ withStatus: true });
     },
-    [confirm, invalidate, t],
+    [confirm, displayEmail, invalidate, t],
   );
 }

@@ -1,33 +1,34 @@
 import {
   Download01Icon,
-  Layers01Icon,
   PlusIcon,
+  Refresh01Icon,
   SearchXIcon,
   UsersRoundIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { AddAccountDialog } from "@/features/add-account/add-account-dialog";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { accountsQuery, refreshAllModels } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import type { AccountSort, AccountsSearch } from "@/routes/-search";
 import { AccountDetailSheet } from "./account-detail-sheet";
 import {
   type AccountFilters,
   defaultSortDesc,
+  describeFailures,
   FILTER_DIMENSIONS,
   filterAccounts,
   sortAccounts,
@@ -37,7 +38,6 @@ import { AccountsToolbar } from "./accounts-toolbar";
 import { BatchBar } from "./batch-bar";
 import { ExportDialog } from "./export-dialog";
 import { TestAccountDialog } from "./test-account-dialog";
-import { useListLayout } from "./use-list-layout";
 
 const NO_ACCOUNTS: Account[] = [];
 const PAGE_SIZES = [25, 50, 100];
@@ -71,16 +71,16 @@ export function AccountsPage(): JSX.Element {
   const search = useSearch({ from: "/_app/accounts" });
   const navigate = useNavigate({ from: "/accounts" });
   const confirm = useConfirm();
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const layout = useListLayout(listRef);
-  // Phones show Refresh models as an icon, so the header fits 360 px.
-  const isPhone = useMediaQuery("max-sm");
+  const displayEmail = useDisplayEmail();
 
   const query = useQuery(accountsQuery());
   const accounts = query.data ?? NO_ACCOUNTS;
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [exportOpen, setExportOpen] = useState(false);
+  // The export dialog opens on every account (header Export) or on the selection (batch bar).
+  const [exportState, setExportState] = useState<{ open: boolean; ids?: string[] }>({
+    open: false,
+  });
   const [detail, openDetail, closeDetail] = useDialogTarget();
   const [test, openTest, closeTest] = useDialogTarget();
 
@@ -151,22 +151,31 @@ export function AccountsPage(): JSX.Element {
     const toastId = toast.loading(t("models.refreshing"));
     try {
       const result = await refreshAllModels();
-      // `refreshed` counts models, not accounts.
+      // `refreshed` and `failed` count accounts; `models` is the cached model count.
+      const failed = result.failed ?? 0;
+      const nameOf = (id: string) => {
+        const account = accounts.find((item) => item.id === id);
+        return account ? displayEmail(account.email, account.id) : id;
+      };
       toast.update(toastId, {
-        type: "success",
-        title: t("models.refreshAllDone", { count: result.refreshed ?? 0 }),
+        type: failed > 0 ? "warning" : "success",
+        title:
+          failed > 0
+            ? t("models.refreshAllPartial", { count: result.models ?? 0, failed })
+            : t("models.refreshAllDone", { count: result.models ?? 0 }),
+        description: describeFailures(result.results, nameOf, t) || undefined,
       });
     } catch (error) {
       toast.update(toastId, { type: "error", title: errorMessage(error, t) });
     }
   };
 
-  const onExport = () => {
+  const onExport = (ids?: string[]) => {
     if (accounts.length === 0) {
       toast.warning(t("empty.title"));
       return;
     }
-    setExportOpen(true);
+    setExportState({ open: true, ids });
   };
 
   const onTest = useCallback((account: Account) => openTest(account.id), [openTest]);
@@ -204,51 +213,68 @@ export function AccountsPage(): JSX.Element {
     );
 
   const testAccount = test ? accounts.find((account) => account.id === test.id) : undefined;
+  // Loaded and empty: the card holds only the empty state, and there is nothing to refresh.
+  const noAccounts = !query.isPending && !query.isError && accounts.length === 0;
+  const loadFailed = query.isError && !query.data;
 
-  // The page size sits at the end of the filter row; a new size starts again at page 1.
   const onPageSizeChange = (size: number) =>
     updateSearch({
       pageSize: size === DEFAULT_PAGE_SIZE ? undefined : (size as AccountsSearch["pageSize"]),
       page: undefined,
     });
 
-  const table = (
-    <AccountsTable
-      accounts={pageRows}
-      desc={desc}
-      emptyState={emptyState}
-      layout={layout}
-      loading={query.isPending}
-      onDetails={onDetails}
-      onSelectionChange={setSelected}
-      onSortChange={setSort}
-      onTest={onTest}
-      selected={selected}
-      sort={sort}
-    />
-  );
+  const toolbar =
+    noAccounts || loadFailed ? undefined : (
+      <AccountsToolbar
+        accounts={accounts}
+        desc={desc}
+        filters={filters}
+        loading={query.isPending}
+        onClearFilters={clearFilters}
+        onFiltersChange={setFilters}
+        onSortChange={setSort}
+        shown={sorted.length}
+        sort={sort}
+        tabActions={
+          // Quiet, at the end of the tab row; icon-only on phones.
+          <Button onClick={() => onExport()} size="sm" variant="ghost">
+            <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
+            <span className="max-sm:sr-only">{t("actions.export")}</span>
+          </Button>
+        }
+      />
+    );
+
+  // The page size sits in the footer with the pager; a new size starts again at page 1.
+  const footer =
+    sorted.length > PAGE_SIZES[0] ? (
+      <DataTablePagination
+        onPageChange={(next) => updateSearch({ page: next > 1 ? next : undefined }, false)}
+        onPageSizeChange={onPageSizeChange}
+        page={page}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZES}
+        total={sorted.length}
+      />
+    ) : undefined;
 
   return (
     <>
       <PageHeader
         actions={
-          // One refresh only: Refresh models (periwinkle), then Add account (purple). The list
-          // itself refetches on focus and after every action, so it needs no refresh button of
-          // its own next to a second one. Export sits at the end of the status tab row.
+          // One refresh only: Refresh models, then Add account. The list itself refetches on
+          // focus and after every action, so it needs no refresh button of its own. Export sits
+          // at the end of the status tab row.
           <>
-            {isPhone ? (
+            {noAccounts ? null : (
               <Button
                 aria-label={t("models.refreshAll")}
                 onClick={() => void onRefreshAllModels()}
-                size="icon"
-                variant="periwinkle"
+                variant="outline"
               >
-                <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
-              </Button>
-            ) : (
-              <Button onClick={() => void onRefreshAllModels()} variant="periwinkle">
-                <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
-                {t("models.refreshAll")}
+                <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
+                <span className="sm:hidden">{t("models.refreshShort")}</span>
+                <span className="max-sm:hidden">{t("models.refreshAll")}</span>
               </Button>
             )}
             <Button onClick={() => setAddOpen(true)}>
@@ -257,59 +283,43 @@ export function AccountsPage(): JSX.Element {
             </Button>
           </>
         }
+        description={t("description")}
         title={t("title")}
       />
 
-      {/* The accounts container hides low-priority table columns on narrower lists. */}
-      <div className="@container/accounts flex min-w-0 flex-col gap-4" ref={listRef}>
-        {query.isError && !query.data ? (
-          <Card>
+      <div className="flex min-w-0 flex-col gap-4">
+        {/* The accounts container lets the toolbar give the search its own row on narrow cards. */}
+        <DataTableCard className="@container/accounts" footer={footer} toolbar={toolbar}>
+          {loadFailed ? (
             <ErrorState
               error={query.error}
               onRetry={() => void query.refetch()}
               title={t("loadError")}
             />
-          </Card>
-        ) : (
-          // One box: the status tabs and filters head the table's own card, over a hairline,
-          // so they read as part of the table rather than a separate strip above it.
-          <Card className="min-w-0 overflow-hidden">
-            <div className="border-border/60 border-b p-3 sm:p-4">
-              <AccountsToolbar
-                accounts={accounts}
-                desc={desc}
-                filters={filters}
-                loading={query.isPending}
-                onClearFilters={clearFilters}
-                onFiltersChange={setFilters}
-                onPageSizeChange={onPageSizeChange}
-                onSortChange={setSort}
-                pageSize={pageSize}
-                pageSizeOptions={PAGE_SIZES}
-                shown={sorted.length}
-                sort={sort}
-                tabActions={
-                  // A quiet icon and label, like the tabs beside it; icon-only on phones.
-                  <Button className="hover:bg-accent" onClick={onExport} size="sm" variant="quiet">
-                    <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
-                    <span className="max-sm:sr-only">{t("actions.export")}</span>
-                  </Button>
-                }
-              />
-            </div>
-            {layout === "cards" ? <div className="p-3">{table}</div> : table}
-          </Card>
-        )}
-        {sorted.length > PAGE_SIZES[0] ? (
-          <DataTablePagination
-            onPageChange={(next) => updateSearch({ page: next > 1 ? next : undefined }, false)}
-            page={page}
-            pageSize={pageSize}
-            total={sorted.length}
-          />
-        ) : null}
+          ) : (
+            <AccountsTable
+              accounts={pageRows}
+              desc={desc}
+              emptyState={emptyState}
+              filtered={hasFilters && accounts.length > 0}
+              loading={query.isPending}
+              onDetails={onDetails}
+              onSelectionChange={setSelected}
+              onSortChange={setSort}
+              onTest={onTest}
+              pageSize={pageSize}
+              selected={selected}
+              sort={sort}
+            />
+          )}
+        </DataTableCard>
         {selected.size > 0 ? (
-          <BatchBar onClear={() => setSelected(new Set())} selectedIds={[...selected]} />
+          <BatchBar
+            accounts={accounts}
+            onClear={() => setSelected(new Set())}
+            onExport={() => onExport([...selected])}
+            selectedIds={[...selected]}
+          />
         ) : null}
       </div>
 
@@ -333,7 +343,12 @@ export function AccountsPage(): JSX.Element {
           open={test.open}
         />
       ) : null}
-      <ExportDialog accounts={accounts} onOpenChange={setExportOpen} open={exportOpen} />
+      <ExportDialog
+        accounts={accounts}
+        initialSelection={exportState.ids}
+        onOpenChange={(open) => setExportState((current) => ({ ...current, open }))}
+        open={exportState.open}
+      />
       <AddAccountDialog onOpenChange={setAddOpen} open={search.add === true} />
     </>
   );

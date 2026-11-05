@@ -14,19 +14,24 @@ afterEach(() => {
   vi.mocked(saveJson).mockClear();
 });
 
-async function openExport() {
+async function openExport(initialSelection?: string[]) {
   const view = renderWithProviders(
-    <ExportDialog accounts={mockDb.accounts} onOpenChange={() => {}} open />,
+    <ExportDialog
+      accounts={mockDb.accounts}
+      initialSelection={initialSelection}
+      onOpenChange={() => {}}
+      open
+    />,
   );
   const dialog = await screen.findByRole("dialog");
-  await within(dialog).findByText(`${mockDb.accounts.length} selected`);
+  await within(dialog).findByText(`${initialSelection?.length ?? mockDb.accounts.length} selected`);
   return { ...view, dialog };
 }
 
 describe("ExportDialog", () => {
   it("warns and copies nothing when no account is selected", async () => {
     const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("button", { name: "Deselect all" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Deselect all" }));
     expect(within(dialog).getByText("0 selected")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Copy JSON" }));
     expect(await screen.findByText("Select at least one account.")).toBeInTheDocument();
@@ -37,7 +42,7 @@ describe("ExportDialog", () => {
     const apiKeyAccount = mockDb.accounts.find((a) => a.authMethod === "api_key");
     if (!apiKeyAccount) throw new Error("fixture missing");
     const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("button", { name: "Deselect all" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Deselect all" }));
     await user.click(within(dialog).getByRole("checkbox", { name: /^api-key-/ }));
     await user.click(within(dialog).getByRole("button", { name: "Copy JSON" }));
 
@@ -60,6 +65,31 @@ describe("ExportDialog", () => {
     const [data, filename] = vi.mocked(saveJson).mock.calls[0];
     expect(filename).toMatch(/^kiro-accounts-\d{4}-\d{2}-\d{2}\.json$/);
     expect((data as { accounts: unknown[] }).accounts).toHaveLength(mockDb.accounts.length);
+  });
+
+  it("opens on the given selection and narrows the list with its search", async () => {
+    const [first] = mockDb.accounts;
+    const { dialog, user } = await openExport([first.id]);
+    const list = within(dialog).getByRole("list", { name: "Accounts to export" });
+    expect(within(list).getAllByRole("checkbox", { checked: true })).toHaveLength(1);
+    await user.type(
+      within(dialog).getByRole("searchbox", { name: "Search by email or nickname" }),
+      "overfl",
+    );
+    await waitFor(() => expect(within(list).getAllByRole("checkbox")).toHaveLength(1));
+    // The search hides rows but keeps the selection.
+    expect(within(dialog).getByText("1 selected")).toBeInTheDocument();
+  });
+
+  it("swaps the list for the JSON and back", async () => {
+    const { dialog, user } = await openExport();
+    await user.click(within(dialog).getByRole("button", { name: "Show JSON" }));
+    await within(dialog).findByRole("textbox", { name: "Export JSON" });
+    expect(
+      within(dialog).queryByRole("list", { name: "Accounts to export" }),
+    ).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Show accounts" }));
+    expect(within(dialog).getByRole("list", { name: "Accounts to export" })).toBeInTheDocument();
   });
 
   it("focuses the JSON once Show JSON renders it, so it is in view on phones", async () => {

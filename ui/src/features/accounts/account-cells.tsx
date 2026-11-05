@@ -11,12 +11,14 @@ import {
   ZapIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { type JSX, type ReactNode, useRef, useState } from "react";
+import type { JSX, ReactNode } from "react";
+import { RelativeTime } from "@/components/shared/relative-time";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterLabel, MeterTrack } from "@/components/ui/meter";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
-import { EMPTY, formatDateTime, formatFraction, formatRelativeTime } from "@/lib/format";
+import { EMPTY, formatFraction } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,7 @@ import {
   creditTone,
   formatCreditAmount,
   formatTokenExpiry,
+  isApiKeyAccount,
   isHeld,
   overageEnabled,
   planLabel,
@@ -36,14 +39,15 @@ import {
 } from "./account-model";
 
 /**
- * The one coloured pill of a row. Colour carries the meaning: red stops the account, orange
- * needs attention, grey is the admin's own switch, green is healthy.
+ * The one coloured pill of a row. Colour carries the meaning: red stops the account (a ban, no
+ * token, no credits left), orange needs attention, grey is the admin's own switch, green is
+ * healthy.
  */
 export const STATUS_PILL: Record<AccountStatus, { tone: BadgeTone; icon: IconSvgElement }> = {
   banned: { tone: "destructive", icon: CircleXIcon },
   suspended: { tone: "warning", icon: PauseCircleIcon },
   noToken: { tone: "destructive", icon: CircleMinusIcon },
-  outOfCredits: { tone: "warning", icon: AlertCircleIcon },
+  outOfCredits: { tone: "destructive", icon: AlertCircleIcon },
   expired: { tone: "warning", icon: Clock01Icon },
   disabled: { tone: "neutral", icon: CircleSlashIcon },
   active: { tone: "success", icon: CircleCheckIcon },
@@ -90,29 +94,25 @@ export function StatusPill({
 }
 
 /**
- * The email, truncated to its column, with the full (or masked, under privacy) text as a
- * tooltip only when it is cut off.
+ * The name a list shows for an account: the email (masked under privacy), or for an account
+ * without one (an API key, an id) that id, set in mono like every other id.
  */
-function TruncatedEmail({ account, className }: { account: Account; className?: string }) {
+export function useAccountName(): (account: Account) => { text: string; mono: boolean } {
   const displayEmail = useDisplayEmail();
-  const text = displayEmail(account.email, account.id);
-  const ref = useRef<HTMLSpanElement | null>(null);
-  const [open, setOpen] = useState(false);
+  return (account) => ({
+    text: displayEmail(account.email, account.id),
+    mono: isApiKeyAccount(account) || !account.email,
+  });
+}
+
+/** The account's name cut to its column, with the full text as a tooltip only when cut off. */
+function AccountName({ account }: { account: Account }): JSX.Element {
+  const name = useAccountName()(account);
   return (
-    <Tooltip
-      onOpenChange={(next) => {
-        const element = ref.current;
-        setOpen(next && element !== null && element.scrollWidth > element.clientWidth);
-      }}
-      open={open}
-    >
-      <TooltipTrigger
-        render={<span className={cn("block min-w-0 truncate font-medium", className)} ref={ref} />}
-      >
-        {text}
-      </TooltipTrigger>
-      <TooltipPopup>{text}</TooltipPopup>
-    </Tooltip>
+    // The mono id keeps the email's 14 px line, so every row is the same height.
+    <TruncatedText className={cn("font-medium", name.mono && "font-mono text-meta leading-3.5")}>
+      {name.text}
+    </TruncatedText>
   );
 }
 
@@ -138,7 +138,7 @@ function trialHint(account: Account, t: ReturnType<typeof useT>["t"]): string | 
 }
 
 /** Weight, an active trial and overage, as quiet icons after the email. Nothing when plain. */
-function AccountFlags({ account }: { account: Account }): JSX.Element | null {
+export function AccountFlags({ account }: { account: Account }): JSX.Element | null {
   const { t } = useT("accounts");
   const flags: ReactNode[] = [];
   if (account.weight >= 2) {
@@ -182,10 +182,10 @@ export function AccountIdentity({
   return (
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <div className="flex min-w-0 items-center gap-2">
-        <TruncatedEmail account={account} />
+        <AccountName account={account} />
         <AccountFlags account={account} />
       </div>
-      <span className="block truncate text-muted-foreground text-xs leading-tight">
+      <span className="block truncate text-meta text-muted-foreground leading-tight">
         {accountMeta(account, t)}
       </span>
     </div>
@@ -197,7 +197,14 @@ export function AccountIdentity({
  * leads, the percent sits at the end, and the bar turns orange over 70 % and red over 90 %. The
  * plan label is for screen readers only (the column header names it); a trial says so.
  */
-export function UsageMeter({ account }: { account: Account }): JSX.Element {
+export function UsageMeter({
+  account,
+  className,
+}: {
+  account: Account;
+  /** Layout only: the meter fills its box (the table column, or a card row). */
+  className?: string;
+}): JSX.Element {
   const { t, lang } = useT("accounts");
   const hasPlan = account.usageLimit > 0;
   const hasTrial = account.trialUsageLimit > 0;
@@ -206,7 +213,7 @@ export function UsageMeter({ account }: { account: Account }): JSX.Element {
   const limit = hasPlan ? account.usageLimit : account.trialUsageLimit;
   const pct = usagePercent(hasPlan ? account.usagePercent : account.trialUsagePercent);
   return (
-    <Meter className="w-full min-w-32 max-w-48 gap-1.5" max={100} min={0} value={pct}>
+    <Meter className={cn("w-full min-w-32 gap-1.5", className)} max={100} min={0} value={pct}>
       <div className="flex items-baseline justify-between gap-2 text-xs leading-none">
         <span className="flex min-w-0 items-baseline gap-1.5">
           <MeterLabel
@@ -217,11 +224,13 @@ export function UsageMeter({ account }: { account: Account }): JSX.Element {
           >
             {hasPlan ? t("planCredits") : t("trialCredits")}
           </MeterLabel>
-          <span className="truncate">
+          <span className="truncate tabular-nums">
             {formatCreditAmount(current, lang)} / {formatCreditAmount(limit, lang)}
           </span>
         </span>
-        <span className="shrink-0 text-muted-foreground">{formatFraction(pct / 100, 0)}</span>
+        <span className="shrink-0 text-muted-foreground tabular-nums">
+          {formatFraction(pct / 100, 0)}
+        </span>
       </div>
       <MeterTrack>
         <MeterIndicator tone={creditTone(pct)} />
@@ -237,23 +246,16 @@ export function TokenExpiryText({ account }: { account: Account }): JSX.Element 
   return <span className="text-muted-foreground">{formatTokenExpiry(expiry, t)}</span>;
 }
 
-/** "5 minutes ago" with the full date as a tooltip; a dash when the account was never used. */
-export function LastUsedText({ account }: { account: Account }): JSX.Element {
-  const { lang } = useT("accounts");
-  if (!account.lastUsed) return <span className="text-muted-foreground">{EMPTY}</span>;
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <time
-            className="whitespace-nowrap"
-            dateTime={new Date(account.lastUsed * 1000).toISOString()}
-          />
-        }
-      >
-        {formatRelativeTime(account.lastUsed, lang)}
-      </TooltipTrigger>
-      <TooltipPopup>{formatDateTime(account.lastUsed, lang)}</TooltipPopup>
-    </Tooltip>
-  );
+/**
+ * When the account last served a request: the shared RelativeTime ("5 minutes ago", or "5m ago"
+ * narrow), with the full date as a tooltip; a dash when it was never used.
+ */
+export function LastUsedText({
+  account,
+  style,
+}: {
+  account: Account;
+  style?: "long" | "narrow";
+}): JSX.Element {
+  return <RelativeTime style={style} value={account.lastUsed} />;
 }

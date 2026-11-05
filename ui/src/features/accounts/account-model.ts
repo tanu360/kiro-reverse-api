@@ -1,6 +1,12 @@
 // Pure helpers for the Accounts page. Rules keep the old admin panel's behaviour unless noted.
 
-import type { Account, AccountFull, ExportData, ModelInfo } from "@/lib/api/types";
+import type {
+  Account,
+  AccountActionResult,
+  AccountFull,
+  ExportData,
+  ModelInfo,
+} from "@/lib/api/types";
 import { belowStep, dateTimeFormat, EMPTY, numberFormat, roundsToZero } from "@/lib/format";
 import type { Lang, TFunction } from "@/lib/i18n";
 import {
@@ -511,3 +517,54 @@ export function overageEnabled(account: Pick<Account, "overageStatus">): boolean
 export function overageCapable(account: Pick<Account, "overageCapability">): boolean {
   return (account.overageCapability ?? "").toUpperCase() !== "NOT_OVERAGE_CAPABLE";
 }
+
+// ---------------------------------------------------------------------------
+// Batch results
+// ---------------------------------------------------------------------------
+
+/** How many failed accounts a result toast names before it says "and N more". */
+export const FAILURE_NAMES_SHOWN = 3;
+
+/**
+ * The failed rows of a batch or sweep answer as one toast description: "name: error" for the
+ * first few, then "and N more". `nameOf` gives the display name (masked under privacy); an id
+ * with no account falls back to the id. Empty when nothing failed.
+ */
+export function describeFailures(
+  results: readonly AccountActionResult[] | undefined,
+  nameOf: (id: string) => string,
+  t: TFunction,
+): string {
+  const failed = (results ?? []).filter((result) => !result.ok);
+  if (failed.length === 0) return "";
+  const named = failed.slice(0, FAILURE_NAMES_SHOWN).map((result) => {
+    const reason = result.error || (result.status === "not_found" ? t("batch.notFound") : "");
+    return reason ? `${nameOf(result.id)}: ${reason}` : nameOf(result.id);
+  });
+  const rest = failed.length - named.length;
+  if (rest > 0) named.push(t("batch.moreFailures", { count: rest }));
+  return named.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Detail sheet edit dialogs
+// ---------------------------------------------------------------------------
+
+export type DetailEditField = "nickname" | "machineId" | "weight" | "proxy";
+
+/**
+ * The title and description keys of each Edit dialog in the detail sheet (accounts namespace).
+ * Weight and proxy reuse their field hints as the description.
+ */
+export const DETAIL_EDIT_COPY: Record<DetailEditField, { title: string; description: string }> = {
+  nickname: {
+    title: "detail.edit.nickname.title",
+    description: "detail.edit.nickname.description",
+  },
+  machineId: {
+    title: "detail.edit.machineId.title",
+    description: "detail.edit.machineId.description",
+  },
+  weight: { title: "detail.edit.weight.title", description: "detail.weightHint" },
+  proxy: { title: "detail.edit.proxy.title", description: "detail.proxyHint" },
+};
