@@ -129,7 +129,7 @@ export function CookieFlow(): JSX.Element {
         />
       </FormField>
       <FlowFooter>
-        <SubmitButton busy={pending} busyLabel={t("adding")} formId={formId} label={t("add")} />
+        <SubmitButton busy={pending} formId={formId} label={t("add")} />
       </FlowFooter>
     </form>
   );

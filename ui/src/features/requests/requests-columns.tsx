@@ -32,8 +32,10 @@ import { formatRowDate, isKnownEndpoint, normalizeApiKeyMask } from "./request-m
  */
 const NAME_CAP = "max-w-28 @5xl/requests:max-w-32 @7xl/requests:max-w-40";
 // Model IDs differ only in their version suffix, so the model gets more room than the token line.
-const MODEL_CAP = "max-w-28 @3xl/requests:max-w-32 @5xl/requests:max-w-40 @7xl/requests:max-w-48";
-const TOKENS_CAP = "max-w-32 @3xl/requests:max-w-36 @7xl/requests:max-w-none";
+// No 112 px step: at 1024 px with the sidebar open it cut every claude-sonnet-* to the same text.
+const MODEL_CAP = "max-w-32 @5xl/requests:max-w-40 @7xl/requests:max-w-48";
+const TOKENS_CAP =
+  "max-w-30 @3xl/requests:max-w-36 @5xl/requests:max-w-44 @7xl/requests:max-w-none";
 
 function Muted({ children = EMPTY }: { children?: string }): JSX.Element {
   return <span className="text-muted-foreground">{children}</span>;

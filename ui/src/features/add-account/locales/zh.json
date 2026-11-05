@@ -3,15 +3,12 @@
   "description": "选择登录方式或导入方式。",
   "cancel": "取消",
   "add": "添加",
-  "adding": "正在添加…",
   "open": "打开",
   "copyLink": "复制链接",
   "region": "区域",
   "regionInvalid": "请输入类似 us-east-1 的区域。",
   "startSignIn": "开始登录",
-  "starting": "正在启动…",
   "completeSignIn": "完成登录",
-  "completing": "正在完成…",
   "callbackUrl": "回调 URL",
   "callbackRequired": "请先粘贴回调 URL。",
   "success": "已添加账号：{name}",
@@ -58,7 +55,7 @@
   "microsoft.portalStep": "第 1 步：登录 Kiro 门户",
   "microsoft.providerStep": "第 2 步：使用 Microsoft 登录",
   "microsoft.pasteStep": "每次登录后，粘贴浏览器最终停留的地址，该地址开头为",
-  "microsoft.callbackInstructions": "打开链接并完成登录。浏览器随后会显示一个无法打开的 http://localhost:3128 页面，这是正常的。复制地址栏中的完整地址并粘贴到下方。",
+  "microsoft.callbackInstructions": "打开链接并完成登录。浏览器随后会显示一个无法打开的页面，这是正常的。复制地址栏中的完整地址并粘贴到下方，该地址开头为",
   "microsoft.selectProfileDesc": "此账号有多个 Kiro Profile。请选择代理要使用的 Kiro Profile。",
   "microsoft.profileLabel": "Kiro Profile",
   "microsoft.selectProfile": "使用此 Kiro Profile",
@@ -72,7 +69,6 @@
   "sso.tokenLabel": "SSO Token",
   "sso.tokenHint": "每行一个 Token。粘贴多个即可批量导入。每个 Token 的导入最多可能需要 2 分钟。",
   "sso.tokenRequired": "请至少粘贴一个 SSO Token。",
-  "sso.importing": "正在导入…",
 
   "local.fileLocation": "文件位置",
   "local.windows": "Windows",
@@ -127,7 +123,7 @@
 
   "apikey.help": "Kiro API Key 永不过期，无需 OAuth 刷新。请求会发送到该 API Key 所在区域的 Kiro CLI 运行时。",
   "apikey.keysLabel": "Kiro API Key",
-  "apikey.keysHint": "每行一个。可用 ksk_…|eu-central-1 指定区域。",
-  "apikey.regionHint": "用于未带 |区域 后缀的 API Key。",
+  "apikey.keysHint": "每行一个。如需为某个 API Key 指定区域，写法为",
+  "apikey.regionHint": "用于未带区域后缀的 API Key：",
   "apikey.keyMissing": "请至少输入一个 Kiro API Key。"
 }

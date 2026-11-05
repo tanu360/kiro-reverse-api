@@ -1,8 +1,7 @@
-import { ChevronLeftIcon, ChevronRightIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
 import { CodeBlock } from "@/components/shared/code-block";
 import { CreditAmount } from "@/components/shared/credit-amount";
+import { PagerChevronButton } from "@/components/shared/data-table-pagination";
 import { DisplayEmail } from "@/components/shared/display-email";
 import { KeyValueGrid, type KeyValueItem } from "@/components/shared/key-value-grid";
 import {
@@ -13,7 +12,6 @@ import {
   ResponsiveSheetPanel,
   ResponsiveSheetTitle,
 } from "@/components/shared/responsive-sheet";
-import { Button } from "@/components/ui/button";
 import type { RequestRecord } from "@/lib/api/types";
 import { EMPTY, formatDateTime, formatDurationMs, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -197,24 +195,19 @@ export function RequestDetailSheet({
           {position > 0 ? t("detail.position", { index: position, count }) : null}
         </span>
         <div className="flex items-center gap-2">
-          <Button
-            aria-label={t("detail.previous")}
+          {/* The table pager's chevrons, so both pairs on the page look and dim alike. */}
+          <PagerChevronButton
+            direction="previous"
             disabled={!onPrevious}
-            onClick={onPrevious}
-            size="icon"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={ChevronLeftIcon} aria-hidden="true" />
-          </Button>
-          <Button
-            aria-label={t("detail.next")}
+            label={t("detail.previous")}
+            onClick={() => onPrevious?.()}
+          />
+          <PagerChevronButton
+            direction="next"
             disabled={!onNext}
-            onClick={onNext}
-            size="icon"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" />
-          </Button>
+            label={t("detail.next")}
+            onClick={() => onNext?.()}
+          />
         </div>
       </ResponsiveSheetFooter>
     </ResponsiveSheet>

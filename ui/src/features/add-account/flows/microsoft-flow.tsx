@@ -17,7 +17,7 @@ import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { FlowGuide, FlowNote, FormField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
-import { useFocusAfter } from "../focus";
+import { stepFocus, useFocusAfter } from "../focus";
 
 type Stage = "idle" | "kiro" | "microsoft" | "profile";
 
@@ -97,7 +97,7 @@ export function MicrosoftFlow(): JSX.Element {
       setAuthorizeUrl(res.authorizeUrl);
       setCallbackUrl("");
       setStage("kiro");
-      focusAfter(callbackRef);
+      focusAfter(stepFocus(formId, callbackRef));
     });
 
   const complete = () => {
@@ -123,7 +123,7 @@ export function MicrosoftFlow(): JSX.Element {
           setAuthorizeUrl(res.authorizeUrl);
           setCallbackUrl("");
           setStage("microsoft");
-          focusAfter(callbackRef);
+          focusAfter(stepFocus(formId, callbackRef));
         }
       },
       () => focusAfter(callbackRef),
@@ -162,11 +162,16 @@ export function MicrosoftFlow(): JSX.Element {
       : stage === "profile"
         ? t("microsoft.selectProfile")
         : t("completeSignIn");
-  const busyLabel =
-    stage === "idle" ? t("starting") : stage === "profile" ? t("adding") : t("completing");
 
   return (
-    <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
+    // tabIndex -1: a step change focuses the form itself on touch screens (see stepFocus).
+    <form
+      className="flex flex-col gap-4 outline-none"
+      id={formId}
+      noValidate
+      onSubmit={onSubmit}
+      tabIndex={-1}
+    >
       {stage === "profile" ? (
         <Field className="w-full" invalid={Boolean(fieldError)}>
           <FieldLabel>{t("microsoft.profileLabel")}</FieldLabel>
@@ -201,7 +206,9 @@ export function MicrosoftFlow(): JSX.Element {
             url={authorizeUrl}
           />
           {/* A step note, not the field hint: it stays in view while the field shows an error. */}
-          <FlowNote>{t("microsoft.callbackInstructions")}</FlowNote>
+          <FlowNote>
+            {t("microsoft.callbackInstructions")} <Code>http://localhost:3128</Code>
+          </FlowNote>
           <FormField error={fieldError} label={t("callbackUrl")}>
             <Input
               autoCapitalize="off"
@@ -227,7 +234,7 @@ export function MicrosoftFlow(): JSX.Element {
         </FlowGuide>
       )}
       <FlowFooter>
-        <SubmitButton busy={busy} busyLabel={busyLabel} formId={formId} label={submitLabel} />
+        <SubmitButton busy={busy} formId={formId} label={submitLabel} />
       </FlowFooter>
     </form>
   );

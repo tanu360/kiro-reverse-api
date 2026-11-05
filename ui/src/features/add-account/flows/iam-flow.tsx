@@ -8,7 +8,7 @@ import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { FlowNote, FormField, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
-import { useFocusAfter } from "../focus";
+import { stepFocus, useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
 
 /**
@@ -52,7 +52,7 @@ export function IamFlow(): JSX.Element {
       if (!sessions.isCurrent(generation)) return;
       sessions.iamSession = res.sessionId;
       setAuthorizeUrl(res.authorizeUrl);
-      focusAfter(callbackRef);
+      focusAfter(stepFocus(formId, callbackRef));
     } catch (error) {
       if (sessions.isCurrent(generation)) {
         toast.error(t("startFailed", { error: errorMessage(error, t) }));
@@ -96,7 +96,14 @@ export function IamFlow(): JSX.Element {
 
   const started = Boolean(authorizeUrl);
   return (
-    <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
+    // tabIndex -1: a step change focuses the form itself on touch screens (see stepFocus).
+    <form
+      className="flex flex-col gap-4 outline-none"
+      id={formId}
+      noValidate
+      onSubmit={onSubmit}
+      tabIndex={-1}
+    >
       {started ? (
         <>
           {/* The start URL and region are fixed once the login starts; one line recalls them. */}
@@ -149,7 +156,6 @@ export function IamFlow(): JSX.Element {
       <FlowFooter>
         <SubmitButton
           busy={pending}
-          busyLabel={started ? t("completing") : t("starting")}
           formId={formId}
           label={started ? t("completeSignIn") : t("startSignIn")}
         />

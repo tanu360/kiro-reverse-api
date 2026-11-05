@@ -1,4 +1,5 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
+import { Code } from "@/components/shared/code";
 import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -70,7 +71,15 @@ export function ApiKeyFlow(): JSX.Element {
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
       <FlowNote>{t("apikey.help")}</FlowNote>
-      <FormField error={errors.keys} hint={t("apikey.keysHint")} label={t("apikey.keysLabel")}>
+      <FormField
+        error={errors.keys}
+        hint={
+          <>
+            {t("apikey.keysHint")} <Code>ksk_…|eu-central-1</Code>
+          </>
+        }
+        label={t("apikey.keysLabel")}
+      >
         <Textarea
           autoComplete="off"
           disabled={pending}
@@ -85,13 +94,17 @@ export function ApiKeyFlow(): JSX.Element {
       <RegionField
         disabled={pending}
         error={errors.region}
-        hint={t("apikey.regionHint")}
+        hint={
+          <>
+            {t("apikey.regionHint")} <Code>|region</Code>
+          </>
+        }
         inputRef={regionRef}
         onChange={setRegion}
         value={region}
       />
       <FlowFooter>
-        <SubmitButton busy={pending} busyLabel={t("adding")} formId={formId} label={t("add")} />
+        <SubmitButton busy={pending} formId={formId} label={t("add")} />
       </FlowFooter>
     </form>
   );

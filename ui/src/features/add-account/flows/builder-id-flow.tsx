@@ -150,12 +150,7 @@ export function BuilderIdFlow(): JSX.Element {
         value={region}
       />
       <FlowFooter>
-        <SubmitButton
-          busy={starting}
-          busyLabel={t("starting")}
-          formId={formId}
-          label={t("startSignIn")}
-        />
+        <SubmitButton busy={starting} formId={formId} label={t("startSignIn")} />
       </FlowFooter>
     </form>
   );

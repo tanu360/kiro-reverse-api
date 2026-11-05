@@ -85,12 +85,7 @@ export function SsoTokenFlow(): JSX.Element {
         value={region}
       />
       <FlowFooter>
-        <SubmitButton
-          busy={pending}
-          busyLabel={t("sso.importing")}
-          formId={formId}
-          label={t("add")}
-        />
+        <SubmitButton busy={pending} formId={formId} label={t("add")} />
       </FlowFooter>
     </form>
   );

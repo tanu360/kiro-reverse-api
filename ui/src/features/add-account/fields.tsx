@@ -109,7 +109,7 @@ export function RegionField({
   value: string;
   onChange: (value: string) => void;
   error?: string | null;
-  hint?: string;
+  hint?: ReactNode;
   disabled?: boolean;
   inputRef?: Ref<HTMLInputElement>;
 }): JSX.Element {
@@ -134,17 +134,16 @@ export function RegionField({
  * The flow's submit button. While busy it is the Button's loading state (focusable, aria-busy,
  * clicks ignored) and takes focus from the fields that are disabled during the request, so
  * keyboard focus never falls to `<body>`. The flow's submit handler ignores a submit while busy.
+ * The label stays while busy (a Spinner joins it), so the footer's Cancel does not jump.
  */
 export function SubmitButton({
   formId,
   busy,
   label,
-  busyLabel,
 }: {
   formId: string;
   busy: boolean;
   label: string;
-  busyLabel: string;
 }): JSX.Element {
   const ref = useRef<HTMLButtonElement>(null);
 
@@ -156,7 +155,7 @@ export function SubmitButton({
   }, [busy, formId]);
 
   return (
-    <Button form={formId} loading={busy} loadingText={busyLabel} ref={ref} type="submit">
+    <Button form={formId} loading={busy} ref={ref} type="submit">
       {label}
     </Button>
   );

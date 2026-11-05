@@ -87,6 +87,10 @@ export function RequestsToolbar({
           type="search"
           value={text}
         />
+        {/*
+          One trailing control at a time: the clear X takes the hint's slot while there is text,
+          so it sits at the field's edge and the two touch targets never overlap.
+        */}
         <InputGroupAddon align="inline-end">
           {text ? (
             <Button
@@ -100,11 +104,12 @@ export function RequestsToolbar({
             >
               <HugeiconsIcon icon={XIcon} aria-hidden="true" />
             </Button>
-          ) : null}
-          {/* Opens on hover, click and tap; the label is for screen readers only. */}
-          <InfoHint className="gap-0" hint={t("searchHint")}>
-            <span className="sr-only">{t("searchHintLabel")}</span>
-          </InfoHint>
+          ) : (
+            // Opens on hover, click and tap; the label is for screen readers only.
+            <InfoHint className="gap-0" hint={t("searchHint")}>
+              <span className="sr-only">{t("searchHintLabel")}</span>
+            </InfoHint>
+          )}
         </InputGroupAddon>
       </InputGroup>
 

@@ -3,15 +3,12 @@
   "description": "Choose how to sign in or what to import.",
   "cancel": "Cancel",
   "add": "Add",
-  "adding": "Adding…",
   "open": "Open",
   "copyLink": "Copy link",
   "region": "Region",
   "regionInvalid": "Enter a region like us-east-1.",
   "startSignIn": "Start sign-in",
-  "starting": "Starting…",
   "completeSignIn": "Complete sign-in",
-  "completing": "Completing…",
   "callbackUrl": "Callback URL",
   "callbackRequired": "Paste the callback URL first.",
   "success": "Account added: {name}",
@@ -61,7 +58,7 @@
   "microsoft.portalStep": "Step 1: sign in to the Kiro portal",
   "microsoft.providerStep": "Step 2: sign in with Microsoft",
   "microsoft.pasteStep": "After each sign-in, paste the address your browser lands on. It starts with",
-  "microsoft.callbackInstructions": "Open the link and sign in. Your browser then shows a page that fails to load at http://localhost:3128. That is expected. Copy the full address from the address bar and paste it below.",
+  "microsoft.callbackInstructions": "Open the link and sign in. Your browser then shows a page that fails to load. That is expected. Copy the full address from the address bar and paste it below. It starts with",
   "microsoft.selectProfileDesc": "This account has more than one Kiro profile. Choose the one this proxy should use.",
   "microsoft.profileLabel": "Kiro profile",
   "microsoft.selectProfile": "Use profile",
@@ -75,7 +72,6 @@
   "sso.tokenLabel": "SSO tokens",
   "sso.tokenHint": "One token per line. Pasting several imports them in a batch. Each token can take up to 2 minutes to import.",
   "sso.tokenRequired": "Paste at least one SSO token.",
-  "sso.importing": "Importing…",
 
   "local.fileLocation": "File location",
   "local.windows": "Windows",
@@ -130,7 +126,7 @@
 
   "apikey.help": "Kiro API keys never expire and skip OAuth refresh. Requests go to the Kiro CLI runtime in the key's region.",
   "apikey.keysLabel": "Kiro API keys",
-  "apikey.keysHint": "One per line. Add a region with ksk_…|eu-central-1.",
-  "apikey.regionHint": "Used for keys without a |region suffix.",
+  "apikey.keysHint": "One per line. Add a region to a key with",
+  "apikey.regionHint": "Used for keys without a region suffix:",
   "apikey.keyMissing": "Enter at least one Kiro API key."
 }

@@ -238,7 +238,7 @@ export function LocalCacheFlow(): JSX.Element {
         </FormField>
       ) : null}
       <FlowFooter>
-        <SubmitButton busy={pending} busyLabel={t("adding")} formId={formId} label={t("add")} />
+        <SubmitButton busy={pending} formId={formId} label={t("add")} />
       </FlowFooter>
     </form>
   );

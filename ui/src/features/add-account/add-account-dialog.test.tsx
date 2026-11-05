@@ -232,7 +232,7 @@ describe("Microsoft SSO", () => {
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     expect(await screen.findByText("Paste the callback URL first.")).toBeInTheDocument();
     // The paste instructions are a step note, so the error does not replace them.
-    expect(screen.getByText(/fails to load at http:\/\/localhost:3128/)).toBeInTheDocument();
+    expect(screen.getByText(/fails to load\. That is expected/)).toBeInTheDocument();
 
     await user.type(callback, "http://localhost:3128/signin/callback?login_option=external_idp");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
@@ -307,10 +307,8 @@ describe("Microsoft SSO", () => {
     });
     await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/leg1");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
-    // While the request runs, the X is hidden and Escape is ignored; Cancel still closes.
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument(),
-    );
+    // While the request runs, the X is disabled and Escape is ignored; Cancel still closes.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Close" })).toBeDisabled());
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await expectClosed();
     await waitFor(() => expect(cancels.bodies).toEqual([{ sessionId, selectionId: "" }]));
@@ -402,8 +400,11 @@ describe("SSO token", () => {
     const { user } = renderWithProviders(<Harness initialMethod="sso" onAdded={onAdded} />);
 
     await user.type(await screen.findByRole("textbox", { name: "SSO tokens" }), "token-1");
-    await user.click(screen.getByRole("button", { name: "Add" }));
-    const busy = await screen.findByRole("button", { name: "Importing…" });
+    const busy = screen.getByRole("button", { name: "Add" });
+    await user.click(busy);
+    // The label stays while busy (a Spinner joins it), so Cancel beside it does not jump.
+    await waitFor(() => expect(busy).toHaveAttribute("aria-busy", "true"));
+    expect(busy).toHaveAccessibleName("Add");
     // aria-disabled, not disabled: focus stays on it instead of falling to <body>.
     expect(busy).toHaveAttribute("aria-disabled", "true");
     expect(busy).toBeEnabled();
@@ -508,6 +509,38 @@ describe("Focus after a failed submit or a step change", () => {
     );
     await waitFor(() => expect(callback).toHaveFocus());
     expect(callback).toBeEnabled();
+  });
+
+  it("on touch screens, a step change focuses the step, not its text field", async () => {
+    // A focused text field opens the on-screen keyboard over the drawer.
+    const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes("pointer: coarse"),
+          media: query,
+          onchange: null,
+          addListener: () => {},
+          removeListener: () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    try {
+      const { user } = renderWithProviders(<Harness initialMethod="iam" />);
+      const startUrl = await screen.findByRole("textbox", { name: "Start URL" });
+      await user.type(startUrl, "https://acme.awsapps.com/start");
+      await user.click(screen.getByRole("button", { name: "Start sign-in" }));
+      const callback = await screen.findByRole("textbox", { name: "Callback URL" });
+      await waitFor(() => expect(callback.closest("form")).toHaveFocus());
+
+      // An error still focuses the field to fix.
+      await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
+      expect(await screen.findByText("Paste the callback URL first.")).toBeInTheDocument();
+      await waitFor(() => expect(callback).toHaveFocus());
+    } finally {
+      matchMedia.mockRestore();
+    }
   });
 
   it("SSO token: returns focus to the tokens after the server rejects them", async () => {

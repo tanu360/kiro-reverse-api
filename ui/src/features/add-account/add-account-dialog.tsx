@@ -15,7 +15,7 @@ import { IamFlow } from "./flows/iam-flow";
 import { LocalCacheFlow } from "./flows/local-cache-flow";
 import { MicrosoftFlow } from "./flows/microsoft-flow";
 import { SsoTokenFlow } from "./flows/sso-token-flow";
-import { firstStepControl } from "./focus";
+import { firstStepControl, isCoarsePointer } from "./focus";
 import { MethodList } from "./method-list";
 
 export type AddAccountMethod =
@@ -159,8 +159,9 @@ export function AddAccountDialog({
     }
     // On touch screens a focused text field opens the keyboard over the drawer, so focus the
     // step itself there; the next swipe or Tab reaches its first field.
-    const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-    const target = coarse ? body : (firstStepControl(body) ?? footerSubmit(footer) ?? body);
+    const target = isCoarsePointer()
+      ? body
+      : (firstStepControl(body) ?? footerSubmit(footer) ?? body);
     target.focus();
   }, [method, flowKey]);
 
