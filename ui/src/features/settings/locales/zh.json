@@ -170,7 +170,7 @@
   "promptFilter.type": "类型",
   "promptFilter.apply": "应用",
   "promptFilter.matchHintContains": "包含此文本的每一行都会被删除，不区分大小写。",
-  "promptFilter.matchHintRegex": "Go (RE2) 正则表达式，每个匹配项都会被替换。",
+  "promptFilter.matchHintRegex": "Go（RE2）正则表达式，每个匹配项都会被替换。",
   "promptFilter.replaceHint": "留空则删除匹配内容。{group} 插入捕获组。",
   "promptFilter.deletesMatch": "删除匹配内容",
   "promptFilter.all": "全部过滤器和规则",

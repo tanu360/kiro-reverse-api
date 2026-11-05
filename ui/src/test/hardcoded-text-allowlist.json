@@ -35,11 +35,6 @@
     "reason": "Short language tags for the sign-in language button, the same in every UI language."
   },
   {
-    "file": "src/components/layout/update-dialog.tsx",
-    "text": "v",
-    "reason": "Version tag prefix (v1.2.3), a data format that is the same in every language."
-  },
-  {
     "file": "src/features/add-account/fields.tsx",
     "text": "us-east-1",
     "reason": "AWS region id example; region ids are data values."

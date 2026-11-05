@@ -22,6 +22,7 @@ const SKIPPED = [
 
 const NAMESPACED = /^([A-Za-z][\w-]*):(.+)$/;
 const DEFAULT_NAMESPACE = "common";
+const UI_NAMESPACE = "ui";
 
 // biome-ignore lint/suspicious/noExplicitAny: Babel AST nodes are walked generically.
 type Node = any;
@@ -67,6 +68,9 @@ function scanFile(code: string, file: string): FileScan {
     const [arg] = node.arguments;
     if (node.callee.name === "useT") {
       scan.namespaces.add(arg?.type === "StringLiteral" ? arg.value : DEFAULT_NAMESPACE);
+    } else if (node.callee.name === "useUiT") {
+      // components/ui/messages.ts: useT bound to the primitives' own namespace.
+      scan.namespaces.add(UI_NAMESPACE);
     } else if (node.callee.name === "t" && arg) {
       const line = node.loc?.start.line ?? 0;
       if (arg.type === "StringLiteral") scan.uses.push({ file, line, key: arg.value });

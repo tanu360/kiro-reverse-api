@@ -39,7 +39,6 @@
   "table.pageInfo": "{start}–{end} de {total}",
   "table.previous": "Anterior",
   "table.next": "Próxima",
-  "table.rowsPerPage": "Linhas por página",
   "table.rowsShort": "Linhas",
   "table.actions": "Ações",
   "table.selectAll": "Selecionar tudo",
@@ -115,6 +114,5 @@
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Entrar",
   "shell.page.setup": "Configuração inicial",
-  "a11y.labelWithDetail": "{label}. {detail}",
   "text.joinSentences": "{first} {second}"
 }

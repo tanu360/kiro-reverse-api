@@ -24,7 +24,7 @@
   "actions.more": "更多操作",
   "actions.back": "返回",
   "actions.copy": "复制",
-  "actions.copyValue": "复制{label}",
+  "actions.copyValue": "复制 {label}",
   "actions.viewAll": "查看全部",
   "status.enabled": "已启用",
   "status.disabled": "已禁用",
@@ -39,7 +39,6 @@
   "table.pageInfo": "第 {start}–{end} 条，共 {total} 条",
   "table.previous": "上一页",
   "table.next": "下一页",
-  "table.rowsPerPage": "每页行数",
   "table.rowsShort": "行数",
   "table.actions": "操作",
   "table.selectAll": "全选",
@@ -115,6 +114,5 @@
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "登录",
   "shell.page.setup": "初始设置",
-  "a11y.labelWithDetail": "{label}。{detail}",
   "text.joinSentences": "{first}{second}"
 }

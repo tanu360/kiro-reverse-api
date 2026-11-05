@@ -39,7 +39,6 @@
   "table.pageInfo": "{start}–{end} / {total}",
   "table.previous": "Trước",
   "table.next": "Sau",
-  "table.rowsPerPage": "Số dòng trên mỗi trang",
   "table.rowsShort": "Số dòng",
   "table.actions": "Thao tác",
   "table.selectAll": "Chọn tất cả",
@@ -115,6 +114,5 @@
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Đăng nhập",
   "shell.page.setup": "Thiết lập",
-  "a11y.labelWithDetail": "{label}. {detail}",
   "text.joinSentences": "{first} {second}"
 }

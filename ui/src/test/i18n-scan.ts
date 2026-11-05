@@ -81,6 +81,61 @@ const NOT_PROSE = /^(?:var\(|url\(|#[\da-f]{3,8}$)/i;
 // Names that end like a visible prop but hold data (raw server text matched against a table).
 const DATA_NAMES = new Set(["serverMessage"]);
 
+// Tailwind utilities that are a bare word, with no dash, colon or bracket.
+const BARE_UTILITIES = new Set([
+  "flex",
+  "grid",
+  "block",
+  "inline",
+  "hidden",
+  "contents",
+  "truncate",
+  "relative",
+  "absolute",
+  "fixed",
+  "sticky",
+  "static",
+  "isolate",
+  "invisible",
+  "visible",
+  "underline",
+  "italic",
+  "uppercase",
+  "lowercase",
+  "capitalize",
+  "border",
+  "rounded",
+  "shadow",
+  "outline",
+  "ring",
+  "transition",
+  "grow",
+  "shrink",
+  "group",
+  "peer",
+  "container",
+  "table",
+  "antialiased",
+]);
+const UTILITY_WORD = /^!?-?[a-z@*&[(.][\w@*&[\]():/.%#=>,'"!-]*$/;
+const UTILITY_MARK = /[-:[\]/]/;
+
+/**
+ * A class list such as "flex h-5 items-center": every word is a utility (it has a dash, colon,
+ * bracket or slash, or is a bare utility such as `flex`) and at least one is marked. A map of
+ * variant classes keyed `label` or `title` is styling, not text.
+ */
+export function isClassList(text: string): boolean {
+  const words = text.trim().split(/\s+/);
+  if (text.includes("://")) return false;
+  if (!words.every((word) => UTILITY_WORD.test(word))) return false;
+  if (!words.some((word) => UTILITY_MARK.test(word))) return false;
+  // One hyphenated word ("sign-in", "us-east-1") may be prose or data; a lone utility needs a
+  // variant colon or an arbitrary-value bracket.
+  if (words.length === 1 && !/[:[]/.test(words[0])) return false;
+  return words.every((word) => UTILITY_MARK.test(word) || BARE_UTILITIES.has(word));
+}
+
 const tokenPattern = new RegExp(
   `(?<![\\p{L}\\p{N}])(?:${[...ALLOWED_TOKENS]
     .sort((a, b) => b.length - a.length)
@@ -189,7 +244,7 @@ export function scanSource(code: string, file: string): Finding[] {
 
   const report = (kind: string, node: Node, text: string, strict: boolean) => {
     const value = text.replace(/\s+/g, " ").trim();
-    if (!value || !hasProse(value) || NOT_PROSE.test(value)) return;
+    if (!value || !hasProse(value) || NOT_PROSE.test(value) || isClassList(value)) return;
     if (!strict && isKeyLike(value)) return;
     findings.push({ file, line: node.loc?.start.line ?? 0, kind, text: value });
   };

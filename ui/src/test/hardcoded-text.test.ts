@@ -131,4 +131,18 @@ describe("scanSource", () => {
       `),
     ).toEqual([]);
   });
+
+  it("skips class lists kept under a visible-looking key, but not hyphenated prose", () => {
+    expect(
+      scan(`
+        const SIZE = { label: "flex h-5 items-center", title: "truncate text-meta" };
+        const LINK = { label: "touch-hit leading-[inherit] data-popup-open:text-foreground" };
+        const COPY = { label: "sign-in", title: "Re-run tests", text: "use-case notes" };
+      `),
+    ).toEqual([
+      "property label: sign-in",
+      "property title: Re-run tests",
+      "property text: use-case notes",
+    ]);
+  });
 });
