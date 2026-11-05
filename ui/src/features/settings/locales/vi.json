@@ -14,7 +14,7 @@
   "reload": "Tải lại",
   "remove": "Gỡ",
   "loadFailed": "Không thể tải cài đặt",
-  "loadSectionFailed": "Không thể tải cài đặt {section}",
+  "loadSectionFailed": "Không thể tải phần này",
   "unsavedMark": "(có thay đổi chưa lưu)",
   "discardTitle": "Bỏ các thay đổi chưa lưu?",
   "discardBody": "Một số thẻ cài đặt có thay đổi chưa lưu. Rời khỏi trang này sẽ bỏ các thay đổi đó.",

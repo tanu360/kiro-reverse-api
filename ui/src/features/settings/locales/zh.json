@@ -14,7 +14,7 @@
   "reload": "重新加载",
   "remove": "移除",
   "loadFailed": "无法加载设置",
-  "loadSectionFailed": "无法加载{section}设置",
+  "loadSectionFailed": "无法加载此部分",
   "unsavedMark": "（有未保存的更改）",
   "discardTitle": "放弃未保存的更改？",
   "discardBody": "部分设置卡片有尚未保存的更改。离开此页面会放弃这些更改。",

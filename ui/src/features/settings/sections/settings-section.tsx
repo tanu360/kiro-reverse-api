@@ -255,7 +255,7 @@ export function SectionQuery<T>({
           error={query.error}
           onRetry={() => void query.refetch()}
           retrying={query.isFetching}
-          title={t("loadSectionFailed", { section: title })}
+          title={t("loadSectionFailed")}
         />
       </SettingsGroup>
     );

@@ -22,7 +22,6 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
@@ -264,8 +263,6 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
               {entries.map((entry) => (
                 <SidebarMenuItem key={entry.id}>
                   <SidebarMenuButton
-                    // Room for the On/Off pill, which sits over the row's end.
-                    className={entry.on === undefined ? undefined : "pe-14"}
                     isActive={entry.current}
                     render={
                       <a
@@ -279,12 +276,13 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
                     <HugeiconsIcon aria-hidden="true" icon={entry.icon} />
                     <span className="min-w-0 flex-1 truncate">{entry.label}</span>
                     {entry.dirty ? <DirtyMark /> : null}
+                    {/* In the row's own flex line, so the label truncates before a pill of any width. */}
+                    {entry.on === undefined ? null : (
+                      <span className="flex shrink-0">
+                        <StateBadge on={entry.on} />
+                      </span>
+                    )}
                   </SidebarMenuButton>
-                  {entry.on === undefined ? null : (
-                    <SidebarMenuBadge className="peer-data-[size=default]/menu-button:top-2">
-                      <StateBadge on={entry.on} />
-                    </SidebarMenuBadge>
-                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -299,7 +297,7 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   return (
     <nav
       aria-label={t("sections")}
-      className="sticky top-12 z-30 -mx-4 bg-background/95 pt-1 md:-mx-6"
+      className="sticky top-12 z-30 -mx-4 bg-background pt-1 md:-mx-6"
     >
       <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade scrollbarGutter>
         {/* The top 4px of padding sits inside the scroller, so a chip's focus ring is not clipped. */}
@@ -367,10 +365,11 @@ function SettingsContent(): JSX.Element {
   return (
     <div className="flex min-w-0 flex-col gap-4 md:gap-6">
       <PageHeader description={t("description")} title={t("title")} />
-      <div className="flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-10">
+      <div className="flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-[14rem_minmax(0,1fr)] xl:gap-10">
         <SectionNav wide={wide} />
-        {/* Capped, so on a wide screen a row's control stays near its label. */}
-        <div className="flex min-w-0 max-w-5xl flex-col gap-4 md:gap-6">
+        {/* Capped, so on a wide screen a row's control stays near its label; a little wider
+            from 2xl, so the column does not leave an empty band on the right only. */}
+        <div className="flex min-w-0 max-w-5xl flex-col gap-4 md:gap-6 2xl:max-w-6xl">
           <GeneralSettingsError />
           <UsageCard />
           <StreamIntegrityCard />

@@ -14,7 +14,7 @@
   "reload": "Reload",
   "remove": "Remove",
   "loadFailed": "Could not load settings",
-  "loadSectionFailed": "Could not load {section} settings",
+  "loadSectionFailed": "Could not load this section",
   "unsavedMark": "(unsaved changes)",
   "discardTitle": "Discard unsaved changes?",
   "discardBody": "Some settings cards have changes that are not saved. Leaving this page discards them.",
