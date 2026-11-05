@@ -14,7 +14,7 @@ export function ApiPage(): JSX.Element {
       <PageHeader description={t("description")} title={t("title")} />
       <ApiAccessCard />
       <ApiKeysCard />
-      <div className="grid min-w-0 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2 xl:items-start">
+      <div className="grid min-w-0 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
         <EndpointsCard />
         <ClientSnippetsCard />
       </div>

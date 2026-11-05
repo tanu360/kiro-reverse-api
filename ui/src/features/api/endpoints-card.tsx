@@ -1,6 +1,4 @@
 import {
-  ArrowDownLeft01Icon,
-  ArrowUpRight01Icon,
   ChartColumnIcon,
   CodeIcon,
   Globe02Icon,
@@ -13,8 +11,10 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { CopyButton } from "@/components/shared/copy-button";
+import { CopyField } from "@/components/shared/code-field";
+import { IconChip } from "@/components/shared/icon-chip";
 import { SectionCard } from "@/components/shared/section-card";
+import { SettingsRowTitle } from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
 import { settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
@@ -81,20 +81,6 @@ const ENDPOINTS: readonly Endpoint[] = [
   },
 ];
 
-/** "http://host:port/v1/x" with protocol, host and path tinted apart. */
-function EndpointUrl({ origin, path }: { origin: string; path: string }): JSX.Element {
-  const match = /^([a-z][a-z0-9+.-]*:\/\/)(.*)$/i.exec(origin);
-  const protocol = match?.[1] ?? "";
-  const host = match?.[2] ?? origin;
-  return (
-    <code className="min-w-0 flex-1 break-all text-xs leading-relaxed">
-      <span className="text-muted-foreground">{protocol}</span>
-      <span className="text-foreground">{host}</span>
-      <span className="text-info-foreground">{path}</span>
-    </code>
-  );
-}
-
 export function EndpointsCard(): JSX.Element {
   const { t } = useT("api");
   const settings = useQuery(settingsQuery());
@@ -103,18 +89,13 @@ export function EndpointsCard(): JSX.Element {
 
   return (
     <SectionCard
-      actions={
-        <Badge icon={Globe02Icon} iconStyle="line" variant="outline">
-          {t("endpoints.protocolHttp")}
-        </Badge>
-      }
       description={t("endpoints.description")}
       footer={
-        <p className="flex items-start gap-2 text-muted-foreground text-sm">
+        <p className="flex items-start gap-2">
           <HugeiconsIcon
             icon={KeyRoundIcon}
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0"
+            className="mt-0.5 size-3.5 shrink-0"
           />
           <span data-testid="endpoints-auth-hint">
             <CodeText
@@ -124,39 +105,38 @@ export function EndpointsCard(): JSX.Element {
           </span>
         </p>
       }
+      icon={Globe02Icon}
       id="api-endpoints"
+      meta={t("endpoints.protocolHttp")}
       title={t("endpoints.title")}
     >
-      <ul aria-label={t("endpoints.title")} className="flex flex-col divide-y divide-border/50">
+      <ul aria-label={t("endpoints.title")} className="flex flex-col gap-3">
         {ENDPOINTS.map((endpoint) => {
-          const Icon = endpoint.icon;
-          const url = origin + endpoint.path;
+          const title = t(endpoint.titleKey);
+          const post = endpoint.method === "POST";
           return (
-            <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0" key={endpoint.id}>
-              <div className="flex items-center gap-2">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
-                  <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-3.5" />
+            <li
+              className="flex min-w-0 flex-col gap-2 @2xl:flex-row @2xl:items-center @2xl:gap-3"
+              data-endpoint={endpoint.id}
+              key={endpoint.id}
+            >
+              <div className="flex min-w-0 items-center gap-2 @2xl:w-60 @2xl:shrink-0">
+                <IconChip icon={endpoint.icon} />
+                <span className="min-w-0 truncate">
+                  <SettingsRowTitle>{title}</SettingsRowTitle>
                 </span>
-                <span className="min-w-0 truncate font-medium text-sm">{t(endpoint.titleKey)}</span>
-                <Badge
-                  className="ms-auto"
-                  icon={endpoint.method === "POST" ? ArrowUpRight01Icon : ArrowDownLeft01Icon}
-                  iconStyle="line"
-                  tone={endpoint.method === "POST" ? "primary" : "success"}
-                  variant="soft-outline"
-                >
-                  {endpoint.method === "POST"
-                    ? t("endpoints.methodPost")
-                    : t("endpoints.methodGet")}
+                <Badge className="ms-auto" size="sm" tone={post ? "primary" : "neutral"}>
+                  {post ? t("endpoints.methodPost") : t("endpoints.methodGet")}
                 </Badge>
               </div>
-              <div
-                className="flex min-w-0 items-center gap-1 rounded-lg border bg-muted/40 py-1 ps-3 pe-1"
-                data-endpoint={endpoint.id}
-              >
-                <EndpointUrl origin={origin} path={endpoint.path} />
-                <CopyButton label={t(endpoint.copyKey)} value={url} />
-              </div>
+              {/* Under the title until the card has room for both, so a URL rarely needs to wrap. */}
+              <CopyField
+                className="min-w-0 @2xl:flex-1"
+                copyLabel={t(endpoint.copyKey)}
+                label={title}
+                multiline
+                value={origin + endpoint.path}
+              />
             </li>
           );
         })}

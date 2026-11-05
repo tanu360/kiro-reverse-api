@@ -1,6 +1,7 @@
 import { KeyRoundIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
+import { CopyField } from "@/components/shared/code-field";
 import { CopyButton } from "@/components/shared/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,17 +20,21 @@ export function CreatedKeyPanel({
 }): JSX.Element {
   const { t } = useT("api");
   return (
-    <Alert className="mb-4" data-testid="created-key-panel" variant="success">
+    <Alert data-testid="created-key-panel" variant="success">
       <HugeiconsIcon icon={KeyRoundIcon} aria-hidden="true" />
       <AlertTitle>{t("created.title")}</AlertTitle>
       <AlertDescription>
         <p>{t("created.body")}</p>
-        <div className="flex min-w-0 items-center gap-1 rounded-lg border bg-background py-1 ps-3 pe-1">
-          <code className="min-w-0 flex-1 break-all text-foreground text-xs">{apiKey}</code>
-          <CopyButton label={t("created.copy")} value={apiKey} />
-        </div>
-        <div>
-          <Button onClick={onDismiss} size="sm" variant="outline">
+        <CopyField label={t("created.title")} multiline value={apiKey} />
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyButton
+            label={t("created.copy")}
+            showLabel
+            size="sm"
+            value={apiKey}
+            variant="outline"
+          />
+          <Button onClick={onDismiss} size="sm" variant="ghost">
             {t("created.dismiss")}
           </Button>
         </div>

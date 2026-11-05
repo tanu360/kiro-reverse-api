@@ -3,7 +3,7 @@ import {
   CircleCheckIcon,
   CircleSlashIcon,
   Delete02Icon,
-  EllipsisIcon,
+  EllipsisVerticalIcon,
   KeyRoundIcon,
   PencilEdit01Icon,
   PlusIcon,
@@ -13,23 +13,26 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type JSX, useCallback, useEffect, useRef, useState } from "react";
+import { Code } from "@/components/shared/code";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { ListCard } from "@/components/shared/list-card";
 import { RefreshButton } from "@/components/shared/page-header";
+import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge, BadgeIcon, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { CardPanel } from "@/components/ui/card";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { useElementWidth } from "@/hooks/use-element-width";
 import {
   apiKeysQuery,
   deleteApiKey,
@@ -40,29 +43,27 @@ import {
 import { queryKeys } from "@/lib/api/query-keys";
 import { settingsQuery } from "@/lib/api/settings";
 import type { ApiKey } from "@/lib/api/types";
-import {
-  EMPTY,
-  formatCredits,
-  formatDateTime,
-  formatNumber,
-  formatRelativeTime,
-} from "@/lib/format";
+import { formatCredits, formatNumber, formatRelativeTime } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { isLimitReached, wouldLockOutClients } from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
 import { CreatedKeyPanel } from "./created-key-panel";
-import { useElementWidth } from "./use-element-size";
 
 /**
- * Below this content width (px) the keys render as cards. The table needs about 850 px, so
- * the switch follows the card's own width (sidebar open or not), not the viewport.
+ * The keys turn into cards below DataTable's `cardsBelow="4xl"` (a 56rem container: the table
+ * needs about 850 px), two to a row from 42rem. Script only needs the same width for the page
+ * size: ten cards a page, twenty-five table rows.
  */
-export const KEYS_TABLE_MIN_WIDTH = 880;
-// The actions column stays in view while a narrow table scrolls sideways, opaque in the panel's
-// own fill (the card at 40 % over the page).
-const STICKY_END = "sticky right-0 z-[1] bg-surface-inset";
+const CARDS_BELOW_PX = 896;
+/*
+ * The one-column card grid is an implicit track sized to its widest card's content, so a long
+ * key name pushes every card past the panel. A shrinkable track until CARD_GRID_CLASS sets one.
+ */
+const CARD_TRACK = "[&_[data-slot=data-table-cards]>ul]:auto-cols-fr";
+const CARD_PAGE_SIZE = 10;
+const TABLE_PAGE_SIZE = 25;
 
 interface DialogState {
   open: boolean;
@@ -80,8 +81,13 @@ function fetchSecret(id: string): Promise<string> {
   return getApiKey(id).then((detail) => detail.key);
 }
 
+/** Shown, not inside the layout CSS hides (the table and the cards are both rendered). */
+function isShown(element: HTMLElement): boolean {
+  return typeof element.checkVisibility === "function" ? element.checkVisibility() : true;
+}
+
 export function ApiKeysCard(): JSX.Element {
-  const { t } = useT("api");
+  const { t, lang } = useT("api");
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const keys = useQuery(apiKeysQuery());
@@ -93,23 +99,35 @@ export function ApiKeysCard(): JSX.Element {
     session: 0,
   });
   const [createdKey, setCreatedKey] = useState<string | null>(null);
-  const layoutRef = useRef<HTMLDivElement>(null);
-  const width = useElementWidth(layoutRef);
-  const asCards = width > 0 && width < KEYS_TABLE_MIN_WIDTH;
+  const [page, setPage] = useState(1);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const width = useElementWidth(bodyRef);
   const createRef = useRef<HTMLButtonElement>(null);
-  // Row menu triggers by key id, so focus can land on a neighbour when a row goes away.
-  const triggers = useRef(new Map<string, HTMLButtonElement>());
+  // Row menu triggers by key id (one in the table, one in the cards), so focus can land on a
+  // neighbour when a row goes away.
+  const triggers = useRef(new Map<string, Set<HTMLButtonElement>>());
   const focusAfterDelete = useRef<{ id: string; order: string[] } | null>(null);
   const triggerRef = useCallback(
     (id: string) => (element: HTMLButtonElement | null) => {
-      if (element) triggers.current.set(id, element);
-      else triggers.current.delete(id);
+      if (!element) return;
+      const set = triggers.current.get(id) ?? new Set<HTMLButtonElement>();
+      set.add(element);
+      triggers.current.set(id, set);
+      return () => {
+        set.delete(element);
+        if (set.size === 0) triggers.current.delete(id);
+      };
     },
     [],
   );
 
   const list = keys.data ?? [];
   const editingId = dialog.open && dialog.target.mode === "edit" ? dialog.target.apiKey.id : null;
+  const pageSize = width > 0 && width < CARDS_BELOW_PX ? CARD_PAGE_SIZE : TABLE_PAGE_SIZE;
+  const pageCount = Math.max(1, Math.ceil(list.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = list.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const disabledCount = list.filter((apiKey) => !apiKey.enabled).length;
 
   // The key being edited was deleted elsewhere: nothing is left to save.
   useEffect(() => {
@@ -130,14 +148,19 @@ export function ApiKeysCard(): JSX.Element {
     const active = document.activeElement;
     const lost = !active || active === document.body || active.closest('[role="alertdialog"]');
     if (!lost) return;
-    const remaining = new Set(keys.data.map((k) => k.id));
     const index = pending.order.indexOf(pending.id);
-    const next = [
+    const candidates = [
       ...pending.order.slice(index + 1),
       ...pending.order.slice(0, index).reverse(),
-    ].find((id) => remaining.has(id));
-    const target = next ? triggers.current.get(next) : undefined;
-    (target ?? createRef.current)?.focus();
+    ];
+    for (const id of candidates) {
+      const shown = [...(triggers.current.get(id) ?? [])].find(isShown);
+      if (shown) {
+        shown.focus();
+        return;
+      }
+    }
+    createRef.current?.focus();
   }, [keys.data]);
 
   const toggle = useMutation({
@@ -265,19 +288,51 @@ export function ApiKeysCard(): JSX.Element {
       id: "requests",
       header: t("keys.requests"),
       align: "end",
-      cell: (apiKey) => <span>{formatNumber(apiKey.requestsCount)}</span>,
+      cell: (apiKey) => formatNumber(apiKey.requestsCount, lang),
     },
-    { id: "lastUsed", header: t("keys.lastUsed"), cell: (apiKey) => <LastUsed apiKey={apiKey} /> },
+    {
+      id: "lastUsed",
+      header: t("keys.lastUsed"),
+      cell: (apiKey) => <RelativeTime value={apiKey.lastUsedAt} />,
+    },
     {
       id: "actions",
       header: <span className="sr-only">{t("common:table.actions")}</span>,
       align: "end",
       width: "1%",
-      className: STICKY_END,
-      headerClassName: STICKY_END,
+      // Pinned, so the row menu stays in reach while a narrow table scrolls sideways.
+      sticky: "end",
       cell: actions,
     },
   ];
+
+  const renderCard = (apiKey: ApiKey) => (
+    <ListCard
+      action={actions(apiKey)}
+      badge={<KeyStatus apiKey={apiKey} />}
+      footer={<MaskedKey apiKey={apiKey} />}
+      meta={
+        <span className="flex flex-wrap gap-x-3 gap-y-1">
+          <span className="tabular-nums">
+            {t("keys.requestsCount", {
+              count: apiKey.requestsCount,
+              n: formatNumber(apiKey.requestsCount, lang),
+            })}
+          </span>
+          <span>
+            {apiKey.lastUsedAt
+              ? t("keys.lastUsedLabel", { time: formatRelativeTime(apiKey.lastUsedAt, lang) })
+              : t("keys.neverUsed")}
+          </span>
+        </span>
+      }
+      title={
+        <span className={cn(!apiKey.name && "text-muted-foreground")}>{keyName(apiKey, t)}</span>
+      }
+    >
+      <KeyUsage apiKey={apiKey} />
+    </ListCard>
+  );
 
   const headerActions = (
     <>
@@ -289,32 +344,60 @@ export function ApiKeysCard(): JSX.Element {
     </>
   );
 
+  // The header keeps the one primary Create; the empty state offers the same as an outline.
   const emptyState = (
     <EmptyState
       action={
-        <Button onClick={openCreate}>
+        <Button onClick={openCreate} variant="outline">
           <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
           {t("keys.create")}
         </Button>
       }
       description={t("keys.emptyBody")}
       icon={KeyRoundIcon}
+      inCard
       title={t("keys.emptyTitle")}
-      variant="compact"
     />
   );
+
+  const meta =
+    list.length === 0
+      ? undefined
+      : disabledCount > 0
+        ? t("keys.metaDisabled", {
+            total: formatNumber(list.length, lang),
+            disabled: formatNumber(disabledCount, lang),
+          })
+        : formatNumber(list.length, lang);
 
   return (
     <SectionCard
       actions={headerActions}
+      // Clips the last row's hover tint to the card's rounded corners.
+      className="overflow-hidden"
       description={t("keys.description")}
+      footer={
+        list.length > pageSize ? (
+          <DataTablePagination
+            onPageChange={setPage}
+            page={currentPage}
+            pageSize={pageSize}
+            total={list.length}
+          />
+        ) : undefined
+      }
+      icon={KeyRoundIcon}
       id="api-keys"
+      meta={meta}
+      slim
       title={t("keys.title")}
     >
       {createdKey ? (
-        <CreatedKeyPanel apiKey={createdKey} onDismiss={() => setCreatedKey(null)} />
+        <CardPanel>
+          <CreatedKeyPanel apiKey={createdKey} onDismiss={() => setCreatedKey(null)} />
+        </CardPanel>
       ) : null}
-      <div className="min-w-0" ref={layoutRef}>
+      <div className={cn("min-w-0", CARD_TRACK)} ref={bodyRef}>
         {keys.isError ? (
           <ErrorState
             compact
@@ -322,25 +405,18 @@ export function ApiKeysCard(): JSX.Element {
             onRetry={() => void keys.refetch()}
             title={t("keys.loadFailed")}
           />
-        ) : asCards ? (
-          <KeyCardList
-            caption={t("keys.caption")}
-            emptyState={emptyState}
-            items={list.map((apiKey) => ({
-              id: apiKey.id,
-              card: <KeyCard actions={actions(apiKey)} apiKey={apiKey} />,
-            }))}
-            loading={keys.isPending}
-          />
         ) : (
           <DataTable
-            bleed
             caption={t("keys.caption")}
+            cardLayout="grid"
+            cardsBelow="4xl"
             columns={columns}
-            data={list}
+            data={pageRows}
             emptyState={emptyState}
             getRowId={(apiKey) => apiKey.id}
+            inset
             loading={keys.isPending}
+            renderCard={renderCard}
           />
         )}
       </div>
@@ -358,11 +434,13 @@ export function ApiKeysCard(): JSX.Element {
 function MaskedKey({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const { t } = useT("api");
   return (
-    <span className="inline-flex items-center gap-1">
-      <code className="whitespace-nowrap text-xs">{apiKey.keyMasked}</code>
+    <span className="inline-flex min-w-0 items-center gap-1">
+      <Code>{apiKey.keyMasked}</Code>
       <CopyButton
         label={t("keys.copyKey", { name: keyName(apiKey, t) })}
+        size="icon-sm"
         value={() => fetchSecret(apiKey.id)}
+        variant="quiet"
       />
     </span>
   );
@@ -389,15 +467,7 @@ function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
             closeDelay={100}
             delay={200}
             openOnHover
-            render={
-              <button
-                className={cn(
-                  badgeVariants({ tone: "warning" }),
-                  "pointer-coarse:after:min-h-10 pointer-coarse:after:min-w-10",
-                )}
-                type="button"
-              />
-            }
+            render={<button className={badgeVariants({ tone: "warning" })} type="button" />}
           >
             <BadgeIcon icon={AlertCircleIcon} />
             {t("keys.limitReached")}
@@ -428,7 +498,7 @@ function UsageLine({
   const reached = limit > 0 && used >= limit;
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="flex items-baseline gap-1.5 whitespace-nowrap text-xs">
+      <span className="flex items-baseline gap-1.5 whitespace-nowrap text-xs tabular-nums">
         <span className="text-muted-foreground">{label}</span>
         <span className={cn(reached && "text-warning-foreground")}>
           {format(used)} / {limit > 0 ? format(limit) : t("common:unlimited")}
@@ -486,29 +556,6 @@ function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   );
 }
 
-function LastUsed({ apiKey }: { apiKey: ApiKey }): JSX.Element {
-  const { lang } = useT("api");
-  if (!apiKey.lastUsedAt) return <span className="text-muted-foreground">{EMPTY}</span>;
-  const absolute = formatDateTime(apiKey.lastUsedAt, lang);
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <time
-            className="whitespace-nowrap"
-            dateTime={new Date(apiKey.lastUsedAt * 1000).toISOString()}
-            // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users reach the tooltip.
-            tabIndex={0}
-          />
-        }
-      >
-        {formatRelativeTime(apiKey.lastUsedAt, lang)}
-      </TooltipTrigger>
-      <TooltipPopup>{absolute}</TooltipPopup>
-    </Tooltip>
-  );
-}
-
 function KeyActions({
   apiKey,
   busy,
@@ -526,7 +573,7 @@ function KeyActions({
   onToggle: () => void;
   onReset: () => void;
   onDelete: () => void;
-  triggerRef: (element: HTMLButtonElement | null) => void;
+  triggerRef: (element: HTMLButtonElement | null) => (() => void) | undefined;
 }): JSX.Element {
   const { t } = useT("api");
   // The trigger stays enabled while the row is busy: disabling it would drop keyboard focus
@@ -538,14 +585,13 @@ function KeyActions({
           <Button
             aria-busy={busy || undefined}
             aria-label={t("keys.rowActions", { name: keyName(apiKey, t) })}
-            className="size-10 md:size-8"
             ref={triggerRef}
             size="icon"
             variant="quiet"
           />
         }
       >
-        <HugeiconsIcon icon={EllipsisIcon} aria-hidden="true" />
+        <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
       </MenuTrigger>
       <MenuPopup align="end">
         <MenuItem disabled={editing} onClick={onEdit}>
@@ -571,72 +617,5 @@ function KeyActions({
         </MenuItem>
       </MenuPopup>
     </Menu>
-  );
-}
-
-/** The keys as a card list, used while the card is too narrow for the table. */
-function KeyCardList({
-  caption,
-  items,
-  loading,
-  emptyState,
-}: {
-  caption: string;
-  items: Array<{ id: string; card: ReactNode }>;
-  loading: boolean;
-  emptyState: ReactNode;
-}): JSX.Element {
-  const grid = "grid grid-cols-1 gap-2 @2xl:grid-cols-2";
-  if (loading && items.length === 0) {
-    return (
-      <div aria-busy="true" className={grid}>
-        {Array.from({ length: 3 }, (_, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
-          <Skeleton className="h-36 w-full rounded-xl" key={index} />
-        ))}
-      </div>
-    );
-  }
-  if (items.length === 0) return <>{emptyState}</>;
-  return (
-    <ul aria-label={caption} className={grid} data-testid="api-key-cards">
-      {items.map((item) => (
-        <li className="min-w-0" key={item.id}>
-          {item.card}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function KeyCard({ apiKey, actions }: { apiKey: ApiKey; actions: JSX.Element }): JSX.Element {
-  const { t, lang } = useT("api");
-  return (
-    <Card className="h-full gap-3 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <TruncatedText className={cn("font-medium", !apiKey.name && "text-muted-foreground")}>
-            {keyName(apiKey, t)}
-          </TruncatedText>
-          <KeyStatus apiKey={apiKey} />
-        </div>
-        {actions}
-      </div>
-      <MaskedKey apiKey={apiKey} />
-      <KeyUsage apiKey={apiKey} />
-      <p className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
-        <span>
-          {t("keys.requestsCount", {
-            count: apiKey.requestsCount,
-            n: formatNumber(apiKey.requestsCount, lang),
-          })}
-        </span>
-        <span>
-          {apiKey.lastUsedAt
-            ? t("keys.lastUsedLabel", { time: formatRelativeTime(apiKey.lastUsedAt, lang) })
-            : t("keys.neverUsed")}
-        </span>
-      </p>
-    </Card>
   );
 }

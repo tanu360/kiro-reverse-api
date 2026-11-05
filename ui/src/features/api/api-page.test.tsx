@@ -59,8 +59,13 @@ function sent(method: string, path: string): LoggedRequest[] {
   return requests.filter((r) => r.method === method && r.path === `/admin/api${path}`);
 }
 
+// The keys render as a table and as cards (CSS shows one), so row queries go through the table.
+function keysTable(): HTMLElement {
+  return screen.getByRole("table", { name: "API keys" });
+}
+
 function row(name: string): HTMLElement {
-  const cell = screen.getByText(name);
+  const cell = within(keysTable()).getByText(name);
   const tr = cell.closest("tr");
   if (!tr) throw new Error(`no row for ${name}`);
   return tr;
@@ -68,15 +73,16 @@ function row(name: string): HTMLElement {
 
 async function renderPage() {
   const result = renderWithProviders(<ApiPage />);
-  await screen.findByText("team-a");
+  await screen.findAllByText("team-a");
   return result;
 }
 
 describe("ApiPage", () => {
   it("lists the seeded keys with masked values and flags the limit-reached key", async () => {
     await renderPage();
+    const table = keysTable();
     for (const apiKey of mockDb.apiKeys) {
-      expect(screen.getByText(apiKey.keyMasked)).toBeInTheDocument();
+      expect(within(table).getByText(apiKey.keyMasked)).toBeInTheDocument();
       // Keys up to 10 characters are their own mask (Go MaskApiKey).
       if (apiKey.key !== apiKey.keyMasked) {
         expect(screen.queryByText(apiKey.key, { exact: false })).not.toBeInTheDocument();
@@ -84,8 +90,8 @@ describe("ApiPage", () => {
     }
     expect(within(row("ci-runner")).getByText("Limit reached")).toBeInTheDocument();
     expect(within(row("team-a")).queryByText("Limit reached")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Limit reached")).toHaveLength(1);
-    expect(screen.getByText("Unnamed key")).toBeInTheDocument();
+    expect(within(table).getAllByText("Limit reached")).toHaveLength(1);
+    expect(within(table).getByText("Unnamed key")).toBeInTheDocument();
   });
 
   it("creates a key and shows the full key once, ready to copy", async () => {
@@ -147,7 +153,7 @@ describe("ApiPage", () => {
   it("copies the full key of a row from GET /api-keys/{id}", async () => {
     const { user } = await renderPage();
     const teamA = mockDb.apiKeys[0];
-    await user.click(screen.getByRole("button", { name: "Copy API key team-a" }));
+    await user.click(within(keysTable()).getByRole("button", { name: "Copy API key team-a" }));
     await waitFor(() => expect(copyTextMock).toHaveBeenCalledTimes(1));
     expect(await copyTextMock.mock.calls[0]?.[0]).toBe(teamA?.key);
     expect(sent("GET", `/api-keys/${teamA?.id}`)).toHaveLength(1);
@@ -156,7 +162,7 @@ describe("ApiPage", () => {
   it("disables a key with PUT {enabled:false} and no confirm", async () => {
     const { user } = await renderPage();
     const teamA = mockDb.apiKeys[0];
-    await user.click(screen.getByRole("button", { name: "Actions for team-a" }));
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Disable" }));
     await waitFor(() => expect(sent("PUT", `/api-keys/${teamA?.id}`)).toHaveLength(1));
     expect(sent("PUT", `/api-keys/${teamA?.id}`)[0]?.body).toEqual({ enabled: false });
@@ -166,7 +172,7 @@ describe("ApiPage", () => {
   it("resets usage without a confirm", async () => {
     const { user } = await renderPage();
     const teamA = mockDb.apiKeys[0];
-    await user.click(screen.getByRole("button", { name: "Actions for team-a" }));
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Reset usage" }));
     await waitFor(() => expect(sent("POST", `/api-keys/${teamA?.id}/reset-usage`)).toHaveLength(1));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
@@ -176,7 +182,7 @@ describe("ApiPage", () => {
   it("deletes a key only after the confirm", async () => {
     const { user } = await renderPage();
     const teamA = mockDb.apiKeys[0];
-    await user.click(screen.getByRole("button", { name: "Actions for team-a" }));
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     const confirm = await screen.findByRole("alertdialog");
     expect(within(confirm).getByText("Delete this API key?")).toBeInTheDocument();
@@ -196,7 +202,7 @@ describe("ApiPage", () => {
     for (const apiKey of mockDb.apiKeys) apiKey.enabled = apiKey.name === "team-a";
     const { user } = await renderPage();
     await screen.findByText("Clients must send an API key");
-    await user.click(screen.getByRole("button", { name: "Actions for team-a" }));
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     const confirm = await screen.findByRole("alertdialog");
     expect(within(confirm).getByText(/Every client is locked out/)).toBeInTheDocument();
@@ -212,6 +218,16 @@ describe("ApiPage", () => {
       await screen.findByText("Create and enable at least one API key before you require one."),
     ).toBeInTheDocument();
     expect(settingsPosts).toHaveLength(0);
+  });
+
+  it("marks the switch's hint as not saved while the draft differs", async () => {
+    const { user } = await renderPage();
+    await screen.findByText("Any client can call the proxy");
+    await user.click(screen.getByRole("switch", { name: "Require an API key" }));
+    expect(screen.getByTestId("api-access-state")).toHaveTextContent(
+      "Clients must send an API key (not saved)",
+    );
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
   });
 
   it("requires an API key with POST /settings {requireApiKey:true} only", async () => {
@@ -232,7 +248,7 @@ describe("ApiPage", () => {
     const list = screen.getByRole("list", { name: "Endpoints" });
     const urls = within(list)
       .getAllByRole("listitem")
-      .map((item) => item.querySelector("code")?.textContent);
+      .map((item) => item.querySelector('[data-slot="copy-field"]')?.textContent);
     const origin = window.location.origin;
     expect(urls).toEqual([
       `${origin}/v1/messages`,

@@ -1,4 +1,5 @@
 import { Fragment, type JSX } from "react";
+import { Code } from "@/components/shared/code";
 
 const PLACEHOLDER = /\{(\w+)\}/g;
 
@@ -20,11 +21,7 @@ export function CodeText({
     const value = name === undefined ? undefined : code[name];
     if (value === undefined) continue;
     parts.push(text.slice(last, match.index));
-    parts.push(
-      <code className="inline-code whitespace-nowrap" key={match.index}>
-        {value}
-      </code>,
-    );
+    parts.push(<Code key={match.index}>{value}</Code>);
     last = match.index + match[0].length;
   }
   parts.push(text.slice(last));

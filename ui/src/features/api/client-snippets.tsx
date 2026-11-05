@@ -1,58 +1,44 @@
+import { CommandLineIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, useMemo, useRef } from "react";
-import { CopyButton } from "@/components/shared/copy-button";
+import { type JSX, useMemo } from "react";
+import { CodeBlock } from "@/components/shared/code-block";
 import { SectionCard } from "@/components/shared/section-card";
+import { ROW_DESCRIPTION } from "@/components/shared/settings-rows";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { CodeText } from "./code-text";
 import { buildClientSnippets, SNIPPET_KEY_ENV } from "./snippets";
-import { useHorizontalOverflow } from "./use-element-size";
 
 const CODEX_CONFIG_FILE = "~/.codex/config.toml";
-// Four tabs fit in one row on a 390 px phone; narrower screens scroll the row.
-const TAB_CLASS = "max-sm:px-2 max-sm:text-sm";
 
-/**
- * A scrollable mono code block with its own copy button. Long lines never widen the page.
- * While the code scrolls sideways, the block is a labelled tab stop so arrow keys can scroll it.
- */
-function CodeBlock({
+/** A snippet in the shared code block; while it scrolls sideways its region is "<title> code". */
+function Snippet({
   code,
   title,
   copyLabel,
+  className,
 }: {
   code: string;
   title: string;
   copyLabel: string;
+  className?: string;
 }): JSX.Element {
   const { t } = useT("api");
-  const preRef = useRef<HTMLPreElement>(null);
-  const scrolls = useHorizontalOverflow(preRef, code);
   return (
-    <figure className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-muted/40">
-      <div className="flex min-h-10 items-center justify-between gap-2 border-b py-1 ps-3 pe-1">
-        <figcaption className="min-w-0 truncate font-medium text-muted-foreground text-xs">
-          {title}
-        </figcaption>
-        <CopyButton label={copyLabel} value={code} />
-      </div>
-      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: the label is set only with role="region". */}
-      <pre
-        aria-label={scrolls ? t("snippets.codeRegion", { name: title }) : undefined}
-        className="scrollbar-x max-w-full overflow-x-auto rounded-b-lg p-3 font-mono text-xs leading-relaxed outline-none focus-outline-inset"
-        ref={preRef}
-        role={scrolls ? "region" : undefined}
-        tabIndex={scrolls ? 0 : undefined}
-      >
-        <code>{code}</code>
-      </pre>
-    </figure>
+    <CodeBlock
+      className={className}
+      code={code}
+      copyLabel={copyLabel}
+      regionLabel={t("snippets.codeRegion", { name: title })}
+      title={title}
+    />
   );
 }
 
 function Hint({ children }: { children: JSX.Element | string }): JSX.Element {
-  return <p className="text-muted-foreground text-sm">{children}</p>;
+  return <p className={ROW_DESCRIPTION}>{children}</p>;
 }
 
 export function ClientSnippetsCard(): JSX.Element {
@@ -78,33 +64,29 @@ export function ClientSnippetsCard(): JSX.Element {
           }
         />
       }
+      icon={CommandLineIcon}
       id="api-client-setup"
+      panelClassName="flex flex-col"
       title={t("snippets.title")}
     >
-      <Tabs className="min-w-0 gap-4" defaultValue="curl">
-        <div className="scrollbar-x max-w-full overflow-x-auto">
+      <Tabs className="min-w-0 flex-1 gap-3" defaultValue="curl">
+        {/* Four tabs fit one row on a 390 px phone; a narrower card scrolls them, faded at the edge. */}
+        <ScrollArea className="h-auto max-w-full" clampContentMinWidth={false} scrollFade>
           <TabsList>
-            <TabsTab className={TAB_CLASS} value="curl">
-              {t("snippets.curl")}
-            </TabsTab>
-            <TabsTab className={TAB_CLASS} value="claude-code">
-              {t("snippets.claudeCode")}
-            </TabsTab>
-            <TabsTab className={TAB_CLASS} value="codex">
-              {t("snippets.codex")}
-            </TabsTab>
-            <TabsTab className={TAB_CLASS} value="openai-sdk">
-              {t("snippets.openaiSdk")}
-            </TabsTab>
+            <TabsTab value="curl">{t("snippets.curl")}</TabsTab>
+            <TabsTab value="claude-code">{t("snippets.claudeCode")}</TabsTab>
+            <TabsTab value="codex">{t("snippets.codex")}</TabsTab>
+            <TabsTab value="openai-sdk">{t("snippets.openaiSdk")}</TabsTab>
           </TabsList>
-        </div>
-        <TabsPanel className="flex min-w-0 flex-col gap-4" value="curl">
-          <CodeBlock
+        </ScrollArea>
+        <TabsPanel className="flex min-w-0 flex-col gap-3" value="curl">
+          <Snippet
             code={snippets.curl.anthropic}
             copyLabel={copy(t("snippets.anthropicMessages"))}
             title={t("snippets.anthropicMessages")}
           />
-          <CodeBlock
+          <Snippet
+            className="flex-1"
             code={snippets.curl.openai}
             copyLabel={copy(t("snippets.openaiChat"))}
             title={t("snippets.openaiChat")}
@@ -112,7 +94,8 @@ export function ClientSnippetsCard(): JSX.Element {
         </TabsPanel>
         <TabsPanel className="flex min-w-0 flex-col gap-3" value="claude-code">
           <Hint>{t("snippets.claudeCodeHint")}</Hint>
-          <CodeBlock
+          <Snippet
+            className="flex-1"
             code={snippets.claudeCode}
             copyLabel={copy(t("snippets.claudeCode"))}
             title={t("snippets.shell")}
@@ -125,20 +108,22 @@ export function ClientSnippetsCard(): JSX.Element {
               text={t("snippets.codexHint")}
             />
           </Hint>
-          <CodeBlock
+          <Snippet
+            className="flex-1"
             code={snippets.codex}
             copyLabel={copy(t("snippets.codex"))}
             title={CODEX_CONFIG_FILE}
           />
         </TabsPanel>
-        <TabsPanel className="min-w-0" value="openai-sdk">
-          <Tabs className="min-w-0 gap-3" defaultValue="python">
+        <TabsPanel className="flex min-w-0 flex-col" value="openai-sdk">
+          <Tabs className="min-w-0 flex-1 gap-3" defaultValue="python">
             <TabsList aria-label={t("snippets.sdkLanguage")} size="sm" variant="underline">
               <TabsTab value="python">{t("snippets.python")}</TabsTab>
               <TabsTab value="typescript">{t("snippets.typescript")}</TabsTab>
             </TabsList>
-            <TabsPanel className="min-w-0" value="python">
-              <CodeBlock
+            <TabsPanel className="flex min-w-0 flex-col" value="python">
+              <Snippet
+                className="flex-1"
                 code={snippets.openaiSdk.python}
                 copyLabel={copy(
                   t("snippets.sdkWithLanguage", {
@@ -149,8 +134,9 @@ export function ClientSnippetsCard(): JSX.Element {
                 title="main.py"
               />
             </TabsPanel>
-            <TabsPanel className="min-w-0" value="typescript">
-              <CodeBlock
+            <TabsPanel className="flex min-w-0 flex-col" value="typescript">
+              <Snippet
+                className="flex-1"
                 code={snippets.openaiSdk.typescript}
                 copyLabel={copy(
                   t("snippets.sdkWithLanguage", {

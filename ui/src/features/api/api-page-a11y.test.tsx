@@ -6,7 +6,6 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderApp, renderWithProviders } from "@/test/render";
-import { KEYS_TABLE_MIN_WIDTH } from "./api-keys-card";
 import { ApiPage } from "./api-page";
 
 // Focus, keyboard and layout behaviour of the API page (QA fixes).
@@ -32,32 +31,47 @@ async function renderPage() {
   return result;
 }
 
-/** Lays out every element at `width` px, so the keys card measures that content width. */
-function layoutWidth(width: number): void {
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
-    DOMRect.fromRect({ x: 0, y: 0, width, height: 100 }),
-  );
+function keysTable(): HTMLElement {
+  return screen.getByRole("table", { name: "API keys" });
+}
+
+/** Thirty keys: more than a page of cards (10) or table rows (25). */
+function seedManyKeys(): void {
+  const first = mockDb.apiKeys[0];
+  if (!first) throw new Error("no seeded key");
+  mockDb.apiKeys.splice(0);
+  for (let index = 0; index < 30; index++) {
+    const id = `key-${index}`;
+    mockDb.apiKeys.push({ ...first, id, name: `client-${index}`, key: `sk-${id}`, keyMasked: id });
+  }
 }
 
 describe("API keys layout", () => {
-  it("shows cards while the card is narrower than the table, whatever the viewport", async () => {
-    layoutWidth(KEYS_TABLE_MIN_WIDTH - 200);
+  it("renders the keys as cards too, shown by CSS while the card is narrow", async () => {
     const { user } = await renderPage();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
     const cards = screen.getByRole("list", { name: "API keys" });
+    expect(cards.closest('[data-slot="data-table-cards"]')).toHaveClass("@4xl/data-table:hidden");
     expect(within(cards).getAllByRole("listitem")).toHaveLength(mockDb.apiKeys.length);
     // Every row's actions stay one tap away in the card layout.
     await user.click(within(cards).getByRole("button", { name: "Actions for ci-runner" }));
     expect(await screen.findByRole("menuitem", { name: "Reset usage" })).toBeInTheDocument();
   });
 
-  it("shows the table, with a sticky actions column, once the card is wide enough", async () => {
-    layoutWidth(KEYS_TABLE_MIN_WIDTH + 40);
+  it("pins the actions column to the end of the table", async () => {
     await renderPage();
-    const table = screen.getByRole("table", { name: "API keys" });
-    expect(screen.queryByRole("list", { name: "API keys" })).not.toBeInTheDocument();
-    const trigger = within(table).getByRole("button", { name: "Actions for team-a" });
+    const trigger = within(keysTable()).getByRole("button", { name: "Actions for team-a" });
     expect(trigger.closest("td")).toHaveClass("sticky", "right-0");
+  });
+
+  it("pages the table 25 keys at a time in the card footer", async () => {
+    seedManyKeys();
+    const { user } = renderWithProviders(<ApiPage />);
+    await screen.findAllByText("client-0");
+    expect(within(keysTable()).getAllByRole("row")).toHaveLength(26);
+    expect(screen.getByText("1–25 of 30")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(within(keysTable()).getAllByRole("row")).toHaveLength(6);
+    expect(within(keysTable()).getByText("client-29")).toBeInTheDocument();
   });
 });
 
@@ -74,7 +88,7 @@ describe("API keys focus", () => {
       }),
     );
     const { user } = await renderPage();
-    const trigger = screen.getByRole("button", { name: "Actions for team-a" });
+    const trigger = within(keysTable()).getByRole("button", { name: "Actions for team-a" });
     await user.click(trigger);
     await user.click(await screen.findByRole("menuitem", { name: "Reset usage" }));
     await waitFor(() => expect(trigger).toHaveAttribute("aria-busy", "true"));
@@ -88,7 +102,7 @@ describe("API keys focus", () => {
 
   it("keeps focus on the row menu trigger after Disable", async () => {
     const { user } = await renderPage();
-    const trigger = screen.getByRole("button", { name: "Actions for team-a" });
+    const trigger = within(keysTable()).getByRole("button", { name: "Actions for team-a" });
     await user.click(trigger);
     await user.click(await screen.findByRole("menuitem", { name: "Disable" }));
     expect(await screen.findByText("API key disabled")).toBeInTheDocument();
@@ -97,20 +111,23 @@ describe("API keys focus", () => {
 
   it("moves focus to the next row's menu after a delete", async () => {
     const { user } = await renderPage();
-    await user.click(screen.getByRole("button", { name: "Actions for team-a" }));
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     const confirm = await screen.findByRole("alertdialog");
     await user.click(within(confirm).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(screen.queryByText("team-a")).not.toBeInTheDocument());
+    // The neighbour's trigger: the one in the layout on screen (jsdom shows both).
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Actions for Unnamed key" })).toHaveFocus(),
+      expect(screen.getAllByRole("button", { name: "Actions for Unnamed key" })).toContain(
+        document.activeElement,
+      ),
     );
   });
 
   it("moves focus to Create API key after the last key is deleted", async () => {
     mockDb.apiKeys.splice(1);
     const { user } = await renderPage();
-    await user.click(screen.getByRole("button", { name: "Actions for team-a" }));
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     await user.click(
       within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }),
@@ -124,7 +141,7 @@ describe("API keys focus", () => {
 
   it("opens the limit-reached hint on a tap, not only on hover", async () => {
     const { user } = await renderPage();
-    const badge = screen.getByRole("button", { name: "Limit reached" });
+    const badge = within(keysTable()).getByRole("button", { name: "Limit reached" });
     expect(badge).toHaveAttribute("aria-expanded", "false");
     await user.click(badge);
     expect(badge).toHaveAttribute("aria-expanded", "true");
@@ -133,17 +150,19 @@ describe("API keys focus", () => {
 });
 
 describe("API access", () => {
-  it("moves focus to the switch when Save turns disabled after saving", async () => {
+  it("keeps focus on Save when it turns inert after saving", async () => {
     for (const apiKey of mockDb.apiKeys) apiKey.enabled = true;
     const { user } = await renderPage();
     await screen.findByText("Any client can call the proxy");
-    const toggle = screen.getByRole("switch", { name: "Require an API key" });
-    await user.click(toggle);
     const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getByRole("switch", { name: "Require an API key" }));
+    expect(save).not.toHaveAttribute("aria-disabled");
     await user.click(save);
     expect(await screen.findByText("Settings saved")).toBeInTheDocument();
-    await waitFor(() => expect(save).toBeDisabled());
-    await waitFor(() => expect(toggle).toHaveFocus());
+    await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
+    expect(save).toHaveFocus();
+    expect(save).toBeEnabled();
   });
 
   it("asks before leaving the page with an unsaved change", async () => {

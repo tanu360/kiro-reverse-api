@@ -3,7 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type JSX, useId, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -93,13 +93,8 @@ export function ApiKeyFormDialog({
   };
 
   const limitsDescribedBy = limitsError ? limitsErrorId : undefined;
-  const submitLabel = editing
-    ? mutation.isPending
-      ? t("common:actions.saving")
-      : t("common:actions.save")
-    : mutation.isPending
-      ? t("form.submitCreating")
-      : t("form.submitCreate");
+  const submitLabel = editing ? t("common:actions.save") : t("form.submitCreate");
+  const pendingLabel = editing ? t("common:actions.saving") : t("form.submitCreating");
 
   return (
     <ResponsiveDialog
@@ -108,7 +103,12 @@ export function ApiKeyFormDialog({
           <Button onClick={() => onOpenChange(false)} variant="ghost">
             {t("common:actions.cancel")}
           </Button>
-          <Button disabled={mutation.isPending} form={formId} type="submit">
+          <Button
+            form={formId}
+            loading={mutation.isPending}
+            loadingText={pendingLabel}
+            type="submit"
+          >
             {submitLabel}
           </Button>
         </>
@@ -197,6 +197,7 @@ export function ApiKeyFormDialog({
         {mutation.isError ? (
           <Alert variant="error">
             <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
+            <AlertTitle>{editing ? t("form.saveFailed") : t("form.createFailed")}</AlertTitle>
             <AlertDescription className="break-words">
               {errorMessage(mutation.error, t)}
             </AlertDescription>
