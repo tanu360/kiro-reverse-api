@@ -1,16 +1,17 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BackupEntry } from "@/lib/api/types";
 import { getSession, type SessionChangeReason, subscribeSession } from "@/lib/auth/session";
 import { saveBlob } from "@/lib/download";
+import { formatDateTime } from "@/lib/format";
 import { mockDb } from "@/lib/mocks/db";
 import { makeBackupEntry } from "@/lib/mocks/fixtures";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { toast } from "@/lib/toast";
-import { renderWithProviders } from "@/test/render";
+import { renderApp, renderWithProviders } from "@/test/render";
 import { BackupsPage } from "./backups-page";
 
 vi.mock("@/lib/download", () => ({ saveBlob: vi.fn(), saveJson: vi.fn() }));
@@ -18,12 +19,26 @@ vi.mock("@/lib/download", () => ({ saveBlob: vi.fn(), saveJson: vi.fn() }));
 const sessionEvents: SessionChangeReason[] = [];
 let unsubscribe: () => void = () => {};
 
+/*
+ * The list renders its table and its cards, and a container query shows one (jsdom has no
+ * layout). This sheet stands in for it: it hides the other layout, so role queries and focus
+ * see what a browser would.
+ */
+const layoutSheet = document.createElement("style");
+function showLayout(layout: "table" | "cards"): void {
+  const hidden = layout === "table" ? "data-table-cards" : "data-table-view";
+  layoutSheet.textContent = `[data-slot="${hidden}"] { display: none; }`;
+}
+
 beforeEach(() => {
   sessionEvents.length = 0;
+  document.head.append(layoutSheet);
+  showLayout("table");
 });
 
 afterEach(() => {
   unsubscribe();
+  layoutSheet.remove();
   vi.restoreAllMocks();
   vi.mocked(saveBlob).mockReset();
 });
@@ -45,21 +60,6 @@ async function rowAction(
   name: "Download" | "Restore" | "Delete",
 ): Promise<void> {
   await user.click(within(row).getByRole("button", { name }));
-}
-
-/** Makes every element report this width, so the list measures itself as that wide. */
-function stubListWidth(width: number): void {
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-    width,
-    height: 40,
-    x: 0,
-    y: 0,
-    top: 0,
-    left: 0,
-    right: width,
-    bottom: 40,
-    toJSON: () => ({}),
-  } as DOMRect);
 }
 
 /** Renders the page, waits for the rows, then records session changes from here on. */
@@ -86,23 +86,17 @@ describe("BackupsPage", () => {
   it("lists the seeded backups newest first with kind badges", async () => {
     await renderPage();
     const rows = dataRows();
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(5);
     const kinds = rows.map((row) => row.querySelector('[data-slot="badge"]')?.textContent);
-    expect(kinds).toEqual([
-      "Manual",
-      "Before save",
-      "Scheduled",
-      "Rollback point",
-      "Scheduled",
-      "Rollback point",
-    ]);
-    const rollback = within(rows[3]).getByText("Rollback point");
+    expect(kinds).toEqual(["Manual", "Scheduled", "Rollback point", "Scheduled", "Rollback point"]);
+    const rollback = within(rows[2]).getByText("Rollback point");
     expect(rollback).toHaveAttribute("data-tone", "warning");
-    expect(within(rows[1]).getByText("Before save")).toHaveAttribute("data-tone", "info");
-    expect(within(rows[2]).getByText("Scheduled (Daily)")).toBeInTheDocument();
-    expect(within(rows[3]).getByText("7 restored")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("Manual")).toHaveAttribute("data-tone", "primary");
+    expect(within(rows[1]).getByText("Scheduled")).toHaveAttribute("data-tone", "neutral");
+    expect(within(rows[1]).getByText("Scheduled (Daily)")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("7 restored")).toBeInTheDocument();
     expect(
-      within(rows[5]).getByText("Before restoring from file kiro-backup-x.json"),
+      within(rows[4]).getByText("Before restoring from file kiro-backup-x.json"),
     ).toBeInTheDocument();
   });
 
@@ -150,9 +144,8 @@ describe("BackupsPage", () => {
       }),
     );
     const { user } = await renderPage();
-    const keep = await screen.findByRole("textbox", {
-      name: "Number of scheduled backups to keep",
-    });
+    const keep = await screen.findByRole("textbox", { name: "Keep latest" });
+    expect(keep).toHaveAccessibleDescription("Keep 1–200. Older scheduled backups are deleted.");
     expect(keep).toHaveValue("14");
     await user.clear(keep);
     await user.type(keep, "500");
@@ -193,7 +186,9 @@ describe("BackupsPage", () => {
     unsubscribe = subscribeSession((_session, reason) => order.push(`session:${reason}`));
     const [first] = newestFirst();
     await rowAction(user, dataRows()[0], "Restore");
-    expect(within(dialog()).getByText("Restore this backup?")).toBeInTheDocument();
+    expect(dialog()).toHaveAccessibleName(
+      `Restore the backup from ${formatDateTime(first.createdAt, "en")}?`,
+    );
     await user.click(within(dialog()).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(restored).toEqual([]);
@@ -318,30 +313,35 @@ describe("BackupsPage", () => {
     ).toBeInTheDocument();
     await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
     expect(await findToast("Backup deleted")).toBeInTheDocument();
-    await waitFor(() => expect(dataRows()).toHaveLength(5));
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
     expect(mockDb.backups.some((row) => row.id === first.id)).toBe(false);
   });
 });
 
 describe("BackupsPage layout", () => {
-  it("renders cards, not a clipped table, when the list is narrower than the table", async () => {
-    stubListWidth(500);
+  it("shows the count and total size in the card header, with Refresh and Create there", async () => {
+    await renderPage();
+    const card = screen.getByRole("region", { name: "Saved backups" });
+    expect(within(card).getByText(/^5 backups · /)).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Create backup" })).toBeInTheDocument();
+  });
+
+  it("renders cards in a narrow container, every action one tap away in the menu", async () => {
+    showLayout("cards");
     const { user } = renderWithProviders(<BackupsPage />);
     const list = await screen.findByRole("list", { name: "Backups, newest first" });
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     const cards = within(list).getAllByRole("listitem");
-    expect(cards).toHaveLength(6);
-    // Every action is one tap away in the card menu.
+    expect(cards).toHaveLength(5);
     await user.click(within(cards[0]).getByRole("button", { name: /^Actions for backup / }));
     for (const name of ["Download", "Restore", "Delete"]) {
       expect(await screen.findByRole("menuitem", { name })).toBeInTheDocument();
     }
   });
 
-  it("renders the table when the list is wide enough, with icon-only row actions", async () => {
-    stubListWidth(1100);
-    renderWithProviders(<BackupsPage />);
-    await screen.findAllByRole("button", { name: "Download" });
+  it("renders the table in a wide container, with icon-only row actions", async () => {
+    await renderPage();
     const row = dataRows()[0];
     for (const name of ["Download", "Restore", "Delete"]) {
       const button = within(row).getByRole("button", { name });
@@ -351,8 +351,8 @@ describe("BackupsPage layout", () => {
     expect(screen.queryByRole("list", { name: "Backups, newest first" })).not.toBeInTheDocument();
   });
 
-  it("deletes from a card's menu", async () => {
-    stubListWidth(500);
+  it("deletes from a card's menu and moves focus to the next card's menu", async () => {
+    showLayout("cards");
     const { user } = renderWithProviders(<BackupsPage />);
     const list = await screen.findByRole("list", { name: "Backups, newest first" });
     const [first] = newestFirst();
@@ -360,9 +360,8 @@ describe("BackupsPage layout", () => {
     await user.click(within(card).getByRole("button", { name: /^Actions for backup / }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(5));
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(4));
     expect(mockDb.backups.some((row) => row.id === first.id)).toBe(false);
-    // Focus moves to the menu of the card that took its place.
     const next = within(within(list).getAllByRole("listitem")[0]).getByRole("button", {
       name: /^Actions for backup /,
     });
@@ -371,12 +370,11 @@ describe("BackupsPage layout", () => {
 
   it("opens a row hint on tap, so touch users can read it", async () => {
     const { user } = await renderPage();
-    const trigger = within(dataRows()[3]).getByRole("button", { name: /^7 restored\. / });
+    const trigger = within(dataRows()[2]).getByRole("button", { name: "7 restored" });
     await user.click(trigger);
-    const popup = await screen.findByText(
-      /^Rollback point saved \d+ accounts? before the restore\.$/,
-    );
-    expect(trigger).toHaveAccessibleName(`7 restored. ${popup.textContent}`);
+    expect(
+      await screen.findByText(/^Rollback point saved \d+ accounts? before the restore\.$/),
+    ).toBeInTheDocument();
   });
 });
 
@@ -448,7 +446,7 @@ describe("BackupsPage focus", () => {
     const [, second] = newestFirst();
     await rowAction(user, dataRows()[0], "Delete");
     await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(dataRows()).toHaveLength(5));
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
     const next = within(dataRows()[0]).getByRole("button", { name: "Download" });
     expect(next).toHaveAttribute("data-row-focus", second.id);
     await waitFor(() => expect(next).toHaveFocus());
@@ -456,10 +454,10 @@ describe("BackupsPage focus", () => {
 
   it("moves focus to the row above when the last row is deleted", async () => {
     const { user } = await renderPage();
-    await rowAction(user, dataRows()[5], "Delete");
+    await rowAction(user, dataRows()[4], "Delete");
     await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(dataRows()).toHaveLength(5));
-    const above = within(dataRows()[4]).getByRole("button", { name: "Download" });
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
+    const above = within(dataRows()[3]).getByRole("button", { name: "Download" });
     await waitFor(() => expect(above).toHaveFocus());
   });
 
@@ -500,9 +498,7 @@ describe("ScheduleCard", () => {
 
   it("keeps focus on Save after saving instead of remounting the form", async () => {
     const { user } = await renderPage();
-    const keep = await screen.findByRole("textbox", {
-      name: "Number of scheduled backups to keep",
-    });
+    const keep = await screen.findByRole("textbox", { name: "Keep latest" });
     await user.clear(keep);
     await user.type(keep, "30");
     const save = screen.getByRole("button", { name: "Save" });
@@ -512,5 +508,24 @@ describe("ScheduleCard", () => {
     expect(save).toBeInTheDocument();
     expect(save).toHaveFocus();
     expect(keep).toHaveValue("30");
+  });
+
+  it("shows when the schedule last ran and runs next under the switch", async () => {
+    await renderPage();
+    const toggle = await screen.findByRole("switch", { name: "Scheduled backup" });
+    expect(toggle).toHaveAccessibleDescription(/^(Last run .+|Not run yet) · Next run in .+$/);
+  });
+
+  it("asks before leaving the page with an unsaved schedule change", async () => {
+    const { user, router } = await renderApp("/backups");
+    await user.click(await screen.findByRole("combobox", { name: "Frequency" }));
+    await user.click(await screen.findByRole("option", { name: "Weekly" }));
+    act(() => {
+      void router.navigate({ to: "/settings" });
+    });
+    const confirm = await screen.findByRole("alertdialog");
+    expect(within(confirm).getByText("Discard unsaved changes?")).toBeInTheDocument();
+    await user.click(within(confirm).getByRole("button", { name: "Discard changes" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
   });
 });

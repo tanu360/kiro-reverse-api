@@ -10,124 +10,53 @@ import {
   Undo02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import {
-  type JSX,
-  type ReactNode,
-  type RefObject,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type JSX, type ReactNode, useMemo } from "react";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { InfoHint } from "@/components/shared/info-hint";
+import { ListCard } from "@/components/shared/list-card";
+import { RelativeTime } from "@/components/shared/relative-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
-import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
-import { useIsMobile } from "@/hooks/use-media-query";
 import type { BackupEntry } from "@/lib/api/types";
-import { EMPTY, formatBytes, formatDateTime, formatRelativeTime } from "@/lib/format";
+import { EMPTY, formatBytes, formatDateTime } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { cn } from "@/lib/utils";
 import { accountsCell, kindLabel, kindTone, noteText } from "./backup-model";
+
+export type BackupAction = "download" | "restore" | "delete";
 
 export interface BackupRowActions {
   onDownload: (entry: BackupEntry) => void;
   onRestore: (entry: BackupEntry) => void;
   onDelete: (entry: BackupEntry) => void;
-  /** Rows with a request in flight; their actions do nothing but stay focusable. */
-  busyIds: ReadonlySet<string>;
+  /**
+   * Rows with a request in flight, and which action it is: that button shows the spinner, the
+   * row's other actions do nothing but stay focusable.
+   */
+  busy: ReadonlyMap<string, BackupAction>;
 }
-
-/**
- * The table's minimum width in px (measured: 825 en, 731 zh). Narrower lists render as
- * cards, whatever the viewport, so a tablet or a laptop with the sidebar open never clips the
- * row actions. The actions column is also sticky in case a long note widens a row.
- */
-export const TABLE_MIN_WIDTH = 832;
 
 /** Marks each row's first action; it takes focus when the row above it is deleted. */
 export const ROW_FOCUS_ATTR = "data-row-focus";
 
-// Busy actions stay in the tab order: a native disabled button would drop focus to <body>.
-const BUSY_CLASS = "aria-disabled:pointer-events-none aria-disabled:opacity-64";
-
-// A 44 px hit area around short text triggers on touch screens, without changing the layout.
-const TOUCH_HIT_AREA =
-  "relative pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:top-1/2 pointer-coarse:after:h-11 pointer-coarse:after:min-w-11 pointer-coarse:after:-translate-y-1/2";
-
-/** Width of the element, or null before it is measured (or when layout gives none, as in jsdom). */
-function useElementWidth(ref: RefObject<HTMLElement | null>): number | null {
-  const [width, setWidth] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const measure = () => {
-      const next = element.getBoundingClientRect().width;
-      setWidth(next > 0 ? next : null);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [ref]);
-  return width;
+function isoTime(unixSec: number): string {
+  return new Date(unixSec * 1000).toISOString();
 }
 
-/**
- * Text with a hint that opens on hover, focus or tap (a popover, so touch users reach it too).
- * The hint is also part of the accessible name.
- */
-function HintText({
-  children,
-  hint,
-  label,
-  className,
-}: {
-  children: ReactNode;
-  hint: string;
-  label: string;
-  className?: string;
-}): JSX.Element {
-  const { t } = useT();
-  return (
-    <Popover>
-      <PopoverTrigger
-        aria-label={t("a11y.labelWithDetail", { label, detail: hint })}
-        className={cn(
-          "cursor-default rounded-sm text-left underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 outline-none focus-outline",
-          TOUCH_HIT_AREA,
-          className,
-        )}
-        closeDelay={100}
-        data-slot="backup-hint-trigger"
-        delay={300}
-        openOnHover
-      >
-        {children}
-      </PopoverTrigger>
-      <PopoverPopup className="max-w-64" initialFocus={false} side="top" tooltipStyle>
-        {hint}
-      </PopoverPopup>
-    </Popover>
-  );
-}
-
+/** The date and time on the first line, how long ago on a muted second line. */
 function TimeCell({ entry }: { entry: BackupEntry }): JSX.Element {
   const { lang } = useT("backups");
-  const absolute = formatDateTime(entry.createdAt, lang);
   return (
-    <HintText
-      className="whitespace-nowrap no-underline"
-      hint={formatRelativeTime(entry.createdAt, lang)}
-      label={absolute}
-    >
-      <time dateTime={new Date(entry.createdAt * 1000).toISOString()}>{absolute}</time>
-    </HintText>
+    <div className="flex flex-col">
+      <time className="whitespace-nowrap" dateTime={isoTime(entry.createdAt)}>
+        {formatDateTime(entry.createdAt, lang)}
+      </time>
+      <span className="text-meta text-muted-foreground">
+        <RelativeTime value={entry.createdAt} />
+      </span>
+    </div>
   );
 }
 
@@ -147,17 +76,20 @@ function KindBadge({ kind, t }: { kind: string; t: TFunction }): JSX.Element {
   );
 }
 
+/** The account count; a rollback point's count opens what it saved before the restore. */
 function AccountsCell({ entry, t }: { entry: BackupEntry; t: TFunction }): JSX.Element {
   const { lang } = useT();
   const { text, hint } = accountsCell(entry, t, lang);
-  if (!hint) {
-    return <span className={cn(text === EMPTY && "text-muted-foreground")}>{text}</span>;
-  }
-  return (
-    <HintText hint={hint} label={text}>
-      {text}
-    </HintText>
-  );
+  if (hint) return <InfoHint hint={hint}>{text}</InfoHint>;
+  return <span className={text === EMPTY ? "text-muted-foreground" : undefined}>{text}</span>;
+}
+
+type Mask = (text?: string) => string;
+
+/** The note, or a muted dash when there is none. */
+function NoteCell({ entry, t, mask }: { entry: BackupEntry; t: TFunction; mask: Mask }): ReactNode {
+  const note = noteText(entry, t, mask);
+  return note === EMPTY ? <span className="text-muted-foreground">{EMPTY}</span> : note;
 }
 
 /** The card's row menu: every action of the row, one tap away. */
@@ -171,7 +103,7 @@ function RowMenu({
   label: string;
 }): JSX.Element {
   const { t } = useT("backups");
-  const busy = actions.busyIds.has(entry.id);
+  const busy = actions.busy.has(entry.id);
   return (
     <Menu>
       <MenuTrigger
@@ -179,7 +111,6 @@ function RowMenu({
           <Button
             aria-busy={busy || undefined}
             aria-label={label}
-            className="size-10 sm:size-8"
             data-row-focus={entry.id}
             size="icon"
             variant="quiet"
@@ -207,20 +138,25 @@ function RowMenu({
   );
 }
 
-/** One quiet icon button with its name in a tooltip. A busy row keeps it focusable. */
+/**
+ * One quiet icon button with its name in a tooltip. While its row is busy it stays focusable:
+ * the running action shows the spinner, the others are inert.
+ */
 function RowIconButton({
   label,
   hint,
   icon: Icon,
-  busy,
+  running,
+  blocked,
   destructive = false,
   focusId,
   onClick,
 }: {
   label: string;
   hint?: string;
-  icon: typeof Download01Icon;
-  busy: boolean;
+  icon: IconSvgElement;
+  running: boolean;
+  blocked: boolean;
   destructive?: boolean;
   focusId?: string;
   onClick: () => void;
@@ -230,19 +166,15 @@ function RowIconButton({
       <TooltipTrigger
         render={
           <Button
-            aria-busy={busy || undefined}
-            aria-disabled={busy || undefined}
+            aria-disabled={blocked || undefined}
             aria-label={label}
-            className={cn(
-              BUSY_CLASS,
-              destructive && "[:hover,[data-pressed]]:text-destructive-foreground",
-            )}
             data-row-focus={focusId}
+            loading={running}
             onClick={() => {
-              if (!busy) onClick();
+              if (!blocked) onClick();
             }}
             size="icon"
-            variant="quiet"
+            variant={destructive ? "quiet-destructive" : "quiet"}
           />
         }
       >
@@ -261,7 +193,7 @@ function RowIconButton({
   );
 }
 
-/** Table row actions as three ghost icon buttons, quieter than bordered text buttons. */
+/** Table row actions as three quiet icon buttons, quieter than bordered text buttons. */
 function RowActions({
   entry,
   actions,
@@ -270,34 +202,39 @@ function RowActions({
   actions: BackupRowActions;
 }): JSX.Element {
   const { t } = useT("backups");
-  const busy = actions.busyIds.has(entry.id);
+  const running = actions.busy.get(entry.id);
+  const blocked = running !== undefined;
   return (
     <div className="flex items-center justify-end gap-0.5">
       <RowIconButton
-        busy={busy}
+        blocked={blocked}
         focusId={entry.id}
         hint={t("downloadHint")}
         icon={Download01Icon}
         label={t("download")}
         onClick={() => actions.onDownload(entry)}
+        running={running === "download"}
       />
       <RowIconButton
-        busy={busy}
+        blocked={blocked}
         icon={Undo02Icon}
         label={t("restore")}
         onClick={() => actions.onRestore(entry)}
+        running={running === "restore"}
       />
       <RowIconButton
-        busy={busy}
+        blocked={blocked}
         destructive
         icon={Delete02Icon}
         label={t("delete")}
         onClick={() => actions.onDelete(entry)}
+        running={running === "delete"}
       />
     </div>
   );
 }
 
+/** A backup as a card: time and menu, how long ago and the size, the note, kind and accounts. */
 function BackupCard({
   entry,
   actions,
@@ -308,78 +245,46 @@ function BackupCard({
   const { t, lang } = useT("backups");
   const mask = useMaskText();
   const time = formatDateTime(entry.createdAt, lang);
+  const note = noteText(entry, t, mask);
   return (
-    <Card className="flex-row items-start gap-3 p-3 pe-1.5" data-slot="backup-card">
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <TimeCell entry={entry} />
+    <ListCard
+      action={<RowMenu actions={actions} entry={entry} label={t("rowActions", { time })} />}
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <KindBadge kind={entry.kind} t={t} />
-        </div>
-        <p className="break-words text-muted-foreground text-sm">{noteText(entry, t, mask)}</p>
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground text-xs">
-          <span>
+          <span className="text-meta text-muted-foreground">
             {t("accountsInBackup")}: <AccountsCell entry={entry} t={t} />
           </span>
-          <span>{formatBytes(entry.size, lang)}</span>
-        </p>
-      </div>
-      <RowMenu actions={actions} entry={entry} label={t("rowActions", { time })} />
-    </Card>
-  );
-}
-
-function BackupCards({
-  rows,
-  loading,
-  emptyState,
-  actions,
-}: {
-  rows: BackupEntry[];
-  loading: boolean;
-  emptyState: ReactNode;
-  actions: BackupRowActions;
-}): JSX.Element {
-  const { t } = useT("backups");
-  if (loading && rows.length === 0) {
-    return (
-      <div aria-busy="true" className="flex flex-col gap-2">
-        {Array.from({ length: 3 }, (_, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
-          <Skeleton className="h-20 w-full rounded-xl" key={index} />
-        ))}
-      </div>
-    );
-  }
-  if (rows.length === 0) return <>{emptyState}</>;
-  return (
-    <ul aria-label={t("list.caption")} className="flex flex-col gap-2">
-      {rows.map((entry) => (
-        <li key={entry.id}>
-          <BackupCard actions={actions} entry={entry} />
-        </li>
-      ))}
-    </ul>
+        </div>
+      }
+      meta={
+        <span className="tabular-nums">
+          <RelativeTime value={entry.createdAt} /> · {formatBytes(entry.size, lang)}
+        </span>
+      }
+      title={<time dateTime={isoTime(entry.createdAt)}>{time}</time>}
+    >
+      {note === EMPTY ? null : <p className="break-words text-muted-foreground text-sm">{note}</p>}
+    </ListCard>
   );
 }
 
 export function BackupsTable({
   rows,
   loading,
+  pageSize,
   emptyState,
   actions,
 }: {
   rows: BackupEntry[];
   loading: boolean;
+  /** Rows a full page holds, for the loading placeholder. */
+  pageSize?: number;
   emptyState: ReactNode;
   actions: BackupRowActions;
 }): JSX.Element {
   const { t, lang } = useT("backups");
   const mask = useMaskText();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const width = useElementWidth(containerRef);
-  const isMobile = useIsMobile();
-  // The list's own width decides, not the viewport. Before the first measure the viewport does.
-  const asCards = width === null ? isMobile : width < TABLE_MIN_WIDTH;
 
   const columns = useMemo<DataTableColumn<BackupEntry>[]>(
     () => [
@@ -389,7 +294,7 @@ export function BackupsTable({
         id: "note",
         header: t("note"),
         className: "min-w-48 max-w-96 whitespace-normal break-words leading-snug",
-        cell: (entry) => noteText(entry, t, mask),
+        cell: (entry) => <NoteCell entry={entry} mask={mask} t={t} />,
       },
       {
         id: "accounts",
@@ -398,18 +303,20 @@ export function BackupsTable({
         cell: (entry) => <AccountsCell entry={entry} t={t} />,
       },
       {
+        // The card's meta has the total; the column joins the table once there is room.
         id: "size",
         header: t("size"),
         align: "end",
-        className: "whitespace-nowrap text-muted-foreground",
+        className: "hidden whitespace-nowrap text-muted-foreground @5xl/data-table:table-cell",
+        headerClassName: "hidden @5xl/data-table:table-cell",
         cell: (entry) => formatBytes(entry.size, lang),
       },
       {
         id: "actions",
         header: <span className="sr-only">{t("common:table.actions")}</span>,
         align: "end",
-        // Pinned to the right edge as on Accounts, so the actions stay in view if the table ever
-        // scrolls. The shared sticky style keeps the header band and the row's hover tint on it.
+        // Pinned to the right edge, so the actions stay in view if a long note widens the
+        // table past its card.
         sticky: "end",
         className: "py-1",
         cell: (entry) => <RowActions actions={actions} entry={entry} />,
@@ -419,20 +326,20 @@ export function BackupsTable({
   );
 
   return (
-    <div className="min-w-0" data-layout={asCards ? "cards" : "table"} ref={containerRef}>
-      {asCards ? (
-        <BackupCards actions={actions} emptyState={emptyState} loading={loading} rows={rows} />
-      ) : (
-        <DataTable
-          bleed
-          caption={t("list.caption")}
-          columns={columns}
-          data={rows}
-          emptyState={emptyState}
-          getRowId={(entry) => entry.id}
-          loading={loading}
-        />
-      )}
-    </div>
+    <DataTable
+      caption={t("list.caption")}
+      cardLayout="grid"
+      // Below 56rem the five columns squeeze the note; two columns of cards read better there.
+      cardsBelow="4xl"
+      columns={columns}
+      data={rows}
+      density="comfortable"
+      emptyState={emptyState}
+      getRowId={(entry) => entry.id}
+      inset
+      loading={loading}
+      pageSize={pageSize}
+      renderCard={(entry) => <BackupCard actions={actions} entry={entry} />}
+    />
   );
 }

@@ -1,9 +1,16 @@
+import { TimeScheduleIcon } from "@hugeicons/core-free-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useId, useState } from "react";
 import { ErrorState } from "@/components/shared/error-state";
-import { SectionCard } from "@/components/shared/section-card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { RelativeTime } from "@/components/shared/relative-time";
+import { SettingsFrame } from "@/components/shared/section-card";
+import {
+  SaveFooter,
+  SETTINGS_ROW_X,
+  SettingsRow,
+  SwitchField,
+} from "@/components/shared/settings-rows";
+import { useDraftGuard } from "@/components/shared/use-draft-guard";
 import {
   NumberField,
   NumberFieldDecrement,
@@ -19,33 +26,134 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
 import { backupScheduleQuery, updateBackupSchedule } from "@/lib/api/backups";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { BackupCadence, BackupSchedule } from "@/lib/api/types";
-import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import {
   CADENCES,
   clampKeep,
   KEEP_MAX,
   KEEP_MIN,
-  keepSentenceParts,
+  messageParts,
   type ScheduleForm,
   scheduleDirty,
   scheduleForm,
 } from "./backup-model";
 
+/** What SettingsRow puts on its control: the row title as the name, the description. */
+interface RowAria {
+  "aria-labelledby"?: string;
+  "aria-describedby"?: string;
+}
+
 function seedKey(form: ScheduleForm): string {
   return `${form.enabled}-${form.cadence}-${form.keep}`;
 }
 
-function ScheduleFields({ initial }: { initial: ScheduleForm }): JSX.Element {
-  const { t, lang } = useT("backups");
+/** The cadence Select; the row's title and description name and describe its trigger. */
+function FrequencySelect({
+  value,
+  onValueChange,
+  ...aria
+}: RowAria & {
+  value: BackupCadence;
+  onValueChange: (value: BackupCadence) => void;
+}): JSX.Element {
+  const { t } = useT("backups");
+  const items = CADENCES.map((cadence) => ({ value: cadence, label: t(cadence) }));
+  return (
+    <Select
+      items={items}
+      onValueChange={(next) => {
+        if (next) onValueChange(next as BackupCadence);
+      }}
+      value={value}
+    >
+      <SelectTrigger {...aria}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectPopup>
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
+  );
+}
+
+/** How many scheduled backups to keep; `id` is the input's, for the row title's label. */
+function KeepField({
+  id,
+  value,
+  onValueChange,
+  ...aria
+}: RowAria & {
+  id: string;
+  value: number | null;
+  onValueChange: (value: number | null) => void;
+}): JSX.Element {
+  return (
+    <NumberField
+      id={id}
+      max={KEEP_MAX}
+      min={KEEP_MIN}
+      onValueChange={(next) => onValueChange(next)}
+      step={1}
+      value={value}
+    >
+      <NumberFieldGroup>
+        <NumberFieldDecrement />
+        <NumberFieldInput {...aria} />
+        <NumberFieldIncrement />
+      </NumberFieldGroup>
+    </NumberField>
+  );
+}
+
+/** "Last run {time}" with a live relative time where `{time}` goes. */
+function RunTime({ messageKey, value }: { messageKey: string; value: number }): JSX.Element {
+  const { t } = useT("backups");
+  const [before, after] = messageParts(t, messageKey, "time");
+  return (
+    <>
+      {before}
+      <RelativeTime value={value} />
+      {after}
+    </>
+  );
+}
+
+/** The scheduler's state under the switch: the last run (or none yet) and the next one. */
+function RunTimes({ schedule }: { schedule: BackupSchedule }): JSX.Element {
+  const { t } = useT("backups");
+  return (
+    <>
+      {schedule.lastRun ? <RunTime messageKey="lastRun" value={schedule.lastRun} /> : t("neverRun")}
+      {schedule.nextRun ? (
+        <>
+          {" · "}
+          <RunTime messageKey="nextRun" value={schedule.nextRun} />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function ScheduleFormCard({
+  initial,
+  schedule,
+}: {
+  initial: ScheduleForm;
+  schedule: BackupSchedule;
+}): JSX.Element {
+  const { t } = useT("backups");
   const queryClient = useQueryClient();
-  const ids = { switch: useId(), frequency: useId(), keep: useId() };
+  const keepId = useId();
   const [enabled, setEnabled] = useState(initial.enabled);
   const [cadence, setCadence] = useState<BackupCadence>(initial.cadence);
   const [keep, setKeep] = useState<number | null>(initial.keep);
@@ -61,6 +169,14 @@ function ScheduleFields({ initial }: { initial: ScheduleForm }): JSX.Element {
   }
 
   const dirty = scheduleDirty(initial, { enabled, cadence, keep });
+  useDraftGuard(dirty, {
+    message: {
+      title: t("discardTitle"),
+      description: t("discardBody"),
+      confirmLabel: t("discardAction"),
+      variant: "danger",
+    },
+  });
 
   const save = useMutation({
     mutationFn: () => {
@@ -68,96 +184,52 @@ function ScheduleFields({ initial }: { initial: ScheduleForm }): JSX.Element {
       setKeep(body.keep);
       return updateBackupSchedule(body);
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       toast.success(t("scheduleSaved"));
+      // The server answers with the saved schedule (nextRun included): the form re-seeds from
+      // it right away. An older server answers without one; the refetch below covers that.
+      if (Object.keys(saved).length > 0) {
+        queryClient.setQueryData(queryKeys.backups.schedule(), saved);
+      }
       void queryClient.invalidateQueries({ queryKey: queryKeys.backups.all });
     },
     onError: (error) => toastError(error, t),
   });
 
-  const [before, after] = keepSentenceParts(t, lang, clampKeep(keep ?? Number.NaN));
-  const items = CADENCES.map((value) => ({ value, label: t(value) }));
-
   return (
     <form
-      className="grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(11rem,1fr)_minmax(10rem,12rem)_auto_auto] lg:items-end"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         if (dirty && !save.isPending) save.mutate();
       }}
     >
-      <div className="flex min-h-10 items-center lg:min-h-9">
-        <Label className="cursor-pointer" htmlFor={ids.switch}>
-          <Switch checked={enabled} id={ids.switch} onCheckedChange={setEnabled} />
-          {t("scheduleEnabled")}
-        </Label>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label id={ids.frequency}>{t("frequency")}</Label>
-        <Select
-          items={items}
-          onValueChange={(value) => {
-            if (value) setCadence(value as BackupCadence);
-          }}
-          value={cadence}
-        >
-          <SelectTrigger aria-labelledby={ids.frequency} className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectPopup>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span aria-hidden="true">{before}</span>
-        <NumberField
-          className="w-32"
-          id={ids.keep}
-          max={KEEP_MAX}
-          min={KEEP_MIN}
-          onValueChange={(value) => setKeep(value)}
-          step={1}
-          value={keep}
-        >
-          <NumberFieldGroup>
-            <NumberFieldDecrement />
-            <NumberFieldInput aria-label={t("keepAria")} />
-            <NumberFieldIncrement />
-          </NumberFieldGroup>
-        </NumberField>
-        <span aria-hidden="true">{after}</span>
-      </div>
-
-      {/* aria-disabled, not disabled: a clean or saving form keeps Save focusable. */}
-      <Button
-        aria-busy={save.isPending || undefined}
-        aria-disabled={!dirty || save.isPending || undefined}
-        className="w-full aria-disabled:pointer-events-none sm:w-auto"
-        type="submit"
+      <SettingsFrame
+        description={t("schedule.description")}
+        footer={<SaveFooter dirty={dirty} saving={save.isPending} />}
+        icon={TimeScheduleIcon}
+        id="backup-schedule"
+        title={t("schedule.title")}
       >
-        {save.isPending ? <Spinner aria-hidden="true" /> : null}
-        {save.isPending ? t("common:actions.saving") : t("common:actions.save")}
-      </Button>
+        <SwitchField
+          checked={enabled}
+          description={<RunTimes schedule={schedule} />}
+          onCheckedChange={setEnabled}
+          title={t("scheduleEnabled")}
+        />
+        <SettingsRow
+          control={<FrequencySelect onValueChange={setCadence} value={cadence} />}
+          title={t("frequency")}
+        />
+        <SettingsRow
+          control={<KeepField id={keepId} onValueChange={setKeep} value={keep} />}
+          controlWidth="number"
+          description={t("keepHint")}
+          htmlFor={keepId}
+          title={t("keepTitle")}
+        />
+      </SettingsFrame>
     </form>
-  );
-}
-
-function LastRun({ schedule }: { schedule: BackupSchedule }): JSX.Element {
-  const { t, lang } = useT("backups");
-  if (!schedule.lastRun) {
-    return <span className="text-muted-foreground text-sm">{t("neverRun")}</span>;
-  }
-  return (
-    <span className="text-muted-foreground text-sm" title={formatDateTime(schedule.lastRun, lang)}>
-      {t("lastRun", { time: formatRelativeTime(schedule.lastRun, lang) })}
-    </span>
   );
 }
 
@@ -165,21 +237,17 @@ export function ScheduleCard(): JSX.Element {
   const { t } = useT("backups");
   const query = useQuery(backupScheduleQuery());
   const schedule = query.data;
-  const initial = schedule ? scheduleForm(schedule) : null;
+
+  if (schedule) return <ScheduleFormCard initial={scheduleForm(schedule)} schedule={schedule} />;
 
   return (
-    <SectionCard
-      actions={schedule ? <LastRun schedule={schedule} /> : null}
-      description={t("common:text.joinSentences", {
-        first: t("schedule.description"),
-        second: t("keepHint"),
-      })}
+    <SettingsFrame
+      description={t("schedule.description")}
+      icon={TimeScheduleIcon}
       id="backup-schedule"
       title={t("schedule.title")}
     >
-      {initial ? (
-        <ScheduleFields initial={initial} />
-      ) : query.isError ? (
+      {query.isError ? (
         <ErrorState
           compact
           error={query.error}
@@ -187,13 +255,18 @@ export function ScheduleCard(): JSX.Element {
           title={t("scheduleLoadError")}
         />
       ) : (
-        <div aria-busy="true" className="grid gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }, (_, index) => (
+        Array.from({ length: 3 }, (_, index) => (
+          <div
+            aria-hidden="true"
+            className={cn(SETTINGS_ROW_X, "flex items-center justify-between gap-8 py-4")}
             // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders never reorder.
-            <Skeleton className="h-9 w-full" key={index} />
-          ))}
-        </div>
+            key={index}
+          >
+            <Skeleton className="h-4 w-full max-w-40" />
+            <Skeleton className="h-8 w-full max-w-72" />
+          </div>
+        ))
       )}
-    </SectionCard>
+    </SettingsFrame>
   );
 }

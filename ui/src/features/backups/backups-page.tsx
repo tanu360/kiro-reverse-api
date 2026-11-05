@@ -17,7 +17,6 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   backupsQuery,
@@ -32,47 +31,60 @@ import { queryKeys } from "@/lib/api/query-keys";
 import type { BackupEntry } from "@/lib/api/types";
 import { clearSession } from "@/lib/auth/session";
 import { saveBlob } from "@/lib/download";
+import { formatDateTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
-import { isNotABackupMessage, MAX_UPLOAD_BYTES, manualNote } from "./backup-model";
-import { type BackupRowActions, BackupsTable, ROW_FOCUS_ATTR } from "./backups-table";
+import { isNotABackupMessage, listMeta, MAX_UPLOAD_BYTES, manualNote } from "./backup-model";
+import {
+  type BackupAction,
+  type BackupRowActions,
+  BackupsTable,
+  ROW_FOCUS_ATTR,
+} from "./backups-table";
 import { ScheduleCard } from "./schedule-card";
 
 const PAGE_SIZE = 25;
 
 /**
- * Tracks which rows have a request in flight. A second action on a busy row is ignored: the
- * controls stay focusable while busy, so they can still be pressed.
+ * Tracks which rows have a request in flight, and which action. A second action on a busy row
+ * is ignored: the controls stay focusable while busy, so they can still be pressed.
  */
 function useBusyRows(): {
-  busyIds: ReadonlySet<string>;
+  busy: ReadonlyMap<string, BackupAction>;
   isBusy: (id: string) => boolean;
-  run: (id: string, task: () => Promise<void>) => Promise<void>;
+  run: (id: string, action: BackupAction, task: () => Promise<void>) => Promise<void>;
 } {
-  const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [busy, setBusy] = useState<ReadonlyMap<string, BackupAction>>(() => new Map());
   const busyRef = useRef(new Set<string>());
   const isBusy = useCallback((id: string) => busyRef.current.has(id), []);
-  const run = useCallback(async (id: string, task: () => Promise<void>) => {
+  const run = useCallback(async (id: string, action: BackupAction, task: () => Promise<void>) => {
     if (busyRef.current.has(id)) return;
     busyRef.current.add(id);
-    setBusyIds((current) => new Set(current).add(id));
+    setBusy((current) => new Map(current).set(id, action));
     try {
       await task();
     } finally {
       busyRef.current.delete(id);
-      setBusyIds((current) => {
-        const next = new Set(current);
+      setBusy((current) => {
+        const next = new Map(current);
         next.delete(id);
         return next;
       });
     }
   }, []);
-  return { busyIds, isBusy, run };
+  return { busy, isBusy, run };
 }
 
-// Header buttons stay focusable while busy (aria-disabled, not disabled): a natively disabled
-// button drops keyboard focus to <body>. Their click handlers ignore presses while busy.
-const BUSY_BUTTON = "aria-disabled:pointer-events-none aria-disabled:opacity-64";
+/**
+ * Focuses the first of `elements` that can take focus. The list renders both its table and its
+ * cards and CSS shows one, so the hidden layout's copy of a control refuses focus.
+ */
+function focusFirstShown(elements: readonly HTMLElement[]): void {
+  for (const element of elements) {
+    element.focus();
+    if (document.activeElement === element) return;
+  }
+}
 
 /** A deleted row, and where it was, until focus has moved on from it. */
 interface Refocus {
@@ -81,13 +93,13 @@ interface Refocus {
 }
 
 export function BackupsPage(): JSX.Element {
-  const { t } = useT("backups");
+  const { t, lang } = useT("backups");
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const list = useQuery(backupsQuery());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
-  const { busyIds, isBusy, run } = useBusyRows();
+  const { busy, isBusy, run } = useBusyRows();
   const listRef = useRef<HTMLDivElement | null>(null);
   const [refocus, setRefocus] = useState<Refocus | null>(null);
 
@@ -122,9 +134,10 @@ export function BackupsPage(): JSX.Element {
   }, [t]);
 
   const restoreConfirm = useCallback(
-    (title: string) =>
+    (title: string, target?: string) =>
       confirm({
         title,
+        target,
         description: t("restoreBody"),
         confirmLabel: t("restore"),
         variant: "danger",
@@ -134,9 +147,9 @@ export function BackupsPage(): JSX.Element {
 
   const actions = useMemo<BackupRowActions>(
     () => ({
-      busyIds,
+      busy,
       onDownload: (entry: BackupEntry) =>
-        void run(entry.id, async () => {
+        void run(entry.id, "download", async () => {
           try {
             const { blob, filename } = await downloadBackup(entry.id);
             saveBlob(blob, filename || `kiro-backup-${entry.id}.json`);
@@ -149,8 +162,9 @@ export function BackupsPage(): JSX.Element {
       onRestore: (entry: BackupEntry) =>
         void (async () => {
           if (isBusy(entry.id)) return;
-          if (!(await restoreConfirm(t("confirmRestore")))) return;
-          await run(entry.id, async () => {
+          const time = formatDateTime(entry.createdAt, lang);
+          if (!(await restoreConfirm(t("confirmRestore", { time }), time))) return;
+          await run(entry.id, "restore", async () => {
             try {
               await restoreBackup(entry.id);
             } catch (error) {
@@ -170,7 +184,7 @@ export function BackupsPage(): JSX.Element {
             variant: "danger",
           });
           if (!ok) return;
-          await run(entry.id, async () => {
+          await run(entry.id, "delete", async () => {
             try {
               await deleteBackup(entry.id);
             } catch (error) {
@@ -184,7 +198,7 @@ export function BackupsPage(): JSX.Element {
           });
         })(),
     }),
-    [busyIds, isBusy, run, t, confirm, restoreConfirm, finishRestore, invalidate, list.data],
+    [busy, isBusy, run, t, lang, confirm, restoreConfirm, finishRestore, invalidate, list.data],
   );
 
   const rows = list.data ?? [];
@@ -206,11 +220,12 @@ export function BackupsPage(): JSX.Element {
     const container = listRef.current;
     if (!container) return;
     const next = rows[Math.min(refocus.index, rows.length - 1)];
-    const candidates = Array.from(container.querySelectorAll<HTMLElement>(`[${ROW_FOCUS_ATTR}]`));
-    const target = next
-      ? candidates.find((element) => element.getAttribute(ROW_FOCUS_ATTR) === next.id)
-      : container.querySelector<HTMLElement>("[data-empty-focus]");
-    target?.focus();
+    const targets = next
+      ? Array.from(container.querySelectorAll<HTMLElement>(`[${ROW_FOCUS_ATTR}]`)).filter(
+          (element) => element.getAttribute(ROW_FOCUS_ATTR) === next.id,
+        )
+      : Array.from(container.querySelectorAll<HTMLElement>("[data-empty-focus]"));
+    focusFirstShown(targets);
     setRefocus(null);
   }, [refocus, rows]);
 
@@ -246,20 +261,18 @@ export function BackupsPage(): JSX.Element {
     finishRestore();
   };
 
+  // In the card header the primary action; in the empty state under it, the quiet repeat.
   const createButton = (inEmptyState: boolean) => (
     <Button
-      aria-busy={create.isPending || undefined}
-      aria-disabled={create.isPending || undefined}
-      className={BUSY_BUTTON}
       data-empty-focus={inEmptyState ? "" : undefined}
+      loading={create.isPending}
+      loadingText={t("creating")}
       onClick={startCreate}
+      size="sm"
+      variant={inEmptyState ? "outline" : "default"}
     >
-      {create.isPending ? (
-        <Spinner aria-hidden="true" />
-      ) : (
-        <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-      )}
-      {create.isPending ? t("creating") : t("create")}
+      <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+      {t("create")}
     </Button>
   );
 
@@ -280,30 +293,17 @@ export function BackupsPage(): JSX.Element {
               <TooltipTrigger
                 render={
                   <Button
-                    aria-busy={uploading || undefined}
-                    aria-disabled={uploading || undefined}
-                    className={BUSY_BUTTON}
-                    onClick={() => {
-                      if (!uploading) fileInputRef.current?.click();
-                    }}
+                    loading={uploading}
+                    onClick={() => fileInputRef.current?.click()}
                     variant="outline"
                   />
                 }
               >
-                {uploading ? (
-                  <Spinner aria-hidden="true" />
-                ) : (
-                  <HugeiconsIcon icon={FileUpIcon} aria-hidden="true" />
-                )}
+                <HugeiconsIcon icon={FileUpIcon} aria-hidden="true" />
                 {t("upload")}
               </TooltipTrigger>
               <TooltipPopup>{t("uploadHint")}</TooltipPopup>
             </Tooltip>
-            <RefreshButton
-              fetching={list.isFetching && !list.isPending}
-              onRefresh={() => void invalidate()}
-            />
-            {createButton(false)}
           </>
         }
         description={t("description")}
@@ -312,15 +312,42 @@ export function BackupsPage(): JSX.Element {
 
       <ScheduleCard />
 
-      <SectionCard id="backup-list" title={t("list.title")}>
+      <SectionCard
+        actions={
+          <>
+            <RefreshButton
+              fetching={list.isFetching && !list.isPending}
+              onRefresh={() => void invalidate()}
+              variant="icon"
+            />
+            {createButton(false)}
+          </>
+        }
+        footer={
+          rows.length > PAGE_SIZE ? (
+            <DataTablePagination
+              onPageChange={setPage}
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              total={rows.length}
+            />
+          ) : undefined
+        }
+        icon={ArchiveIcon}
+        id="backup-list"
+        meta={list.data ? listMeta(rows, t, lang) : undefined}
+        slim
+        title={t("list.title")}
+      >
         {list.isError && !list.data ? (
           <ErrorState
+            compact
             error={list.error}
             onRetry={() => void list.refetch()}
             title={t("loadError")}
           />
         ) : (
-          <div ref={listRef}>
+          <div className="min-w-0" ref={listRef}>
             <BackupsTable
               actions={actions}
               emptyState={
@@ -328,23 +355,17 @@ export function BackupsPage(): JSX.Element {
                   action={createButton(true)}
                   description={t("emptyBody")}
                   icon={ArchiveIcon}
+                  inCard
                   title={t("empty")}
                 />
               }
               loading={list.isPending}
+              pageSize={PAGE_SIZE}
               rows={pageRows}
             />
           </div>
         )}
       </SectionCard>
-      {rows.length > PAGE_SIZE ? (
-        <DataTablePagination
-          onPageChange={setPage}
-          page={currentPage}
-          pageSize={PAGE_SIZE}
-          total={rows.length}
-        />
-      ) : null}
     </div>
   );
 }

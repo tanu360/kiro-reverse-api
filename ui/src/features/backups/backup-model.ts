@@ -1,6 +1,6 @@
 import type { BackupCadence, BackupEntry, BackupSchedule } from "@/lib/api/types";
-import { EMPTY, formatNumber } from "@/lib/format";
-import { type Lang, pluralCategory, type TFunction } from "@/lib/i18n";
+import { EMPTY, formatBytes, formatNumber } from "@/lib/format";
+import type { Lang, TFunction, TParams } from "@/lib/i18n";
 
 /** The server caps every request body at 32 MiB and answers a larger one with a plain 413. */
 export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
@@ -16,7 +16,7 @@ const UPLOAD_PREFIX = "upload ";
 const RESTORE_PREFIX = "auto before restore ";
 const SCHEDULED_NOTE = /^auto-(hourly|daily|weekly)$/;
 
-export type BackupTone = "warning" | "info";
+export type BackupTone = "primary" | "neutral" | "warning";
 
 export interface ScheduleForm {
   enabled: boolean;
@@ -83,8 +83,21 @@ export function kindLabel(kind: string, t: TFunction): string {
   return kind || EMPTY;
 }
 
+/** A backup someone made stands out, a rollback point warns, the automatic ones stay quiet. */
 export function kindTone(kind: string): BackupTone {
-  return kind === "pre-restore" ? "warning" : "info";
+  if (kind === "manual") return "primary";
+  if (kind === "pre-restore") return "warning";
+  return "neutral";
+}
+
+/** The Saved backups card meta: "6 backups · 1.2 MB". */
+export function listMeta(rows: readonly BackupEntry[], t: TFunction, lang?: Lang): string {
+  const total = rows.reduce((sum, row) => sum + (row.size || 0), 0);
+  return t("list.meta", {
+    count: rows.length,
+    n: formatNumber(rows.length, lang),
+    size: formatBytes(total, lang),
+  });
 }
 
 /**
@@ -153,17 +166,18 @@ export function isNotABackupMessage(message: string): boolean {
   return NOT_A_BACKUP.some((pattern) => pattern.test(text));
 }
 
-const COUNT_MARKER = "\u0000";
+const MARKER = "\u0000";
 
 /**
- * The text before and after `{count}` in "Keep latest {count} backups", so the number field
- * can sit where the count goes. The plural form follows `keep`.
+ * The text before and after one placeholder of a message ("Last run {time}"), so a component
+ * such as a live RelativeTime can sit where the value goes. The parts keep their own spacing.
  */
-export function keepSentenceParts(t: TFunction, lang: Lang, keep: number): [string, string] {
-  // The language's own form first, then `other` (zh and vi only have `other`).
-  const forms = [pluralCategory(lang, keep), "other"];
-  const key = forms.map((form) => `keepLatest_${form}`).find((name) => t(name) !== name);
-  const text = t(key ?? "keepLatest_other", { count: COUNT_MARKER });
-  const [before = "", after = ""] = text.split(COUNT_MARKER);
-  return [before.trim(), after.trim()];
+export function messageParts(
+  t: TFunction,
+  key: string,
+  name: string,
+  params: TParams = {},
+): [string, string] {
+  const [before = "", after = ""] = t(key, { ...params, [name]: MARKER }).split(MARKER);
+  return [before, after];
 }

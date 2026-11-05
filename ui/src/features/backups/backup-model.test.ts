@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { BackupEntry } from "@/lib/api/types";
+import { formatBytes } from "@/lib/format";
 import { type Lang, type TParams, translate } from "@/lib/i18n";
 import {
   accountsCell,
   clampKeep,
   isNotABackupMessage,
-  keepSentenceParts,
   kindLabel,
   kindTone,
+  listMeta,
   manualNote,
+  messageParts,
   noteText,
   scheduleDirty,
   scheduleForm,
@@ -90,10 +92,11 @@ describe("kindLabel and kindTone", () => {
     expect(kindLabel("", t)).toBe("—");
   });
 
-  it("uses the warning tone only for rollback points", () => {
+  it("marks manual backups, warns on rollback points and keeps the rest neutral", () => {
+    expect(kindTone("manual")).toBe("primary");
     expect(kindTone("pre-restore")).toBe("warning");
-    for (const kind of ["manual", "scheduled", "auto", "nightly-import"]) {
-      expect(kindTone(kind)).toBe("info");
+    for (const kind of ["scheduled", "auto", "nightly-import"]) {
+      expect(kindTone(kind)).toBe("neutral");
     }
   });
 });
@@ -155,17 +158,21 @@ describe("scheduleForm", () => {
   });
 });
 
-describe("keepSentenceParts", () => {
-  it("splits the keep message around the count", () => {
-    expect(keepSentenceParts(t, "en", 20)).toEqual(["Keep latest", "backups"]);
-    expect(keepSentenceParts(t, "en", 1)).toEqual(["Keep latest", "backup"]);
-    expect(keepSentenceParts(tFor("zh"), "zh", 1)).toEqual(["保留最新", "份备份"]);
-    expect(keepSentenceParts(tFor("vi"), "vi", 1)).toEqual(["Giữ", "bản sao lưu mới nhất"]);
-    expect(keepSentenceParts(tFor("pt-BR"), "pt-BR", 1)).toEqual(["Manter", "backup mais recente"]);
-    expect(keepSentenceParts(tFor("pt-BR"), "pt-BR", 0)).toEqual([
-      "Manter",
-      "backups mais recentes",
-    ]);
+describe("messageParts", () => {
+  it("splits a message around one placeholder, keeping its spacing", () => {
+    expect(messageParts(t, "lastRun", "time")).toEqual(["Last run ", ""]);
+    expect(messageParts(t, "nextRun", "time")).toEqual(["Next run ", ""]);
+    expect(messageParts(tFor("zh"), "lastRun", "time")).toEqual(["上次运行：", ""]);
+    expect(messageParts(t, "confirmRestore", "time")).toEqual(["Restore the backup from ", "?"]);
+  });
+});
+
+describe("listMeta", () => {
+  it("counts the backups and adds up their size", () => {
+    const rows = [entry({ size: 1024 }), entry({ size: 1024 })];
+    expect(listMeta(rows, t, "en")).toBe(`2 backups · ${formatBytes(2048, "en")}`);
+    expect(listMeta([entry({ size: 512 })], t, "en")).toBe(`1 backup · ${formatBytes(512, "en")}`);
+    expect(listMeta([], t, "en")).toBe(`0 backups · ${formatBytes(0, "en")}`);
   });
 });
 
