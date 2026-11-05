@@ -1,10 +1,13 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { useState } from "react";
+import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
 import { Autocomplete, AutocompleteInput } from "./autocomplete";
+import { Button } from "./button";
 import { Input } from "./input";
 import { NumberField, NumberFieldDecrement, NumberFieldGroup, NumberFieldIncrement, NumberFieldInput } from "./number-field";
 import { SegmentedControl, SegmentedControlItem } from "./segmented-control";
+import { Select, SelectTrigger, SelectValue } from "./select";
 import { Switch } from "./switch";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "./tabs";
 
@@ -33,10 +36,10 @@ describe("Tabs", () => {
     expect(list.className).not.toContain("text-muted-foreground/72");
   });
 
-  it("makes each tab 40 px tall on touch screens", () => {
+  it("makes the default tab strip 40 px tall on touch screens (36 px tabs in the track)", () => {
     renderTabs();
     for (const tab of screen.getAllByRole("tab")) {
-      expect(tab.className).toContain("pointer-coarse:h-10");
+      expect(tab.className).toContain("pointer-coarse:h-9");
     }
   });
 
@@ -51,7 +54,7 @@ describe("Tabs", () => {
 });
 
 describe("SegmentedControl", () => {
-  it("uses full-strength muted text and 40 px tall items on touch screens", () => {
+  it("uses full-strength muted text and a 40 px track on touch screens", () => {
     renderWithProviders(
       <SegmentedControl>
         <SegmentedControlItem aria-pressed>All</SegmentedControlItem>
@@ -60,21 +63,21 @@ describe("SegmentedControl", () => {
     );
     const item = screen.getByRole("button", { name: "Failed" });
     expect(item.className).not.toContain("text-muted-foreground/72");
-    expect(item.className).toContain("pointer-coarse:h-10");
+    expect(item.className).toContain("pointer-coarse:h-9");
   });
 });
 
 describe("Switch", () => {
-  it("draws the off track with a contrasting edge and has a 44 px touch hit area", () => {
+  it("has a 44 px touch hit area and dims to 64 % when disabled", () => {
     renderWithProviders(<Switch aria-label="Allow overage" />);
     const control = screen.getByRole("switch", { name: "Allow overage" });
-    expect(control.className).toContain("data-unchecked:inset-ring-switch-border");
-    expect(control.className).toContain("pointer-coarse:after:size-11");
+    expect(control.className).toContain("touch-hit");
+    expect(control.className).toContain("data-disabled:opacity-64");
   });
 });
 
 describe("Input", () => {
-  it("is 40 px tall on touch screens at every size", () => {
+  it("is 40 px tall on touch screens at every size, border included", () => {
     renderWithProviders(
       <>
         <Input aria-label="Search" />
@@ -82,8 +85,75 @@ describe("Input", () => {
       </>,
     );
     for (const name of ["Search", "Rule"]) {
-      expect(screen.getByRole("textbox", { name }).className).toContain("pointer-coarse:h-10");
+      expect(screen.getByRole("textbox", { name }).className).toContain("pointer-coarse:h-9.5");
     }
+  });
+});
+
+describe("Button", () => {
+  it("keeps focus while loading, is busy, and ignores further clicks", async () => {
+    const onSave = vi.fn();
+    function SaveButton() {
+      const [saving, setSaving] = useState(false);
+      return (
+        <Button
+          loading={saving}
+          onClick={() => {
+            onSave();
+            setSaving(true);
+          }}
+        >
+          Save
+        </Button>
+      );
+    }
+    const { user } = renderWithProviders(<SaveButton />);
+    const button = screen.getByRole("button", { name: "Save" });
+    await user.click(button);
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(button).not.toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(document.activeElement).toBe(button);
+    // The label stays beside the spinner.
+    expect(button).toHaveTextContent("Save");
+    await user.keyboard("{Enter}");
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("shows loadingText in place of the label while loading", () => {
+    renderWithProviders(
+      <Button loading loadingText="Saving…">
+        Save
+      </Button>,
+    );
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeInTheDocument();
+  });
+});
+
+describe("SelectTrigger", () => {
+  it("is a full-width field by default and as wide as its value with fit=content", () => {
+    renderWithProviders(
+      <>
+        <Select defaultValue="25" items={{ "25": "25 / page" }}>
+          <SelectTrigger aria-label="Rows" fit="content">
+            <SelectValue />
+          </SelectTrigger>
+        </Select>
+        <Select defaultValue="all" items={{ all: "All" }}>
+          <SelectTrigger aria-label="Status">
+            <SelectValue />
+          </SelectTrigger>
+        </Select>
+      </>,
+    );
+    const rows = screen.getByRole("combobox", { name: "Rows" });
+    expect(rows.className).toContain("w-fit");
+    expect(rows.className.split(" ")).not.toContain("w-full");
+    expect(rows.className).not.toContain("min-w-36");
+    const status = screen.getByRole("combobox", { name: "Status" });
+    expect(status.className.split(" ")).toContain("w-full");
   });
 });
 

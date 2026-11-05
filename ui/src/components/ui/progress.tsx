@@ -46,7 +46,7 @@ export function ProgressTrack({
   return (
     <ProgressPrimitive.Track
       className={cn(
-        "block h-1.5 w-full overflow-hidden rounded-full bg-input",
+        "block h-1.5 w-full overflow-hidden rounded-full bg-chart-scale-01",
         className,
       )}
       data-slot="progress-track"
@@ -74,7 +74,7 @@ export function ProgressValue({
 }: ProgressPrimitive.Value.Props): React.ReactElement {
   return (
     <ProgressPrimitive.Value
-      className={cn("text-sm", className)}
+      className={cn("text-sm tabular-nums", className)}
       data-slot="progress-value"
       {...props}
     />

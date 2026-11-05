@@ -8,7 +8,6 @@ import {
   segmentedControlIndicatorSurfaceClassName,
   segmentedControlItemLayoutClassName,
   segmentedControlItemSizeClassNames,
-  segmentedControlItemTouchClassName,
   segmentedControlTrackClassName,
 } from "@/components/ui/segmented-control";
 
@@ -34,6 +33,11 @@ export function Tabs({
   );
 }
 
+/**
+ * `default`: the segmented control (the sign-in theme toggle), the same sizes and sliding
+ * indicator. `underline`: page-level tabs over a full-width hairline, the active one underlined
+ * in purple; the strip scrolls sideways on its own, fading at an edge it can still scroll past.
+ */
 export function TabsList({
   variant = "default",
   size = "default",
@@ -44,7 +48,7 @@ export function TabsList({
   size?: TabsSize;
   variant?: TabsVariant;
 }): React.ReactElement {
-  return (
+  const list = (
     <TabsPrimitive.List
       className={cn(
         "relative z-0 flex w-fit items-center justify-center gap-x-0.5 text-muted-foreground",
@@ -53,7 +57,7 @@ export function TabsList({
           ? // The segmented control's frame (the sign-in theme toggle): round tabs in a hairline pill.
             cn(segmentedControlTrackClassName, "*:data-[slot=tabs-tab]:rounded-full")
           : // Page-level tabs: left-aligned over a full-width hairline, the active one underlined.
-            "justify-start gap-x-1 data-[orientation=horizontal]:border-b data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:grow-0 *:data-[slot=tabs-tab]:hover:bg-accent",
+            "w-max min-w-full justify-start gap-x-1 data-[orientation=horizontal]:border-b data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:grow-0 *:data-[slot=tabs-tab]:hover:bg-accent",
         className,
       )}
       data-size={size}
@@ -74,6 +78,18 @@ export function TabsList({
       />
     </TabsPrimitive.List>
   );
+
+  if (variant !== "underline") {
+    return list;
+  }
+  return (
+    <div
+      className="scroll-fade-x scrollbar-none min-w-0 max-w-full overflow-x-auto overscroll-x-contain"
+      data-slot="tabs-list-scroller"
+    >
+      {list}
+    </div>
+  );
 }
 
 export function TabsTab({
@@ -89,10 +105,13 @@ export function TabsTab({
   return (
     <TabsPrimitive.Tab
       className={cn(
-        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-base outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-outline-inset data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64 sm:text-sm",
+        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-sm outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-outline-inset data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64",
         segmentedControlItemLayoutClassName,
-        segmentedControlItemTouchClassName,
         segmentedControlItemSizeClassNames[resolvedSize],
+        // Phones: a little less side padding, so three or four tabs fit at 360 px.
+        "max-sm:px-2.5",
+        // A count badge in a tab (coss p-tabs-10) goes muted while its tab is not the active one.
+        "not-data-active:[&_[data-slot=badge]]:text-muted-foreground",
         className,
       )}
       data-size={resolvedSize}

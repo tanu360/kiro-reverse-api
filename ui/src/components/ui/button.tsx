@@ -13,13 +13,16 @@ import { Spinner } from "@/components/ui/spinner";
  * utility (index.css), no will-change layer (it re-rasterised the label), and the filled variants
  * share the sign-in button finish. The grain sits on the ::before layer every button already has;
  * ::after stays free for the touch hit area.
- * Icons take --control-icon-color: the label colour, or muted on ghost.
+ * Icons take --control-icon-color: the label colour, or muted on ghost. While `loading`, a
+ * Spinner takes the leading icon's place and the label stays (the sign-in button's look).
  * Every fill comes from the site's own colours (index.css): Kiro purple for the
  * main action, the sign-in showcase's API stickers for supporting ones (lime, periwinkle, peach;
- * --sticker-*), a faint tint of the surface for neutral actions (`outline`), solid zinc for
- * `secondary`, and red for `destructive`. Only the purple button wears the sign-in finish (grain and rim).
- * Kiro adds the sticker variants and `quiet` (an icon button that changes only its colour on
- * hover).
+ * --sticker-*), a faint tint of the surface for neutral actions (`outline`), the inverse fill
+ * for `secondary` (--inverse), and solid red (--destructive-solid) for `destructive`. Only the
+ * purple button wears the sign-in finish (grain and rim).
+ * Kiro adds the sticker variants, `quiet` and `quiet-destructive` (icon buttons that change
+ * only their colour on hover), `link-inline`, and `on-primary` / `on-primary-danger` for the
+ * purple batch toolbar.
  */
 /**
  * The sign-in button finish, on the purple main action only: the faint film grain (index.css
@@ -30,14 +33,8 @@ import { Spinner } from "@/components/ui/spinner";
 export const PRIMARY_FINISH: string =
   "grain-overlay [--grain-overlay-opacity:0.1] not-disabled:not-aria-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [&_svg:not([class*='opacity-'])]:opacity-80";
 
-/*
- * The sticker buttons (index.css --sticker-*): the pastel fill and its label colour, an edge and
- * a hover a step towards the label colour. Written out in full so Tailwind finds the classes.
- */
-const STICKER_LOADING = "*:data-[slot=button-loading-indicator]:text-current";
-
 export const buttonVariants = cva(
-  "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[var(--control-radius)] border font-medium text-base outline-none transition-[box-shadow,scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--control-radius)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:cursor-not-allowed aria-disabled:opacity-64 data-loading:select-none data-loading:text-transparent sm:text-sm [&_svg:not([class*='text-']):not([data-slot=button-loading-indicator])]:text-[var(--control-icon-color)] [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0",
+  "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-medium text-base outline-none transition-[box-shadow,scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:not-aria-busy:opacity-64 aria-busy:cursor-progress sm:text-sm [&_svg:not([class*='text-'])]:text-[var(--control-icon-color)] [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0 [&>[data-slot=button-loading-indicator]+svg]:hidden",
   {
     defaultVariants: {
       size: "default",
@@ -45,73 +42,78 @@ export const buttonVariants = cva(
     },
     variants: {
       /*
-       * The size scale follows shadcn's compact Base UI style (registry style-nova.css), desktop
-       * values, with the matching field (input.tsx, select.tsx) of the same height beside it:
-       *   xs       24 px, 12 px text   inline and table-cell actions
-       *   sm       28 px, 13 px text   actions inside a card, row or toolbar (nova: 0.8rem)
-       *   default  32 px, 14 px text   page and form actions, beside a default field
-       *   lg       40 px, 14 px text   the sign-in button beside the 40 px sign-in field
-       *                                (nova's lg is 36 px; the sign-in page is the reference)
-       * Icon buttons are square at the same steps: icon-xs 24, icon-sm 28, icon 32, icon-lg 36.
-       * Below sm (phones) every size is one 4 px step taller, with 14 px text from sm down and
-       * 16 px from default up, so a thumb has a real target.
+       * One control height scale (phone below sm / sm and up / coarse pointer), shared with the
+       * fields (input.tsx, select.tsx, number-field.tsx) and the segmented control:
+       *   xs       28 / 24 px, 12 px text   inline and table-cell actions
+       *   sm       32 / 28 / 36 px, 13 px   actions inside a card, row or toolbar (Save, Edit, Add)
+       *   default  36 / 32 / 40 px, 14 px   page-header actions and dialog footers
+       *   lg       44 / 40 / 44 px, 14 px   the sign-in button beside the 40 px sign-in field
+       * Icon buttons are square: icon-xs 28 / 24, icon-sm 32 / 28 / 36, icon 36 / 32 / 40,
+       * icon-lg 44 / 40. A coarse pointer grows the control itself (pointer-coarse sorts after
+       * sm:), and every size keeps the 44 px ::after hit area, so no call site sizes for touch.
        */
       size: {
-        default: "h-9 px-[calc(--spacing(3)-1px)] sm:h-8",
-        icon: "size-9 sm:size-8",
-        "icon-lg": "size-10 sm:size-9",
-        "icon-sm": "size-8 sm:size-7",
-        "icon-xl":
-          "size-11 sm:size-10 [&_svg:not([class*='size-'])]:size-5 sm:[&_svg:not([class*='size-'])]:size-4.5",
+        default: "h-9 px-[calc(--spacing(3)-1px)] sm:h-8 pointer-coarse:h-10",
+        icon: "size-9 sm:size-8 pointer-coarse:size-10",
+        "icon-lg": "size-11 sm:size-10",
+        "icon-sm": "size-8 sm:size-7 pointer-coarse:size-9",
         "icon-xs":
           "size-7 sm:size-6 not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-4 sm:not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-3.5",
-        // The sign-in button: 44 px on phones and touch screens, 40 px from sm up (the lg field).
         lg: "h-11 px-[calc(--spacing(3.5)-1px)] sm:h-10 pointer-coarse:h-11",
-        // 13 px text (--text-meta) in the 28 px desktop button, 14 px in the 32 px phone one.
-        sm: "h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] text-sm sm:h-7 sm:text-[length:var(--text-meta)]",
-        xl: "h-11 px-[calc(--spacing(4)-1px)] text-lg sm:h-10 sm:text-base [&_svg:not([class*='size-'])]:size-5 sm:[&_svg:not([class*='size-'])]:size-4.5",
+        // 13 px text (text-meta) in the 28 px desktop button, 14 px in the 32 px phone one.
+        sm: "h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] text-sm sm:h-7 sm:text-meta pointer-coarse:h-9",
         xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-sm sm:h-6 sm:text-xs [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
       },
       variant: {
+        // The main action, one per surface: Kiro purple with the sign-in finish.
         default: cn(
           PRIMARY_FINISH,
-          "border-primary bg-primary text-primary-foreground *:data-[slot=button-loading-indicator]:text-primary-foreground [:hover,[data-pressed]]:bg-primary/90",
+          "border-primary bg-primary text-primary-foreground [:hover,[data-pressed]]:border-primary-hover [:hover,[data-pressed]]:bg-primary-hover",
         ),
+        // The confirm button of a destructive dialog: solid red, white label (4.8:1), a step
+        // deeper on hover.
         destructive:
-          "border-destructive bg-destructive text-primary-foreground *:data-[slot=button-loading-indicator]:text-primary-foreground [:hover,[data-pressed]]:bg-destructive/90",
-        // Kiro: a destructive action that stays quiet until reached for: a red label and hairline,
-        // then solid bright red with a white label and icon on hover, press or click, in both
-        // themes (fixed colours, not theme tokens; white on red-600 is 4.8:1).
-        // The outline button's shape in red: a faint red fill and border, solid red on hover.
+          "border-destructive-solid bg-destructive-solid text-destructive-solid-foreground [:hover,[data-pressed]]:bg-[color-mix(in_oklab,var(--destructive-solid)_88%,var(--color-black))]",
+        // An in-row destructive action that stays quiet until reached for: the outline button's
+        // shape in a faint red with a red label, then solid red with a white label on hover or
+        // press, in both themes.
         danger:
-          "[--control-icon-color:currentColor] border-destructive/24 bg-destructive/8 text-destructive-foreground dark:border-destructive/32 dark:bg-destructive/14 *:data-[slot=button-loading-indicator]:text-current [:hover,[data-pressed]]:border-red-600 [:hover,[data-pressed]]:bg-red-600 [:hover,[data-pressed]]:text-white active:border-red-600 active:bg-red-600 active:text-white",
+          "border-destructive/24 bg-destructive/8 text-destructive-foreground dark:border-destructive/32 dark:bg-destructive/14 [:hover,[data-pressed]]:border-destructive-solid [:hover,[data-pressed]]:bg-destructive-solid [:hover,[data-pressed]]:text-destructive-solid-foreground",
         // Supporting actions in the showcase's API sticker colours: lime (OpenAI) for Export,
         // periwinkle (Codex) for model refreshes, peach (Claude) for a soft destructive action.
-        lime: cn(
-          STICKER_LOADING,
-          "border-[color-mix(in_srgb,var(--sticker-openai-fg)_20%,var(--sticker-openai))] bg-(--sticker-openai) text-(--sticker-openai-fg) [:hover,[data-pressed]]:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))]",
-        ),
-        periwinkle: cn(
-          STICKER_LOADING,
+        lime: "border-[color-mix(in_srgb,var(--sticker-openai-fg)_20%,var(--sticker-openai))] bg-(--sticker-openai) text-(--sticker-openai-fg) [:hover,[data-pressed]]:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))]",
+        periwinkle:
           "border-[color-mix(in_srgb,var(--sticker-codex-fg)_20%,var(--sticker-codex))] bg-(--sticker-codex) text-(--sticker-codex-fg) [:hover,[data-pressed]]:bg-[color-mix(in_srgb,var(--sticker-codex-fg)_9%,var(--sticker-codex))]",
-        ),
-        peach: cn(
-          STICKER_LOADING,
+        peach:
           "border-[color-mix(in_srgb,var(--sticker-claude-fg)_20%,var(--sticker-claude))] bg-(--sticker-claude) text-(--sticker-claude-fg) [:hover,[data-pressed]]:bg-[color-mix(in_srgb,var(--sticker-claude-fg)_9%,var(--sticker-claude))]",
-        ),
+        // Dialog Cancel and Back.
         ghost:
-          "[--control-icon-color:var(--contrast-muted-foreground)] border-transparent text-foreground *:data-[slot=button-loading-indicator]:text-foreground data-pressed:bg-accent [:hover,[data-pressed]]:bg-accent",
-        link: "border-transparent text-foreground underline-offset-4 *:data-[slot=button-loading-indicator]:text-foreground [:hover,[data-pressed]]:underline",
-        // Neutral actions (Cancel, Disable, Refresh tokens…): a faint foreground tint over the
+          "[--control-icon-color:var(--contrast-muted-foreground)] border-transparent text-foreground data-pressed:bg-accent [:hover,[data-pressed]]:bg-accent",
+        link: "border-transparent text-foreground underline-offset-4 [:hover,[data-pressed]]:underline",
+        // A link inside a sentence: the text's own size, no box, a dotted underline that turns
+        // solid on hover. The Button drops the size classes for it.
+        "link-inline":
+          "h-auto whitespace-normal rounded-sm border-0 p-0 text-[length:inherit] text-foreground underline decoration-dotted underline-offset-3 sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 [:hover,[data-pressed]]:decoration-solid",
+        // Neutral actions (Refresh, Add mapping, Edit, Export): a faint foreground tint over the
         // surface it sits on, a step past a field's, and a step deeper on hover (index.css
         // --neutral-button-*).
         outline:
-          "border-(--neutral-button-border) bg-(--neutral-button) text-foreground *:data-[slot=button-loading-indicator]:text-current [:hover,[data-pressed]]:bg-(--neutral-button-hover)",
-        // Kiro: an icon button that only changes its colour on hover, with no fill behind it.
+          "border-(--neutral-button-border) bg-(--neutral-button) text-foreground [:hover,[data-pressed]]:bg-(--neutral-button-hover)",
+        // An icon button that changes only its colour on hover (row kebabs, eye toggles, header
+        // icons); pressed (aria-pressed) it also takes the accent fill.
         quiet:
-          "[--control-icon-color:currentColor] border-transparent text-muted-foreground *:data-[slot=button-loading-indicator]:text-foreground aria-pressed:text-foreground data-popup-open:text-foreground [:hover,[data-pressed]]:text-foreground",
+          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground data-popup-open:text-foreground [:hover,[data-pressed]]:text-foreground",
+        "quiet-destructive":
+          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground data-popup-open:text-foreground [:hover,[data-pressed]]:text-destructive-foreground",
+        // Buttons on the purple batch toolbar: the toolbar's label colour, a white veil on hover.
+        "on-primary":
+          "border-transparent text-primary-foreground [:hover,[data-pressed]]:bg-primary-foreground/14",
+        "on-primary-danger":
+          "border-transparent text-primary-foreground [:hover,[data-pressed]]:bg-destructive-solid [:hover,[data-pressed]]:text-destructive-solid-foreground",
+        // The inverse fill (index.css --inverse): near-black in light, near-white in dark, a step
+        // towards its label on hover.
         secondary:
-          "border-zinc-700 bg-zinc-800 text-zinc-50 *:data-[slot=button-loading-indicator]:text-current dark:border-zinc-400 dark:bg-zinc-200 dark:text-zinc-950 [:hover,[data-pressed]]:bg-zinc-700 dark:[:hover,[data-pressed]]:bg-zinc-300",
+          "border-inverse bg-inverse text-inverse-foreground [:hover,[data-pressed]]:bg-[color-mix(in_oklab,var(--inverse)_88%,var(--inverse-foreground))]",
       },
     },
   },
@@ -120,7 +122,17 @@ export const buttonVariants = cva(
 export interface ButtonProps extends useRender.ComponentProps<"button"> {
   variant?: VariantProps<typeof buttonVariants>["variant"];
   size?: VariantProps<typeof buttonVariants>["size"];
+  /**
+   * Busy: the button keeps focus (aria-disabled and aria-busy, never native `disabled`), ignores
+   * clicks, and a Spinner replaces its leading icon while the label stays.
+   */
   loading?: boolean;
+  /** The label shown while `loading` ("Saving…"); without it the usual label stays. */
+  loadingText?: React.ReactNode;
+}
+
+function preventWhileLoading(event: React.MouseEvent<HTMLButtonElement>): void {
+  event.preventDefault();
 }
 
 export function Button({
@@ -130,30 +142,32 @@ export function Button({
   render,
   children,
   loading = false,
-  disabled: disabledProp,
+  loadingText,
+  onClick,
   ...props
 }: ButtonProps): React.ReactElement {
-  const isDisabled: boolean = Boolean(loading || disabledProp);
   const typeValue: React.ButtonHTMLAttributes<HTMLButtonElement>["type"] =
     render ? undefined : "button";
 
   const defaultProps = {
-    children: (
+    children: loading ? (
       <>
-        {children}
-        {loading && (
-          <Spinner
-            className="pointer-events-none absolute"
-            data-slot="button-loading-indicator"
-          />
-        )}
+        <Spinner aria-hidden="true" data-slot="button-loading-indicator" />
+        {loadingText ?? children}
       </>
+    ) : (
+      children
     ),
-    className: cn(buttonVariants({ className, size, variant })),
+    // An inline link takes the sentence's size, so it drops the size scale.
+    className: cn(
+      buttonVariants({ className, size: variant === "link-inline" ? null : size, variant }),
+    ),
+    "aria-busy": loading || undefined,
     "aria-disabled": loading || undefined,
     "data-loading": loading ? "" : undefined,
     "data-slot": "button",
-    disabled: isDisabled,
+    // While loading, a click (mouse, Enter or Space) does nothing, a submit included.
+    onClick: loading ? preventWhileLoading : onClick,
     type: typeValue,
   };
 

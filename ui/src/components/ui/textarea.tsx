@@ -8,12 +8,18 @@ import { cn } from "@/lib/utils";
 export type TextareaProps = React.ComponentPropsWithoutRef<"textarea"> &
   React.RefAttributes<HTMLTextAreaElement> & {
     size?: "sm" | "default" | "lg" | number;
+    /**
+     * `mono`: Geist Mono at 13 px from sm up (16 px on phones, so iOS does not zoom), for JSON,
+     * tokens and keys. With `wrap="off"` long lines scroll instead of wrapping.
+     */
+    variant?: "default" | "mono";
     unstyled?: boolean;
   };
 
 export function Textarea({
   className,
   size = "default",
+  variant = "default",
   unstyled = false,
   ref,
   ...props
@@ -41,7 +47,10 @@ export function Textarea({
         render={(defaultProps: React.ComponentProps<"textarea">) => (
           <textarea
             className={cn(
-              "field-sizing-content min-h-17.5 max-h-64 w-full rounded-[inherit] px-[calc(--spacing(3)-1px)] py-[calc(--spacing(1.5)-1px)] text-foreground outline-none wrap-anywhere placeholder:text-placeholder max-sm:min-h-20.5",
+              // It grows with its text up to 16rem (field-sizing), so it has no resize grip.
+              "field-sizing-content min-h-17.5 max-h-64 w-full resize-none rounded-[inherit] px-[calc(--spacing(3)-1px)] py-[calc(--spacing(1.5)-1px)] text-foreground outline-none placeholder:text-placeholder max-sm:min-h-20.5",
+              props.wrap === "off" ? "overflow-x-auto whitespace-pre" : "wrap-anywhere",
+              variant === "mono" && "font-mono sm:text-meta",
               size === "sm" &&
                 "min-h-16.5 px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1)-1px)] max-sm:min-h-19.5",
               size === "lg" &&

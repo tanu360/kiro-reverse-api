@@ -127,7 +127,9 @@ export function AutocompletePopup({
       >
         <span
           className={cn(
-            "popup-surface popup-width relative flex max-h-full origin-(--transform-origin) rounded-lg transition-[scale,opacity]",
+            // The popups' one open and close motion (select, menu, popover): a 100 ms fade from
+            // 98 %. The state attributes sit on the Popup inside this sheet.
+            "popup-surface popup-width relative flex max-h-full origin-(--transform-origin) rounded-lg transition-[scale,opacity] duration-100 has-data-ending-style:scale-98 has-data-starting-style:scale-98 has-data-ending-style:opacity-0 has-data-starting-style:opacity-0",
             className,
           )}
         >

@@ -24,7 +24,7 @@ export function FieldLabel({
   return (
     <FieldPrimitive.Label
       className={cn(
-        "inline-flex items-center gap-2 font-medium text-base/4.5 text-foreground data-disabled:opacity-64 sm:text-sm/4",
+        "inline-flex items-center gap-2 font-medium text-foreground text-sm/5 data-disabled:opacity-64",
         className,
       )}
       data-slot="field-label"
@@ -52,7 +52,7 @@ export function FieldDescription({
 }: FieldPrimitive.Description.Props): React.ReactElement {
   return (
     <FieldPrimitive.Description
-      className={cn("text-muted-foreground text-xs", className)}
+      className={cn("text-muted-foreground text-xs leading-normal", className)}
       data-slot="field-description"
       {...props}
     />

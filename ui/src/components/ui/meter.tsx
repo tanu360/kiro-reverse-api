@@ -44,19 +44,20 @@ export function MeterTrack({
 }: MeterPrimitive.Track.Props): React.ReactElement {
   return (
     <MeterPrimitive.Track
-      // A thin rounded bar: 4 px, fully rounded, on the input tone.
-      className={cn("block h-1 w-full overflow-hidden rounded-full bg-input", className)}
+      // A thin rounded bar: 4 px, fully rounded, on the charts' empty step (index.css
+      // --chart-scale-01), the same grey as an empty heatmap cell.
+      className={cn("block h-1 w-full overflow-hidden rounded-full bg-chart-scale-01", className)}
       data-slot="meter-track"
       {...props}
     />
   );
 }
 
-/** The fill in the primary purple, or a status pill colour (index.css --pill-*) as it fills up. */
+/** The fill in the primary purple, or a status ramp colour (index.css) as it fills up. */
 const METER_TONE = {
   default: "bg-primary",
-  warning: "bg-(--pill-warning)",
-  destructive: "bg-(--pill-error)",
+  warning: "bg-warning",
+  destructive: "bg-destructive",
 } as const;
 
 export type MeterTone = keyof typeof METER_TONE;
@@ -81,7 +82,7 @@ export function MeterValue({
 }: MeterPrimitive.Value.Props): React.ReactElement {
   return (
     <MeterPrimitive.Value
-      className={cn("text-foreground text-sm", className)}
+      className={cn("text-foreground text-sm tabular-nums", className)}
       data-slot="meter-value"
       {...props}
     />

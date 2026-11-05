@@ -9,6 +9,8 @@ export type InputProps = Omit<
   "size"
 > & {
   size?: "sm" | "default" | "lg" | number;
+  /** `code`: Geist Mono, for keys, tokens, URLs and IDs. */
+  variant?: "default" | "code";
   unstyled?: boolean;
   nativeInput?: boolean;
 };
@@ -16,6 +18,7 @@ export type InputProps = Omit<
 export function Input({
   className,
   size = "default",
+  variant = "default",
   unstyled = false,
   nativeInput = false,
   style,
@@ -28,8 +31,10 @@ export function Input({
     // lg is the sign-in password field: 44 px on phones and touch screens, 40 px from sm up.
     size === "lg"
       ? "h-10.5 leading-10.5 sm:h-9.5 sm:leading-9.5 pointer-coarse:h-10.5 pointer-coarse:leading-10.5"
-      : // Touch screens get a 40 px field whatever the size (pointer-coarse sorts after sm:).
-        "pointer-coarse:h-10 pointer-coarse:leading-10",
+      : // Touch screens get a 40 px field whatever the size, border included (pointer-coarse
+        // sorts after sm:), the height of the select trigger and the default button.
+        "pointer-coarse:h-9.5 pointer-coarse:leading-9.5",
+    variant === "code" && "font-mono",
     props.type === "search" &&
       "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none",
     props.type === "number" &&

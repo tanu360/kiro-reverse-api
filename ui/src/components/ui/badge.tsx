@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
  * circle with the glyph knocked out; see `[data-badge-icon="disc"]` in index.css.
  */
 export const badgeVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-transparent font-medium leading-none outline-none transition-[background-color,box-shadow] focus-outline disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-(--badge-icon) [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
+  "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-transparent font-medium tabular-nums leading-none outline-none transition-[background-color,box-shadow] focus-outline disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-(--badge-icon) [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
   {
     defaultVariants: {
       size: "default",
@@ -35,28 +35,30 @@ export const badgeVariants = cva(
     },
     variants: {
       size: {
-        sm: "h-5 px-1.5 text-2xs has-[>svg:first-child]:ps-1 [&_svg:not([class*='size-'])]:size-3",
+        // min-w-5 keeps a one-digit count round.
+        sm: "h-5 min-w-5 justify-center px-1.5 text-2xs has-[>svg:first-child]:ps-1 has-[>[data-slot=badge-dot]:first-child]:ps-1.5 [&_svg:not([class*='size-'])]:size-3",
         // The disc nearly fills the pill (a 2 px inset), as in the reference; line icons stay a
         // step smaller so they sit with the 12 px label instead of shouting over it.
         default:
-          "h-6 px-2.5 text-xs has-[>svg:first-child]:ps-1 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='size-'])[data-badge-icon=line]]:size-3.5 has-[>svg[data-badge-icon=line]:first-child]:ps-2",
-        lg: "h-7 gap-1.5 px-2.5 text-sm has-[>svg:first-child]:ps-1.5 [&_svg:not([class*='size-'])]:size-4",
+          "h-6 px-2.5 text-xs has-[>svg:first-child]:ps-1 has-[>[data-slot=badge-dot]:first-child]:ps-2 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='size-'])[data-badge-icon=line]]:size-3.5 has-[>svg[data-badge-icon=line]:first-child]:ps-2",
+        lg: "h-7 gap-1.5 px-2.5 text-sm has-[>svg:first-child]:ps-1.5 has-[>[data-slot=badge-dot]:first-child]:ps-2.5 [&_svg:not([class*='size-'])]:size-4",
       },
-      // Every tone reads its colours from the --pill-* tokens (index.css), which already switch
-      // for the dark theme. Only the solid fills keep their own Tailwind colours.
+      // Every tone reads its colours from the --pill-* tokens and the status ramps (index.css),
+      // which already switch for the dark theme. A solid fill is the tone's text colour (4.5:1 on
+      // a card in both themes) with the card colour as its label; neutral is the inverse fill.
       tone: {
         neutral:
-          "[--badge-bg:var(--pill-neutral-bg)] [--badge-disc:var(--pill-neutral)] [--badge-fg:var(--pill-neutral-fg)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--color-zinc-800)] [--badge-tint:var(--pill-neutral)] dark:[--badge-solid-fg:var(--color-zinc-900)] dark:[--badge-solid:var(--color-zinc-100)]",
+          "[--badge-bg:var(--pill-neutral-bg)] [--badge-disc:var(--pill-neutral)] [--badge-fg:var(--pill-neutral-fg)] [--badge-solid-fg:var(--inverse-foreground)] [--badge-solid:var(--inverse)] [--badge-tint:var(--pill-neutral)]",
         primary:
           "[--badge-bg:var(--pill-primary-bg)] [--badge-disc:var(--pill-primary)] [--badge-fg:var(--pill-primary-fg)] [--badge-solid-fg:var(--primary-foreground)] [--badge-solid:var(--primary)] [--badge-tint:var(--pill-primary)]",
         // Kiro purple, like primary: the app has no blue.
-        info: "[--badge-bg:var(--pill-primary-bg)] [--badge-disc:var(--pill-primary)] [--badge-fg:var(--pill-primary-fg)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--info)] [--badge-tint:var(--pill-primary)]",
+        info: "[--badge-bg:var(--pill-primary-bg)] [--badge-disc:var(--pill-primary)] [--badge-fg:var(--pill-primary-fg)] [--badge-solid-fg:var(--primary-foreground)] [--badge-solid:var(--info)] [--badge-tint:var(--pill-primary)]",
         success:
-          "[--badge-bg:var(--pill-success-bg)] [--badge-disc:var(--pill-success)] [--badge-fg:var(--pill-success-fg)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--color-emerald-700)] [--badge-tint:var(--pill-success)]",
+          "[--badge-bg:var(--pill-success-bg)] [--badge-disc:var(--pill-success)] [--badge-fg:var(--pill-success-fg)] [--badge-solid-fg:var(--card)] [--badge-solid:var(--success-foreground)] [--badge-tint:var(--pill-success)]",
         warning:
-          "[--badge-bg:var(--pill-warning-bg)] [--badge-disc:var(--pill-warning)] [--badge-fg:var(--pill-warning-fg)] [--badge-solid-fg:var(--color-amber-950)] [--badge-solid:var(--color-amber-400)] [--badge-tint:var(--pill-warning)]",
+          "[--badge-bg:var(--pill-warning-bg)] [--badge-disc:var(--pill-warning)] [--badge-fg:var(--pill-warning-fg)] [--badge-solid-fg:var(--card)] [--badge-solid:var(--warning-foreground)] [--badge-tint:var(--pill-warning)]",
         destructive:
-          "[--badge-bg:var(--pill-error-bg)] [--badge-disc:var(--pill-error)] [--badge-fg:var(--pill-error-fg)] [--badge-solid-fg:var(--color-white)] [--badge-solid:var(--destructive)] [--badge-tint:var(--pill-error)]",
+          "[--badge-bg:var(--pill-error-bg)] [--badge-disc:var(--pill-error)] [--badge-fg:var(--pill-error-fg)] [--badge-solid-fg:var(--destructive-solid-foreground)] [--badge-solid:var(--destructive-solid)] [--badge-tint:var(--pill-error)]",
       },
       variant: {
         soft: "bg-(--badge-bg) text-(--badge-fg) [--badge-dot:var(--badge-disc)] [--badge-glyph:var(--pill-glyph)] [--badge-icon:var(--badge-fg)] [button&,a&]:hover:bg-[color-mix(in_srgb,var(--badge-tint)_20%,transparent)] dark:[button&,a&]:hover:bg-[color-mix(in_srgb,var(--badge-tint)_28%,transparent)]",
@@ -84,6 +86,22 @@ export interface BadgeProps extends useRender.ComponentProps<"span"> {
   icon?: IconSvgElement;
   /** `disc`: a filled colour circle with a white glyph. `line`: a plain icon in the text colour. */
   iconStyle?: "disc" | "line";
+  /** A leading 6 px dot in the tone's colour, in place of an icon (a status pill). */
+  dot?: boolean;
+  /** The dot with a ring pinging out of it, for a live connection (implies `dot`). */
+  live?: boolean;
+}
+
+/** The leading status dot of a Badge; with `live`, a ring pings out of it (motion-safe only). */
+export function BadgeDot({ live = false }: { live?: boolean }): React.ReactElement {
+  return (
+    <span aria-hidden="true" className="relative flex size-1.5 shrink-0" data-slot="badge-dot">
+      {live ? (
+        <span className="absolute inset-0 rounded-full bg-(--badge-dot) opacity-60 motion-safe:animate-ping" />
+      ) : null}
+      <span className="relative size-1.5 rounded-full bg-(--badge-dot)" />
+    </span>
+  );
 }
 
 /** The leading icon of a pill built by hand from `badgeVariants` (for example a button). */
@@ -104,16 +122,24 @@ export function Badge({
   size,
   icon,
   iconStyle = "disc",
+  dot = false,
+  live = false,
   render,
   children,
   ...props
 }: BadgeProps): React.ReactElement {
+  const leading: React.ReactNode =
+    dot || live ? (
+      <BadgeDot live={live} />
+    ) : icon ? (
+      <BadgeIcon icon={icon} iconStyle={iconStyle} />
+    ) : null;
   const defaultProps = {
     className: cn(badgeVariants({ className, size, tone, variant })),
     "data-slot": "badge",
-    children: icon ? (
+    children: leading ? (
       <>
-        <BadgeIcon icon={icon} iconStyle={iconStyle} />
+        {leading}
         {children}
       </>
     ) : (

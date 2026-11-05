@@ -103,7 +103,9 @@ export function NumberFieldInput({
     <NumberFieldPrimitive.Input
       aria-roledescription={t("numberField.roleDescription")}
       className={cn(
-        "h-8.5 in-data-[size=lg]:h-9.5 in-data-[size=sm]:h-7.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground in-data-[size=lg]:leading-9.5 in-data-[size=sm]:leading-7.5 leading-8.5 outline-none [transition:background-color_5000000s_ease-in-out_0s] sm:h-7.5 sm:in-data-[size=lg]:h-8.5 sm:in-data-[size=sm]:h-6.5 sm:in-data-[size=lg]:leading-8.5 sm:in-data-[size=sm]:leading-8.5 sm:leading-7.5 pointer-coarse:h-10 pointer-coarse:leading-10",
+        // The field heights of input.tsx, border included: 36 / 32 by default, 32 / 28 sm,
+        // 44 / 40 lg, and 40 on a coarse pointer (44 lg).
+        "h-8.5 in-data-[size=lg]:h-10.5 in-data-[size=sm]:h-7.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground tabular-nums in-data-[size=lg]:leading-10.5 in-data-[size=sm]:leading-7.5 leading-8.5 outline-none [transition:background-color_5000000s_ease-in-out_0s] sm:h-7.5 sm:in-data-[size=lg]:h-9.5 sm:in-data-[size=sm]:h-6.5 sm:in-data-[size=lg]:leading-9.5 sm:in-data-[size=sm]:leading-6.5 sm:leading-7.5 pointer-coarse:h-9.5 pointer-coarse:leading-9.5 pointer-coarse:in-data-[size=lg]:h-10.5 pointer-coarse:in-data-[size=lg]:leading-10.5",
         className,
       )}
       data-slot="number-field-input"

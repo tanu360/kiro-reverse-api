@@ -11,7 +11,9 @@ export function Switch({
   return (
     <SwitchPrimitive.Root
       className={cn(
-        "relative inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 cursor-pointer items-center rounded-full p-[2px] outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(5)] pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 focus-outline data-checked:bg-primary data-unchecked:bg-switch-track data-disabled:cursor-not-allowed data-disabled:opacity-75 sm:[--thumb-size:--spacing(4)]",
+        // 38 x 22 on phones, 30 x 18 from sm up, with a 44 px hit area on a coarse pointer
+        // (index.css touch-hit). Disabled is 64 %, as every control.
+        "touch-hit relative inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 cursor-pointer items-center rounded-full p-[2px] outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(5)] focus-outline data-checked:bg-primary data-unchecked:bg-switch-track hover:data-unchecked:bg-switch-track/85 data-disabled:cursor-not-allowed data-disabled:opacity-64 sm:[--thumb-size:--spacing(4)]",
         className,
       )}
       data-slot="switch"

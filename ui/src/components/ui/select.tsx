@@ -25,16 +25,25 @@ export const Select: typeof SelectPrimitive.Root = SelectPrimitive.Root;
  * The trigger is a form field (index.css --field-*, the sign-in password field's soft fill): a
  * faint tint, a hairline border, a deeper tint on hover and while open, and a soft purple border
  * on keyboard focus, with no ring. Sizes match the input and the button: 36 / 32 px by default,
- * 44 / 40 px lg (the sign-in field), 32 / 28 px sm. Coarse pointers keep a 44 px hit area (the
- * ::after layer).
+ * 44 / 40 px lg (the sign-in field), 32 / 28 px sm, and 40 px on a coarse pointer (44 lg), with
+ * a 44 px hit area (the ::after layer).
  */
 export const selectTriggerVariants = cva(
-  "relative inline-flex w-full min-w-36 cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-base text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 sm:text-sm pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-base text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 sm:text-sm pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
+      fit: "field",
       size: "default",
     },
     variants: {
+      /**
+       * `field` (default): a form field, as wide as its column. `content`: as wide as the chosen
+       * option, for toolbars and pagers (a "25 / page" select).
+       */
+      fit: {
+        content: "w-fit",
+        field: "w-full min-w-0",
+      },
       size: {
         // Touch screens get a real 40 px trigger, as the input (pointer-coarse sorts after sm:).
         default: "min-h-9 px-[calc(--spacing(3)-1px)] sm:min-h-8 pointer-coarse:min-h-10",
@@ -85,13 +94,14 @@ export function SelectButton({
 export function SelectTrigger({
   className,
   size = "default",
+  fit = "field",
   children,
   ...props
 }: SelectPrimitive.Trigger.Props &
   VariantProps<typeof selectTriggerVariants>): React.ReactElement {
   return (
     <SelectPrimitive.Trigger
-      className={cn(selectTriggerVariants({ size }), className)}
+      className={cn(selectTriggerVariants({ fit, size }), className)}
       data-slot="select-trigger"
       {...props}
     >
@@ -159,7 +169,7 @@ export function SelectPopup({
         sideOffset={sideOffset}
       >
         <SelectPrimitive.Popup
-          className="origin-(--transform-origin) rounded-lg text-foreground outline-none"
+          className="origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0"
           data-slot="select-popup"
           {...props}
         >
@@ -266,7 +276,7 @@ export function SelectLabel({
   return (
     <SelectPrimitive.Label
       className={cn(
-        "not-in-data-[slot=field]:mb-2 inline-flex cursor-default items-center gap-2 font-medium text-base/4.5 text-foreground sm:text-sm/4",
+        "not-in-data-[slot=field]:mb-2 inline-flex cursor-default items-center gap-2 font-medium text-foreground text-sm/5",
         className,
       )}
       data-slot="select-label"
