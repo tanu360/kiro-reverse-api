@@ -8,6 +8,13 @@ import { cn } from "@/lib/utils";
  * A scroll box with no vertical bar and a thin sideways one. `scrollFade` fades whichever edge
  * still has content past it, on both axes: the top and bottom of a tall panel, and the start and
  * end of a row wider than its box (tab strips, chip rows), 24 px at most.
+ * `scrollbarGutter` gives the sideways bar its own 10 px lane under an overflowing row, so the bar
+ * never covers the row:
+ *   true       the lane is part of the box (bottom padding while the row overflows), for a row
+ *              with nothing below it to lend the space, such as a sticky chip bar
+ *   "overlap"  the lane takes no layout space: the bar is drawn 10 px lower, in the gap below the
+ *              box (a toolbar's gap, a card's padding), so a row is as tall with and without
+ *              overflow and the spacing around it stays even. Margins on the box still apply.
  */
 export function ScrollArea({
   className,
@@ -20,7 +27,7 @@ export function ScrollArea({
   ...props
 }: ScrollAreaPrimitive.Root.Props & {
   scrollFade?: boolean;
-  scrollbarGutter?: boolean;
+  scrollbarGutter?: boolean | "overlap";
   fill?: boolean;
   clampContentMinWidth?: boolean;
   overscrollContain?: boolean;
@@ -37,7 +44,7 @@ export function ScrollArea({
             "data-has-overflow-y:overscroll-y-contain data-has-overflow-x:overscroll-x-contain",
           scrollFade &&
             "mask-t-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-start)))] mask-b-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-end)))] mask-l-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-x-start)))] mask-r-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-x-end)))] [--fade-size:1.5rem]",
-          scrollbarGutter && "data-has-overflow-x:pb-2.5",
+          scrollbarGutter === true && "data-has-overflow-x:pb-2.5",
         )}
         data-slot="scroll-area-viewport"
       >
@@ -50,7 +57,9 @@ export function ScrollArea({
         </ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
       {/* Kiro: no vertical bar, ever (see the scrollbar rules in index.css); only the sideways one. */}
-      <HorizontalScrollBar />
+      <HorizontalScrollBar
+        className={scrollbarGutter === "overlap" ? "translate-y-2.5" : undefined}
+      />
       <ScrollAreaPrimitive.Corner data-slot="scroll-area-corner" />
     </ScrollAreaPrimitive.Root>
   );

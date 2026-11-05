@@ -79,9 +79,10 @@ export const buttonVariants = cva(
           "border-destructive-solid bg-destructive-solid text-destructive-solid-foreground hover:bg-[color-mix(in_oklab,var(--destructive-solid)_88%,var(--color-black))] data-pressed:bg-[color-mix(in_oklab,var(--destructive-solid)_88%,var(--color-black))]",
         // An in-row destructive action that stays quiet until reached for: the outline button's
         // shape in a faint red with a red label, then solid red with a white label on hover or
-        // press, in both themes.
+        // press, in both themes. The dark tint is a dark: class, so the solid fill repeats under
+        // dark: or the tint would outrank it there.
         danger:
-          "border-destructive/24 bg-destructive/8 text-destructive-foreground dark:border-destructive/32 dark:bg-destructive/14 hover:border-destructive-solid data-pressed:border-destructive-solid hover:bg-destructive-solid data-pressed:bg-destructive-solid hover:text-destructive-solid-foreground data-pressed:text-destructive-solid-foreground",
+          "border-destructive/24 bg-destructive/8 text-destructive-foreground dark:border-destructive/32 dark:bg-destructive/14 hover:border-destructive-solid data-pressed:border-destructive-solid hover:bg-destructive-solid data-pressed:bg-destructive-solid hover:text-destructive-solid-foreground data-pressed:text-destructive-solid-foreground dark:hover:border-destructive-solid dark:data-pressed:border-destructive-solid dark:hover:bg-destructive-solid dark:data-pressed:bg-destructive-solid",
         // Supporting actions in the showcase's API sticker colours: lime (OpenAI) for Export,
         // periwinkle (Codex) for model refreshes, peach (Claude) for a soft destructive action.
         lime: "border-[color-mix(in_srgb,var(--sticker-openai-fg)_20%,var(--sticker-openai))] bg-(--sticker-openai) text-(--sticker-openai-fg) hover:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))] data-pressed:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))]",
@@ -103,12 +104,14 @@ export const buttonVariants = cva(
         outline:
           "border-(--neutral-button-border) bg-(--neutral-button) text-foreground hover:bg-(--neutral-button-hover) data-pressed:bg-(--neutral-button-hover)",
         // An icon button that changes only its colour on hover (row kebabs, eye toggles, header
-        // icons); pressed (aria-pressed) or with its menu open (data-popup-open) it also takes the
-        // accent fill, so an open menu's trigger reads as the one that opened it.
+        // icons); pressed (aria-pressed) or with its menu open (aria-expanded) it also takes the
+        // accent fill, so an open menu's trigger reads as the one that opened it. Not
+        // data-popup-open: a tooltip trigger gets that too once its tooltip shows, which filled
+        // every hovered icon button with a tooltip (and turned the red hover back to foreground).
         quiet:
-          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground data-popup-open:bg-accent data-popup-open:text-foreground hover:text-foreground data-pressed:text-foreground",
+          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground hover:text-foreground data-pressed:text-foreground",
         "quiet-destructive":
-          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground data-popup-open:bg-accent data-popup-open:text-foreground hover:text-destructive-foreground data-pressed:text-destructive-foreground",
+          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground hover:text-destructive-foreground data-pressed:text-destructive-foreground",
         // Buttons on the purple batch toolbar: the toolbar's label colour, a white veil on hover.
         "on-primary":
           "border-transparent text-primary-foreground hover:bg-primary-foreground/14 data-pressed:bg-primary-foreground/14",

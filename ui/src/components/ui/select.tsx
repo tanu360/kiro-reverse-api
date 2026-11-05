@@ -144,7 +144,8 @@ export function SelectPopup({
 }: SelectPrimitive.Popup.Props & {
   portalProps?: SelectPrimitive.Portal.Props;
   /**
-   * Kiro: "field" (default) makes the list exactly as wide as its field-like trigger; "content"
+   * Kiro: "field" (default) makes the list at least as wide as its field-like trigger, growing
+   * to fit its longest option up to max(trigger, 14rem) (index.css popup-width-field); "content"
    * lets it grow past a narrow, flat trigger (a bare label such as the sign-in language picker)
    * to fit its options, as menus do (index.css popup-width).
    */
@@ -216,6 +217,10 @@ export function SelectPopup({
  * One option as the sign-in language picker draws it: the label (icons inline before it), then,
  * on the chosen option, a CheckedDot at the row's end. `meta` adds muted trailing text such as a
  * count; with it the dot's place is kept on every row, so the counts line up.
+ * The label starts 12 px in from the popup's outer edge (1 px border, the list's 4 px, then
+ * ps-1.75), the same as the default trigger's value (1 px border, then 11 px). The popup lines
+ * the chosen option's text up with the trigger's, so equal insets keep the popup square over
+ * the trigger instead of 1 px to its left.
  */
 export function SelectItem({
   className,
@@ -225,7 +230,7 @@ export function SelectItem({
 }: SelectPrimitive.Item.Props & { meta?: React.ReactNode }): React.ReactElement {
   return (
     <SelectPrimitive.Item
-      className={cn(POPUP_ROW_CLASS, POPUP_CHECK_ROW_CLASS, className)}
+      className={cn(POPUP_ROW_CLASS, POPUP_CHECK_ROW_CLASS, "ps-1.75", className)}
       data-slot="select-item"
       {...props}
     >

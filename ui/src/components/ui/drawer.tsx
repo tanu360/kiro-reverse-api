@@ -9,7 +9,7 @@ import { useRender } from "@base-ui/react/use-render";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CheckIcon, ChevronRightIcon, XIcon } from "@hugeicons/core-free-icons";
 import type React from "react";
-import { createContext, useContext } from "react";
+import { createContext, useCallback, useContext } from "react";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -148,6 +148,64 @@ export function DrawerViewport({
   );
 }
 
+/** The drawer's slide: the same 450 ms curve as its CSS transitions. */
+const DRAWER_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
+const DRAWER_DURATION_MS = 450;
+
+/**
+ * A top or bottom drawer is as tall as its content (height auto, up to the screen), and CSS
+ * cannot transition from one auto height to another (interpolate-size only covers a change of
+ * the height value, not of the content), so a step flow's sheet jumped to its new height in one
+ * frame. This watches the popup and, when its content makes it taller or shorter, plays the
+ * change as a height animation on the drawer's own curve, so the top edge glides. A change of
+ * padding alone (the on-screen keyboard's inset, which has its own transition) only updates the
+ * baseline. It stays out of the open and close slides, a swipe, a parent with a nested drawer
+ * open (Base UI sizes that one itself) and reduced motion. Returns the cleanup.
+ */
+function animateContentHeight(popup: HTMLElement): () => void {
+  if (typeof ResizeObserver !== "function" || typeof popup.animate !== "function") {
+    return () => {};
+  }
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  let borderHeight = 0;
+  let contentHeight = 0;
+  let running: Animation | null = null;
+  const observer = new ResizeObserver(([entry]) => {
+    // While an animation runs, the sizes reported are its own frames.
+    if (!entry || running) return;
+    const nextBorder = entry.borderBoxSize?.[0]?.blockSize ?? popup.offsetHeight;
+    const nextContent = entry.contentBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+    const from = borderHeight;
+    const contentChanged = Math.abs(nextContent - contentHeight) >= 1;
+    borderHeight = nextBorder;
+    contentHeight = nextContent;
+    if (!from || !contentChanged || Math.abs(nextBorder - from) < 2) return;
+    if (
+      reducedMotion?.matches ||
+      popup.matches(
+        "[data-starting-style],[data-ending-style],[data-swiping],[data-nested-drawer-open]",
+      )
+    ) {
+      return;
+    }
+    const animation = popup.animate(
+      [{ height: `${from}px` }, { height: `${nextBorder}px` }],
+      { duration: DRAWER_DURATION_MS, easing: DRAWER_EASING },
+    );
+    running = animation;
+    const settle = (): void => {
+      if (running === animation) running = null;
+    };
+    animation.addEventListener("finish", settle);
+    animation.addEventListener("cancel", settle);
+  });
+  observer.observe(popup, { box: "border-box" });
+  return () => {
+    observer.disconnect();
+    running?.cancel();
+  };
+}
+
 export function DrawerPopup({
   className,
   children,
@@ -157,6 +215,7 @@ export function DrawerPopup({
   showBar = false,
   portalProps,
   onKeyDown,
+  ref,
   ...props
 }: DrawerPrimitive.Popup.Props & {
   showCloseButton?: boolean;
@@ -168,10 +227,31 @@ export function DrawerPopup({
   const { t } = useT();
   const { position: contextPosition } = useContext(DrawerContext);
   const position = positionProp ?? contextPosition;
+  const vertical = position === "bottom" || position === "top";
+
+  // The caller's ref plus, on a top or bottom drawer, the content-height animation (a ref
+  // callback's cleanup ends it when the popup unmounts).
+  const popupRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+      const stop = node && vertical ? animateContentHeight(node) : undefined;
+      return () => {
+        stop?.();
+        if (typeof ref === "function") ref(null);
+        else if (ref) ref.current = null;
+      };
+    },
+    [ref, vertical],
+  );
 
   const popup = (
     <DrawerPortal {...portalProps}>
-      <DrawerBackdrop />
+      {/*
+        forceRender: a drawer opened from inside another drawer or a sheet (Base UI nesting)
+        draws its own backdrop too, so the parent dims behind it, as DialogPopup does.
+      */}
+      <DrawerBackdrop forceRender />
       <DrawerViewport position={position} variant={variant}>
         <DrawerPrimitive.Popup
           className={cn(
@@ -226,6 +306,7 @@ export function DrawerPopup({
             onKeyDown?.(event);
             wrapTabFocus(event);
           }}
+          ref={popupRef}
           {...props}
         >
           {children}

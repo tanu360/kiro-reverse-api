@@ -23,6 +23,7 @@ export function AutocompleteInput({
   showClear = false,
   startAddon,
   size,
+  variant = "default",
   triggerProps,
   clearProps,
   ...props
@@ -31,6 +32,8 @@ export function AutocompleteInput({
   showClear?: boolean;
   startAddon?: React.ReactNode;
   size?: "sm" | "default" | "lg" | number;
+  /** `code`: Geist Mono (Input's code variant), for model IDs and other identifiers. */
+  variant?: "default" | "code";
   ref?: React.Ref<HTMLInputElement>;
   triggerProps?: AutocompletePrimitive.Trigger.Props;
   clearProps?: AutocompletePrimitive.Clear.Props;
@@ -62,7 +65,7 @@ export function AutocompleteInput({
           className,
         )}
         data-slot="autocomplete-input"
-        render={<Input nativeInput size={sizeValue} />}
+        render={<Input nativeInput size={sizeValue} variant={variant} />}
         {...props}
       />
       {showTrigger && (
