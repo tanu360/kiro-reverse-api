@@ -208,29 +208,46 @@ type StatusTab = typeof ALL | StatusGroup;
 const TAB_FADE_PX = 24;
 
 /**
- * Brings the selected tab into the visible part of the scrolling track, centred, when it sits
- * outside it or under an edge fade: on load (a `?status=` link, a reload) and on every change.
- * Only the track scrolls, never the page. The first move is instant, later ones glide.
+ * Scrolls the track so the selected tab sits centred in it, when the tab is outside the visible
+ * part or under an edge fade. Only the track scrolls, never the page.
  */
-function useSelectedTabInView(value: StatusTab) {
+function revealSelectedTab(list: HTMLElement | null, smooth: boolean) {
+  const tab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+  const viewport = tab?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]');
+  if (!tab || !viewport) return;
+  const box = viewport.getBoundingClientRect();
+  const rect = tab.getBoundingClientRect();
+  if (box.width === 0) return;
+  const hidden = rect.left < box.left + TAB_FADE_PX || rect.right > box.right - TAB_FADE_PX;
+  if (!hidden) return;
+  const left = viewport.scrollLeft + rect.left + rect.width / 2 - (box.left + box.width / 2);
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  viewport.scrollTo?.({ left, behavior: smooth && !reduce ? "smooth" : "auto" });
+}
+
+/**
+ * Keeps the selected tab in view: on load (a `?status=` link, a reload), once the counts replace
+ * their placeholders (the track grows, so the scroll set while loading falls short), on every
+ * change and whenever the track's width changes. Moves are instant until the list has loaded;
+ * after that a picked tab glides into place.
+ */
+function useSelectedTabInView(value: StatusTab, loading: boolean) {
   const listRef = useRef<HTMLDivElement>(null);
-  const mountedRef = useRef(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `value` moves the selected tab.
+  const loadedRef = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `value` and `loading` move the tab.
   useEffect(() => {
-    const smooth = mountedRef.current;
-    mountedRef.current = true;
-    const tab = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
-    const viewport = tab?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]');
-    if (!tab || !viewport) return;
-    const box = viewport.getBoundingClientRect();
-    const rect = tab.getBoundingClientRect();
-    if (box.width === 0) return;
-    const hidden = rect.left < box.left + TAB_FADE_PX || rect.right > box.right - TAB_FADE_PX;
-    if (!hidden) return;
-    const left = viewport.scrollLeft + rect.left + rect.width / 2 - (box.left + box.width / 2);
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    viewport.scrollTo?.({ left, behavior: smooth && !reduce ? "smooth" : "auto" });
-  }, [value]);
+    const smooth = loadedRef.current;
+    if (!loading) loadedRef.current = true;
+    revealSelectedTab(listRef.current, smooth);
+  }, [value, loading]);
+  // A wider or narrower track (counts arriving, a font swap, a rotation) can push it under the fade.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => revealSelectedTab(list, false));
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, []);
   return listRef;
 }
 
@@ -257,7 +274,7 @@ function StatusTabs({
   end?: ReactNode;
 }): JSX.Element {
   const { t, lang } = useT("accounts");
-  const listRef = useSelectedTabInView(value);
+  const listRef = useSelectedTabInView(value, loading);
   const label: Record<StatusTab, string> = {
     all: t("filter.all"),
     active: t("health.active"),
@@ -280,7 +297,8 @@ function StatusTabs({
               <TabsTab disabled={loading} key={tab} value={tab}>
                 {label[tab]}
                 {loading ? (
-                  <Skeleton className="h-4 w-6" />
+                  // The badge's size, so the track barely moves when the counts arrive.
+                  <Skeleton className="h-5 w-7" />
                 ) : (
                   <Badge size="sm">{formatNumber(tab === ALL ? total : counts[tab], lang)}</Badge>
                 )}
