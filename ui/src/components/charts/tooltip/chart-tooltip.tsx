@@ -679,7 +679,8 @@ function DatePillTrackerInner({
       style={{
         left: discreteInteraction ? xWithMargin : animatedX,
         transform: "translateX(-50%)",
-        bottom: 4,
+        // Centred on the x-axis labels (bottom 12, one 16 px chart-tick line): the pill is 20 px.
+        bottom: 10,
       }}
     >
       <DateTicker

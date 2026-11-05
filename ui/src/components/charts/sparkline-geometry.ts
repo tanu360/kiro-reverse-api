@@ -215,25 +215,73 @@ export function sparklineBarWidth(band: number, gap: number): number {
   return Math.max(1, band - gap);
 }
 
-/** All bars as a single path — one DOM node regardless of point count. */
+/**
+ * Bar tip y for a point, pushed `minHeight` px away from the baseline when the
+ * bar would be shorter, so zero and tiny values still read as a stub.
+ */
+export function sparklineBarTipY(
+  point: SparklinePoint,
+  baselineY: number,
+  minHeight = 0
+): number {
+  if (minHeight <= 0 || Math.abs(baselineY - point.y) >= minHeight) {
+    return point.y;
+  }
+  return point.value < 0 ? baselineY + minHeight : baselineY - minHeight;
+}
+
+/**
+ * All bars as a single path — one DOM node regardless of point count.
+ * `indices` limits the path to those bars (one path per bar colour);
+ * `minHeight` draws zero and tiny values as stubs.
+ */
 export function buildSparklineBarsPath(
   layout: SparklineLayout,
-  options: { gap: number; radius: number }
+  options: {
+    gap: number;
+    radius: number;
+    minHeight?: number;
+    indices?: readonly number[];
+  }
 ): string {
   const barWidth = sparklineBarWidth(layout.band, options.gap);
+  const minHeight = options.minHeight ?? 0;
   let d = "";
-  for (const point of layout.points) {
-    if (Number.isFinite(point.y)) {
+  const draw = (point: SparklinePoint | undefined) => {
+    if (point && Number.isFinite(point.y)) {
       d += buildSparklineBarSegment(
         point.x,
         barWidth,
-        point.y,
+        sparklineBarTipY(point, layout.baselineY, minHeight),
         layout.baselineY,
         options.radius
       );
     }
+  };
+  if (options.indices) {
+    for (const index of options.indices) {
+      draw(layout.points[index]);
+    }
+  } else {
+    for (const point of layout.points) {
+      draw(point);
+    }
   }
   return d;
+}
+
+/** True when there is data and no bar has a value other than 0 (nothing to compare yet). */
+export function isSparklineFlatZero(values: readonly number[]): boolean {
+  let any = false;
+  for (const value of values) {
+    if (Number.isFinite(value)) {
+      if (value !== 0) {
+        return false;
+      }
+      any = true;
+    }
+  }
+  return any;
 }
 
 /** Nearest data index for a pointer x position (in chart pixels). */

@@ -30,7 +30,7 @@ export function TooltipHeader({ children, className }: TooltipHeaderProps) {
   return (
     <div
       className={cn(
-        "border-b px-3.5 py-2.5 text-left font-medium text-chart-tooltip-foreground text-sm",
+        "border-border-subtle border-b px-3.5 py-2.5 text-left font-medium text-chart-tooltip-foreground text-sm tabular-nums",
         className
       )}
     >
@@ -64,7 +64,7 @@ export function TooltipContent({ title, rows, children }: TooltipContentProps) {
                       {row.label}
                     </span>
                   </div>
-                  <span className="text-right font-medium text-chart-tooltip-foreground text-sm">
+                  <span className="text-right font-medium text-chart-tooltip-foreground text-sm tabular-nums">
                     {typeof row.value === "number"
                       ? intFmt(row.value)
                       : row.value}

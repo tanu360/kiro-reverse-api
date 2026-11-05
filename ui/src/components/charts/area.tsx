@@ -25,9 +25,23 @@ import { SeriesHoverDim } from "./series-hover-dim";
 import { SeriesMarkers } from "./series-markers";
 import type { SeriesPointMarkerStyle } from "./series-point-marker";
 
+/**
+ * Series look:
+ * - `"area"` (default): stroke over a gradient fill.
+ * - `"muted"`: a quiet muted-foreground line (30%), no fill and no hover
+ *   highlight, for empty states.
+ * - `"line-dash"`: a dashed `var(--chart-comparison)` line ("4 4"), no fill and
+ *   no hover highlight, for a previous-period comparison series.
+ *
+ * Explicit `stroke`, `strokeWidth` and `dashArray` still win.
+ */
+export type AreaVariant = "area" | "muted" | "line-dash";
+
 export interface AreaProps {
   /** Key in data to use for y values */
   dataKey: string;
+  /** Series look. Default: `"area"`. */
+  variant?: AreaVariant;
   /** Y-scale group id (Recharts `yAxisId`). Default: `"left"`. */
   yAxisId?: string | number;
   /** Fill color for the area gradient start. Default: var(--chart-line-primary) */
@@ -103,6 +117,42 @@ export interface AreaProps {
   loadingStyle?: LoadingStyle;
 }
 
+const MUTED_SERIES_STROKE =
+  "color-mix(in oklab, var(--muted-foreground) 30%, transparent)";
+const COMPARISON_SERIES_STROKE = "var(--chart-comparison)";
+const COMPARISON_SERIES_DASH = "4 4";
+const QUIET_SERIES_STROKE_WIDTH = 1.5;
+
+/**
+ * Props with the variant's defaults applied: the chart reads the same result
+ * for its series config (tooltip dots, value labels) as the series draws.
+ */
+export function resolveAreaVariant(props: AreaProps): AreaProps {
+  const { variant = "area" } = props;
+  if (variant === "area") {
+    return props;
+  }
+  const stroke =
+    props.stroke ??
+    (variant === "muted" ? MUTED_SERIES_STROKE : COMPARISON_SERIES_STROKE);
+  return {
+    ...props,
+    stroke,
+    fill: stroke,
+    fillOpacity: 0,
+    strokeWidth: props.strokeWidth ?? QUIET_SERIES_STROKE_WIDTH,
+    showHighlight: false,
+    showMarkers: false,
+    // The dash-tail stroke from the first point: the whole line is dashed.
+    ...(variant === "line-dash"
+      ? {
+          dashFromIndex: 0,
+          dashArray: props.dashArray ?? COMPARISON_SERIES_DASH,
+        }
+      : {}),
+  };
+}
+
 function useAreaLoadingPulseState(
   chartPhase: ChartPhase,
   loading: boolean | undefined,
@@ -140,8 +190,13 @@ function useAreaLoadingPulseState(
   };
 }
 
+/** One series of an `AreaChart`: a filled area, or a quiet / dashed line (see `variant`). */
+export function Area(props: AreaProps) {
+  return <AreaSeries {...resolveAreaVariant(props)} />;
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: mirrors Line series layout (fill, stroke, dash, markers, pulse)
-export function Area({
+function AreaSeries({
   dataKey,
   yAxisId,
   fill = chartCssVars.linePrimary,
@@ -183,6 +238,12 @@ export function Area({
     notifyLoadingPulseComplete,
   } = useChartStable();
   const yScale = useYScale(yAxisId);
+  const seriesIndex = useMemo(() => {
+    const index = lines.findIndex((line) => line.dataKey === dataKey);
+    return index >= 0 ? index : 0;
+  }, [lines, dataKey]);
+  // The loading skeleton only carries the first series' values, so only that
+  // series pulses; the others would trace the plot's top edge. They appear on reveal.
   const {
     handleLoadingPulseComplete,
     pulseMode,
@@ -191,15 +252,10 @@ export function Area({
     showSeriesContent,
   } = useAreaLoadingPulseState(
     chartPhase,
-    loading,
+    loading ?? (seriesIndex === 0 ? undefined : false),
     loadingPulseMode,
     notifyLoadingPulseComplete
   );
-
-  const seriesIndex = useMemo(() => {
-    const index = lines.findIndex((line) => line.dataKey === dataKey);
-    return index >= 0 ? index : 0;
-  }, [lines, dataKey]);
 
   const pathRef = useRef<SVGPathElement>(null);
   const hasDashTail = resolveDashTailBounds(dashFromIndex, data.length);
@@ -397,5 +453,6 @@ export function Area({
 }
 
 Area.displayName = "Area";
+AreaSeries.displayName = "AreaSeries";
 
 export default Area;

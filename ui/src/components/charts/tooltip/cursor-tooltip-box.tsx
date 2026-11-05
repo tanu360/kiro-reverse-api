@@ -225,8 +225,7 @@ function CursorTooltipPanel({
           TOOLTIP_PANEL_CLASS_NAME,
           panelStyle?.backgroundColor === undefined &&
             backgroundColor === chartCssVars.tooltipBackground &&
-            "bg-chart-tooltip-background",
-          panelStyle?.backdropFilter === undefined && "backdrop-blur-md"
+            "bg-chart-tooltip-background"
         )}
         entrance={reducedMotion ? false : { scale: 0.85 }}
         style={{

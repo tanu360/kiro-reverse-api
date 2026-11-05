@@ -51,15 +51,18 @@ export function DashTailStroke({
           />
         </clipPath>
       </defs>
-      {/* Solid head — same curved path, gradient/fade preserved */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke={stroke}
-        strokeDasharray={`${dashStartLength} ${Math.max(1, pathLength - dashStartLength)}`}
-        strokeLinecap="round"
-        strokeWidth={strokeWidth}
-      />
+      {/* Solid head — same curved path, gradient/fade preserved. None when the
+          whole line is dashed: a zero-length dash would still paint a round cap. */}
+      {dashStartLength > 0 ? (
+        <path
+          d={pathD}
+          fill="none"
+          stroke={stroke}
+          strokeDasharray={`${dashStartLength} ${Math.max(1, pathLength - dashStartLength)}`}
+          strokeLinecap="round"
+          strokeWidth={strokeWidth}
+        />
+      ) : null}
       {/* Dashed tail — clipped to x ≥ dashStartX so dashes follow the curve */}
       <path
         clipPath={`url(#${clipPathId})`}

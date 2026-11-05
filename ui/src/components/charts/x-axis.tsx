@@ -21,7 +21,7 @@ const X_AXIS_POSITION_TWEEN_MS = DEFAULT_Y_DOMAIN_TWEEN_MS;
 export interface XAxisProps {
   /** Number of ticks to show (including first and last). Default: 5. */
   numTicks?: ChartLabelCount;
-  /** Width of the date ticker box for fade calculation. Default: 50 */
+  /** Half the date ticker pill plus half a label, for the fade calculation. Default: 40 */
   tickerHalfWidth?: number;
   /**
    * `"data"` — tick labels snap to data rows so crosshair and tooltip stay aligned (default).
@@ -98,7 +98,7 @@ const XAxisLabel = memo(function XAxisLabel({
       }}
     >
       <span
-        className="whitespace-nowrap text-chart-label text-xs"
+        className="chart-tick whitespace-nowrap"
         style={{
           opacity,
           transition: "opacity 0.4s ease-in-out",
@@ -590,7 +590,7 @@ export function XAxis(props: XAxisProps) {
 
 const XAxisInner = memo(function XAxisInner({
   numTicks = 5,
-  tickerHalfWidth = 50,
+  tickerHalfWidth = 40,
   tickMode = "data",
   labels: labelsProp,
   container,

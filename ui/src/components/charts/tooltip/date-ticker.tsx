@@ -10,7 +10,11 @@ import {
 } from "motion/react";
 import { memo, type RefObject, useLayoutEffect, useMemo, useRef } from "react";
 
-const TICKER_ITEM_HEIGHT = 24;
+/** One ticker row: `h-4`, inside the `h-5` pill's `py-0.5`. */
+const TICKER_ITEM_HEIGHT = 16;
+/** The x-axis pill: small mono tabular figures on the inverse surface. */
+const TICKER_PILL_CLASS_NAME =
+  "h-5 overflow-hidden rounded-md bg-inverse px-2 py-0.5 font-medium font-mono text-2xs text-inverse-foreground tabular-nums floating-shadow";
 const TICKER_SPRING = { stiffness: 400, damping: 35 };
 /** Full scroll stacks are skipped above this count — single label + instant updates. */
 const COMPACT_TICKER_THRESHOLD = 60;
@@ -178,17 +182,14 @@ const DateTickerCompact = memo(function DateTickerCompact({
   useActiveItemWidth(stackRef, labelItems, 0, width, reduceMotion, label);
 
   return (
-    <div className="overflow-hidden rounded-full bg-inverse px-4 py-1 text-inverse-foreground floating-shadow">
-      <m.div className="relative h-6" style={{ width }}>
+    <div className={TICKER_PILL_CLASS_NAME}>
+      <m.div className="relative h-4" style={{ width }}>
         <m.div
-          className="absolute top-0 left-1/2 flex h-6 items-center"
+          className="absolute top-0 left-1/2 flex h-4 items-center"
           ref={stackRef}
           style={{ x: "-50%" }}
         >
-          <span
-            className="whitespace-nowrap font-medium text-sm"
-            data-ticker-item
-          >
+          <span className="whitespace-nowrap" data-ticker-item>
             {label}
           </span>
         </m.div>
@@ -268,12 +269,12 @@ const DateTickerInner = memo(function DateTickerInner({
   }, [currentMonthIndex, monthY, reduceMotion]);
 
   return (
-    <div className="overflow-hidden rounded-full bg-inverse px-4 py-1 text-inverse-foreground floating-shadow">
-      <div className="relative h-6 overflow-hidden">
+    <div className={TICKER_PILL_CLASS_NAME}>
+      <div className="relative h-4 overflow-hidden">
         <div className="flex items-center justify-center gap-1">
           {/* Month stack */}
           <m.div
-            className="relative h-6 overflow-hidden"
+            className="relative h-4 overflow-hidden"
             style={{ width: monthWidth }}
           >
             <m.div
@@ -283,11 +284,11 @@ const DateTickerInner = memo(function DateTickerInner({
             >
               {monthSegments.map((segment) => (
                 <div
-                  className="flex h-6 shrink-0 items-center justify-center"
+                  className="flex h-4 shrink-0 items-center justify-center"
                   data-ticker-item
                   key={segment.key}
                 >
-                  <span className="whitespace-nowrap font-medium text-sm">
+                  <span className="whitespace-nowrap">
                     {segment.value}
                   </span>
                 </div>
@@ -297,7 +298,7 @@ const DateTickerInner = memo(function DateTickerInner({
 
           {/* Second-part stack (day or year) */}
           <m.div
-            className="relative h-6 overflow-hidden"
+            className="relative h-4 overflow-hidden"
             style={{ width: dayWidth }}
           >
             <m.div
@@ -307,11 +308,11 @@ const DateTickerInner = memo(function DateTickerInner({
             >
               {daySegments.map((segment) => (
                 <div
-                  className="flex h-6 shrink-0 items-center justify-center"
+                  className="flex h-4 shrink-0 items-center justify-center"
                   data-ticker-item
                   key={segment.key}
                 >
-                  <span className="whitespace-nowrap font-medium text-sm">
+                  <span className="whitespace-nowrap">
                     {segment.value}
                   </span>
                 </div>

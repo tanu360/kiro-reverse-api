@@ -195,6 +195,8 @@ export interface TimeSeriesChartInnerProps {
   composedStackGap?: number;
   /** When set, drives the y-axis max instead of scanning `lines` (e.g. stacked bar totals). */
   yScaleDomainMax?: number;
+  /** Fixed y-domain for every axis, used as given (no `nice()`). */
+  yDomain?: [number, number];
   /** Loading vs ready — drives chart phase until transition orchestration lands. */
   chartStatus?: ChartStatus;
   loadingLabel?: string;
@@ -242,6 +244,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
   composedStackOffsets,
   composedStackGap,
   yScaleDomainMax,
+  yDomain: fixedYDomain,
   chartStatus = DEFAULT_CHART_STATUS,
   loadingLabel,
   yDomainTween = true,
@@ -402,6 +405,9 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
     [lines, resolveYDomain, skeletonData]
   );
 
+  // Primitives, so an inline `yDomain={[0, top]}` literal doesn't re-tween.
+  const fixedYMin = fixedYDomain?.[0];
+  const fixedYMax = fixedYDomain?.[1];
   const yDomainTargetByAxis = useMemo(() => {
     const base = computeYDomainsByAxis({
       extraKeysByAxis: bandKeysByAxisId,
@@ -409,6 +415,11 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
       resolveDomain: (dataKeys) =>
         resolveYDomain(xDomain ? visiblePlotData : data, dataKeys),
     });
+    if (fixedYMin != null && fixedYMax != null && fixedYMax > fixedYMin) {
+      for (const axisId of Object.keys(base)) {
+        base[axisId] = [fixedYMin, fixedYMax];
+      }
+    }
     if (projectionConfigs.length === 0) {
       return base;
     }
@@ -433,6 +444,8 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
   }, [
     bandKeysByAxisId,
     data,
+    fixedYMax,
+    fixedYMin,
     lines,
     projectionConfigs,
     resolveYDomain,

@@ -22,6 +22,8 @@ export type RingLineCap = "round" | "butt";
 export interface RingProps {
   index: number;
   color?: string;
+  /** Unfilled track colour. Default: `var(--chart-grid)`. */
+  trackColor?: string;
   animate?: boolean;
   showGlow?: boolean;
   lineCap?: RingLineCap;
@@ -60,6 +62,7 @@ function RingProgressPath({
 export const Ring = memo(function Ring({
   index,
   color: colorProp,
+  trackColor = ringCssVars.ringBackground,
   animate = true,
   showGlow = true,
   lineCap = "round",
@@ -213,7 +216,7 @@ export const Ring = memo(function Ring({
             opacity: { duration: 0.15 },
           }}
         >
-          <path d={bgPath} fill={ringCssVars.ringBackground} />
+          <path d={bgPath} fill={trackColor} />
           {progressPath ? <path d={progressPath} fill={color} /> : null}
         </m.g>
       </g>
@@ -232,7 +235,7 @@ export const Ring = memo(function Ring({
             opacity: layerOpacity,
           }}
         >
-          <path d={bgPath} fill={ringCssVars.ringBackground} />
+          <path d={bgPath} fill={trackColor} />
         </m.g>
       </g>
     );
@@ -251,7 +254,7 @@ export const Ring = memo(function Ring({
           opacity: { duration: 0.15 },
         }}
       >
-        <path d={bgPath} fill={ringCssVars.ringBackground} />
+        <path d={bgPath} fill={trackColor} />
         <RingProgressPath
           animatedProgressPath={animatedProgressPath}
           color={color}

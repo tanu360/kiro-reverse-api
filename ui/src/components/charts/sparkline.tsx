@@ -37,12 +37,14 @@ import {
   computeSparklineLayout,
   describeSparkline,
   interpolateSparklineLayout,
+  isSparklineFlatZero,
   resolveSparklinePadding,
   resolveSparklineValues,
   type SparklineCurve,
   type SparklineDataKey,
   type SparklineLayout,
   type SparklinePadding,
+  sparklineBarTipY,
   sparklineBarWidth,
   sparklineIndexAtX,
 } from "./sparkline-geometry";
@@ -145,11 +147,63 @@ export interface AreaSparklineProps<T> extends LineSparklineProps<T> {
 }
 
 export interface BarSparklineProps<T> extends SparklineBaseProps<T> {
-  /** Gap between bars in px. */
+  /** Gap between bars in px. Default: 2 */
   barGap?: number;
+  /** Corner radius of a bar tip in px. Default: 1 */
   barRadius?: number;
   /** Opacity of non-hovered bars while hovering. */
   inactiveOpacity?: number;
+  /**
+   * Paint the last `n` bars in the series colour (`color`, default
+   * `var(--chart-line-primary)`) and the bars before them in `idleColor`, the
+   * KPI-strip look. Omit to paint every bar in `color`.
+   */
+  highlightLast?: number;
+  /** Bars outside `highlightLast`. Default: muted-foreground at 45%. */
+  idleColor?: string;
+  /**
+   * Colour per bar; wins over `highlightLast` (e.g. `var(--chart-negative)`
+   * for a bucket with failures). Bars of one colour share one path.
+   */
+  barColor?: (index: number, value: number) => string;
+  /** Shortest bar in px, so zero and tiny values still read as a stub. Default: 2 */
+  minBarHeight?: number;
+  /**
+   * Colour of the flat stubs drawn when every value is 0 (the empty state).
+   * Default: `var(--chart-scale-01)`.
+   */
+  emptyColor?: string;
+}
+
+/** Height of a bar sparkline: the KPI tiles' 28 px trend slot. */
+const DEFAULT_BAR_SPARKLINE_HEIGHT = 28;
+const DEFAULT_BAR_IDLE_COLOR =
+  "color-mix(in oklab, var(--muted-foreground) 45%, transparent)";
+const DEFAULT_BAR_EMPTY_COLOR = "var(--chart-scale-01)";
+/** All-zero data: pin the domain so the stubs sit on the bottom edge, not mid-height. */
+const EMPTY_BAR_DOMAIN: [number, number] = [0, 1];
+
+interface BarColorGroup {
+  color: string;
+  indices: number[];
+}
+
+/** One group per distinct bar colour, in first-seen order. */
+function groupBarsByColor(
+  values: readonly number[],
+  colorOf: (index: number, value: number) => string
+): BarColorGroup[] {
+  const groups = new Map<string, number[]>();
+  values.forEach((value, index) => {
+    const color = colorOf(index, value);
+    const indices = groups.get(color);
+    if (indices) {
+      indices.push(index);
+    } else {
+      groups.set(color, [index]);
+    }
+  });
+  return [...groups].map(([color, indices]) => ({ color, indices }));
 }
 
 // One ResizeObserver for every sparkline on the page.
@@ -1015,6 +1069,11 @@ function BarSparklineImpl<T>(props: BarSparklineProps<T>) {
     barGap = 2,
     barRadius = 1,
     inactiveOpacity = 0.4,
+    highlightLast,
+    idleColor = DEFAULT_BAR_IDLE_COLOR,
+    barColor,
+    minBarHeight = 2,
+    emptyColor = DEFAULT_BAR_EMPTY_COLOR,
     animate = true,
     animationDuration = DEFAULT_SPARKLINE_ANIMATION_DURATION_MS,
     animationEasing = DEFAULT_ANIMATION_EASING,
@@ -1027,29 +1086,49 @@ function BarSparklineImpl<T>(props: BarSparklineProps<T>) {
   const spring = resolveHoverSpring(hoverTransition, springConfig);
   const padding = resolveSparklinePadding(props.padding, 2);
   const groupRef = useRef<SVGGElement>(null);
+  const values = useMemo(
+    () => resolveSparklineValues(props.data, props.dataKey),
+    [props.data, props.dataKey]
+  );
+  const empty = isSparklineFlatZero(values);
+  const config = useMemo<SparklineBaseProps<T>>(
+    () => ({
+      ...props,
+      height: props.height ?? DEFAULT_BAR_SPARKLINE_HEIGHT,
+      yDomain: empty ? EMPTY_BAR_DOMAIN : props.yDomain,
+    }),
+    [props, empty]
+  );
 
   return (
     <LazyMotion features={domAnimation}>
-      <SparklineFrame config={props} defaultPadding={2} includeZero kind="band">
+      <SparklineFrame config={config} defaultPadding={2} includeZero kind="band">
         {({ width, height, layout, hoverIndex, color, gradientId }) => (
           <BarPaths
             animate={animate}
             animationDuration={animationDuration}
             animationEasing={animationEasing}
+            barColor={barColor}
             barGap={barGap}
             barRadius={barRadius}
             color={color}
             crosshair={crosshair}
             dataTransitionDuration={animate ? dataTransitionDuration : 0}
             dot={dot}
+            empty={empty}
+            emptyColor={emptyColor}
             gradientId={gradientId}
             groupRef={groupRef}
             height={height}
+            highlightLast={highlightLast}
             hoverIndex={hoverIndex}
+            idleColor={idleColor}
             inactiveOpacity={inactiveOpacity}
             layout={layout}
+            minBarHeight={minBarHeight}
             padding={padding}
             spring={spring}
+            values={values}
             width={width}
           />
         )}
@@ -1060,13 +1139,20 @@ function BarSparklineImpl<T>(props: BarSparklineProps<T>) {
 
 function BarPaths({
   layout,
+  values,
   width,
   height,
   padding,
   barGap,
   barRadius,
+  minBarHeight,
   inactiveOpacity,
   color,
+  idleColor,
+  highlightLast,
+  barColor,
+  empty,
+  emptyColor,
   hoverIndex,
   crosshair,
   dot,
@@ -1079,13 +1165,20 @@ function BarPaths({
   spring,
 }: {
   layout: SparklineLayout;
+  values: readonly number[];
   width: number;
   height: number;
   padding: SparklinePadding;
   barGap: number;
   barRadius: number;
+  minBarHeight: number;
   inactiveOpacity: number;
   color: string;
+  idleColor: string;
+  highlightLast: number | undefined;
+  barColor: ((index: number, value: number) => string) | undefined;
+  empty: boolean;
+  emptyColor: string;
   hoverIndex: number | null;
   crosshair: SparklineCrosshair;
   dot: boolean;
@@ -1097,16 +1190,55 @@ function BarPaths({
   groupRef: RefObject<SVGGElement | null>;
   spring: SparklineSpringConfig | null;
 }) {
-  const barsRef = useRef<SVGPathElement>(null);
+  // Empty: every bar is a flat stub in the empty colour. Otherwise bars are
+  // grouped by colour (barColor > highlightLast > color), one path each.
+  const colorOf = useCallback(
+    (index: number, value: number) => {
+      if (empty) {
+        return emptyColor;
+      }
+      if (barColor) {
+        return barColor(index, value);
+      }
+      if (highlightLast != null) {
+        return index >= values.length - highlightLast ? color : idleColor;
+      }
+      return color;
+    },
+    [empty, emptyColor, barColor, highlightLast, values.length, color, idleColor]
+  );
+  const groups = useMemo(
+    () => groupBarsByColor(values, colorOf),
+    [values, colorOf]
+  );
+  const minHeight = Math.max(0, minBarHeight);
+  const pathRefs = useRef(new Map<string, SVGPathElement>());
   useDataTransition(layout, width, dataTransitionDuration, (frame) => {
-    barsRef.current?.setAttribute(
-      "d",
-      buildSparklineBarsPath(frame, { gap: barGap, radius: barRadius })
-    );
+    for (const group of groups) {
+      pathRefs.current
+        .get(group.color)
+        ?.setAttribute(
+          "d",
+          buildSparklineBarsPath(frame, {
+            gap: barGap,
+            radius: barRadius,
+            minHeight,
+            indices: group.indices,
+          })
+        );
+    }
   });
-  const barsPath = useMemo(
-    () => buildSparklineBarsPath(layout, { gap: barGap, radius: barRadius }),
-    [layout, barGap, barRadius]
+  const groupPaths = useMemo(
+    () =>
+      groups.map((group) =>
+        buildSparklineBarsPath(layout, {
+          gap: barGap,
+          radius: barRadius,
+          minHeight,
+          indices: group.indices,
+        })
+      ),
+    [groups, layout, barGap, barRadius, minHeight]
   );
 
   // Bars grow from the baseline while a left → right wipe staggers them.
@@ -1133,19 +1265,30 @@ function BarPaths({
   });
 
   const hovered = hoverIndex === null ? undefined : layout.points[hoverIndex];
+  const hoveredColor =
+    hovered && hoverIndex !== null ? colorOf(hoverIndex, hovered.value) : color;
 
   return (
     <>
       <g aria-hidden ref={groupRef}>
-        <path
-          d={barsPath}
-          fill={color}
-          ref={barsRef}
-          style={{
-            opacity: hovered ? inactiveOpacity : 1,
-            transition: HOVER_FADE,
-          }}
-        />
+        {groups.map((group, index) => (
+          <path
+            d={groupPaths[index]}
+            fill={group.color}
+            key={group.color}
+            ref={(element) => {
+              if (element) {
+                pathRefs.current.set(group.color, element);
+              } else {
+                pathRefs.current.delete(group.color);
+              }
+            }}
+            style={{
+              opacity: hovered ? inactiveOpacity : 1,
+              transition: HOVER_FADE,
+            }}
+          />
+        ))}
         {/* The focused bar sits on top at full strength; moving between bars
             cross-fades it, and the rest fade with the base path above. */}
         <AnimatePresence>
@@ -1155,12 +1298,12 @@ function BarPaths({
               d={buildSparklineBarSegment(
                 hovered.x,
                 sparklineBarWidth(layout.band, barGap),
-                hovered.y,
+                sparklineBarTipY(hovered, layout.baselineY, minHeight),
                 layout.baselineY,
                 barRadius
               )}
               exit={{ opacity: 0 }}
-              fill={color}
+              fill={hoveredColor}
               initial={{ opacity: inactiveOpacity }}
               key={hoverIndex}
               transition={{ duration: 0.2, ease: "easeInOut" }}
@@ -1169,7 +1312,7 @@ function BarPaths({
         </AnimatePresence>
       </g>
       <HoverOverlay
-        color={color}
+        color={hoveredColor}
         crosshair={crosshair}
         dot={dot}
         gradientId={gradientId}
@@ -1191,7 +1334,10 @@ export const LineSparkline = memo(
 export const AreaSparkline = memo(
   AreaSparklineImpl
 ) as typeof AreaSparklineImpl;
-/** Tiny bar chart — all bars drawn as a single path. */
+/**
+ * Tiny bar chart — bars of one colour share a path. `highlightLast` paints the
+ * newest bars in `color` over muted idle bars; all-zero data draws flat stubs.
+ */
 export const BarSparkline = memo(BarSparklineImpl) as typeof BarSparklineImpl;
 
 /**

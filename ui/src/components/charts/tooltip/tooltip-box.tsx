@@ -92,9 +92,10 @@ export interface TooltipBoxProps {
  * tokens (`border`, `--radius`) and Tailwind utilities.
  */
 // Kiro: the one popup sheet (index.css --popup-*: the chart tooltip background is --popup), its
-// hairline, corner and soft drop, as menus and selects.
+// hairline, corner and soft drop, as menus and selects. The sheet is opaque, so there is no
+// backdrop blur.
 export const TOOLTIP_PANEL_CLASS_NAME =
-  "relative min-w-[160px] rounded-lg border border-popup-border text-chart-tooltip-foreground shadow-(--popup-shadow)";
+  "relative min-w-40 rounded-lg border border-popup-border text-chart-tooltip-foreground shadow-(--popup-shadow)";
 
 /** Clips content to the panel's inner radius. */
 export const TOOLTIP_PANEL_INNER_CLASS_NAME =
@@ -664,7 +665,7 @@ function TooltipBoxInner({
     backgroundColor === chartCssVars.tooltipBackground
       ? " bg-chart-tooltip-background"
       : ""
-  }${panelStyle?.backdropFilter === undefined ? " backdrop-blur-md" : ""}`;
+  }`;
   const panelStyleResolved = {
     ...(panelStyle?.backgroundColor === undefined && {
       backgroundColor,

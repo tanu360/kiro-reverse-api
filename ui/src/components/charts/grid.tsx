@@ -34,7 +34,7 @@ export interface GridProps {
   strokeOpacity?: number;
   /** Grid line stroke width. Default: 1 */
   strokeWidth?: number;
-  /** Grid line dash array. Default: "4,4" for dashed lines */
+  /** Grid line dash array. Default: "2,4" (short dashes on the --chart-grid hairline) */
   strokeDasharray?: string;
   /** Horizontal row values rendered with alternate styling (e.g. zero baseline). */
   highlightRowValues?: number[];
@@ -56,7 +56,10 @@ export interface GridProps {
   hideVerticalEdgeLines?: boolean;
   /** Y-scale for horizontal grid lines. Default: primary (`"left"`) axis. */
   yAxisId?: string | number;
-  /** Animate a shimmer band across horizontal grid lines. Default: false */
+  /**
+   * Animate a shimmer band across horizontal grid lines while the chart is
+   * loading (`status="loading"`, also with no data yet). Default: true
+   */
   shimmer?: boolean;
   /** Shimmer band stroke (color and opacity via color-mix or oklch alpha). */
   shimmerStroke?: string;
@@ -103,7 +106,7 @@ export function Grid({
   loadingStroke,
   strokeOpacity = 1,
   strokeWidth = 1,
-  strokeDasharray = "4,4",
+  strokeDasharray = "2,4",
   highlightRowValues,
   highlightRowStroke = chartCssVars.foregroundMuted,
   highlightRowStrokeOpacity = 1,
@@ -114,7 +117,7 @@ export function Grid({
   hideHorizontalEdgeLines = false,
   hideVerticalEdgeLines = false,
   yAxisId,
-  shimmer = false,
+  shimmer = true,
   shimmerStroke = DEFAULT_SHIMMER_STROKE,
   shimmerLength = DEFAULT_SHIMMER_LENGTH_PX,
   shimmerSpeed = DEFAULT_SHIMMER_SPEED,

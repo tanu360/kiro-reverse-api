@@ -49,9 +49,13 @@ export interface RingChartProps {
   hoveredIndex?: number | null;
   /** Callback when hover state changes */
   onHoverChange?: (index: number | null) => void;
-  /** Start angle in radians. Default: -PI/2 (top) */
+  /**
+   * Start angle in radians, d3 convention: 0 is 12 o'clock and angles run
+   * clockwise. Default: -PI/2 (9 o'clock). Pass 0 with `endAngle` 2*PI to
+   * start every ring at 12 o'clock.
+   */
   startAngle?: number;
-  /** End angle in radians. Default: 3*PI/2 (full circle) */
+  /** End angle in radians (same convention). Default: 3*PI/2, a full turn from the default start. */
   endAngle?: number;
   /** Framer Motion transition for ring enter animation */
   enterTransition?: Transition;

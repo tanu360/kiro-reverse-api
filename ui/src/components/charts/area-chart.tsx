@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import { cn } from "@/lib/utils";
-import { Area, type AreaProps } from "./area";
+import { Area, type AreaProps, resolveAreaVariant } from "./area";
 import { AreaValueLabels } from "./area-value-labels";
 import { type LineConfig, type Margin, useStableMargin } from "./chart-context";
 import { ChartLoadingLabel } from "./chart-loading-label";
@@ -58,6 +58,12 @@ export interface AreaChartProps {
   yDomainTweenDuration?: number;
   /** Animate y-domain when status or target domain changes. Default: true */
   yDomainTween?: boolean;
+  /**
+   * Fixed y-domain for every axis, used as given (no d3 `nice()`), e.g.
+   * `[0, ticks.at(-1)]` with `niceTicks` so the top label sits on the top gridline.
+   * Default: zero-anchored and niced from the data.
+   */
+  yDomain?: [number, number];
   /** Visible x-domain for brush zoom. */
   xDomain?: [Date, Date];
   /** Full dataset length for x-scale padding when `xDomain` is set. */
@@ -109,12 +115,13 @@ function extractAreaConfigs(children: ReactNode): (LineConfig & AreaProps)[] {
         !isSeriesOverlay);
 
     if (isAreaComponent && props?.dataKey) {
+      const resolved = resolveAreaVariant(props);
       configs.push({
-        ...props,
-        dataKey: props.dataKey,
-        stroke: props.stroke || props.fill || "var(--chart-line-primary)",
-        strokeWidth: props.strokeWidth || 2,
-        yAxisId: props.yAxisId,
+        ...resolved,
+        dataKey: resolved.dataKey,
+        stroke: resolved.stroke || resolved.fill || "var(--chart-line-primary)",
+        strokeWidth: resolved.strokeWidth || 2,
+        yAxisId: resolved.yAxisId,
       });
     }
   });
@@ -136,6 +143,7 @@ export function AreaChart({
   loadingLabel,
   yDomainTweenDuration = DEFAULT_Y_DOMAIN_TWEEN_MS,
   yDomainTween = true,
+  yDomain,
   xDomain,
   xDomainSlotCount,
   tweenYDomainOnXDomainChange = false,
@@ -194,6 +202,7 @@ export function AreaChart({
                 xDataKey={xDataKey}
                 xDomain={xDomain}
                 xDomainSlotCount={xDomainSlotCount}
+                yDomain={yDomain}
                 yDomainTween={yDomainTween}
                 yDomainTweenDuration={yDomainTweenDuration}
               >
@@ -215,6 +224,6 @@ export function AreaChart({
   );
 }
 
-export { Area, type AreaProps } from "./area";
+export { Area, type AreaProps, type AreaVariant } from "./area";
 
 export default AreaChart;
