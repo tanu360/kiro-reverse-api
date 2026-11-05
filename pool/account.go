@@ -492,6 +492,28 @@ func (p *AccountPool) AvailableCount() int {
 // request log. An account out of rotation (disabled mid-request, over its
 // limit) is counted on its persisted row instead of being dropped.
 func (p *AccountPool) RecordOutcome(id string, success bool, tokens int, credits float64) {
+	p.updateStats(id, func(acc *config.Account) {
+		acc.RequestCount++
+		if !success {
+			acc.ErrorCount++
+		}
+		addUsage(acc, tokens, credits)
+	})
+}
+
+// AddUsage adds tokens and credits an account spent on part of a request that
+// is counted against another account, such as an earlier round of a web search
+// loop that failed over. RequestCount and ErrorCount stay as they are.
+func (p *AccountPool) AddUsage(id string, tokens int, credits float64) {
+	if tokens <= 0 && credits <= 0 {
+		return
+	}
+	p.updateStats(id, func(acc *config.Account) { addUsage(acc, tokens, credits) })
+}
+
+// updateStats applies apply to the account's counters, in rotation or, for an
+// account out of rotation, on its persisted row, and saves them.
+func (p *AccountPool) updateStats(id string, apply func(acc *config.Account)) {
 	if id == "" {
 		return
 	}
@@ -504,7 +526,7 @@ func (p *AccountPool) RecordOutcome(id string, success bool, tokens int, credits
 			continue
 		}
 		if stats == nil {
-			applyOutcome(&p.accounts[i], success, tokens, credits)
+			apply(&p.accounts[i])
 			stats = &p.accounts[i]
 			continue
 		}
@@ -516,17 +538,13 @@ func (p *AccountPool) RecordOutcome(id string, success bool, tokens int, credits
 		if stored == nil {
 			return
 		}
-		applyOutcome(stored, success, tokens, credits)
+		apply(stored)
 		stats = stored
 	}
 	_ = config.UpdateAccountStats(id, stats.RequestCount, stats.ErrorCount, stats.TotalTokens, stats.TotalCredits, stats.LastUsed)
 }
 
-func applyOutcome(acc *config.Account, success bool, tokens int, credits float64) {
-	acc.RequestCount++
-	if !success {
-		acc.ErrorCount++
-	}
+func addUsage(acc *config.Account, tokens int, credits float64) {
 	acc.TotalTokens += max(tokens, 0)
 	acc.TotalCredits += max(credits, 0)
 	acc.LastUsed = time.Now().Unix()

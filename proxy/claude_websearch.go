@@ -382,10 +382,11 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 	maxUses := resolveClaudeWebSearchMaxUses(req.Tools)
 	presented := make([]map[string]interface{}, 0)
 	searches := 0
-	outputTokens := 0
-	inputTokens := 0
-	var credits float64
+	var usage webSearchLoopUsage
 	var lastAccount *config.Account
+	finish := func(success bool, status int, message string) {
+		h.recordWebSearchLoop(r.Context(), apiKeyReservation, lastAccount, req.Model, &usage, success, status, message)
+	}
 
 	//! Every search round spends budget, so at most maxUses+2 upstream calls run before the final answer.
 	for roundIdx := 0; ; roundIdx++ {
@@ -398,7 +399,7 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 		}
 		if err != nil {
 			if isContextCanceledError(err) {
-				recordClientDisconnect(r.Context(), apiKeyReservation, lastAccount, req.Model)
+				finish(false, clientClosedRequestStatus, clientDisconnectedMessage)
 				return
 			}
 			status, errType, message := http.StatusInternalServerError, "api_error", err.Error()
@@ -406,21 +407,19 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 				//! Same answer as the plain Claude path, so clients see one message for an empty pool or unknown model.
 				status, errType, message = h.noAccountError(req.Model, "api_error")
 			}
-			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, req.Model, 0, 0, 0, false, status, message)
+			finish(false, status, message)
 			h.sendClaudeError(w, status, errType, message)
 			return
 		}
-		credits += round.credits
-		outputTokens += round.outputTokens
-		inputTokens += round.inputTokens
-		//! The client request is counted once, by recordFinalRequestForApiKey after the last round.
+		usage.add(account.ID, round.inputTokens, round.outputTokens, round.credits)
+		//! The client request is counted once, by recordWebSearchLoop after the last round.
 		h.pool.RecordSuccess(account.ID)
 
 		searchUses, clientUses := splitWebSearchToolUses(round.toolUses)
 		if len(searchUses) > 0 && len(clientUses) == 0 && roundIdx <= maxUses {
 			outcomes := h.runWebSearches(ctx, req.Model, searchUses, &searches, maxUses)
 			if ctx.Err() != nil {
-				recordClientDisconnect(r.Context(), apiKeyReservation, lastAccount, req.Model)
+				finish(false, clientClosedRequestStatus, clientDisconnectedMessage)
 				return
 			}
 			appendWebSearchRound(&working, round, searchUses, outcomes)
@@ -468,16 +467,62 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 			})
 		}
 		if ctx.Err() != nil {
-			recordClientDisconnect(r.Context(), apiKeyReservation, lastAccount, req.Model)
+			finish(false, clientClosedRequestStatus, clientDisconnectedMessage)
 			return
 		}
 
 		stopReason := mapClaudeStopReason(round.stopReason, len(clientUses))
-		h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
-		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, lastAccount, req.Model, inputTokens, outputTokens, credits, true, 200, "")
+		h.recordSuccessForApiKey(apiKeyReservation, usage.inTokens, usage.outTokens, usage.credits)
+		finish(true, http.StatusOK, "")
 
-		h.writeClaudeWebSearchResponse(w, req.Stream, req.Model, content, stopReason, inputTokens, outputTokens, searches)
+		h.writeClaudeWebSearchResponse(w, req.Stream, req.Model, content, stopReason, usage.inTokens, usage.outTokens, searches)
 		return
+	}
+}
+
+// webSearchLoopUsage sums the tokens and credits of a web search loop's
+// rounds, in total and per account. Each round picks its account on its own,
+// so a loop that failed over spent quota on more than one.
+type webSearchLoopUsage struct {
+	inTokens, outTokens int
+	credits             float64
+	perAccount          map[string]webSearchAccountUsage
+}
+
+type webSearchAccountUsage struct {
+	tokens  int
+	credits float64
+}
+
+func (u *webSearchLoopUsage) add(accountID string, inTokens, outTokens int, credits float64) {
+	u.inTokens += inTokens
+	u.outTokens += outTokens
+	u.credits += credits
+	if u.perAccount == nil {
+		u.perAccount = make(map[string]webSearchAccountUsage)
+	}
+	share := u.perAccount[accountID]
+	share.tokens += inTokens + outTokens
+	share.credits += credits
+	u.perAccount[accountID] = share
+}
+
+// recordWebSearchLoop logs the loop's final outcome, success or not, with every
+// finished round's tokens and credits, on the account that answered last. The
+// request log and the heatmap (rebuilt from that log) name one account per
+// request, so they carry the totals; each account's own counters get only the
+// rounds it served, and only the last account counts the request.
+func (h *Handler) recordWebSearchLoop(ctx context.Context, apiKeyReservation *apiKeyUsageReservation, last *config.Account, model string, usage *webSearchLoopUsage, success bool, status int, message string) {
+	accountID, email := accountIdentity(last)
+	getObserveStore().RecordTracedRequest(requestTraceFromContext(ctx), accountID, apiKeyReservation.apiKeyID(), apiKeyReservation.apiKeyValue(), email, model, usage.inTokens, usage.outTokens, usage.credits, success, status, message)
+	for id, share := range usage.perAccount {
+		if id != accountID {
+			h.pool.AddUsage(id, share.tokens, share.credits)
+		}
+	}
+	if accountID != "" {
+		own := usage.perAccount[accountID]
+		h.pool.RecordOutcome(accountID, success, own.tokens, own.credits)
 	}
 }
 

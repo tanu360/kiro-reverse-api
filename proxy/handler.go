@@ -1472,9 +1472,14 @@ func accountIdentity(account *config.Account) (string, string) {
 	return account.ID, account.Email
 }
 
-func recordClientDisconnect(ctx context.Context, apiKeyReservation *apiKeyUsageReservation, account *config.Account, model string) {
+const (
 	//! 499 is the de facto "client closed request" status; nothing is written back to the gone client.
-	recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, 0, 0, 0, false, 499, "client disconnected")
+	clientClosedRequestStatus = 499
+	clientDisconnectedMessage = "client disconnected"
+)
+
+func recordClientDisconnect(ctx context.Context, apiKeyReservation *apiKeyUsageReservation, account *config.Account, model string) {
+	recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, 0, 0, 0, false, clientClosedRequestStatus, clientDisconnectedMessage)
 }
 
 func recordAttemptError(account *config.Account, model string, status int, err error) {

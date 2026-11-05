@@ -574,3 +574,23 @@ func TestRecordOutcomeCountsRequestsAndErrorsAndPersists(t *testing.T) {
 		t.Fatalf("persisted off = %+v", got)
 	}
 }
+
+func TestAddUsageLeavesRequestCountAlone(t *testing.T) {
+	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "a", Enabled: true, RequestCount: 3, TotalTokens: 10}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+	p := &AccountPool{cooldowns: map[string]time.Time{}, errorCounts: map[string]int{}, modelLists: map[string]map[string]bool{}}
+	p.Reload()
+
+	p.AddUsage("a", 25, 0.4)
+	p.AddUsage("a", 0, 0)
+
+	for _, acc := range config.GetAccounts() {
+		if acc.ID == "a" && (acc.RequestCount != 3 || acc.ErrorCount != 0 || acc.TotalTokens != 35 || acc.TotalCredits != 0.4 || acc.LastUsed == 0) {
+			t.Fatalf("persisted a = %+v", acc)
+		}
+	}
+}
