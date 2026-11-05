@@ -79,7 +79,10 @@ export function NavMain(): JSX.Element {
       </SidebarGroup>
       {NAV_GROUPS.map((group) => (
         <SidebarGroup key={group}>
-          <SidebarGroupLabel>{t(`nav.group.${group}`)}</SidebarGroupLabel>
+          {/* The rail hides the label by fading it over the row above; keep it out of hit-testing. */}
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:pointer-events-none">
+            {t(`nav.group.${group}`)}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {NAV_ITEMS.filter((item) => item.group === group).map((item) => {
