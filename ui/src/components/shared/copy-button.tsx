@@ -10,10 +10,15 @@ import { cn } from "@/lib/utils";
 
 const COPIED_MS = 2000;
 
+/**
+ * Copies a value and says so: a toast, and a tick in place of the copy icon for two seconds.
+ * Icon-only by default, with `label` as its accessible name and tooltip; the touch sizes come
+ * from the Button's icon sizes. `showLabel` makes it a small outline button with the label.
+ */
 export function CopyButton({
   value,
   label,
-  variant = "ghost",
+  variant,
   size = "icon",
   showLabel = false,
   copiedMessage,
@@ -23,8 +28,10 @@ export function CopyButton({
   label: string;
   /** The success toast, when it can say what was copied; defaults to "Copied to clipboard". */
   copiedMessage?: string;
-  variant?: "ghost" | "outline";
-  size?: "icon" | "sm";
+  /** Ghost by default when icon-only, outline with a label. */
+  variant?: "ghost" | "quiet" | "outline";
+  /** The icon size; a labelled button is always `sm` (the value "sm" is kept for old callers). */
+  size?: "icon" | "icon-sm" | "icon-xs" | "sm";
   showLabel?: boolean;
   className?: string;
 }): JSX.Element {
@@ -55,16 +62,16 @@ export function CopyButton({
     }, COPIED_MS);
   };
 
-  const iconOnly = !showLabel || size === "icon";
+  const iconOnly = !showLabel;
   const Icon = copied ? CheckIcon : Copy01Icon;
   const button = (
     <Button
       aria-label={iconOnly ? label : undefined}
-      className={cn(size === "icon" && "size-10 md:size-8", className)}
+      className={className}
       data-copied={copied ? "" : undefined}
       onClick={onClick}
-      size={size}
-      variant={variant}
+      size={iconOnly ? (size === "sm" ? "icon" : size) : "sm"}
+      variant={variant ?? (iconOnly ? "ghost" : "outline")}
     >
       <AnimatedIcon
         icon={Icon}

@@ -1,7 +1,12 @@
 import type { JSX } from "react";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { useDisplayEmail } from "@/lib/privacy";
-import { cn } from "@/lib/utils";
 
+/**
+ * An account's address on one line. A cut-off address shows in full in a tooltip: the real
+ * address, or the masked one under privacy mode (the real address never reaches the tooltip
+ * then).
+ */
 export function DisplayEmail({
   email,
   id,
@@ -12,12 +17,5 @@ export function DisplayEmail({
   className?: string;
 }): JSX.Element {
   const display = useDisplayEmail();
-  const text = display(email, id);
-  // The title repeats the shown text, so a cut-off address can be read: the full address, or
-  // the masked one under privacy mode (the real address never reaches the title then).
-  return (
-    <span className={cn("truncate", className)} title={email ? text : undefined}>
-      {text}
-    </span>
-  );
+  return <TruncatedText className={className}>{display(email, id)}</TruncatedText>;
 }

@@ -37,6 +37,31 @@ describe("CopyButton", () => {
     expect(await copyTextMock.mock.calls[0]?.[0]).toBe("secret-value");
   });
 
+  it("is an icon button sized by the Button, with no touch-size override", () => {
+    renderWithProviders(<CopyButton label="Copy key" value="sk-123" />);
+    const button = screen.getByRole("button", { name: "Copy key" });
+    expect(button).not.toHaveClass("size-10");
+    expect(button).not.toHaveClass("md:size-8");
+    expect(button).toHaveClass("size-9", "sm:size-8");
+  });
+
+  it("passes a smaller icon size through", () => {
+    renderWithProviders(<CopyButton label="Copy key" size="icon-sm" value="sk-123" />);
+    expect(screen.getByRole("button", { name: "Copy key" })).toHaveClass("size-8", "sm:size-7");
+  });
+
+  it("shows its label as a small outline button", async () => {
+    copyTextMock.mockResolvedValue(true);
+    const { user } = renderWithProviders(
+      <CopyButton label="Copy link" showLabel value="https://x" />,
+    );
+    const button = screen.getByRole("button", { name: "Copy link" });
+    expect(button).not.toHaveAttribute("aria-label");
+    expect(button).toHaveClass("h-8", "sm:h-7");
+    await user.click(button);
+    await waitFor(() => expect(button).toHaveAttribute("data-copied"));
+  });
+
   it("reports a failed copy", async () => {
     copyTextMock.mockResolvedValue(false);
     const { user } = renderWithProviders(<CopyButton label="Copy key" value="sk-123" />);

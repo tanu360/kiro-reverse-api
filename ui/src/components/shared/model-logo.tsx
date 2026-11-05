@@ -9,8 +9,8 @@ import { MODEL_MAKERS, type ModelMaker } from "./model-logos";
 const BOX = "inline-flex size-4 shrink-0 items-center justify-center";
 
 /**
- * A model maker's mark beside text that already names it: hidden from screen readers, with the
- * maker's name as a tooltip.
+ * A model maker's mark beside text that already names it: decorative, so it is hidden from
+ * screen readers and has no tooltip of its own.
  */
 export function MakerLogo({
   maker,
@@ -19,17 +19,17 @@ export function MakerLogo({
   maker: ModelMaker;
   className?: string;
 }): JSX.Element {
-  const { name, Mark } = MODEL_MAKERS[maker];
+  const { Mark } = MODEL_MAKERS[maker];
   return (
-    <span aria-hidden="true" className={cn(BOX, className)} title={name}>
+    <span aria-hidden="true" className={cn(BOX, className)}>
       <Mark className="size-full" />
     </span>
   );
 }
 
 /**
- * The mark of the company behind a model name, next to the name: decorative (the name says it),
- * with the company in a tooltip. A name that gives no company away gets a plain cube.
+ * The mark of the company behind a model name, next to the name: decorative (the name says it).
+ * A name that gives no company away gets a plain cube in the muted icon colour.
  */
 export function ModelLogo({
   model,
@@ -42,14 +42,14 @@ export function ModelLogo({
   const box = cn(BOX, className);
   if (origin === "kiro") {
     return (
-      <span aria-hidden="true" className={box} title="Kiro">
+      <span aria-hidden="true" className={box}>
         <KiroLogo className="size-full" />
       </span>
     );
   }
   if (origin) return <MakerLogo className={className} maker={origin} />;
   return (
-    <span aria-hidden="true" className={cn(box, "text-muted-foreground/70")}>
+    <span aria-hidden="true" className={cn(box, "text-icon-muted")}>
       <HugeiconsIcon className="size-full" icon={CubeIcon} />
     </span>
   );

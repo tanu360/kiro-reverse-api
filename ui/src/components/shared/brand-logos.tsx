@@ -1,4 +1,5 @@
 import { type JSX, type SVGProps, useId } from "react";
+import { cn } from "@/lib/utils";
 
 /*
  * Brand marks, inlined so the app never hotlinks: the "works with" stickers on the sign-in
@@ -58,9 +59,16 @@ export function CodexLogo(props: LogoProps): JSX.Element {
 }
 
 /** Kiro. Source: LobeHub icons, `@lobehub/icons-static-svg` 1.102.0 `kiro-color.svg`; MIT. */
-export function KiroLogo(props: LogoProps): JSX.Element {
+export function KiroLogo({ className, ...props }: LogoProps): JSX.Element {
+  // The mark is a tile: it rounds its own box (rounded-xs), so callers do not round it.
   return (
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" {...props}>
+    <svg
+      aria-hidden="true"
+      className={cn("rounded-xs", className)}
+      focusable="false"
+      viewBox="0 0 24 24"
+      {...props}
+    >
       <path
         d="M18.8 0H5.2A5.2 5.2 0 000 5.2v13.6A5.2 5.2 0 005.2 24h13.6a5.2 5.2 0 005.2-5.2V5.2A5.2 5.2 0 0018.8 0z"
         fill="#9046FF"
