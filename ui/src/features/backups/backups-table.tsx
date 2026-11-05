@@ -299,7 +299,7 @@ export function BackupsTable({
       {
         id: "note",
         header: t("note"),
-        className: "min-w-48 max-w-96 whitespace-normal break-words leading-snug",
+        className: "min-w-32 max-w-96 whitespace-normal break-words leading-snug",
         cell: (entry) => <NoteCell entry={entry} mask={mask} t={t} />,
       },
       {
@@ -342,8 +342,8 @@ export function BackupsTable({
       caption={t("list.caption")}
       cardLayout="divided"
       // Rows divided inside the card on a phone, the table from 42rem, as on Accounts and
-      // Requests. With the short Accounts header its five columns fit the 744 px a 1024 px window
-      // leaves, unscrolled.
+      // Requests. With the short Accounts header and the note's 8rem floor its five columns fit
+      // that 672 px container, unscrolled, so the pinned actions never cover the counts.
       cardsBelow="2xl"
       columns={columns}
       data={rows}

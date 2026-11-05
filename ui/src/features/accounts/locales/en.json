@@ -243,7 +243,6 @@
   "export.viewList": "Accounts",
   "export.viewJson": "JSON",
   "export.selectAll": "Select all",
-  "export.deselectAll": "Deselect all",
   "export.selected": "{count} selected",
   "export.copyJson": "Copy JSON",
   "export.downloadJson": "Download JSON",

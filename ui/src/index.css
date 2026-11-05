@@ -610,8 +610,9 @@
  * A vertical scroller that fades its content out at an edge it can still scroll past: 20 px at
  * the top once it has scrolled down, 20 px at the bottom until it reaches the end (the menu and
  * select lists). The fades follow the scroll position through a scroll-driven animation of two
- * registered lengths, so a list that does not scroll, or a browser without scroll timelines,
- * shows no fade.
+ * registered lengths, so a list that does not scroll shows no fade. The mask sits behind
+ * @supports: without scroll timelines the animation would run once as a plain 0 s animation and
+ * hold its last frame, a fade at the start edge that never goes, so such a browser gets none.
  */
 @property --scroll-fade-top {
   syntax: "<length>";
@@ -640,20 +641,23 @@
   }
 }
 @utility scroll-fade-y {
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--scroll-fade-top),
-    #000 calc(100% - var(--scroll-fade-bottom)),
-    transparent
-  );
-  animation: scroll-fade-y linear both;
-  animation-timeline: scroll(self block);
+  @supports (animation-timeline: scroll()) {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 var(--scroll-fade-top),
+      #000 calc(100% - var(--scroll-fade-bottom)),
+      transparent
+    );
+    animation: scroll-fade-y linear both;
+    animation-timeline: scroll(self block);
+  }
 }
 
 /*
  * The sideways twin of scroll-fade-y (tab strips, chip rows): 24 px at the leading edge once it
  * has scrolled, 24 px at the trailing edge until it reaches the end. Right-to-left text flips it.
+ * Behind the same @supports guard: a browser without scroll timelines shows the strip unmasked.
  */
 @property --scroll-fade-start {
   syntax: "<length>";
@@ -683,15 +687,18 @@
 }
 @utility scroll-fade-x {
   --scroll-fade-direction: to right;
-  mask-image: linear-gradient(
-    var(--scroll-fade-direction),
-    transparent,
-    #000 var(--scroll-fade-start),
-    #000 calc(100% - var(--scroll-fade-end)),
-    transparent
-  );
-  animation: scroll-fade-x linear both;
-  animation-timeline: scroll(self inline);
+
+  @supports (animation-timeline: scroll()) {
+    mask-image: linear-gradient(
+      var(--scroll-fade-direction),
+      transparent,
+      #000 var(--scroll-fade-start),
+      #000 calc(100% - var(--scroll-fade-end)),
+      transparent
+    );
+    animation: scroll-fade-x linear both;
+    animation-timeline: scroll(self inline);
+  }
 
   &:dir(rtl) {
     --scroll-fade-direction: to left;

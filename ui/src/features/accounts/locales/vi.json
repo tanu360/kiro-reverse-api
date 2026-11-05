@@ -231,7 +231,6 @@
   "export.viewList": "Tài khoản",
   "export.viewJson": "JSON",
   "export.selectAll": "Chọn tất cả",
-  "export.deselectAll": "Bỏ chọn tất cả",
   "export.selected": "Đã chọn {count}",
   "export.copyJson": "Sao chép JSON",
   "export.downloadJson": "Tải xuống JSON",

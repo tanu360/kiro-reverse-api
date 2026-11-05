@@ -180,8 +180,9 @@ describe("AccountsPage", () => {
     const { table, user } = await renderAccounts();
     const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
     await user.click(within(row).getAllByRole("cell")[2]);
-    // The sheet's own title is the detail package's; any open dialog proves the row opened it.
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    // The sheet is titled with the clicked account's (masked) email, so this proves the row
+    // opened its own account's details, not another row's or another dialog.
+    expect(await screen.findByRole("dialog", { name: DANA_MASKED })).toBeInTheDocument();
   });
 
   it("keeps the selection across filters and batch-deletes it after a confirm", async () => {
