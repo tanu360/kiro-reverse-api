@@ -10,6 +10,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
@@ -120,17 +121,26 @@ export function AccountRowActions({
   if (variant === "menu") {
     return (
       <Menu>
+        {/*
+          Busy, not loading: a loading Button drops the click that opens the menu and is
+          aria-disabled, so Test, Details, Copy JSON and Delete would wait for the refresh.
+          Only the Refresh item waits.
+        */}
         <MenuTrigger
           render={
             <Button
+              aria-busy={refresh.isPending || undefined}
               aria-label={t("actions.more")}
-              loading={refresh.isPending}
               size="icon"
               variant="quiet"
             />
           }
         >
-          <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
+          {refresh.isPending ? (
+            <Spinner aria-hidden="true" />
+          ) : (
+            <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
+          )}
         </MenuTrigger>
         <MenuPopup align="end">
           <MenuItem disabled={refresh.isPending} onClick={() => refresh.mutate()}>

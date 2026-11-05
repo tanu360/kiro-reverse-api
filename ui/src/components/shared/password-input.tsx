@@ -30,8 +30,10 @@ type PasswordInputProps = Omit<
 
 /**
  * The sign-in password field, for every password in the app: the soft field with an optional
- * lock icon, and a quiet eye button at the end that shows or hides the text. The toggle is a
- * pressed-state button with a tooltip; its touch target comes from the Button's icon size.
+ * lock icon, and a quiet eye button at the end that shows or hides the text. The toggle is an
+ * action button whose name says what a press does ("Show password", then "Hide password"), so it
+ * has no aria-pressed: a flipping name plus a pressed state would read as two opposite states.
+ * The tooltip repeats the name; the touch target comes from the Button's icon size.
  * Inside a Base UI Field the input takes the field's label, id and error wiring.
  */
 export function PasswordInput({
@@ -75,7 +77,6 @@ export function PasswordInput({
             render={
               <Button
                 aria-label={label}
-                aria-pressed={visible}
                 // The lg field is 40 px on a fine pointer from sm up: 2 px more end inset puts the
                 // 28 px eye 6 px from the top, bottom and end, so its focus ring clears the
                 // field's border. Elsewhere the addon's own inset is already even.

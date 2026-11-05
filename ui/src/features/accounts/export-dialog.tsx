@@ -279,7 +279,8 @@ export function ExportDialog({
                 indeterminate={someVisible}
                 onCheckedChange={toggleVisible}
               />
-              {allVisible ? t("export.deselectAll") : t("export.selectAll")}
+              {/* One name in every state: checked, mixed and unchecked already say which. */}
+              {t("export.selectAll")}
             </label>
             {visible.length > 0 ? (
               // Shrinks to the space left, scrolling inside its card, and to its rows when few.

@@ -31,8 +31,13 @@ async function openExport(initialSelection?: string[]) {
 describe("ExportDialog", () => {
   it("warns and copies nothing when no account is selected", async () => {
     const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("checkbox", { name: "Deselect all" }));
+    // The select-all checkbox keeps one name; its checked state says whether all are selected.
+    const selectAll = within(dialog).getByRole("checkbox", { name: "Select all" });
+    expect(selectAll).toBeChecked();
+    expect(within(dialog).queryByRole("checkbox", { name: "Deselect all" })).toBeNull();
+    await user.click(selectAll);
     expect(within(dialog).getByText("0 selected")).toBeInTheDocument();
+    expect(within(dialog).getByRole("checkbox", { name: "Select all" })).not.toBeChecked();
     await user.click(within(dialog).getByRole("button", { name: "Copy JSON" }));
     expect(await screen.findByText("Select at least one account.")).toBeInTheDocument();
     expect(copyText).not.toHaveBeenCalled();
@@ -42,7 +47,7 @@ describe("ExportDialog", () => {
     const apiKeyAccount = mockDb.accounts.find((a) => a.authMethod === "api_key");
     if (!apiKeyAccount) throw new Error("fixture missing");
     const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("checkbox", { name: "Deselect all" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Select all" }));
     await user.click(within(dialog).getByRole("checkbox", { name: /^api-key-/ }));
     await user.click(within(dialog).getByRole("button", { name: "Copy JSON" }));
 
@@ -94,7 +99,7 @@ describe("ExportDialog", () => {
 
   it("stays on the list and warns when JSON is picked with nothing selected", async () => {
     const { dialog, user } = await openExport();
-    await user.click(within(dialog).getByRole("checkbox", { name: "Deselect all" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Select all" }));
     await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
     expect(await screen.findByText("Select at least one account.")).toBeInTheDocument();
     expect(within(dialog).getByRole("radio", { name: "Accounts" })).toBeChecked();
