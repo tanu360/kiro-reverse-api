@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/input-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 /**
  * The value with a break opportunity after each "/", so a long URL wraps at its path segments.
@@ -33,10 +34,21 @@ function breakAtSlashes(value: string): ReactNode {
   ));
 }
 
+/*
+ * The multiline value: a 20 px line with 4 px above and below, in a group that is at least a
+ * field's height (36 / 32 / coarse 40, border included), so one line measures exactly like an
+ * input beside it and the box grows only when the value wraps.
+ */
+const MULTILINE_GROUP = "min-h-9 sm:min-h-8 pointer-coarse:min-h-10";
+const MULTILINE_TEXT =
+  "block min-w-0 flex-1 cursor-text select-all whitespace-normal py-1 ps-3 font-mono text-foreground text-meta leading-5 outline-none";
+
 /**
  * A value to copy (a URL, a key, a command) in a read-only field: mono text in the soft field,
  * with a copy button and, for a link, an open button at its end. One line scrolls inside the
- * input (focus selects it all); `multiline` wraps the value anywhere instead, for long URLs.
+ * input (focus selects it all); `multiline` wraps the value instead: a URL at its slashes (then
+ * anywhere), anything else (a key, a token) at any character, so it fills every line evenly
+ * instead of leaving "sk-" alone on the first one.
  * Inside a Base UI Field the input takes the field's label; otherwise pass `label`. The
  * multiline value is a read-only textbox (a tab stop), named by `label` or by `labelledBy`.
  */
@@ -71,14 +83,14 @@ export function CopyField({
 }): JSX.Element {
   const { t } = useT();
   return (
-    <InputGroup className={className} data-slot="copy-field">
+    <InputGroup className={cn(multiline && MULTILINE_GROUP, className)} data-slot="copy-field">
       {multiline ? (
         <InputGroupText
           aria-label={labelledBy ? undefined : label}
           aria-labelledby={labelledBy}
           aria-multiline="true"
           aria-readonly="true"
-          className="block min-w-0 flex-1 cursor-text select-all whitespace-normal py-2 ps-3 font-mono text-foreground text-meta leading-normal outline-none wrap-anywhere"
+          className={cn(MULTILINE_TEXT, value.includes("/") ? "wrap-anywhere" : "break-all")}
           id={id}
           role="textbox"
           tabIndex={0}

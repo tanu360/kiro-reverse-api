@@ -41,15 +41,29 @@ function Harness({ results, options = OPTIONS }: { results: boolean[]; options?:
 }
 
 describe("useConfirm", () => {
-  it("opens a danger confirm on Cancel, so Enter does not run the action", async () => {
+  it("opens a danger confirm on Cancel from the keyboard, so Enter does not run the action", async () => {
     const results: boolean[] = [];
     const { user } = renderWithProviders(<Harness results={results} />);
-    await user.click(screen.getByRole("button", { name: "Ask" }));
+    screen.getByRole("button", { name: "Ask" }).focus();
+    await user.keyboard("{Enter}");
     const dialog = await screen.findByRole("alertdialog");
     expect(dialog).toHaveTextContent("Delete this account?");
     await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus());
     await user.keyboard("{Enter}");
     await waitFor(() => expect(results).toEqual([false]));
+  });
+
+  it("opens on the dialog itself after a click, so no button shows a ring", async () => {
+    const results: boolean[] = [];
+    const { user } = renderWithProviders(<Harness results={results} />);
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await waitFor(() => expect(dialog).toHaveFocus());
+    // Enter on the dialog runs nothing; Tab reaches Cancel first.
+    await user.keyboard("{Enter}");
+    expect(results).toEqual([]);
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
   });
 
   it("resolves true on confirm", async () => {
@@ -68,7 +82,8 @@ describe("useConfirm", () => {
         results={results}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "Ask with options" }));
+    screen.getByRole("button", { name: "Ask with options" }).focus();
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByRole("button", { name: "Sign out" })).toHaveFocus());
   });
 

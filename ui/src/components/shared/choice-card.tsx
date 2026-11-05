@@ -3,18 +3,33 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { ComponentProps, JSX, ReactNode } from "react";
 import { IconChip } from "@/components/shared/icon-chip";
 import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+
+// The card carries the keyboard focus, so the Radio's or Checkbox's own ring is turned off: one
+// ring, not two concentric ones.
+const CHOICE_BASE =
+  "flex min-h-11 cursor-pointer items-start gap-3 transition-colors hover:bg-accent has-data-checked:bg-accent has-data-disabled:pointer-events-none has-data-disabled:opacity-64 [&_[data-slot=checkbox]:focus-visible]:outline-none [&_[data-slot=radio]:focus-visible]:outline-none";
+const CHOICE_VARIANT = {
+  // A bordered card on its own; checked adds the primary edge.
+  card: "rounded-lg border border-border p-3 has-data-checked:border-primary/48 has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:outline-offset-2 has-focus-visible:outline-solid",
+  // A row divided inside a ChoiceList: no border of its own, checked is the accent fill only,
+  // and the focus ring is drawn inside the row so the list's edges do not clip it.
+  row: "w-full px-4 py-3 has-focus-visible:outline-1 has-focus-visible:outline-ring has-focus-visible:-outline-offset-1 has-focus-visible:outline-solid",
+} as const;
 
 /**
  * A radio or checkbox as a card: the whole card is its label. `control` is the Base UI Radio or
- * Checkbox; the card takes the primary edge and the accent fill while it is checked, and the
- * focus outline while the control has keyboard focus.
+ * Checkbox; the card takes the accent fill while it is checked (a `card` also the primary edge),
+ * and the focus outline while the control has keyboard focus. `row` is one item of a ChoiceList
+ * (it renders its own `<li>`), for long lists where a border per item would be noise.
  */
 export function ChoiceCard({
   control,
   title,
   description,
   children,
+  variant = "card",
   className,
 }: {
   control: ReactNode;
@@ -22,17 +37,16 @@ export function ChoiceCard({
   description?: ReactNode;
   /** More lines under the description (an id, a region). */
   children?: ReactNode;
+  variant?: "card" | "row";
   /** Layout only. */
   className?: string;
 }): JSX.Element {
-  return (
+  const label = (
     // biome-ignore lint/a11y/noLabelWithoutControl: the Base UI Radio or Checkbox inside is the control.
     <label
-      className={cn(
-        "flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent has-data-checked:border-primary/48 has-data-checked:bg-accent has-data-disabled:pointer-events-none has-data-disabled:opacity-64 has-focus-visible:outline-2 has-focus-visible:outline-ring has-focus-visible:outline-offset-2 has-focus-visible:outline-solid",
-        className,
-      )}
+      className={cn(CHOICE_BASE, CHOICE_VARIANT[variant], className)}
       data-slot="choice-card"
+      data-variant={variant}
     >
       {/* The 16 px control sits on the title's 20 px first line. */}
       <span className="flex h-5 shrink-0 items-center">{control}</span>
@@ -45,23 +59,45 @@ export function ChoiceCard({
       </span>
     </label>
   );
+  return variant === "row" ? <li className="flex">{label}</li> : label;
 }
 
-/** A list of ChoiceRows in one card, split by hairlines. */
+const LIST_CLASS = "divide-y divide-border-subtle";
+
+/**
+ * A list of ChoiceRows, or of `ChoiceCard variant="row"` items, in one card, split by hairlines.
+ * `scroll` caps it at 18rem and scrolls inside the card, fading the edge that has more rows past
+ * it, so a long list shows that it goes on.
+ */
 export function ChoiceList({
   children,
+  scroll = false,
   className,
   "aria-label": ariaLabel,
 }: {
   children: ReactNode;
+  scroll?: boolean;
   /** Layout only. */
   className?: string;
   "aria-label"?: string;
 }): JSX.Element {
+  if (scroll) {
+    return (
+      <Card className={cn("overflow-hidden", className)} data-slot="choice-list">
+        {/* A flex column, so the viewport shrinks to the cap and scrolls. */}
+        <ScrollArea className="flex max-h-72 flex-col" scrollFade>
+          <ul aria-label={ariaLabel} className={LIST_CLASS}>
+            {children}
+          </ul>
+        </ScrollArea>
+      </Card>
+    );
+  }
   return (
     <Card
       aria-label={ariaLabel}
-      className={cn("divide-y divide-border-subtle overflow-hidden", className)}
+      className={cn(LIST_CLASS, "overflow-hidden", className)}
+      data-slot="choice-list"
       render={<ul />}
     >
       {children}

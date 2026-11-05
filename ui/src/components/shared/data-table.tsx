@@ -79,7 +79,8 @@ export interface DataTableProps<T> {
   rowLabel?: (row: T) => string;
   /**
    * Below this container width (DataTable's own, not the viewport) the rows render as cards
-   * through `renderCard`: lg = 32rem, 2xl = 42rem, 4xl = 56rem.
+   * through `renderCard`: lg = 32rem, 2xl = 42rem, 4xl = 56rem, 5xl = 64rem (a table whose
+   * first column needs about 250 px beside wide figure columns).
    */
   cardsBelow?: CardsBelow;
   renderCard?: (row: T, ctx: DataTableCardContext) => ReactNode;
@@ -116,7 +117,7 @@ export interface DataTableProps<T> {
   density?: "compact" | "comfortable";
 }
 
-type CardsBelow = "lg" | "2xl" | "4xl";
+type CardsBelow = "lg" | "2xl" | "4xl" | "5xl";
 
 /** Set by DataTableCard: a DataTable inside it is inset without the prop. */
 export const DataTableInsetContext = createContext(false);
@@ -132,6 +133,7 @@ const CARD_SWITCH: Record<CardsBelow, { cards: string; table: string }> = {
   lg: { cards: "@lg/data-table:hidden", table: "hidden @lg/data-table:block" },
   "2xl": { cards: "@2xl/data-table:hidden", table: "hidden @2xl/data-table:block" },
   "4xl": { cards: "@4xl/data-table:hidden", table: "hidden @4xl/data-table:block" },
+  "5xl": { cards: "@5xl/data-table:hidden", table: "hidden @5xl/data-table:block" },
 };
 const CARD_LIST_CLASS = {
   stack: "flex flex-col gap-2",
@@ -166,11 +168,14 @@ const ALIGN_CLASS = {
 } as const;
 // Sticky cells need an opaque background: the card the table sits in, with the row's own tint
 // laid over it as an image (the header band, hover, keyboard focus, an open row menu, selected
-// and selected-hovered). So a pinned cell matches its row exactly on any card fill. A 1 px inset
-// edge on the side facing the scrolling columns shows where they slide under it, only while
-// something is hidden on that side (Table marks its scroller data-overflow-start/-end).
+// and selected-hovered). So a pinned cell matches its row exactly on any card fill. The body
+// states exclude each other (selected, then an open menu, then hover or focus), so no selector
+// order or specificity decides: an open menu keeps its tint under the pointer, as on the row
+// (TableRow has-aria-expanded). A 1 px inset edge on the side facing the scrolling columns
+// shows where they slide under it, only while something is hidden on that side (Table marks its
+// scroller data-overflow-start/-end).
 const STICKY_BASE =
-  "sticky z-[1] bg-card [thead_&]:bg-[linear-gradient(var(--row-head),var(--row-head))] [tr:hover>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tr:focus-visible>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tr:has([aria-expanded=true])>&]:bg-[linear-gradient(color-mix(in_srgb,var(--row-selected)_50%,transparent),color-mix(in_srgb,var(--row-selected)_50%,transparent))] [tr[data-state=selected]>&]:bg-[linear-gradient(var(--row-selected),var(--row-selected))] [tr[data-state=selected]:hover>&]:bg-[linear-gradient(var(--row-selected-hover),var(--row-selected-hover))]";
+  "sticky z-[1] bg-card [thead_&]:bg-[linear-gradient(var(--row-head),var(--row-head))] [tbody>tr:is(:hover,:focus-visible):not([data-state=selected]):not(:has([aria-expanded=true]))>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tbody>tr:not([data-state=selected]):has([aria-expanded=true])>&]:bg-[linear-gradient(color-mix(in_srgb,var(--row-selected)_50%,transparent),color-mix(in_srgb,var(--row-selected)_50%,transparent))] [tbody>tr[data-state=selected]>&]:bg-[linear-gradient(var(--row-selected),var(--row-selected))] [tbody>tr[data-state=selected]:hover>&]:bg-[linear-gradient(var(--row-selected-hover),var(--row-selected-hover))]";
 const STICKY_CLASS = {
   start: cn(
     STICKY_BASE,
@@ -188,6 +193,12 @@ function stickyClass(sticky: DataTableColumn<unknown>["sticky"]): string | undef
   return STICKY_CLASS[sticky === "end" ? "end" : "start"];
 }
 const coreFeatures = tableFeatures({});
+const SKELETON_LINE = "flex w-full items-center";
+const SKELETON_ALIGN = {
+  start: "justify-start",
+  center: "justify-center",
+  end: "justify-end",
+} as const;
 const DEFAULT_SKELETON_ROWS = 5;
 const MAX_SKELETON_ROWS = 10;
 const SKELETON_CARDS = 3;
@@ -455,10 +466,32 @@ export function DataTable<T>({
                     {/* Column classes too, so a column hidden by a breakpoint stays hidden here. */}
                     {columns.map((column) => (
                       <TableCell className={column.className} key={column.id}>
-                        {/* Two lines, the height of a real two-line row, so nothing jumps. */}
-                        <div className="flex flex-col gap-1">
-                          <Skeleton className="h-3.5 w-3/4 max-w-32" />
-                          <Skeleton className="h-3 w-1/2 max-w-20" />
+                        {/*
+                          Two bars on the two text lines of a real row (a 20 px name over a
+                          14 px meta line: 34 px, the Accounts name cell), so the rows keep
+                          their height when data arrives.
+                          They sit on the column's side: a figure column's bars end at its
+                          right-aligned header.
+                        */}
+                        <div className="flex flex-col">
+                          <span
+                            className={cn(
+                              SKELETON_LINE,
+                              "h-5",
+                              SKELETON_ALIGN[column.align ?? "start"],
+                            )}
+                          >
+                            <Skeleton className="h-3.5 w-3/4 max-w-32" />
+                          </span>
+                          <span
+                            className={cn(
+                              SKELETON_LINE,
+                              "h-3.5",
+                              SKELETON_ALIGN[column.align ?? "start"],
+                            )}
+                          >
+                            <Skeleton className="h-3 w-1/2 max-w-20" />
+                          </span>
                         </div>
                       </TableCell>
                     ))}

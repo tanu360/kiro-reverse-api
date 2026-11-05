@@ -59,7 +59,7 @@ interface ChartInteractionResult {
     onMouseUp?: () => void;
     onTouchStart?: (event: React.TouchEvent<SVGGElement>) => void;
     onTouchMove?: (event: React.TouchEvent<SVGGElement>) => void;
-    onTouchEnd?: () => void;
+    onTouchEnd?: (event: React.TouchEvent<SVGGElement>) => void;
   };
   interactionStyle: React.CSSProperties;
 }
@@ -113,6 +113,9 @@ export function useChartInteraction({
   const isDraggingRef = useRef(false);
   const dragStartXRef = useRef<number>(0);
   const lastHoveredXRef = useRef<number | null>(null);
+  // The plot group a finger last touched: a tap leaves its tooltip up until a touch lands
+  // outside it.
+  const touchTargetRef = useRef<SVGGElement | null>(null);
 
   const resolveTooltipFromX = useCallback(
     (pixelX: number): TooltipData | null => {
@@ -263,6 +266,7 @@ export function useChartInteraction({
 
   const handleTouchStart = useCallback(
     (event: React.TouchEvent<SVGGElement>) => {
+      touchTargetRef.current = event.currentTarget;
       if (event.touches.length === 1) {
         event.preventDefault();
         const chartX = getChartX(event, 0);
@@ -345,10 +349,41 @@ export function useChartInteraction({
     ]
   );
 
-  const handleTouchEnd = useCallback(() => {
-    clearTooltip();
-    setSelection(null);
-  }, [clearTooltip, setSelection]);
+  // A tap or a drag leaves the crosshair and tooltip where the finger lifted (a touch has no
+  // hover to keep them up); a touch outside the plot clears them. preventDefault stops the
+  // browser's emulated mouse events after the tap, whose mousedown would start a drag and clear
+  // the tooltip straight away.
+  const handleTouchEnd = useCallback(
+    (event: React.TouchEvent<SVGGElement>) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      setSelection(null);
+    },
+    [setSelection]
+  );
+
+  useEffect(() => {
+    if (!canInteract) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      const plot = touchTargetRef.current;
+      if (event.pointerType === "mouse" || !plot) {
+        return;
+      }
+      if (event.target instanceof Node && plot.contains(event.target)) {
+        return;
+      }
+      touchTargetRef.current = null;
+      lastHoveredXRef.current = null;
+      clearTooltip();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, [canInteract, clearTooltip]);
 
   // Re-anchor tooltip/crosshair when x-scale or visible data changes (e.g. brush zoom commit).
   useEffect(() => {

@@ -14,4 +14,11 @@ describe("CopyField", () => {
     expect(box.textContent).toBe(url);
     expect(box.querySelectorAll("wbr")).toHaveLength(5);
   });
+
+  it("breaks a key at any character, so no fragment sits alone on the first line", () => {
+    renderWithProviders(<CopyField label="Key" multiline value="sk-0123456789abcdef" />);
+    const box = screen.getByRole("textbox", { name: "Key" });
+    expect(box).toHaveClass("break-all");
+    expect(box).not.toHaveClass("wrap-anywhere");
+  });
 });

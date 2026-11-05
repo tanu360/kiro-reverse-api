@@ -25,7 +25,11 @@ export interface ConfirmOptions {
   description?: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
-  /** `danger` opens with focus on Cancel, so a stray Enter or Space never runs the action. */
+  /**
+   * `danger` opens with focus on Cancel, so a stray Enter or Space never runs the action. That
+   * applies to a keyboard open; opened by a click or a tap, focus goes to the dialog itself (no
+   * ring on a button the pointer never touched), and Tab then reaches Cancel first.
+   */
   variant?: "danger" | "default";
   /**
    * What the action applies to (an account's email, a backup's time). Callers put it in the
@@ -62,6 +66,26 @@ export function ConfirmProvider({ children }: { children: ReactNode }): JSX.Elem
   const resolverRef = useRef<((value: boolean) => void) | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  // How the last confirm was asked for: confirm() is called from a menu item or a button, so the
+  // last keydown or pointerdown before it is what opened the dialog.
+  const lastInputRef = useRef<"keyboard" | "pointer">("pointer");
+  const openedByKeyboardRef = useRef(false);
+
+  useEffect(() => {
+    const onKeyDown = () => {
+      lastInputRef.current = "keyboard";
+    };
+    const onPointerDown = () => {
+      lastInputRef.current = "pointer";
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, []);
 
   const settle = useCallback((value: boolean) => {
     const resolve = resolverRef.current;
@@ -75,6 +99,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }): JSX.Elem
       // Opening a second confirm settles the first one as cancelled (old UI parity).
       resolverRef.current?.(false);
       resolverRef.current = resolve;
+      openedByKeyboardRef.current = lastInputRef.current === "keyboard";
       setOptions(next);
       setOpen(true);
     });
@@ -102,8 +127,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }): JSX.Elem
       >
         {options ? (
           <AlertDialogPopup
-            initialFocus={options.variant === "danger" ? cancelRef : confirmButtonRef}
+            initialFocus={(type) =>
+              type === "keyboard" || openedByKeyboardRef.current
+                ? (options.variant === "danger" ? cancelRef : confirmButtonRef).current
+                : popupRef.current
+            }
             portalProps={{ onClick: onPortalClick }}
+            ref={popupRef}
           >
             <AlertDialogHeader>
               <AlertDialogTitle>

@@ -467,8 +467,12 @@ function moveTo(
 const DEFAULT_TOOLTIP_WIDTH = 180;
 const DEFAULT_TOOLTIP_HEIGHT = 80;
 
-/** Panel position beside the cursor: flips left near the right edge and is
- * clamped vertically inside the container. */
+/** The panel keeps at least this much room from the container's left and right edges. */
+const TOOLTIP_EDGE_GAP = 8;
+
+/** Panel position beside the cursor: flips left near the right edge, takes the
+ * other side when the chosen one would cut it off, and is clamped inside the
+ * container on both axes. */
 function resolveTooltipTarget({
   x,
   flipX = x,
@@ -488,10 +492,24 @@ function resolveTooltipTarget({
   containerWidth: number;
   containerHeight: number;
 }) {
-  const flipped = flipX + width + offset > containerWidth;
+  const rightLeft = x + offset;
+  const leftLeft = x - offset - width;
+  const fitsRight = rightLeft + width <= containerWidth - TOOLTIP_EDGE_GAP;
+  const fitsLeft = leftLeft >= TOOLTIP_EDGE_GAP;
+  let flipped = flipX + width + offset > containerWidth;
+  // The chosen side would cut the panel off (a narrow phone chart): take the other side when
+  // the panel fits there.
+  if (flipped && !fitsLeft && fitsRight) {
+    flipped = false;
+  } else if (!flipped && !fitsRight && fitsLeft) {
+    flipped = true;
+  }
+  // Neither side fits: keep the side, and clamp the panel inside the container.
+  const maxLeft = Math.max(TOOLTIP_EDGE_GAP, containerWidth - width - TOOLTIP_EDGE_GAP);
+  const left = Math.min(Math.max(flipped ? leftLeft : rightLeft, TOOLTIP_EDGE_GAP), maxLeft);
   return {
     flipped,
-    left: flipped ? x - offset - width : x + offset,
+    left,
     top: Math.max(
       offset,
       Math.min(y - height / 2, containerHeight - height - offset)
@@ -565,12 +583,6 @@ function TooltipBoxInner({
   // Flip side + replay key for the panel entrance. Seeded from the default
   // size (the inner box mounts fresh on every show); refined from the measured
   // width in the layout effect, which only re-renders when the side changes.
-  const [flip, setFlip] = useState(() => ({
-    flipped: (flipX ?? x) + DEFAULT_TOOLTIP_WIDTH + offset > containerWidth,
-    key: 0,
-  }));
-  const shouldFlipX = flip.flipped;
-
   const [initialTarget] = useState(() =>
     resolveTooltipTarget({
       x,
@@ -583,6 +595,11 @@ function TooltipBoxInner({
       containerHeight,
     })
   );
+  const [flip, setFlip] = useState(() => ({
+    flipped: initialTarget.flipped,
+    key: 0,
+  }));
+  const shouldFlipX = flip.flipped;
   const animatedLeft = useSpring(initialTarget.left, effectiveSpring);
   const animatedTop = useSpring(initialTarget.top, effectiveSpring);
 

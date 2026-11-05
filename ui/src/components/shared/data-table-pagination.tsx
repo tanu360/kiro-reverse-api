@@ -21,20 +21,20 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /*
- * The prev/next chevrons: round, in the topbar search pill's surface (command-menu.tsx: the
- * --field tint and the --input hairline), so they read on the page in both themes. Sized by the
- * Button's `icon` step, like the page numbers. Disabled keeps the circle, dimmed like every
- * disabled control, with a muted chevron.
+ * The prev/next chevrons: in the topbar search pill's surface (command-menu.tsx: the --field
+ * tint and the --input hairline), so they read on the page in both themes, with the 8 px corners
+ * of every button. Sized by the Button's `icon` step, like the page numbers. Disabled keeps the
+ * box, dimmed like every disabled control, with a muted chevron.
  */
 export const PAGER_CHEVRON_CLASS =
-  "rounded-full border-input bg-(--field) text-foreground [:hover,[data-pressed]]:bg-(--field-hover) disabled:text-muted-foreground";
-// The page numbers: round quiet buttons; the current page takes the accent fill, the same
-// surface as a selected segment.
-const PAGE = "rounded-full tabular-nums";
+  "border-input bg-(--field) text-foreground [:hover,[data-pressed]]:bg-(--field-hover) disabled:text-muted-foreground";
+// The page numbers: quiet buttons; the current page takes the accent fill, the same surface as
+// a selected segment.
+const PAGE = "tabular-nums";
 const PAGE_ACTIVE = "bg-accent text-foreground";
 
 /**
- * The pager's round previous/next button, for any prev/next pair that should match the table
+ * The pager's previous/next button, for any prev/next pair that should match the table
  * pager (a detail sheet stepping through rows). `label` is its accessible name.
  */
 export function PagerChevronButton({
@@ -96,7 +96,9 @@ export function DataTablePagination({
     .sort((a, b) => a - b);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-meta">
+    // w-full: in a card footer (a flex row) the pager is the only child, so without it the root
+    // shrinks to its content and the count and the pager sit together at the start.
+    <div className="flex w-full flex-wrap items-center justify-between gap-3 text-meta">
       <p aria-live="polite" className="text-muted-foreground tabular-nums">
         {t("table.pageInfo", {
           start: formatNumber(start, lang),
@@ -125,7 +127,8 @@ export function DataTablePagination({
               }}
               value={String(pageSize)}
             >
-              <SelectTrigger aria-labelledby={sizeLabelId} fit="content" size="sm">
+              {/* The default step (36 / 32 / coarse 40) matches the icon buttons beside it. */}
+              <SelectTrigger aria-labelledby={sizeLabelId} fit="content" size="default">
                 <SelectValue className="tabular-nums" />
               </SelectTrigger>
               <SelectPopup fit="content">
@@ -154,7 +157,7 @@ export function DataTablePagination({
               </span>
             </PaginationItem>
             <PaginationItem className="max-sm:hidden">
-              <ol className="flex items-center gap-0.5 p-1">
+              <ol className="flex items-center gap-0.5">
                 {pages.map((n, index) => (
                   <PaginationItem className="flex items-center gap-0.5" key={n}>
                     {index > 0 && n - pages[index - 1] > 1 ? (

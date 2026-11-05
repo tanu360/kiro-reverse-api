@@ -76,12 +76,16 @@ export function ListCard({
         {leading ? (
           <div className="relative z-[1] flex shrink-0 items-center">{leading}</div>
         ) : null}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        {/*
+          The title and its badges wrap: when both do not fit, the badges drop under the title
+          instead of crushing it to a few letters (a key that is disabled and over its limit).
+        */}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           {onOpen ? (
             <button
               aria-label={openLabel}
               className={cn(
-                "min-w-0 cursor-pointer truncate text-left font-medium text-foreground text-sm/5",
+                "min-w-0 max-w-full cursor-pointer truncate text-left font-medium text-foreground text-sm/5",
                 OPEN_BUTTON[variant],
               )}
               data-slot="list-card-open"
@@ -91,7 +95,9 @@ export function ListCard({
               {title}
             </button>
           ) : (
-            <div className="min-w-0 truncate font-medium text-foreground text-sm/5">{title}</div>
+            <div className="min-w-0 max-w-full truncate font-medium text-foreground text-sm/5">
+              {title}
+            </div>
           )}
           {badge ? <div className="flex shrink-0 items-center">{badge}</div> : null}
         </div>

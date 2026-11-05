@@ -38,20 +38,29 @@ export interface ResponsiveDialogProps {
    */
   size?: DialogSize;
   /**
-   * `top` hangs the dialog from near the top, so a step flow keeps its title in place. On phones
-   * the bottom drawer then takes a fixed 90 % of the screen, so its top stays put as steps change
-   * height (the panel scrolls, the footer stays at the bottom).
+   * `top` hangs the dialog from near the top from md up, so a step flow or a form that grows (a
+   * validation line, a server error) keeps its title in place. The phone bottom drawer is not
+   * affected: it fits its content (up to 90 % of the screen), so a short step is not a tall
+   * empty sheet.
    */
   anchor?: DialogAnchor;
   /** Shows a back arrow before the title (a step flow's way back); the footer keeps the actions. */
   onBack?: () => void;
   /** The back arrow's accessible name; defaults to the common "Back". */
   backLabel?: string;
+  /**
+   * `false` while a request runs: Escape and outside presses do nothing and the close X stays
+   * in place but disabled, so the header does not shift.
+   */
   dismissible?: boolean;
   initialFocus?: RefObject<HTMLElement | null>;
 }
 
-/** The title row: an optional back arrow, then the title. */
+/**
+ * The title row: an optional back arrow, then the title. The arrow is the close X's size and is
+ * pulled out of the row's height (-my-2), so the title sits on the same line with and without it
+ * and does not jump between a flow's first step and the next.
+ */
 function TitleRow({
   title,
   onBack,
@@ -68,9 +77,9 @@ function TitleRow({
     <div className="flex min-w-0 items-center gap-1.5" data-slot="responsive-dialog-title-row">
       <Button
         aria-label={backLabel}
-        className="-ms-2 shrink-0"
+        className="-my-2 -ms-2 shrink-0"
         onClick={onBack}
-        size="icon-sm"
+        size="icon"
         variant="ghost"
       >
         <HugeiconsIcon aria-hidden="true" icon={ArrowLeft01Icon} />
@@ -113,11 +122,7 @@ export function ResponsiveDialog({
         open={open}
         position="bottom"
       >
-        <DrawerPopup
-          className={anchor === "top" ? "h-[90dvh] max-h-[90dvh]" : "max-h-[90dvh]"}
-          initialFocus={initialFocus}
-          showBar
-        >
+        <DrawerPopup className="max-h-[90dvh]" initialFocus={initialFocus} showBar>
           <DrawerHeader>
             <TitleRow backLabel={back} onBack={onBack} title={title} Title={DrawerTitle} />
             {description ? <DrawerDescription>{description}</DrawerDescription> : null}
@@ -133,8 +138,8 @@ export function ResponsiveDialog({
     <Dialog disablePointerDismissal={!dismissible} onOpenChange={handleOpenChange} open={open}>
       <DialogPopup
         anchor={anchor}
+        closeProps={{ disabled: !dismissible }}
         initialFocus={initialFocus}
-        showCloseButton={dismissible}
         size={size}
       >
         <DialogHeader>

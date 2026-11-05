@@ -30,10 +30,11 @@ export function PageHeader({
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
       <div className="flex min-w-48 grow basis-0 flex-col gap-1.5">
         {/*
-          The title row is always the buttons' height, so the two share a centre line and the
-          first card starts at the same height on every page, with or without actions.
+          The title row is always the buttons' height (36 / 32 / coarse 40, the default Button
+          step), so the title centres on the actions beside it and the first card starts at the
+          same height on every page, with or without actions.
         */}
-        <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+        <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 sm:min-h-8 pointer-coarse:min-h-10">
           <h1 className="text-balance font-semibold text-xl leading-tight sm:text-title">
             {title}
           </h1>

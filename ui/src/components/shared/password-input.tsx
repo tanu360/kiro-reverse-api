@@ -76,6 +76,10 @@ export function PasswordInput({
               <Button
                 aria-label={label}
                 aria-pressed={visible}
+                // The lg field is 40 px on a fine pointer from sm up: 2 px more end inset puts the
+                // 28 px eye 6 px from the top, bottom and end, so its focus ring clears the
+                // field's border. Elsewhere the addon's own inset is already even.
+                className={size === "lg" ? "sm:pointer-fine:me-0.5" : undefined}
                 onClick={() => setVisible((shown) => !shown)}
                 size="icon-sm"
                 variant="quiet"

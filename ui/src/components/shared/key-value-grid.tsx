@@ -6,12 +6,13 @@ import { cn } from "@/lib/utils";
 
 /*
  * Columns follow the grid's own width (container queries), not the viewport, so every grid in
- * one sheet or card switches at the same width: 1 column under 24rem, 2 from @sm, 3 from @2xl.
+ * one sheet or card switches at the same width: 1 column under 20rem, 2 from @xs (a phone sheet's
+ * 358 px content still pairs Input with Output), 3 from @2xl.
  */
 const COLUMN_CLASS = {
   1: "grid-cols-1",
-  2: "grid-cols-1 @sm:grid-cols-2",
-  3: "grid-cols-1 @sm:grid-cols-2 @2xl:grid-cols-3",
+  2: "grid-cols-1 @xs:grid-cols-2",
+  3: "grid-cols-1 @xs:grid-cols-2 @2xl:grid-cols-3",
 } as const;
 
 export interface KeyValueItem {
@@ -61,7 +62,7 @@ export function KeyValueGrid({
             <div
               className={cn(
                 "flex min-w-0 flex-col gap-1",
-                item.span === 2 && columns > 1 && "@sm:col-span-2",
+                item.span === 2 && columns > 1 && "@xs:col-span-2",
               )}
               key={item.label}
             >
