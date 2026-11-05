@@ -1200,3 +1200,36 @@ func TestAccountWritesPublishAccountsChanged(t *testing.T) {
 	(&Handler{}).apiResetStats(rec, httptest.NewRequest(http.MethodPost, "/admin/api/stats/reset", nil))
 	waitForEvent(t, ch, eventStatsReset)
 }
+
+func TestAccountFieldWritesAndCooldownsPublishAccountsChanged(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.AddAccount(config.Account{ID: "acc", Enabled: true}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+	p := accountpool.GetPool()
+	p.Reload()
+	id, ch := getBroadcaster().Subscribe()
+	defer getBroadcaster().Unsubscribe(id)
+
+	for _, step := range []struct {
+		name  string
+		write func() error
+	}{
+		{"overage", func() error { return config.DisableAccountOverage("acc") }},
+		{"profile", func() error { return config.UpdateAccountProfileArn("acc", "arn:aws:codewhisperer:profile/x") }},
+		{"pin", func() error { return config.PinAccountProfileArn("acc", "arn:aws:codewhisperer:profile/y") }},
+		{"token", func() error { return config.UpdateAccountToken("acc", "access", "refresh", 1) }},
+		{"cooldown", func() error { p.RecordThrottleError("acc", time.Minute); return nil }},
+		{"cooldown cleared", func() error { p.RecordSuccess("acc"); return nil }},
+	} {
+		name, write := step.name, step.write
+		if err := write(); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if evt := waitForEvent(t, ch, eventAccountsChanged); evt.Payload != "acc" {
+			t.Fatalf("%s: payload = %q, want acc", name, evt.Payload)
+		}
+	}
+}

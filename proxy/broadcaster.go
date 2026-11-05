@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"kiro-proxy/config"
+	"kiro-proxy/pool"
 )
 
 // Admin events. Each one tells open admin pages which data to refetch; the
@@ -21,9 +22,14 @@ const (
 )
 
 func init() {
-	//! Every account write goes through config, including background bans and
-	//! usage refreshes, so the hook is where no change can be missed.
+	//! Every account row write goes through config, including background bans and
+	//! usage refreshes, so its hook is where no change can be missed. Per-request
+	//! counters are the exception: they would fire on every request.
 	config.SetAccountsChangedHook(func(id string) {
+		publishEvent(eventAccountsChanged, id)
+	})
+	//! Cooldowns live only in the pool, yet they change what /status counts as available.
+	pool.SetCooldownChangedHook(func(id string) {
 		publishEvent(eventAccountsChanged, id)
 	})
 }

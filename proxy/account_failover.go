@@ -183,11 +183,8 @@ func (h *Handler) handleBackgroundAccountFailure(account *config.Account, err er
 	if err == nil || !isTerminalAccountErrorMessage(err.Error()) {
 		return
 	}
+	//! Bans reach admin pages through the config hook and cooldowns through the pool's.
 	h.handleAccountFailure(account, err)
-	//! A cooldown lives only in the pool, never in config, so the config hook misses it.
-	if account != nil {
-		publishEvent(eventAccountsChanged, account.ID)
-	}
 }
 
 func (h *Handler) handleAccountFailure(account *config.Account, err error) {

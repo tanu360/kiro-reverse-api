@@ -260,9 +260,13 @@ func (p *AccountPool) GetByID(id string) *config.Account {
 
 func (p *AccountPool) RecordSuccess(id string) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	cleared := time.Now().Before(p.cooldowns[id])
 	delete(p.cooldowns, id)
 	p.errorCounts[id] = 0
+	p.mu.Unlock()
+	if cleared {
+		notifyCooldownChanged(id)
+	}
 }
 
 func (p *AccountPool) RecordError(id string, isQuotaError bool) int {
@@ -295,7 +299,9 @@ func (p *AccountPool) RecordThrottleError(id string, retryAfter time.Duration) i
 		delay = min(delay, throttleMaxCooldown)
 	}
 	//! Never shorten a longer cooldown, such as a quota cooldown already in force.
-	if until := time.Now().Add(delay); until.After(p.cooldowns[id]) {
+	until := time.Now().Add(delay)
+	grew := until.After(p.cooldowns[id])
+	if grew {
 		p.cooldowns[id] = until
 	}
 	p.mu.Unlock()
@@ -303,6 +309,9 @@ func (p *AccountPool) RecordThrottleError(id string, retryAfter time.Duration) i
 	go func() {
 		_ = p.SaveCooldowns()
 	}()
+	if grew {
+		notifyCooldownChanged(id)
+	}
 
 	return count
 }
@@ -319,6 +328,7 @@ func (p *AccountPool) recordError(id string, isQuotaError bool, retryAfter time.
 	p.errorCounts[id]++
 	count := p.errorCounts[id]
 
+	changed := false
 	if isQuotaError {
 		until := p.calculateQuotaCooldown(id)
 		if retryAfter > 0 {
@@ -326,16 +336,21 @@ func (p *AccountPool) recordError(id string, isQuotaError bool, retryAfter time.
 		}
 		if until.After(p.cooldowns[id]) {
 			p.cooldowns[id] = until
+			changed = true
 		}
 	} else if count >= 3 {
 
 		p.cooldowns[id] = time.Now().Add(time.Minute)
+		changed = true
 	}
 	p.mu.Unlock()
 
 	go func() {
 		_ = p.SaveCooldowns()
 	}()
+	if changed {
+		notifyCooldownChanged(id)
+	}
 
 	return count
 }
@@ -437,6 +452,7 @@ func (p *AccountPool) MarkOverLimit(id string) {
 	p.mu.Unlock()
 	_ = p.SaveCooldowns()
 	p.Reload()
+	notifyCooldownChanged(id)
 }
 
 func (p *AccountPool) UpdateToken(id, accessToken, refreshToken string, expiresAt int64) {

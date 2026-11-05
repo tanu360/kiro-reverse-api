@@ -473,8 +473,12 @@ func preserveAccountCredentials(account *Account, current Account) {
 	account.Scopes = current.Scopes
 }
 
-func UpdateAccountOverageStatus(id, status, capability string, cap, rate, current float64, checkedAt int64) error {
-
+func UpdateAccountOverageStatus(id, status, capability string, cap, rate, current float64, checkedAt int64) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 	if CredentialsLoaded() {
 		return UpdateCredentialOverageStatus(id, status, capability, cap, rate, current, checkedAt)
 	}
@@ -575,8 +579,12 @@ func SetAccountBanStatus(id, status, reason string) (err error) {
 	return nil
 }
 
-func UpdateAccountProfileArn(id, profileArn string) error {
-
+func UpdateAccountProfileArn(id, profileArn string) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 	if CredentialsLoaded() {
 		return UpdateCredentialProfileArn(id, profileArn)
 	}
@@ -598,7 +606,12 @@ func UpdateAccountProfileArn(id, profileArn string) error {
 // PinAccountProfileArn stores an operator-chosen profile ARN that automatic
 // resolution will not replace. An empty ARN clears the pin and the ARN so the
 // next request resolves the profile automatically again.
-func PinAccountProfileArn(id, profileArn string) error {
+func PinAccountProfileArn(id, profileArn string) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 	profileArn = strings.TrimSpace(profileArn)
 	if CredentialsLoaded() {
 		return PinCredentialProfileArn(id, profileArn)
@@ -638,8 +651,12 @@ func DeleteAccount(id string) (err error) {
 	return nil
 }
 
-func UpdateAccountToken(id, accessToken, refreshToken string, expiresAt int64) error {
-
+func UpdateAccountToken(id, accessToken, refreshToken string, expiresAt int64) (err error) {
+	defer func() {
+		if err == nil {
+			notifyAccountsChanged(id)
+		}
+	}()
 	if CredentialsLoaded() {
 		return UpdateCredentialToken(id, accessToken, refreshToken, expiresAt)
 	}
