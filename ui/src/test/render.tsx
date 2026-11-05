@@ -12,7 +12,7 @@ import userEvent, { type UserEvent } from "@testing-library/user-event";
 import type { ReactElement, ReactNode } from "react";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
-import { NotchToaster } from "@/components/ui/notch-toaster";
+import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { setSession } from "@/lib/auth/session";
 import { I18nProvider, type Lang } from "@/lib/i18n";
@@ -63,7 +63,7 @@ function Providers({
             <TooltipProvider>
               <ConfirmProvider>{children}</ConfirmProvider>
             </TooltipProvider>
-            <NotchToaster />
+            <ToastProvider />
           </QueryClientProvider>
         </PrivacyProvider>
       </I18nProvider>

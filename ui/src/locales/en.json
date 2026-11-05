@@ -105,8 +105,6 @@
   "shell.error.title": "Something went wrong",
   "shell.error.description": "This page could not be shown. Try again, or go to Overview.",
   "shell.sheetDescription": "Pages, Add account and the Admin menu.",
-  "shell.notifications": "Notifications",
-  "shell.toast.dismiss": "Dismiss notification",
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Sign in",
   "shell.page.setup": "Setup",

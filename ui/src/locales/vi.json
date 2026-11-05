@@ -105,8 +105,6 @@
   "shell.error.title": "Đã xảy ra lỗi",
   "shell.error.description": "Không thể hiển thị trang này. Hãy thử lại hoặc về Tổng quan.",
   "shell.sheetDescription": "Trang, Thêm tài khoản và menu Quản trị.",
-  "shell.notifications": "Thông báo",
-  "shell.toast.dismiss": "Đóng thông báo",
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Đăng nhập",
   "shell.page.setup": "Thiết lập",

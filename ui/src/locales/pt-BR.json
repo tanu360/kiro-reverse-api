@@ -105,8 +105,6 @@
   "shell.error.title": "Algo deu errado",
   "shell.error.description": "Não foi possível mostrar esta página. Tente novamente ou vá para a Visão geral.",
   "shell.sheetDescription": "Páginas, Adicionar conta e o menu Admin.",
-  "shell.notifications": "Notificações",
-  "shell.toast.dismiss": "Fechar notificação",
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Entrar",
   "shell.page.setup": "Configuração inicial",

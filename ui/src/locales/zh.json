@@ -105,8 +105,6 @@
   "shell.error.title": "出错了",
   "shell.error.description": "无法显示此页面。请重试，或前往概览。",
   "shell.sheetDescription": "页面、添加账号和管理员菜单。",
-  "shell.notifications": "通知",
-  "shell.toast.dismiss": "关闭通知",
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "登录",
   "shell.page.setup": "初始设置",

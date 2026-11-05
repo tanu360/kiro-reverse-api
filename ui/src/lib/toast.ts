@@ -1,4 +1,4 @@
-import { notchToast } from "@/components/ui/notch-toaster";
+import { toastManager as manager } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { TFunction } from "@/lib/i18n";
 
@@ -6,50 +6,71 @@ export interface ToastOptions {
   description?: string;
   duration?: number;
   action?: { label: string; onClick: () => void };
-  /** Showing a toast with the id of an open one morphs that toast instead of adding another. */
+  /** Showing a toast with the id of an open one replaces that toast instead of adding another. */
   id?: string;
 }
 
 type ToastType = "success" | "error" | "warning" | "info" | "loading";
+type SettledType = Exclude<ToastType, "loading">;
 
-// Errors and loading toasts stay until dismissed (0 = no auto-dismiss).
+// The coss toast has no close button, so every settled toast times out; errors stay longest.
+// Loading toasts never time out (0) and wait for their update.
 const DEFAULT_DURATION: Record<ToastType, number> = {
   success: 4000,
   info: 4000,
   warning: 6000,
-  error: 0,
+  error: 8000,
   loading: 0,
 };
 
+let idSeed = 0;
+
 function show(type: ToastType, title: string, options: ToastOptions = {}): string {
-  const { duration, ...rest } = options;
-  return notchToast.show(type, title, { ...rest, duration: duration ?? DEFAULT_DURATION[type] });
+  const id = options.id ?? `toast-${Date.now()}-${idSeed++}`;
+  const { action } = options;
+  // No `type`: the coss toast then shows the plain message, without a status icon or colour.
+  manager.add({
+    id,
+    title,
+    description: options.description,
+    timeout: options.duration ?? DEFAULT_DURATION[type],
+    // Errors are announced at once; everything else waits its turn.
+    priority: type === "error" ? "high" : "low",
+    actionProps: action
+      ? {
+          children: action.label,
+          onClick: () => {
+            action.onClick();
+            manager.close(id);
+          },
+        }
+      : undefined,
+  });
+  return id;
 }
 
-/** App toasts on top of the notch toaster. Each call returns the toast id. */
+function update(
+  id: string,
+  next: { type: SettledType; title: string; description?: string; duration?: number },
+): void {
+  manager.update(id, {
+    title: next.title,
+    description: next.description,
+    timeout: next.duration ?? DEFAULT_DURATION[next.type],
+    priority: next.type === "error" ? "high" : "low",
+  });
+}
+
+/** App toasts on top of the coss ui toast (Base UI). Each call returns the toast id. */
 export const toast: {
   success(title: string, options?: ToastOptions): string;
   error(title: string, options?: ToastOptions): string;
   warning(title: string, options?: ToastOptions): string;
   info(title: string, options?: ToastOptions): string;
   loading(title: string, options?: ToastOptions): string;
-  /** A loading toast that morphs into the result when `work` settles; returns `work`'s result. */
-  promise<T>(
-    work: Promise<T> | (() => Promise<T>),
-    messages: {
-      loading: string;
-      success: string | ((value: T) => string);
-      error: string | ((reason: unknown) => string);
-    },
-  ): Promise<T>;
   update(
     id: string,
-    next: {
-      type: "success" | "error" | "warning" | "info";
-      title: string;
-      description?: string;
-      duration?: number;
-    },
+    next: { type: SettledType; title: string; description?: string; duration?: number },
   ): void;
   dismiss(id?: string): void;
 } = {
@@ -58,17 +79,9 @@ export const toast: {
   warning: (title, options) => show("warning", title, options),
   info: (title, options) => show("info", title, options),
   loading: (title, options) => show("loading", title, options),
-  promise: (work, messages) => notchToast.promise(work, messages),
-  update(id, next) {
-    notchToast.update(id, {
-      type: next.type,
-      title: next.title,
-      description: next.description,
-      duration: next.duration ?? DEFAULT_DURATION[next.type],
-    });
-  },
+  update,
   dismiss(id) {
-    notchToast.dismiss(id);
+    manager.close(id);
   },
 };
 

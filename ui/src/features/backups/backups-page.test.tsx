@@ -73,7 +73,7 @@ async function renderPage() {
 /** The toast title element, so text elsewhere on the page with the same words never matches. */
 async function findToast(text: string): Promise<HTMLElement> {
   const matches = await screen.findAllByText(text);
-  const title = matches.find((node) => node.getAttribute("data-slot") === "notch-toast-title");
+  const title = matches.find((node) => node.getAttribute("data-slot") === "toast-title");
   if (!title) throw new Error(`no toast titled "${text}"`);
   return title;
 }

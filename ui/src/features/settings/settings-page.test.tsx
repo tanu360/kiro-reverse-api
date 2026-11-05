@@ -356,7 +356,9 @@ describe("SettingsPage", () => {
           body: { proxyURL: "socks5://us%40r:p%3Ass@proxy.example:1080" },
         },
       ]);
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "Edit proxy" })).not.toBeInTheDocument(),
+      );
       expect(within(card).getByText("proxy.example:1080")).toBeInTheDocument();
       expect(within(card).getByText("Signs in as us@r")).toBeInTheDocument();
     });
