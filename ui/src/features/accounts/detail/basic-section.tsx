@@ -1,58 +1,74 @@
-import { type FormEvent, type JSX, useState } from "react";
+import { UserCircleIcon } from "@hugeicons/core-free-icons";
+import { type JSX, useState } from "react";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
-import { Button } from "@/components/ui/button";
+import { SectionCard } from "@/components/shared/section-card";
+import { CardPanel } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { Account } from "@/lib/api/types";
 import { EMPTY } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { useDisplayEmail } from "@/lib/privacy";
 import { authLabel } from "../account-model";
-import { DetailSection, TOUCH_BUTTON, TOUCH_INPUT, useSaveAccountField } from "./detail-section";
+import { EditableFieldRow, useSaveAccountField } from "./detail-section";
+import { MachineIdRow } from "./machine-id-section";
+import { ProxyRow } from "./proxy-section";
+import { WeightRow } from "./weight-section";
 
+/**
+ * The account's facts (the email is the sheet's title) over its editable fields: nickname,
+ * machine ID, weight and proxy, each a row with an Edit dialog.
+ */
 export function BasicSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
-  const displayEmail = useDisplayEmail();
-  const save = useSaveAccountField(account.id);
-  const [nickname, setNickname] = useState(account.nickname);
+  return (
+    <SectionCard icon={UserCircleIcon} slim title={t("detail.basicInfo")}>
+      <CardPanel>
+        <KeyValueGrid
+          items={[
+            account.userId
+              ? { label: t("detail.userId"), value: account.userId, mono: true, copy: true }
+              : { label: t("detail.userId"), value: EMPTY },
+            { label: t("detail.authMethod"), value: authLabel(account, t) },
+            { label: t("detail.region"), value: account.region || "us-east-1" },
+          ]}
+        />
+      </CardPanel>
+      <NicknameRow account={account} />
+      <MachineIdRow account={account} />
+      <WeightRow account={account} />
+      <ProxyRow account={account} />
+    </SectionCard>
+  );
+}
 
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    save.mutate({ nickname: nickname.trim() });
-  };
+function NicknameRow({ account }: { account: Account }): JSX.Element {
+  const { t } = useT("accounts");
+  const save = useSaveAccountField(account.id);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(account.nickname);
 
   return (
-    <DetailSection title={t("detail.basicInfo")}>
-      <KeyValueGrid
-        items={[
-          { label: t("detail.email"), value: displayEmail(account.email, account.id) },
-          { label: t("detail.userId"), value: account.userId || EMPTY },
-          { label: t("detail.authMethod"), value: authLabel(account, t) },
-          { label: t("detail.region"), value: account.region || "us-east-1" },
-        ]}
-      />
-      <form className="flex flex-col gap-2" onSubmit={onSubmit}>
-        <Field>
-          <FieldLabel>{t("detail.nickname")}</FieldLabel>
-          <div className="flex w-full gap-2">
-            <Input
-              className={TOUCH_INPUT}
-              maxLength={200}
-              onChange={(event) => setNickname(event.target.value)}
-              placeholder={t("detail.nicknamePlaceholder")}
-              value={nickname}
-            />
-            <Button
-              className={TOUCH_BUTTON}
-              loading={save.isPending}
-              type="submit"
-              variant="outline"
-            >
-              {t("detail.save")}
-            </Button>
-          </div>
-        </Field>
-      </form>
-    </DetailSection>
+    <EditableFieldRow
+      onEdit={() => {
+        setDraft(account.nickname);
+        setOpen(true);
+      }}
+      onOpenChange={setOpen}
+      onSubmit={() => save.mutate({ nickname: draft.trim() }, { onSuccess: () => setOpen(false) })}
+      open={open}
+      saving={save.isPending}
+      title={t("detail.nickname")}
+      value={account.nickname}
+    >
+      <Field>
+        <FieldLabel className="sr-only">{t("detail.nickname")}</FieldLabel>
+        <Input
+          maxLength={200}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={t("detail.nicknamePlaceholder")}
+          value={draft}
+        />
+      </Field>
+    </EditableFieldRow>
   );
 }

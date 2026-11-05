@@ -1,10 +1,12 @@
-import { CloudDownloadIcon } from "@hugeicons/core-free-icons";
+import { CloudDownloadIcon, ZapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useState } from "react";
+import { type JSX, useState } from "react";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
+import { SectionCard } from "@/components/shared/section-card";
+import { SwitchField } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import { CardPanel } from "@/components/ui/card";
 import { getAccountOverage, setAccountOverage } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -13,7 +15,6 @@ import { EMPTY, formatDateTime, formatUsd } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { overageCapable, overageEnabled } from "../account-model";
-import { DetailSection, TOUCH_BUTTON } from "./detail-section";
 
 /** Merges an overage snapshot (not a full Account) into the cached list row. */
 function useMergeOverage(accountId: string): (snapshot: OverageResponse) => void {
@@ -40,7 +41,6 @@ function useMergeOverage(accountId: string): (snapshot: OverageResponse) => void
 /** Both calls reach real AWS. No confirm for the toggle (old UI parity). */
 export function OverageSection({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
-  const switchId = useId();
   const merge = useMergeOverage(account.id);
   // The switch shows the requested state while the call runs, then the cached snapshot again.
   const [pending, setPending] = useState<boolean | null>(null);
@@ -89,57 +89,43 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
         : t("detail.overageUnknown");
 
   return (
-    <DetailSection
+    <SectionCard
       actions={
-        <Button
-          loading={sync.isPending}
-          onClick={() => sync.mutate()}
-          className={TOUCH_BUTTON}
-          size="sm"
-          variant="outline"
-        >
+        <Button loading={sync.isPending} onClick={() => sync.mutate()} size="sm" variant="outline">
           <HugeiconsIcon icon={CloudDownloadIcon} aria-hidden="true" />
           {t("detail.overageRefresh")}
         </Button>
       }
+      icon={ZapIcon}
+      slim
       title={t("detail.overage")}
     >
-      {/* biome-ignore lint/a11y/noLabelWithoutControl: the Switch inside is the control. */}
-      <label className="flex items-start gap-3">
-        <Switch
-          aria-describedby={`${switchId}-hint`}
-          aria-labelledby={`${switchId}-label`}
-          checked={pending ?? overageEnabled(account)}
-          disabled={!capable || toggle.isPending}
-          onCheckedChange={(checked) => toggle.mutate(checked)}
-        />
-        <span className="flex flex-col gap-1">
-          <span className="font-medium text-sm" id={`${switchId}-label`}>
-            {t("detail.overageSwitch")}
-          </span>
-          <span className="text-muted-foreground text-xs" id={`${switchId}-hint`}>
-            {t("detail.overageHint")}
-          </span>
-        </span>
-      </label>
-      <KeyValueGrid
-        columns={3}
-        items={[
-          { label: t("detail.overageStatus"), value: statusLabel },
-          { label: t("detail.overageCap"), value: formatUsd(account.overageCap) },
-          { label: t("detail.overageRate"), value: formatUsd(account.overageRate) },
-          { label: t("detail.overageCurrent"), value: formatUsd(account.currentOverages) },
-          {
-            label: t("detail.overageCheckedAt"),
-            value: account.overageCheckedAt
-              ? formatDateTime(account.overageCheckedAt, lang)
-              : EMPTY,
-          },
-          ...(capable
-            ? []
-            : [{ label: t("detail.overageCapability"), value: t("detail.overageNotCapable") }]),
-        ]}
+      <SwitchField
+        checked={pending ?? overageEnabled(account)}
+        description={t("detail.overageHint")}
+        disabled={!capable || toggle.isPending}
+        onCheckedChange={(checked) => toggle.mutate(checked)}
+        title={t("detail.overageSwitch")}
       />
-    </DetailSection>
+      <CardPanel>
+        <KeyValueGrid
+          items={[
+            { label: t("detail.overageStatus"), value: statusLabel },
+            { label: t("detail.overageCap"), value: formatUsd(account.overageCap) },
+            { label: t("detail.overageRate"), value: formatUsd(account.overageRate) },
+            { label: t("detail.overageCurrent"), value: formatUsd(account.currentOverages) },
+            {
+              label: t("detail.overageCheckedAt"),
+              value: account.overageCheckedAt
+                ? formatDateTime(account.overageCheckedAt, lang)
+                : EMPTY,
+            },
+            ...(capable
+              ? []
+              : [{ label: t("detail.overageCapability"), value: t("detail.overageNotCapable") }]),
+          ]}
+        />
+      </CardPanel>
+    </SectionCard>
   );
 }

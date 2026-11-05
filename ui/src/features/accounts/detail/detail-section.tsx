@@ -1,57 +1,22 @@
+import { PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
-import { type JSX, type ReactNode, useId } from "react";
+import { type FormEvent, type JSX, type ReactNode, useId } from "react";
+import { Code } from "@/components/shared/code";
+import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
+import { ROW_DESCRIPTION, SettingsRow } from "@/components/shared/settings-rows";
+import { Button } from "@/components/ui/button";
 import { updateAccount } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { UpdateAccountRequest } from "@/lib/api/types";
+import { EMPTY } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 import { useInvalidateAccounts } from "../use-account-actions";
 
 /**
- * Touch targets of at least 40 px on phones for the sheet's buttons and inputs. `max-sm`
- * because the controls' own `sm:` heights win from 640 px up. A button next to an input
- * stretches to the input's height, so the pair lines up. The input rule sizes the inner
- * `<input>`, which holds the height, through the `Input` wrapper.
- */
-export const TOUCH_BUTTON = "max-sm:h-auto max-sm:min-h-10";
-export const TOUCH_INPUT = "max-sm:*:data-[slot=input]:h-10 max-sm:*:data-[slot=input]:leading-10";
-
-/** One titled block of the detail sheet. */
-export function DetailSection({
-  title,
-  actions,
-  children,
-  className,
-}: {
-  title: string;
-  actions?: ReactNode;
-  children: ReactNode;
-  className?: string;
-}): JSX.Element {
-  const headingId = useId();
-  return (
-    <section
-      aria-labelledby={headingId}
-      className={cn(
-        "flex min-w-0 flex-col gap-3 border-border/50 border-t pt-5 first:border-t-0 first:pt-0",
-        className,
-      )}
-    >
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <h3 className="font-medium text-sm" id={headingId}>
-          {title}
-        </h3>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/**
- * PUT one field of an account, toast "Saved" and refetch the list. Each section owns its own
- * input state, so the refetch never wipes unsaved input elsewhere in the sheet.
+ * PUT one field of an account, toast "Saved" and refetch the list. Each editor owns its own
+ * draft, so the refetch never wipes unsaved input elsewhere in the sheet.
  */
 export function useSaveAccountField(accountId: string) {
   const { t } = useT("accounts");
@@ -66,4 +31,98 @@ export function useSaveAccountField(accountId: string) {
       toast.error(t("detail.saveFailed", { reason: errorMessage(error, t) }));
     },
   });
+}
+
+/** The saved value under a row's title: muted text, or the mono Code chip for an ID or a URL. */
+function FieldValue({ value, mono }: { value: string; mono: boolean }): JSX.Element {
+  if (mono && value !== "") {
+    return <Code className="block w-fit max-w-full truncate">{value}</Code>;
+  }
+  return (
+    <span className="block min-w-0 truncate text-muted-foreground text-sm tabular-nums">
+      {value === "" ? EMPTY : value}
+    </span>
+  );
+}
+
+/**
+ * One editable field of the sheet, in the Settings row-and-dialog pattern: the row shows the
+ * title, the saved value and a hint, with an Edit button at its end; the form lives in a small
+ * dialog with Cancel and Save. The caller owns the draft (reset it in `onEdit`) and closes the
+ * dialog once the save lands.
+ */
+export function EditableFieldRow({
+  title,
+  value,
+  mono = false,
+  hint,
+  open,
+  onEdit,
+  onOpenChange,
+  onSubmit,
+  saving,
+  children,
+}: {
+  title: string;
+  /** The saved value; empty shows a dash. */
+  value: string;
+  /** An ID or a URL: shown in the mono Code chip. */
+  mono?: boolean;
+  hint?: ReactNode;
+  open: boolean;
+  onEdit: () => void;
+  onOpenChange: (open: boolean) => void;
+  /** Called on Save (or Enter in a field) while no save is running. */
+  onSubmit: () => void;
+  saving: boolean;
+  /** The dialog's form controls. */
+  children: ReactNode;
+}): JSX.Element {
+  const { t } = useT();
+  const editId = useId();
+  const formId = useId();
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!saving) onSubmit();
+  };
+
+  return (
+    <>
+      <SettingsRow
+        control={
+          // Named "Edit" plus the row title (SettingsRow appends it to aria-labelledby).
+          <Button aria-labelledby={editId} id={editId} onClick={onEdit} size="sm" variant="outline">
+            <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
+            {t("actions.edit")}
+          </Button>
+        }
+        controlWidth="auto"
+        title={title}
+      >
+        <FieldValue mono={mono} value={value} />
+        {hint ? <p className={ROW_DESCRIPTION}>{hint}</p> : null}
+      </SettingsRow>
+      <ResponsiveDialog
+        footer={
+          <>
+            <Button onClick={() => onOpenChange(false)} variant="ghost">
+              {t("actions.cancel")}
+            </Button>
+            <Button form={formId} loading={saving} type="submit">
+              {t("actions.save")}
+            </Button>
+          </>
+        }
+        onOpenChange={onOpenChange}
+        open={open}
+        size="md"
+        title={title}
+      >
+        <form className="grid gap-4" id={formId} noValidate onSubmit={submit}>
+          {children}
+        </form>
+      </ResponsiveDialog>
+    </>
+  );
 }

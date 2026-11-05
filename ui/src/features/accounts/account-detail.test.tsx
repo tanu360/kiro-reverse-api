@@ -42,17 +42,39 @@ function section(sheet: HTMLElement, title: string): HTMLElement {
   return within(sheet).getByRole("region", { name: title });
 }
 
+/** Opens a row's Edit dialog ("Edit Machine ID") and returns the dialog. */
+async function openEditor(
+  sheet: HTMLElement,
+  user: Awaited<ReturnType<typeof openSheet>>["user"],
+  title: string,
+): Promise<HTMLElement> {
+  await user.click(within(sheet).getByRole("button", { name: `Edit ${title}` }));
+  return screen.findByRole("dialog", { name: title });
+}
+
 describe("AccountDetailSheet", () => {
+  it("titles the sheet with the email over the nickname, plan and sign-in line", async () => {
+    const account = dana();
+    const { sheet } = await openSheet(account);
+    // Masked by the default privacy mode, as in the list.
+    expect(sheet).toHaveAccessibleName("da***@no***.com");
+    expect(sheet).toHaveAccessibleDescription(`${account.nickname} · Pro · Enterprise`);
+    const basic = section(sheet, "Basic info");
+    // The email is the title, not a row of the basic info.
+    expect(within(basic).queryByText("Email")).not.toBeInTheDocument();
+    expect(within(basic).getByRole("button", { name: "Copy User ID" })).toBeInTheDocument();
+  });
+
   it("shows a field error for an invalid machine ID and sends nothing", async () => {
     const puts = capture("put", "/accounts/:id");
     const { sheet, user } = await openSheet(dana());
-    const machine = section(sheet, "Machine ID");
-    const input = within(machine).getByPlaceholderText("UUID");
+    const dialog = await openEditor(sheet, user, "Machine ID");
+    const input = within(dialog).getByPlaceholderText("UUID");
     await user.clear(input);
     await user.type(input, "not-a-uuid");
-    await user.click(within(machine).getByRole("button", { name: "Save" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
     expect(
-      await within(machine).findByText(
+      await within(dialog).findByText(
         "Enter a UUID or 32 hex characters, or leave the field empty.",
       ),
     ).toBeInTheDocument();
@@ -62,10 +84,10 @@ describe("AccountDetailSheet", () => {
 
   it("fills the machine ID from Generate", async () => {
     const { sheet, user } = await openSheet(dana());
-    const machine = section(sheet, "Machine ID");
-    const input = within(machine).getByPlaceholderText("UUID") as HTMLInputElement;
+    const dialog = await openEditor(sheet, user, "Machine ID");
+    const input = within(dialog).getByPlaceholderText("UUID") as HTMLInputElement;
     await user.clear(input);
-    await user.click(within(machine).getByRole("button", { name: "Generate" }));
+    await user.click(within(dialog).getByRole("button", { name: "Generate" }));
     await waitFor(() =>
       expect(input.value).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
@@ -73,16 +95,36 @@ describe("AccountDetailSheet", () => {
     );
   });
 
-  it("saves the weight as a JSON number", async () => {
+  it("saves the weight as a JSON number and closes the dialog", async () => {
     const puts = capture("put", "/accounts/:id");
     const { sheet, user } = await openSheet(dana());
-    const weight = section(sheet, "Weight");
-    const input = within(weight).getByRole("textbox", { name: "Weight" });
+    const dialog = await openEditor(sheet, user, "Weight");
+    const input = within(dialog).getByRole("textbox", { name: "Weight" });
     await user.clear(input);
     await user.type(input, "4");
-    await user.click(within(weight).getByRole("button", { name: "Save" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(puts).toEqual([{ weight: 4 }]));
     expect(await screen.findByText("Saved")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Weight" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("drops an edit on Cancel and starts the next one from the saved value", async () => {
+    const puts = capture("put", "/accounts/:id");
+    const account = dana();
+    const { sheet, user } = await openSheet(account);
+    let dialog = await openEditor(sheet, user, "Nickname");
+    const input = within(dialog).getByPlaceholderText("Team primary");
+    await user.clear(input);
+    await user.type(input, "Scratch");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Nickname" })).not.toBeInTheDocument(),
+    );
+    dialog = await openEditor(sheet, user, "Nickname");
+    expect(within(dialog).getByPlaceholderText("Team primary")).toHaveValue(account.nickname);
+    expect(puts).toEqual([]);
   });
 
   it("reverts the overage switch when AWS fails", async () => {
@@ -112,7 +154,7 @@ describe("AccountDetailSheet", () => {
   it("hides the Kiro profile section for API key accounts", async () => {
     const { sheet } = await openSheet(apiKeyAccount());
     expect(within(sheet).queryByRole("region", { name: "Kiro profile" })).not.toBeInTheDocument();
-    expect(within(sheet).getByRole("region", { name: "Machine ID" })).toBeInTheDocument();
+    expect(within(sheet).getByRole("button", { name: "Edit Machine ID" })).toBeInTheDocument();
   });
 
   it("pins the selected profile and refetches the accounts list", async () => {

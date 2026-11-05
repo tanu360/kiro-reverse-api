@@ -1,7 +1,13 @@
-import { ListRestartIcon, ScanSearchIcon } from "@hugeicons/core-free-icons";
+import { BoxesIcon, ListRestartIcon, ScanSearchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
 import type { JSX } from "react";
+import { Code } from "@/components/shared/code";
+import { ListCard } from "@/components/shared/list-card";
+import { ModelLogo } from "@/components/shared/model-logo";
+import { SectionCard } from "@/components/shared/section-card";
+import { SettingsEmptyRow } from "@/components/shared/settings-rows";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { getAccountModels, refreshAccountModels } from "@/lib/api/accounts";
@@ -9,7 +15,6 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { modelRate, sortModels } from "../account-model";
-import { DetailSection, TOUCH_BUTTON } from "./detail-section";
 
 /** Live model list (GET /models updates the server cache) and a route-cache refresh. */
 export function ModelsSection({ accountId }: { accountId: string }): JSX.Element {
@@ -39,13 +44,12 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
 
   const models = load.data ? sortModels(load.data.models) : null;
   return (
-    <DetailSection
+    <SectionCard
       actions={
         <>
           <Button
             loading={load.isPending}
             onClick={() => load.mutate()}
-            className={TOUCH_BUTTON}
             size="sm"
             variant="outline"
           >
@@ -55,7 +59,6 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
           <Button
             loading={refresh.isPending}
             onClick={() => refresh.mutate()}
-            className={TOUCH_BUTTON}
             size="sm"
             variant="outline"
           >
@@ -64,43 +67,47 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
           </Button>
         </>
       }
+      icon={BoxesIcon}
+      slim
       title={t("detail.models")}
     >
-      <div aria-live="polite">
+      {/* Always holds one row (the hint, a state or the list), so the card keeps its hairline. */}
+      <div aria-live="polite" className="min-w-0">
         {load.isPending ? (
-          <p className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Spinner aria-hidden="true" className="size-4" />
+          <SettingsEmptyRow className="flex items-center gap-2">
+            <Spinner aria-hidden="true" className="size-3.5" />
             {t("detail.modelsLoading")}
-          </p>
+          </SettingsEmptyRow>
         ) : load.isError ? (
-          <p className="text-destructive-foreground text-sm" role="alert">
-            {t("detail.loadFailed", { reason: errorMessage(load.error, t) })}
-          </p>
+          <SettingsEmptyRow>
+            <span className="text-destructive-foreground" role="alert">
+              {t("detail.loadFailed", { reason: errorMessage(load.error, t) })}
+            </span>
+          </SettingsEmptyRow>
         ) : models && models.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("detail.noModels")}</p>
+          <SettingsEmptyRow>{t("detail.noModels")}</SettingsEmptyRow>
         ) : models ? (
-          <ul
-            aria-label={t("detail.models")}
-            className="flex flex-col divide-y divide-border/50 rounded-lg border border-border/60"
-          >
+          <ul aria-label={t("detail.models")} className="divide-y divide-border-subtle">
             {models.map((model) => (
-              <li className="flex flex-col gap-0.5 px-3 py-2" key={model.modelId}>
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="break-all text-sm">{model.modelId}</span>
-                  <span className="text-muted-foreground text-xs">
+              <ListCard
+                badge={
+                  <Badge size="sm" tone="neutral">
                     {t("detail.creditMultiplier", { ratio: modelRate(model) })}
-                  </span>
-                </div>
-                {model.description ? (
-                  <span className="text-muted-foreground text-xs">{model.description}</span>
-                ) : null}
-              </li>
+                  </Badge>
+                }
+                key={model.modelId}
+                leading={<ModelLogo className="size-4" model={model.modelId} />}
+                meta={model.description || undefined}
+                render={<li />}
+                title={<Code>{model.modelId}</Code>}
+                variant="row"
+              />
             ))}
           </ul>
         ) : (
-          <p className="text-muted-foreground text-sm">{t("detail.modelsHint")}</p>
+          <SettingsEmptyRow>{t("detail.modelsHint")}</SettingsEmptyRow>
         )}
       </div>
-    </DetailSection>
+    </SectionCard>
   );
 }

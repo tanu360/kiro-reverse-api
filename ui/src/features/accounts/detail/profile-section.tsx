@@ -1,10 +1,13 @@
-import { CircleCheckIcon, ScanSearchIcon } from "@hugeicons/core-free-icons";
+import { CircleCheckIcon, ScanSearchIcon, UserSwitchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
+import { ChoiceCard } from "@/components/shared/choice-card";
 import { KeyValueGrid } from "@/components/shared/key-value-grid";
+import { SectionCard } from "@/components/shared/section-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { getAccountProfiles, setAccountProfile } from "@/lib/api/accounts";
@@ -13,7 +16,6 @@ import type { Account, AccountProfilesResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { useInvalidateAccounts } from "../use-account-actions";
-import { DetailSection, TOUCH_BUTTON } from "./detail-section";
 
 function defaultArn(result: AccountProfilesResponse): string {
   return (result.profiles.find((profile) => profile.current) ?? result.profiles[0])?.arn ?? "";
@@ -64,102 +66,108 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
   };
 
   const result = load.data;
+  const choices = result && result.profiles.length > 0 ? result : null;
   return (
-    <DetailSection
+    <SectionCard
       actions={
-        <Button
-          loading={load.isPending}
-          onClick={() => load.mutate()}
-          className={TOUCH_BUTTON}
-          size="sm"
-          variant="outline"
-        >
+        <Button loading={load.isPending} onClick={() => load.mutate()} size="sm" variant="outline">
           <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
           {t("detail.profileLoad")}
         </Button>
       }
+      description={t("detail.profileHint")}
+      footer={
+        choices ? (
+          <div className="ms-auto flex flex-wrap items-center gap-2">
+            {choices.pinned ? (
+              <Button
+                disabled={pin.isPending}
+                loading={pin.isPending && pin.variables === ""}
+                onClick={() => pin.mutate("")}
+                size="sm"
+                variant="outline"
+              >
+                {t("detail.profileUnpin")}
+              </Button>
+            ) : null}
+            <Button
+              disabled={pin.isPending}
+              loading={pin.isPending && pin.variables !== ""}
+              onClick={onUseSelected}
+              size="sm"
+            >
+              {t("detail.profileUse")}
+            </Button>
+          </div>
+        ) : undefined
+      }
+      icon={UserSwitchIcon}
+      slim
       title={t("detail.profile")}
     >
-      <KeyValueGrid
-        items={[
-          { label: t("detail.profileRegion"), value: account.activeRegion || "us-east-1" },
-          {
-            label: t("detail.profileMode"),
-            value: account.profileArnPinned ? t("detail.profilePinned") : t("detail.profileAuto"),
-          },
-        ]}
-      />
-      <p className="text-muted-foreground text-xs">{t("detail.profileHint")}</p>
-      <div aria-live="polite" className="flex flex-col gap-3">
-        {load.isPending ? (
-          <p className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Spinner aria-hidden="true" className="size-4" />
-            {t("detail.profileLoading")}
-          </p>
-        ) : load.isError ? (
-          <p className="text-destructive-foreground text-sm" role="alert">
-            {t("detail.loadFailed", { reason: errorMessage(load.error, t) })}
-          </p>
-        ) : result && result.profiles.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("detail.profileNone")}</p>
-        ) : result ? (
-          <>
+      <CardPanel>
+        <KeyValueGrid
+          items={[
+            { label: t("detail.profileRegion"), value: account.activeRegion || "us-east-1" },
+            {
+              label: t("detail.profileMode"),
+              value: account.profileArnPinned ? t("detail.profilePinned") : t("detail.profileAuto"),
+            },
+          ]}
+        />
+        {/* Always in the tree, so screen readers hear the list, the wait or the error arrive. */}
+        <div aria-live="polite">
+          {load.isPending ? (
+            <p className="mt-4 flex items-center gap-2 text-muted-foreground text-sm">
+              <Spinner aria-hidden="true" className="size-4" />
+              {t("detail.profileLoading")}
+            </p>
+          ) : load.isError ? (
+            <p className="mt-4 text-destructive-foreground text-sm" role="alert">
+              {t("detail.loadFailed", { reason: errorMessage(load.error, t) })}
+            </p>
+          ) : result && result.profiles.length === 0 ? (
+            <p className="mt-4 text-muted-foreground text-sm">{t("detail.profileNone")}</p>
+          ) : result ? (
             <RadioGroup
               aria-label={t("detail.profileList")}
-              className="gap-2"
+              className="mt-4 gap-2"
               onValueChange={(value) => setSelectedArn(String(value))}
               value={selectedArn}
             >
               {result.profiles.map((profile) => (
-                // biome-ignore lint/a11y/noLabelWithoutControl: the Radio inside is the control.
-                <label
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-data-checked:border-ring has-data-checked:bg-accent/40"
+                <ChoiceCard
+                  control={<Radio value={profile.arn} />}
+                  description={profile.region}
                   key={profile.arn}
-                >
-                  <Radio className="mt-0.5" value={profile.arn} />
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="flex flex-wrap items-center gap-2 font-medium text-sm">
-                      <span className="break-all">{profile.name || profile.arn}</span>
+                  title={
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      {profile.name ? (
+                        <span className="min-w-0 wrap-anywhere">{profile.name}</span>
+                      ) : (
+                        <span className="min-w-0 wrap-anywhere font-mono text-meta">
+                          {profile.arn}
+                        </span>
+                      )}
                       {profile.current ? (
-                        <Badge icon={CircleCheckIcon} tone="success">
+                        <Badge icon={CircleCheckIcon} size="sm" tone="success">
                           {t("detail.profileCurrent")}
                         </Badge>
                       ) : null}
                     </span>
-                    <span className="text-muted-foreground text-xs">{profile.region}</span>
-                    {profile.name ? (
-                      <span className="break-all text-muted-foreground text-xs">{profile.arn}</span>
-                    ) : null}
-                  </span>
-                </label>
+                  }
+                >
+                  {profile.name ? (
+                    <span className="wrap-anywhere font-mono text-meta text-muted-foreground">
+                      {profile.arn}
+                    </span>
+                  ) : null}
+                </ChoiceCard>
               ))}
             </RadioGroup>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled={pin.isPending}
-                loading={pin.isPending && pin.variables !== ""}
-                onClick={onUseSelected}
-                className={TOUCH_BUTTON}
-                size="sm"
-              >
-                {t("detail.profileUse")}
-              </Button>
-              {result.pinned ? (
-                <Button
-                  disabled={pin.isPending}
-                  loading={pin.isPending && pin.variables === ""}
-                  onClick={() => pin.mutate("")}
-                  className={TOUCH_BUTTON}
-                  size="sm"
-                  variant="outline"
-                >
-                  {t("detail.profileUnpin")}
-                </Button>
-              ) : null}
-            </div>
-          </>
-        ) : null}
-      </div>
-    </DetailSection>
+          ) : null}
+        </div>
+      </CardPanel>
+    </SectionCard>
   );
 }
