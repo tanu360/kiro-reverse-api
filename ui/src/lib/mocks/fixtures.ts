@@ -864,68 +864,176 @@ function minuteOffset(ts: number, nowUnix: number): number {
   return Math.floor(nowUnix / 60) - Math.floor(ts / 60);
 }
 
-function emptyCells(windowMin: number): Array<HeatmapCell & { credits: number }> {
-  return Array.from({ length: windowMin }, (_, offset) => ({
+/** Minutes the Go rings keep (and rebuild from SQLite on start). */
+const RING_MINUTES = 1440;
+/** Minutes in the overview series. */
+const SERIES_MINUTES = 30;
+/** Minutes that rank accounts for top=N. */
+const TOP_RANK_MINUTES = 60;
+
+type CellSums = {
+  offset: number;
+  reqs: number;
+  failures: number;
+  retries: number;
+  credits: number;
+};
+
+function emptyCells(count: number): CellSums[] {
+  return Array.from({ length: count }, (_, offset) => ({
     offset,
     reqs: 0,
     failures: 0,
+    retries: 0,
     credits: 0,
   }));
 }
 
-function finishCells(cells: Array<HeatmapCell & { credits: number }>): HeatmapCell[] {
-  return cells.map(({ credits, ...cell }) =>
-    credits > 0 ? { ...cell, credits: round(credits, 4) } : cell,
-  );
+function isEmptyCell(cell: CellSums): boolean {
+  return cell.reqs === 0 && cell.failures === 0 && cell.retries === 0 && cell.credits === 0;
 }
 
-/** Per-minute cells like Go: offset 0 is the current minute, `credits` omitted when 0. */
+/** Like Go's JSON: `retries` and `credits` are omitted when 0; sparse rows drop empty cells. */
+function finishCells(cells: CellSums[], sparse: boolean): HeatmapCell[] {
+  return cells
+    .filter((cell) => !sparse || !isEmptyCell(cell))
+    .map(({ retries, credits, ...cell }) => ({
+      ...cell,
+      ...(retries > 0 ? { retries } : {}),
+      ...(credits > 0 ? { credits: round(credits, 4) } : {}),
+    }));
+}
+
+/** The query params of GET /observe/account-heatmap, plus the errors log retries come from. */
+export interface BuildHeatmapOptions {
+  /** failed upstream attempts (the mock's recent-errors ring); each adds a retry */
+  errors?: readonly ObserveError[];
+  scope?: "global" | "all";
+  top?: number;
+  sparse?: boolean;
+  bucketMin?: number;
+}
+
+/**
+ * The account heatmap like Go: offset 0 is the current minute (or bucket). `reqs` and
+ * `failures` count final requests, `retries` count failed attempts. Accounts are the configured
+ * ones with traffic in the last day (Go prunes deleted ones), sorted by id, or with `top` the
+ * busiest by requests plus retries over the last hour, idle ones left out.
+ */
 export function buildHeatmap(
-  requests: RequestRecord[],
-  accounts: Account[],
+  requests: readonly RequestRecord[],
+  accounts: readonly Account[],
   windowMin: number,
   nowUnix: number,
-): HeatmapData {
-  const global = emptyCells(windowMin);
-  const perAccount = new Map<string, Array<HeatmapCell & { credits: number }>>();
-  for (const r of requests) {
-    const offset = minuteOffset(r.ts, nowUnix);
-    if (offset < 0 || offset >= windowMin) continue;
-    const targets = [global];
-    if (r.accountId) {
-      let cells = perAccount.get(r.accountId);
-      if (!cells) {
-        cells = emptyCells(windowMin);
-        perAccount.set(r.accountId, cells);
-      }
-      targets.push(cells);
-    }
-    for (const cells of targets) {
-      const cell = cells[offset];
-      cell.reqs += 1;
-      if (!r.success) cell.failures += 1;
-      else cell.credits += r.credits;
-    }
-  }
+  options: BuildHeatmapOptions = {},
+): HeatmapData & { restCount?: number } {
+  const bucketMin = Math.min(Math.max(1, options.bucketMin ?? 1), windowMin);
+  const count = Math.ceil(windowMin / bucketMin);
   const emails = new Map(accounts.map((a) => [a.id, a.email]));
-  return {
-    windowMin,
-    nowUnix,
-    global: { accountId: "_global_", cells: finishCells(global) },
-    accounts: [...perAccount.entries()]
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([accountId, cells]) => {
-        const email = emails.get(accountId);
-        return { accountId, ...(email ? { email } : {}), cells: finishCells(cells) };
-      }),
+  const global = emptyCells(count);
+  const rows = new Map<string, { cells: CellSums[]; rank: number }>();
+  const add = (
+    accountId: string,
+    ts: number,
+    apply: (cell: CellSums) => void,
+    rankBy: number,
+  ): void => {
+    const offset = minuteOffset(ts, nowUnix);
+    if (offset < 0 || offset >= RING_MINUTES) return;
+    let row: { cells: CellSums[]; rank: number } | undefined;
+    if (accountId && emails.has(accountId)) {
+      row = rows.get(accountId);
+      if (!row) {
+        row = { cells: emptyCells(count), rank: 0 };
+        rows.set(accountId, row);
+      }
+      if (offset < TOP_RANK_MINUTES) row.rank += rankBy;
+    }
+    if (offset >= windowMin) return;
+    const index = Math.floor(offset / bucketMin);
+    apply(global[index]);
+    if (row) apply(row.cells[index]);
   };
+  for (const r of requests) {
+    add(
+      r.accountId,
+      r.ts,
+      (cell) => {
+        cell.reqs += 1;
+        if (!r.success) cell.failures += 1;
+        cell.credits += r.credits;
+      },
+      1,
+    );
+  }
+  for (const e of options.errors ?? []) {
+    add(e.accountId, e.ts, (cell) => (cell.retries += 1), 1);
+  }
+
+  const sparse = options.sparse ?? false;
+  const toRow = (accountId: string, cells: CellSums[]) => {
+    const email = emails.get(accountId);
+    return { accountId, ...(email ? { email } : {}), cells: finishCells(cells, sparse) };
+  };
+  const result: HeatmapData & { restCount?: number } = {
+    windowMin,
+    bucketMin,
+    nowUnix,
+    global: { accountId: "_global_", cells: finishCells(global, sparse) },
+    accounts: [],
+  };
+  if (options.scope === "global") return result;
+  const top = options.top ?? 0;
+  if (top > 0) {
+    const busy = [...rows.entries()]
+      .filter(([, row]) => row.rank > 0)
+      .sort(([a, x], [b, y]) => y.rank - x.rank || (a < b ? -1 : a > b ? 1 : 0));
+    result.accounts = busy.slice(0, top).map(([id, row]) => toRow(id, row.cells));
+    result.restCount = Math.max(0, busy.length - top);
+    return result;
+  }
+  result.accounts = [...rows.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([id, row]) => toRow(id, row.cells));
+  return result;
 }
 
-/** GET /observe/overview over the requests since `startedAt`. */
+/** Go's accountAvailability: enabled, and of those the ones that can take traffic. */
+export function buildAvailability(
+  accounts: readonly Account[],
+  allowOverUsage: boolean,
+): { enabledAccts: number; availableAccts: number } {
+  let enabledAccts = 0;
+  let availableAccts = 0;
+  for (const a of accounts) {
+    if (!a.enabled) continue;
+    enabledAccts += 1;
+    if (a.silent || isBanned(a)) continue;
+    if (isExhausted(a) && !allowOverUsage && a.overageStatus.toUpperCase() !== "ENABLED") continue;
+    availableAccts += 1;
+  }
+  return { enabledAccts, availableAccts };
+}
+
+/** What GET /observe/overview reads besides the request log. */
+export interface BuildOverviewContext {
+  /** failed upstream attempts; each adds a retry */
+  errors?: readonly ObserveError[];
+  /** configured accounts, for enabledAccts/availableAccts and the ring prune */
+  accounts?: readonly Account[];
+  allowOverUsage?: boolean;
+}
+
+/**
+ * GET /observe/overview like Go: the rings hold final requests from the last day whatever the
+ * process start, retries come from the errors log, and `series` is the last 30 minutes, oldest
+ * first.
+ */
 export function buildOverview(
-  requests: RequestRecord[],
+  requests: readonly RequestRecord[],
   nowUnix: number,
   startedAt: number,
+  context: BuildOverviewContext = {},
 ): ObserveOverview {
   let rpm1 = 0;
   let reqs5 = 0;
@@ -937,33 +1045,52 @@ export function buildOverview(
   let credits60 = 0;
   let errors60 = 0;
   let successes60 = 0;
+  let retries60 = 0;
+  const known = context.accounts ? new Set(context.accounts.map((a) => a.id)) : null;
+  const ringAccount = (id: string) => id !== "" && (known === null || known.has(id));
   const active = new Set<string>();
-  const seenAccounts = new Set<string>();
+  const ringAccounts = new Set<string>();
   const models = new Set<string>();
+  const series = {
+    rpm: Array<number>(SERIES_MINUTES).fill(0),
+    failures: Array<number>(SERIES_MINUTES).fill(0),
+    inTpm: Array<number>(SERIES_MINUTES).fill(0),
+    outTpm: Array<number>(SERIES_MINUTES).fill(0),
+    credits: Array<number>(SERIES_MINUTES).fill(0),
+  };
   for (const r of requests) {
-    if (r.ts < startedAt) continue;
-    if (r.accountId) seenAccounts.add(r.accountId);
     if (r.model) models.add(r.model);
     const offset = minuteOffset(r.ts, nowUnix);
-    if (offset < 0 || offset >= 60) continue;
-    if (r.success) {
-      successes60 += 1;
-      credits60 += r.credits;
-    } else {
-      errors60 += 1;
+    if (offset < 0 || offset >= RING_MINUTES) continue;
+    if (ringAccount(r.accountId)) ringAccounts.add(r.accountId);
+    if (offset >= 60) continue;
+    if (r.success) successes60 += 1;
+    else errors60 += 1;
+    credits60 += r.credits;
+    if (offset < SERIES_MINUTES) {
+      const at = SERIES_MINUTES - 1 - offset;
+      series.rpm[at] += 1;
+      if (!r.success) series.failures[at] += 1;
+      series.inTpm[at] += r.inTokens;
+      series.outTpm[at] += r.outTokens;
+      series.credits[at] += r.credits;
     }
     if (offset >= 5) continue;
     if (offset === 0) rpm1 += 1;
     reqs5 += 1;
-    if (r.accountId) active.add(r.accountId);
-    if (r.success) {
-      successes5 += 1;
-      in5 += r.inTokens;
-      out5 += r.outTokens;
-      credits5 += r.credits;
-    } else {
-      failures5 += 1;
-    }
+    if (ringAccount(r.accountId)) active.add(r.accountId);
+    if (r.success) successes5 += 1;
+    else failures5 += 1;
+    in5 += r.inTokens;
+    out5 += r.outTokens;
+    credits5 += r.credits;
+  }
+  for (const e of context.errors ?? []) {
+    if (e.model) models.add(e.model);
+    const offset = minuteOffset(e.ts, nowUnix);
+    if (offset < 0 || offset >= RING_MINUTES) continue;
+    if (ringAccount(e.accountId)) ringAccounts.add(e.accountId);
+    if (offset < 60) retries60 += 1;
   }
   return {
     startedAt,
@@ -977,9 +1104,18 @@ export function buildOverview(
     credits60: round(credits60, 4),
     errors60,
     successes60,
+    retries60,
     activeAccts: active.size,
-    totalAccts: seenAccounts.size,
+    totalAccts: ringAccounts.size,
     totalModels: models.size,
+    ...buildAvailability(context.accounts ?? [], context.allowOverUsage ?? false),
+    series: {
+      rpm: series.rpm,
+      errRate: series.rpm.map((reqs, i) => (reqs > 0 ? series.failures[i] / reqs : 0)),
+      inTpm: series.inTpm,
+      outTpm: series.outTpm,
+      credits: series.credits.map((c) => round(c, 4)),
+    },
   };
 }
 
@@ -987,6 +1123,7 @@ export function makeModelMixEntry(overrides: Partial<ModelMixEntry> = {}): Model
   return {
     model: "claude-sonnet-5",
     reqs: 0,
+    retries: 0,
     inTokens: 0,
     outTokens: 0,
     cacheReadTokens: 0,
@@ -997,24 +1134,38 @@ export function makeModelMixEntry(overrides: Partial<ModelMixEntry> = {}): Model
   };
 }
 
-/** Like Go: failures count only toward reqs and lastUsed; sorted by credits, highest first. */
-export function buildModelMix(requests: RequestRecord[]): ModelMixEntry[] {
+/**
+ * Like Go: every final request counts once, with its tokens and credits, success or failure;
+ * each failed attempt in the errors log adds a retry. Sorted by credits, highest first.
+ */
+export function buildModelMix(
+  requests: readonly RequestRecord[],
+  errors: readonly ObserveError[] = [],
+): ModelMixEntry[] {
   const byModel = new Map<string, ModelMixEntry>();
+  const entryFor = (model: string): ModelMixEntry => {
+    let entry = byModel.get(model);
+    if (!entry) {
+      entry = makeModelMixEntry({ model, lastUsed: 0 });
+      byModel.set(model, entry);
+    }
+    return entry;
+  };
   for (const r of requests) {
     if (!r.model) continue;
-    let entry = byModel.get(r.model);
-    if (!entry) {
-      entry = makeModelMixEntry({ model: r.model, lastUsed: 0 });
-      byModel.set(r.model, entry);
-    }
+    const entry = entryFor(r.model);
     entry.reqs += 1;
     entry.lastUsed = Math.max(entry.lastUsed, r.ts);
-    if (!r.success) continue;
     entry.inTokens += r.inTokens;
     entry.outTokens += r.outTokens;
     entry.cacheReadTokens += r.cacheReadTokens;
     entry.cacheWriteTokens += r.cacheWriteTokens;
     entry.credits += r.credits;
+  }
+  for (const e of errors) {
+    if (!e.model) continue;
+    const entry = entryFor(e.model);
+    entry.retries = (entry.retries ?? 0) + 1;
   }
   return [...byModel.values()]
     .map((entry) => ({ ...entry, credits: round(entry.credits, 4) }))
@@ -1125,7 +1276,7 @@ export function makeBackupEntry(overrides: Partial<BackupEntry> = {}): BackupEnt
   };
 }
 
-/** Six backups, newest first: manual, auto, two scheduled and two rollback points. */
+/** Five backups, newest first: manual, two scheduled and two rollback points. Go makes no "auto" kind. */
 export function seedBackups(nowUnix: number): BackupEntry[] {
   const rng = createRng(3003);
   const entry = (createdAt: number, fields: Partial<BackupEntry>): BackupEntry => {
@@ -1147,7 +1298,6 @@ export function seedBackups(nowUnix: number): BackupEntry[] {
   });
   return [
     entry(manualAt, { kind: "manual", note: manualNote(manualAt) }),
-    entry(nowUnix - 5 * HOUR, { kind: "auto" }),
     entry(nowUnix - 20 * HOUR, { kind: "scheduled", note: "auto-daily" }),
     entry(nowUnix - 30 * HOUR, {
       kind: "pre-restore",

@@ -70,6 +70,8 @@ export interface FirstRunResponse {
  * Change events carry the changed row's id as `payload`, or "*" for many (none for settings
  * and stats): accounts_changed comes from every account write, background bans and cooldowns
  * included; backup_deleted also fires with "*" when lowering `keep` prunes scheduled backups.
+ * observe_tick comes at most once a second and only after observe data changed; its payload
+ * is the store's change counter as a decimal string.
  */
 export type AdminEventType =
   | "hello"
@@ -626,9 +628,29 @@ export interface ExportData {
 // Observe
 // ---------------------------------------------------------------------------
 
-/** GET /admin/api/observe/overview */
+/**
+ * Per-minute values for the last 30 minutes, oldest first; the last entry is the current,
+ * partial minute. Taken from the global ring.
+ */
+export interface ObserveSeries {
+  /** client requests per minute */
+  rpm: number[];
+  /** failed / requests per minute, 0..1 (0 for an empty minute) */
+  errRate: number[];
+  /** input tokens per minute */
+  inTpm: number[];
+  /** output tokens per minute */
+  outTpm: number[];
+  credits: number[];
+}
+
+/**
+ * GET /admin/api/observe/overview. Request counts are final client requests, the rows the
+ * request log keeps; `retries60` counts failed upstream attempts. The rings are rebuilt from
+ * SQLite on start, so the windows survive a restart.
+ */
 export interface ObserveOverview {
-  /** unix s */
+  /** unix s, process start or last stats reset */
   startedAt: number;
   /** unix s */
   nowUnix: number;
@@ -642,18 +664,31 @@ export interface ObserveOverview {
   outTpm5: number;
   credits5: number;
   credits60: number;
+  /** failed client requests in the last hour */
   errors60: number;
   successes60: number;
+  /** failed upstream attempts in the last hour (a request that failed over twice adds 2) */
+  retries60: number;
+  /** accounts with requests in the last 5 minutes */
   activeAccts: number;
   /** accounts with traffic rings, not configured accounts */
   totalAccts: number;
   totalModels: number;
+  /** configured accounts that are enabled */
+  enabledAccts: number;
+  /** enabled accounts that are not banned, suspended or over their limit (unless overage or over-usage is allowed) */
+  availableAccts: number;
+  series: ObserveSeries;
 }
 export interface HeatmapCell {
-  /** 0 = current minute, N = N minutes ago */
+  /** 0 = current minute (or bucket), N = N minutes (buckets) ago */
   offset: number;
+  /** final client requests, success or failure */
   reqs: number;
+  /** final client requests that failed */
   failures: number;
+  /** failed upstream attempts; omitted when 0 */
+  retries?: number;
   /** omitted when 0 */
   credits?: number;
 }
@@ -662,21 +697,31 @@ export interface AccountHeatmap {
   accountId: string;
   /** never set on global; omitted if the account is missing */
   email?: string;
-  /** length === windowMin */
+  /** one per bucket, offset 0 first; with sparse=1 on the wire, empty cells are left out */
   cells: HeatmapCell[];
 }
-/** GET /admin/api/observe/account-heatmap?windowMin= */
+/**
+ * GET /admin/api/observe/account-heatmap?windowMin=&bucketMin=&scope=&top=&sparse=
+ * Without the optional params the response is dense, per minute and lists every account.
+ */
 export interface HeatmapResponse {
   /** 1..1440 */
   windowMin: number;
+  /** minutes per cell, 1 unless bucketMin was sent (older servers omit it) */
+  bucketMin?: number;
   nowUnix: number;
   global: AccountHeatmap;
-  /** null when there is no traffic */
-  accounts: AccountHeatmap[] | null;
+  /** left out with scope=global or when no account has traffic (older servers send null) */
+  accounts?: AccountHeatmap[] | null;
+  /** with top=N: busy accounts beyond the N returned */
+  restCount?: number;
 }
 export interface ModelMixEntry {
   model: string;
+  /** final client requests since the last stats reset */
   reqs: number;
+  /** failed upstream attempts for this model (older servers omit it) */
+  retries?: number;
   inTokens: number;
   outTokens: number;
   cacheReadTokens: number;
@@ -1019,7 +1064,10 @@ export interface BackupFile {
 // Normalized types (what the endpoint functions return after cleaning the wire shape)
 // ---------------------------------------------------------------------------
 
-/** HeatmapResponse with `accounts` never null. */
+/**
+ * HeatmapResponse with `accounts` always an array and every row dense: one cell per bucket,
+ * offset 0 first, even when the wire was sparse. getAccountHeatmap always sets `bucketMin`.
+ */
 export type HeatmapData = Omit<HeatmapResponse, "accounts"> & { accounts: AccountHeatmap[] };
 
 /** SsoTokenImportResponse with `errors` never null. */

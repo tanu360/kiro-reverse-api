@@ -1772,7 +1772,7 @@ function backupsFull(now: number): BackupEntry[] {
       }),
     );
   }
-  for (let d = 1; d <= 8; d++) {
+  for (let d = 1; d <= 10; d++) {
     rows.push(
       entry(now - d * DAY - int(rng, 0, 600), {
         kind: "scheduled",
@@ -1795,9 +1795,6 @@ function backupsFull(now: number): BackupEntry[] {
   const manual = [3 * MINUTE, 2 * HOUR + 7 * MINUTE, 26 * HOUR, 4 * DAY, 15 * DAY, 45 * DAY];
   for (const age of manual) {
     rows.push(entry(now - age, { kind: "manual", note: manualNote(now - age), accountCnt: 118 }));
-  }
-  for (const age of [40 * MINUTE, 5 * HOUR, 30 * HOUR, 3 * DAY, 10 * DAY, 22 * DAY]) {
-    rows.push(entry(now - age, { kind: "auto", accountCnt: 116 }));
   }
   const restored = rows[14];
   rows.push(

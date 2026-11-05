@@ -15,29 +15,56 @@ function clampParam(raw: string | null, fallback: number, max: number): number {
   return Math.min(value, max);
 }
 
+/** Go's queryFlag: 1, true, yes or on. */
+function isFlag(raw: string | null): boolean {
+  return ["1", "true", "yes", "on"].includes((raw ?? "").trim().toLowerCase());
+}
+
 // /observe/recent-requests belongs to the Requests feature's mocks.
 export const handlers: HttpHandler[] = [
   http.get(apiUrl("/observe/overview"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
-    return HttpResponse.json(buildOverview(mockDb.requests, mockNowUnix(), mockDb.startedAt));
+    return HttpResponse.json(
+      buildOverview(mockDb.requests, mockNowUnix(), mockDb.startedAt, {
+        errors: mockDb.errors,
+        accounts: mockDb.accounts,
+        allowOverUsage: mockDb.settings.allowOverUsage,
+      }),
+    );
   }),
 
+  // Go's query params: windowMin, bucketMin, scope=global, top=N, sparse=1.
   http.get(apiUrl("/observe/account-heatmap"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
+    const params = new URL(request.url).searchParams;
     const windowMin = clampParam(
-      new URL(request.url).searchParams.get("windowMin"),
+      params.get("windowMin"),
       DEFAULT_HEATMAP_WINDOW,
       MAX_HEATMAP_WINDOW,
     );
-    const heatmap = buildHeatmap(mockDb.requests, mockDb.accounts, windowMin, mockNowUnix());
-    // Go sends null instead of an empty account list.
+    const top = clampParam(params.get("top"), 0, Number.MAX_SAFE_INTEGER);
+    const { accounts, restCount, ...heatmap } = buildHeatmap(
+      mockDb.requests,
+      mockDb.accounts,
+      windowMin,
+      mockNowUnix(),
+      {
+        errors: mockDb.errors,
+        bucketMin: clampParam(params.get("bucketMin"), 1, windowMin),
+        scope: params.get("scope")?.toLowerCase() === "global" ? "global" : "all",
+        top,
+        sparse: isFlag(params.get("sparse")),
+      },
+    );
+    // Go omits an empty account list (and the list itself with scope=global).
     return HttpResponse.json({
       ...heatmap,
-      accounts: heatmap.accounts.length > 0 ? heatmap.accounts : null,
+      ...(accounts.length > 0 ? { accounts } : {}),
+      ...(top > 0 ? { restCount } : {}),
     });
   }),
 

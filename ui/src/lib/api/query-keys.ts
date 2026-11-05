@@ -15,7 +15,20 @@ export const queryKeys = {
   observe: {
     all: ["observe"] as const,
     overview: () => ["observe", "overview"] as const,
-    heatmap: (windowMin: number) => ["observe", "heatmap", windowMin] as const,
+    /** The default shape keeps the original 3-part key; shaped requests add their params. */
+    heatmap: (
+      windowMin: number,
+      params?: { scope?: "global" | "all"; top?: number; bucketMin?: number },
+    ) => {
+      const shape = {
+        ...(params?.scope === "global" ? { scope: "global" as const } : {}),
+        ...(params?.top && params.top > 0 ? { top: params.top } : {}),
+        ...(params?.bucketMin && params.bucketMin > 1 ? { bucketMin: params.bucketMin } : {}),
+      };
+      return Object.keys(shape).length > 0
+        ? (["observe", "heatmap", windowMin, shape] as const)
+        : (["observe", "heatmap", windowMin] as const);
+    },
     modelMix: () => ["observe", "model-mix"] as const,
     recentErrors: (limit: number) => ["observe", "recent-errors", limit] as const,
     recentRequests: (pageSize: number) => ["observe", "recent-requests", pageSize] as const,

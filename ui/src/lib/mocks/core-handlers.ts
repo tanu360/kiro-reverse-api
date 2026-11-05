@@ -47,9 +47,9 @@ function errorEvent(record: RequestRecord) {
  * The full dataset's tick: 0-3 requests drawn like the seeded ones (every endpoint, model, key and
  * error type), so the live tiles, sparklines and heatmap keep moving at the seeded rate.
  */
-function appendFullRequests(): void {
+function appendFullRequests(): number {
   const count = Math.floor(Math.random() * 4);
-  if (count === 0 || mockDb.accounts.length === 0) return;
+  if (count === 0 || mockDb.accounts.length === 0) return 0;
   const now = mockNowUnix();
   let nextId = (mockDb.requests[0]?.id ?? 0) + 1;
   for (let i = 0; i < count; i++) {
@@ -73,19 +73,17 @@ function appendFullRequests(): void {
     }
   }
   mockDb.errors.length = Math.min(mockDb.errors.length, MAX_RECENT_ERRORS);
-  mockDb.modelMix = buildModelMix(mockDb.requests);
+  mockDb.modelMix = buildModelMix(mockDb.requests, mockDb.errors);
+  return count;
 }
 
-/** Adds 0-3 synthetic requests (newest first) so live views move in mock mode. */
-function appendSyntheticRequests(): void {
-  if (mockScenario() === "full") {
-    appendFullRequests();
-    return;
-  }
+/** Adds 0-3 synthetic requests (newest first) so live views move in mock mode; returns how many. */
+function appendSyntheticRequests(): number {
+  if (mockScenario() === "full") return appendFullRequests();
   const serving = mockDb.accounts.filter(
     (a) => a.enabled && a.hasToken && (a.banStatus === "" || a.banStatus === "ACTIVE"),
   );
-  if (serving.length === 0) return;
+  if (serving.length === 0) return 0;
   const count = Math.floor(Math.random() * 4);
   const now = mockNowUnix();
   let nextId = mockDb.requests.reduce((max, r) => Math.max(max, r.id ?? 0), 0) + 1;
@@ -126,8 +124,12 @@ function appendSyntheticRequests(): void {
       mockDb.errors.length = Math.min(mockDb.errors.length, 100);
     }
   }
-  if (count > 0) mockDb.modelMix = buildModelMix(mockDb.requests);
+  if (count > 0) mockDb.modelMix = buildModelMix(mockDb.requests, mockDb.errors);
+  return count;
 }
+
+// The observe store's change counter, as Go's observe_tick payload carries it.
+let observeSeq = 0;
 
 // MSW's sse() needs EventSource when the handler is built. jsdom and Node 22 have none, so in
 // tests the stream is not mocked and the events provider stays 'closed'.
@@ -156,8 +158,13 @@ function eventsHandlers(): HttpHandler[] {
           stop();
           return;
         }
-        appendSyntheticRequests();
-        client.send({ event: "observe_tick", data: JSON.stringify({ type: "observe_tick" }) });
+        // Like Go: a tick only when observe data changed, carrying the change counter.
+        if (appendSyntheticRequests() === 0) return;
+        observeSeq += 1;
+        client.send({
+          event: "observe_tick",
+          data: JSON.stringify({ type: "observe_tick", payload: String(observeSeq) }),
+        });
       }, TICK_MS);
       request.signal.addEventListener("abort", stop, { once: true });
       // When the app closes its EventSource (sign-out), MSW cancels the stream and calls

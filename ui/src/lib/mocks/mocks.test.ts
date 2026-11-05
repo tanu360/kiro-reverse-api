@@ -10,6 +10,7 @@ import {
   buildModelMix,
   buildOverview,
   makeAccount,
+  makeObserveError,
   makeRequestRecord,
   seedAccounts,
   seedRequests,
@@ -130,7 +131,7 @@ describe("mock database", () => {
     );
     expect(mockDb.apiKeys.some((k) => k.key.length <= 10 && k.keyMasked === k.key)).toBe(true);
     expect(mockDb.backups.map((b) => b.kind).sort()).toEqual(
-      ["auto", "manual", "pre-restore", "pre-restore", "scheduled", "scheduled"].sort(),
+      ["manual", "pre-restore", "pre-restore", "scheduled", "scheduled"].sort(),
     );
     expect(mockDb.backups.some((b) => b.note?.startsWith("auto before restore "))).toBe(true);
     expect(mockDb.backups.some((b) => b.note === "upload kiro-backup-x.json")).toBe(true);
@@ -146,40 +147,100 @@ describe("observe builders", () => {
   const accountId = "acc-1";
   const requests = [
     makeRequestRecord({ ts: now, accountId, credits: 0.5 }),
-    makeRequestRecord({ ts: now - 3 * 60, accountId, success: false, credits: 0 }),
+    makeRequestRecord({
+      ts: now - 3 * 60,
+      accountId,
+      success: false,
+      credits: 0,
+      inTokens: 0,
+      outTokens: 0,
+    }),
     makeRequestRecord({ ts: now - 2 * 3600, accountId }),
+  ];
+  // Two failed attempts before the failed request, one of them on another account.
+  const errors = [
+    makeObserveError({ ts: now - 3 * 60, accountId, model: "claude-sonnet-5" }),
+    makeObserveError({ ts: now - 3 * 60, accountId: "acc-2", model: "claude-sonnet-5" }),
+  ];
+  const accounts = [
+    makeAccount({ id: accountId, email: "a@b.io" }),
+    makeAccount({ id: "acc-2", email: "b@b.io" }),
+    makeAccount({ id: "idle", email: "idle@b.io" }),
   ];
 
   it("buildHeatmap returns windowMin cells with offset 0 = the current minute", () => {
-    const heatmap = buildHeatmap(
-      requests,
-      [makeAccount({ id: accountId, email: "a@b.io" })],
-      60,
-      now,
-    );
+    const heatmap = buildHeatmap(requests, accounts, 60, now, { errors });
     expect(heatmap.global.accountId).toBe("_global_");
+    expect(heatmap.bucketMin).toBe(1);
     expect(heatmap.global.cells).toHaveLength(60);
     expect(heatmap.global.cells[0]).toEqual({ offset: 0, reqs: 1, failures: 0, credits: 0.5 });
-    expect(heatmap.global.cells[3]).toEqual({ offset: 3, reqs: 1, failures: 1 });
-    expect(heatmap.accounts).toEqual([expect.objectContaining({ accountId, email: "a@b.io" })]);
+    expect(heatmap.global.cells[3]).toEqual({ offset: 3, reqs: 1, failures: 1, retries: 2 });
+    // Accounts with traffic in the last day, by id; the idle one has no ring.
+    expect(heatmap.accounts.map((a) => a.accountId)).toEqual([accountId, "acc-2"]);
+    expect(heatmap.accounts[0]).toEqual(expect.objectContaining({ accountId, email: "a@b.io" }));
     expect(heatmap.accounts[0].cells).toHaveLength(60);
+    expect(heatmap.accounts[1].cells[3]).toEqual({ offset: 3, reqs: 0, failures: 0, retries: 1 });
+    expect(heatmap.restCount).toBeUndefined();
     expect(buildHeatmap([], [], 120, now).accounts).toEqual([]);
   });
 
-  it("buildOverview counts the 1, 5 and 60 minute windows", () => {
-    const overview = buildOverview(requests, now, now - 86_400);
+  it("buildHeatmap honours scope, top, sparse and bucketMin like Go", () => {
+    expect(buildHeatmap(requests, accounts, 60, now, { errors, scope: "global" }).accounts).toEqual(
+      [],
+    );
+    const top = buildHeatmap(requests, accounts, 60, now, { errors, top: 1 });
+    expect(top.accounts.map((a) => a.accountId)).toEqual([accountId]);
+    expect(top.restCount).toBe(1);
+    const sparse = buildHeatmap(requests, accounts, 60, now, { errors, sparse: true });
+    expect(sparse.global.cells.map((c) => c.offset)).toEqual([0, 3]);
+    const buckets = buildHeatmap(requests, accounts, 60, now, { errors, bucketMin: 5 });
+    expect(buckets.bucketMin).toBe(5);
+    expect(buckets.global.cells).toHaveLength(12);
+    expect(buckets.global.cells[0]).toEqual({
+      offset: 0,
+      reqs: 2,
+      failures: 1,
+      retries: 2,
+      credits: 0.5,
+    });
+  });
+
+  it("buildOverview counts final requests in the 1, 5 and 60 minute windows", () => {
+    const overview = buildOverview(requests, now, now - 60, { errors, accounts });
     expect(overview.rpm1).toBe(1);
     expect(overview.rpm5Avg).toBe(2 / 5);
     expect(overview.errRate5).toBe(0.5);
     expect(overview.errors60).toBe(1);
     expect(overview.successes60).toBe(1);
+    expect(overview.retries60).toBe(2);
     expect(overview.activeAccts).toBe(1);
-    expect(overview.totalAccts).toBe(1);
+    // Rings come from the last day whatever the start time; acc-2 has a retry-only ring.
+    expect(overview.totalAccts).toBe(2);
+    expect(overview.enabledAccts).toBe(3);
+    expect(overview.availableAccts).toBe(3);
+    expect(overview.series.rpm).toHaveLength(30);
+    expect(overview.series.rpm.slice(-4)).toEqual([1, 0, 0, 1]);
+    expect(overview.series.errRate.slice(-4)).toEqual([1, 0, 0, 0]);
+    expect(overview.series.credits.at(-1)).toBe(0.5);
   });
 
-  it("buildModelMix counts failures only as requests", () => {
-    const [entry] = buildModelMix(requests);
+  it("buildOverview counts enabled and available accounts like Go", () => {
+    const { enabledAccts, availableAccts } = buildOverview([], now, now, {
+      accounts: [
+        makeAccount({ id: "ok" }),
+        makeAccount({ id: "off", enabled: false }),
+        makeAccount({ id: "banned", banStatus: "DISABLED" }),
+        makeAccount({ id: "silent", silent: true }),
+        makeAccount({ id: "over", usageCurrent: 50, usageLimit: 50 }),
+      ],
+    });
+    expect({ enabledAccts, availableAccts }).toEqual({ enabledAccts: 4, availableAccts: 1 });
+  });
+
+  it("buildModelMix counts every final request once and failed attempts as retries", () => {
+    const [entry] = buildModelMix(requests, errors);
     expect(entry.reqs).toBe(3);
+    expect(entry.retries).toBe(2);
     expect(entry.inTokens).toBe(2400);
   });
 });
@@ -407,7 +468,7 @@ describe("full dataset (the browser default)", () => {
     );
     expect(values(full.promptFilter.rules, (r) => r.enabled)).toEqual(new Set([true, false]));
     expect(values(full.backups, (b) => b.kind)).toEqual(
-      new Set(["manual", "scheduled", "auto", "pre-restore", "legacy-import"]),
+      new Set(["manual", "scheduled", "pre-restore", "legacy-import"]),
     );
     expect(full.backups.some((b) => b.accountCnt === undefined)).toBe(true);
     expect(full.backups.some((b) => b.includesCredentials === false)).toBe(true);

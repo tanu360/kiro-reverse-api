@@ -158,7 +158,7 @@ function seedFullDb(now: number): MockDb {
   return {
     ...baseDb(),
     ...data,
-    modelMix: buildModelMix(data.requests),
+    modelMix: buildModelMix(data.requests, data.errors),
     // An update is out, so the update notice shows.
     remoteVersion: { version: "2.2.0", changelog: REMOTE_CHANGELOG },
   };
@@ -192,14 +192,15 @@ function seedDb(scenario: MockScenario): MockDb {
   if (scenario === "empty") return seedEmptyDb(now);
   const accounts = seedAccounts();
   const requests = seedRequests(now, SEED_REQUEST_COUNT);
+  const errors = seedErrors(requests);
   return {
     ...baseDb(),
     accounts,
     secrets: Object.fromEntries(accounts.map((account) => [account.id, makeAccountFull(account)])),
     apiKeys: seedApiKeys(),
     requests,
-    errors: seedErrors(requests),
-    modelMix: buildModelMix(requests),
+    errors,
+    modelMix: buildModelMix(requests, errors),
     backups: seedBackups(now),
     schedule: { enabled: true, cadence: "daily", keep: 14, lastRun: now - 6 * 3600 },
     settings: defaultSettings(),
