@@ -1,8 +1,12 @@
+import { CircleXIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type JSX, useEffect, useRef, useState } from "react";
 import { Skeleton, SkulletProvider } from "skullet/react";
 import { useTheme } from "@/components/layout/theme-provider";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { firstRunQuery } from "@/lib/api/session";
 import { isAuthenticated, subscribeSession } from "@/lib/auth/session";
@@ -104,6 +108,7 @@ function GeneratedPassword({
   const { t } = useT("auth");
   const { t: tShared } = useT();
   const { resolvedTheme } = useTheme();
+  const failed = unavailable && !password;
 
   return (
     <section
@@ -113,33 +118,40 @@ function GeneratedPassword({
       {/*
        * The label doubles as the copy hint: "Generated password" at rest, "Click to copy" while
        * the password is hovered or keyboard-focused, then "Copied to clipboard" in green. The
-       * three sit in one grid cell and cross-fade, so the line never changes height.
+       * three sit in one grid cell and cross-fade, so the line never changes height. With no
+       * password to show, the label goes too: the notice below says why.
        */}
-      <p className="grid text-meta [&>span]:col-start-1 [&>span]:row-start-1 [&>span]:transition-opacity [&>span]:duration-150">
-        <span className="text-muted-foreground group-has-[[data-copied]]/pw:opacity-0 group-has-[[data-copy-password]:focus-visible]/pw:opacity-0 group-has-[[data-copy-password]:hover]/pw:opacity-0">
-          {t("generatedPasswordLabel")}
-        </span>
-        <span
-          aria-hidden="true"
-          className="text-info-foreground opacity-0 group-has-[[data-copy-password]:not([data-copied]):focus-visible]/pw:opacity-100 group-has-[[data-copy-password]:not([data-copied]):hover]/pw:opacity-100"
-        >
-          {t("clickToCopy")}
-        </span>
-        <span
-          aria-hidden="true"
-          className="text-success-foreground opacity-0 group-has-[[data-copied]]/pw:opacity-100"
-        >
-          {tShared("toast.copied")}
-        </span>
-      </p>
-      {unavailable && !password ? (
-        // The message, then "Try again" centred on its own line.
-        <div className="flex min-h-10 flex-col items-center justify-center">
-          <span className="text-muted-foreground text-sm">{t("firstRunUnavailable")}</span>
-          <Button onClick={onRetry} size="sm" variant="ghost">
-            {tShared("actions.retry")}
-          </Button>
-        </div>
+      {failed ? null : (
+        <p className="grid text-meta [&>span]:col-start-1 [&>span]:row-start-1 [&>span]:transition-opacity [&>span]:duration-150">
+          <span className="text-muted-foreground group-has-[[data-copied]]/pw:opacity-0 group-has-[[data-copy-password]:focus-visible]/pw:opacity-0 group-has-[[data-copy-password]:hover]/pw:opacity-0">
+            {t("generatedPasswordLabel")}
+          </span>
+          <span
+            aria-hidden="true"
+            className="text-info-foreground opacity-0 group-has-[[data-copy-password]:not([data-copied]):focus-visible]/pw:opacity-100 group-has-[[data-copy-password]:not([data-copied]):hover]/pw:opacity-100"
+          >
+            {t("clickToCopy")}
+          </span>
+          <span
+            aria-hidden="true"
+            className="text-success-foreground opacity-0 group-has-[[data-copied]]/pw:opacity-100"
+          >
+            {tShared("toast.copied")}
+          </span>
+        </p>
+      )}
+      {failed ? (
+        // The sign-in form's own error notice, with "Try again" as its outline action.
+        <Alert className="w-full text-start" variant="error">
+          <AnimatedIcon icon={CircleXIcon} aria-hidden="true" playOnMount />
+          <AlertDescription>{t("firstRunUnavailable")}</AlertDescription>
+          <AlertAction>
+            <Button onClick={onRetry} size="sm" variant="outline">
+              <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
+              {tShared("actions.retry")}
+            </Button>
+          </AlertAction>
+        </Alert>
       ) : (
         // While it loads (first visit, or after "Try again"), skullet draws the row from a sample
         // password: a bar where the password will be, the same size as the real row, so nothing
