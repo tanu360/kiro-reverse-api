@@ -17,6 +17,9 @@ import {
 import { cn } from "@/lib/utils";
 import { intFmt } from "./chart-formatters";
 import { useOptionalChartLegendHover } from "./chart-legend-hover";
+import { ShareBar } from "./share-bar";
+
+export { ShareBar, type ShareBarProps } from "./share-bar";
 
 export type LegendMarkerVariant = "dot" | "line" | "dashed";
 
@@ -318,27 +321,23 @@ export interface LegendProgressProps {
   className?: string;
 }
 
-/** A 4 px share bar (value / maxValue) on the chart-grid track. Decorative: pair it with LegendValue. */
+/**
+ * The item's {@link ShareBar} (value / maxValue). Decorative: pair it with LegendValue. Outside a
+ * Legend (a table cell, a card), use `ShareBar` itself.
+ */
 export function LegendProgress({ className }: LegendProgressProps) {
-  const { item, percentage } = useLegendItem();
+  const { item } = useLegendItem();
   if (!item.maxValue || item.value === undefined) {
     return null;
   }
-  const width = Math.min(100, Math.max(0, percentage));
 
   return (
-    <span
-      aria-hidden
-      className={cn(
-        "block h-1 w-full overflow-hidden rounded-full bg-chart-grid",
-        className
-      )}
-    >
-      <span
-        className="block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none"
-        style={{ width: `${width}%`, backgroundColor: item.color }}
-      />
-    </span>
+    <ShareBar
+      className={className}
+      color={item.color}
+      max={item.maxValue}
+      value={item.value}
+    />
   );
 }
 

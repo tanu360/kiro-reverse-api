@@ -30,6 +30,55 @@ export interface XAxisProps {
   tickMode?: "domain" | "data";
   /** Optional labels aligned with data rows for the displayed ticks. */
   labels?: string[];
+  /**
+   * Explicit tick dates, e.g. round times from {@link roundTimeTicks}. Each date gets a tick at
+   * its own x (it need not be a data row); dates outside the x domain are dropped. Overrides
+   * `numTicks`, `tickMode` and `tickFilter`.
+   */
+  tickValues?: readonly Date[];
+  /**
+   * Data rows allowed to carry a tick (data mode). Every row it keeps gets a tick, so `numTicks`
+   * no longer thins them; rows with a label already shown are skipped.
+   */
+  tickFilter?: (row: Record<string, unknown>, index: number) => boolean;
+  /** Tick label. Default: `labels` / the chart's date labels, else the short date. */
+  formatTick?: (date: Date) => string;
+  /**
+   * Keeps edge labels whole: `"container"` (default) stops them at the chart's outer edges,
+   * `"plot"` at the plot area (clear of y labels in the margins), `"none"` centres every
+   * label on its tick even when that cuts it off.
+   */
+  clamp?: "container" | "plot" | "none";
+}
+
+/**
+ * Local-time round ticks in `[start, end]`: every `stepMinutes` from midnight (15 -> :00, :15,
+ * :30, :45; 60 -> each hour; 240 -> 00:00, 04:00, ...). Pass to `XAxis tickValues`.
+ */
+export function roundTimeTicks(
+  start: Date,
+  end: Date,
+  stepMinutes: number
+): Date[] {
+  const step = Math.max(1, Math.round(stepMinutes));
+  const endTime = end.getTime();
+  if (!(Number.isFinite(start.getTime()) && Number.isFinite(endTime))) {
+    return [];
+  }
+  const tick = new Date(start.getTime());
+  if (tick.getSeconds() !== 0 || tick.getMilliseconds() !== 0) {
+    tick.setSeconds(60, 0);
+  }
+  const offset = (tick.getHours() * 60 + tick.getMinutes()) % step;
+  if (offset !== 0) {
+    tick.setMinutes(tick.getMinutes() + step - offset);
+  }
+  const ticks: Date[] = [];
+  while (tick.getTime() <= endTime && ticks.length < 1000) {
+    ticks.push(new Date(tick.getTime()));
+    tick.setMinutes(tick.getMinutes() + step);
+  }
+  return ticks;
 }
 
 interface AxisTick {
@@ -44,6 +93,20 @@ interface XAxisLabelProps {
   /** Fades out near the crosshair; see {@link xAxisLabelOpacity}. */
   opacity: number;
   animatePosition: boolean;
+  /** Container-px range the label must stay inside, or null to always centre it. */
+  bounds: readonly [number, number] | null;
+}
+
+/**
+ * Centres the label on its tick, shifted just enough to stay inside `bounds`. The percentages
+ * are the label's own width, so no measuring is needed; the left bound wins when both bind.
+ */
+function labelShift(x: number, bounds: readonly [number, number] | null) {
+  if (!bounds) {
+    return "translateX(-50%)";
+  }
+  const [min, max] = bounds;
+  return `translateX(clamp(${min - x}px, -50%, calc(${max - x}px - 100%)))`;
 }
 
 /**
@@ -82,23 +145,22 @@ const XAxisLabel = memo(function XAxisLabel({
   x,
   opacity,
   animatePosition,
+  bounds,
 }: XAxisLabelProps) {
   return (
     <div
-      className="absolute"
+      className="absolute whitespace-nowrap"
       style={{
         left: x,
         bottom: 12,
-        width: 0,
-        display: "flex",
-        justifyContent: "center",
+        transform: labelShift(x, bounds),
         transition: animatePosition
           ? `left ${X_AXIS_POSITION_TWEEN_MS}ms cubic-bezier(${LINE_LOADING_PULSE_EASE.join(", ")})`
           : undefined,
       }}
     >
       <span
-        className="chart-tick whitespace-nowrap"
+        className="chart-tick block"
         style={{
           opacity,
           transition: "opacity 0.4s ease-in-out",
@@ -455,9 +517,11 @@ function buildDomainTicks({
   marginLeft,
   numTicks,
   xScale,
+  format = (date) => shortDateFmt.format(date),
 }: {
   marginLeft: number;
   numTicks: number;
+  format?: (date: Date) => string;
   xScale: {
     domain: () => Date[];
     (date: Date): number | undefined;
@@ -481,7 +545,7 @@ function buildDomainTicks({
   for (let i = 0; i < tickCount; i++) {
     const t = i / (tickCount - 1);
     const date = new Date(startTime + t * timeRange);
-    const label = shortDateFmt.format(date);
+    const label = format(date);
     if (seenLabels.has(label)) {
       continue;
     }
@@ -493,6 +557,75 @@ function buildDomainTicks({
     });
   }
 
+  return ticks;
+}
+
+/** One tick per date inside the x domain, labelled by `format`; repeated labels are dropped. */
+function buildValueTicks({
+  format,
+  marginLeft,
+  tickValues,
+  xScale,
+}: {
+  format: (date: Date) => string;
+  marginLeft: number;
+  tickValues: readonly Date[];
+  xScale: {
+    domain: () => Date[];
+    (date: Date): number | undefined;
+  };
+}): AxisTick[] {
+  const [start, end] = xScale.domain();
+  if (!(start && end)) {
+    return [];
+  }
+  const seenLabels = new Set<string>();
+  const ticks: AxisTick[] = [];
+  for (const date of tickValues) {
+    const time = date.getTime();
+    if (!(time >= start.getTime() && time <= end.getTime())) {
+      continue;
+    }
+    const label = format(date);
+    if (seenLabels.has(label)) {
+      continue;
+    }
+    seenLabels.add(label);
+    ticks.push({ date, label, x: (xScale(date) ?? 0) + marginLeft });
+  }
+  return ticks;
+}
+
+/** One tick per data row `keep` accepts; rows whose label is already shown are skipped. */
+function buildFilteredTicks({
+  data,
+  dateLabels,
+  keep,
+  marginLeft,
+  xAccessor,
+  xScale,
+}: {
+  data: Record<string, unknown>[];
+  dateLabels: string[];
+  keep: (row: Record<string, unknown>, index: number) => boolean;
+  marginLeft: number;
+  xAccessor: (d: Record<string, unknown>) => Date;
+  xScale: (date: Date) => number | undefined;
+}): AxisTick[] {
+  const seenLabels = new Set<string>();
+  const ticks: AxisTick[] = [];
+  data.forEach((row, index) => {
+    if (!keep(row, index)) {
+      return;
+    }
+    const date = xAccessor(row);
+    const label = dateLabels[index] ?? shortDateFmt.format(date);
+    if (seenLabels.has(label)) {
+      return;
+    }
+    seenLabels.add(label);
+    ticks.push({ date, label, x: (xScale(date) ?? 0) + marginLeft });
+  });
   return ticks;
 }
 
@@ -593,6 +726,10 @@ const XAxisInner = memo(function XAxisInner({
   tickerHalfWidth = 40,
   tickMode = "data",
   labels: labelsProp,
+  tickValues: tickValuesProp,
+  tickFilter,
+  formatTick,
+  clamp = "container",
   container,
 }: XAxisProps & { container: HTMLDivElement }) {
   const {
@@ -603,22 +740,66 @@ const XAxisInner = memo(function XAxisInner({
     dateLabels: contextDateLabels,
     xDomain,
     width,
+    innerWidth,
   } = useChartStable();
   const tooltipData = useChartHoverSelector(selectTooltipData);
-  const dateLabels = labelsProp ?? contextDateLabels;
+  const dateLabels = useMemo(
+    () =>
+      formatTick
+        ? data.map((row) => formatTick(xAccessor(row)))
+        : (labelsProp ?? contextDateLabels),
+    [formatTick, data, xAccessor, labelsProp, contextDateLabels]
+  );
   const resolvedNumTicks = useMemo(
     () => resolveResponsiveChartLabelCount(numTicks, width, 5),
     [numTicks, width]
   );
+  // Keyed on the times, so an inline `tickValues={[…]}` array stays cheap.
+  const tickValuesKey = tickValuesProp
+    ?.map((date) => date.getTime())
+    .join(",");
+  const tickValues = useMemo(
+    () =>
+      tickValuesKey === undefined
+        ? undefined
+        : tickValuesKey
+            .split(",")
+            .filter(Boolean)
+            .map((time) => new Date(Number(time))),
+    [tickValuesKey]
+  );
 
   const labelsToShow = useMemo(() => {
+    const format = formatTick ?? ((date: Date) => shortDateFmt.format(date));
+
+    if (tickValues) {
+      return buildValueTicks({
+        format,
+        marginLeft: margin.left,
+        tickValues,
+        xScale,
+      });
+    }
+
     const projectionExtendsScale =
       tickMode === "data" && domainExtendsPastData(data, xAccessor, xScale);
 
     if (tickMode === "domain") {
       return buildDomainTicks({
+        format,
         marginLeft: margin.left,
         numTicks: resolvedNumTicks,
+        xScale,
+      });
+    }
+
+    if (tickFilter) {
+      return buildFilteredTicks({
+        data,
+        dateLabels,
+        keep: tickFilter,
+        marginLeft: margin.left,
+        xAccessor,
         xScale,
       });
     }
@@ -626,6 +807,7 @@ const XAxisInner = memo(function XAxisInner({
     // No brush: evenly spaced ticks across the full domain (data + projection).
     if (projectionExtendsScale && xDomain == null) {
       return buildDomainTicks({
+        format,
         marginLeft: margin.left,
         numTicks: resolvedNumTicks,
         xScale,
@@ -655,6 +837,9 @@ const XAxisInner = memo(function XAxisInner({
 
     return dataTicks;
   }, [
+    tickValues,
+    tickFilter,
+    formatTick,
     tickMode,
     xDomain,
     data,
@@ -664,6 +849,15 @@ const XAxisInner = memo(function XAxisInner({
     margin.left,
     resolvedNumTicks,
   ]);
+
+  const bounds = useMemo<readonly [number, number] | null>(() => {
+    if (clamp === "none") {
+      return null;
+    }
+    return clamp === "plot"
+      ? [margin.left, margin.left + innerWidth]
+      : [0, width];
+  }, [clamp, margin.left, innerWidth, width]);
 
   const crosshairX = tooltipData ? tooltipData.x + margin.left : null;
   const hoveredLabel = tooltipData
@@ -676,6 +870,7 @@ const XAxisInner = memo(function XAxisInner({
       {labelsToShow.map((item) => (
         <XAxisLabel
           animatePosition={xDomain == null}
+          bounds={bounds}
           key={`${item.date.getTime()}-${item.x}`}
           label={item.label}
           opacity={xAxisLabelOpacity(

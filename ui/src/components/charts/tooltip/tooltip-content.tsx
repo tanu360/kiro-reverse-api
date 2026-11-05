@@ -11,7 +11,11 @@ export interface TooltipRow {
 }
 
 export interface TooltipContentProps {
-  title?: string;
+  title?: ReactNode;
+  /** Muted meta-size text after the title, e.g. the bucket size or the account. */
+  meta?: ReactNode;
+  /** Set the title in the mono face (time ranges, IDs). Default: false */
+  mono?: boolean;
   rows: TooltipRow[];
   /** Optional additional content (e.g., markers) */
   children?: ReactNode;
@@ -19,33 +23,69 @@ export interface TooltipContentProps {
 
 export interface TooltipHeaderProps {
   children: ReactNode;
+  /** Muted meta-size text after the title on the same baseline; truncates when long. */
+  meta?: ReactNode;
+  /** Set the title in the mono face (time ranges, IDs). Default: false */
+  mono?: boolean;
+  /** Layout classes only. */
   className?: string;
+}
+
+function hasContent(node: ReactNode): boolean {
+  return node !== undefined && node !== null && node !== false && node !== "";
 }
 
 /**
  * Popover-style header row: medium-weight label separated from the body by a
- * full-width border. Use it at the top of custom `ChartTooltip` `content`.
+ * full-width border, with an optional muted `meta` after it. Use it at the top
+ * of custom `ChartTooltip` `content`.
  */
-export function TooltipHeader({ children, className }: TooltipHeaderProps) {
+export function TooltipHeader({
+  children,
+  meta,
+  mono = false,
+  className,
+}: TooltipHeaderProps) {
+  const withMeta = hasContent(meta);
   return (
     <div
       className={cn(
         "border-border-subtle border-b px-3.5 py-2.5 text-left font-medium text-chart-tooltip-foreground text-sm tabular-nums",
+        withMeta && "flex min-w-0 items-baseline gap-2",
         className
       )}
     >
-      {children}
+      {withMeta || mono ? (
+        <span className={cn("shrink-0", mono && "font-mono")}>{children}</span>
+      ) : (
+        children
+      )}
+      {withMeta ? (
+        <span className="min-w-0 truncate font-normal text-chart-tooltip-muted text-meta">
+          {meta}
+        </span>
+      ) : null}
     </div>
   );
 }
 
 TooltipHeader.displayName = "TooltipHeader";
 
-export function TooltipContent({ title, rows, children }: TooltipContentProps) {
+export function TooltipContent({
+  title,
+  meta,
+  mono,
+  rows,
+  children,
+}: TooltipContentProps) {
   const hasBody = rows.length > 0 || Boolean(children);
   return (
     <div>
-      {title && <TooltipHeader>{title}</TooltipHeader>}
+      {hasContent(title) ? (
+        <TooltipHeader meta={meta} mono={mono}>
+          {title}
+        </TooltipHeader>
+      ) : null}
       {hasBody && (
         <div className="px-3.5 py-3">
           {rows.length > 0 && (
