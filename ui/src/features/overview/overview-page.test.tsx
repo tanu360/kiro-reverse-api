@@ -204,8 +204,10 @@ describe("OverviewPage", () => {
     const trend = (tile: HTMLElement) => tile.querySelector('[data-slot="stat-trend"]');
     for (const label of ["Requests", "Succeeded", "Failed"]) {
       const tile = await statCard(label);
-      // The lazy sparkline replaces the loading placeholder in the reserved 28 px slot. jsdom
-      // has no layout, so the sparkline draws its box without the svg.
+      // The lazy sparkline replaces the loading placeholder in the reserved aside slot (the
+      // 48 px column beside the value and the delta). jsdom has no layout, so the sparkline
+      // draws its box without the svg.
+      expect(trend(tile)).toHaveAttribute("data-placement", "aside");
       await waitFor(() => {
         expect(trend(tile)?.childElementCount).toBe(1);
         expect(trend(tile)?.querySelector('[data-slot="skeleton"]')).toBeNull();
@@ -214,6 +216,7 @@ describe("OverviewPage", () => {
       expect(tile.querySelector('[data-slot="stat-delta"]')).toBeNull();
     }
     const accounts = await statCard("Accounts");
+    expect(trend(accounts)).toHaveAttribute("data-placement", "aside");
     expect(trend(accounts)?.querySelector('[data-slot="meter-indicator"]')).not.toBeNull();
   });
 

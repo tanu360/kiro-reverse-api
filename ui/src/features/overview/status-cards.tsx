@@ -2,6 +2,7 @@ import { CircleCheckIcon, CircleXIcon, Route01Icon, UsersIcon } from "@hugeicons
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, type ReactNode, useMemo } from "react";
 import {
+  STAT_TREND_HEIGHT,
   type StatDelta,
   StatGroup,
   type StatMetric,
@@ -74,7 +75,13 @@ function barTrends(series: Partial<ObserveSeries>, animate: boolean): Record<Tre
   const bars = outcomeBars(series.rpm ?? [], series.errRate ?? []);
   const failing = bars.failed.slice(-HIGHLIGHT_BARS).some((bar) => bar.value > 0);
   const sparkline = (data: Bars, color?: string, highlight = HIGHLIGHT_BARS) => (
-    <LazySparkline animate={animate} color={color} data={data} highlight={highlight} />
+    <LazySparkline
+      animate={animate}
+      color={color}
+      data={data}
+      height={STAT_TREND_HEIGHT.aside}
+      highlight={highlight}
+    />
   );
   return {
     requests: sparkline(bars.requests),
@@ -105,7 +112,10 @@ function capacityTone(used: number, limit: number): MeterTone {
   return "default";
 }
 
-/** Plan credits used across the pool as a thin meter, and "x% capacity used" beside it. */
+/**
+ * Plan credits used across the pool as a thin meter, centred in the aside trend slot the other
+ * tiles draw their bars in, and "x% capacity used" on the delta line.
+ */
 function capacity(s: StatusResponse, t: TFunction): Pick<StatTileProps, "caption" | "trend"> {
   // No plan limit reported yet: no rate, so the muted dash (as requestRate).
   if (s.accountCreditsLimit <= 0) {
@@ -113,7 +123,7 @@ function capacity(s: StatusResponse, t: TFunction): Pick<StatTileProps, "caption
   }
   const value = formatPercent(s.accountCreditsUsed, s.accountCreditsLimit);
   const meter: ReactNode = (
-    <div className="flex h-full items-end pb-1">
+    <div className="flex h-full items-center">
       <Meter
         max={s.accountCreditsLimit}
         min={0}
@@ -219,9 +229,10 @@ function failedTile(s: StatusResponse, t: TFunction, lang: Lang): StatTileProps 
 
 /**
  * The four /status totals as one joined KPI strip, like the reference's top row: icon and label,
- * the big number, a delta line and a small bar sparkline at its end. Requests, Succeeded and
- * Failed compare this hour with the previous one and draw the last half hour as bars; Accounts
- * shows the plan capacity used as a meter in the same slot.
+ * the big number, a delta line, and a bar sparkline in a column beside the number and the delta
+ * (the aside trend). Requests, Succeeded and Failed compare this hour with the previous one and
+ * draw the last half hour as bars; Accounts shows the plan capacity used as a meter in the same
+ * slot.
  */
 export function StatusCards(): JSX.Element {
   const { t, lang } = useT("overview");
@@ -245,7 +256,7 @@ export function StatusCards(): JSX.Element {
       // An older server sends no series: the bars then draw as the flat empty stubs.
       nodes = barTrends(overview.series ?? {}, animate);
     } else if (livePending) {
-      // Until the series loads, the 28 px slot holds a placeholder, so nothing shifts.
+      // Until the series loads, the aside slot holds a placeholder, so nothing shifts.
       const pending = <TrendPlaceholder />;
       nodes = { requests: pending, succeeded: pending, failed: pending };
     }
@@ -264,7 +275,13 @@ export function StatusCards(): JSX.Element {
     strip = (
       <StatGroup columns="kpi" joined>
         {PLACEHOLDERS.map((tile) => (
-          <StatTile icon={tile.icon} key={tile.label} label={t(tile.label)} value={EMPTY} />
+          <StatTile
+            icon={tile.icon}
+            key={tile.label}
+            label={t(tile.label)}
+            trendPlacement="aside"
+            value={EMPTY}
+          />
         ))}
       </StatGroup>
     );
@@ -273,7 +290,7 @@ export function StatusCards(): JSX.Element {
       <StatGroup aria-hidden="true" columns="kpi" joined>
         {Array.from({ length: 4 }, (_, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders never reorder.
-          <StatTileSkeleton key={index} metrics={4} />
+          <StatTileSkeleton key={index} metrics={4} trendPlacement="aside" />
         ))}
       </StatGroup>
     );
@@ -281,10 +298,10 @@ export function StatusCards(): JSX.Element {
     // A failed background refetch keeps the last values; the page banner reports it.
     strip = (
       <StatGroup columns="kpi" joined>
-        <StatTile {...accountsTile(data, t, lang)} />
-        <StatTile {...requestsTile(data, t, lang)} {...trends.requests} />
-        <StatTile {...succeededTile(data, t, lang)} {...trends.succeeded} />
-        <StatTile {...failedTile(data, t, lang)} {...trends.failed} />
+        <StatTile {...accountsTile(data, t, lang)} trendPlacement="aside" />
+        <StatTile {...requestsTile(data, t, lang)} {...trends.requests} trendPlacement="aside" />
+        <StatTile {...succeededTile(data, t, lang)} {...trends.succeeded} trendPlacement="aside" />
+        <StatTile {...failedTile(data, t, lang)} {...trends.failed} trendPlacement="aside" />
       </StatGroup>
     );
   }

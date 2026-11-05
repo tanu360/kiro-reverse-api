@@ -11,7 +11,7 @@ void load();
 
 /**
  * The stat tiles' bar sparkline, code-split. Until its chunk is in, the trend slot holds the
- * same 28 px placeholder as while the data loads, so nothing shifts or flashes empty.
+ * same placeholder as while the data loads, so nothing shifts or flashes empty.
  */
 export function LazySparkline(props: StatSparklineProps): JSX.Element {
   return (
@@ -21,7 +21,7 @@ export function LazySparkline(props: StatSparklineProps): JSX.Element {
   );
 }
 
-/** The trend slot's loading placeholder (28 px, the slot's full width). */
+/** The trend slot's loading placeholder, filling the slot (28 px inline, 48 px aside). */
 export function TrendPlaceholder(): JSX.Element {
-  return <Skeleton className="h-7 w-full" />;
+  return <Skeleton className="size-full" />;
 }

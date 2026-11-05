@@ -121,6 +121,46 @@ describe("StatTile", () => {
     expect(slot).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("puts an aside trend in its own column slot, beside the value and the delta", () => {
+    renderWithProviders(
+      <StatTile
+        delta={{ value: 0.1, label: "vs previous hour" }}
+        label="Requests"
+        trend={<svg data-testid="bars" />}
+        trendPlacement="aside"
+        value="8"
+      />,
+    );
+    const slot = screen.getByTestId("bars").closest('[data-slot="stat-trend"]');
+    expect(slot).toHaveAttribute("data-placement", "aside");
+    expect(slot).toHaveAttribute("aria-hidden", "true");
+    expect(slot).toHaveClass("h-12");
+    // The value keeps clear of the column wherever the column sits beside it.
+    expect(screen.getByText("8").className).toMatch(/stat-row:pr-/);
+  });
+
+  it("keeps the inline trend slot by default", () => {
+    renderWithProviders(<StatTile label="Requests" trend={<svg data-testid="bars" />} value="8" />);
+    const slot = screen.getByTestId("bars").closest('[data-slot="stat-trend"]');
+    expect(slot).not.toHaveAttribute("data-placement");
+    expect(slot).toHaveClass("h-7");
+    expect(screen.getByText("8").className).not.toMatch(/stat-row/);
+  });
+
+  it("keeps the value's line height at its font size", () => {
+    renderWithProviders(<StatTile label="Requests" value="8" />);
+    expect(screen.getByText("8")).toHaveClass("text-display", "leading-none");
+  });
+
+  it("reserves the aside slot in the loading skeleton", () => {
+    const { container } = renderWithProviders(
+      <StatTile label="Requests" loading trendPlacement="aside" value="8" />,
+    );
+    const skeleton = container.querySelector('[data-slot="stat-card-skeleton"]');
+    const slot = skeleton?.querySelector('[data-placement="aside"]');
+    expect(slot).toHaveClass("h-12");
+  });
+
   it("shows a label hint", async () => {
     const { user } = renderWithProviders(
       <StatTile hint="Accounts that served a request" label="Active accounts" value="3 / 8" />,

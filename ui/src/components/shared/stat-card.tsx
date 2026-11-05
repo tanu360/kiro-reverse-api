@@ -45,10 +45,16 @@ export interface StatTileProps {
   /** A muted line in the delta row, after the delta or in its place ("94 % capacity used"). */
   caption?: ReactNode;
   /**
-   * The trend slot at the end of the delta row, 28 px tall and always reserved: a BarSparkline,
-   * a Meter, or nothing. Decorative; wrapped in aria-hidden.
+   * The trend slot: a BarSparkline, a Meter, or nothing. Decorative; wrapped in aria-hidden.
+   * Where it sits and how tall it is follows `trendPlacement`.
    */
   trend?: ReactNode;
+  /**
+   * `inline` (default): 28 px at the end of the delta row. `aside`: 48 px in a right-hand
+   * column beside the value and the delta, its foot on the delta line (the reference KPI
+   * strip); in a tile too narrow for the number beside it, it drops under the delta.
+   */
+  trendPlacement?: StatTrendPlacement;
   /** @deprecated Use `trend`. */
   sparkline?: ReactNode;
   metrics?: StatMetric[];
@@ -59,6 +65,11 @@ export interface StatTileProps {
 
 /** @deprecated Use StatTileProps. */
 export type StatCardProps = StatTileProps;
+
+export type StatTrendPlacement = "inline" | "aside";
+
+/** The trend slot's height in px per placement, for a sparkline's `height`. */
+export const STAT_TREND_HEIGHT: Record<StatTrendPlacement, number> = { inline: 28, aside: 48 };
 
 /** 0.125 -> "+12.5%", -0.2 -> "-20%", 0 -> "0%" (in the UI language's number format). */
 export function formatDelta(fraction: number, lang?: Lang): string {
@@ -194,7 +205,9 @@ function DeltaText({ delta, lang }: { delta: StatDelta; lang: Lang }): JSX.Eleme
       >
         {formatDelta(delta.value, lang)}
       </span>{" "}
-      <span className="text-muted-foreground">{delta.label}</span>
+      {/* One piece: in a narrow column the comparison moves under the change whole, rather than
+          leaving its last word alone on a second line. */}
+      <span className="inline-block text-muted-foreground">{delta.label}</span>
     </span>
   );
 }
@@ -217,10 +230,24 @@ const VALUE_SIZE = { display: "text-display", kpi: "text-kpi" } as const;
  */
 const METRICS_CLASS = "grid grid-cols-2 gap-3 border-border-subtle border-t pt-3";
 
+/*
+ * The aside trend. The value row and the delta row are each a `stat-row` container (a subgrid
+ * row cannot be one itself: containment turns the subgrid off), and both are the tile's full
+ * width, so they switch together. From a 15rem row the trend is a 112 px column (128 px from
+ * 20rem) 12 px off the text, which both rows keep clear; it hangs from the foot of the delta
+ * row, 4 px up so the bars (2 px inner padding) stand on the delta's baseline, and reaches up
+ * beside the value. In a narrower row it drops under the delta, start-aligned.
+ */
+const ASIDE_ROW = "@container/stat-row min-w-0";
+const ASIDE_GUTTER = "@[15rem]/stat-row:pr-31 @xs/stat-row:pr-35";
+const ASIDE_SLOT =
+  "h-12 w-28 shrink-0 @xs/stat-row:w-32 @[15rem]/stat-row:absolute @[15rem]/stat-row:right-0 @[15rem]/stat-row:bottom-1";
+
 /**
  * One stat: the label row (icon and label), the value, the delta row (signed change in green or
- * red, a muted comparison, and the 28 px trend slot at the end) and an optional metrics grid
- * under a hairline. Rows keep their heights when empty, so tiles side by side line up.
+ * red, a muted comparison, and the 28 px trend slot at the end, or the 48 px aside trend beside
+ * the value and the delta) and an optional metrics grid under a hairline. Rows keep their heights
+ * when empty, so tiles side by side line up.
  */
 export function StatTile({
   icon,
@@ -232,6 +259,7 @@ export function StatTile({
   delta,
   caption,
   trend,
+  trendPlacement = "inline",
   sparkline,
   metrics,
   loading = false,
@@ -240,11 +268,26 @@ export function StatTile({
   const { lang } = useT();
   const placement = useContext(PlacementContext);
   if (loading) {
-    return <StatTileSkeleton className={className} metrics={metrics?.length ?? 0} size={size} />;
+    return (
+      <StatTileSkeleton
+        className={className}
+        metrics={metrics?.length ?? 0}
+        size={size}
+        trendPlacement={trendPlacement}
+      />
+    );
   }
 
   const trendSlot = trend ?? sparkline;
   const hasMetrics = metrics !== undefined && metrics.length > 0;
+  const aside = trendPlacement === "aside" && Boolean(trendSlot);
+  const deltaLines =
+    delta || caption ? (
+      <>
+        {delta ? <DeltaText delta={delta} lang={lang} /> : null}
+        {caption ? <span className="min-w-0 text-muted-foreground">{caption}</span> : null}
+      </>
+    ) : null;
   return (
     <TileShell className={className} slot="stat-tile" tone={tone}>
       <div className="flex min-h-5 min-w-0 items-center gap-1.5 text-meta text-muted-foreground">
@@ -265,37 +308,56 @@ export function StatTile({
           <p className="min-w-0 truncate">{label}</p>
         )}
       </div>
-      <div
-        className={cn(
-          "mt-3 min-w-0 break-words font-semibold text-foreground leading-none tabular-nums",
-          VALUE_SIZE[size],
-        )}
-        data-slot="stat-value"
-      >
-        {value}
-      </div>
-      <div
-        className={cn(
-          "mt-2 flex min-h-7 min-w-0 items-end justify-between gap-3 text-meta",
-          hasMetrics && "mb-4",
-        )}
-      >
-        {/* The delta keeps its line; the trend gives way first, down to 48 px. */}
+      <div className={cn("mt-3", aside ? ASIDE_ROW : "min-w-0")}>
         <div
           className={cn(
-            "flex min-w-0 flex-col gap-0.5",
-            trendSlot && "max-w-[calc(100%-3.75rem)] shrink-0",
+            // The size first: a later font-size class makes cn() drop `leading-none`.
+            VALUE_SIZE[size],
+            "min-w-0 break-words font-semibold text-foreground leading-none tabular-nums",
+            aside && ASIDE_GUTTER,
+          )}
+          data-slot="stat-value"
+        >
+          {value}
+        </div>
+      </div>
+      {aside ? (
+        <div className={cn("mt-2 text-meta", ASIDE_ROW, hasMetrics && "mb-4")}>
+          <div className={cn("relative flex min-h-5 flex-col gap-3", ASIDE_GUTTER)}>
+            {deltaLines ? <div className="flex min-w-0 flex-col gap-0.5">{deltaLines}</div> : null}
+            <div
+              aria-hidden="true"
+              className={ASIDE_SLOT}
+              data-placement="aside"
+              data-slot="stat-trend"
+            >
+              {trendSlot}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "mt-2 flex min-h-7 min-w-0 items-end justify-between gap-3 text-meta",
+            hasMetrics && "mb-4",
           )}
         >
-          {delta ? <DeltaText delta={delta} lang={lang} /> : null}
-          {caption ? <span className="min-w-0 text-muted-foreground">{caption}</span> : null}
-        </div>
-        {trendSlot ? (
-          <div aria-hidden="true" className="h-7 w-24 min-w-12 shrink" data-slot="stat-trend">
-            {trendSlot}
+          {/* The delta keeps its line; the trend gives way first, down to 48 px. */}
+          <div
+            className={cn(
+              "flex min-w-0 flex-col gap-0.5",
+              trendSlot && "max-w-[calc(100%-3.75rem)] shrink-0",
+            )}
+          >
+            {deltaLines}
           </div>
-        ) : null}
-      </div>
+          {trendSlot ? (
+            <div aria-hidden="true" className="h-7 w-24 min-w-12 shrink" data-slot="stat-trend">
+              {trendSlot}
+            </div>
+          ) : null}
+        </div>
+      )}
       {metrics && hasMetrics ? (
         <dl className={cn(METRICS_CLASS, "text-xs", placement !== "joined" && "mt-auto")}>
           {metrics.map((metric) => (
@@ -329,28 +391,54 @@ export function StatTile({
 export function StatTileSkeleton({
   metrics = 4,
   size = "display",
+  trendPlacement = "inline",
   className,
 }: {
   /** How many metric cells to reserve (rounded up to full rows of two); 0 for none. */
   metrics?: number;
   size?: "display" | "kpi";
+  /** Reserve the trend where the loaded tile puts it (see StatTile). */
+  trendPlacement?: StatTrendPlacement;
   className?: string;
 }): JSX.Element {
   const cells = Math.ceil(Math.max(0, metrics) / 2) * 2;
   const placement = useContext(PlacementContext);
+  const valueHeight = size === "kpi" ? "h-6" : "h-7";
   return (
     <TileShell className={className} slot="stat-card-skeleton">
       <div aria-hidden="true" className="flex min-h-5 items-center">
         <Skeleton className="h-4 w-1/3" />
       </div>
-      <Skeleton aria-hidden="true" className={cn("mt-3 w-1/2", size === "kpi" ? "h-6" : "h-7")} />
-      <div
-        aria-hidden="true"
-        className={cn("mt-2 flex min-h-7 items-end justify-between gap-3", cells > 0 && "mb-4")}
-      >
-        <Skeleton className="h-4 w-2/5" />
-        <Skeleton className="h-7 w-24 min-w-12 shrink" />
-      </div>
+      {trendPlacement === "aside" ? (
+        <>
+          <div aria-hidden="true" className={cn("mt-3", ASIDE_ROW)}>
+            <div className={ASIDE_GUTTER}>
+              <Skeleton className={cn("w-3/4", valueHeight)} />
+            </div>
+          </div>
+          <div aria-hidden="true" className={cn("mt-2", ASIDE_ROW, cells > 0 && "mb-4")}>
+            <div className={cn("relative flex min-h-5 flex-col gap-3", ASIDE_GUTTER)}>
+              {/* Beside the trend, from 15rem to about 17rem, the delta takes two lines. */}
+              <div className="flex flex-col">
+                <Skeleton className="my-0.5 h-4 w-4/5" />
+                <Skeleton className="my-0.5 hidden h-4 w-3/5 @[15rem]/stat-row:block @[17rem]/stat-row:hidden" />
+              </div>
+              <Skeleton className={ASIDE_SLOT} data-placement="aside" />
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <Skeleton aria-hidden="true" className={cn("mt-3 w-1/2", valueHeight)} />
+          <div
+            aria-hidden="true"
+            className={cn("mt-2 flex min-h-7 items-end justify-between gap-3", cells > 0 && "mb-4")}
+          >
+            <Skeleton className="h-4 w-2/5" />
+            <Skeleton className="h-7 w-24 min-w-12 shrink" />
+          </div>
+        </>
+      )}
       {cells > 0 ? (
         <div aria-hidden="true" className={cn(METRICS_CLASS, placement !== "joined" && "mt-auto")}>
           {Array.from({ length: cells }, (_, index) => (
