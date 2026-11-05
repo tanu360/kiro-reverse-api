@@ -116,11 +116,11 @@ export function EndpointsCard(): JSX.Element {
           const post = endpoint.method === "POST";
           return (
             <li
-              className="flex min-w-0 flex-col gap-2 @2xl:flex-row @2xl:items-center @2xl:gap-3"
+              className="flex min-w-0 flex-col gap-2 @3xl:flex-row @3xl:items-center @3xl:gap-3"
               data-endpoint={endpoint.id}
               key={endpoint.id}
             >
-              <div className="flex min-w-0 items-center gap-2 @2xl:w-60 @2xl:shrink-0">
+              <div className="flex min-w-0 items-center gap-2 @3xl:w-60 @3xl:shrink-0">
                 <IconChip icon={endpoint.icon} />
                 <span className="min-w-0 truncate">
                   <SettingsRowTitle>{title}</SettingsRowTitle>
@@ -131,7 +131,7 @@ export function EndpointsCard(): JSX.Element {
               </div>
               {/* Under the title until the card has room for both, so a URL rarely needs to wrap. */}
               <CopyField
-                className="min-w-0 @2xl:flex-1"
+                className="min-w-0 @3xl:flex-1"
                 copyLabel={t(endpoint.copyKey)}
                 label={title}
                 multiline

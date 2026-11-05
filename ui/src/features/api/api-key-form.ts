@@ -16,9 +16,12 @@ export interface ApiKeyFormData {
   creditLimit: number;
 }
 
+/** The limit field that failed, so only that field is marked invalid. */
+export type ApiKeyLimitField = "tokenLimit" | "creditLimit";
+
 export type ApiKeyFormResult =
   | { ok: true; value: ApiKeyFormData }
-  | { ok: false; error: "invalidLimits" };
+  | { ok: false; error: "invalidLimits"; field: ApiKeyLimitField };
 
 export const EMPTY_API_KEY_FORM: ApiKeyFormValues = {
   name: "",
@@ -39,7 +42,8 @@ export function formValuesFromKey(apiKey: ApiKey): ApiKeyFormValues {
 
 /**
  * Old UI rules: empty limits are 0, the token limit is a finite whole number >= 0 (the server
- * decodes it as int64), the credit limit is finite and >= 0. Name and key are trimmed.
+ * decodes it as int64), the credit limit is finite and >= 0. Name and key are trimmed. A failure
+ * names the first bad field (token limit before credit limit).
  */
 export function parseApiKeyForm(values: ApiKeyFormValues): ApiKeyFormResult {
   const tokenLimit = values.tokenLimit ?? 0;
@@ -47,7 +51,8 @@ export function parseApiKeyForm(values: ApiKeyFormValues): ApiKeyFormResult {
   const tokensValid =
     Number.isFinite(tokenLimit) && tokenLimit >= 0 && Number.isInteger(tokenLimit);
   const creditsValid = Number.isFinite(creditLimit) && creditLimit >= 0;
-  if (!tokensValid || !creditsValid) return { ok: false, error: "invalidLimits" };
+  if (!tokensValid) return { ok: false, error: "invalidLimits", field: "tokenLimit" };
+  if (!creditsValid) return { ok: false, error: "invalidLimits", field: "creditLimit" };
   return {
     ok: true,
     value: { name: values.name.trim(), key: values.key.trim(), tokenLimit, creditLimit },

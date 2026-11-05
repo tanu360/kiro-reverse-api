@@ -5,7 +5,7 @@ import { type FormEvent, type JSX, useId, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldHint, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   NumberField,
@@ -23,6 +23,7 @@ import { toast } from "@/lib/toast";
 import {
   type ApiKeyFormData,
   type ApiKeyFormValues,
+  type ApiKeyLimitField,
   buildCreateRequest,
   buildUpdateRequest,
   EMPTY_API_KEY_FORM,
@@ -54,10 +55,11 @@ export function ApiKeyFormDialog({
   const [values, setValues] = useState<ApiKeyFormValues>(() =>
     target.mode === "edit" ? formValuesFromKey(target.apiKey) : EMPTY_API_KEY_FORM,
   );
-  const [limitsError, setLimitsError] = useState(false);
+  // The one limit field that failed validation: only it turns red, and Base UI wires its
+  // FieldError into that input's aria-describedby.
+  const [limitsError, setLimitsError] = useState<ApiKeyLimitField | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const formId = useId();
-  const limitsErrorId = useId();
 
   const mutation = useMutation({
     mutationFn: async (data: ApiKeyFormData): Promise<string | null> => {
@@ -78,7 +80,7 @@ export function ApiKeyFormDialog({
 
   const set = <K extends keyof ApiKeyFormValues>(field: K, value: ApiKeyFormValues[K]) => {
     setValues((prev) => ({ ...prev, [field]: value }));
-    if (field === "tokenLimit" || field === "creditLimit") setLimitsError(false);
+    if (field === "tokenLimit" || field === "creditLimit") setLimitsError(null);
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -86,13 +88,18 @@ export function ApiKeyFormDialog({
     if (mutation.isPending) return;
     const parsed = parseApiKeyForm(values);
     if (!parsed.ok) {
-      setLimitsError(true);
+      setLimitsError(parsed.field);
       return;
     }
     mutation.mutate(parsed.value);
   };
 
-  const limitsDescribedBy = limitsError ? limitsErrorId : undefined;
+  const limitError = (field: ApiKeyLimitField) =>
+    limitsError === field ? (
+      <FieldError match role="alert">
+        {field === "tokenLimit" ? t("form.invalidTokenLimit") : t("form.invalidCreditLimit")}
+      </FieldError>
+    ) : null;
   const submitLabel = editing ? t("common:actions.save") : t("form.submitCreate");
   const pendingLabel = editing ? t("common:actions.saving") : t("form.submitCreating");
 
@@ -137,10 +144,9 @@ export function ApiKeyFormDialog({
           />
         </Field>
         <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
-          <Field className="mb-2 sm:mb-0" invalid={limitsError}>
+          <Field className="mb-2 sm:mb-0" invalid={limitsError === "tokenLimit"}>
             <FieldLabel>{t("form.tokenLimit")}</FieldLabel>
             <NumberField
-              aria-describedby={limitsDescribedBy}
               min={0}
               onValueChange={(value) => set("tokenLimit", value)}
               step={1}
@@ -152,11 +158,11 @@ export function ApiKeyFormDialog({
                 <NumberFieldIncrement />
               </NumberFieldGroup>
             </NumberField>
+            {limitError("tokenLimit")}
           </Field>
-          <Field invalid={limitsError}>
+          <Field invalid={limitsError === "creditLimit"}>
             <FieldLabel>{t("form.creditLimit")}</FieldLabel>
             <NumberField
-              aria-describedby={limitsDescribedBy}
               min={0}
               onValueChange={(value) => set("creditLimit", value)}
               step={0.01}
@@ -168,17 +174,9 @@ export function ApiKeyFormDialog({
                 <NumberFieldIncrement />
               </NumberFieldGroup>
             </NumberField>
+            {limitError("creditLimit")}
           </Field>
-          <p className="text-muted-foreground text-xs sm:col-span-2">{t("form.limitsHint")}</p>
-          {limitsError ? (
-            <p
-              className="text-destructive-foreground text-xs sm:col-span-2"
-              id={limitsErrorId}
-              role="alert"
-            >
-              {t("form.invalidLimits")}
-            </p>
-          ) : null}
+          <FieldHint className="sm:col-span-2">{t("form.limitsHint")}</FieldHint>
         </div>
         <Field>
           <FieldLabel>{t("form.customKey")}</FieldLabel>

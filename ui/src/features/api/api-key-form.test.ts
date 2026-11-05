@@ -46,6 +46,7 @@ describe("parseApiKeyForm", () => {
     expect(parseApiKeyForm(values({ tokenLimit: 1.5 }))).toEqual({
       ok: false,
       error: "invalidLimits",
+      field: "tokenLimit",
     });
   });
 
@@ -53,6 +54,7 @@ describe("parseApiKeyForm", () => {
     expect(parseApiKeyForm(values({ creditLimit: -1 }))).toEqual({
       ok: false,
       error: "invalidLimits",
+      field: "creditLimit",
     });
   });
 

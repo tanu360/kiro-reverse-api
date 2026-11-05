@@ -81,9 +81,8 @@ export function ApiAccessCard(): JSX.Element {
     );
   }
 
-  // The hint follows the switch, so a draft never reads as the saved state.
-  const state = checked ? t("access.stateOn") : t("access.stateOff");
-  const hint = dirty ? t("access.notSaved", { state }) : state;
+  // The hint follows the switch; SaveFooter's "Unsaved changes" says when it is only a draft.
+  const hint = checked ? t("access.stateOn") : t("access.stateOff");
 
   return (
     <SettingsFrame

@@ -128,11 +128,13 @@ describe("ApiPage", () => {
     await user.clear(tokenLimit);
     await user.type(tokenLimit, "1.5");
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
-    expect(
-      await within(dialog).findByText(
-        "Token limit must be a whole number, and limits cannot be negative.",
-      ),
-    ).toBeInTheDocument();
+    const error = await within(dialog).findByText("Token limit must be a whole number, 0 or more.");
+    // Only the failing field is marked and described; the credit limit stays untouched.
+    expect(tokenLimit).toHaveAttribute("aria-invalid", "true");
+    expect(tokenLimit.getAttribute("aria-describedby")?.split(" ")).toContain(error.id);
+    const creditLimit = within(dialog).getByRole("textbox", { name: "Credit limit" });
+    expect(creditLimit).not.toHaveAttribute("aria-invalid", "true");
+    expect(creditLimit.getAttribute("aria-describedby") ?? "").not.toContain(error.id);
     expect(sent("POST", "/api-keys")).toHaveLength(0);
   });
 
@@ -220,12 +222,12 @@ describe("ApiPage", () => {
     expect(settingsPosts).toHaveLength(0);
   });
 
-  it("marks the switch's hint as not saved while the draft differs", async () => {
+  it("lets the hint follow the switch and the footer flag the draft", async () => {
     const { user } = await renderPage();
     await screen.findByText("Any client can call the proxy");
     await user.click(screen.getByRole("switch", { name: "Require an API key" }));
     expect(screen.getByTestId("api-access-state")).toHaveTextContent(
-      "Clients must send an API key (not saved)",
+      /^Clients must send an API key$/,
     );
     expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
   });

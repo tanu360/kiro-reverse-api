@@ -327,7 +327,10 @@ export function ApiKeysCard(): JSX.Element {
         </span>
       }
       title={
-        <span className={cn(!apiKey.name && "text-muted-foreground")}>{keyName(apiKey, t)}</span>
+        // The same cut as the Name column: a clipped name keeps its full text in a tooltip.
+        <TruncatedText className={cn(!apiKey.name && "text-muted-foreground")}>
+          {keyName(apiKey, t)}
+        </TruncatedText>
       }
     >
       <KeyUsage apiKey={apiKey} />
@@ -438,7 +441,7 @@ function MaskedKey({ apiKey }: { apiKey: ApiKey }): JSX.Element {
       <Code>{apiKey.keyMasked}</Code>
       <CopyButton
         label={t("keys.copyKey", { name: keyName(apiKey, t) })}
-        size="icon-sm"
+        size="icon"
         value={() => fetchSecret(apiKey.id)}
         variant="quiet"
       />
@@ -526,7 +529,8 @@ function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const tokenLimit = apiKey.tokenLimit ?? 0;
   const creditLimit = apiKey.creditLimit ?? 0;
   if (!tokenLimit && !creditLimit) {
-    return <span className="text-muted-foreground text-sm">{t("common:unlimited")}</span>;
+    // The UsageLine size, so the column (and a card's body) never jumps from 12 to 14 px.
+    return <span className="text-muted-foreground text-xs">{t("common:unlimited")}</span>;
   }
   const tokens = (value: number) => formatNumber(value, lang);
   const credits = (value: number) => formatCredits(value);
