@@ -2,7 +2,7 @@ import { KeyRoundIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
 import { CopyField } from "@/components/shared/code-field";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 
@@ -30,12 +30,13 @@ export function CreatedKeyPanel({
           multiline
           value={apiKey}
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={onDismiss} size="sm" variant="ghost">
-            {t("created.dismiss")}
-          </Button>
-        </div>
       </AlertDescription>
+      {/* Right of the text from sm, under it on phones: its edge lines up with the copy field. */}
+      <AlertAction>
+        <Button onClick={onDismiss} size="sm" variant="outline">
+          {t("created.dismiss")}
+        </Button>
+      </AlertAction>
     </Alert>
   );
 }

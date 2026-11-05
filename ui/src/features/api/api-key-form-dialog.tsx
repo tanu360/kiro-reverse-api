@@ -33,6 +33,11 @@ import {
 
 export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: ApiKey };
 
+const CREDIT_FORMAT: Intl.NumberFormatOptions = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+};
+
 /**
  * Create and edit form in one dialog. The parent remounts it for every opening, so each one
  * starts from fresh values. Server errors (duplicate key, collision, limits) show inside it.
@@ -59,6 +64,8 @@ export function ApiKeyFormDialog({
   // FieldError into that input's aria-describedby.
   const [limitsError, setLimitsError] = useState<ApiKeyLimitField | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const tokenLimitRef = useRef<HTMLInputElement>(null);
+  const creditLimitRef = useRef<HTMLInputElement>(null);
   const formId = useId();
 
   const mutation = useMutation({
@@ -89,6 +96,8 @@ export function ApiKeyFormDialog({
     const parsed = parseApiKeyForm(values);
     if (!parsed.ok) {
       setLimitsError(parsed.field);
+      // Straight to the bad field, so nobody has to hunt for the red one.
+      (parsed.field === "tokenLimit" ? tokenLimitRef : creditLimitRef).current?.focus();
       return;
     }
     mutation.mutate(parsed.value);
@@ -154,7 +163,7 @@ export function ApiKeyFormDialog({
             >
               <NumberFieldGroup>
                 <NumberFieldDecrement />
-                <NumberFieldInput />
+                <NumberFieldInput ref={tokenLimitRef} />
                 <NumberFieldIncrement />
               </NumberFieldGroup>
             </NumberField>
@@ -162,7 +171,9 @@ export function ApiKeyFormDialog({
           </Field>
           <Field invalid={limitsError === "creditLimit"}>
             <FieldLabel>{t("form.creditLimit")}</FieldLabel>
+            {/* Two decimals, as formatCredits shows credits in the table and the cards. */}
             <NumberField
+              format={CREDIT_FORMAT}
               min={0}
               onValueChange={(value) => set("creditLimit", value)}
               step={0.01}
@@ -170,7 +181,7 @@ export function ApiKeyFormDialog({
             >
               <NumberFieldGroup>
                 <NumberFieldDecrement />
-                <NumberFieldInput />
+                <NumberFieldInput ref={creditLimitRef} />
                 <NumberFieldIncrement />
               </NumberFieldGroup>
             </NumberField>

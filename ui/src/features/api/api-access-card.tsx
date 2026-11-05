@@ -4,7 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard, SettingsFrame } from "@/components/shared/section-card";
-import { SaveButton, SaveFooter, SwitchField } from "@/components/shared/settings-rows";
+import {
+  SaveButton,
+  SaveFooter,
+  SETTINGS_ROW_X,
+  SwitchField,
+} from "@/components/shared/settings-rows";
 import { useDraftGuard } from "@/components/shared/use-draft-guard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +19,7 @@ import { settingsQuery, updateSettings } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { countEnabledKeys } from "./api-key-form";
 
 /**
@@ -84,9 +90,9 @@ export function ApiAccessCard(): JSX.Element {
   // The hint follows the switch; SaveFooter's "Unsaved changes" says when it is only a draft.
   const hint = checked ? t("access.stateOn") : t("access.stateOff");
 
+  // Title-only header, as the Settings cards: the row itself says what the switch does.
   return (
     <SettingsFrame
-      description={t("access.description")}
       footer={
         <SaveFooter
           action={
@@ -100,26 +106,32 @@ export function ApiAccessCard(): JSX.Element {
       id="api-access"
       title={t("access.title")}
     >
-      <SwitchField
-        checked={checked}
-        description={
-          settings.isPending ? undefined : <span data-testid="api-access-state">{hint}</span>
-        }
-        disabled={settings.isPending || save.isPending}
-        onCheckedChange={(next) => {
-          setDraft(next);
-          setShowKeyWarning(false);
-        }}
-        title={t("access.requireApiKey")}
-      >
-        {settings.isPending ? <Skeleton className="h-4 w-48" /> : null}
-        {showKeyWarning ? (
-          <Alert className="mt-2" variant="warning">
-            <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
-            <AlertDescription>{t("access.enabledApiKeyRequired")}</AlertDescription>
-          </Alert>
-        ) : null}
-      </SwitchField>
+      {settings.isPending ? (
+        // Skeleton rows while it loads, as the Settings sections: an unchecked switch would
+        // claim a state the server may not have.
+        <div aria-hidden="true" className={cn(SETTINGS_ROW_X, "flex flex-col gap-2 py-4")}>
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      ) : (
+        <SwitchField
+          checked={checked}
+          description={<span data-testid="api-access-state">{hint}</span>}
+          disabled={save.isPending}
+          onCheckedChange={(next) => {
+            setDraft(next);
+            setShowKeyWarning(false);
+          }}
+          title={t("access.requireApiKey")}
+        >
+          {showKeyWarning ? (
+            <Alert className="mt-2" variant="warning">
+              <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
+              <AlertDescription>{t("access.enabledApiKeyRequired")}</AlertDescription>
+            </Alert>
+          ) : null}
+        </SwitchField>
+      )}
     </SettingsFrame>
   );
 }

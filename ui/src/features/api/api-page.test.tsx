@@ -131,6 +131,8 @@ describe("ApiPage", () => {
     const error = await within(dialog).findByText("Token limit must be a whole number, 0 or more.");
     // Only the failing field is marked and described; the credit limit stays untouched.
     expect(tokenLimit).toHaveAttribute("aria-invalid", "true");
+    // Focus moves to the bad field.
+    expect(tokenLimit).toHaveFocus();
     expect(tokenLimit.getAttribute("aria-describedby")?.split(" ")).toContain(error.id);
     const creditLimit = within(dialog).getByRole("textbox", { name: "Credit limit" });
     expect(creditLimit).not.toHaveAttribute("aria-invalid", "true");
@@ -187,7 +189,7 @@ describe("ApiPage", () => {
     await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
     const confirm = await screen.findByRole("alertdialog");
-    expect(within(confirm).getByText("Delete this API key?")).toBeInTheDocument();
+    expect(within(confirm).getByText("Delete team-a?")).toBeInTheDocument();
     expect(
       within(confirm).getByText(
         "Clients that use it can no longer call the proxy. This cannot be undone.",

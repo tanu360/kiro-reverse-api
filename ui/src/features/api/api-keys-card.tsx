@@ -56,11 +56,6 @@ import { CreatedKeyPanel } from "./created-key-panel";
  * size: ten cards a page, twenty-five table rows.
  */
 const CARDS_BELOW_PX = 896;
-/*
- * The one-column card grid is an implicit track sized to its widest card's content, so a long
- * key name pushes every card past the panel. A shrinkable track until CARD_GRID_CLASS sets one.
- */
-const CARD_TRACK = "[&_[data-slot=data-table-cards]>ul]:auto-cols-fr";
 const CARD_PAGE_SIZE = 10;
 const TABLE_PAGE_SIZE = 25;
 
@@ -216,7 +211,7 @@ export function ApiKeysCard(): JSX.Element {
   const onToggle = async (apiKey: ApiKey) => {
     if (apiKey.enabled && wouldLockOutClients(list, apiKey.id, requireApiKey)) {
       const ok = await confirm({
-        title: t("keys.confirmDisableTitle"),
+        title: t("keys.confirmDisableTitle", { name: keyName(apiKey, t) }),
         description: t("keys.lockoutWarning"),
         confirmLabel: t("common:actions.disable"),
         variant: "danger",
@@ -229,7 +224,7 @@ export function ApiKeysCard(): JSX.Element {
   const onDelete = async (apiKey: ApiKey) => {
     const lockout = wouldLockOutClients(list, apiKey.id, requireApiKey);
     const ok = await confirm({
-      title: t("keys.confirmDeleteTitle"),
+      title: t("keys.confirmDeleteTitle", { name: keyName(apiKey, t) }),
       description: lockout
         ? t("common:text.joinSentences", {
             first: t("keys.confirmDeleteBody"),
@@ -279,7 +274,8 @@ export function ApiKeysCard(): JSX.Element {
     {
       id: "key",
       header: t("keys.key"),
-      cell: (apiKey) => <MaskedKey apiKey={apiKey} />,
+      // Fills the cell, so every copy button lines up at the column's end.
+      cell: (apiKey) => <MaskedKey apiKey={apiKey} fill />,
     },
     { id: "status", header: t("keys.status"), cell: (apiKey) => <KeyStatus apiKey={apiKey} /> },
     { id: "usage", header: t("keys.usage"), cell: (apiKey) => <KeyUsage apiKey={apiKey} /> },
@@ -408,7 +404,7 @@ export function ApiKeysCard(): JSX.Element {
           <CreatedKeyPanel apiKey={createdKey} onDismiss={() => setCreatedKey(null)} />
         </CardPanel>
       ) : null}
-      <div className={cn("min-w-0", CARD_TRACK)} ref={bodyRef}>
+      <div className="min-w-0" ref={bodyRef}>
         {keys.isError ? (
           <ErrorState
             compact
@@ -442,10 +438,16 @@ export function ApiKeysCard(): JSX.Element {
   );
 }
 
-function MaskedKey({ apiKey }: { apiKey: ApiKey }): JSX.Element {
+/** `fill` spreads it across a table cell (copy button at the end); inline in a card footer. */
+function MaskedKey({ apiKey, fill = false }: { apiKey: ApiKey; fill?: boolean }): JSX.Element {
   const { t } = useT("api");
   return (
-    <span className="inline-flex min-w-0 items-center gap-1">
+    <span
+      className={cn(
+        "min-w-0 items-center gap-1",
+        fill ? "flex w-full justify-between" : "inline-flex",
+      )}
+    >
       <TruncatedText className="font-mono text-meta">{apiKey.keyMasked}</TruncatedText>
       <CopyButton
         label={t("keys.copyKey", { name: keyName(apiKey, t) })}

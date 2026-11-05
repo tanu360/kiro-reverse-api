@@ -1,9 +1,11 @@
-import { CommandLineIcon } from "@hugeicons/core-free-icons";
+import { CommandLineIcon, InfoIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, useMemo } from "react";
 import { CodeBlock } from "@/components/shared/code-block";
 import { SectionCard } from "@/components/shared/section-card";
 import { ROW_DESCRIPTION } from "@/components/shared/settings-rows";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { settingsQuery } from "@/lib/api/settings";
@@ -18,17 +20,14 @@ function Snippet({
   code,
   title,
   copyLabel,
-  className,
 }: {
   code: string;
   title: string;
   copyLabel: string;
-  className?: string;
 }): JSX.Element {
   const { t } = useT("api");
   return (
     <CodeBlock
-      className={className}
       code={code}
       copyLabel={copyLabel}
       regionLabel={t("snippets.codeRegion", { name: title })}
@@ -51,25 +50,20 @@ export function ClientSnippetsCard(): JSX.Element {
 
   return (
     <SectionCard
-      description={
-        <CodeText
-          code={env}
-          text={
-            settings.data && !settings.data.requireApiKey
-              ? t("common:text.joinSentences", {
-                  first: t("snippets.description"),
-                  second: t("snippets.anyKeyWorks"),
-                })
-              : t("snippets.description")
-          }
-        />
-      }
+      // One line, so this header lines up with the Endpoints header beside it at xl.
+      description={<CodeText code={env} text={t("snippets.description")} />}
       icon={CommandLineIcon}
       id="api-client-setup"
       panelClassName="flex flex-col"
       title={t("snippets.title")}
     >
       <Tabs className="min-w-0 flex-1 gap-3" defaultValue="curl">
+        {settings.data && !settings.data.requireApiKey ? (
+          <Alert role="note" size="sm" variant="info">
+            <HugeiconsIcon icon={InfoIcon} aria-hidden="true" />
+            <AlertDescription>{t("snippets.anyKeyWorks")}</AlertDescription>
+          </Alert>
+        ) : null}
         {/* Four tabs fit one row on a 390 px phone; a narrower card scrolls them, faded at the edge. */}
         <ScrollArea className="h-auto max-w-full" clampContentMinWidth={false} scrollFade>
           <TabsList>
@@ -86,7 +80,6 @@ export function ClientSnippetsCard(): JSX.Element {
             title={t("snippets.anthropicMessages")}
           />
           <Snippet
-            className="flex-1"
             code={snippets.curl.openai}
             copyLabel={copy(t("snippets.openaiChat"))}
             title={t("snippets.openaiChat")}
@@ -95,7 +88,6 @@ export function ClientSnippetsCard(): JSX.Element {
         <TabsPanel className="flex min-w-0 flex-col gap-3" value="claude-code">
           <Hint>{t("snippets.claudeCodeHint")}</Hint>
           <Snippet
-            className="flex-1"
             code={snippets.claudeCode}
             copyLabel={copy(t("snippets.claudeCode"))}
             title={t("snippets.shell")}
@@ -109,7 +101,6 @@ export function ClientSnippetsCard(): JSX.Element {
             />
           </Hint>
           <Snippet
-            className="flex-1"
             code={snippets.codex}
             copyLabel={copy(t("snippets.codex"))}
             title={CODEX_CONFIG_FILE}
@@ -123,7 +114,6 @@ export function ClientSnippetsCard(): JSX.Element {
             </TabsList>
             <TabsPanel className="flex min-w-0 flex-col" value="python">
               <Snippet
-                className="flex-1"
                 code={snippets.openaiSdk.python}
                 copyLabel={copy(
                   t("snippets.sdkWithLanguage", {
@@ -136,7 +126,6 @@ export function ClientSnippetsCard(): JSX.Element {
             </TabsPanel>
             <TabsPanel className="flex min-w-0 flex-col" value="typescript">
               <Snippet
-                className="flex-1"
                 code={snippets.openaiSdk.typescript}
                 copyLabel={copy(
                   t("snippets.sdkWithLanguage", {
