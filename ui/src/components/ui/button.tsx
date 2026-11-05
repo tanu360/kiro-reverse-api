@@ -64,56 +64,60 @@ export const buttonVariants = cva(
         sm: "h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] text-sm sm:h-7 sm:text-meta pointer-coarse:h-9",
         xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-sm sm:h-6 sm:text-xs [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
       },
+      // Hover is the guarded `hover:` variant (only where the pointer can hover), never a bare
+      // :hover, so a tapped button on a touch screen does not keep its hover fill; data-pressed
+      // gives the same fill while a pointer or key presses it.
       variant: {
         // The main action, one per surface: Kiro purple with the sign-in finish.
         default: cn(
           PRIMARY_FINISH,
-          "border-primary bg-primary text-primary-foreground [:hover,[data-pressed]]:border-primary-hover [:hover,[data-pressed]]:bg-primary-hover",
+          "border-primary bg-primary text-primary-foreground hover:border-primary-hover data-pressed:border-primary-hover hover:bg-primary-hover data-pressed:bg-primary-hover",
         ),
         // The confirm button of a destructive dialog: solid red, white label (4.8:1), a step
         // deeper on hover.
         destructive:
-          "border-destructive-solid bg-destructive-solid text-destructive-solid-foreground [:hover,[data-pressed]]:bg-[color-mix(in_oklab,var(--destructive-solid)_88%,var(--color-black))]",
+          "border-destructive-solid bg-destructive-solid text-destructive-solid-foreground hover:bg-[color-mix(in_oklab,var(--destructive-solid)_88%,var(--color-black))] data-pressed:bg-[color-mix(in_oklab,var(--destructive-solid)_88%,var(--color-black))]",
         // An in-row destructive action that stays quiet until reached for: the outline button's
         // shape in a faint red with a red label, then solid red with a white label on hover or
         // press, in both themes.
         danger:
-          "border-destructive/24 bg-destructive/8 text-destructive-foreground dark:border-destructive/32 dark:bg-destructive/14 [:hover,[data-pressed]]:border-destructive-solid [:hover,[data-pressed]]:bg-destructive-solid [:hover,[data-pressed]]:text-destructive-solid-foreground",
+          "border-destructive/24 bg-destructive/8 text-destructive-foreground dark:border-destructive/32 dark:bg-destructive/14 hover:border-destructive-solid data-pressed:border-destructive-solid hover:bg-destructive-solid data-pressed:bg-destructive-solid hover:text-destructive-solid-foreground data-pressed:text-destructive-solid-foreground",
         // Supporting actions in the showcase's API sticker colours: lime (OpenAI) for Export,
         // periwinkle (Codex) for model refreshes, peach (Claude) for a soft destructive action.
-        lime: "border-[color-mix(in_srgb,var(--sticker-openai-fg)_20%,var(--sticker-openai))] bg-(--sticker-openai) text-(--sticker-openai-fg) [:hover,[data-pressed]]:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))]",
+        lime: "border-[color-mix(in_srgb,var(--sticker-openai-fg)_20%,var(--sticker-openai))] bg-(--sticker-openai) text-(--sticker-openai-fg) hover:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))] data-pressed:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))]",
         periwinkle:
-          "border-[color-mix(in_srgb,var(--sticker-codex-fg)_20%,var(--sticker-codex))] bg-(--sticker-codex) text-(--sticker-codex-fg) [:hover,[data-pressed]]:bg-[color-mix(in_srgb,var(--sticker-codex-fg)_9%,var(--sticker-codex))]",
+          "border-[color-mix(in_srgb,var(--sticker-codex-fg)_20%,var(--sticker-codex))] bg-(--sticker-codex) text-(--sticker-codex-fg) hover:bg-[color-mix(in_srgb,var(--sticker-codex-fg)_9%,var(--sticker-codex))] data-pressed:bg-[color-mix(in_srgb,var(--sticker-codex-fg)_9%,var(--sticker-codex))]",
         peach:
-          "border-[color-mix(in_srgb,var(--sticker-claude-fg)_20%,var(--sticker-claude))] bg-(--sticker-claude) text-(--sticker-claude-fg) [:hover,[data-pressed]]:bg-[color-mix(in_srgb,var(--sticker-claude-fg)_9%,var(--sticker-claude))]",
+          "border-[color-mix(in_srgb,var(--sticker-claude-fg)_20%,var(--sticker-claude))] bg-(--sticker-claude) text-(--sticker-claude-fg) hover:bg-[color-mix(in_srgb,var(--sticker-claude-fg)_9%,var(--sticker-claude))] data-pressed:bg-[color-mix(in_srgb,var(--sticker-claude-fg)_9%,var(--sticker-claude))]",
         // Dialog Cancel and Back.
         ghost:
-          "[--control-icon-color:var(--contrast-muted-foreground)] border-transparent text-foreground data-pressed:bg-accent [:hover,[data-pressed]]:bg-accent",
-        link: "border-transparent text-foreground underline-offset-4 [:hover,[data-pressed]]:underline",
+          "[--control-icon-color:var(--contrast-muted-foreground)] border-transparent text-foreground hover:bg-accent data-pressed:bg-accent",
+        link: "border-transparent text-foreground underline-offset-4 hover:underline data-pressed:underline",
         // A link inside a sentence: the text's own size, no box, a dotted underline that turns
         // solid on hover. The Button drops the size classes for it.
         "link-inline":
-          "h-auto whitespace-normal rounded-sm border-0 p-0 text-[length:inherit] text-foreground underline decoration-dotted underline-offset-3 sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 [:hover,[data-pressed]]:decoration-solid",
+          "h-auto whitespace-normal rounded-sm border-0 p-0 text-[length:inherit] text-foreground underline decoration-dotted underline-offset-3 sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 hover:decoration-solid data-pressed:decoration-solid",
         // Neutral actions (Refresh, Add mapping, Edit, Export): a faint foreground tint over the
         // surface it sits on, a step past a field's, and a step deeper on hover (index.css
         // --neutral-button-*).
         outline:
-          "border-(--neutral-button-border) bg-(--neutral-button) text-foreground [:hover,[data-pressed]]:bg-(--neutral-button-hover)",
+          "border-(--neutral-button-border) bg-(--neutral-button) text-foreground hover:bg-(--neutral-button-hover) data-pressed:bg-(--neutral-button-hover)",
         // An icon button that changes only its colour on hover (row kebabs, eye toggles, header
-        // icons); pressed (aria-pressed) it also takes the accent fill.
+        // icons); pressed (aria-pressed) or with its menu open (data-popup-open) it also takes the
+        // accent fill, so an open menu's trigger reads as the one that opened it.
         quiet:
-          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground data-popup-open:text-foreground [:hover,[data-pressed]]:text-foreground",
+          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground data-popup-open:bg-accent data-popup-open:text-foreground hover:text-foreground data-pressed:text-foreground",
         "quiet-destructive":
-          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground data-popup-open:text-foreground [:hover,[data-pressed]]:text-destructive-foreground",
+          "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground data-popup-open:bg-accent data-popup-open:text-foreground hover:text-destructive-foreground data-pressed:text-destructive-foreground",
         // Buttons on the purple batch toolbar: the toolbar's label colour, a white veil on hover.
         "on-primary":
-          "border-transparent text-primary-foreground [:hover,[data-pressed]]:bg-primary-foreground/14",
+          "border-transparent text-primary-foreground hover:bg-primary-foreground/14 data-pressed:bg-primary-foreground/14",
         "on-primary-danger":
-          "border-transparent text-primary-foreground [:hover,[data-pressed]]:bg-destructive-solid [:hover,[data-pressed]]:text-destructive-solid-foreground",
+          "border-transparent text-primary-foreground hover:bg-destructive-solid data-pressed:bg-destructive-solid hover:text-destructive-solid-foreground data-pressed:text-destructive-solid-foreground",
         // The inverse fill (index.css --inverse): near-black in light, near-white in dark, a step
         // towards its label on hover.
         secondary:
-          "border-inverse bg-inverse text-inverse-foreground [:hover,[data-pressed]]:bg-[color-mix(in_oklab,var(--inverse)_88%,var(--inverse-foreground))]",
+          "border-inverse bg-inverse text-inverse-foreground hover:bg-[color-mix(in_oklab,var(--inverse)_88%,var(--inverse-foreground))] data-pressed:bg-[color-mix(in_oklab,var(--inverse)_88%,var(--inverse-foreground))]",
       },
     },
   },

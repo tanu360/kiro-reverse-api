@@ -4,7 +4,7 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import type { IconSvgElement } from "@hugeicons/react";
 import { cva, type VariantProps } from "class-variance-authority";
-import type React from "react";
+import * as React from "react";
 import { IconChip } from "@/components/shared/icon-chip";
 import { cn } from "@/lib/utils";
 
@@ -72,13 +72,15 @@ export function Card({
  * Header recipe. The header is a wrapping row: the optional icon chip, the heading block
  * (title over a stacked description, or title and an inline description on one baseline) and
  * the actions at the end. Actions wrap below on a narrow card instead of squeezing the title.
- * Items centre on the row; a stacked description moves them to the top and the padding to 16 px.
+ * Items sit at the top, so the chip and the actions line up with the title line (24 px) even
+ * when a description or meta wraps under it; a stacked description moves the padding to 16 px.
+ * A title-only header is 48 px with or without actions.
  */
 // Literal class strings (Tailwind only sees classes written out in full).
 const HEADER_CLASS =
-  "flex flex-wrap items-center gap-3 px-4 py-3 sm:px-5 [&:has([data-slot$=-description][data-variant=stacked])]:items-start [&:has([data-slot$=-description][data-variant=stacked])]:py-4";
+  "flex flex-wrap items-start gap-3 px-4 py-3 sm:px-5 [&:has([data-slot$=-description][data-variant=stacked])]:py-4";
 const HEADING_CLASS =
-  "flex min-w-0 flex-1 basis-48 flex-col gap-1 [&:has(>[data-slot$=-description][data-variant=inline])]:flex-row [&:has(>[data-slot$=-description][data-variant=inline])]:flex-wrap [&:has(>[data-slot$=-description][data-variant=inline])]:items-baseline [&:has(>[data-slot$=-description][data-variant=inline])]:gap-x-2 [&:has(>[data-slot$=-description][data-variant=inline])]:gap-y-0.5";
+  "flex min-w-0 flex-1 basis-48 flex-col gap-1 pe-3 [&:has(>[data-slot$=-description][data-variant=inline])]:flex-row [&:has(>[data-slot$=-description][data-variant=inline])]:flex-wrap [&:has(>[data-slot$=-description][data-variant=inline])]:items-baseline [&:has(>[data-slot$=-description][data-variant=inline])]:gap-x-2 [&:has(>[data-slot$=-description][data-variant=inline])]:gap-y-0.5";
 const TITLE_CLASS =
   "flex min-h-6 min-w-0 items-center gap-2 font-semibold text-foreground text-heading leading-6";
 const descriptionVariants = cva("", {
@@ -90,8 +92,54 @@ const descriptionVariants = cva("", {
     },
   },
 });
-// A 24 px minimum gap between the heading and the actions (12 px row gap + 12 px here).
-const ACTION_CLASS = "ms-auto flex max-w-full shrink-0 flex-wrap items-center gap-2 ps-3";
+/*
+ * A 24 px minimum gap between the heading and the actions (12 px row gap + the heading's 12 px
+ * end padding). Beside the title, the actions centre in a 40 px box (44 px on a coarse pointer,
+ * the tallest header control) pulled back to the 24 px title line, so any sm control, segmented
+ * range or option row centres on the title without growing the header. On a row of their own
+ * (data-wrapped, a narrow card) they drop that pull, keep the header's 12 px spacing above and
+ * below, and start flush with the chip.
+ */
+const ACTION_CLASS =
+  "-my-2 ms-auto flex min-h-10 max-w-full shrink-0 flex-wrap items-center gap-2 pointer-coarse:-my-2.5 pointer-coarse:min-h-11 data-wrapped:my-0 data-wrapped:ms-0 data-wrapped:min-h-0";
+
+/**
+ * Whether a header's actions sit on a row of their own: they start below the heading. Measured
+ * before paint and again whenever the header or the actions resize, so the pull toward the
+ * title line (ACTION_CLASS) only applies while they share its row.
+ */
+function useWrappedActions(): {
+  ref: React.RefObject<HTMLDivElement | null>;
+  wrapped: boolean;
+} {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [wrapped, setWrapped] = React.useState(false);
+
+  React.useLayoutEffect(() => {
+    const action = ref.current;
+    const header = action?.parentElement;
+    if (!action || !header || typeof ResizeObserver === "undefined") return;
+    const measure = (): void => {
+      // The heading (or the title, in a frame header), not the icon chip.
+      const heading = Array.from(header.children).find(
+        (child): child is HTMLElement =>
+          child !== action &&
+          child instanceof HTMLElement &&
+          child.getAttribute("data-slot") !== "icon-chip",
+      );
+      setWrapped(
+        heading ? action.offsetTop >= heading.offsetTop + heading.offsetHeight : false,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    observer.observe(action);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, wrapped };
+}
 const PANEL_CLASS = "min-w-0 flex-1 px-4 py-4 sm:px-5";
 const FOOTER_CLASS =
   "flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-meta text-muted-foreground sm:px-5";
@@ -204,14 +252,17 @@ export function CardFrameAction({
   render,
   ...props
 }: useRender.ComponentProps<"div">): React.ReactElement {
+  const { ref, wrapped } = useWrappedActions();
   const defaultProps = {
     className: cn(ACTION_CLASS, className),
     "data-slot": "card-frame-action",
+    "data-wrapped": wrapped ? "" : undefined,
   };
 
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
+    ref,
     render,
   });
 }
@@ -326,14 +377,17 @@ export function CardAction({
   render,
   ...props
 }: useRender.ComponentProps<"div">): React.ReactElement {
+  const { ref, wrapped } = useWrappedActions();
   const defaultProps = {
     className: cn(ACTION_CLASS, className),
     "data-slot": "card-action",
+    "data-wrapped": wrapped ? "" : undefined,
   };
 
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
+    ref,
     render,
   });
 }

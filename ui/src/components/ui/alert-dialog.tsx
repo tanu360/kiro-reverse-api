@@ -100,7 +100,8 @@ export function AlertDialogHeader({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-col gap-2 p-6 text-center max-sm:px-4 max-sm:pb-4 sm:text-left",
+        // Start-aligned at every width, as the dialogs and sheets that share the phone bottom sheet.
+        "flex min-h-0 flex-col gap-2 p-6 text-start max-sm:px-4 max-sm:pb-4",
         className,
       )}
       data-slot="alert-dialog-header"

@@ -78,7 +78,9 @@ export function DialogViewport({
     <DialogPrimitive.Viewport
       className={cn(
         "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4",
-        anchor === "top" && "sm:grid-rows-[minmax(--spacing(12),8dvh)_auto_1fr]",
+        // Top-anchored (the tall pickers): a 6dvh lead, at least 48 px, so an eight-row list
+        // still fits a 768 px laptop screen.
+        anchor === "top" && "sm:grid-rows-[minmax(--spacing(12),6dvh)_auto_1fr]",
         className,
       )}
       data-anchor={anchor}
@@ -172,7 +174,7 @@ export function DialogHeader({
   const defaultProps = {
     className: cn(
       // 24 px round (16 px at the sides on phones), 12 px above a panel; clear of the close X.
-      "flex flex-col gap-2 p-6 max-sm:px-4 max-sm:pb-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 in-[[data-slot=dialog-popup]:has(>[data-slot=dialog-dismiss])]:pe-14",
+      "flex flex-col gap-2 p-6 max-sm:px-4 max-sm:pb-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 max-sm:in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 in-[[data-slot=dialog-popup]:has(>[data-slot=dialog-dismiss])]:pe-14",
       className,
     ),
     "data-slot": "dialog-header",

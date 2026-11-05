@@ -46,8 +46,9 @@
   --primary: #9046ff;
   --primary-foreground: var(--color-white);
   /*
-   * A filled purple button's hover: a step deeper in both themes. A lighter step would drop the
-   * white label under 4.5:1 (the purple itself is 4.66:1; 88 % toward white is 3.7:1).
+   * A filled purple button's hover: a step deeper on the light page. The dark theme lifts it a
+   * step toward white instead (the .dark block), since a deeper purple on the near-black page
+   * reads as disabled.
    */
   --primary-hover: color-mix(in oklab, var(--primary) 88%, var(--color-black));
   --secondary: var(--color-zinc-50);
@@ -118,6 +119,15 @@
    * the batch toolbar while one is open; taller on phones, where the bar wraps to two lines.
    */
   --toast-stack-offset: 0px;
+  /*
+   * The sticky chrome a top toast (phones) hangs under: none on the sign-in pages, the 48 px
+   * header in the app (below), so a toast never covers the nav toggle, search or header icons.
+   */
+  --toast-top-offset: 0px;
+}
+
+:root:has([data-slot="site-header"]) {
+  --toast-top-offset: 3rem;
 }
 
 :root:has([data-slot="batch-bar"]) {
@@ -132,6 +142,11 @@
 
 .dark {
   color-scheme: dark;
+  /*
+   * A lighter purple on hover. 92 % keeps the white label at 4:1 while it is hovered (the purple
+   * is 4.66:1; 88 % toward white would drop it to 3.7:1).
+   */
+  --primary-hover: color-mix(in oklab, var(--primary) 92%, var(--color-white));
   --background: #09090a;
   --surface-solid: #111113;
   --surface-2: #1a1a1d;
@@ -821,7 +836,10 @@
  * The rule sets outline-style itself: Tailwind's outline-none/outline-hidden zero
  * --tw-outline-style, which would leave `focus-visible:outline-1` invisible.
  * `focus-outline` sits 2 px off the edge; `focus-outline-inset` is 1 px on the inner edge, for
- * rows, cells and items packed in a track or a scrolling box that would clip an outer outline.
+ * rows, cells, panels and scrolling boxes that would clip an outer outline.
+ * `focus-outline-inner` is the full 2 px ring drawn just inside the edge, for items packed in a
+ * track (segmented items, tabs), so it matches the 2 px ring of the controls beside them
+ * without touching a neighbour or the track's own border.
  */
 @utility focus-outline {
   &:focus-visible {
@@ -834,6 +852,13 @@
   &:focus-visible {
     outline: 1px solid var(--color-ring);
     outline-offset: -1px;
+  }
+}
+
+@utility focus-outline-inner {
+  &:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: -2px;
   }
 }
 
@@ -1125,9 +1150,9 @@
 
 /*
  * Bklit UI chart variables (merged by the shadcn CLI from @bklit/chart-context). One purple plus
- * neutrals, with red as the only alert series: chart-1 is Kiro purple, chart-2 a softer purple,
- * chart-3..5 greys stepping down toward the card (the model mix ramp; never green or red for a
- * category). Labels, grid and comparison lines use the app's own greys and hairline.
+ * neutrals, with red as the only alert series: chart-1 is Kiro purple, chart-2 a paler purple,
+ * chart-3..5 greys stepping down toward the card and chart-other below them (the model mix
+ * ramp; never green or red for a category). Labels, grid and comparison lines use the app's own greys and hairline.
  * chart-scale-01..05 is the volume ramp for heatmap cells and idle bars: 01 is empty, 02..05 run
  * from a faint to the full purple.
  */
@@ -1137,6 +1162,7 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-other: var(--chart-other);
   --color-chart-positive: var(--chart-positive);
   --color-chart-negative: var(--chart-negative);
   --color-chart-background: var(--chart-background);
@@ -1172,10 +1198,18 @@
 
 :root {
   --chart-1: var(--primary);
-  --chart-2: color-mix(in oklab, var(--primary) 55%, var(--card));
-  --chart-3: color-mix(in oklab, var(--foreground) 60%, var(--card));
-  --chart-4: color-mix(in oklab, var(--foreground) 38%, var(--card));
-  --chart-5: color-mix(in oklab, var(--foreground) 22%, var(--card));
+  /*
+   * The categorical ramp (model mix): every step is at least 3:1 on the card, and after the
+   * purple each one is quieter than the one before. chart-2 is the purple mixed toward the text
+   * colour (a light lavender in dark, a deep violet in light); chart-3..5 step the text colour
+   * down toward the card (dark 7 / 4.9 / 3.3:1, light 6.6 / 4.4 / 3:1). chart-other, for the
+   * rest of the models, sits below them all.
+   */
+  --chart-2: color-mix(in oklab, var(--primary) 60%, var(--foreground));
+  --chart-3: color-mix(in oklab, var(--foreground) 66%, var(--card));
+  --chart-4: color-mix(in oklab, var(--foreground) 54%, var(--card));
+  --chart-5: color-mix(in oklab, var(--foreground) 42%, var(--card));
+  --chart-other: color-mix(in oklab, var(--foreground) 30%, var(--card));
   --chart-positive: var(--success);
   --chart-negative: var(--destructive);
   /* The card the charts sit on, so dot outlines and ring gaps cut cleanly into it. */

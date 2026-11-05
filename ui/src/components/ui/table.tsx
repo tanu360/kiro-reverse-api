@@ -130,8 +130,8 @@ export function TableRow({
     <tr
       className={cn(
         // Hover is the --row-hover tint; a row whose menu is open keeps half the selected tint,
-        // so it is clear which row the menu belongs to.
-        "relative border-border-subtle border-b transition-colors not-in-data-[variant=card]:hover:bg-(--row-hover) not-in-data-[variant=card]:has-aria-expanded:bg-(--row-selected)/50 not-in-data-[variant=card]:data-[state=selected]:bg-(--row-selected) not-in-data-[variant=card]:data-[state=selected]:hover:bg-(--row-selected-hover)",
+        // so it is clear which row the menu belongs to. Body rows only: the header row stays flat.
+        "relative border-border-subtle border-b transition-colors not-in-data-[variant=card]:[tbody>&]:hover:bg-(--row-hover) not-in-data-[variant=card]:[tbody>&]:has-aria-expanded:bg-(--row-selected)/50 not-in-data-[variant=card]:data-[state=selected]:bg-(--row-selected) not-in-data-[variant=card]:data-[state=selected]:hover:bg-(--row-selected-hover)",
         className,
       )}
       data-slot="table-row"

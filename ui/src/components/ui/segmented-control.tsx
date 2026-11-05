@@ -10,7 +10,7 @@ export type SegmentedControlSize = "default" | "lg" | "sm" | "icon";
 /**
  * Item heights; the track adds its 1 px padding and 1 px border on each side (+4 px), so each
  * size is the height of the matching field and button (phone / sm and up / coarse pointer):
- *   sm       items 28 / 24 / 32   track 32 / 28 / 36
+ *   sm       items 28 / 24 / 36   track 32 / 28 / 40
  *   default  items 32 / 28 / 36   track 36 / 32 / 40
  *   lg       items 40 / 36 / 40   track 44 / 40 / 44
  *   icon     square default items, for icon-only segments (the sign-in theme toggle)
@@ -24,7 +24,7 @@ export const segmentedControlItemSizeClassNames: Record<
   default: "h-8 px-[calc(--spacing(2.5)-1px)] sm:h-7 pointer-coarse:h-9",
   icon: "size-8 p-0 sm:size-7 pointer-coarse:size-9",
   lg: "h-10 px-[calc(--spacing(3.5)-1px)] sm:h-9 pointer-coarse:h-10",
-  sm: "h-7 px-[calc(--spacing(2)-1px)] sm:h-6 pointer-coarse:h-8",
+  sm: "h-7 px-[calc(--spacing(2)-1px)] sm:h-6 pointer-coarse:h-9",
 };
 
 /**
@@ -123,7 +123,7 @@ export function SegmentedControlItem({
 
   const defaultProps = {
     className: cn(
-      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-outline-inset disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
+      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-outline-inner disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
       // The chosen item's own fill, until the sliding indicator has measured it.
       "data-checked:bg-(--neutral-button-hover) data-checked:text-foreground",
       "aria-[current=page]:bg-(--neutral-button-hover) aria-[current=page]:text-foreground",

@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 /**
  * A form label: 14 / 20 px medium at every width, the same as FieldLabel and SelectLabel.
  * `option`: the caption of a checkbox, radio or switch it wraps (the sign-in "Remember me"),
- * regular weight in muted text, with a 40 px row to tap.
+ * regular weight in muted text, with a 40 px row to tap (44 px on a coarse pointer). In a card
+ * header's actions the row centres on the title line (card.tsx).
  */
 export function Label({
   className,
@@ -21,7 +22,7 @@ export function Label({
   const defaultProps = {
     className: cn(
       "inline-flex items-center gap-2 font-medium text-foreground text-sm/5",
-      variant === "option" && "min-h-10 cursor-pointer font-normal text-muted-foreground",
+      variant === "option" && "min-h-10 cursor-pointer pointer-coarse:min-h-11 font-normal text-muted-foreground",
       className,
     ),
     "data-slot": "label",

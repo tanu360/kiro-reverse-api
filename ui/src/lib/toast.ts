@@ -8,6 +8,12 @@ export interface ToastOptions {
   action?: { label: string; onClick: () => void };
   /** Showing a toast with the id of an open one replaces that toast instead of adding another. */
   id?: string;
+  /**
+   * The app path this toast points at (such as "/settings"). There it has nothing to add, so it
+   * is not shown while the app is on that page and closes when the app goes there (see
+   * syncToastPath).
+   */
+  hideOnPath?: string;
 }
 
 type ToastType = "success" | "error" | "warning" | "info" | "loading";
@@ -34,9 +40,49 @@ function toastType(type: ToastType): "error" | "warning" | "loading" | undefined
 
 let idSeed = 0;
 
+/** Open toasts that close on a path (ToastOptions.hideOnPath), by id. */
+const pathToasts = new Map<string, { path: string }>();
+
+/** True when `pathname` (with or without the /admin base) is `path` or a page under it. */
+function isOnPath(pathname: string, path: string): boolean {
+  const current = pathname.replace(/\/+$/, "");
+  const target = path.replace(/\/+$/, "");
+  return current.endsWith(target) || current.includes(`${target}/`);
+}
+
+function currentPathname(): string {
+  return typeof window === "undefined" ? "" : window.location.pathname;
+}
+
+/**
+ * Closes the toasts that point at the page the app is now on (ToastOptions.hideOnPath). The app
+ * shell calls it on every navigation.
+ */
+export function syncToastPath(pathname: string): void {
+  for (const [id, entry] of pathToasts) {
+    if (isOnPath(pathname, entry.path)) {
+      pathToasts.delete(id);
+      manager.close(id);
+    }
+  }
+}
+
 function show(type: ToastType, title: string, options: ToastOptions = {}): string {
   const id = options.id ?? `toast-${Date.now()}-${idSeed++}`;
-  const { action } = options;
+  const { action, hideOnPath } = options;
+  // Already on the page it points at: nothing to say.
+  if (hideOnPath && isOnPath(currentPathname(), hideOnPath)) return id;
+  // A toast that takes over an open one's id also takes over (or drops) its path.
+  pathToasts.delete(id);
+  let onRemove: (() => void) | undefined;
+  if (hideOnPath) {
+    const entry = { path: hideOnPath };
+    pathToasts.set(id, entry);
+    // Forget it once it is gone, unless a newer toast took over its id.
+    onRemove = () => {
+      if (pathToasts.get(id) === entry) pathToasts.delete(id);
+    };
+  }
   manager.add({
     id,
     type: toastType(type),
@@ -54,6 +100,7 @@ function show(type: ToastType, title: string, options: ToastOptions = {}): strin
           },
         }
       : undefined,
+    onRemove,
   });
   return id;
 }

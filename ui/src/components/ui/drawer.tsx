@@ -264,7 +264,9 @@ export function DrawerHeader({
 }): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "flex flex-col gap-2 p-6 max-sm:px-4 max-sm:pb-4 in-[[data-slot=drawer-popup]:has([data-slot=drawer-panel])]:pb-3 in-[[data-slot=drawer-popup]:has(>[data-slot=drawer-dismiss])]:pe-14",
+      // 24 px round (16 px at the sides on phones), 12 px above a panel at every width. Once the
+      // panel scrolls, a hairline under the header marks where the content runs beneath it.
+      "flex flex-col gap-2 border-transparent border-b p-6 transition-colors max-sm:px-4 max-sm:pb-4 in-[[data-slot=drawer-popup]:has([data-slot=drawer-panel])]:pb-3 max-sm:in-[[data-slot=drawer-popup]:has([data-slot=drawer-panel])]:pb-3 in-[[data-slot=drawer-popup]:has([data-slot=scroll-area-content][data-overflow-y-start]>[data-slot=drawer-panel])]:border-border-subtle in-[[data-slot=drawer-popup]:has(>[data-slot=drawer-dismiss])]:pe-14",
       !allowSelection && "cursor-default",
       className,
     ),

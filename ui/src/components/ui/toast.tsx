@@ -3,7 +3,8 @@
 // coss ui toast (https://coss.com/ui/docs/components/toast), added with the shadcn CLI from @coss.
 // Kiro patches: Hugeicons instead of lucide-react (the project's icon library), a translated
 // region label from the `ui` namespace, the one floating sheet (index.css popup-surface), a close
-// button on every toast, room above the batch bar (--toast-stack-offset) and a place under the
+// button on every toast, the page gutter as its inset, room under the app header
+// (--toast-top-offset) and above the batch bar (--toast-stack-offset), and a place under the
 // modal layer while a dialog, sheet or drawer is open.
 import { Toast } from "@base-ui/react/toast";
 import {
@@ -142,10 +143,12 @@ function Toasts({
       <Toast.Viewport
         aria-label={t("toast.region")}
         className={cn(
-          "fixed z-60 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] sm:[--toast-inset:--spacing(8)]",
+          // The page gutter: 16 px, 24 px from md up, so a toast lines up with the content column.
+          "fixed z-60 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] md:[--toast-inset:--spacing(6)]",
           UNDER_MODALS,
-          // Vertical positioning; bottom toasts clear the batch bar (index.css --toast-stack-offset).
-          "data-[position*=top]:top-(--toast-inset)",
+          // Vertical positioning. Top toasts hang under the app's sticky header (index.css
+          // --toast-top-offset); bottom toasts clear the batch bar (--toast-stack-offset).
+          "data-[position*=top]:top-[calc(var(--toast-inset)+var(--toast-top-offset,0px))]",
           "data-[position*=bottom]:bottom-[calc(var(--toast-inset)+var(--toast-stack-offset,0px))]",
           // Horizontal positioning
           "data-[position*=left]:left-(--toast-inset)",
@@ -190,13 +193,13 @@ function Toasts({
                 "data-expanded:h-(--toast-height)",
                 "data-position:data-expanded:transform-[translateX(var(--toast-swipe-movement-x))_translateY(var(--toast-calc-offset-y))]",
                 // Starting and ending animations
-                "motion-safe:data-[position*=top]:data-starting-style:transform-[translateY(calc(-100%-var(--toast-inset)))]",
+                "motion-safe:data-[position*=top]:data-starting-style:transform-[translateY(calc(-100%-var(--toast-inset)-var(--toast-top-offset,0px)))]",
                 "motion-safe:data-[position*=bottom]:data-starting-style:transform-[translateY(calc(100%+var(--toast-inset)))]",
                 "data-ending-style:opacity-0",
                 // Reduced motion: no travel, fade in and out in place
                 "motion-reduce:data-starting-style:opacity-0 motion-reduce:[transition:opacity_.5s,height_.15s]",
                 // Ending animations (direction-aware)
-                "motion-safe:data-[position*=top]:data-ending-style:not-data-limited:not-data-swipe-direction:transform-[translateY(calc(-100%-var(--toast-inset)))]",
+                "motion-safe:data-[position*=top]:data-ending-style:not-data-limited:not-data-swipe-direction:transform-[translateY(calc(-100%-var(--toast-inset)-var(--toast-top-offset,0px)))]",
                 "motion-safe:data-[position*=bottom]:data-ending-style:not-data-limited:not-data-swipe-direction:transform-[translateY(calc(100%+var(--toast-inset)))]",
                 "data-ending-style:data-[swipe-direction=left]:transform-[translateX(calc(var(--toast-swipe-movement-x)-100%-var(--toast-inset)))_translateY(var(--toast-calc-offset-y))]",
                 "data-ending-style:data-[swipe-direction=right]:transform-[translateX(calc(var(--toast-swipe-movement-x)+100%+var(--toast-inset)))_translateY(var(--toast-calc-offset-y))]",

@@ -26,6 +26,10 @@ export const Route = createFileRoute("/setup")({
       // A network error still renders the page and its sign-in form.
     }
   },
+  // While a slow first-run check holds the loader, the page itself shows: it reads the same
+  // query, so its password row is the loading skeleton until the answer comes.
+  pendingMs: 200,
+  pendingComponent: SetupPageRoute,
   component: SetupPageRoute,
 });
 
