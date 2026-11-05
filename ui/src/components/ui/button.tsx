@@ -21,8 +21,8 @@ import { Spinner } from "@/components/ui/spinner";
  * for `secondary` (--inverse), and solid red (--destructive-solid) for `destructive`. Only the
  * purple button wears the sign-in finish (grain and rim).
  * Kiro adds the sticker variants, `quiet` and `quiet-destructive` (icon buttons that change
- * only their colour on hover), `link-inline`, and `on-primary` / `on-primary-danger` for the
- * purple batch toolbar.
+ * only their colour on hover), `quiet-warning` (an amber icon with an amber hover fill),
+ * `link-inline`, and `on-primary` / `on-primary-danger` for the purple batch toolbar.
  */
 /**
  * The sign-in button finish, on the purple main action only: the faint film grain (index.css
@@ -112,6 +112,10 @@ export const buttonVariants = cva(
           "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground hover:text-foreground data-pressed:text-foreground",
         "quiet-destructive":
           "border-transparent text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground hover:text-destructive-foreground data-pressed:text-destructive-foreground",
+        // A quiet icon that needs attention (the header's update notice): amber in every state,
+        // so hover, press and an open popup show as a faint amber fill instead of a colour change.
+        "quiet-warning":
+          "border-transparent text-warning-foreground hover:bg-warning-surface data-pressed:bg-warning-surface aria-pressed:bg-warning-surface aria-expanded:bg-warning-surface",
         // Buttons on the purple batch toolbar: the toolbar's label colour, a white veil on hover.
         "on-primary":
           "border-transparent text-primary-foreground hover:bg-primary-foreground/14 data-pressed:bg-primary-foreground/14",
@@ -151,6 +155,7 @@ export function Button({
   loading = false,
   loadingText,
   onClick,
+  "aria-disabled": ariaDisabled,
   ...props
 }: ButtonProps): React.ReactElement {
   const typeValue: React.ButtonHTMLAttributes<HTMLButtonElement>["type"] =
@@ -170,7 +175,9 @@ export function Button({
       buttonVariants({ className, size: variant === "link-inline" ? null : size, variant }),
     ),
     "aria-busy": loading || undefined,
-    "aria-disabled": loading || undefined,
+    // Loading wins over the caller's value: merged later, an explicit aria-disabled={undefined}
+    // or false would otherwise clear it while busy.
+    "aria-disabled": loading ? true : ariaDisabled,
     "data-loading": loading ? "" : undefined,
     "data-slot": "button",
     // While loading, a click (mouse, Enter or Space) does nothing, a submit included.

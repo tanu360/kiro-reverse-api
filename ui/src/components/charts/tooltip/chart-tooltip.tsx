@@ -1,7 +1,7 @@
 "use client";
 
-import { m, useSpring } from "motion/react";
-import { memo, useEffect, useMemo } from "react";
+import { m, useMotionValue, useSpring, useTransform } from "motion/react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   resolveTooltipBoxMotion,
@@ -610,6 +610,7 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
         discreteInteraction={discreteInteraction}
         enabled={showDatePill && !isHorizontal}
         labels={dateLabels}
+        containerWidth={width}
         springConfig={springConfig}
         visible={visible}
         xWithMargin={xWithMargin}
@@ -639,8 +640,21 @@ interface DatePillTrackerProps {
   labels: string[];
   currentIndex: number;
   xWithMargin: number;
+  /** The chart's width: the pill stays inside it. */
+  containerWidth: number;
   discreteInteraction: boolean;
   springConfig?: SpringConfig;
+}
+
+/**
+ * The pill's centre, kept far enough from the chart's edges that the whole pill shows (the card
+ * clips anything past them). Before the pill is measured (width 0) it follows the crosshair.
+ */
+function clampPillCenter(x: number, pillWidth: number, containerWidth: number): number {
+  const half = pillWidth / 2;
+  if (containerWidth <= 0) return x;
+  if (pillWidth >= containerWidth) return containerWidth / 2;
+  return Math.min(Math.max(x, half), containerWidth - half);
 }
 
 // Inner-only-on-visible so `useSpring` initializes at the real cursor x
@@ -656,6 +670,7 @@ function DatePillTrackerInner({
   labels,
   currentIndex,
   xWithMargin,
+  containerWidth,
   discreteInteraction,
   springConfig,
   visible,
@@ -663,8 +678,12 @@ function DatePillTrackerInner({
   const { tooltipSpring } = useChartConfig();
   const effectiveSpring = springConfig ?? tooltipSpring;
   const animatedX = useSpring(xWithMargin, effectiveSpring);
+  // Discrete charts jump straight to the crosshair; the clamp below reads either source.
+  const discreteX = useMotionValue(xWithMargin);
 
-  if (!discreteInteraction) {
+  if (discreteInteraction) {
+    discreteX.set(xWithMargin);
+  } else {
     animatedX.set(xWithMargin);
   }
 
@@ -673,11 +692,34 @@ function DatePillTrackerInner({
     animatedX.set(xWithMargin);
   }, [animatedX, visible]);
 
+  // The pill's own width (it follows the label), so its centre can be held inside the chart
+  // the way TooltipBox keeps its panel in: near the first or last bucket it stops at the edge
+  // instead of being cut by the card.
+  const pillRef = useRef<HTMLDivElement>(null);
+  const pillWidth = useMotionValue(0);
+  useLayoutEffect(() => {
+    const pill = pillRef.current;
+    if (!pill) return;
+    pillWidth.set(pill.offsetWidth);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => pillWidth.set(pill.offsetWidth));
+    observer.observe(pill);
+    return () => observer.disconnect();
+  }, [pillWidth]);
+  const left = useTransform(() =>
+    clampPillCenter(
+      (discreteInteraction ? discreteX : animatedX).get(),
+      pillWidth.get(),
+      containerWidth
+    )
+  );
+
   return (
     <m.div
       className="pointer-events-none absolute z-50 w-max"
+      ref={pillRef}
       style={{
-        left: discreteInteraction ? xWithMargin : animatedX,
+        left,
         transform: "translateX(-50%)",
         // Centred on the x-axis labels (bottom 12, one 16 px chart-tick line): the pill is 20 px.
         bottom: 10,

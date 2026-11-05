@@ -256,7 +256,11 @@ export function StatTile({
           />
         ) : null}
         {hint ? (
-          <InfoHint hint={hint}>{label}</InfoHint>
+          // One line like the plain labels, so every tile's label row stays 20 px and the values
+          // beside it line up.
+          <InfoHint hint={hint} truncate>
+            {label}
+          </InfoHint>
         ) : (
           <p className="min-w-0 truncate">{label}</p>
         )}

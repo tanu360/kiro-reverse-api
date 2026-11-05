@@ -57,6 +57,7 @@ export function MenuPopup({
   alignOffset,
   side = "bottom",
   anchor,
+  collisionPadding = 16,
   portalProps,
   ...props
 }: MenuPrimitive.Popup.Props & {
@@ -65,6 +66,11 @@ export function MenuPopup({
   alignOffset?: MenuPrimitive.Positioner.Props["alignOffset"];
   side?: MenuPrimitive.Positioner.Props["side"];
   anchor?: MenuPrimitive.Positioner.Props["anchor"];
+  /**
+   * The space kept between the popup and the viewport edge. 16 px by default: the phone
+   * gutter, so an end-aligned header menu lines up with the page content instead of the edge.
+   */
+  collisionPadding?: MenuPrimitive.Positioner.Props["collisionPadding"];
   portalProps?: MenuPrimitive.Portal.Props;
 }): React.ReactElement {
   return (
@@ -74,6 +80,7 @@ export function MenuPopup({
         alignOffset={alignOffset}
         anchor={anchor}
         className="z-50"
+        collisionPadding={collisionPadding}
         data-slot="menu-positioner"
         side={side}
         sideOffset={sideOffset}

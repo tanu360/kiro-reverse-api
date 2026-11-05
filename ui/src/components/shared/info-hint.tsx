@@ -22,19 +22,25 @@ export function InfoHint({
   children,
   hint,
   variant = "label",
+  truncate = false,
   className,
 }: {
   /** The visible label; it is also the trigger's accessible name. */
   children: ReactNode;
   hint: ReactNode;
   variant?: "label" | "link";
+  /**
+   * `label` only: keep the label on one line, cut with an ellipsis, instead of wrapping to two.
+   * For a row of tiles whose label rows must stay the same height (StatTile).
+   */
+  truncate?: boolean;
   className?: string;
 }): JSX.Element {
   const link = variant === "link";
   return (
     <Popover>
       <PopoverTrigger
-        className={cn(TRIGGER_CLASS[variant], className)}
+        className={cn(TRIGGER_CLASS[variant], truncate && !link && "min-w-0", className)}
         closeDelay={200}
         data-slot="info-hint"
         data-variant={variant}
@@ -54,7 +60,9 @@ export function InfoHint({
           </>
         ) : (
           <>
-            <span className="line-clamp-2 text-pretty">{children}</span>
+            <span className={truncate ? "min-w-0 truncate" : "line-clamp-2 text-pretty"}>
+              {children}
+            </span>
             <HugeiconsIcon aria-hidden="true" className="size-3.5 shrink-0" icon={InfoIcon} />
           </>
         )}

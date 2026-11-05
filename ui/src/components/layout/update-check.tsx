@@ -13,6 +13,7 @@ import {
 import { compareVersions, fetchRemoteVersion, versionQuery } from "@/lib/api/system";
 import type { RemoteVersionJson } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { readStorage, writeStorage } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { stripV, UpdateDialog } from "./update-dialog";
@@ -21,6 +22,12 @@ import { stripV, UpdateDialog } from "./update-dialog";
 export const SILENT_CHECK_DELAY_MS = 2000;
 const AVAILABLE_TOAST_MS = 5200;
 const AVAILABLE_TOAST_ID = "update-available";
+/**
+ * The release the silent check last announced with a toast. Each release gets one toast; after
+ * that the header button's dot carries the notice, so the toast does not cover the page (the
+ * sticky Settings chips on a phone) on every visit.
+ */
+export const ANNOUNCED_VERSION_KEY = "kiro_update_announced";
 const UP_TO_DATE_TOAST_MS = 3600;
 
 interface UpdateCheckValue {
@@ -76,7 +83,10 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
       lookUp()
         .then(({ newer }) => {
           if (cancelled || !newer) return;
-          toast.warning(tRef.current("shell.update.available", { latest: stripV(newer.version) }), {
+          const version = stripV(newer.version);
+          if (readStorage(ANNOUNCED_VERSION_KEY) === version) return;
+          writeStorage(ANNOUNCED_VERSION_KEY, version);
+          toast.warning(tRef.current("shell.update.available", { latest: version }), {
             id: AVAILABLE_TOAST_ID,
             duration: AVAILABLE_TOAST_MS,
             action: { label: tRef.current("shell.update.view"), onClick: openDialog },

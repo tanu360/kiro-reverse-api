@@ -178,11 +178,12 @@ const ALIGN_CLASS = {
 // and selected-hovered). So a pinned cell matches its row exactly on any card fill. The body
 // states exclude each other (selected, then an open menu, then hover or focus), so no selector
 // order or specificity decides: an open menu keeps its tint under the pointer, as on the row
-// (TableRow has-aria-expanded). A 1 px inset edge on the side facing the scrolling columns
-// shows where they slide under it, only while something is hidden on that side (Table marks its
-// scroller data-overflow-start/-end).
+// (TableRow: an open [aria-haspopup=menu] trigger; a hover popover in a cell, such as the Limit
+// reached hint, also sets aria-expanded and must not tint the row). A 1 px inset edge on the
+// side facing the scrolling columns shows where they slide under it, only while something is
+// hidden on that side (Table marks its scroller data-overflow-start/-end).
 const STICKY_BASE =
-  "sticky z-[1] bg-card [thead_&]:bg-[linear-gradient(var(--row-head),var(--row-head))] [tbody>tr:is(:hover,:focus-visible):not([data-state=selected]):not(:has([aria-expanded=true]))>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tbody>tr:not([data-state=selected]):has([aria-expanded=true])>&]:bg-[linear-gradient(color-mix(in_srgb,var(--row-selected)_50%,transparent),color-mix(in_srgb,var(--row-selected)_50%,transparent))] [tbody>tr[data-state=selected]>&]:bg-[linear-gradient(var(--row-selected),var(--row-selected))] [tbody>tr[data-state=selected]:hover>&]:bg-[linear-gradient(var(--row-selected-hover),var(--row-selected-hover))]";
+  "sticky z-[1] bg-card [thead_&]:bg-[linear-gradient(var(--row-head),var(--row-head))] [tbody>tr:is(:hover,:focus-visible):not([data-state=selected]):not(:has([aria-haspopup=menu][aria-expanded=true]))>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tbody>tr:not([data-state=selected]):has([aria-haspopup=menu][aria-expanded=true])>&]:bg-[linear-gradient(color-mix(in_srgb,var(--row-selected)_50%,transparent),color-mix(in_srgb,var(--row-selected)_50%,transparent))] [tbody>tr[data-state=selected]>&]:bg-[linear-gradient(var(--row-selected),var(--row-selected))] [tbody>tr[data-state=selected]:hover>&]:bg-[linear-gradient(var(--row-selected-hover),var(--row-selected-hover))]";
 const STICKY_CLASS = {
   start: cn(
     STICKY_BASE,

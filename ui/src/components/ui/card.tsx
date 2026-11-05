@@ -80,7 +80,7 @@ export function Card({
 const HEADER_CLASS =
   "flex flex-wrap items-start gap-3 px-4 py-3 sm:px-5 [&:has([data-slot$=-description][data-variant=stacked])]:py-4";
 const HEADING_CLASS =
-  "flex min-w-0 flex-1 basis-48 flex-col gap-1 pe-3 [&:has(>[data-slot$=-description][data-variant=inline])]:flex-row [&:has(>[data-slot$=-description][data-variant=inline])]:flex-wrap [&:has(>[data-slot$=-description][data-variant=inline])]:items-baseline [&:has(>[data-slot$=-description][data-variant=inline])]:gap-x-2 [&:has(>[data-slot$=-description][data-variant=inline])]:gap-y-0.5";
+  "flex min-w-0 flex-1 basis-40 flex-col gap-1 pe-3 [&:has(>[data-slot$=-description][data-variant=inline])]:flex-row [&:has(>[data-slot$=-description][data-variant=inline])]:flex-wrap [&:has(>[data-slot$=-description][data-variant=inline])]:items-baseline [&:has(>[data-slot$=-description][data-variant=inline])]:gap-x-2 [&:has(>[data-slot$=-description][data-variant=inline])]:gap-y-0.5";
 const TITLE_CLASS =
   "flex min-h-6 min-w-0 items-center gap-2 font-semibold text-foreground text-heading leading-6";
 const descriptionVariants = cva("", {
