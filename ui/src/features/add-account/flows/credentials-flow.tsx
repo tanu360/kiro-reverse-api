@@ -5,7 +5,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { AddedAccountRef } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { FormField, HelpText, SubmitButton } from "../fields";
+import { FlowGuide, FormField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import {
@@ -82,12 +82,11 @@ export function CredentialsFlow(): JSX.Element {
 
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
-      <HelpText>{t("methods.credentials.description")}</HelpText>
-      <ul className="flex list-disc flex-col gap-1 ps-5 text-muted-foreground text-sm">
+      <FlowGuide list title={t("credentials.formatTitle")}>
         <li>{t("credentials.formats")}</li>
         <li>{t("credentials.required")}</li>
         <li>{t("credentials.optional")}</li>
-      </ul>
+      </FlowGuide>
       <FormField error={error} label={t("credentials.label")}>
         <Textarea
           autoComplete="off"
@@ -97,6 +96,7 @@ export function CredentialsFlow(): JSX.Element {
           placeholder='[{"refreshToken":"xxx","provider":"BuilderID"}]'
           spellCheck={false}
           value={json}
+          variant="mono"
         />
       </FormField>
       <FlowFooter>

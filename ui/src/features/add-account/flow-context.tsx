@@ -11,8 +11,6 @@ export interface FlowContextValue {
   finishAdd: (refs: AddedAccountRef[]) => void;
   /** While true the dialog cannot be dismissed with Escape, the backdrop or the X. */
   setBusy: (busy: boolean) => void;
-  /** Leaves the flow for the method list. */
-  back: () => void;
   /** Closes the dialog. */
   cancel: () => void;
   /** The dialog footer, where flows render their buttons. */
@@ -45,27 +43,17 @@ export function useFormId(): string {
 }
 
 /**
- * Footer buttons: Back (unless `hideBack`), Cancel, then the flow's own actions. Rendered into
- * the dialog footer through a portal, so the body can scroll while the buttons stay put.
+ * Footer buttons: a ghost Cancel, then the flow's own actions (Back is the arrow in the dialog
+ * header). Rendered into the dialog footer through a portal, so the body can scroll while the
+ * buttons stay put; on phones Cancel and the main action share one row.
  */
-export function FlowFooter({
-  children,
-  hideBack = false,
-}: {
-  children?: ReactNode;
-  hideBack?: boolean;
-}): JSX.Element | null {
+export function FlowFooter({ children }: { children?: ReactNode }): JSX.Element | null {
   const { t } = useT("add-account");
-  const { footer, back, cancel } = useFlow();
+  const { footer, cancel } = useFlow();
   if (!footer) return null;
   return createPortal(
     <>
-      {hideBack ? null : (
-        <Button className="h-10 sm:me-auto sm:h-8" onClick={back} variant="ghost">
-          {t("back")}
-        </Button>
-      )}
-      <Button className="h-10 sm:h-8" onClick={cancel} variant="outline">
+      <Button onClick={cancel} variant="ghost">
         {t("cancel")}
       </Button>
       {children}

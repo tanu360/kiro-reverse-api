@@ -1,7 +1,6 @@
 {
   "title": "Add account",
   "description": "Choose how to sign in or what to import.",
-  "back": "Back",
   "cancel": "Cancel",
   "add": "Add",
   "adding": "Adding…",
@@ -54,6 +53,7 @@
   "iam.startUrlRequired": "Enter a start URL.",
   "iam.loginUrl": "Sign-in URL",
   "iam.completeLogin": "Complete sign-in in your browser, then paste the callback URL.",
+  "iam.summary": "Signing in to {url} in {region}.",
   "iam.callbackUrlPlaceholder": "http://127.0.0.1:52341/?code=…",
 
   "microsoft.portalStep": "Step 1: sign in to the Kiro portal",
@@ -70,9 +70,8 @@
   "sso.step2": "Press F12 to open DevTools → Application → Cookies.",
   "sso.step3": "Find and copy",
   "sso.tokenLabel": "SSO tokens",
-  "sso.tokenHint": "One token per line. Pasting several imports them in a batch.",
+  "sso.tokenHint": "One token per line. Pasting several imports them in a batch. Each token can take up to 2 minutes to import.",
   "sso.tokenRequired": "Paste at least one SSO token.",
-  "sso.slowHint": "Each token can take up to 2 minutes to import.",
   "sso.importing": "Importing…",
 
   "local.fileLocation": "File location",
@@ -85,10 +84,9 @@
   "local.providers.Github": "GitHub",
   "local.providers.Microsoft": "Microsoft (Entra ID)",
   "local.tokenFile": "kiro-auth-token.json",
-  "local.tokenRequired": "Required",
   "local.clientFile": "{hash}.json",
-  "local.clientRequired": "Required for IdC sign-in",
-  "local.clientOptionalMicrosoft": "Optional for Microsoft. Needed only when kiro-auth-token.json has no clientId.",
+  "local.clientHint": "Needed for IdC sign-in. Paste the file contents or upload the file.",
+  "local.clientHintMicrosoft": "Needed only when kiro-auth-token.json has no clientId. Paste the file contents or upload the file.",
   "local.pasteOrUpload": "Paste the file contents or upload the file.",
   "local.upload": "Upload",
   "local.uploadFile": "Upload {file}",
@@ -105,6 +103,7 @@
   "local.microsoftTenantMissing": "Microsoft sign-in needs the tenant. kiro-auth-token.json must contain tokenEndpoint, issuerUrl or an Entra accessToken.",
 
   "credentials.label": "Credentials JSON",
+  "credentials.formatTitle": "What the JSON can hold",
   "credentials.formats": "Accepts one object, a JSON array or a Kiro Account Manager export.",
   "credentials.required": "Required: refreshToken, or kiroApiKey for API key accounts.",
   "credentials.optional": "Optional: provider (BuilderId, Enterprise, GitHub, Google), clientId, clientSecret, region.",
@@ -115,13 +114,14 @@
 
   "cookie.howToGet": "How to get the refresh token",
   "cookie.step1": "Sign in at",
-  "cookie.step2": "Right-click the page → Inspect → Application → Cookies → https://app.kiro.dev.",
+  "cookie.step2": "Right-click the page → Inspect → Application → Cookies →",
   "cookie.step3": "Copy the value of the cookie named",
   "cookie.link": "https://app.kiro.dev/account/usage",
   "cookie.provider": "Provider",
   "cookie.google": "Google",
   "cookie.github": "GitHub",
   "cookie.refreshToken": "Refresh token",
+  "cookie.refreshTokenPlaceholder": "aorAAAAAG…",
   "cookie.refreshTokenMissing": "Enter a refresh token.",
 
   "apikey.help": "Kiro API keys never expire and skip OAuth refresh. Requests go to the Kiro CLI runtime in the key's region.",

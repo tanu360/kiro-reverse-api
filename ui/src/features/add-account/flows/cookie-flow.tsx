@@ -1,4 +1,6 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
+import { Code } from "@/components/shared/code";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectItem,
@@ -12,7 +14,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { Code, FormField, SubmitButton } from "../fields";
+import { FlowGuide, FormField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 
@@ -67,6 +69,8 @@ export function CookieFlow(): JSX.Element {
   };
 
   const link = t("cookie.link");
+  // The site's origin, where DevTools lists its cookies.
+  const host = link.replace(/^(https?:\/\/[^/]+).*$/, "$1");
   const items = [
     { value: "Google", label: t("cookie.google") },
     { value: "Github", label: t("cookie.github") },
@@ -74,26 +78,23 @@ export function CookieFlow(): JSX.Element {
 
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
-      <div className="flex flex-col gap-2 text-sm">
-        <span className="font-medium">{t("cookie.howToGet")}</span>
-        <ol className="flex list-decimal flex-col gap-1.5 ps-5 text-muted-foreground">
-          <li>
-            {t("cookie.step1")}{" "}
-            <a
-              className="break-all text-foreground underline underline-offset-4"
-              href={link}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              {link}
-            </a>
-          </li>
-          <li>{t("cookie.step2")}</li>
-          <li>
-            {t("cookie.step3")} <Code>RefreshToken</Code>
-          </li>
-        </ol>
-      </div>
+      <FlowGuide title={t("cookie.howToGet")}>
+        <li>
+          {t("cookie.step1")}{" "}
+          <Button
+            render={<a href={link} rel="noopener noreferrer" target="_blank" />}
+            variant="link-inline"
+          >
+            {link}
+          </Button>
+        </li>
+        <li>
+          {t("cookie.step2")} <Code>{host}</Code>
+        </li>
+        <li>
+          {t("cookie.step3")} <Code>RefreshToken</Code>
+        </li>
+      </FlowGuide>
       <FormField label={t("cookie.provider")}>
         <Select
           disabled={pending}
@@ -103,7 +104,7 @@ export function CookieFlow(): JSX.Element {
           }}
           value={provider}
         >
-          <SelectTrigger className="h-10 sm:h-8">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectPopup>
@@ -120,9 +121,11 @@ export function CookieFlow(): JSX.Element {
           autoComplete="off"
           disabled={pending}
           onChange={(event) => setRefreshToken(event.target.value)}
+          placeholder={t("cookie.refreshTokenPlaceholder")}
           ref={tokenRef}
           spellCheck={false}
           value={refreshToken}
+          variant="mono"
         />
       </FormField>
       <FlowFooter>

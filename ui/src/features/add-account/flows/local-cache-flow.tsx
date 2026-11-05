@@ -1,7 +1,11 @@
 import { Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ChangeEvent, type FormEvent, type JSX, type Ref, useRef, useState } from "react";
+import { Code } from "@/components/shared/code";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import {
   Select,
   SelectItem,
@@ -9,13 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { Code, FormField, HelpText, SubmitButton } from "../fields";
+import { FlowGuide, FormField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import {
@@ -27,7 +30,10 @@ import {
   localCacheErrorField,
 } from "../lib/local-cache";
 
-/** A JSON textarea with an Upload button that reads a .json file into it. */
+/**
+ * A JSON textarea with an Upload button in its bottom bar that reads a .json file into it.
+ * The file input sits outside the group, so the group's click-to-focus finds the textarea.
+ */
 function JsonFileInput({
   file,
   value,
@@ -54,16 +60,31 @@ function JsonFileInput({
   };
 
   return (
-    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-start">
-      <Textarea
-        autoComplete="off"
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        ref={textareaRef}
-        spellCheck={false}
-        value={value}
-      />
+    <>
+      <InputGroup>
+        <InputGroupTextarea
+          autoComplete="off"
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          ref={textareaRef}
+          spellCheck={false}
+          value={value}
+          variant="mono"
+        />
+        <InputGroupAddon align="block-end">
+          <Button
+            aria-label={t("local.uploadFile", { file })}
+            disabled={disabled}
+            onClick={() => inputRef.current?.click()}
+            size="xs"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Upload01Icon} aria-hidden="true" />
+            {t("local.upload")}
+          </Button>
+        </InputGroupAddon>
+      </InputGroup>
       <input
         accept=".json,application/json"
         className="hidden"
@@ -72,18 +93,7 @@ function JsonFileInput({
         tabIndex={-1}
         type="file"
       />
-      <Button
-        aria-label={t("local.uploadFile", { file })}
-        className="h-10 shrink-0 sm:h-8"
-        disabled={disabled}
-        onClick={() => inputRef.current?.click()}
-        size="sm"
-        variant="outline"
-      >
-        <HugeiconsIcon icon={Upload01Icon} aria-hidden="true" />
-        {t("local.upload")}
-      </Button>
-    </div>
+    </>
   );
 }
 
@@ -150,16 +160,16 @@ export function LocalCacheFlow(): JSX.Element {
 
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
-      <HelpText>{t("methods.local.description")}</HelpText>
-      <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-card/40 px-3 py-2.5 text-sm">
-        <span className="font-medium">{t("local.fileLocation")}</span>
-        <span className="text-muted-foreground">
-          {t("local.windows")}: <Code>%USERPROFILE%\.aws\sso\cache\</Code>
-        </span>
-        <span className="text-muted-foreground">
-          {t("local.macosLinux")}: <Code>~/.aws/sso/cache/</Code>
-        </span>
-      </div>
+      <Card size="sm">
+        <FlowGuide list title={t("local.fileLocation")}>
+          <li>
+            {t("local.windows")}: <Code>%USERPROFILE%\.aws\sso\cache\</Code>
+          </li>
+          <li>
+            {t("local.macosLinux")}: <Code>~/.aws/sso/cache/</Code>
+          </li>
+        </FlowGuide>
+      </Card>
       <FormField label={t("local.provider")}>
         <Select
           disabled={pending}
@@ -171,7 +181,7 @@ export function LocalCacheFlow(): JSX.Element {
           }}
           value={provider}
         >
-          <SelectTrigger className="h-10 sm:h-8">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectPopup>
@@ -188,10 +198,10 @@ export function LocalCacheFlow(): JSX.Element {
         hint={t("local.pasteOrUpload")}
         label={
           <>
-            <span>{t("local.tokenFile")}</span>
-            <span className="font-normal text-muted-foreground text-xs">
-              {t("local.tokenRequired")}
-            </span>
+            {t("local.tokenFile")}
+            <Badge size="sm" tone="neutral">
+              {t("common:form.required")}
+            </Badge>
           </>
         }
       >
@@ -207,15 +217,13 @@ export function LocalCacheFlow(): JSX.Element {
       {showClient ? (
         <FormField
           error={problemField === "client" ? problemText : null}
-          hint={t("local.pasteOrUpload")}
+          hint={provider === "Microsoft" ? t("local.clientHintMicrosoft") : t("local.clientHint")}
           label={
             <>
-              <span>{t("local.clientFile")}</span>
-              <span className="font-normal text-muted-foreground text-xs">
-                {provider === "Microsoft"
-                  ? t("local.clientOptionalMicrosoft")
-                  : t("local.clientRequired")}
-              </span>
+              {t("local.clientFile")}
+              <Badge size="sm" tone="neutral">
+                {provider === "Microsoft" ? t("common:form.optional") : t("common:form.required")}
+              </Badge>
             </>
           }
         >

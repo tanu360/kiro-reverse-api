@@ -51,9 +51,10 @@ const FLOWS: Record<AddAccountMethod, () => JSX.Element> = {
 };
 
 /**
- * The add-account wizard: a method list, then one flow. Every way out (X, Escape, backdrop,
- * Cancel, Back, success, unmount) resets the shared FlowSessions, which cancels the Microsoft
- * login, stops Builder ID polling, forgets the IAM session and drops late responses.
+ * The add-account wizard: a method list, then one flow, with a back arrow in the header. Every
+ * way out (X, Escape, backdrop, Cancel, Back, success, unmount) resets the shared FlowSessions,
+ * which cancels the Microsoft login, stops Builder ID polling, forgets the IAM session and drops
+ * late responses.
  */
 export function AddAccountDialog({
   open,
@@ -170,27 +171,32 @@ export function AddAccountDialog({
       sessions,
       finishAdd: (refs) => void finishAdd(refs),
       setBusy,
-      back,
       cancel,
       footer,
     }),
-    [sessions, finishAdd, back, cancel, footer],
+    [sessions, finishAdd, cancel, footer],
   );
 
   const Flow = method ? FLOWS[method] : null;
   return (
     <ResponsiveDialog
-      description={method ? undefined : t("description")}
+      // Hung from the top, so the title stays put while the steps change height.
+      anchor="top"
+      backLabel={t("common:actions.back")}
+      description={t(method ? `methods.${method}.description` : "description")}
       dismissible={!busy}
       footer={
+        // The flows portal their buttons in here. The box itself does not lay out: the buttons
+        // are the footer's own items (one row of two on phones), and a lone Cancel spans it.
         <div
-          className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end"
+          className="contents max-sm:[&>:last-child:nth-child(odd)]:col-span-2"
           ref={setFooter}
         />
       }
+      onBack={method ? back : undefined}
       onOpenChange={handleOpenChange}
       open={open}
-      size="lg"
+      size="xl"
       title={method ? t(`methods.${method}.title`) : t("title")}
     >
       <div className="outline-none" ref={bodyRef} tabIndex={-1}>

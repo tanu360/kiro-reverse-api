@@ -1,7 +1,6 @@
 {
   "title": "添加账号",
   "description": "选择登录方式或导入方式。",
-  "back": "返回",
   "cancel": "取消",
   "add": "添加",
   "adding": "正在添加…",
@@ -51,6 +50,7 @@
   "iam.startUrlRequired": "请输入 Start URL。",
   "iam.loginUrl": "登录链接",
   "iam.completeLogin": "请在浏览器中完成登录，然后粘贴回调 URL。",
+  "iam.summary": "正在通过 {url}（{region}）登录。",
   "iam.callbackUrlPlaceholder": "http://127.0.0.1:52341/?code=…",
 
   "microsoft.portalStep": "第 1 步：登录 Kiro 门户",
@@ -67,9 +67,8 @@
   "sso.step2": "按 F12 打开开发者工具 → Application → Cookies。",
   "sso.step3": "找到并复制",
   "sso.tokenLabel": "SSO Token",
-  "sso.tokenHint": "每行一个 Token。粘贴多个即可批量导入。",
+  "sso.tokenHint": "每行一个 Token。粘贴多个即可批量导入。每个 Token 的导入最多可能需要 2 分钟。",
   "sso.tokenRequired": "请至少粘贴一个 SSO Token。",
-  "sso.slowHint": "每个 Token 的导入最多可能需要 2 分钟。",
   "sso.importing": "正在导入…",
 
   "local.fileLocation": "文件位置",
@@ -82,10 +81,9 @@
   "local.providers.Github": "GitHub",
   "local.providers.Microsoft": "Microsoft (Entra ID)",
   "local.tokenFile": "kiro-auth-token.json",
-  "local.tokenRequired": "必填",
   "local.clientFile": "{hash}.json",
-  "local.clientRequired": "IdC 登录必填",
-  "local.clientOptionalMicrosoft": "Microsoft 可选。仅当 kiro-auth-token.json 中没有 clientId 时需要。",
+  "local.clientHint": "IdC 登录必填。粘贴文件内容或上传文件。",
+  "local.clientHintMicrosoft": "仅当 kiro-auth-token.json 中没有 clientId 时需要。粘贴文件内容或上传文件。",
   "local.pasteOrUpload": "粘贴文件内容或上传文件。",
   "local.upload": "上传",
   "local.uploadFile": "上传 {file}",
@@ -102,6 +100,7 @@
   "local.microsoftTenantMissing": "Microsoft 登录需要租户信息。kiro-auth-token.json 必须包含 tokenEndpoint、issuerUrl 或 Entra accessToken。",
 
   "credentials.label": "凭证 JSON",
+  "credentials.formatTitle": "JSON 可包含的内容",
   "credentials.formats": "支持单个对象、JSON 数组或 Kiro Account Manager 导出格式。",
   "credentials.required": "必填：refreshToken；API Key 账号填 kiroApiKey。",
   "credentials.optional": "可选：provider（BuilderId、Enterprise、GitHub、Google）、clientId、clientSecret、region。",
@@ -112,13 +111,14 @@
 
   "cookie.howToGet": "如何获取刷新 Token",
   "cookie.step1": "打开并登录",
-  "cookie.step2": "在页面空白处右键 → 检查 → Application → Cookies → https://app.kiro.dev。",
+  "cookie.step2": "在页面空白处右键 → 检查 → Application → Cookies →",
   "cookie.step3": "复制以下 Cookie 的值：",
   "cookie.link": "https://app.kiro.dev/account/usage",
   "cookie.provider": "登录方式",
   "cookie.google": "Google",
   "cookie.github": "GitHub",
   "cookie.refreshToken": "刷新 Token",
+  "cookie.refreshTokenPlaceholder": "aorAAAAAG…",
   "cookie.refreshTokenMissing": "请输入刷新 Token。",
 
   "apikey.help": "Kiro API Key 永不过期，无需 OAuth 刷新。请求会发送到该 API Key 所在区域的 Kiro CLI 运行时。",

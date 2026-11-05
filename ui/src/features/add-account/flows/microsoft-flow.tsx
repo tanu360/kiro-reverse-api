@@ -1,5 +1,6 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { ChoiceCard } from "@/components/shared/choice-card";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import {
@@ -13,7 +14,7 @@ import type { KiroProfile, MicrosoftSelectProfileResponse } from "@/lib/api/type
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FormField, HelpText, SubmitButton, UrlBox } from "../fields";
+import { FormField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 
@@ -168,7 +169,7 @@ export function MicrosoftFlow(): JSX.Element {
       {stage === "profile" ? (
         <Field className="w-full" invalid={Boolean(fieldError)}>
           <FieldLabel>{t("microsoft.profileLabel")}</FieldLabel>
-          <HelpText>{t("microsoft.selectProfileDesc")}</HelpText>
+          <FieldDescription>{t("microsoft.selectProfileDesc")}</FieldDescription>
           <RadioGroup
             aria-label={t("microsoft.profileLabel")}
             className="w-full gap-2"
@@ -178,53 +179,45 @@ export function MicrosoftFlow(): JSX.Element {
             value={selectedArn}
           >
             {profiles.map((profile) => (
-              // biome-ignore lint/a11y/noLabelWithoutControl: the Base UI Radio inside is the control.
-              <label
-                className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3 has-data-checked:border-primary has-data-checked:bg-accent/40"
+              <ChoiceCard
+                control={<Radio value={profile.arn} />}
+                description={profile.region}
                 key={profile.arn}
+                title={profile.name || t("microsoft.unnamedProfile")}
               >
-                <Radio className="mt-0.5" value={profile.arn} />
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="break-words font-medium text-sm">
-                    {profile.name || t("microsoft.unnamedProfile")}
-                  </span>
-                  <span className="text-muted-foreground text-xs">{profile.region}</span>
-                  <span className="break-all text-muted-foreground text-xs">{profile.arn}</span>
+                <span className="break-all font-mono text-muted-foreground text-xs">
+                  {profile.arn}
                 </span>
-              </label>
+              </ChoiceCard>
             ))}
           </RadioGroup>
           <FieldError match={Boolean(fieldError)}>{fieldError}</FieldError>
         </Field>
-      ) : (
+      ) : stage !== "idle" ? (
         <>
-          <HelpText>{t("methods.microsoft.description")}</HelpText>
-          {stage !== "idle" ? (
-            <>
-              <UrlBox
-                label={
-                  stage === "microsoft" ? t("microsoft.providerStep") : t("microsoft.portalStep")
-                }
-                url={authorizeUrl}
-              />
-              <HelpText className="text-foreground">{t("microsoft.callbackInstructions")}</HelpText>
-              <FormField error={fieldError} label={t("callbackUrl")}>
-                <Input
-                  autoCapitalize="off"
-                  autoComplete="off"
-                  disabled={busy}
-                  inputMode="url"
-                  onChange={(event) => setCallbackUrl(event.target.value)}
-                  placeholder="http://localhost:3128/..."
-                  ref={callbackRef}
-                  spellCheck={false}
-                  value={callbackUrl}
-                />
-              </FormField>
-            </>
-          ) : null}
+          <UrlBox
+            label={stage === "microsoft" ? t("microsoft.providerStep") : t("microsoft.portalStep")}
+            url={authorizeUrl}
+          />
+          <FormField
+            error={fieldError}
+            hint={t("microsoft.callbackInstructions")}
+            label={t("callbackUrl")}
+          >
+            <Input
+              autoCapitalize="off"
+              autoComplete="off"
+              disabled={busy}
+              inputMode="url"
+              onChange={(event) => setCallbackUrl(event.target.value)}
+              placeholder="http://localhost:3128/..."
+              ref={callbackRef}
+              spellCheck={false}
+              value={callbackUrl}
+            />
+          </FormField>
         </>
-      )}
+      ) : null}
       <FlowFooter>
         <SubmitButton busy={busy} busyLabel={busyLabel} formId={formId} label={submitLabel} />
       </FlowFooter>

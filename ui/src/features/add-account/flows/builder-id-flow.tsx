@@ -1,13 +1,13 @@
-import { LoaderCircleIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { type FormEvent, type JSX, useEffect, useRef, useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import { pollBuilderId, startBuilderId } from "@/lib/api/auth-flows";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { HelpText, RegionField, SubmitButton, UrlBox } from "../fields";
+import { FlowNote, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
@@ -111,30 +111,27 @@ export function BuilderIdFlow(): JSX.Element {
 
   if (code) {
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         {/* The code is the new step's main content, so it takes focus when the step opens. */}
-        <div
-          className="flex flex-col items-center gap-2 rounded-xl border bg-muted/40 px-4 py-5 text-center outline-none focus-visible:border-ring"
+        <Card
+          className="items-center text-center outline-none focus-outline"
           ref={codeRef}
+          size="sm"
           tabIndex={-1}
         >
           <span className="sr-only">{t("builderid.userCode")}</span>
-          <kbd className="select-all rounded-lg border bg-background px-4 py-2 font-semibold text-2xl tracking-[0.2em] sm:text-3xl">
+          <kbd className="select-all font-mono font-semibold text-display tracking-widest tabular-nums">
             {code.userCode}
           </kbd>
-          <HelpText>{t("builderid.verifyCode")}</HelpText>
-        </div>
+          <FlowNote>{t("builderid.verifyCode")}</FlowNote>
+        </Card>
         <UrlBox label={t("builderid.verifyUrl")} url={code.verificationUri} />
         <p
           aria-live="polite"
           className="flex items-center justify-center gap-2 text-muted-foreground text-sm"
           role="status"
         >
-          <HugeiconsIcon
-            icon={LoaderCircleIcon}
-            aria-hidden="true"
-            className="size-4 animate-spin"
-          />
+          <Spinner aria-hidden="true" className="size-4" />
           {reconnecting ? t("builderid.reconnecting") : t("builderid.waiting")}
         </p>
         <FlowFooter />
@@ -144,7 +141,6 @@ export function BuilderIdFlow(): JSX.Element {
 
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onStart}>
-      <HelpText>{t("methods.builderid.description")}</HelpText>
       <RegionField
         disabled={starting}
         error={regionError}

@@ -1,6 +1,5 @@
 import {
   Building06Icon,
-  ChevronRightIcon,
   CodeIcon,
   CookieIcon,
   FolderOpenIcon,
@@ -9,8 +8,9 @@ import {
   ShieldHalfIcon,
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import type { IconSvgElement } from "@hugeicons/react";
 import type { JSX } from "react";
+import { ChoiceList, ChoiceRow } from "@/components/shared/choice-card";
 import { useT } from "@/lib/i18n";
 import type { AddAccountMethod } from "./add-account-dialog";
 import { FlowFooter } from "./flow-context";
@@ -26,6 +26,7 @@ export const METHODS: ReadonlyArray<{ id: AddAccountMethod; icon: IconSvgElement
   { id: "apikey", icon: TerminalIcon },
 ];
 
+/** The eight ways to add an account, as one divided card of rows that open their flow. */
 export function MethodList({
   onSelect,
 }: {
@@ -34,34 +35,19 @@ export function MethodList({
   const { t } = useT("add-account");
   return (
     <>
-      <ul className="flex flex-col gap-2">
-        {METHODS.map(({ id, icon: Icon }) => (
-          <li key={id}>
-            <button
-              className="flex w-full min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-3 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:border-ring"
-              data-method={id}
-              onClick={() => onSelect(id)}
-              type="button"
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-4.5" />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="font-medium text-sm">{t(`methods.${id}.title`)}</span>
-                <span className="text-muted-foreground text-xs">
-                  {t(`methods.${id}.description`)}
-                </span>
-              </span>
-              <HugeiconsIcon
-                icon={ChevronRightIcon}
-                aria-hidden="true"
-                className="size-4 shrink-0 text-muted-foreground"
-              />
-            </button>
-          </li>
+      <ChoiceList>
+        {METHODS.map(({ id, icon }) => (
+          <ChoiceRow
+            data-method={id}
+            description={t(`methods.${id}.description`)}
+            icon={icon}
+            key={id}
+            onClick={() => onSelect(id)}
+            title={t(`methods.${id}.title`)}
+          />
         ))}
-      </ul>
-      <FlowFooter hideBack />
+      </ChoiceList>
+      <FlowFooter />
     </>
   );
 }

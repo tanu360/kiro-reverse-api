@@ -1,11 +1,12 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Input } from "@/components/ui/input";
 import { completeIamSso, startIamSso } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FormField, HelpText, RegionField, SubmitButton, UrlBox } from "../fields";
+import { FlowNote, FormField, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
@@ -96,32 +97,16 @@ export function IamFlow(): JSX.Element {
   const started = Boolean(authorizeUrl);
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
-      <HelpText>{t("methods.iam.description")}</HelpText>
-      <FormField error={errors.startUrl} label={t("iam.startUrl")}>
-        <Input
-          autoCapitalize="off"
-          autoComplete="url"
-          disabled={started || pending}
-          inputMode="url"
-          onChange={(event) => setStartUrl(event.target.value)}
-          placeholder={t("iam.startUrlPlaceholder")}
-          ref={startUrlRef}
-          spellCheck={false}
-          value={startUrl}
-        />
-      </FormField>
-      <RegionField
-        disabled={started || pending}
-        error={errors.region}
-        inputRef={regionRef}
-        onChange={setRegion}
-        value={region}
-      />
       {started ? (
         <>
+          {/* The start URL and region are fixed once the login starts; one line recalls them. */}
+          <FlowNote>
+            <TruncatedText>
+              {t("iam.summary", { url: startUrl.trim(), region: region.trim() })}
+            </TruncatedText>
+          </FlowNote>
           <UrlBox label={t("iam.loginUrl")} url={authorizeUrl} />
-          <HelpText className="text-foreground">{t("iam.completeLogin")}</HelpText>
-          <FormField error={errors.callback} label={t("callbackUrl")}>
+          <FormField error={errors.callback} hint={t("iam.completeLogin")} label={t("callbackUrl")}>
             <Input
               autoCapitalize="off"
               autoComplete="off"
@@ -135,7 +120,30 @@ export function IamFlow(): JSX.Element {
             />
           </FormField>
         </>
-      ) : null}
+      ) : (
+        <>
+          <FormField error={errors.startUrl} label={t("iam.startUrl")}>
+            <Input
+              autoCapitalize="off"
+              autoComplete="url"
+              disabled={pending}
+              inputMode="url"
+              onChange={(event) => setStartUrl(event.target.value)}
+              placeholder={t("iam.startUrlPlaceholder")}
+              ref={startUrlRef}
+              spellCheck={false}
+              value={startUrl}
+            />
+          </FormField>
+          <RegionField
+            disabled={pending}
+            error={errors.region}
+            inputRef={regionRef}
+            onChange={setRegion}
+            value={region}
+          />
+        </>
+      )}
       <FlowFooter>
         <SubmitButton
           busy={pending}

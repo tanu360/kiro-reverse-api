@@ -5,7 +5,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { AddedAccountRef } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { FormField, HelpText, RegionField, SubmitButton } from "../fields";
+import { FlowNote, FormField, RegionField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseApiKeyLines } from "../lib/api-key-lines";
@@ -69,7 +69,7 @@ export function ApiKeyFlow(): JSX.Element {
 
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
-      <HelpText>{t("apikey.help")}</HelpText>
+      <FlowNote>{t("apikey.help")}</FlowNote>
       <FormField error={errors.keys} hint={t("apikey.keysHint")} label={t("apikey.keysLabel")}>
         <Textarea
           autoComplete="off"
@@ -79,6 +79,7 @@ export function ApiKeyFlow(): JSX.Element {
           placeholder={"ksk_...\nksk_...|eu-central-1"}
           spellCheck={false}
           value={keys}
+          variant="mono"
         />
       </FormField>
       <RegionField
