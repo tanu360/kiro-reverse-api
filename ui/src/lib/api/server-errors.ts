@@ -7,7 +7,7 @@ import type { ServerErrorCode } from "./types";
  * its English text without breaking the UI.
  */
 export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string>>> = {
-  api_key_lockout: "api:keys.lockoutWarning",
+  api_key_lockout: "errors:serverError.apiKeyLockout",
 };
 
 /** The `code` of an ApiError's JSON body, or null. */

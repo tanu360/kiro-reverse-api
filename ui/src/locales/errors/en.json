@@ -33,6 +33,7 @@
   "serverError.creditLimitNegative": "The credit limit must be 0 or more.",
   "serverError.microsoftCanceled": "The Microsoft sign-in was canceled. Start again.",
   "serverError.microsoftDuplicate": "This Microsoft account is already added.",
+  "serverError.apiKeyLockout": "API keys are required, and no key would stay enabled, so every client would be locked out.",
   "serverError.ssoSessionExpired": "The sign-in session expired. Start again.",
   "serverError.invalidCallbackUrl": "The callback URL is not valid. Copy the full address again.",
   "serverError.ssoStateMismatch": "The callback URL belongs to another sign-in. Start again and use the new link.",

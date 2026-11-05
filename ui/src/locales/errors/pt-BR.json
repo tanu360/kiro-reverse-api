@@ -33,6 +33,7 @@
   "serverError.creditLimitNegative": "O limite de créditos deve ser 0 ou mais.",
   "serverError.microsoftCanceled": "O login da Microsoft foi cancelado. Comece novamente.",
   "serverError.microsoftDuplicate": "Esta conta Microsoft já foi adicionada.",
+  "serverError.apiKeyLockout": "As chaves de API são obrigatórias e nenhuma ficaria ativada, então todos os clientes seriam bloqueados.",
   "serverError.ssoSessionExpired": "A sessão de login expirou. Comece novamente.",
   "serverError.invalidCallbackUrl": "A URL de callback não é válida. Copie o endereço completo novamente.",
   "serverError.ssoStateMismatch": "A URL de callback pertence a outro login. Comece novamente e use o novo link.",

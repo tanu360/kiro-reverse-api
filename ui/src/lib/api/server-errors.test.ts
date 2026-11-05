@@ -152,13 +152,13 @@ describe("server error codes", () => {
   });
 
   it("translates api_key_lockout by its code, whatever the message says", () => {
-    expect(errorMessage(lockout(), t)).toBe("t(api:keys.lockoutWarning)");
+    expect(errorMessage(lockout(), t)).toBe("t(errors:serverError.apiKeyLockout)");
     const reworded = new ApiError({
       status: 409,
       serverMessage: "no client could authenticate",
       body: { code: "api_key_lockout" },
     });
-    expect(errorMessage(reworded, t)).toBe("t(api:keys.lockoutWarning)");
+    expect(errorMessage(reworded, t)).toBe("t(errors:serverError.apiKeyLockout)");
   });
 
   it("shows real text in every language for each mapped code", () => {
