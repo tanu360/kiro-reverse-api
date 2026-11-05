@@ -32,6 +32,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ModelLogo } from "@/components/shared/model-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +44,6 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
@@ -70,7 +70,6 @@ import {
   ServerChangedNotice,
   SettingsRow,
   SettingsSection,
-  TOUCH_INPUT,
   useSectionSave,
 } from "./settings-section";
 
@@ -282,7 +281,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
         </div>
       }
       badge={
-        <Badge className="tabular-nums" size="sm" tone="neutral">
+        <Badge size="sm" tone="neutral">
           {rows.length}
         </Badge>
       }
@@ -450,7 +449,8 @@ function MappingRowItem({
         ROW_GRID,
         "relative py-1",
         // Opaque while dragged, so it covers the rows it passes.
-        isDragging && "z-10 rounded-lg bg-background shadow-lg outline-1 outline-border",
+        // A barely-there lift: an opaque fill and a hairline, no heavy shadow.
+        isDragging && "z-10 rounded-lg bg-background shadow-xs outline-1 outline-border/60",
         error !== null && "bg-destructive/6",
       )}
       data-error={error !== null || undefined}
@@ -473,27 +473,32 @@ function MappingRowItem({
           <HugeiconsIcon icon={GripVerticalIcon} aria-hidden="true" />
         </Button>
       )}
-      <span className="hidden text-end text-muted-foreground text-xs tabular-nums sm:block">
-        {n}
-      </span>
+      <span className="hidden text-end text-muted-foreground text-xs sm:block">{n}</span>
       {/* One cell on phones (match over target), three columns from sm. */}
       <div className="flex min-w-0 flex-col gap-0.5 sm:contents">
-        <code className="truncate font-mono text-foreground text-sm" title={row.key} translate="no">
-          {row.key}
-        </code>
+        {/* Each name with the mark of the company behind it. */}
+        <span className="flex min-w-0 items-center gap-2">
+          <ModelLogo model={row.key} />
+          <code className="truncate text-foreground text-sm" title={row.key} translate="no">
+            {row.key}
+          </code>
+        </span>
         <span className="flex min-w-0 items-center gap-1.5 sm:contents">
           <HugeiconsIcon
             icon={ArrowRight02Icon}
             aria-hidden="true"
             className="size-3.5 shrink-0 text-muted-foreground sm:size-4"
           />
-          <code
-            className="truncate font-mono text-muted-foreground text-sm sm:text-foreground"
-            title={row.value}
-            translate="no"
-          >
-            {row.value}
-          </code>
+          <span className="flex min-w-0 items-center gap-2">
+            <ModelLogo model={row.value} />
+            <code
+              className="truncate text-muted-foreground text-sm sm:text-foreground"
+              title={row.value}
+              translate="no"
+            >
+              {row.value}
+            </code>
+          </span>
         </span>
       </div>
       <Menu>
@@ -583,15 +588,20 @@ function MappingEditor({
           <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-end sm:gap-3">
             <div className="flex min-w-0 flex-col gap-2">
               <Label htmlFor={`${id}-key`}>{t("modelMappings.match")}</Label>
-              <Input
-                autoComplete="off"
-                className={cn("font-mono", TOUCH_INPUT)}
-                id={`${id}-key`}
-                onChange={(event) => setKey(event.target.value)}
-                placeholder={t("modelMappings.matchPlaceholder")}
-                spellCheck={false}
-                value={key}
-              />
+              {/* The mark follows the name as it is typed. */}
+              <InputGroup>
+                <InputGroupAddon>
+                  <ModelLogo model={key || t("modelMappings.matchPlaceholder")} />
+                </InputGroupAddon>
+                <InputGroupInput
+                  autoComplete="off"
+                  id={`${id}-key`}
+                  onChange={(event) => setKey(event.target.value)}
+                  placeholder={t("modelMappings.matchPlaceholder")}
+                  spellCheck={false}
+                  value={key}
+                />
+              </InputGroup>
             </div>
             <HugeiconsIcon
               icon={ArrowRight02Icon}
@@ -600,15 +610,19 @@ function MappingEditor({
             />
             <div className="flex min-w-0 flex-col gap-2">
               <Label htmlFor={`${id}-value`}>{t("modelMappings.target")}</Label>
-              <Input
-                autoComplete="off"
-                className={cn("font-mono", TOUCH_INPUT)}
-                id={`${id}-value`}
-                onChange={(event) => setValue(event.target.value)}
-                placeholder={t("modelMappings.targetPlaceholder")}
-                spellCheck={false}
-                value={value}
-              />
+              <InputGroup>
+                <InputGroupAddon>
+                  <ModelLogo model={value || t("modelMappings.targetPlaceholder")} />
+                </InputGroupAddon>
+                <InputGroupInput
+                  autoComplete="off"
+                  id={`${id}-value`}
+                  onChange={(event) => setValue(event.target.value)}
+                  placeholder={t("modelMappings.targetPlaceholder")}
+                  spellCheck={false}
+                  value={value}
+                />
+              </InputGroup>
             </div>
           </div>
           <ul className="flex flex-col gap-2 text-muted-foreground text-xs leading-normal">
