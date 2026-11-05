@@ -193,7 +193,7 @@ describe("SettingsPage", () => {
       );
     });
 
-    it("resets to the nine defaults without a request", async () => {
+    it("resets to the nine defaults after confirmation, without a request", async () => {
       mockServer.use(
         http.get(apiUrl("/model-mappings"), () =>
           HttpResponse.json({
@@ -211,15 +211,48 @@ describe("SettingsPage", () => {
       );
       const card = section(SECTION_ID.modelMappings);
 
-      await user.click(within(card).getByRole("button", { name: "Reset to defaults" }));
+      const reset = within(card).getByRole("button", { name: "Reset to defaults" });
+      await user.click(reset);
+      const dialog = await screen.findByRole("alertdialog");
+      expect(
+        within(dialog).getByText("Your 2 mappings are replaced by the 9 defaults when you save."),
+      ).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: "Reset" }));
 
-      expect(mappingTexts(card)).toEqual(
-        defaultModelMappings().map((rule) => `${rule.key} -> ${rule.value}`),
+      await waitFor(() =>
+        expect(mappingTexts(card)).toEqual(
+          defaultModelMappings().map((rule) => `${rule.key} -> ${rule.value}`),
+        ),
       );
       expect(within(card).getByRole("button", { name: "Save" })).not.toHaveAttribute(
         "aria-disabled",
       );
+      // The list is the defaults now: Reset stays focusable but does nothing.
+      expect(reset).toHaveAttribute("aria-disabled", "true");
       expect(await writes()).toEqual([]);
+    });
+
+    it("keeps the list when the reset is canceled", async () => {
+      mockServer.use(
+        http.get(apiUrl("/model-mappings"), () =>
+          HttpResponse.json({
+            mappings: [{ key: "a", value: "b" }],
+            defaults: defaultModelMappings(),
+          }),
+        ),
+      );
+      const { user } = renderWithProviders(<SettingsPage />);
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Mapping 1 actions" })).toBeInTheDocument(),
+      );
+      const card = section(SECTION_ID.modelMappings);
+
+      await user.click(within(card).getByRole("button", { name: "Reset to defaults" }));
+      const dialog = await screen.findByRole("alertdialog");
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+      expect(mappingTexts(card)).toEqual(["a -> b"]);
     });
 
     it("saves the order changed through Move down", async () => {

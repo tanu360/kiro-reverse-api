@@ -32,6 +32,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ModelLogo } from "@/components/shared/model-logo";
 import { SETTINGS_ROW_X, SettingsEmptyRow } from "@/components/shared/settings-rows";
 import { TruncatedText } from "@/components/shared/truncated-text";
@@ -106,6 +107,7 @@ export function ModelMappingsCard(): JSX.Element {
 function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Element {
   const { t } = useT("settings");
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   // Rows of the last render: a server copy of the same rules keeps their ids, so a refetch
   // after Save does not remount the rows and drop focus.
   const rowsRef = useRef<readonly MappingRow[]>([]);
@@ -225,8 +227,24 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
         row.value.toLowerCase().includes(needle),
     );
 
-  // Local only until Save.
-  const resetToDefaults = () => {
+  // Local only until Save. It replaces the whole list, so a list with rules of its own asks
+  // first; a list that already is the defaults has nothing to reset.
+  const defaults = useMemo(() => rowsFromRules(data.defaults), [data.defaults]);
+  const atDefaults = sameMappings(rows, defaults);
+  const resetToDefaults = async () => {
+    if (atDefaults) return;
+    if (rows.length > 0) {
+      const confirmed = await confirm({
+        title: t("modelMappings.resetTitle"),
+        description: t("modelMappings.resetBody", {
+          count: rows.length,
+          defaults: defaults.length,
+        }),
+        confirmLabel: t("modelMappings.resetConfirm"),
+        variant: "danger",
+      });
+      if (!confirmed) return;
+    }
     clearError();
     setFilter("");
     draft.set(rowsFromRules(data.defaults));
@@ -271,7 +289,13 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
             <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
             {t("modelMappings.add")}
           </Button>
-          <Button onClick={resetToDefaults} size="sm" variant="outline">
+          {/* Dimmed but focusable while the list is the defaults. */}
+          <Button
+            aria-disabled={atDefaults || undefined}
+            onClick={resetToDefaults}
+            size="sm"
+            variant="outline"
+          >
             <HugeiconsIcon icon={Undo02Icon} aria-hidden="true" />
             {t("modelMappings.reset")}
           </Button>
