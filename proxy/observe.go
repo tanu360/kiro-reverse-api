@@ -21,6 +21,10 @@ const (
 	observeTopRankMin = 60
 )
 
+// observeNow is the store's clock. Tests pin it so a minute boundary cannot
+// fall between recording and asserting.
+var observeNow = time.Now
+
 // cacheTokenCounts splits out the prompt-cache share of a request's input
 // tokens. Both counts are subsets of the input total, never added to it.
 type cacheTokenCounts struct {
@@ -119,6 +123,8 @@ type observeStore struct {
 	recentReqIdx   int
 	maxAccountRing int
 	accountTouched map[string]int64
+	// generation counts resets, so a late model warmup can tell it is stale.
+	generation uint64
 	// seq goes up on every change to the store, so the tick can skip idle seconds.
 	seq atomic.Uint64
 }
@@ -131,7 +137,7 @@ var (
 func getObserveStore() *observeStore {
 	observeStoreOnce.Do(func() {
 		observeStoreInst = &observeStore{
-			startedAt:      time.Now().Unix(),
+			startedAt:      observeNow().Unix(),
 			accountRings:   make(map[string]*[observeMinuteSlots]minuteBucket),
 			modelStats:     make(map[string]*modelStat),
 			recentErrors:   make([]errorRecord, observeRecentErrs),
@@ -162,7 +168,7 @@ func (s *observeStore) getOrCreateAccountRing(accountID string) *[observeMinuteS
 	}
 	ring, ok := s.accountRings[accountID]
 	if ok {
-		s.accountTouched[accountID] = time.Now().Unix()
+		s.accountTouched[accountID] = observeNow().Unix()
 		return ring
 	}
 	if len(s.accountRings) >= s.maxAccountRing {
@@ -182,11 +188,12 @@ func (s *observeStore) getOrCreateAccountRing(accountID string) *[observeMinuteS
 	}
 	ring = &[observeMinuteSlots]minuteBucket{}
 	s.accountRings[accountID] = ring
-	s.accountTouched[accountID] = time.Now().Unix()
+	s.accountTouched[accountID] = observeNow().Unix()
 	return ring
 }
 
-// Seq is the store's change counter. It moves on every Record* call and Reset.
+// Seq is the store's change counter. It moves on every Record* call and
+// Reset, and when backgroundObserveTick sees the windows move without new data.
 func (s *observeStore) Seq() uint64 {
 	if s == nil {
 		return 0
@@ -194,8 +201,23 @@ func (s *observeStore) Seq() uint64 {
 	return s.seq.Load()
 }
 
+// hasTrafficSince reports whether the global ring holds any request or retry
+// from sinceMin on.
+func (s *observeStore) hasTrafficSince(sinceMin int64) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.globalRing {
+		b := &s.globalRing[i]
+		if b.WindowMin >= sinceMin && (b.Reqs > 0 || b.Retries > 0) {
+			return true
+		}
+	}
+	return false
+}
+
 // countRequestLocked adds one final client request to the global ring, the
-// account's ring (skipped when accountID is empty) and the model's stats.
+// account's ring and the model's stats. A request rejected before any account
+// was tried (empty accountID) counts in the global row only.
 func (s *observeStore) countRequestLocked(now int64, accountID, model string, success bool, inTokens, outTokens int, credits float64, cache cacheTokenCounts) {
 	slot, curMin := curSlot(now)
 	add := func(b *minuteBucket) {
@@ -215,7 +237,9 @@ func (s *observeStore) countRequestLocked(now int64, accountID, model string, su
 	if ring := s.getOrCreateAccountRing(accountID); ring != nil {
 		add(touchBucket(ring, slot, curMin))
 	}
-	if model != "" {
+	//! The model of a rejected request is whatever the client sent; counting it
+	//! would let any caller grow the model mix without bound.
+	if model != "" && accountID != "" {
 		ms := s.modelStatLocked(model)
 		ms.Reqs++
 		ms.InTokens += int64(inTokens)
@@ -243,14 +267,14 @@ func (s *observeStore) RecordFailure(accountID, model string) {
 	if s == nil {
 		return
 	}
-	now := time.Now().Unix()
+	now := observeNow().Unix()
 	slot, curMin := curSlot(now)
 	s.mu.Lock()
 	touchBucket(&s.globalRing, slot, curMin).Retries++
 	if ring := s.getOrCreateAccountRing(accountID); ring != nil {
 		touchBucket(ring, slot, curMin).Retries++
 	}
-	if model != "" {
+	if model != "" && accountID != "" {
 		s.modelStatLocked(model).Retries++
 	}
 	s.mu.Unlock()
@@ -265,7 +289,7 @@ func (s *observeStore) RecordError(accountID, email, model string, status int, m
 		message = message[:240]
 	}
 	rec := errorRecord{
-		TS:        time.Now().Unix(),
+		TS:        observeNow().Unix(),
 		AccountID: accountID,
 		Email:     email,
 		Model:     model,
@@ -297,7 +321,8 @@ func (s *observeStore) RecordTracedRequest(trace *requestTrace, accountID, apiKe
 
 // RecordTracedRequestWithCache logs one final client request and counts it
 // once in the rings and model stats, success or failure. An empty accountID
-// (rejected before an account was picked) counts in the global row only.
+// (rejected before an account was picked) counts in the global row only and
+// leaves the model mix alone.
 func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, accountID, apiKeyID, apiKey, email, model string, inTokens, outTokens int, credits float64, success bool, status int, message string, cache cacheTokenCounts) {
 	if s == nil {
 		return
@@ -307,7 +332,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 		message = message[:500]
 	}
 	rec := requestRecord{
-		TS:           time.Now().Unix(),
+		TS:           observeNow().Unix(),
 		AccountID:    accountID,
 		APIKeyID:     apiKeyID,
 		APIKey:       apiKey,
@@ -385,7 +410,7 @@ func (s *observeStore) Overview() OverviewSnapshot {
 	if s == nil {
 		return OverviewSnapshot{}
 	}
-	now := time.Now().Unix()
+	now := observeNow().Unix()
 	curSlotIdx, curMin := curSlot(now)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -471,15 +496,20 @@ func (s *observeStore) Overview() OverviewSnapshot {
 }
 
 // accountAvailability counts enabled accounts and the ones among them that can
-// take traffic: not banned, not suspended and not over their usage limit
-// (unless overage is on for the account or over-usage is allowed).
-func accountAvailability(accounts []config.Account, allowOverUsage bool) (enabled, available int) {
+// take traffic: not banned, not suspended, not cooling down and not over their
+// usage limit (unless overage is on for the account or over-usage is allowed).
+// It is the same rule as pool.AvailableCount, so /status and the overview agree.
+// coolingDown may be nil.
+func accountAvailability(accounts []config.Account, allowOverUsage bool, coolingDown func(id string) bool) (enabled, available int) {
 	for _, a := range accounts {
 		if !a.Enabled {
 			continue
 		}
 		enabled++
 		if a.Silent || (a.BanStatus != "" && a.BanStatus != "ACTIVE") {
+			continue
+		}
+		if coolingDown != nil && coolingDown(a.ID) {
 			continue
 		}
 		overLimit := a.UsageLimit > 0 && a.UsageCurrent >= a.UsageLimit
@@ -489,6 +519,17 @@ func accountAvailability(accounts []config.Account, allowOverUsage bool) (enable
 		available++
 	}
 	return enabled, available
+}
+
+// accountAvailabilityNow is accountAvailability over the live config and the
+// pool's cooldowns.
+func (h *Handler) accountAvailabilityNow() (enabled, available int) {
+	var coolingDown func(string) bool
+	if h.pool != nil {
+		now := time.Now()
+		coolingDown = func(id string) bool { return h.pool.CooldownUntil(id).After(now) }
+	}
+	return accountAvailability(config.GetAccounts(), config.GetAllowOverUsage(), coolingDown)
 }
 
 type HeatmapCell struct {
@@ -556,7 +597,7 @@ func (s *observeStore) HeatmapWith(opts HeatmapOptions) HeatmapResponse {
 		bucketMin = windowMin
 	}
 	buckets := (windowMin + bucketMin - 1) / bucketMin
-	now := time.Now().Unix()
+	now := observeNow().Unix()
 	curSlotIdx, curMin := curSlot(now)
 
 	collect := func(ring *[observeMinuteSlots]minuteBucket) []HeatmapCell {
@@ -856,13 +897,14 @@ func (s *observeStore) Reset() {
 	}
 	s.mu.Lock()
 	s.resetLocked()
-	s.startedAt = time.Now().Unix()
+	s.startedAt = observeNow().Unix()
 	s.mu.Unlock()
 	s.seq.Add(1)
 }
 
 // resetLocked empties every ring, model stat and recent list.
 func (s *observeStore) resetLocked() {
+	s.generation++
 	for i := range s.globalRing {
 		s.globalRing[i] = minuteBucket{}
 	}
@@ -907,13 +949,50 @@ const (
 	observePruneEvery = 30
 )
 
+// observeTickState remembers what the last observe_tick reflected.
+type observeTickState struct {
+	seq                uint64
+	minute             int64
+	enabled, available int
+}
+
+// advance moves seq when the overview changed without a store write, then
+// reports the seq to publish, if any. Two things change it that way:
+//   - a minute ends while the rings hold traffic: every window is anchored to
+//     the current minute, so rates decay and heatmap cells shift;
+//   - the enabled or available account count changes (a cooldown ends, an
+//     account is enabled), which the overview reports next to the rings.
+func (t *observeTickState) advance(store *observeStore, minute int64, enabled, available int) (uint64, bool) {
+	if minute != t.minute {
+		t.minute = minute
+		//! The heatmap serves up to observeMinuteSlots minutes, so traffic anywhere in
+		//! that span still moves on screen; a store idle for a whole day stays quiet.
+		if store.hasTrafficSince(minute - observeMinuteSlots) {
+			store.seq.Add(1)
+		}
+	}
+	if enabled != t.enabled || available != t.available {
+		t.enabled, t.available = enabled, available
+		store.seq.Add(1)
+	}
+	seq := store.Seq()
+	if seq == t.seq {
+		return seq, false
+	}
+	t.seq = seq
+	return seq, true
+}
+
 // backgroundObserveTick tells admin pages that observe data changed. It sends
-// at most one observe_tick per second, and none while the store is idle.
+// at most one observe_tick per second: after a store write, when a minute ends
+// while recent traffic is on screen, or when account availability changes.
 func (h *Handler) backgroundObserveTick() {
 	ticker := time.NewTicker(observeTickInterval)
 	defer ticker.Stop()
 	store := getObserveStore()
-	lastSeq := store.Seq()
+	_, minute := curSlot(observeNow().Unix())
+	state := observeTickState{seq: store.Seq(), minute: minute}
+	state.enabled, state.available = h.accountAvailabilityNow()
 	for tick := 0; ; tick++ {
 		select {
 		case <-h.stopStatsSaver:
@@ -922,8 +1001,9 @@ func (h *Handler) backgroundObserveTick() {
 			if tick%observePruneEvery == 0 {
 				store.pruneAccountRings(config.GetAccounts())
 			}
-			if seq := store.Seq(); seq != lastSeq {
-				lastSeq = seq
+			_, minute := curSlot(observeNow().Unix())
+			enabled, available := h.accountAvailabilityNow()
+			if seq, ok := state.advance(store, minute, enabled, available); ok {
 				publishObserveTick(seq)
 			}
 		}

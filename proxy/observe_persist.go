@@ -3,7 +3,6 @@ package proxy
 import (
 	"database/sql"
 	"strings"
-	"time"
 
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
@@ -292,9 +291,11 @@ FROM requests WHERE ts >= ? GROUP BY m, account_id`, sinceMin*60)
 	return out, rows.Err()
 }
 
-// loadModelStatsFromDB sums every logged request and retry per model, so the
-// model mix covers everything since the last stats reset.
-func loadModelStatsFromDB() (map[string]*modelStat, error) {
+// loadModelStatsFromDB sums the logged requests and retries per model, up to
+// and including the given row ids, so the model mix covers everything since
+// the last stats reset. Rows without an account (rejected before one was
+// tried) carry whatever model the client sent and are left out.
+func loadModelStatsFromDB(maxRequestID, maxErrorID int64) (map[string]*modelStat, error) {
 	d, err := db.Get()
 	if err != nil {
 		return nil, err
@@ -304,7 +305,7 @@ func loadModelStatsFromDB() (map[string]*modelStat, error) {
 COALESCE(SUM(in_tokens), 0), COALESCE(SUM(out_tokens), 0),
 COALESCE(SUM(cache_read_tokens), 0), COALESCE(SUM(cache_write_tokens), 0),
 COALESCE(SUM(credits), 0), COALESCE(MAX(ts), 0)
-FROM requests WHERE model != '' GROUP BY model`)
+FROM requests WHERE id <= ? AND model != '' AND account_id != '' GROUP BY model`, maxRequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +323,7 @@ FROM requests WHERE model != '' GROUP BY model`)
 		return nil, err
 	}
 
-	rows, err = d.Query(`SELECT model, COUNT(*) FROM errors WHERE model != '' GROUP BY model`)
+	rows, err = d.Query(`SELECT model, COUNT(*) FROM errors WHERE id <= ? AND model != '' AND account_id != '' GROUP BY model`, maxErrorID)
 	if err != nil {
 		return nil, err
 	}
@@ -343,34 +344,73 @@ FROM requests WHERE model != '' GROUP BY model`)
 	return stats, rows.Err()
 }
 
+// maxLoggedIDs is the newest request and error row ids.
+func maxLoggedIDs() (requestID, errorID int64, err error) {
+	d, err := db.Get()
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := d.QueryRow(`SELECT COALESCE(MAX(id), 0) FROM requests`).Scan(&requestID); err != nil {
+		return 0, 0, err
+	}
+	if err := d.QueryRow(`SELECT COALESCE(MAX(id), 0) FROM errors`).Scan(&errorID); err != nil {
+		return 0, 0, err
+	}
+	return requestID, errorID, nil
+}
+
+// modelWarmup is the model-mix half of a LoadFromDB, left to run later: it
+// sums every row up to the ids logged when the rings were rebuilt.
+type modelWarmup struct {
+	store                    *observeStore
+	maxRequestID, maxErrorID int64
+	// generation is the store's reset count the rings were rebuilt at; a
+	// reset since then (a stats reset) makes the logged totals stale.
+	generation uint64
+}
+
 // LoadFromDB rebuilds the store from SQLite: the last day of minute rings, the
 // model mix and the recent request and error lists. It replaces what the store
 // held, so calling it twice counts nothing twice.
 func (s *observeStore) LoadFromDB() error {
+	warmup, err := s.loadWindowFromDB()
+	if err != nil {
+		return err
+	}
+	return warmup.run()
+}
+
+// loadWindowFromDB resets the store and rebuilds the rings and recent lists,
+// which index scans keep fast. The model mix scans the whole log, so it is
+// left to the returned warmup; requests logged meanwhile count live on top.
+func (s *observeStore) loadWindowFromDB() (*modelWarmup, error) {
 	if s == nil {
-		return nil
+		return &modelWarmup{}, nil
 	}
 	reqs, err := loadRecentRequestsFromDB(observeRecentReqs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	errs, err := loadRecentErrorsFromDB(observeRecentErrs)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, curMin := curSlot(time.Now().Unix())
+	_, curMin := curSlot(observeNow().Unix())
 	sinceMin := curMin - observeMinuteSlots + 1
 	minutes, err := loadMinuteRowsFromDB(sinceMin)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	models, err := loadModelStatsFromDB()
+	//! Read before the reset: a request counted after it is logged after it too,
+	//! so the warmup's id bound never counts it a second time.
+	maxRequestID, maxErrorID, err := maxLoggedIDs()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	s.mu.Lock()
 	s.resetLocked()
+	generation := s.generation
 	for i := len(reqs) - 1; i >= 0; i-- {
 		s.recentRequests[s.recentReqIdx] = reqs[i]
 		s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
@@ -390,11 +430,44 @@ func (s *observeStore) LoadFromDB() error {
 			addMinute(touchBucket(ring, slot, row.minute), row.bucket)
 		}
 	}
-	s.modelStats = models
 	s.mu.Unlock()
 	s.seq.Add(1)
 
-	logger.Infof("[Observe] Warmed %d requests, %d errors, %d minute rows, %d models from db", len(reqs), len(errs), len(minutes), len(models))
+	logger.Infof("[Observe] Warmed %d requests, %d errors, %d minute rows from db", len(reqs), len(errs), len(minutes))
+	return &modelWarmup{store: s, maxRequestID: maxRequestID, maxErrorID: maxErrorID, generation: generation}, nil
+}
+
+// run adds the logged model totals to the model mix, on top of whatever was
+// counted live since loadWindowFromDB.
+func (w *modelWarmup) run() error {
+	if w == nil || w.store == nil {
+		return nil
+	}
+	models, err := loadModelStatsFromDB(w.maxRequestID, w.maxErrorID)
+	if err != nil {
+		return err
+	}
+	s := w.store
+	s.mu.Lock()
+	if s.generation != w.generation {
+		s.mu.Unlock()
+		return nil
+	}
+	for model, logged := range models {
+		ms := s.modelStatLocked(model)
+		ms.Reqs += logged.Reqs
+		ms.Retries += logged.Retries
+		ms.InTokens += logged.InTokens
+		ms.OutTokens += logged.OutTokens
+		ms.CacheReadTokens += logged.CacheReadTokens
+		ms.CacheWriteTokens += logged.CacheWriteTokens
+		ms.Credits += logged.Credits
+		ms.LastUsed = max(ms.LastUsed, logged.LastUsed)
+	}
+	s.mu.Unlock()
+	s.seq.Add(1)
+
+	logger.Infof("[Observe] Warmed %d models from db", len(models))
 	return nil
 }
 

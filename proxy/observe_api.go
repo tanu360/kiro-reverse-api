@@ -11,7 +11,7 @@ import (
 
 func (h *Handler) apiObserveOverview(w http.ResponseWriter, _ *http.Request) {
 	snap := getObserveStore().Overview()
-	snap.EnabledAccts, snap.AvailableAccts = accountAvailability(config.GetAccounts(), config.GetAllowOverUsage())
+	snap.EnabledAccts, snap.AvailableAccts = h.accountAvailabilityNow()
 	json.NewEncoder(w).Encode(snap)
 }
 

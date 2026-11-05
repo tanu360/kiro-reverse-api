@@ -238,8 +238,16 @@ func NewHandler() *Handler {
 
 	go h.backgroundObserveTick()
 
-	if err := getObserveStore().LoadFromDB(); err != nil {
+	//! The model mix sums the whole request log, so it warms in the background
+	//! and the listener does not wait on a full-table scan.
+	if warmup, err := getObserveStore().loadWindowFromDB(); err != nil {
 		logger.Warnf("[Observe] Failed to load: %v", err)
+	} else {
+		go func() {
+			if err := warmup.run(); err != nil {
+				logger.Warnf("[Observe] Failed to load the model mix: %v", err)
+			}
+		}()
 	}
 
 	go h.backgroundBackupScheduler()

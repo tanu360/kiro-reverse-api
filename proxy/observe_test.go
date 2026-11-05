@@ -24,6 +24,14 @@ func resetObservePersistenceForTest(t *testing.T) {
 	})
 }
 
+// pinObserveClock stops the store's clock at at for the rest of the test.
+func pinObserveClock(t *testing.T, at time.Time) {
+	t.Helper()
+	old := observeNow
+	observeNow = func() time.Time { return at }
+	t.Cleanup(func() { observeNow = old })
+}
+
 // newObserveStoreForTest gives the test a fresh store over a throwaway SQLite
 // file, so request logging never touches a real data dir.
 func newObserveStoreForTest(t *testing.T) *observeStore {
@@ -76,15 +84,17 @@ func TestObserveStore_RecordAndOverview(t *testing.T) {
 
 func TestObserveStore_CountsEachClientRequestOnce(t *testing.T) {
 	s := newObserveStoreForTest(t)
+	now := time.Now()
+	pinObserveClock(t, now)
 
 	// Two failed attempts, then the third account answers: one request, two retries.
 	s.RecordFailure("acc-a", "m")
 	s.RecordFailure("acc-b", "m")
 	s.RecordTracedRequestWithCache(nil, "acc-c", "", "", "c@x", "m", 10, 5, 0.2, true, 200, "", cacheTokenCounts{Read: 4})
-	// Rejected before any account was picked: global row only.
+	// Rejected before any account was picked: global row only, not the model mix.
 	s.RecordRequest("", "", "m", 0, 0, 0, false, 401, "no key")
 
-	slot, curMin := curSlot(time.Now().Unix())
+	slot, curMin := curSlot(now.Unix())
 	g := s.globalRing[slot]
 	if g.WindowMin != curMin || g.Reqs != 2 || g.Successes != 1 || g.Failures != 1 || g.Retries != 2 || g.CacheReadTokens != 4 {
 		t.Fatalf("global bucket = %+v", g)
@@ -99,7 +109,7 @@ func TestObserveStore_CountsEachClientRequestOnce(t *testing.T) {
 		t.Fatalf("empty account id must not get a ring: %v", len(s.accountRings))
 	}
 	mix := s.ModelMix()
-	if len(mix) != 1 || mix[0].Reqs != 2 || mix[0].Retries != 2 || mix[0].Credits != 0.2 {
+	if len(mix) != 1 || mix[0].Reqs != 1 || mix[0].Retries != 2 || mix[0].Credits != 0.2 {
 		t.Fatalf("model mix = %+v", mix)
 	}
 }
@@ -268,17 +278,59 @@ func TestObserveAccountAvailability(t *testing.T) {
 		{ID: "suspended", Enabled: true, Silent: true},
 		{ID: "over", Enabled: true, UsageCurrent: 50, UsageLimit: 50},
 		{ID: "over-overage", Enabled: true, UsageCurrent: 50, UsageLimit: 50, OverageStatus: "ENABLED"},
+		{ID: "cooling", Enabled: true},
 	}
-	if enabled, available := accountAvailability(accounts, false); enabled != 6 || available != 3 {
-		t.Fatalf("enabled %d available %d, want 6 and 3", enabled, available)
+	cooling := func(id string) bool { return id == "cooling" }
+	if enabled, available := accountAvailability(accounts, false, cooling); enabled != 7 || available != 3 {
+		t.Fatalf("enabled %d available %d, want 7 and 3", enabled, available)
 	}
-	if _, available := accountAvailability(accounts, true); available != 4 {
+	if _, available := accountAvailability(accounts, true, cooling); available != 4 {
 		t.Fatalf("allowOverUsage available %d, want 4", available)
+	}
+	if _, available := accountAvailability(accounts, false, nil); available != 4 {
+		t.Fatalf("without cooldowns available %d, want 4", available)
+	}
+}
+
+func TestObserveTickAdvancesWindowsWhileIdle(t *testing.T) {
+	s := newObserveStoreForTest(t)
+	at := time.Unix(1_700_000_000, 0)
+	pinObserveClock(t, at)
+	_, minute := curSlot(at.Unix())
+	state := observeTickState{seq: s.Seq(), minute: minute}
+
+	if _, ok := state.advance(s, minute+1, 0, 0); ok {
+		t.Fatalf("an empty store published on a minute rollover")
+	}
+	s.RecordFailure("a", "m")
+	if _, ok := state.advance(s, minute+1, 0, 0); !ok {
+		t.Fatalf("a store write did not publish")
+	}
+	if _, ok := state.advance(s, minute+1, 0, 0); ok {
+		t.Fatalf("an unchanged minute published twice")
+	}
+	seq, ok := state.advance(s, minute+2, 0, 0)
+	if !ok || seq != s.Seq() {
+		t.Fatalf("an idle minute rollover with recent traffic did not publish (seq %d, ok %v)", seq, ok)
+	}
+	if _, ok := state.advance(s, minute+observeMinuteSlots, 0, 0); !ok {
+		t.Fatalf("the rollover that drops the last traffic from the heatmap did not publish")
+	}
+	if _, ok := state.advance(s, minute+observeMinuteSlots+1, 0, 0); ok {
+		t.Fatalf("traffic older than the heatmap still published")
+	}
+	if _, ok := state.advance(s, minute+observeMinuteSlots+1, 2, 1); !ok {
+		t.Fatalf("an availability change did not publish")
+	}
+	if _, ok := state.advance(s, minute+observeMinuteSlots+1, 2, 1); ok {
+		t.Fatalf("unchanged availability published")
 	}
 }
 
 func TestObserveTickPublishesOnlyOnChange(t *testing.T) {
 	s := newObserveStoreForTest(t)
+	//! A frozen clock keeps a minute rollover from publishing mid-test.
+	pinObserveClock(t, time.Now())
 	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
