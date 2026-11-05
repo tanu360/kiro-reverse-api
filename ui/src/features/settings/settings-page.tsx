@@ -299,10 +299,11 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   return (
     <nav
       aria-label={t("sections")}
-      className="sticky top-12 z-30 -mx-4 bg-background/95 pt-2 md:-mx-6"
+      className="sticky top-12 z-30 -mx-4 bg-background/95 pt-1 md:-mx-6"
     >
       <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade scrollbarGutter>
-        <div className="flex w-max gap-2 px-4 md:px-6" ref={listRef}>
+        {/* The top 4px of padding sits inside the scroller, so a chip's focus ring is not clipped. */}
+        <div className="flex w-max gap-2 px-4 pt-1 md:px-6" ref={listRef}>
           {groups.map(({ group, labelId, entries }) => (
             <div className="flex shrink-0" key={group}>
               <p className="sr-only" id={labelId}>
