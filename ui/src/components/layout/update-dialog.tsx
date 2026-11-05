@@ -92,7 +92,7 @@ export function UpdateDialog({
         </div>
         {changelog ? (
           <section aria-labelledby="update-changelog" className="flex min-h-0 flex-col gap-2.5">
-            <h3 className="font-medium text-sm" id="update-changelog">
+            <h3 className="font-semibold text-heading leading-6" id="update-changelog">
               {t("shell.update.changelog")}
             </h3>
             {/* A list, one change per line: the release's emoji as the marker (a dot when the
@@ -108,9 +108,7 @@ export function UpdateDialog({
                     aria-hidden="true"
                     className="flex h-lh w-5 shrink-0 items-center justify-center leading-relaxed"
                   >
-                    {line.marker ?? (
-                      <span className="size-1.5 rounded-full bg-muted-foreground/50" />
-                    )}
+                    {line.marker ?? <span className="size-1.5 rounded-full bg-muted-foreground" />}
                   </span>
                   <span className="min-w-0 text-pretty break-words text-foreground/90">
                     {line.tag ? (

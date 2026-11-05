@@ -21,7 +21,7 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
     <UpdateCheckProvider>
       <SidebarProvider style={SIDEBAR_STYLE}>
         <a
-          className="sr-only z-50 rounded-md bg-background px-3 py-2 font-medium text-sm shadow-md focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus-outline"
+          className="sr-only z-50 rounded-lg bg-background font-medium text-sm shadow-md focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:px-3 focus:py-2 focus-outline"
           href="#main"
         >
           {t("shell.skipToContent")}

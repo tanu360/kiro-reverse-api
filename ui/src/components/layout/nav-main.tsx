@@ -64,7 +64,7 @@ export function NavMain(): JSX.Element {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                className="min-w-8"
+                className="min-w-8 group-data-[collapsible=icon]:gap-0"
                 onClick={closeOnMobile}
                 render={<Link search={{ add: true }} to="/accounts" />}
                 tooltip={t("shell.addAccount")}

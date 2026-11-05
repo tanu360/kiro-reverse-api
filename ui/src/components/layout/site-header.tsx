@@ -62,7 +62,10 @@ export function SiteHeader(): JSX.Element {
               />
               <TooltipPopup>{toggleLabel}</TooltipPopup>
             </Tooltip>
-            <Separator className="mx-1 h-4 self-center max-sm:hidden" orientation="vertical" />
+            <Separator
+              className="-ms-1 me-1 h-4 self-center max-sm:hidden"
+              orientation="vertical"
+            />
             {active ? <PageTrail item={active} view={view} /> : null}
           </div>
           <div className="hidden min-w-0 justify-center sm:flex">
