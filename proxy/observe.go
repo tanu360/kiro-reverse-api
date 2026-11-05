@@ -194,30 +194,6 @@ func (s *observeStore) Seq() uint64 {
 	return s.seq.Load()
 }
 
-// RecordSuccess counts a success in the rings and model stats without logging
-// a request.
-//
-// Deprecated: production paths record once per client request through
-// RecordTracedRequestWithCache, which updates the rings itself. Calling both
-// counts the request twice.
-func (s *observeStore) RecordSuccess(accountID, model string, inTokens, outTokens int, credits float64) {
-	s.RecordSuccessWithCache(accountID, model, inTokens, outTokens, credits, cacheTokenCounts{})
-}
-
-// RecordSuccessWithCache is RecordSuccess with the prompt-cache share.
-//
-// Deprecated: see RecordSuccess.
-func (s *observeStore) RecordSuccessWithCache(accountID, model string, inTokens, outTokens int, credits float64, cache cacheTokenCounts) {
-	if s == nil {
-		return
-	}
-	now := time.Now().Unix()
-	s.mu.Lock()
-	s.countRequestLocked(now, accountID, model, true, inTokens, outTokens, credits, cache)
-	s.mu.Unlock()
-	s.seq.Add(1)
-}
-
 // countRequestLocked adds one final client request to the global ring, the
 // account's ring (skipped when accountID is empty) and the model's stats.
 func (s *observeStore) countRequestLocked(now int64, accountID, model string, success bool, inTokens, outTokens int, credits float64, cache cacheTokenCounts) {

@@ -522,12 +522,6 @@ func (p *AccountPool) RecordOutcome(id string, success bool, tokens int, credits
 	_ = config.UpdateAccountStats(id, stats.RequestCount, stats.ErrorCount, stats.TotalTokens, stats.TotalCredits, stats.LastUsed)
 }
 
-// UpdateStats is kept for callers that have not moved to RecordOutcome yet.
-//
-// Deprecated: per-round counting double-counted requests; the final request
-// is recorded once through RecordOutcome. This no longer changes any stats.
-func (p *AccountPool) UpdateStats(id string, tokens int, credits float64) {}
-
 func applyOutcome(acc *config.Account, success bool, tokens int, credits float64) {
 	acc.RequestCount++
 	if !success {

@@ -69,10 +69,9 @@ func TestResolveCacheTokensPrefersUpstreamAndStaysWithinInput(t *testing.T) {
 }
 
 func TestObserveStoreTracksCacheTokensSeparately(t *testing.T) {
-	resetObservePersistenceForTest(t)
-	s := getObserveStore()
-	s.RecordSuccess("acc", "m", 100, 10, 0.1)
-	s.RecordSuccessWithCache("acc", "m", 400, 20, 0.2, cacheTokenCounts{Read: 300, Write: 50})
+	s := newObserveStoreForTest(t)
+	s.RecordTracedRequestWithCache(nil, "acc", "", "", "", "m", 100, 10, 0.1, true, 200, "", cacheTokenCounts{})
+	s.RecordTracedRequestWithCache(nil, "acc", "", "", "", "m", 400, 20, 0.2, true, 200, "", cacheTokenCounts{Read: 300, Write: 50})
 
 	mix := s.ModelMix()
 	if len(mix) != 1 {
