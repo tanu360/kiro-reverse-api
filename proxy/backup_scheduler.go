@@ -12,25 +12,25 @@ import (
 const backupTick = 5 * time.Minute
 
 func (h *Handler) backgroundBackupScheduler() {
-	first := time.NewTimer(time.Until(nextBackupTick(time.Now())))
-	defer first.Stop()
-	select {
-	case <-h.stopStatsSaver:
-		return
-	case <-first.C:
-		h.maybeRunScheduledBackup()
-	}
-
-	ticker := time.NewTicker(backupTick)
-	defer ticker.Stop()
+	timer := time.NewTimer(untilBackupTick(time.Now()))
+	defer timer.Stop()
 	for {
 		select {
 		case <-h.stopStatsSaver:
 			return
-		case <-ticker.C:
+		case <-timer.C:
 			h.maybeRunScheduledBackup()
+			//! Re-armed from the wall clock each time: a Ticker follows the monotonic
+			//! clock, so a slow run or a clock step would drift it off the ticks nextRun names.
+			timer.Reset(untilBackupTick(time.Now()))
 		}
 	}
+}
+
+// untilBackupTick is how long from now until the first scheduler tick after it.
+func untilBackupTick(now time.Time) time.Duration {
+	//! Truncate drops the monotonic reading, so the wait is measured on the wall clock.
+	return now.Truncate(backupTick).Add(backupTick).Sub(now)
 }
 
 // nextBackupTick is the first scheduler tick at or after t.
@@ -95,7 +95,7 @@ func (h *Handler) maybeRunScheduledBackup() {
 	if err := config.MarkScheduleRan(now); err != nil {
 		logger.Warnf("[Backup] Persist scheduled backup timestamp failed: %v", err)
 	}
-	if err := config.PruneScheduled(); err != nil {
+	if _, err := config.PruneScheduled(); err != nil {
 		logger.Warnf("[Backup] Prune scheduled backups failed: %v", err)
 	}
 	publishEvent(eventBackupCreated, entry.ID)

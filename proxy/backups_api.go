@@ -11,14 +11,13 @@ import (
 	"time"
 
 	"kiro-proxy/config"
+	"kiro-proxy/logger"
 )
 
 const (
 	backupKeepMin = 1
 	//! Matches KEEP_MAX in ui/src/features/backups/backup-model.ts.
 	backupKeepMax = 200
-	// backupKeepDefault is what PruneScheduled keeps when keep was never set.
-	backupKeepDefault = 50
 )
 
 // writeBackupError answers 404 for an unknown backup, 400 with a code for a
@@ -158,7 +157,8 @@ func (h *Handler) apiBackupsRestoreUpload(w http.ResponseWriter, r *http.Request
 }
 
 // backupScheduleView is the schedule as GET and POST /backups/schedule return
-// it. Unset fields are omitted, so a never-configured schedule is {}.
+// it. Unset fields are omitted, so a never-configured schedule is
+// {"keep":50}: keep is always the number of scheduled backups actually kept.
 type backupScheduleView struct {
 	Enabled bool   `json:"enabled,omitempty"`
 	Cadence string `json:"cadence,omitempty"`
@@ -172,7 +172,7 @@ func scheduleView(sched config.BackupSchedule, now time.Time) backupScheduleView
 	return backupScheduleView{
 		Enabled: sched.Enabled,
 		Cadence: sched.Cadence,
-		Keep:    sched.Keep,
+		Keep:    sched.EffectiveKeep(),
 		LastRun: sched.LastRun,
 		NextRun: nextScheduledBackup(sched, now),
 	}
@@ -196,29 +196,33 @@ func (h *Handler) apiBackupsScheduleUpdate(w http.ResponseWriter, r *http.Reques
 		json.NewEncoder(w).Encode(map[string]string{"error": "cadence must be hourly, daily or weekly", "code": "invalid_cadence"})
 		return
 	}
-	if sched.Keep < backupKeepMin || sched.Keep > backupKeepMax {
+	//! The old UI never enforced its max, so a stored keep above it stays valid while it is sent back unchanged.
+	legacyKeep := sched.Keep > backupKeepMax && sched.Keep == config.GetBackupSchedule().Keep
+	if (sched.Keep < backupKeepMin || sched.Keep > backupKeepMax) && !legacyKeep {
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("keep must be between %d and %d", backupKeepMin, backupKeepMax), "code": "invalid_keep"})
 		return
 	}
 
-	previousKeep := config.GetBackupSchedule().Keep
-	if previousKeep <= 0 {
-		previousKeep = backupKeepDefault
-	}
 	if err := config.UpdateBackupSchedule(sched); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
-	if sched.Keep < previousKeep {
-		//! Prune now: waiting for the next scheduled run keeps rows the admin just asked to drop.
-		if err := config.PruneScheduled(); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-			return
+	resp := map[string]interface{}{}
+	//! A schedule that is off never prunes, as before. One that is on prunes now, not at its
+	//! next run, so a lowered keep takes effect at once and a failed prune is retried on the next save.
+	if sched.Enabled {
+		removed, err := config.PruneScheduled()
+		if removed > 0 {
+			publishEvent(eventBackupDeleted, "*")
 		}
-		publishEvent(eventBackupDeleted, "*")
+		if err != nil {
+			//! The schedule is saved; answering 500 would tell the admin it was not.
+			logger.Warnf("[Backup] Prune scheduled backups failed: %v", err)
+			resp["pruneError"] = err.Error()
+		}
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"schedule": scheduleView(config.GetBackupSchedule(), time.Now())})
+	resp["schedule"] = scheduleView(config.GetBackupSchedule(), time.Now())
+	json.NewEncoder(w).Encode(resp)
 }

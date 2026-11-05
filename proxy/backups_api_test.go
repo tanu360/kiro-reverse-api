@@ -110,6 +110,81 @@ func TestBackupScheduleLoweringKeepPrunes(t *testing.T) {
 	}
 }
 
+func countScheduledBackups(t *testing.T) int {
+	t.Helper()
+	list, err := config.ListBackups(true)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	n := 0
+	for _, entry := range list {
+		if entry.Kind == "scheduled" {
+			n++
+		}
+	}
+	return n
+}
+
+func TestBackupScheduleOffNeverPrunesAndLegacyKeepSurvives(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	h := &Handler{}
+	rec := httptest.NewRecorder()
+	h.apiBackupsScheduleGet(rec, httptest.NewRequest(http.MethodGet, "/admin/api/backups/schedule", nil))
+	if keep := decodeJSON(t, rec)["schedule"].(map[string]interface{})["keep"]; keep != float64(config.DefaultBackupKeep) {
+		t.Fatalf("unset keep shows as %v, want the %d actually kept", keep, config.DefaultBackupKeep)
+	}
+
+	// A config the old UI wrote: keep 500, which its unenforced max let through.
+	if err := config.UpdateBackupSchedule(config.BackupSchedule{Enabled: true, Cadence: "daily", Keep: 500}); err != nil {
+		t.Fatalf("seed schedule: %v", err)
+	}
+	for range 3 {
+		if _, err := config.CreateBackup("scheduled", "auto-daily"); err != nil {
+			t.Fatalf("create backup: %v", err)
+		}
+	}
+	if rec := postSchedule(h, `{"enabled":false,"cadence":"daily","keep":1}`); rec.Code != http.StatusOK {
+		t.Fatalf("turn off: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if n := countScheduledBackups(t); n != 3 {
+		t.Fatalf("turning the schedule off pruned to %d", n)
+	}
+
+	if err := config.UpdateBackupSchedule(config.BackupSchedule{Enabled: true, Cadence: "daily", Keep: 500}); err != nil {
+		t.Fatalf("seed schedule: %v", err)
+	}
+	if rec := postSchedule(h, `{"enabled":true,"cadence":"weekly","keep":500}`); rec.Code != http.StatusOK {
+		t.Fatalf("unchanged legacy keep: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := config.GetBackupSchedule(); got.Keep != 500 || got.Cadence != "weekly" {
+		t.Fatalf("schedule = %+v", got)
+	}
+	if rec := postSchedule(h, `{"enabled":true,"cadence":"weekly","keep":300}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("a new keep above the max: status=%d, want 400", rec.Code)
+	}
+	if n := countScheduledBackups(t); n != 3 {
+		t.Fatalf("an unchanged keep pruned to %d", n)
+	}
+}
+
+func TestUntilBackupTickLandsOnTheWallClock(t *testing.T) {
+	const tick = int64(1_700_000_100) // a multiple of 300 s
+	for _, c := range []struct {
+		now  time.Time
+		want time.Duration
+	}{
+		{time.Unix(tick, 0), backupTick},
+		{time.Unix(tick, int64(time.Second)), backupTick - time.Second},
+		{time.Unix(tick-1, 0), time.Second},
+	} {
+		if got := untilBackupTick(c.now); got != c.want {
+			t.Fatalf("untilBackupTick(%v) = %v, want %v", c.now, got, c.want)
+		}
+	}
+}
+
 func TestBackupErrorsUse404And400(t *testing.T) {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatalf("config.Init: %v", err)

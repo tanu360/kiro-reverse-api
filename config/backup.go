@@ -251,25 +251,27 @@ func pruneAutoBackups(keep int) {
 	}
 }
 
-func pruneKindLocked(kind string, keep int) error {
+// pruneKindLocked deletes all but the newest keep backups of kind and reports
+// how many it deleted.
+func pruneKindLocked(kind string, keep int) (int, error) {
 	if keep <= 0 {
-		return nil
+		return 0, nil
 	}
 	d, err := db.Get()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	ids, err := queryBackupIDs(d, `SELECT id FROM backup_entries WHERE kind=?
 		ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?`, kind, keep)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	for _, id := range ids {
+	for i, id := range ids {
 		if _, err := d.Exec(`DELETE FROM backup_entries WHERE id=?`, id); err != nil {
-			return err
+			return i, err
 		}
 	}
-	return nil
+	return len(ids), nil
 }
 
 // queryBackupIDs collects every id the query returns, or an error if any row
@@ -687,12 +689,22 @@ func MarkScheduleRan(now int64) error {
 	return saveLocked()
 }
 
-func PruneScheduled() error {
-	sched := GetBackupSchedule()
-	keep := 50
-	if sched.Keep > 0 {
-		keep = sched.Keep
+// DefaultBackupKeep is how many scheduled backups are kept while the schedule
+// has no keep set.
+const DefaultBackupKeep = 50
+
+// EffectiveKeep is how many scheduled backups the schedule keeps.
+func (s BackupSchedule) EffectiveKeep() int {
+	if s.Keep > 0 {
+		return s.Keep
 	}
+	return DefaultBackupKeep
+}
+
+// PruneScheduled deletes the scheduled backups beyond the schedule's keep and
+// reports how many it deleted.
+func PruneScheduled() (int, error) {
+	keep := GetBackupSchedule().EffectiveKeep()
 	backupMu.Lock()
 	defer backupMu.Unlock()
 	return pruneKindLocked("scheduled", keep)
