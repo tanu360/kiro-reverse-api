@@ -55,7 +55,7 @@
   "confirmUpload": "Restaurar de {name}?",
   "restoreBody": "As contas e configurações atuais são substituídas. Um ponto de reversão é salvo antes. Você será desconectado.",
   "restored": "Backup restaurado. Entre com a senha armazenada no backup.",
-  "confirmDelete": "Excluir este backup?",
+  "confirmDelete": "Excluir o backup de {time}?",
   "deleteBody": "O arquivo de backup é removido do servidor. Não é possível desfazer.",
   "deleted": "Backup excluído",
   "empty": "Nenhum backup por enquanto",

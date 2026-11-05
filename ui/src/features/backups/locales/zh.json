@@ -52,7 +52,7 @@
   "confirmUpload": "从 {name} 恢复？",
   "restoreBody": "当前的账号和设置会被替换。系统会先保存一个回滚点。恢复后你会退出登录。",
   "restored": "备份已恢复。请使用备份中的密码登录。",
-  "confirmDelete": "删除此备份？",
+  "confirmDelete": "删除 {time} 的备份？",
   "deleteBody": "备份文件会从服务器上删除。此操作无法撤销。",
   "deleted": "备份已删除",
   "empty": "暂无备份",

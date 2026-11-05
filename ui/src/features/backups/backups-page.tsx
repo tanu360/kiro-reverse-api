@@ -177,8 +177,10 @@ export function BackupsPage(): JSX.Element {
       onDelete: (entry: BackupEntry) =>
         void (async () => {
           if (isBusy(entry.id)) return;
+          const time = formatDateTime(entry.createdAt, lang);
           const ok = await confirm({
-            title: t("confirmDelete"),
+            title: t("confirmDelete", { time }),
+            target: time,
             description: t("deleteBody"),
             confirmLabel: t("delete"),
             variant: "danger",

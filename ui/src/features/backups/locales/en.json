@@ -54,7 +54,7 @@
   "confirmUpload": "Restore from {name}?",
   "restoreBody": "Current accounts and settings are replaced. A rollback point is saved first. You will be signed out.",
   "restored": "Backup restored. Sign in with the password stored in the backup.",
-  "confirmDelete": "Delete this backup?",
+  "confirmDelete": "Delete the backup from {time}?",
   "deleteBody": "The backup file is removed from the server. This cannot be undone.",
   "deleted": "Backup deleted",
   "empty": "No backups yet",

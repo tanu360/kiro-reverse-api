@@ -109,9 +109,9 @@ function RowMenu({
       <MenuTrigger
         render={
           <Button
-            aria-busy={busy || undefined}
             aria-label={label}
             data-row-focus={entry.id}
+            loading={busy}
             size="icon"
             variant="quiet"
           />

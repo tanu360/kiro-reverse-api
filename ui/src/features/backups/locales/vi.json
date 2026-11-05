@@ -52,7 +52,7 @@
   "confirmUpload": "Khôi phục từ {name}?",
   "restoreBody": "Tài khoản và cài đặt hiện tại sẽ bị thay thế. Điểm hoàn tác được lưu trước. Bạn sẽ bị đăng xuất.",
   "restored": "Đã khôi phục bản sao lưu. Đăng nhập bằng mật khẩu lưu trong bản sao lưu.",
-  "confirmDelete": "Xóa bản sao lưu này?",
+  "confirmDelete": "Xóa bản sao lưu lúc {time}?",
   "deleteBody": "Tệp sao lưu sẽ bị xóa khỏi máy chủ. Không thể hoàn tác thao tác này.",
   "deleted": "Đã xóa bản sao lưu",
   "empty": "Chưa có bản sao lưu",

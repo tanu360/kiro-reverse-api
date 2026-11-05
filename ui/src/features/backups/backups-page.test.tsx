@@ -329,7 +329,9 @@ describe("BackupsPage", () => {
     const { user } = await renderPage();
     const [first] = newestFirst();
     await rowAction(user, dataRows()[0], "Delete");
-    expect(within(dialog()).getByText("Delete this backup?")).toBeInTheDocument();
+    expect(dialog()).toHaveAccessibleName(
+      `Delete the backup from ${formatDateTime(first.createdAt, "en")}?`,
+    );
     expect(
       within(dialog()).getByText(
         "The backup file is removed from the server. This cannot be undone.",
