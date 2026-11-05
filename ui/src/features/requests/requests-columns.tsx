@@ -26,14 +26,14 @@ import { ErrorTypeLabel } from "./error-type-badge";
 import { formatRowDate, isKnownEndpoint, normalizeApiKeyMask } from "./request-model";
 
 /*
- * Width caps that keep the table inside a 1024 px desktop with the sidebar open (and a 820 px
+ * Width caps that keep the table inside a 1024 px desktop with the sidebar open (and a 768-820 px
  * tablet): names and the token breakdown cut with an ellipsis (tooltips carry the full text) until
  * the 7xl container step has room for them.
  */
 const NAME_CAP = "max-w-28 @5xl/requests:max-w-32 @7xl/requests:max-w-40";
 // Model IDs differ only in their version suffix, so the model gets more room than the token line.
-const MODEL_CAP = "max-w-32 @5xl/requests:max-w-40 @7xl/requests:max-w-48";
-const TOKENS_CAP = "max-w-36 @7xl/requests:max-w-none";
+const MODEL_CAP = "max-w-28 @3xl/requests:max-w-32 @5xl/requests:max-w-40 @7xl/requests:max-w-48";
+const TOKENS_CAP = "max-w-32 @3xl/requests:max-w-36 @7xl/requests:max-w-none";
 
 function Muted({ children = EMPTY }: { children?: string }): JSX.Element {
   return <span className="text-muted-foreground">{children}</span>;
@@ -118,7 +118,7 @@ function StatusCell({ record }: { record: RequestRecord }): JSX.Element {
       <StatusBadge record={record} />
       {!record.success && record.errorType ? (
         <ErrorTypeLabel
-          className="text-meta text-muted-foreground @5xl/requests:hidden"
+          className="max-w-28 text-meta text-muted-foreground @5xl/requests:hidden"
           type={record.errorType}
         />
       ) : null}

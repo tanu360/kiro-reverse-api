@@ -66,7 +66,7 @@ export function RequestsToolbar({
   return (
     // One row from the @md container step up; below it each control takes a full-width row.
     <div className="flex min-w-0 flex-wrap items-center gap-2" ref={rootRef}>
-      <InputGroup className="min-w-32 flex-1 basis-full @md/requests:basis-auto @3xl/requests:max-w-md">
+      <InputGroup className="min-w-32 flex-1 basis-full @md/requests:basis-0 @3xl/requests:max-w-md">
         <InputGroupAddon>
           <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
         </InputGroupAddon>
