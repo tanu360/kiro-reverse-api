@@ -125,6 +125,8 @@ export function AdminEventsProvider(props: {
     let source: EventSourceLike | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let observeTimer: ReturnType<typeof setTimeout> | null = null;
+    // The observe store's change counter from the last observe_tick on this connection.
+    let observeSeq: string | undefined;
     const changeTimers = new Map<ChangeEventType, ReturnType<typeof setTimeout>>();
 
     const react = (event: AdminEvent) => {
@@ -139,6 +141,11 @@ export function AdminEventsProvider(props: {
             }
           }, CHANGE_DEBOUNCE_MS),
         );
+      }
+      if (event.type === "observe_tick" && event.payload !== undefined) {
+        // The payload is the store's change counter: a repeat carries no new data.
+        if (event.payload === observeSeq) return;
+        observeSeq = event.payload;
       }
       switch (event.type) {
         case "hello":
@@ -203,6 +210,7 @@ export function AdminEventsProvider(props: {
       if (disposed) return;
       const es = factory(`${API_BASE}/events?ticket=${encodeURIComponent(ticket)}`);
       source = es;
+      observeSeq = undefined;
       es.onopen = () => {
         if (source === es) setStatus("open");
       };

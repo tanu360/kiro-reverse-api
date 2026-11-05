@@ -149,6 +149,30 @@ describe("AdminEventsProvider", () => {
     expect(slow).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores an observe_tick that repeats the last change counter", async () => {
+    const live = vi.fn(async () => "live");
+    const slow = vi.fn(async () => "slow");
+    const client = renderProvider(<Observers live={live} slow={slow} />);
+    await flush();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const tick = (seq: string) =>
+      act(() =>
+        latest().emit("observe_tick", JSON.stringify({ type: "observe_tick", payload: seq })),
+      );
+
+    tick("7");
+    await advance(1200);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+
+    tick("7");
+    await advance(1200);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+
+    tick("8");
+    await advance(1200);
+    expect(invalidate).toHaveBeenCalledTimes(2);
+  });
+
   it("closes on error and reconnects after 5000 ms with a fresh ticket", async () => {
     renderProvider();
     await flush();
