@@ -234,7 +234,10 @@ function RowActions({
   );
 }
 
-/** A backup as a card: time and menu, how long ago and the size, the note, kind and accounts. */
+/**
+ * A backup as a row of the phone list: time and menu, how long ago and the size, the note, kind
+ * and accounts.
+ */
 function BackupCard({
   entry,
   actions,
@@ -250,8 +253,9 @@ function BackupCard({
     <ListCard
       action={<RowMenu actions={actions} entry={entry} label={t("rowActions", { time })} />}
       footer={
-        // One line: a long count wraps in its own column, so every card's badge sits bottom-left.
-        <div className="flex items-end justify-between gap-3">
+        // One line: a long count wraps in its own column, so every card's badge sits bottom-left,
+        // on the baseline of the count's last line.
+        <div className="flex items-baseline-last justify-between gap-3">
           <KindBadge kind={entry.kind} t={t} />
           <span className="min-w-0 text-end text-meta text-muted-foreground">
             {t("accountsInBackup")}: <AccountsCell entry={entry} t={t} />
@@ -264,6 +268,7 @@ function BackupCard({
         </span>
       }
       title={<time dateTime={isoTime(entry.createdAt)}>{time}</time>}
+      variant="row"
     >
       {note === EMPTY ? null : <p className="break-words text-muted-foreground text-sm">{note}</p>}
     </ListCard>
@@ -335,9 +340,10 @@ export function BackupsTable({
   return (
     <DataTable
       caption={t("list.caption")}
-      cardLayout="grid"
-      // Cards on a phone, the table from 42rem as on Accounts and Requests. With the short
-      // Accounts header its five columns fit the 744 px a 1024 px window leaves, unscrolled.
+      cardLayout="divided"
+      // Rows divided inside the card on a phone, the table from 42rem, as on Accounts and
+      // Requests. With the short Accounts header its five columns fit the 744 px a 1024 px window
+      // leaves, unscrolled.
       cardsBelow="2xl"
       columns={columns}
       data={rows}

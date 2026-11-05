@@ -267,8 +267,12 @@ export function ExportDialog({
                 value={query}
               />
             </InputGroup>
+            {/*
+              Inset like the rows below (their 16 px padding and the list's border), so its
+              checkbox heads the column of row checkboxes.
+            */}
             {/* biome-ignore lint/a11y/noLabelWithoutControl: the Base UI Checkbox inside is the control. */}
-            <label className="flex cursor-pointer items-center gap-3 self-start font-medium text-sm/5">
+            <label className="flex cursor-pointer items-center gap-3 self-start ps-4.25 font-medium text-sm/5">
               <Checkbox
                 checked={allVisible}
                 disabled={visible.length === 0}

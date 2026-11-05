@@ -21,6 +21,7 @@ import {
   CardPanel,
   CardTitle,
 } from "@/components/ui/card";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { getAccountModelsCached, testAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -205,16 +206,17 @@ export function TestAccountDialog({
       <div className="flex flex-col gap-4">
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="truncate font-medium text-sm">{displayEmail(account.email, account.id)}</p>
-          <p className="truncate text-muted-foreground text-xs">
+          <p className="truncate text-meta text-muted-foreground">
             {authLabel(account, t)} · {account.proxyURL || t("test.globalProxy")}
           </p>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="font-medium text-sm" htmlFor={fieldId}>
-            {t("test.model")}
-          </label>
+        <Field>
+          <FieldLabel htmlFor={fieldId}>{t("test.model")}</FieldLabel>
           <Autocomplete
+            // A whole model id in the field (the default, or a pick) lists every cached model;
+            // typing anything else filters the list as usual.
+            filter={models.includes(modelValue) ? null : undefined}
             items={models}
             onOpenChange={setSuggestionsOpen}
             onValueChange={(value) => setModel(value)}
@@ -229,7 +231,8 @@ export function TestAccountDialog({
               placeholder={t("test.modelPlaceholder")}
               showTrigger={models.length > 0}
               spellCheck={false}
-              triggerProps={{ "aria-label": t("test.showModels") }}
+              // Its own name: inside a Field the trigger would take the field's label instead.
+              triggerProps={{ "aria-label": t("test.showModels"), "aria-labelledby": undefined }}
             />
             <AutocompletePopup>
               <AutocompleteEmpty>{t("test.noModelMatches")}</AutocompleteEmpty>
@@ -243,16 +246,13 @@ export function TestAccountDialog({
               </AutocompleteList>
             </AutocompletePopup>
           </Autocomplete>
-          <p
+          <FieldDescription
             aria-live="polite"
-            className={cn(
-              "text-xs",
-              cached.isError ? "text-warning-foreground" : "text-muted-foreground",
-            )}
+            className={cached.isError ? "text-warning-foreground" : undefined}
           >
             {status}
-          </p>
-        </div>
+          </FieldDescription>
+        </Field>
 
         <Card divided>
           <CardHeader>
@@ -278,8 +278,7 @@ export function TestAccountDialog({
             <CardPanel
               aria-label={t("testLog.title")}
               className="scrollbar-y max-h-64 min-h-32 overflow-y-auto font-mono text-meta tabular-nums leading-relaxed"
-              ref={logRef}
-              render={<ol />}
+              render={<ol ref={logRef} />}
               role="log"
             >
               {lines.map((line) => (

@@ -26,11 +26,24 @@ import { AccountRowActions, EnabledSwitch, type RowActionHandlers } from "./acco
 
 /**
  * Low-priority columns show only when the table is wide enough for them: Requests from a 56rem
- * table (@4xl), Last used and Token expiry from 64rem (@5xl). The query container is DataTable's
- * own wrapper. The detail sheet and the cards still show these values.
+ * table (@4xl), Last used from 64rem (@5xl), Token expiry from 72rem (@6xl). The query container
+ * is DataTable's own wrapper. The detail sheet and the cards still show these values.
+ *
+ * Every other column has a fixed width, set on the column so the header, the loading rows and
+ * the data rows share it; Account takes the rest of the table. So the headers stay put while the
+ * rows load and when a filter empties the table, and each tier leaves Account at least 15rem
+ * (14rem at @3xl, under 13rem only in the 42 to 48rem band).
  */
 const MEDIUM_UP = "hidden @4xl/data-table:table-cell";
 const WIDE_ONLY = "hidden @5xl/data-table:table-cell";
+const WIDEST_ONLY = "hidden @6xl/data-table:table-cell";
+// Three icon buttons (gap-0.5) and the cell padding, at the button's fine and coarse sizes.
+const ACTIONS_WIDTH = "w-32.5 pointer-coarse:w-38.5";
+
+/** The same width classes on a column's header and cells. */
+function width(classes: string): { className: string; headerClassName: string } {
+  return { className: classes, headerClassName: classes };
+}
 
 const SORTABLE = new Set<string>(ACCOUNT_SORTS);
 
@@ -79,35 +92,32 @@ export function AccountsTable({
         id: "account",
         header: t("columns.account"),
         sortable: true,
-        // A fixed measure, so a long address truncates (with a tooltip) instead of widening
-        // the column. It steps with the table's width (not the viewport's), so a mid-size table
-        // gives the meta line the room the Status column does not need.
+        // The one column without a width: it takes what the others leave. The content does not
+        // size it (inline-size containment), so a long address truncates (with a tooltip)
+        // instead of widening the column, and loading rows measure the same as data rows.
         cell: (account) => (
-          <AccountIdentity
-            account={account}
-            className="w-44 @3xl/data-table:w-52 @6xl/data-table:w-64"
-          />
+          <AccountIdentity account={account} className="w-full contain-inline-size" />
         ),
       },
       {
         id: "status",
         header: t("columns.status"),
         sortable: true,
+        ...width("w-36"),
         cell: (account) => <StatusPill account={account} />,
       },
       {
         id: "usage",
         header: t("columns.usage"),
         sortable: true,
-        className: "w-40",
+        ...width("w-40"),
         cell: (account) => <UsageMeter account={account} />,
       },
       {
         id: "requests",
         header: t("columns.requests"),
         sortable: true,
-        className: MEDIUM_UP,
-        headerClassName: MEDIUM_UP,
+        ...width(`w-24 ${MEDIUM_UP}`),
         align: "end",
         cell: (account) => formatNumber(account.requestCount, lang),
       },
@@ -115,27 +125,27 @@ export function AccountsTable({
         id: "lastUsed",
         header: t("columns.lastUsed"),
         sortable: true,
-        className: WIDE_ONLY,
-        headerClassName: WIDE_ONLY,
+        ...width(`w-32 ${WIDE_ONLY}`),
         cell: (account) => <LastUsedText account={account} />,
       },
       {
         id: "expiry",
         header: t("columns.expiry"),
         sortable: true,
-        className: WIDE_ONLY,
-        headerClassName: WIDE_ONLY,
+        ...width(`w-28 ${WIDEST_ONLY}`),
         cell: (account) => <TokenExpiryText account={account} />,
       },
       {
         id: "enabled",
         header: t("columns.enabled"),
+        ...width("w-20"),
         cell: (account) => <EnabledSwitch account={account} />,
       },
       {
         id: "actions",
         header: <span className="sr-only">{tc("table.actions")}</span>,
         align: "end",
+        ...width(ACTIONS_WIDTH),
         // Pinned, so the row actions stay in reach if a long translation makes the table scroll.
         sticky: "end",
         cell: (account) => (

@@ -93,6 +93,15 @@ describe("TestAccountDialog", () => {
     expect(within(dialog).getByRole("button", { name: "Show models" })).toBeInTheDocument();
   });
 
+  it("lists every cached model while the field holds a whole model id", async () => {
+    const { dialog, user } = await openDialog(accountBy((a) => a.email.startsWith("dana.")));
+    expect(within(dialog).getByRole("combobox", { name: "Test model" })).toHaveValue(
+      "claude-sonnet-4.6",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Show models" }));
+    expect(await screen.findAllByRole("option")).toHaveLength(6);
+  });
+
   it("keeps the model id on one line in the log", async () => {
     const { dialog, user } = await openDialog(accountBy((a) => a.email.startsWith("dana.")));
     await user.click(within(dialog).getByRole("button", { name: "Test" }));

@@ -313,9 +313,8 @@ describe("AccountsPage layout", () => {
     const { table } = await renderAccounts();
     const header = (name: string) => within(table).getByRole("columnheader", { name });
     expect(header("Requests")).toHaveClass("hidden", "@4xl/data-table:table-cell");
-    for (const name of ["Last used", "Token expiry"]) {
-      expect(header(name)).toHaveClass("hidden", "@5xl/data-table:table-cell");
-    }
+    expect(header("Last used")).toHaveClass("hidden", "@5xl/data-table:table-cell");
+    expect(header("Token expiry")).toHaveClass("hidden", "@6xl/data-table:table-cell");
     for (const name of ["Account", "Status", "Usage", "Enabled"]) {
       expect(header(name)).not.toHaveClass("hidden");
     }
