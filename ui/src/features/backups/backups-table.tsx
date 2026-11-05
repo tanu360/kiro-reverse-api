@@ -341,10 +341,10 @@ export function BackupsTable({
     <DataTable
       caption={t("list.caption")}
       cardLayout="divided"
-      // Rows divided inside the card on a phone, the table from 42rem, as on Accounts and
-      // Requests. With the short Accounts header and the note's 8rem floor its five columns fit
-      // that 672 px container, unscrolled, so the pinned actions never cover the counts.
-      cardsBelow="2xl"
+      // Rows divided inside the card on a phone and a narrow tablet, the table from 48rem: the
+      // longer pt-BR and vi headers with the note's 8rem floor need that 768 px container for
+      // the five columns to fit unscrolled, so the pinned actions never cover the counts.
+      cardsBelow="3xl"
       columns={columns}
       data={rows}
       density="comfortable"

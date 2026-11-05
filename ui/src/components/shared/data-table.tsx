@@ -80,7 +80,7 @@ export interface DataTableProps<T> {
   rowLabel?: (row: T) => string;
   /**
    * Below this container width (DataTable's own, not the viewport) the rows render as cards
-   * through `renderCard`: lg = 32rem, 2xl = 42rem, 4xl = 56rem, 5xl = 64rem (a table whose
+   * through `renderCard`: lg = 32rem, 2xl = 42rem, 3xl = 48rem, 4xl = 56rem, 5xl = 64rem (a table whose
    * first column needs about 250 px beside wide figure columns).
    */
   cardsBelow?: CardsBelow;
@@ -124,7 +124,7 @@ export interface DataTableProps<T> {
   density?: "compact" | "comfortable";
 }
 
-type CardsBelow = "lg" | "2xl" | "4xl" | "5xl";
+type CardsBelow = "lg" | "2xl" | "3xl" | "4xl" | "5xl";
 
 /** Set by DataTableCard: a DataTable inside it is inset without the prop. */
 export const DataTableInsetContext = createContext(false);
@@ -139,6 +139,7 @@ const DENSITY_CLASS = { compact: undefined, comfortable: "[&_tbody_td]:py-3" } a
 const CARD_SWITCH: Record<CardsBelow, { cards: string; table: string }> = {
   lg: { cards: "@lg/data-table:hidden", table: "hidden @lg/data-table:block" },
   "2xl": { cards: "@2xl/data-table:hidden", table: "hidden @2xl/data-table:block" },
+  "3xl": { cards: "@3xl/data-table:hidden", table: "hidden @3xl/data-table:block" },
   "4xl": { cards: "@4xl/data-table:hidden", table: "hidden @4xl/data-table:block" },
   "5xl": { cards: "@5xl/data-table:hidden", table: "hidden @5xl/data-table:block" },
 };
