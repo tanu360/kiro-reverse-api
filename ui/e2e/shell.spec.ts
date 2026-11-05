@@ -52,16 +52,25 @@ test.describe("app shell", () => {
     await page.emulateMedia({ colorScheme: "light" });
     const html = page.locator("html");
     const dark = /(^|\s)dark(\s|$)/;
+    // The header's theme control opens the modes as a radio menu (ThemeSwitch variant="menu").
     const toggle = page.getByRole("button", { name: /^Theme:/ });
-    // The cycle is system, light, dark (old UI order); the OS scheme here is light.
+    async function pick(mode: "Light" | "Dark" | "System"): Promise<void> {
+      await toggle.click();
+      const item = page.getByRole("menuitemradio", { name: mode });
+      await item.click();
+      await expect(item).toHaveAttribute("aria-checked", "true");
+      await page.keyboard.press("Escape");
+      await expect(item).toBeHidden();
+    }
+    // The OS scheme here is light.
     await expect(html).not.toHaveClass(dark);
-    await toggle.click();
+    await pick("Light");
     await expect(toggle).toHaveAttribute("data-theme-mode", "light");
     await expect(html).not.toHaveClass(dark);
-    await toggle.click();
+    await pick("Dark");
     await expect(toggle).toHaveAttribute("data-theme-mode", "dark");
     await expect(html).toHaveClass(dark);
-    await toggle.click();
+    await pick("System");
     await expect(toggle).toHaveAttribute("data-theme-mode", "system");
     await expect(html).not.toHaveClass(dark);
   });
@@ -98,35 +107,41 @@ test.describe("app shell", () => {
     await expect(trigger).toBeFocused();
   });
 
-  test("phone touch targets in the sheet and the command menu are at least 40 px", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    const search = page.getByRole("button", { name: "Search" });
-    const searchBox = await search.boundingBox();
-    expect(searchBox?.width).toBeGreaterThanOrEqual(40);
-    expect(searchBox?.height).toBeGreaterThanOrEqual(40);
+  test.describe("on a touch screen", () => {
+    // Phone header icons are 36 px under a fine pointer; a coarse pointer (touch emulation)
+    // grows every control to at least 40 px.
+    test.use({ hasTouch: true });
 
-    await page.getByRole("button", { name: "Toggle sidebar" }).click();
-    const sheet = page.locator('[data-slot="sidebar"][data-mobile="true"]');
-    await expect(sheet).toBeVisible();
-    const targets = sheet.locator("a, button");
-    const count = await targets.count();
-    expect(count).toBeGreaterThan(8);
-    for (let i = 0; i < count; i++) {
-      const box = await targets.nth(i).boundingBox();
-      if (!box) continue;
-      expect(box.height, (await targets.nth(i).textContent()) ?? "").toBeGreaterThanOrEqual(40);
-    }
-    await page.keyboard.press("Escape");
+    test("phone touch targets in the sheet and the command menu are at least 40 px", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      const search = page.getByRole("button", { name: "Search" });
+      const searchBox = await search.boundingBox();
+      expect(searchBox?.width).toBeGreaterThanOrEqual(40);
+      expect(searchBox?.height).toBeGreaterThanOrEqual(40);
 
-    await search.click();
-    const option = page.getByRole("option").first();
-    await expect(option).toBeVisible();
-    // The dialog zooms in; measure once it settles.
-    await expect
-      .poll(async () => (await option.boundingBox())?.height ?? 0)
-      .toBeGreaterThanOrEqual(40);
+      await page.getByRole("button", { name: "Toggle sidebar" }).click();
+      const sheet = page.locator('[data-slot="sidebar"][data-mobile="true"]');
+      await expect(sheet).toBeVisible();
+      const targets = sheet.locator("a, button");
+      const count = await targets.count();
+      expect(count).toBeGreaterThan(8);
+      for (let i = 0; i < count; i++) {
+        const box = await targets.nth(i).boundingBox();
+        if (!box) continue;
+        expect(box.height, (await targets.nth(i).textContent()) ?? "").toBeGreaterThanOrEqual(40);
+      }
+      await page.keyboard.press("Escape");
+
+      await search.click();
+      const option = page.getByRole("option").first();
+      await expect(option).toBeVisible();
+      // The dialog zooms in; measure once it settles.
+      await expect
+        .poll(async () => (await option.boundingBox())?.height ?? 0)
+        .toBeGreaterThanOrEqual(40);
+    });
   });
 
   test("an unknown search value does not break the page", async ({ page }) => {

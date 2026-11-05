@@ -50,7 +50,7 @@ export function BreadcrumbLink({
   ...props
 }: useRender.ComponentProps<"a">): React.ReactElement {
   const defaultProps = {
-    className: cn("transition-colors hover:text-foreground", className),
+    className: cn("focus-outline rounded-sm transition-colors hover:text-foreground", className),
     "data-slot": "breadcrumb-link",
   };
 

@@ -86,7 +86,7 @@ export function CommandDialogPopup({
       <CommandDialogViewport>
         <CommandDialogPrimitive.Popup
           className={cn(
-            "popup-surface command-palette flex min-w-0 origin-top flex-col overflow-hidden rounded-2xl text-popover-foreground [--popup-shadow:var(--floating-shadow)] outline-none [--command-foot:--spacing(14)] pointer-coarse:[--command-foot:--spacing(4)]",
+            "popup-surface command-palette flex min-w-0 origin-top flex-col overflow-hidden rounded-2xl text-popover-foreground outline-none [--command-foot:--spacing(14)] pointer-coarse:[--command-foot:--spacing(4)]",
             "transition-[opacity,translate,scale] duration-220 data-ending-style:-translate-y-2 data-starting-style:-translate-y-2 data-ending-style:scale-96 data-starting-style:scale-96 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-140 data-ending-style:ease-in motion-reduce:transition-opacity",
             OPEN_EASE,
             className,

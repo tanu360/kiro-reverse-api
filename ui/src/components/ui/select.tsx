@@ -180,9 +180,10 @@ export function SelectPopup({
             <HugeiconsIcon icon={ChevronUpIcon} className="relative size-4.5 sm:size-4" />
           </SelectPrimitive.ScrollUpArrow>
           {/* The one popup sheet (index.css popup-surface), the same as menus. */}
-          {/* Exactly as wide as the trigger (index.css popup-width-field, or popup-width with
-              fit="content") and at most 22rem tall, fading at an edge it can still scroll past; a
-              longer label slides when its row is highlighted. */}
+          {/* At least as wide as the trigger, growing to fit its longest option up to
+              max(trigger, 14rem) (index.css popup-width-field, or popup-width with fit="content"),
+              and at most 22rem tall, fading at an edge it can still scroll past; a label still too
+              long slides when its row is highlighted. */}
           <div
             className={cn(
               "popup-surface relative h-full rounded-lg",
