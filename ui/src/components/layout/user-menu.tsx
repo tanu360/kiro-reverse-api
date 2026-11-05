@@ -74,7 +74,7 @@ function UserMenuItems(): JSX.Element {
           </MenuItem>
         )}
         <MenuItem render={<a href={GITHUB_URL} rel="noopener" target="_blank" />}>
-          <GithubLogo className="size-4 text-foreground" />
+          <GithubLogo className="size-4" />
           {t("shell.github")}
         </MenuItem>
       </MenuGroup>
@@ -114,14 +114,16 @@ function SidebarUserMenu(): JSX.Element {
         }
       >
         {/*
-         * The admin's mark, bare: no box, as tall as the two lines beside it (17.5 + 15 px). The
-         * icon set's own stroke (1.5 on 24), so it draws 2 px at 32 px and reads as solid.
+         * The admin's mark in a chip, as tall as the two lines beside it, like a workspace avatar;
+         * in the icon rail the chip is the whole button.
          */}
-        <AnimatedIcon icon={UserShield01Icon} aria-hidden="true" className="size-8 shrink-0" />
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2">
+          <AnimatedIcon icon={UserShield01Icon} aria-hidden="true" className="size-4" />
+        </span>
         <span className="grid flex-1 text-left text-sm leading-tight">
           <span className="truncate font-medium text-sidebar-foreground">{t("shell.admin")}</span>
           {version ? (
-            <span className="truncate text-secondary-label text-xs">{version}</span>
+            <span className="truncate text-sidebar-muted-foreground text-xs">{version}</span>
           ) : null}
         </span>
         <AnimatedIcon icon={EllipsisVerticalIcon} aria-hidden="true" className="ms-auto size-4" />

@@ -46,7 +46,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
   const [checking, setChecking] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const busyRef = useRef(false);
-  // The update toast would cover the dialog's footer (a bottom drawer on phones).
+  // The dialog says what the toast said, so opening it retires the toast.
   const openDialog = useCallback(() => {
     toast.dismiss(AVAILABLE_TOAST_ID);
     setDialogOpen(true);

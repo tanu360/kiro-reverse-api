@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 import { usePrivacy } from "@/lib/privacy";
-import { HEADER_ICON_BUTTON } from "./header-button";
 
+/** The header's privacy switch: a quiet icon button whose on state is the pressed fill. */
 export function PrivacyToggle(): JSX.Element {
   const { t } = useT();
   const { enabled, toggle } = usePrivacy();
@@ -19,7 +19,6 @@ export function PrivacyToggle(): JSX.Element {
           <Button
             aria-label={t("shell.privacy.label")}
             aria-pressed={enabled}
-            className={HEADER_ICON_BUTTON}
             onClick={toggle}
             size="icon"
             variant="quiet"

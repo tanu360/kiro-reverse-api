@@ -10,15 +10,20 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   type CSSProperties,
+  createContext,
   type JSX,
+  type ReactNode,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { AppIcon } from "@/components/shared/app-icon";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandCollection,
@@ -38,6 +43,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { LANGS, useLanguage, useT } from "@/lib/i18n";
 import { usePrivacy } from "@/lib/privacy";
+import { cn } from "@/lib/utils";
 import { LANGUAGE_NAMES } from "./language-switch";
 import { NAV_ITEMS } from "./nav-items";
 import { THEMES, useTheme } from "./theme-provider";
@@ -67,6 +73,21 @@ interface CommandGroupEntry {
 /** Space between the header trigger and the palette under it. */
 const PALETTE_GAP = 8;
 
+interface CommandMenuContextValue {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  /** Each trigger registers its button, so the palette can hang under the one on screen. */
+  register: (trigger: HTMLButtonElement) => () => void;
+}
+
+const CommandMenuContext = createContext<CommandMenuContextValue | null>(null);
+
+function useCommandMenu(): CommandMenuContextValue {
+  const context = useContext(CommandMenuContext);
+  if (!context) throw new Error("CommandMenuTrigger must be used within a CommandMenuProvider");
+  return context;
+}
+
 function isMac(): boolean {
   return typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform);
 }
@@ -79,16 +100,16 @@ function matches(entry: CommandEntry, query: string): boolean {
 
 /**
  * The ⌘K palette, after the Raycast-style one in claude-guest-pass: centred, a search row, grouped
- * rows, and a foot naming what Enter does. Opens with ⌘K / Ctrl+K or the header trigger; picking
- * an entry closes the menu and then runs it.
+ * rows, and a foot naming what Enter does. Opens with ⌘K / Ctrl+K or a CommandMenuTrigger inside
+ * the provider; picking an entry closes the menu and then runs it.
  */
-export function CommandMenu(): JSX.Element {
+export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.Element {
   const { t } = useT();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<CommandEntry | undefined>();
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggers = useRef(new Set<HTMLButtonElement>());
   const [anchor, setAnchor] = useState<CSSProperties>();
   const { toggle: togglePrivacy } = usePrivacy();
   const { theme, setTheme } = useTheme();
@@ -107,11 +128,21 @@ export function CommandMenu(): JSX.Element {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // The palette hangs 8 px under the trigger, centred on it, and follows it when the window
-  // resizes. A trigger with no box leaves the stylesheet's centred default.
+  const register = useCallback((trigger: HTMLButtonElement) => {
+    triggers.current.add(trigger);
+    return () => {
+      triggers.current.delete(trigger);
+    };
+  }, []);
+
+  // The palette hangs 8 px under the visible trigger (the field from sm up, the icon below),
+  // centred on it, and follows it when the window resizes. No trigger with a box leaves the
+  // stylesheet's centred default.
   const place = useCallback(() => {
-    const box = triggerRef.current?.getBoundingClientRect();
-    if (!box?.width) return setAnchor(undefined);
+    const box = [...triggers.current]
+      .map((trigger) => trigger.getBoundingClientRect())
+      .find((rect) => rect.width > 0);
+    if (!box) return setAnchor(undefined);
     setAnchor({
       "--command-x": `${Math.round(box.left + box.width / 2)}px`,
       "--command-y": `${Math.round(box.bottom) + PALETTE_GAP}px`,
@@ -220,30 +251,11 @@ export function CommandMenu(): JSX.Element {
     entry.run();
   };
 
+  const value = useMemo(() => ({ open, setOpen, register }), [open, register]);
+
   return (
-    <>
-      <button
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-keyshortcuts="Meta+K Control+K"
-        aria-label={t("shell.search")}
-        // A 40 px round button below sm; from sm up a pill that fills the header's middle column.
-        className="group focus-outline flex size-10 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-input bg-(--field) text-muted-foreground text-sm outline-none transition-[border-color,background-color,color,scale] duration-150 ease-out hover:border-muted-foreground/40 hover:bg-(--field-hover) hover:text-foreground active:scale-98 aria-expanded:border-muted-foreground/40 aria-expanded:text-foreground sm:w-full sm:justify-start sm:ps-4 sm:pe-2 md:h-9 motion-reduce:active:scale-100"
-        onClick={() => setOpen(true)}
-        ref={triggerRef}
-        type="button"
-      >
-        <HugeiconsIcon icon={Search01Icon} aria-hidden="true" className="size-4 shrink-0" />
-        <span className="hidden min-w-0 flex-1 truncate text-start sm:inline">
-          {t("shell.search")}
-        </span>
-        <Kbd
-          aria-hidden="true"
-          className="hidden shrink-0 transition-colors group-hover:text-foreground group-aria-expanded:text-foreground sm:inline-flex"
-        >
-          {isMac() ? "⌘" : "Ctrl"} K
-        </Kbd>
-      </button>
+    <CommandMenuContext.Provider value={value}>
+      {children}
       <CommandDialog onOpenChange={setOpen} open={open}>
         <CommandDialogPopup aria-label={t("shell.search")} style={anchor}>
           <Command
@@ -279,15 +291,71 @@ export function CommandMenu(): JSX.Element {
             <CommandFooterPill className="w-10 justify-center">
               <AppIcon className="size-5 rounded-sm" size={20} />
             </CommandFooterPill>
-            <CommandFooterPill className="gap-4 ps-4 pe-3 font-medium text-[13px] text-muted-foreground">
-              {active ? (
+            {/* The keys only mean something while a row is highlighted. */}
+            {active ? (
+              <CommandFooterPill className="gap-4 ps-4 pe-3 font-medium text-meta text-muted-foreground">
                 <CommandHint className="text-foreground" keys={["↵"]} label={active.verb} />
-              ) : null}
-              <CommandHint keys={["↑", "↓"]} label={t("shell.command.move")} />
-            </CommandFooterPill>
+                <CommandHint keys={["↑", "↓"]} label={t("shell.command.move")} />
+              </CommandFooterPill>
+            ) : null}
           </CommandFooter>
         </CommandDialogPopup>
       </CommandDialog>
-    </>
+    </CommandMenuContext.Provider>
+  );
+}
+
+/**
+ * Opens the palette. `field`: the header's search field (sm and up), a rounded field with the
+ * shortcut at its end. `icon`: a quiet icon button like its header neighbours (phones).
+ */
+export function CommandMenuTrigger({
+  variant = "field",
+  className,
+}: {
+  variant?: "field" | "icon";
+  className?: string;
+}): JSX.Element {
+  const { t } = useT();
+  const { open, setOpen, register } = useCommandMenu();
+  const ref = useCallback(
+    (trigger: HTMLButtonElement | null) => (trigger ? register(trigger) : undefined),
+    [register],
+  );
+  const shared = {
+    "aria-expanded": open,
+    "aria-haspopup": "dialog" as const,
+    "aria-keyshortcuts": "Meta+K Control+K",
+    "aria-label": t("shell.search"),
+    onClick: () => setOpen(true),
+    ref,
+  };
+
+  if (variant === "icon") {
+    return (
+      <Button {...shared} className={className} size="icon" variant="quiet">
+        <AnimatedIcon icon={Search01Icon} aria-hidden="true" />
+      </Button>
+    );
+  }
+
+  return (
+    <button
+      {...shared}
+      className={cn(
+        "group focus-outline flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-field-border bg-field ps-3 pe-1.5 text-muted-foreground text-sm outline-none transition-[background-color,color] duration-150 ease-out hover:bg-field-hover hover:text-foreground aria-expanded:bg-field-hover aria-expanded:text-foreground pointer-coarse:h-10",
+        className,
+      )}
+      type="button"
+    >
+      <HugeiconsIcon icon={Search01Icon} aria-hidden="true" className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-start">{t("shell.search")}</span>
+      <Kbd
+        aria-hidden="true"
+        className="shrink-0 transition-colors group-hover:text-foreground group-aria-expanded:text-foreground"
+      >
+        {isMac() ? "⌘" : "Ctrl"} K
+      </Kbd>
+    </button>
   );
 }

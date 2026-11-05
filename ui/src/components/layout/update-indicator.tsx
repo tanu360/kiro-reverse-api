@@ -23,7 +23,7 @@ export function UpdateIndicator(): JSX.Element | null {
         render={
           <Button
             aria-label={label}
-            className="relative size-10 text-warning-foreground md:size-8 [:hover,[data-pressed]]:text-warning-foreground"
+            className="relative text-warning-foreground"
             data-slot="update-indicator"
             onClick={openDialog}
             size="icon"
@@ -32,7 +32,8 @@ export function UpdateIndicator(): JSX.Element | null {
         }
       >
         <AnimatedIcon icon={CircleArrowUp02Icon} aria-hidden="true" />
-        <UpdateDot className="top-2 right-2 md:top-1 md:right-1" />
+        {/* On the glyph's top corner at each button size (36 / 32 px, 40 on touch). */}
+        <UpdateDot className="top-1.5 right-1.5 sm:top-1 sm:right-1 pointer-coarse:top-2 pointer-coarse:right-2" />
       </TooltipTrigger>
       <TooltipPopup>{label}</TooltipPopup>
     </Tooltip>

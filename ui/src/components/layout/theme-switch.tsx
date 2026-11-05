@@ -11,11 +11,10 @@ import {
   MenuRadioItem,
   MenuTrigger,
 } from "@/components/ui/menu";
+import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
-import { HEADER_ICON_BUTTON } from "./header-button";
 import { THEMES, type Theme, useTheme } from "./theme-provider";
 
 export const THEME_ICONS = { system: MonitorIcon, light: Sun03Icon, dark: Moon02Icon } as const;
@@ -26,9 +25,10 @@ function nextTheme(theme: Theme): Theme {
 }
 
 /**
- * `icon`: one button that steps through the modes (the app header). `menu`: a button that opens
- * the modes as a menu. `segmented`: all three modes side by side as a flat icon toggle, the
- * current one highlighted, for the sign-in pages' footer.
+ * `icon`: one button that steps through the modes. `menu`: a button that opens the modes as a
+ * radio menu, like the language menu beside it (the app header). `segmented`: all three modes
+ * side by side as a radio group in the segmented icon track, the current one highlighted, for the
+ * sign-in pages' top row.
  */
 export function ThemeSwitch({
   variant = "icon",
@@ -45,29 +45,34 @@ export function ThemeSwitch({
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   if (variant === "segmented") {
+    // A radio group (coss p-radio-group-7): one tab stop, arrow keys move the choice.
     return (
       <SegmentedControl
-        aria-label={t("shell.theme.title")}
         className={className}
-        role="group"
-        size="sm"
+        render={
+          <RadioGroupPrimitive
+            aria-label={t("shell.theme.title")}
+            onValueChange={(value, details) =>
+              setTheme(
+                value as Theme,
+                (details.event.target as Element | null)?.closest("[role=radio]"),
+              )
+            }
+            value={theme}
+          />
+        }
+        size="icon"
       >
         {THEMES.map((mode) => {
           const ModeIcon = THEME_ICONS[mode];
           const modeLabel = t(`shell.theme.${mode}`);
-          const active = mode === theme;
           return (
             <Tooltip key={mode}>
               <TooltipTrigger
                 render={
                   <SegmentedControlItem
                     aria-label={modeLabel}
-                    aria-pressed={active}
-                    // 40 px below md and on touch screens (touch rule), 32 px from md up, with
-                    // the segmented control's own 18 / 16 px icons.
-                    className="size-10 p-0 sm:size-10 md:size-8 pointer-coarse:size-10"
-                    data-pressed={active ? "" : undefined}
-                    onClick={(event) => setTheme(mode, event.currentTarget)}
+                    render={<RadioPrimitive.Root value={mode} />}
                   />
                 }
               >
@@ -91,7 +96,8 @@ export function ThemeSwitch({
                 render={
                   <Button
                     aria-label={label}
-                    className={HEADER_ICON_BUTTON}
+                    className={className}
+                    data-theme-mode={theme}
                     ref={menuTriggerRef}
                     size="icon"
                     variant="quiet"
@@ -115,10 +121,8 @@ export function ThemeSwitch({
                 const ModeIcon = THEME_ICONS[mode];
                 return (
                   <MenuRadioItem key={mode} value={mode}>
-                    <span className="flex items-center gap-2">
-                      <AnimatedIcon icon={ModeIcon} aria-hidden="true" />
-                      {t(`shell.theme.${mode}`)}
-                    </span>
+                    <AnimatedIcon icon={ModeIcon} aria-hidden="true" />
+                    {t(`shell.theme.${mode}`)}
                   </MenuRadioItem>
                 );
               })}
@@ -135,7 +139,7 @@ export function ThemeSwitch({
         render={
           <Button
             aria-label={label}
-            className={cn(HEADER_ICON_BUTTON, className)}
+            className={className}
             data-theme-mode={theme}
             onClick={(event) => setTheme(nextTheme(theme), event.currentTarget)}
             size="icon"

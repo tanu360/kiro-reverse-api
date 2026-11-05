@@ -25,6 +25,22 @@ const NO_TRANSITIONS_CLASS = "no-transitions";
 const REVEAL_CLASS = "theme-reveal";
 const REVEAL_MS = 400;
 
+/**
+ * The browser chrome's colour (mobile address bar, PWA title bar): the page background of the
+ * theme on screen (index.css --background), so a forced theme does not sit under the OS one.
+ */
+export const THEME_COLORS: Record<ResolvedTheme, string> = { dark: "#09090a", light: "#fafafa" };
+
+/** Leaves one <meta name="theme-color"> (index.html ships a light and a dark media variant). */
+function writeThemeColor(theme: ResolvedTheme): void {
+  const metas = [...document.head.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
+  const meta = metas.shift() ?? document.head.appendChild(document.createElement("meta"));
+  for (const extra of metas) extra.remove();
+  meta.name = "theme-color";
+  meta.removeAttribute("media");
+  meta.content = THEME_COLORS[theme];
+}
+
 interface ThemeContextValue {
   theme: Theme;
   resolvedTheme: ResolvedTheme;
@@ -124,6 +140,7 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     root.classList.add(NO_TRANSITIONS_CLASS);
     root.classList.toggle("dark", resolvedTheme === "dark");
     root.style.colorScheme = resolvedTheme;
+    writeThemeColor(resolvedTheme);
     const frame = requestAnimationFrame(() => root.classList.remove(NO_TRANSITIONS_CLASS));
     return () => {
       cancelAnimationFrame(frame);

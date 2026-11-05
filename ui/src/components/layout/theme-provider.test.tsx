@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import { THEME_STORAGE_KEY, ThemeProvider, useTheme } from "./theme-provider";
+import { THEME_COLORS, THEME_STORAGE_KEY, ThemeProvider, useTheme } from "./theme-provider";
 
 function Probe() {
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -74,6 +74,36 @@ describe("ThemeProvider", () => {
     expect(document.documentElement).toHaveClass("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
+  });
+
+  it("keeps one theme-color meta in the page colour of the theme on screen", async () => {
+    mockColorScheme(false);
+    // index.html ships one meta per OS scheme.
+    for (const scheme of ["light", "dark"]) {
+      const meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.media = `(prefers-color-scheme: ${scheme})`;
+      meta.content = "#000000";
+      document.head.append(meta);
+    }
+    onTestFinished(() => {
+      for (const meta of document.head.querySelectorAll('meta[name="theme-color"]')) meta.remove();
+    });
+    const metas = () => [...document.head.querySelectorAll('meta[name="theme-color"]')];
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    expect(metas()).toHaveLength(1);
+    expect(metas()[0]).not.toHaveAttribute("media");
+    expect(metas()[0]).toHaveAttribute("content", THEME_COLORS.light);
+
+    // A forced dark theme on a light OS: the browser chrome follows the page, not the OS.
+    await user.click(screen.getByRole("button", { name: "dark" }));
+    expect(metas()).toHaveLength(1);
+    expect(metas()[0]).toHaveAttribute("content", THEME_COLORS.dark);
   });
 
   it("reads the stored theme", () => {

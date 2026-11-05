@@ -55,22 +55,27 @@ const sidebarMenuButtonVariants = cva(
     },
     variants: {
       size: {
-        // Kiro patch: 36 px rows, 40 px in the sheet (below lg), where they are touch targets.
+        // Kiro patch: the nav row, 36 px, and 40 px in the sheet (below lg), where rows are touch
+        // targets.
         default:
-          "h-9 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-sm max-lg:h-10",
-        lg: "h-12 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-sm group-data-[collapsible=icon]:p-0!",
-        sm: "h-7 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-xs",
+          "h-9 rounded-lg px-[var(--sidebar-row-content-inset)] py-1.5 text-sm max-lg:h-10",
+        lg: "h-12 rounded-lg px-[var(--sidebar-row-content-inset)] py-2 text-sm group-data-[collapsible=icon]:p-0!",
+        sm: "h-7 rounded-lg px-[var(--sidebar-row-content-inset)] py-2 text-xs",
       },
       variant: {
         // Kiro patch: labels in the sidebar text colour (80%), not the muted grey, so the
         // list reads at a glance; icons keep the quieter --sidebar-icon-color.
         default: "font-medium text-sidebar-foreground/80",
+        // Kiro patch: a row whose page or section is destructive (Settings' danger zone): red
+        // label and icon, a red tint on hover and while selected.
+        destructive:
+          "font-medium text-destructive-foreground hover:bg-error-surface hover:text-destructive-foreground active:bg-error-surface active:text-destructive-foreground data-[active=true]:bg-error-surface data-[active=true]:text-destructive-foreground data-[active=true]:hover:bg-error-surface data-[active=true]:active:bg-error-surface [&>svg]:text-destructive-foreground hover:[&>svg]:text-destructive-foreground active:[&>svg]:text-destructive-foreground data-[active=true]:[&>svg]:text-destructive-foreground",
         outline: "bg-sidebar-control-surface ring-1 ring-sidebar-border",
         // Kiro patch: the sidebar's main action in the sign-in button's look: solid purple, a
         // white centred label and icon, the grain and top highlight, a slight press.
         primary: cn(
           PRIMARY_FINISH,
-          "relative justify-center bg-primary font-medium text-primary-foreground transition-[width,height,padding,scale] hover:bg-primary/90 hover:text-primary-foreground active:scale-[0.98] active:bg-primary/90 active:text-primary-foreground [&>svg]:text-primary-foreground hover:[&>svg]:text-primary-foreground active:[&>svg]:text-primary-foreground",
+          "relative justify-center bg-primary font-medium text-primary-foreground transition-[width,height,padding,scale] hover:bg-primary-hover hover:text-primary-foreground active:scale-[0.98] active:bg-primary-hover active:text-primary-foreground [&>svg]:text-primary-foreground hover:[&>svg]:text-primary-foreground active:[&>svg]:text-primary-foreground",
         ),
       },
     },
@@ -325,7 +330,7 @@ export function SidebarTrigger({
 
   return (
     <Button
-      className={cn("size-7", className)}
+      className={className}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
@@ -333,7 +338,8 @@ export function SidebarTrigger({
         toggleSidebar();
       }}
       size="icon"
-      variant="ghost"
+      // Kiro patch: quiet like the other header icons (only the colour moves), not a ghost fill.
+      variant="quiet"
       {...props}
     >
       <HugeiconsIcon icon={PanelLeftIcon} aria-hidden="true" />
@@ -486,7 +492,7 @@ export function SidebarGroupLabel({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "flex h-8 shrink-0 items-center rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] font-medium text-secondary-label text-xs outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-outline [&>svg]:size-4 [&>svg]:shrink-0",
+      "flex h-8 shrink-0 items-center rounded-lg px-[var(--sidebar-row-content-inset)] font-medium text-sidebar-muted-foreground text-xs outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-outline [&>svg]:size-4 [&>svg]:shrink-0",
       "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
       className,
     ),
@@ -638,7 +644,7 @@ export function SidebarMenuAction({
   const defaultProps = {
     className: cn(
       // Kiro patch: 24 px, centred on its row (not on the item, which may hold a sub-menu).
-      "absolute end-1.5 flex size-6 cursor-pointer items-center justify-center rounded-[calc(var(--control-radius)-2px)] p-0 text-[var(--sidebar-icon-color)] outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline peer-hover/menu-button:text-sidebar-foreground peer-data-[active=true]/menu-button:text-sidebar-foreground [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0",
+      "absolute end-1.5 flex size-6 cursor-pointer items-center justify-center rounded-md p-0 text-[var(--sidebar-icon-color)] outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline peer-hover/menu-button:text-sidebar-foreground peer-data-[active=true]/menu-button:text-sidebar-foreground [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0",
       // Increases the hit area of the button on mobile.
       "after:absolute after:-inset-2 lg:after:hidden",
       "peer-data-[size=sm]/menu-button:top-0.5",
@@ -813,7 +819,7 @@ export function SidebarMenuSubButton({
     className: cn(
       // Kiro patch: same row language as SidebarMenuButton (radius, inset, label colour), one
       // step shorter: 32 px, 40 px in the sheet.
-      "flex h-8 min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] font-medium text-sidebar-foreground/80 outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 max-lg:h-10 [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
+      "flex h-8 min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-[var(--sidebar-row-content-inset)] font-medium text-sidebar-foreground/80 outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:opacity-64 max-lg:h-10 [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
       "data-[active=true]:bg-sidebar-row-selected data-[active=true]:hover:bg-sidebar-row-selected data-[active=true]:active:bg-sidebar-row-selected data-[active=true]:text-sidebar-foreground",
       size === "sm" && "text-xs",
       size === "md" && "text-sm",

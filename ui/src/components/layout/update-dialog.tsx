@@ -81,7 +81,7 @@ export function UpdateDialog({
     >
       <div className="flex flex-col gap-5">
         {/* One strip, read left to right: the running version, an arrow, the new one in purple. */}
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[var(--control-radius)] border border-border/60 bg-muted/40 px-4 py-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-lg border border-border-subtle bg-surface-inset px-4 py-3">
           <VersionCell label={t("shell.update.current")} value={current} />
           <HugeiconsIcon
             aria-hidden="true"
@@ -106,7 +106,7 @@ export function UpdateDialog({
                 >
                   <span
                     aria-hidden="true"
-                    className="flex h-[1.625em] w-5 shrink-0 items-center justify-center"
+                    className="flex h-lh w-5 shrink-0 items-center justify-center leading-relaxed"
                   >
                     {line.marker ?? (
                       <span className="size-1.5 rounded-full bg-muted-foreground/50" />
