@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { HeatmapCell, ModelMixEntry } from "@/lib/api/types";
 import {
   bucketGlobal,
+  busyAccounts,
   heatFailure,
   heatLevel,
   hourDelta,
@@ -252,6 +253,41 @@ describe("heatFailure", () => {
     expect(heatFailure(8, 2)).toBe("alert");
     expect(heatFailure(0, 3)).toBe("alert");
   });
+
+  it("marks a minute with failed attempts but no requests of its own with the thin bar", () => {
+    expect(heatFailure(0, 0, 4)).toBe("some");
+    // With requests the fill already shows the minute; the failures alone pick the mark.
+    expect(heatFailure(5, 0, 4)).toBe("none");
+    expect(heatFailure(4, 1, 2)).toBe("alert");
+    expect(heatFailure(0, 0, 0)).toBe("none");
+  });
+});
+
+describe("busyAccounts", () => {
+  const row = (accountId: string, cells: HeatmapCell[]) => ({ accountId, cells });
+
+  it("keeps the server's order and an account whose attempts all failed over", () => {
+    const accounts = [
+      row("busy", [{ offset: 0, reqs: 12, failures: 0 }]),
+      row("failing-over", [{ offset: 3, reqs: 0, failures: 0, retries: 10 }]),
+      row("mid", [{ offset: 1, reqs: 4, failures: 1 }]),
+    ];
+    expect(busyAccounts(accounts, 60, 5).map((account) => account.accountId)).toEqual([
+      "busy",
+      "failing-over",
+      "mid",
+    ]);
+  });
+
+  it("leaves out rows without requests or failed attempts in the window and caps the count", () => {
+    const accounts = [
+      row("old", [{ offset: 60, reqs: 9, failures: 0, retries: 2 }]),
+      row("credits-only", [{ offset: 0, reqs: 0, failures: 0, credits: 1 }]),
+      row("a", [{ offset: 0, reqs: 1, failures: 0 }]),
+      row("b", [{ offset: 0, reqs: 1, failures: 0 }]),
+    ];
+    expect(busyAccounts(accounts, 60, 1).map((account) => account.accountId)).toEqual(["a"]);
+  });
 });
 
 describe("windowCells", () => {
@@ -262,9 +298,17 @@ describe("windowCells", () => {
       { offset: 5, reqs: 9, failures: 0 },
     ];
     expect(windowCells(input, 3)).toEqual([
-      { offset: 2, reqs: 3, failures: 1 },
-      { offset: 1, reqs: 0, failures: 0 },
-      { offset: 0, reqs: 1, failures: 0 },
+      { offset: 2, reqs: 3, failures: 1, retries: 0 },
+      { offset: 1, reqs: 0, failures: 0, retries: 0 },
+      { offset: 0, reqs: 1, failures: 0, retries: 0 },
+    ]);
+  });
+
+  it("carries the failed attempts through", () => {
+    const input: HeatmapCell[] = [{ offset: 1, reqs: 0, failures: 0, retries: 3 }];
+    expect(windowCells(input, 2)).toEqual([
+      { offset: 1, reqs: 0, failures: 0, retries: 3 },
+      { offset: 0, reqs: 0, failures: 0, retries: 0 },
     ]);
   });
 });
@@ -273,15 +317,15 @@ describe("mergeCells", () => {
   it("sums oldest-first cells in groups cut from the newest end", () => {
     const input: HeatmapCell[] = [
       { offset: 4, reqs: 1, failures: 0 },
-      { offset: 3, reqs: 2, failures: 1 },
-      { offset: 2, reqs: 3, failures: 0 },
+      { offset: 3, reqs: 2, failures: 1, retries: 1 },
+      { offset: 2, reqs: 3, failures: 0, retries: 2 },
       { offset: 1, reqs: 4, failures: 2 },
       { offset: 0, reqs: 5, failures: 0 },
     ];
     expect(mergeCells(input, 2)).toEqual([
-      { offset: 4, reqs: 1, failures: 0 },
-      { offset: 2, reqs: 5, failures: 1 },
-      { offset: 0, reqs: 9, failures: 2 },
+      { offset: 4, reqs: 1, failures: 0, retries: 0 },
+      { offset: 2, reqs: 5, failures: 1, retries: 3 },
+      { offset: 0, reqs: 9, failures: 2, retries: 0 },
     ]);
     expect(mergeCells(windowCells(input, 60), 2)).toHaveLength(30);
   });

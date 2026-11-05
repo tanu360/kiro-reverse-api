@@ -207,10 +207,39 @@ export function heatLevel(reqs: number, maxReq: number): 1 | 2 | 3 | 4 | 5 {
 /** Share of a minute's requests that failed at which its cell turns red (the alert colour). */
 export const HEAT_FAIL_SHARE = 0.25;
 
-/** How a minute's failures show: none, a thin red bar under the threshold, or a red cell. */
-export function heatFailure(reqs: number, failures: number): "none" | "some" | "alert" {
-  if (!(failures > 0)) return "none";
-  return failures / Math.max(reqs, failures) >= HEAT_FAIL_SHARE ? "alert" : "some";
+/**
+ * How a minute's failures show: none, a thin red bar under the threshold, or a red cell. A minute
+ * with failed attempts (`retries`) but no requests of its own, as when every attempt on an
+ * account failed over to another one, gets the thin bar, so it does not read as idle.
+ */
+export function heatFailure(
+  reqs: number,
+  failures: number,
+  retries = 0,
+): "none" | "some" | "alert" {
+  if (failures > 0) {
+    return failures / Math.max(reqs, failures) >= HEAT_FAIL_SHARE ? "alert" : "some";
+  }
+  return retries > 0 && !(reqs > 0) ? "some" : "none";
+}
+
+/**
+ * The accounts the server sent for top=N, in its order (busiest first by requests plus failed
+ * attempts over the last `windowMin` minutes), at most `limit`. A row with neither in the window
+ * is left out, should one come; a row with only failed attempts stays, as the server counts it.
+ */
+export function busyAccounts<T extends { cells: readonly HeatmapCell[] }>(
+  accounts: readonly T[],
+  windowMin: number,
+  limit: number,
+): T[] {
+  return accounts
+    .filter((account) =>
+      account.cells.some(
+        (cell) => cell.offset < windowMin && (cell.reqs > 0 || (cell.retries ?? 0) > 0),
+      ),
+    )
+    .slice(0, Math.max(0, limit));
 }
 
 /** Offsets 0..windowMin-1 oldest-first (oldest on the left); missing minutes are zeros. */
@@ -219,7 +248,12 @@ export function windowCells(cells: readonly HeatmapCell[], windowMin: number): H
   return Array.from({ length: windowMin }, (_, index) => {
     const offset = windowMin - 1 - index;
     const cell = byOffset.get(offset);
-    return { offset, reqs: cell?.reqs ?? 0, failures: cell?.failures ?? 0 };
+    return {
+      offset,
+      reqs: cell?.reqs ?? 0,
+      failures: cell?.failures ?? 0,
+      retries: cell?.retries ?? 0,
+    };
   });
 }
 
@@ -237,6 +271,7 @@ export function mergeCells(cells: readonly HeatmapCell[], size: number): Heatmap
       offset: Math.min(...group.map((cell) => cell.offset)),
       reqs: group.reduce((sum, cell) => sum + cell.reqs, 0),
       failures: group.reduce((sum, cell) => sum + cell.failures, 0),
+      retries: group.reduce((sum, cell) => sum + (cell.retries ?? 0), 0),
     });
   }
   return merged;

@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type RefObject,
   Suspense,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -28,7 +29,7 @@ import { dateTimeFormat, formatNumber, formatTime, unixToDate } from "@/lib/form
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
-import { HOUR, heatFailure, heatLevel, mergeCells, windowCells } from "./aggregate";
+import { busyAccounts, HOUR, heatFailure, heatLevel, mergeCells, windowCells } from "./aggregate";
 import { FAILED_COLOR, SUCCEEDED_COLOR } from "./colors";
 import { useTotalsFailed } from "./status-cards";
 
@@ -74,10 +75,12 @@ function stackedPosition(
 /** One cell's minute, row and counts in the charts' tooltip panel. */
 function HeatTooltip({
   hover,
+  tip,
   containerRef,
   labels,
 }: {
   hover: Hover;
+  tip: CellTip;
   containerRef: RefObject<HTMLDivElement | null>;
   labels: { requests: string; errors: string };
 }): JSX.Element {
@@ -116,13 +119,13 @@ function HeatTooltip({
     >
       <div ref={contentRef}>
         <TooltipContent
-          meta={hover.label}
+          meta={tip.label}
           mono
           rows={[
-            { color: SUCCEEDED_COLOR, label: labels.requests, value: hover.requests },
-            { color: FAILED_COLOR, label: labels.errors, value: hover.errors },
+            { color: SUCCEEDED_COLOR, label: labels.requests, value: tip.requests },
+            { color: FAILED_COLOR, label: labels.errors, value: tip.errors },
           ]}
-          title={hover.time}
+          title={tip.time}
         />
       </div>
     </TooltipBox>
@@ -154,8 +157,17 @@ const LEVEL_CLASS = {
   4: "bg-chart-scale-04",
   5: "bg-chart-scale-05",
 } as const;
-/** Positions of the -45, -30 and -15 minute ticks: the centre of that minute's cell. */
+/** The -45, -30 and -15 minute ticks, oldest first; each sits on the centre of its minute's cell. */
 const TICKS = [45, 30, 15] as const;
+/** The tick sets to try, fullest first: the axis stays symmetric as ticks drop out. */
+const TICK_SETS: readonly (readonly number[])[] = [TICKS, [30], []];
+/** The least room between two axis labels. */
+const AXIS_GAP = 8;
+
+/** A tick's centre as a share of the cells' width. */
+function tickShare(minutes: number): number {
+  return (HOUR - minutes - 0.5) / HOUR;
+}
 
 interface HeatRow {
   key: string;
@@ -168,8 +180,19 @@ interface HeatRow {
   total: number;
 }
 
+/**
+ * The cell under the pointer: where it is, not what it holds. The tooltip reads the minute, the
+ * row and the counts from the current data on every render, so a live refetch, a reordered row
+ * or a minute rollover never leaves it showing old numbers.
+ */
 interface Hover {
+  /** `rowIndex:span:offset`, as on the cell's `data-cell`. */
   key: string;
+  rowIndex: number;
+  /** Minutes per cell: 1, or 2 on narrow cards. */
+  span: number;
+  /** The cell's newest minute. */
+  offset: number;
   /** The cell's centre, in container px. */
   x: number;
   y: number;
@@ -178,10 +201,48 @@ interface Hover {
   bottom: number;
   /** Tapped rather than pointed at: the panel goes above or below the row, clear of the finger. */
   touch: boolean;
+}
+
+/** What the tooltip says about the hovered cell. */
+interface CellTip {
   time: string;
   label: string;
   requests: string;
   errors: string;
+}
+
+interface HeatView {
+  rows: HeatRow[];
+  nowUnix: number;
+  total: { requests: number; errors: number };
+}
+
+/**
+ * The hovered cell's minute (or two-minute range), row and counts from `view`, or null when the
+ * grid is not drawn or the row is gone.
+ */
+function describeCell(view: HeatView, hover: Hover, lang: Lang): CellTip | null {
+  if (view.total.requests === 0) return null;
+  const row = view.rows[hover.rowIndex];
+  if (!row) return null;
+  const { span, offset } = hover;
+  const minutes = row.cells.filter((cell) => cell.offset >= offset && cell.offset < offset + span);
+  if (minutes.length === 0) return null;
+  const total = sum(minutes);
+  const newest = view.nowUnix - offset * 60;
+  return {
+    // "11:52 – 11:53 AM": the range in the language's own short form.
+    time:
+      span > 1
+        ? dateTimeFormat(lang, { timeStyle: "short" }).formatRange(
+            unixToDate(newest - (span - 1) * 60),
+            unixToDate(newest),
+          )
+        : formatTime(newest, lang),
+    label: row.text,
+    requests: formatNumber(total.requests, lang),
+    errors: formatNumber(total.errors, lang),
+  };
 }
 
 function sum(cells: readonly HeatmapCell[]): { requests: number; errors: number } {
@@ -229,8 +290,9 @@ const HeatGrid = memo(function HeatGrid({
   return (
     <div className={className}>
       {cells.map((cell) => {
-        const empty = cell.reqs === 0 && cell.failures === 0;
-        const failure = heatFailure(cell.reqs, cell.failures);
+        const retries = cell.retries ?? 0;
+        const empty = cell.reqs === 0 && cell.failures === 0 && retries === 0;
+        const failure = heatFailure(cell.reqs, cell.failures, retries);
         return (
           <span
             className={cn(
@@ -282,6 +344,88 @@ function HeatCells({
 }
 
 /**
+ * The time axis under the cells: "60 min ago" at the start, "Now" at the end and the -45, -30 and
+ * -15 ticks between them. The labels' widths differ by language and the cells' width by card, so
+ * the axis measures them and shows the fullest tick set (all three, then -30 alone, then none)
+ * whose labels all keep AXIS_GAP from their neighbours. A dropped tick is hidden, still laid out,
+ * so it can be measured again on the next resize.
+ */
+const HeatAxis = memo(function HeatAxis({
+  oldest,
+  newest,
+  lang,
+}: {
+  oldest: string;
+  newest: string;
+  lang: Lang;
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [shown, setShown] = useState<readonly number[]>(TICKS);
+
+  useLayoutEffect(() => {
+    const axis = ref.current;
+    if (!axis) return;
+    const measure = () => {
+      const width = axis.clientWidth;
+      // Nothing laid out yet (or no layout at all, as in tests): keep every tick.
+      if (width === 0) return;
+      const start = axis.querySelector<HTMLElement>("[data-axis-edge=start]")?.offsetWidth ?? 0;
+      const end = axis.querySelector<HTMLElement>("[data-axis-edge=end]")?.offsetWidth ?? 0;
+      // Each set is oldest first; a set fits when every tick clears the label before it and the
+      // last one clears "Now".
+      const fits = (set: readonly number[]) => {
+        let free = start + AXIS_GAP;
+        for (const minutes of set) {
+          const tick = axis.querySelector<HTMLElement>(`[data-axis-tick="${minutes}"]`);
+          const half = (tick?.offsetWidth ?? 0) / 2;
+          const centre = tickShare(minutes) * width;
+          if (centre - half < free) return false;
+          free = centre + half + AXIS_GAP;
+        }
+        return free <= width - end;
+      };
+      const next = TICK_SETS.find(fits) ?? TICK_SETS[TICK_SETS.length - 1];
+      setShown((prev) => (prev === next ? prev : next));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    // The cells' width follows the card; the labels' widths follow the font once it loads and
+    // the language, so a new text is measured through its label's resize.
+    const observer = new ResizeObserver(measure);
+    observer.observe(axis);
+    for (const label of axis.children) observer.observe(label);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div aria-hidden="true" className={ROW_GRID}>
+      <span className="hidden @md:block" />
+      <div className={cn("relative h-4", CELLS_PLACEMENT)} ref={ref}>
+        <span className="chart-tick absolute start-0" data-axis-edge="start">
+          {oldest}
+        </span>
+        {TICKS.map((minutes) => (
+          <span
+            className={cn(
+              "chart-tick absolute -translate-x-1/2",
+              !shown.includes(minutes) && "invisible",
+            )}
+            data-axis-tick={minutes}
+            key={minutes}
+            style={{ left: `${tickShare(minutes) * 100}%` }}
+          >
+            {formatNumber(-minutes, lang)}
+          </span>
+        ))}
+        <span className="chart-tick absolute end-0" data-axis-edge="end">
+          {newest}
+        </span>
+      </div>
+    </div>
+  );
+});
+
+/**
  * Per-minute requests for all accounts and the five busiest ones over the last hour. The server
  * sends only those five (top=5) and counts the other busy accounts in `restCount`, which the
  * header subtitle shows as "Top 5 of N".
@@ -297,11 +441,9 @@ export function TrafficHeatmap(): JSX.Element {
 
   const view = useMemo(() => {
     if (!data) return null;
-    // The server sends the busiest first (by requests, failures included); a row without
-    // traffic in the hour is left out, should one come.
-    const busiest = data.accounts
-      .filter((account) => account.cells.some((cell) => cell.offset < HOUR && cell.reqs > 0))
-      .slice(0, TOP_ACCOUNTS);
+    // The server sends the busiest first, ranked by requests plus failed attempts, so an account
+    // whose attempts all failed over keeps its row and the "Top N of M" count adds up.
+    const busiest = busyAccounts(data.accounts, HOUR, TOP_ACCOUNTS);
     const rows: HeatRow[] = [
       {
         key: data.global.accountId,
@@ -336,6 +478,15 @@ export function TrafficHeatmap(): JSX.Element {
     };
   }, [data, t, display]);
 
+  // What the tooltip says, read from the current data on every render.
+  const tip = hover && view ? describeCell(view, hover, lang) : null;
+  const stale = hover !== null && tip === null;
+  // The hovered row is gone or the grid made way for the empty state: drop the hover, so the
+  // tooltip does not come back on its own when the grid returns.
+  useEffect(() => {
+    if (stale) setHover(null);
+  }, [stale]);
+
   // One listener for every cell: the tooltip follows the cell under the pointer, or (touch) the
   // tapped cell, where it stays until the next tap.
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -352,12 +503,7 @@ export function TrafficHeatmap(): JSX.Element {
     if (hover?.key === key) return;
     // rowIndex:span:offset, the offset being the cell's newest minute.
     const [rowIndex, span, offset] = key.split(":").map(Number);
-    const row = view.rows[rowIndex];
-    if (!row) return;
-    const minutes = row.cells.filter((c) => c.offset >= offset && c.offset < offset + span);
-    if (minutes.length === 0) return;
-    const total = sum(minutes);
-    const newest = view.nowUnix - offset * 60;
+    if (!view.rows[rowIndex]) return;
     const cellBox = target.getBoundingClientRect();
     const rowBox = (
       target.closest<HTMLElement>("[data-heat-row]") ?? target
@@ -365,22 +511,14 @@ export function TrafficHeatmap(): JSX.Element {
     const outer = box.getBoundingClientRect();
     setHover({
       key,
+      rowIndex,
+      span,
+      offset,
       x: cellBox.left + cellBox.width / 2 - outer.left,
       y: cellBox.top + cellBox.height / 2 - outer.top,
       top: rowBox.top - outer.top,
       bottom: rowBox.bottom - outer.top,
       touch: event.pointerType === "touch",
-      // "11:52 – 11:53 AM": the range in the language's own short form.
-      time:
-        span > 1
-          ? dateTimeFormat(lang, { timeStyle: "short" }).formatRange(
-              unixToDate(newest - (span - 1) * 60),
-              unixToDate(newest),
-            )
-          : formatTime(newest, lang),
-      label: row.text,
-      requests: formatNumber(total.requests, lang),
-      errors: formatNumber(total.errors, lang),
     });
   };
 
@@ -455,30 +593,13 @@ export function TrafficHeatmap(): JSX.Element {
                 </span>
               </div>
             ))}
-            <div aria-hidden="true" className={ROW_GRID}>
-              <span className="hidden @md:block" />
-              <div className={cn("relative h-4", CELLS_PLACEMENT)}>
-                <span className="chart-tick absolute start-0">{t("heatmap.oldest")}</span>
-                {TICKS.map((minutes) => (
-                  <span
-                    className={cn(
-                      "chart-tick absolute -translate-x-1/2",
-                      minutes !== 30 && "hidden @md:block",
-                    )}
-                    key={minutes}
-                    style={{ left: `${((HOUR - minutes - 0.5) / HOUR) * 100}%` }}
-                  >
-                    {formatNumber(-minutes, lang)}
-                  </span>
-                ))}
-                <span className="chart-tick absolute end-0">{t("heatmap.newest")}</span>
-              </div>
-            </div>
-            {hover ? (
+            <HeatAxis lang={lang} newest={t("heatmap.newest")} oldest={t("heatmap.oldest")} />
+            {hover && tip ? (
               <Suspense fallback={null}>
                 <HeatTooltip
                   containerRef={containerRef}
                   hover={hover}
+                  tip={tip}
                   labels={{
                     requests: t("heatmap.tooltipRequests"),
                     errors: t("heatmap.tooltipErrors"),

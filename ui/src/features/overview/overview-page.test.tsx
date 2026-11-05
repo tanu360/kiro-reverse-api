@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { delay, HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
+import { heatmapQuery } from "@/lib/api/observe";
 import { mockDb } from "@/lib/mocks/db";
 import { buildStatus } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
@@ -283,6 +284,80 @@ describe("OverviewPage", () => {
     // One subtitle, not a separate meta run beside the description.
     expect(await within(heatmap).findByText("Top 5 of 8 · last 60 min")).toBeInTheDocument();
     expect(heatmap.querySelector('[data-slot="card-meta"]')).toBeNull();
+  });
+
+  it("keeps a busy account whose attempts all failed over, so the top count adds up", async () => {
+    const cell = (reqs: number, retries = 0) => [
+      { offset: 1, reqs, failures: 0, ...(retries > 0 ? { retries } : {}) },
+    ];
+    // The server ranks by requests plus failed attempts: busy 12, failing-over 10, mid 4, a 3, b 3
+    // and c 2 come back as the top five plus one more.
+    const accounts = [
+      { accountId: "busy", email: "busy@example.com", cells: cell(12) },
+      { accountId: "failing-over", email: "failover@example.com", cells: cell(0, 10) },
+      { accountId: "mid", email: "mid@example.com", cells: cell(4) },
+      { accountId: "a", email: "a@example.com", cells: cell(3) },
+      { accountId: "b", email: "b@example.com", cells: cell(3) },
+    ];
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        const windowMin = Number(params.get("windowMin") ?? 60);
+        const global = { accountId: "_global_", cells: cell(24, 10) };
+        if (params.get("scope") === "global") {
+          return HttpResponse.json({ windowMin, nowUnix: 1_700_000_000, global });
+        }
+        return HttpResponse.json({
+          windowMin,
+          nowUnix: 1_700_000_000,
+          global,
+          accounts,
+          restCount: 1,
+        });
+      }),
+    );
+    await renderApp("/", { privacy: false });
+    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
+    expect(await within(heatmap).findByText("Top 5 of 6 · last 60 min")).toBeInTheDocument();
+    expect(within(heatmap).getByText("failover@example.com")).toBeInTheDocument();
+    // Its failed minute is marked, not left to read as idle.
+    const failing = within(heatmap).getByRole("img", { name: /^failover@example\.com:/ });
+    expect(failing.querySelectorAll('[data-failed="some"]').length).toBeGreaterThan(0);
+  });
+
+  it("updates the heatmap tooltip with live data while the pointer stays on a cell", async () => {
+    let newest = 7;
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        const windowMin = Number(params.get("windowMin") ?? 60);
+        const global = {
+          accountId: "_global_",
+          cells: [
+            { offset: 0, reqs: newest, failures: 0 },
+            { offset: 5, reqs: 100, failures: 0 },
+          ],
+        };
+        if (params.get("scope") === "global") {
+          return HttpResponse.json({ windowMin, nowUnix: 1_700_000_000, global });
+        }
+        return HttpResponse.json({ windowMin, nowUnix: 1_700_000_000, global, accounts: [] });
+      }),
+    );
+    const { queryClient } = await renderApp("/");
+    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
+    await within(heatmap).findByText("All accounts");
+    const cell = heatmap.querySelector<HTMLElement>('[data-cell="0:1:0"]');
+    if (!cell) throw new Error("no cell for the global row's newest minute");
+    fireEvent.pointerMove(cell);
+    const requestsRow = async () =>
+      (await within(heatmap).findByText("Requests")).closest(".justify-between")?.textContent;
+    expect(await requestsRow()).toBe("Requests7");
+
+    // A live refetch while the pointer has not moved: the tooltip reads the new count.
+    newest = 31;
+    await queryClient.refetchQueries({ queryKey: heatmapQuery(60, { top: 5 }).queryKey });
+    await waitFor(async () => expect(await requestsRow()).toBe("Requests31"));
   });
 
   it("lists at most 10 recent errors", async () => {
