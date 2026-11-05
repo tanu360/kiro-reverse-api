@@ -78,6 +78,7 @@ export function MachineIdRow({ account }: { account: Account }): JSX.Element {
               event.currentTarget.form?.requestSubmit();
             }}
             placeholder={t("detail.machineIdPlaceholder")}
+            // The single-line mode: the box hugs the id (one or two lines), no empty third line.
             rows={1}
             spellCheck={false}
             value={value}

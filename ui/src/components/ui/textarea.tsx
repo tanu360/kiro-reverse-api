@@ -16,6 +16,12 @@ export type TextareaProps = React.ComponentPropsWithoutRef<"textarea"> &
     unstyled?: boolean;
   };
 
+/**
+ * A field that grows with its text up to 16rem. `rows={1}` is the single-line mode: no
+ * three-line floor, so it starts at an Input's height and hugs a value that wraps (a UUID on a
+ * phone); with a coarse pointer it is as tall as the Input there too.
+ */
+
 export function Textarea({
   className,
   size = "default",
@@ -24,6 +30,7 @@ export function Textarea({
   ref,
   ...props
 }: TextareaProps): React.ReactElement {
+  const singleLine = props.rows === 1;
   return (
     <span
       className={
@@ -48,13 +55,15 @@ export function Textarea({
           <textarea
             className={cn(
               // It grows with its text up to 16rem (field-sizing), so it has no resize grip.
-              "field-sizing-content min-h-17.5 max-h-64 w-full resize-none rounded-[inherit] px-[calc(--spacing(3)-1px)] py-[calc(--spacing(1.5)-1px)] text-foreground outline-none placeholder:text-placeholder max-sm:min-h-20.5",
+              "field-sizing-content max-h-64 w-full resize-none rounded-[inherit] px-[calc(--spacing(3)-1px)] py-[calc(--spacing(1.5)-1px)] text-foreground outline-none placeholder:text-placeholder",
+              !singleLine && "min-h-17.5 max-sm:min-h-20.5",
+              singleLine && size === "default" && "pointer-coarse:py-[calc(--spacing(2)-1px)]",
               props.wrap === "off" ? "overflow-x-auto whitespace-pre" : "wrap-anywhere",
               variant === "mono" && "font-mono sm:text-meta",
-              size === "sm" &&
-                "min-h-16.5 px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1)-1px)] max-sm:min-h-19.5",
-              size === "lg" &&
-                "min-h-18.5 py-[calc(--spacing(2)-1px)] max-sm:min-h-21.5",
+              size === "sm" && "px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1)-1px)]",
+              size === "sm" && !singleLine && "min-h-16.5 max-sm:min-h-19.5",
+              size === "lg" && "py-[calc(--spacing(2)-1px)]",
+              size === "lg" && !singleLine && "min-h-18.5 max-sm:min-h-21.5",
             )}
             data-slot="textarea"
             {...mergeProps(defaultProps, props)}

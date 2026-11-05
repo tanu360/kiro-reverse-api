@@ -311,7 +311,8 @@ describe("DataTable", () => {
     const cells = row.querySelectorAll("td");
     // The selection cell, then one per column; a column hidden by a breakpoint stays hidden.
     expect(cells).toHaveLength(3);
-    expect(cells[0]).toHaveClass("w-px");
+    // The data rows' checkbox cell drops its end padding; so does its placeholder.
+    expect(cells[0]).toHaveClass("w-px", "pe-0");
     expect(cells[2]).toHaveClass("hidden", "wide:table-cell");
     expect(cells[1]).not.toHaveClass("hidden");
   });

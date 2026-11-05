@@ -110,9 +110,9 @@ export function ThemeSwitch({
           </TooltipTrigger>
           <TooltipPopup>{label}</TooltipPopup>
         </Tooltip>
-        {/* The trigger sits out by its glyph's inset; 8 px in puts the popup's end edge on the
-            page gutter, like the last header glyph, instead of 5 px from a phone's edge. */}
-        <MenuPopup align="end" alignOffset={8}>
+        {/* Its end edge meets the trigger's; on a phone MenuPopup's collision padding keeps it
+            on the 16 px gutter. */}
+        <MenuPopup align="end">
           <MenuGroup>
             <MenuGroupLabel>{t("shell.theme.title")}</MenuGroupLabel>
             <MenuRadioGroup

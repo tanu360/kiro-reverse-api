@@ -125,10 +125,10 @@ export function SignInForm({
        * it signs in, the Button's spinner takes the icon's place and it stays focusable. While
        * the rate limit holds, aria-disabled (not native disabled) dims it and keeps focus on it,
        * so a click that set off the lock does not drop focus to the page; onSubmit returns early.
-       * `pending` is repeated because the prop replaces the one the Button sets while loading.
+       * The Button keeps aria-disabled on while loading, whatever this prop says.
        */}
       <Button
-        aria-disabled={locked || pending || undefined}
+        aria-disabled={locked || undefined}
         className="w-full"
         loading={pending}
         loadingText={t("signingIn")}

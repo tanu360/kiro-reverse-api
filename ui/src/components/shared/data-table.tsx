@@ -201,7 +201,13 @@ function stickyClass(sticky: DataTableColumn<unknown>["sticky"]): string | undef
   return STICKY_CLASS[sticky === "end" ? "end" : "start"];
 }
 const coreFeatures = tableFeatures({});
-const SKELETON_LINE = "flex w-full items-center";
+// One grid track per bar, up to the bar's width: the track's 0 floor adds nothing to the
+// column's min-content (a fixed-width column keeps its width while loading), and its cap still
+// asks an auto-width column for about its data width.
+const SKELETON_LINE = {
+  name: "grid w-full grid-cols-[minmax(0,--spacing(24))] items-center",
+  meta: "grid w-full grid-cols-[minmax(0,--spacing(14))] items-center",
+} as const;
 const SKELETON_ALIGN = {
   start: "justify-start",
   center: "justify-center",
@@ -493,7 +499,9 @@ export function DataTable<T>({
                   // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
                   <TableRow aria-hidden="true" className="hover:bg-transparent" key={index}>
                     {selection ? (
-                      <TableCell className="w-px">
+                      // pe-0 as in the data rows (their checkbox cell drops its end padding),
+                      // so the selection column is as wide while loading.
+                      <TableCell className="w-px pe-0">
                         <Skeleton className="size-4" />
                       </TableCell>
                     ) : null}
@@ -505,29 +513,30 @@ export function DataTable<T>({
                           14 px meta line: 34 px, the Accounts name cell), so the rows keep
                           their height when data arrives.
                           They sit on the column's side: a figure column's bars end at its
-                          right-aligned header. Fixed widths, not fractions of the cell: an
+                          right-aligned header. Capped widths, not fractions of the cell: an
                           auto-width column then keeps about its data width while loading
                           instead of shrinking to its header beside a full-width name column.
-                          They still shrink in a column narrower than that (flex items).
+                          In a fixed-width column narrower than the cap they shrink to fit, so
+                          the column does not grow while loading (SKELETON_LINE).
                         */}
                         <div className="flex flex-col">
                           <span
                             className={cn(
-                              SKELETON_LINE,
+                              SKELETON_LINE.name,
                               "h-5",
                               SKELETON_ALIGN[column.align ?? "start"],
                             )}
                           >
-                            <Skeleton className="h-3.5 w-24" />
+                            <Skeleton className="h-3.5" />
                           </span>
                           <span
                             className={cn(
-                              SKELETON_LINE,
+                              SKELETON_LINE.meta,
                               "h-3.5",
                               SKELETON_ALIGN[column.align ?? "start"],
                             )}
                           >
-                            <Skeleton className="h-3 w-14" />
+                            <Skeleton className="h-3" />
                           </span>
                         </div>
                       </TableCell>
