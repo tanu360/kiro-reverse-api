@@ -16,23 +16,27 @@
   --control-radius: 0.5rem;
   --sidebar-content-inset: 0.5rem;
   --sidebar-control-gap: 0.5rem;
-  --sidebar-icon-color: color-mix(
-    in srgb,
-    var(--contrast-sidebar-muted-foreground) 85%,
-    var(--sidebar)
-  );
   --sidebar-row-content-inset: 0.625rem;
-  --app-scrollbar-thumb: rgb(217 217 217);
-  --app-scrollbar-thumb-hover: rgb(191 191 191);
+  /*
+   * The one scrollbar thumb (see the scrollbar rules below): the foreground at 22 %, 32 % on
+   * hover, so it reads on every surface in both themes.
+   */
+  --app-scrollbar-thumb: color-mix(in oklab, var(--foreground) 22%, transparent);
+  --app-scrollbar-thumb-hover: color-mix(in oklab, var(--foreground) 32%, transparent);
   /* Frosted dialogs (t3code dialog-glass). */
   --glass-blur: 12px;
   --glass-opacity: 80%;
   --glass-saturation: 1.14;
-  --background: var(--color-zinc-25);
-  --surface-solid: #fcfcfc;
+  /*
+   * The surface ladder: the page (--background), then a solid sheet one step up for cards,
+   * popovers and popups (--surface-solid), then --surface-2 for what sits on a card: header
+   * chips, icon chips, the active nav row, kbd. Light: zinc-50 page, white cards, zinc-100 chips.
+   */
+  --background: var(--color-zinc-50);
+  --surface-solid: var(--color-white);
+  --surface-2: var(--color-zinc-100);
   /* t3code paints html and body with the chrome background, which is the canvas. */
   --app-chrome-background: var(--background);
-  --surface-raised: color-mix(in srgb, var(--card) 20%, transparent);
   --foreground: var(--color-zinc-900);
   --card: var(--surface-solid);
   --card-foreground: var(--color-zinc-900);
@@ -41,146 +45,167 @@
   /* Kiro purple-500 (#9046ff, kiro.dev --cta-primary): white text on it is 4.6:1. */
   --primary: #9046ff;
   --primary-foreground: var(--color-white);
+  /*
+   * A filled purple button's hover: a step deeper in both themes. A lighter step would drop the
+   * white label under 4.5:1 (the purple itself is 4.66:1; 88 % toward white is 3.7:1).
+   */
+  --primary-hover: color-mix(in oklab, var(--primary) 88%, var(--color-black));
   --secondary: var(--color-zinc-50);
   --secondary-foreground: var(--color-zinc-800);
   --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-500);
+  /* zinc at L 0.5 (#62626c): 5.9:1 on the page, 5.2:1 on a selected row (zinc-500 was 4.4). */
+  --muted-foreground: oklch(0.5 0.016 286);
   --placeholder: var(--muted-foreground);
+  /* Deprecated: an alias of --muted-foreground until menu, sidebar and user-menu move off it. */
   --secondary-label: var(--muted-foreground);
+  /* Model logos without their own colour (components/shared/model-logo.tsx). */
   --icon-muted: var(--muted-foreground);
   --accent: var(--color-zinc-100);
   --accent-foreground: var(--color-zinc-900);
+  /*
+   * Hairlines: --border-subtle for dividers inside a card (header rules, row dividers, footers),
+   * --border for cards, popups and outline buttons, --border-strong for a control's own edge that
+   * must read at 3:1 (checkbox, radio).
+   */
+  --border-subtle: color-mix(in srgb, var(--color-zinc-200) 55%, transparent);
   --border: var(--color-zinc-200);
+  --border-strong: color-mix(in oklab, var(--foreground) 50%, transparent);
   --input: var(--color-zinc-300);
   --ring: var(--primary);
-  --error: var(--color-red-500);
-  --error-foreground: var(--color-red-700);
-  --error-surface: color-mix(in srgb, var(--error) 8%, transparent);
-  --destructive: var(--error);
-  --destructive-foreground: var(--error-foreground);
+  /*
+   * Status ramps, one per tone (the pill colours further down are their source): the bare token
+   * is the disc or icon (at least 3:1 on a card), -foreground the text (at least 4.5:1) and
+   * -surface the tint behind it. Red is the one alert accent.
+   */
+  --destructive: var(--color-red-500);
+  --destructive-foreground: var(--pill-error-fg);
+  --error-surface: var(--pill-error-bg);
+  /* Solid red for a destructive confirm button and a danger button's hover: white on it is 4.8:1. */
+  --destructive-solid: var(--color-red-600);
+  --destructive-solid-foreground: var(--color-white);
   /* Kiro purple, not blue: purple-700 text is 7.4:1 on white. */
-  --info: #9046ff;
+  --info: var(--primary);
   --info-foreground: #7a0ecd;
-  --success: var(--color-emerald-500);
-  --success-foreground: var(--color-emerald-700);
-  --warning: var(--color-amber-500);
-  --warning-foreground: var(--color-amber-700);
-  --warning-surface: color-mix(in srgb, var(--warning) 8%, transparent);
+  --info-surface: var(--pill-primary-bg);
+  --success: var(--color-emerald-600);
+  --success-foreground: var(--pill-success-fg);
+  --success-surface: var(--pill-success-bg);
+  --warning: var(--color-amber-600);
+  --warning-foreground: var(--pill-warning-fg);
+  --warning-surface: var(--pill-warning-bg);
   --sidebar: var(--color-zinc-50);
   --sidebar-foreground: var(--foreground);
   --sidebar-muted-foreground: var(--muted-foreground);
   --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: color-mix(in srgb, var(--sidebar), var(--foreground) 3%);
-  --sidebar-row-active: color-mix(in srgb, var(--sidebar), var(--foreground) 8%);
-  --sidebar-row-selected: color-mix(in srgb, var(--sidebar), var(--foreground) 5.5%);
-  --sidebar-stage-fade: var(--sidebar);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--accent);
-  --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
-  --code-background: color-mix(in srgb, var(--card) 90%, var(--background));
+  /* Sidebar row tints over --sidebar (mixed in the `:root, [data-app-sidebar]` block below). */
+  --sidebar-row-hover-mix: 3%;
+  --sidebar-row-selected-mix: 7%;
+  --sidebar-row-active-mix: 9%;
+  /* Inline code (the inline-code utility): a see-through chip that reads on the page and cards. */
+  --code-background: color-mix(in oklab, var(--foreground) 6%, transparent);
   --code-foreground: var(--foreground);
   --switch-track: var(--color-zinc-500);
   --switch-thumb: var(--color-white);
+  /*
+   * Loading bars: components/ui/skeleton.tsx and setup-page's password bar. The highlight is the
+   * soft sheen that sweeps across a bar.
+   */
+  --skeleton: color-mix(in srgb, var(--muted-foreground) 15%, transparent);
+  --skeleton-highlight: color-mix(in srgb, var(--background) 64%, transparent);
+  /*
+   * Toasts sit this far above their usual bottom inset (components/ui/toast.tsx), so they clear
+   * the batch toolbar while one is open; taller on phones, where the bar wraps to two lines.
+   */
+  --toast-stack-offset: 0px;
+}
+
+:root:has([data-slot="batch-bar"]) {
+  --toast-stack-offset: 5rem;
+}
+
+@media (max-width: 639px) {
+  :root:has([data-slot="batch-bar"]) {
+    --toast-stack-offset: 7rem;
+  }
 }
 
 .dark {
   color-scheme: dark;
-  --app-scrollbar-thumb: rgb(255 255 255 / 8%);
-  --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
-  --background: #000;
-  --surface-solid: #0c0c0c;
+  --background: #09090a;
+  --surface-solid: #111113;
+  --surface-2: #1a1a1d;
   --foreground: var(--color-neutral-100);
   --card: var(--surface-solid);
   --card-foreground: var(--color-neutral-100);
-  --surface-raised: var(--surface-solid);
   --popover: var(--surface-solid);
   --popover-foreground: var(--color-neutral-100);
-  --primary: #9046ff;
   --secondary: --alpha(var(--color-white) / 3%);
   --secondary-foreground: var(--color-neutral-100);
   --muted: --alpha(var(--color-white) / 3%);
   --muted-foreground: var(--color-neutral-400);
   --accent: --alpha(var(--color-white) / 4%);
   --accent-foreground: var(--color-neutral-100);
+  --border-subtle: --alpha(var(--color-white) / 5.5%);
   --border: --alpha(var(--color-white) / 8%);
+  --border-strong: color-mix(in oklab, var(--color-white) 35%, transparent);
   --input: --alpha(var(--color-white) / 11%);
-  --error: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-  --error-foreground: var(--color-red-400);
-  --error-surface: color-mix(in srgb, var(--error) 16%, transparent);
+  --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
   /* Kiro purple-300: 9.7:1 on black. */
   --info-foreground: #c59eff;
-  --success-foreground: var(--color-emerald-400);
-  --warning-foreground: var(--color-amber-400);
-  --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
+  --success: var(--color-emerald-500);
+  --warning: var(--color-amber-500);
   --sidebar: var(--card);
   --sidebar-control-surface: var(--muted);
-  --sidebar-row-hover: color-mix(in srgb, var(--sidebar), var(--foreground) 4%);
-  --sidebar-row-active: color-mix(in srgb, var(--sidebar), var(--foreground) 10%);
-  --sidebar-row-selected: color-mix(in srgb, var(--sidebar), var(--foreground) 7%);
-  --sidebar-stage-fade: var(--card);
+  --sidebar-row-hover-mix: 5%;
+  --sidebar-row-selected-mix: 11%;
+  --sidebar-row-active-mix: 14%;
   --switch-track: var(--color-neutral-500);
-  --switch-thumb: var(--color-white);
+  --skeleton-highlight: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 
-/* Keep navigation states consistent in the desktop sidebar and mobile sheet. */
+/*
+ * The navigation (desktop sidebar and mobile sheet) shares the app palette. In dark it sits on
+ * the page colour rather than the card, so the sidebar reads as part of the chrome.
+ */
 [data-app-sidebar] {
-  --background: var(--color-zinc-25);
-  --foreground: var(--color-zinc-900);
-  --card: var(--surface-solid);
-  --card-foreground: var(--color-zinc-900);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-500);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-300);
-  --sidebar: var(--color-zinc-50);
-  --sidebar-foreground: var(--color-zinc-900);
-  --sidebar-muted-foreground: var(--color-zinc-500);
-  --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: color-mix(in srgb, var(--sidebar), var(--foreground) 3%);
-  --sidebar-row-active: color-mix(in srgb, var(--sidebar), var(--foreground) 8%);
-  --sidebar-row-selected: color-mix(in srgb, var(--sidebar), var(--foreground) 5.5%);
-  --sidebar-border: var(--color-zinc-200);
-  --sidebar-stage-fade: var(--sidebar);
-
   @variant dark {
-    --background: #000;
-    --foreground: #f1f3f7;
-    --card: #000;
-    --card-foreground: var(--foreground);
-    --accent: #191a1d;
-    --accent-foreground: #f7f9ff;
-    --muted: #0a0a0a;
-    --muted-foreground: #a3a3a3;
-    --border: rgb(255 255 255 / 8%);
-    --input: rgb(255 255 255 / 18%);
+    --card: var(--background);
     --sidebar: var(--card);
-    --sidebar-foreground: var(--foreground);
-    --sidebar-muted-foreground: var(--muted-foreground);
-    --sidebar-control-surface: var(--muted);
-    --sidebar-row-hover: color-mix(in srgb, var(--sidebar), var(--foreground) 4%);
-    --sidebar-row-active: color-mix(in srgb, var(--sidebar), var(--foreground) 10%);
-    --sidebar-row-selected: color-mix(in srgb, var(--sidebar), var(--foreground) 7%);
-    --sidebar-border: var(--border);
-    --sidebar-stage-fade: var(--card);
-    /* Row metadata sits a step below read titles (75% white). */
-    --secondary-label: #8f8f8f;
   }
 }
 
 /*
  * t3code recomputes contrast tokens wherever a subtree owns its palette. With no contrast boost
- * they equal their base tokens, so they are declared again on the sidebar to resolve there.
+ * they equal their base tokens, so they are declared again on the sidebar to resolve there. The
+ * sidebar row tints and icon colour are mixed here too, so inside the sidebar they mix with its
+ * own --sidebar.
  */
 :root,
 [data-app-sidebar] {
   --contrast-foreground: var(--foreground);
   --contrast-muted-foreground: var(--muted-foreground);
   --contrast-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --sidebar-icon-color: color-mix(
+    in srgb,
+    var(--contrast-sidebar-muted-foreground) 85%,
+    var(--sidebar)
+  );
+  --sidebar-row-hover: color-mix(
+    in srgb,
+    var(--sidebar),
+    var(--foreground) var(--sidebar-row-hover-mix)
+  );
+  --sidebar-row-selected: color-mix(
+    in srgb,
+    var(--sidebar),
+    var(--foreground) var(--sidebar-row-selected-mix)
+  );
+  --sidebar-row-active: color-mix(
+    in srgb,
+    var(--sidebar),
+    var(--foreground) var(--sidebar-row-active-mix)
+  );
 }
 
 /*
@@ -243,22 +268,31 @@
 }
 
 @theme {
-  --color-zinc-25: oklch(99.2% 0 0);
-
   /*
    * The type scale, set by the sign-in pages. Body copy is text-sm (14 px) and small labels
    * text-xs (12 px); these add the steps between and above them:
-   *   display  28 px  the sign-in h1 (from sm up) and a stat card's number
+   *   display  28 px  the sign-in h1 (from sm up) and a status card's number
    *   title    22 px  a page's h1 (from sm up)
+   *   kpi      24 px  a live tile's number
+   *   subtitle 18 px  dialog, alert dialog, sheet and drawer titles
    *   heading  15 px  section, card, empty and error state titles
    *   meta     13 px  footer lines, stat captions, table heads, key labels, mono values
-   *   2xs      11 px  small pills
-   * Line heights follow the page's 1.5 unless the step is a title.
+   *   2xs      11 px  small pills, chart ticks
+   * Line heights follow the page's 1.5 unless the step is a title. Only the large steps tighten
+   * their tracking; body text keeps Geist's own spacing. lib/utils.ts lists these steps for cn(),
+   * so a new step goes there too.
    */
   --text-display: 1.75rem;
   --text-display--line-height: 1.25;
+  --text-display--letter-spacing: -0.02em;
   --text-title: 1.375rem;
   --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.015em;
+  --text-kpi: 1.5rem;
+  --text-kpi--line-height: 1.1;
+  --text-kpi--letter-spacing: -0.02em;
+  --text-subtitle: 1.125rem;
+  --text-subtitle--line-height: 1.375;
   --text-heading: 0.9375rem;
   --text-heading--line-height: 1.5;
   --text-meta: 0.8125rem;
@@ -301,18 +335,16 @@
 }
 
 /*
- * Every dropdown (select, menu, combobox, autocomplete, popover) is one popup: the sign-in
- * language picker's solid raised sheet, not glass. Off-white on the zinc-25 page with a zinc-200
- * hairline in light; near-black on the black page with a white hairline in dark. No shadow. Rows inside
- * use the accent tone for their highlight (components/ui/popup-row.tsx).
+ * Every floating layer (select, menu, combobox, autocomplete, popover, tooltip, toast) is one
+ * popup: the sign-in language picker's solid raised sheet, not glass. The card's sheet with the
+ * card's hairline, lifted by the one floating shadow. Rows inside use the accent tone for their
+ * highlight (components/ui/popup-row.tsx). --popup is an alias of --popover, kept because the
+ * coss ui components read it.
  */
 :root {
-  --popup: var(--surface-solid);
-  --popup-border: var(--color-zinc-200);
-  --popup-shadow: none;
-}
-.dark {
-  --popup-border: rgb(255 255 255 / 10%);
+  --popup: var(--popover);
+  --popup-border: var(--border);
+  --popup-shadow: var(--floating-shadow);
 }
 
 @utility popup-surface {
@@ -337,82 +369,129 @@
 }
 
 /*
- * A select's list: exactly as wide as its field, never wider. A select trigger is always a
- * field showing the chosen option, so the options fit it; a longer one truncates and slides
- * when highlighted.
+ * A select's list: at least as wide as its field (a select trigger is always a field showing the
+ * chosen option, so the options usually fit it), growing to fit a longer option up to 14rem or
+ * the field, whichever is wider. Never wider than the viewport less 1rem a side.
  */
 @utility popup-width-field {
-  width: min(var(--anchor-width, 11rem), calc(100vw - 2rem));
+  min-width: min(var(--anchor-width, 11rem), calc(100vw - 2rem));
+  width: max-content;
+  max-width: min(max(var(--anchor-width, 11rem), 14rem), calc(100vw - 2rem));
 }
 
 /*
  * Form fields (input, textarea, select trigger, number field, input group): the sign-in
- * password field's soft fill. A faint foreground tint with a hairline border
- * barely darker than it; hover deepens the tint a step, focus turns the border a soft purple and
- * lightens the fill. No focus ring. Checkboxes and radios take the same fill with a firmer edge
- * (--field-border-strong), so the box still reads at 16 px.
+ * password field's soft fill. A faint foreground tint with a hairline border barely darker than
+ * it, kept soft on purpose (the sign-in look; the label and the fill mark the field); hover
+ * deepens the tint a step, and focus turns the border solid Kiro purple (at least 3:1) and
+ * lightens the fill. No focus ring. Checkboxes and radios take the same fill with the firmer
+ * --border-strong edge (--field-border-strong), so the box reads at 3:1 at 16 px.
  */
 :root {
   --field: color-mix(in oklab, var(--foreground) 3.5%, transparent);
-  --field-hover: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --field-hover: color-mix(in oklab, var(--foreground) 7%, transparent);
   --field-focus: color-mix(in oklab, var(--foreground) 2%, transparent);
   --field-border: color-mix(in oklab, var(--foreground) 8%, transparent);
-  --field-border-strong: color-mix(in oklab, var(--foreground) 14%, transparent);
-  --field-border-focus: color-mix(in oklab, var(--primary) 55%, transparent);
+  --field-border-strong: var(--border-strong);
+  --field-border-focus: var(--primary);
 }
 .dark {
   --field: color-mix(in oklab, var(--color-white) 4.5%, transparent);
-  --field-hover: color-mix(in oklab, var(--color-white) 6%, transparent);
+  --field-hover: color-mix(in oklab, var(--color-white) 8.5%, transparent);
   --field-focus: color-mix(in oklab, var(--color-white) 5%, transparent);
   --field-border: color-mix(in oklab, var(--color-white) 7%, transparent);
-  --field-border-strong: color-mix(in oklab, var(--color-white) 12%, transparent);
-  --field-border-focus: color-mix(in oklab, var(--primary) 70%, transparent);
 }
 
 /*
  * The neutral button (components/ui/button.tsx `outline`): the field's see-through tint a step
  * deeper, so it takes the colour of the card, dialog or page under it with a slight lift, and a
- * step deeper again on hover or press.
+ * clear step deeper on hover or press. The hover tint is also the selected segment and tab
+ * indicator. Its edge is the card hairline.
  */
 :root {
   --neutral-button: color-mix(in oklab, var(--foreground) 4.5%, transparent);
-  --neutral-button-hover: color-mix(in oklab, var(--foreground) 7.5%, transparent);
-  --neutral-button-border: color-mix(in oklab, var(--foreground) 9%, transparent);
+  --neutral-button-hover: color-mix(in oklab, var(--foreground) 11%, transparent);
+  --neutral-button-border: var(--border);
 }
 .dark {
   --neutral-button: color-mix(in oklab, var(--color-white) 6%, transparent);
-  --neutral-button-hover: color-mix(in oklab, var(--color-white) 9%, transparent);
-  --neutral-button-border: color-mix(in oklab, var(--color-white) 9%, transparent);
+  --neutral-button-hover: color-mix(in oklab, var(--color-white) 13%, transparent);
 }
 
 /*
  * Inset panels (t3code's SettingsGroup fill): the card at 40 % over the page, for a list panel,
  * a sticky table cell or a backdrop on a chart. Table rows (components/ui/table.tsx) lay a see-
- * through tint over that panel: the foreground at 3 % on hover, Kiro purple at 9 % when
- * selected (12 % hovered), and the header row a 2.5 % foreground band. The opaque
+ * through tint over that panel: the foreground at 4.5 % on hover (6 % in dark), Kiro purple at
+ * 9 % when selected (12 % hovered), and the header row a 2.5 % foreground band. The opaque
  * --surface-inset-* steps are the same tints already mixed into the panel, for sticky cells,
  * which must hide what scrolls under them, so a pinned cell matches its row exactly.
  */
 :root {
   --surface-inset: color-mix(in srgb, var(--card) 40%, var(--background));
   --row-head: color-mix(in srgb, var(--foreground) 2.5%, transparent);
-  --row-hover: color-mix(in srgb, var(--foreground) 3%, transparent);
+  --row-hover: color-mix(in srgb, var(--foreground) 4.5%, transparent);
   --row-selected: color-mix(in srgb, var(--primary) 9%, transparent);
   --row-selected-hover: color-mix(in srgb, var(--primary) 12%, transparent);
   --surface-inset-head: color-mix(in srgb, var(--surface-inset), var(--foreground) 2.5%);
-  --surface-inset-hover: color-mix(in srgb, var(--surface-inset), var(--foreground) 3%);
+  --surface-inset-hover: color-mix(in srgb, var(--surface-inset), var(--foreground) 4.5%);
   --surface-inset-selected: color-mix(in srgb, var(--surface-inset), var(--primary) 9%);
   --surface-inset-selected-hover: color-mix(in srgb, var(--surface-inset), var(--primary) 12%);
   --card-hover: color-mix(in srgb, var(--card), var(--foreground) 2%);
   --card-selected: color-mix(in srgb, var(--card), var(--foreground) 4%);
 }
+.dark {
+  --row-hover: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --surface-inset-hover: color-mix(in srgb, var(--surface-inset), var(--foreground) 6%);
+}
 
-/* Inline code in running text: the body font, a touch smaller than the line, on a muted chip. */
+/*
+ * Inline code in running text: Geist Mono, a touch smaller than the line but never under the
+ * 11 px 2xs step, on the see-through --code-background chip.
+ */
 @utility inline-code {
   border-radius: 0.25rem;
-  background-color: var(--muted);
+  background-color: var(--code-background);
+  color: var(--code-foreground);
   padding: 0.125rem 0.25rem;
-  font-size: 0.85em;
+  font-family: var(--font-mono);
+  font-size: max(0.85em, 0.6875rem);
+}
+
+/* Chart axis ticks: small mono figures in the chart label grey, for SVG text (fill) and HTML. */
+@utility chart-tick {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--text-2xs--line-height);
+  font-variant-numeric: tabular-nums;
+  fill: var(--chart-label);
+  color: var(--chart-label);
+}
+
+/*
+ * A larger touch target without a larger control: on a coarse pointer an invisible ::after,
+ * centred on the control, is at least 44 px square. The control must not clip its overflow.
+ */
+@utility touch-hit {
+  position: relative;
+
+  @media (pointer: coarse) {
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 100%;
+      min-width: 44px;
+      min-height: 44px;
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+/* A heatmap cell with failures under the alert threshold: a thin red bar along its bottom. */
+@utility heat-fail {
+  box-shadow: inset 0 -2px 0 var(--chart-negative);
 }
 
 /*
@@ -493,6 +572,27 @@
   }
 }
 
+/* Opt in to a vertical scrollbar: the same 6 px round thumb as the horizontal one. */
+@utility scrollbar-y {
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--app-scrollbar-thumb) transparent;
+  }
+}
+
+/* No scrollbar on either axis (a tab strip that scrolls sideways under its own fades). */
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /*
  * A vertical scroller that fades its content out at an edge it can still scroll past: 20 px at
  * the top once it has scrolled down, 20 px at the bottom until it reaches the end (the menu and
@@ -536,6 +636,53 @@
   );
   animation: scroll-fade-y linear both;
   animation-timeline: scroll(self block);
+}
+
+/*
+ * The sideways twin of scroll-fade-y (tab strips, chip rows): 24 px at the leading edge once it
+ * has scrolled, 24 px at the trailing edge until it reaches the end. Right-to-left text flips it.
+ */
+@property --scroll-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --scroll-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes scroll-fade-x {
+  from {
+    --scroll-fade-start: 0px;
+    --scroll-fade-end: 24px;
+  }
+  8% {
+    --scroll-fade-start: 24px;
+  }
+  92% {
+    --scroll-fade-end: 24px;
+  }
+  to {
+    --scroll-fade-start: 24px;
+    --scroll-fade-end: 0px;
+  }
+}
+@utility scroll-fade-x {
+  --scroll-fade-direction: to right;
+  mask-image: linear-gradient(
+    var(--scroll-fade-direction),
+    transparent,
+    #000 var(--scroll-fade-start),
+    #000 calc(100% - var(--scroll-fade-end)),
+    transparent
+  );
+  animation: scroll-fade-x linear both;
+  animation-timeline: scroll(self inline);
+
+  &:dir(rtl) {
+    --scroll-fade-direction: to left;
+  }
 }
 
 /*
@@ -610,7 +757,7 @@
   -webkit-mask-image:
     linear-gradient(
       #000 calc(100% - var(--command-foot)),
-      rgb(0 0 0 / 35%) calc(100% - var(--command-foot) + 12px),
+      transparent calc(100% - var(--command-foot) + 12px),
       transparent
     ),
     linear-gradient(
@@ -620,7 +767,7 @@
   mask-image:
     linear-gradient(
       #000 calc(100% - var(--command-foot)),
-      rgb(0 0 0 / 35%) calc(100% - var(--command-foot) + 12px),
+      transparent calc(100% - var(--command-foot) + 12px),
       transparent
     ),
     linear-gradient(
@@ -669,16 +816,16 @@
 /*
  * The keyboard focus cue. The UI is flat: bordered fields (input, select, textarea…) show focus
  * by their border colour alone, with no halo. Controls without a visible border (ghost and icon
- * buttons, links, tabs, rows, checkboxes) get this thin outline in the ring colour instead.
+ * buttons, links, tabs, rows, checkboxes) get a 2 px outline in the ring colour instead.
  * :focus-visible does not match a mouse click on a button, so pointer users never see it.
  * The rule sets outline-style itself: Tailwind's outline-none/outline-hidden zero
  * --tw-outline-style, which would leave `focus-visible:outline-1` invisible.
- * `focus-outline` sits 2 px off the edge; `focus-outline-inset` sits on the inner edge, for
+ * `focus-outline` sits 2 px off the edge; `focus-outline-inset` is 1 px on the inner edge, for
  * rows, cells and items packed in a track or a scrolling box that would clip an outer outline.
  */
 @utility focus-outline {
   &:focus-visible {
-    outline: 1px solid var(--color-ring);
+    outline: 2px solid var(--color-ring);
     outline-offset: 2px;
   }
 }
@@ -729,7 +876,7 @@
  * Sticker colours: the pastel API stickers of the sign-in showcase (features/auth/auth-showcase.tsx),
  * reused as the solid supporting buttons (components/ui/button.tsx lime, periwinkle, peach). Each
  * label is at least 5.4:1 on its pastel. The pastels stay the same in the dark theme, where they
- * stand out on the black page like the stickers on the purple panel.
+ * stand out on the dark page like the stickers on the purple panel.
  */
 :root {
   --sticker-claude: #ffe9de;
@@ -748,7 +895,9 @@
  * tint, measured over a selected table row (the darkest surface a pill sits on):
  *   neutral #3a3a3a 9.5:1, warning #ab5000 4.6:1, success #27793c 4.6:1, error #c92518 4.6:1,
  *   primary #7a0ecd 6.1:1.
- * The tints are see-through, so a pill keeps its look on cards, the page and tinted rows.
+ * The tints are see-through, so a pill keeps its look on cards, the page and tinted rows. These
+ * are the source of the status ramps (--success-foreground, --error-surface… at the top), so a
+ * pill, a notice, a toast and a delta of one tone share one colour.
  * Dark theme: the tint is the hue at low alpha over near-black, the disc and label lighter
  * steps of it, and the glyph is knocked out to black (white on a light disc was under 2:1).
  * Labels there: neutral 8.9:1, warning 7.4:1, success 7.1:1, error 5.9:1, primary 6.2:1.
@@ -759,7 +908,7 @@
   --pill-neutral-fg: #3a3a3a;
   --pill-neutral-bg: color-mix(in srgb, var(--pill-neutral) 15%, transparent);
   --pill-primary: var(--primary);
-  --pill-primary-fg: #7a0ecd;
+  --pill-primary-fg: var(--info-foreground);
   --pill-primary-bg: color-mix(in srgb, var(--pill-primary) 10%, transparent);
   --pill-success: #3dbe5f;
   --pill-success-fg: #27793c;
@@ -777,7 +926,6 @@
   --pill-neutral-fg: #d4d4d4;
   --pill-neutral-bg: color-mix(in srgb, var(--pill-neutral) 16%, transparent);
   --pill-primary: #a066ff;
-  --pill-primary-fg: #c59eff;
   --pill-primary-bg: color-mix(in srgb, var(--pill-primary) 20%, transparent);
   --pill-success: #4cc96d;
   --pill-success-fg: #6fd68b;
@@ -794,6 +942,8 @@
   --font-sans:
     "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Headings use the body face (the sign-in h1 and showcase lines ask for font-heading). */
+  --font-heading: var(--font-sans);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -803,6 +953,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -812,22 +963,28 @@
   --color-icon-muted: var(--icon-muted);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-border-subtle: var(--border-subtle);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-error: var(--error);
-  --color-error-foreground: var(--error-foreground);
+  --color-destructive-solid: var(--destructive-solid);
+  --color-destructive-solid-foreground: var(--destructive-solid-foreground);
   --color-error-surface: var(--error-surface);
-  --color-warning-surface: var(--warning-surface);
-  --color-surface-raised: var(--surface-raised);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-info-surface: var(--info-surface);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-surface: var(--success-surface);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-surface: var(--warning-surface);
+  --color-surface-2: var(--surface-2);
+  --color-skeleton: var(--skeleton);
+  --color-skeleton-highlight: var(--skeleton-highlight);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
@@ -835,12 +992,7 @@
   --color-sidebar-row-hover: var(--sidebar-row-hover);
   --color-sidebar-row-active: var(--sidebar-row-active);
   --color-sidebar-row-selected: var(--sidebar-row-selected);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
   --color-code: var(--code-background);
   --color-code-foreground: var(--code-foreground);
   --color-switch-track: var(--switch-track);
@@ -857,8 +1009,6 @@
   /* The inverted pill (chart date tickers): dark on light, light on dark. */
   --color-inverse: var(--inverse);
   --color-inverse-foreground: var(--inverse-foreground);
-  --color-surface-inset-hover: var(--surface-inset-hover);
-  --color-surface-inset-selected: var(--surface-inset-selected);
   --color-card-hover: var(--card-hover);
   --color-card-selected: var(--card-selected);
 
@@ -974,8 +1124,12 @@
 }
 
 /*
- * Bklit UI chart variables (merged by the shadcn CLI from @bklit/chart-context). The primary
- * series follows the t3code primary, and positive/negative follow the status colours.
+ * Bklit UI chart variables (merged by the shadcn CLI from @bklit/chart-context). One purple plus
+ * neutrals, with red as the only alert series: chart-1 is Kiro purple, chart-2 a softer purple,
+ * chart-3..5 greys stepping down toward the card (the model mix ramp; never green or red for a
+ * category). Labels, grid and comparison lines use the app's own greys and hairline.
+ * chart-scale-01..05 is the volume ramp for heatmap cells and idle bars: 01 is empty, 02..05 run
+ * from a faint to the full purple.
  */
 @theme inline {
   --color-chart-1: var(--chart-1);
@@ -1000,6 +1154,7 @@
   --color-chart-marker-border: var(--chart-marker-border);
   --color-chart-marker-foreground: var(--chart-marker-foreground);
   --color-chart-label: var(--chart-label);
+  --color-chart-comparison: var(--chart-comparison);
   --color-chart-scale-mix: var(--chart-scale-mix);
   --color-chart-scale-01: var(--chart-scale-01);
   --color-chart-scale-02: var(--chart-scale-02);
@@ -1017,19 +1172,22 @@
 
 :root {
   --chart-1: var(--primary);
-  --chart-2: oklch(0.852 0.199 91.936);
-  --chart-3: oklch(0.667 0.295 322.15);
-  --chart-4: oklch(0.56 0.021 213.5);
-  --chart-5: oklch(0 0 0);
+  --chart-2: color-mix(in oklab, var(--primary) 55%, var(--card));
+  --chart-3: color-mix(in oklab, var(--foreground) 60%, var(--card));
+  --chart-4: color-mix(in oklab, var(--foreground) 38%, var(--card));
+  --chart-5: color-mix(in oklab, var(--foreground) 22%, var(--card));
   --chart-positive: var(--success);
   --chart-negative: var(--destructive);
+  /* The card the charts sit on, so dot outlines and ring gaps cut cleanly into it. */
   --chart-background: var(--card);
-  --chart-foreground: oklch(0.145 0.004 285);
-  --chart-foreground-muted: oklch(0.55 0.014 260);
+  --chart-foreground: var(--foreground);
+  --chart-foreground-muted: var(--muted-foreground);
   --chart-line-primary: var(--chart-1);
   --chart-line-secondary: var(--chart-2);
-  --chart-crosshair: #5e17ab;
-  --chart-grid: oklch(0.9 0 0);
+  --chart-crosshair: color-mix(in oklab, var(--foreground) 30%, transparent);
+  --chart-grid: var(--border);
+  /* The previous-window line, drawn dashed. */
+  --chart-comparison: var(--muted-foreground);
   --chart-brush-border: var(--chart-grid);
   --chart-tooltip-background: var(--popup);
   --chart-tooltip-foreground: var(--popover-foreground);
@@ -1037,7 +1195,7 @@
   --chart-marker-background: oklch(0.97 0.005 260);
   --chart-marker-border: oklch(0.85 0.01 260);
   --chart-marker-foreground: oklch(0.3 0.01 260);
-  --chart-label: oklch(0.45 0.01 260);
+  --chart-label: var(--muted-foreground);
   --chart-scale-mix: oklch(1 0 0);
   --chart-scale-01: oklch(0.922 0 0);
   --chart-scale-02: color-mix(in oklab, var(--chart-1) 35%, var(--chart-scale-mix));
@@ -1054,30 +1212,13 @@
 }
 
 .dark {
-  --chart-1: var(--primary);
-  --chart-2: oklch(0.852 0.199 91.936);
-  --chart-3: oklch(0.667 0.295 322.15);
-  --chart-4: oklch(0.56 0.021 213.5);
-  --chart-5: oklch(1 0 0);
-  --chart-positive: var(--success);
-  --chart-negative: var(--destructive);
-  /* The card the charts sit on, so dot outlines and ring gaps cut cleanly into it. */
-  --chart-background: var(--card);
-  --chart-foreground: oklch(0.45 0 0);
-  --chart-foreground-muted: oklch(0.65 0.01 260);
-  --chart-crosshair: oklch(0.45 0 0);
-  --chart-grid: oklch(0.25 0 0);
-  --chart-brush-border: var(--chart-grid);
+  /* Ring spokes and loading strokes: a mid grey that still reads on the dark card. */
+  --chart-foreground: color-mix(in oklab, var(--foreground) 45%, transparent);
   --chart-marker-background: oklch(0.25 0.01 260);
   --chart-marker-border: oklch(0.4 0.01 260);
   --chart-marker-foreground: oklch(0.9 0 0);
-  --chart-label: oklch(0.75 0.01 260);
   --chart-scale-mix: oklch(0.25 0 0);
   --chart-scale-01: oklch(0.3 0 0);
-  --chart-scale-02: color-mix(in oklab, var(--chart-1) 35%, var(--chart-scale-mix));
-  --chart-scale-03: color-mix(in oklab, var(--chart-1) 55%, var(--chart-scale-mix));
-  --chart-scale-04: color-mix(in oklab, var(--chart-1) 78%, var(--chart-scale-mix));
-  --chart-scale-05: var(--chart-1);
   --chart-scale-pattern-color: oklch(0.145 0 0);
   --chart-indicator-color: oklch(1 0 0);
   --chart-indicator-secondary-color: oklch(0.145 0 0);
@@ -1087,7 +1228,7 @@
   --chart-segment-line: oklch(1 0 0 / 0.25);
 }
 
-/* The inverted pill (chart date tickers): dark on the light theme, light on the black page. */
+/* The inverted pill (chart date tickers): dark on the light theme, light on the dark page. */
 :root {
   --inverse: var(--color-zinc-900);
   --inverse-foreground: var(--color-zinc-50);
@@ -1114,7 +1255,7 @@
   /*
    * Selected text in Kiro purple instead of the browser's blue, and the text turns white on it,
    * as on a filled button: solid purple in light (4.7:1 for white text), a step deeper in dark
-   * (the purple at 80 % over the black page), so a selection reads as one highlighted strip.
+   * (the purple at 80 % over the dark page), so a selection reads as one highlighted strip.
    */
   ::selection {
     background-color: var(--primary);
@@ -1130,8 +1271,6 @@
   }
   body {
     @apply text-foreground font-sans antialiased;
-    /* Geist sets tight by default; a hair of tracking keeps letters from packing together. */
-    letter-spacing: 0.01em;
     background-image: var(--surface-grain);
     background-repeat: repeat;
     background-size: var(--surface-grain-size);
