@@ -15,13 +15,13 @@ test("first visit goes to setup, signs in with the first-run password and stays 
   await page.route("https://raw.githubusercontent.com/**", (route) => route.abort());
 
   await page.goto("/admin/");
-  await expect(page).toHaveURL(/\/admin\/setup$/);
+  // The guard's ?redirect= rides along from /login to /setup.
+  await expect(page).toHaveURL(/\/admin\/setup(?:\?|$)/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome to Kiro Proxy");
   await expect(page.getByText("12345678", { exact: true })).toBeVisible();
-  const field = page.getByLabel("Password", { exact: true });
-  await expect(field).toHaveValue("");
+  // Setup fills the generated password in for the first sign-in.
+  await expect(page.getByLabel("Password", { exact: true })).toHaveValue("12345678");
 
-  await field.fill("12345678");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/admin\/?$/);
   await expect(page.locator("main#main h1")).toHaveText("Overview");

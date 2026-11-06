@@ -42,6 +42,8 @@ const DATA_PATTERNS: RegExp[] = [
   /^[\da-f]+(?:-[\da-f]+)*…?$/i,
   // Compact numbers and units from Intl: 9.9M, 30.8K, 56.4kB, 1.84s, 120ms.
   /^[\d.,]+(?:K|M|B|T|kB|MB|GB|ms|s|m|h|d)$/,
+  // A lone letter: an avatar's initial, cut from the email beside it.
+  /^\p{L}$/u,
 ];
 
 const WORD_SEPARATORS = /[\s,;·|()[\]{}"'“”«»:]+/;
@@ -67,8 +69,9 @@ function collectLeaks(markers: { open: string; close: string }): Leak[] {
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const parent = node.parentElement;
     if (!parent || ["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"].includes(parent.tagName)) continue;
-    // Code snippets, key names and wire field names are code, not prose.
-    if (parent.closest("code, pre, kbd, samp")) continue;
+    // Code snippets, key names and wire field names are code, not prose; so is a copy field's
+    // value, which a multiline field splits into one text node per URL segment.
+    if (parent.closest("code, pre, kbd, samp, [data-slot=copy-field] [role=textbox]")) continue;
     // Base UI's Meter and Progress add a visually hidden role="presentation" "x" as a VoiceOver
     // workaround; it is never read or shown.
     if (parent.getAttribute("role") === "presentation" && parent.style.clipPath) continue;
@@ -308,11 +311,9 @@ test.describe("pseudo locale", () => {
       .click();
     await expect(page.getByRole("alertdialog")).toBeHidden();
 
-    await page
-      .getByRole("main")
-      .getByRole("button", { name: /Details/ })
-      .first()
-      .click();
+    // Details sits in the row's More actions menu.
+    await rowMenu.click();
+    await page.getByRole("menuitem", { name: /Details/ }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expectAllTranslated(page, serverStrings, "account detail sheet");
     await page.keyboard.press("Escape");
