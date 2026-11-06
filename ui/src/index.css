@@ -786,9 +786,8 @@
  * or a group title with its gap) under a 60 px search row, and a floating foot that the list
  * scrolls behind. It hangs 8 px under the header trigger, centred on it (--command-x and
  * --command-y, set when it opens), and kept 16 px inside the window; without them it sits
- * centred 12vh down. Phones float it 90vw wide, centred, its top as far down as its sides are
- * in (the modal gap, 5vw). Shorter windows drop whole slots, so the last row in view ends 8 px
- * over the foot.
+ * centred 12vh down. Phones float it 90vw wide and centred both ways at one fixed height.
+ * Shorter windows drop whole slots, so the last row in view ends 8 px over the foot.
  */
 @utility command-palette {
   --command-w: min(640px, calc(100vw - 32px));
@@ -804,10 +803,17 @@
   max-height: min(470px, calc(100dvh - var(--command-top) - 16px));
   max-height: min(470px, calc(70px + round(down, 100dvh - var(--command-top) - 86px, 40px)));
 
+  /*
+   * Phones: one fixed height, centred like every other modal (equal gaps above and below), so
+   * the panel neither sits high nor jumps while the results filter: up to 470 px, or 90dvh.
+   */
   @media (width < 40rem) {
     --command-w: calc(100vw - var(--modal-gap-x) * 2);
-    --command-top: var(--modal-gap-x);
+    --command-h: min(470px, calc(100dvh - var(--modal-gap-y) * 2));
+    --command-top: calc((100dvh - var(--command-h)) / 2);
     left: var(--modal-gap-x);
+    height: var(--command-h);
+    max-height: var(--command-h);
   }
 }
 

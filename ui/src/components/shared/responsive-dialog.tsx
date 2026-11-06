@@ -13,16 +13,6 @@ import {
   type DialogSize,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Drawer,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerPanel,
-  DrawerPopup,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import { useIsMobile } from "@/hooks/use-media-query";
 import { useT } from "@/lib/i18n";
 
 export interface ResponsiveDialogProps {
@@ -33,15 +23,13 @@ export interface ResponsiveDialogProps {
   children: ReactNode;
   footer?: ReactNode;
   /**
-   * Width from md up, named after the Tailwind max-w step (dialog.tsx DIALOG_SIZE_CLASS):
-   * sm 384, md 448, lg 512 (the default), xl 576, 2xl 672 px.
+   * Width, named after the Tailwind max-w step (dialog.tsx DIALOG_SIZE_CLASS): sm 384, md 448,
+   * lg 512 (the default), xl 576, 2xl 672 px; on phones at most 90vw.
    */
   size?: DialogSize;
   /**
-   * `top` hangs the dialog from near the top from md up, so a step flow or a form that grows (a
-   * validation line, a server error) keeps its title in place. The phone bottom drawer is not
-   * affected: it fits its content (up to 90 % of the screen, and 90vw wide on phones), so a
-   * short step is not a tall empty sheet.
+   * `top` hangs the dialog from near the top from sm up, so a step flow or a form that grows (a
+   * validation line, a server error) keeps its title in place. Phones always centre it.
    */
   anchor?: DialogAnchor;
   /** Shows a back arrow before the title (a step flow's way back); the footer keeps the actions. */
@@ -71,7 +59,7 @@ function TitleRow({
   title: ReactNode;
   onBack?: () => void;
   backLabel: string;
-  Title: typeof DialogTitle | typeof DrawerTitle;
+  Title: typeof DialogTitle;
 }): JSX.Element {
   if (!onBack) return <Title>{title}</Title>;
   return (
@@ -93,8 +81,10 @@ function TitleRow({
 }
 
 /**
- * coss Dialog from `md` up, a bottom Drawer below it (on phones a floating panel 5vw clear of the
- * sides and the bottom, drawer.tsx). Every close path reports onOpenChange(false).
+ * The app's dialog at every width: the coss Dialog, which on phones is a floating panel centred
+ * with even gaps, at most 90vw by 90dvh (dialog.tsx), like every other modal. Phones used to get a
+ * bottom drawer, which sat 5vw over the bottom edge but far below the top: one centred panel keeps
+ * every popup in the same place. Every close path reports onOpenChange(false).
  */
 export function ResponsiveDialog({
   open,
@@ -110,7 +100,6 @@ export function ResponsiveDialog({
   dismissible = true,
   initialFocus,
 }: ResponsiveDialogProps): JSX.Element {
-  const isMobile = useIsMobile();
   const { t } = useT();
   const back = backLabel ?? t("actions.back");
 
@@ -119,26 +108,6 @@ export function ResponsiveDialog({
     if (!next && !dismissible && details?.reason === "escape-key") return;
     onOpenChange(next);
   };
-
-  if (isMobile) {
-    return (
-      <Drawer
-        disablePointerDismissal={!dismissible}
-        onOpenChange={handleOpenChange}
-        open={open}
-        position="bottom"
-      >
-        <DrawerPopup className="max-h-[90dvh]" initialFocus={initialFocus} showBar>
-          <DrawerHeader>
-            <TitleRow backLabel={back} onBack={onBack} title={title} Title={DrawerTitle} />
-            {description ? <DrawerDescription>{description}</DrawerDescription> : null}
-          </DrawerHeader>
-          <DrawerPanel className="min-h-0">{children}</DrawerPanel>
-          {footer ? <DrawerFooter>{footer}</DrawerFooter> : null}
-        </DrawerPopup>
-      </Drawer>
-    );
-  }
 
   return (
     <Dialog disablePointerDismissal={!dismissible} onOpenChange={handleOpenChange} open={open}>
