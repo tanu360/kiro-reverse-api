@@ -272,6 +272,7 @@ function ScheduleFormCard({
                 value={cadence}
               />
             }
+            controlWidth="number"
             title={t("frequency")}
           >
             {invalid === "cadence" ? <FieldError match>{t("invalidCadence")}</FieldError> : null}
@@ -378,7 +379,7 @@ function ScheduleSkeleton(): JSX.Element {
         wrapsNarrow
       />
       <RowSkeleton
-        control={<Skeleton className={cn(FIELD_SKELETON, "@xl/settings-row:w-72")} />}
+        control={<Skeleton className={cn(FIELD_SKELETON, "@md/settings-row:w-36")} />}
         titleWidth="w-20"
       />
       <RowSkeleton

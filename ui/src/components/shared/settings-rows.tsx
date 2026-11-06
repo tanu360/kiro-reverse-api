@@ -94,11 +94,11 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string; "ari
  * aria-labelledby and aria-describedby, so a control without a visible label of its own is
  * named and described by the row. `children` go under the description (a current value, an
  * error). `controlWidth` sizes the control slot: a text field or select (`field`), a number
- * field (`number`), a group of buttons at their own width (`actions`), or the control's own
- * width (`auto`: a switch or a button, kept on the title's line at every width, while `children`
- * such as a warning notice take the row's full width under the description). A Button control
- * keeps its own name (its label, "Add rule"): the row title is not put on it, only the
- * description. `labelControl` overrides that either way.
+ * field or a select of short options (`number`), a group of buttons at their own width
+ * (`actions`), or the control's own width (`auto`: a switch or a button, kept on the title's
+ * line at every width, while `children` such as a warning notice take the row's full width under
+ * the description). A Button control keeps its own name (its label, "Add rule"): the row title
+ * is not put on it, only the description. `labelControl` overrides that either way.
  */
 export function SettingsRow({
   title,
