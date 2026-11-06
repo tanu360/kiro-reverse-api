@@ -37,7 +37,7 @@ export const cardVariants = cva(
       tone: {
         default: "border-border bg-card",
         danger:
-          "border-destructive/40 bg-error-surface [&>*+*]:border-destructive/24 [&>[data-slot^=card-]]:border-destructive/24",
+          "border-destructive/40 bg-destructive/4 [&>*+*]:border-border/50",
       },
     },
   },

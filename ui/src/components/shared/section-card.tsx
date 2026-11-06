@@ -75,7 +75,7 @@ export function SectionCard({
         <CardHeading>
           <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <CardTitle
-              className={cn(danger && "text-destructive-foreground")}
+              className={cn(danger && "text-danger-foreground")}
               id={headingId}
               render={(props) => <h2 {...props} />}
             >

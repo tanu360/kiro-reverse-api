@@ -67,9 +67,10 @@ const sidebarMenuButtonVariants = cva(
         // list reads at a glance; icons keep the quieter --sidebar-icon-color.
         default: "font-medium text-sidebar-foreground/80",
         // Kiro patch: a row whose page or section is destructive (Settings' danger zone): red
-        // label and icon, a red tint on hover and while selected.
+        // label and icon, a red tint while selected, and solid red with a white label and icon
+        // on hover and press, selected or not.
         destructive:
-          "font-medium text-destructive-foreground hover:bg-error-surface hover:text-destructive-foreground active:bg-error-surface active:text-destructive-foreground data-[active=true]:bg-error-surface data-[active=true]:text-destructive-foreground data-[active=true]:hover:bg-error-surface data-[active=true]:active:bg-error-surface [&>svg]:text-destructive-foreground hover:[&>svg]:text-destructive-foreground active:[&>svg]:text-destructive-foreground data-[active=true]:[&>svg]:text-destructive-foreground",
+          "font-medium text-danger-foreground data-[active=true]:bg-error-surface data-[active=true]:text-danger-foreground hover:bg-destructive-solid hover:text-destructive-solid-foreground active:bg-destructive-solid active:text-destructive-solid-foreground data-[active=true]:hover:bg-destructive-solid data-[active=true]:hover:text-destructive-solid-foreground data-[active=true]:active:bg-destructive-solid data-[active=true]:active:text-destructive-solid-foreground [&>svg]:text-current hover:[&>svg]:text-current active:[&>svg]:text-current data-[active=true]:[&>svg]:text-current",
         outline: "bg-sidebar-control-surface ring-1 ring-sidebar-border",
         // Kiro patch: the sidebar's main action in the sign-in button's look: solid purple, a
         // white centred label and icon, the grain and top highlight, a slight press.

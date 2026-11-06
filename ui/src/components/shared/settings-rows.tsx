@@ -64,7 +64,7 @@ export function SettingsRowTitle({
 }): JSX.Element {
   const className = cn(
     "font-medium text-sm/5",
-    tone === "danger" ? "text-destructive-foreground" : "text-foreground",
+    tone === "danger" ? "text-danger-foreground" : "text-foreground",
   );
   if (htmlFor) {
     return (
@@ -155,7 +155,10 @@ export function SettingsRow({
     </div>
   );
   const hint = description ? (
-    <p className={ROW_DESCRIPTION} id={hintId}>
+    <p
+      className={cn(ROW_DESCRIPTION, tone === "danger" && "text-danger-foreground/80")}
+      id={hintId}
+    >
       {description}
     </p>
   ) : null;
