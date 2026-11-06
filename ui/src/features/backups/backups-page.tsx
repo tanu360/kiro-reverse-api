@@ -325,20 +325,6 @@ export function BackupsPage(): JSX.Element {
             {createButton(false)}
           </>
         }
-        footer={
-          rows.length > PAGE_SIZE ? (
-            <DataTablePagination
-              onPageChange={(next) => {
-                setPage(next);
-                // The next page starts at its first backup, not where the last one was scrolled.
-                document.getElementById("backup-list")?.scrollIntoView({ block: "start" });
-              }}
-              page={currentPage}
-              pageSize={PAGE_SIZE}
-              total={rows.length}
-            />
-          ) : undefined
-        }
         icon={ArchiveIcon}
         id="backup-list"
         // Nothing to count with no backups: the empty state under it says so.
@@ -373,6 +359,19 @@ export function BackupsPage(): JSX.Element {
           </div>
         )}
       </SectionCard>
+      {/* The pager sits under the card, as on Accounts. */}
+      {rows.length > PAGE_SIZE ? (
+        <DataTablePagination
+          onPageChange={(next) => {
+            setPage(next);
+            // The next page starts at its first backup, not where the last one was scrolled.
+            document.getElementById("backup-list")?.scrollIntoView({ block: "start" });
+          }}
+          page={currentPage}
+          pageSize={PAGE_SIZE}
+          total={rows.length}
+        />
+      ) : null}
     </div>
   );
 }
