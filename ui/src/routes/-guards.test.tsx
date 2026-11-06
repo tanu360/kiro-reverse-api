@@ -55,6 +55,7 @@ vi.mock("@/lib/api/system", async (importOriginal) => {
 
 vi.mock("@/lib/toast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+  syncToastPath: vi.fn(),
 }));
 
 const authed = vi.mocked(isAuthenticated);
