@@ -77,11 +77,17 @@ function Copyright(): JSX.Element {
   );
 }
 
-/** Under the copyright: this is an independent project (README wording). Text only. */
+/**
+ * Under the copyright: this is an independent project (README wording). Text only, a step
+ * quieter than the copyright line in dark mode (80 % muted, still above 4.5:1); light mode keeps
+ * the full muted colour, which a lighter tint would drop under AA.
+ */
 function Disclaimer(): JSX.Element {
   const { t } = useT("auth");
   return (
-    <p className="text-balance text-center text-muted-foreground text-xs">{t("disclaimer")}</p>
+    <p className="text-balance text-center text-muted-foreground text-xs dark:text-muted-foreground/80">
+      {t("disclaimer")}
+    </p>
   );
 }
 

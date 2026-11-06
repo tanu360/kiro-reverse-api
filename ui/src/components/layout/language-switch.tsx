@@ -1,4 +1,4 @@
-import { LanguagesIcon } from "@hugeicons/core-free-icons";
+import { ChevronDownIcon, LanguagesIcon } from "@hugeicons/core-free-icons";
 import type { JSX } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { FlagIcon } from "@/components/shared/flag-icon";
@@ -12,15 +12,10 @@ import {
   MenuRadioItem,
   MenuTrigger,
 } from "@/components/ui/menu";
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectPrimitive,
-  SelectTrigger,
-} from "@/components/ui/select";
+import { Select, SelectItem, SelectPopup, SelectPrimitive } from "@/components/ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { LANGUAGES, type SupportedLang, useLanguage, useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 /** Language names are shown in their own script, whatever the active language. */
 export const LANGUAGE_NAMES: Record<SupportedLang, string> = Object.fromEntries(
@@ -80,7 +75,7 @@ export function LanguageSwitch({
 }
 
 /**
- * The sign-in pages' language picker: the shared select trigger (the current flag and name, a
+ * The sign-in pages' language picker: a bare, borderless trigger (the current flag and name, a
  * chevron) and a select popup at least as wide as it. With a mouse the popup opens over the
  * trigger, the current language's row sitting exactly where the trigger was (Base UI
  * alignItemWithTrigger), so the list reads as the trigger unfolding; the row repeats the
@@ -98,9 +93,16 @@ function LanguageSelect({ className }: { className?: string }): JSX.Element {
       <Tooltip>
         <TooltipTrigger
           render={
-            // As wide as the current name; the shared default size, so it stands as tall as the
-            // theme toggle across the row (36 / 32 px, 40 on touch).
-            <SelectTrigger aria-label={triggerLabel} className={className} fit="content" />
+            // A bare label, no border or fill: only the text colour moves on hover and while
+            // the list is open. As tall as the theme toggle across the row (36 / 32 px, 40 on
+            // touch).
+            <SelectPrimitive.Trigger
+              aria-label={triggerLabel}
+              className={cn(
+                "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground sm:h-8 pointer-coarse:h-10",
+                className,
+              )}
+            />
           }
         >
           <SelectPrimitive.Value className="flex items-center gap-2.5">
@@ -111,10 +113,13 @@ function LanguageSelect({ className }: { className?: string }): JSX.Element {
               </>
             )}
           </SelectPrimitive.Value>
+          <SelectPrimitive.Icon className="flex">
+            <AnimatedIcon icon={ChevronDownIcon} aria-hidden="true" className="size-4" />
+          </SelectPrimitive.Icon>
         </TooltipTrigger>
         <TooltipPopup>{triggerLabel}</TooltipPopup>
       </Tooltip>
-      {/* The trigger is as narrow as the current name, so the list grows to fit its rows. */}
+      {/* The trigger is a bare label, as narrow as the current name, so the list fits its rows. */}
       <SelectPopup fit="content">
         {/* Single-line rows (popup-row.tsx): flag, name, and the CheckedDot on the current one. */}
         {LANGUAGES.map((option) => (
