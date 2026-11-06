@@ -9,14 +9,14 @@ import { cn } from "@/lib/utils";
  * line height, baseline-aligned), so a hinted term lines up with the plain ones beside it. It
  * opens on hover, click and tap, as a tooltip-styled note.
  * `link`: the "Learn more" at the end of a hint line (Settings): an info icon and the label in
- * the brand purple, medium weight, no underline; a faint purple tint behind it on hover and
- * while its note is open. It opens on click or tap only, as a popover for longer notes.
+ * the brand purple, medium weight, plain text: no underline, tint or border on hover (only the
+ * pointer cursor). It opens on click or tap only, as a popover for longer notes.
  * Both get a 44 px hit area on touch screens and stay focusable.
  */
 const TRIGGER_CLASS = {
   label:
     "touch-hit inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm text-left align-baseline text-muted-foreground leading-[inherit] outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground",
-  link: "touch-hit inline-flex cursor-pointer items-baseline gap-1 whitespace-nowrap rounded-md px-1 align-baseline font-medium text-info-foreground outline-none transition-colors hover:bg-info/10 focus-outline data-popup-open:bg-info/10",
+  link: "touch-hit inline-flex cursor-pointer items-baseline gap-1 whitespace-nowrap rounded-sm align-baseline font-medium text-info-foreground outline-none focus-outline",
 } as const;
 
 export function InfoHint({
