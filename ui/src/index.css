@@ -88,7 +88,7 @@
    * orange, keys and properties pink, comments and punctuation muted. Each is at least 4.5:1 on
    * the code well.
    */
-  --code-foreground: var(--color-neutral-800);
+  --code-block-foreground: var(--color-neutral-800);
   --code-token-keyword: var(--info-foreground);
   --code-token-string: var(--color-emerald-700);
   --code-token-constant: var(--color-yellow-700);
@@ -181,7 +181,7 @@
   --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
   /* Kiro purple-300: 9.7:1 on black. */
   --info-foreground: #c59eff;
-  --code-foreground: var(--color-neutral-200);
+  --code-block-foreground: var(--color-neutral-200);
   --code-token-keyword: var(--info-foreground);
   --code-token-string: var(--color-emerald-300);
   --code-token-constant: var(--color-amber-300);

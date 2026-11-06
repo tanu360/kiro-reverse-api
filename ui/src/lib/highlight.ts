@@ -15,7 +15,10 @@ const color = (token: string) => `var(--code-token-${token})`;
 const KIRO_THEME: ThemeRegistration = {
   name: THEME,
   type: "dark",
-  colors: { "editor.foreground": "var(--code-foreground)", "editor.background": "transparent" },
+  colors: {
+    "editor.foreground": "var(--code-block-foreground)",
+    "editor.background": "transparent",
+  },
   tokenColors: [
     {
       scope: ["comment", "punctuation.definition.comment"],
