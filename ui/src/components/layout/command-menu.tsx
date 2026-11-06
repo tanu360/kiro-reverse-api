@@ -12,6 +12,7 @@ import {
   type CSSProperties,
   createContext,
   type JSX,
+  type MouseEvent,
   type ReactNode,
   useCallback,
   useContext,
@@ -75,7 +76,8 @@ const PALETTE_GAP = 8;
 
 interface CommandMenuContextValue {
   open: boolean;
-  setOpen: (open: boolean) => void;
+  /** Opens the palette from a trigger, which gets focus back when it closes. */
+  openFrom: (trigger: HTMLElement) => void;
   /** Each trigger registers its button, so the palette can hang under the one on screen. */
   register: (trigger: HTMLButtonElement) => () => void;
 }
@@ -110,6 +112,14 @@ export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<CommandEntry | undefined>();
   const triggers = useRef(new Set<HTMLButtonElement>());
+  /*
+   * Where focus goes back when the palette is dismissed: the trigger that opened it, or what had
+   * focus when ⌘K opened it. The triggers are plain buttons, not Dialog triggers, so without this
+   * the dialog drops focus on the body. Running an entry clears it, as the command may move focus.
+   */
+  const opener = useRef<HTMLElement | null>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
   const [anchor, setAnchor] = useState<CSSProperties>();
   const { toggle: togglePrivacy } = usePrivacy();
   const { theme, setTheme } = useTheme();
@@ -122,6 +132,10 @@ export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.
       if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
       if (event.altKey || event.shiftKey) return;
       event.preventDefault();
+      if (!openRef.current) {
+        const active = document.activeElement;
+        opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+      }
       setOpen((value) => !value);
     };
     document.addEventListener("keydown", onKeyDown);
@@ -247,17 +261,27 @@ export function CommandMenuProvider({ children }: { children: ReactNode }): JSX.
 
   // Closing first hands focus back to the page, so a command can then move it.
   const select = (entry: CommandEntry) => {
+    opener.current = null;
     setOpen(false);
     entry.run();
   };
 
-  const value = useMemo(() => ({ open, setOpen, register }), [open, register]);
+  const openFrom = useCallback((trigger: HTMLElement) => {
+    opener.current = trigger;
+    setOpen(true);
+  }, []);
+
+  const value = useMemo(() => ({ open, openFrom, register }), [open, openFrom, register]);
 
   return (
     <CommandMenuContext.Provider value={value}>
       {children}
       <CommandDialog onOpenChange={setOpen} open={open}>
-        <CommandDialogPopup aria-label={t("shell.search")} style={anchor}>
+        <CommandDialogPopup
+          aria-label={t("shell.search")}
+          finalFocus={() => (opener.current?.isConnected ? opener.current : false)}
+          style={anchor}
+        >
           <Command
             filter={(item, value) => matches(item as CommandEntry, value)}
             items={groups}
@@ -317,7 +341,7 @@ export function CommandMenuTrigger({
   className?: string;
 }): JSX.Element {
   const { t } = useT();
-  const { open, setOpen, register } = useCommandMenu();
+  const { open, openFrom, register } = useCommandMenu();
   const ref = useCallback(
     (trigger: HTMLButtonElement | null) => (trigger ? register(trigger) : undefined),
     [register],
@@ -327,7 +351,7 @@ export function CommandMenuTrigger({
     "aria-haspopup": "dialog" as const,
     "aria-keyshortcuts": "Meta+K Control+K",
     "aria-label": t("shell.search"),
-    onClick: () => setOpen(true),
+    onClick: (event: MouseEvent<HTMLButtonElement>) => openFrom(event.currentTarget),
     ref,
   };
 
