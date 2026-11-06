@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * `label`: a label followed by an info icon. It sits in the text's own line box (inherited
  * line height, baseline-aligned), so a hinted term lines up with the plain ones beside it. It
  * opens on hover, click and tap, as a tooltip-styled note.
- * `link`: the "Learn more" at the end of a hint line (Settings): an info icon and the label in
+ * `link`: the "Learn more" at the end of a hint line (Settings): the label alone, no icon, in
  * the brand purple, medium weight, plain text: no underline, tint or border on hover (only the
  * pointer cursor). It opens on click or tap only, as a popover for longer notes.
  * Both get a 44 px hit area on touch screens and stay focusable.
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 const TRIGGER_CLASS = {
   label:
     "touch-hit inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm text-left align-baseline text-muted-foreground leading-[inherit] outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground",
-  link: "touch-hit inline-flex cursor-pointer items-baseline gap-1 whitespace-nowrap rounded-sm align-baseline font-medium text-info-foreground outline-none focus-outline",
+  link: "touch-hit inline-flex cursor-pointer items-baseline whitespace-nowrap rounded-sm align-baseline font-medium text-info-foreground outline-none focus-outline",
 } as const;
 
 export function InfoHint({
@@ -49,14 +49,7 @@ export function InfoHint({
         openOnHover={!link}
       >
         {link ? (
-          <>
-            <HugeiconsIcon
-              aria-hidden="true"
-              className="size-3.5 shrink-0 self-center"
-              icon={InfoIcon}
-            />
-            <span>{children}</span>
-          </>
+          <span>{children}</span>
         ) : (
           <>
             <span className={truncate ? "min-w-0 truncate" : "line-clamp-2 text-pretty"}>
