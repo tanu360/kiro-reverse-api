@@ -96,8 +96,10 @@ export function UpdateDialog({
               {t("shell.update.changelog")}
             </h3>
             {/* A list, one change per line: the release's emoji as the marker (a dot when the
-                line has none), 14 px text with room between items; scrolls past 18rem. */}
-            <ul className="scroll-fade-y -me-2 flex max-h-72 flex-col gap-2.5 overflow-y-auto pe-2">
+                line has none), 14 px text with room between items. From sm up it scrolls past
+                18rem. Phones show it whole and the dialog's own panel scrolls instead (90dvh):
+                no scroller inside a scroller, and no cut that falls between two items unseen. */}
+            <ul className="scroll-fade-y -me-2 flex flex-col gap-2.5 pe-2 sm:max-h-72 sm:overflow-y-auto">
               {parseChangelog(changelog).map((line, index) => (
                 <li
                   className="flex gap-2.5 text-sm leading-relaxed"
