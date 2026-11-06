@@ -56,9 +56,9 @@ const DEFAULT_SORT = "default";
 /**
  * A "Label: Value" control: the muted label as a group segment, then an outline button with the
  * value and a chevron that opens a menu of radio rows. The button's name spells out "Plan: All",
- * since the label segment is not part of it. min-w-16 keeps the button at least 4rem wide, past
- * index.css popup-width's icon floor (11rem for narrower anchors), so a short list such as Rows
- * or Enabled fits its rows instead of reaching past the control (as the pager's Rows select).
+ * since the label segment is not part of it. Even "All" leaves the button wider than index.css
+ * popup-width's icon cut-off (3rem), so a short list such as Rows or Enabled fits its rows instead
+ * of taking an icon menu's 11rem past the control (as the pager's Rows select).
  */
 function FilterTrigger({
   label,
@@ -75,13 +75,7 @@ function FilterTrigger({
       <GroupText aria-hidden="true">{label}</GroupText>
       <GroupSeparator />
       <MenuTrigger
-        render={
-          <Button
-            aria-label={t("filter.trigger", { label, value })}
-            className="min-w-16"
-            variant="outline"
-          />
-        }
+        render={<Button aria-label={t("filter.trigger", { label, value })} variant="outline" />}
       >
         <span className="max-w-36 truncate">{value}</span>
         {after}
@@ -224,7 +218,7 @@ function PageSizeSelect({
   return (
     <Menu>
       <FilterTrigger label={t("table.rowsShort")} value={formatNumber(value, lang)} />
-      {/* Short numbers: the list fits them (FilterTrigger's min-w-16), not a menu's 11rem. */}
+      {/* Short numbers: the list fits them (the trigger is past the 3rem icon cut-off), not 11rem. */}
       <MenuPopup align="end">
         <MenuRadioGroup onValueChange={(next) => onChange(Number(next))} value={String(value)}>
           {options.map((size) => (

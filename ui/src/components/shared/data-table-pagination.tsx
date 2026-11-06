@@ -128,17 +128,11 @@ export function DataTablePagination({
               value={String(pageSize)}
             >
               {/*
-                The default step (36 / 32 / coarse 40) matches the icon buttons beside it.
-                min-w-16 keeps the trigger at least 4rem wide, past index.css popup-width's
-                icon floor (11rem for narrower anchors), so the list fits its numbers instead of
-                spreading over the pager.
+                The default step (36 / 32 / coarse 40) matches the icon buttons beside it. The
+                trigger is wider than index.css popup-width's icon cut-off (3rem), so the list
+                fits its numbers instead of taking an icon menu's 11rem over the pager.
               */}
-              <SelectTrigger
-                aria-labelledby={sizeLabelId}
-                className="min-w-16"
-                fit="content"
-                size="default"
-              >
+              <SelectTrigger aria-labelledby={sizeLabelId} fit="content" size="default">
                 <SelectValue className="tabular-nums" />
               </SelectTrigger>
               <SelectPopup fit="content">

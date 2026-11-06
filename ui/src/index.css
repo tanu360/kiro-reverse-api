@@ -402,14 +402,15 @@
  * Dropdown width, the one rule for menus, selects and comboboxes: a popup opened from a field or
  * a text button is as wide as that trigger (Base UI's --anchor-width). It grows past it only when
  * its items need the room (a label beside a count and a check mark), up to 14rem; a longer label
- * truncates and slides when highlighted. A popup from an icon button (under 4rem wide) is at
+ * truncates and slides when highlighted. A popup from an icon button (under 3rem wide; icon
+ * buttons are 32-44 px, the shortest text buttons such as "All" or a Rows count are wider) is at
  * least 11rem. The `* 1000` term turns that floor on in CSS alone: far above 11rem when the
- * trigger is under 4rem, zero or below otherwise. Never wider than 90 % of the viewport, nor the
+ * trigger is under 3rem, zero or below otherwise. Never wider than 90 % of the viewport, nor the
  * viewport less 1rem a side (--popup-max-w).
  */
 @utility popup-width {
   --popup-anchor: var(--anchor-width, 0px);
-  --popup-icon-floor: min(11rem, calc((4rem - var(--popup-anchor)) * 1000));
+  --popup-icon-floor: min(11rem, calc((3rem - var(--popup-anchor)) * 1000));
   --popup-max-w: min(90vw, calc(100vw - 2rem));
   min-width: min(max(var(--popup-anchor), var(--popup-icon-floor)), var(--popup-max-w));
   max-width: min(max(var(--popup-anchor), 14rem), var(--popup-max-w));
