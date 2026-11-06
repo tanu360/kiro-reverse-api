@@ -39,6 +39,7 @@
     "motion": "^14.9.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "shiki": "4.5.0",
     "skullet": "0.0.3",
     "tailwind-merge": "^3.7.0"
   },

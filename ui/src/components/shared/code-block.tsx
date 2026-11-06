@@ -1,5 +1,15 @@
-import { type JSX, type RefObject, useLayoutEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  type JSX,
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import type { ThemedToken } from "shiki/core";
 import { CopyButton } from "@/components/shared/copy-button";
+import { type CodeLanguage, highlightCode } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
 
 /** True while the element's content is wider than its box; rechecked on resize and new content. */
@@ -19,6 +29,38 @@ function useScrollsSideways(ref: RefObject<HTMLElement | null>, content: string)
 }
 
 /**
+ * The code as highlighted lines once Shiki has them (lib/highlight.ts, loaded on first use), or
+ * null while it loads, without a language, or if it fails: the block then shows the plain text.
+ */
+function useHighlightedLines(
+  code: string,
+  language: CodeLanguage | undefined,
+): ThemedToken[][] | null {
+  const [result, setResult] = useState<{
+    code: string;
+    language: CodeLanguage;
+    lines: ThemedToken[][];
+  } | null>(null);
+  useEffect(() => {
+    if (!language) return;
+    let live = true;
+    highlightCode(code, language).then(
+      (lines) => {
+        if (live) setResult({ code, language, lines });
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [code, language]);
+  return result && result.code === code && result.language === language ? result.lines : null;
+}
+
+/** Shiki's font style bit for italic (FontStyle.Italic). */
+const ITALIC = 1;
+
+/**
  * A block of code (a config file, a command) with its title and a copy button in a strip above
  * it. The code is mono on the inset well and scrolls sideways inside the block, so long lines
  * never widen the page; while it scrolls, the block is a labelled tab stop so arrow keys can
@@ -32,6 +74,7 @@ export function CodeBlock({
   copiedMessage,
   regionLabel,
   wrap = false,
+  language,
   className,
 }: {
   code: string;
@@ -42,11 +85,14 @@ export function CodeBlock({
   regionLabel?: string;
   /** Wraps long lines (anywhere) instead of scrolling sideways. */
   wrap?: boolean;
+  /** Highlights the code as this language (the colours are the --code-token-* tokens). */
+  language?: CodeLanguage;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
   const preRef = useRef<HTMLPreElement>(null);
   const scrolls = useScrollsSideways(preRef, code);
+  const lines = useHighlightedLines(code, language);
   return (
     <figure
       className={cn(
@@ -79,7 +125,30 @@ export function CodeBlock({
         role={scrolls ? "region" : undefined}
         tabIndex={scrolls ? 0 : undefined}
       >
-        <code>{code}</code>
+        <code>
+          {lines
+            ? lines.map((line, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: lines have no id; the code is static.
+                <Fragment key={index}>
+                  {line.map((token) => (
+                    <span
+                      key={token.offset}
+                      style={{
+                        color: token.color,
+                        fontStyle:
+                          token.fontStyle !== undefined && token.fontStyle & ITALIC
+                            ? "italic"
+                            : undefined,
+                      }}
+                    >
+                      {token.content}
+                    </span>
+                  ))}
+                  {index < lines.length - 1 ? "\n" : null}
+                </Fragment>
+              ))
+            : code}
+        </code>
       </pre>
     </figure>
   );

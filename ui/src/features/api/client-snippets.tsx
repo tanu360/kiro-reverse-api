@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { settingsQuery } from "@/lib/api/settings";
+import type { CodeLanguage } from "@/lib/highlight";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { CodeText } from "./code-text";
@@ -21,16 +22,19 @@ function Snippet({
   code,
   title,
   copyLabel,
+  language,
 }: {
   code: string;
   title: string;
   copyLabel: string;
+  language: CodeLanguage;
 }): JSX.Element {
   const { t } = useT("api");
   return (
     <CodeBlock
       code={code}
       copyLabel={copyLabel}
+      language={language}
       regionLabel={t("snippets.codeRegion", { name: title })}
       title={title}
     />
@@ -39,7 +43,8 @@ function Snippet({
 
 /*
  * The tab panels share one grid cell and stay mounted: the inactive ones keep their place
- * (invisible, so out of the tab order and the accessibility tree), so the card is always as tall
+ * (inert and transparent: out of the tab order and the accessibility tree, and no animated icon
+ * inside can paint through), so the card is always as tall
  * as its tallest panel (curl) and neither it nor the Endpoints card beside it changes height when
  * another tab is picked. The panel drops Base UI's `hidden` attribute for `data-inactive`: the
  * preflight's `[hidden] { display: none !important }` sits in the base layer, which no utility
@@ -54,12 +59,17 @@ function StackedPanel({
   return (
     <TabsPanel
       className={cn(
-        "[grid-area:1/1] data-inactive:pointer-events-none data-inactive:invisible",
+        "[grid-area:1/1] data-inactive:pointer-events-none data-inactive:invisible data-inactive:opacity-0",
         className,
       )}
       keepMounted
       render={(panelProps, state) => (
-        <div {...panelProps} data-inactive={state.hidden ? "" : undefined} hidden={undefined} />
+        <div
+          {...panelProps}
+          data-inactive={state.hidden ? "" : undefined}
+          hidden={undefined}
+          inert={state.hidden || undefined}
+        />
       )}
       {...props}
     />
@@ -107,11 +117,13 @@ export function ClientSnippetsCard(): JSX.Element {
           <StackedPanel className="flex min-w-0 flex-col gap-3" value="curl">
             <Snippet
               code={snippets.curl.anthropic}
+              language="bash"
               copyLabel={copy(t("snippets.anthropicMessages"))}
               title={t("snippets.anthropicMessages")}
             />
             <Snippet
               code={snippets.curl.openai}
+              language="bash"
               copyLabel={copy(t("snippets.openaiChat"))}
               title={t("snippets.openaiChat")}
             />
@@ -120,6 +132,7 @@ export function ClientSnippetsCard(): JSX.Element {
             <Hint>{t("snippets.claudeCodeHint")}</Hint>
             <Snippet
               code={snippets.claudeCode}
+              language="bash"
               copyLabel={copy(t("snippets.claudeCode"))}
               title={t("snippets.shell")}
             />
@@ -133,6 +146,7 @@ export function ClientSnippetsCard(): JSX.Element {
             </Hint>
             <Snippet
               code={snippets.codex}
+              language="toml"
               copyLabel={copy(t("snippets.codex"))}
               title={CODEX_CONFIG_FILE}
             />
@@ -147,6 +161,7 @@ export function ClientSnippetsCard(): JSX.Element {
                 <StackedPanel className="flex min-w-0 flex-col" value="python">
                   <Snippet
                     code={snippets.openaiSdk.python}
+                    language="python"
                     copyLabel={copy(
                       t("snippets.sdkWithLanguage", {
                         sdk: t("snippets.openaiSdk"),
@@ -159,6 +174,7 @@ export function ClientSnippetsCard(): JSX.Element {
                 <StackedPanel className="flex min-w-0 flex-col" value="typescript">
                   <Snippet
                     code={snippets.openaiSdk.typescript}
+                    language="typescript"
                     copyLabel={copy(
                       t("snippets.sdkWithLanguage", {
                         sdk: t("snippets.openaiSdk"),

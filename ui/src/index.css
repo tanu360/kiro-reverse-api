@@ -82,6 +82,21 @@
   /* Solid red for a destructive confirm button and a danger button's hover: white on it is 4.8:1. */
   --destructive-solid: var(--color-red-600);
   --destructive-solid-foreground: var(--color-white);
+  /*
+   * Code highlighting (lib/highlight.ts maps the TextMate scopes onto these): keywords in the
+   * brand purple, strings green, numbers and variables yellow, commands and functions teal, flags
+   * orange, keys and properties pink, comments and punctuation muted. Each is at least 4.5:1 on
+   * the code well.
+   */
+  --code-foreground: var(--color-neutral-800);
+  --code-token-keyword: var(--info-foreground);
+  --code-token-string: var(--color-emerald-700);
+  --code-token-constant: var(--color-yellow-700);
+  --code-token-function: var(--color-teal-700);
+  --code-token-parameter: var(--color-orange-700);
+  --code-token-property: var(--color-pink-700);
+  --code-token-comment: var(--color-neutral-500);
+  --code-token-punctuation: var(--color-neutral-500);
   /* Kiro purple, not blue: purple-700 text is 7.4:1 on white. */
   --info: var(--primary);
   --info-foreground: #7a0ecd;
@@ -166,6 +181,15 @@
   --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
   /* Kiro purple-300: 9.7:1 on black. */
   --info-foreground: #c59eff;
+  --code-foreground: var(--color-neutral-200);
+  --code-token-keyword: var(--info-foreground);
+  --code-token-string: var(--color-emerald-300);
+  --code-token-constant: var(--color-amber-300);
+  --code-token-function: var(--color-teal-300);
+  --code-token-parameter: var(--color-orange-300);
+  --code-token-property: var(--color-pink-300);
+  --code-token-comment: var(--color-neutral-500);
+  --code-token-punctuation: var(--color-neutral-400);
   --success: var(--color-emerald-500);
   --warning: var(--color-amber-500);
   --sidebar: var(--card);
