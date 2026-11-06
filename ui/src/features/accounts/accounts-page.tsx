@@ -242,8 +242,9 @@ export function AccountsPage(): JSX.Element {
         shown={sorted.length}
         sort={sort}
         tabActions={
-          // A neutral secondary action at the end of the tab row; a square icon button with a
-          // tooltip on phones. It waits for the list, so it never exports an empty fleet.
+          // A quiet action at the end of the tab row: no fill and no border, the label lighting up
+          // on hover; an icon button with a tooltip on phones. It waits for the list, so it never
+          // exports an empty fleet.
           phone ? (
             <Tooltip>
               <TooltipTrigger
@@ -253,7 +254,7 @@ export function AccountsPage(): JSX.Element {
                     disabled={query.isPending}
                     onClick={() => onExport()}
                     size="icon-sm"
-                    variant="outline"
+                    variant="quiet"
                   />
                 }
               >
@@ -263,10 +264,12 @@ export function AccountsPage(): JSX.Element {
             </Tooltip>
           ) : (
             <Button
+              // The label, not the invisible box, lines up with the card's content edge.
+              className="-me-2.5"
               disabled={query.isPending}
               onClick={() => onExport()}
               size="sm"
-              variant="outline"
+              variant="quiet"
             >
               <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
               {t("actions.export")}
