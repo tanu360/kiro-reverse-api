@@ -63,9 +63,9 @@ export const DIALOG_SIZE_CLASS: Record<DialogSize, string> = {
 };
 
 /**
- * Where the popup rests from sm up: `center` in the middle of the screen, `top` hung a fixed
- * distance below the top (at least 48 px, 8 % of the screen), so a dialog whose height changes
- * (a wizard, a log that fills) keeps its title in place. Phones always centre it.
+ * Where the popup rests: `center` in the middle of the screen, `top` hung a fixed distance below
+ * the top (from sm up at least 48 px, 8 % of the screen; on phones the 5dvh modal gap), so a
+ * dialog whose height changes (a wizard, a log that fills) keeps its title in place.
  */
 export type DialogAnchor = "center" | "top";
 
@@ -81,8 +81,9 @@ export function DialogViewport({
         // in index.css), with its four rounded corners and full border.
         "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4 max-sm:px-(--modal-gap-x) max-sm:py-(--modal-gap-y)",
         // Top-anchored (the tall pickers): a 6dvh lead, at least 48 px, so an eight-row list
-        // still fits a 768 px laptop screen.
-        anchor === "top" && "sm:grid-rows-[minmax(--spacing(12),6dvh)_auto_1fr]",
+        // still fits a 768 px laptop screen. On phones it hangs from the 5dvh gap (no lead row),
+        // still at most 90vw by 90dvh, so a step flow's title stays put as the steps change height.
+        anchor === "top" && "max-sm:grid-rows-[0_auto_1fr] sm:grid-rows-[minmax(--spacing(12),6dvh)_auto_1fr]",
         className,
       )}
       data-anchor={anchor}

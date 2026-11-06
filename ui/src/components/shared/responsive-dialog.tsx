@@ -1,3 +1,4 @@
+import type { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactNode, RefObject } from "react";
@@ -28,8 +29,8 @@ export interface ResponsiveDialogProps {
    */
   size?: DialogSize;
   /**
-   * `top` hangs the dialog from near the top from sm up, so a step flow or a form that grows (a
-   * validation line, a server error) keeps its title in place. Phones always centre it.
+   * `top` hangs the dialog from near the top (on phones from the 5dvh modal gap), so a step flow
+   * or a form that grows (a validation line, a server error) keeps its title in place.
    */
   anchor?: DialogAnchor;
   /** Shows a back arrow before the title (a step flow's way back); the footer keeps the actions. */
@@ -42,6 +43,11 @@ export interface ResponsiveDialogProps {
    */
   dismissible?: boolean;
   initialFocus?: RefObject<HTMLElement | null>;
+  /**
+   * Where focus goes on close, for a dialog whose opener is gone by then (a dismissed toast's
+   * button): Base UI's Popup finalFocus. Defaults to the element that opened it.
+   */
+  finalFocus?: DialogPrimitive.Popup.Props["finalFocus"];
 }
 
 /**
@@ -99,6 +105,7 @@ export function ResponsiveDialog({
   backLabel,
   dismissible = true,
   initialFocus,
+  finalFocus,
 }: ResponsiveDialogProps): JSX.Element {
   const { t } = useT();
   const back = backLabel ?? t("actions.back");
@@ -114,6 +121,7 @@ export function ResponsiveDialog({
       <DialogPopup
         anchor={anchor}
         closeProps={{ disabled: !dismissible }}
+        finalFocus={finalFocus}
         initialFocus={initialFocus}
         size={size}
       >
