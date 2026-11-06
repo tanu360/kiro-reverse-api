@@ -64,8 +64,10 @@ export const DIALOG_SIZE_CLASS: Record<DialogSize, string> = {
 
 /**
  * Where the popup rests: `center` in the middle of the screen, `top` hung a fixed distance below
- * the top (from sm up at least 48 px, 8 % of the screen; on phones the 5dvh modal gap), so a
- * dialog whose height changes (a wizard, a log that fills) keeps its title in place.
+ * the top from sm up (at least 48 px, 8 % of the screen), so a dialog whose height changes (a
+ * wizard, a log that fills) keeps its title in place. On phones a `top` dialog instead fills the
+ * whole 90dvh box, 5dvh above and below like every other modal: the title stays put as steps
+ * change height and the gaps stay even (a short step leaves room above its footer).
  */
 export type DialogAnchor = "center" | "top";
 
@@ -81,9 +83,8 @@ export function DialogViewport({
         // in index.css), with its four rounded corners and full border.
         "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4 max-sm:px-(--modal-gap-x) max-sm:py-(--modal-gap-y)",
         // Top-anchored (the tall pickers): a 6dvh lead, at least 48 px, so an eight-row list
-        // still fits a 768 px laptop screen. On phones it hangs from the 5dvh gap (no lead row),
-        // still at most 90vw by 90dvh, so a step flow's title stays put as the steps change height.
-        anchor === "top" && "max-sm:grid-rows-[0_auto_1fr] sm:grid-rows-[minmax(--spacing(12),6dvh)_auto_1fr]",
+        // still fits a 768 px laptop screen. On phones it fills the 90dvh box (DialogPopup).
+        anchor === "top" && "max-sm:grid-rows-[0_1fr_0] sm:grid-rows-[minmax(--spacing(12),6dvh)_auto_1fr]",
         className,
       )}
       data-anchor={anchor}
@@ -131,6 +132,9 @@ export function DialogPopup({
             // t3code dialog-styles.ts DIALOG_POPUP_CLASS: frosted glass (index.css dialog-glass).
             "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 -translate-y-[calc(1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
             DIALOG_SIZE_CLASS[size],
+            // A `top` dialog on phones fills its 90dvh row (the grid stretches it); the footer
+            // keeps to the bottom edge when a step is short.
+            anchor === "top" && "max-sm:*:data-[slot=dialog-footer]:mt-auto",
             className,
           )}
           data-size={size}
