@@ -11,13 +11,14 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
-import { CopyField } from "@/components/shared/code-field";
+import { CopyButton } from "@/components/shared/copy-button";
 import { IconChip } from "@/components/shared/icon-chip";
 import { SectionCard } from "@/components/shared/section-card";
-import { SettingsRowTitle } from "@/components/shared/settings-rows";
+import { SETTINGS_ROW_X, SettingsRowTitle } from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
 import { settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { CodeText } from "./code-text";
 
 interface Endpoint {
@@ -81,6 +82,13 @@ const ENDPOINTS: readonly Endpoint[] = [
   },
 ];
 
+/**
+ * The endpoints as a flush list, one row each under a hairline: the icon chip, the name with
+ * its URL under it (mono; the host muted, the path in the text colour, so the paths scan down
+ * the list), then the method and a copy button at the row's end. Plain text, no field boxes.
+ * Beside a taller Client setup card (xl) the rows share the spare height, so the list fills the
+ * card down to the auth hint instead of leaving a gap above it.
+ */
 export function EndpointsCard(): JSX.Element {
   const { t } = useT("api");
   const settings = useQuery(settingsQuery());
@@ -108,33 +116,46 @@ export function EndpointsCard(): JSX.Element {
       icon={Globe02Icon}
       id="api-endpoints"
       meta={t("endpoints.protocolHttp")}
+      slim
       title={t("endpoints.title")}
     >
-      <ul aria-label={t("endpoints.title")} className="flex flex-col gap-3">
+      <ul
+        aria-label={t("endpoints.title")}
+        className="flex grow flex-col divide-y divide-border-subtle"
+      >
         {ENDPOINTS.map((endpoint) => {
           const title = t(endpoint.titleKey);
           const post = endpoint.method === "POST";
           return (
             <li
-              className="flex min-w-0 flex-col gap-2 @2xl:flex-row @2xl:items-center @2xl:gap-3"
+              className={cn("flex grow items-center gap-3 py-3", SETTINGS_ROW_X)}
               data-endpoint={endpoint.id}
               key={endpoint.id}
             >
-              <div className="flex min-w-0 items-center gap-2 @2xl:w-60 @2xl:shrink-0">
-                <IconChip icon={endpoint.icon} />
-                <span className="min-w-0 truncate">
-                  <SettingsRowTitle>{title}</SettingsRowTitle>
-                </span>
-                <Badge className="ms-auto" size="sm" tone={post ? "primary" : "neutral"}>
-                  {post ? t("endpoints.methodPost") : t("endpoints.methodGet")}
-                </Badge>
+              <IconChip icon={endpoint.icon} />
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <SettingsRowTitle>{title}</SettingsRowTitle>
+                {/* A narrow row breaks between the host and the path, not inside either. */}
+                <code
+                  className="break-words font-mono text-meta leading-normal"
+                  data-slot="endpoint-url"
+                >
+                  <span className="text-muted-foreground">{origin}</span>
+                  <wbr />
+                  <span className="text-foreground">{endpoint.path}</span>
+                </code>
               </div>
-              {/* Under the title until the card has room for both, so a URL rarely needs to wrap. */}
-              <CopyField
-                className="min-w-0 @2xl:flex-1"
-                copyLabel={t(endpoint.copyKey)}
-                label={title}
-                multiline
+              {/* One width for POST and GET, so the badges line up down the list. */}
+              <Badge
+                className="min-w-12 shrink-0 justify-center"
+                size="sm"
+                tone={post ? "primary" : "neutral"}
+              >
+                {post ? t("endpoints.methodPost") : t("endpoints.methodGet")}
+              </Badge>
+              <CopyButton
+                className="-me-1.5 shrink-0"
+                label={t(endpoint.copyKey)}
                 value={origin + endpoint.path}
               />
             </li>

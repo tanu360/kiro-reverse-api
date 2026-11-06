@@ -252,7 +252,7 @@ describe("ApiPage", () => {
     const list = screen.getByRole("list", { name: "Endpoints" });
     const urls = within(list)
       .getAllByRole("listitem")
-      .map((item) => item.querySelector('[data-slot="copy-field"]')?.textContent);
+      .map((item) => item.querySelector('[data-slot="endpoint-url"]')?.textContent);
     const origin = window.location.origin;
     expect(urls).toEqual([
       `${origin}/v1/messages`,
