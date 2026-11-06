@@ -68,17 +68,14 @@ describe("TestAccountDialog", () => {
     expect(details).toHaveTextContent("stop reason none | in/out 13/2");
     expect(warn).toHaveAttribute("data-type", "warn");
     expect(warn).toHaveTextContent("The stream carried no stop reason.");
-    // The result panel repeats the warning next to the "none" stop reason.
+    // The result card flags it with a warning chip; the step above explains it.
     const result = within(dialog)
       .getByRole("heading", { name: "Result" })
       .closest("[data-slot=card]");
-    expect(within(result as HTMLElement).getByText("none")).toBeInTheDocument();
-    expect(within(result as HTMLElement).getByRole("alert")).toHaveTextContent(
-      "The stream carried no stop reason.",
-    );
+    expect(within(result as HTMLElement).getByText("No stop reason")).toBeInTheDocument();
   });
 
-  it("shows the latest run as a result: status, time, reply and token counts", async () => {
+  it("shows the latest run as a result: status, latency, tokens, credits and the reply", async () => {
     const { dialog, user } = await openDialog(accountBy((a) => a.email.startsWith("dana.")));
     expect(within(dialog).getByText("No test run yet")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Test" }));
@@ -89,18 +86,27 @@ describe("TestAccountDialog", () => {
     const reply = well(dialog, "Reply");
     expect(reply).toHaveTextContent("ok");
     expect(within(reply).getByRole("button", { name: "Copy reply" })).toBeInTheDocument();
-    const figures = (label: string) =>
-      within(dialog).getByText(label, { selector: "dt" }).nextElementSibling;
-    expect(figures("Stop reason")).toHaveTextContent("end_turn");
-    expect(figures("Tokens in / out")).toHaveTextContent("13 / 2");
-    expect(figures("Context")).toHaveTextContent("0.0%");
+    expect(within(dialog).getByText("13 in · 2 out")).toBeInTheDocument();
+    expect(within(dialog).getByText(/^[\d.]+ credits$/)).toBeInTheDocument();
+    expect(within(dialog).queryByText("No stop reason")).not.toBeInTheDocument();
   });
 
-  it("shows a failed run with its error", async () => {
+  it("shows a failed run with its latency and error", async () => {
     const { dialog, user } = await openDialog(accountBy((a) => a.banStatus === "BANNED"));
     await user.click(within(dialog).getByRole("button", { name: "Test" }));
     expect(await within(dialog).findByText("Failed")).toBeInTheDocument();
+    expect(within(dialog).getByText(/^\d+\.\d s$/)).toBeInTheDocument();
     expect(well(dialog, "Error")).toHaveTextContent(/AccessDenied/);
+  });
+
+  it("puts the Test button beside the model field and keeps its name while running", async () => {
+    const { dialog, user } = await openDialog(accountBy((a) => a.email.startsWith("dana.")));
+    const input = within(dialog).getByRole("combobox", { name: "Test model" });
+    const run = within(dialog).getByRole("button", { name: "Test" });
+    expect(input.closest("[data-slot=field]")).toContainElement(run);
+    await user.click(run);
+    expect(run).toHaveAccessibleName("Test");
+    await waitFor(() => expect(run).not.toHaveAttribute("aria-busy"));
   });
 
   it("logs a failure line for a failing account", async () => {
@@ -124,7 +130,8 @@ describe("TestAccountDialog", () => {
     await waitFor(() => expect(logLines(dialog)).toHaveLength(MAX_LOG_LINES));
     // The oldest lines are dropped: the log now starts with a details line of run 1.
     expect(logLines(dialog)[0]).toHaveTextContent("stop reason end_turn");
-  });
+    // 34 full runs, each a click and a round trip: a busy machine needs more than the 5 s default.
+  }, 15_000);
 
   it("names the button that opens the model list", async () => {
     const { dialog } = await openDialog(accountBy((a) => a.email.startsWith("dana.")));

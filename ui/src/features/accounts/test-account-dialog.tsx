@@ -1,22 +1,24 @@
 import {
   AlertCircleIcon,
+  ArrowDataTransferVerticalIcon,
   CircleCheckIcon,
   CircleXIcon,
+  Coins01Icon,
   FlaskConicalIcon,
   InformationCircleIcon,
   PlayIcon,
+  Timer01Icon,
   UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import { type JSX, type KeyboardEvent, memo, useEffect, useId, useRef, useState } from "react";
 import { CodeBlock } from "@/components/shared/code-block";
 import { EMPTY_SIZING } from "@/components/shared/empty-state";
 import { IconChip } from "@/components/shared/icon-chip";
 import { ModelLogo } from "@/components/shared/model-logo";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { TruncatedText } from "@/components/shared/truncated-text";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Autocomplete,
   AutocompleteEmpty,
@@ -30,7 +32,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
-  CardDescription,
   CardHeader,
   CardHeading,
   CardPanel,
@@ -43,17 +44,12 @@ import { getAccountModelsCached, testAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, TestAccountResponse } from "@/lib/api/types";
-import {
-  formatClockTime,
-  formatCreditsExact,
-  formatDecimal,
-  formatFraction,
-  formatNumber,
-} from "@/lib/format";
+import { formatClockTime, formatCreditsExact, formatDecimal, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
-import { authLabel } from "./account-model";
+import { StatusPill } from "./account-cells";
+import { authLabel, planLabel } from "./account-model";
 
 /** The old UI's fallback when nothing is cached (the server's own default differs). */
 export const DEFAULT_TEST_MODEL = "claude-sonnet-4.6";
@@ -69,10 +65,10 @@ interface LogLine {
   keep?: string;
 }
 
-/** The latest run, for the result panel; the log keeps every run. */
+/** The latest finished run, for the result card; the step list keeps every run. */
 type Outcome =
-  | { kind: "ok"; model: string; seconds: string; result: TestAccountResponse }
-  | { kind: "err"; model: string; seconds: string; reason: string };
+  | { kind: "ok"; seconds: string; result: TestAccountResponse }
+  | { kind: "err"; seconds: string; reason: string };
 
 /** The line text with its `keep` part (first match) on one line; the rest wraps as usual. */
 function LogText({ text, keep }: { text: string; keep?: string }): JSX.Element {
@@ -87,71 +83,60 @@ function LogText({ text, keep }: { text: string; keep?: string }): JSX.Element {
   );
 }
 
-/** One circled icon per line type, in the status colours (the icon tone, ≥3:1 on the card). */
-const LOG_ICON: Record<LogType, { icon: IconSvgElement; className: string }> = {
+/** One circled icon per step type, in the status colours (the icon step, ≥3:1 on the surface). */
+const STEP_ICON: Record<LogType, { icon: IconSvgElement; className: string }> = {
   info: { icon: InformationCircleIcon, className: "text-muted-foreground" },
   ok: { icon: CircleCheckIcon, className: "text-success" },
   warn: { icon: AlertCircleIcon, className: "text-warning" },
   err: { icon: CircleXIcon, className: "text-destructive" },
 };
 
-/** Problem lines keep their readable status colour; the rest are plain text. */
-const LOG_TEXT_CLASS: Record<LogType, string | undefined> = {
+/** Problem steps keep their readable status colour; the rest are plain text. */
+const STEP_TEXT_CLASS: Record<LogType, string | undefined> = {
   info: undefined,
   ok: undefined,
   warn: "text-warning-foreground",
   err: "text-destructive-foreground",
 };
 
-/**
- * The log's fixed height, empty or full, so a run never moves what is below it: about five
- * lines, and more on a phone, where lines wrap and the sheet scrolls anyway.
+/*
+ * Fixed heights, so nothing moves between idle, running and done: the result card's body fits
+ * the stat chips over a three-line well (a longer reply scrolls inside the well), and the step
+ * list shows about four steps (more on a phone, where steps wrap) and scrolls. The result body
+ * is `flex-none`: as a growing flex item of the card its basis would win over the height.
  */
-const LOG_HEIGHT = "min-h-28 max-h-28 max-sm:min-h-40 max-sm:max-h-40";
+const RESULT_HEIGHT = "h-44";
+const STEPS_HEIGHT = "h-32 max-sm:h-40";
 
 function defaultModel(models: string[]): string {
   if (models.length === 0 || models.includes(DEFAULT_TEST_MODEL)) return DEFAULT_TEST_MODEL;
   return models[0];
 }
 
-/** Seconds since `started` with one decimal, ticking every 100 ms; empty while it is null. */
-function useElapsed(started: number | null): string {
+/** "1.2 s elapsed" since `started`, ticking every 100 ms (only this line re-renders). */
+function Elapsed({ started }: { started: number }): JSX.Element {
+  const { t } = useT("accounts");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (started === null) return;
-    setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 100);
     return () => window.clearInterval(timer);
-  }, [started]);
-  return started === null ? "" : formatDecimal(Math.max(0, now - started) / 1000, 1);
-}
-
-/**
- * The run's figures in two columns at every width (the detail sheet's key-value look), so the
- * result keeps one height from a phone to a desktop.
- */
-function Metrics({ items }: { items: { label: string; value: string }[] }): JSX.Element {
+  }, []);
   return (
-    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-      {items.map((item) => (
-        <div className="flex min-w-0 flex-col gap-1" key={item.label}>
-          <dt className="text-meta text-muted-foreground">{item.label}</dt>
-          <dd className="min-w-0 break-words tabular-nums">{item.value}</dd>
-        </div>
-      ))}
-    </dl>
+    <span className="tabular-nums">
+      {t("test.elapsed", { seconds: formatDecimal(Math.max(0, now - started) / 1000, 1) })}
+    </span>
   );
 }
 
-/** The idle and running states: the empty-state tile, title and hint, centred in the panel. */
-function PanelState({
+/** The idle and running body: the empty-state tile, title and hint, centred in the card. */
+function ResultState({
   media,
   title,
   description,
 }: {
   media: JSX.Element;
   title: string;
-  description: string;
+  description: JSX.Element | string;
 }): JSX.Element {
   return (
     <div className="flex flex-1 flex-col items-center justify-center">
@@ -165,6 +150,40 @@ function PanelState({
     </div>
   );
 }
+
+/** A small stat next to the result (latency, tokens, credits): an outline chip with a line icon. */
+function StatChip({ icon, children }: { icon: IconSvgElement; children: string }): JSX.Element {
+  return (
+    <Badge icon={icon} iconStyle="line" size="sm" variant="outline">
+      {children}
+    </Badge>
+  );
+}
+
+/**
+ * One step of the timeline: its icon on the first line with a hairline down to the next step,
+ * the text, and the time at the end. Memoised: a new step renders only itself, not the 100
+ * before it.
+ */
+const Step = memo(function Step({ line }: { line: LogLine }): JSX.Element {
+  const step = STEP_ICON[line.type];
+  return (
+    <li className="group flex gap-3" data-type={line.type}>
+      <span aria-hidden="true" className="flex shrink-0 flex-col items-center">
+        <span className="flex h-lh items-center">
+          <HugeiconsIcon className={cn("size-4", step.className)} icon={step.icon} />
+        </span>
+        <span className="my-1 w-px flex-1 bg-border group-last:hidden" />
+      </span>
+      <span className="flex min-w-0 flex-1 gap-3 pb-3 group-last:pb-0">
+        <span className={cn("min-w-0 flex-1 break-words", STEP_TEXT_CLASS[line.type])}>
+          <LogText keep={line.keep} text={line.text} />
+        </span>
+        <span className="shrink-0 text-muted-foreground tabular-nums">{line.time}</span>
+      </span>
+    </li>
+  );
+});
 
 /** Sends a real "say ok" request through one account and logs the outcome. Spends credits. */
 export function TestAccountDialog({
@@ -181,6 +200,7 @@ export function TestAccountDialog({
   const displayEmail = useDisplayEmail();
   const maskText = useMaskText();
   const fieldId = useId();
+  const stepsId = useId();
 
   const cached = useQuery({
     queryKey: queryKeys.accounts.modelsCached(account.id),
@@ -197,14 +217,13 @@ export function TestAccountDialog({
   const [model, setModel] = useState<string | null>(null);
   const [lines, setLines] = useState<LogLine[]>([]);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
-  // The running model and its start time; null while idle.
-  const [pending, setPending] = useState<{ model: string; started: number } | null>(null);
+  // When the running test started; null while idle.
+  const [started, setStarted] = useState<number | null>(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const runningRef = useRef(false);
   const nextIdRef = useRef(0);
   const logRef = useRef<HTMLOListElement | null>(null);
-  const elapsed = useElapsed(pending?.started ?? null);
-  const running = pending !== null;
+  const running = started !== null;
 
   const modelValue = model ?? (cached.isPending ? "" : defaultModel(models));
   const email = displayEmail(account.email, account.id);
@@ -231,14 +250,14 @@ export function TestAccountDialog({
     if (runningRef.current || cached.isPending) return;
     runningRef.current = true;
     const target = modelValue.trim() || DEFAULT_TEST_MODEL;
-    const started = Date.now();
-    setPending({ model: target, started });
+    const startedAt = Date.now();
+    setStarted(startedAt);
     append("info", t("testLog.start", { email, model: target, proxy }), target);
-    const seconds = () => formatDecimal((Date.now() - started) / 1000, 1);
+    const seconds = () => formatDecimal((Date.now() - startedAt) / 1000, 1);
     try {
       const result = await testAccount(account.id, { model: target });
       const took = seconds();
-      setOutcome({ kind: "ok", model: target, seconds: took, result });
+      setOutcome({ kind: "ok", seconds: took, result });
       append("ok", t("testLog.success", { email, seconds: took, reply: result.reply }));
       append(
         "info",
@@ -254,11 +273,11 @@ export function TestAccountDialog({
     } catch (error) {
       const took = seconds();
       const reason = maskText(errorMessage(error, t));
-      setOutcome({ kind: "err", model: target, seconds: took, reason });
+      setOutcome({ kind: "err", seconds: took, reason });
       append("err", t("testLog.failed", { email, seconds: took, reason }));
     } finally {
       runningRef.current = false;
-      setPending(null);
+      setStarted(null);
     }
   };
 
@@ -275,84 +294,83 @@ export function TestAccountDialog({
       ? t("test.modelsFallback")
       : t("test.modelsReady", { count: models.length });
 
-  // The model the result panel talks about: the running one, else the last finished one.
-  const shownModel = pending?.model ?? outcome?.model;
-  // Its time: ticking while it runs, then the time the last run took.
-  const shownSeconds = running ? elapsed : outcome?.seconds;
-
   return (
     <ResponsiveDialog
       description={t("test.hint")}
       footer={
-        <>
-          <Button onClick={() => onOpenChange(false)} variant="ghost">
-            {tc("actions.close")}
-          </Button>
-          <Button
-            disabled={cached.isPending}
-            loading={running}
-            loadingText={t("test.running")}
-            onClick={() => void run()}
-          >
-            <HugeiconsIcon icon={PlayIcon} aria-hidden="true" />
-            {t("test.run")}
-          </Button>
-        </>
+        <Button onClick={() => onOpenChange(false)} variant="ghost">
+          {tc("actions.close")}
+        </Button>
       }
-      anchor="top"
       onOpenChange={onOpenChange}
       open={open}
       size="lg"
       title={t("test.title")}
     >
-      <div className="flex flex-col gap-4">
-        {/* Who the test runs as: the account, its sign-in and the proxy it goes through. */}
+      <div className="flex flex-col gap-5">
+        {/* Who the test runs as: the account and its state, then its plan, sign-in and proxy. */}
         <div className="flex min-w-0 items-center gap-3">
           <IconChip icon={UserCircleIcon} size="md" />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <TruncatedText className="font-medium text-sm">{email}</TruncatedText>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <TruncatedText className="font-medium text-sm">{email}</TruncatedText>
+              <StatusPill account={account} plain size="sm" />
+            </div>
             <TruncatedText className="text-meta text-muted-foreground">
-              {`${authLabel(account, t)} · ${proxy}`}
+              {`${planLabel(account, t)} · ${authLabel(account, t)} · ${proxy}`}
             </TruncatedText>
           </div>
         </div>
 
+        {/* The model and the Run button on one row, at one height. */}
         <Field>
           <FieldLabel htmlFor={fieldId}>{t("test.model")}</FieldLabel>
-          <Autocomplete
-            // A whole model id in the field (the default, or a pick) lists every cached model;
-            // typing anything else filters the list as usual.
-            filter={models.includes(modelValue) ? null : undefined}
-            items={models}
-            onOpenChange={setSuggestionsOpen}
-            onValueChange={(value) => setModel(value)}
-            openOnInputClick
-            value={modelValue}
-          >
-            <AutocompleteInput
-              autoComplete="off"
-              disabled={cached.isPending}
-              id={fieldId}
-              onKeyDown={onKeyDown}
-              placeholder={t("test.modelPlaceholder")}
-              showTrigger={models.length > 0}
-              spellCheck={false}
-              // Its own name: inside a Field the trigger would take the field's label instead.
-              triggerProps={{ "aria-label": t("test.showModels"), "aria-labelledby": undefined }}
-              variant="code"
-            />
-            <AutocompletePopup>
-              <AutocompleteEmpty>{t("test.noModelMatches")}</AutocompleteEmpty>
-              <AutocompleteList>
-                {(item: string) => (
-                  <AutocompleteItem key={item} value={item}>
-                    <ModelLogo model={item} />
-                    <span className="font-mono text-meta">{item}</span>
-                  </AutocompleteItem>
-                )}
-              </AutocompleteList>
-            </AutocompletePopup>
-          </Autocomplete>
+          <div className="flex w-full min-w-0 items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <Autocomplete
+                // A whole model id in the field (the default, or a pick) lists every cached model;
+                // typing anything else filters the list as usual.
+                filter={models.includes(modelValue) ? null : undefined}
+                items={models}
+                onOpenChange={setSuggestionsOpen}
+                onValueChange={(value) => setModel(value)}
+                openOnInputClick
+                value={modelValue}
+              >
+                <AutocompleteInput
+                  autoComplete="off"
+                  disabled={cached.isPending}
+                  id={fieldId}
+                  onKeyDown={onKeyDown}
+                  placeholder={t("test.modelPlaceholder")}
+                  showTrigger={models.length > 0}
+                  spellCheck={false}
+                  // Its own name: inside a Field the trigger would take the field's label instead.
+                  triggerProps={{
+                    "aria-label": t("test.showModels"),
+                    "aria-labelledby": undefined,
+                  }}
+                  variant="code"
+                />
+                <AutocompletePopup>
+                  <AutocompleteEmpty>{t("test.noModelMatches")}</AutocompleteEmpty>
+                  <AutocompleteList>
+                    {(item: string) => (
+                      <AutocompleteItem key={item} value={item}>
+                        <ModelLogo model={item} />
+                        <span className="font-mono text-meta">{item}</span>
+                      </AutocompleteItem>
+                    )}
+                  </AutocompleteList>
+                </AutocompletePopup>
+              </Autocomplete>
+            </div>
+            {/* While it runs the spinner takes the icon's place and the label stays: no shift. */}
+            <Button disabled={cached.isPending} loading={running} onClick={() => void run()}>
+              <HugeiconsIcon icon={PlayIcon} aria-hidden="true" />
+              {t("test.run")}
+            </Button>
+          </div>
           <FieldDescription
             aria-live="polite"
             className={cached.isError ? "text-warning-foreground" : undefined}
@@ -363,104 +381,83 @@ export function TestAccountDialog({
 
         <Card divided>
           <CardHeader>
-            {/* Sized to its text, so the pill and the time stay on the title's line on a phone. */}
-            <CardHeading className="basis-auto">
+            <CardHeading>
               <CardTitle render={(props) => <h3 {...props} />}>{t("test.result")}</CardTitle>
-              {shownModel ? (
-                // Phones drop it (the field above names the model), so the pill stays on the
-                // title's line.
-                <CardDescription
-                  className="min-w-0 truncate font-mono max-sm:hidden"
-                  variant="inline"
-                >
-                  {shownModel}
-                </CardDescription>
-              ) : null}
             </CardHeading>
-            <CardAction>
-              {/* The pill is the live part: "Running", then "Succeeded" or "Failed". */}
-              <span aria-live="polite" className="flex">
-                {running ? (
-                  <Badge live tone="info">
-                    {t("test.status.running")}
-                  </Badge>
-                ) : outcome?.kind === "ok" ? (
-                  <Badge icon={CircleCheckIcon} tone="success">
-                    {t("test.status.ok")}
-                  </Badge>
-                ) : outcome?.kind === "err" ? (
-                  <Badge icon={CircleXIcon} tone="destructive">
-                    {t("test.status.failed")}
-                  </Badge>
-                ) : null}
-              </span>
-              {shownSeconds ? (
-                <span className="text-meta text-muted-foreground tabular-nums">
-                  {t("test.seconds", { seconds: shownSeconds })}
-                </span>
+            {/* The pill is the live part: "Running", then "Succeeded" or "Failed". */}
+            <CardAction aria-live="polite">
+              {running ? (
+                <Badge live tone="info">
+                  {t("test.status.running")}
+                </Badge>
+              ) : outcome?.kind === "ok" ? (
+                <Badge icon={CircleCheckIcon} tone="success">
+                  {t("test.status.ok")}
+                </Badge>
+              ) : outcome?.kind === "err" ? (
+                <Badge icon={CircleXIcon} tone="destructive">
+                  {t("test.status.failed")}
+                </Badge>
               ) : null}
             </CardAction>
           </CardHeader>
-          {/*
-            One height for the idle, running and success states (the success layout's), so the
-            dialog does not jump while a test runs; a long reply or error grows it.
-          */}
-          <CardPanel className="flex min-h-60 flex-col gap-4">
-            {running ? (
-              <PanelState
-                description={t("test.waitingHint")}
+          <CardPanel className={cn(RESULT_HEIGHT, "flex flex-none flex-col gap-3")}>
+            {started !== null ? (
+              <ResultState
+                description={<Elapsed started={started} />}
                 media={<Spinner aria-hidden="true" />}
                 title={t("test.waitingTitle")}
               />
             ) : outcome?.kind === "ok" ? (
               <>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <StatChip icon={Timer01Icon}>
+                    {t("test.seconds", { seconds: outcome.seconds })}
+                  </StatChip>
+                  <StatChip icon={ArrowDataTransferVerticalIcon}>
+                    {t("test.tokens", {
+                      input: formatNumber(outcome.result.inputTokens, lang),
+                      output: formatNumber(outcome.result.outputTokens, lang),
+                    })}
+                  </StatChip>
+                  <StatChip icon={Coins01Icon}>
+                    {t("test.credits", {
+                      credits: formatCreditsExact(outcome.result.credits, lang),
+                    })}
+                  </StatChip>
+                  {/* The step list explains it (common on Enterprise accounts). */}
+                  {outcome.result.stopReason ? null : (
+                    <Badge icon={AlertCircleIcon} size="sm" tone="warning">
+                      {t("test.noStopReason")}
+                    </Badge>
+                  )}
+                </div>
+                {/* The well fills the rest of the card and scrolls a long reply. */}
                 <CodeBlock
+                  className="min-h-0 flex-1"
                   code={outcome.result.reply}
                   copyLabel={t("test.copyReply")}
                   title={t("test.reply")}
                   wrap
                 />
-                <Metrics
-                  items={[
-                    {
-                      label: t("test.stopReason"),
-                      value: outcome.result.stopReason || t("testLog.noStopReason"),
-                    },
-                    {
-                      label: t("test.tokens"),
-                      value: `${formatNumber(outcome.result.inputTokens, lang)} / ${formatNumber(outcome.result.outputTokens, lang)}`,
-                    },
-                    {
-                      label: t("test.credits"),
-                      value: formatCreditsExact(outcome.result.credits, lang),
-                    },
-                    {
-                      label: t("test.context"),
-                      value: formatFraction(Number(outcome.result.contextUsage) / 100, 1, lang),
-                    },
-                  ]}
-                />
-                {outcome.result.stopReason ? null : (
-                  <Alert size="sm" variant="warning">
-                    <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
-                    <AlertDescription>{t("testLog.noStopReasonHint")}</AlertDescription>
-                  </Alert>
-                )}
               </>
             ) : outcome?.kind === "err" ? (
               <>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <StatChip icon={Timer01Icon}>
+                    {t("test.seconds", { seconds: outcome.seconds })}
+                  </StatChip>
+                </div>
                 <CodeBlock
+                  className="min-h-0 flex-1"
                   code={outcome.reason}
                   copyLabel={t("test.copyError")}
                   title={t("test.error")}
                   wrap
                 />
-                <p className="text-pretty text-muted-foreground text-sm leading-relaxed">
-                  {t("test.failedHint")}
-                </p>
               </>
             ) : (
-              <PanelState
+              <ResultState
                 description={t("test.idleHint")}
                 media={<HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />}
                 title={t("test.idleTitle")}
@@ -469,58 +466,46 @@ export function TestAccountDialog({
           </CardPanel>
         </Card>
 
-        <Card divided>
-          <CardHeader>
-            <CardHeading>
-              <CardTitle render={(props) => <h3 {...props} />}>{t("testLog.title")}</CardTitle>
-            </CardHeading>
-            <CardAction>
-              <Button
-                disabled={lines.length === 0}
-                onClick={() => setLines([])}
-                size="sm"
-                variant="ghost"
-              >
-                {t("testLog.clear")}
-              </Button>
-            </CardAction>
-          </CardHeader>
+        {/* The steps of every run, oldest first: a quiet timeline with no frame of its own. */}
+        <section aria-labelledby={stepsId} className="flex flex-col gap-2">
+          <div className="flex min-h-8 items-center justify-between gap-2">
+            <h3 className="font-medium text-foreground text-sm" id={stepsId}>
+              {t("testLog.title")}
+            </h3>
+            <Button
+              disabled={lines.length === 0}
+              onClick={() => setLines([])}
+              size="sm"
+              variant="ghost"
+            >
+              {t("testLog.clear")}
+            </Button>
+          </div>
           {lines.length === 0 ? (
-            <CardPanel className={cn(LOG_HEIGHT, "text-muted-foreground text-sm")} render={<p />}>
+            <p
+              className={cn(
+                STEPS_HEIGHT,
+                "flex items-center justify-center text-center text-muted-foreground text-sm",
+              )}
+            >
               {t("testLog.empty")}
-            </CardPanel>
+            </p>
           ) : (
-            <CardPanel
+            <ol
               aria-label={t("testLog.title")}
               className={cn(
-                LOG_HEIGHT,
-                "scrollbar-y flex flex-col gap-1.5 overflow-y-auto font-mono text-meta tabular-nums leading-relaxed",
+                STEPS_HEIGHT,
+                "scrollbar-y scroll-fade-y flex flex-col overflow-y-auto font-mono text-meta leading-relaxed",
               )}
-              render={<ol ref={logRef} />}
+              ref={logRef}
               role="log"
             >
-              {lines.map((line) => {
-                const icon = LOG_ICON[line.type];
-                return (
-                  // Icon and time are their own columns: a long line wraps under its text.
-                  <li className="flex gap-2" data-type={line.type} key={line.id}>
-                    <span className="flex h-lh shrink-0 items-center">
-                      <HugeiconsIcon
-                        aria-hidden="true"
-                        className={cn("size-3.5", icon.className)}
-                        icon={icon.icon}
-                      />
-                    </span>
-                    <span className="shrink-0 text-muted-foreground">{line.time}</span>
-                    <span className={cn("min-w-0 break-words", LOG_TEXT_CLASS[line.type])}>
-                      <LogText keep={line.keep} text={line.text} />
-                    </span>
-                  </li>
-                );
-              })}
-            </CardPanel>
+              {lines.map((line) => (
+                <Step key={line.id} line={line} />
+              ))}
+            </ol>
           )}
-        </Card>
+        </section>
       </div>
     </ResponsiveDialog>
   );
