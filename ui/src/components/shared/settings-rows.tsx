@@ -155,7 +155,10 @@ export function SettingsRow({
     </div>
   );
   const hint = description ? (
-    <p className={ROW_DESCRIPTION} id={hintId}>
+    <p
+      className={cn(ROW_DESCRIPTION, tone === "danger" && "text-destructive-foreground/80")}
+      id={hintId}
+    >
       {description}
     </p>
   ) : null;
