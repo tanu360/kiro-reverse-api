@@ -34,10 +34,13 @@ export function PopoverPopup({
   alignOffset = 0,
   tooltipStyle = false,
   anchor,
+  collisionPadding = 16,
   portalProps,
   ...props
 }: PopoverPrimitive.Popup.Props & {
   portalProps?: PopoverPrimitive.Portal.Props;
+  /** The space kept from the viewport edge: the 16 px phone gutter, as menus (menu.tsx). */
+  collisionPadding?: PopoverPrimitive.Positioner.Props["collisionPadding"];
   side?: PopoverPrimitive.Positioner.Props["side"];
   align?: PopoverPrimitive.Positioner.Props["align"];
   sideOffset?: PopoverPrimitive.Positioner.Props["sideOffset"];
@@ -51,7 +54,9 @@ export function PopoverPopup({
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
-        className="z-50 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
+        // At most 90 % of the viewport wide and, on phones, its viewport (below) 90 % tall.
+        className="z-50 h-(--positioner-height) w-(--positioner-width) max-w-[min(var(--available-width),90vw)] transition-[top,left,right,bottom,transform] data-instant:transition-none"
+        collisionPadding={collisionPadding}
         data-slot="popover-positioner"
         side={side}
         sideOffset={sideOffset}
@@ -71,7 +76,7 @@ export function PopoverPopup({
         >
           <PopoverPrimitive.Viewport
             className={cn(
-              "relative size-full max-h-(--available-height) overflow-clip px-(--viewport-inline-padding) has-data-[slot=calendar]:p-2 data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity",
+              "relative size-full max-h-(--available-height) overflow-clip max-sm:max-h-[min(var(--available-height),90dvh)] px-(--viewport-inline-padding) has-data-[slot=calendar]:p-2 data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity",
               tooltipStyle
                 ? "py-1 [--viewport-inline-padding:--spacing(2)]"
                 : "not-data-transitioning:overflow-y-auto py-4 [--viewport-inline-padding:--spacing(4)]",

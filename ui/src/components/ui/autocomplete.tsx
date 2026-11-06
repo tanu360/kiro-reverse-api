@@ -107,6 +107,7 @@ export function AutocompletePopup({
   alignOffset,
   align = "start",
   anchor,
+  collisionPadding = 16,
   portalProps,
   ...props
 }: AutocompletePrimitive.Popup.Props & {
@@ -115,6 +116,8 @@ export function AutocompletePopup({
   alignOffset?: AutocompletePrimitive.Positioner.Props["alignOffset"];
   side?: AutocompletePrimitive.Positioner.Props["side"];
   anchor?: AutocompletePrimitive.Positioner.Props["anchor"];
+  /** The space kept from the viewport edge: the 16 px phone gutter, as menus (menu.tsx). */
+  collisionPadding?: AutocompletePrimitive.Positioner.Props["collisionPadding"];
   portalProps?: AutocompletePrimitive.Portal.Props;
 }): React.ReactElement {
   return (
@@ -124,6 +127,7 @@ export function AutocompletePopup({
         alignOffset={alignOffset}
         anchor={anchor}
         className="z-50 select-none"
+        collisionPadding={collisionPadding}
         data-slot="autocomplete-positioner"
         side={side}
         sideOffset={sideOffset}
@@ -137,7 +141,7 @@ export function AutocompletePopup({
           )}
         >
           <AutocompletePrimitive.Popup
-            className="flex max-h-[min(var(--available-height),23rem)] flex-1 flex-col text-foreground"
+            className="flex max-h-[min(var(--available-height),23rem,90dvh)] flex-1 flex-col text-foreground"
             data-slot="autocomplete-popup"
             {...props}
           >

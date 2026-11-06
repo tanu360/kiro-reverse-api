@@ -57,9 +57,12 @@ export function SheetViewport({
   return (
     <SheetPrimitive.Viewport
       className={cn(
-        "fixed inset-0 z-50 grid",
+        // Phones (below sm): every sheet is an inset floating panel, at most 90vw by 90dvh (the
+        // modal gaps in index.css). A side sheet keeps its side; a top or bottom one is centred.
+        "fixed inset-0 z-50 grid max-sm:px-(--modal-gap-x) max-sm:py-(--modal-gap-y)",
         side === "bottom" && "grid grid-rows-[1fr_auto] pt-12",
         side === "top" && "grid grid-rows-[auto_1fr] pb-12",
+        (side === "bottom" || side === "top") && "max-sm:grid-rows-[1fr_auto_1fr]",
         side === "left" && "flex justify-start",
         side === "right" && "flex justify-end",
         variant === "inset" && "sm:p-4",
@@ -100,13 +103,14 @@ export function SheetPopup({
             side === "bottom" &&
               "row-start-2 rounded-t-2xl border-t data-ending-style:translate-y-8 data-starting-style:translate-y-8",
             side === "top" &&
-              "border-b data-ending-style:-translate-y-8 data-starting-style:-translate-y-8",
+              "border-b max-sm:row-start-2 data-ending-style:-translate-y-8 data-starting-style:-translate-y-8",
             side === "left" &&
               "w-[calc(100%-(--spacing(12)))] max-w-md border-e data-ending-style:-translate-x-8 data-starting-style:-translate-x-8",
             side === "right" &&
               "col-start-2 w-[calc(100%-(--spacing(12)))] max-w-md border-s data-ending-style:translate-x-8 data-starting-style:translate-x-8",
             variant === "inset" &&
               "sm:rounded-2xl sm:border sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
+            "max-sm:rounded-2xl max-sm:border max-sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
             className,
           )}
           data-slot="sheet-popup"

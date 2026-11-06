@@ -65,7 +65,7 @@ export const DIALOG_SIZE_CLASS: Record<DialogSize, string> = {
 /**
  * Where the popup rests from sm up: `center` in the middle of the screen, `top` hung a fixed
  * distance below the top (at least 48 px, 8 % of the screen), so a dialog whose height changes
- * (a wizard, a log that fills) keeps its title in place. Phones keep the bottom sheet.
+ * (a wizard, a log that fills) keeps its title in place. Phones always centre it.
  */
 export type DialogAnchor = "center" | "top";
 
@@ -77,7 +77,9 @@ export function DialogViewport({
   return (
     <DialogPrimitive.Viewport
       className={cn(
-        "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4",
+        // Phones (below sm): a floating panel, centred, at most 90vw by 90dvh (the modal gaps
+        // in index.css), with its four rounded corners and full border.
+        "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4 max-sm:px-(--modal-gap-x) max-sm:py-(--modal-gap-y)",
         // Top-anchored (the tall pickers): a 6dvh lead, at least 48 px, so an eight-row list
         // still fits a 768 px laptop screen.
         anchor === "top" && "sm:grid-rows-[minmax(--spacing(12),6dvh)_auto_1fr]",
@@ -100,7 +102,6 @@ export function DialogPopup({
   className,
   children,
   showCloseButton = true,
-  bottomStickOnMobile = true,
   size = "lg",
   anchor = "center",
   closeProps,
@@ -109,8 +110,7 @@ export function DialogPopup({
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
-  bottomStickOnMobile?: boolean;
-  /** Width from sm up (DIALOG_SIZE_CLASS); phones take the full width. */
+  /** Width (DIALOG_SIZE_CLASS); on phones it is also at most 90vw. */
   size?: DialogSize;
   anchor?: DialogAnchor;
   closeProps?: DialogPrimitive.Close.Props;
@@ -124,20 +124,12 @@ export function DialogPopup({
         its own backdrop too, so the parent dims behind it instead of staying at full brightness.
       */}
       <DialogBackdrop forceRender />
-      <DialogViewport
-        anchor={anchor}
-        className={cn(
-          bottomStickOnMobile &&
-            "max-sm:grid-rows-[1fr_auto] max-sm:p-0 max-sm:pt-12",
-        )}
-      >
+      <DialogViewport anchor={anchor}>
         <DialogPrimitive.Popup
           className={cn(
             // t3code dialog-styles.ts DIALOG_POPUP_CLASS: frosted glass (index.css dialog-glass).
             "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 -translate-y-[calc(1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
             DIALOG_SIZE_CLASS[size],
-            bottomStickOnMobile &&
-              "max-sm:max-w-none max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-t max-sm:border-b-0 max-sm:opacity-[calc(1-min(var(--nested-dialogs),1))] max-sm:data-ending-style:translate-y-4 max-sm:data-starting-style:translate-y-4",
             className,
           )}
           data-size={size}
@@ -199,7 +191,7 @@ export function DialogFooter({
     className: cn(
       // Phones: Cancel and the main action share one row of two; a lone (or odd last) button
       // takes the whole row. From sm up they sit at the end.
-      "grid grid-cols-2 gap-2 px-6 max-sm:px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end sm:rounded-b-[calc(var(--radius-2xl)-1px)]",
+      "grid grid-cols-2 gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] px-6 max-sm:px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
       variant === "default" && "border-t border-border-subtle bg-surface-inset py-4",
       variant === "bare" &&
         "in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pt-3 pt-4 pb-6",

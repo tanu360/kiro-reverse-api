@@ -2,12 +2,16 @@ import { screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/test/render";
+import { AlertDialog, AlertDialogPopup, AlertDialogTitle } from "./alert-dialog";
 import { Autocomplete, AutocompleteInput } from "./autocomplete";
 import { Button } from "./button";
+import { Dialog, DialogPopup, DialogTitle } from "./dialog";
+import { Drawer, DrawerPopup, DrawerTitle } from "./drawer";
 import { Input } from "./input";
 import { NumberField, NumberFieldDecrement, NumberFieldGroup, NumberFieldIncrement, NumberFieldInput } from "./number-field";
 import { SegmentedControl, SegmentedControlItem } from "./segmented-control";
 import { Select, SelectTrigger, SelectValue } from "./select";
+import { Sheet, SheetPopup, SheetTitle } from "./sheet";
 import { Switch } from "./switch";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "./tabs";
 
@@ -202,5 +206,71 @@ describe("NumberField", () => {
     );
     expect(screen.getByRole("button", { name: "减少" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "增加" })).toBeInTheDocument();
+  });
+});
+
+describe("Modal surfaces on phones", () => {
+  function slot(name: string): string {
+    const element = document.querySelector(`[data-slot="${name}"]`);
+    expect(element).not.toBeNull();
+    return element?.className ?? "";
+  }
+
+  it("float dialogs and alert dialogs centred, 5vw and 5dvh clear of the edges", () => {
+    renderWithProviders(
+      <>
+        <Dialog open>
+          <DialogPopup>
+            <DialogTitle>Edit</DialogTitle>
+          </DialogPopup>
+        </Dialog>
+        <AlertDialog open>
+          <AlertDialogPopup>
+            <AlertDialogTitle>Delete?</AlertDialogTitle>
+          </AlertDialogPopup>
+        </AlertDialog>
+      </>,
+    );
+    for (const name of ["dialog", "alert-dialog"]) {
+      const viewport = slot(`${name}-viewport`);
+      expect(viewport).toContain("grid-rows-[1fr_auto_1fr]");
+      expect(viewport).toContain("max-sm:px-(--modal-gap-x)");
+      expect(viewport).toContain("max-sm:py-(--modal-gap-y)");
+      const popup = slot(`${name}-popup`);
+      expect(popup).toContain("rounded-2xl");
+      expect(popup).not.toContain("max-sm:max-w-none");
+      expect(popup).not.toContain("max-sm:rounded-b-none");
+    }
+  });
+
+  it("makes a side sheet an inset panel with four rounded corners", () => {
+    renderWithProviders(
+      <Sheet open>
+        <SheetPopup side="left">
+          <SheetTitle>Navigation</SheetTitle>
+        </SheetPopup>
+      </Sheet>,
+    );
+    expect(slot("sheet-viewport")).toContain("max-sm:py-(--modal-gap-y)");
+    const popup = slot("sheet-popup");
+    expect(popup).toContain("max-sm:rounded-2xl");
+    expect(popup).toContain("max-sm:border");
+  });
+
+  it("keeps the bottom drawer as far above the screen edge as it is from the sides", () => {
+    renderWithProviders(
+      <Drawer open>
+        <DrawerPopup>
+          <DrawerTitle>Add account</DrawerTitle>
+        </DrawerPopup>
+      </Drawer>,
+    );
+    const viewport = slot("drawer-viewport");
+    expect(viewport).toContain("max-sm:[--inset:var(--modal-gap-x)]");
+    expect(viewport).toContain("max-sm:px-(--inset)");
+    expect(viewport).toContain("max-sm:pb-[calc(var(--inset)+env(safe-area-inset-bottom,0px))]");
+    const popup = slot("drawer-popup");
+    expect(popup).toContain("max-sm:rounded-2xl");
+    expect(popup).toContain("max-sm:after:hidden");
   });
 });

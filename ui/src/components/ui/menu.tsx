@@ -94,9 +94,9 @@ export function MenuPopup({
           data-slot="menu-popup"
           {...props}
         >
-          {/* At most 22rem tall (a part row shows there is more), fading at an edge it can still
-              scroll past; a label wider than the popup (index.css popup-width) slides when its row is highlighted. */}
-          <div className="scroll-fade-y max-h-[min(var(--available-height),22rem)] w-full overflow-y-auto p-1">
+          {/* At most 22rem tall (a part row shows there is more), 90dvh on a short screen, fading at an
+              edge it can still scroll past; a label wider than the popup (index.css popup-width) slides when its row is highlighted. */}
+          <div className="scroll-fade-y max-h-[min(var(--available-height),22rem,90dvh)] w-full overflow-y-auto p-1">
             {children}
           </div>
         </MenuPrimitive.Popup>

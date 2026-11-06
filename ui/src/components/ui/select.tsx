@@ -138,11 +138,14 @@ export function SelectPopup({
   alignOffset = 0,
   alignItemWithTrigger = true,
   anchor,
+  collisionPadding = 16,
   portalProps,
   fit = "field",
   ...props
 }: SelectPrimitive.Popup.Props & {
   portalProps?: SelectPrimitive.Portal.Props;
+  /** The space kept from the viewport edge: the 16 px phone gutter, as menus (menu.tsx). */
+  collisionPadding?: SelectPrimitive.Positioner.Props["collisionPadding"];
   /**
    * Kiro: "field" (default) makes the list at least as wide as its field-like trigger, growing
    * to fit its longest option up to max(trigger, 14rem) (index.css popup-width-field); "content"
@@ -165,6 +168,7 @@ export function SelectPopup({
         alignOffset={alignOffset}
         anchor={anchor}
         className="z-50 select-none"
+        collisionPadding={collisionPadding}
         data-slot="select-positioner"
         side={side}
         sideOffset={sideOffset}
@@ -193,7 +197,7 @@ export function SelectPopup({
           >
             <SelectPrimitive.List
               className={cn(
-                "scroll-fade-y max-h-[min(var(--available-height),22rem)] overflow-y-auto p-1",
+                "scroll-fade-y max-h-[min(var(--available-height),22rem,90dvh)] overflow-y-auto p-1",
                 className,
               )}
               data-slot="select-list"

@@ -382,6 +382,14 @@
   --popup: var(--popover);
   --popup-border: var(--border);
   --popup-shadow: var(--floating-shadow);
+  /*
+   * Phones (below sm): every modal (dialog, alert dialog, sheet, drawer) floats clear of the
+   * screen edge, at most 90 % of the screen wide and 90 % tall. These are the gaps it keeps: 5vw
+   * at the sides (a bottom drawer keeps the same 5vw under it, plus the home-indicator inset) and
+   * 5dvh above and below a centred panel. Anchored popups stay within 90vw (popup-width).
+   */
+  --modal-gap-x: 5vw;
+  --modal-gap-y: 5dvh;
 }
 
 @utility popup-surface {
@@ -396,24 +404,28 @@
  * its items need the room (a label beside a count and a check mark), up to 14rem; a longer label
  * truncates and slides when highlighted. A popup from an icon button (under 4rem wide) is at
  * least 11rem. The `* 1000` term turns that floor on in CSS alone: far above 11rem when the
- * trigger is under 4rem, zero or below otherwise. Never wider than the viewport less 1rem a side.
+ * trigger is under 4rem, zero or below otherwise. Never wider than 90 % of the viewport, nor the
+ * viewport less 1rem a side (--popup-max-w).
  */
 @utility popup-width {
   --popup-anchor: var(--anchor-width, 0px);
   --popup-icon-floor: min(11rem, calc((4rem - var(--popup-anchor)) * 1000));
-  min-width: min(max(var(--popup-anchor), var(--popup-icon-floor)), calc(100vw - 2rem));
-  max-width: min(max(var(--popup-anchor), 14rem), calc(100vw - 2rem));
+  --popup-max-w: min(90vw, calc(100vw - 2rem));
+  min-width: min(max(var(--popup-anchor), var(--popup-icon-floor)), var(--popup-max-w));
+  max-width: min(max(var(--popup-anchor), 14rem), var(--popup-max-w));
 }
 
 /*
  * A select's list: at least as wide as its field (a select trigger is always a field showing the
  * chosen option, so the options usually fit it), growing to fit a longer option up to 14rem or
- * the field, whichever is wider. Never wider than the viewport less 1rem a side.
+ * the field, whichever is wider. Never wider than 90 % of the viewport, nor the viewport less
+ * 1rem a side.
  */
 @utility popup-width-field {
-  min-width: min(var(--anchor-width, 11rem), calc(100vw - 2rem));
+  --popup-max-w: min(90vw, calc(100vw - 2rem));
+  min-width: min(var(--anchor-width, 11rem), var(--popup-max-w));
   width: max-content;
-  max-width: min(max(var(--anchor-width, 11rem), 14rem), calc(100vw - 2rem));
+  max-width: min(max(var(--anchor-width, 11rem), 14rem), var(--popup-max-w));
 }
 
 /*
@@ -774,8 +786,9 @@
  * or a group title with its gap) under a 60 px search row, and a floating foot that the list
  * scrolls behind. It hangs 8 px under the header trigger, centred on it (--command-x and
  * --command-y, set when it opens), and kept 16 px inside the window; without them it sits
- * centred 12vh down. Phones pin it 16 px from the top. Shorter windows drop whole slots, so
- * the last row in view ends 8 px over the foot.
+ * centred 12vh down. Phones float it 90vw wide, centred, its top as far down as its sides are
+ * in (the modal gap, 5vw). Shorter windows drop whole slots, so the last row in view ends 8 px
+ * over the foot.
  */
 @utility command-palette {
   --command-w: min(640px, calc(100vw - 32px));
@@ -792,7 +805,9 @@
   max-height: min(470px, calc(70px + round(down, 100dvh - var(--command-top) - 86px, 40px)));
 
   @media (width < 40rem) {
-    --command-top: 16px;
+    --command-w: calc(100vw - var(--modal-gap-x) * 2);
+    --command-top: var(--modal-gap-x);
+    left: var(--modal-gap-x);
   }
 }
 

@@ -172,6 +172,7 @@ export function ComboboxPopup({
   alignOffset,
   align = "start",
   anchor: anchorProp,
+  collisionPadding = 16,
   portalProps,
   ...props
 }: ComboboxPrimitive.Popup.Props & {
@@ -180,6 +181,8 @@ export function ComboboxPopup({
   alignOffset?: ComboboxPrimitive.Positioner.Props["alignOffset"];
   side?: ComboboxPrimitive.Positioner.Props["side"];
   anchor?: ComboboxPrimitive.Positioner.Props["anchor"];
+  /** The space kept from the viewport edge: the 16 px phone gutter, as menus (menu.tsx). */
+  collisionPadding?: ComboboxPrimitive.Positioner.Props["collisionPadding"];
   portalProps?: ComboboxPrimitive.Portal.Props;
 }): React.ReactElement {
   const { chipsRef } = React.useContext(ComboboxContext);
@@ -192,6 +195,7 @@ export function ComboboxPopup({
         alignOffset={alignOffset}
         anchor={anchor}
         className="z-50 select-none"
+        collisionPadding={collisionPadding}
         data-slot="combobox-positioner"
         side={side}
         sideOffset={sideOffset}
@@ -205,7 +209,7 @@ export function ComboboxPopup({
           )}
         >
           <ComboboxPrimitive.Popup
-            className="flex min-w-0 max-h-[min(var(--available-height),23rem)] flex-1 flex-col overflow-hidden text-foreground"
+            className="flex min-w-0 max-h-[min(var(--available-height),23rem,90dvh)] flex-1 flex-col overflow-hidden text-foreground"
             data-slot="combobox-popup"
             {...props}
           >

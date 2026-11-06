@@ -45,7 +45,8 @@ export function AlertDialogViewport({
   return (
     <AlertDialogPrimitive.Viewport
       className={cn(
-        "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4",
+        // Phones: centred and floating, at most 90vw by 90dvh, as dialogs (dialog.tsx).
+        "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4 max-sm:px-(--modal-gap-x) max-sm:py-(--modal-gap-y)",
         className,
       )}
       data-slot="alert-dialog-viewport"
@@ -56,29 +57,20 @@ export function AlertDialogViewport({
 
 export function AlertDialogPopup({
   className,
-  bottomStickOnMobile = true,
   portalProps,
   onKeyDown,
   ...props
 }: AlertDialogPrimitive.Popup.Props & {
-  bottomStickOnMobile?: boolean;
   portalProps?: AlertDialogPrimitive.Portal.Props;
 }): React.ReactElement {
   return (
     <AlertDialogPortal {...portalProps}>
       {/* forceRender: nested in a dialog or sheet, it still dims its parent (dialog.tsx). */}
       <AlertDialogBackdrop forceRender />
-      <AlertDialogViewport
-        className={cn(
-          bottomStickOnMobile &&
-            "max-sm:grid-rows-[1fr_auto] max-sm:p-0 max-sm:pt-12",
-        )}
-      >
+      <AlertDialogViewport>
         <AlertDialogPrimitive.Popup
           className={cn(
             "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 max-w-lg -translate-y-[calc(1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
-            bottomStickOnMobile &&
-              "max-sm:max-w-none max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-t max-sm:border-b-0 max-sm:opacity-[calc(1-min(var(--nested-dialogs),1))] max-sm:data-ending-style:translate-y-4 max-sm:data-starting-style:translate-y-4",
             className,
           )}
           data-slot="alert-dialog-popup"
@@ -100,7 +92,7 @@ export function AlertDialogHeader({
   return (
     <div
       className={cn(
-        // Start-aligned at every width, as the dialogs and sheets that share the phone bottom sheet.
+        // Start-aligned at every width, as the dialogs and sheets.
         "flex min-h-0 flex-col gap-2 p-6 text-start max-sm:px-4 max-sm:pb-4",
         className,
       )}
@@ -121,7 +113,7 @@ export function AlertDialogFooter({
     <div
       className={cn(
         // Phones: Cancel and the action share one row of two (dialog.tsx DialogFooter).
-        "grid grid-cols-2 gap-2 px-6 max-sm:px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end sm:rounded-b-[calc(var(--radius-2xl)-1px)]",
+        "grid grid-cols-2 gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] px-6 max-sm:px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
         variant === "default" && "border-t border-border-subtle bg-surface-inset py-4",
         variant === "bare" && "pb-6",
         className,

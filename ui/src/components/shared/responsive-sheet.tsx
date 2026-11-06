@@ -27,7 +27,8 @@ export interface ResponsiveSheetProps {
 
 /**
  * The one detail sheet: from md up a right sheet 576 px wide; below md a bottom sheet that fills
- * the screen under a 48 px strip, with 16 px top corners. Compose it with the parts below.
+ * the screen under a 48 px strip, with 16 px top corners; on phones (below sm) a floating panel
+ * 90vw by 90dvh, centred, rounded all round (sheet.tsx). Compose it with the parts below.
  */
 export function ResponsiveSheet({
   open,

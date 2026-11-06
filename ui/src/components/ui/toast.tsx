@@ -144,7 +144,8 @@ function Toasts({
         aria-label={t("toast.region")}
         className={cn(
           // The page gutter: 16 px, 24 px from md up, so a toast lines up with the content column.
-          "fixed z-60 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] md:[--toast-inset:--spacing(6)]",
+          // Phones (below sm) keep the modal gap (5vw, index.css), so a toast is at most 90vw.
+          "fixed z-60 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] max-sm:[--toast-inset:max(--spacing(4),var(--modal-gap-x))] md:[--toast-inset:--spacing(6)]",
           UNDER_MODALS,
           // Vertical positioning. Top toasts hang under the app's sticky header (index.css
           // --toast-top-offset); bottom toasts clear the batch bar (--toast-stack-offset).

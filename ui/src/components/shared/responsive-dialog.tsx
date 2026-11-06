@@ -40,8 +40,8 @@ export interface ResponsiveDialogProps {
   /**
    * `top` hangs the dialog from near the top from md up, so a step flow or a form that grows (a
    * validation line, a server error) keeps its title in place. The phone bottom drawer is not
-   * affected: it fits its content (up to 90 % of the screen), so a short step is not a tall
-   * empty sheet.
+   * affected: it fits its content (up to 90 % of the screen, and 90vw wide on phones), so a
+   * short step is not a tall empty sheet.
    */
   anchor?: DialogAnchor;
   /** Shows a back arrow before the title (a step flow's way back); the footer keeps the actions. */
@@ -92,7 +92,10 @@ function TitleRow({
   );
 }
 
-/** coss Dialog from `md` up, a bottom Drawer below it. Every close path reports onOpenChange(false). */
+/**
+ * coss Dialog from `md` up, a bottom Drawer below it (on phones a floating panel 5vw clear of the
+ * sides and the bottom, drawer.tsx). Every close path reports onOpenChange(false).
+ */
 export function ResponsiveDialog({
   open,
   onOpenChange,
