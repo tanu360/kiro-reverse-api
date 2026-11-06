@@ -21,19 +21,17 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /*
- * The prev/next chevrons: in the topbar search pill's surface (command-menu.tsx: the --field
- * tint and the --input hairline), so they read on the page in both themes, with the 8 px corners
- * of every button. Sized by the Button's `icon` step, like the page numbers. Disabled keeps the
- * box, dimmed like every disabled control, with a muted chevron. The hover fill is hover-guarded
- * (Tailwind's `hover:` only applies on a hover-capable pointer), so a tapped chevron does not keep
- * it on touch; pressed shows it on every pointer.
+ * The prev/next chevrons: round, in the topbar search pill's surface (command-menu.tsx: the
+ * --field tint and the --input hairline), so they read on the page in both themes. Disabled keeps
+ * the circle and only dims the chevron. The hover fill is hover-guarded (Tailwind's `hover:` only
+ * applies on a hover-capable pointer), so a tapped chevron does not keep it on touch; pressed
+ * shows it on every pointer.
  */
 export const PAGER_CHEVRON_CLASS =
-  "border-input bg-(--field) text-foreground hover:bg-(--field-hover) data-pressed:bg-(--field-hover) disabled:text-muted-foreground";
-// The page numbers: quiet buttons; the current page takes the accent fill, the same surface as
-// a selected segment.
-const PAGE = "tabular-nums";
-const PAGE_ACTIVE = "bg-accent text-foreground";
+  "rounded-full border-input bg-(--field) text-foreground before:rounded-full hover:bg-(--field-hover) data-pressed:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
+// The page numbers: round quiet buttons with no fill; the current page is the bold one.
+const PAGE = "rounded-full tabular-nums before:rounded-full";
+const PAGE_ACTIVE = "font-semibold text-foreground";
 
 /**
  * The pager's previous/next button, for any prev/next pair that should match the table
