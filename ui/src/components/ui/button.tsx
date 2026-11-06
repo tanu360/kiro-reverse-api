@@ -82,7 +82,7 @@ export const buttonVariants = cva(
         // press, in both themes. The dark tint is a dark: class, so the solid fill repeats under
         // dark: or the tint would outrank it there.
         danger:
-          "border-destructive/24 bg-destructive/8 text-danger-foreground dark:border-destructive/32 dark:bg-destructive/14 hover:border-destructive-solid data-pressed:border-destructive-solid hover:bg-destructive-solid data-pressed:bg-destructive-solid hover:text-destructive-solid-foreground data-pressed:text-destructive-solid-foreground dark:hover:border-destructive-solid dark:data-pressed:border-destructive-solid dark:hover:bg-destructive-solid dark:data-pressed:bg-destructive-solid",
+          "border-destructive/24 bg-destructive/8 text-destructive-foreground dark:border-destructive/32 dark:bg-destructive/14 hover:border-destructive-solid data-pressed:border-destructive-solid hover:bg-destructive-solid data-pressed:bg-destructive-solid hover:text-destructive-solid-foreground data-pressed:text-destructive-solid-foreground dark:hover:border-destructive-solid dark:data-pressed:border-destructive-solid dark:hover:bg-destructive-solid dark:data-pressed:bg-destructive-solid",
         // Supporting actions in the showcase's API sticker colours: lime (OpenAI) for Export,
         // periwinkle (Codex) for model refreshes, peach (Claude) for a soft destructive action.
         lime: "border-[color-mix(in_srgb,var(--sticker-openai-fg)_20%,var(--sticker-openai))] bg-(--sticker-openai) text-(--sticker-openai-fg) hover:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))] data-pressed:bg-[color-mix(in_srgb,var(--sticker-openai-fg)_9%,var(--sticker-openai))]",

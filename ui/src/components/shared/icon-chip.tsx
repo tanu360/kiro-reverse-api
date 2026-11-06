@@ -22,7 +22,7 @@ export const iconChipVariants = cva(
       },
       tone: {
         default: "",
-        danger: "border-destructive/24 bg-destructive/8 text-danger-foreground",
+        danger: "border-destructive/24 bg-error-surface text-destructive-foreground",
       },
     },
   },

@@ -82,8 +82,6 @@
   /* Solid red for a destructive confirm button and a danger button's hover: white on it is 4.8:1. */
   --destructive-solid: var(--color-red-600);
   --destructive-solid-foreground: var(--color-white);
-  /* Settings' danger zone text: red-700, 6.5:1 on white (red-400 in dark, 7:1 on black). */
-  --danger-foreground: var(--color-red-700);
   /* Kiro purple, not blue: purple-700 text is 7.4:1 on white. */
   --info: var(--primary);
   --info-foreground: #7a0ecd;
@@ -166,7 +164,6 @@
   --border-strong: color-mix(in oklab, var(--color-white) 35%, transparent);
   --input: --alpha(var(--color-white) / 11%);
   --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-  --danger-foreground: var(--color-red-400);
   /* Kiro purple-300: 9.7:1 on black. */
   --info-foreground: #c59eff;
   --success: var(--color-emerald-500);
@@ -1004,7 +1001,6 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-solid: var(--destructive-solid);
   --color-destructive-solid-foreground: var(--destructive-solid-foreground);
-  --color-danger-foreground: var(--danger-foreground);
   --color-error-surface: var(--error-surface);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);

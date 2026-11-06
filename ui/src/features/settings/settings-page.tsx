@@ -152,13 +152,12 @@ function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] 
 /*
  * A chip of the phone and tablet nav row. The nav is page navigation, not a control kit part,
  * so its chip look lives here, in theme tokens only: a hairline pill, the surface step and a
- * firmer edge for the current section; the danger zone in red text, a red tint when current
- * and solid red with a white label on hover.
+ * firmer edge for the current section, red text and a red tint for the danger zone.
  */
 const CHIP_CLASS =
   "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline aria-[current=true]:border-border-strong aria-[current=true]:bg-surface-2 aria-[current=true]:text-foreground sm:min-h-9 pointer-coarse:min-h-10 [&_svg]:size-4 [&_svg]:shrink-0";
 const DANGER_CHIP_CLASS =
-  "text-danger-foreground hover:border-destructive-solid hover:bg-destructive-solid hover:text-destructive-solid-foreground active:border-destructive-solid active:bg-destructive-solid active:text-destructive-solid-foreground aria-[current=true]:border-destructive/32 aria-[current=true]:bg-error-surface aria-[current=true]:text-danger-foreground aria-[current=true]:hover:border-destructive-solid aria-[current=true]:hover:bg-destructive-solid aria-[current=true]:hover:text-destructive-solid-foreground";
+  "text-destructive-foreground hover:bg-error-surface hover:text-destructive-foreground aria-[current=true]:border-destructive/32 aria-[current=true]:bg-error-surface aria-[current=true]:text-destructive-foreground";
 
 interface NavEntry {
   id: SectionId;
