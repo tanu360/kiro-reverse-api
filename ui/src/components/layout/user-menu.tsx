@@ -143,8 +143,18 @@ function SidebarUserMenu(): JSX.Element {
           </span>
           <AnimatedIcon icon={EllipsisVerticalIcon} aria-hidden="true" className="ms-auto size-4" />
         </MenuTrigger>
-        {/* From the sidebar (desktop) 12 px out, so the popup clears the sidebar's edge line. */}
-        <MenuPopup align="end" side={isMobile ? "bottom" : "right"} sideOffset={isMobile ? 4 : 12}>
+        {/*
+         * From the sidebar (desktop) 12 px out, so the popup clears the sidebar's edge line. In the
+         * sheet it opens over the row, edge to edge with it: on tablets the sheet meets the
+         * viewport edge and the row sits 8 px in, so the default 16 px collision padding would
+         * push the popup 8 px past the row's end, onto the sheet's border.
+         */}
+        <MenuPopup
+          align="end"
+          collisionPadding={isMobile ? 8 : undefined}
+          side={isMobile ? "bottom" : "right"}
+          sideOffset={isMobile ? 4 : 12}
+        >
           <UserMenuItems onCheckSettled={() => setOpen(false)} />
         </MenuPopup>
       </Menu>
