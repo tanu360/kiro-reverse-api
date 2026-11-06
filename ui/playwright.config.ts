@@ -32,6 +32,12 @@ export default defineConfig({
     },
     // Kept only for failed tests; CI uploads test-results/ when the job fails.
     trace: "retain-on-failure",
+    // Chrome for Testing 156 and 157 (headless, software compositing) crash their renderer
+    // (SIGSEGV at 0, "Target crashed") when a sheet or menu closes while the Overview charts,
+    // live tiles and status cards animate. The more of them run, the likelier it is; reduced
+    // motion stops those animations (0 crashes in 24 repeats of the shell specs, against about
+    // 1 in 4 without it).
+    reducedMotion: "reduce",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
