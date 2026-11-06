@@ -55,9 +55,13 @@ export function Table({
     children: (
       <table
         className={cn(
-          // Rows are split by hairlines only (border-subtle), no column dividers. Figures are
-          // tabular, so right-aligned numbers line up on their digits and widths hold on refetch.
-          "w-full caption-bottom in-data-[variant=card]:border-separate in-data-[variant=card]:border-spacing-0 text-sm tabular-nums",
+          // Column dividers, so the table reads as a grid of boxes: a 1 px inset line on the left
+          // of every cell but the first, in the row divider's colour (border at 50 %). An inset
+          // shadow, not a border, so it matches the sticky end column's own edge instead of
+          // doubling it. The cell after a row's checkbox gets none: the box belongs to the row.
+          // Figures are tabular, so right-aligned numbers line up on their digits and widths
+          // hold on refetch.
+          "w-full caption-bottom in-data-[variant=card]:border-separate in-data-[variant=card]:border-spacing-0 text-sm tabular-nums [&_tr>*:not(:has([role=checkbox]))+*]:shadow-[inset_1px_0_0_color-mix(in_srgb,var(--border)_50%,transparent)]",
           className,
         )}
         data-slot="table"
@@ -83,7 +87,7 @@ export function TableHeader({
 }: React.ComponentProps<"thead">): React.ReactElement {
   return (
     <thead
-      className={cn("not-in-data-[variant=card]:bg-(--row-head) [&_tr]:border-b [&_tr]:border-border-subtle", className)}
+      className={cn("not-in-data-[variant=card]:bg-(--row-head) [&_tr]:border-border [&_tr]:border-b", className)}
       data-slot="table-header"
       {...props}
     />
