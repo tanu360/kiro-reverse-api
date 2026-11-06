@@ -94,7 +94,7 @@ describe("AccountsPage", () => {
 
   it("filters by nickname as the user types", async () => {
     const { table, user } = await renderAccounts();
-    await user.type(screen.getByRole("searchbox", { name: "Search accounts" }), "overfl");
+    await user.type(screen.getByRole("searchbox", { name: "Search by email or nickname" }), "overfl");
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
     expect(within(table).getByText(/^Overflow ·/)).toBeInTheDocument();
   });
@@ -193,7 +193,7 @@ describe("AccountsPage", () => {
     await user.click(within(table).getByRole("checkbox", { name: "Select all" }));
     expect(await screen.findByText(`${ids.length} selected`)).toBeInTheDocument();
 
-    await user.type(screen.getByRole("searchbox", { name: "Search accounts" }), "overfl");
+    await user.type(screen.getByRole("searchbox", { name: "Search by email or nickname" }), "overfl");
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
     expect(screen.getByText(`${ids.length} selected`)).toBeInTheDocument();
 
@@ -253,7 +253,7 @@ describe("AccountsPage", () => {
   it("offers no filters while the list loads: zero counts would read as an empty fleet", async () => {
     mockServer.use(http.get(apiUrl("/accounts"), () => new Promise<Response>(() => {})));
     await renderApp("/accounts?status=banned&plan=power");
-    expect(await screen.findByRole("searchbox", { name: "Search accounts" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search by email or nickname" })).toBeInTheDocument();
     // The tabs hold their place, disabled and without counts, so the table does not shift.
     const tabs = screen.getByRole("tablist", { name: "Account status" });
     for (const tab of within(tabs).getAllByRole("tab")) {

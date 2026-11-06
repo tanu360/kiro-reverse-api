@@ -13,7 +13,7 @@
   "openDetails": "Mở chi tiết của {email}",
   "lockedSwitch.banned": "Kiro đã cấm tài khoản này. Không thể bật lại.",
   "lockedSwitch.suspended": "Kiro đã tạm ngưng tài khoản này. Làm mới token để kiểm tra lại.",
-  "filter.search": "Tìm tài khoản",
+  "filter.search": "Tìm theo email hoặc biệt danh",
   "filter.status": "Trạng thái tài khoản",
   "filter.all": "Tất cả",
   "filter.attention": "Cần xử lý",

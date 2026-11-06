@@ -13,7 +13,7 @@
   "openDetails": "Abrir detalhes de {email}",
   "lockedSwitch.banned": "Banida pelo Kiro. A conta não pode ser ativada.",
   "lockedSwitch.suspended": "Suspensa pelo Kiro. Atualize o token para verificar de novo.",
-  "filter.search": "Buscar contas",
+  "filter.search": "Buscar por e-mail ou apelido",
   "filter.status": "Status da conta",
   "filter.all": "Todas",
   "filter.attention": "Requer atenção",

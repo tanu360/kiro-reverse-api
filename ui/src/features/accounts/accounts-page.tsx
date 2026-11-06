@@ -235,7 +235,10 @@ export function AccountsPage(): JSX.Element {
         loading={query.isPending}
         onClearFilters={clearFilters}
         onFiltersChange={setFilters}
+        onPageSizeChange={onPageSizeChange}
         onSortChange={setSort}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZES}
         shown={sorted.length}
         sort={sort}
         tabActions={
@@ -273,18 +276,17 @@ export function AccountsPage(): JSX.Element {
       />
     );
 
-  // The page size sits in the footer with the pager; a new size starts again at page 1.
-  const footer =
+  // The pager sits under the card; the page size is the "Rows" select at the end of the filter
+  // row, and a new size starts again at page 1.
+  const pager =
     sorted.length > PAGE_SIZES[0] ? (
       <DataTablePagination
         onPageChange={(next) => updateSearch({ page: next > 1 ? next : undefined }, false)}
-        onPageSizeChange={onPageSizeChange}
         page={page}
         pageSize={pageSize}
-        pageSizeOptions={PAGE_SIZES}
         total={sorted.length}
       />
-    ) : undefined;
+    ) : null;
 
   return (
     <>
@@ -318,7 +320,7 @@ export function AccountsPage(): JSX.Element {
 
       <div className="flex min-w-0 flex-col gap-4">
         {/* The accounts container lets the toolbar give the search its own row on narrow cards. */}
-        <DataTableCard className="@container/accounts" footer={footer} toolbar={toolbar}>
+        <DataTableCard className="@container/accounts" toolbar={toolbar}>
           {loadFailed ? (
             <ErrorState
               error={query.error}
@@ -342,6 +344,7 @@ export function AccountsPage(): JSX.Element {
             />
           )}
         </DataTableCard>
+        {pager}
         {selected.size > 0 ? (
           <BatchBar
             accounts={accounts}
