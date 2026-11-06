@@ -24,6 +24,7 @@ export function TooltipPopup({
   sideOffset = 4,
   side = "top",
   anchor,
+  collisionPadding = 16,
   children,
   portalProps,
   ...props
@@ -32,6 +33,8 @@ export function TooltipPopup({
   side?: TooltipPrimitive.Positioner.Props["side"];
   sideOffset?: TooltipPrimitive.Positioner.Props["sideOffset"];
   anchor?: TooltipPrimitive.Positioner.Props["anchor"];
+  /** The space kept from the viewport edge: the 16 px phone gutter, as menus (menu.tsx). */
+  collisionPadding?: TooltipPrimitive.Positioner.Props["collisionPadding"];
   portalProps?: TooltipPrimitive.Portal.Props;
 }): React.ReactElement {
   return (
@@ -39,7 +42,9 @@ export function TooltipPopup({
       <TooltipPrimitive.Positioner
         align={align}
         anchor={anchor}
-        className="z-50 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
+        // z-70: above the toast layer (toast.tsx, z-60), as every anchored popup.
+        className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
+        collisionPadding={collisionPadding}
         data-slot="tooltip-positioner"
         side={side}
         sideOffset={sideOffset}
@@ -47,7 +52,7 @@ export function TooltipPopup({
         <TooltipPrimitive.Popup
           className={cn(
             // The one floating sheet (index.css popup-surface), as menus, selects, popovers and toasts.
-            "popup-surface relative flex h-(--popup-height,auto) w-(--popup-width,auto) max-w-[min(--spacing(80),90vw)] origin-(--transform-origin) wrap-anywhere text-balance whitespace-normal rounded-lg text-popover-foreground text-xs leading-snug transition-[width,height,scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
+            "popup-surface relative flex h-(--popup-height,auto) w-(--popup-width,auto) max-w-[min(--spacing(80),90vw)] origin-(--transform-origin) wrap-anywhere text-pretty whitespace-normal rounded-lg text-popover-foreground text-xs leading-snug transition-[width,height,scale,opacity] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
             className,
           )}
           data-slot="tooltip-popup"

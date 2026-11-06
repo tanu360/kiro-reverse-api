@@ -35,7 +35,8 @@ type SwipeDirection = "up" | "down" | "left" | "right";
 /*
  * Toasts float above the page (z-60) but drop under the modal layer (z-50) while a dialog, alert
  * dialog, sheet, drawer, the command palette or the phone sidebar is open, so they never cover a
- * modal's buttons; the modal's backdrop dims them like the rest of the page.
+ * modal's buttons; the modal's backdrop dims them like the rest of the page. Anchored popups
+ * (menus, selects, popovers, tooltips) sit above both at z-70, so a toast never covers one.
  */
 const UNDER_MODALS =
   "[body:has([data-slot=dialog-popup],[data-slot=alert-dialog-popup],[data-slot=sheet-popup],[data-slot=drawer-popup],[data-slot=command-dialog-popup],[data-slot=sidebar][data-mobile=true])_&]:z-40";

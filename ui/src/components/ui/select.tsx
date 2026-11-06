@@ -167,7 +167,8 @@ export function SelectPopup({
         alignItemWithTrigger={alignItemWithTrigger}
         alignOffset={alignOffset}
         anchor={anchor}
-        className="z-50 select-none"
+        // z-70: above the toast layer (toast.tsx, z-60), so a toast never covers an open list.
+        className="z-70 select-none"
         collisionPadding={collisionPadding}
         data-slot="select-positioner"
         side={side}

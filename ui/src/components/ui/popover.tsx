@@ -54,8 +54,9 @@ export function PopoverPopup({
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
-        // At most 90 % of the viewport wide and, on phones, its viewport (below) 90 % tall.
-        className="z-50 h-(--positioner-height) w-(--positioner-width) max-w-[min(var(--available-width),90vw)] transition-[top,left,right,bottom,transform] data-instant:transition-none"
+        // At most 90 % of the viewport wide and, on phones, its viewport (below) 90 % tall. z-70:
+        // above the toast layer (toast.tsx, z-60), so a toast never covers an open popup.
+        className="z-70 h-(--positioner-height) w-(--positioner-width) max-w-[min(var(--available-width),90vw)] transition-[top,left,right,bottom,transform] data-instant:transition-none"
         collisionPadding={collisionPadding}
         data-slot="popover-positioner"
         side={side}
@@ -67,7 +68,7 @@ export function PopoverPopup({
             // A tooltip-style popover is drawn as the tooltip (tooltip.tsx); any other is the one
             // popup sheet (index.css popup-surface), as menus and selects.
             tooltipStyle
-              ? "popup-surface w-fit text-balance rounded-lg text-xs"
+              ? "popup-surface w-fit text-pretty rounded-lg text-xs"
               : "popup-surface rounded-lg text-sm",
             className,
           )}

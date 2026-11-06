@@ -126,7 +126,8 @@ export function AutocompletePopup({
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
-        className="z-50 select-none"
+        // z-70: above the toast layer (toast.tsx, z-60), so a toast never covers an open list.
+        className="z-70 select-none"
         collisionPadding={collisionPadding}
         data-slot="autocomplete-positioner"
         side={side}
