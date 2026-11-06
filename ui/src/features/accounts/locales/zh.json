@@ -150,7 +150,7 @@
   "detail.machineId": "机器 ID",
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "请输入 UUID 或 32 位十六进制字符，或留空。",
-  "detail.generate": "生成",
+  "detail.generateRandom": "随机生成机器 ID",
   "detail.generateFailed": "无法生成机器 ID。",
   "detail.weight": "权重",
   "detail.weightHint": "0 或 1 为默认权重。权重为 N 的账号承接约 N 倍的新请求。",

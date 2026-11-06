@@ -150,7 +150,7 @@
   "detail.machineId": "Machine ID",
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "Nhập UUID hoặc 32 ký tự hex, hoặc để trống.",
-  "detail.generate": "Tạo",
+  "detail.generateRandom": "Tạo machine ID ngẫu nhiên",
   "detail.generateFailed": "Không thể tạo machine ID.",
   "detail.weight": "Trọng số",
   "detail.weightHint": "0 hoặc 1 là bình thường. Tài khoản có trọng số N nhận số yêu cầu mới gấp khoảng N lần.",

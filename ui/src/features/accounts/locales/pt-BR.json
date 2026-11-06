@@ -162,7 +162,7 @@
   "detail.machineId": "ID da máquina",
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "Informe um UUID ou 32 caracteres hexadecimais, ou deixe o campo vazio.",
-  "detail.generate": "Gerar",
+  "detail.generateRandom": "Gerar ID da máquina aleatório",
   "detail.generateFailed": "Não foi possível gerar um ID da máquina.",
   "detail.weight": "Peso",
   "detail.weightHint": "0 ou 1 é o normal. Uma conta com peso N recebe cerca de N vezes mais requisições novas.",

@@ -161,7 +161,7 @@
   "detail.machineId": "Machine ID",
   "detail.machineIdPlaceholder": "UUID",
   "detail.machineIdError": "Enter a UUID or 32 hex characters, or leave the field empty.",
-  "detail.generate": "Generate",
+  "detail.generateRandom": "Generate random machine ID",
   "detail.generateFailed": "Could not generate a machine ID.",
   "detail.weight": "Weight",
   "detail.weightHint": "0 or 1 is normal. An account with weight N takes about N times as many new requests.",

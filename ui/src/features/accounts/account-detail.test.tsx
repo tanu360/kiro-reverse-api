@@ -82,12 +82,12 @@ describe("AccountDetailSheet", () => {
     expect(puts).toEqual([]);
   });
 
-  it("fills the machine ID from Generate", async () => {
+  it("fills the machine ID from the dice button", async () => {
     const { sheet, user } = await openSheet(dana());
     const dialog = await openEditor(sheet, user, "Machine ID");
     const input = within(dialog).getByPlaceholderText("UUID") as HTMLInputElement;
     await user.clear(input);
-    await user.click(within(dialog).getByRole("button", { name: "Generate" }));
+    await user.click(within(dialog).getByRole("button", { name: "Generate random machine ID" }));
     await waitFor(() =>
       expect(input.value).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
