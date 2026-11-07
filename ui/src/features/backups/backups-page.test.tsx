@@ -105,6 +105,8 @@ describe("BackupsPage", () => {
     renderWithProviders(<BackupsPage />);
     expect(await screen.findByText("No backups yet")).toBeInTheDocument();
     expect(screen.getByText("Create a backup before you change accounts.")).toBeInTheDocument();
+    // The card header's Create backup is the only one: the empty state does not repeat it.
+    expect(screen.getAllByRole("button", { name: "Create backup" })).toHaveLength(1);
   });
 
   it("shows an error state when the list fails to load", async () => {
@@ -490,15 +492,14 @@ describe("BackupsPage focus", () => {
     await waitFor(() => expect(above).toHaveFocus());
   });
 
-  it("moves focus to Create backup in the empty state after deleting the only backup", async () => {
+  it("moves focus to the header's Create backup after deleting the only backup", async () => {
     mockDb.backups.splice(1);
     const { user } = await renderPage();
     await rowAction(user, dataRows()[0], "Delete");
     await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
     expect(await screen.findByText("No backups yet")).toBeInTheDocument();
-    const create = screen
-      .getAllByRole("button", { name: "Create backup" })
-      .find((button) => button.hasAttribute("data-empty-focus"));
+    const card = screen.getByRole("region", { name: "Saved backups" });
+    const create = within(card).getByRole("button", { name: "Create backup" });
     await waitFor(() => expect(create).toHaveFocus());
   });
 });

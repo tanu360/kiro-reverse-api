@@ -101,6 +101,7 @@ export function BackupsPage(): JSX.Element {
   const [uploading, setUploading] = useState(false);
   const { busy, isBusy, run } = useBusyRows();
   const listRef = useRef<HTMLDivElement | null>(null);
+  const createRef = useRef<HTMLButtonElement | null>(null);
   const [refocus, setRefocus] = useState<Refocus | null>(null);
 
   const invalidate = useCallback(
@@ -215,7 +216,8 @@ export function BackupsPage(): JSX.Element {
   );
 
   // After a delete, focus goes to the row that took the deleted one's place (or the one above
-  // it, or the empty state's Create backup), not to <body> with the removed row.
+  // it, or the card header's Create backup once the list is empty), not to <body> with the
+  // removed row.
   useLayoutEffect(() => {
     if (!refocus) return;
     if (rows.some((row) => row.id === refocus.id)) return;
@@ -226,7 +228,9 @@ export function BackupsPage(): JSX.Element {
       ? Array.from(container.querySelectorAll<HTMLElement>(`[${ROW_FOCUS_ATTR}]`)).filter(
           (element) => element.getAttribute(ROW_FOCUS_ATTR) === next.id,
         )
-      : Array.from(container.querySelectorAll<HTMLElement>("[data-empty-focus]"));
+      : createRef.current
+        ? [createRef.current]
+        : [];
     focusFirstShown(targets);
     setRefocus(null);
   }, [refocus, rows]);
@@ -262,22 +266,6 @@ export function BackupsPage(): JSX.Element {
     }
     finishRestore();
   };
-
-  // In the card header the primary action; in the empty state under it, the quiet repeat.
-  const createButton = (inEmptyState: boolean) => (
-    <Button
-      data-empty-focus={inEmptyState ? "" : undefined}
-      loading={create.isPending}
-      onClick={startCreate}
-      // The header's primary action at the page's button size (as Add account); the empty
-      // state's repeat stays small.
-      size={inEmptyState ? "sm" : "default"}
-      variant={inEmptyState ? "secondary" : "default"}
-    >
-      <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
-      {t("create")}
-    </Button>
-  );
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
@@ -323,7 +311,11 @@ export function BackupsPage(): JSX.Element {
               onRefresh={() => void invalidate()}
               variant="icon"
             />
-            {createButton(false)}
+            {/* The page's primary action at the page's button size, as Add account. */}
+            <Button loading={create.isPending} onClick={startCreate} ref={createRef}>
+              <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
+              {t("create")}
+            </Button>
           </>
         }
         icon={ArchiveIcon}
@@ -346,7 +338,6 @@ export function BackupsPage(): JSX.Element {
               actions={actions}
               emptyState={
                 <EmptyState
-                  action={createButton(true)}
                   description={t("emptyBody")}
                   icon={ArchiveIcon}
                   inCard
