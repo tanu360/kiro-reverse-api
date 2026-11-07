@@ -6,6 +6,8 @@ PR-*.md
 docker-compose.yml
 README.md
 README_CN.md
+README_PT-BR.md
+README_VI.md
 *.log
 ui/node_modules
 ui/dist
