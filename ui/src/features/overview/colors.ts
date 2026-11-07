@@ -7,9 +7,9 @@ export const FAILED_COLOR = "var(--chart-negative)";
 export const PREVIOUS_COLOR = "var(--chart-comparison)";
 
 /**
- * Series colours for the model-mix donut and table dots and the traffic-by-account bars: five
- * purple-family hues (index.css --chart-1..5), then "Other" in the quietest grey. Never green or
- * red: a share is not good or bad news.
+ * Series colours for the model-mix donut and table dots and the traffic-by-account bars: purple,
+ * lavender, fuchsia, periwinkle and lime (index.css --chart-1..5), then "Other" in peach. No grey
+ * and no red: a share is not bad news.
  */
 export const MODEL_COLORS = [
   "var(--chart-1)",

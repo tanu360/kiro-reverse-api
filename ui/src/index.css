@@ -1249,17 +1249,17 @@
 :root {
   --chart-1: var(--primary);
   /*
-   * The categorical series (model-mix donut, traffic-by-account bars): five hues that stay
-   * apart side by side, all in the purple family (never green or red: a share is not good or
-   * bad news), each at least 3:1 on the card. chart-1 is the brand purple, chart-2 the purple
-   * mixed toward the text colour (lavender in dark, deep violet in light), chart-3 fuchsia,
-   * chart-4 indigo and chart-5 a neutral grey; chart-other, for the rest, is the quietest grey.
+   * The categorical series (model-mix donut, traffic-by-account bars): six hues that stay apart
+   * side by side, no grey and no red (a share is not bad news). chart-1 is the brand purple,
+   * chart-2 the purple mixed toward the text colour (lavender in dark, deep violet in light),
+   * chart-3 fuchsia, chart-4 periwinkle and chart-5 lime (the showcase's sticker hues);
+   * chart-other, for the rest, is peach.
    */
   --chart-2: color-mix(in oklab, var(--primary) 60%, var(--foreground));
   --chart-3: var(--color-fuchsia-600);
-  --chart-4: var(--color-indigo-500);
-  --chart-5: color-mix(in oklab, var(--foreground) 50%, var(--card));
-  --chart-other: color-mix(in oklab, var(--foreground) 26%, var(--card));
+  --chart-4: var(--color-indigo-400);
+  --chart-5: var(--color-lime-500);
+  --chart-other: var(--color-orange-300);
   --chart-positive: var(--success);
   --chart-negative: var(--destructive);
   /* The card the charts sit on, so dot outlines and ring gaps cut cleanly into it. */
@@ -1298,7 +1298,9 @@
 .dark {
   /* The series' lighter steps of the same hues, so they read on the near-black card. */
   --chart-3: var(--color-fuchsia-400);
-  --chart-4: var(--color-indigo-400);
+  --chart-4: var(--color-indigo-300);
+  --chart-5: var(--color-lime-400);
+  --chart-other: var(--color-orange-300);
   /* Ring spokes and loading strokes: a mid grey that still reads on the dark card. */
   --chart-foreground: color-mix(in oklab, var(--foreground) 45%, transparent);
   --chart-marker-background: oklch(0.25 0.01 260);
