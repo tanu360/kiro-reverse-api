@@ -1,10 +1,29 @@
 import { ArrowRight02Icon, ExternalLinkIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
+import { CopyField } from "@/components/shared/code-field";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import type { RemoteVersionJson } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { GITHUB_URL } from "./user-menu";
+
+/*
+ * How a running proxy is updated. The repo publishes no GitHub releases: the Compose file builds
+ * from the clone, and the image on ghcr.io is rebuilt from main on every push (docker.yml).
+ */
+const UPDATE_COMMANDS = [
+  {
+    id: "compose",
+    label: "shell.update.viaCompose",
+    command: "git pull && docker compose up -d --build",
+  },
+  {
+    id: "image",
+    label: "shell.update.viaImage",
+    command: "docker pull ghcr.io/tanu360/kiro-reverse-api:latest",
+  },
+] as const;
 
 /** "v2.1.0" and "2.1.0" both display as "2.1.0", the one format the shell shows. */
 export function stripV(version: string): string {
@@ -55,8 +74,8 @@ export function UpdateDialog({
 }): JSX.Element {
   const { t } = useT();
   const download = latest?.download ?? "";
-  // Only an https release link is offered; anything else in the remote file is ignored.
-  const releaseUrl = download.startsWith("https://") ? download : null;
+  // Only an https link from the remote file is followed; otherwise the repository.
+  const projectUrl = download.startsWith("https://") ? download : GITHUB_URL;
   const changelog = latest?.changelog?.trim();
 
   return (
@@ -67,12 +86,10 @@ export function UpdateDialog({
           <Button onClick={() => onOpenChange(false)} variant="ghost">
             {t("actions.close")}
           </Button>
-          {releaseUrl ? (
-            <Button render={<a href={releaseUrl} rel="noopener noreferrer" target="_blank" />}>
-              {t("shell.update.viewRelease")}
-              <HugeiconsIcon icon={ExternalLinkIcon} aria-hidden="true" />
-            </Button>
-          ) : null}
+          <Button render={<a href={projectUrl} rel="noopener noreferrer" target="_blank" />}>
+            {t("shell.update.openGithub")}
+            <HugeiconsIcon icon={ExternalLinkIcon} aria-hidden="true" />
+          </Button>
         </>
       }
       onOpenChange={onOpenChange}
@@ -123,6 +140,19 @@ export function UpdateDialog({
             </ul>
           </section>
         ) : null}
+        <section aria-labelledby="update-how" className="flex flex-col gap-2.5">
+          <h3 className="font-semibold text-heading leading-6" id="update-how">
+            {t("shell.update.howTo")}
+          </h3>
+          {UPDATE_COMMANDS.map((item) => (
+            <div className="flex flex-col gap-1.5" key={item.id}>
+              <span className="text-muted-foreground text-xs" id={`update-${item.id}`}>
+                {t(item.label)}
+              </span>
+              <CopyField labelledBy={`update-${item.id}`} multiline value={item.command} />
+            </div>
+          ))}
+        </section>
       </div>
     </ResponsiveDialog>
   );
