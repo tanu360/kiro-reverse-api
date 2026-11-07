@@ -119,7 +119,7 @@ export function SegmentedControlItem({
 
   const defaultProps = {
     className: cn(
-      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-outline-inner disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
+      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium text-meta text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline-inner disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
       // The chosen item's own fill, until the sliding indicator has measured it.
       "data-checked:bg-(--neutral-button-hover) data-checked:text-foreground",
       "aria-[current=page]:bg-(--neutral-button-hover) aria-[current=page]:text-foreground",

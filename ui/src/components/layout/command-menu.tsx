@@ -367,7 +367,7 @@ export function CommandMenuTrigger({
     <button
       {...shared}
       className={cn(
-        "group focus-outline flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-field-border bg-field ps-3 pe-1.5 text-muted-foreground text-sm outline-none transition-[background-color,color] duration-150 ease-out hover:bg-field-hover hover:text-foreground aria-expanded:bg-field-hover aria-expanded:text-foreground pointer-coarse:h-10",
+        "group focus-outline flex h-8 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-field-border bg-field ps-3 pe-1.5 text-meta text-muted-foreground outline-none transition-[background-color,color] duration-150 ease-out hover:bg-field-hover hover:text-foreground aria-expanded:bg-field-hover aria-expanded:text-foreground pointer-coarse:h-10",
         className,
       )}
       type="button"

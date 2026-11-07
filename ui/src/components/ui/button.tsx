@@ -44,12 +44,12 @@ export const buttonVariants = cva(
       /*
        * One control height scale (phone below sm / sm and up / coarse pointer), shared with the
        * fields (input.tsx, select.tsx, number-field.tsx) and the segmented control:
-       *   xs       28 / 24 px, 13 / 12 px text   inline and table-cell actions
-       *   sm       32 / 28 / 36 px, 13 px        actions inside a card, row or toolbar (Save, Edit, Add)
+       *   xs       28 / 24 px, 12 / 11 px text   inline and field-addon actions (Upload)
+       *   sm       32 / 28 / 36 px, 13 / 12 px   actions inside a card, row or toolbar (Save, Edit, Add)
        *   default  36 / 32 / 40 px, 14 / 13 px   page-header actions and dialog footers
        *   lg       44 / 40 / 44 px, 16 / 14 px   the sign-in button beside the 40 px sign-in field
-       * Text is phone / sm-and-up; a text button's icon is 16 px (14 px on xs from sm up), an icon
-       * button's 18 px on phones and 16 px from sm up.
+       * Text is phone / sm-and-up. A text button's icon is 16 px (sm: 14 px from sm up; xs: 14 px),
+       * an icon button's 18 px on phones and 16 px from sm up.
        * Icon buttons are square: icon-xs 28 / 24, icon-sm 32 / 28 / 36, icon 36 / 32 / 40,
        * icon-lg 44 / 40. A coarse pointer grows the control itself (pointer-coarse sorts after
        * sm:), and every size keeps the 44 px ::after hit area, so no call site sizes for touch.
@@ -64,9 +64,9 @@ export const buttonVariants = cva(
           "size-7 sm:size-6 not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-4 sm:not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-3.5",
         // The sign-in button keeps the larger text (16 px on phones, 14 px from sm up).
         lg: "h-11 px-[calc(--spacing(3.5)-1px)] text-base sm:h-10 sm:text-sm pointer-coarse:h-11",
-        // 13 px text (text-meta) at every width, in the 32 px phone and 28 px desktop button.
-        sm: "h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] text-meta sm:h-7 sm:text-meta pointer-coarse:h-9 [&_svg:not([class*='size-'])]:size-4",
-        xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-meta sm:h-6 sm:text-xs [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        // 13 px text in the 32 px phone button, 12 px in the 28 px desktop one.
+        sm: "h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] text-meta sm:h-7 sm:text-xs pointer-coarse:h-9 [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-xs sm:h-6 sm:text-2xs [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
       },
       // Hover is the guarded `hover:` variant (only where the pointer can hover), never a bare
       // :hover, so a tapped button on a touch screen does not keep its hover fill; data-pressed
