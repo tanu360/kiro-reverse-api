@@ -526,6 +526,33 @@ describe("OverviewPage", () => {
     );
   });
 
+  it("keeps the traffic chart when only the previous hour had requests", async () => {
+    const heatmap = (cells: { offset: number; reqs: number; failures: number }[]) =>
+      http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
+        const windowMin = Number(new URL(request.url).searchParams.get("windowMin") ?? 60);
+        return HttpResponse.json({
+          windowMin,
+          nowUnix: 1_700_000_000,
+          global: { accountId: "_global_", cells },
+          accounts: null,
+        });
+      });
+    // Offsets 60-119 are the previous hour: the dashed line has something to draw.
+    mockServer.use(heatmap([{ offset: 75, reqs: 4, failures: 0 }]));
+    const { unmount } = await renderApp("/");
+    const traffic = await screen.findByRole("region", { name: "Traffic" });
+    // The summary means the data arrived, so a missing empty state is not just still loading.
+    await within(traffic).findByText("0 succeeded and 0 failed requests in this range.");
+    expect(within(traffic).queryByText("No traffic yet")).toBeNull();
+    unmount();
+
+    // Neither hour had a request: the empty state replaces it.
+    mockServer.use(heatmap([]));
+    await renderApp("/");
+    const quiet = await screen.findByRole("region", { name: "Traffic" });
+    expect(await within(quiet).findByText("No traffic yet")).toBeInTheDocument();
+  });
+
   it("shows an empty state in the heatmap without traffic", async () => {
     mockServer.use(
       http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {

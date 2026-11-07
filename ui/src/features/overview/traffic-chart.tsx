@@ -144,39 +144,42 @@ export default function TrafficChart({
           formatTick={(date) => formatTime(date.getTime() / 1000, lang)}
           tickValues={timeTicks}
         />
-        <ChartTooltip
-          content={({ point }) => {
-            const start = (point.date as Date).getTime() / 1000;
-            const rows: TooltipRow[] = [
-              {
-                color: SUCCEEDED_COLOR,
-                label: labels.succeeded,
-                value: formatNumber(Number(point.succeeded), lang),
-              },
-              {
-                color: FAILED_COLOR,
-                label: labels.failed,
-                value: formatNumber(Number(point.failed), lang),
-              },
-            ];
-            if (hasPrevious) {
-              rows.push({
-                color: PREVIOUS_COLOR,
-                label: labels.previous,
-                value: formatNumber(Number(point.previous ?? 0), lang),
-              });
-            }
-            return (
-              <TooltipContent
-                meta={labels.bucket}
-                mono
-                rows={rows}
-                title={`${formatTime(start, lang)}–${formatTime(start + bucketMin * 60, lang)}`}
-              />
-            );
-          }}
-          dateLabels={timeLabels}
-        />
+        {/* An empty chart has nothing to inspect: no crosshair or tooltip over its empty state. */}
+        {empty ? null : (
+          <ChartTooltip
+            content={({ point }) => {
+              const start = (point.date as Date).getTime() / 1000;
+              const rows: TooltipRow[] = [
+                {
+                  color: SUCCEEDED_COLOR,
+                  label: labels.succeeded,
+                  value: formatNumber(Number(point.succeeded), lang),
+                },
+                {
+                  color: FAILED_COLOR,
+                  label: labels.failed,
+                  value: formatNumber(Number(point.failed), lang),
+                },
+              ];
+              if (hasPrevious) {
+                rows.push({
+                  color: PREVIOUS_COLOR,
+                  label: labels.previous,
+                  value: formatNumber(Number(point.previous ?? 0), lang),
+                });
+              }
+              return (
+                <TooltipContent
+                  meta={labels.bucket}
+                  mono
+                  rows={rows}
+                  title={`${formatTime(start, lang)}–${formatTime(start + bucketMin * 60, lang)}`}
+                />
+              );
+            }}
+            dateLabels={timeLabels}
+          />
+        )}
       </AreaChart>
     </div>
   );

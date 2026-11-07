@@ -108,7 +108,9 @@ export function TrafficCard(): JSX.Element {
       ),
     [points],
   );
-  const empty = totals.succeeded + totals.failed === 0;
+  // Empty only when nothing at all is drawn: in the 1 h view the previous hour's dashed line
+  // alone is still traffic to show, so it keeps the chart instead of "No traffic yet".
+  const empty = totals.succeeded + totals.failed + totals.previous === 0;
 
   const setRange = (value: unknown) => {
     if (!isRange(value)) return;
