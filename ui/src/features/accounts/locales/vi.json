@@ -137,6 +137,7 @@
   "detail.profileLoading": "Đang tải Kiro profile…",
   "detail.profileList": "Kiro profile",
   "detail.profileNone": "Không có Kiro profile nào khả dụng cho tài khoản này.",
+  "detail.profileUnsupported": "Kiro profile chỉ có ở tài khoản Enterprise (IAM Identity Center) và Microsoft SSO. Kiểu đăng nhập này không có profile, và yêu cầu vẫn hoạt động bình thường khi không có.",
   "detail.profileCurrent": "Đang dùng",
   "detail.profileUse": "Dùng profile đã chọn",
   "detail.profileUnpin": "Trở về tự động",

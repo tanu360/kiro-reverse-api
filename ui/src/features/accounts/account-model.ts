@@ -156,6 +156,26 @@ export function authKey(account: Pick<Account, "provider" | "authMethod">): stri
   return AUTH_IDS[raw] ?? raw;
 }
 
+/**
+ * Login types Kiro lists no profiles for: ListAvailableProfiles answers 403 for Builder ID and
+ * an empty list for social logins, and api_key accounts have no profile at all.
+ */
+const NO_PROFILE_AUTH: ReadonlySet<string> = new Set([
+  "builderId",
+  "social",
+  "github",
+  "google",
+  "apiKey",
+]);
+
+/**
+ * Whether Kiro can list profiles for this account: Enterprise (IAM Identity Center) and
+ * Microsoft SSO logins. An unknown login type stays allowed, so the server decides.
+ */
+export function supportsKiroProfiles(account: Pick<Account, "provider" | "authMethod">): boolean {
+  return !NO_PROFILE_AUTH.has(authKey(account));
+}
+
 /** A plan tier, or the raw subscription type when the tier is unknown. */
 function planKey(account: Pick<Account, "subscriptionType">): string {
   return subscriptionTier(account.subscriptionType) ?? account.subscriptionType;

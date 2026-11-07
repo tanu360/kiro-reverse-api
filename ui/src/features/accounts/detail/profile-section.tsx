@@ -15,15 +15,21 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, AccountProfilesResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { supportsKiroProfiles } from "../account-model";
 import { useInvalidateAccounts } from "../use-account-actions";
 
 function defaultArn(result: AccountProfilesResponse): string {
   return (result.profiles.find((profile) => profile.current) ?? result.profiles[0])?.arn ?? "";
 }
 
-/** Kiro profile pinning. The caller hides it for api_key accounts (the server answers 400). */
+/**
+ * Kiro profile pinning. The caller hides it for api_key accounts (the server answers 400).
+ * Builder ID and social logins have no profiles, so loading is disabled for them; a pinned
+ * account keeps it, so it can still return to automatic.
+ */
 export function ProfileSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
+  const supported = supportsKiroProfiles(account) || account.profileArnPinned;
   const invalidate = useInvalidateAccounts();
   const [selectedArn, setSelectedArn] = useState("");
 
@@ -71,6 +77,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
     <SectionCard
       actions={
         <Button
+          disabled={!supported}
           loading={load.isPending}
           onClick={() => load.mutate()}
           size="sm"
@@ -80,7 +87,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
           {t("detail.profileLoad")}
         </Button>
       }
-      description={t("detail.profileHint")}
+      description={supported ? t("detail.profileHint") : t("detail.profileUnsupported")}
       footer={
         choices ? (
           <div className="ms-auto flex flex-wrap items-center gap-2">

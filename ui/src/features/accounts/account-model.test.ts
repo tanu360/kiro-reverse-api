@@ -24,6 +24,7 @@ import {
   statusGroup,
   subscriptionLabel,
   subscriptionTier,
+  supportsKiroProfiles,
   tokenExpiry,
   trialExpiry,
   usagePercent,
@@ -186,6 +187,16 @@ describe("filterAccounts / filterOptions", () => {
     expect(authKey({ provider: "", authMethod: "idc" })).toBe("enterprise");
     expect(authKey({ provider: "BuilderId", authMethod: "social" })).toBe("builderId");
     expect(authKey({ provider: "Okta", authMethod: "external_idp" })).toBe("okta");
+  });
+
+  it("offers Kiro profiles only where Kiro lists them", () => {
+    expect(supportsKiroProfiles({ provider: "", authMethod: "idc" })).toBe(true);
+    expect(supportsKiroProfiles({ provider: "", authMethod: "external_idp" })).toBe(true);
+    expect(supportsKiroProfiles({ provider: "Okta", authMethod: "external_idp" })).toBe(true);
+    expect(supportsKiroProfiles({ provider: "BuilderId", authMethod: "idc" })).toBe(false);
+    expect(supportsKiroProfiles({ provider: "Google", authMethod: "social" })).toBe(false);
+    expect(supportsKiroProfiles({ provider: "Github", authMethod: "social" })).toBe(false);
+    expect(supportsKiroProfiles({ provider: "", authMethod: "api_key" })).toBe(false);
   });
 
   it("knows which accounts are banned, and that DISABLED is not a ban", () => {
