@@ -49,19 +49,23 @@ If this project helps you, a Star would mean a lot.
 
 ## 🖼 Preview
 
+<p align="center">
+  <img alt="Kiro Proxy admin panel, light and dark" src="screenshots/hero.webp" width="100%">
+</p>
+
 <table>
   <tr>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/login-dark.webp">
-        <img alt="Login" src="screenshots/login-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/login-dark.webp">
+        <img alt="Login" src="screenshots/en/login-light.webp" width="100%">
       </picture>
       <br><sub><b>Login</b> — sign-in with theme and language switches</sub>
     </td>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/overview-dark.webp">
-        <img alt="Overview" src="screenshots/overview-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/overview-dark.webp">
+        <img alt="Overview" src="screenshots/en/overview-light.webp" width="100%">
       </picture>
       <br><sub><b>Overview</b> — live traffic, credits and errors across accounts</sub>
     </td>
@@ -69,49 +73,59 @@ If this project helps you, a Star would mean a lot.
   <tr>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/accounts-dark.webp">
-        <img alt="Accounts" src="screenshots/accounts-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/accounts-dark.webp">
+        <img alt="Accounts" src="screenshots/en/accounts-light.webp" width="100%">
       </picture>
-      <br><sub><b>Accounts</b> — plan credits, status filters, batch actions and export</sub>
+      <br><sub><b>Accounts</b> — plan credits, status tabs, filters, batch actions and export</sub>
     </td>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/requests-dark.webp">
-        <img alt="Requests" src="screenshots/requests-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/requests-dark.webp">
+        <img alt="Requests" src="screenshots/en/requests-light.webp" width="100%">
       </picture>
-      <br><sub><b>Requests</b> — search, status filters, sorting and a detail view</sub>
+      <br><sub><b>Requests</b> — status tabs, search, sorting and a detail view</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/api-dark.webp">
-        <img alt="API" src="screenshots/api-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/api-dark.webp">
+        <img alt="API" src="screenshots/en/api-light.webp" width="100%">
       </picture>
-      <br><sub><b>API</b> — API access, per-client keys with limits, client setup</sub>
+      <br><sub><b>API</b> — API access, per-client keys with limits, highlighted client setup</sub>
     </td>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/backups-dark.webp">
-        <img alt="Backups" src="screenshots/backups-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/backups-dark.webp">
+        <img alt="Backups" src="screenshots/en/backups-light.webp" width="100%">
       </picture>
       <br><sub><b>Backups</b> — manual and scheduled backups, one-click restore</sub>
     </td>
   </tr>
+</table>
+
+<table>
   <tr>
-    <td width="50%" align="center">
+    <td width="33%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/proxy-dark.webp">
-        <img alt="Outbound proxy" src="screenshots/proxy-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-1-dark.webp">
+        <img alt="Settings" src="screenshots/en/settings-1-light.webp" width="100%">
       </picture>
-      <br><sub><b>Outbound proxy</b> — SOCKS5 or HTTP, applied without a restart</sub>
+      <br><sub><b>Settings</b> — usage, stream integrity, routing, auto-continue</sub>
     </td>
-    <td width="50%" align="center">
+    <td width="33%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/settings-dark.webp">
-        <img alt="Settings" src="screenshots/settings-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-2-dark.webp">
+        <img alt="Settings" src="screenshots/en/settings-2-light.webp" width="100%">
       </picture>
-      <br><sub><b>Settings</b> — usage, routing, auto-continue, thinking, model mappings</sub>
+      <br><sub><b>Settings</b> — thinking and model mappings</sub>
+    </td>
+    <td width="33%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-3-dark.webp">
+        <img alt="Settings" src="screenshots/en/settings-3-light.webp" width="100%">
+      </picture>
+      <br><sub><b>Settings</b> — Kiro endpoint, admin password, outbound proxy</sub>
     </td>
   </tr>
 </table>

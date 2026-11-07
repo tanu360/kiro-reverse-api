@@ -49,19 +49,23 @@
 
 ## 🖼 界面预览
 
+<p align="center">
+  <img alt="Kiro Proxy 管理面板，浅色与深色" src="screenshots/hero.webp" width="100%">
+</p>
+
 <table>
   <tr>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/login-dark.webp">
-        <img alt="登录" src="screenshots/login-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/login-dark.webp">
+        <img alt="登录" src="screenshots/zh/login-light.webp" width="100%">
       </picture>
       <br><sub><b>登录</b> — 登录页可切换主题与界面语言</sub>
     </td>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/overview-dark.webp">
-        <img alt="概览" src="screenshots/overview-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/overview-dark.webp">
+        <img alt="概览" src="screenshots/zh/overview-light.webp" width="100%">
       </picture>
       <br><sub><b>概览</b> — 各账号的实时流量、Credits 与错误</sub>
     </td>
@@ -69,49 +73,59 @@
   <tr>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/accounts-dark.webp">
-        <img alt="账号" src="screenshots/accounts-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/accounts-dark.webp">
+        <img alt="账号" src="screenshots/zh/accounts-light.webp" width="100%">
       </picture>
-      <br><sub><b>账号</b> — 套餐 Credits、状态筛选、批量操作与导出</sub>
+      <br><sub><b>账号</b> — 套餐 Credits、状态标签、筛选、批量操作与导出</sub>
     </td>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/requests-dark.webp">
-        <img alt="请求" src="screenshots/requests-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/requests-dark.webp">
+        <img alt="请求" src="screenshots/zh/requests-light.webp" width="100%">
       </picture>
-      <br><sub><b>请求</b> — 搜索、状态筛选、排序与详情视图</sub>
+      <br><sub><b>请求</b> — 状态标签、搜索、排序与详情视图</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/api-dark.webp">
-        <img alt="接口" src="screenshots/api-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/api-dark.webp">
+        <img alt="接口" src="screenshots/zh/api-light.webp" width="100%">
       </picture>
-      <br><sub><b>接口</b> — API 访问、带限额的客户端 Key 与客户端配置</sub>
+      <br><sub><b>接口</b> — API 访问、带限额的客户端 Key 与高亮的客户端配置</sub>
     </td>
     <td width="50%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/backups-dark.webp">
-        <img alt="备份" src="screenshots/backups-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/backups-dark.webp">
+        <img alt="备份" src="screenshots/zh/backups-light.webp" width="100%">
       </picture>
       <br><sub><b>备份</b> — 手动与定时备份、一键恢复</sub>
     </td>
   </tr>
+</table>
+
+<table>
   <tr>
-    <td width="50%" align="center">
+    <td width="33%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/proxy-dark.webp">
-        <img alt="出站代理" src="screenshots/proxy-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/settings-1-dark.webp">
+        <img alt="设置" src="screenshots/zh/settings-1-light.webp" width="100%">
       </picture>
-      <br><sub><b>出站代理</b> — SOCKS5 或 HTTP，无需重启即生效</sub>
+      <br><sub><b>设置</b> — 用量、流完整性、账号路由、自动续写</sub>
     </td>
-    <td width="50%" align="center">
+    <td width="33%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/settings-dark.webp">
-        <img alt="设置" src="screenshots/settings-light.webp" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/settings-2-dark.webp">
+        <img alt="设置" src="screenshots/zh/settings-2-light.webp" width="100%">
       </picture>
-      <br><sub><b>设置</b> — 用量、账号路由、自动续写、Thinking、模型映射</sub>
+      <br><sub><b>设置</b> — Thinking 与模型映射</sub>
+    </td>
+    <td width="33%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/settings-3-dark.webp">
+        <img alt="设置" src="screenshots/zh/settings-3-light.webp" width="100%">
+      </picture>
+      <br><sub><b>设置</b> — Kiro 端点、管理员密码、出站代理</sub>
     </td>
   </tr>
 </table>
