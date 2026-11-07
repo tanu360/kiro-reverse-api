@@ -2,6 +2,7 @@ import { setupWorker } from "msw/browser";
 import { mockDb, resetMockDb } from "./db";
 import { allHandlers } from "./handlers";
 import { resolveMockScenario } from "./scenario";
+import { installWorkerRecovery } from "./worker-recovery";
 
 /**
  * Starts the MSW service worker in mock mode. Only main.tsx loads this, through a dynamic
@@ -25,6 +26,7 @@ export async function startMockWorker(): Promise<void> {
     onUnhandledFrame: "bypass",
     quiet: true,
   });
+  installWorkerRecovery();
   reloadIfUncontrolled();
 }
 

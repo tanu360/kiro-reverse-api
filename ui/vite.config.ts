@@ -39,6 +39,8 @@ function serveMockWorker(): Plugin {
           res.statusCode = 503;
           res.setHeader("Content-Type", "application/json");
           res.setHeader("Cache-Control", "no-store");
+          // The page re-announces itself to a restarted worker on this (src/lib/mocks/worker-recovery.ts).
+          res.setHeader("X-Kiro-Mock-Unhandled", "1");
           res.end(
             JSON.stringify({
               error: "Mock worker is not handling this request. Reload the preview.",
