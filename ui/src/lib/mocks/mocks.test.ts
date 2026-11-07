@@ -318,7 +318,7 @@ function classify(status: number, message: string): RequestErrorType {
   return "unknown";
 }
 
-describe("full dataset (the browser default)", () => {
+describe("full dataset (the browser default, polished for screenshots)", () => {
   const now = mockNowUnix();
   const started = performance.now();
   const full = seedFullDataset(now);
@@ -409,12 +409,8 @@ describe("full dataset (the browser default)", () => {
     some((a) => a.usagePercent === 1);
     some((a) => a.usagePercent > 1);
     some((a) => a.currentOverages > a.overageCap && a.overageCap > 0);
-    some((a) => a.email === "" && a.hasToken);
-    some((a) => a.email.length > 90);
-    some((a) => /[^\x20-\x7e]/.test(a.email));
-    some((a) => /[؀-ۿ]/.test(a.nickname));
     some((a) => a.requestCount === 0 && a.lastUsed === 0);
-    some((a) => a.totalTokens > 100_000_000_000);
+    some((a) => a.totalTokens > 1_000_000_000);
     some((a) => a.totalCredits > 0 && a.totalCredits < 0.001);
     some((a) => a.profileArnPinned);
     some((a) => a.proxyURL !== "");
@@ -433,7 +429,7 @@ describe("full dataset (the browser default)", () => {
     expect(values(requests, (r) => r.endpoint)).toEqual(
       new Set(["claude", "openai", "responses", undefined]),
     );
-    expect(values(requests, (r) => r.model).size).toBeGreaterThanOrEqual(14);
+    expect(values(requests, (r) => r.model).size).toBeGreaterThanOrEqual(12);
     const failures = requests.filter((r) => !r.success);
     expect(values(failures, (r) => r.errorType)).toEqual(new Set(ERROR_TYPES));
     for (const r of failures) {

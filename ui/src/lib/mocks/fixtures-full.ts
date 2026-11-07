@@ -42,8 +42,9 @@ import {
   weighted,
 } from "./fixtures";
 
-// The "full" browser dataset (?mock=full, the dev server default): every value the Go server can
-// send, many times over, at a realistic volume. Unit tests never load it; they keep the small seed
+// The "full" browser dataset (?mock=full, the dev server default): a realistic, polished fleet
+// for demos and screenshots (believable names, mostly healthy accounts, a few in every state the
+// Go server can report), at a realistic volume. Unit tests never load it; they keep the small seed
 // in fixtures.ts. Every generator draws from its own fixed-seed PRNG, so the data is the same on
 // every load; times are relative to "now".
 
@@ -77,7 +78,7 @@ export interface FullDataset {
 // Models
 // ---------------------------------------------------------------------------
 
-/** id, credit multiplier, share of traffic. Thinking variants, `auto` and an oversized id included. */
+/** id, credit multiplier, share of traffic. Thinking variants and `auto` included. */
 const MODELS: ReadonlyArray<readonly [string, number, number]> = [
   ["claude-sonnet-5", 1.3, 30],
   ["claude-haiku-4.5", 0.4, 18],
@@ -92,11 +93,11 @@ const MODELS: ReadonlyArray<readonly [string, number, number]> = [
   ["claude-opus-5-thinking", 2.2, 2],
   ["claude-sonnet-4.5-thinking", 1, 1.5],
   ["claude-haiku-5", 0.5, 1],
-  ["claude-sonnet-4.6-1m-context-extended-thinking-preview-20261015", 1.6, 0.3],
 ];
 const MODEL_WEIGHTS = MODELS.map(([id, , share]) => [id, share] as const);
 const MODEL_RATES = new Map(MODELS.map(([id, rate]) => [id, rate]));
-const LONG_MODEL = MODELS[MODELS.length - 1][0];
+/** The model of the one very large request in the log. */
+const LONG_MODEL = "claude-sonnet-4.6";
 
 const ENDPOINT_WEIGHTS: ReadonlyArray<readonly [RequestEndpoint, number]> = [
   ["claude", 55],
@@ -187,29 +188,33 @@ const BAN_REASONS = [
 ];
 
 const FIRST =
-  "dana marcus priya jun elena tomas aisha kwame sofia liam mei oluwaseun ingrid rahul yuki fatima noah zoe mateo hana ivan chloe diego amara bjorn leila sanjay nadia owen an giulia kenji".split(
+  "maya ethan sofia lucas amara noah isla leo zara mateo nina kai elena omar ava jonas lina arjun clara hugo yara theo mila ravi ines felix nora sami aria daniel".split(
     " ",
   );
 const LAST =
-  "whitfield oyelaran raman lee kovacs nguyen schmidt okafor rossi tanaka fernandez haddad novak silva kim andersen mensah dubois patel ivanova garcia yilmaz cohen murphy sato wong costa larsen".split(
+  "chen patel novak rivera okafor laurent tanaka berg moreau ito costa haas ward lindqvist kapoor sato reyes hale fischer park adler quinn nakamura silva brooks vega marsh holm".split(
     " ",
   );
 const COMPANY_DOMAINS =
-  "northwind-labs.com contoso-retail.com fabrikam.io tailspin-toys.dev wingtip.co adatum.net litware.ai proseware.com woodgrove-bank.com relecloud.io".split(
+  "northwind.studio lumen.ai orbitlabs.dev helix.health paperplane.co novadesign.io tidewater.dev brightline.app copperleaf.com atlasworks.io".split(
     " ",
   );
-const PERSONAL_DOMAINS =
-  "gmail.com outlook.com protonmail.com icloud.com hey.com fastmail.com yahoo.co.jp web.de".split(
-    " ",
-  );
+const PERSONAL_DOMAINS = "gmail.com icloud.com proton.me fastmail.com hey.com outlook.com".split(
+  " ",
+);
 const AZURE_DOMAINS = [
-  "fabrikam.onmicrosoft.com",
-  "contoso.onmicrosoft.com",
-  "litware.onmicrosoft.com",
+  "northwind.onmicrosoft.com",
+  "atlasworks.onmicrosoft.com",
+  "helix.onmicrosoft.com",
 ];
 const NICKNAMES =
-  "Team primary|Overflow|Night shift|Backup pool|CI runner|EU traffic|Batch jobs|Load test|Research|Design team|Support bot|Staging|Hot spare|Trial #2|Weekend only|Do not use|Legacy import|Migrated from v1|APAC|Frontend squad".split(
+  "Primary|Design team|Research|Night shift|EU traffic|Platform|Data science|Support|Growth|Mobile squad|Evaluations|Docs team|Infra|Prototyping|Backend|APAC|Frontend|Analytics|Billing|QA".split(
     "|",
+  );
+/** Labels for headless API-key accounts. */
+const KEY_LABELS =
+  "build-runner nightly-evals agent-fleet docs-bot review-bot batch-worker sandbox eval-harness".split(
+    " ",
   );
 
 type MailKind = "company" | "personal" | "azure" | "apikey";
@@ -253,7 +258,12 @@ function orgProfiles(rng: Rng): Array<{ arn: string; region: string }> {
 }
 
 function emailFor(rng: Rng, mail: MailKind, used: Set<string>): string {
-  if (mail === "apikey") return `api-key-${hex(rng, 12)}`;
+  if (mail === "apikey") {
+    let label = `${pick(rng, KEY_LABELS)}-${int(rng, 1, 9)}`;
+    for (let n = 2; used.has(label); n++) label = `${pick(rng, KEY_LABELS)}-${int(rng, 1, 9)}${n}`;
+    used.add(label);
+    return label;
+  }
   const first = pick(rng, FIRST);
   const last = pick(rng, LAST);
   const domain =
@@ -263,11 +273,9 @@ function emailFor(rng: Rng, mail: MailKind, used: Set<string>): string {
         ? pick(rng, AZURE_DOMAINS)
         : pick(rng, PERSONAL_DOMAINS);
   const local = weighted(rng, [
-    [`${first}.${last}`, 5],
+    [`${first}.${last}`, 7],
     [`${first[0]}${last}`, 3],
-    [`${first}${int(rng, 1, 99)}`, 2],
-    [`${first}+kiro${int(rng, 1, 9)}`, 1],
-    [`${last}.${first}.dev`, 1],
+    [first, 1],
   ] as const);
   let email = `${local}@${domain}`;
   for (let n = 2; used.has(email); n++) email = `${local}${n}@${domain}`;
@@ -285,10 +293,9 @@ function machineIdFor(rng: Rng): string {
 
 function proxyFor(rng: Rng): string {
   return weighted(rng, [
-    ["", 85],
-    [`socks5://127.0.0.1:${int(rng, 1080, 1099)}`, 6],
-    [`http://egress-${int(rng, 1, 9)}.corp.northwind-labs.com:3128`, 5],
-    ["socks5h://kiro:p%40ssw0rd@proxy.fabrikam.io:1080", 4],
+    ["", 88],
+    [`socks5://127.0.0.1:${int(rng, 1080, 1089)}`, 6],
+    ["http://proxy.northwind.studio:3128", 6],
   ] as const);
 }
 
@@ -304,13 +311,13 @@ interface Traffic {
 
 function usage(rng: Rng, limit: number, overage: boolean) {
   const bucket = weighted(rng, [
-    ["zero", 8],
-    ["low", 38],
-    ["mid", 16],
-    ["warn", 12],
-    ["danger", 10],
-    ["full", 8],
-    ["over", overage ? 8 : 0],
+    ["zero", 6],
+    ["low", 34],
+    ["mid", 26],
+    ["warn", 16],
+    ["danger", 8],
+    ["full", 4],
+    ["over", overage ? 6 : 0],
   ] as const);
   const fraction = {
     zero: 0,
@@ -406,15 +413,15 @@ function randomAccount(
 
   // Health
   const health = weighted(rng, [
-    ["healthy", 62],
-    ["cleared", 8],
-    ["expired", 7],
-    ["banned", 6],
-    ["suspended", 3],
-    ["disabledBan", 3],
-    ["adminOff", 5],
-    ["silent", 4],
-    ["noToken", 2],
+    ["healthy", 82],
+    ["cleared", 5],
+    ["expired", 4],
+    ["banned", 2],
+    ["suspended", 1],
+    ["disabledBan", 1],
+    ["adminOff", 3],
+    ["silent", 2],
+    ["noToken", 0],
   ] as const);
   const tier = weighted(rng, [
     ["heavy", 16],
@@ -577,27 +584,25 @@ function edgeAccount(now: number, index: number, overrides: Partial<Account>): A
 
 /** Hand-made accounts for the values a random draw might miss. */
 function edgeAccounts(now: number): Account[] {
-  const long = "a-very-long-local-part-for-layout-testing.with.many.dots";
-  const banReasonLong = `AccessDeniedException: User is not authorized to perform: codewhisperer:GenerateAssistantResponse on resource ${DEFAULT_PROFILE} because no identity-based policy allows the codewhisperer:GenerateAssistantResponse action. Request ID: 3f9a1c0b-7e2d-4c8a-9e1d-3f7b6a5c4d2e. Contact your administrator to restore access.`;
   const cases: Array<Partial<Account>> = [
     {
-      email: `${long}@subdomain.engineering.northwind-labs-international.com`,
-      nickname:
-        "A nickname long enough to wrap twice in any table cell, sheet header or dialog title it lands in",
+      email: "zoe.lindqvist@copperleaf.com",
+      nickname: "Dublin team",
+      region: "eu-west-1",
+      activeRegion: "eu-west-1",
     },
-    { email: "zoë.ångström@bücher-beispiel.de", nickname: "東京チーム 🚀 Tokyo" },
-    { email: "noor.haddad@relecloud.io", nickname: "فريق الدعم الفني" },
+    { email: "noor.haddad@helix.health", nickname: "Support" },
     {
-      email: "",
+      email: "kai.tanaka@proton.me",
       nickname: "",
       authMethod: "social",
       provider: "Github",
       profileArn: DEFAULT_PROFILE,
     },
-    { email: "legacy-import@adatum.net", authMethod: "", provider: "", subscriptionType: "" },
-    { email: "sso.user@okta-tenant.example", authMethod: "saml", provider: "Okta" },
+    { email: "archive@atlasworks.io", authMethod: "", provider: "", subscriptionType: "" },
+    { email: "ines.moreau@brightline.app", authMethod: "saml", provider: "Okta" },
     {
-      email: "custom.plan@woodgrove-bank.com",
+      email: "finance@copperleaf.com",
       subscriptionType: "Q_DEVELOPER_ENTERPRISE_CUSTOM",
       subscriptionTitle: "KIRO ENTERPRISE (custom contract)",
       usageCurrent: 41_250,
@@ -605,8 +610,8 @@ function edgeAccounts(now: number): Account[] {
       usagePercent: 0.825,
     },
     {
-      email: "over.cap@contoso-retail.com",
-      nickname: "Over the plan, overage on",
+      email: "lucas.rivera@paperplane.co",
+      nickname: "Growth",
       overageStatus: "ENABLED",
       usageCurrent: 1240,
       usagePercent: 1.24,
@@ -614,7 +619,7 @@ function edgeAccounts(now: number): Account[] {
       currentOverages: 9.6,
     },
     {
-      email: "overage.at.cap@fabrikam.io",
+      email: "ava.chen@lumen.ai",
       overageStatus: "ENABLED",
       usageCurrent: 1500,
       usagePercent: 1.5,
@@ -622,7 +627,7 @@ function edgeAccounts(now: number): Account[] {
       currentOverages: 20,
     },
     {
-      email: "overage.past.cap@fabrikam.io",
+      email: "omar.haas@orbitlabs.dev",
       overageStatus: "ENABLED",
       subscriptionType: POWER.type,
       subscriptionTitle: POWER.title,
@@ -632,9 +637,9 @@ function edgeAccounts(now: number): Account[] {
       overageCap: 100,
       currentOverages: 105,
     },
-    { email: "lowercase.overage@litware.ai", overageStatus: "enabled" },
+    { email: "nina.berg@tidewater.dev", overageStatus: "enabled" },
     {
-      email: "power.exhausted@tailspin-toys.dev",
+      email: "theo.ward@novadesign.io",
       subscriptionType: "POWER",
       subscriptionTitle: POWER.title,
       usageCurrent: 10_000,
@@ -643,22 +648,22 @@ function edgeAccounts(now: number): Account[] {
       overageStatus: "DISABLED",
     },
     {
-      email: "firehose@northwind-labs.com",
-      nickname: "Firehose",
+      email: "platform@northwind.studio",
+      nickname: "Platform",
       subscriptionType: POWER.type,
       subscriptionTitle: POWER.title,
       usageCurrent: 9_412.37,
       usageLimit: 10_000,
       usagePercent: 0.9412,
       weight: 100,
-      requestCount: 48_213_907,
-      errorCount: 2_114_208,
-      totalTokens: 912_441_208_331,
-      totalCredits: 1_284_331.72,
+      requestCount: 482_139,
+      errorCount: 2_114,
+      totalTokens: 3_912_441_208,
+      totalCredits: 12_843.72,
       lastUsed: now - 2,
     },
     {
-      email: "one.request@proseware.com",
+      email: "mila.adler@hey.com",
       requestCount: 1,
       errorCount: 0,
       totalTokens: 3,
@@ -668,7 +673,7 @@ function edgeAccounts(now: number): Account[] {
       usagePercent: 0.0000001,
     },
     {
-      email: "never.used@wingtip.co",
+      email: "felix.quinn@fastmail.com",
       requestCount: 0,
       errorCount: 0,
       totalTokens: 0,
@@ -688,33 +693,33 @@ function edgeAccounts(now: number): Account[] {
       overageRate: 0,
       overageCheckedAt: 0,
     },
-    { email: "expires.in.45s@contoso-retail.com", expiresAt: now + 45 },
-    { email: "expires.in.2m@contoso-retail.com", expiresAt: now + 2 * MINUTE + 5 },
+    { email: "sami.reyes@brightline.app", expiresAt: now + 45 },
+    { email: "clara.ito@brightline.app", expiresAt: now + 2 * MINUTE + 5 },
     {
-      email: "long.lived@fabrikam.onmicrosoft.com",
+      email: "daniel.park@northwind.onmicrosoft.com",
       authMethod: "external_idp",
       provider: "AzureAD",
       profileArn: MS_PROFILE_SANDBOX,
       profileArnPinned: true,
       expiresAt: now + 89 * DAY,
     },
-    { email: "expired.1m@adatum.net", expiresAt: now - 61 },
+    { email: "yara.costa@atlasworks.io", expiresAt: now - 61 },
     {
-      email: "expired.long.ago@adatum.net",
+      email: "hugo.fischer@atlasworks.io",
       expiresAt: now - 400 * DAY,
       lastUsed: now - 400 * DAY,
       lastRefresh: now - 400 * DAY,
     },
     {
-      email: "banned.today@relecloud.io",
+      email: "ravi.kapoor@gmail.com",
       enabled: false,
       banStatus: "BANNED",
-      banReason: banReasonLong,
+      banReason: BAN_REASONS[0],
       banTime: now - 15 * MINUTE,
       lastUsed: now - 16 * MINUTE,
     },
     {
-      email: "suspended.no.reason@relecloud.io",
+      email: "leo.marsh@outlook.com",
       enabled: false,
       banStatus: "SUSPENDED",
       banReason: "",
@@ -722,31 +727,31 @@ function edgeAccounts(now: number): Account[] {
       lastUsed: now - 3 * DAY,
     },
     {
-      email: "ban.cleared@litware.ai",
+      email: "aria.vega@lumen.ai",
       banStatus: "ACTIVE",
       banReason: "",
       banTime: 0,
-      nickname: "Back from a ban",
+      nickname: "Research",
     },
     {
-      email: "config.disabled@woodgrove-bank.com",
+      email: "jonas.holm@copperleaf.com",
       enabled: false,
       banStatus: "DISABLED",
       banTime: now - 6 * HOUR,
       lastUsed: now - 6 * HOUR - 40,
     },
     {
-      email: "silenced@proseware.com",
+      email: "isla.brooks@paperplane.co",
       enabled: false,
       silent: true,
       silentReason:
-        "Paused by the on-call engineer while support investigates repeated stream truncation on long tool-use conversations (ticket INC-48213)",
+        "Paused by the on-call engineer while support looks into truncated replies on long tool-use conversations (INC-4821)",
       silentTime: now - 2 * HOUR,
       lastUsed: now - 2 * HOUR - 30,
     },
     {
-      email: "api-key-ap-southeast",
-      nickname: "API key, unserved region",
+      email: "agent-fleet-apac",
+      nickname: "APAC",
       authMethod: "api_key",
       provider: "APIKey",
       region: "ap-southeast-1",
@@ -764,11 +769,11 @@ function edgeAccounts(now: number): Account[] {
       overageCap: 0,
       overageRate: 0,
       requestCount: 4_120,
-      errorCount: 3_877,
+      errorCount: 312,
     },
     {
-      email: "",
-      nickname: "EU API key",
+      email: "batch-worker-eu",
+      nickname: "EU traffic",
       authMethod: "apikey",
       provider: "APIKey",
       region: "eu-central-1",
@@ -779,7 +784,7 @@ function edgeAccounts(now: number): Account[] {
       subscriptionTitle: PRO.title,
     },
     {
-      email: "trial.ends.today@gmail.com",
+      email: "zara.nakamura@gmail.com",
       authMethod: "social",
       provider: "Google",
       subscriptionType: FREE.type,
@@ -796,7 +801,7 @@ function edgeAccounts(now: number): Account[] {
       trialExpiresAt: now + 3 * HOUR,
     },
     {
-      email: "trial.expired@outlook.com",
+      email: "ethan.hale@outlook.com",
       authMethod: "social",
       provider: "Github",
       subscriptionType: FREE.type,
@@ -813,7 +818,7 @@ function edgeAccounts(now: number): Account[] {
       trialExpiresAt: now - DAY,
     },
     {
-      email: "trial.long@icloud.com",
+      email: "elena.silva@icloud.com",
       authMethod: "builderid",
       provider: "BuilderId",
       subscriptionType: FREE.type,
@@ -828,28 +833,27 @@ function edgeAccounts(now: number): Account[] {
       trialExpiresAt: now + 30 * DAY,
     },
     {
-      email: "huge.limit@woodgrove-bank.com",
+      email: "operations@helix.health",
       subscriptionType: "PRO_PLUS",
       subscriptionTitle: PRO_PLUS.title,
-      usageCurrent: 999_999.99,
-      usageLimit: 1_000_000,
-      usagePercent: 0.99999999,
+      usageCurrent: 1_624.5,
+      usageLimit: 2_000,
+      usagePercent: 0.81225,
     },
     {
-      email: "no.profile@northwind-labs.com",
+      email: "noah.laurent@northwind.studio",
       profileArn: "",
       activeRegion: "",
       profileArnPinned: false,
     },
-    { email: "turned.off@contoso-retail.com", nickname: "Turned off by admin", enabled: false },
-    { email: "no.reset.date@tailspin-toys.dev", nextResetDate: "", daysRemaining: 0 },
+    { email: "maya.novak@paperplane.co", nickname: "Staging", enabled: false },
+    { email: "kai.sato@novadesign.io", nextResetDate: "", daysRemaining: 0 },
     {
-      email: "own.proxy@fabrikam.io",
-      proxyURL:
-        "http://proxy-user-with-a-long-name:Sup3r%2FS3cret%40Pass@egress-proxy-eu-central-1.corp.northwind-labs.com:3128",
+      email: "arjun.patel@lumen.ai",
+      proxyURL: "socks5://proxy.lumen.ai:1080",
     },
     {
-      email: "banned.and.empty@protonmail.com",
+      email: "lina.okafor@proton.me",
       authMethod: "social",
       provider: "Google",
       enabled: false,
@@ -864,14 +868,14 @@ function edgeAccounts(now: number): Account[] {
       lastUsed: now - 2 * DAY - 300,
     },
     {
-      email: "no.token.pro@fabrikam.io",
+      email: "mateo.chen@orbitlabs.dev",
       hasToken: false,
       expiresAt: 0,
       lastUsed: now - 4 * DAY,
     },
     // Auth methods the random draw makes rarely; stored by older imports.
     {
-      email: "octocat.dev@users.noreply.github.com",
+      email: "octavia.lee@proton.me",
       authMethod: "github",
       provider: "Github",
       userId: "us-east-1:5c2d7e0a-1b3f-4a8e-9d6c-0f1e2d3c4b5a",
@@ -884,19 +888,19 @@ function edgeAccounts(now: number): Account[] {
       overageStatus: "",
     },
     {
-      email: "gwen.builder@gmail.com",
+      email: "gwen.adler@gmail.com",
       authMethod: "google",
       provider: "Google",
       userId: "us-east-1:8a7b6c5d-4e3f-4a2b-9c1d-0e9f8a7b6c5d",
     },
     {
-      email: "builder.id.user@hey.com",
+      email: "nora.ward@hey.com",
       authMethod: "builderid",
       provider: "BuilderId",
       userId: "us-east-1:0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
     },
     {
-      email: "eu.enterprise@litware.ai",
+      email: "eu-team@helix.health",
       region: "eu-central-1",
       activeRegion: "eu-central-1",
       profileArn: "arn:aws:codewhisperer:eu-central-1:381492027763:profile/EUENTERPRISE01",
@@ -918,8 +922,8 @@ function trafficFor(account: Account, now: number, rng: Rng): Traffic {
   if (offAt) until = Math.min(until, offAt);
   return {
     account,
-    // Capped, so the busiest account leads without drowning out the rest.
-    weight: account.lastUsed > 0 ? Math.min(2500, Math.sqrt(account.requestCount + 1)) : 0,
+    // Busy accounts carry most of it, so the busiest few stand out in the per-account charts.
+    weight: account.lastUsed > 0 ? (account.requestCount + 1) ** 1.25 : 0,
     from: rng() < 0.1 ? now - int(rng, DAY, 5 * DAY) : now - WINDOW_DAYS * DAY - DAY,
     until,
   };
@@ -934,7 +938,7 @@ function apiKeysFull(now: number): StoredKey[] {
   const sk = () => `sk-${hex(rng, 64)}`;
   const rows: Array<Partial<StoredKey> & { createdAt: number }> = [
     {
-      name: "team-a",
+      name: "Production",
       createdAt: now - 41 * DAY,
       lastUsedAt: now - 5 * MINUTE,
       tokenLimit: 2_000_000,
@@ -944,6 +948,7 @@ function apiKeysFull(now: number): StoredKey[] {
       requestsCount: 412,
     },
     {
+      name: "Mobile app",
       createdAt: now - 17 * DAY,
       lastUsedAt: now - 40,
       tokensUsed: 523_118,
@@ -951,7 +956,7 @@ function apiKeysFull(now: number): StoredKey[] {
       requestsCount: 157,
     },
     {
-      name: "ci-runner",
+      name: "CI pipeline",
       enabled: false,
       createdAt: now - 9 * DAY,
       lastUsedAt: now - 2 * DAY,
@@ -960,18 +965,17 @@ function apiKeysFull(now: number): StoredKey[] {
       creditsUsed: 9.87,
       requestsCount: 233,
     },
-    { name: "local-dev", key: "kiro-dev-1", createdAt: now - 3 * DAY },
+    { name: "Local dev", key: "kiro-dev-1", createdAt: now - 3 * DAY },
     {
-      name: "Production gateway — EU (Frankfurt) — do not rotate without telling #platform-oncall first",
-      key: "northwind-prod-gateway-eu-central-1-2026-11-primary-key-do-not-share-0f3e9a71c2b84d56",
+      name: "Gateway — EU",
       createdAt: now - 380 * DAY,
       lastUsedAt: now - 1,
-      tokensUsed: 9_412_008_331,
-      creditsUsed: 182_441.27,
-      requestsCount: 2_481_093,
+      tokensUsed: 941_200_833,
+      creditsUsed: 18_244.27,
+      requestsCount: 248_109,
     },
     {
-      name: "研究チーム",
+      name: "Research",
       createdAt: now - 60 * DAY,
       lastUsedAt: now - 3 * MINUTE,
       creditLimit: 500,
@@ -980,7 +984,7 @@ function apiKeysFull(now: number): StoredKey[] {
       requestsCount: 9_120,
     },
     {
-      name: "équipe-données",
+      name: "Data team",
       createdAt: now - 33 * DAY,
       lastUsedAt: now - 20 * MINUTE,
       tokenLimit: 100_000_000,
@@ -989,7 +993,7 @@ function apiKeysFull(now: number): StoredKey[] {
       requestsCount: 31_877,
     },
     {
-      name: "🧪 experiments",
+      name: "Experiments",
       createdAt: now - 12 * DAY,
       lastUsedAt: now - 4 * HOUR,
       tokensUsed: 3_211_004,
@@ -1016,7 +1020,7 @@ function apiKeysFull(now: number): StoredKey[] {
       requestsCount: 388,
     },
     {
-      name: "Cursor (Dana)",
+      name: "Cursor",
       createdAt: now - 25 * DAY,
       lastUsedAt: now - 8,
       tokenLimit: 50_000_000,
@@ -1049,18 +1053,18 @@ function apiKeysFull(now: number): StoredKey[] {
       creditsUsed: 2.04,
       requestsCount: 61,
     },
-    { name: "staging", createdAt: now - 2 * MINUTE },
+    { name: "Staging", createdAt: now - 2 * MINUTE },
     {
-      name: "load-test-2026-10",
+      name: "Load testing",
       createdAt: now - 30 * DAY,
       lastUsedAt: now - 29 * DAY,
-      tokenLimit: 1,
+      tokenLimit: 1_000_000,
       tokensUsed: 0,
       creditsUsed: 0,
       requestsCount: 0,
     },
     {
-      name: "partner: Contoso",
+      name: "Partner: Brightline",
       createdAt: now - 90 * DAY,
       lastUsedAt: now - 50 * MINUTE,
       creditLimit: 0.5,
@@ -1085,6 +1089,7 @@ function apiKeysFull(now: number): StoredKey[] {
       requestsCount: 1_903,
     },
     {
+      name: "Legacy SDK",
       createdAt: now - 700 * DAY,
       lastUsedAt: now - 300 * DAY,
       tokensUsed: 4_118,
@@ -1092,8 +1097,8 @@ function apiKeysFull(now: number): StoredKey[] {
       requestsCount: 3,
     },
     {
-      name: "x",
-      key: "abc",
+      name: "Demo",
+      key: "demo-key",
       createdAt: now - DAY,
       lastUsedAt: now - 22 * HOUR,
       requestsCount: 1,
@@ -1118,7 +1123,7 @@ function apiKeysFull(now: number): StoredKey[] {
       creditsUsed: 12.4,
       requestsCount: 340,
     },
-    { createdAt: now - 1 * DAY, tokenLimit: 250_000, creditLimit: 5 },
+    { name: "Webhook relay", createdAt: now - 1 * DAY, tokenLimit: 250_000, creditLimit: 5 },
     {
       name: "Cline",
       enabled: false,
@@ -1510,6 +1515,8 @@ function makeRequest(
 
 /** Hand-made rows in the newest minutes: the extremes a random draw would rarely produce. */
 function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): RequestRecord[] {
+  // A day back, so the newest pages and the recent-errors table show everyday traffic.
+  const edgeNow = now - DAY;
   const byEmail = (email: string) => accounts.find((a) => a.email === email) ?? accounts[0];
   const longEmail = accounts.reduce((a, b) => (b.email.length > a.email.length ? b : a));
   const noEmail = accounts.find((a) => a.email === "" && a.hasToken && a.enabled) ?? accounts[0];
@@ -1521,10 +1528,10 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       0,
       500,
     );
-  const firehose = byEmail("firehose@northwind-labs.com");
+  const firehose = byEmail("platform@northwind.studio");
   return [
     makeRequestRecord({
-      ts: now - 14,
+      ts: edgeNow - 14,
       ...of(firehose),
       ...keyOf(prod),
       endpoint: "claude",
@@ -1537,7 +1544,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 284_512,
     }),
     makeRequestRecord({
-      ts: now - 37,
+      ts: edgeNow - 37,
       ...of(firehose),
       ...keyOf(prod),
       endpoint: "openai",
@@ -1548,7 +1555,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 1,
     }),
     makeRequestRecord({
-      ts: now - 95,
+      ts: edgeNow - 95,
       ...of(firehose),
       ...keyOf(prod),
       endpoint: "responses",
@@ -1563,8 +1570,8 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 12_004,
     }),
     makeRequestRecord({
-      ts: now - 140,
-      ...of(byEmail("zoë.ångström@bücher-beispiel.de")),
+      ts: edgeNow - 140,
+      ...of(byEmail("zoe.lindqvist@copperleaf.com")),
       endpoint: "claude",
       model: "claude-sonnet-4.6",
       inTokens: 0,
@@ -1574,11 +1581,11 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       status: 400,
       errorType: "invalid_request",
       message:
-        'messages.0.content: invalid UTF-8 sequence near "résumé — 履歴書 🚀"\nhint: send the request body as UTF-8',
+        'messages.0.content: invalid UTF-8 sequence near "résumé"\nhint: send the request body as UTF-8',
       durationMs: 3,
     }),
     makeRequestRecord({
-      ts: now - 200,
+      ts: edgeNow - 200,
       ...of(firehose),
       apiKeyId: "7d1e0f9a-8b7c-4a9e-b6c5-2d1e0f9a8b7c",
       apiKeyMasked: "sk-0ld3****dead",
@@ -1590,9 +1597,9 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 7_412,
     }),
     makeRequestRecord({
-      ts: now - 260,
+      ts: edgeNow - 260,
       accountId: "0b6f6a4e-3c1d-4e9a-8f00-deadbeef0001",
-      email: "former.contractor@tailspin-toys.dev",
+      email: "former.contractor@northwind.studio",
       endpoint: "claude",
       model: "claude-sonnet-4.5",
       inTokens: 5_002,
@@ -1601,7 +1608,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 4_118,
     }),
     makeRequestRecord({
-      ts: now - 330,
+      ts: edgeNow - 330,
       ...of(firehose),
       endpoint: "claude",
       model: "claude-sonnet-5",
@@ -1615,7 +1622,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 30_001,
     }),
     makeRequestRecord({
-      ts: now - 410,
+      ts: edgeNow - 410,
       ...of(firehose),
       ...keyOf(keys[11]),
       endpoint: "responses",
@@ -1627,7 +1634,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 141_220,
     }),
     makeRequestRecord({
-      ts: now - 480,
+      ts: edgeNow - 480,
       ...of(firehose),
       ...keyOf(keys[12]),
       endpoint: "responses",
@@ -1643,7 +1650,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 48_112,
     }),
     makeRequestRecord({
-      ts: now - 560,
+      ts: edgeNow - 560,
       ...of(noEmail),
       endpoint: "openai",
       model: "auto",
@@ -1655,7 +1662,7 @@ function edgeRequests(now: number, accounts: Account[], keys: StoredKey[]): Requ
       durationMs: 1_903,
     }),
     makeRequestRecord({
-      ts: now - 640,
+      ts: edgeNow - 640,
       ...of(longEmail),
       endpoint: "claude",
       model: "claude-opus-4.8",
@@ -1812,7 +1819,7 @@ function backupsFull(now: number): BackupEntry[] {
     }),
     entry(now - 20 * DAY, {
       kind: "pre-restore",
-      note: "upload uploaded",
+      note: "upload kiro-backup-weekly.json",
       // A file with no accounts: Go omits both zero counts.
       accountCnt: undefined,
     }),
@@ -1820,13 +1827,13 @@ function backupsFull(now: number): BackupEntry[] {
   rows.push(
     entry(now - 61 * DAY, {
       kind: "manual",
-      note: "移行前のバックアップ — before migrating to v2 ✅",
+      note: "Before the v2 migration",
       accountCnt: 42,
       version: "1.9.12",
     }),
     entry(now - 90 * DAY, {
       kind: "manual",
-      note: "Snapshot taken right before the Q4 credential rotation, covering every Enterprise, BuilderId and Microsoft account plus the API key accounts used by the CI fleet; restore this one if the rotation script leaves accounts without refresh tokens, and ping the platform on-call before doing so.",
+      note: "Before the Q4 credential rotation",
       accountCnt: 37,
       version: "1.9.12",
     }),
@@ -1911,7 +1918,7 @@ function promptFilterFull(): PromptFilterConfig {
         id: `rule-${base}`,
         name: "Hide internal hostnames",
         type: "regex",
-        match: "\\b[a-z0-9-]+\\.corp\\.northwind-labs\\.com\\b",
+        match: "\\b[a-z0-9-]+\\.corp\\.northwind\\.studio\\b",
         replace: "internal-host",
         enabled: true,
       },
@@ -1939,21 +1946,21 @@ function promptFilterFull(): PromptFilterConfig {
       },
       {
         id: `rule-${base + 240_000}`,
-        name: "Old rule kept for reference (disabled)",
+        name: "Drop debug lines",
         type: "lines-containing",
         match: "DEBUG",
         enabled: false,
       },
       {
         id: `rule-${base + 300_000}`,
-        name: "Contains rule written by the old panel",
+        name: "Drop request ids",
         type: "contains",
         match: "x-amzn-requestid",
         enabled: true,
       },
       {
         id: `rule-${base + 360_000}`,
-        name: "Masquer les données personnelles — 個人情報を隠す",
+        name: "Mask phone numbers",
         type: "regex",
         match: "\\b\\d{3}-\\d{4}-\\d{4}\\b",
         replace: "•••-••••-••••",
@@ -1961,7 +1968,7 @@ function promptFilterFull(): PromptFilterConfig {
       },
       {
         id: `rule-${base + 420_000}`,
-        name: "A rule name long enough to overflow any list row, card title or dialog heading it is rendered in",
+        name: "Redact inline secrets",
         type: "regex",
         match:
           "(?i)(?:api[_-]?key|secret|token|password|passwd|pwd|authorization|bearer)\\s*[:=]\\s*['\"]?[A-Za-z0-9_\\-\\.=+/]{12,}['\"]?(?:\\s*,\\s*(?:api[_-]?key|secret|token|password)\\s*[:=]\\s*['\"]?[A-Za-z0-9_\\-\\.=+/]{12,}['\"]?)*",
@@ -1970,14 +1977,14 @@ function promptFilterFull(): PromptFilterConfig {
       },
       {
         id: `rule-${base + 480_000}`,
-        name: "",
+        name: "Drop generator banners",
         type: "lines-containing",
         match: "# generated by",
         enabled: true,
       },
       {
         id: `rule-${base + 540_000}`,
-        name: "Disabled regex with a replacement",
+        name: "Shorten home paths",
         type: "regex",
         match: "/home/[a-z]+/",
         replace: "~/",
@@ -2005,17 +2012,33 @@ function promptFilterFull(): PromptFilterConfig {
 // The dataset
 // ---------------------------------------------------------------------------
 
+/** Emails for the small seed's eight accounts in this dataset (an API-key label in sixth place). */
+const BASE_EMAILS = [
+  "dana.whitfield@northwind.studio",
+  "maya.oyelaran@outlook.com",
+  "priya.raman@gmail.com",
+  "june.lee@proton.me",
+  "ops@brightline.app",
+  "review-bot-1",
+  "elena.kovacs@northwind.onmicrosoft.com",
+  "sam.okafor@gmail.com",
+];
+
 export function seedFullDataset(now: number): FullDataset {
   const rng = createRng(4104);
   const used = new Set<string>();
   const profiles = orgProfiles(rng);
-  const base = seedAccounts();
+  // The small seed's accounts lead the list; here they get the same polished names as the rest.
+  const base = seedAccounts().map((account, index) => ({
+    ...account,
+    email: BASE_EMAILS[index] ?? account.email,
+  }));
   const edges = edgeAccounts(now);
   for (const account of [...base, ...edges]) used.add(account.email);
   const random = Array.from({ length: ACCOUNT_COUNT - base.length - edges.length }, (_, i) =>
     randomAccount(rng, now, i, used, profiles),
   );
-  const accounts = [...base, ...shuffle(rng, [...edges, ...random])];
+  const accounts = shuffle(rng, [...base, ...edges, ...random]);
   for (const account of accounts) {
     // A plan's usage percent is derived from the current/limit pair; keep the two in step.
     if (account.trialUsageLimit > 0) {
@@ -2064,10 +2087,7 @@ export function seedFullDataset(now: number): FullDataset {
     },
     modelMappings: modelMappingsFull(),
     endpoint: { preferredEndpoint: "codewhisperer", endpointFallback: false },
-    proxy: {
-      proxyURL:
-        "http://proxy-user:s3cr3t%40pass@egress-proxy.eu-central-1.corp.northwind-labs.com:3128",
-    },
+    proxy: { proxyURL: "http://proxy.northwind.studio:3128" },
     promptFilter: promptFilterFull(),
     // Up for 9 days: the persisted log reaches further back than this process.
     startedAt: now - (9 * DAY + 4 * HOUR + 12 * MINUTE + 7),
