@@ -1,4 +1,5 @@
 import { type FormEvent, type JSX, useEffect, useRef, useState } from "react";
+import { CopyButton } from "@/components/shared/copy-button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { pollBuilderId, startBuilderId } from "@/lib/api/auth-flows";
@@ -120,9 +121,20 @@ export function BuilderIdFlow(): JSX.Element {
           tabIndex={-1}
         >
           <span className="sr-only">{t("builderid.userCode")}</span>
-          <kbd className="select-all font-mono font-semibold text-display tracking-widest tabular-nums">
-            {code.userCode}
-          </kbd>
+          {/* The code stays centred; the copy button sits in the right-hand column beside it. */}
+          <span className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-1">
+            <span aria-hidden="true" />
+            <kbd className="select-all font-mono font-semibold text-display tracking-widest tabular-nums">
+              {code.userCode}
+            </kbd>
+            <CopyButton
+              className="justify-self-start"
+              label={t("builderid.copyCode")}
+              size="icon-sm"
+              value={code.userCode}
+              variant="quiet"
+            />
+          </span>
           <FlowNote>{t("builderid.verifyCode")}</FlowNote>
         </Card>
         <UrlBox label={t("builderid.verifyUrl")} url={code.verificationUri} />

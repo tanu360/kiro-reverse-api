@@ -148,3 +148,47 @@ export function ChoiceRow({
     </li>
   );
 }
+
+/**
+ * A choice as a tile in a grid (the Add account methods): a button with an icon chip, a title,
+ * an optional badge after it and a short description. `wide` spans both columns of a
+ * two-column grid, for the featured choice or the last tile of an odd row.
+ */
+export function ChoiceTile({
+  icon,
+  title,
+  badge,
+  description,
+  wide = false,
+  className,
+  ...props
+}: Omit<ComponentProps<"button">, "title" | "children"> & {
+  icon: IconSvgElement;
+  title: ReactNode;
+  badge?: ReactNode;
+  description?: ReactNode;
+  wide?: boolean;
+}): JSX.Element {
+  return (
+    <button
+      className={cn(
+        "group/choice-tile flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-3 text-start outline-none transition-[background-color,border-color,scale] hover:border-border-strong/50 hover:bg-accent focus-outline active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64",
+        wide && "sm:col-span-2",
+        className,
+      )}
+      type="button"
+      {...props}
+    >
+      <IconChip icon={icon} size="md" />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-medium text-foreground text-sm/5">{title}</span>
+          {badge}
+        </span>
+        {description ? (
+          <span className="text-muted-foreground text-xs leading-normal">{description}</span>
+        ) : null}
+      </span>
+    </button>
+  );
+}

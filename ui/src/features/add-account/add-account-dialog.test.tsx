@@ -561,7 +561,8 @@ describe("Focus after a failed submit or a step change", () => {
       await user.clear(region);
       await user.type(region, "eu-west-9{Enter}");
       const code = await screen.findByText("ABCD-EFGH", { selector: "kbd" });
-      await waitFor(() => expect(code.parentElement).toHaveFocus());
+      // The code card (the copy button sits beside the code inside it) takes focus.
+      await waitFor(() => expect(code.closest("[tabindex='-1']")).toHaveFocus());
 
       // eu-west-9 makes the mock report an expired authorization on the first poll.
       await act(() => vi.advanceTimersByTimeAsync(6000));

@@ -1,6 +1,9 @@
 {
   "title": "Add account",
   "description": "Choose how to sign in or what to import.",
+  "groups.signIn": "Sign in",
+  "groups.import": "Import",
+  "recommended": "Recommended",
   "cancel": "Cancel",
   "add": "Add",
   "open": "Open",
@@ -42,6 +45,7 @@
   "builderid.startNote": "You get a code to enter on the AWS page.",
   "builderid.verifyCode": "Enter this code at the link below.",
   "builderid.userCode": "Your code",
+  "builderid.copyCode": "Copy code",
   "builderid.verifyUrl": "Verification URL",
   "builderid.waiting": "Waiting for authorization…",
   "builderid.reconnecting": "Connection lost. Retrying…",

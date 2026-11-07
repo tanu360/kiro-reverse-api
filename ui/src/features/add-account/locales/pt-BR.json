@@ -1,6 +1,9 @@
 {
   "title": "Adicionar conta",
   "description": "Escolha como entrar ou o que importar.",
+  "groups.signIn": "Entrar",
+  "groups.import": "Importar",
+  "recommended": "Recomendado",
   "cancel": "Cancelar",
   "add": "Adicionar",
   "open": "Abrir",
@@ -40,6 +43,7 @@
   "builderid.startNote": "Você recebe um código para informar na página da AWS.",
   "builderid.verifyCode": "Informe este código no link abaixo.",
   "builderid.userCode": "Seu código",
+  "builderid.copyCode": "Copiar código",
   "builderid.verifyUrl": "URL de verificação",
   "builderid.waiting": "Aguardando autorização…",
   "builderid.reconnecting": "Conexão perdida. Tentando novamente…",

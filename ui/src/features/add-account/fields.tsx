@@ -1,5 +1,7 @@
+import { ExternalLinkIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, type Ref, useEffect, useId, useRef } from "react";
-import { CopyField } from "@/components/shared/code-field";
+import { CopyButton } from "@/components/shared/copy-button";
 import { ROW_DESCRIPTION } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
@@ -8,21 +10,31 @@ import { Label } from "@/components/ui/label";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-/** A long sign-in URL that wraps, in a read-only field with Open and Copy buttons at its end. */
+/**
+ * A sign-in link as one quiet line instead of a field: the label, then the URL in mono cut to a
+ * single line (Open and Copy carry the full address), with Open as a secondary
+ * button and a copy icon at its end. A long OAuth URL no longer fills the step.
+ */
 export function UrlBox({ label, url }: { label: string; url: string }): JSX.Element {
   const { t } = useT("add-account");
   return (
-    <Field className="w-full">
-      <FieldLabel>{label}</FieldLabel>
-      <CopyField
-        copyLabel={t("copyLink")}
-        label={label}
-        multiline
-        openHref={url}
-        openLabel={t("open")}
-        value={url}
-      />
-    </Field>
+    <div className="flex w-full min-w-0 flex-col gap-2">
+      <span className="font-medium text-foreground text-sm">{label}</span>
+      <div className="flex min-w-0 items-center gap-1 rounded-lg bg-accent py-1 ps-3 pe-1">
+        <span className="min-w-0 flex-1 truncate font-mono text-meta text-muted-foreground">
+          {url}
+        </span>
+        <Button
+          render={<a href={url} rel="noopener noreferrer" target="_blank" />}
+          size="sm"
+          variant="secondary"
+        >
+          <HugeiconsIcon icon={ExternalLinkIcon} aria-hidden="true" />
+          {t("open")}
+        </Button>
+        <CopyButton label={t("copyLink")} size="icon-sm" value={url} variant="quiet" />
+      </div>
+    </div>
   );
 }
 

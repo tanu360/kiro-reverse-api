@@ -1,6 +1,9 @@
 {
   "title": "Thêm tài khoản",
   "description": "Chọn cách đăng nhập hoặc dữ liệu cần nhập.",
+  "groups.signIn": "Đăng nhập",
+  "groups.import": "Nhập",
+  "recommended": "Đề xuất",
   "cancel": "Hủy",
   "add": "Thêm",
   "open": "Mở",
@@ -37,6 +40,7 @@
   "builderid.startNote": "Bạn sẽ nhận một mã để nhập trên trang AWS.",
   "builderid.verifyCode": "Nhập mã này tại liên kết bên dưới.",
   "builderid.userCode": "Mã của bạn",
+  "builderid.copyCode": "Sao chép mã",
   "builderid.verifyUrl": "URL xác minh",
   "builderid.waiting": "Đang chờ cấp quyền…",
   "builderid.reconnecting": "Mất kết nối. Đang thử lại…",
