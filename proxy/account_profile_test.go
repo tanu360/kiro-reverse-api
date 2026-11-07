@@ -100,7 +100,7 @@ func TestAccountProfileListAndPin(t *testing.T) {
 		t.Fatalf("pool still routes the old profile: %+v", live)
 	}
 
-	rec, got = callAccountProfileAPI(t, h, http.MethodGet, "/accounts", "")
+	rec, _ = callAccountProfileAPI(t, h, http.MethodGet, "/accounts", "")
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"profileArnPinned":true`) || !strings.Contains(rec.Body.String(), `"activeRegion":"eu-central-1"`) {
 		t.Fatalf("account list lacks pin state: %s", rec.Body.String())
 	}

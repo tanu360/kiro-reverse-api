@@ -7,17 +7,17 @@ const (
 	thinkingCloseTag = "</thinking>"
 )
 
-//! Kiro has no native reasoning channel for the Responses API; thinking arrives inline
-//! as <thinking>...</thinking> inside the normal assistant text stream. Tags can be split
-//! across chunks, so the splitter holds back only the buffer suffix that could still grow
-//! into a tag and releases everything else immediately.
+// ! Kiro has no native reasoning channel for the Responses API; thinking arrives inline
+// ! as <thinking>...</thinking> inside the normal assistant text stream. Tags can be split
+// ! across chunks, so the splitter holds back only the buffer suffix that could still grow
+// ! into a tag and releases everything else immediately.
 type thinkingTagSplitter struct {
 	buf     string
 	inBlock bool
 }
 
-//! Push feeds one upstream chunk; onText receives visible answer text and onThinking
-//! receives reasoning text, both already stripped of the tags themselves.
+// ! Push feeds one upstream chunk; onText receives visible answer text and onThinking
+// ! receives reasoning text, both already stripped of the tags themselves.
 func (s *thinkingTagSplitter) Push(text string, onText, onThinking func(string)) {
 	if text == "" {
 		return
@@ -26,8 +26,8 @@ func (s *thinkingTagSplitter) Push(text string, onText, onThinking func(string))
 	s.drain(false, onText, onThinking)
 }
 
-//! Flush releases whatever is buffered once the upstream stream ends. An unterminated
-//! thinking block is treated as reasoning so a truncated tag never leaks into the answer.
+// ! Flush releases whatever is buffered once the upstream stream ends. An unterminated
+// ! thinking block is treated as reasoning so a truncated tag never leaks into the answer.
 func (s *thinkingTagSplitter) Flush(onText, onThinking func(string)) {
 	s.drain(true, onText, onThinking)
 }
@@ -64,9 +64,9 @@ func emitSplit(sink func(string), text string) {
 	}
 }
 
-//! partialTagSuffixLen reports how many trailing bytes of s form a proper prefix of tag,
-//! i.e. the bytes that must stay buffered because they may complete the tag next chunk.
-//! Tags are ASCII, so cutting before them never splits a multi-byte rune.
+// ! partialTagSuffixLen reports how many trailing bytes of s form a proper prefix of tag,
+// ! i.e. the bytes that must stay buffered because they may complete the tag next chunk.
+// ! Tags are ASCII, so cutting before them never splits a multi-byte rune.
 func partialTagSuffixLen(s, tag string) int {
 	maxLen := len(tag) - 1
 	if maxLen > len(s) {

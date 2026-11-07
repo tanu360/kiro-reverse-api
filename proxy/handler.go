@@ -3892,7 +3892,7 @@ func (h *Handler) refreshAccountNow(ctx context.Context, account *config.Account
 
 	if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {
 		if err := refreshTokenIfNeeded(); err != nil {
-			return nil, false, fmt.Errorf("Token refresh failed: %w", err)
+			return nil, false, fmt.Errorf("token refresh failed: %w", err)
 		}
 	}
 

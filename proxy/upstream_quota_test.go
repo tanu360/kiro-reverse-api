@@ -22,7 +22,7 @@ func TestUpstreamQuotaPreservesStatusHintAndCooldown(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			h := newStreamTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Retry-After", "120")
-				http.Error(w, "rate limited", 429)
+				http.Error(w, "rate limited", http.StatusTooManyRequests)
 			})
 			t.Cleanup(func() { h.pool.RecordSuccess("only") })
 			body := `{"model":"claude-sonnet-4.5","max_tokens":100,"messages":[{"role":"user","content":"hi"}]}`

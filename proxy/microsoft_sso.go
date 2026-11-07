@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	errMicrosoftSSOCanceled   = errors.New("Microsoft SSO login was canceled")
+	errMicrosoftSSOCanceled   = errors.New("this Microsoft SSO login was canceled")
 	errMicrosoftAccountExists = errors.New("this Microsoft account is already added")
 )
 
@@ -158,17 +158,17 @@ func (f *microsoftFlows) addAccountLocked(sessionID string, account config.Accou
 	return config.AddAccount(account)
 }
 
-func writeMicrosoftError(w http.ResponseWriter, status int, err error) {
+func writeMicrosoftError(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 func writeMicrosoftAddError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, errMicrosoftSSOCanceled), errors.Is(err, errMicrosoftAccountExists):
-		writeMicrosoftError(w, http.StatusConflict, err)
+		writeMicrosoftError(w, http.StatusConflict, err.Error())
 	default:
-		writeMicrosoftError(w, http.StatusInternalServerError, err)
+		writeMicrosoftError(w, http.StatusInternalServerError, err.Error())
 	}
 }
 
@@ -193,7 +193,7 @@ func (h *Handler) writeMicrosoftAdded(w http.ResponseWriter, account config.Acco
 func (h *Handler) apiStartMicrosoftSSO(w http.ResponseWriter, _ *http.Request) {
 	sessionID, authorizeURL, expiresIn, err := auth.StartMicrosoftSSOLogin()
 	if err != nil {
-		writeMicrosoftError(w, http.StatusInternalServerError, err)
+		writeMicrosoftError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -214,18 +214,18 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeMicrosoftError(w, http.StatusBadRequest, errors.New("Invalid JSON"))
+		writeMicrosoftError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 	sessionID := strings.TrimSpace(req.SessionID)
 	if sessionID == "" || strings.TrimSpace(req.CallbackURL) == "" {
-		writeMicrosoftError(w, http.StatusBadRequest, errors.New("sessionId and callbackUrl are required"))
+		writeMicrosoftError(w, http.StatusBadRequest, "sessionId and callbackUrl are required")
 		return
 	}
 
 	progress, err := auth.ContinueMicrosoftSSOLogin(sessionID, req.CallbackURL)
 	if err != nil {
-		writeMicrosoftError(w, http.StatusBadRequest, err)
+		writeMicrosoftError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if progress.AuthorizationURL != "" {
@@ -237,7 +237,7 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if progress.Result == nil {
-		writeMicrosoftError(w, http.StatusInternalServerError, errors.New("Microsoft SSO returned no credential"))
+		writeMicrosoftError(w, http.StatusInternalServerError, "Microsoft SSO returned no credential")
 		return
 	}
 
@@ -263,7 +263,7 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 	flows := microsoftSSOFlows
 	ctx, ok := flows.beginDiscovery(r.Context(), sessionID)
 	if !ok {
-		writeMicrosoftError(w, http.StatusConflict, errMicrosoftSSOCanceled)
+		writeMicrosoftError(w, http.StatusConflict, errMicrosoftSSOCanceled.Error())
 		return
 	}
 	profiles, profileErr := DiscoverKiroProfiles(ctx, &account)
@@ -275,13 +275,13 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 	flows.mu.Lock()
 	defer flows.mu.Unlock()
 	if flows.canceledLocked(sessionID, time.Now()) {
-		writeMicrosoftError(w, http.StatusConflict, errMicrosoftSSOCanceled)
+		writeMicrosoftError(w, http.StatusConflict, errMicrosoftSSOCanceled.Error())
 		return
 	}
 	if len(profiles) > 1 {
 		selectionID, err := flows.storeSelectionLocked(sessionID, account, profiles, time.Now())
 		if err != nil {
-			writeMicrosoftError(w, http.StatusServiceUnavailable, err)
+			writeMicrosoftError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -316,7 +316,7 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeMicrosoftError(w, http.StatusBadRequest, errors.New("Invalid JSON"))
+		writeMicrosoftError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 	selectionID := strings.TrimSpace(req.SelectionID)
@@ -328,7 +328,7 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 	sel := flows.selections[selectionID]
 	if sel == nil || !time.Now().Before(sel.expiresAt) {
 		delete(flows.selections, selectionID)
-		writeMicrosoftError(w, http.StatusBadRequest, errors.New("Microsoft profile selection not found or expired"))
+		writeMicrosoftError(w, http.StatusBadRequest, "Microsoft profile selection not found or expired")
 		return
 	}
 	//! Only an ARN Kiro listed for this token may be pinned; the client cannot name an arbitrary one.
@@ -340,7 +340,7 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 		}
 	}
 	if !offered {
-		writeMicrosoftError(w, http.StatusBadRequest, errors.New("Selected Kiro profile was not offered for this login"))
+		writeMicrosoftError(w, http.StatusBadRequest, "Selected Kiro profile was not offered for this login")
 		return
 	}
 
@@ -364,7 +364,7 @@ func (h *Handler) apiCancelMicrosoftSSO(w http.ResponseWriter, r *http.Request) 
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
-		writeMicrosoftError(w, http.StatusBadRequest, errors.New("Invalid JSON"))
+		writeMicrosoftError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 	microsoftSSOFlows.cancel(strings.TrimSpace(req.SessionID), strings.TrimSpace(req.SelectionID))

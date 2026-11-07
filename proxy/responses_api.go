@@ -797,9 +797,9 @@ func buildResponsesReasoningOutputItem(reasoning string) map[string]interface{} 
 	return buildResponsesReasoningOutputItemWithID("rs_"+uuid.NewString(), reasoning)
 }
 
-//! Codex decodes reasoning items strictly: "summary" holds summary_text parts and
-//! "content" holds reasoning_text parts. A bare string or an empty summary leaves the
-//! client with nothing to render, so the thinking block vanishes after the stream ends.
+// ! Codex decodes reasoning items strictly: "summary" holds summary_text parts and
+// ! "content" holds reasoning_text parts. A bare string or an empty summary leaves the
+// ! client with nothing to render, so the thinking block vanishes after the stream ends.
 func buildResponsesReasoningOutputItemWithID(id, reasoning string) map[string]interface{} {
 	summary := []interface{}{}
 	content := []interface{}{}

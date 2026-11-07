@@ -119,7 +119,7 @@ type ClaudeOutputConfig struct {
 	Effort string `json:"effort,omitempty"`
 }
 
-//! Effort is independent of thinking: it is forwarded as-is and never toggles thinking mode.
+// ! Effort is independent of thinking: it is forwarded as-is and never toggles thinking mode.
 func claudeOutputEffort(req *ClaudeRequest) string {
 	if req == nil || req.OutputConfig == nil {
 		return ""
@@ -801,9 +801,9 @@ func ensureObjectSchema(schema interface{}) interface{} {
 	return cleaned
 }
 
-//! flattenTopLevelComposition lifts oneOf/anyOf/allOf branch properties to the root
-//! and drops the composition keyword. Nested composition (inside properties) is left
-//! untouched since Anthropic only forbids it at the top level.
+// ! flattenTopLevelComposition lifts oneOf/anyOf/allOf branch properties to the root
+// ! and drops the composition keyword. Nested composition (inside properties) is left
+// ! untouched since Anthropic only forbids it at the top level.
 func flattenTopLevelComposition(m map[string]interface{}) {
 	flattened := false
 	for _, keyword := range []string{"oneOf", "anyOf", "allOf"} {
@@ -1664,8 +1664,8 @@ func dropLeadingAssistant(tail []KiroHistoryMessage) []KiroHistoryMessage {
 	return tail
 }
 
-//! maxPayloadBytes bounds conversation text. Inline image/document bytes are left
-//! out: counting a large image against it replaced the user's own text with ".".
+// ! maxPayloadBytes bounds conversation text. Inline image/document bytes are left
+// ! out: counting a large image against it replaced the user's own text with ".".
 func payloadByteSize(payload *KiroPayload) int {
 	raw, err := json.Marshal(payload)
 	if err != nil {

@@ -66,18 +66,6 @@ func isWebSearchToolUse(tu KiroToolUse) bool {
 	return name == "websearch"
 }
 
-func allWebSearchToolUses(toolUses []KiroToolUse) bool {
-	if len(toolUses) == 0 {
-		return false
-	}
-	for _, tu := range toolUses {
-		if !isWebSearchToolUse(tu) {
-			return false
-		}
-	}
-	return true
-}
-
 func resolveWebSearchToolResults(ctx context.Context, account *config.Account, toolUses []KiroToolUse) ([]KiroToolResult, error) {
 	results := make([]KiroToolResult, 0, len(toolUses))
 	for _, tu := range toolUses {

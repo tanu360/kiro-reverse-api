@@ -535,12 +535,6 @@ func normalizePromptCacheTTL(ttl time.Duration) time.Duration {
 	return defaultPromptCacheTTL
 }
 
-func computePromptCacheTTLBreakdown(profile *promptCacheProfile, matchedTokens int) (int, int) {
-	if profile == nil {
-		return 0, 0
-	}
-	return computePromptCacheTTLBreakdownLimited(profile, matchedTokens, maxInt(profile.TotalInputTokens-matchedTokens, 0))
-}
 func computePromptCacheTTLBreakdownLimited(profile *promptCacheProfile, matchedTokens, creation int) (int, int) {
 	if profile == nil || len(profile.Breakpoints) == 0 {
 		return 0, 0

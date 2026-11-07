@@ -558,8 +558,8 @@ func TestParseModelAndThinkingUsesConfiguredMappings(t *testing.T) {
 	}
 }
 
-//! Guards the Claude Code (/v1/messages) path: the top-level composition flattener must
-//! leave ordinary tool schemas, and any nested oneOf/anyOf/allOf, completely untouched.
+// ! Guards the Claude Code (/v1/messages) path: the top-level composition flattener must
+// ! leave ordinary tool schemas, and any nested oneOf/anyOf/allOf, completely untouched.
 func TestEnsureObjectSchemaLeavesClaudeCodeToolSchemasIntact(t *testing.T) {
 	const schemas = `[
 	{"type":"object","properties":{"file_path":{"type":"string"},"limit":{"type":"integer"},"offset":{"type":"integer"}},"required":["file_path"]},
@@ -601,8 +601,8 @@ func TestEnsureObjectSchemaLeavesClaudeCodeToolSchemasIntact(t *testing.T) {
 	}
 }
 
-//! A schema with no root composition keyword keeps whatever type it declared; only a
-//! flattened schema is forced back to "object".
+// ! A schema with no root composition keyword keeps whatever type it declared; only a
+// ! flattened schema is forced back to "object".
 func TestEnsureObjectSchemaKeepsDeclaredTypeWithoutComposition(t *testing.T) {
 	got := ensureObjectSchema(map[string]interface{}{
 		"type":       "string",

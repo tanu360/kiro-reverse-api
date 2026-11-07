@@ -597,24 +597,6 @@ FROM backup_entries WHERE id=?`, id)
 	return &e, data, nil
 }
 
-func reloadFromDisk() error {
-	raw, ok, err := getSetting("config")
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("config setting missing after restore")
-	}
-	var c Config
-	if err := json.Unmarshal([]byte(raw), &c); err != nil {
-		return err
-	}
-	cfgLock.Lock()
-	cfg = &c
-	cfgLock.Unlock()
-	return LoadCredentials()
-}
-
 func RestoreFromBytes(data []byte, note string) error {
 	parsed, err := parseBackupData(data)
 	if err != nil {

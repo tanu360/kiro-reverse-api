@@ -163,7 +163,7 @@ func StartMicrosoftSSOLogin() (sessionID, authorizationURL string, expiresIn int
 func ContinueMicrosoftSSOLogin(sessionID, callbackURL string) (*MicrosoftSSOProgress, error) {
 	session := getMicrosoftSSOSession(strings.TrimSpace(sessionID))
 	if session == nil {
-		return nil, fmt.Errorf("Microsoft SSO session not found or expired")
+		return nil, fmt.Errorf("unknown or expired Microsoft SSO session")
 	}
 
 	session.mu.Lock()
@@ -177,11 +177,11 @@ func ContinueMicrosoftSSOLogin(sessionID, callbackURL string) (*MicrosoftSSOProg
 	}()
 
 	if session.canceled.Load() {
-		return nil, fmt.Errorf("Microsoft SSO session not found or expired")
+		return nil, fmt.Errorf("unknown or expired Microsoft SSO session")
 	}
 	if time.Now().After(session.ExpiresAt) {
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("Microsoft SSO session expired")
+		return nil, fmt.Errorf("this Microsoft SSO session has expired")
 	}
 
 	switch session.stage {
@@ -190,7 +190,7 @@ func ContinueMicrosoftSSOLogin(sessionID, callbackURL string) (*MicrosoftSSOProg
 	case microsoftSSOWaitingForProvider:
 		return continueMicrosoftProviderLeg(session, callbackURL)
 	default:
-		return nil, fmt.Errorf("Microsoft SSO session is in an invalid state")
+		return nil, fmt.Errorf("this Microsoft SSO session is in an invalid state")
 	}
 }
 
@@ -212,7 +212,7 @@ func continueMicrosoftPortalLeg(session *microsoftSSOSession, rawURL string) (*M
 	} else if errCode != "" {
 		description, _ := optionalSingleQueryValue(q, "error_description")
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("Kiro sign-in failed: %s%s", errCode, formatOAuthDescription(description))
+		return nil, fmt.Errorf("sign-in to Kiro failed: %s%s", errCode, formatOAuthDescription(description))
 	}
 
 	// Some Kiro portal builds omit state from the external-IdP descriptor. In
@@ -221,7 +221,7 @@ func continueMicrosoftPortalLeg(session *microsoftSSOSession, rawURL string) (*M
 	if state, err := optionalSingleQueryValue(q, "state"); err != nil {
 		return nil, err
 	} else if state != "" && !constantTimeEqual(state, session.PortalState) {
-		return nil, fmt.Errorf("Kiro callback state does not match this login session")
+		return nil, fmt.Errorf("callback state from Kiro does not match this login session")
 	}
 
 	loginOption, err := requiredSingleQueryValue(q, "login_option")
@@ -248,10 +248,10 @@ func continueMicrosoftPortalLeg(session *microsoftSSOSession, rawURL string) (*M
 		return nil, err
 	}
 	if len(loginHint) > 320 {
-		return nil, fmt.Errorf("Microsoft login_hint is too long")
+		return nil, fmt.Errorf("invalid Microsoft login_hint: too long")
 	}
 	if _, err := uuid.Parse(clientID); err != nil {
-		return nil, fmt.Errorf("Microsoft client_id is not a valid UUID")
+		return nil, fmt.Errorf("invalid Microsoft client_id: not a UUID")
 	}
 	scopes, err = validateMicrosoftScopes(scopes, clientID)
 	if err != nil {
@@ -265,7 +265,7 @@ func continueMicrosoftPortalLeg(session *microsoftSSOSession, rawURL string) (*M
 	}
 	if session.canceled.Load() {
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("Microsoft SSO session was canceled")
+		return nil, fmt.Errorf("this Microsoft SSO session was canceled")
 	}
 	verifier, err := randomURLSafe(32)
 	if err != nil {
@@ -312,7 +312,7 @@ func continueMicrosoftProviderLeg(session *microsoftSSOSession, rawURL string) (
 	}
 	leg := session.providerLeg
 	if leg == nil {
-		return nil, fmt.Errorf("Microsoft SSO provider state is missing")
+		return nil, fmt.Errorf("this Microsoft SSO session has no provider state")
 	}
 	q := callback.Query()
 	state, err := requiredSingleQueryValue(q, "state")
@@ -320,21 +320,21 @@ func continueMicrosoftProviderLeg(session *microsoftSSOSession, rawURL string) (
 		return nil, err
 	}
 	if !constantTimeEqual(state, leg.State) {
-		return nil, fmt.Errorf("Microsoft callback state does not match this login session")
+		return nil, fmt.Errorf("callback state from Microsoft does not match this login session")
 	}
 	if errCode, err := optionalSingleQueryValue(q, "error"); err != nil {
 		return nil, err
 	} else if errCode != "" {
 		description, _ := optionalSingleQueryValue(q, "error_description")
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("Microsoft authorization failed: %s%s", errCode, formatOAuthDescription(description))
+		return nil, fmt.Errorf("authorization with Microsoft failed: %s%s", errCode, formatOAuthDescription(description))
 	}
 	code, err := requiredSingleQueryValue(q, "code")
 	if err != nil {
 		return nil, err
 	}
 	if len(code) > 8192 {
-		return nil, fmt.Errorf("Microsoft authorization code is too long")
+		return nil, fmt.Errorf("invalid Microsoft authorization code: too long")
 	}
 
 	client := GetAuthClientForProxy(session.ProxyURL)
@@ -345,12 +345,12 @@ func continueMicrosoftProviderLeg(session *microsoftSSOSession, rawURL string) (
 	}
 	if session.canceled.Load() {
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("Microsoft SSO session was canceled")
+		return nil, fmt.Errorf("this Microsoft SSO session was canceled")
 	}
 	metadata := parseExternalTokenMetadata(token.AccessToken)
 	if !externalTokenTenantMatches(metadata, leg.IssuerURL) {
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("Microsoft access token tenant does not match the login issuer")
+		return nil, fmt.Errorf("tenant of the Microsoft access token does not match the login issuer")
 	}
 
 	email, userID := externalIdpIdentity(metadata, leg.IssuerURL)
@@ -416,11 +416,11 @@ func optionalSingleQueryValue(q url.Values, key string) (string, error) {
 
 func validateMicrosoftScopes(raw, clientID string) (string, error) {
 	if len(raw) > 4096 {
-		return "", fmt.Errorf("Microsoft scopes are too long")
+		return "", fmt.Errorf("invalid Microsoft scopes: too long")
 	}
 	fields := strings.Fields(raw)
 	if len(fields) == 0 || len(fields) > 16 {
-		return "", fmt.Errorf("Microsoft scopes are invalid")
+		return "", fmt.Errorf("invalid Microsoft scopes")
 	}
 	standard := map[string]bool{
 		"openid": true, "profile": true, "email": true, "offline_access": true,
@@ -447,16 +447,16 @@ func validateMicrosoftScopes(raw, clientID string) (string, error) {
 		case strings.HasPrefix(scope, resourcePrefix) && kiroScopes[strings.TrimPrefix(scope, resourcePrefix)]:
 			hasKiroScope = true
 		default:
-			return "", fmt.Errorf("Microsoft scope %q is not expected for Kiro", scope)
+			return "", fmt.Errorf("unexpected Microsoft scope %q for Kiro", scope)
 		}
 		seen[scope] = true
 		normalized = append(normalized, scope)
 	}
 	if !hasOfflineAccess {
-		return "", fmt.Errorf("Microsoft scopes must include offline_access")
+		return "", fmt.Errorf("invalid Microsoft scopes: must include offline_access")
 	}
 	if !hasKiroScope {
-		return "", fmt.Errorf("Microsoft scopes do not contain a Kiro resource scope")
+		return "", fmt.Errorf("invalid Microsoft scopes: no Kiro resource scope")
 	}
 	return strings.Join(normalized, " "), nil
 }
@@ -465,7 +465,7 @@ func validateMicrosoftScopes(raw, clientID string) (string, error) {
 // a Microsoft external-IdP account.
 func NormalizeExternalIdpScopes(raw, clientID string) (string, error) {
 	if _, err := uuid.Parse(strings.TrimSpace(clientID)); err != nil {
-		return "", fmt.Errorf("Microsoft client_id is not a valid UUID")
+		return "", fmt.Errorf("invalid Microsoft client_id: not a UUID")
 	}
 	return validateMicrosoftScopes(raw, strings.TrimSpace(clientID))
 }
@@ -531,7 +531,7 @@ func discoverMicrosoftOIDC(client *http.Client, issuerURL string) (authorization
 
 	response, err := noRedirectClient(client).Do(request)
 	if err != nil {
-		return "", "", fmt.Errorf("Microsoft OIDC discovery failed: %w", err)
+		return "", "", fmt.Errorf("fetch Microsoft OIDC discovery document: %w", err)
 	}
 	defer response.Body.Close()
 	body, err := readBoundedBody(response.Body, microsoftSSOMaxResponse)
@@ -539,7 +539,7 @@ func discoverMicrosoftOIDC(client *http.Client, issuerURL string) (authorization
 		return "", "", fmt.Errorf("read Microsoft OIDC discovery response: %w", err)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", "", fmt.Errorf("Microsoft OIDC discovery failed with HTTP %d", response.StatusCode)
+		return "", "", fmt.Errorf("fetch Microsoft OIDC discovery document: HTTP %d", response.StatusCode)
 	}
 	var document struct {
 		Issuer                string `json:"issuer"`
@@ -550,13 +550,13 @@ func discoverMicrosoftOIDC(client *http.Client, issuerURL string) (authorization
 		return "", "", fmt.Errorf("parse Microsoft OIDC discovery response: %w", err)
 	}
 	if !sameNormalizedURL(document.Issuer, issuer.String()) {
-		return "", "", fmt.Errorf("Microsoft OIDC discovery issuer does not match the requested issuer")
+		return "", "", fmt.Errorf("discovered Microsoft OIDC issuer does not match the requested issuer")
 	}
 	if err := validateMicrosoftDiscoveredEndpoint(document.AuthorizationEndpoint, issuer, tenant, "/oauth2/v2.0/authorize"); err != nil {
-		return "", "", fmt.Errorf("Microsoft authorization endpoint rejected: %w", err)
+		return "", "", fmt.Errorf("discovered Microsoft authorization endpoint rejected: %w", err)
 	}
 	if err := validateMicrosoftDiscoveredEndpoint(document.TokenEndpoint, issuer, tenant, "/oauth2/v2.0/token"); err != nil {
-		return "", "", fmt.Errorf("Microsoft token endpoint rejected: %w", err)
+		return "", "", fmt.Errorf("discovered Microsoft token endpoint rejected: %w", err)
 	}
 	return document.AuthorizationEndpoint, document.TokenEndpoint, nil
 }
@@ -567,18 +567,18 @@ func parseMicrosoftIssuer(raw string) (*url.URL, string, error) {
 	}
 	u, _ := url.Parse(strings.TrimRight(strings.TrimSpace(raw), "/"))
 	if u.RawQuery != "" {
-		return nil, "", fmt.Errorf("Microsoft issuer must not contain a query")
+		return nil, "", fmt.Errorf("invalid Microsoft issuer: must not contain a query")
 	}
 	segments := strings.Split(strings.Trim(u.EscapedPath(), "/"), "/")
 	if len(segments) != 2 || !strings.EqualFold(segments[1], "v2.0") {
-		return nil, "", fmt.Errorf("Microsoft issuer must end with /<tenant>/v2.0")
+		return nil, "", fmt.Errorf("invalid Microsoft issuer: must end with /<tenant>/v2.0")
 	}
 	tenant, err := url.PathUnescape(segments[0])
 	if err != nil {
-		return nil, "", fmt.Errorf("Microsoft issuer tenant is invalid")
+		return nil, "", fmt.Errorf("invalid Microsoft issuer tenant")
 	}
 	if _, err := uuid.Parse(tenant); err != nil {
-		return nil, "", fmt.Errorf("Microsoft issuer tenant must be a UUID")
+		return nil, "", fmt.Errorf("invalid Microsoft issuer tenant: not a UUID")
 	}
 	return u, tenant, nil
 }
@@ -620,10 +620,10 @@ func exchangeMicrosoftAuthorizationCode(client *http.Client, leg *microsoftProvi
 	form.Set("scope", leg.Scopes)
 	token, err := postExternalIdpToken(context.Background(), client, leg.TokenEndpoint, leg.IssuerURL, form)
 	if err != nil {
-		return nil, fmt.Errorf("Microsoft token exchange failed: %w", err)
+		return nil, fmt.Errorf("token exchange with Microsoft failed: %w", err)
 	}
 	if token.RefreshToken == "" {
-		return nil, fmt.Errorf("Microsoft token exchange did not return a refresh token")
+		return nil, fmt.Errorf("token exchange with Microsoft did not return a refresh token")
 	}
 	return token, nil
 }
