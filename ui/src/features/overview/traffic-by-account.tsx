@@ -102,6 +102,10 @@ export function TrafficByAccount(): JSX.Element {
       }
       return row;
     });
+    // From the first bucket with traffic to now: an hour that only just got busy draws its few
+    // bars in the middle of the plot (TrafficByAccountBars), not at its left edge.
+    const firstBusy = rows.findIndex((row) => all.some((item) => Number(row[item.key]) > 0));
+    const visibleRows = firstBusy > 0 ? rows.slice(firstBusy) : rows;
     const series: AccountSeries[] = all.map(({ key, text, color }) => ({
       key,
       label: text,
@@ -115,7 +119,8 @@ export function TrafficByAccount(): JSX.Element {
       ...totals(buckets),
     }));
     return {
-      rows,
+      rows: visibleRows,
+      slots: rows.length,
       series,
       legend,
       total: totals(global),
@@ -191,6 +196,7 @@ export function TrafficByAccount(): JSX.Element {
               formatCount={(value) => formatNumber(value, lang)}
               reducedMotion={reducedMotion}
               series={view.series}
+              slots={view.slots}
             />
           </Suspense>
         </figure>

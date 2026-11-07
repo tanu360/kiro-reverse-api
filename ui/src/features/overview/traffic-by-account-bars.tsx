@@ -21,10 +21,16 @@ export interface AccountBucket {
   [key: string]: string | number;
 }
 
+/** Side margin of the plot: room for the first and last time label, centred on their bars. */
+const SIDE = 20;
+
 /**
  * Lazy-loaded Bklit stacked bar chart for Traffic by account: one bar per two-minute bucket of
  * the last hour, stacked by the busiest accounts and "Other accounts" (oldest on the left). The
  * tooltip lists every account's requests in the hovered bucket, with its failures after them.
+ * `data` may hold fewer buckets than the hour's `slots` (traffic began a few minutes ago): the
+ * plot then keeps the full-hour bar width and sits centred, growing outward as buckets arrive,
+ * the older bars moving left to make room for the newest.
  */
 export default function TrafficByAccountBars({
   data,
@@ -32,53 +38,72 @@ export default function TrafficByAccountBars({
   formatCount,
   failedLabel,
   reducedMotion,
+  slots = data.length,
 }: {
   data: AccountBucket[];
   series: AccountSeries[];
   formatCount: (value: number) => string;
   failedLabel: (count: number) => string;
   reducedMotion: boolean;
+  /** Buckets in the whole window; `data` may cover only the newest of them. */
+  slots?: number;
 }): JSX.Element {
   // Phones get a taller plot, so thirty bars do not turn into slivers.
   const phone = useIsMobile();
+  const full = data.length >= slots;
+  const share = Math.min(1, data.length / Math.max(1, slots));
   return (
-    <BarChart
-      aspectRatio={phone ? "2 / 1" : "4 / 1"}
-      barGap={0.3}
-      className="w-full"
-      data={data}
-      // Side room for the first and last time label, centred on their bars.
-      margin={{ top: 8, right: 20, bottom: 28, left: 20 }}
-      stacked
-      stackGap={1}
-      xDataKey="name"
+    // The box keeps the full-hour height; the plot inside is as wide as its buckets need.
+    <div
+      className="flex w-full justify-center"
+      data-slot="traffic-bars"
+      style={{ aspectRatio: phone ? "2 / 1" : "4 / 1" }}
     >
-      <Grid horizontal numTicksRows={3} />
-      {series.map((item) => (
-        <Bar animate={!reducedMotion} dataKey={item.key} fill={item.color} key={item.key} />
-      ))}
-      <BarXAxis maxLabels={{ base: 3, sm: 4, md: 6 }} />
-      <ChartTooltip
-        content={({ point }) => {
-          const rows: TooltipRow[] = series
-            .filter((item) => Number(point[item.key] ?? 0) > 0)
-            .map((item) => {
-              const failed = Number(point[`${item.key}Failed`] ?? 0);
-              return {
-                color: item.color,
-                label: item.label,
-                value:
-                  failed > 0
-                    ? `${formatCount(Number(point[item.key]))} · ${failedLabel(failed)}`
-                    : formatCount(Number(point[item.key])),
-              };
-            });
-          return <TooltipContent mono rows={rows} title={String(point.range ?? point.name)} />;
+      <div
+        className="h-full"
+        style={{
+          width: full ? "100%" : `calc((100% - ${SIDE * 2}px) * ${share} + ${SIDE * 2}px)`,
         }}
-        showCrosshair={false}
-        showDatePill={false}
-        showDots={false}
-      />
-    </BarChart>
+      >
+        <BarChart
+          aspectRatio="auto"
+          barGap={0.3}
+          className="h-full"
+          data={data}
+          margin={{ top: 8, right: SIDE, bottom: 28, left: SIDE }}
+          stacked
+          stackGap={1}
+          xDataKey="name"
+        >
+          {/* Grid lines only across a full hour: on a short centred plot they stop mid-card. */}
+          {full ? <Grid horizontal numTicksRows={3} /> : null}
+          {series.map((item) => (
+            <Bar animate={!reducedMotion} dataKey={item.key} fill={item.color} key={item.key} />
+          ))}
+          <BarXAxis maxLabels={{ base: 3, sm: 4, md: 6 }} />
+          <ChartTooltip
+            content={({ point }) => {
+              const rows: TooltipRow[] = series
+                .filter((item) => Number(point[item.key] ?? 0) > 0)
+                .map((item) => {
+                  const failed = Number(point[`${item.key}Failed`] ?? 0);
+                  return {
+                    color: item.color,
+                    label: item.label,
+                    value:
+                      failed > 0
+                        ? `${formatCount(Number(point[item.key]))} · ${failedLabel(failed)}`
+                        : formatCount(Number(point[item.key])),
+                  };
+                });
+              return <TooltipContent mono rows={rows} title={String(point.range ?? point.name)} />;
+            }}
+            showCrosshair={false}
+            showDatePill={false}
+            showDots={false}
+          />
+        </BarChart>
+      </div>
+    </div>
   );
 }
