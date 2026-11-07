@@ -29,8 +29,14 @@ import { cn } from "@/lib/utils";
  */
 export const PAGER_CHEVRON_CLASS =
   "rounded-full border-input bg-(--field) text-foreground before:rounded-full hover:bg-(--field-hover) data-pressed:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
-// The page numbers: round quiet buttons with no fill; the current page is the bold one.
-const PAGE = "rounded-full tabular-nums before:rounded-full";
+/*
+ * The page numbers and the ellipsis share one box, the icon button's (36 / 32 / coarse 40), so
+ * the numbers keep an even beat; a wide number ("1,024") grows its box into a pill instead of
+ * spilling out of the circle. The numbers are quiet buttons with no fill; the current page is the
+ * bold one. Proportional digits: Geist's tabular 1 has a foot that reads as another typeface.
+ */
+const PAGE_BOX = "min-w-9 sm:min-w-8 pointer-coarse:min-w-10";
+const PAGE = cn(PAGE_BOX, "rounded-full px-1.5 before:rounded-full");
 const PAGE_ACTIVE = "font-semibold text-foreground";
 
 /**
@@ -165,7 +171,7 @@ export function DataTablePagination({
                 {pages.map((n, index) => (
                   <PaginationItem className="flex items-center gap-0.5" key={n}>
                     {index > 0 && n - pages[index - 1] > 1 ? (
-                      <PaginationEllipsis className="min-w-4 text-muted-foreground" />
+                      <PaginationEllipsis className={cn(PAGE_BOX, "text-muted-foreground")} />
                     ) : null}
                     <PaginationLink
                       isActive={n === page}
@@ -174,7 +180,6 @@ export function DataTablePagination({
                           aria-label={t("table.page", { n: formatNumber(n, lang) })}
                           className={cn(PAGE, n === page && PAGE_ACTIVE)}
                           onClick={() => onPageChange(n)}
-                          size="icon"
                           variant="quiet"
                         />
                       }
