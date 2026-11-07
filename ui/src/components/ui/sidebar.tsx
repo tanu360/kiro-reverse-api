@@ -781,7 +781,7 @@ export function SidebarMenuSub({
         // Kiro patch: a tree as in the reference sidebars. The line runs down the centre of
         // the parent row's icon and stops at the last row's node dot.
         "relative ms-[calc(var(--sidebar-row-content-inset)+0.5rem)] flex min-w-0 flex-col gap-0.5 ps-3.5 pt-0.5",
-        "before:pointer-events-none before:absolute before:start-0 before:top-0 before:bottom-4 before:w-px before:-translate-x-1/2 before:bg-sidebar-muted-foreground/25 max-lg:before:bottom-5",
+        "before:pointer-events-none before:absolute before:start-0 before:top-0 before:bottom-4 before:w-px before:-translate-x-1/2 before:bg-primary/25 max-lg:before:bottom-5 dark:before:bg-primary/45",
         "group-data-[collapsible=icon]:hidden",
         className,
       )}
@@ -801,8 +801,9 @@ export function SidebarMenuSubItem({
       className={cn(
         "group/menu-sub-item relative",
         // Kiro patch: the node dot on the tree line, ringed in the sidebar colour so the line
-        // breaks around it; in the label colour on the selected row.
-        "before:pointer-events-none before:absolute before:-start-3.5 before:top-1/2 before:z-10 before:size-1.5 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-sidebar-muted-foreground/45 before:ring-2 before:ring-sidebar before:transition-colors hover:before:bg-sidebar-muted-foreground has-data-[active=true]:before:bg-sidebar-foreground",
+        // breaks around it. Dots and line take the primary accent: a soft tint at rest (a
+        // stronger one on the dark sidebar), the full colour on hover and on the selected row.
+        "before:pointer-events-none before:absolute before:-start-3.5 before:top-1/2 before:z-10 before:size-1.5 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-primary/55 dark:before:bg-primary/80 before:ring-2 before:ring-sidebar before:transition-colors hover:before:bg-primary has-data-[active=true]:before:bg-primary",
         className,
       )}
       data-sidebar="menu-sub-item"
