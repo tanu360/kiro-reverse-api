@@ -148,7 +148,7 @@
   "detail.profileLoading": "Loading Kiro profiles…",
   "detail.profileList": "Kiro profiles",
   "detail.profileNone": "No Kiro profile is available for this account.",
-  "detail.profileUnsupported": "Kiro profiles exist only for Enterprise (IAM Identity Center) and Microsoft SSO accounts. This login type has none, and requests work without one.",
+  "detail.profileUnsupported": "Kiro profiles exist only for Enterprise (IAM Identity Center) and Microsoft SSO accounts.",
   "detail.profileCurrent": "In use",
   "detail.profileUse": "Use selected profile",
   "detail.profileUnpin": "Return to automatic",

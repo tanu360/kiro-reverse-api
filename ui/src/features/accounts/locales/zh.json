@@ -137,7 +137,7 @@
   "detail.profileLoading": "正在加载 Kiro Profile…",
   "detail.profileList": "Kiro Profile 列表",
   "detail.profileNone": "此账号没有可用的 Kiro Profile。",
-  "detail.profileUnsupported": "Kiro Profile 仅适用于企业（IAM Identity Center）和 Microsoft SSO 账号。此登录方式没有 Kiro Profile，请求无需它也能正常使用。",
+  "detail.profileUnsupported": "Kiro Profile 仅适用于企业（IAM Identity Center）和 Microsoft SSO 账号。",
   "detail.profileCurrent": "使用中",
   "detail.profileUse": "使用所选 Kiro Profile",
   "detail.profileUnpin": "恢复自动",
