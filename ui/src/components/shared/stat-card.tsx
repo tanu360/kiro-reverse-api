@@ -226,9 +226,12 @@ function MetricLabel({ metric }: { metric: StatMetric }): JSX.Element {
 const VALUE_SIZE = { display: "text-display", kpi: "text-kpi" } as const;
 /*
  * The metrics grid under its hairline. In a joined group the rows share subgrid tracks, so the
- * hairlines line up at the top of the metrics row; in a lone card it sinks to the bottom.
+ * hairlines line up at the top of the metrics row; in a lone card it sinks to the bottom. The
+ * hairline runs to the tile's edges (it bleeds through the tile's 16 / 20 px padding, which the
+ * grid puts back inside), so across a joined strip it meets the column dividers as one line.
  */
-const METRICS_CLASS = "grid grid-cols-2 gap-3 border-border-subtle border-t pt-3";
+const METRICS_CLASS =
+  "-mx-4 grid grid-cols-2 gap-3 border-border-subtle border-t px-4 pt-3 sm:-mx-5 sm:px-5";
 
 /*
  * The aside trend. The value row and the delta row are each a `stat-row` container (a subgrid
