@@ -36,6 +36,7 @@ export const queryKeys = {
   requests: {
     all: ["requests"] as const,
     list: (p: RecentRequestsParams) => ["requests", "list", p] as const,
+    counts: () => ["requests", "counts"] as const,
   },
   apiKeys: {
     all: ["api-keys"] as const,

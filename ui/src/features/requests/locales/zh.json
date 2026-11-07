@@ -11,6 +11,8 @@
   "allStatuses": "全部",
   "ok": "成功",
   "fail": "失败",
+  "filter.clear": "清除",
+  "filter.results": "{shown} / {total}",
   "table": "请求",
   "time": "时间",
   "status": "状态",

@@ -11,6 +11,8 @@
   "allStatuses": "All",
   "ok": "Succeeded",
   "fail": "Failed",
+  "filter.clear": "Clear",
+  "filter.results": "{shown} of {total}",
   "table": "Requests",
   "time": "Time",
   "status": "Status",

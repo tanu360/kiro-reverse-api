@@ -11,6 +11,8 @@
   "allStatuses": "Tất cả",
   "ok": "Thành công",
   "fail": "Thất bại",
+  "filter.clear": "Xóa",
+  "filter.results": "{shown} / {total}",
   "table": "Yêu cầu",
   "time": "Thời gian",
   "status": "Trạng thái",

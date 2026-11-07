@@ -11,7 +11,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { recentRequestsQuery } from "@/lib/api/requests";
+import { recentRequestsQuery, requestCountsQuery } from "@/lib/api/requests";
 import type { RequestRecord } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toastError } from "@/lib/toast";
@@ -45,6 +45,7 @@ export function RequestsPage(): JSX.Element {
   const navigate = useNavigate({ from: "/requests" });
   const params = useMemo(() => toQueryParams(search), [search]);
   const query = useQuery(recentRequestsQuery(params));
+  const countsQuery = useQuery(requestCountsQuery());
   const columns = useRequestColumns();
   const [selection, setSelection] = useState<Selection | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -100,6 +101,8 @@ export function RequestsPage(): JSX.Element {
     id: params.sort ?? DEFAULT_SORT,
     desc: (params.order ?? DEFAULT_ORDER) === "desc",
   };
+  const setSort = (next: RequestSort, desc: boolean) =>
+    updateSearch({ sort: next, order: desc ? "desc" : "asc", page: undefined });
 
   const clearFilters = () =>
     updateSearch({ search: undefined, status: undefined, page: undefined });
@@ -156,94 +159,98 @@ export function RequestsPage(): JSX.Element {
     ) : null;
   // Nothing to page through when the list fits the smallest page, is out of range or failed.
   const showPager = hasData && total > PAGE_SIZES[0] && !outOfRange && !fatalError;
+  const refresh = () => {
+    void query.refetch();
+    void countsQuery.refetch();
+  };
 
   return (
     <>
       <PageHeader
-        actions={
-          <RefreshButton fetching={query.isFetching} onRefresh={() => void query.refetch()} />
-        }
+        actions={<RefreshButton fetching={query.isFetching} onRefresh={refresh} />}
         description={t("description")}
         title={t("title")}
       />
 
-      {/* The container the toolbar and column widths respond to. */}
-      <DataTableCard
-        className="@container/requests"
-        footer={
-          showPager ? (
-            <DataTablePagination
-              onPageChange={(next) => updateSearch({ page: next })}
-              onPageSizeChange={(next) => {
-                if ((PAGE_SIZES as readonly number[]).includes(next)) {
-                  updateSearch({ pageSize: next as PageSize, page: undefined });
-                }
-              }}
-              page={page}
-              pageSize={pageSize}
-              pageSizeOptions={[...PAGE_SIZES]}
-              total={total}
+      <div className="flex min-w-0 flex-col gap-4">
+        {/* The container the toolbar and column widths respond to. */}
+        <DataTableCard
+          className="@container/requests"
+          toolbar={
+            showFilters ? (
+              <>
+                <RequestsToolbar
+                  counts={countsQuery.data}
+                  countsLoading={countsQuery.isPending}
+                  desc={sort.desc}
+                  onClear={clearFilters}
+                  onPageSizeChange={(next) => {
+                    if ((PAGE_SIZES as readonly number[]).includes(next)) {
+                      updateSearch({ pageSize: next as PageSize, page: undefined });
+                    }
+                  }}
+                  onSearchChange={(text) =>
+                    updateSearch({ search: text || undefined, page: undefined }, { replace: true })
+                  }
+                  onSortChange={setSort}
+                  onStatusChange={(status) => updateSearch({ status, page: undefined })}
+                  pageSize={pageSize}
+                  search={search.search?.trim() ?? ""}
+                  shown={hasData ? total : undefined}
+                  sort={sort.id as RequestSort}
+                  status={search.status}
+                />
+                {memoryNote}
+              </>
+            ) : (
+              memoryNote
+            )
+          }
+        >
+          {fatalError ? (
+            <ErrorState
+              error={error}
+              onRetry={() => void query.refetch()}
+              retrying={query.isFetching}
+              title={t("loadError")}
             />
-          ) : null
-        }
-        toolbar={
-          showFilters ? (
-            <>
-              <RequestsToolbar
-                onSearchChange={(text) =>
-                  updateSearch({ search: text || undefined, page: undefined }, { replace: true })
-                }
-                onStatusChange={(status) => updateSearch({ status, page: undefined })}
-                search={search.search?.trim() ?? ""}
-                status={search.status}
-              />
-              {memoryNote}
-            </>
           ) : (
-            memoryNote
-          )
-        }
-      >
-        {fatalError ? (
-          <ErrorState
-            error={error}
-            onRetry={() => void query.refetch()}
-            retrying={query.isFetching}
-            title={t("loadError")}
+            <div
+              className={cn(
+                "transition-opacity",
+                query.isPlaceholderData && "opacity-60 motion-reduce:transition-none",
+              )}
+            >
+              <DataTable<RequestRecord>
+                caption={t("table")}
+                cardLayout="divided"
+                cardsBelow="2xl"
+                columns={columns}
+                data={rows}
+                defaultSortDesc={defaultSortDesc}
+                emptyState={emptyState}
+                filtered={filtered}
+                getRowId={rowKey}
+                loading={!hasData && query.isPending}
+                onRowClick={openRow}
+                onSortChange={(next) => setSort(next.id as RequestSort, next.desc)}
+                pageSize={pageSize}
+                renderCard={(row) => <RequestCard onOpen={() => openRow(row)} record={row} />}
+                sort={sort}
+              />
+            </div>
+          )}
+        </DataTableCard>
+        {/* The pager sits under the card, as on Accounts; the page size is the toolbar's Rows. */}
+        {showPager ? (
+          <DataTablePagination
+            onPageChange={(next) => updateSearch({ page: next })}
+            page={page}
+            pageSize={pageSize}
+            total={total}
           />
-        ) : (
-          <div
-            className={cn(
-              "transition-opacity",
-              query.isPlaceholderData && "opacity-60 motion-reduce:transition-none",
-            )}
-          >
-            <DataTable<RequestRecord>
-              caption={t("table")}
-              cardLayout="divided"
-              cardsBelow="2xl"
-              columns={columns}
-              data={rows}
-              defaultSortDesc={defaultSortDesc}
-              emptyState={emptyState}
-              filtered={filtered}
-              getRowId={rowKey}
-              loading={!hasData && query.isPending}
-              onRowClick={openRow}
-              onSortChange={(next) =>
-                updateSearch({
-                  sort: next.id as RequestSort,
-                  order: next.desc ? "desc" : "asc",
-                  page: undefined,
-                })
-              }
-              pageSize={pageSize}
-              renderCard={(row) => <RequestCard onOpen={() => openRow(row)} record={row} />}
-              sort={sort}
-            />
-          </div>
-        )}
-      </DataTableCard>
+        ) : null}
+      </div>
 
       <RequestDetailSheet
         count={rows.length}

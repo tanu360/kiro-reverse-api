@@ -1,14 +1,14 @@
-import {
-  ArrowDown02Icon,
-  ArrowUp02Icon,
-  ChevronDownIcon,
-  Search01Icon,
-} from "@hugeicons/core-free-icons";
+import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type JSX, type ReactNode, useEffect, useMemo, useRef } from "react";
-import { Badge } from "@/components/ui/badge";
+import { type JSX, type ReactNode, useMemo } from "react";
+import {
+  FilterTrigger,
+  PageSizeSelect,
+  SortSelect,
+  type StatusTab,
+  StatusTabs,
+} from "@/components/shared/table-toolbar";
 import { Button } from "@/components/ui/button";
-import { Group, GroupSeparator, GroupText } from "@/components/ui/group";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import {
   Menu,
@@ -16,12 +16,9 @@ import {
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
-  MenuTrigger,
 } from "@/components/ui/menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { selectTriggerIconClassName } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -50,44 +47,6 @@ const SELECT_DIMENSIONS: readonly FilterSelectDimension[] = ["plan", "auth", "re
 
 /** The radio value of "All" in a select, and of the All tab. */
 const ALL = "all";
-/** The radio value of the sort select's "Default" (the server order). */
-const DEFAULT_SORT = "default";
-
-/**
- * A "Label: Value" control: the muted label as a group segment, then an outline button with the
- * value and a chevron that opens a menu of radio rows. The button's name spells out "Plan: All",
- * since the label segment is not part of it. Even "All" leaves the button wider than index.css
- * popup-width's icon cut-off (3rem), so a short list such as Rows or Enabled fits its rows instead
- * of taking an icon menu's 11rem past the control (as the pager's Rows select).
- */
-function FilterTrigger({
-  label,
-  value,
-  after,
-}: {
-  label: string;
-  value: string;
-  after?: ReactNode;
-}): JSX.Element {
-  const { t } = useT("accounts");
-  return (
-    <Group>
-      <GroupText aria-hidden="true">{label}</GroupText>
-      <GroupSeparator />
-      <MenuTrigger
-        render={<Button aria-label={t("filter.trigger", { label, value })} variant="outline" />}
-      >
-        <span className="max-w-36 truncate">{value}</span>
-        {after}
-        <HugeiconsIcon
-          aria-hidden="true"
-          className={selectTriggerIconClassName}
-          icon={ChevronDownIcon}
-        />
-      </MenuTrigger>
-    </Group>
-  );
-}
 
 /** One filter as "Label: Value ▾", with All and each value (and its count) in the menu. */
 function FilterSelect({
@@ -139,210 +98,7 @@ function FilterSelect({
   );
 }
 
-/** "Sort by: Usage ↓": the column the table headers sort by, and the direction. */
-function SortSelect({
-  sort,
-  desc,
-  onChange,
-}: {
-  sort: AccountSort | undefined;
-  desc: boolean;
-  onChange: (sort: AccountSort | undefined, desc: boolean) => void;
-}): JSX.Element {
-  const { t } = useT("accounts");
-  const DirectionIcon = desc ? ArrowDown02Icon : ArrowUp02Icon;
-  return (
-    <Menu>
-      <FilterTrigger
-        after={
-          sort ? (
-            <HugeiconsIcon icon={DirectionIcon} aria-hidden="true" className="size-3.5" />
-          ) : null
-        }
-        label={t("sort.by")}
-        value={sort ? t(`columns.${sort}`) : t("sort.default")}
-      />
-      <MenuPopup align="start">
-        <MenuRadioGroup
-          onValueChange={(value) => {
-            if (value === DEFAULT_SORT) {
-              onChange(undefined, false);
-              return;
-            }
-            const next = value as AccountSort;
-            onChange(next, next === sort ? desc : defaultSortDesc(next));
-          }}
-          value={sort ?? DEFAULT_SORT}
-        >
-          <MenuRadioItem closeOnClick value={DEFAULT_SORT}>
-            {t("sort.default")}
-          </MenuRadioItem>
-          {ACCOUNT_SORTS.map((column) => (
-            <MenuRadioItem closeOnClick key={column} value={column}>
-              {t(`columns.${column}`)}
-            </MenuRadioItem>
-          ))}
-        </MenuRadioGroup>
-        {sort ? (
-          <>
-            <MenuSeparator />
-            <MenuRadioGroup
-              onValueChange={(value) => onChange(sort, value === "desc")}
-              value={desc ? "desc" : "asc"}
-            >
-              <MenuRadioItem closeOnClick value="asc">
-                {t("sort.asc")}
-              </MenuRadioItem>
-              <MenuRadioItem closeOnClick value="desc">
-                {t("sort.desc")}
-              </MenuRadioItem>
-            </MenuRadioGroup>
-          </>
-        ) : null}
-      </MenuPopup>
-    </Menu>
-  );
-}
-
-/** "Rows: 25": the page size, as a filter-style select at the end of the filter row. */
-function PageSizeSelect({
-  value,
-  options,
-  onChange,
-}: {
-  value: number;
-  options: readonly number[];
-  onChange: (size: number) => void;
-}): JSX.Element {
-  const { t, lang } = useT();
-  return (
-    <Menu>
-      <FilterTrigger label={t("table.rowsShort")} value={formatNumber(value, lang)} />
-      {/* Short numbers: the list fits them (the trigger is past the 3rem icon cut-off), not 11rem. */}
-      <MenuPopup align="end">
-        <MenuRadioGroup onValueChange={(next) => onChange(Number(next))} value={String(value)}>
-          {options.map((size) => (
-            <MenuRadioItem closeOnClick key={size} value={String(size)}>
-              {formatNumber(size, lang)}
-            </MenuRadioItem>
-          ))}
-        </MenuRadioGroup>
-      </MenuPopup>
-    </Menu>
-  );
-}
-
-type StatusTab = typeof ALL | StatusGroup;
-
-/** The scroll box's edge fade (ScrollArea's --fade-size): a tab under it reads as cut off. */
-const TAB_FADE_PX = 24;
-
-/**
- * Scrolls the track so the selected tab sits centred in it, when the tab is outside the visible
- * part or under an edge fade. Only the track scrolls, never the page.
- */
-function revealSelectedTab(list: HTMLElement | null, smooth: boolean) {
-  const tab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
-  const viewport = tab?.closest<HTMLElement>(
-    '[data-slot="scroll-area-viewport"], [data-slot="tabs-list-scroller"]',
-  );
-  if (!tab || !viewport) return;
-  const box = viewport.getBoundingClientRect();
-  const rect = tab.getBoundingClientRect();
-  if (box.width === 0) return;
-  const hidden = rect.left < box.left + TAB_FADE_PX || rect.right > box.right - TAB_FADE_PX;
-  if (!hidden) return;
-  const left = viewport.scrollLeft + rect.left + rect.width / 2 - (box.left + box.width / 2);
-  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  viewport.scrollTo?.({ left, behavior: smooth && !reduce ? "smooth" : "auto" });
-}
-
-/**
- * Keeps the selected tab in view: on load (a `?status=` link, a reload), once the counts replace
- * their placeholders (the track grows, so the scroll set while loading falls short), on every
- * change and whenever the track's width changes. Moves are instant until the list has loaded;
- * after that a picked tab glides into place.
- */
-function useSelectedTabInView(value: StatusTab, loading: boolean) {
-  const listRef = useRef<HTMLDivElement>(null);
-  const loadedRef = useRef(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `value` and `loading` move the tab.
-  useEffect(() => {
-    const smooth = loadedRef.current;
-    if (!loading) loadedRef.current = true;
-    revealSelectedTab(listRef.current, smooth);
-  }, [value, loading]);
-  // A wider or narrower track (counts arriving, a font swap, a rotation) can push it under the fade.
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => revealSelectedTab(list, false));
-    observer.observe(list);
-    return () => observer.disconnect();
-  }, []);
-  return listRef;
-}
-
-/**
- * All, Active, Needs attention and Disabled, each with its count, as underlined page tabs over a
- * hairline that scroll sideways (fading at the edge) when the row is too narrow; the selected tab
- * is kept in view and its count is purple. `end` sits at the right of the same row, on the same
- * hairline (outside the tablist). While `loading` the tabs
- * keep their place, disabled, with a placeholder for each count (zero counts would read as an
- * empty fleet), so the table does not shift when the list arrives.
- */
-function StatusTabs({
-  value,
-  counts,
-  total,
-  loading,
-  onValueChange,
-  end,
-}: {
-  value: StatusTab;
-  counts: Record<StatusGroup, number>;
-  total: number;
-  loading: boolean;
-  onValueChange: (value: StatusTab) => void;
-  end?: ReactNode;
-}): JSX.Element {
-  const { t, lang } = useT("accounts");
-  const listRef = useSelectedTabInView(value, loading);
-  const label: Record<StatusTab, string> = {
-    all: t("filter.all"),
-    active: t("health.active"),
-    attention: t("filter.attention"),
-    disabled: t("health.disabled"),
-  };
-  const tabs: StatusTab[] = [ALL, ...STATUS_GROUPS];
-  return (
-    // The tabs and `end` stretch to one height, so their two hairlines meet in one line.
-    <div className="flex min-w-0 items-stretch">
-      <Tabs
-        className="min-w-0 flex-1"
-        onValueChange={(next) => onValueChange(next as StatusTab)}
-        value={value}
-      >
-        <TabsList aria-label={t("filter.status")} ref={listRef} variant="underline">
-          {tabs.map((tab) => (
-            <TabsTab disabled={loading} key={tab} value={tab}>
-              {label[tab]}
-              {loading ? (
-                // The badge's size, so the track barely moves when the counts arrive.
-                <Skeleton className="h-5 w-7" />
-              ) : (
-                <Badge className="min-w-5" size="sm" tone={tab === value ? "primary" : "neutral"}>
-                  {formatNumber(tab === ALL ? total : counts[tab], lang)}
-                </Badge>
-              )}
-            </TabsTab>
-          ))}
-        </TabsList>
-      </Tabs>
-      {end ? <div className="flex shrink-0 items-center border-b ps-2">{end}</div> : null}
-    </div>
-  );
-}
+type AccountTab = typeof ALL | StatusGroup;
 
 export interface AccountsToolbarProps {
   /** The whole list: filter values and counts come from it, not from the filtered rows. */
@@ -415,7 +171,19 @@ export function AccountsToolbar({
     return counts;
   }, [options.status]);
 
-  const tab = statusFilterGroup(filters.status) ?? ALL;
+  const tab: AccountTab = statusFilterGroup(filters.status) ?? ALL;
+  const tabs: StatusTab<AccountTab>[] = [
+    { value: ALL, label: t("filter.all"), count: accounts.length },
+    ...STATUS_GROUPS.map((group) => ({
+      value: group,
+      label: t(group === "attention" ? "filter.attention" : `health.${group}`),
+      count: groupCounts[group],
+    })),
+  ];
+  const sortOptions = ACCOUNT_SORTS.map((column) => ({
+    value: column,
+    label: t(`columns.${column}`),
+  }));
   const issueOptions = options.status.filter(
     (option) => statusGroup(option.value as AccountStatus) === "attention",
   );
@@ -444,13 +212,13 @@ export function AccountsToolbar({
     <div className="flex min-w-0 flex-col gap-3" data-slot="accounts-toolbar">
       {showTabs ? (
         <StatusTabs
-          counts={groupCounts}
           end={tabActions}
+          label={t("filter.status")}
           loading={loading}
           onValueChange={(next) =>
             onFiltersChange({ status: next === ALL ? undefined : (next as AccountStatusFilter) })
           }
-          total={accounts.length}
+          tabs={tabs}
           value={tab}
         />
       ) : null}
@@ -485,7 +253,16 @@ export function AccountsToolbar({
                 scrollbarGutter="overlap"
               >
                 <div className="flex w-max items-center gap-2 p-1 @lg/accounts:w-auto @lg/accounts:flex-wrap">
-                  {showSort ? <SortSelect desc={desc} onChange={onSortChange} sort={sort} /> : null}
+                  {showSort ? (
+                    <SortSelect
+                      defaultLabel={t("sort.default")}
+                      defaultSortDesc={defaultSortDesc}
+                      desc={desc}
+                      onChange={onSortChange}
+                      options={sortOptions}
+                      sort={sort}
+                    />
+                  ) : null}
 
                   {showIssue ? (
                     <FilterSelect

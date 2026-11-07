@@ -11,6 +11,8 @@
   "allStatuses": "Todos",
   "ok": "Sucesso",
   "fail": "Falha",
+  "filter.clear": "Limpar",
+  "filter.results": "{shown} de {total}",
   "table": "Requisições",
   "time": "Horário",
   "status": "Status",

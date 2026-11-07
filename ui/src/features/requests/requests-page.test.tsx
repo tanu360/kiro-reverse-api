@@ -18,15 +18,23 @@ vi.mock("@/lib/toast", async (importOriginal) => {
 
 const RECENT_REQUESTS = apiUrl("/observe/recent-requests");
 
-/** Records every list request, then falls through to the feature mock. */
+/**
+ * Records every list request, then falls through to the feature mock. The tab counts' one-row
+ * pages (requestCountsQuery) are left out: the list never asks for a page of one.
+ */
 function recordRequests(): URLSearchParams[] {
   const seen: URLSearchParams[] = [];
   mockServer.use(
     http.get(RECENT_REQUESTS, ({ request }) => {
-      seen.push(new URL(request.url).searchParams);
+      const params = new URL(request.url).searchParams;
+      if (params.get("pageSize") !== "1") seen.push(params);
     }),
   );
   return seen;
+}
+
+function statusTabs(): HTMLElement {
+  return screen.getByRole("tablist", { name: "Status" });
 }
 
 function last(seen: URLSearchParams[]): URLSearchParams {
@@ -97,20 +105,54 @@ describe("RequestsPage", () => {
     expect(seen.every((params) => params.get("search") !== "  sonnet ")).toBe(true);
   });
 
+  it("counts each status in its tab, as Accounts does", async () => {
+    await renderApp("/requests");
+    await waitForRows();
+    const failed = mockDb.requests.filter((record) => !record.success).length;
+    const tabs = statusTabs();
+    await waitFor(() =>
+      expect(within(tabs).getByRole("tab", { name: /^All/ })).toHaveTextContent(
+        String(mockDb.requests.length),
+      ),
+    );
+    expect(within(tabs).getByRole("tab", { name: /^Succeeded/ })).toHaveTextContent(
+      String(mockDb.requests.length - failed),
+    );
+    expect(within(tabs).getByRole("tab", { name: /^Failed/ })).toHaveTextContent(String(failed));
+  });
+
   it("filters by failed status", async () => {
     const seen = recordRequests();
     const { user, router } = await renderApp("/requests");
     await waitForRows();
-    // The status filter is a radio group: one tab stop, arrow keys move the choice.
-    expect(screen.getByRole("radiogroup", { name: "Status" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
-    await user.click(screen.getByRole("radio", { name: "Failed" }));
+    const tabs = statusTabs();
+    await waitFor(() => expect(within(tabs).getByRole("tab", { name: /^Failed/ })).toBeEnabled());
+    expect(within(tabs).getByRole("tab", { name: /^All/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await user.click(within(tabs).getByRole("tab", { name: /^Failed/ }));
     await waitFor(() => expect(last(seen).get("status")).toBe("failed"));
     expect(router.state.location.search).toEqual({ status: "failed" });
-    expect(screen.getByRole("radio", { name: "Failed" })).toHaveAttribute("aria-checked", "true");
+    expect(within(tabs).getByRole("tab", { name: /^Failed/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     await waitFor(() => {
       for (const row of bodyRows()) expect(within(row).getByText(/^Failed/)).toBeInTheDocument();
     });
+  });
+
+  it("sorts from the Sort by select as a header click would", async () => {
+    const seen = recordRequests();
+    const { user, router } = await renderApp("/requests?page=2");
+    await waitForRows();
+    await user.click(screen.getByRole("button", { name: "Sort by: Time" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "Credits" }));
+    await waitFor(() => expect(last(seen).get("sort")).toBe("credits"));
+    expect(last(seen).get("order")).toBe("asc");
+    expect(router.state.location.search).toEqual({ sort: "credits", order: "asc" });
+    expect(screen.getByRole("button", { name: "Sort by: Credits" })).toBeInTheDocument();
   });
 
   it("sorts on the server and toggles the order on a second click", async () => {
@@ -137,14 +179,12 @@ describe("RequestsPage", () => {
     expect(await screen.findByText("26–50 of 320")).toBeInTheDocument();
   });
 
-  it("changes the page size from the Rows select in the table footer", async () => {
+  it("changes the page size from the Rows select at the end of the filter row", async () => {
     const seen = recordRequests();
     const { user, router } = await renderApp("/requests?page=2");
     await waitForRows();
-    const rows = screen.getByRole("combobox", { name: "Rows" });
-    expect(rows).toHaveTextContent("25");
-    await user.click(rows);
-    await user.click(await screen.findByRole("option", { name: "50" }));
+    await user.click(screen.getByRole("button", { name: "Rows: 25" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "50" }));
     await waitFor(() => expect(router.state.location.search).toEqual({ pageSize: 50 }));
     await waitFor(() => expect(last(seen).get("pageSize")).toBe("50"));
     expect(last(seen).get("page")).toBe("1");
@@ -365,7 +405,10 @@ describe("RequestsPage", () => {
     // Nothing to page through, so no "0–0 of 0" footer and no disabled Previous/Next.
     expect(screen.queryByText("0–0 of 0")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    // The empty state's action; the toolbar's Clear does the same.
+    await user.click(
+      screen.getAllByRole("button", { name: "Clear filters" }).at(-1) as HTMLElement,
+    );
     await waitFor(() => expect(router.state.location.search).toEqual({}));
     await waitForRows();
     expect(screen.getByRole("searchbox", { name: "Search requests" })).toHaveValue("");
@@ -382,7 +425,7 @@ describe("RequestsPage", () => {
     expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
     // Search and the status filter have nothing to narrow yet.
     expect(screen.queryByRole("searchbox", { name: "Search requests" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 
   it("offers the first page when the page is out of range", async () => {
