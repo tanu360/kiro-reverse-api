@@ -102,9 +102,9 @@ export const buttonVariants = cva(
         // solid on hover. The Button drops the size classes for it.
         "link-inline":
           "h-auto whitespace-normal rounded-sm border-0 p-0 text-[length:inherit] text-foreground underline decoration-dotted underline-offset-3 sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 hover:decoration-solid data-pressed:decoration-solid",
-        // Neutral actions (Refresh, Add mapping, Edit, Export): a faint foreground tint over the
-        // surface it sits on, a step past a field's, and a step deeper on hover (index.css
-        // --neutral-button-*).
+        // A field-like trigger (the Accounts filter selects in their label group): a faint
+        // foreground tint with a hairline border, a step past a field's, and a step deeper on
+        // hover (index.css --neutral-button-*). Supporting actions use `secondary`.
         outline:
           "border-(--neutral-button-border) bg-(--neutral-button) text-foreground hover:bg-(--neutral-button-hover) data-pressed:bg-(--neutral-button-hover)",
         // An icon button that changes only its colour on hover (row kebabs, eye toggles, header
@@ -125,10 +125,12 @@ export const buttonVariants = cva(
           "border-transparent text-primary-foreground hover:bg-primary-foreground/14 data-pressed:bg-primary-foreground/14",
         "on-primary-danger":
           "border-transparent text-primary-foreground hover:bg-destructive-solid data-pressed:bg-destructive-solid hover:text-destructive-solid-foreground data-pressed:text-destructive-solid-foreground",
-        // The inverse fill (index.css --inverse): near-black in light, near-white in dark, a step
-        // towards its label on hover.
+        // Supporting actions beside the purple primary (Refresh models, Edit, Restore from file,
+        // Clear, a clean Save): a soft neutral fill with no border (coss ui / shadcn secondary),
+        // a step deeper on hover and while pressed. The fill is the foreground mixed into the
+        // surface it sits on, so it reads on cards, dialogs and the page in both themes.
         secondary:
-          "border-inverse bg-inverse text-inverse-foreground hover:bg-[color-mix(in_oklab,var(--inverse)_88%,var(--inverse-foreground))] data-pressed:bg-[color-mix(in_oklab,var(--inverse)_88%,var(--inverse-foreground))]",
+          "border-transparent bg-[color-mix(in_oklab,var(--foreground)_7%,transparent)] text-foreground hover:bg-[color-mix(in_oklab,var(--foreground)_11%,transparent)] data-pressed:bg-[color-mix(in_oklab,var(--foreground)_13%,transparent)]",
       },
     },
   },

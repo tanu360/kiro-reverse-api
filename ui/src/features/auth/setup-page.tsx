@@ -148,7 +148,7 @@ function GeneratedPassword({
           <AnimatedIcon icon={CircleXIcon} aria-hidden="true" playOnMount />
           <AlertDescription>{t("firstRunUnavailable")}</AlertDescription>
           <AlertAction>
-            <Button onClick={onRetry} size="sm" variant="outline">
+            <Button onClick={onRetry} size="sm" variant="secondary">
               <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
               {tShared("actions.retry")}
             </Button>

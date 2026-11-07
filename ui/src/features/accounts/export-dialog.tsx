@@ -186,7 +186,7 @@ export function ExportDialog({
             disabled={busy !== null && busy !== "copy"}
             loading={busy === "copy"}
             onClick={onCopy}
-            variant="outline"
+            variant="secondary"
           >
             <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
             {t("export.copyJson")}

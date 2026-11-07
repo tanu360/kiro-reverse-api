@@ -75,7 +75,7 @@ function TotalsErrorBanner(): JSX.Element | null {
           loading={retrying || status.isFetching || live.isFetching}
           onClick={() => void retry()}
           size="sm"
-          variant="outline"
+          variant="secondary"
         >
           <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
           {tc("actions.retry")}

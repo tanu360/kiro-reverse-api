@@ -151,7 +151,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
             <Button
               onClick={() => setEditor((prev) => ({ open: true, session: prev.session + 1 }))}
               size="sm"
-              variant="outline"
+              variant="secondary"
             >
               <HugeiconsIcon icon={direct ? PlusSignIcon : PencilEdit01Icon} aria-hidden="true" />
               {direct ? t("proxySetUp") : t("common:actions.edit")}

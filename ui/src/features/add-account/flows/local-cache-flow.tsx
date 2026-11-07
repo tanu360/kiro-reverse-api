@@ -78,7 +78,7 @@ function JsonFileInput({
             disabled={disabled}
             onClick={() => inputRef.current?.click()}
             size="xs"
-            variant="outline"
+            variant="secondary"
           >
             <HugeiconsIcon icon={Upload01Icon} aria-hidden="true" />
             {t("local.upload")}

@@ -28,7 +28,7 @@ export function NotFound(): JSX.Element {
           className="w-full"
           onClick={() => router.history.back()}
           size="lg"
-          variant="outline"
+          variant="secondary"
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} aria-hidden="true" />
           {t("shell.notFound.back")}

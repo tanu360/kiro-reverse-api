@@ -99,7 +99,7 @@ function RootError({ error }: ErrorComponentProps): JSX.Element {
         {t("actions.retry")}
       </Button>
       {pathname === "/" ? null : (
-        <Button className="w-full" render={<Link to="/" />} size="lg" variant="outline">
+        <Button className="w-full" render={<Link to="/" />} size="lg" variant="secondary">
           <AnimatedIcon icon={LayoutDashboardIcon} aria-hidden="true" />
           {t("shell.notFound.action")}
         </Button>

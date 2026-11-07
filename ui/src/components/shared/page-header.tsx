@@ -57,8 +57,8 @@ export function PageHeader({
 }
 
 /**
- * The page header's Refresh. `outline` (the default) is an outline button with an icon and a
- * label, the same size as every other header action. `icon` is a quiet icon-only button (its
+ * The page header's Refresh. `outline` (the default) is a secondary (soft fill) button with an
+ * icon and a label, the same size as every other header action. `icon` is a quiet icon-only button (its
  * colour changes on hover, no fill) with the label as its name and tooltip, for a header whose
  * other actions carry the colour. While `fetching`, the button's own loading state shows a
  * spinner in place of the icon and clicks are ignored. `size="sm"` is the card-header step,
@@ -91,7 +91,7 @@ export function RefreshButton({
         if (!fetching) onRefresh();
       }}
       size={iconOnly ? (size === "sm" ? "icon-sm" : "icon") : size}
-      variant={iconOnly ? "quiet" : "outline"}
+      variant={iconOnly ? "quiet" : "secondary"}
     >
       <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
       {iconOnly ? null : text}

@@ -109,7 +109,7 @@ export function RequestsPage(): JSX.Element {
     emptyState = (
       <EmptyState
         action={
-          <Button onClick={() => updateSearch({ page: undefined })} size="sm" variant="outline">
+          <Button onClick={() => updateSearch({ page: undefined })} size="sm" variant="secondary">
             {t("outOfRange.action")}
           </Button>
         }
@@ -123,7 +123,7 @@ export function RequestsPage(): JSX.Element {
     emptyState = (
       <EmptyState
         action={
-          <Button onClick={clearFilters} size="sm" variant="outline">
+          <Button onClick={clearFilters} size="sm" variant="secondary">
             {t("common:actions.clearFilters")}
           </Button>
         }

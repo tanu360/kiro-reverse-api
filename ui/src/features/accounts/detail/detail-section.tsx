@@ -95,7 +95,13 @@ export function EditableFieldRow({
       <SettingsRow
         control={
           // Named "Edit" plus the row title (SettingsRow appends it to aria-labelledby).
-          <Button aria-labelledby={editId} id={editId} onClick={onEdit} size="sm" variant="outline">
+          <Button
+            aria-labelledby={editId}
+            id={editId}
+            onClick={onEdit}
+            size="sm"
+            variant="secondary"
+          >
             <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
             {t("actions.edit")}
           </Button>

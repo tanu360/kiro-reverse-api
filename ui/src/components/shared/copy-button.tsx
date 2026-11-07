@@ -28,8 +28,8 @@ export function CopyButton({
   label: string;
   /** The success toast, when it can say what was copied; defaults to "Copied to clipboard". */
   copiedMessage?: string;
-  /** Ghost by default when icon-only, outline with a label. */
-  variant?: "ghost" | "quiet" | "outline";
+  /** Ghost by default when icon-only, secondary (soft fill) with a label. */
+  variant?: "ghost" | "quiet" | "outline" | "secondary";
   /** The icon size; a labelled button is always `sm` (the value "sm" is kept for old callers). */
   size?: "icon" | "icon-sm" | "icon-xs" | "sm";
   showLabel?: boolean;
@@ -71,7 +71,7 @@ export function CopyButton({
       data-copied={copied ? "" : undefined}
       onClick={onClick}
       size={iconOnly ? (size === "sm" ? "icon" : size) : "sm"}
-      variant={variant ?? (iconOnly ? "ghost" : "outline")}
+      variant={variant ?? (iconOnly ? "ghost" : "secondary")}
     >
       <AnimatedIcon
         icon={Icon}

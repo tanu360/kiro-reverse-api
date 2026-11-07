@@ -70,7 +70,12 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
   return (
     <SectionCard
       actions={
-        <Button loading={load.isPending} onClick={() => load.mutate()} size="sm" variant="outline">
+        <Button
+          loading={load.isPending}
+          onClick={() => load.mutate()}
+          size="sm"
+          variant="secondary"
+        >
           <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
           {t("detail.profileLoad")}
         </Button>
@@ -85,7 +90,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
                 loading={pin.isPending && pin.variables === ""}
                 onClick={() => pin.mutate("")}
                 size="sm"
-                variant="outline"
+                variant="secondary"
               >
                 {t("detail.profileUnpin")}
               </Button>

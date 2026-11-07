@@ -70,7 +70,7 @@ export function ErrorState({
               if (!retrying) onRetry();
             }}
             size={compact ? "sm" : "default"}
-            variant="outline"
+            variant="secondary"
           >
             <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
             {t("actions.retry")}

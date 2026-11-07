@@ -270,7 +270,7 @@ export function BackupsPage(): JSX.Element {
       loading={create.isPending}
       onClick={startCreate}
       size="sm"
-      variant={inEmptyState ? "outline" : "default"}
+      variant={inEmptyState ? "secondary" : "default"}
     >
       <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
       {t("create")}
@@ -296,7 +296,7 @@ export function BackupsPage(): JSX.Element {
                   <Button
                     loading={uploading}
                     onClick={() => fileInputRef.current?.click()}
-                    variant="outline"
+                    variant="secondary"
                   />
                 }
               >

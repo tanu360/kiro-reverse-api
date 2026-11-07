@@ -328,7 +328,7 @@ export function SubmitButton({
       size="sm"
       type={type}
       // Only a card with something to save shows the primary button; a clean one stays quiet.
-      variant={(primary ?? (!blocked || busy)) ? "default" : "outline"}
+      variant={(primary ?? (!blocked || busy)) ? "default" : "secondary"}
     >
       {icon ? <HugeiconsIcon icon={icon} aria-hidden="true" /> : null}
       {children}

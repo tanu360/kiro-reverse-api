@@ -247,7 +247,7 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
               onClick={() => openEditor(null)}
               ref={addButton}
               size="sm"
-              variant="outline"
+              variant="secondary"
             >
               <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
               {t("promptFilter.addRule")}

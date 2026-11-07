@@ -203,7 +203,7 @@ export function AccountsPage(): JSX.Element {
       <EmptyState
         action={
           hasFilters ? (
-            <Button onClick={clearFilters} variant="outline">
+            <Button onClick={clearFilters} variant="secondary">
               {tc("actions.clearFilters")}
             </Button>
           ) : undefined
@@ -304,7 +304,7 @@ export function AccountsPage(): JSX.Element {
               <Button
                 aria-label={t("models.refreshAll")}
                 onClick={() => void onRefreshAllModels()}
-                variant="outline"
+                variant="secondary"
               >
                 <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
                 <span className="sm:hidden">{t("models.refreshShort")}</span>

@@ -45,7 +45,12 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
   return (
     <SectionCard
       actions={
-        <Button loading={load.isPending} onClick={() => load.mutate()} size="sm" variant="outline">
+        <Button
+          loading={load.isPending}
+          onClick={() => load.mutate()}
+          size="sm"
+          variant="secondary"
+        >
           <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
           {t("detail.loadModels")}
         </Button>
@@ -58,7 +63,7 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
           loading={refresh.isPending}
           onClick={() => refresh.mutate()}
           size="sm"
-          variant="outline"
+          variant="secondary"
         >
           <HugeiconsIcon icon={ListRestartIcon} aria-hidden="true" />
           {t("detail.refreshModelCache")}

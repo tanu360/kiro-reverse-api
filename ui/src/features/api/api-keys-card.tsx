@@ -355,7 +355,7 @@ export function ApiKeysCard(): JSX.Element {
   const emptyState = (
     <EmptyState
       action={
-        <Button onClick={openCreate} size="sm" variant="outline">
+        <Button onClick={openCreate} size="sm" variant="secondary">
           <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
           {t("keys.create")}
         </Button>

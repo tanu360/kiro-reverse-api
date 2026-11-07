@@ -91,7 +91,12 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
   return (
     <SectionCard
       actions={
-        <Button loading={sync.isPending} onClick={() => sync.mutate()} size="sm" variant="outline">
+        <Button
+          loading={sync.isPending}
+          onClick={() => sync.mutate()}
+          size="sm"
+          variant="secondary"
+        >
           <HugeiconsIcon icon={CloudDownloadIcon} aria-hidden="true" />
           {t("detail.overageRefresh")}
         </Button>

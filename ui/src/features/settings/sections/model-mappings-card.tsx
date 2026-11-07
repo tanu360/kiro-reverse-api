@@ -285,7 +285,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
       actions={
         // Beside the title on a narrow page; under the description once the heading has a column.
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => openEditor(null)} ref={addButton} size="sm" variant="outline">
+          <Button onClick={() => openEditor(null)} ref={addButton} size="sm" variant="secondary">
             <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
             {t("modelMappings.add")}
           </Button>
@@ -294,7 +294,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
             aria-disabled={atDefaults || undefined}
             onClick={resetToDefaults}
             size="sm"
-            variant="outline"
+            variant="secondary"
           >
             <HugeiconsIcon icon={Undo02Icon} aria-hidden="true" />
             {t("modelMappings.reset")}
