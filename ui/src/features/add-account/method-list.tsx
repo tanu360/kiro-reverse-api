@@ -27,10 +27,15 @@ export const METHODS: ReadonlyArray<{ id: AddAccountMethod; icon: IconSvgElement
   { id: "apikey", icon: TerminalIcon },
 ];
 
-/** Sign in through a provider, or import credentials the user already has. */
-const GROUPS: ReadonlyArray<{ id: "signIn" | "import"; methods: AddAccountMethod[] }> = [
-  { id: "signIn", methods: ["builderid", "iam", "microsoft"] },
-  { id: "import", methods: ["sso", "local", "credentials", "cookie", "apikey"] },
+/** The eight methods in four pairs by where the credentials come from. */
+const GROUPS: ReadonlyArray<{
+  id: "aws" | "browser" | "kiro" | "files";
+  methods: [AddAccountMethod, AddAccountMethod];
+}> = [
+  { id: "aws", methods: ["builderid", "iam"] },
+  { id: "browser", methods: ["microsoft", "sso"] },
+  { id: "kiro", methods: ["local", "cookie"] },
+  { id: "files", methods: ["credentials", "apikey"] },
 ];
 
 const ICON = Object.fromEntries(METHODS.map(({ id, icon }) => [id, icon])) as Record<
@@ -39,10 +44,10 @@ const ICON = Object.fromEntries(METHODS.map(({ id, icon }) => [id, icon])) as Re
 >;
 
 /**
- * The eight ways to add an account as tiles in two labelled groups: sign in with a provider
- * (AWS Builder ID first, full width and marked recommended) and import credentials. Two
- * columns from sm up, one on phones; a group's odd last tile spans both columns, so every row
- * is even.
+ * The eight ways to add an account, side by side in four labelled pairs (AWS sign-in, browser
+ * sign-in, from Kiro, keys and exports): two equal tiles per row at every width. AWS Builder ID
+ * carries the Recommended badge. On phones a tile is its icon over its name; from sm up the
+ * description shows beside the icon.
  */
 export function MethodList({
   onSelect,
@@ -52,7 +57,7 @@ export function MethodList({
   const { t } = useT("add-account");
   return (
     <>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         {GROUPS.map((group) => {
           const headingId = `add-account-group-${group.id}`;
           return (
@@ -60,34 +65,24 @@ export function MethodList({
               <h3 className="font-medium text-meta text-muted-foreground" id={headingId}>
                 {t(`groups.${group.id}`)}
               </h3>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {group.methods.map((id, index) => {
-                  const featured = id === "builderid";
-                  const rest = featured
-                    ? index
-                    : index - (group.methods.includes("builderid") ? 1 : 0);
-                  const count =
-                    group.methods.length - (group.methods.includes("builderid") ? 1 : 0);
-                  const oddLast = !featured && count % 2 === 1 && rest === count - 1;
-                  return (
-                    <ChoiceTile
-                      badge={
-                        featured ? (
-                          <Badge size="sm" tone="primary">
-                            {t("recommended")}
-                          </Badge>
-                        ) : undefined
-                      }
-                      data-method={id}
-                      description={t(`methods.${id}.description`)}
-                      icon={ICON[id]}
-                      key={id}
-                      onClick={() => onSelect(id)}
-                      title={t(`methods.${id}.title`)}
-                      wide={featured || oddLast}
-                    />
-                  );
-                })}
+              <div className="grid grid-cols-2 gap-2">
+                {group.methods.map((id) => (
+                  <ChoiceTile
+                    badge={
+                      id === "builderid" ? (
+                        <Badge size="sm" tone="primary">
+                          {t("recommended")}
+                        </Badge>
+                      ) : undefined
+                    }
+                    data-method={id}
+                    description={t(`methods.${id}.description`)}
+                    icon={ICON[id]}
+                    key={id}
+                    onClick={() => onSelect(id)}
+                    title={t(`methods.${id}.title`)}
+                  />
+                ))}
               </div>
             </section>
           );

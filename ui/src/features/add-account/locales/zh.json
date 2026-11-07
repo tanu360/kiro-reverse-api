@@ -1,8 +1,10 @@
 {
   "title": "添加账号",
   "description": "选择登录方式或导入方式。",
-  "groups.signIn": "登录",
-  "groups.import": "导入",
+  "groups.aws": "AWS 登录",
+  "groups.browser": "浏览器登录",
+  "groups.kiro": "来自 Kiro",
+  "groups.files": "密钥与导出",
   "recommended": "推荐",
   "cancel": "取消",
   "add": "添加",

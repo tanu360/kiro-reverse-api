@@ -1,8 +1,10 @@
 {
   "title": "Thêm tài khoản",
   "description": "Chọn cách đăng nhập hoặc dữ liệu cần nhập.",
-  "groups.signIn": "Đăng nhập",
-  "groups.import": "Nhập",
+  "groups.aws": "Đăng nhập AWS",
+  "groups.browser": "Đăng nhập qua trình duyệt",
+  "groups.kiro": "Từ Kiro",
+  "groups.files": "Khóa và tệp xuất",
   "recommended": "Đề xuất",
   "cancel": "Hủy",
   "add": "Thêm",

@@ -150,16 +150,16 @@ export function ChoiceRow({
 }
 
 /**
- * A choice as a tile in a grid (the Add account methods): a button with an icon chip, a title,
- * an optional badge after it and a short description. `wide` spans both columns of a
- * two-column grid, for the featured choice or the last tile of an odd row.
+ * A choice as a tile in a two-column grid (the Add account methods): a button with an icon chip,
+ * a title with an optional badge, and a short description. On phones the icon sits over the title
+ * and the description is left out, so two tiles fit side by side; from sm up the icon is beside
+ * the text and the description shows. Tiles in a row share the row's height.
  */
 export function ChoiceTile({
   icon,
   title,
   badge,
   description,
-  wide = false,
   className,
   ...props
 }: Omit<ComponentProps<"button">, "title" | "children"> & {
@@ -167,13 +167,11 @@ export function ChoiceTile({
   title: ReactNode;
   badge?: ReactNode;
   description?: ReactNode;
-  wide?: boolean;
 }): JSX.Element {
   return (
     <button
       className={cn(
-        "group/choice-tile flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-3 text-start outline-none transition-[background-color,border-color,scale] hover:border-border-strong/50 hover:bg-accent focus-outline active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64",
-        wide && "sm:col-span-2",
+        "group/choice-tile flex min-w-0 cursor-pointer flex-col items-start gap-2.5 rounded-xl border border-border bg-card p-3 text-start outline-none transition-[background-color,border-color,scale] hover:border-border-strong/50 hover:bg-accent focus-outline active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64 sm:flex-row sm:gap-3",
         className,
       )}
       type="button"
@@ -186,7 +184,9 @@ export function ChoiceTile({
           {badge}
         </span>
         {description ? (
-          <span className="text-muted-foreground text-xs leading-normal">{description}</span>
+          <span className="text-muted-foreground text-xs leading-normal max-sm:hidden">
+            {description}
+          </span>
         ) : null}
       </span>
     </button>
