@@ -1249,17 +1249,17 @@
 :root {
   --chart-1: var(--primary);
   /*
-   * The categorical series (model-mix donut, traffic-by-account bars): six hues that stay apart
-   * side by side, no grey and no red (a share is not bad news). chart-1 is the brand purple,
-   * chart-2 the purple mixed toward the text colour (lavender in dark, deep violet in light),
-   * chart-3 fuchsia, chart-4 periwinkle and chart-5 lime (the showcase's sticker hues);
-   * chart-other, for the rest, is peach.
+   * The categorical series (model-mix donut, traffic-by-account bars): one family of purples and
+   * blues that still stay apart side by side, no grey and no red (a share is not bad news).
+   * chart-1 is the brand purple, chart-2 the purple mixed toward the text colour (lavender in
+   * dark, deep violet in light), chart-3 fuchsia, chart-4 periwinkle and chart-5 blue;
+   * chart-other, for the rest, is a soft tint of the brand purple.
    */
   --chart-2: color-mix(in oklab, var(--primary) 60%, var(--foreground));
   --chart-3: var(--color-fuchsia-600);
   --chart-4: var(--color-indigo-400);
-  --chart-5: var(--color-lime-500);
-  --chart-other: var(--color-orange-300);
+  --chart-5: var(--color-blue-500);
+  --chart-other: color-mix(in oklab, var(--primary) 32%, var(--card));
   --chart-positive: var(--success);
   --chart-negative: var(--destructive);
   /* The card the charts sit on, so dot outlines and ring gaps cut cleanly into it. */
@@ -1299,8 +1299,8 @@
   /* The series' lighter steps of the same hues, so they read on the near-black card. */
   --chart-3: var(--color-fuchsia-400);
   --chart-4: var(--color-indigo-300);
-  --chart-5: var(--color-lime-400);
-  --chart-other: var(--color-orange-300);
+  --chart-5: var(--color-sky-400);
+  --chart-other: color-mix(in oklab, var(--primary) 38%, var(--card));
   /* Ring spokes and loading strokes: a mid grey that still reads on the dark card. */
   --chart-foreground: color-mix(in oklab, var(--foreground) 45%, transparent);
   --chart-marker-background: oklch(0.25 0.01 260);

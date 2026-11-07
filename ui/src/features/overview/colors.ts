@@ -8,8 +8,8 @@ export const PREVIOUS_COLOR = "var(--chart-comparison)";
 
 /**
  * Series colours for the model-mix donut and table dots and the traffic-by-account bars: purple,
- * lavender, fuchsia, periwinkle and lime (index.css --chart-1..5), then "Other" in peach. No grey
- * and no red: a share is not bad news.
+ * lavender, fuchsia, periwinkle and blue (index.css --chart-1..5), then "Other" in a soft purple
+ * tint. One purple-blue family, no grey and no red: a share is not bad news.
  */
 export const MODEL_COLORS = [
   "var(--chart-1)",
