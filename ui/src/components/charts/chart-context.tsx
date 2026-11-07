@@ -262,14 +262,10 @@ export interface ChartContextValue extends ChartHoverContextValue {
  * (data, scales, dimensions, animation state, layout config). Consumers that
  * subscribe via `useChartStable()` skip re-renders on every mouse move.
  */
-export type ChartStableContextValue = Omit<
-  ChartContextValue,
-  keyof ChartHoverContextValue
->;
+export type ChartStableContextValue = Omit<ChartContextValue, keyof ChartHoverContextValue>;
 
 /** `useLayoutEffect` in the browser, `useEffect` on the server (no SSR warning). */
-const useIsomorphicLayoutEffect =
-  typeof window === "undefined" ? useEffect : useLayoutEffect;
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const ChartStableContext = createContext<ChartStableContextValue | null>(null);
 const ChartHoverContext = createContext<ChartHoverContextValue | null>(null);
@@ -285,7 +281,7 @@ export interface ChartHoverStore {
 }
 
 /** A {@link ChartHoverStore} the owning chart writes to. */
-export interface WritableChartHoverStore extends ChartHoverStore {
+interface WritableChartHoverStore extends ChartHoverStore {
   setTooltipData: Dispatch<SetStateAction<TooltipData | null>>;
   setSelection: (selection: ChartSelection | null) => void;
 }
@@ -302,9 +298,7 @@ export function createChartHoverStore(): WritableChartHoverStore {
       listener();
     }
   };
-  const setTooltipData: Dispatch<SetStateAction<TooltipData | null>> = (
-    action
-  ) => {
+  const setTooltipData: Dispatch<SetStateAction<TooltipData | null>> = (action) => {
     const next = typeof action === "function" ? action(tooltipData) : action;
     if (next === tooltipData) {
       return;
@@ -362,16 +356,10 @@ export function ChartHoverStoreProvider({
   children: ReactNode;
   store: ChartHoverStore;
 }) {
-  const hover = useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-    store.getSnapshot
-  );
+  const hover = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   return (
     <ChartHoverStoreContext.Provider value={store}>
-      <ChartHoverContext.Provider value={hover}>
-        {children}
-      </ChartHoverContext.Provider>
+      <ChartHoverContext.Provider value={hover}>{children}</ChartHoverContext.Provider>
     </ChartHoverStoreContext.Provider>
   );
 }
@@ -483,7 +471,7 @@ export function ChartProvider({
       value.composedStackOffsets,
       value.composedStackGap,
       value.nearestPointHover,
-    ]
+    ],
   );
 
   const hover = useMemo<ChartHoverContextValue>(
@@ -506,7 +494,7 @@ export function ChartProvider({
       value.setHoveredBarIndex,
       value.hoveredCandleIndex,
       value.setHoveredCandleIndex,
-    ]
+    ],
   );
 
   const hoverStore = useMemo(() => staticChartHoverStore(hover), [hover]);
@@ -514,9 +502,7 @@ export function ChartProvider({
   return (
     <ChartStableContext.Provider value={stable}>
       <ChartHoverStoreContext.Provider value={hoverStore}>
-        <ChartHoverContext.Provider value={hover}>
-          {children}
-        </ChartHoverContext.Provider>
+        <ChartHoverContext.Provider value={hover}>{children}</ChartHoverContext.Provider>
       </ChartHoverStoreContext.Provider>
     </ChartStableContext.Provider>
   );
@@ -535,7 +521,7 @@ export function useChartStable(): ChartStableContextValue {
   if (!context) {
     throw new Error(
       "useChartStable must be used within a ChartProvider. " +
-        "Make sure your component is wrapped in <LineChart>, <AreaChart>, <BarChart>, or <ComposedChart>."
+        "Make sure your component is wrapped in <LineChart>, <AreaChart>, <BarChart>, or <ComposedChart>.",
     );
   }
   return context;
@@ -557,14 +543,12 @@ export function useChartStable(): ChartStableContextValue {
  *   `null` above. By the passive phase every ref is attached; this picks it up.
  */
 export function useChartPortalContainer<T extends HTMLElement>(
-  containerRef: RefObject<T | null> | undefined
+  containerRef: RefObject<T | null> | undefined,
 ): T | null {
   // Seed from the ref when it is already attached (charts render after their
   // container measured, so it usually is) — saves a mount re-render of every
   // portalled axis / tooltip. The effects below stay as the fallback.
-  const [container, setContainer] = useState<T | null>(
-    () => containerRef?.current ?? null
-  );
+  const [container, setContainer] = useState<T | null>(() => containerRef?.current ?? null);
   useIsomorphicLayoutEffect(() => {
     setContainer(containerRef?.current ?? null);
   }, [containerRef]);
@@ -581,19 +565,13 @@ export function useChartPortalContainer<T extends HTMLElement>(
  */
 export function useStableMargin(margin: Margin): Margin {
   const { top, right, bottom, left } = margin;
-  return useMemo(
-    () => ({ top, right, bottom, left }),
-    [top, right, bottom, left]
-  );
+  return useMemo(() => ({ top, right, bottom, left }), [top, right, bottom, left]);
 }
 
 /** Y-scale for a series axis (`yAxisId` on Line / Area / YAxis). */
-export function useYScale(
-  yAxisId?: string | number
-): ScaleLinear<number, number> {
+export function useYScale(yAxisId?: string | number): ScaleLinear<number, number> {
   const { yScales, yScale } = useChartStable();
-  const id =
-    yAxisId == null || yAxisId === "" ? DEFAULT_Y_AXIS_ID : String(yAxisId);
+  const id = yAxisId == null || yAxisId === "" ? DEFAULT_Y_AXIS_ID : String(yAxisId);
   return yScales[id] ?? yScale;
 }
 
@@ -602,23 +580,17 @@ export function useYScale(
  * that animate toward their final pixels rather than the mid-tween scale.
  * Falls back to {@link useYScale} when no target domain is published.
  */
-export function useSettledYScale(
-  yAxisId?: string | number
-): ScaleLinear<number, number> {
+export function useSettledYScale(yAxisId?: string | number): ScaleLinear<number, number> {
   const { yDomainTargetByAxis, innerHeight } = useChartStable();
   const liveScale = useYScale(yAxisId);
-  const id =
-    yAxisId == null || yAxisId === "" ? DEFAULT_Y_AXIS_ID : String(yAxisId);
-  const domain =
-    yDomainTargetByAxis?.[id] ?? yDomainTargetByAxis?.[DEFAULT_Y_AXIS_ID];
+  const id = yAxisId == null || yAxisId === "" ? DEFAULT_Y_AXIS_ID : String(yAxisId);
+  const domain = yDomainTargetByAxis?.[id] ?? yDomainTargetByAxis?.[DEFAULT_Y_AXIS_ID];
   const min = domain?.[0];
   const max = domain?.[1];
   const settled = useMemo(
     () =>
-      min == null || max == null
-        ? null
-        : scaleLinear().domain([min, max]).range([innerHeight, 0]),
-    [min, max, innerHeight]
+      min == null || max == null ? null : scaleLinear().domain([min, max]).range([innerHeight, 0]),
+    [min, max, innerHeight],
   );
   return settled ?? liveScale;
 }
@@ -633,7 +605,7 @@ export function useChartHover(): ChartHoverContextValue {
   if (!context) {
     throw new Error(
       "useChartHover must be used within a ChartProvider. " +
-        "Make sure your component is wrapped in <LineChart>, <AreaChart>, <BarChart>, or <ComposedChart>."
+        "Make sure your component is wrapped in <LineChart>, <AreaChart>, <BarChart>, or <ComposedChart>.",
     );
   }
   return context;
@@ -646,14 +618,12 @@ export function useChartHover(): ChartHoverContextValue {
  * `useChartHover()` for components that only care about part of hover, such
  * as "is the chart hovered" or "which index".
  */
-export function useChartHoverSelector<T>(
-  selector: (hover: ChartHoverContextValue) => T
-): T {
+export function useChartHoverSelector<T>(selector: (hover: ChartHoverContextValue) => T): T {
   const store = useContext(ChartHoverStoreContext);
   if (!store) {
     throw new Error(
       "useChartHoverSelector must be used within a ChartProvider. " +
-        "Make sure your component is wrapped in <LineChart>, <AreaChart>, <BarChart>, or <ComposedChart>."
+        "Make sure your component is wrapped in <LineChart>, <AreaChart>, <BarChart>, or <ComposedChart>.",
     );
   }
   const getSelected = () => selector(store.getSnapshot());
@@ -668,9 +638,7 @@ export function useChartHoverStore(): ChartHoverStore | null {
   return useContext(ChartHoverStoreContext);
 }
 
-export function selectTooltipData(
-  hover: ChartHoverContextValue
-): TooltipData | null {
+export function selectTooltipData(hover: ChartHoverContextValue): TooltipData | null {
   return hover.tooltipData;
 }
 
@@ -693,5 +661,3 @@ export function useChart(): ChartContextValue {
   // re-rendering on hover.
   return { ...stable, ...hover };
 }
-
-export default ChartStableContext;

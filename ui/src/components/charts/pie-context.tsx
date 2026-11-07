@@ -1,16 +1,10 @@
 "use client";
 
 import type { Transition } from "motion/react";
-import {
-  createContext,
-  type ReactNode,
-  type RefObject,
-  useContext,
-  useMemo,
-} from "react";
+import { createContext, type ReactNode, type RefObject, useContext, useMemo } from "react";
 
 // CSS variable references for pie chart theming
-export const pieCssVars = {
+const pieCssVars = {
   background: "var(--chart-background)",
   foreground: "var(--chart-foreground)",
   foregroundMuted: "var(--chart-foreground-muted)",
@@ -107,13 +101,7 @@ export type PieContextValue = PieStableContextValue & PieHoverContextValue;
 const PieStableContext = createContext<PieStableContextValue | null>(null);
 const PieHoverContext = createContext<PieHoverContextValue | null>(null);
 
-export function PieProvider({
-  children,
-  value,
-}: {
-  children: ReactNode;
-  value: PieContextValue;
-}) {
+export function PieProvider({ children, value }: { children: ReactNode; value: PieContextValue }) {
   const stable = useMemo<PieStableContextValue>(
     () => ({
       data: value.data,
@@ -156,7 +144,7 @@ export function PieProvider({
       value.getFill,
       value.geometryScrubbing,
       value.scrubSlicePaths,
-    ]
+    ],
   );
 
   const hover = useMemo<PieHoverContextValue>(
@@ -164,14 +152,12 @@ export function PieProvider({
       hoveredIndex: value.hoveredIndex,
       setHoveredIndex: value.setHoveredIndex,
     }),
-    [value.hoveredIndex, value.setHoveredIndex]
+    [value.hoveredIndex, value.setHoveredIndex],
   );
 
   return (
     <PieStableContext.Provider value={stable}>
-      <PieHoverContext.Provider value={hover}>
-        {children}
-      </PieHoverContext.Provider>
+      <PieHoverContext.Provider value={hover}>{children}</PieHoverContext.Provider>
     </PieStableContext.Provider>
   );
 }
@@ -181,7 +167,7 @@ export function usePieStable(): PieStableContextValue {
   if (!context) {
     throw new Error(
       "usePieStable must be used within a PieProvider. " +
-        "Make sure your component is wrapped in <PieChart>."
+        "Make sure your component is wrapped in <PieChart>.",
     );
   }
   return context;
@@ -192,14 +178,8 @@ export function usePieHover(): PieHoverContextValue {
   if (!context) {
     throw new Error(
       "usePieHover must be used within a PieProvider. " +
-        "Make sure your component is wrapped in <PieChart>."
+        "Make sure your component is wrapped in <PieChart>.",
     );
   }
   return context;
 }
-
-export function usePie(): PieContextValue {
-  return { ...usePieStable(), ...usePieHover() };
-}
-
-export default PieStableContext;

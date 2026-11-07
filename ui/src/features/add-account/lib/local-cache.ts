@@ -52,7 +52,7 @@ export function localCacheErrorField(
   return client && clientShown ? "client" : "token";
 }
 
-export type LocalCacheResult =
+type LocalCacheResult =
   | { ok: true; payload: CredentialsImportRequest }
   | { ok: false; error: LocalCacheError };
 

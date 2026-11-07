@@ -28,7 +28,7 @@ export type AddAccountMethod =
   | "cookie"
   | "apikey";
 
-export interface AddAccountDialogProps {
+interface AddAccountDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialMethod?: AddAccountMethod;
@@ -146,7 +146,8 @@ export function AddAccountDialog({
     setBusy(false);
   }, [sessions]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the step changes.
+  // Runs after every commit and acts only on a pending move: the handlers that set focusNext
+  // also change the step, so the commit that shows the new step is the next one.
   useEffect(() => {
     const next = focusNext.current;
     const body = bodyRef.current;
@@ -163,7 +164,7 @@ export function AddAccountDialog({
       ? body
       : (firstStepControl(body) ?? footerSubmit(footer) ?? body);
     target.focus();
-  }, [method, flowKey]);
+  });
 
   const cancel = useCallback(() => handleOpenChange(false), [handleOpenChange]);
 

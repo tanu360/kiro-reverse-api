@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { errorMessage } from "@/lib/api/server-errors";
 import { type TFunction, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import { cn, keyByText } from "@/lib/utils";
 import { useReportDirty } from "../lib/unsaved";
 import { SETTINGS_SECTIONS } from "./sections";
 
@@ -89,7 +89,7 @@ export function Hint({ children, more }: { children: ReactNode; more?: ReactNode
 }
 
 /** Save that also marks its card as unsaved in the section nav and the leave-page guard. */
-export function SaveButton({ dirty, saving }: { dirty: boolean; saving: boolean }): JSX.Element {
+function SaveButton({ dirty, saving }: { dirty: boolean; saving: boolean }): JSX.Element {
   useReportDirty(useContext(SectionIdContext), dirty);
   return <SharedSaveButton dirty={dirty} saving={saving} />;
 }
@@ -122,7 +122,7 @@ export function SaveFooter({
 }
 
 /** The saved value changed on the server while this card was edited: Reload takes it. */
-export function ServerChangedNotice({ onReload }: { onReload: () => void }): JSX.Element {
+function ServerChangedNotice({ onReload }: { onReload: () => void }): JSX.Element {
   const { t } = useT("settings");
   return (
     <Alert role="status" size="sm" variant="warning">
@@ -319,10 +319,9 @@ export function RowAction({
 
 /** Fills `{name}` placeholders of a translated template with React nodes (code spans). */
 export function fillNodes(template: string, nodes: Record<string, ReactNode>): ReactNode[] {
-  return template.split(/(\{\w+\})/).map((part, index) => {
+  return keyByText(template.split(/(\{\w+\})/), (part) => part).map(({ key, item: part }) => {
     const name = /^\{(\w+)\}$/.exec(part)?.[1];
     const node = name !== undefined && Object.hasOwn(nodes, name) ? nodes[name] : part;
-    // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one template never reorder.
-    return <Fragment key={index}>{node}</Fragment>;
+    return <Fragment key={key}>{node}</Fragment>;
   });
 }

@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 
-export interface DashTailStrokeProps {
+interface DashTailStrokeProps {
   /** SVG path `d` for the full series (single curved path). */
   pathD: string | null;
   /** Total length of `pathD` in user units. */

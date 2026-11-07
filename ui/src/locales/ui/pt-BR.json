@@ -12,18 +12,12 @@
   "sparkline.summaryDown_one": "{count} ponto, de {first} a {last}, queda de {change}%",
   "sparkline.summaryDown_other": "{count} pontos, de {first} a {last}, queda de {change}%",
   "chart.loading": "Carregando…",
-  "chart.total": "Total",
   "spinner.loading": "Carregando…",
   "toast.region": "Notificações",
   "sidebar.toggle": "Alternar barra lateral",
   "sidebar.title": "Barra lateral",
   "sidebar.description": "Exibe a barra lateral no celular.",
   "pagination.label": "Paginação",
-  "pagination.previous": "Anterior",
-  "pagination.previousPage": "Ir para a página anterior",
-  "pagination.next": "Próxima",
-  "pagination.nextPage": "Ir para a próxima página",
   "pagination.more": "Mais páginas",
-  "breadcrumb.label": "Trilha de navegação",
-  "breadcrumb.more": "Mais"
+  "breadcrumb.label": "Trilha de navegação"
 }

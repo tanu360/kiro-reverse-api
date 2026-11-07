@@ -3,9 +3,9 @@ import { ApiError } from "./errors";
 
 export const API_BASE = "/admin/api";
 
-export type QueryValue = string | number | boolean | null | undefined;
+type QueryValue = string | number | boolean | null | undefined;
 
-export interface RequestOptions {
+interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   /** FormData is sent as-is; anything else is JSON.stringify'd */
   body?: unknown;

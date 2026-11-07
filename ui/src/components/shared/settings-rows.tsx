@@ -23,12 +23,6 @@ import { cn } from "@/lib/utils";
  */
 export const ROW_DESCRIPTION = "max-w-2xl text-pretty text-muted-foreground text-xs leading-normal";
 
-/**
- * Standalone prose: a note or an instruction that is its own paragraph (a dialog step's note),
- * not a hint under a control. 14 px muted, relaxed leading, like a page description.
- */
-export const BODY_PROSE = "text-pretty text-muted-foreground text-sm leading-relaxed";
-
 /** A row's inline padding (the card's), for a row element that is not a SettingsRow. */
 export const SETTINGS_ROW_X = "min-w-0 px-4 sm:px-5";
 

@@ -4,21 +4,23 @@ import type { ScaleBand as D3ScaleBand } from "d3-scale";
 import type { Transition } from "motion/react";
 import { m } from "motion/react";
 import { memo, useId, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { barDepthAndRise, barDepthMaxDepth } from "./bar-depth-geometry";
 import {
   type BarValueLabelOrientation,
   type BarValueLabelPosition,
   getBarValueLabelLayout,
 } from "./bar-value-label-layout";
-import {
-  chartCssVars,
-  useChartHover,
-  useChartStable,
-  useYScale,
-} from "./chart-context";
+import { chartCssVars, useChartHover, useChartStable, useYScale } from "./chart-context";
 import { valueLabelFmt } from "./chart-formatters";
 import { useChartLegendHover } from "./chart-legend-hover";
 import { transitionWithDelay } from "./motion-utils";
+
+/**
+ * The hover fade, as a class rather than an inline style so the global
+ * reduced-motion and theme-swap overrides (index.css, theme-transitions.css) win over it.
+ */
+const BAR_FADE_CLASS = "[transition:opacity_0.15s_ease-in-out]";
 
 type ScaleBand<Domain extends { toString(): string }> = D3ScaleBand<Domain>;
 
@@ -39,14 +41,13 @@ function barDepthPerspectiveRise(
   innerWidth: number,
   datum: Record<string, unknown>,
   topY: number,
-  baselineY: number
+  baselineY: number,
 ): number {
   const centerX = innerWidth / 2;
   if (centerX <= 0) {
     return 0;
   }
-  const step =
-    (barScale as unknown as { step?: () => number }).step?.() ?? bandWidth;
+  const step = (barScale as unknown as { step?: () => number }).step?.() ?? bandWidth;
   const maxDepth = barDepthMaxDepth(step, bandWidth);
   const bandX = barScale(barXAccessor(datum)) ?? 0;
   const cx = bandX + bandWidth / 2;
@@ -206,15 +207,10 @@ function AnimatedBar({
   const initial = isHorizontal
     ? { width: 0, height, x: growOrigin, y }
     : { width, height: 0, x, y: growOrigin };
-  const target = isHorizontal
-    ? { width, height, x, y }
-    : { width, height, x, y };
+  const target = isHorizontal ? { width, height, x, y } : { width, height, x, y };
 
   return (
-    <g
-      opacity={isFaded ? fadedOpacity : 1}
-      style={{ transition: "opacity 0.15s ease-in-out" }}
-    >
+    <g className={BAR_FADE_CLASS} opacity={isFaded ? fadedOpacity : 1}>
       <m.rect
         animate={target}
         fill={fill}
@@ -245,11 +241,7 @@ interface BarGeometry {
   labelTransform?: string;
 }
 
-const STATIC_BAR_STYLE = {
-  cursor: "default",
-  transition: "opacity 0.15s ease-in-out",
-} as const;
-const STATIC_LABEL_STYLE = { transition: "opacity 0.15s ease-in-out" } as const;
+const STATIC_BAR_STYLE = { cursor: "default" } as const;
 
 interface StaticBarProps {
   geometry: BarGeometry;
@@ -278,6 +270,7 @@ const StaticBar = memo(function StaticBar({
         height={geometry.height}
         opacity={opacity}
         rx={geometry.rx}
+        className={BAR_FADE_CLASS}
         ry={geometry.rx}
         style={STATIC_BAR_STYLE}
         width={geometry.width}
@@ -286,13 +279,12 @@ const StaticBar = memo(function StaticBar({
       />
       {geometry.valueLabel ? (
         <text
-          className={valueLabelClassName}
+          className={cn(valueLabelClassName, BAR_FADE_CLASS)}
           dominantBaseline="middle"
           fill={valueLabelColor}
           fontSize={12}
           fontWeight={600}
           opacity={opacity}
-          style={STATIC_LABEL_STYLE}
           textAnchor="middle"
           transform={geometry.labelTransform}
           x={geometry.labelX}
@@ -359,14 +351,13 @@ const BarInner = memo(function BarInner({
 
   const seriesIndex = useMemo(() => {
     const idx = lines.findIndex((l) => l.dataKey === dataKey);
-    return idx >= 0 ? idx : 0;
+    return Math.max(idx, 0);
   }, [lines, dataKey]);
 
   const seriesConfig = lines[seriesIndex];
   const valueScale = useYScale(yAxisId ?? seriesConfig?.yAxisId);
 
-  const isLegendDimmed =
-    legendHoveredIndex !== null && legendHoveredIndex !== seriesIndex;
+  const isLegendDimmed = legendHoveredIndex !== null && legendHoveredIndex !== seriesIndex;
 
   const seriesCount = lines.length;
   const isLastSeries = seriesIndex === seriesCount - 1;
@@ -454,9 +445,7 @@ const BarInner = memo(function BarInner({
           x = Math.min(valuePos, zeroX);
           barW = Math.abs(valuePos - zeroX);
         }
-        y = stacked
-          ? bandPos
-          : bandPos + seriesIndex * (barWidth + effectiveGroupGap);
+        y = stacked ? bandPos : bandPos + seriesIndex * (barWidth + effectiveGroupGap);
       } else {
         // Vertical bars: category on x-axis, value on y-axis
         // Measure from the zero line (not the plot floor) so negative
@@ -478,9 +467,7 @@ const BarInner = memo(function BarInner({
         } else {
           y = Math.min(valuePos, zeroY);
         }
-        x = stacked
-          ? bandPos
-          : bandPos + seriesIndex * (barWidth + effectiveGroupGap);
+        x = stacked ? bandPos : bandPos + seriesIndex * (barWidth + effectiveGroupGap);
 
         // Minimum visible height — floor short/zero non-stacked bars so a
         // zero-value data point still reads as a tiny bar instead of
@@ -489,12 +476,7 @@ const BarInner = memo(function BarInner({
         // (sub-pixel on a 3px bar; keeps the front aligned with bar-depth,
         // which also skips trim for floored bars).
         let isFloored = false;
-        if (
-          !stacked &&
-          minBarHeight > 0 &&
-          value >= 0 &&
-          barHeight < minBarHeight
-        ) {
+        if (!stacked && minBarHeight > 0 && value >= 0 && barHeight < minBarHeight) {
           barHeight = minBarHeight;
           y = zeroY - minBarHeight;
           isFloored = true;
@@ -505,12 +487,7 @@ const BarInner = memo(function BarInner({
         // lid back edge. Stacked: only the last (topmost) series; grouped or
         // single: every positive bar. Clamped to `barHeight - 1` so very
         // short bars keep a positive height (matches bar-depth's clamp).
-        if (
-          perspective &&
-          value > 0 &&
-          !isFloored &&
-          (!stacked || isLastSeries)
-        ) {
+        if (perspective && value > 0 && !isFloored && (!stacked || isLastSeries)) {
           const rise = barDepthPerspectiveRise(
             barScale,
             bandWidth,
@@ -518,7 +495,7 @@ const BarInner = memo(function BarInner({
             innerWidth,
             d,
             y,
-            zeroY
+            zeroY,
           );
           const trim = Math.min(rise, Math.max(0, barHeight - 1));
           y += trim;
@@ -606,8 +583,7 @@ const BarInner = memo(function BarInner({
     <g className={`bar-series-${uniqueId}`}>
       {geometries.map((bar) => {
         const isFaded =
-          (hoveredBarIndex !== null && hoveredBarIndex !== bar.index) ||
-          isLegendDimmed;
+          (hoveredBarIndex !== null && hoveredBarIndex !== bar.index) || isLegendDimmed;
 
         if (animating) {
           return (
@@ -664,15 +640,8 @@ export function Bar(props: BarProps) {
   }
 
   return (
-    <BarInner
-      {...props}
-      bandWidth={bandWidth}
-      barScale={barScale}
-      barXAccessor={barXAccessor}
-    />
+    <BarInner {...props} bandWidth={bandWidth} barScale={barScale} barXAccessor={barXAccessor} />
   );
 }
 
 Bar.displayName = "Bar";
-
-export default Bar;

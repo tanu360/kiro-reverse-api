@@ -1,41 +1,45 @@
 import type { JSX } from "react";
-import { BarSparkline } from "@/components/charts/sparkline";
+import { AreaSparkline } from "@/components/charts/sparkline";
 import { STAT_TREND_HEIGHT } from "@/components/shared/stat-card";
 
 export interface StatSparklineProps {
-  /** Oldest first; the last bar is the newest. */
+  /** Oldest first; the last point is the newest. */
   data: readonly { value: number }[];
-  /** The newest bars' colour (default the series purple). */
+  /** The area's colour (default the series purple). */
   color?: string;
-  /** How many of the newest bars take `color`; the older ones are the idle grey. Default 1. */
-  highlight?: number;
+  /** Draw the area in the quiet grey instead of `color` (a failure trend with no failures). */
+  idle?: boolean;
   /** The trend slot's height in px (STAT_TREND_HEIGHT); default the inline slot's 28. */
   height?: number;
   animate: boolean;
 }
 
+const AREA_IDLE_COLOR = "color-mix(in oklab, var(--muted-foreground) 60%, transparent)";
+
 /**
- * The stat tiles' bar sparkline, as tall as its trend slot (28 px inline, 48 px aside): the newest `highlight` bars in `color`
- * and the older ones in the idle grey. All-zero data draws the flat empty stubs. Lazy-loaded
- * (see lazy-sparkline), so the chart code stays out of the overview route chunk. Decorative
- * only (the tile's value and delta line say the same in words).
+ * The stat tiles' sparkline, as tall as its trend slot (28 px inline, 48 px aside): one smooth
+ * line over a gradient fill, from zero so a quiet stretch reads low rather than as a swing.
+ * Lazy-loaded (see lazy-sparkline), so the chart code stays out of the overview route chunk.
+ * Decorative only (the tile's value and delta line say the same in words).
  */
 export default function StatSparkline({
   data,
   color,
-  highlight = 1,
+  idle = false,
   height = STAT_TREND_HEIGHT.inline,
   animate,
 }: StatSparklineProps): JSX.Element {
   return (
-    <BarSparkline
+    <AreaSparkline
       animate={animate}
-      color={color}
+      color={idle ? AREA_IDLE_COLOR : color}
       data={data}
       dataKey="value"
+      fillOpacity={0.35}
       height={height}
-      highlightLast={highlight}
       interactive={false}
+      strokeWidth={1.75}
+      yDomain={[0, undefined]}
     />
   );
 }

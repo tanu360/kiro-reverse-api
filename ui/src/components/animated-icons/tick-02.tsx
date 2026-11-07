@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { type AnimatedIconProps, useIconAnimation } from "@/lib/use-icon-animation";
 import { cn } from "@/lib/utils";
 
-export interface Tick02IconHandle {
+interface Tick02IconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * (muted) or selected/dirty (primary). Each tone uses its status ramp's disc colour (>= 3:1).
  * `ping` adds a soft pulse for something live; it is skipped under reduced motion.
  */
-export const statusDotVariants = cva("relative inline-flex shrink-0 rounded-full", {
+const statusDotVariants = cva("relative inline-flex shrink-0 rounded-full", {
   defaultVariants: {
     size: "md",
     tone: "muted",
@@ -28,7 +28,7 @@ export const statusDotVariants = cva("relative inline-flex shrink-0 rounded-full
   },
 });
 
-export type StatusDotProps = Omit<React.ComponentProps<"span">, "children"> &
+type StatusDotProps = Omit<React.ComponentProps<"span">, "children"> &
   VariantProps<typeof statusDotVariants> & {
     /** Pulse outward, for a live state. */
     ping?: boolean;

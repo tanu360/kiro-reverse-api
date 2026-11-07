@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { type AnimatedIconProps, useIconAnimation } from "@/lib/use-icon-animation";
 import { cn } from "@/lib/utils";
 
-export interface Sun03IconHandle {
+interface Sun03IconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }

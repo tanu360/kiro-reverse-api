@@ -14,23 +14,17 @@ export function CodeText({
   text: string;
   code: Record<string, string>;
 }): JSX.Element {
-  const parts: Array<string | JSX.Element> = [];
+  // Each part is keyed by where it starts in the sentence.
+  const parts: JSX.Element[] = [];
   let last = 0;
   for (const match of text.matchAll(PLACEHOLDER)) {
     const name = match[1];
     const value = name === undefined ? undefined : code[name];
     if (value === undefined) continue;
-    parts.push(text.slice(last, match.index));
-    parts.push(<Code key={match.index}>{value}</Code>);
+    parts.push(<Fragment key={`text-${last}`}>{text.slice(last, match.index)}</Fragment>);
+    parts.push(<Code key={`code-${match.index}`}>{value}</Code>);
     last = match.index + match[0].length;
   }
-  parts.push(text.slice(last));
-  return (
-    <>
-      {parts.map((part, index) =>
-        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one sentence never reorder.
-        typeof part === "string" ? <Fragment key={index}>{part}</Fragment> : part,
-      )}
-    </>
-  );
+  parts.push(<Fragment key={`text-${last}`}>{text.slice(last)}</Fragment>);
+  return <>{parts}</>;
 }

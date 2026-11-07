@@ -1,5 +1,4 @@
-export const chartCenterContainerClassName =
-  "@container/chart-center size-full min-w-0";
+export const chartCenterContainerClassName = "@container/chart-center size-full min-w-0";
 
 /** Primary stat — ~22% of center width, clamped between text-sm and text-3xl. Tabular figures. */
 export const chartCenterValueClassName =

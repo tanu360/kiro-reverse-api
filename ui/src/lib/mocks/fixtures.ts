@@ -16,7 +16,6 @@ import type {
   ObserveOverview,
   OverageResponse,
   PromptFilterConfig,
-  ProxyConfig,
   RequestEndpoint,
   RequestErrorType,
   RequestRecord,
@@ -109,7 +108,7 @@ export function round(value: number, digits: number): number {
   return Math.round(value * f) / f;
 }
 
-export function pad(n: number, width = 2): string {
+function pad(n: number, width = 2): string {
   return String(n).padStart(width, "0");
 }
 
@@ -537,9 +536,7 @@ export function seedAccounts(): Account[] {
 // API keys
 // ---------------------------------------------------------------------------
 
-export function makeApiKey(
-  overrides: Partial<ApiKey & { key: string }> = {},
-): ApiKey & { key: string } {
+function makeApiKey(overrides: Partial<ApiKey & { key: string }> = {}): ApiKey & { key: string } {
   const key = overrides.key ?? `sk-${hex(factoryRng, 64)}`;
   return {
     id: uuid(factoryRng),
@@ -905,7 +902,7 @@ function finishCells(cells: CellSums[], sparse: boolean): HeatmapCell[] {
 }
 
 /** The query params of GET /observe/account-heatmap, plus the errors log retries come from. */
-export interface BuildHeatmapOptions {
+interface BuildHeatmapOptions {
   /** failed upstream attempts (the mock's recent-errors ring); each adds a retry */
   errors?: readonly ObserveError[];
   scope?: "global" | "all";
@@ -1016,7 +1013,7 @@ export function buildAvailability(
 }
 
 /** What GET /observe/overview reads besides the request log. */
-export interface BuildOverviewContext {
+interface BuildOverviewContext {
   /** failed upstream attempts; each adds a retry */
   errors?: readonly ObserveError[];
   /** configured accounts, for enabledAccts/availableAccts and the ring prune */
@@ -1119,7 +1116,7 @@ export function buildOverview(
   };
 }
 
-export function makeModelMixEntry(overrides: Partial<ModelMixEntry> = {}): ModelMixEntry {
+function makeModelMixEntry(overrides: Partial<ModelMixEntry> = {}): ModelMixEntry {
   return {
     model: "claude-sonnet-5",
     reqs: 0,
@@ -1411,10 +1408,6 @@ export function defaultModelMappings(): ModelMappingRule[] {
 
 export function defaultEndpoint(): EndpointConfig {
   return { preferredEndpoint: "auto", endpointFallback: true };
-}
-
-export function defaultProxy(): ProxyConfig {
-  return { proxyURL: "" };
 }
 
 export function defaultPromptFilter(): PromptFilterConfig {

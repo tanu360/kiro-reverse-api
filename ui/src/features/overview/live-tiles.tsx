@@ -15,6 +15,7 @@ import {
   StatTileSkeleton,
 } from "@/components/shared/stat-card";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { observeOverviewQuery } from "@/lib/api/observe";
 import type { ObserveOverview, ObserveSeries } from "@/lib/api/types";
 import { EMPTY, formatCredits, formatFraction, formatNumber } from "@/lib/format";
@@ -22,9 +23,10 @@ import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { type Bars, rateBars, sumBars } from "./aggregate";
 import { FAILED_COLOR } from "./colors";
 import { LazySparkline } from "./lazy-sparkline";
-import { usePrefersReducedMotion } from "./use-reduced-motion";
 
-type TileId = "rpm" | "errRate" | "inTpm" | "outTpm" | "credits60" | "activeAccounts";
+// The tiles in order; while loading, each has a placeholder.
+const TILE_IDS = ["rpm", "errRate", "inTpm", "outTpm", "credits60", "activeAccounts"] as const;
+type TileId = (typeof TILE_IDS)[number];
 
 interface Tile {
   id: TileId;
@@ -60,7 +62,7 @@ function values(o: ObserveOverview, lang: Lang): Record<TileId, string> {
   };
 }
 
-/** Older servers send no series; every tile then shows the flat empty stubs. */
+/** Older servers send no series; every tile then shows a flat line. */
 const NO_SERIES: ObserveSeries = { rpm: [], errRate: [], inTpm: [], outTpm: [], credits: [] };
 
 function trends(o: ObserveOverview, animate: boolean): Record<TileId, ReactNode> {
@@ -68,8 +70,8 @@ function trends(o: ObserveOverview, animate: boolean): Record<TileId, ReactNode>
   const errRate = rateBars(series.rpm ?? [], series.errRate ?? []);
   const last = errRate.at(-1)?.value ?? 0;
   const before = errRate.at(-2)?.value ?? 0;
-  const sparkline = (data: Bars, color?: string) => (
-    <LazySparkline animate={animate} color={color} data={data} />
+  const sparkline = (data: Bars, color?: string, idle = false) => (
+    <LazySparkline animate={animate} color={color} data={data} idle={idle} />
   );
   // Active accounts has no series: a meter of the active share of the available accounts.
   const available = Math.max(0, o.availableAccts ?? 0);
@@ -84,8 +86,8 @@ function trends(o: ObserveOverview, animate: boolean): Record<TileId, ReactNode>
   );
   return {
     rpm: sparkline(sumBars(series.rpm ?? [])),
-    // The newest bar turns red only while the error rate is rising.
-    errRate: sparkline(errRate, last > before ? FAILED_COLOR : undefined),
+    // The error area is red while the error rate is rising, otherwise the quiet grey.
+    errRate: sparkline(errRate, FAILED_COLOR, last <= before),
     inTpm: sparkline(sumBars(series.inTpm ?? [])),
     outTpm: sparkline(sumBars(series.outTpm ?? [])),
     credits60: sparkline(sumBars(series.credits ?? [])),
@@ -110,9 +112,8 @@ export function LiveTiles(): JSX.Element {
     return (
       <section aria-busy="true" aria-label={t("live.label")}>
         <StatGroup aria-hidden="true" columns="live">
-          {Array.from({ length: 6 }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders never reorder.
-            <StatTileSkeleton key={index} metrics={0} size="kpi" />
+          {TILE_IDS.map((id) => (
+            <StatTileSkeleton key={id} metrics={0} size="kpi" />
           ))}
         </StatGroup>
       </section>

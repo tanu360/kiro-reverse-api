@@ -41,6 +41,7 @@ export function ExportDialog({
   const { t: tc } = useT();
   const accountName = useAccountName();
   const jsonId = useId();
+  const selectAllId = useId();
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState("");
   const [json, setJson] = useState<string | null>(null);
@@ -59,15 +60,18 @@ export function ExportDialog({
   }, [jsonShown]);
 
   // Every opening starts from its selection (or all accounts), the full list and no JSON.
-  // Only on open: a refetch while the dialog is open keeps the user's choice.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when `open` changes only.
-  useEffect(() => {
-    if (!open) return;
-    setSelected(new Set(initialSelection ?? accounts.map((account) => account.id)));
-    setQuery("");
-    setJson(null);
-    setView("list");
-  }, [open]);
+  // Only on open: a refetch while the dialog is open keeps the user's choice. Reset while
+  // rendering, when `open` turns true, so the dialog never shows the last visit's state.
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setSelected(new Set(initialSelection ?? accounts.map((account) => account.id)));
+      setQuery("");
+      setJson(null);
+      setView("list");
+    }
+  }
 
   // The search narrows the list by email or nickname; the selection keeps hidden rows.
   const visible = useMemo(
@@ -271,11 +275,14 @@ export function ExportDialog({
               Inset like the rows below (their 16 px padding and the list's border), so its
               checkbox heads the column of row checkboxes.
             */}
-            {/* biome-ignore lint/a11y/noLabelWithoutControl: the Base UI Checkbox inside is the control. */}
-            <label className="flex cursor-pointer items-center gap-3 self-start ps-4.25 font-medium text-sm/5">
+            <label
+              className="flex cursor-pointer items-center gap-3 self-start ps-4.25 font-medium text-sm/5"
+              htmlFor={selectAllId}
+            >
               <Checkbox
                 checked={allVisible}
                 disabled={visible.length === 0}
+                id={selectAllId}
                 indeterminate={someVisible}
                 onCheckedChange={toggleVisible}
               />
@@ -289,12 +296,13 @@ export function ExportDialog({
                   const name = accountName(account);
                   return (
                     <ChoiceCard
-                      control={
+                      control={(id) => (
                         <Checkbox
                           checked={selected.has(account.id)}
+                          id={id}
                           onCheckedChange={() => toggle(account.id)}
                         />
-                      }
+                      )}
                       description={accountMeta(account, t)}
                       key={account.id}
                       title={

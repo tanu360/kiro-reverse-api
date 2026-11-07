@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
 
-export interface ResponsiveDialogProps {
+interface ResponsiveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;

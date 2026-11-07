@@ -270,7 +270,9 @@ function BackupCard({
       title={<time dateTime={isoTime(entry.createdAt)}>{time}</time>}
       variant="row"
     >
-      {note === EMPTY ? null : <p className="break-words text-muted-foreground text-sm">{note}</p>}
+      {note === EMPTY ? null : (
+        <p className="wrap-break-word text-muted-foreground text-sm">{note}</p>
+      )}
     </ListCard>
   );
 }
@@ -299,7 +301,7 @@ export function BackupsTable({
       {
         id: "note",
         header: t("note"),
-        className: "min-w-32 max-w-96 whitespace-normal break-words leading-snug",
+        className: "min-w-32 max-w-96 whitespace-normal wrap-break-word leading-snug",
         cell: (entry) => <NoteCell entry={entry} mask={mask} t={t} />,
       },
       {

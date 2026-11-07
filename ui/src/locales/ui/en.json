@@ -12,18 +12,12 @@
   "sparkline.summaryDown_one": "{count} point, from {first} to {last}, down {change}%",
   "sparkline.summaryDown_other": "{count} points, from {first} to {last}, down {change}%",
   "chart.loading": "Loading…",
-  "chart.total": "Total",
   "spinner.loading": "Loading…",
   "toast.region": "Notifications",
   "sidebar.toggle": "Toggle sidebar",
   "sidebar.title": "Sidebar",
   "sidebar.description": "Displays the mobile sidebar.",
   "pagination.label": "Pagination",
-  "pagination.previous": "Previous",
-  "pagination.previousPage": "Go to previous page",
-  "pagination.next": "Next",
-  "pagination.nextPage": "Go to next page",
   "pagination.more": "More pages",
-  "breadcrumb.label": "Breadcrumb",
-  "breadcrumb.more": "More"
+  "breadcrumb.label": "Breadcrumb"
 }

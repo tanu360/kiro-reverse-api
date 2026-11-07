@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AnimatePresence,
   animate as animateValue,
   domAnimation,
   LazyMotion,
@@ -25,44 +24,44 @@ import {
   useState,
 } from "react";
 import { useUiT } from "@/components/ui/messages";
+import { intlLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { DEFAULT_ANIMATION_EASING } from "./animation";
 import { chartCssVars } from "./chart-context";
 import {
   buildSparklineAreaPath,
-  buildSparklineBarSegment,
-  buildSparklineBarsPath,
   buildSparklineLinePath,
   computeSparklineDomain,
   computeSparklineLayout,
   describeSparkline,
   interpolateSparklineLayout,
-  isSparklineFlatZero,
   resolveSparklinePadding,
   resolveSparklineValues,
   type SparklineCurve,
   type SparklineDataKey,
   type SparklineLayout,
   type SparklinePadding,
-  sparklineBarTipY,
-  sparklineBarWidth,
   sparklineIndexAtX,
 } from "./sparkline-geometry";
-import { intlLocale } from "@/lib/i18n";
 
-export const DEFAULT_SPARKLINE_ANIMATION_DURATION_MS = 900;
+const DEFAULT_SPARKLINE_ANIMATION_DURATION_MS = 900;
 /** Matches the main charts' data-change tween (`DEFAULT_Y_DOMAIN_TWEEN_MS`). */
-export const DEFAULT_SPARKLINE_DATA_TRANSITION_MS = 500;
+const DEFAULT_SPARKLINE_DATA_TRANSITION_MS = 500;
 const DATA_TRANSITION_EASE = [0.85, 0, 0.15, 1] as const;
-/** Same as the main charts' `SeriesHoverDim` / `HighlightSegment`. */
-const HOVER_FADE = "opacity 400ms ease-in-out";
+/**
+ * Same as the main charts' `SeriesHoverDim` / `HighlightSegment`. A class, not an inline
+ * transition, so the global reduced-motion and theme-swap overrides win over it.
+ */
+const HOVER_FADE_CLASS = "[transition:opacity_400ms_ease-in-out]";
 const HIGHLIGHT_SPRING: SparklineSpringConfig = { stiffness: 180, damping: 28 };
 const DEFAULT_SPARKLINE_HEIGHT = 32;
+/** Inner padding when `padding` is omitted, so strokes and the hover dot are not clipped. */
+const DEFAULT_SPARKLINE_PADDING = 4;
 const REDUCED_MOTION_FADE_MS = 200;
 
-export type SparklineCrosshair = "dashed" | "solid" | "gradient" | false;
+type SparklineCrosshair = "dashed" | "solid" | "gradient" | false;
 
-export interface SparklineSpringConfig {
+interface SparklineSpringConfig {
   stiffness: number;
   damping: number;
 }
@@ -71,12 +70,12 @@ export interface SparklineSpringConfig {
  * Same feel as the main charts' tooltip crosshair (`tooltipSpring`). Inlined
  * so the sparkline install doesn't pull in the tooltip.
  */
-export const DEFAULT_SPARKLINE_HOVER_SPRING: SparklineSpringConfig = {
+const DEFAULT_SPARKLINE_HOVER_SPRING: SparklineSpringConfig = {
   stiffness: 300,
   damping: 30,
 };
 
-export interface SparklineBaseProps<T> {
+interface SparklineBaseProps<T> {
   data: readonly T[];
   /** Field (or accessor) holding the numeric value. */
   dataKey: SparklineDataKey<T>;
@@ -126,7 +125,7 @@ export interface SparklineBaseProps<T> {
   style?: CSSProperties;
 }
 
-export interface LineSparklineProps<T> extends SparklineBaseProps<T> {
+interface LineSparklineProps<T> extends SparklineBaseProps<T> {
   curve?: SparklineCurve;
   strokeWidth?: number;
   /** Keep a dot on the last point when not hovering. */
@@ -140,70 +139,10 @@ export interface LineSparklineProps<T> extends SparklineBaseProps<T> {
   inactiveOpacity?: number;
 }
 
-export interface AreaSparklineProps<T> extends LineSparklineProps<T> {
+interface AreaSparklineProps<T> extends LineSparklineProps<T> {
   fill?: "gradient" | "solid";
   /** Opacity of the fill at its strongest point. */
   fillOpacity?: number;
-}
-
-export interface BarSparklineProps<T> extends SparklineBaseProps<T> {
-  /** Gap between bars in px. Default: 2 */
-  barGap?: number;
-  /** Corner radius of a bar tip in px. Default: 1 */
-  barRadius?: number;
-  /** Opacity of non-hovered bars while hovering. */
-  inactiveOpacity?: number;
-  /**
-   * Paint the last `n` bars in the series colour (`color`, default
-   * `var(--chart-line-primary)`) and the bars before them in `idleColor`, the
-   * KPI-strip look. Omit to paint every bar in `color`.
-   */
-  highlightLast?: number;
-  /** Bars outside `highlightLast`. Default: muted-foreground at 45%. */
-  idleColor?: string;
-  /**
-   * Colour per bar; wins over `highlightLast` (e.g. `var(--chart-negative)`
-   * for a bucket with failures). Bars of one colour share one path.
-   */
-  barColor?: (index: number, value: number) => string;
-  /** Shortest bar in px, so zero and tiny values still read as a stub. Default: 2 */
-  minBarHeight?: number;
-  /**
-   * Colour of the flat stubs drawn when every value is 0 (the empty state).
-   * Default: `var(--chart-scale-01)`.
-   */
-  emptyColor?: string;
-}
-
-/** Height of a bar sparkline: the KPI tiles' 28 px trend slot. */
-const DEFAULT_BAR_SPARKLINE_HEIGHT = 28;
-const DEFAULT_BAR_IDLE_COLOR =
-  "color-mix(in oklab, var(--muted-foreground) 45%, transparent)";
-const DEFAULT_BAR_EMPTY_COLOR = "var(--chart-scale-01)";
-/** All-zero data: pin the domain so the stubs sit on the bottom edge, not mid-height. */
-const EMPTY_BAR_DOMAIN: [number, number] = [0, 1];
-
-interface BarColorGroup {
-  color: string;
-  indices: number[];
-}
-
-/** One group per distinct bar colour, in first-seen order. */
-function groupBarsByColor(
-  values: readonly number[],
-  colorOf: (index: number, value: number) => string
-): BarColorGroup[] {
-  const groups = new Map<string, number[]>();
-  values.forEach((value, index) => {
-    const color = colorOf(index, value);
-    const indices = groups.get(color);
-    if (indices) {
-      indices.push(index);
-    } else {
-      groups.set(color, [index]);
-    }
-  });
-  return [...groups].map(([color, indices]) => ({ color, indices }));
 }
 
 // One ResizeObserver for every sparkline on the page.
@@ -231,7 +170,7 @@ function observeWidth(element: Element, listener: SizeListener) {
 
 function useSparklineWidth(
   ref: RefObject<HTMLDivElement | null>,
-  fixedWidth: number | undefined
+  fixedWidth: number | undefined,
 ): number {
   const [measured, setMeasured] = useState(0);
   useEffect(() => {
@@ -239,9 +178,7 @@ function useSparklineWidth(
     if (fixedWidth !== undefined || !element) {
       return;
     }
-    return observeWidth(element, (width) =>
-      setMeasured(Math.round(width * 2) / 2)
-    );
+    return observeWidth(element, (width) => setMeasured(Math.round(width * 2) / 2));
   }, [ref, fixedWidth]);
   return fixedWidth ?? measured;
 }
@@ -266,7 +203,7 @@ function useEnterAnimation(
     duration: number;
     easing: string;
     keyframes: Keyframe[];
-  }
+  },
 ) {
   const played = useRef(false);
   const { animate, duration, easing, keyframes } = options;
@@ -300,9 +237,7 @@ function sameShape(a: SparklineLayout, b: SparklineLayout): boolean {
   }
   return a.points.every((point, i) => {
     const other = b.points[i];
-    return (
-      other !== undefined && Object.is(point.y, other.y) && point.x === other.x
-    );
+    return other !== undefined && Object.is(point.y, other.y) && point.x === other.x;
   });
 }
 
@@ -314,7 +249,7 @@ function useDataTransition(
   layout: SparklineLayout,
   width: number,
   duration: number,
-  draw: (frame: SparklineLayout) => void
+  draw: (frame: SparklineLayout) => void,
 ) {
   const displayed = useRef<SparklineLayout | null>(null);
   const prevWidth = useRef(width);
@@ -329,13 +264,7 @@ function useDataTransition(
     const resized = prevWidth.current !== width;
     prevWidth.current = width;
     displayed.current = layout;
-    if (
-      !from ||
-      sameShape(from, layout) ||
-      resized ||
-      duration <= 0 ||
-      prefersReducedMotion()
-    ) {
+    if (!from || sameShape(from, layout) || resized || duration <= 0 || prefersReducedMotion()) {
       // An interrupted tween may have left the DOM mid-frame.
       if (running.current) {
         running.current = false;
@@ -368,15 +297,12 @@ const wipeKeyframes: Keyframe[] = [
   { clipPath: "inset(0 0% 0 0)" },
 ];
 
-const drawKeyframes: Keyframe[] = [
-  { strokeDashoffset: 1 },
-  { strokeDashoffset: 0 },
-];
+const drawKeyframes: Keyframe[] = [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }];
 
 function useHoverState<T>(
   data: readonly T[],
   hoverIndexProp: number | null | undefined,
-  onHoverChange: SparklineBaseProps<T>["onHoverChange"]
+  onHoverChange: SparklineBaseProps<T>["onHoverChange"],
 ) {
   const [internal, setInternal] = useState<number | null>(null);
   const controlled = hoverIndexProp !== undefined;
@@ -396,7 +322,7 @@ function useHoverState<T>(
       }
       onHoverChange?.(index, index === null ? null : (data[index] ?? null));
     },
-    [controlled, data, onHoverChange]
+    [controlled, data, onHoverChange],
   );
 
   return [hoverIndex, setHoverIndex] as const;
@@ -404,9 +330,6 @@ function useHoverState<T>(
 
 interface FrameProps<T> {
   config: SparklineBaseProps<T>;
-  kind: "point" | "band";
-  includeZero: boolean;
-  defaultPadding: number;
   children: (frame: {
     width: number;
     height: number;
@@ -418,13 +341,7 @@ interface FrameProps<T> {
   }) => ReactNode;
 }
 
-function SparklineFrame<T>({
-  config,
-  kind,
-  includeZero,
-  defaultPadding,
-  children,
-}: FrameProps<T>) {
+function SparklineFrame<T>({ config, children }: FrameProps<T>) {
   const {
     data,
     dataKey,
@@ -443,17 +360,11 @@ function SparklineFrame<T>({
   const width = useSparklineWidth(containerRef, widthProp);
   const gradientId = useId();
 
-  const values = useMemo(
-    () => resolveSparklineValues(data, dataKey),
-    [data, dataKey]
-  );
-  const resolvedPadding = resolveSparklinePadding(paddingProp, defaultPadding);
+  const values = useMemo(() => resolveSparklineValues(data, dataKey), [data, dataKey]);
+  const resolvedPadding = resolveSparklinePadding(paddingProp, DEFAULT_SPARKLINE_PADDING);
   const { top, right, bottom, left } = resolvedPadding;
   // Keyed on the four numbers so inline `padding={{ … }}` literals stay cheap.
-  const padding = useMemo(
-    () => ({ top, right, bottom, left }),
-    [top, right, bottom, left]
-  );
+  const padding = useMemo(() => ({ top, right, bottom, left }), [top, right, bottom, left]);
   const yMin = yDomain?.[0];
   const yMax = yDomain?.[1];
   const layout = useMemo(
@@ -462,20 +373,12 @@ function SparklineFrame<T>({
         width,
         height,
         padding,
-        kind,
-        domain: computeSparklineDomain(values, {
-          yDomain: [yMin, yMax],
-          includeZero,
-        }),
+        domain: computeSparklineDomain(values, { yDomain: [yMin, yMax] }),
       }),
-    [values, width, height, padding, kind, yMin, yMax, includeZero]
+    [values, width, height, padding, yMin, yMax],
   );
 
-  const [hoverIndex, setHoverIndex] = useHoverState(
-    data,
-    hoverIndexProp,
-    onHoverChange
-  );
+  const [hoverIndex, setHoverIndex] = useHoverState(data, hoverIndexProp, onHoverChange);
 
   const handlePointerMove = useCallback(
     (event: PointerEvent<SVGSVGElement>) => {
@@ -485,29 +388,19 @@ function SparklineFrame<T>({
           count: values.length,
           width,
           padding,
-          kind,
-        })
+        }),
       );
     },
-    [setHoverIndex, values.length, width, padding, kind]
+    [setHoverIndex, values.length, width, padding],
   );
-  const handlePointerLeave = useCallback(
-    () => setHoverIndex(null),
-    [setHoverIndex]
-  );
+  const handlePointerLeave = useCallback(() => setHoverIndex(null), [setHoverIndex]);
 
   const { t, lang } = useUiT();
-  const label =
-    config["aria-label"] ??
-    describeSparkline(values, t, intlLocale(lang));
+  const label = config["aria-label"] ?? describeSparkline(values, t, intlLocale(lang));
 
   return (
     <div
-      className={cn(
-        "relative min-w-0",
-        widthProp === undefined && "w-full",
-        className
-      )}
+      className={cn("relative min-w-0", widthProp === undefined && "w-full", className)}
       ref={containerRef}
       style={{ width: widthProp, height, ...style }}
     >
@@ -559,21 +452,9 @@ function SparklineCrosshairLine({
         <>
           <defs>
             <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
-              <stop
-                offset="0"
-                stopColor={chartCssVars.crosshair}
-                stopOpacity="0"
-              />
-              <stop
-                offset="0.5"
-                stopColor={chartCssVars.crosshair}
-                stopOpacity="1"
-              />
-              <stop
-                offset="1"
-                stopColor={chartCssVars.crosshair}
-                stopOpacity="0"
-              />
+              <stop offset="0" stopColor={chartCssVars.crosshair} stopOpacity="0" />
+              <stop offset="0.5" stopColor={chartCssVars.crosshair} stopOpacity="1" />
+              <stop offset="1" stopColor={chartCssVars.crosshair} stopOpacity="0" />
             </linearGradient>
           </defs>
           {/* Gradient strokes need a non-zero bbox width, so draw a 1px rect. */}
@@ -594,15 +475,7 @@ function SparklineCrosshairLine({
   );
 }
 
-function SparklineDot({
-  x,
-  y,
-  color,
-}: {
-  x: AnimatedNumber;
-  y: AnimatedNumber;
-  color: string;
-}) {
+function SparklineDot({ x, y, color }: { x: AnimatedNumber; y: AnimatedNumber; color: string }) {
   return (
     <m.circle
       aria-hidden
@@ -678,9 +551,7 @@ function SpringHoverMarks({
     x.set(point.x);
     y.set(targetY);
   }, [x, y, point.x, targetY]);
-  return (
-    <HoverMarksView showDot={Number.isFinite(point.y)} x={x} y={y} {...rest} />
-  );
+  return <HoverMarksView showDot={Number.isFinite(point.y)} x={x} y={y} {...rest} />;
 }
 
 function HoverMarks({
@@ -691,23 +562,9 @@ function HoverMarks({
 }: HoverMarksProps & { spring: SparklineSpringConfig | null }) {
   const reducedMotion = useReducedMotion();
   if (spring && !reducedMotion) {
-    return (
-      <SpringHoverMarks
-        fallbackY={fallbackY}
-        point={point}
-        spring={spring}
-        {...rest}
-      />
-    );
+    return <SpringHoverMarks fallbackY={fallbackY} point={point} spring={spring} {...rest} />;
   }
-  return (
-    <HoverMarksView
-      showDot={Number.isFinite(point.y)}
-      x={point.x}
-      y={point.y}
-      {...rest}
-    />
-  );
+  return <HoverMarksView showDot={Number.isFinite(point.y)} x={point.x} y={point.y} {...rest} />;
 }
 
 /**
@@ -740,10 +597,7 @@ function SparklineHighlight({
 
   useLayoutEffect(() => {
     // Reuse the base stroke's `d` — it may be mid data-transition.
-    highlightRef.current?.setAttribute(
-      "d",
-      lineRef.current?.getAttribute("d") ?? ""
-    );
+    highlightRef.current?.setAttribute("d", lineRef.current?.getAttribute("d") ?? "");
     if (prefersReducedMotion()) {
       x.jump(start);
       width.jump(end - start);
@@ -758,12 +612,7 @@ function SparklineHighlight({
       <defs>
         <clipPath id={clipId}>
           {/* Bleed by strokeWidth so strokes at the min/max keep full width. */}
-          <m.rect
-            height={height + strokeWidth * 2}
-            width={width}
-            x={x}
-            y={-strokeWidth}
-          />
+          <m.rect height={height + strokeWidth * 2} width={width} x={x} y={-strokeWidth} />
         </clipPath>
       </defs>
       <m.path
@@ -796,24 +645,15 @@ function HoverOverlay({
   if (!point) {
     return null;
   }
-  return (
-    <HoverMarks
-      fallbackY={layout.baselineY}
-      point={point}
-      spring={spring}
-      {...rest}
-    />
-  );
+  return <HoverMarks fallbackY={layout.baselineY} point={point} spring={spring} {...rest} />;
 }
 
 /** Resolves the hover spring: `null` means snap. */
 function resolveHoverSpring(
   hoverTransition: boolean,
-  springConfig: Partial<SparklineSpringConfig> | undefined
+  springConfig: Partial<SparklineSpringConfig> | undefined,
 ): SparklineSpringConfig | null {
-  return hoverTransition
-    ? { ...DEFAULT_SPARKLINE_HOVER_SPRING, ...springConfig }
-    : null;
+  return hoverTransition ? { ...DEFAULT_SPARKLINE_HOVER_SPRING, ...springConfig } : null;
 }
 
 function LineOrArea<T>({
@@ -841,17 +681,12 @@ function LineOrArea<T>({
     inactiveOpacity = 0.5,
   } = config;
   const spring = resolveHoverSpring(hoverTransition, springConfig);
-  const padding = resolveSparklinePadding(config.padding, 4);
+  const padding = resolveSparklinePadding(config.padding, DEFAULT_SPARKLINE_PADDING);
   const groupRef = useRef<SVGGElement>(null);
   const lineRef = useRef<SVGPathElement>(null);
 
   return (
-    <SparklineFrame
-      config={config}
-      defaultPadding={4}
-      includeZero={false}
-      kind="point"
-    >
+    <SparklineFrame config={config}>
       {({ width, height, layout, hoverIndex, color, gradientId }) => (
         <LineOrAreaPaths
           animate={animate}
@@ -935,27 +770,19 @@ function LineOrAreaPaths({
   showHighlight: boolean;
   inactiveOpacity: number;
 }) {
-  const linePath = useMemo(
-    () => buildSparklineLinePath(layout.points, curve),
-    [layout, curve]
-  );
+  const linePath = useMemo(() => buildSparklineLinePath(layout.points, curve), [layout, curve]);
   const areaPath = useMemo(
     () =>
-      variant === "area"
-        ? buildSparklineAreaPath(layout.points, curve, layout.baselineY)
-        : "",
-    [variant, layout, curve]
+      variant === "area" ? buildSparklineAreaPath(layout.points, curve, layout.baselineY) : "",
+    [variant, layout, curve],
   );
 
   const areaRef = useRef<SVGPathElement>(null);
   useDataTransition(layout, width, dataTransitionDuration, (frame) => {
-    lineRef.current?.setAttribute(
-      "d",
-      buildSparklineLinePath(frame.points, curve)
-    );
+    lineRef.current?.setAttribute("d", buildSparklineLinePath(frame.points, curve));
     areaRef.current?.setAttribute(
       "d",
-      buildSparklineAreaPath(frame.points, curve, frame.baselineY)
+      buildSparklineAreaPath(frame.points, curve, frame.baselineY),
     );
   });
 
@@ -980,22 +807,16 @@ function LineOrAreaPaths({
     <>
       <g
         aria-hidden
+        className={HOVER_FADE_CLASS}
         ref={groupRef}
-        style={{
-          opacity: hoverIndex === null ? 1 : inactiveOpacity,
-          transition: HOVER_FADE,
-        }}
+        style={{ opacity: hoverIndex === null ? 1 : inactiveOpacity }}
       >
         {variant === "area" ? (
           <>
             {fill === "gradient" ? (
               <defs>
                 <linearGradient id={fillId} x1="0" x2="0" y1="0" y2="1">
-                  <stop
-                    offset="0"
-                    stopColor={color}
-                    stopOpacity={fillOpacity}
-                  />
+                  <stop offset="0" stopColor={color} stopOpacity={fillOpacity} />
                   <stop offset="1" stopColor={color} stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -1048,14 +869,6 @@ function LineOrAreaPaths({
   );
 }
 
-function LineSparklineImpl<T>(props: LineSparklineProps<T>) {
-  return (
-    <LazyMotion features={domAnimation}>
-      <LineOrArea config={props} variant="line" />
-    </LazyMotion>
-  );
-}
-
 function AreaSparklineImpl<T>(props: AreaSparklineProps<T>) {
   return (
     <LazyMotion features={domAnimation}>
@@ -1064,309 +877,5 @@ function AreaSparklineImpl<T>(props: AreaSparklineProps<T>) {
   );
 }
 
-function BarSparklineImpl<T>(props: BarSparklineProps<T>) {
-  const {
-    barGap = 2,
-    barRadius = 1,
-    inactiveOpacity = 0.4,
-    highlightLast,
-    idleColor = DEFAULT_BAR_IDLE_COLOR,
-    barColor,
-    minBarHeight = 2,
-    emptyColor = DEFAULT_BAR_EMPTY_COLOR,
-    animate = true,
-    animationDuration = DEFAULT_SPARKLINE_ANIMATION_DURATION_MS,
-    animationEasing = DEFAULT_ANIMATION_EASING,
-    dataTransitionDuration = DEFAULT_SPARKLINE_DATA_TRANSITION_MS,
-    crosshair = "dashed",
-    dot = true,
-    hoverTransition = true,
-    springConfig,
-  } = props;
-  const spring = resolveHoverSpring(hoverTransition, springConfig);
-  const padding = resolveSparklinePadding(props.padding, 2);
-  const groupRef = useRef<SVGGElement>(null);
-  const values = useMemo(
-    () => resolveSparklineValues(props.data, props.dataKey),
-    [props.data, props.dataKey]
-  );
-  const empty = isSparklineFlatZero(values);
-  const config = useMemo<SparklineBaseProps<T>>(
-    () => ({
-      ...props,
-      height: props.height ?? DEFAULT_BAR_SPARKLINE_HEIGHT,
-      yDomain: empty ? EMPTY_BAR_DOMAIN : props.yDomain,
-    }),
-    [props, empty]
-  );
-
-  return (
-    <LazyMotion features={domAnimation}>
-      <SparklineFrame config={config} defaultPadding={2} includeZero kind="band">
-        {({ width, height, layout, hoverIndex, color, gradientId }) => (
-          <BarPaths
-            animate={animate}
-            animationDuration={animationDuration}
-            animationEasing={animationEasing}
-            barColor={barColor}
-            barGap={barGap}
-            barRadius={barRadius}
-            color={color}
-            crosshair={crosshair}
-            dataTransitionDuration={animate ? dataTransitionDuration : 0}
-            dot={dot}
-            empty={empty}
-            emptyColor={emptyColor}
-            gradientId={gradientId}
-            groupRef={groupRef}
-            height={height}
-            highlightLast={highlightLast}
-            hoverIndex={hoverIndex}
-            idleColor={idleColor}
-            inactiveOpacity={inactiveOpacity}
-            layout={layout}
-            minBarHeight={minBarHeight}
-            padding={padding}
-            spring={spring}
-            values={values}
-            width={width}
-          />
-        )}
-      </SparklineFrame>
-    </LazyMotion>
-  );
-}
-
-function BarPaths({
-  layout,
-  values,
-  width,
-  height,
-  padding,
-  barGap,
-  barRadius,
-  minBarHeight,
-  inactiveOpacity,
-  color,
-  idleColor,
-  highlightLast,
-  barColor,
-  empty,
-  emptyColor,
-  hoverIndex,
-  crosshair,
-  dot,
-  gradientId,
-  animate,
-  animationDuration,
-  animationEasing,
-  dataTransitionDuration,
-  groupRef,
-  spring,
-}: {
-  layout: SparklineLayout;
-  values: readonly number[];
-  width: number;
-  height: number;
-  padding: SparklinePadding;
-  barGap: number;
-  barRadius: number;
-  minBarHeight: number;
-  inactiveOpacity: number;
-  color: string;
-  idleColor: string;
-  highlightLast: number | undefined;
-  barColor: ((index: number, value: number) => string) | undefined;
-  empty: boolean;
-  emptyColor: string;
-  hoverIndex: number | null;
-  crosshair: SparklineCrosshair;
-  dot: boolean;
-  gradientId: string;
-  animate: boolean;
-  animationDuration: number;
-  animationEasing: string;
-  dataTransitionDuration: number;
-  groupRef: RefObject<SVGGElement | null>;
-  spring: SparklineSpringConfig | null;
-}) {
-  // Empty: every bar is a flat stub in the empty colour. Otherwise bars are
-  // grouped by colour (barColor > highlightLast > color), one path each.
-  const colorOf = useCallback(
-    (index: number, value: number) => {
-      if (empty) {
-        return emptyColor;
-      }
-      if (barColor) {
-        return barColor(index, value);
-      }
-      if (highlightLast != null) {
-        return index >= values.length - highlightLast ? color : idleColor;
-      }
-      return color;
-    },
-    [empty, emptyColor, barColor, highlightLast, values.length, color, idleColor]
-  );
-  const groups = useMemo(
-    () => groupBarsByColor(values, colorOf),
-    [values, colorOf]
-  );
-  const minHeight = Math.max(0, minBarHeight);
-  const pathRefs = useRef(new Map<string, SVGPathElement>());
-  useDataTransition(layout, width, dataTransitionDuration, (frame) => {
-    for (const group of groups) {
-      pathRefs.current
-        .get(group.color)
-        ?.setAttribute(
-          "d",
-          buildSparklineBarsPath(frame, {
-            gap: barGap,
-            radius: barRadius,
-            minHeight,
-            indices: group.indices,
-          })
-        );
-    }
-  });
-  const groupPaths = useMemo(
-    () =>
-      groups.map((group) =>
-        buildSparklineBarsPath(layout, {
-          gap: barGap,
-          radius: barRadius,
-          minHeight,
-          indices: group.indices,
-        })
-      ),
-    [groups, layout, barGap, barRadius, minHeight]
-  );
-
-  // Bars grow from the baseline while a left → right wipe staggers them.
-  const keyframes = useMemo<Keyframe[]>(
-    () => [
-      {
-        clipPath: "inset(0 100% 0 0)",
-        transform: "scaleY(0)",
-        transformOrigin: `0 ${layout.baselineY}px`,
-      },
-      {
-        clipPath: "inset(0 0% 0 0)",
-        transform: "scaleY(1)",
-        transformOrigin: `0 ${layout.baselineY}px`,
-      },
-    ],
-    [layout.baselineY]
-  );
-  useEnterAnimation(groupRef, width > 0, {
-    animate,
-    duration: animationDuration,
-    easing: animationEasing,
-    keyframes,
-  });
-
-  const hovered = hoverIndex === null ? undefined : layout.points[hoverIndex];
-  const hoveredColor =
-    hovered && hoverIndex !== null ? colorOf(hoverIndex, hovered.value) : color;
-
-  return (
-    <>
-      <g aria-hidden ref={groupRef}>
-        {groups.map((group, index) => (
-          <path
-            d={groupPaths[index]}
-            fill={group.color}
-            key={group.color}
-            ref={(element) => {
-              if (element) {
-                pathRefs.current.set(group.color, element);
-              } else {
-                pathRefs.current.delete(group.color);
-              }
-            }}
-            style={{
-              opacity: hovered ? inactiveOpacity : 1,
-              transition: HOVER_FADE,
-            }}
-          />
-        ))}
-        {/* The focused bar sits on top at full strength; moving between bars
-            cross-fades it, and the rest fade with the base path above. */}
-        <AnimatePresence>
-          {hovered && hoverIndex !== null && Number.isFinite(hovered.y) ? (
-            <m.path
-              animate={{ opacity: 1 }}
-              d={buildSparklineBarSegment(
-                hovered.x,
-                sparklineBarWidth(layout.band, barGap),
-                sparklineBarTipY(hovered, layout.baselineY, minHeight),
-                layout.baselineY,
-                barRadius
-              )}
-              exit={{ opacity: 0 }}
-              fill={hoveredColor}
-              initial={{ opacity: inactiveOpacity }}
-              key={hoverIndex}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
-            />
-          ) : null}
-        </AnimatePresence>
-      </g>
-      <HoverOverlay
-        color={hoveredColor}
-        crosshair={crosshair}
-        dot={dot}
-        gradientId={gradientId}
-        height={height}
-        hoverIndex={hoverIndex}
-        layout={layout}
-        padding={padding}
-        spring={spring}
-      />
-    </>
-  );
-}
-
-/** Tiny line chart — one path, no axes, minimal hover crosshair + dot. */
-export const LineSparkline = memo(
-  LineSparklineImpl
-) as typeof LineSparklineImpl;
 /** Tiny area chart — line over a gradient or solid fill. */
-export const AreaSparkline = memo(
-  AreaSparklineImpl
-) as typeof AreaSparklineImpl;
-/**
- * Tiny bar chart — bars of one colour share a path. `highlightLast` paints the
- * newest bars in `color` over muted idle bars; all-zero data draws flat stubs.
- */
-export const BarSparkline = memo(BarSparklineImpl) as typeof BarSparklineImpl;
-
-/**
- * Lift a sparkline's hover state so you can display the hovered value.
- * Spread `sparklineProps` onto one sparkline — or several to sync their
- * crosshairs.
- *
- * ```tsx
- * const hover = useSparklineHover<Row>();
- * <span>{hover.datum?.value ?? latest}</span>
- * <LineSparkline data={rows} dataKey="value" {...hover.sparklineProps} />
- * ```
- */
-export function useSparklineHover<T>() {
-  const [state, setState] = useState<{ index: number | null; datum: T | null }>(
-    { index: null, datum: null }
-  );
-  const onHoverChange = useCallback(
-    (index: number | null, datum: T | null) => setState({ index, datum }),
-    []
-  );
-  const sparklineProps = useMemo(
-    () => ({ hoverIndex: state.index, onHoverChange }),
-    [state.index, onHoverChange]
-  );
-  return {
-    index: state.index,
-    datum: state.datum,
-    isHovering: state.index !== null,
-    sparklineProps,
-  };
-}
+export const AreaSparkline = memo(AreaSparklineImpl) as typeof AreaSparklineImpl;

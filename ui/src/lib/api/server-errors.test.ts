@@ -28,12 +28,17 @@ describe("serverErrorKey", () => {
   });
 
   it("maps every entry to an errors:serverError key present in both locales", () => {
-    for (const key of Object.values(SERVER_ERROR_KEYS)) {
+    for (const [, key] of SERVER_ERROR_KEYS) {
       expect(key).toMatch(/^errors:serverError\.[a-zA-Z]+$/);
       const name = key.slice("errors:".length);
       expect(en, name).toHaveProperty([name]);
       expect(zh, name).toHaveProperty([name]);
     }
+  });
+
+  it("lists each message once (the lookup ignores case)", () => {
+    const messages = SERVER_ERROR_KEYS.map(([message]) => message.toLowerCase());
+    expect(new Set(messages).size).toBe(messages.length);
   });
 
   it("ships the same keys in en and zh", () => {
@@ -117,8 +122,13 @@ describe("errorMessage", () => {
     expect(errorMessage(error, zhT)).toBe("回调 URL 无效，请重新复制完整地址。");
   });
 
+  it("lists each phrase once", () => {
+    const list = SERVER_ERROR_PHRASES.map(([phrase]) => phrase.toLowerCase());
+    expect(new Set(list).size).toBe(list.length);
+  });
+
   it("maps every phrase to a key present in both locales", () => {
-    for (const key of Object.values(SERVER_ERROR_PHRASES)) {
+    for (const [, key] of SERVER_ERROR_PHRASES) {
       const name = key.slice("errors:".length);
       expect(en, name).toHaveProperty([name]);
       expect(zh, name).toHaveProperty([name]);

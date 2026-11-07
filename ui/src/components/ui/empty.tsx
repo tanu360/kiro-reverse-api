@@ -28,10 +28,7 @@ const emptyMediaVariants = cva(
   },
 );
 
-export function Empty({
-  className,
-  ...props
-}: React.ComponentProps<"div">): React.ReactElement {
+export function Empty({ className, ...props }: React.ComponentProps<"div">): React.ReactElement {
   return (
     <div
       className={cn(
@@ -50,10 +47,7 @@ export function EmptyHeader({
 }: React.ComponentProps<"div">): React.ReactElement {
   return (
     <div
-      className={cn(
-        "flex max-w-sm flex-col items-center text-center",
-        className,
-      )}
+      className={cn("flex max-w-sm flex-col items-center text-center", className)}
       data-slot="empty-header"
       {...props}
     />
@@ -66,8 +60,7 @@ export function EmptyMedia({
   tone = "default",
   children,
   ...props
-}: React.ComponentProps<"div"> &
-  VariantProps<typeof emptyMediaVariants>): React.ReactElement {
+}: React.ComponentProps<"div"> & VariantProps<typeof emptyMediaVariants>): React.ReactElement {
   const pile = variant === "icon" && tone !== "destructive";
   return (
     // Only this wrapper takes className and props, so a margin passed in lands once.

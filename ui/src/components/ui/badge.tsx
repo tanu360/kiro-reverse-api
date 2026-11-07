@@ -2,8 +2,8 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { cva, type VariantProps } from "class-variance-authority";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { cva, type VariantProps } from "class-variance-authority";
 import type React from "react";
 import { cn } from "@/lib/utils";
 
@@ -97,7 +97,7 @@ export interface BadgeProps extends useRender.ComponentProps<"span"> {
 }
 
 /** The leading status dot of a Badge; with `live`, a ring pings out of it (motion-safe only). */
-export function BadgeDot({ live = false }: { live?: boolean }): React.ReactElement {
+function BadgeDot({ live = false }: { live?: boolean }): React.ReactElement {
   return (
     <span aria-hidden="true" className="relative flex size-1.5 shrink-0" data-slot="badge-dot">
       {live ? (

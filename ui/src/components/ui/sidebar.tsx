@@ -2,16 +2,13 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { cva, type VariantProps } from "class-variance-authority";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon, PanelLeftIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
-import { useSidebarIsSheet } from "@/hooks/use-media-query";
-import { cn } from "@/lib/utils";
 import { Button, PRIMARY_FINISH } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useUiT } from "@/components/ui/messages";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetDescription,
@@ -19,13 +16,9 @@ import {
   SheetPopup,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipPopup,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useUiT } from "@/components/ui/messages";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSidebarIsSheet } from "@/hooks/use-media-query";
+import { cn } from "@/lib/utils";
 
 // Kiro patch: persist the open state in localStorage instead of the Cookie Store API,
 // which Firefox lacks. The admin UI relies on no cookies.
@@ -47,7 +40,7 @@ const SIDEBAR_KEYBOARD_SHORTCUT: string = "b";
 // Kiro patch: row states, geometry and icon colour follow t3code's sidebar
 // (apps/web/src/components/ui/sidebar.tsx), reading the --sidebar-row-* tokens.
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full cursor-pointer items-center gap-[var(--sidebar-control-gap)] overflow-hidden text-left outline-hidden transition-[width,height,padding] hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-has-data-[sidebar=menu-chevron]/menu-item:pe-8 aria-disabled:pointer-events-none aria-disabled:opacity-64 data-[active=true]:bg-sidebar-row-selected data-[active=true]:hover:bg-sidebar-row-selected data-[active=true]:active:bg-sidebar-row-selected data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground data-[state=open]:hover:bg-sidebar-row-hover data-[state=open]:hover:text-sidebar-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-[var(--sidebar-content-inset)]! [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-[var(--sidebar-icon-color)] hover:[&>svg]:text-sidebar-foreground active:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
+  "peer/menu-button flex w-full cursor-pointer items-center gap-(--sidebar-control-gap) overflow-hidden text-left outline-hidden transition-[width,height,padding] hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-has-data-[sidebar=menu-chevron]/menu-item:pe-8 aria-disabled:pointer-events-none aria-disabled:opacity-64 data-[active=true]:bg-sidebar-row-selected data-[active=true]:hover:bg-sidebar-row-selected data-[active=true]:active:bg-sidebar-row-selected data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground data-[state=open]:hover:bg-sidebar-row-hover data-[state=open]:hover:text-sidebar-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-(--sidebar-content-inset)! [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-(--sidebar-icon-color) hover:[&>svg]:text-sidebar-foreground active:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
   {
     defaultVariants: {
       size: "default",
@@ -57,10 +50,9 @@ const sidebarMenuButtonVariants = cva(
       size: {
         // Kiro patch: the nav row, 36 px, and 40 px in the sheet (below lg), where rows are touch
         // targets.
-        default:
-          "h-9 rounded-lg px-[var(--sidebar-row-content-inset)] py-1.5 text-sm max-lg:h-10",
-        lg: "h-12 rounded-lg px-[var(--sidebar-row-content-inset)] py-2 text-sm group-data-[collapsible=icon]:p-0!",
-        sm: "h-7 rounded-lg px-[var(--sidebar-row-content-inset)] py-2 text-xs",
+        default: "h-9 rounded-lg px-(--sidebar-row-content-inset) py-1.5 text-sm max-lg:h-10",
+        lg: "h-12 rounded-lg px-(--sidebar-row-content-inset) py-2 text-sm group-data-[collapsible=icon]:p-0!",
+        sm: "h-7 rounded-lg px-(--sidebar-row-content-inset) py-2 text-xs",
       },
       variant: {
         // Kiro patch: labels in the sidebar text colour (80%), not the muted grey, so the
@@ -82,7 +74,7 @@ const sidebarMenuButtonVariants = cva(
   },
 );
 
-export type SidebarContextProps = {
+type SidebarContextProps = {
   state: "expanded" | "collapsed";
   open: boolean;
   setOpen: (open: boolean) => void;
@@ -92,7 +84,7 @@ export type SidebarContextProps = {
   toggleSidebar: () => void;
 };
 
-export const SidebarContext: React.Context<SidebarContextProps | null> =
+const SidebarContext: React.Context<SidebarContextProps | null> =
   React.createContext<SidebarContextProps | null>(null);
 
 export function useSidebar(): SidebarContextProps {
@@ -124,9 +116,7 @@ export function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(() =>
-    readStoredSidebarOpen(defaultOpen),
-  );
+  const [_open, _setOpen] = React.useState(() => readStoredSidebarOpen(defaultOpen));
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -153,10 +143,7 @@ export function SidebarProvider({
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
-      ) {
+      if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         toggleSidebar();
       }
@@ -295,8 +282,8 @@ export function Sidebar({
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear lg:flex",
           side === "left"
-            ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
-            : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+            ? "left-0 group-data-[collapsible=offcanvas]:-left-(--sidebar-width)"
+            : "right-0 group-data-[collapsible=offcanvas]:-right-(--sidebar-width)",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -349,67 +336,6 @@ export function SidebarTrigger({
   );
 }
 
-export function SidebarRail({
-  className,
-  ...props
-}: React.ComponentProps<"button">): React.ReactElement {
-  const { toggleSidebar } = useSidebar();
-  const { t } = useUiT();
-
-  return (
-    <button
-      aria-label={t("sidebar.toggle")}
-      className={cn(
-        "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
-        "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
-        "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
-        "group-data-[collapsible=offcanvas]:translate-x-0 hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:after:left-full",
-        "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
-        "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
-        className,
-      )}
-      data-sidebar="rail"
-      data-slot="sidebar-rail"
-      onClick={toggleSidebar}
-      tabIndex={-1}
-      title={t("sidebar.toggle")}
-      type="button"
-      {...props}
-    />
-  );
-}
-
-export function SidebarInset({
-  className,
-  ...props
-}: React.ComponentProps<"main">): React.ReactElement {
-  return (
-    <main
-      className={cn(
-        "relative flex min-w-0 w-full flex-1 flex-col bg-background surface-grain",
-        "lg:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 lg:peer-data-[variant=inset]:m-2 lg:peer-data-[variant=inset]:ms-0 lg:peer-data-[variant=inset]:rounded-xl",
-        className,
-      )}
-      data-slot="sidebar-inset"
-      {...props}
-    />
-  );
-}
-
-export function SidebarInput({
-  className,
-  ...props
-}: React.ComponentProps<typeof Input>): React.ReactElement {
-  return (
-    <Input
-      className={cn("h-8 w-full bg-background shadow-none", className)}
-      data-sidebar="input"
-      data-slot="sidebar-input"
-      {...props}
-    />
-  );
-}
-
 export function SidebarHeader({
   className,
   ...props
@@ -433,20 +359,6 @@ export function SidebarFooter({
       className={cn("flex flex-col gap-2 p-2", className)}
       data-sidebar="footer"
       data-slot="sidebar-footer"
-      {...props}
-    />
-  );
-}
-
-export function SidebarSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof Separator>): React.ReactElement {
-  return (
-    <Separator
-      className={cn("mx-2 w-auto bg-sidebar-border", className)}
-      data-sidebar="separator"
-      data-slot="sidebar-separator"
       {...props}
     />
   );
@@ -492,7 +404,7 @@ export function SidebarGroupLabel({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "flex h-8 shrink-0 items-center rounded-lg px-[var(--sidebar-row-content-inset)] font-medium text-sidebar-muted-foreground text-xs outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-outline [&>svg]:size-4 [&>svg]:shrink-0",
+      "flex h-8 shrink-0 items-center rounded-lg px-(--sidebar-row-content-inset) font-medium text-sidebar-muted-foreground text-xs outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-outline [&>svg]:size-4 [&>svg]:shrink-0",
       "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
       className,
     ),
@@ -502,30 +414,6 @@ export function SidebarGroupLabel({
 
   return useRender({
     defaultTagName: "div",
-    props: mergeProps(defaultProps, props),
-    render,
-  });
-}
-
-export function SidebarGroupAction({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"button">): React.ReactElement {
-  const defaultProps = {
-    className: cn(
-      "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-lg p-0 text-sidebar-foreground outline-hidden transition-transform hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0",
-      // Increases the hit area of the button on mobile.
-      "after:absolute after:-inset-2 lg:after:hidden",
-      "group-data-[collapsible=icon]:hidden",
-      className,
-    ),
-    "data-sidebar": "group-action",
-    "data-slot": "sidebar-group-action",
-  };
-
-  return useRender({
-    defaultTagName: "button",
     props: mergeProps(defaultProps, props),
     render,
   });
@@ -625,50 +513,10 @@ export function SidebarMenuButton({
 
   return (
     <Tooltip disabled={tooltipOff}>
-      <TooltipTrigger
-        render={buttonElement as React.ReactElement<Record<string, unknown>>}
-      />
-      <TooltipPopup
-        align="center"
-        hidden={tooltipOff}
-        side="right"
-        {...tooltip}
-      />
+      <TooltipTrigger render={buttonElement as React.ReactElement<Record<string, unknown>>} />
+      <TooltipPopup align="center" hidden={tooltipOff} side="right" {...tooltip} />
     </Tooltip>
   );
-}
-
-export function SidebarMenuAction({
-  className,
-  showOnHover = false,
-  render,
-  ...props
-}: useRender.ComponentProps<"button"> & {
-  showOnHover?: boolean;
-}): React.ReactElement {
-  const defaultProps = {
-    className: cn(
-      // Kiro patch: 24 px, centred on its row (not on the item, which may hold a sub-menu).
-      "absolute end-1.5 flex size-6 cursor-pointer items-center justify-center rounded-md p-0 text-[var(--sidebar-icon-color)] outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline peer-hover/menu-button:text-sidebar-foreground peer-data-[active=true]/menu-button:text-sidebar-foreground [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0",
-      // Increases the hit area of the button on mobile.
-      "after:absolute after:-inset-2 lg:after:hidden",
-      "peer-data-[size=sm]/menu-button:top-0.5",
-      "peer-data-[size=default]/menu-button:top-1.5 max-lg:peer-data-[size=default]/menu-button:top-2",
-      "peer-data-[size=lg]/menu-button:top-3",
-      "group-data-[collapsible=icon]:hidden",
-      showOnHover &&
-        "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-foreground lg:opacity-0",
-      className,
-    ),
-    "data-sidebar": "menu-action",
-    "data-slot": "sidebar-menu-action",
-  };
-
-  return useRender({
-    defaultTagName: "button",
-    props: mergeProps<"button">(defaultProps, props),
-    render,
-  });
 }
 
 /**
@@ -686,7 +534,7 @@ export function SidebarMenuChevron({
     <span
       aria-hidden="true"
       className={cn(
-        "pointer-events-none absolute end-[var(--sidebar-row-content-inset)] flex size-4 items-center justify-center text-[var(--sidebar-icon-color)] peer-hover/menu-button:text-sidebar-foreground peer-data-[active=true]/menu-button:text-sidebar-foreground",
+        "pointer-events-none absolute inset-e-(--sidebar-row-content-inset) flex size-4 items-center justify-center text-(--sidebar-icon-color) peer-hover/menu-button:text-sidebar-foreground peer-data-[active=true]/menu-button:text-sidebar-foreground",
         "peer-data-[size=sm]/menu-button:top-1.5",
         "peer-data-[size=default]/menu-button:top-2.5 max-lg:peer-data-[size=default]/menu-button:top-3",
         "peer-data-[size=lg]/menu-button:top-4",
@@ -709,68 +557,6 @@ export function SidebarMenuChevron({
   );
 }
 
-export function SidebarMenuBadge({
-  className,
-  ...props
-}: React.ComponentProps<"div">): React.ReactElement {
-  return (
-    <div
-      className={cn(
-        "pointer-events-none absolute right-1 flex h-5 min-w-5 select-none items-center justify-center rounded-lg px-1 font-medium text-sidebar-foreground text-xs",
-        "peer-hover/menu-button:text-sidebar-foreground peer-data-[active=true]/menu-button:text-sidebar-foreground",
-        // Kiro patch: centred on its row (20 px badge): sm 28 px, default 36 px (40 px below
-        // lg), lg 48 px.
-        "peer-data-[size=sm]/menu-button:top-1",
-        "peer-data-[size=default]/menu-button:top-2 max-lg:peer-data-[size=default]/menu-button:top-2.5",
-        "peer-data-[size=lg]/menu-button:top-3.5",
-        "group-data-[collapsible=icon]:hidden",
-        className,
-      )}
-      data-sidebar="menu-badge"
-      data-slot="sidebar-menu-badge"
-      {...props}
-    />
-  );
-}
-
-export function SidebarMenuSkeleton({
-  className,
-  showIcon = false,
-  ...props
-}: React.ComponentProps<"div"> & {
-  showIcon?: boolean;
-}): React.ReactElement {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`;
-  }, []);
-
-  return (
-    <div
-      className={cn("flex h-8 items-center gap-2 rounded-lg px-2", className)}
-      data-sidebar="menu-skeleton"
-      data-slot="sidebar-menu-skeleton"
-      {...props}
-    >
-      {showIcon && (
-        <Skeleton
-          className="size-4 rounded-lg"
-          data-sidebar="menu-skeleton-icon"
-        />
-      )}
-      <Skeleton
-        className="h-4 max-w-(--skeleton-width) flex-1"
-        data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": width,
-          } as React.CSSProperties
-        }
-      />
-    </div>
-  );
-}
-
 export function SidebarMenuSub({
   className,
   ...props
@@ -781,7 +567,7 @@ export function SidebarMenuSub({
         // Kiro patch: a tree as in the reference sidebars. The line runs down the centre of
         // the parent row's icon and stops at the last row's node dot.
         "relative ms-[calc(var(--sidebar-row-content-inset)+0.5rem)] flex min-w-0 flex-col gap-0.5 ps-3.5 pt-0.5",
-        "before:pointer-events-none before:absolute before:start-0 before:top-0 before:bottom-4 before:w-px before:-translate-x-1/2 before:bg-sidebar-muted-foreground/25 max-lg:before:bottom-5",
+        "before:pointer-events-none before:absolute before:inset-s-0 before:top-0 before:bottom-4 before:w-px before:-translate-x-1/2 before:bg-sidebar-muted-foreground/25 max-lg:before:bottom-5",
         "group-data-[collapsible=icon]:hidden",
         className,
       )}
@@ -802,7 +588,7 @@ export function SidebarMenuSubItem({
         "group/menu-sub-item relative",
         // Kiro patch: the node dot on the tree line, ringed in the sidebar colour so the line
         // breaks around it; in the label colour on the selected row.
-        "before:pointer-events-none before:absolute before:-start-3.5 before:top-1/2 before:z-10 before:size-1.5 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-sidebar-muted-foreground/45 before:ring-2 before:ring-sidebar before:transition-colors hover:before:bg-sidebar-muted-foreground has-data-[active=true]:before:bg-sidebar-foreground",
+        "before:pointer-events-none before:absolute before:-inset-s-3.5 before:top-1/2 before:z-10 before:size-1.5 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-sidebar-muted-foreground/45 before:ring-2 before:ring-sidebar before:transition-colors hover:before:bg-sidebar-muted-foreground has-data-[active=true]:before:bg-sidebar-foreground",
         className,
       )}
       data-sidebar="menu-sub-item"
@@ -826,7 +612,7 @@ export function SidebarMenuSubButton({
     className: cn(
       // Kiro patch: same row language as SidebarMenuButton (radius, inset, label colour), one
       // step shorter: 32 px, 40 px in the sheet.
-      "flex h-8 min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-[var(--sidebar-row-content-inset)] font-medium text-sidebar-foreground/80 outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:opacity-64 max-lg:h-10 [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
+      "flex h-8 min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-(--sidebar-row-content-inset) font-medium text-sidebar-foreground/80 outline-hidden hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-outline-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:opacity-64 max-lg:h-10 [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted-foreground",
       "data-[active=true]:bg-sidebar-row-selected data-[active=true]:hover:bg-sidebar-row-selected data-[active=true]:active:bg-sidebar-row-selected data-[active=true]:text-sidebar-foreground",
       size === "sm" && "text-xs",
       size === "md" && "text-sm",

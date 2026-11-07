@@ -22,10 +22,10 @@ export const PSEUDO_LANG = "pseudo";
 /** The UI language: a supported language, or the pseudo language in dev and tests. */
 export type Lang = SupportedLang | typeof PSEUDO_LANG;
 export const PSEUDO_ENABLED: boolean = import.meta.env.DEV || import.meta.env.MODE === "test";
-export const PSEUDO_OPEN = "⟦";
-export const PSEUDO_CLOSE = "⟧";
+const PSEUDO_OPEN = "⟦";
+const PSEUDO_CLOSE = "⟧";
 
-export interface LanguageOption {
+interface LanguageOption {
   code: SupportedLang;
   /** The language's name in its own script, shown the same whatever the UI language. */
   nativeLabel: string;
@@ -57,7 +57,7 @@ const catalog: Record<SupportedLang, Record<string, Dict>> = {
   "pt-BR": {},
 };
 
-export function isLang(value: unknown): value is SupportedLang {
+function isLang(value: unknown): value is SupportedLang {
   return typeof value === "string" && (LANGS as readonly string[]).includes(value);
 }
 

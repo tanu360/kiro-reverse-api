@@ -9,6 +9,7 @@ import {
   type MouseEvent,
   type ReactNode,
   useContext,
+  useId,
   useMemo,
 } from "react";
 import { CARD_GRID_CLASS, ListCardSkeleton } from "@/components/shared/list-card";
@@ -24,7 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, placeholderKeys } from "@/lib/utils";
 
 /** Own column type, so features do not depend on the TanStack Table major version. */
 export interface DataTableColumn<T> {
@@ -54,7 +55,7 @@ export interface DataTableCardContext {
   toggleSelected: () => void;
 }
 
-export interface DataTableProps<T> {
+interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: T[];
   getRowId: (row: T, index: number) => string;
@@ -184,7 +185,7 @@ const ALIGN_CLASS = {
 // side facing the scrolling columns shows where they slide under it, only while something is
 // hidden on that side (Table marks its scroller data-overflow-start/-end).
 const STICKY_BASE =
-  "sticky z-[1] bg-card [thead_&]:bg-[linear-gradient(var(--row-head),var(--row-head))] [tbody>tr:is(:hover,:focus-visible):not([data-state=selected]):not(:has([aria-haspopup=menu][aria-expanded=true]))>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tbody>tr:not([data-state=selected]):has([aria-haspopup=menu][aria-expanded=true])>&]:bg-[linear-gradient(color-mix(in_srgb,var(--row-selected)_50%,transparent),color-mix(in_srgb,var(--row-selected)_50%,transparent))] [tbody>tr[data-state=selected]>&]:bg-[linear-gradient(var(--row-selected),var(--row-selected))] [tbody>tr[data-state=selected]:hover>&]:bg-[linear-gradient(var(--row-selected-hover),var(--row-selected-hover))]";
+  "sticky z-1 bg-card in-[thead]:bg-[linear-gradient(var(--row-head),var(--row-head))] [tbody>tr:is(:hover,:focus-visible):not([data-state=selected]):not(:has([aria-haspopup=menu][aria-expanded=true]))>&]:bg-[linear-gradient(var(--row-hover),var(--row-hover))] [tbody>tr:not([data-state=selected]):has([aria-haspopup=menu][aria-expanded=true])>&]:bg-[linear-gradient(color-mix(in_srgb,var(--row-selected)_50%,transparent),color-mix(in_srgb,var(--row-selected)_50%,transparent))] [tbody>tr[data-state=selected]>&]:bg-[linear-gradient(var(--row-selected),var(--row-selected))] [tbody>tr[data-state=selected]:hover>&]:bg-[linear-gradient(var(--row-selected-hover),var(--row-selected-hover))]";
 const STICKY_CLASS = {
   start: cn(
     STICKY_BASE,
@@ -195,7 +196,7 @@ const STICKY_CLASS = {
 // A clickable row's keyboard ring is drawn by an ::after layer above the sticky cells (z-[2]),
 // so a pinned column cannot cover part of it.
 const ROW_FOCUS =
-  "cursor-pointer outline-none focus-visible:bg-(--row-hover) focus-visible:after:pointer-events-none focus-visible:after:absolute focus-visible:after:inset-0 focus-visible:after:z-[2] focus-visible:after:outline focus-visible:after:outline-1 focus-visible:after:-outline-offset-1 focus-visible:after:outline-ring";
+  "cursor-pointer outline-none focus-visible:bg-(--row-hover) focus-visible:after:pointer-events-none focus-visible:after:absolute focus-visible:after:inset-0 focus-visible:after:z-2 focus-visible:after:outline focus-visible:after:outline-1 focus-visible:after:-outline-offset-1 focus-visible:after:outline-ring";
 
 function stickyClass(sticky: DataTableColumn<unknown>["sticky"]): string | undefined {
   if (!sticky) return undefined;
@@ -250,6 +251,7 @@ export function DataTable<T>({
   density = "compact",
 }: DataTableProps<T>): JSX.Element {
   const { t } = useT();
+  const selectAllId = useId();
   const insetFromCard = useContext(DataTableInsetContext);
   const inset = insetProp ?? insetFromCard;
 
@@ -354,11 +356,9 @@ export function DataTable<T>({
           // Divided rows are as many as the table's placeholder rows (a page, at most 10), in
           // a ListCard row's geometry, so the list does not jump when the data arrives.
           <div aria-busy="true" className={cardListClass}>
-            {Array.from(
-              { length: cardLayout === "divided" ? skeletonRows : SKELETON_CARDS },
-              (_, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cards never reorder.
-                <Fragment key={index}>
+            {placeholderKeys("card", cardLayout === "divided" ? skeletonRows : SKELETON_CARDS).map(
+              (key) => (
+                <Fragment key={key}>
                   {renderCardSkeleton ? (
                     renderCardSkeleton()
                   ) : cardLayout === "divided" ? (
@@ -375,14 +375,15 @@ export function DataTable<T>({
             {selection && rows.length > 0 ? (
               // The table header's select-all, for the cards (they have no header row): one
               // slim row over the list, its checkbox in line with the cards' own.
-              // biome-ignore lint/a11y/noLabelWithoutControl: the Base UI Checkbox inside is the control.
               <label
                 className="flex cursor-pointer items-center gap-3 border-border-subtle border-b px-4 py-2.5 text-meta text-muted-foreground transition-colors hover:text-foreground sm:px-5"
                 data-slot="data-table-select-all"
+                htmlFor={selectAllId}
               >
                 <Checkbox
                   aria-label={t("table.selectAll")}
                   checked={allSelected}
+                  id={selectAllId}
                   indeterminate={someSelected}
                   onCheckedChange={toggleAll}
                 />
@@ -496,9 +497,8 @@ export function DataTable<T>({
           </TableHeader>
           <TableBody>
             {showSkeleton
-              ? Array.from({ length: skeletonRows }, (_, index) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows never reorder.
-                  <TableRow aria-hidden="true" className="hover:bg-transparent" key={index}>
+              ? placeholderKeys("row", skeletonRows).map((key) => (
+                  <TableRow aria-hidden="true" className="hover:bg-transparent" key={key}>
                     {selection ? (
                       // pe-0 as in the data rows (their checkbox cell drops its end padding),
                       // so the selection column is as wide while loading.

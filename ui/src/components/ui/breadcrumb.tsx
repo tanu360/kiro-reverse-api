@@ -2,15 +2,13 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
+import { ChevronRightIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronRightIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
-import { cn } from "@/lib/utils";
 import { useUiT } from "@/components/ui/messages";
+import { cn } from "@/lib/utils";
 
-export function Breadcrumb({
-  ...props
-}: React.ComponentProps<"nav">): React.ReactElement {
+export function Breadcrumb({ ...props }: React.ComponentProps<"nav">): React.ReactElement {
   const { t } = useUiT();
   return <nav aria-label={t("breadcrumb.label")} data-slot="breadcrumb" {...props} />;
 }
@@ -90,24 +88,5 @@ export function BreadcrumbSeparator({
     >
       {children ?? <HugeiconsIcon icon={ChevronRightIcon} />}
     </li>
-  );
-}
-
-export function BreadcrumbEllipsis({
-  className,
-  ...props
-}: React.ComponentProps<"span">): React.ReactElement {
-  const { t } = useUiT();
-  return (
-    <span
-      aria-hidden="true"
-      className={className}
-      data-slot="breadcrumb-ellipsis"
-      role="presentation"
-      {...props}
-    >
-      <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
-      <span className="sr-only">{t("breadcrumb.more")}</span>
-    </span>
   );
 }

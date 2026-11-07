@@ -25,8 +25,6 @@ const toolbarVariants = cva("relative flex items-center gap-2 rounded-xl border 
   },
 });
 
-export type ToolbarVariant = NonNullable<VariantProps<typeof toolbarVariants>["variant"]>;
-
 export function Toolbar({
   className,
   variant,
@@ -48,22 +46,6 @@ export function ToolbarButton({
 }: ToolbarPrimitive.Button.Props): React.ReactElement {
   return (
     <ToolbarPrimitive.Button className={cn(className)} data-slot="toolbar-button" {...props} />
-  );
-}
-
-export function ToolbarLink({
-  className,
-  ...props
-}: ToolbarPrimitive.Link.Props): React.ReactElement {
-  return <ToolbarPrimitive.Link className={cn(className)} data-slot="toolbar-link" {...props} />;
-}
-
-export function ToolbarInput({
-  className,
-  ...props
-}: ToolbarPrimitive.Input.Props): React.ReactElement {
-  return (
-    <ToolbarPrimitive.Input className={cn(className)} data-slot="toolbar-input" {...props} />
   );
 }
 
@@ -96,5 +78,3 @@ export function ToolbarSeparator({
     />
   );
 }
-
-export { ToolbarPrimitive };

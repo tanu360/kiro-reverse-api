@@ -2,7 +2,7 @@ import { toastManager as manager } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { TFunction } from "@/lib/i18n";
 
-export interface ToastOptions {
+interface ToastOptions {
   description?: string;
   duration?: number;
   action?: { label: string; onClick: () => void };

@@ -6,11 +6,11 @@ const load = () => import("./stat-sparkline");
 const StatSparkline = lazy(load);
 
 // The chart chunk starts loading with the page instead of after the first data arrives, so the
-// bars are drawn as soon as the numbers are, not a beat later.
+// trends are drawn as soon as the numbers are, not a beat later.
 void load();
 
 /**
- * The stat tiles' bar sparkline, code-split. Until its chunk is in, the trend slot holds the
+ * The stat tiles' area sparkline, code-split. Until its chunk is in, the trend slot holds the
  * same placeholder as while the data loads, so nothing shifts or flashes empty.
  */
 export function LazySparkline(props: StatSparklineProps): JSX.Element {

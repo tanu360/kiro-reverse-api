@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  animate,
-  useMotionValue,
-  useReducedMotion,
-  useTransform,
-} from "motion/react";
+import { animate, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { useEffect } from "react";
 import {
   LINE_LOADING_LOOP_PAUSE_MS,
@@ -13,7 +8,7 @@ import {
   LINE_LOADING_PULSE_EASE,
 } from "./line-loading-timing";
 
-export interface UseGridShimmerOptions {
+interface UseGridShimmerOptions {
   innerWidth: number;
   shimmer: boolean;
   shimmerLength: number;
@@ -36,10 +31,8 @@ export function useGridShimmer({
 }: UseGridShimmerOptions) {
   const progress = useMotionValue(0);
   const reducedMotion = useReducedMotion();
-  const shimmerCycleS =
-    LINE_LOADING_PULSE_CYCLE_S / Math.max(shimmerSpeed, 0.1);
-  const shimmerEnabled =
-    active && shimmer && reducedMotion !== true && innerWidth > 0;
+  const shimmerCycleS = LINE_LOADING_PULSE_CYCLE_S / Math.max(shimmerSpeed, 0.1);
+  const shimmerEnabled = active && shimmer && reducedMotion !== true && innerWidth > 0;
 
   useEffect(() => {
     if (!shimmerEnabled) {
@@ -63,10 +56,7 @@ export function useGridShimmer({
           if (cancelled) {
             return;
           }
-          timeoutId = window.setTimeout(
-            runSyncedCycle,
-            LINE_LOADING_LOOP_PAUSE_MS
-          );
+          timeoutId = window.setTimeout(runSyncedCycle, LINE_LOADING_LOOP_PAUSE_MS);
         },
       });
     };
@@ -103,7 +93,7 @@ export function useGridShimmer({
 
   const shimmerX = useTransform(
     progress,
-    (value) => -shimmerLength + value * (innerWidth + shimmerLength * 2)
+    (value) => -shimmerLength + value * (innerWidth + shimmerLength * 2),
   );
   const shimmerTransform = useTransform(shimmerX, (x) => `translate(${x}, 0)`);
 

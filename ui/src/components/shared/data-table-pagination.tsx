@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
  * applies on a hover-capable pointer), so a tapped chevron does not keep it on touch; pressed
  * shows it on every pointer.
  */
-export const PAGER_CHEVRON_CLASS =
+const PAGER_CHEVRON_CLASS =
   "rounded-full border-input bg-(--field) text-foreground before:rounded-full hover:bg-(--field-hover) data-pressed:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
 /*
  * The page numbers and the ellipsis share one box, the icon button's (36 / 32 / coarse 40), so

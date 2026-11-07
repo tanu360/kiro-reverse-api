@@ -7,7 +7,7 @@ describe("TooltipHeader", () => {
     const { getByText } = render(
       <TooltipHeader meta="2 min" mono>
         14:02–14:04
-      </TooltipHeader>
+      </TooltipHeader>,
     );
     expect(getByText("14:02–14:04")).toHaveClass("font-mono");
     expect(getByText("2 min")).toHaveClass("text-meta", "truncate");
@@ -26,7 +26,7 @@ describe("TooltipHeader", () => {
         mono
         rows={[{ color: "red", label: "Errors", value: 3 }]}
         title="09:15"
-      />
+      />,
     );
     expect(getByText("09:15")).toHaveClass("font-mono");
     expect(getByText("acc-1")).toBeInTheDocument();

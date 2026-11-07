@@ -25,15 +25,22 @@ export function Checkbox({
       <CheckboxPrimitive.Indicator
         className="absolute -inset-px flex items-center justify-center rounded-sm text-primary-foreground data-unchecked:hidden data-checked:bg-primary data-indeterminate:text-foreground"
         data-slot="checkbox-indicator"
-        render={(
-          props: React.ComponentProps<"span">,
-          state: CheckboxPrimitive.Indicator.State,
-        ) => (
+        render={(props: React.ComponentProps<"span">, state: CheckboxPrimitive.Indicator.State) => (
           <span {...props}>
             {state.indeterminate ? (
-              <HugeiconsIcon aria-hidden="true" className="size-3" icon={MinusIcon} strokeWidth={3} />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-3"
+                icon={MinusIcon}
+                strokeWidth={3}
+              />
             ) : (
-              <HugeiconsIcon aria-hidden="true" className="size-3" icon={CheckIcon} strokeWidth={3} />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-3"
+                icon={CheckIcon}
+                strokeWidth={3}
+              />
             )}
           </span>
         )}
@@ -41,5 +48,3 @@ export function Checkbox({
     </CheckboxPrimitive.Root>
   );
 }
-
-export { CheckboxPrimitive };

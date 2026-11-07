@@ -19,7 +19,7 @@ export interface ApiKeyFormData {
 /** The limit field that failed, so only that field is marked invalid. */
 export type ApiKeyLimitField = "tokenLimit" | "creditLimit";
 
-export type ApiKeyFormResult =
+type ApiKeyFormResult =
   | { ok: true; value: ApiKeyFormData }
   | { ok: false; error: "invalidLimits"; field: ApiKeyLimitField };
 

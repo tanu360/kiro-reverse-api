@@ -19,5 +19,3 @@ export function Separator({
     />
   );
 }
-
-export { SeparatorPrimitive };

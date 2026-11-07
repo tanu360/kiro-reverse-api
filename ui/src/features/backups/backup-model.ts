@@ -8,7 +8,7 @@ export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
 export const KEEP_MIN = 1;
 export const KEEP_MAX = 200;
 /** The keep the server applies while none was ever set (GET answers it; an older server omits it). */
-export const KEEP_DEFAULT = 50;
+const KEEP_DEFAULT = 50;
 
 export const CADENCES: readonly BackupCadence[] = ["hourly", "daily", "weekly"];
 
@@ -16,7 +16,7 @@ const UPLOAD_PREFIX = "upload ";
 const RESTORE_PREFIX = "auto before restore ";
 const SCHEDULED_NOTE = /^auto-(hourly|daily|weekly)$/;
 
-export type BackupTone = "primary" | "neutral" | "warning";
+type BackupTone = "primary" | "neutral" | "warning";
 
 export interface ScheduleForm {
   enabled: boolean;
@@ -79,7 +79,7 @@ export function scheduleDirty(
   );
 }
 
-export function cadenceLabel(cadence: BackupCadence, t: TFunction): string {
+function cadenceLabel(cadence: BackupCadence, t: TFunction): string {
   return t(cadence);
 }
 

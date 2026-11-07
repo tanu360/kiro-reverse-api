@@ -82,7 +82,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
 export const NAV_GROUPS: readonly NavItem["group"][] = ["monitor", "manage"];
 
 /** The router reports paths without the /admin basepath; strip it defensively anyway. */
-export function normalizePath(pathname: string): string {
+function normalizePath(pathname: string): string {
   const stripped = pathname.replace(/^\/admin(?=\/|$)/, "");
   const trimmed = stripped.length > 1 ? stripped.replace(/\/+$/, "") : stripped;
   return trimmed || "/";

@@ -6,16 +6,6 @@
 // Generic
 // ---------------------------------------------------------------------------
 
-/** Error body of every non-2xx admin response. `index` comes with model-mapping 400s. */
-export interface ApiErrorBody {
-  error: string;
-  /** Stable machine code on some errors (see ServerErrorCode); match on it, not on `error`. */
-  code?: ServerErrorCode | (string & {});
-  /** 0-based index in the submitted model-mapping array; -1 = the whole list. */
-  index?: number;
-  success?: false;
-}
-
 export interface SuccessResponse {
   success: true;
 }
@@ -41,15 +31,11 @@ export type ServerErrorCode =
 // Session and first run
 // ---------------------------------------------------------------------------
 
-export interface SessionCreateRequest {
-  password: string;
-}
 export interface SessionCreateResponse {
   token: string;
   /** ms epoch, about now + 12 h */
   expiresAt: number;
 }
-export type SessionDeleteResponse = SuccessResponse;
 export interface SessionTicketResponse {
   ticket: string;
   /** ms epoch, about now + 30 s */
@@ -87,17 +73,13 @@ export type AdminEventType =
   | "api_keys_changed"
   | "settings_changed"
   | "stats_reset";
-export interface AdminEventData {
-  type: AdminEventType;
-  payload?: string;
-}
 
 // ---------------------------------------------------------------------------
 // Stats, status, version, machine id
 // ---------------------------------------------------------------------------
 
 /** GET /admin/api/stats and GET /v1/stats */
-export interface StatsResponse {
+interface StatsResponse {
   status: "ok";
   version: string;
   accounts: number;
@@ -123,8 +105,6 @@ export interface StatusResponse extends StatsResponse {
   todayBanned: number;
   totalExhausted: number;
 }
-/** POST /admin/api/stats/reset */
-export type StatsResetResponse = SuccessResponse;
 
 export interface VersionResponse {
   version: string;
@@ -169,7 +149,6 @@ export interface IamSsoCompleteRequest {
 export type IamSsoCompleteResponse = AddAccountResponse;
 
 // Microsoft SSO
-export type MicrosoftStage = "kiro" | "microsoft" | "profile" | "complete";
 export interface MicrosoftStartResponse {
   sessionId: string;
   authorizeUrl: string;
@@ -201,7 +180,6 @@ export interface MicrosoftCancelRequest {
   sessionId?: string;
   selectionId?: string;
 }
-export type MicrosoftCancelResponse = SuccessResponse;
 
 // BuilderID device code
 export interface BuilderIdStartRequest {
@@ -219,11 +197,6 @@ export interface BuilderIdPollRequest {
 export type BuilderIdPollResponse =
   | { success: true; completed: false; status: "pending" | "slow_down"; interval: number }
   | { success: true; completed: true; account: AddedAccountRef };
-/** HTTP 400 */
-export interface BuilderIdPollError {
-  success: false;
-  error: string;
-}
 
 // SSO token (bulk)
 export interface SsoTokenImportRequest {
@@ -235,11 +208,6 @@ export interface SsoTokenImportResponse {
   success: true;
   accounts: AddedAccountRef[];
   errors: string[] | null;
-}
-/** HTTP 500 */
-export interface SsoTokenImportFailure {
-  success: false;
-  error: string;
 }
 
 // Credentials import
@@ -351,7 +319,6 @@ export interface Account {
   /** unix s */
   lastUsed: number;
 }
-export type AccountListResponse = Account[];
 
 /** GET /accounts/{id}/full */
 export interface AccountFull extends Omit<Account, "hasToken" | "activeRegion"> {
@@ -363,41 +330,6 @@ export interface AccountFull extends Omit<Account, "hasToken" | "activeRegion"> 
   tokenEndpoint: string;
   issuerUrl: string;
   scopes: string;
-}
-
-/** POST /accounts (unused by the UI) */
-export interface AddAccountRequest {
-  id?: string;
-  email?: string;
-  userId?: string;
-  nickname?: string;
-  accessToken?: string;
-  refreshToken?: string;
-  kiroApiKey?: string;
-  clientId?: string;
-  clientSecret?: string;
-  authMethod?: string;
-  provider?: string;
-  region?: string;
-  startUrl?: string;
-  expiresAt?: number;
-  machineId?: string;
-  profileArn?: string;
-  tokenEndpoint?: string;
-  issuerUrl?: string;
-  scopes?: string;
-  proxyURL?: string;
-  weight?: number;
-  /** defaults to false */
-  enabled?: boolean;
-}
-/**
- * POST /accounts response. Research calls it `AddAccountResponse`; renamed because that name
- * belongs to the add-account flows (`{ success, account }`).
- */
-export interface CreateAccountResponse {
-  success: true;
-  id: string;
 }
 
 /** PUT /accounts/{id} */
@@ -550,9 +482,6 @@ export interface OverageResponse {
   currentOverages: number;
   overageCheckedAt: number;
 }
-export interface SetOverageRequest {
-  enabled: boolean;
-}
 
 // Profiles
 export interface AccountProfile {
@@ -568,10 +497,6 @@ export interface AccountProfilesResponse {
   activeRegion: string;
   pinned: boolean;
 }
-/** profileArn '' = unpin */
-export interface SetAccountProfileRequest {
-  profileArn: string;
-}
 export type SetAccountProfileResponse =
   | { success: true; pinned: false }
   | { success: true; pinned: true; profileArn: string; region: string };
@@ -580,9 +505,6 @@ export type SetAccountProfileResponse =
 // Export (POST /admin/api/export)
 // ---------------------------------------------------------------------------
 
-export interface ExportRequest {
-  ids?: string[];
-}
 export interface ExportCredentials {
   accessToken: string;
   csrfToken: string;
@@ -892,7 +814,6 @@ export interface ApiKeyUpdateResponse {
   success: true;
   apiKey: ApiKey;
 }
-export type ApiKeyDeleteResponse = SuccessResponse;
 export type ApiKeyResetUsageResponse = { success: true; apiKey?: ApiKey };
 
 // ---------------------------------------------------------------------------
@@ -1014,17 +935,11 @@ export interface BackupEntry {
 export interface BackupListResponse {
   backups: BackupEntry[] | null;
 }
-export interface BackupListQuery {
-  autoInclude?: "true";
-}
 export interface BackupCreateRequest {
   kind?: BackupKind;
   note?: string;
 }
 export interface BackupCreateResponse {
-  backup: BackupEntry;
-}
-export interface BackupGetResponse {
   backup: BackupEntry;
 }
 export type BackupCadence = "hourly" | "daily" | "weekly";

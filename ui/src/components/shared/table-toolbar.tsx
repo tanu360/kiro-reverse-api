@@ -173,11 +173,10 @@ export function PageSizeSelect({
 const TAB_FADE_PX = 24;
 
 /**
- * Scrolls the track so the selected tab sits centred in it, when the tab is outside the visible
- * part or under an edge fade. Only the track scrolls, never the page.
+ * Scrolls the track so the tab sits centred in it, when the tab is outside the visible part or
+ * under an edge fade. Only the track scrolls, never the page.
  */
-function revealSelectedTab(list: HTMLElement | null, smooth: boolean) {
-  const tab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+function revealTab(tab: HTMLElement | null | undefined, smooth: boolean) {
   const viewport = tab?.closest<HTMLElement>(
     '[data-slot="scroll-area-viewport"], [data-slot="tabs-list-scroller"]',
   );
@@ -201,17 +200,23 @@ function revealSelectedTab(list: HTMLElement | null, smooth: boolean) {
 function useSelectedTabInView(value: string, loading: boolean) {
   const listRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `value` and `loading` move the tab.
   useEffect(() => {
     const smooth = loadedRef.current;
     if (!loading) loadedRef.current = true;
-    revealSelectedTab(listRef.current, smooth);
+    // Each tab carries its value (StatusTabs' data-value), so the tab for `value` is found.
+    const tabs = listRef.current?.querySelectorAll<HTMLElement>("[data-value]") ?? [];
+    revealTab(
+      Array.from(tabs).find((tab) => tab.dataset.value === value),
+      smooth,
+    );
   }, [value, loading]);
   // A wider or narrower track (counts arriving, a font swap, a rotation) can push it under the fade.
   useEffect(() => {
     const list = listRef.current;
     if (!list || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => revealSelectedTab(list, false));
+    const observer = new ResizeObserver(() =>
+      revealTab(list.querySelector<HTMLElement>('[aria-selected="true"]'), false),
+    );
     observer.observe(list);
     return () => observer.disconnect();
   }, []);
@@ -260,7 +265,7 @@ export function StatusTabs<V extends string>({
       >
         <TabsList aria-label={label} ref={listRef} variant="underline">
           {tabs.map((tab) => (
-            <TabsTab disabled={loading} key={tab.value} value={tab.value}>
+            <TabsTab data-value={tab.value} disabled={loading} key={tab.value} value={tab.value}>
               {tab.label}
               {loading ? (
                 // The badge's size, so the track barely moves when the counts arrive.

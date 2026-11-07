@@ -16,7 +16,7 @@ import { useT } from "@/lib/i18n";
 import type { AddAccountMethod } from "./add-account-dialog";
 import { FlowFooter } from "./flow-context";
 
-export const METHODS: ReadonlyArray<{ id: AddAccountMethod; icon: IconSvgElement }> = [
+const METHODS: ReadonlyArray<{ id: AddAccountMethod; icon: IconSvgElement }> = [
   { id: "builderid", icon: IdCardIcon },
   { id: "iam", icon: KeyRoundIcon },
   { id: "microsoft", icon: Building06Icon },

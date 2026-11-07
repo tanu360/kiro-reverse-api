@@ -52,10 +52,10 @@ import { StatusPill } from "./account-cells";
 import { authLabel, planLabel } from "./account-model";
 
 /** The old UI's fallback when nothing is cached (the server's own default differs). */
-export const DEFAULT_TEST_MODEL = "claude-sonnet-4.6";
+const DEFAULT_TEST_MODEL = "claude-sonnet-4.6";
 export const MAX_LOG_LINES = 100;
 
-export type LogType = "info" | "ok" | "warn" | "err";
+type LogType = "info" | "ok" | "warn" | "err";
 interface LogLine {
   id: number;
   time: string;
@@ -176,7 +176,7 @@ const Step = memo(function Step({ line }: { line: LogLine }): JSX.Element {
         <span className="my-1 w-px flex-1 bg-border group-last:hidden" />
       </span>
       <span className="flex min-w-0 flex-1 gap-3 pb-3 group-last:pb-0">
-        <span className={cn("min-w-0 flex-1 break-words", STEP_TEXT_CLASS[line.type])}>
+        <span className={cn("min-w-0 flex-1 wrap-break-word", STEP_TEXT_CLASS[line.type])}>
           <LogText keep={line.keep} text={line.text} />
         </span>
         <span className="shrink-0 text-muted-foreground tabular-nums">{line.time}</span>

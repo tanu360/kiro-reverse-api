@@ -33,10 +33,7 @@ export function ScrollArea({
   overscrollContain?: boolean;
 }): React.ReactElement {
   return (
-    <ScrollAreaPrimitive.Root
-      className={cn("size-full min-h-0", className)}
-      {...props}
-    >
+    <ScrollAreaPrimitive.Root className={cn("size-full min-h-0", className)} {...props}>
       <ScrollAreaPrimitive.Viewport
         className={cn(
           "h-full rounded-[inherit] outline-none transition-shadow focus-outline-inset",
@@ -65,7 +62,7 @@ export function ScrollArea({
   );
 }
 
-export function ScrollBar({
+function ScrollBar({
   className,
   orientation = "vertical",
   ...props
@@ -81,7 +78,7 @@ export function ScrollBar({
       {...props}
     >
       <ScrollAreaPrimitive.Thumb
-        className="relative flex-1 rounded-full bg-[var(--app-scrollbar-thumb)] transition-colors hover:bg-[var(--app-scrollbar-thumb-hover)]"
+        className="relative flex-1 rounded-full bg-(--app-scrollbar-thumb) transition-colors hover:bg-(--app-scrollbar-thumb-hover)"
         data-slot="scroll-area-thumb"
       />
     </ScrollAreaPrimitive.Scrollbar>
@@ -89,10 +86,8 @@ export function ScrollBar({
 }
 
 /** The sideways bar on its own: a 6 px round thumb that shows while scrolling or hovered. */
-export function HorizontalScrollBar(
+function HorizontalScrollBar(
   props: Omit<ScrollAreaPrimitive.Scrollbar.Props, "orientation">,
 ): React.ReactElement {
   return <ScrollBar orientation="horizontal" {...props} />;
 }
-
-export { ScrollAreaPrimitive };

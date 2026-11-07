@@ -69,7 +69,7 @@ export function KeyValueGrid({
               <dt className="text-meta text-muted-foreground">{item.label}</dt>
               <dd
                 className={cn(
-                  "min-w-0 tabular-nums [overflow-wrap:anywhere]",
+                  "min-w-0 tabular-nums wrap-anywhere",
                   copy !== null && "flex items-center gap-1",
                 )}
               >

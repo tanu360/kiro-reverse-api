@@ -2,10 +2,7 @@
 
 import type { RefObject } from "react";
 import { useChartStable } from "./chart-context";
-import {
-  HighlightSegment,
-  type HighlightSegmentGlow,
-} from "./highlight-segment";
+import { HighlightSegment, type HighlightSegmentGlow } from "./highlight-segment";
 import { useHighlightSegment } from "./use-highlight-segment";
 
 interface SeriesHighlightLayerProps {
@@ -61,5 +58,3 @@ export function SeriesHighlightLayer({
 }
 
 SeriesHighlightLayer.displayName = "SeriesHighlightLayer";
-
-export default SeriesHighlightLayer;

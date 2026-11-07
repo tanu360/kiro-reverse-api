@@ -10,14 +10,14 @@ import {
   resolveVerticalFadeSides,
 } from "../indicator-fade";
 
-export type IndicatorWidth =
+type IndicatorWidth =
   | number // Pixel width
   | "line" // 1px line (default)
   | "thin" // 2px
   | "medium" // 4px
   | "thick"; // 8px
 
-export interface TooltipIndicatorProps {
+interface TooltipIndicatorProps {
   /** X position in pixels (center of the indicator) */
   x: number;
   /** Height of the indicator */
@@ -105,7 +105,6 @@ export function TooltipIndicator(props: TooltipIndicatorProps) {
 
 function TooltipIndicatorInner({
   x,
-  visible,
   height,
   width = "line",
   span,
@@ -124,15 +123,12 @@ function TooltipIndicatorInner({
   // Per-instance id: a shared id makes every chart on the page resolve
   // `url(#…)` to the first chart's gradient (and its colours).
   const generatedId = useId();
-  const gradientId =
-    gradientIdProp ?? `tooltip-indicator-gradient-${generatedId}`;
+  const gradientId = gradientIdProp ?? `tooltip-indicator-gradient-${generatedId}`;
   const { tooltipSpring } = useChartConfig();
   const effectiveSpring = springConfig ?? tooltipSpring;
 
   const pixelWidth =
-    span !== undefined && columnWidth !== undefined
-      ? span * columnWidth
-      : resolveWidth(width);
+    span !== undefined && columnWidth !== undefined ? span * columnWidth : resolveWidth(width);
 
   const rectX = x - pixelWidth / 2;
   const lineX = x;
@@ -147,12 +143,14 @@ function TooltipIndicatorInner({
     animatedEndY.set(endY);
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: we need to jump the animatedX when the visible prop changes
+  // Keep the springs on target while static (`animate={false}`), so turning
+  // animation on starts from the current position. Inner only mounts while
+  // visible, so each show starts at the cursor (see `TooltipIndicator`).
   useEffect(() => {
     animatedX.set(rectX);
     animatedLineX.set(lineX);
     animatedEndY.set(endY);
-  }, [animatedLineX, animatedX, animatedEndY, endY, lineX, rectX, visible]);
+  }, [animatedLineX, animatedX, animatedEndY, endY, lineX, rectX]);
 
   const indicatorFill = colorMid || colorEdge;
   const fadeSides = resolveVerticalFadeSides(fadeEdges);
@@ -185,21 +183,9 @@ function TooltipIndicatorInner({
 
   if (!(fadeSides.any || colorEnd)) {
     return animate ? (
-      <m.rect
-        fill={indicatorFill}
-        height={animatedEndY}
-        width={pixelWidth}
-        x={animatedX}
-        y={0}
-      />
+      <m.rect fill={indicatorFill} height={animatedEndY} width={pixelWidth} x={animatedX} y={0} />
     ) : (
-      <rect
-        fill={indicatorFill}
-        height={endY}
-        width={pixelWidth}
-        x={rectX}
-        y={0}
-      />
+      <rect fill={indicatorFill} height={endY} width={pixelWidth} x={rectX} y={0} />
     );
   }
 
@@ -235,18 +221,10 @@ function TooltipIndicatorInner({
           y={0}
         />
       ) : (
-        <rect
-          fill={`url(#${gradientId})`}
-          height={endY}
-          width={pixelWidth}
-          x={rectX}
-          y={0}
-        />
+        <rect fill={`url(#${gradientId})`} height={endY} width={pixelWidth} x={rectX} y={0} />
       )}
     </g>
   );
 }
 
 TooltipIndicator.displayName = "TooltipIndicator";
-
-export default TooltipIndicator;

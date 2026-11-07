@@ -1,4 +1,4 @@
-export interface SquareColumnLayout {
+interface SquareColumnLayout {
   /** Number of squares in the column */
   count: number;
   /** Top-left Y of each square, bottom square first (relative to bar top at 0) */
@@ -10,7 +10,7 @@ export interface SquareColumnLayout {
   gap: number;
 }
 
-export interface SquareColumnInput {
+interface SquareColumnInput {
   /** Raw bar length in pixels (baseline − value) */
   barLengthPx: number;
   /** Square width/height — typically equals bar width */
@@ -22,7 +22,7 @@ export interface SquareColumnInput {
 }
 
 /** Quantize bar length into a stack of square cells. */
-export function computeSquareColumn({
+function computeSquareColumn({
   barLengthPx,
   squareSize,
   gap,
@@ -33,14 +33,9 @@ export function computeSquareColumn({
   }
 
   if (fit) {
-    const count = Math.max(
-      1,
-      Math.floor((barLengthPx + gap) / (squareSize + gap))
-    );
+    const count = Math.max(1, Math.floor((barLengthPx + gap) / (squareSize + gap)));
     const effectiveGap =
-      count > 1
-        ? Math.max(0, (barLengthPx - count * squareSize) / (count - 1))
-        : 0;
+      count > 1 ? Math.max(0, (barLengthPx - count * squareSize) / (count - 1)) : 0;
     const step = squareSize + effectiveGap;
     const columnHeight = barLengthPx;
     const positions: number[] = [];

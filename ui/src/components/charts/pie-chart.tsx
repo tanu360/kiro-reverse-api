@@ -27,9 +27,19 @@ import {
 } from "./pie-context";
 
 /** Default hover offset in pixels */
-export const DEFAULT_HOVER_OFFSET = 10;
+const DEFAULT_HOVER_OFFSET = 10;
 
-export interface PieChartProps {
+/** Index of the slice whose hitbox (`data-pie-slice`, see `PieSlice`) is `target`, if any. */
+function sliceIndexOf(target: EventTarget | null): number | null {
+  if (!(target instanceof Element)) {
+    return null;
+  }
+  const hitbox = target.closest("[data-pie-slice]");
+  const index = hitbox ? Number(hitbox.getAttribute("data-pie-slice")) : Number.NaN;
+  return Number.isInteger(index) ? index : null;
+}
+
+interface PieChartProps {
   /** Data array - each item represents a slice */
   data: PieData[];
   /** Chart size in pixels. If not provided, uses parent container size */
@@ -149,9 +159,7 @@ const PieChartCore = memo(function PieChartCore({
   enterStaggerScale,
   geometryScrubbing,
 }: PieChartInnerProps) {
-  const [internalHoveredIndex, setInternalHoveredIndex] = useState<
-    number | null
-  >(null);
+  const [internalHoveredIndex, setInternalHoveredIndex] = useState<number | null>(null);
   const [animationKey] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -166,8 +174,29 @@ const PieChartCore = memo(function PieChartCore({
         setInternalHoveredIndex(index);
       }
     },
-    [isControlled, onHoverChange]
+    [isControlled, onHoverChange],
   );
+
+  // Slice hover: the listeners sit on the decorative (aria-hidden) svg root and
+  // update only when the pointer enters or leaves a slice's hitbox, the same
+  // moments per-slice mouseenter / mouseleave would.
+  const pointerSliceRef = useRef<number | null>(null);
+  const handleSliceMouseMove = useCallback(
+    (event: React.MouseEvent<SVGSVGElement>) => {
+      const index = sliceIndexOf(event.target);
+      if (index !== pointerSliceRef.current) {
+        pointerSliceRef.current = index;
+        setHoveredIndex(index);
+      }
+    },
+    [setHoveredIndex],
+  );
+  const handleSliceMouseLeave = useCallback(() => {
+    if (pointerSliceRef.current !== null) {
+      pointerSliceRef.current = null;
+      setHoveredIndex(null);
+    }
+  }, [setHoveredIndex]);
 
   // Use the smaller dimension to ensure the chart fits
   const size = Math.min(width, height);
@@ -179,10 +208,7 @@ const PieChartCore = memo(function PieChartCore({
   const innerRadius = innerRadiusProp;
 
   // Calculate total value
-  const totalValue = useMemo(
-    () => data.reduce((sum, d) => sum + d.value, 0),
-    [data]
-  );
+  const totalValue = useMemo(() => data.reduce((sum, d) => sum + d.value, 0), [data]);
 
   // Get color for a slice index
   const getColor = useCallback(
@@ -193,7 +219,7 @@ const PieChartCore = memo(function PieChartCore({
       }
       return defaultPieColors[index % defaultPieColors.length] as string;
     },
-    [data]
+    [data],
   );
 
   // Get fill for a slice index (supports patterns/gradients)
@@ -207,7 +233,7 @@ const PieChartCore = memo(function PieChartCore({
       // Fall back to color
       return getColor(index);
     },
-    [data, getColor]
+    [data, getColor],
   );
 
   // Compute arcs using d3-shape pie
@@ -236,14 +262,7 @@ const PieChartCore = memo(function PieChartCore({
       return null;
     }
     return arcs.map((arc) =>
-      arcPath(
-        innerRadius,
-        outerRadius,
-        arc.startAngle,
-        arc.endAngle,
-        cornerRadius,
-        arc.padAngle
-      )
+      arcPath(innerRadius, outerRadius, arc.startAngle, arc.endAngle, cornerRadius, arc.padAngle),
     );
   }, [geometryScrubbing, arcs, innerRadius, outerRadius, cornerRadius]);
 
@@ -267,16 +286,16 @@ const PieChartCore = memo(function PieChartCore({
     }
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: enterTransition
+  // Each new enter key (a replay) restarts the load delay.
   useEffect(() => {
-    if (geometryScrubbing) {
+    if (enterKey.geometryScrubbing) {
       return;
     }
     const timer = setTimeout(() => {
       setIsLoaded(true);
     }, 100);
     return () => clearTimeout(timer);
-  }, [enterTransition, enterStaggerScale, geometryScrubbing]);
+  }, [enterKey]);
 
   // Separate children into categories
   const { svgChildren, centerChildren, defsChildren } = useMemo(() => {
@@ -361,7 +380,7 @@ const PieChartCore = memo(function PieChartCore({
       getFill,
       geometryScrubbing,
       scrubSlicePaths,
-    ]
+    ],
   );
 
   // Use CSS Grid stacking to layer SVG and HTML content
@@ -381,6 +400,8 @@ const PieChartCore = memo(function PieChartCore({
         <svg
           aria-hidden="true"
           height={size}
+          onMouseLeave={handleSliceMouseLeave}
+          onMouseMove={handleSliceMouseMove}
           style={{
             gridArea: "1 / 1",
             // No `paint` containment: it clips hover glow at the svg box.
@@ -402,7 +423,7 @@ const PieChartCore = memo(function PieChartCore({
                       key={data[index]?.label ?? index}
                       pointerEvents="none"
                     />
-                  ) : null
+                  ) : null,
                 )
               : null}
             {svgChildren}
@@ -423,10 +444,7 @@ const PieChartCore = memo(function PieChartCore({
   );
 }, pieChartCorePropsEqual);
 
-function pieChartCorePropsEqual(
-  prev: PieChartInnerProps,
-  next: PieChartInnerProps
-): boolean {
+function pieChartCorePropsEqual(prev: PieChartInnerProps, next: PieChartInnerProps): boolean {
   return (
     prev.width === next.width &&
     prev.height === next.height &&
@@ -501,10 +519,7 @@ export function PieChart({
   // Otherwise use ParentSize for responsive sizing
   return (
     <LazyMotion features={domAnimation}>
-      <div
-        className={cn("relative aspect-square w-full", className)}
-        ref={containerRef}
-      >
+      <div className={cn("relative aspect-square w-full", className)} ref={containerRef}>
         <ParentSize debounceTime={10}>
           {({ width, height }) => (
             <PieChartInner
@@ -534,5 +549,3 @@ export function PieChart({
 }
 
 PieChart.displayName = "PieChart";
-
-export default PieChart;

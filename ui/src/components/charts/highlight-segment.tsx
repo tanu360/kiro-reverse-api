@@ -17,7 +17,7 @@ export interface HighlightSegmentGlow {
   strokeWidth: number;
 }
 
-export interface HighlightSegmentProps {
+interface HighlightSegmentProps {
   /** Ref to the rendered base stroke `<path>` — its `d` is re-used verbatim. */
   pathRef: RefObject<SVGPathElement | null>;
   /** Whether to render (caller gates on showHighlight + active + loaded). */
@@ -170,5 +170,3 @@ export function HighlightSegment({
 }
 
 HighlightSegment.displayName = "HighlightSegment";
-
-export default HighlightSegment;

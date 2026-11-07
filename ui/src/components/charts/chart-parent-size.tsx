@@ -11,10 +11,9 @@ import {
 } from "react";
 
 /** `useLayoutEffect` in the browser, `useEffect` on the server (no SSR warning). */
-export const useIsomorphicLayoutEffect =
-  typeof window === "undefined" ? useEffect : useLayoutEffect;
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-export interface ElementSize {
+interface ElementSize {
   width: number;
   height: number;
 }
@@ -36,7 +35,7 @@ function readElementSize(element: HTMLElement): ElementSize {
   };
 }
 
-export interface ElementSizeOptions {
+interface ElementSizeOptions {
   /**
    * - `"layout"` (default): measure in a layout effect so the sized render
    *   commits before the first paint; later `ResizeObserver` changes are
@@ -51,8 +50,7 @@ export interface ElementSizeOptions {
   timing?: "layout" | "observer";
 }
 
-const sameSize = (a: ElementSize, b: ElementSize) =>
-  a.width === b.width && a.height === b.height;
+const sameSize = (a: ElementSize, b: ElementSize) => a.width === b.width && a.height === b.height;
 
 /**
  * visx `debounce(fn, wait, { leading: true })`: fires on the first call, then
@@ -94,21 +92,17 @@ function leadingDebounce<A>(fn: (arg: A) => void, wait: number) {
  * immediate leading update. `timing: "observer"` keeps visx `useParentSize`
  * behaviour instead (see {@link ElementSizeOptions}).
  */
-export function useElementSize<T extends HTMLElement>(
+function useElementSize<T extends HTMLElement>(
   ref: RefObject<T | null>,
   debounceTime = 0,
-  { timing = "layout" }: ElementSizeOptions = {}
+  { timing = "layout" }: ElementSizeOptions = {},
 ): ElementSize {
   const [size, setSize] = useState<ElementSize>(ZERO_SIZE);
 
   // visx useParentSize: passive effect, rAF-deferred observer callbacks.
   useEffect(() => {
     const element = ref.current;
-    if (
-      timing !== "observer" ||
-      !element ||
-      typeof ResizeObserver === "undefined"
-    ) {
+    if (timing !== "observer" || !element || typeof ResizeObserver === "undefined") {
       return;
     }
     const resize = leadingDebounce<ElementSize>((next) => {
@@ -178,7 +172,7 @@ export function useElementSize<T extends HTMLElement>(
   return size;
 }
 
-export interface ChartParentSizeProps {
+interface ChartParentSizeProps {
   children: (size: { width: number; height: number }) => ReactNode;
   className?: string;
   debounceTime?: number;
@@ -190,12 +184,7 @@ export interface ChartParentSizeProps {
  * layer, so tooltips, markers, and strokes at the chart edge aren't clipped.
  * Measures before first paint (see {@link useElementSize}).
  */
-export function ParentSize({
-  children,
-  className,
-  debounceTime,
-  style,
-}: ChartParentSizeProps) {
+export function ParentSize({ children, className, debounceTime, style }: ChartParentSizeProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const { width, height } = useElementSize(parentRef, debounceTime ?? 300);
   return (

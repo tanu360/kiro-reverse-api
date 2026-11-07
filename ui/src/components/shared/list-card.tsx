@@ -3,7 +3,7 @@ import { useRender } from "@base-ui/react/use-render";
 import type { JSX, ReactElement, ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, placeholderKeys } from "@/lib/utils";
 
 /*
  * The list item that replaces a table row on narrow containers (API keys, Backups, Accounts,
@@ -30,7 +30,7 @@ const OPEN_BUTTON = {
   row: "outline-none after:absolute after:inset-0 focus-visible:after:outline-1 focus-visible:after:outline-ring focus-visible:after:outline-solid focus-visible:after:-outline-offset-1",
 } as const;
 
-export interface ListCardProps {
+interface ListCardProps {
   title: ReactNode;
   /** Before the title: a selection checkbox, a logo. Stays clickable over the open layer. */
   leading?: ReactNode;
@@ -207,9 +207,8 @@ export function ListCardSkeleton({
           <Skeleton className="h-3 w-1/2" />
         </div>
       ) : null}
-      {Array.from({ length: lines }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder lines never reorder.
-        <div className={SKELETON_LINE.text} key={index}>
+      {placeholderKeys("line", lines).map((key, index) => (
+        <div className={SKELETON_LINE.text} key={key}>
           <Skeleton
             className={cn("h-3.5", SKELETON_BODY_WIDTHS[index % SKELETON_BODY_WIDTHS.length])}
           />
@@ -229,9 +228,8 @@ export function ListCardSkeleton({
           className="grid gap-3"
           style={{ gridTemplateColumns: `repeat(${stats}, minmax(0, 1fr))` }}
         >
-          {Array.from({ length: stats }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder stats never reorder.
-            <div className="flex flex-col gap-0.5" key={index}>
+          {placeholderKeys("stat", stats).map((key) => (
+            <div className="flex flex-col gap-0.5" key={key}>
               <div className={SKELETON_LINE.text}>
                 <Skeleton className="h-3 w-3/5" />
               </div>
@@ -285,35 +283,3 @@ function ListRowShell({ className, render, ...props }: useRender.ComponentProps<
  */
 export const CARD_GRID_CLASS =
   "grid grid-cols-1 gap-2 @2xl:grid-cols-2 *:flex *:*:min-w-0 *:*:flex-1 @2xl:[&>*:last-child:nth-child(odd)]:col-span-2";
-
-export function CardGrid({ className, render, ...props }: useRender.ComponentProps<"ul">) {
-  return useRender({
-    defaultTagName: "ul",
-    props: mergeProps<"ul">({ className: cn(CARD_GRID_CLASS, className) }, props),
-    render,
-  });
-}
-
-/**
- * Rows divided inside one card (hairlines, no nested borders): the `divided` list. Put
- * `<ListCard variant="row" render={<li />} />` items in it.
- */
-export function ListCardGroup({
-  children,
-  className,
-  render,
-  ...props
-}: {
-  children: ReactNode;
-  /** Layout classes only. */
-  className?: string;
-  /** The list element; a `<ul>` by default. */
-  render?: ReactElement;
-  "aria-label"?: string;
-}): JSX.Element {
-  return (
-    <Card className={cn("overflow-hidden", className)} divided render={render ?? <ul />} {...props}>
-      {children}
-    </Card>
-  );
-}

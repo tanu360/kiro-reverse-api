@@ -9,18 +9,12 @@
   "sparkline.summaryUp_other": "{count} điểm, từ {first} đến {last}, tăng {change}%",
   "sparkline.summaryDown_other": "{count} điểm, từ {first} đến {last}, giảm {change}%",
   "chart.loading": "Đang tải…",
-  "chart.total": "Tổng",
   "spinner.loading": "Đang tải…",
   "toast.region": "Thông báo",
   "sidebar.toggle": "Bật/tắt thanh bên",
   "sidebar.title": "Thanh bên",
   "sidebar.description": "Hiển thị thanh bên trên thiết bị di động.",
   "pagination.label": "Phân trang",
-  "pagination.previous": "Trước",
-  "pagination.previousPage": "Đến trang trước",
-  "pagination.next": "Tiếp",
-  "pagination.nextPage": "Đến trang tiếp theo",
   "pagination.more": "Thêm trang",
-  "breadcrumb.label": "Đường dẫn",
-  "breadcrumb.more": "Thêm"
+  "breadcrumb.label": "Đường dẫn"
 }

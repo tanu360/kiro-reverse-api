@@ -1,9 +1,9 @@
 "use client";
 
 import NumberFlow from "@number-flow/react";
-import { numberFormat } from "@/lib/format";
-import { intlLocale, useT } from "@/lib/i18n";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { numberFormat } from "@/lib/format";
+import { intlLocale, type Lang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /** Subset of `Intl.NumberFormatOptions` supported by NumberFlow */
@@ -30,18 +30,17 @@ export const defaultChartStatFlowFormat: ChartStatFlowFormat = {
 function formatStatValue(
   value: number,
   formatOptions: ChartStatFlowFormat,
+  lang: Lang,
   prefix?: string,
-  suffix?: string
+  suffix?: string,
 ): string {
-  const formatted = numberFormat(undefined, formatOptions).format(value);
+  const formatted = numberFormat(lang, formatOptions).format(value);
   return `${prefix ?? ""}${formatted}${suffix ?? ""}`;
 }
 
 function useNumberFlowElementReady(): boolean {
   const [ready, setReady] = useState(
-    () =>
-      typeof customElements !== "undefined" &&
-      Boolean(customElements.get("number-flow-react"))
+    () => typeof customElements !== "undefined" && Boolean(customElements.get("number-flow-react")),
   );
 
   useEffect(() => {
@@ -62,7 +61,7 @@ function useNumberFlowElementReady(): boolean {
   return ready;
 }
 
-export interface ChartStatFlowProps {
+interface ChartStatFlowProps {
   value: number;
   label: string;
   formatOptions?: ChartStatFlowFormat;
@@ -89,10 +88,10 @@ export function ChartStatFlow({
 }: ChartStatFlowProps) {
   const numberFlowReady = useNumberFlowElementReady();
   const { lang } = useT();
+  // The static value is formatted in the UI language.
   const staticValue = useMemo(
-    () => formatStatValue(value, formatOptions, prefix, suffix),
-    // lang: the static value is formatted in the UI language.
-    [value, formatOptions, prefix, suffix, lang]
+    () => formatStatValue(value, formatOptions, lang, prefix, suffix),
+    [value, formatOptions, lang, prefix, suffix],
   );
 
   return (
@@ -117,9 +116,7 @@ export function ChartStatFlow({
           staticValue
         )}
       </span>
-      <span className={cn("mt-0.5 text-chart-label", labelClassName)}>
-        {label}
-      </span>
+      <span className={cn("mt-0.5 text-chart-label", labelClassName)}>{label}</span>
     </>
   );
 }

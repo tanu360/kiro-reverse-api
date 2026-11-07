@@ -235,7 +235,7 @@ const RELATIVE_STEPS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number, number
   ["year", 86_400 * 365, Number.POSITIVE_INFINITY],
 ];
 
-export type RelativeTimeStyle = "long" | "short" | "narrow";
+type RelativeTimeStyle = "long" | "short" | "narrow";
 
 const relativeFormats = new Map<string, Intl.RelativeTimeFormat>();
 

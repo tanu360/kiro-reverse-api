@@ -1,4 +1,4 @@
-export interface LocalPoint {
+interface LocalPoint {
   x: number;
   y: number;
 }
@@ -13,7 +13,7 @@ interface TouchEventLike {
 }
 
 /** Native/React mouse, pointer, touch or focus event, or a `Touch`. */
-export type LocalPointEvent =
+type LocalPointEvent =
   | Event
   | ClientPointLike
   | TouchEventLike
@@ -24,7 +24,7 @@ function isElement(value: unknown): value is Element {
 }
 
 function isEvent(
-  value: unknown
+  value: unknown,
 ): value is Event | { nativeEvent: Event; target: EventTarget | null } {
   if (typeof Event === "undefined" || !value) {
     return false;
@@ -46,11 +46,7 @@ function clientCoords(event: LocalPointEvent): LocalPoint {
   }
   // Focus (and other coordinate-less) events: centre of the target.
   const target = (event as { target?: unknown }).target;
-  if (
-    target &&
-    typeof target === "object" &&
-    "getBoundingClientRect" in target
-  ) {
+  if (target && typeof target === "object" && "getBoundingClientRect" in target) {
     const rect = (target as Element).getBoundingClientRect();
     return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
   }
@@ -62,14 +58,11 @@ function localPointFromNode(node: Element, event: LocalPointEvent): LocalPoint {
 
   // Top-most SVG (null for the outermost <svg> itself -> rect fallback).
   const svg: Element | null =
-    (typeof SVGElement !== "undefined" && node instanceof SVGElement) ||
-    "ownerSVGElement" in node
+    (typeof SVGElement !== "undefined" && node instanceof SVGElement) || "ownerSVGElement" in node
       ? (node as SVGElement).ownerSVGElement
       : node;
   const screenCTM =
-    svg && "getScreenCTM" in svg
-      ? (svg as SVGGraphicsElement).getScreenCTM()
-      : null;
+    svg && "getScreenCTM" in svg ? (svg as SVGGraphicsElement).getScreenCTM() : null;
 
   if (svg && "createSVGPoint" in svg && screenCTM) {
     const point = (svg as SVGSVGElement).createSVGPoint();
@@ -89,11 +82,11 @@ function localPointFromNode(node: Element, event: LocalPointEvent): LocalPoint {
 export function localPoint(event: LocalPointEvent): LocalPoint | null;
 export function localPoint(
   node: Element | null | undefined,
-  event: LocalPointEvent
+  event: LocalPointEvent,
 ): LocalPoint | null;
 export function localPoint(
   nodeOrEvent: Element | LocalPointEvent | null | undefined,
-  maybeEvent?: LocalPointEvent
+  maybeEvent?: LocalPointEvent,
 ): LocalPoint | null {
   if (isElement(nodeOrEvent) && maybeEvent) {
     return localPointFromNode(nodeOrEvent, maybeEvent);

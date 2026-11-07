@@ -1,7 +1,7 @@
 "use client";
 
 import { MotionGlobalConfig } from "motion/react";
-import { memo, useLayoutEffect, useRef } from "react";
+import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { DEFAULT_ANIMATION_EASING } from "./animation";
 
 export interface SeriesPointMarkerStyle {
@@ -85,7 +85,7 @@ function MarkerCircles({
   );
 }
 
-export interface StaticSeriesPointMarkerProps extends SeriesPointMarkerStyle {
+interface StaticSeriesPointMarkerProps extends SeriesPointMarkerStyle {
   cx: number;
   cy: number;
   scale?: number;
@@ -124,7 +124,7 @@ export const StaticSeriesPointMarker = memo(function StaticSeriesPointMarker({
   );
 });
 
-export interface SeriesPointMarkerProps extends SeriesPointMarkerStyle {
+interface SeriesPointMarkerProps extends SeriesPointMarkerStyle {
   dataKey: string;
   index: number;
   cx: number;
@@ -136,6 +136,52 @@ export interface SeriesPointMarkerProps extends SeriesPointMarkerStyle {
 
 /** Marker style once the enter fade has finished (what Motion left inline). */
 const MARKER_ENTERED_STYLE = { opacity: 1, filter: "blur(0px)" } as const;
+
+interface MarkerEnterProps {
+  enterBlur: number;
+  revealDelay: number;
+  enterDuration: number;
+  children: ReactNode;
+}
+
+/**
+ * Runs the enter fade once, on mount. The parent keys it by reveal epoch, so a
+ * new epoch mounts a fresh group and replays the fade.
+ */
+function MarkerEnter({ enterBlur, revealDelay, enterDuration, children }: MarkerEnterProps) {
+  const enterRef = useRef<SVGGElement>(null);
+  // Fixed when the fade starts, like Motion's mount animation: later prop
+  // changes do not restart it.
+  const [timing] = useState(() => ({ enterBlur, revealDelay, enterDuration }));
+
+  useLayoutEffect(() => {
+    const element = enterRef.current;
+    if (
+      !element ||
+      typeof element.animate !== "function" ||
+      MotionGlobalConfig.skipAnimations ||
+      MotionGlobalConfig.instantAnimations
+    ) {
+      return;
+    }
+    const animation = element.animate(
+      [{ opacity: 0, filter: `blur(${timing.enterBlur}px)` }, MARKER_ENTERED_STYLE],
+      {
+        delay: timing.revealDelay * 1000,
+        duration: timing.enterDuration * 1000,
+        easing: DEFAULT_ANIMATION_EASING,
+        fill: "backwards",
+      },
+    );
+    return () => animation.cancel();
+  }, [timing]);
+
+  return (
+    <g ref={enterRef} style={MARKER_ENTERED_STYLE}>
+      {children}
+    </g>
+  );
+}
 
 /**
  * Enter marker — used only while the chart reveal is running.
@@ -167,43 +213,14 @@ export function SeriesPointMarker({
   outlineColor,
   radius = 5,
 }: SeriesPointMarkerProps) {
-  const enterRef = useRef<SVGGElement>(null);
-  const timingRef = useRef({ enterBlur, revealDelay, enterDuration });
-  timingRef.current = { enterBlur, revealDelay, enterDuration };
-
-  // Replays per reveal epoch only; the timing is read when it starts.
-  useLayoutEffect(() => {
-    const element = enterRef.current;
-    if (
-      !element ||
-      typeof element.animate !== "function" ||
-      MotionGlobalConfig.skipAnimations ||
-      MotionGlobalConfig.instantAnimations
-    ) {
-      return;
-    }
-    const timing = timingRef.current;
-    const animation = element.animate(
-      [
-        { opacity: 0, filter: `blur(${timing.enterBlur}px)` },
-        MARKER_ENTERED_STYLE,
-      ],
-      {
-        delay: timing.revealDelay * 1000,
-        duration: timing.enterDuration * 1000,
-        easing: DEFAULT_ANIMATION_EASING,
-        fill: "backwards",
-      }
-    );
-    return () => animation.cancel();
-  }, [revealEpoch]);
-
+  // Replays per reveal epoch only: a new epoch remounts the enter group.
   return (
     <g transform={`translate(${cx}, ${cy})`}>
-      <g
+      <MarkerEnter
+        enterBlur={enterBlur}
+        enterDuration={enterDuration}
         key={`${dataKey}-${index}-${revealEpoch}`}
-        ref={enterRef}
-        style={MARKER_ENTERED_STYLE}
+        revealDelay={revealDelay}
       >
         <MarkerCircles
           fill={fill}
@@ -214,7 +231,7 @@ export function SeriesPointMarker({
           stroke={stroke}
           strokeWidth={strokeWidth}
         />
-      </g>
+      </MarkerEnter>
     </g>
   );
 }
@@ -222,12 +239,8 @@ export function SeriesPointMarker({
 export function getSeriesMarkerVisualExtent(
   style: Pick<
     SeriesPointMarkerStyle,
-    | "radius"
-    | "strokeWidth"
-    | "ringGap"
-    | "outlineWidth"
-    | "showActiveHighlight"
-  >
+    "radius" | "strokeWidth" | "ringGap" | "outlineWidth" | "showActiveHighlight"
+  >,
 ): number {
   const radius = style.radius ?? 5;
   const strokeWidth = style.strokeWidth ?? 2;
@@ -235,7 +248,7 @@ export function getSeriesMarkerVisualExtent(
   const outlineWidth = style.outlineWidth ?? 0;
   const showActiveHighlight = style.showActiveHighlight ?? true;
   const ring = strokeWidth > 0 ? ringGap + strokeWidth : 0;
-  const outline = outlineWidth > 0 ? outlineWidth : 0;
+  const outline = Math.max(outlineWidth, 0);
   const highlightPad = showActiveHighlight ? radius * 0.35 : 0;
   return radius + ring + outline + highlightPad + 2;
 }

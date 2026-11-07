@@ -1,5 +1,6 @@
 import { parse } from "@babel/parser";
 import { describe, expect, it } from "vitest";
+import { type AstNode, fields, isAstNode, isNode, type NodeOf } from "./babel-ast";
 import { baseKey, catalog, namespaces } from "./locale-catalog";
 
 // Every `t("key")` in the source must name a key that exists, and every English key must be used
@@ -26,9 +27,6 @@ const NAMESPACED = /^([A-Za-z][\w-]*):(.+)$/;
 const DEFAULT_NAMESPACE = "common";
 const UI_NAMESPACE = "ui";
 
-// biome-ignore lint/suspicious/noExplicitAny: Babel AST nodes are walked generically.
-type Node = any;
-
 interface KeyUse {
   file: string;
   line: number;
@@ -44,18 +42,18 @@ interface FileScan {
   literals: Set<string>;
 }
 
-function walk(node: Node, visit: (node: Node) => void): void {
-  if (!node || typeof node.type !== "string") return;
-  visit(node);
-  for (const [field, value] of Object.entries(node)) {
+function walk(value: unknown, visit: (node: AstNode) => void): void {
+  if (!isAstNode(value)) return;
+  visit(value);
+  for (const [field, child] of fields(value)) {
     if (field === "loc" || field === "start" || field === "end") continue;
-    if (Array.isArray(value)) for (const child of value) walk(child, visit);
-    else if (value && typeof value === "object") walk(value, visit);
+    if (Array.isArray(child)) for (const item of child) walk(item, visit);
+    else walk(child, visit);
   }
 }
 
-function templatePattern(node: Node): RegExp {
-  const parts = node.quasis.map((quasi: Node) =>
+function templatePattern(node: NodeOf<"TemplateLiteral">): RegExp {
+  const parts = node.quasis.map((quasi) =>
     (quasi.value.cooked ?? quasi.value.raw).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
   );
   return new RegExp(`^${parts.join("[\\w.-]+")}$`);
@@ -65,18 +63,19 @@ function scanFile(code: string, file: string): FileScan {
   const ast = parse(code, { sourceType: "module", plugins: ["typescript", "jsx"] });
   const scan: FileScan = { namespaces: new Set(), uses: [], literals: new Set() };
   walk(ast.program, (node) => {
-    if (node.type === "StringLiteral") scan.literals.add(node.value);
-    if (node.type !== "CallExpression" || node.callee.type !== "Identifier") return;
+    if (isNode(node, "StringLiteral")) scan.literals.add(node.value);
+    if (!isNode(node, "CallExpression") || !isNode(node.callee, "Identifier")) return;
+    const callee = node.callee.name;
     const [arg] = node.arguments;
-    if (node.callee.name === "useT") {
-      scan.namespaces.add(arg?.type === "StringLiteral" ? arg.value : DEFAULT_NAMESPACE);
-    } else if (node.callee.name === "useUiT") {
+    if (callee === "useT") {
+      scan.namespaces.add(isNode(arg, "StringLiteral") ? arg.value : DEFAULT_NAMESPACE);
+    } else if (callee === "useUiT") {
       // components/ui/messages.ts: useT bound to the primitives' own namespace.
       scan.namespaces.add(UI_NAMESPACE);
-    } else if (node.callee.name === "t" && arg) {
+    } else if (callee === "t" && arg) {
       const line = node.loc?.start.line ?? 0;
-      if (arg.type === "StringLiteral") scan.uses.push({ file, line, key: arg.value });
-      else if (arg.type === "TemplateLiteral" && arg.expressions.length > 0) {
+      if (isNode(arg, "StringLiteral")) scan.uses.push({ file, line, key: arg.value });
+      else if (isNode(arg, "TemplateLiteral") && arg.expressions.length > 0) {
         scan.uses.push({ file, line, key: templatePattern(arg) });
       }
     }

@@ -1,20 +1,15 @@
 import { dateTimeFormat, numberFormat } from "@/lib/format";
 
 // Formatters in the active UI language: each call resolves the cached Intl formatter for it.
-function dateFormatter(options: Intl.DateTimeFormatOptions): { format: (date: Date | number) => string } {
+function dateFormatter(options: Intl.DateTimeFormatOptions): {
+  format: (date: Date | number) => string;
+} {
   return { format: (date) => dateTimeFormat(undefined, options).format(date) };
 }
 
 export const shortDateFmt = dateFormatter({ month: "short", day: "numeric" });
 
 export const weekdayDateFmt = dateFormatter({ weekday: "short", month: "short", day: "numeric" });
-
-export const hmsTimeFmt = dateFormatter({
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
 
 export const intFmt = (value: number): string => numberFormat(undefined).format(value);
 export const valueLabelFmt = (value: number): string =>
@@ -33,7 +28,7 @@ export function formatBandRange(
   point: Record<string, unknown>,
   upperKey: string,
   lowerKey: string,
-  format: (value: number) => string = intFmt
+  format: (value: number) => string = intFmt,
 ): string | number | null {
   const upper = point[upperKey];
   const lower = point[lowerKey];
@@ -59,9 +54,7 @@ function toArrayIndex(prop: string | symbol, length: number): number {
     return -1;
   }
   const index = Number(prop);
-  return Number.isInteger(index) && index < length && String(index) === prop
-    ? index
-    : -1;
+  return Number.isInteger(index) && index < length && String(index) === prop ? index : -1;
 }
 
 /**
@@ -71,10 +64,7 @@ function toArrayIndex(prop: string | symbol, length: number): number {
  * front would add ~10 ms to every mount and data update. Behaves like a
  * regular array (length, indexing, iteration, `map`, `Array.isArray`).
  */
-export function lazyLabels(
-  length: number,
-  format: (index: number) => string
-): string[] {
+export function lazyLabels(length: number, format: (index: number) => string): string[] {
   if (length <= EAGER_LABEL_LIMIT) {
     return Array.from({ length }, (_, index) => format(index));
   }

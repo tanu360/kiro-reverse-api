@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * one step above the card (--surface-2) under a hairline, with the icon in the muted colour.
  * `danger` tints it red for destructive sections.
  */
-export const iconChipVariants = cva(
+const iconChipVariants = cva(
   "flex shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-2 text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
@@ -28,7 +28,7 @@ export const iconChipVariants = cva(
   },
 );
 
-export type IconChipProps = Omit<React.ComponentProps<"span">, "children"> &
+type IconChipProps = Omit<React.ComponentProps<"span">, "children"> &
   VariantProps<typeof iconChipVariants> & {
     /** The icon to draw. Decorative: the chip is hidden from assistive tech. */
     icon: IconSvgElement;

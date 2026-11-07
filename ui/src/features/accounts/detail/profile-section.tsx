@@ -142,7 +142,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
             >
               {result.profiles.map((profile) => (
                 <ChoiceCard
-                  control={<Radio value={profile.arn} />}
+                  control={(id) => <Radio id={id} value={profile.arn} />}
                   description={profile.region}
                   key={profile.arn}
                   title={

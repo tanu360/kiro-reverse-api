@@ -18,7 +18,7 @@ import {
   StaticSeriesPointMarker,
 } from "./series-point-marker";
 
-export interface SeriesMarkersProps extends SeriesPointMarkerStyle {
+interface SeriesMarkersProps extends SeriesPointMarkerStyle {
   dataKey: string;
   /** Marker fill color. Defaults to series stroke or chart palette color. */
   fill?: string;
@@ -28,10 +28,7 @@ export interface SeriesMarkersProps extends SeriesPointMarkerStyle {
    * Optional per-point pixel offset (e.g. scatter jitter). Must be
    * deterministic for a given `(index, seriesIndex)` pair.
    */
-  getPointOffset?: (
-    index: number,
-    seriesIndex: number
-  ) => { x: number; y: number };
+  getPointOffset?: (index: number, seriesIndex: number) => { x: number; y: number };
 }
 
 interface PointAt {
@@ -85,14 +82,13 @@ export function SeriesMarkers({
 
   const seriesIndex = useMemo(() => {
     const index = lines.findIndex((line) => line.dataKey === dataKey);
-    return index >= 0 ? index : 0;
+    return Math.max(index, 0);
   }, [lines, dataKey]);
 
   const seriesConfig = lines[seriesIndex];
   const yScale = useYScale(seriesConfig?.yAxisId);
   const seriesColor =
-    defaultScatterColors[seriesIndex % defaultScatterColors.length] ??
-    defaultScatterColors[0];
+    defaultScatterColors[seriesIndex % defaultScatterColors.length] ?? defaultScatterColors[0];
 
   const resolvedFill = fill ?? seriesConfig?.stroke ?? seriesColor;
   const resolvedStroke = stroke ?? resolvedFill;
@@ -106,7 +102,7 @@ export function SeriesMarkers({
         outlineWidth,
         showActiveHighlight,
       }),
-    [radius, strokeWidth, ringGap, outlineWidth, showActiveHighlight]
+    [radius, strokeWidth, ringGap, outlineWidth, showActiveHighlight],
   );
 
   const revealDurationSec =
@@ -119,7 +115,7 @@ export function SeriesMarkers({
       const value = d[dataKey];
       return typeof value === "number" ? (yScale(value) ?? 0) : null;
     },
-    [dataKey, yScale]
+    [dataKey, yScale],
   );
 
   const points = useMemo<PointAt[]>(
@@ -133,9 +129,7 @@ export function SeriesMarkers({
         const cx = (xScale(xAccessor(d)) ?? 0) + (offset?.x ?? 0);
         const leadingEdge = Math.max(0, cx - visualExtent);
         const revealDelay =
-          innerWidth > 0 && isRevealing
-            ? (leadingEdge / innerWidth) * revealDurationSec
-            : 0;
+          innerWidth > 0 && isRevealing ? (leadingEdge / innerWidth) * revealDurationSec : 0;
 
         return [{ index, cx, cy: cy + (offset?.y ?? 0), revealDelay }];
       }),
@@ -150,7 +144,7 @@ export function SeriesMarkers({
       visualExtent,
       getPointOffset,
       seriesIndex,
-    ]
+    ],
   );
 
   // Memo so the inner <SeriesMarkersActiveHighlight> sees a stable prop and
@@ -165,15 +159,7 @@ export function SeriesMarkers({
       outlineColor,
       radius,
     }),
-    [
-      resolvedFill,
-      resolvedStroke,
-      strokeWidth,
-      ringGap,
-      outlineWidth,
-      outlineColor,
-      radius,
-    ]
+    [resolvedFill, resolvedStroke, strokeWidth, ringGap, outlineWidth, outlineColor, radius],
   );
 
   if (isRevealing) {
@@ -218,7 +204,7 @@ export function SeriesMarkers({
         key={`${dataKey}-${point.index}`}
         {...markerStyle}
       />
-    )
+    ),
   );
   const activeScale = showActiveHighlight ? 1.35 : 1;
 
@@ -258,8 +244,7 @@ interface SeriesMarkersDimWrapperProps {
  * hover internally so the grid (passed as `children`) keeps a stable reference
  * and React skips reconciling it when this wrapper re-renders.
  */
-const selectIsTooltipShown = (hover: ChartHoverContextValue) =>
-  hover.tooltipData !== null;
+const selectIsTooltipShown = (hover: ChartHoverContextValue) => hover.tooltipData !== null;
 
 function SeriesMarkersDimWrapper({
   enabled,
@@ -270,16 +255,16 @@ function SeriesMarkersDimWrapper({
 }: SeriesMarkersDimWrapperProps) {
   const isHovered = useChartHoverSelector(selectIsTooltipShown);
   const { hoveredIndex: legendHoveredIndex } = useChartLegendHover();
-  const isLegendDimmed =
-    legendHoveredIndex !== null && legendHoveredIndex !== seriesIndex;
+  const isLegendDimmed = legendHoveredIndex !== null && legendHoveredIndex !== seriesIndex;
   const dimBase = enabled && (isHovered || isLegendDimmed);
   return (
     <g
+      // A class, not an inline transition, so the global reduced-motion and
+      // theme-swap overrides win over it.
+      className="[transition:opacity_0.15s_ease-in-out,filter_0.15s_ease-in-out]"
       opacity={dimBase ? inactiveOpacity : 1}
       style={{
-        transition: "opacity 0.15s ease-in-out, filter 0.15s ease-in-out",
-        filter:
-          dimBase && inactiveBlur > 0 ? `blur(${inactiveBlur}px)` : "none",
+        filter: dimBase && inactiveBlur > 0 ? `blur(${inactiveBlur}px)` : "none",
       }}
     >
       {children}
@@ -311,10 +296,7 @@ function SeriesMarkersActiveHighlight({
     return null;
   }
   // Nearest-point hover (jittered scatter): only the hovered series' point.
-  if (
-    tooltipData.activeDataKey !== undefined &&
-    tooltipData.activeDataKey !== dataKey
-  ) {
+  if (tooltipData.activeDataKey !== undefined && tooltipData.activeDataKey !== dataKey) {
     return null;
   }
   const activePoint = points.find((point) => point.index === tooltipData.index);
@@ -330,5 +312,3 @@ function SeriesMarkersActiveHighlight({
     />
   );
 }
-
-export default SeriesMarkers;

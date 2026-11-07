@@ -1,6 +1,6 @@
 import { ChevronRightIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import type { ComponentProps, JSX, ReactNode } from "react";
+import { type ComponentProps, type JSX, type ReactNode, useId } from "react";
 import { IconChip } from "@/components/shared/icon-chip";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,10 +19,13 @@ const CHOICE_VARIANT = {
 } as const;
 
 /**
- * A radio or checkbox as a card: the whole card is its label. `control` is the Base UI Radio or
- * Checkbox; the card takes the accent fill while it is checked (a `card` also the primary edge),
- * and the focus outline while the control has keyboard focus. `row` is one item of a ChoiceList
- * (it renders its own `<li>`), for long lists where a border per item would be noise.
+ * A radio or checkbox as a card: the whole card is its label. `control` renders the Base UI Radio
+ * or Checkbox with the given id, which the label points at; the card takes the accent fill while
+ * it is checked (a `card` also the primary edge), and the focus outline while the control has
+ * keyboard focus. `row` is one item of a ChoiceList (it renders its own `<li>`), for long lists
+ * where a border per item would be noise.
+ * Inside a Base UI Field, wrap each card in a Field.Item: a Field gives every control in it the
+ * field's one id, so without the item the card's id would not reach its control.
  */
 export function ChoiceCard({
   control,
@@ -32,7 +35,7 @@ export function ChoiceCard({
   variant = "card",
   className,
 }: {
-  control: ReactNode;
+  control: (id: string) => ReactNode;
   title: ReactNode;
   description?: ReactNode;
   /** More lines under the description (an id, a region). */
@@ -41,17 +44,18 @@ export function ChoiceCard({
   /** Layout only. */
   className?: string;
 }): JSX.Element {
+  const controlId = useId();
   const label = (
-    // biome-ignore lint/a11y/noLabelWithoutControl: the Base UI Radio or Checkbox inside is the control.
     <label
       className={cn(CHOICE_BASE, CHOICE_VARIANT[variant], className)}
       data-slot="choice-card"
       data-variant={variant}
+      htmlFor={controlId}
     >
       {/* The 16 px control sits on the title's 20 px first line. */}
-      <span className="flex h-5 shrink-0 items-center">{control}</span>
+      <span className="flex h-5 shrink-0 items-center">{control(controlId)}</span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="break-words font-medium text-foreground text-sm/5">{title}</span>
+        <span className="wrap-break-word font-medium text-foreground text-sm/5">{title}</span>
         {description ? (
           <span className="text-muted-foreground text-xs leading-normal">{description}</span>
         ) : null}

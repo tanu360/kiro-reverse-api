@@ -9,18 +9,12 @@
   "sparkline.summaryUp_other": "{count} 个数据点，从 {first} 到 {last}，上升 {change}%",
   "sparkline.summaryDown_other": "{count} 个数据点，从 {first} 到 {last}，下降 {change}%",
   "chart.loading": "正在加载…",
-  "chart.total": "合计",
   "spinner.loading": "正在加载…",
   "toast.region": "通知",
   "sidebar.toggle": "切换侧边栏",
   "sidebar.title": "侧边栏",
   "sidebar.description": "显示移动端侧边栏。",
   "pagination.label": "分页",
-  "pagination.previous": "上一页",
-  "pagination.previousPage": "转到上一页",
-  "pagination.next": "下一页",
-  "pagination.nextPage": "转到下一页",
   "pagination.more": "更多页",
-  "breadcrumb.label": "面包屑导航",
-  "breadcrumb.more": "更多"
+  "breadcrumb.label": "面包屑导航"
 }

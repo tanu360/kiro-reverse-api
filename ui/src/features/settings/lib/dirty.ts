@@ -15,7 +15,7 @@ export function isEqual(a: unknown, b: unknown): boolean {
   return aKeys.length === bKeys.length && aKeys.every((key) => isEqual(aRecord[key], bRecord[key]));
 }
 
-export interface DraftState<T> {
+interface DraftState<T> {
   /** The value the draft started from: the last adopted server copy or the last saved value. */
   base: T;
   draft: T;

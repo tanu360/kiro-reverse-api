@@ -1,7 +1,7 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
 import { ChoiceCard } from "@/components/shared/choice-card";
 import { Code } from "@/components/shared/code";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldItem, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import {
@@ -184,17 +184,19 @@ export function MicrosoftFlow(): JSX.Element {
             ref={profilesRef}
             value={selectedArn}
           >
+            {/* Each card is a FieldItem, so its radio keeps the card's own id inside the Field. */}
             {profiles.map((profile) => (
-              <ChoiceCard
-                control={<Radio value={profile.arn} />}
-                description={profile.region}
-                key={profile.arn}
-                title={profile.name || t("microsoft.unnamedProfile")}
-              >
-                <span className="break-all font-mono text-meta text-muted-foreground">
-                  {profile.arn}
-                </span>
-              </ChoiceCard>
+              <FieldItem key={profile.arn}>
+                <ChoiceCard
+                  control={(id) => <Radio id={id} value={profile.arn} />}
+                  description={profile.region}
+                  title={profile.name || t("microsoft.unnamedProfile")}
+                >
+                  <span className="break-all font-mono text-meta text-muted-foreground">
+                    {profile.arn}
+                  </span>
+                </ChoiceCard>
+              </FieldItem>
             ))}
           </RadioGroup>
           <FieldError match={Boolean(fieldError)}>{fieldError}</FieldError>

@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { type AnimatedIconProps, useIconAnimation } from "@/lib/use-icon-animation";
 import { cn } from "@/lib/utils";
 
-export interface Clock01IconHandle {
+interface Clock01IconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }

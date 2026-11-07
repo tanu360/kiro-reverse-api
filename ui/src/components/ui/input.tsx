@@ -26,8 +26,7 @@ export function Input({
 }: InputProps): React.ReactElement {
   const inputClassName = cn(
     "h-8.5 w-full min-w-0 rounded-[inherit] px-[calc(--spacing(3)-1px)] text-foreground leading-8.5 outline-none [transition:background-color_5000000s_ease-in-out_0s] placeholder:text-placeholder sm:h-7.5 sm:leading-7.5 autofill:[-webkit-text-fill-color:var(--foreground)]",
-    size === "sm" &&
-      "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
+    size === "sm" && "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
     // lg is the sign-in password field: 44 px on phones and touch screens, 40 px from sm up.
     size === "lg"
       ? "h-10.5 leading-10.5 sm:h-9.5 sm:leading-9.5 pointer-coarse:h-10.5 pointer-coarse:leading-10.5"
@@ -77,5 +76,3 @@ export function Input({
     </span>
   );
 }
-
-export { InputPrimitive };

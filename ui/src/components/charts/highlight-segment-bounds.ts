@@ -38,11 +38,8 @@ export function computeSegmentBounds(
   xScale: (value: Date) => number | undefined,
   xAccessor: (d: Record<string, unknown>) => Date,
   tooltipData: Pick<TooltipData, "index"> | null | undefined,
-  selection:
-    | Pick<ChartSelection, "active" | "startX" | "endX">
-    | null
-    | undefined,
-  span = 1
+  selection: Pick<ChartSelection, "active" | "startX" | "endX"> | null | undefined,
+  span = 1,
 ): SegmentBounds {
   if (data.length === 0) {
     return INACTIVE_SEGMENT;

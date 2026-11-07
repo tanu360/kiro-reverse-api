@@ -1,9 +1,6 @@
 "use client";
 
-import type {
-  ScaleLinear as D3ScaleLinear,
-  ScaleTime as D3ScaleTime,
-} from "d3-scale";
+import type { ScaleLinear as D3ScaleLinear, ScaleTime as D3ScaleTime } from "d3-scale";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type BandConfig,
@@ -38,11 +35,7 @@ interface UseChartInteractionParams {
   bands?: BandConfig[];
   margin: Margin;
   xAccessor: (d: Record<string, unknown>) => Date;
-  bisectDate: (
-    data: Record<string, unknown>[],
-    date: Date,
-    lo: number
-  ) => number;
+  bisectDate: (data: Record<string, unknown>[], date: Date, lo: number) => number;
   canInteract: boolean;
 }
 
@@ -70,7 +63,7 @@ function resolveYPositions(
   lines: LineConfig[],
   bands: BandConfig[] | undefined,
   yScales: Record<string, ScaleLinear>,
-  yScale: ScaleLinear
+  yScale: ScaleLinear,
 ): Record<string, number> {
   const yPositions: Record<string, number> = {};
   const place = (key: string, yAxisId: string | number | undefined) => {
@@ -107,8 +100,9 @@ export function useChartInteraction({
 }: UseChartInteractionParams): ChartInteractionResult {
   const [hoverStore] = useState(createChartHoverStore);
   const { setSelection } = hoverStore;
-  const { scheduleTooltip, clearTooltip, resetTooltipDedupe } =
-    useScheduledTooltip<TooltipData>(hoverStore.setTooltipData);
+  const { scheduleTooltip, clearTooltip, resetTooltipDedupe } = useScheduledTooltip<TooltipData>(
+    hoverStore.setTooltipData,
+  );
 
   const isDraggingRef = useRef(false);
   const dragStartXRef = useRef<number>(0);
@@ -146,7 +140,7 @@ export function useChartInteraction({
         yPositions: resolveYPositions(d, lines, bands, yScales, yScale),
       };
     },
-    [xScale, yScale, yScales, data, lines, bands, xAccessor, bisectDate]
+    [xScale, yScale, yScales, data, lines, bands, xAccessor, bisectDate],
   );
 
   const resolveIndexFromX = useCallback(
@@ -167,13 +161,13 @@ export function useChartInteraction({
       }
       return index - 1;
     },
-    [xScale, data, xAccessor, bisectDate]
+    [xScale, data, xAccessor, bisectDate],
   );
 
   const getChartX = useCallback(
     (
       event: React.MouseEvent<SVGGElement> | React.TouchEvent<SVGGElement>,
-      touchIndex = 0
+      touchIndex = 0,
     ): number | null => {
       let point: { x: number; y: number } | null = null;
 
@@ -196,7 +190,7 @@ export function useChartInteraction({
       }
       return point.x - margin.left;
     },
-    [margin.left]
+    [margin.left],
   );
 
   const handleMouseMove = useCallback(
@@ -225,13 +219,7 @@ export function useChartInteraction({
         scheduleTooltip(tooltip);
       }
     },
-    [
-      getChartX,
-      resolveTooltipFromX,
-      resolveIndexFromX,
-      scheduleTooltip,
-      setSelection,
-    ]
+    [getChartX, resolveTooltipFromX, resolveIndexFromX, scheduleTooltip, setSelection],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -254,7 +242,7 @@ export function useChartInteraction({
       clearTooltip();
       setSelection(null);
     },
-    [getChartX, clearTooltip, setSelection]
+    [getChartX, clearTooltip, setSelection],
   );
 
   const handleMouseUp = useCallback(() => {
@@ -306,7 +294,7 @@ export function useChartInteraction({
       resetTooltipDedupe,
       clearTooltip,
       setSelection,
-    ]
+    ],
   );
 
   const handleTouchMove = useCallback(
@@ -340,13 +328,7 @@ export function useChartInteraction({
         });
       }
     },
-    [
-      getChartX,
-      resolveTooltipFromX,
-      resolveIndexFromX,
-      scheduleTooltip,
-      setSelection,
-    ]
+    [getChartX, resolveTooltipFromX, resolveIndexFromX, scheduleTooltip, setSelection],
   );
 
   // A tap or a drag leaves the crosshair and tooltip where the finger lifted (a touch has no
@@ -360,7 +342,7 @@ export function useChartInteraction({
       }
       setSelection(null);
     },
-    [setSelection]
+    [setSelection],
   );
 
   useEffect(() => {

@@ -13,16 +13,13 @@ import {
 } from "./y-domain-utils";
 
 function lerpDomain(from: YDomain, to: YDomain, progress: number): YDomain {
-  return [
-    from[0] + (to[0] - from[0]) * progress,
-    from[1] + (to[1] - from[1]) * progress,
-  ];
+  return [from[0] + (to[0] - from[0]) * progress, from[1] + (to[1] - from[1]) * progress];
 }
 
 function snapDomains(
   domains: Record<string, YDomain>,
   setAnimatedByAxis: (domains: Record<string, YDomain>) => void,
-  animatedRef: { current: Record<string, YDomain> }
+  animatedRef: { current: Record<string, YDomain> },
 ) {
   if (domainsEqual(animatedRef.current, domains)) {
     return;
@@ -64,8 +61,7 @@ function tweenDomains({
 
   let needsTween = false;
   for (const axisId of axisIds) {
-    const from =
-      fromSnapshot[axisId] ?? destination[axisId] ?? ([0, 100] as YDomain);
+    const from = fromSnapshot[axisId] ?? destination[axisId] ?? ([0, 100] as YDomain);
     const to = destination[axisId] ?? from;
     if (shouldTweenYDomain(from, to)) {
       needsTween = true;
@@ -81,8 +77,7 @@ function tweenDomains({
 
   const fromByAxis: Record<string, YDomain> = {};
   for (const axisId of axisIds) {
-    fromByAxis[axisId] = fromSnapshot[axisId] ??
-      destination[axisId] ?? [0, 100];
+    fromByAxis[axisId] = fromSnapshot[axisId] ?? destination[axisId] ?? [0, 100];
   }
 
   const control = animate(0, 1, {
@@ -91,12 +86,9 @@ function tweenDomains({
     onUpdate: (progress) => {
       const next: Record<string, YDomain> = {};
       for (const axisId of axisIds) {
-        const from =
-          fromByAxis[axisId] ?? destination[axisId] ?? ([0, 100] as YDomain);
+        const from = fromByAxis[axisId] ?? destination[axisId] ?? ([0, 100] as YDomain);
         const to = destination[axisId] ?? from;
-        next[axisId] = shouldTweenYDomain(from, to)
-          ? lerpDomain(from, to, progress)
-          : to;
+        next[axisId] = shouldTweenYDomain(from, to) ? lerpDomain(from, to, progress) : to;
       }
       animatedRef.current = next;
       setAnimatedByAxis(next);
@@ -110,7 +102,7 @@ function tweenDomains({
   return control;
 }
 
-export interface UseAnimatedYDomainsOptions {
+interface UseAnimatedYDomainsOptions {
   enabled: boolean;
   durationMs: number;
   chartPhase: ChartPhase;
@@ -134,7 +126,7 @@ export function useAnimatedYDomains({
   const destinationByAxis = resolveAnimatedYDestinationDomains(
     chartPhase,
     skeletonByAxis,
-    targetByAxis
+    targetByAxis,
   );
   const destinationRef = useRef(destinationByAxis);
   const skeletonRef = useRef(skeletonByAxis);
@@ -148,10 +140,7 @@ export function useAnimatedYDomains({
   // with the old y-scale, then re-render).
   const mayTween =
     isYDomainTweenPhase(chartPhase) ||
-    (tweenOnTargetChange &&
-      chartPhase === "ready" &&
-      enabled &&
-      !reducedMotion);
+    (tweenOnTargetChange && chartPhase === "ready" && enabled && !reducedMotion);
   if (
     !mayTween &&
     animatedByAxis !== destinationByAxis &&
@@ -253,14 +242,7 @@ export function useAnimatedYDomains({
     }
 
     snapDomains(targetRef.current, setAnimatedByAxis, animatedRef);
-  }, [
-    chartPhase,
-    durationMs,
-    enabled,
-    reducedMotion,
-    targetSignature,
-    tweenOnTargetChange,
-  ]);
+  }, [chartPhase, durationMs, enabled, reducedMotion, targetSignature, tweenOnTargetChange]);
 
   return mayTween ? animatedByAxis : destinationByAxis;
 }

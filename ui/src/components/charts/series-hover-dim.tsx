@@ -39,11 +39,8 @@ export function SeriesHoverDim({
   const isChartHovering = useChartHoverSelector(selectIsChartHovering);
   const { hoveredIndex: legendHoveredIndex } = useChartLegendHover();
   const isLegendDimmed =
-    legendHoveredIndex !== null &&
-    seriesIndex !== undefined &&
-    legendHoveredIndex !== seriesIndex;
-  const opacity =
-    enabled && (isChartHovering || isLegendDimmed) ? dimOpacity : 1;
+    legendHoveredIndex !== null && seriesIndex !== undefined && legendHoveredIndex !== seriesIndex;
+  const opacity = enabled && (isChartHovering || isLegendDimmed) ? dimOpacity : 1;
   return (
     <m.g
       animate={{ opacity }}
@@ -56,5 +53,3 @@ export function SeriesHoverDim({
 }
 
 SeriesHoverDim.displayName = "SeriesHoverDim";
-
-export default SeriesHoverDim;

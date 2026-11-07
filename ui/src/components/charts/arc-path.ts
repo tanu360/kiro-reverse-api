@@ -32,7 +32,7 @@ export function arcPath(
   startAngle: number,
   endAngle: number,
   cornerRadius = 0,
-  padAngle = 0
+  padAngle = 0,
 ): string {
   return (
     generator({

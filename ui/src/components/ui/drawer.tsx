@@ -1,48 +1,32 @@
 "use client";
 
-import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
 import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer";
 import { mergeProps } from "@base-ui/react/merge-props";
-import { Radio as RadioPrimitive } from "@base-ui/react/radio";
-import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group";
 import { useRender } from "@base-ui/react/use-render";
+import { XIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CheckIcon, ChevronRightIcon, XIcon } from "@hugeicons/core-free-icons";
 import type React from "react";
 import { createContext, useCallback, useContext } from "react";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { OVERLAY_CLOSE_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
-import {
-  POPUP_BUTTON_ROW_CLASS,
-  POPUP_GROUP_LABEL_CLASS,
-  POPUP_SEPARATOR_CLASS,
-  POPUP_SWITCH_THUMB_CLASS,
-  POPUP_SWITCH_TRACK_CLASS,
-} from "@/components/ui/popup-row";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 type DrawerPosition = "right" | "left" | "top" | "bottom";
 
-const DrawerContext: React.Context<{ position: DrawerPosition }> =
-  createContext<{ position: DrawerPosition }>({
-    position: "bottom",
-  });
+const DrawerContext: React.Context<{ position: DrawerPosition }> = createContext<{
+  position: DrawerPosition;
+}>({
+  position: "bottom",
+});
 
-const directionMap: Record<
-  DrawerPosition,
-  DrawerPrimitive.Root.Props["swipeDirection"]
-> = {
+const directionMap: Record<DrawerPosition, DrawerPrimitive.Root.Props["swipeDirection"]> = {
   bottom: "down",
   left: "left",
   right: "right",
   top: "up",
 };
-
-export const DrawerCreateHandle: typeof DrawerPrimitive.createHandle =
-  DrawerPrimitive.createHandle;
 
 export function Drawer({
   swipeDirection,
@@ -53,56 +37,14 @@ export function Drawer({
 }): React.ReactElement {
   return (
     <DrawerContext.Provider value={{ position }}>
-      <DrawerPrimitive.Root
-        swipeDirection={swipeDirection ?? directionMap[position]}
-        {...props}
-      />
+      <DrawerPrimitive.Root swipeDirection={swipeDirection ?? directionMap[position]} {...props} />
     </DrawerContext.Provider>
   );
 }
 
-export const DrawerPortal: typeof DrawerPrimitive.Portal =
-  DrawerPrimitive.Portal;
+const DrawerPortal: typeof DrawerPrimitive.Portal = DrawerPrimitive.Portal;
 
-export function DrawerTrigger(
-  props: DrawerPrimitive.Trigger.Props,
-): React.ReactElement {
-  return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />;
-}
-
-export function DrawerClose(
-  props: DrawerPrimitive.Close.Props,
-): React.ReactElement {
-  return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />;
-}
-
-export function DrawerSwipeArea({
-  className,
-  position: positionProp,
-  ...props
-}: DrawerPrimitive.SwipeArea.Props & {
-  position?: DrawerPosition;
-}): React.ReactElement {
-  const { position: contextPosition } = useContext(DrawerContext);
-  const position = positionProp ?? contextPosition;
-
-  return (
-    <DrawerPrimitive.SwipeArea
-      className={cn(
-        "fixed z-50 touch-none",
-        position === "bottom" && "inset-x-0 bottom-0 h-8",
-        position === "top" && "inset-x-0 top-0 h-8",
-        position === "left" && "inset-y-0 left-0 w-8",
-        position === "right" && "inset-y-0 right-0 w-8",
-        className,
-      )}
-      data-slot="drawer-swipe-area"
-      {...props}
-    />
-  );
-}
-
-export function DrawerBackdrop({
+function DrawerBackdrop({
   className,
   ...props
 }: DrawerPrimitive.Backdrop.Props): React.ReactElement {
@@ -118,7 +60,7 @@ export function DrawerBackdrop({
   );
 }
 
-export function DrawerViewport({
+function DrawerViewport({
   className,
   position,
   variant = "default",
@@ -193,10 +135,10 @@ function animateContentHeight(popup: HTMLElement): () => void {
     ) {
       return;
     }
-    const animation = popup.animate(
-      [{ height: `${from}px` }, { height: `${nextBorder}px` }],
-      { duration: DRAWER_DURATION_MS, easing: DRAWER_EASING },
-    );
+    const animation = popup.animate([{ height: `${from}px` }, { height: `${nextBorder}px` }], {
+      duration: DRAWER_DURATION_MS,
+      easing: DRAWER_EASING,
+    });
     running = animation;
     const settle = (): void => {
       if (running === animation) running = null;
@@ -267,9 +209,9 @@ export function DrawerPopup({
             position === "top" &&
               "data-starting-style:transform-[translateY(calc(-100%-var(--inset)))] data-ending-style:transform-[translateY(calc(-100%-var(--inset)))] transform-[translateY(var(--drawer-swipe-movement-y))] border-b after:inset-x-0 after:bottom-full after:h-(--bleed) has-data-[slot=drawer-bar]:pb-2",
             position === "left" &&
-              "data-starting-style:transform-[translateX(calc(-100%-var(--inset)))] data-ending-style:transform-[translateX(calc(-100%-var(--inset)))] transform-[translateX(var(--drawer-swipe-movement-x))] w-[calc(100%-(--spacing(12)))] max-w-md border-e after:inset-y-0 after:end-full after:w-(--bleed) has-data-[slot=drawer-bar]:pe-2",
+              "data-starting-style:transform-[translateX(calc(-100%-var(--inset)))] data-ending-style:transform-[translateX(calc(-100%-var(--inset)))] transform-[translateX(var(--drawer-swipe-movement-x))] w-[calc(100%-(--spacing(12)))] max-w-md border-e after:inset-y-0 after:inset-e-full after:w-(--bleed) has-data-[slot=drawer-bar]:pe-2",
             position === "right" &&
-              "transform-[translateX(var(--drawer-swipe-movement-x))] data-ending-style:transform-[translateX(calc(100%+var(--inset)))] data-starting-style:transform-[translateX(calc(100%+var(--inset)))] col-start-2 w-[calc(100%-(--spacing(12)))] max-w-md border-s after:inset-y-0 after:start-full after:w-(--bleed) has-data-[slot=drawer-bar]:ps-2",
+              "transform-[translateX(var(--drawer-swipe-movement-x))] data-ending-style:transform-[translateX(calc(100%+var(--inset)))] data-starting-style:transform-[translateX(calc(100%+var(--inset)))] col-start-2 w-[calc(100%-(--spacing(12)))] max-w-md border-s after:inset-y-0 after:inset-s-full after:w-(--bleed) has-data-[slot=drawer-bar]:ps-2",
             variant !== "straight" &&
               cn(
                 position === "bottom" && "rounded-t-2xl",
@@ -282,14 +224,10 @@ export function DrawerPopup({
               ),
             variant === "default" &&
               cn(
-                position === "bottom" &&
-                  "before:rounded-t-[calc(var(--radius-2xl)-1px)]",
-                position === "top" &&
-                  "before:rounded-b-[calc(var(--radius-2xl)-1px)]",
-                position === "left" &&
-                  "before:rounded-e-[calc(var(--radius-2xl)-1px)]",
-                position === "right" &&
-                  "before:rounded-s-[calc(var(--radius-2xl)-1px)]",
+                position === "bottom" && "before:rounded-t-[calc(var(--radius-2xl)-1px)]",
+                position === "top" && "before:rounded-b-[calc(var(--radius-2xl)-1px)]",
+                position === "left" && "before:rounded-e-[calc(var(--radius-2xl)-1px)]",
+                position === "right" && "before:rounded-s-[calc(var(--radius-2xl)-1px)]",
               ),
             variant === "inset" &&
               "before:hidden sm:rounded-2xl sm:border sm:after:bg-transparent sm:before:rounded-[calc(var(--radius-2xl)-1px)] sm:**:data-[slot=drawer-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
@@ -337,69 +275,10 @@ export function DrawerPopup({
   );
 
   return position === "bottom" ? (
-    <DrawerPrimitive.VirtualKeyboardProvider>
-      {popup}
-    </DrawerPrimitive.VirtualKeyboardProvider>
+    <DrawerPrimitive.VirtualKeyboardProvider>{popup}</DrawerPrimitive.VirtualKeyboardProvider>
   ) : (
     popup
   );
-}
-
-export function DrawerHeader({
-  className,
-  allowSelection = false,
-  render,
-  ...props
-}: useRender.ComponentProps<"div"> & {
-  allowSelection?: boolean;
-}): React.ReactElement {
-  const defaultProps = {
-    className: cn(
-      // 24 px round (16 px at the sides on phones), 12 px above a panel at every width. Once the
-      // panel scrolls, a hairline under the header marks where the content runs beneath it.
-      "flex flex-col gap-2 border-transparent border-b p-6 transition-colors max-sm:px-4 max-sm:pb-4 in-[[data-slot=drawer-popup]:has([data-slot=drawer-panel])]:pb-3 max-sm:in-[[data-slot=drawer-popup]:has([data-slot=drawer-panel])]:pb-3 in-[[data-slot=drawer-popup]:has([data-slot=scroll-area-content][data-overflow-y-start]>[data-slot=drawer-panel])]:border-border-subtle in-[[data-slot=drawer-popup]:has(>[data-slot=drawer-dismiss])]:pe-14",
-      !allowSelection && "cursor-default",
-      className,
-    ),
-    "data-slot": "drawer-header",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render: allowSelection ? <DrawerContent render={render} /> : render,
-  });
-}
-
-export function DrawerFooter({
-  className,
-  variant = "default",
-  allowSelection = true,
-  render,
-  ...props
-}: useRender.ComponentProps<"div"> & {
-  variant?: "default" | "bare";
-  allowSelection?: boolean;
-}): React.ReactElement {
-  const defaultProps = {
-    className: cn(
-      // Phones: Cancel and the main action share one row of two (dialog.tsx DialogFooter).
-      "grid grid-cols-2 gap-2 px-6 pb-(--safe-area-inset-bottom,0px) max-sm:px-4 max-sm:[&>:last-child:nth-child(odd)]:col-span-2 sm:flex sm:flex-row sm:justify-end",
-      !allowSelection && "cursor-default",
-      variant === "default" &&
-        "border-t border-border-subtle bg-surface-inset pt-4 pb-[calc(var(--drawer-safe-bottom,env(safe-area-inset-bottom,0px))+--spacing(4))]",
-      variant === "bare" &&
-        "in-[[data-slot=drawer-popup]:has([data-slot=drawer-panel])]:pt-3 pt-4 pb-[calc(var(--drawer-safe-bottom,env(safe-area-inset-bottom,0px))+--spacing(6))]",
-      className,
-    ),
-    "data-slot": "drawer-footer",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render: allowSelection ? <DrawerContent render={render} /> : render,
-  });
 }
 
 export function DrawerTitle({
@@ -415,63 +294,7 @@ export function DrawerTitle({
   );
 }
 
-export function DrawerDescription({
-  className,
-  ...props
-}: DrawerPrimitive.Description.Props): React.ReactElement {
-  return (
-    <DrawerPrimitive.Description
-      className={cn("text-pretty text-muted-foreground text-sm leading-relaxed", className)}
-      data-slot="drawer-description"
-      {...props}
-    />
-  );
-}
-
-export function DrawerPanel({
-  className,
-  scrollFade = true,
-  scrollable = true,
-  allowSelection = true,
-  render,
-  ...props
-}: useRender.ComponentProps<"div"> & {
-  scrollFade?: boolean;
-  scrollable?: boolean;
-  allowSelection?: boolean;
-}): React.ReactElement {
-  const defaultProps = {
-    className: cn(
-      "p-6 max-sm:px-4 in-[[data-slot=drawer-popup]:has([data-slot=drawer-header])]:pt-1 in-[[data-slot=drawer-popup]:has([data-slot=drawer-footer]:not(.border-t))]:pb-1",
-      !allowSelection && "cursor-default",
-      className,
-    ),
-    "data-slot": "drawer-panel",
-  };
-
-  const content = useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render: allowSelection ? <DrawerContent render={render} /> : render,
-  });
-
-  if (scrollable) {
-    // The popup reserves keyboard space; extra viewport padding would overflow the panel.
-    return (
-      <ScrollArea
-        className="touch-auto *:data-[slot=scroll-area-viewport]:pb-0!"
-        overscrollContain
-        scrollFade={scrollFade}
-      >
-        {content}
-      </ScrollArea>
-    );
-  }
-
-  return content;
-}
-
-export function DrawerBar({
+function DrawerBar({
   className,
   position: positionProp,
   render,
@@ -486,9 +309,7 @@ export function DrawerBar({
     "aria-hidden": true as const,
     className: cn(
       "absolute flex touch-none items-center justify-center p-3 before:rounded-full before:bg-input",
-      horizontal
-        ? "inset-y-0 before:h-12 before:w-1"
-        : "inset-x-0 before:h-1 before:w-12",
+      horizontal ? "inset-y-0 before:h-12 before:w-1" : "inset-x-0 before:h-1 before:w-12",
       position === "top" && "bottom-0",
       position === "bottom" && "top-0",
       position === "left" && "right-0",
@@ -504,225 +325,3 @@ export function DrawerBar({
     render,
   });
 }
-
-export const DrawerContent: typeof DrawerPrimitive.Content =
-  DrawerPrimitive.Content;
-
-export function DrawerMenu({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"nav">): React.ReactElement {
-  const defaultProps = {
-    className: cn("-m-2 flex flex-col", className),
-    "data-slot": "drawer-menu",
-  };
-
-  return useRender({
-    defaultTagName: "nav",
-    props: mergeProps<"nav">(defaultProps, props),
-    render,
-  });
-}
-
-export function DrawerMenuItem({
-  className,
-  variant = "default",
-  render,
-  disabled,
-  ...props
-}: useRender.ComponentProps<"button"> & {
-  variant?: "default" | "destructive";
-}): React.ReactElement {
-  const defaultProps = {
-    className: cn(
-      // The popup row (popup-row.tsx) as a button; icons muted, as menu action rows.
-      POPUP_BUTTON_ROW_CLASS,
-      "data-[variant=destructive]:text-destructive-foreground [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current",
-      className,
-    ),
-    "data-slot": "drawer-menu-item",
-    "data-variant": variant,
-    disabled,
-    type: "button" as const,
-  };
-
-  return useRender({
-    defaultTagName: "button",
-    props: mergeProps<"button">(defaultProps, props),
-    render,
-  });
-}
-
-export function DrawerMenuSeparator({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"div">): React.ReactElement {
-  const defaultProps = {
-    className: cn(POPUP_SEPARATOR_CLASS, className),
-    "data-slot": "drawer-menu-separator",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
-}
-
-export function DrawerMenuGroup({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"div">): React.ReactElement {
-  const defaultProps = {
-    className: cn("flex flex-col", className),
-    "data-slot": "drawer-menu-group",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
-}
-
-export function DrawerMenuGroupLabel({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"div">): React.ReactElement {
-  const defaultProps = {
-    className: cn(POPUP_GROUP_LABEL_CLASS, className),
-    "data-slot": "drawer-menu-group-label",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
-}
-
-export function DrawerMenuTrigger({
-  className,
-  children,
-  ...props
-}: DrawerPrimitive.Trigger.Props): React.ReactElement {
-  return (
-    <DrawerTrigger
-      className={cn(
-        POPUP_BUTTON_ROW_CLASS,
-        "[&_svg:not([class*='text-'])]:text-muted-foreground",
-        className,
-      )}
-      data-slot="drawer-menu-trigger"
-      {...props}
-    >
-      {children}
-      <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" className="-me-1 ms-auto" />
-    </DrawerTrigger>
-  );
-}
-
-export function DrawerMenuCheckboxItem({
-  className,
-  children,
-  checked,
-  defaultChecked,
-  onCheckedChange,
-  variant = "default",
-  disabled,
-  render,
-  ...props
-}: CheckboxPrimitive.Root.Props & {
-  variant?: "default" | "switch";
-  render?: React.ReactElement;
-}): React.ReactElement {
-  return (
-    <CheckboxPrimitive.Root
-      checked={checked}
-      className={cn(
-        POPUP_BUTTON_ROW_CLASS,
-        "grid",
-        variant === "switch"
-          ? "grid-cols-[minmax(0,1fr)_auto] gap-4 pe-1.5 data-checked:text-foreground"
-          : "grid-cols-[1rem_minmax(0,1fr)] pe-4",
-        className,
-      )}
-      data-slot="drawer-menu-checkbox-item"
-      defaultChecked={defaultChecked}
-      disabled={disabled}
-      onCheckedChange={onCheckedChange}
-      render={render}
-      {...props}
-    >
-      {variant === "switch" ? (
-        <>
-          <span className="wrap-anywhere col-start-1 min-w-0">{children}</span>
-          <CheckboxPrimitive.Indicator
-            className={cn("col-start-2", POPUP_SWITCH_TRACK_CLASS)}
-            keepMounted
-          >
-            <span className={POPUP_SWITCH_THUMB_CLASS} />
-          </CheckboxPrimitive.Indicator>
-        </>
-      ) : (
-        <>
-          <CheckboxPrimitive.Indicator className="col-start-1">
-            <HugeiconsIcon aria-hidden="true" icon={CheckIcon} />
-          </CheckboxPrimitive.Indicator>
-          <span className="wrap-anywhere col-start-2 min-w-0">{children}</span>
-        </>
-      )}
-    </CheckboxPrimitive.Root>
-  );
-}
-
-export function DrawerMenuRadioGroup({
-  className,
-  ...props
-}: RadioGroupPrimitive.Props): React.ReactElement {
-  return (
-    <RadioGroupPrimitive
-      className={cn("flex flex-col", className)}
-      data-slot="drawer-menu-radio-group"
-      {...props}
-    />
-  );
-}
-
-export function DrawerMenuRadioItem({
-  className,
-  children,
-  value,
-  disabled,
-  render,
-  ...props
-}: RadioPrimitive.Root.Props & {
-  value: string;
-  render?: React.ReactElement;
-}): React.ReactElement {
-  return (
-    <RadioPrimitive.Root
-      className={cn(
-        POPUP_BUTTON_ROW_CLASS,
-        "grid grid-cols-[1rem_minmax(0,1fr)] pe-4",
-        className,
-      )}
-      data-slot="drawer-menu-radio-item"
-      disabled={disabled}
-      render={render}
-      value={value}
-      {...props}
-    >
-      <RadioPrimitive.Indicator className="col-start-1">
-        <HugeiconsIcon aria-hidden="true" icon={CheckIcon} />
-      </RadioPrimitive.Indicator>
-      <span className="wrap-anywhere col-start-2 min-w-0">{children}</span>
-    </RadioPrimitive.Root>
-  );
-}
-
-export { DrawerPrimitive };

@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useChartStable } from "./chart-context";
 import { areaClosedD } from "./line-path";
 
-export interface PatternAreaProps {
+interface PatternAreaProps {
   /** Key in data to use for y values */
   dataKey: string;
   /** Fill color or pattern URL (e.g. `url(#pattern-id)`) */
@@ -20,11 +20,7 @@ export interface PatternAreaProps {
  * Filled area using an SVG pattern (`url(#id)`).
  * Pair with `PatternLines` in `AreaChart` children and an `Area` with `fillOpacity={0}` for the stroke line.
  */
-export function PatternArea({
-  dataKey,
-  fill,
-  curve = curveMonotoneX,
-}: PatternAreaProps) {
+export function PatternArea({ dataKey, fill, curve = curveMonotoneX }: PatternAreaProps) {
   const { renderData, xScale, yScale, xAccessor } = useChartStable();
 
   const d = useMemo(
@@ -38,12 +34,10 @@ export function PatternArea({
         },
         yScale,
       }),
-    [curve, dataKey, renderData, xAccessor, xScale, yScale]
+    [curve, dataKey, renderData, xAccessor, xScale, yScale],
   );
 
   return <path d={d} fill={fill} />;
 }
 
 PatternArea.displayName = "PatternArea";
-
-export default PatternArea;

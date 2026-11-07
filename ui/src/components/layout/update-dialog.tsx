@@ -6,6 +6,7 @@ import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import type { RemoteVersionJson } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { keyByText } from "@/lib/utils";
 import { GITHUB_URL } from "./user-menu";
 
 /*
@@ -37,28 +38,31 @@ const LEADING_BULLET = /^[-*•]\s+/;
 /** "New:", "Fixed:" and the like, set in medium weight. */
 const LEADING_TAG = /^((?:new|fixed|fix|changed|improved|removed|breaking|security)\s*:)\s*/i;
 
-export interface ChangelogLine {
+interface ChangelogLine {
+  /** The line's text, numbered when it repeats (keyByText). */
+  key: string;
   marker: string | null;
   tag: string | null;
   text: string;
 }
 
 /** One list item per non-empty changelog line: its emoji marker, a "Fixed:" tag, the text. */
-export function parseChangelog(changelog: string): ChangelogLine[] {
-  return changelog
+function parseChangelog(changelog: string): ChangelogLine[] {
+  const lines = changelog
     .split(/\r?\n/)
     .map((line) => line.trim().replace(LEADING_BULLET, ""))
-    .filter(Boolean)
-    .map((line) => {
-      const emoji = LEADING_EMOJI.exec(line);
-      const rest = emoji ? line.slice(emoji[0].length) : line;
-      const tag = LEADING_TAG.exec(rest);
-      return {
-        marker: emoji ? emoji[1] : null,
-        tag: tag ? tag[1] : null,
-        text: tag ? rest.slice(tag[0].length) : rest,
-      };
-    });
+    .filter(Boolean);
+  return keyByText(lines, (line) => line).map(({ key, item: line }) => {
+    const emoji = LEADING_EMOJI.exec(line);
+    const rest = emoji ? line.slice(emoji[0].length) : line;
+    const tag = LEADING_TAG.exec(rest);
+    return {
+      key,
+      marker: emoji ? emoji[1] : null,
+      tag: tag ? tag[1] : null,
+      text: tag ? rest.slice(tag[0].length) : rest,
+    };
+  });
 }
 
 export function UpdateDialog({
@@ -117,19 +121,15 @@ export function UpdateDialog({
                 18rem. Phones show it whole and the dialog's own panel scrolls instead (90dvh):
                 no scroller inside a scroller, and no cut that falls between two items unseen. */}
             <ul className="scroll-fade-y -me-2 flex flex-col gap-2.5 pe-2 sm:max-h-72 sm:overflow-y-auto">
-              {parseChangelog(changelog).map((line, index) => (
-                <li
-                  className="flex gap-2.5 text-sm leading-relaxed"
-                  // biome-ignore lint/suspicious/noArrayIndexKey: changelog lines are static text and may repeat.
-                  key={index}
-                >
+              {parseChangelog(changelog).map((line) => (
+                <li className="flex gap-2.5 text-sm leading-relaxed" key={line.key}>
                   <span
                     aria-hidden="true"
                     className="flex h-lh w-5 shrink-0 items-center justify-center leading-relaxed"
                   >
                     {line.marker ?? <span className="size-1.5 rounded-full bg-muted-foreground" />}
                   </span>
-                  <span className="min-w-0 text-pretty break-words text-foreground/90">
+                  <span className="min-w-0 text-pretty wrap-break-word text-foreground/90">
                     {line.tag ? (
                       <span className="font-medium text-foreground">{line.tag} </span>
                     ) : null}

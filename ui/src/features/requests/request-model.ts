@@ -16,7 +16,7 @@ export const DEFAULT_ORDER = "desc" as const;
 export const PAGE_SIZES = [25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
 
-export const ERROR_TYPES: readonly RequestErrorType[] = [
+const ERROR_TYPES: readonly RequestErrorType[] = [
   "client_closed",
   "api_key_limit",
   "overage",
@@ -33,7 +33,7 @@ export const ERROR_TYPES: readonly RequestErrorType[] = [
   "unknown",
 ];
 
-export const ENDPOINTS: readonly RequestEndpoint[] = ["claude", "openai", "responses"];
+const ENDPOINTS: readonly RequestEndpoint[] = ["claude", "openai", "responses"];
 
 export type ErrorTone = "muted" | "warning" | "destructive";
 

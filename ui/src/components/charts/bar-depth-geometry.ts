@@ -8,10 +8,10 @@
 
 /** Hard ceiling on side-face thickness in px. Capped further by the column gap
  * so depth never bleeds past the next bar's leading edge. */
-export const BAR_DEPTH_MAX_PX = 7;
+const BAR_DEPTH_MAX_PX = 7;
 /** The side parallelogram's back edge lifts by `depth * this ratio`, giving a
  * subtle head-on perspective slope. */
-export const BAR_DEPTH_PERSPECTIVE_RATIO = 0.45;
+const BAR_DEPTH_PERSPECTIVE_RATIO = 0.45;
 
 /**
  * Maximum side-face depth in px for a chart, clamped so depth never spills past
@@ -35,7 +35,7 @@ export function barDepthMaxDepth(stepWidth: number, bandWidth: number): number {
 export function barDepthAndRise(
   absOffset: number,
   naturalHeight: number,
-  maxDepth: number
+  maxDepth: number,
 ): { depth: number; perspectiveRise: number } {
   const offset = Math.min(1, Math.max(0, absOffset));
   const cappedMaxDepth = Math.min(maxDepth, Math.max(0, naturalHeight));

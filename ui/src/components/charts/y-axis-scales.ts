@@ -4,8 +4,6 @@ import type { LineConfig } from "./chart-context";
 /** Default axis id when `yAxisId` is omitted (Recharts-style `0` / primary left axis). */
 export const DEFAULT_Y_AXIS_ID = "left";
 
-export type YAxisOrientation = "left" | "right";
-
 export function normalizeYAxisId(id?: string | number): string {
   if (id == null || id === "") {
     return DEFAULT_Y_AXIS_ID;
@@ -13,9 +11,7 @@ export function normalizeYAxisId(id?: string | number): string {
   return String(id);
 }
 
-export function groupLinesByYAxisId(
-  lines: LineConfig[]
-): Map<string, LineConfig[]> {
+export function groupLinesByYAxisId(lines: LineConfig[]): Map<string, LineConfig[]> {
   const groups = new Map<string, LineConfig[]>();
   for (const line of lines) {
     const axisId = normalizeYAxisId(line.yAxisId);
@@ -28,10 +24,7 @@ export function groupLinesByYAxisId(
 
 type YScale = ScaleLinear<number, number>;
 
-export function getPrimaryYScale(
-  yScales: Record<string, YScale>,
-  fallback: YScale
-): YScale {
+export function getPrimaryYScale(yScales: Record<string, YScale>, fallback: YScale): YScale {
   const primary = yScales[DEFAULT_Y_AXIS_ID];
   if (primary) {
     return primary;
@@ -57,17 +50,11 @@ export function buildYScalesForLines({
   for (const [axisId, axisLines] of groups) {
     const dataKeys = axisLines.map((line) => line.dataKey);
     const domain = resolveDomain(dataKeys);
-    scales[axisId] = scaleLinear()
-      .domain(domain)
-      .nice()
-      .range([innerHeight, 0]);
+    scales[axisId] = scaleLinear().domain(domain).nice().range([innerHeight, 0]);
   }
 
   if (!scales[DEFAULT_Y_AXIS_ID]) {
-    scales[DEFAULT_Y_AXIS_ID] = scaleLinear()
-      .domain([0, 100])
-      .nice()
-      .range([innerHeight, 0]);
+    scales[DEFAULT_Y_AXIS_ID] = scaleLinear().domain([0, 100]).nice().range([innerHeight, 0]);
   }
 
   return scales;
@@ -88,9 +75,7 @@ export function buildYScalesFromDomains({
 
   for (const [axisId] of groups) {
     const domain =
-      domainsByAxis[axisId] ??
-      domainsByAxis[DEFAULT_Y_AXIS_ID] ??
-      ([0, 100] as [number, number]);
+      domainsByAxis[axisId] ?? domainsByAxis[DEFAULT_Y_AXIS_ID] ?? ([0, 100] as [number, number]);
     scales[axisId] = scaleLinear().domain(domain).range([innerHeight, 0]);
   }
 

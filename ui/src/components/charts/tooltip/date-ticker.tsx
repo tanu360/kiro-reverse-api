@@ -20,11 +20,7 @@ const TICKER_SPRING = { stiffness: 400, damping: 35 };
 const COMPACT_TICKER_THRESHOLD = 60;
 
 /** Retarget a spring, or snap it when motion should be instant. */
-function driveSpring(
-  value: MotionValue<number>,
-  target: number,
-  instant: boolean
-) {
+function driveSpring(value: MotionValue<number>, target: number, instant: boolean) {
   if (instant) {
     value.jump(target);
   } else {
@@ -50,11 +46,7 @@ function toSegments(values: readonly string[]): TickerSegment[] {
 }
 
 /** Index of the segment containing label `index` (0 when out of range). */
-function segmentIndexAt(
-  segments: readonly TickerSegment[],
-  index: number,
-  total: number
-) {
+function segmentIndexAt(segments: readonly TickerSegment[], index: number, total: number) {
   if (index < 0 || index >= total) {
     return 0;
   }
@@ -83,7 +75,7 @@ function useActiveItemWidth(
   activeIndex: number,
   width: MotionValue<number>,
   reduceMotion: boolean,
-  cacheKey?: string
+  cacheKey?: string,
 ) {
   const widthsRef = useRef<number[]>([]);
   const activeIndexRef = useRef(activeIndex);
@@ -91,6 +83,8 @@ function useActiveItemWidth(
   const cacheKeyRef = useRef(cacheKey);
   const fontsPendingRef = useRef(false);
   const mountedRef = useRef(true);
+  // The latest measure, so a font load that lands later measures the current items.
+  const measureRef = useRef<((snap: boolean) => void) | null>(null);
   // Synced before the measure effect below (layout effects run in order).
   useLayoutEffect(() => {
     activeIndexRef.current = activeIndex;
@@ -104,18 +98,16 @@ function useActiveItemWidth(
     };
   }, []);
 
-  // `items` is a dep (unused in the body): new items change the rendered
-  // stack, so re-measure.
+  // New items change the rendered stack, so re-measure.
   useLayoutEffect(() => {
     const measure = (snap: boolean) => {
       const stack = stackRef.current;
       if (!(mountedRef.current && stack)) {
         return;
       }
-      widthsRef.current = Array.from(
-        stack.querySelectorAll<HTMLElement>("[data-ticker-item]"),
-        (node) => node.getBoundingClientRect().width
-      );
+      // The stack renders one `[data-ticker-item]` per item, in order.
+      const nodes = stack.querySelectorAll<HTMLElement>("[data-ticker-item]");
+      widthsRef.current = items.map((_, index) => nodes[index]?.getBoundingClientRect().width ?? 0);
       const key = cacheKeyRef.current;
       if (key !== undefined) {
         widthCacheRef.current ??= new Map();
@@ -128,9 +120,9 @@ function useActiveItemWidth(
       // First measure snaps so the pill never grows in from zero.
       driveSpring(width, next, snap || reduceMotion);
     };
+    measureRef.current = measure;
 
-    const cached =
-      cacheKey === undefined ? undefined : widthCacheRef.current?.get(cacheKey);
+    const cached = cacheKey === undefined ? undefined : widthCacheRef.current?.get(cacheKey);
     if (cached) {
       widthsRef.current = cached;
       const next = cached[activeIndexRef.current];
@@ -149,7 +141,7 @@ function useActiveItemWidth(
       fonts.ready.then(() => {
         fontsPendingRef.current = false;
         widthCacheRef.current?.clear();
-        measure(false);
+        measureRef.current?.(false);
       });
     }
   }, [stackRef, items, width, reduceMotion, cacheKey]);
@@ -164,7 +156,7 @@ function useActiveItemWidth(
   }, [activeIndex, width, reduceMotion]);
 }
 
-export interface DateTickerProps {
+interface DateTickerProps {
   currentIndex: number;
   labels: string[];
   visible: boolean;
@@ -217,23 +209,15 @@ const DateTickerInner = memo(function DateTickerInner({
   // still until it actually changes instead of scrolling through repeats.
   const monthSegments = useMemo(
     () => toSegments(parsedLabels.map((label) => label.month)),
-    [parsedLabels]
+    [parsedLabels],
   );
   const daySegments = useMemo(
     () => toSegments(parsedLabels.map((label) => label.day)),
-    [parsedLabels]
+    [parsedLabels],
   );
 
-  const currentMonthIndex = segmentIndexAt(
-    monthSegments,
-    currentIndex,
-    parsedLabels.length
-  );
-  const currentDayIndex = segmentIndexAt(
-    daySegments,
-    currentIndex,
-    parsedLabels.length
-  );
+  const currentMonthIndex = segmentIndexAt(monthSegments, currentIndex, parsedLabels.length);
+  const currentDayIndex = segmentIndexAt(daySegments, currentIndex, parsedLabels.length);
 
   // Animated Y offsets
   const dayY = useSpring(0, TICKER_SPRING);
@@ -244,20 +228,8 @@ const DateTickerInner = memo(function DateTickerInner({
   const dayStackRef = useRef<HTMLDivElement>(null);
   const monthWidth = useSpring(0, TICKER_SPRING);
   const dayWidth = useSpring(0, TICKER_SPRING);
-  useActiveItemWidth(
-    monthStackRef,
-    monthSegments,
-    currentMonthIndex,
-    monthWidth,
-    reduceMotion
-  );
-  useActiveItemWidth(
-    dayStackRef,
-    daySegments,
-    currentDayIndex,
-    dayWidth,
-    reduceMotion
-  );
+  useActiveItemWidth(monthStackRef, monthSegments, currentMonthIndex, monthWidth, reduceMotion);
+  useActiveItemWidth(dayStackRef, daySegments, currentDayIndex, dayWidth, reduceMotion);
 
   // Scroll the stacks to the active day / month before paint.
   useLayoutEffect(() => {
@@ -273,10 +245,7 @@ const DateTickerInner = memo(function DateTickerInner({
       <div className="relative h-4 overflow-hidden">
         <div className="flex items-center justify-center gap-1">
           {/* Month stack */}
-          <m.div
-            className="relative h-4 overflow-hidden"
-            style={{ width: monthWidth }}
-          >
+          <m.div className="relative h-4 overflow-hidden" style={{ width: monthWidth }}>
             <m.div
               className="absolute top-0 left-1/2 flex flex-col items-center"
               ref={monthStackRef}
@@ -288,19 +257,14 @@ const DateTickerInner = memo(function DateTickerInner({
                   data-ticker-item
                   key={segment.key}
                 >
-                  <span className="whitespace-nowrap">
-                    {segment.value}
-                  </span>
+                  <span className="whitespace-nowrap">{segment.value}</span>
                 </div>
               ))}
             </m.div>
           </m.div>
 
           {/* Second-part stack (day or year) */}
-          <m.div
-            className="relative h-4 overflow-hidden"
-            style={{ width: dayWidth }}
-          >
+          <m.div className="relative h-4 overflow-hidden" style={{ width: dayWidth }}>
             <m.div
               className="absolute top-0 left-1/2 flex flex-col items-center"
               ref={dayStackRef}
@@ -312,9 +276,7 @@ const DateTickerInner = memo(function DateTickerInner({
                   data-ticker-item
                   key={segment.key}
                 >
-                  <span className="whitespace-nowrap">
-                    {segment.value}
-                  </span>
+                  <span className="whitespace-nowrap">{segment.value}</span>
                 </div>
               ))}
             </m.div>
@@ -343,5 +305,3 @@ export function DateTicker({ currentIndex, labels, visible }: DateTickerProps) {
 }
 
 DateTicker.displayName = "DateTicker";
-
-export default DateTicker;

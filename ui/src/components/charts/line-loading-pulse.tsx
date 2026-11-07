@@ -4,12 +4,9 @@ import { animate, m, useMotionValue, useTransform } from "motion/react";
 import { useEffect, useId } from "react";
 import { chartCssVars, useChartStable } from "./chart-context";
 import type { ChartPhase } from "./chart-phase";
+import { fadeGradientStops, resolveFadeSides, viewportFadeGradientAttrs } from "./fade-edges";
 import {
-  fadeGradientStops,
-  resolveFadeSides,
-  viewportFadeGradientAttrs,
-} from "./fade-edges";
-import {
+  LINE_LOADING_LOOP_PAUSE_MS,
   LINE_LOADING_PULSE_CYCLE_S,
   LINE_LOADING_PULSE_EASE,
 } from "./line-loading-timing";
@@ -18,9 +15,7 @@ const CLIP_PADDING = 10;
 
 export type LineLoadingPulseMode = "loop" | "exit" | "enter";
 
-export function resolveLineLoadingPulseMode(
-  phase: ChartPhase
-): LineLoadingPulseMode | null {
+export function resolveLineLoadingPulseMode(phase: ChartPhase): LineLoadingPulseMode | null {
   switch (phase) {
     case "loading":
       return "loop";
@@ -33,24 +28,18 @@ export function resolveLineLoadingPulseMode(
   }
 }
 
-export interface LineLoadingPulseStrokeProps {
+interface LineLoadingPulseStrokeProps {
   pathD: string;
   mode?: LineLoadingPulseMode;
-  /** Bumps to restart loop cycles without remounting the stroke. */
-  loopEpoch?: number;
   stroke?: string;
   /** Stroke opacity for the animated segment. Default: 0.5 */
   strokeOpacity?: number;
   strokeWidth?: number;
+  /** Called when an `"exit"` or `"enter"` pass ends; `"loop"` repeats on its own. */
   onCycleComplete?: () => void;
 }
 
-function useGrowExitClip(
-  innerWidth: number,
-  mode: LineLoadingPulseMode,
-  loopEpoch: number,
-  onComplete?: () => void
-) {
+function useGrowExitClip(innerWidth: number, mode: LineLoadingPulseMode, onComplete?: () => void) {
   const progress = useMotionValue(0);
   const paddedFullWidth = innerWidth + CLIP_PADDING * 2;
   const rightEdge = innerWidth + CLIP_PADDING;
@@ -71,7 +60,6 @@ function useGrowExitClip(
     return rightEdge - (1 - shrink) * paddedFullWidth;
   });
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: loopEpoch restarts pulse when orchestrator advances
   useEffect(() => {
     if (innerWidth <= 0) {
       return;
@@ -97,14 +85,24 @@ function useGrowExitClip(
     };
 
     if (mode === "loop") {
-      progress.set(0);
-      controls = animate(progress, 1, {
-        duration: LINE_LOADING_PULSE_CYCLE_S,
-        ease: [...LINE_LOADING_PULSE_EASE],
-        onComplete: finish,
-      });
+      // Each cycle restarts from 0 after a short idle gap, without remounting.
+      let pauseId: number | undefined;
+      const runCycle = () => {
+        progress.set(0);
+        controls = animate(progress, 1, {
+          duration: LINE_LOADING_PULSE_CYCLE_S,
+          ease: [...LINE_LOADING_PULSE_EASE],
+          onComplete: () => {
+            if (!cancelled) {
+              pauseId = window.setTimeout(runCycle, LINE_LOADING_LOOP_PAUSE_MS);
+            }
+          },
+        });
+      };
+      runCycle();
       return () => {
         cancelled = true;
+        window.clearTimeout(pauseId);
         controls?.stop();
       };
     }
@@ -145,7 +143,7 @@ function useGrowExitClip(
         controls?.stop();
       };
     }
-  }, [innerWidth, loopEpoch, mode, onComplete, progress]);
+  }, [innerWidth, mode, onComplete, progress]);
 
   return { clipX, clipWidth };
 }
@@ -153,7 +151,6 @@ function useGrowExitClip(
 export function LineLoadingPulseStroke({
   pathD,
   mode = "loop",
-  loopEpoch = 0,
   stroke = chartCssVars.foreground,
   strokeOpacity = 0.5,
   strokeWidth = 2.5,
@@ -165,12 +162,7 @@ export function LineLoadingPulseStroke({
   const gradientId = `line-loading-gradient-${reactId}`;
   const fadeStops = fadeGradientStops(resolveFadeSides(true));
   const clipHeight = innerHeight + CLIP_PADDING * 2;
-  const { clipX, clipWidth } = useGrowExitClip(
-    innerWidth,
-    mode,
-    loopEpoch,
-    onCycleComplete
-  );
+  const { clipX, clipWidth } = useGrowExitClip(innerWidth, mode, onCycleComplete);
 
   if (innerWidth <= 0) {
     return null;
@@ -180,16 +172,9 @@ export function LineLoadingPulseStroke({
     <>
       <defs>
         <clipPath id={clipPathId}>
-          <m.rect
-            height={clipHeight}
-            style={{ width: clipWidth, x: clipX }}
-            y={-CLIP_PADDING}
-          />
+          <m.rect height={clipHeight} style={{ width: clipWidth, x: clipX }} y={-CLIP_PADDING} />
         </clipPath>
-        <linearGradient
-          id={gradientId}
-          {...viewportFadeGradientAttrs(innerWidth)}
-        >
+        <linearGradient id={gradientId} {...viewportFadeGradientAttrs(innerWidth)}>
           {fadeStops.map((stop) => (
             <stop
               key={stop.offset}
@@ -214,5 +199,3 @@ export function LineLoadingPulseStroke({
 }
 
 LineLoadingPulseStroke.displayName = "LineLoadingPulseStroke";
-
-export default LineLoadingPulseStroke;

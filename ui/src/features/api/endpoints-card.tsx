@@ -137,7 +137,7 @@ export function EndpointsCard(): JSX.Element {
                 <SettingsRowTitle>{title}</SettingsRowTitle>
                 {/* A narrow row breaks between the host and the path, not inside either. */}
                 <code
-                  className="break-words font-mono text-meta leading-normal"
+                  className="wrap-break-word font-mono text-meta leading-normal"
                   data-slot="endpoint-url"
                 >
                   <span className="text-muted-foreground">{origin}</span>

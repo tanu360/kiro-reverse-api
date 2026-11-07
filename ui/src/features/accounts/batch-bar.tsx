@@ -41,7 +41,7 @@ import { useInvalidateAccounts } from "./use-account-actions";
  * after the list, so it rests below the last row once the list ends.
  */
 const BAR_POSITION =
-  "sticky bottom-[calc(env(safe-area-inset-bottom,0px)+--spacing(3))] z-20 floating-shadow";
+  "sticky bottom-[calc(env(safe-area-inset-bottom,0px)+(--spacing(3)))] z-20 floating-shadow";
 
 const CONFIRM_KEYS: Record<BatchAction, string> = {
   enable: "batch.confirmEnable",

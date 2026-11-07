@@ -52,6 +52,7 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { isApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
 import { modelMappingsQuery, updateModelMappings } from "@/lib/api/settings";
@@ -443,6 +444,7 @@ function MappingRowItem({
   register: (element: HTMLElement | null) => void;
 }): JSX.Element {
   const { t } = useT("settings");
+  const reduceMotion = usePrefersReducedMotion();
   const {
     attributes,
     listeners,
@@ -455,6 +457,9 @@ function MappingRowItem({
     id: row.id,
     disabled: filtering,
     attributes: { roleDescription: t("modelMappings.roleDescription") },
+    // dnd-kit sets the slide as an inline transition, which no stylesheet can override: drop it
+    // under reduced motion so the rows move into place at once.
+    transition: reduceMotion ? null : undefined,
   });
   const n = index + 1;
 

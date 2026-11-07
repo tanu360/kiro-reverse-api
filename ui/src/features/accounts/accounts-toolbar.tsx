@@ -100,7 +100,7 @@ function FilterSelect({
 
 type AccountTab = typeof ALL | StatusGroup;
 
-export interface AccountsToolbarProps {
+interface AccountsToolbarProps {
   /** The whole list: filter values and counts come from it, not from the filtered rows. */
   accounts: Account[];
   filters: AccountFilters;

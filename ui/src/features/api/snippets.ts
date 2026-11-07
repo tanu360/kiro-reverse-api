@@ -8,7 +8,7 @@
 export const SNIPPET_MODEL = "claude-sonnet-5";
 export const SNIPPET_KEY_ENV = "KIRO_API_KEY";
 
-export interface ClientSnippets {
+interface ClientSnippets {
   curl: { anthropic: string; openai: string };
   claudeCode: string;
   codex: string;

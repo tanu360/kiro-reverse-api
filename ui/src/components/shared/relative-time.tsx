@@ -34,7 +34,7 @@ function getNow(): number {
 }
 
 /** The current time in ms, updated once a minute (shared by every caller). */
-export function useMinuteClock(): number {
+function useMinuteClock(): number {
   return useSyncExternalStore(subscribe, getNow, getNow);
 }
 

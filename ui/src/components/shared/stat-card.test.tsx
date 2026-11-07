@@ -2,12 +2,12 @@ import { UsersIcon } from "@hugeicons/core-free-icons";
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "@/test/render";
-import { formatDelta, StatCard, StatGroup, StatTile } from "./stat-card";
+import { formatDelta, StatGroup, StatTile } from "./stat-card";
 
 describe("StatCard", () => {
   it("renders the label, value and metrics", () => {
     renderWithProviders(
-      <StatCard
+      <StatTile
         icon={UsersIcon}
         label="Accounts"
         metrics={[
@@ -26,7 +26,7 @@ describe("StatCard", () => {
 
   it("shows a metric hint as a tooltip", async () => {
     const { user } = renderWithProviders(
-      <StatCard
+      <StatTile
         icon={UsersIcon}
         label="Accounts"
         metrics={[{ label: "Plan credits", value: "120 / 500", hint: "Kiro-reported usage" }]}
@@ -40,7 +40,7 @@ describe("StatCard", () => {
 
   it("opens a metric hint with a click or tap, which a hover tooltip never does", async () => {
     const { user } = renderWithProviders(
-      <StatCard
+      <StatTile
         icon={UsersIcon}
         label="Accounts"
         metrics={[{ label: "Plan credits", value: "120 / 500", hint: "Kiro-reported usage" }]}
@@ -56,7 +56,7 @@ describe("StatCard", () => {
 
   it("formats a positive delta", () => {
     renderWithProviders(
-      <StatCard
+      <StatTile
         delta={{ value: 0.125, label: "vs previous hour" }}
         icon={UsersIcon}
         label="Requests"
@@ -69,7 +69,7 @@ describe("StatCard", () => {
 
   it("uses the destructive tone for a drop when up is good", () => {
     renderWithProviders(
-      <StatCard
+      <StatTile
         delta={{ value: -0.2, label: "vs previous hour", goodWhen: "up" }}
         icon={UsersIcon}
         label="Success"
@@ -83,7 +83,7 @@ describe("StatCard", () => {
 
   it("treats a drop as good when down is good", () => {
     renderWithProviders(
-      <StatCard
+      <StatTile
         delta={{ value: -0.2, label: "vs previous hour", goodWhen: "down" }}
         icon={UsersIcon}
         label="Failed"
@@ -97,7 +97,7 @@ describe("StatCard", () => {
 
   it("renders the skeleton while loading", () => {
     const { container } = renderWithProviders(
-      <StatCard icon={UsersIcon} label="Accounts" loading value="8" />,
+      <StatTile icon={UsersIcon} label="Accounts" loading value="8" />,
     );
     expect(container.querySelector('[data-slot="stat-card-skeleton"]')).toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();

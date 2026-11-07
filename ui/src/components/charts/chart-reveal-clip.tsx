@@ -4,9 +4,9 @@ import type { Transition } from "motion/react";
 import { m } from "motion/react";
 import { clipRevealTransition } from "./animation";
 
-export type ChartRevealClipMode = "reveal" | "conceal";
+type ChartRevealClipMode = "reveal" | "conceal";
 
-export interface ChartRevealClipProps {
+interface ChartRevealClipProps {
   clipPathId: string;
   height: number;
   targetWidth: number;
@@ -52,12 +52,7 @@ export function ChartRevealClip({
   if (!animating) {
     return (
       <clipPath id={clipPathId}>
-        <rect
-          height={paddedHeight}
-          width={paddedWidth}
-          x={-padding}
-          y={-paddingY}
-        />
+        <rect height={paddedHeight} width={paddedWidth} x={-padding} y={-paddingY} />
       </clipPath>
     );
   }

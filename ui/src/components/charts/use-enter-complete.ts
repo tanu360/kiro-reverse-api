@@ -11,7 +11,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 export function useEnterComplete(mountProgress: MotionValue<number>): boolean {
   const subscribe = useCallback(
     (onStoreChange: () => void) => mountProgress.on("change", onStoreChange),
-    [mountProgress]
+    [mountProgress],
   );
   const getSnapshot = () => mountProgress.get() >= 1;
   // Boolean snapshot: re-renders only when progress crosses 1, not per frame.

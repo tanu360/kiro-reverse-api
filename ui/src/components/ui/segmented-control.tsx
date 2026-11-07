@@ -19,10 +19,7 @@ export type SegmentedControlSize = "default" | "lg" | "sm" | "icon";
  * hit box: content after a tab list would paint over an overflowing box. pointer-coarse sorts
  * after the sm: sizes, so it wins on touch tablets too.
  */
-export const segmentedControlItemSizeClassNames: Record<
-  SegmentedControlSize,
-  string
-> = {
+export const segmentedControlItemSizeClassNames: Record<SegmentedControlSize, string> = {
   default: "h-8 px-[calc(--spacing(2.5)-1px)] sm:h-7 pointer-coarse:h-9",
   icon: "size-8 p-0 sm:size-7 pointer-coarse:size-9",
   lg: "h-10 px-[calc(--spacing(3.5)-1px)] sm:h-9 pointer-coarse:h-10",
@@ -37,15 +34,14 @@ export const segmentedControlItemLayoutClassName =
  * inside it, and a round highlight in the neutral button's hover tint (index.css
  * --neutral-button-hover) with no shadow, the same tint a selected tab takes.
  */
-export const segmentedControlIndicatorSurfaceClassName =
-  "rounded-full bg-(--neutral-button-hover)";
+export const segmentedControlIndicatorSurfaceClassName = "rounded-full bg-(--neutral-button-hover)";
 
 /** The frame round the segments (and the default tabs list). */
 export const segmentedControlTrackClassName =
   "relative z-0 flex w-fit items-center justify-center gap-0 rounded-full border border-field-border bg-transparent p-px";
 
 /** `field`: the track takes the field fill, to sit among inputs and selects in a toolbar. */
-export type SegmentedControlSurface = "none" | "field";
+type SegmentedControlSurface = "none" | "field";
 
 const segmentedControlSurfaceClassNames: Record<SegmentedControlSurface, string> = {
   field: "bg-field",
@@ -100,9 +96,7 @@ export function SegmentedControl({
   });
 
   return (
-    <SegmentedControlContext.Provider value={size}>
-      {element}
-    </SegmentedControlContext.Provider>
+    <SegmentedControlContext.Provider value={size}>{element}</SegmentedControlContext.Provider>
   );
 }
 
@@ -144,11 +138,7 @@ export function SegmentedControlItem({
 const activeItemSelector =
   ':scope > [data-checked], :scope > [aria-current="page"], :scope > [data-pressed]';
 
-const observedAttributes: string[] = [
-  "data-checked",
-  "aria-current",
-  "data-pressed",
-];
+const observedAttributes: string[] = ["data-checked", "aria-current", "data-pressed"];
 
 const MAX_LAYOUT_ROUNDING_ERROR = 2;
 
@@ -159,15 +149,9 @@ interface ActiveItemRect {
   width: number;
 }
 
-function isSameRect(
-  a: ActiveItemRect | null,
-  b: ActiveItemRect | null,
-): boolean {
+function isSameRect(a: ActiveItemRect | null, b: ActiveItemRect | null): boolean {
   return (
-    a?.left === b?.left &&
-    a?.top === b?.top &&
-    a?.width === b?.width &&
-    a?.height === b?.height
+    a?.left === b?.left && a?.top === b?.top && a?.width === b?.width && a?.height === b?.height
   );
 }
 
@@ -175,10 +159,7 @@ function getCssSize(element: HTMLElement): { height: number; width: number } {
   const style = getComputedStyle(element);
   const width = Number.parseFloat(style.width) || 0;
   const height = Number.parseFloat(style.height) || 0;
-  if (
-    Math.round(width) !== element.offsetWidth ||
-    Math.round(height) !== element.offsetHeight
-  ) {
+  if (Math.round(width) !== element.offsetWidth || Math.round(height) !== element.offsetHeight) {
     return { height: element.offsetHeight, width: element.offsetWidth };
   }
   return { height, width };
@@ -192,12 +173,8 @@ function measureItem(item: HTMLElement, root: HTMLElement): ActiveItemRect {
   const scaleX = rootSize.width > 0 ? rootRect.width / rootSize.width : 1;
   const scaleY = rootSize.height > 0 ? rootRect.height / rootSize.height : 1;
 
-  const rectLeft =
-    (itemRect.left - rootRect.left) / scaleX -
-    root.clientLeft +
-    root.scrollLeft;
-  const rectTop =
-    (itemRect.top - rootRect.top) / scaleY - root.clientTop + root.scrollTop;
+  const rectLeft = (itemRect.left - rootRect.left) / scaleX - root.clientLeft + root.scrollLeft;
+  const rectTop = (itemRect.top - rootRect.top) / scaleY - root.clientTop + root.scrollTop;
 
   const isUndistorted =
     Math.abs(rectLeft - item.offsetLeft) <= MAX_LAYOUT_ROUNDING_ERROR &&

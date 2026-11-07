@@ -23,7 +23,7 @@ import type {
 
 const accountPath = (id: string, suffix = "") => `/accounts/${encodeURIComponent(id)}${suffix}`;
 
-export function listAccounts(): Promise<Account[]> {
+function listAccounts(): Promise<Account[]> {
   return apiRequest<Account[] | null>("/accounts").then((list) => list ?? []);
 }
 

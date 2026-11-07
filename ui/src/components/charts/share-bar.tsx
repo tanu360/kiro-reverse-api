@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-export interface ShareBarProps {
+interface ShareBarProps {
   /** The part, e.g. one model's credits. */
   value: number;
   /** The whole. Default: 1, so `value` can be a 0..1 share. */
@@ -27,7 +27,7 @@ export function ShareBar({ value, max = 1, color, className }: ShareBarProps) {
       aria-hidden
       className={cn(
         "block h-1 w-full min-w-0 overflow-hidden rounded-full bg-chart-grid",
-        className
+        className,
       )}
       data-slot="share-bar"
     >
@@ -41,5 +41,3 @@ export function ShareBar({ value, max = 1, color, className }: ShareBarProps) {
 }
 
 ShareBar.displayName = "ShareBar";
-
-export default ShareBar;

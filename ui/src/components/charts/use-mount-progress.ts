@@ -5,11 +5,7 @@ import { useEffect, useRef } from "react";
 import { DEFAULT_CHART_ENTER_TRANSITION } from "./animation";
 
 /** Drives 0→1 enter progress using the studio motion transition (spring or tween). */
-export function useMountProgress(
-  enterTransition: Transition | undefined,
-  delaySeconds: number,
-  replayKey: number | string
-) {
+export function useMountProgress(enterTransition: Transition | undefined, delaySeconds: number) {
   const progress = useMotionValue(0);
   const transitionRef = useRef(enterTransition);
   // Latest transition without restarting the enter tween on every new object
@@ -18,8 +14,7 @@ export function useMountProgress(
     transitionRef.current = enterTransition;
   });
 
-  // replayKey intentionally retriggers enter when motion settings change
-  // biome-ignore lint/correctness/useExhaustiveDependencies: replayKey
+  // A new delay (stagger scale) replays the enter.
   useEffect(() => {
     progress.set(0);
     const controls = animate(progress, 1, {
@@ -27,7 +22,7 @@ export function useMountProgress(
       delay: delaySeconds,
     });
     return () => controls.stop();
-  }, [delaySeconds, replayKey, progress]);
+  }, [delaySeconds, progress]);
 
   return progress;
 }

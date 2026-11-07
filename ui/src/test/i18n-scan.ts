@@ -1,4 +1,5 @@
 import { parse } from "@babel/parser";
+import { type AstNode, fields, isAstNode, isNode, type NodeOf } from "./babel-ast";
 
 /**
  * Static scan for user-visible text that bypasses the locale files. It parses a source file and
@@ -18,7 +19,7 @@ export interface Finding {
 }
 
 /** Brand, product and protocol names that stay as written in every language. */
-export const ALLOWED_TOKENS: readonly string[] = [
+const ALLOWED_TOKENS: readonly string[] = [
   "Kiro Proxy",
   "AWS Builder ID",
   "IAM Identity Center",
@@ -125,7 +126,7 @@ const UTILITY_MARK = /[-:[\]/]/;
  * bracket or slash, or is a bare utility such as `flex`) and at least one is marked. A map of
  * variant classes keyed `label` or `title` is styling, not text.
  */
-export function isClassList(text: string): boolean {
+function isClassList(text: string): boolean {
   const words = text.trim().split(/\s+/);
   if (text.includes("://")) return false;
   if (!words.every((word) => UTILITY_WORD.test(word))) return false;
@@ -145,7 +146,7 @@ const tokenPattern = new RegExp(
 );
 
 /** True when the text has letters left after the allowed tokens are removed. */
-export function hasProse(text: string): boolean {
+function hasProse(text: string): boolean {
   return /\p{L}/u.test(text.replace(tokenPattern, ""));
 }
 
@@ -158,77 +159,87 @@ function isVisibleName(name: string): boolean {
   return VISIBLE_ATTRS.has(name) || VISIBLE_SUFFIX.test(name);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Babel AST nodes are walked generically.
-type Node = any;
+/** A string an expression can evaluate to, with the position to report it at. */
+interface LiteralText {
+  value: string;
+  loc?: AstNode["loc"];
+}
+
+/** The expression inside a type assertion or parentheses (`x as T`, `x!`, `(x)`), or null. */
+function unwrapped(node: AstNode | null | undefined): AstNode | null {
+  if (
+    isNode(node, "TSAsExpression") ||
+    isNode(node, "TSSatisfiesExpression") ||
+    isNode(node, "TSNonNullExpression") ||
+    isNode(node, "ParenthesizedExpression")
+  ) {
+    return node.expression;
+  }
+  return null;
+}
 
 /** String literals an expression can evaluate to directly (not through calls). */
-function literalTexts(node: Node): Node[] {
-  if (!node) return [];
-  switch (node.type) {
-    case "StringLiteral":
-      return [node];
-    case "TemplateLiteral":
-      return node.quasis.map((quasi: Node) => ({
-        ...quasi,
-        value: quasi.value.cooked ?? quasi.value.raw,
-      }));
-    case "ConditionalExpression":
-      return [...literalTexts(node.consequent), ...literalTexts(node.alternate)];
-    case "LogicalExpression":
-      return [...literalTexts(node.left), ...literalTexts(node.right)];
-    case "BinaryExpression":
-      return node.operator === "+" ? [...literalTexts(node.left), ...literalTexts(node.right)] : [];
-    case "TSAsExpression":
-    case "TSSatisfiesExpression":
-    case "TSNonNullExpression":
-    case "ParenthesizedExpression":
-      return literalTexts(node.expression);
-    default:
-      return [];
+function literalTexts(node: AstNode | null | undefined): LiteralText[] {
+  if (isNode(node, "StringLiteral")) return [node];
+  if (isNode(node, "TemplateLiteral")) {
+    return node.quasis.map((quasi) => ({
+      ...quasi,
+      value: quasi.value.cooked ?? quasi.value.raw,
+    }));
   }
+  if (isNode(node, "ConditionalExpression")) {
+    return [...literalTexts(node.consequent), ...literalTexts(node.alternate)];
+  }
+  if (isNode(node, "LogicalExpression")) {
+    return [...literalTexts(node.left), ...literalTexts(node.right)];
+  }
+  if (isNode(node, "BinaryExpression")) {
+    return node.operator === "+" ? [...literalTexts(node.left), ...literalTexts(node.right)] : [];
+  }
+  const inner = unwrapped(node);
+  return inner ? literalTexts(inner) : [];
 }
 
 /** Template literals an expression can evaluate to directly. */
-function templates(node: Node): Node[] {
-  if (!node) return [];
-  switch (node.type) {
-    case "TemplateLiteral":
-      return [node];
-    case "ConditionalExpression":
-      return [...templates(node.consequent), ...templates(node.alternate)];
-    case "LogicalExpression":
-      return [...templates(node.left), ...templates(node.right)];
-    case "TSAsExpression":
-    case "TSSatisfiesExpression":
-    case "TSNonNullExpression":
-    case "ParenthesizedExpression":
-      return templates(node.expression);
-    default:
-      return [];
+function templates(node: AstNode | null | undefined): NodeOf<"TemplateLiteral">[] {
+  if (isNode(node, "TemplateLiteral")) return [node];
+  if (isNode(node, "ConditionalExpression")) {
+    return [...templates(node.consequent), ...templates(node.alternate)];
   }
+  if (isNode(node, "LogicalExpression")) return [...templates(node.left), ...templates(node.right)];
+  const inner = unwrapped(node);
+  return inner ? templates(inner) : [];
 }
 
 // Sentence punctuation between interpolations: a sentence built from parts.
 const COMPOSED_GLUE = /[:.,;!?。，：；！？]/;
 
-function jsxName(node: Node): string {
-  if (!node) return "";
-  if (node.type === "JSXIdentifier") return node.name;
-  if (node.type === "JSXMemberExpression") return `${jsxName(node.object)}.${node.property.name}`;
-  if (node.type === "JSXNamespacedName") return `${node.namespace.name}:${node.name.name}`;
+// Type positions: a string there is a type, not text.
+const TYPE_NODES = new Set([
+  "TSTypeAnnotation",
+  "TSTypeAliasDeclaration",
+  "TSInterfaceDeclaration",
+  "TSTypeParameterInstantiation",
+  "TSLiteralType",
+]);
+
+function jsxName(node: AstNode | null | undefined): string {
+  if (isNode(node, "JSXIdentifier")) return node.name;
+  if (isNode(node, "JSXMemberExpression")) return `${jsxName(node.object)}.${node.property.name}`;
+  if (isNode(node, "JSXNamespacedName")) return `${node.namespace.name}:${node.name.name}`;
   return "";
 }
 
-function propName(node: Node): string | undefined {
+function propName(node: NodeOf<"ObjectProperty">): string | undefined {
   if (node.computed) return undefined;
-  if (node.key.type === "Identifier") return node.key.name;
-  if (node.key.type === "StringLiteral") return node.key.value;
+  if (isNode(node.key, "Identifier")) return node.key.name;
+  if (isNode(node.key, "StringLiteral")) return node.key.value;
   return undefined;
 }
 
-function calleeName(node: Node): string {
-  if (node.type === "Identifier") return node.name;
-  if (node.type === "MemberExpression" && !node.computed) {
+function calleeName(node: AstNode | null | undefined): string {
+  if (isNode(node, "Identifier")) return node.name;
+  if (isNode(node, "MemberExpression") && !node.computed && isNode(node.property, "Identifier")) {
     return `${calleeName(node.object)}.${node.property.name}`;
   }
   return "";
@@ -242,19 +253,23 @@ export function scanSource(code: string, file: string): Finding[] {
   });
   const findings: Finding[] = [];
 
-  const report = (kind: string, node: Node, text: string, strict: boolean) => {
+  const report = (kind: string, node: Pick<AstNode, "loc">, text: string, strict: boolean) => {
     const value = text.replace(/\s+/g, " ").trim();
     if (!value || !hasProse(value) || NOT_PROSE.test(value) || isClassList(value)) return;
     if (!strict && isKeyLike(value)) return;
     findings.push({ file, line: node.loc?.start.line ?? 0, kind, text: value });
   };
 
-  const reportExpression = (kind: string, expression: Node, strict: boolean) => {
+  const reportExpression = (
+    kind: string,
+    expression: AstNode | null | undefined,
+    strict: boolean,
+  ) => {
     for (const literal of literalTexts(expression)) report(kind, literal, literal.value, strict);
     // `${t("a")}: ${value}.` glues translated parts with punctuation that differs by language
     // ("：" and "。" in Chinese). The whole sentence must be one key with placeholders.
     for (const template of templates(expression)) {
-      const glue = template.quasis.map((quasi: Node) => quasi.value.cooked ?? "").join("{…}");
+      const glue = template.quasis.map((quasi) => quasi.value.cooked ?? "").join("{…}");
       if (template.expressions.length > 0 && COMPOSED_GLUE.test(glue.replace(/\{…\}/g, ""))) {
         findings.push({
           file,
@@ -266,80 +281,53 @@ export function scanSource(code: string, file: string): Finding[] {
     }
   };
 
-  const walk = (node: Node, inCode: boolean, inTypes: boolean, parent = ""): void => {
-    if (!node || typeof node.type !== "string") return;
+  const walk = (node: unknown, inCode: boolean, inTypes: boolean, parent = ""): void => {
+    if (!isAstNode(node)) return;
+    if (node.type === "ImportDeclaration" || node.type === "ExportAllDeclaration") return;
     let code = inCode;
-    let types = inTypes;
+    const types = inTypes || TYPE_NODES.has(node.type);
 
-    switch (node.type) {
-      case "ImportDeclaration":
-      case "ExportAllDeclaration":
-        return;
-      case "TSTypeAnnotation":
-      case "TSTypeAliasDeclaration":
-      case "TSInterfaceDeclaration":
-      case "TSTypeParameterInstantiation":
-      case "TSLiteralType":
-        types = true;
-        break;
-      case "JSXElement": {
-        const name = jsxName(node.openingElement.name);
-        if (CODE_ELEMENTS.has(name)) code = true;
-        break;
-      }
-      case "JSXText":
-        if (!code) report("jsx-text", node, node.value, true);
-        break;
-      case "JSXAttribute": {
-        const name = jsxName(node.name);
-        if (!code && isVisibleName(name) && node.value) {
-          if (node.value.type === "StringLiteral")
-            report(`prop ${name}`, node.value, node.value.value, false);
-          else if (node.value.type === "JSXExpressionContainer") {
-            reportExpression(`prop ${name}`, node.value.expression, false);
-          }
+    if (isNode(node, "JSXElement")) {
+      if (CODE_ELEMENTS.has(jsxName(node.openingElement.name))) code = true;
+    } else if (isNode(node, "JSXText")) {
+      if (!code) report("jsx-text", node, node.value, true);
+    } else if (isNode(node, "JSXAttribute")) {
+      const name = jsxName(node.name);
+      if (!code && isVisibleName(name) && node.value) {
+        if (isNode(node.value, "StringLiteral"))
+          report(`prop ${name}`, node.value, node.value.value, false);
+        else if (isNode(node.value, "JSXExpressionContainer")) {
+          reportExpression(`prop ${name}`, node.value.expression, false);
         }
-        break;
       }
-      case "JSXExpressionContainer":
-        // A string child: {"text"} or {cond ? "a" : "b"}.
-        if (!code && !types && parent !== "JSXAttribute") {
-          reportExpression("jsx-child", node.expression, true);
-        }
-        break;
-      case "ObjectProperty": {
-        const name = propName(node);
-        if (!types && name && isVisibleName(name))
-          reportExpression(`property ${name}`, node.value, false);
-        break;
+    } else if (isNode(node, "JSXExpressionContainer")) {
+      // A string child: {"text"} or {cond ? "a" : "b"}.
+      if (!code && !types && parent !== "JSXAttribute") {
+        reportExpression("jsx-child", node.expression, true);
       }
-      case "AssignmentExpression": {
-        const target = calleeName(node.left);
-        if (target === "document.title") reportExpression("document.title", node.right, true);
-        break;
-      }
-      case "CallExpression": {
-        const callee = calleeName(node.callee);
-        const [object, method] = callee.split(".");
-        const isToast =
-          (object === "toast" && TOAST_METHODS.has(method ?? "")) || callee === "toast";
-        const isDialog = ["alert", "confirm", "prompt", "window.alert", "window.confirm"].includes(
-          callee,
-        );
-        if (isToast || isDialog) reportExpression(callee, node.arguments[0], true);
-        break;
-      }
+    } else if (isNode(node, "ObjectProperty")) {
+      const name = propName(node);
+      if (!types && name && isVisibleName(name))
+        reportExpression(`property ${name}`, node.value, false);
+    } else if (isNode(node, "AssignmentExpression")) {
+      const target = calleeName(node.left);
+      if (target === "document.title") reportExpression("document.title", node.right, true);
+    } else if (isNode(node, "CallExpression")) {
+      const callee = calleeName(node.callee);
+      const [object, method] = callee.split(".");
+      const isToast = (object === "toast" && TOAST_METHODS.has(method ?? "")) || callee === "toast";
+      const isDialog = ["alert", "confirm", "prompt", "window.alert", "window.confirm"].includes(
+        callee,
+      );
+      if (isToast || isDialog) reportExpression(callee, node.arguments[0], true);
     }
 
-    for (const key of Object.keys(node)) {
+    for (const [key, child] of fields(node)) {
       if (key === "loc" || key === "start" || key === "end" || key === "extra") continue;
       if (key === "leadingComments" || key === "trailingComments" || key === "innerComments")
         continue;
-      const child = node[key];
       if (Array.isArray(child)) for (const item of child) walk(item, code, types, node.type);
-      else if (child && typeof child === "object" && typeof child.type === "string") {
-        walk(child, code, types, node.type);
-      }
+      else walk(child, code, types, node.type);
     }
   };
 

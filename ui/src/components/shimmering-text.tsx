@@ -16,7 +16,7 @@ const SHIMMER_BG_SIZE = "300% 100%";
 const SWEEP_FROM = "100% 0%";
 const SWEEP_TO = "0% 0%";
 
-export type ShimmeringTextProps = Omit<ComponentProps<typeof m.span>, "children"> & {
+type ShimmeringTextProps = Omit<ComponentProps<typeof m.span>, "children"> & {
   /** The text to render with the shimmering effect. */
   text: string;
   /**

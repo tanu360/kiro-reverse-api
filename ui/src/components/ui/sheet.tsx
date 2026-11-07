@@ -3,36 +3,21 @@
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { XIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type React from "react";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { OVERLAY_CLOSE_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 export const Sheet: typeof SheetPrimitive.Root = SheetPrimitive.Root;
 
-export const SheetPortal: typeof SheetPrimitive.Portal = SheetPrimitive.Portal;
+const SheetPortal: typeof SheetPrimitive.Portal = SheetPrimitive.Portal;
 
-export function SheetTrigger(
-  props: SheetPrimitive.Trigger.Props,
-): React.ReactElement {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
-}
-
-export function SheetClose(
-  props: SheetPrimitive.Close.Props,
-): React.ReactElement {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
-}
-
-export function SheetBackdrop({
-  className,
-  ...props
-}: SheetPrimitive.Backdrop.Props): React.ReactElement {
+function SheetBackdrop({ className, ...props }: SheetPrimitive.Backdrop.Props): React.ReactElement {
   return (
     <SheetPrimitive.Backdrop
       className={cn(
@@ -45,7 +30,7 @@ export function SheetBackdrop({
   );
 }
 
-export function SheetViewport({
+function SheetViewport({
   className,
   side,
   variant = "default",
@@ -242,9 +227,3 @@ export function SheetPanel({
     </ScrollArea>
   );
 }
-
-export {
-  SheetPrimitive,
-  SheetBackdrop as SheetOverlay,
-  SheetPopup as SheetContent,
-};

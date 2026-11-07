@@ -11,7 +11,7 @@ import {
 import { useIsMobile } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
-export interface ResponsiveSheetProps {
+interface ResponsiveSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;

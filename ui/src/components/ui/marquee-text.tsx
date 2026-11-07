@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  * the rest and back. With reduced motion it wraps onto more lines instead. The look lives in
  * index.css (`.marquee-text`); this measures how far the label has to travel.
  */
-export function MarqueeText({
+function MarqueeText({
   children,
   className,
 }: {

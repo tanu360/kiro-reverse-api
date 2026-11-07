@@ -209,22 +209,17 @@ describe("Client setup snippets", () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(clientWidth);
   }
 
-  it("makes a code block that scrolls sideways a labelled tab stop", async () => {
+  it("names a code block that scrolls sideways as a region around its scroller", async () => {
     overflow(900, 300);
     const { user } = await renderPage();
     const block = screen.getByRole("region", { name: "Anthropic Messages API code" });
-    expect(block.tagName).toBe("PRE");
-    expect(block).toHaveAttribute("tabindex", "0");
-    block.focus();
-    expect(block).toHaveFocus();
+    expect(block.tagName).toBe("SECTION");
+    expect(block.querySelector("pre")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Codex" }));
-    expect(screen.getByRole("region", { name: "~/.codex/config.toml code" })).toHaveAttribute(
-      "tabindex",
-      "0",
-    );
+    expect(screen.getByRole("region", { name: "~/.codex/config.toml code" })).toBeInTheDocument();
   });
 
-  it("adds no tab stop to a code block that fits", async () => {
+  it("adds no region to a code block that fits", async () => {
     overflow(300, 300);
     await renderPage();
     expect(

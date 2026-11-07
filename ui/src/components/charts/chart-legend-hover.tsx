@@ -1,21 +1,13 @@
 "use client";
 
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 
 interface ChartLegendHoverContextValue {
   hoveredIndex: number | null;
   setHoveredIndex: (index: number | null) => void;
 }
 
-const ChartLegendHoverContext =
-  createContext<ChartLegendHoverContextValue | null>(null);
+const ChartLegendHoverContext = createContext<ChartLegendHoverContextValue | null>(null);
 
 /**
  * Shares the hovered series index between a `Legend` and the chart series it
@@ -42,17 +34,12 @@ export function ChartLegendHoverProvider({
       }
       onHoverChange?.(index);
     },
-    [controlled, onHoverChange]
+    [controlled, onHoverChange],
   );
-  const value = useMemo(
-    () => ({ hoveredIndex, setHoveredIndex }),
-    [hoveredIndex, setHoveredIndex]
-  );
+  const value = useMemo(() => ({ hoveredIndex, setHoveredIndex }), [hoveredIndex, setHoveredIndex]);
 
   return (
-    <ChartLegendHoverContext.Provider value={value}>
-      {children}
-    </ChartLegendHoverContext.Provider>
+    <ChartLegendHoverContext.Provider value={value}>{children}</ChartLegendHoverContext.Provider>
   );
 }
 

@@ -19,14 +19,14 @@ import { I18nProvider, type Lang } from "@/lib/i18n";
 import { PrivacyProvider } from "@/lib/privacy";
 import { routeTree } from "@/routeTree.gen";
 
-export interface RenderOptions {
+interface RenderOptions {
   lang?: Lang;
   privacy?: boolean;
   authed?: boolean;
   queryClient?: QueryClient;
 }
 
-export function createTestQueryClient(): QueryClient {
+function createTestQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: Number.POSITIVE_INFINITY },

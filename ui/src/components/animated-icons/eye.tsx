@@ -4,7 +4,7 @@ import { forwardRef, useId } from "react";
 import { type AnimatedIconProps, useIconAnimation } from "@/lib/use-icon-animation";
 import { cn } from "@/lib/utils";
 
-export interface EyeIconHandle {
+interface EyeIconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }

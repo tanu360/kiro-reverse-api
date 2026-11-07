@@ -2,27 +2,14 @@
 
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
 import type React from "react";
-import { cn } from "@/lib/utils";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
+import { cn } from "@/lib/utils";
 
-export const AlertDialogCreateHandle: typeof AlertDialogPrimitive.createHandle =
-  AlertDialogPrimitive.createHandle;
+export const AlertDialog: typeof AlertDialogPrimitive.Root = AlertDialogPrimitive.Root;
 
-export const AlertDialog: typeof AlertDialogPrimitive.Root =
-  AlertDialogPrimitive.Root;
+const AlertDialogPortal: typeof AlertDialogPrimitive.Portal = AlertDialogPrimitive.Portal;
 
-export const AlertDialogPortal: typeof AlertDialogPrimitive.Portal =
-  AlertDialogPrimitive.Portal;
-
-export function AlertDialogTrigger(
-  props: AlertDialogPrimitive.Trigger.Props,
-): React.ReactElement {
-  return (
-    <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />
-  );
-}
-
-export function AlertDialogBackdrop({
+function AlertDialogBackdrop({
   className,
   ...props
 }: AlertDialogPrimitive.Backdrop.Props): React.ReactElement {
@@ -38,7 +25,7 @@ export function AlertDialogBackdrop({
   );
 }
 
-export function AlertDialogViewport({
+function AlertDialogViewport({
   className,
   ...props
 }: AlertDialogPrimitive.Viewport.Props): React.ReactElement {
@@ -70,7 +57,7 @@ export function AlertDialogPopup({
       <AlertDialogViewport>
         <AlertDialogPrimitive.Popup
           className={cn(
-            "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 max-w-lg -translate-y-[calc(1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
+            "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 max-w-lg translate-y-[calc(-1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
             className,
           )}
           data-slot="alert-dialog-popup"
@@ -149,17 +136,3 @@ export function AlertDialogDescription({
     />
   );
 }
-
-export function AlertDialogClose(
-  props: AlertDialogPrimitive.Close.Props,
-): React.ReactElement {
-  return (
-    <AlertDialogPrimitive.Close data-slot="alert-dialog-close" {...props} />
-  );
-}
-
-export {
-  AlertDialogPrimitive,
-  AlertDialogBackdrop as AlertDialogOverlay,
-  AlertDialogPopup as AlertDialogContent,
-};

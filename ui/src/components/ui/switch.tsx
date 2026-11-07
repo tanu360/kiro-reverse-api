@@ -4,16 +4,13 @@ import { Switch as SwitchPrimitive } from "@base-ui/react/switch";
 import type React from "react";
 import { cn } from "@/lib/utils";
 
-export function Switch({
-  className,
-  ...props
-}: SwitchPrimitive.Root.Props): React.ReactElement {
+export function Switch({ className, ...props }: SwitchPrimitive.Root.Props): React.ReactElement {
   return (
     <SwitchPrimitive.Root
       className={cn(
         // 30 x 18 at every width; a coarse pointer gets the 44 px hit area (index.css touch-hit),
         // not a bigger switch. Disabled is 64 %, as every control.
-        "touch-hit relative inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 cursor-pointer items-center rounded-full p-[2px] outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(4)] focus-outline data-checked:bg-primary data-unchecked:bg-switch-track hover:data-unchecked:bg-switch-track/85 data-disabled:cursor-not-allowed data-disabled:opacity-64",
+        "touch-hit relative inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2-2px)] shrink-0 cursor-pointer items-center rounded-full p-0.5 outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(4)] focus-outline data-checked:bg-primary data-unchecked:bg-switch-track hover:data-unchecked:bg-switch-track/85 data-disabled:cursor-not-allowed data-disabled:opacity-64",
         className,
       )}
       data-slot="switch"
@@ -28,5 +25,3 @@ export function Switch({
     </SwitchPrimitive.Root>
   );
 }
-
-export { SwitchPrimitive };

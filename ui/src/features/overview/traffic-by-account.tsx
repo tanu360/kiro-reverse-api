@@ -9,16 +9,17 @@ import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { heatmapQuery } from "@/lib/api/observe";
 import type { HeatmapCell } from "@/lib/api/types";
 import { formatNumber, formatTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
+import { placeholderKeys } from "@/lib/utils";
 import { busyAccounts, HOUR, mergeCells, windowCells } from "./aggregate";
 import { MODEL_COLORS, OTHER_MODEL_COLOR } from "./colors";
 import { useTotalsFailed } from "./status-cards";
 import type { AccountBucket, AccountSeries } from "./traffic-by-account-bars";
-import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 const TrafficByAccountBars = lazy(() => import("./traffic-by-account-bars"));
 
@@ -26,6 +27,8 @@ const TrafficByAccountBars = lazy(() => import("./traffic-by-account-bars"));
 const TOP_ACCOUNTS = 5;
 /** Minutes per bar: 30 bars over the hour. */
 const BUCKET_MINUTES = 2;
+/** A full legend's rows while loading: the top accounts and "Other accounts". */
+const LEGEND_PLACEHOLDERS = placeholderKeys("legend", TOP_ACCOUNTS + 1);
 
 interface SeriesTotals {
   key: string;
@@ -133,9 +136,8 @@ export function TrafficByAccount(): JSX.Element {
     <div aria-hidden="true" className="flex flex-col gap-3">
       <Skeleton className="aspect-2/1 w-full rounded-lg md:aspect-4/1" />
       <div className="grid grid-cols-2 gap-x-6 gap-y-2 @2xl:grid-cols-3">
-        {Array.from({ length: 6 }, (_, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders never reorder.
-          <Skeleton className="h-4 w-full" key={index} />
+        {LEGEND_PLACEHOLDERS.map((key) => (
+          <Skeleton className="h-4 w-full" key={key} />
         ))}
       </div>
     </div>

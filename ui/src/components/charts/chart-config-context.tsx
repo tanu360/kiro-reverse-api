@@ -1,13 +1,13 @@
 "use client";
 
-import { createContext, type ReactNode, useContext, useMemo } from "react";
+import { createContext, useContext } from "react";
 
 export interface SpringConfig {
   stiffness: number;
   damping: number;
 }
 
-export interface ChartConfigValue {
+interface ChartConfigValue {
   /** Crosshair indicator, tooltip dot, date pill. */
   tooltipSpring: SpringConfig;
   /** Floating tooltip panel. */
@@ -16,7 +16,7 @@ export interface ChartConfigValue {
   highlightSpring: SpringConfig;
 }
 
-export const DEFAULT_CHART_CONFIG: ChartConfigValue = {
+const DEFAULT_CHART_CONFIG: ChartConfigValue = {
   tooltipSpring: { stiffness: 300, damping: 30 },
   tooltipBoxSpring: { stiffness: 100, damping: 20 },
   highlightSpring: { stiffness: 180, damping: 28 },
@@ -24,36 +24,11 @@ export const DEFAULT_CHART_CONFIG: ChartConfigValue = {
 
 const ChartConfigContext = createContext<ChartConfigValue | null>(null);
 
-export interface ChartConfigProviderProps {
-  value?: Partial<ChartConfigValue>;
-  children: ReactNode;
-}
-
-export function ChartConfigProvider({
-  value,
-  children,
-}: ChartConfigProviderProps) {
-  const merged = useMemo<ChartConfigValue>(
-    () => ({
-      ...DEFAULT_CHART_CONFIG,
-      ...value,
-    }),
-    [value]
-  );
-
-  return (
-    <ChartConfigContext.Provider value={merged}>
-      {children}
-    </ChartConfigContext.Provider>
-  );
-}
-
 export function useChartConfig(): ChartConfigValue {
   return useContext(ChartConfigContext) ?? DEFAULT_CHART_CONFIG;
 }
 
-const DEFAULT_TOOLTIP_BOX_DAMPING =
-  DEFAULT_CHART_CONFIG.tooltipBoxSpring.damping;
+const DEFAULT_TOOLTIP_BOX_DAMPING = DEFAULT_CHART_CONFIG.tooltipBoxSpring.damping;
 
 /** Maps a damping slider to the floating tooltip panel follow spring. `0` = instant. */
 export function resolveTooltipBoxMotion(damping?: number): {
@@ -71,14 +46,11 @@ export function resolveTooltipBoxMotion(damping?: number): {
   let stiffness = DEFAULT_CHART_CONFIG.tooltipBoxSpring.stiffness;
 
   if (effectiveDamping < DEFAULT_TOOLTIP_BOX_DAMPING) {
-    const t =
-      (DEFAULT_TOOLTIP_BOX_DAMPING - effectiveDamping) /
-      DEFAULT_TOOLTIP_BOX_DAMPING;
+    const t = (DEFAULT_TOOLTIP_BOX_DAMPING - effectiveDamping) / DEFAULT_TOOLTIP_BOX_DAMPING;
     stiffness += t * 400;
   } else if (effectiveDamping > DEFAULT_TOOLTIP_BOX_DAMPING) {
     const t =
-      (effectiveDamping - DEFAULT_TOOLTIP_BOX_DAMPING) /
-      (100 - DEFAULT_TOOLTIP_BOX_DAMPING);
+      (effectiveDamping - DEFAULT_TOOLTIP_BOX_DAMPING) / (100 - DEFAULT_TOOLTIP_BOX_DAMPING);
     stiffness -= t * 85;
   }
 

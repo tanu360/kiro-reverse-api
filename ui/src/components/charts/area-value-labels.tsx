@@ -10,24 +10,12 @@ import {
 } from "./area-value-label-layout";
 import { chartCssVars, useChartStable } from "./chart-context";
 import { valueLabelFmt } from "./chart-formatters";
-import {
-  fadeGradientStops,
-  resolveFadeSides,
-  viewportFadeGradientAttrs,
-} from "./fade-edges";
+import { fadeGradientStops, resolveFadeSides, viewportFadeGradientAttrs } from "./fade-edges";
 
 /** One final layer keeps later area fills from painting over earlier labels. */
 export function AreaValueLabels({ series }: { series: AreaProps[] }) {
-  const {
-    data,
-    xScale,
-    xAccessor,
-    yScale,
-    yScales,
-    innerWidth,
-    innerHeight,
-    chartPhase,
-  } = useChartStable();
+  const { data, xScale, xAccessor, yScale, yScales, innerWidth, innerHeight, chartPhase } =
+    useChartStable();
   const layerRef = useRef<SVGGElement>(null);
   const id = useId();
   const labels = useMemo(() => {
@@ -43,8 +31,7 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
         seriesIndex,
         points: visible.filter(
           ({ datum }) =>
-            typeof datum[area.dataKey] === "number" &&
-            Number.isFinite(datum[area.dataKey])
+            typeof datum[area.dataKey] === "number" && Number.isFinite(datum[area.dataKey]),
         ),
       }))
       .filter(({ area }) => area.showValue);
@@ -53,8 +40,8 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
         points.length,
         innerWidth,
         area.valueLabelMinCount,
-        area.valueLabelMaxCount
-      )
+        area.valueLabelMaxCount,
+      ),
     );
     const sharedCount = resolveSharedAreaValueLabelCount(counts);
     return visibleSeries.flatMap(({ area, seriesIndex, points }, i) => {
@@ -88,16 +75,7 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
         ];
       });
     });
-  }, [
-    data,
-    series,
-    xScale,
-    xAccessor,
-    yScale,
-    yScales,
-    innerWidth,
-    chartPhase,
-  ]);
+  }, [data, series, xScale, xAccessor, yScale, yScales, innerWidth, chartPhase]);
 
   useLayoutEffect(() => {
     const layer = layerRef.current;
@@ -130,7 +108,7 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
         const bounds = element.getBBox();
         element.setAttribute(
           "transform",
-          `translate(${box.x - bounds.x - bounds.width / 2}, ${box.y - bounds.y - bounds.height / 2})`
+          `translate(${box.x - bounds.x - bounds.width / 2}, ${box.y - bounds.y - bounds.height / 2})`,
         );
         element.style.visibility = "visible";
       }
@@ -157,13 +135,8 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
           (area, index) =>
             area.fadeValueLabels && (
               <g key={area.dataKey}>
-                <linearGradient
-                  id={`${id}-${index}`}
-                  {...viewportFadeGradientAttrs(innerWidth)}
-                >
-                  {fadeGradientStops(
-                    resolveFadeSides(area.fadeEdges ?? false)
-                  ).map((stop) => (
+                <linearGradient id={`${id}-${index}`} {...viewportFadeGradientAttrs(innerWidth)}>
+                  {fadeGradientStops(resolveFadeSides(area.fadeEdges ?? false)).map((stop) => (
                     <stop
                       key={stop.offset}
                       offset={stop.offset}
@@ -180,14 +153,10 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
                   x={0}
                   y={0}
                 >
-                  <rect
-                    fill={`url(#${id}-${index})`}
-                    height={innerHeight}
-                    width={innerWidth}
-                  />
+                  <rect fill={`url(#${id}-${index})`} height={innerHeight} width={innerWidth} />
                 </mask>
               </g>
-            )
+            ),
         )}
       </defs>
       {labels.map((label) => {
@@ -198,11 +167,7 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
         return (
           <g
             key={`${label.seriesIndex}-${label.index}`}
-            mask={
-              area.fadeValueLabels
-                ? `url(#${id}-${label.seriesIndex}-mask)`
-                : undefined
-            }
+            mask={area.fadeValueLabels ? `url(#${id}-${label.seriesIndex}-mask)` : undefined}
           >
             <text
               className="font-medium text-[10px]"

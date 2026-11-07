@@ -10,7 +10,7 @@ export interface TooltipRow {
   value: string | number;
 }
 
-export interface TooltipContentProps {
+interface TooltipContentProps {
   title?: ReactNode;
   /** Muted meta-size text after the title, e.g. the bucket size or the account. */
   meta?: ReactNode;
@@ -21,7 +21,7 @@ export interface TooltipContentProps {
   children?: ReactNode;
 }
 
-export interface TooltipHeaderProps {
+interface TooltipHeaderProps {
   children: ReactNode;
   /** Muted meta-size text after the title on the same baseline; truncates when long. */
   meta?: ReactNode;
@@ -40,19 +40,14 @@ function hasContent(node: ReactNode): boolean {
  * full-width border, with an optional muted `meta` after it. Use it at the top
  * of custom `ChartTooltip` `content`.
  */
-export function TooltipHeader({
-  children,
-  meta,
-  mono = false,
-  className,
-}: TooltipHeaderProps) {
+export function TooltipHeader({ children, meta, mono = false, className }: TooltipHeaderProps) {
   const withMeta = hasContent(meta);
   return (
     <div
       className={cn(
         "border-border-subtle border-b px-3.5 py-2.5 text-left font-medium text-chart-tooltip-foreground text-sm tabular-nums",
         withMeta && "flex min-w-0 items-baseline gap-2",
-        className
+        className,
       )}
     >
       {withMeta || mono ? (
@@ -71,13 +66,7 @@ export function TooltipHeader({
 
 TooltipHeader.displayName = "TooltipHeader";
 
-export function TooltipContent({
-  title,
-  meta,
-  mono,
-  rows,
-  children,
-}: TooltipContentProps) {
+export function TooltipContent({ title, meta, mono, rows, children }: TooltipContentProps) {
   const hasBody = rows.length > 0 || Boolean(children);
   return (
     <div>
@@ -100,14 +89,10 @@ export function TooltipContent({
                       className="size-2 shrink-0 rounded-full"
                       style={{ backgroundColor: row.color }}
                     />
-                    <span className="truncate text-chart-tooltip-muted text-sm">
-                      {row.label}
-                    </span>
+                    <span className="truncate text-chart-tooltip-muted text-sm">{row.label}</span>
                   </div>
                   <span className="text-right font-medium text-chart-tooltip-foreground text-sm tabular-nums">
-                    {typeof row.value === "number"
-                      ? intFmt(row.value)
-                      : row.value}
+                    {typeof row.value === "number" ? intFmt(row.value) : row.value}
                   </span>
                 </div>
               ))}
@@ -132,5 +117,3 @@ export function TooltipContent({
 }
 
 TooltipContent.displayName = "TooltipContent";
-
-export default TooltipContent;

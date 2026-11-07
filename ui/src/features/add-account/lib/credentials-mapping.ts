@@ -3,7 +3,7 @@ import type { CredentialsImportRequest } from "@/lib/api/types";
 /** A credentials item as pasted: any JSON value, read field by field. */
 export type CredentialSource = Record<string, unknown>;
 
-export type MappedCredential =
+type MappedCredential =
   | { kind: "request"; payload: CredentialsImportRequest }
   | { kind: "missingRefreshToken" };
 

@@ -4,8 +4,7 @@ import { roundTimeTicks } from "./x-axis";
 const at = (h: number, m: number, s = 0) => new Date(2026, 10, 5, h, m, s);
 const hm = (dates: Date[]) =>
   dates.map(
-    (d) =>
-      `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+    (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
   );
 
 describe("roundTimeTicks", () => {
@@ -32,11 +31,7 @@ describe("roundTimeTicks", () => {
   });
 
   it("counts four-hour steps from midnight", () => {
-    expect(hm(roundTimeTicks(at(1, 10), at(13, 0), 240))).toEqual([
-      "04:00",
-      "08:00",
-      "12:00",
-    ]);
+    expect(hm(roundTimeTicks(at(1, 10), at(13, 0), 240))).toEqual(["04:00", "08:00", "12:00"]);
   });
 
   it("returns nothing for an empty or invalid range", () => {

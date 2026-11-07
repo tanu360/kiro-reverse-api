@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { type AnimatedIconProps, useIconAnimation } from "@/lib/use-icon-animation";
 import { cn } from "@/lib/utils";
 
-export interface ChevronDownIconHandle {
+interface ChevronDownIconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }

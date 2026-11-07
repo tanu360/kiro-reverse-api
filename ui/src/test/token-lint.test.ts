@@ -1,5 +1,6 @@
 import { parse } from "@babel/parser";
 import { describe, expect, it } from "vitest";
+import { fields, isAstNode, isNode } from "./babel-ast";
 import allowlist from "./token-lint-allowlist.json";
 
 /*
@@ -110,9 +111,6 @@ interface Offence {
   match: string;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Babel AST nodes are walked generically.
-type Node = any;
-
 /** Every string in the file (literals and template parts), and native `title` attributes. */
 function lintSource(code: string, file: string): Offence[] {
   const ast = parse(code, { sourceType: "module", plugins: ["typescript", "jsx"] });
@@ -125,26 +123,26 @@ function lintSource(code: string, file: string): Offence[] {
       }
     }
   };
-  const walk = (node: Node): void => {
-    if (!node || typeof node.type !== "string") return;
+  const walk = (node: unknown): void => {
+    if (!isAstNode(node)) return;
     if (node.type === "ImportDeclaration" || node.type === "ExportAllDeclaration") return;
     const line = node.loc?.start.line ?? 0;
-    if (node.type === "StringLiteral") check(node.value, line);
-    else if (node.type === "TemplateElement") check(node.value.cooked ?? node.value.raw, line);
-    else if (node.type === "JSXOpeningElement" && node.name.type === "JSXIdentifier") {
-      const name: string = node.name.name;
+    if (isNode(node, "StringLiteral")) check(node.value, line);
+    else if (isNode(node, "TemplateElement")) check(node.value.cooked ?? node.value.raw, line);
+    else if (isNode(node, "JSXOpeningElement") && isNode(node.name, "JSXIdentifier")) {
+      const name = node.name.name;
       if (/^[a-z]/.test(name) && !SVG_ELEMENTS.has(name)) {
         for (const attr of node.attributes) {
-          if (attr.type === "JSXAttribute" && attr.name.name === "title") {
+          if (isNode(attr, "JSXAttribute") && attr.name.name === "title") {
             offences.push({ file, line, rule: "native-title", match: `<${name} title>` });
           }
         }
       }
     }
-    for (const [key, value] of Object.entries(node)) {
+    for (const [key, value] of fields(node)) {
       if (key === "loc" || key === "start" || key === "end" || key.endsWith("Comments")) continue;
       if (Array.isArray(value)) for (const child of value) walk(child);
-      else if (value && typeof value === "object") walk(value);
+      else walk(value);
     }
   };
   walk(ast.program);

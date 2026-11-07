@@ -11,9 +11,7 @@ import { translate } from "@/lib/i18n";
 
 export type SparklineCurve = "linear" | "monotone" | "natural" | "step";
 
-export type SparklineDataKey<T> =
-  | keyof T
-  | ((datum: T, index: number) => number);
+export type SparklineDataKey<T> = keyof T | ((datum: T, index: number) => number);
 
 export interface SparklinePadding {
   top: number;
@@ -33,8 +31,6 @@ export interface SparklineLayout {
   points: SparklinePoint[];
   /** Pixel y of the baseline (0, clamped into the domain). */
   baselineY: number;
-  /** Pixel width of one bar slot (bars only; 0 for line/area). */
-  band: number;
   domain: [number, number];
 }
 
@@ -47,7 +43,7 @@ const curves: Record<SparklineCurve, CurveFactory> = {
 
 export function resolveSparklinePadding(
   padding: number | Partial<SparklinePadding> | undefined,
-  fallback: number
+  fallback: number,
 ): SparklinePadding {
   if (typeof padding === "number" || padding === undefined) {
     const p = padding ?? fallback;
@@ -63,7 +59,7 @@ export function resolveSparklinePadding(
 
 export function resolveSparklineValues<T>(
   data: readonly T[],
-  dataKey: SparklineDataKey<T>
+  dataKey: SparklineDataKey<T>,
 ): number[] {
   return data.map((datum, index) => {
     const raw =
@@ -75,13 +71,10 @@ export function resolveSparklineValues<T>(
   });
 }
 
-/**
- * Value domain for the sparkline. Bars always include zero so heights read
- * honestly; line/area hug the data unless `includeZero` is set.
- */
+/** Value domain for the sparkline: it hugs the data unless `yDomain` pins an end. */
 export function computeSparklineDomain(
   values: readonly number[],
-  options: { yDomain?: [number?, number?]; includeZero?: boolean } = {}
+  options: { yDomain?: [number?, number?] } = {},
 ): [number, number] {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -99,10 +92,6 @@ export function computeSparklineDomain(
     min = 0;
     max = 0;
   }
-  if (options.includeZero) {
-    min = Math.min(min, 0);
-    max = Math.max(max, 0);
-  }
   min = options.yDomain?.[0] ?? min;
   max = options.yDomain?.[1] ?? max;
   if (min === max) {
@@ -119,10 +108,9 @@ export function computeSparklineLayout(
     height: number;
     padding: SparklinePadding;
     domain: [number, number];
-    kind: "point" | "band";
-  }
+  },
 ): SparklineLayout {
-  const { width, height, padding, domain, kind } = options;
+  const { width, height, padding, domain } = options;
   const innerWidth = Math.max(0, width - padding.left - padding.right);
   const innerHeight = Math.max(0, height - padding.top - padding.bottom);
   const [d0, d1] = domain;
@@ -130,27 +118,23 @@ export function computeSparklineLayout(
     padding.top + innerHeight - ((value - d0) / (d1 - d0)) * innerHeight;
 
   const n = values.length;
-  const band = kind === "band" && n > 0 ? innerWidth / n : 0;
   const step = n > 1 ? innerWidth / (n - 1) : 0;
 
   const points = values.map((value, i) => ({
-    x:
-      kind === "band"
-        ? padding.left + band * (i + 0.5)
-        : padding.left + (n > 1 ? step * i : innerWidth / 2),
+    x: padding.left + (n > 1 ? step * i : innerWidth / 2),
     y: Number.isFinite(value) ? yOf(value) : Number.NaN,
     value,
   }));
 
   const baseline = Math.min(Math.max(0, d0), d1);
-  return { points, baselineY: yOf(baseline), band, domain };
+  return { points, baselineY: yOf(baseline), domain };
 }
 
 const isDefined = (point: SparklinePoint) => Number.isFinite(point.y);
 
 export function buildSparklineLinePath(
   points: readonly SparklinePoint[],
-  curve: SparklineCurve
+  curve: SparklineCurve,
 ): string {
   return (
     d3Line<SparklinePoint>()
@@ -164,7 +148,7 @@ export function buildSparklineLinePath(
 export function buildSparklineAreaPath(
   points: readonly SparklinePoint[],
   curve: SparklineCurve,
-  baselineY: number
+  baselineY: number,
 ): string {
   return (
     d3Area<SparklinePoint>()
@@ -176,114 +160,6 @@ export function buildSparklineAreaPath(
   );
 }
 
-const round = (value: number) => Math.round(value * 100) / 100;
-
-/** One bar as a path segment, rounding the corners away from the baseline. */
-export function buildSparklineBarSegment(
-  cx: number,
-  barWidth: number,
-  y: number,
-  baselineY: number,
-  radius: number
-): string {
-  const height = Math.abs(baselineY - y);
-  if (height === 0 || barWidth <= 0) {
-    return "";
-  }
-  const x0 = round(cx - barWidth / 2);
-  const x1 = round(cx + barWidth / 2);
-  const r = Math.min(radius, barWidth / 2, height);
-  const up = y < baselineY;
-  const tip = round(y);
-  const base = round(baselineY);
-  if (r <= 0) {
-    return `M${x0},${base}V${tip}H${x1}V${base}Z`;
-  }
-  const dir = up ? 1 : -1;
-  const rr = round(r);
-  const sweep = up ? 1 : 0;
-  return (
-    `M${x0},${base}V${round(tip + dir * r)}` +
-    `A${rr},${rr} 0 0 ${sweep} ${round(x0 + r)},${tip}` +
-    `H${round(x1 - r)}` +
-    `A${rr},${rr} 0 0 ${sweep} ${x1},${round(tip + dir * r)}` +
-    `V${base}Z`
-  );
-}
-
-export function sparklineBarWidth(band: number, gap: number): number {
-  return Math.max(1, band - gap);
-}
-
-/**
- * Bar tip y for a point, pushed `minHeight` px away from the baseline when the
- * bar would be shorter, so zero and tiny values still read as a stub.
- */
-export function sparklineBarTipY(
-  point: SparklinePoint,
-  baselineY: number,
-  minHeight = 0
-): number {
-  if (minHeight <= 0 || Math.abs(baselineY - point.y) >= minHeight) {
-    return point.y;
-  }
-  return point.value < 0 ? baselineY + minHeight : baselineY - minHeight;
-}
-
-/**
- * All bars as a single path — one DOM node regardless of point count.
- * `indices` limits the path to those bars (one path per bar colour);
- * `minHeight` draws zero and tiny values as stubs.
- */
-export function buildSparklineBarsPath(
-  layout: SparklineLayout,
-  options: {
-    gap: number;
-    radius: number;
-    minHeight?: number;
-    indices?: readonly number[];
-  }
-): string {
-  const barWidth = sparklineBarWidth(layout.band, options.gap);
-  const minHeight = options.minHeight ?? 0;
-  let d = "";
-  const draw = (point: SparklinePoint | undefined) => {
-    if (point && Number.isFinite(point.y)) {
-      d += buildSparklineBarSegment(
-        point.x,
-        barWidth,
-        sparklineBarTipY(point, layout.baselineY, minHeight),
-        layout.baselineY,
-        options.radius
-      );
-    }
-  };
-  if (options.indices) {
-    for (const index of options.indices) {
-      draw(layout.points[index]);
-    }
-  } else {
-    for (const point of layout.points) {
-      draw(point);
-    }
-  }
-  return d;
-}
-
-/** True when there is data and no bar has a value other than 0 (nothing to compare yet). */
-export function isSparklineFlatZero(values: readonly number[]): boolean {
-  let any = false;
-  for (const value of values) {
-    if (Number.isFinite(value)) {
-      if (value !== 0) {
-        return false;
-      }
-      any = true;
-    }
-  }
-  return any;
-}
-
 /** Nearest data index for a pointer x position (in chart pixels). */
 export function sparklineIndexAtX(
   x: number,
@@ -291,10 +167,9 @@ export function sparklineIndexAtX(
     count: number;
     width: number;
     padding: SparklinePadding;
-    kind: "point" | "band";
-  }
+  },
 ): number | null {
-  const { count, width, padding, kind } = options;
+  const { count, width, padding } = options;
   if (count === 0) {
     return null;
   }
@@ -303,8 +178,7 @@ export function sparklineIndexAtX(
     return 0;
   }
   const t = (x - padding.left) / innerWidth;
-  const raw =
-    kind === "band" ? Math.floor(t * count) : Math.round(t * (count - 1));
+  const raw = Math.round(t * (count - 1));
   return Math.min(count - 1, Math.max(0, raw));
 }
 
@@ -316,9 +190,9 @@ function formatCompact(value: number, locale: string): string {
 }
 
 /** Message lookup for the summary; keys are `sparkline.*` in the `ui` namespace. */
-export type SparklineTranslate = (
+type SparklineTranslate = (
   key: "sparkline.empty" | "sparkline.summary" | "sparkline.summaryUp" | "sparkline.summaryDown",
-  params?: Record<string, string | number>
+  params?: Record<string, string | number>,
 ) => string;
 
 const englishSummary: SparklineTranslate = (key, params) => translate("en", "ui", key, params);
@@ -330,7 +204,7 @@ const englishSummary: SparklineTranslate = (key, params) => translate("en", "ui"
 export function describeSparkline(
   values: readonly number[],
   t: SparklineTranslate = englishSummary,
-  locale = "en"
+  locale = "en",
 ): string {
   const finite = values.filter(Number.isFinite);
   if (finite.length === 0) {
@@ -361,7 +235,7 @@ export function describeSparkline(
 export function interpolateSparklineLayout(
   from: SparklineLayout,
   to: SparklineLayout,
-  t: number
+  t: number,
 ): SparklineLayout {
   const m = from.points.length;
   const n = to.points.length;

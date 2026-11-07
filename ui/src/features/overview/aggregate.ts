@@ -86,7 +86,7 @@ export function peakCount(points: readonly TrafficPoint[]): number {
   return points.reduce((top, p) => Math.max(top, p.succeeded, p.failed, p.previous ?? 0), 0);
 }
 
-export interface HourDelta {
+interface HourDelta {
   current: number;
   previous: number;
   /** (current - previous) / previous; null when the previous hour is 0. */
@@ -106,14 +106,14 @@ export function hourDelta(cells: readonly HeatmapCell[], value: CellValue = requ
 }
 
 /** Minutes in the live series (/observe/overview `series`): the last half hour, oldest first. */
-export const SERIES_MINUTES = 30;
+const SERIES_MINUTES = 30;
 
 /**
  * Minutes per sparkline bar: the 30 per-minute points become 15 bars, wide enough to read in
  * the 48 to 96 px trend slot. Bars are cut from the newest end, so the last one always holds the
  * current (partial) minute.
  */
-export const BAR_MINUTES = 2;
+const BAR_MINUTES = 2;
 
 export type Bars = { value: number }[];
 
@@ -165,7 +165,7 @@ export function outcomeBars(
   };
 }
 
-export interface ModelSlice {
+interface ModelSlice {
   label: string;
   value: number;
   maxValue: number;

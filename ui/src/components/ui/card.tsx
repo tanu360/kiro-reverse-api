@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
  * a 12 px (title only) or 16 px (title and description) header, a 16 px panel and a slim footer.
  * Dividers between sections are the subtle hairline (--border-subtle).
  */
-export const cardVariants = cva(
-  "relative flex flex-col rounded-xl border text-card-foreground [&>[data-slot^=card-]]:border-border-subtle",
+const cardVariants = cva(
+  "relative flex flex-col rounded-xl border text-card-foreground *:data-[slot^=card-]:border-border-subtle",
   {
     defaultVariants: {
       divided: false,
@@ -37,13 +37,13 @@ export const cardVariants = cva(
       tone: {
         default: "border-border bg-card",
         danger:
-          "border-destructive/40 bg-error-surface [&>*+*]:border-destructive/24 [&>[data-slot^=card-]]:border-destructive/24",
+          "border-destructive/40 bg-error-surface [&>*+*]:border-destructive/24 *:data-[slot^=card-]:border-destructive/24",
       },
     },
   },
 );
 
-export type CardProps = useRender.ComponentProps<"div"> & VariantProps<typeof cardVariants>;
+type CardProps = useRender.ComponentProps<"div"> & VariantProps<typeof cardVariants>;
 
 export function Card({
   className,
@@ -127,9 +127,7 @@ function useWrappedActions(): {
           child instanceof HTMLElement &&
           child.getAttribute("data-slot") !== "icon-chip",
       );
-      setWrapped(
-        heading ? action.offsetTop >= heading.offsetTop + heading.offsetHeight : false,
-      );
+      setWrapped(heading ? action.offsetTop >= heading.offsetTop + heading.offsetHeight : false);
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -163,126 +161,6 @@ type HeaderProps = useRender.ComponentProps<"div"> & {
   icon?: IconSvgElement;
   iconTone?: "default" | "danger";
 };
-
-export function CardFrame({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"div">): React.ReactElement {
-  const defaultProps = {
-    className: cn(
-      "relative flex flex-col rounded-xl border border-border bg-card text-card-foreground [--clip-bottom:-1rem] [--clip-top:-1rem] has-data-[slot=table-container]:overflow-hidden *:data-[slot=card]:-m-px *:data-[slot=table-container]:-m-px *:data-[slot=table-container]:w-[calc(100%+2px)] *:not-first:data-[slot=card]:rounded-t-lg *:not-last:data-[slot=card]:rounded-b-lg *:data-[slot=card]:[clip-path:inset(var(--clip-top)_1px_var(--clip-bottom)_1px_round_calc(var(--radius-xl)-1px))] *:data-[slot=card]:last:[--clip-bottom:1px] *:data-[slot=card]:first:[--clip-top:1px]",
-      className,
-    ),
-    "data-slot": "card-frame",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
-}
-
-export function CardFrameHeader({
-  className,
-  render,
-  icon,
-  iconTone,
-  children,
-  ...props
-}: HeaderProps): React.ReactElement {
-  const defaultProps = {
-    children: (
-      <>
-        {icon ? <HeaderIcon icon={icon} tone={iconTone} /> : null}
-        {children}
-      </>
-    ),
-    className: cn(HEADER_CLASS, className),
-    "data-slot": "card-frame-header",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
-}
-
-export function CardFrameTitle({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"div">): React.ReactElement {
-  const defaultProps = {
-    className: cn(TITLE_CLASS, className),
-    "data-slot": "card-frame-title",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
-}
-
-export function CardFrameDescription({
-  className,
-  render,
-  variant,
-  ...props
-}: useRender.ComponentProps<"div"> &
-  VariantProps<typeof descriptionVariants>): React.ReactElement {
-  const defaultProps = {
-    className: cn(descriptionVariants({ variant }), className),
-    "data-slot": "card-frame-description",
-    "data-variant": variant ?? "stacked",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
-}
-
-export function CardFrameAction({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"div">): React.ReactElement {
-  const { ref, wrapped } = useWrappedActions();
-  const defaultProps = {
-    className: cn(ACTION_CLASS, className),
-    "data-slot": "card-frame-action",
-    "data-wrapped": wrapped ? "" : undefined,
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    ref,
-    render,
-  });
-}
-
-export function CardFrameFooter({
-  className,
-  render,
-  ...props
-}: useRender.ComponentProps<"div">): React.ReactElement {
-  const defaultProps = {
-    className: cn(FOOTER_CLASS, className),
-    "data-slot": "card-frame-footer",
-  };
-
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
-}
 
 export function CardHeader({
   className,
@@ -357,8 +235,7 @@ export function CardDescription({
   render,
   variant,
   ...props
-}: useRender.ComponentProps<"div"> &
-  VariantProps<typeof descriptionVariants>): React.ReactElement {
+}: useRender.ComponentProps<"div"> & VariantProps<typeof descriptionVariants>): React.ReactElement {
   const defaultProps = {
     className: cn(descriptionVariants({ variant }), className),
     "data-slot": "card-description",
@@ -426,5 +303,3 @@ export function CardFooter({
     render,
   });
 }
-
-export { CardPanel as CardContent };

@@ -54,28 +54,16 @@ export const AreaGradientDefs = memo(function AreaGradientDefs({
     <defs>
       {isPatternFill ? null : (
         <linearGradient id={gradientId} x1="0%" x2="0%" y1="0%" y2="100%">
-          <stop
-            offset="0%"
-            style={{ stopColor: fill, stopOpacity: fillOpacity }}
-          />
-          <stop
-            offset={midOffset}
-            style={{ stopColor: fill, stopOpacity: gradientToOpacity }}
-          />
+          <stop offset="0%" style={{ stopColor: fill, stopOpacity: fillOpacity }} />
+          <stop offset={midOffset} style={{ stopColor: fill, stopOpacity: gradientToOpacity }} />
           {span < 1 ? (
-            <stop
-              offset="100%"
-              style={{ stopColor: fill, stopOpacity: gradientToOpacity }}
-            />
+            <stop offset="100%" style={{ stopColor: fill, stopOpacity: gradientToOpacity }} />
           ) : null}
         </linearGradient>
       )}
 
       {strokeStops ? (
-        <linearGradient
-          id={strokeGradientId}
-          {...viewportFadeGradientAttrs(innerWidth)}
-        >
+        <linearGradient id={strokeGradientId} {...viewportFadeGradientAttrs(innerWidth)}>
           {strokeStops.map((stop) => (
             <stop
               key={stop.offset}
@@ -88,10 +76,7 @@ export const AreaGradientDefs = memo(function AreaGradientDefs({
 
       {edgeStops ? (
         <>
-          <linearGradient
-            id={edgeGradientId}
-            {...viewportFadeGradientAttrs(innerWidth)}
-          >
+          <linearGradient id={edgeGradientId} {...viewportFadeGradientAttrs(innerWidth)}>
             {edgeStops.map((stop) => (
               <stop
                 key={stop.offset}

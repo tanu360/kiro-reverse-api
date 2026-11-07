@@ -14,20 +14,16 @@ import { fastShapePath } from "./fast-path";
  * - An empty result (no data) becomes `""`, never `null`.
  */
 
-export type PathAccessor<Datum> = (
-  datum: Datum,
-  index: number,
-  data: Datum[]
-) => number;
+type PathAccessor<Datum> = (datum: Datum, index: number, data: Datum[]) => number;
 
-export interface LinePathConfig<Datum> {
+interface LinePathConfig<Datum> {
   x?: PathAccessor<Datum>;
   y?: PathAccessor<Datum>;
   defined?: (datum: Datum, index: number, data: Datum[]) => boolean;
   curve?: CurveFactory;
 }
 
-export interface AreaClosedConfig<Datum> extends LinePathConfig<Datum> {
+interface AreaClosedConfig<Datum> extends LinePathConfig<Datum> {
   /** Baseline. Default: `yScale.range()[0]`. */
   y0?: number | PathAccessor<Datum>;
   /** Only read when `y0` is omitted. */
@@ -37,7 +33,7 @@ export interface AreaClosedConfig<Datum> extends LinePathConfig<Datum> {
 /** `d` of visx `<LinePath data={data} … />`. */
 export function linePathD<Datum>(
   data: Datum[],
-  { x, y, defined, curve }: LinePathConfig<Datum>
+  { x, y, defined, curve }: LinePathConfig<Datum>,
 ): string {
   const path = line<Datum>();
   if (x) {
@@ -58,7 +54,7 @@ export function linePathD<Datum>(
 /** `d` of visx `<AreaClosed data={data} … />`. */
 export function areaClosedD<Datum>(
   data: Datum[],
-  { x, y, y0, yScale, defined, curve }: AreaClosedConfig<Datum>
+  { x, y, y0, yScale, defined, curve }: AreaClosedConfig<Datum>,
 ): string {
   const path = area<Datum>();
   if (x) {
@@ -86,7 +82,7 @@ export function areaClosedD<Datum>(
   return fastShapePath(path, data);
 }
 
-export type LinePathProps = Omit<SVGProps<SVGPathElement>, "d" | "ref"> & {
+type LinePathProps = Omit<SVGProps<SVGPathElement>, "d" | "ref"> & {
   /** Path data, e.g. from {@link linePathD}. */
   d: string;
   /** Ref to the `<path>` (React 18 compatible, like visx `innerRef`). */
@@ -99,13 +95,6 @@ export type LinePathProps = Omit<SVGProps<SVGPathElement>, "d" | "ref"> & {
  * lone defined point between gaps stays visible), then every other prop in
  * the order given. Props that repeat an earlier key keep its position.
  */
-export function LinePath({
-  d,
-  fill = "transparent",
-  innerRef,
-  ...rest
-}: LinePathProps) {
-  return (
-    <path d={d} fill={fill} ref={innerRef} strokeLinecap="round" {...rest} />
-  );
+export function LinePath({ d, fill = "transparent", innerRef, ...rest }: LinePathProps) {
+  return <path d={d} fill={fill} ref={innerRef} strokeLinecap="round" {...rest} />;
 }

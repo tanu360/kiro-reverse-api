@@ -37,16 +37,12 @@ const alertVariants = cva(
   },
 );
 
-export type AlertVariant = NonNullable<VariantProps<typeof alertVariants>["variant"]>;
-export type AlertSize = NonNullable<VariantProps<typeof alertVariants>["size"]>;
-
 export function Alert({
   className,
   variant,
   size,
   ...props
-}: React.ComponentProps<"div"> &
-  VariantProps<typeof alertVariants>): React.ReactElement {
+}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>): React.ReactElement {
   return (
     <div
       className={cn(alertVariants({ size, variant }), className)}
@@ -77,10 +73,7 @@ export function AlertDescription({
 }: React.ComponentProps<"div">): React.ReactElement {
   return (
     <div
-      className={cn(
-        "flex flex-col gap-2.5 [svg~&]:col-start-2",
-        className,
-      )}
+      className={cn("flex flex-col gap-2.5 [svg~&]:col-start-2", className)}
       data-slot="alert-description"
       {...props}
     />

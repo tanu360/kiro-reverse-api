@@ -56,7 +56,7 @@ const ACCOUNT_COUNT = 120;
 
 type StoredKey = ApiKey & { key: string };
 
-export interface FullDataset {
+interface FullDataset {
   accounts: Account[];
   secrets: Record<string, AccountFull>;
   apiKeys: StoredKey[];

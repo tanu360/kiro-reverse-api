@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { numberFormat } from "@/lib/format";
 import { type Lang, useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, placeholderKeys } from "@/lib/utils";
 import { InfoHint } from "./info-hint";
 
 export interface StatMetric {
@@ -45,7 +45,7 @@ export interface StatTileProps {
   /** A muted line in the delta row, after the delta or in its place ("94 % capacity used"). */
   caption?: ReactNode;
   /**
-   * The trend slot: a BarSparkline, a Meter, or nothing. Decorative; wrapped in aria-hidden.
+   * The trend slot: an area sparkline, a Meter, or nothing. Decorative; wrapped in aria-hidden.
    * Where it sits and how tall it is follows `trendPlacement`.
    */
   trend?: ReactNode;
@@ -62,9 +62,6 @@ export interface StatTileProps {
   /** Layout classes only. */
   className?: string;
 }
-
-/** @deprecated Use StatTileProps. */
-export type StatCardProps = StatTileProps;
 
 export type StatTrendPlacement = "inline" | "aside";
 
@@ -316,7 +313,7 @@ export function StatTile({
           className={cn(
             // The size first: a later font-size class makes cn() drop `leading-none`.
             VALUE_SIZE[size],
-            "min-w-0 break-words font-semibold text-foreground leading-none tabular-nums",
+            "min-w-0 wrap-break-word font-semibold text-foreground leading-none tabular-nums",
             aside && ASIDE_GUTTER,
           )}
           data-slot="stat-value"
@@ -372,7 +369,7 @@ export function StatTile({
               <dd
                 className={cn(
                   "font-medium text-sm tabular-nums",
-                  metric.wrap ? "break-words" : "truncate",
+                  metric.wrap ? "wrap-break-word" : "truncate",
                   metric.tone === "danger" && "text-destructive-foreground",
                   metric.tone === "muted" && "text-muted-foreground",
                 )}
@@ -444,9 +441,8 @@ export function StatTileSkeleton({
       )}
       {cells > 0 ? (
         <div aria-hidden="true" className={cn(METRICS_CLASS, placement !== "joined" && "mt-auto")}>
-          {Array.from({ length: cells }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder cells never reorder.
-            <div className="flex flex-col gap-0.5" key={index}>
+          {placeholderKeys("metric", cells).map((key) => (
+            <div className="flex flex-col gap-0.5" key={key}>
               <Skeleton className="h-4 w-2/3" />
               <Skeleton className="h-5 w-1/2" />
             </div>
@@ -456,6 +452,3 @@ export function StatTileSkeleton({
     </TileShell>
   );
 }
-
-/** @deprecated A standalone StatTile in its own card; use StatTile (inside a StatGroup). */
-export const StatCard = StatTile;

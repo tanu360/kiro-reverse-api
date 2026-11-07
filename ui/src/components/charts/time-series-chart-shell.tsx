@@ -16,15 +16,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  DEFAULT_ANIMATION_EASING,
-  DEFAULT_CHART_ENTER_TRANSITION,
-} from "./animation";
-import {
-  type BandConfig,
-  bandKeysByAxis,
-  extractBandConfigs,
-} from "./band-config";
+import { DEFAULT_ANIMATION_EASING, DEFAULT_CHART_ENTER_TRANSITION } from "./animation";
+import { type BandConfig, bandKeysByAxis, extractBandConfigs } from "./band-config";
 import {
   isClipExcludedComponent,
   isPostOverlayComponent,
@@ -50,10 +43,7 @@ import {
   isChartInteractionPhase,
 } from "./chart-phase";
 import { ChartRevealClip } from "./chart-reveal-clip";
-import {
-  decimateTimeSeries,
-  maxRenderPointsForWidth,
-} from "./decimate-time-series";
+import { decimateTimeSeries, maxRenderPointsForWidth } from "./decimate-time-series";
 import { filterDataByXDomain } from "./filter-data-by-x-domain";
 import {
   generateChartSkeletonData,
@@ -64,15 +54,9 @@ import {
   mergeProjectionXDomainMax,
   mergeProjectionYDomain,
 } from "./projection-config";
-import {
-  extractReferenceAreaConfigs,
-  type ReferenceAreaConfig,
-} from "./reference-area-config";
+import { extractReferenceAreaConfigs, type ReferenceAreaConfig } from "./reference-area-config";
 import { ReferenceAreaRegistrationContext } from "./reference-area-registration-context";
-import {
-  computeSeriesBarRevealClipPadding,
-  computeSeriesBarWidth,
-} from "./series-bar-layout";
+import { computeSeriesBarRevealClipPadding, computeSeriesBarWidth } from "./series-bar-layout";
 import { useStaticChartPreview } from "./static-chart-preview-context";
 import { useAnimatedYDomains } from "./use-animated-y-domains";
 import { useChartInteraction } from "./use-chart-interaction";
@@ -83,10 +67,7 @@ import {
   getPrimaryYScale,
   groupLinesByYAxisId,
 } from "./y-axis-scales";
-import {
-  computeYDomainsByAxis,
-  resolveTimeSeriesYDomain,
-} from "./y-domain-utils";
+import { computeYDomainsByAxis, resolveTimeSeriesYDomain } from "./y-domain-utils";
 
 /**
  * Bleed around the series reveal clip so glyphs centred on the plot edge
@@ -165,7 +146,7 @@ function classifyChartChildren(children: ReactNode): ClassifiedChartChildren {
   return layers;
 }
 
-export interface TimeSeriesChartInnerProps {
+interface TimeSeriesChartInnerProps {
   width: number;
   height: number;
   data: Record<string, unknown>[];
@@ -263,15 +244,11 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
   const resolveYDomain = useCallback(
     (sourceData: Record<string, unknown>[], dataKeys: string[]) => {
       const axisGroups = groupLinesByYAxisId(lines);
-      const usesDefaultOnly =
-        axisGroups.size === 1 && axisGroups.has(DEFAULT_Y_AXIS_ID);
-      const domainMax =
-        usesDefaultOnly && yScaleDomainMax != null
-          ? yScaleDomainMax
-          : undefined;
+      const usesDefaultOnly = axisGroups.size === 1 && axisGroups.has(DEFAULT_Y_AXIS_ID);
+      const domainMax = usesDefaultOnly && yScaleDomainMax != null ? yScaleDomainMax : undefined;
       return resolveTimeSeriesYDomain(sourceData, dataKeys, domainMax);
     },
-    [lines, yScaleDomainMax]
+    [lines, yScaleDomainMax],
   );
 
   const skeletonData = useMemo(() => {
@@ -310,12 +287,12 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
       const value = d[xDataKey];
       return value instanceof Date ? value : new Date(value as string | number);
     },
-    [xDataKey]
+    [xDataKey],
   );
 
   const bisectDate = useMemo(
     () => bisector<Record<string, unknown>, Date>((d) => xAccessor(d)).left,
-    [xAccessor]
+    [xAccessor],
   );
 
   const visiblePlotData = useMemo(() => {
@@ -325,10 +302,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
     return filterDataByXDomain(plotData, xDomain, xAccessor);
   }, [plotData, xDomain, xAccessor]);
 
-  const projectionConfigs = useMemo(
-    () => extractProjectionLineConfigs(children),
-    [children]
-  );
+  const projectionConfigs = useMemo(() => extractProjectionLineConfigs(children), [children]);
 
   // `<Band>` edges extend the y-domain and survive decimation, but are not
   // series: they never enter `lines`. The tooltip reads `bands` separately for
@@ -337,16 +311,13 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
   // `children` so hover re-renders skip it.
   const bandConfigsSignature = useMemo(
     () => JSON.stringify(extractBandConfigs(children)),
-    [children]
+    [children],
   );
   const bandConfigs = useMemo(
     () => JSON.parse(bandConfigsSignature) as BandConfig[],
-    [bandConfigsSignature]
+    [bandConfigsSignature],
   );
-  const bandKeysByAxisId = useMemo(
-    () => bandKeysByAxis(bandConfigs),
-    [bandConfigs]
-  );
+  const bandKeysByAxisId = useMemo(() => bandKeysByAxis(bandConfigs), [bandConfigs]);
 
   const xScale = useMemo(() => {
     const minTime = xDomain
@@ -378,18 +349,12 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
         }
       }
     }
-    return decimateTimeSeries(
-      seriesSourceData,
-      maxRenderPointsForWidth(innerWidth),
-      valueKeys
-    );
+    return decimateTimeSeries(seriesSourceData, maxRenderPointsForWidth(innerWidth), valueKeys);
   }, [seriesSourceData, innerWidth, lines, bandKeysByAxisId]);
 
   const columnWidth = useMemo(() => {
     const slotCount =
-      xDomain && xDomainSlotCount != null
-        ? xDomainSlotCount
-        : visiblePlotData.length;
+      xDomain && xDomainSlotCount != null ? xDomainSlotCount : visiblePlotData.length;
     if (slotCount < 2) {
       return 0;
     }
@@ -402,7 +367,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
         lines,
         resolveDomain: (dataKeys) => resolveYDomain(skeletonData, dataKeys),
       }),
-    [lines, resolveYDomain, skeletonData]
+    [lines, resolveYDomain, skeletonData],
   );
 
   // Primitives, so an inline `yDomain={[0, top]}` literal doesn't re-tween.
@@ -412,8 +377,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
     const base = computeYDomainsByAxis({
       extraKeysByAxis: bandKeysByAxisId,
       lines,
-      resolveDomain: (dataKeys) =>
-        resolveYDomain(xDomain ? visiblePlotData : data, dataKeys),
+      resolveDomain: (dataKeys) => resolveYDomain(xDomain ? visiblePlotData : data, dataKeys),
     });
     if (fixedYMin != null && fixedYMax != null && fixedYMax > fixedYMin) {
       for (const axisId of Object.keys(base)) {
@@ -425,18 +389,14 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
     }
     const merged: Record<string, [number, number]> = { ...base };
     for (const axisId of Object.keys(base)) {
-      merged[axisId] = mergeProjectionYDomain(
-        base[axisId] ?? [0, 100],
-        projectionConfigs,
-        axisId
-      );
+      merged[axisId] = mergeProjectionYDomain(base[axisId] ?? [0, 100], projectionConfigs, axisId);
     }
     for (const config of projectionConfigs) {
       if (!merged[config.yAxisId]) {
         merged[config.yAxisId] = mergeProjectionYDomain(
           [0, 100],
           projectionConfigs,
-          config.yAxisId
+          config.yAxisId,
         );
       }
     }
@@ -460,8 +420,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
     onSettled: notifyYDomainTweenComplete,
     skeletonByAxis: yDomainSkeletonByAxis,
     targetByAxis: yDomainTargetByAxis,
-    tweenOnTargetChange:
-      yDomainTween || (tweenYDomainOnXDomainChange && xDomain != null),
+    tweenOnTargetChange: yDomainTween || (tweenYDomainOnXDomainChange && xDomain != null),
   });
 
   const yDomainsForScales = animatedYDomainsByAxis;
@@ -473,47 +432,41 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
         innerHeight,
         lines,
       }),
-    [yDomainsForScales, innerHeight, lines]
+    [yDomainsForScales, innerHeight, lines],
   );
 
   const fallbackYScale = useMemo(
     () => scaleLinear().domain([0, 100]).nice().range([innerHeight, 0]),
-    [innerHeight]
+    [innerHeight],
   );
   const yScale = getPrimaryYScale(yScales, fallbackYScale);
 
   const dateLabels = useMemo(
     () =>
       lazyLabels(visiblePlotData.length, (index) =>
-        shortDateFmt.format(
-          xAccessor(visiblePlotData[index] as Record<string, unknown>)
-        )
+        shortDateFmt.format(xAccessor(visiblePlotData[index] as Record<string, unknown>)),
       ),
-    [visiblePlotData, xAccessor]
+    [visiblePlotData, xAccessor],
   );
 
   const canInteract = isLoaded && isChartInteractionPhase(chartPhase);
 
   // Hover lives in `hoverStore`, not state: pointer moves re-render only the
   // hover consumers below `ChartHoverStoreProvider`, not this shell.
-  const { hoverStore, interactionHandlers, interactionStyle } =
-    useChartInteraction({
-      bisectDate,
-      canInteract,
-      bands: bandConfigs,
-      data: visiblePlotData,
-      lines,
-      margin,
-      xAccessor,
-      xScale,
-      yScale,
-      yScales,
-    });
+  const { hoverStore, interactionHandlers, interactionStyle } = useChartInteraction({
+    bisectDate,
+    canInteract,
+    bands: bandConfigs,
+    data: visiblePlotData,
+    lines,
+    margin,
+    xAccessor,
+    xScale,
+    yScale,
+    yScales,
+  });
 
-  const memoizedLayers = useMemo(
-    () => classifyChartChildren(children),
-    [children]
-  );
+  const memoizedLayers = useMemo(() => classifyChartChildren(children), [children]);
   // A lazy child that hasn't loaded can't be classified yet: re-classify on
   // every render until it resolves (the pre-memo behaviour).
   const {
@@ -522,34 +475,29 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
     underlayChildren,
     preOverlayChildren,
     postOverlayChildren,
-  } = memoizedLayers.hasPendingLazyChild
-    ? classifyChartChildren(children)
-    : memoizedLayers;
+  } = memoizedLayers.hasPendingLazyChild ? classifyChartChildren(children) : memoizedLayers;
 
   const [registeredReferenceAreas, setRegisteredReferenceAreas] = useState(
-    () => new Map<string, ReferenceAreaConfig>()
+    () => new Map<string, ReferenceAreaConfig>(),
   );
 
-  const registerReferenceArea = useCallback(
-    (id: string, config: ReferenceAreaConfig) => {
-      setRegisteredReferenceAreas((prev) => {
-        const existing = prev.get(id);
-        if (
-          existing &&
-          existing.yAxisId === config.yAxisId &&
-          existing.y1 === config.y1 &&
-          existing.y2 === config.y2 &&
-          existing.axisLabelColor === config.axisLabelColor
-        ) {
-          return prev;
-        }
-        const next = new Map(prev);
-        next.set(id, config);
-        return next;
-      });
-    },
-    []
-  );
+  const registerReferenceArea = useCallback((id: string, config: ReferenceAreaConfig) => {
+    setRegisteredReferenceAreas((prev) => {
+      const existing = prev.get(id);
+      if (
+        existing &&
+        existing.yAxisId === config.yAxisId &&
+        existing.y1 === config.y1 &&
+        existing.y2 === config.y2 &&
+        existing.axisLabelColor === config.axisLabelColor
+      ) {
+        return prev;
+      }
+      const next = new Map(prev);
+      next.set(id, config);
+      return next;
+    });
+  }, []);
 
   const unregisterReferenceArea = useCallback((id: string) => {
     setRegisteredReferenceAreas((prev) => {
@@ -564,7 +512,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
 
   const referenceAreaRegistration = useMemo(
     () => ({ registerReferenceArea, unregisterReferenceArea }),
-    [registerReferenceArea, unregisterReferenceArea]
+    [registerReferenceArea, unregisterReferenceArea],
   );
 
   const referenceAreas = useMemo(() => {
@@ -659,17 +607,13 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
       composedStacked,
       composedStackOffsets,
       composedStackGap,
-    ]
+    ],
   );
 
   const useClipReveal =
-    !staticPreview &&
-    renderData.length > 1 &&
-    innerWidth > 0 &&
-    animationDuration > 0;
+    !staticPreview && renderData.length > 1 && innerWidth > 0 && animationDuration > 0;
   const isRevealAnimating = chartPhase === "revealing";
-  const isRevealConcealing =
-    chartPhase === "exitingReady" && animationDuration > 0;
+  const isRevealConcealing = chartPhase === "exitingReady" && animationDuration > 0;
 
   const effectiveEnterTransition = useMemo<Transition>(
     () =>
@@ -678,7 +622,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
         ...DEFAULT_CHART_ENTER_TRANSITION,
         duration: animationDuration / 1000,
       } satisfies Transition),
-    [animationDuration, enterTransition]
+    [animationDuration, enterTransition],
   );
 
   const barRevealClipPadding = useMemo(() => {
@@ -715,23 +659,13 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
   const revealClipPadding = xDomain
     ? barRevealClipPadding
     : Math.max(barRevealClipPadding, SERIES_CLIP_EDGE_BLEED);
-  const revealClipPaddingY = Math.max(
-    barRevealClipPadding,
-    SERIES_CLIP_EDGE_BLEED
-  );
+  const revealClipPaddingY = Math.max(barRevealClipPadding, SERIES_CLIP_EDGE_BLEED);
 
   return (
-    <ReferenceAreaRegistrationContext.Provider
-      value={referenceAreaRegistration}
-    >
+    <ReferenceAreaRegistrationContext.Provider value={referenceAreaRegistration}>
       <ChartStableContextProvider value={contextValue}>
         <ChartHoverStoreProvider store={hoverStore}>
-          <svg
-            aria-hidden="true"
-            className="overflow-visible"
-            height={height}
-            width={width}
-          >
+          <svg aria-hidden="true" className="overflow-visible" height={height} width={width}>
             <OptionalDefs>
               {defsChildren}
               {useClipReveal ? (
@@ -741,9 +675,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
                   enterTransition={effectiveEnterTransition}
                   height={innerHeight}
                   mode={isRevealConcealing ? "conceal" : "reveal"}
-                  onComplete={
-                    isRevealConcealing ? notifyRevealConcealComplete : undefined
-                  }
+                  onComplete={isRevealConcealing ? notifyRevealConcealComplete : undefined}
                   padding={revealClipPadding}
                   paddingY={revealClipPaddingY}
                   revealEpoch={isRevealConcealing ? concealEpoch : revealEpoch}
@@ -752,33 +684,19 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
               ) : null}
             </OptionalDefs>
 
-            <rect
-              fill="transparent"
-              height={height}
-              width={width}
-              x={0}
-              y={0}
-            />
+            <rect fill="transparent" height={height} width={width} x={0} y={0} />
 
             <g
               {...interactionHandlers}
               style={interactionStyle}
               transform={`translate(${margin.left},${margin.top})`}
             >
-              <rect
-                fill="transparent"
-                height={innerHeight}
-                width={innerWidth}
-                x={0}
-                y={0}
-              />
+              <rect fill="transparent" height={innerHeight} width={innerWidth} x={0} y={0} />
 
               {clipExcludedChildren}
               {underlayChildren}
               {useClipReveal ? (
-                <g clipPath={`url(#${uniqueClipPathId})`}>
-                  {preOverlayChildren}
-                </g>
+                <g clipPath={`url(#${uniqueClipPathId})`}>{preOverlayChildren}</g>
               ) : (
                 preOverlayChildren
               )}

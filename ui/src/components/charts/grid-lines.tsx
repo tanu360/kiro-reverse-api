@@ -7,7 +7,7 @@ import type { CSSProperties, ReactElement, SVGProps } from "react";
  */
 
 /** Any scale a grid can read: d3 linear / time / band / point. */
-export interface GridScale<Value> {
+interface GridScale<Value> {
   (value: Value): number | { valueOf(): number } | undefined;
   domain(): Value[];
   ticks?: (count?: number) => Value[];
@@ -19,10 +19,10 @@ export interface GridScale<Value> {
  * `scale.ticks(numTicks)`, else the domain thinned to about `numTicks`
  * entries (every `round((n - 1) / numTicks)`-th value) when it is longer.
  */
-export function gridTickValues<Value>(
+function gridTickValues<Value>(
   scale: GridScale<Value>,
   numTicks: number | undefined = 10,
-  tickValues?: Value[]
+  tickValues?: Value[],
 ): Value[] {
   if (tickValues) {
     return tickValues;
@@ -36,7 +36,7 @@ export function gridTickValues<Value>(
       (_, index, all) =>
         numTicks == null ||
         all.length <= numTicks ||
-        index % Math.round((all.length - 1) / numTicks) === 0
+        index % Math.round((all.length - 1) / numTicks) === 0,
     );
 }
 
@@ -44,21 +44,19 @@ export function gridTickValues<Value>(
  * Pixel position of each grid line: `scale(tick)` (0 when unmapped) plus
  * `offset` plus half the band for band scales (visx `getScaleBandwidth`).
  */
-export function gridLinePositions<Value>(
+function gridLinePositions<Value>(
   scale: GridScale<Value>,
   {
     numTicks,
     offset,
     tickValues,
-  }: { numTicks?: number; offset?: number; tickValues?: Value[] } = {}
+  }: { numTicks?: number; offset?: number; tickValues?: Value[] } = {},
 ): number[] {
-  const bandOffset =
-    "bandwidth" in scale && scale.bandwidth ? scale.bandwidth() / 2 : 0;
+  const bandOffset = "bandwidth" in scale && scale.bandwidth ? scale.bandwidth() / 2 : 0;
   const scaleOffset = (offset ?? 0) + bandOffset;
   return gridTickValues(scale, numTicks, tickValues).map((tick) => {
     const mapped = scale(tick);
-    const value =
-      mapped != null && typeof mapped === "object" ? mapped.valueOf() : mapped;
+    const value = mapped != null && typeof mapped === "object" ? mapped.valueOf() : mapped;
     return (value ?? 0) + scaleOffset;
   });
 }
@@ -88,12 +86,12 @@ interface GridLinesBaseProps<Value> extends GridLineSvgProps {
   strokeDasharray?: string;
 }
 
-export interface GridRowsProps<Value> extends GridLinesBaseProps<Value> {
+interface GridRowsProps<Value> extends GridLinesBaseProps<Value> {
   /** Line length. */
   width: number;
 }
 
-export interface GridColumnsProps<Value> extends GridLinesBaseProps<Value> {
+interface GridColumnsProps<Value> extends GridLinesBaseProps<Value> {
   /** Line length. */
   height: number;
 }
@@ -117,7 +115,7 @@ function gridLine(
     strokeDasharray?: string;
     lineStyle?: CSSProperties;
     rest: GridLineSvgProps;
-  }
+  },
 ) {
   const rectilinear = x1 === x2 || y1 === y2;
   // An object, not JSX attributes, so the formatter can't re-sort them.
@@ -143,7 +141,7 @@ function gridLine(
  */
 function wrapGridLines(
   lines: ReactElement[],
-  { className, left, top }: { className?: string; left: number; top: number }
+  { className, left, top }: { className?: string; left: number; top: number },
 ) {
   if (left === 0 && top === 0 && !className) {
     return <>{lines}</>;
@@ -178,7 +176,7 @@ export function GridRows<Value>({
       strokeDasharray,
       lineStyle,
       rest,
-    })
+    }),
   );
   return wrapGridLines(lines, { className, left, top });
 }
@@ -206,7 +204,7 @@ export function GridColumns<Value>({
       strokeDasharray,
       lineStyle,
       rest,
-    })
+    }),
   );
   return wrapGridLines(lines, { className, left, top });
 }

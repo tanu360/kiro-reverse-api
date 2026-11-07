@@ -23,7 +23,7 @@ const DAY_MS = 86_400_000;
 // Labels
 // ---------------------------------------------------------------------------
 
-export type SubscriptionTier = "power" | "proPlus" | "pro" | "free";
+type SubscriptionTier = "power" | "proPlus" | "pro" | "free";
 
 /** Checked in this order: POWER, PRO_PLUS/PROPLUS, PRO, FREE. Empty is Free; unknown is null. */
 export function subscriptionTier(type: string): SubscriptionTier | null {
@@ -77,7 +77,7 @@ export function isApiKeyAccount(account: Pick<Account, "authMethod">): boolean {
  * The banStatus the server writes when an account is switched off, by the admin or by the pool
  * (config.SetAccountEnabled, pool DisableAccount). It reads as Disabled, not as a ban.
  */
-export const DISABLED_BAN_STATUS = "DISABLED";
+const DISABLED_BAN_STATUS = "DISABLED";
 
 /** banStatus is set and not ACTIVE: the server holds the account back (config.go). */
 export function isHeld(account: Pick<Account, "banStatus">): boolean {
@@ -90,7 +90,7 @@ export function isBanned(account: Pick<Account, "banStatus">): boolean {
 }
 
 /** Same rule as the server's exhausted check (pool/account.go). */
-export function isOutOfCredits(account: Pick<Account, "usageLimit" | "usageCurrent">): boolean {
+function isOutOfCredits(account: Pick<Account, "usageLimit" | "usageCurrent">): boolean {
   return account.usageLimit > 0 && account.usageCurrent >= account.usageLimit;
 }
 
@@ -109,7 +109,7 @@ export function accountStatus(account: Account, nowSec: number): AccountStatus {
 }
 
 /** 0 for the worst status, rising to `active`. */
-export function statusRank(status: AccountStatus): number {
+function statusRank(status: AccountStatus): number {
   return ACCOUNT_STATUSES.indexOf(status);
 }
 
@@ -131,7 +131,7 @@ export function statusFilterGroup(
 }
 
 /** Whether a row status passes the `status` filter; `attention` takes the whole group. */
-export function matchesStatus(status: AccountStatus, filter: AccountStatusFilter): boolean {
+function matchesStatus(status: AccountStatus, filter: AccountStatusFilter): boolean {
   return filter === "attention" ? statusGroup(status) === "attention" : status === filter;
 }
 
@@ -157,12 +157,12 @@ export function authKey(account: Pick<Account, "provider" | "authMethod">): stri
 }
 
 /** A plan tier, or the raw subscription type when the tier is unknown. */
-export function planKey(account: Pick<Account, "subscriptionType">): string {
+function planKey(account: Pick<Account, "subscriptionType">): string {
   return subscriptionTier(account.subscriptionType) ?? account.subscriptionType;
 }
 
 /** The OAuth region; an empty one is us-east-1, as the detail sheet shows it. */
-export function regionKey(account: Pick<Account, "region">): string {
+function regionKey(account: Pick<Account, "region">): string {
   return account.region || "us-east-1";
 }
 
@@ -275,7 +275,7 @@ function optionLabel(
 }
 
 /** The usage fraction a row shows: plan credits, else trial credits; -1 without either. */
-export function usageFraction(account: Account): number {
+function usageFraction(account: Account): number {
   if (account.usageLimit > 0) return Number(account.usagePercent) || 0;
   if (account.trialUsageLimit > 0) return Number(account.trialUsagePercent) || 0;
   return -1;
@@ -382,7 +382,7 @@ export function planLabel(
   return account.subscriptionTitle || account.subscriptionType || EMPTY;
 }
 
-export type CreditTone = "default" | "warning" | "destructive";
+type CreditTone = "default" | "warning" | "destructive";
 
 /** Warning over 70 %, destructive over 90 % (old UI bar classes). */
 export function creditTone(pct: number): CreditTone {
@@ -391,7 +391,7 @@ export function creditTone(pct: number): CreditTone {
   return "default";
 }
 
-export type TrialExpiry = { kind: "expired" } | { kind: "today" } | { kind: "days"; days: number };
+type TrialExpiry = { kind: "expired" } | { kind: "today" } | { kind: "days"; days: number };
 
 /** Label for a trial expiry: none for 0 or more than 7 days away. */
 export function trialExpiry(trialExpiresAt: number, nowMs: number): TrialExpiry | null {
@@ -403,7 +403,7 @@ export function trialExpiry(trialExpiresAt: number, nowMs: number): TrialExpiry 
   return null;
 }
 
-export type TokenExpiry =
+type TokenExpiry =
   | { kind: "none" }
   | { kind: "expired" }
   | { kind: "minutes" | "hours" | "days"; value: number };
@@ -523,7 +523,7 @@ export function overageCapable(account: Pick<Account, "overageCapability">): boo
 // ---------------------------------------------------------------------------
 
 /** How many failed accounts a result toast names before it says "and N more". */
-export const FAILURE_NAMES_SHOWN = 3;
+const FAILURE_NAMES_SHOWN = 3;
 
 /**
  * The failed rows of a batch or sweep answer as one toast description: "name: error" for the
@@ -545,26 +545,3 @@ export function describeFailures(
   if (rest > 0) named.push(t("batch.moreFailures", { count: rest }));
   return named.join("\n");
 }
-
-// ---------------------------------------------------------------------------
-// Detail sheet edit dialogs
-// ---------------------------------------------------------------------------
-
-export type DetailEditField = "nickname" | "machineId" | "weight" | "proxy";
-
-/**
- * The title and description keys of each Edit dialog in the detail sheet (accounts namespace).
- * Weight and proxy reuse their field hints as the description.
- */
-export const DETAIL_EDIT_COPY: Record<DetailEditField, { title: string; description: string }> = {
-  nickname: {
-    title: "detail.edit.nickname.title",
-    description: "detail.edit.nickname.description",
-  },
-  machineId: {
-    title: "detail.edit.machineId.title",
-    description: "detail.edit.machineId.description",
-  },
-  weight: { title: "detail.edit.weight.title", description: "detail.weightHint" },
-  proxy: { title: "detail.edit.proxy.title", description: "detail.proxyHint" },
-};

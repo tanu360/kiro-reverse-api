@@ -27,8 +27,7 @@ export function computeSeriesBarWidth(input: {
   }
 
   let width =
-    composedBarSize ??
-    Math.min(slot * 0.88, composedMaxBarSize ?? Number.POSITIVE_INFINITY);
+    composedBarSize ?? Math.min(slot * 0.88, composedMaxBarSize ?? Number.POSITIVE_INFINITY);
   if (composedMaxBarSize != null) {
     width = Math.min(width, composedMaxBarSize);
   }

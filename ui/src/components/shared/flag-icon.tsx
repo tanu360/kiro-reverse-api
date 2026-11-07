@@ -150,7 +150,7 @@ export function FlagIcon({
   return (
     <span
       aria-hidden="true"
-      className={cn("inline-flex h-[18px] w-[22px] shrink-0", className)}
+      className={cn("inline-flex h-4.5 w-5.5 shrink-0", className)}
       data-slot="flag-icon"
     >
       {/* opacity-100 and size-full opt out of the icon dimming and sizing rules in buttons. */}

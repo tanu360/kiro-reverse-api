@@ -26,12 +26,9 @@ import {
   resolveRestingChartPhase,
 } from "./chart-phase";
 import { PatternArea } from "./pattern-area";
-import {
-  TimeSeriesChartInner,
-  timeSeriesChartHasRoom,
-} from "./time-series-chart-shell";
+import { TimeSeriesChartInner, timeSeriesChartHasRoom } from "./time-series-chart-shell";
 
-export interface AreaChartProps {
+interface AreaChartProps {
   /** Data array - each item should have a date field and numeric values */
   data: Record<string, unknown>[];
   /** Key in data for the x-axis (date). Default: "date" */
@@ -93,13 +90,10 @@ function extractAreaConfigs(children: ReactNode): (LineConfig & AreaProps)[] {
       name?: string;
     };
     const componentName =
-      typeof child.type === "function"
-        ? childType.displayName || childType.name || ""
-        : "";
+      typeof child.type === "function" ? childType.displayName || childType.name || "" : "";
 
     const props = child.props as AreaProps | undefined;
-    const isPatternArea =
-      componentName === "PatternArea" || child.type === PatternArea;
+    const isPatternArea = componentName === "PatternArea" || child.type === PatternArea;
     // Overlays that carry a dataKey but are not series of their own.
     const isSeriesOverlay =
       componentName === "TrendLine" ||
@@ -154,15 +148,13 @@ export function AreaChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const margin = useStableMargin({ ...DEFAULT_MARGIN, ...marginProp });
   const lines = useMemo(() => extractAreaConfigs(children), [children]);
-  const [chartPhase, setChartPhase] = useState<ChartPhase>(() =>
-    resolveRestingChartPhase(status)
-  );
+  const [chartPhase, setChartPhase] = useState<ChartPhase>(() => resolveRestingChartPhase(status));
   const handlePhaseChange = useCallback(
     (phase: ChartPhase) => {
       setChartPhase(phase);
       onPhaseChange?.(phase);
     },
-    [onPhaseChange]
+    [onPhaseChange],
   );
 
   const showLoadingLabel = Boolean(
@@ -170,7 +162,7 @@ export function AreaChart({
       (chartPhase === "loading" ||
         chartPhase === "exiting" ||
         chartPhase === "gridTweenReady" ||
-        chartPhase === "revealingLoading")
+        chartPhase === "revealingLoading"),
   );
 
   return (
@@ -214,16 +206,11 @@ export function AreaChart({
           }
         </ParentSize>
         {showLoadingLabel ? (
-          <ChartLoadingLabel
-            exiting={chartPhase !== "loading"}
-            text={loadingLabel}
-          />
+          <ChartLoadingLabel exiting={chartPhase !== "loading"} text={loadingLabel} />
         ) : null}
       </div>
     </LazyMotion>
   );
 }
 
-export { Area, type AreaProps, type AreaVariant } from "./area";
-
-export default AreaChart;
+export { Area } from "./area";

@@ -1,10 +1,4 @@
-import {
-  Children,
-  Fragment,
-  isValidElement,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { Children, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 import { isChartClipPassthrough } from "./chart-child-passthrough";
 import type { BandConfig } from "./chart-context";
 import { normalizeYAxisId } from "./y-axis-scales";
@@ -24,7 +18,7 @@ interface BandConfigProps {
 }
 
 /** Default tooltip label: the key for a single-key band, else `lower – upper`. */
-export function defaultBandLabel(upperKey: string, lowerKey: string): string {
+function defaultBandLabel(upperKey: string, lowerKey: string): string {
   return upperKey === lowerKey ? upperKey : `${lowerKey} – ${upperKey}`;
 }
 
@@ -32,9 +26,7 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-function bandConfigFromProps(
-  props: BandConfigProps | undefined
-): BandConfig | null {
+function bandConfigFromProps(props: BandConfigProps | undefined): BandConfig | null {
   if (!(nonEmptyString(props?.upperKey) && nonEmptyString(props.lowerKey))) {
     return null;
   }
@@ -52,9 +44,7 @@ function bandConfigFromProps(
 
 function getChildComponentName(child: ReactElement) {
   const childType = child.type as { displayName?: string; name?: string };
-  return typeof child.type === "function"
-    ? childType.displayName || childType.name || ""
-    : "";
+  return typeof child.type === "function" ? childType.displayName || childType.name || "" : "";
 }
 
 /** Collect `<Band>` props from chart children so band edges extend the y-domain. */
@@ -73,9 +63,7 @@ export function extractBandConfigs(children: ReactNode): BandConfig[] {
       }
 
       if (getChildComponentName(child) === "Band") {
-        const config = bandConfigFromProps(
-          child.props as BandConfigProps | undefined
-        );
+        const config = bandConfigFromProps(child.props as BandConfigProps | undefined);
         if (config) {
           configs.push(config);
         }
@@ -100,7 +88,7 @@ export function extractBandConfigs(children: ReactNode): BandConfig[] {
 
 /** Band edge keys grouped by y-axis id (deduplicated, insertion order). */
 export function bandKeysByAxis(
-  configs: Pick<BandConfig, "yAxisId" | "upperKey" | "lowerKey">[]
+  configs: Pick<BandConfig, "yAxisId" | "upperKey" | "lowerKey">[],
 ): Record<string, string[]> {
   const byAxis: Record<string, string[]> = {};
   for (const config of configs) {

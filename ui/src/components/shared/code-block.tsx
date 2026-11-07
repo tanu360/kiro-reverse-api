@@ -10,21 +10,28 @@ import {
 import type { ThemedToken } from "shiki/core";
 import { CopyButton } from "@/components/shared/copy-button";
 import { type CodeLanguage, highlightCode } from "@/lib/highlight";
-import { cn } from "@/lib/utils";
+import { cn, keyByText } from "@/lib/utils";
+
+function isWiderThanBox(element: HTMLElement): boolean {
+  return element.scrollWidth > element.clientWidth;
+}
 
 /** True while the element's content is wider than its box; rechecked on resize and new content. */
-function useScrollsSideways(ref: RefObject<HTMLElement | null>, content: string): boolean {
+function useScrollsSideways(ref: RefObject<HTMLElement | null>): boolean {
   const [scrolls, setScrolls] = useState(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `content` changes the scroll width.
+  // After every render, since new content (other code, its highlighted lines) changes the scroll
+  // width. An unchanged result does not render again.
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (element) setScrolls(isWiderThanBox(element));
+  });
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
-    const check = () => setScrolls(element.scrollWidth > element.clientWidth);
-    check();
-    const observer = new ResizeObserver(check);
+    const observer = new ResizeObserver(() => setScrolls(isWiderThanBox(element)));
     observer.observe(element);
     return () => observer.disconnect();
-  }, [ref, content]);
+  }, [ref]);
   return scrolls;
 }
 
@@ -60,11 +67,15 @@ function useHighlightedLines(
 /** Shiki's font style bit for italic (FontStyle.Italic). */
 const ITALIC = 1;
 
+function lineText(line: ThemedToken[]): string {
+  return line.map((token) => token.content).join("");
+}
+
 /**
  * A block of code (a config file, a command) with its title and a copy button in a strip above
  * it. The code is mono on the inset well and scrolls sideways inside the block, so long lines
- * never widen the page; while it scrolls, the block is a labelled tab stop so arrow keys can
- * scroll it. `wrap` wraps long lines instead (anywhere, keeping line breaks), for prose-like text
+ * never widen the page; while it scrolls, the block is a named region. `wrap` wraps long lines
+ * instead (anywhere, keeping line breaks), for prose-like text
  * such as an error message.
  */
 export function CodeBlock({
@@ -91,8 +102,37 @@ export function CodeBlock({
   className?: string;
 }): JSX.Element {
   const preRef = useRef<HTMLPreElement>(null);
-  const scrolls = useScrollsSideways(preRef, code);
+  const scrolls = useScrollsSideways(preRef);
   const lines = useHighlightedLines(code, language);
+  const preClassName = cn(
+    "scrollbar-x max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed outline-none focus-outline-inset",
+    wrap && "whitespace-pre-wrap wrap-anywhere",
+  );
+  const content = (
+    <code>
+      {lines
+        ? keyByText(lines, lineText).map(({ key, item: line }, index) => (
+            <Fragment key={key}>
+              {line.map((token) => (
+                <span
+                  key={token.offset}
+                  style={{
+                    color: token.color,
+                    fontStyle:
+                      token.fontStyle !== undefined && token.fontStyle & ITALIC
+                        ? "italic"
+                        : undefined,
+                  }}
+                >
+                  {token.content}
+                </span>
+              ))}
+              {index < lines.length - 1 ? "\n" : null}
+            </Fragment>
+          ))
+        : code}
+    </code>
+  );
   return (
     <figure
       className={cn(
@@ -113,43 +153,17 @@ export function CodeBlock({
           variant="quiet"
         />
       </div>
-      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: the label is set only with role="region". */}
-      <pre
-        aria-label={scrolls ? (regionLabel ?? title) : undefined}
-        className={cn(
-          "scrollbar-x max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed outline-none focus-outline-inset",
-          wrap && "whitespace-pre-wrap wrap-anywhere",
-        )}
-        data-wrap={wrap ? "" : undefined}
-        ref={preRef}
-        role={scrolls ? "region" : undefined}
-        tabIndex={scrolls ? 0 : undefined}
-      >
-        <code>
-          {lines
-            ? lines.map((line, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: lines have no id; the code is static.
-                <Fragment key={index}>
-                  {line.map((token) => (
-                    <span
-                      key={token.offset}
-                      style={{
-                        color: token.color,
-                        fontStyle:
-                          token.fontStyle !== undefined && token.fontStyle & ITALIC
-                            ? "italic"
-                            : undefined,
-                      }}
-                    >
-                      {token.content}
-                    </span>
-                  ))}
-                  {index < lines.length - 1 ? "\n" : null}
-                </Fragment>
-              ))
-            : code}
-        </code>
-      </pre>
+      {/*
+        While the code scrolls sideways, the section is named, which makes it a region landmark
+        around the scroller (browsers make a scrolling box a tab stop themselves, so arrow keys
+        scroll it); otherwise the unnamed section is plain markup. It stays mounted either way,
+        so the measured <pre> is never replaced.
+      */}
+      <section aria-label={scrolls ? (regionLabel ?? title) : undefined} className="min-w-0">
+        <pre className={preClassName} data-wrap={wrap ? "" : undefined} ref={preRef}>
+          {content}
+        </pre>
+      </section>
     </figure>
   );
 }

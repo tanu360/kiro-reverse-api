@@ -3,7 +3,7 @@
 
 export type OverviewRange = "1h" | "6h" | "24h";
 /** range undefined = '1h' */
-export interface OverviewSearch {
+interface OverviewSearch {
   range?: OverviewRange;
 }
 
@@ -79,7 +79,7 @@ export interface RequestsSearch {
   order?: "asc" | "desc";
 }
 
-export interface LoginSearch {
+interface LoginSearch {
   redirect?: string;
 }
 

@@ -36,9 +36,7 @@ export function getBarValueLabelLayout({
     fits = rotatedFits;
   }
 
-  const rotated =
-    fits &&
-    (orientation === "vertical" || (orientation === "auto" && !normalFits));
+  const rotated = fits && (orientation === "vertical" || (orientation === "auto" && !normalFits));
   // Footprint of the (possibly rotated) label, so top/bottom placement keeps
   // the whole label inside the bar instead of just its centre point.
   const extentX = rotated ? LABEL_LINE_HEIGHT : labelWidth;

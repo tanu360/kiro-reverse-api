@@ -1,14 +1,13 @@
 "use client";
 
 import { NumberField as NumberFieldPrimitive } from "@base-ui/react/number-field";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { MinusIcon, PlusIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import * as React from "react";
-import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
 import { useUiT } from "@/components/ui/messages";
+import { cn } from "@/lib/utils";
 
-export const NumberFieldContext: React.Context<{
+const NumberFieldContext: React.Context<{
   fieldId: string;
 } | null> = React.createContext<{
   fieldId: string;
@@ -113,55 +112,3 @@ export function NumberFieldInput({
     />
   );
 }
-
-export function NumberFieldScrubArea({
-  className,
-  label,
-  ...props
-}: NumberFieldPrimitive.ScrubArea.Props & {
-  label: string;
-}): React.ReactElement {
-  const context = React.useContext(NumberFieldContext);
-
-  if (!context) {
-    throw new Error(
-      "NumberFieldScrubArea must be used within a NumberField component for accessibility.",
-    );
-  }
-
-  return (
-    <NumberFieldPrimitive.ScrubArea
-      className={cn("flex cursor-ew-resize", className)}
-      data-slot="number-field-scrub-area"
-      {...props}
-    >
-      <Label className="cursor-ew-resize" htmlFor={context.fieldId}>
-        {label}
-      </Label>
-      <NumberFieldPrimitive.ScrubAreaCursor className="drop-shadow-[0_1px_1px_#0008] filter">
-        <CursorGrowIcon />
-      </NumberFieldPrimitive.ScrubAreaCursor>
-    </NumberFieldPrimitive.ScrubArea>
-  );
-}
-
-export function CursorGrowIcon(
-  props: React.ComponentProps<"svg">,
-): React.ReactElement {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="black"
-      height="14"
-      stroke="white"
-      viewBox="0 0 24 14"
-      width="26"
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-    >
-      <path d="M19.5 5.5L6.49737 5.51844V2L1 6.9999L6.5 12L6.49737 8.5L19.5 8.5V12L25 6.9999L19.5 2V5.5Z" />
-    </svg>
-  );
-}
-
-export { NumberFieldPrimitive };

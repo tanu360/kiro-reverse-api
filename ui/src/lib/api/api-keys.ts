@@ -16,7 +16,7 @@ import type {
 const keyPath = (id: string, suffix = "") => `/api-keys/${encodeURIComponent(id)}${suffix}`;
 
 /** The list carries only `keyMasked`, never the secret. */
-export async function listApiKeys(): Promise<ApiKey[]> {
+async function listApiKeys(): Promise<ApiKey[]> {
   const res = await apiRequest<ApiKeyListResponse>("/api-keys");
   return res.apiKeys ?? [];
 }

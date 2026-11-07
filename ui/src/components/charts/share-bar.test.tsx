@@ -8,7 +8,7 @@ const fill = (container: HTMLElement) =>
 describe("ShareBar", () => {
   it("draws value / max and clamps to the track", () => {
     const { container, rerender } = render(
-      <ShareBar color="var(--chart-1)" max={200} value={50} />
+      <ShareBar color="var(--chart-1)" max={200} value={50} />,
     );
     expect(fill(container)?.style.width).toBe("25%");
     expect(fill(container)?.style.backgroundColor).toBe("var(--chart-1)");
@@ -22,8 +22,6 @@ describe("ShareBar", () => {
 
   it("is decorative", () => {
     const { container } = render(<ShareBar color="red" value={0.5} />);
-    expect(
-      container.querySelector("[data-slot=share-bar]")
-    ).toHaveAttribute("aria-hidden");
+    expect(container.querySelector("[data-slot=share-bar]")).toHaveAttribute("aria-hidden");
   });
 });

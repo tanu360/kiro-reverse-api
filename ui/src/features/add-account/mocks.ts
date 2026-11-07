@@ -229,7 +229,7 @@ export const handlers: HttpHandler[] = [
     if (!sessionId || !callbackUrl) return jsonError(400, "sessionId and callbackUrl are required");
     const session = microsoftState(sessionId);
     if (session?.kind !== "session") {
-      return jsonError(400, "Microsoft SSO session not found or expired");
+      return jsonError(400, "unknown or expired Microsoft SSO session");
     }
     if (callbackUrl.includes("dup"))
       return jsonError(409, "this Microsoft account is already added");

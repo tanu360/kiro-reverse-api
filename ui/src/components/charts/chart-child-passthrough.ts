@@ -9,13 +9,12 @@ import {
 } from "react";
 
 /** Marker on wrapper components whose single child should inherit clip classification. */
-export const CHART_CLIP_PASSTHROUGH = "__chartClipPassthrough" as const;
+const CHART_CLIP_PASSTHROUGH = "__chartClipPassthrough" as const;
 
 export function isChartClipPassthrough(type: unknown): boolean {
   return (
     typeof type === "function" &&
-    (type as { [CHART_CLIP_PASSTHROUGH]?: boolean })[CHART_CLIP_PASSTHROUGH] ===
-      true
+    (type as { [CHART_CLIP_PASSTHROUGH]?: boolean })[CHART_CLIP_PASSTHROUGH] === true
   );
 }
 
@@ -45,7 +44,7 @@ function isLazyComponentType(type: unknown): type is LazyComponentType {
  * axes and grids are classified as series and end up inside the reveal clip,
  * which cuts off marker count badges above the plot.
  */
-export function resolveLazyChartChild(child: ReactElement): ReactElement {
+function resolveLazyChartChild(child: ReactElement): ReactElement {
   const type: unknown = child.type;
   if (!isLazyComponentType(type)) {
     return child;
@@ -57,10 +56,7 @@ export function resolveLazyChartChild(child: ReactElement): ReactElement {
     // Module still loading (lazy init throws a thenable) — keep the lazy element.
     return child;
   }
-  if (
-    typeof resolved !== "function" &&
-    !(typeof resolved === "object" && resolved !== null)
-  ) {
+  if (typeof resolved !== "function" && !(typeof resolved === "object" && resolved !== null)) {
     return child;
   }
   // Only forward a real key: `createElement` stringifies any non-undefined
@@ -109,7 +105,7 @@ export function renderableChartChild(child: ReactElement): ReactElement {
 /** Walk chart children, flattening React fragments (studio often groups layers in `<>...</>`). */
 export function forEachChartChild(
   children: ReactNode,
-  callback: (child: ReactElement, index: number) => void
+  callback: (child: ReactElement, index: number) => void,
 ) {
   let index = 0;
   const visit = (nodes: ReactNode) => {
@@ -160,9 +156,7 @@ export function isPostOverlayComponent(child: ReactElement): boolean {
   }
 
   const componentName =
-    typeof child.type === "function"
-      ? childType.displayName || childType.name || ""
-      : "";
+    typeof child.type === "function" ? childType.displayName || childType.name || "" : "";
 
   return (
     componentName === "ChartMarkers" ||
@@ -175,9 +169,7 @@ export function isPostOverlayComponent(child: ReactElement): boolean {
 export function isUnderlayComponent(child: ReactElement): boolean {
   const childType = child.type as { displayName?: string; name?: string };
   const componentName =
-    typeof child.type === "function"
-      ? childType.displayName || childType.name || ""
-      : "";
+    typeof child.type === "function" ? childType.displayName || childType.name || "" : "";
   return UNDERLAY_COMPONENT_NAMES.has(componentName);
 }
 
@@ -185,15 +177,13 @@ export function isUnderlayComponent(child: ReactElement): boolean {
 export function isClipExcludedComponent(child: ReactElement): boolean {
   const childType = child.type as { displayName?: string; name?: string };
   const componentName =
-    typeof child.type === "function"
-      ? childType.displayName || childType.name || ""
-      : "";
+    typeof child.type === "function" ? childType.displayName || childType.name || "" : "";
   return CLIP_EXCLUDED_COMPONENT_NAMES.has(componentName);
 }
 
 /** SVG layer lists from chart shells need stable keys when rendered as arrays. */
 export function renderKeyedChartLayers(children: ReactElement[]) {
   return children.map((child, index) =>
-    cloneElement(child, { key: child.key ?? `chart-layer-${index}` })
+    cloneElement(child, { key: child.key ?? `chart-layer-${index}` }),
   );
 }

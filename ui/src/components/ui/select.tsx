@@ -1,22 +1,18 @@
 "use client";
 
-import { mergeProps } from "@base-ui/react/merge-props";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
-import { useRender } from "@base-ui/react/use-render";
-import { cva, type VariantProps } from "class-variance-authority";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { ChevronDownIcon, ChevronUpIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
+import { withMarqueeText } from "@/components/ui/marquee-text";
 import {
   CheckedDot,
   POPUP_CHECK_ROW_CLASS,
-  POPUP_GROUP_LABEL_CLASS,
   POPUP_INDICATOR_CLASS,
   POPUP_ROW_CLASS,
   POPUP_ROW_META_CLASS,
-  POPUP_SEPARATOR_CLASS,
 } from "@/components/ui/popup-row";
-import { withMarqueeText } from "@/components/ui/marquee-text";
 import { cn } from "@/lib/utils";
 
 export const Select: typeof SelectPrimitive.Root = SelectPrimitive.Root;
@@ -56,49 +52,13 @@ export const selectTriggerVariants = cva(
 
 export const selectTriggerIconClassName = "-me-0.5 size-4 shrink-0";
 
-export interface SelectButtonProps extends useRender.ComponentProps<"button"> {
-  size?: VariantProps<typeof selectTriggerVariants>["size"];
-}
-
-export function SelectButton({
-  className,
-  size,
-  render,
-  children,
-  ...props
-}: SelectButtonProps): React.ReactElement {
-  const typeValue: React.ButtonHTMLAttributes<HTMLButtonElement>["type"] =
-    render ? undefined : "button";
-
-  const defaultProps = {
-    children: (
-      <>
-        <span className="min-w-0 flex-1 truncate text-left in-data-placeholder:text-placeholder">
-          {children}
-        </span>
-        <HugeiconsIcon icon={ChevronDownIcon} aria-hidden="true" className={selectTriggerIconClassName} />
-      </>
-    ),
-    className: cn(selectTriggerVariants({ size }), "min-w-0", className),
-    "data-slot": "select-button",
-    type: typeValue,
-  };
-
-  return useRender({
-    defaultTagName: "button",
-    props: mergeProps<"button">(defaultProps, props),
-    render,
-  });
-}
-
 export function SelectTrigger({
   className,
   size = "default",
   fit = "field",
   children,
   ...props
-}: SelectPrimitive.Trigger.Props &
-  VariantProps<typeof selectTriggerVariants>): React.ReactElement {
+}: SelectPrimitive.Trigger.Props & VariantProps<typeof selectTriggerVariants>): React.ReactElement {
   return (
     <SelectPrimitive.Trigger
       className={cn(selectTriggerVariants({ fit, size }), className)}
@@ -119,10 +79,7 @@ export function SelectValue({
 }: SelectPrimitive.Value.Props): React.ReactElement {
   return (
     <SelectPrimitive.Value
-      className={cn(
-        "flex-1 truncate data-placeholder:text-placeholder",
-        className,
-      )}
+      className={cn("flex-1 truncate data-placeholder:text-placeholder", className)}
       data-slot="select-value"
       {...props}
     />
@@ -261,51 +218,4 @@ export function SelectItem({
   );
 }
 
-export function SelectSeparator({
-  className,
-  ...props
-}: SelectPrimitive.Separator.Props): React.ReactElement {
-  return (
-    <SelectPrimitive.Separator
-      className={cn(POPUP_SEPARATOR_CLASS, className)}
-      data-slot="select-separator"
-      {...props}
-    />
-  );
-}
-
-export function SelectGroup(
-  props: SelectPrimitive.Group.Props,
-): React.ReactElement {
-  return <SelectPrimitive.Group data-slot="select-group" {...props} />;
-}
-
-export function SelectLabel({
-  className,
-  ...props
-}: SelectPrimitive.Label.Props): React.ReactElement {
-  return (
-    <SelectPrimitive.Label
-      className={cn(
-        "not-in-data-[slot=field]:mb-2 inline-flex cursor-default items-center gap-2 font-medium text-foreground text-sm/5",
-        className,
-      )}
-      data-slot="select-label"
-      {...props}
-    />
-  );
-}
-
-export function SelectGroupLabel(
-  props: SelectPrimitive.GroupLabel.Props,
-): React.ReactElement {
-  return (
-    <SelectPrimitive.GroupLabel
-      className={POPUP_GROUP_LABEL_CLASS}
-      data-slot="select-group-label"
-      {...props}
-    />
-  );
-}
-
-export { SelectPrimitive, SelectPopup as SelectContent };
+export { SelectPrimitive };

@@ -5,7 +5,7 @@ import { type AnimatedIconProps, useIconAnimation } from "@/lib/use-icon-animati
 import { cn } from "@/lib/utils";
 
 /** Imperative controls for the Copy icon animation. */
-export interface Copy01IconHandle {
+interface Copy01IconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }

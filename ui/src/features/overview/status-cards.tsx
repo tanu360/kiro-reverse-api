@@ -11,6 +11,7 @@ import {
   StatTileSkeleton,
 } from "@/components/shared/stat-card";
 import { Meter, MeterIndicator, type MeterTone, MeterTrack } from "@/components/ui/meter";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { heatmapQuery, observeOverviewQuery } from "@/lib/api/observe";
 import { statusQuery } from "@/lib/api/system";
 import type { HeatmapCell, ObserveSeries, StatusResponse } from "@/lib/api/types";
@@ -19,7 +20,6 @@ import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { type Bars, type CellValue, HOUR_PAIR_WINDOW, hourDelta, outcomeBars } from "./aggregate";
 import { FAILED_COLOR } from "./colors";
 import { LazySparkline, TrendPlaceholder } from "./lazy-sparkline";
-import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 /**
  * True while /status or /observe/overview has failed: the page shows one error banner with the
@@ -46,10 +46,10 @@ const failures: CellValue = (cell) => cell.failures;
 const requests: CellValue = (cell) => cell.reqs;
 
 /**
- * The newest bars drawn in the series colour: three 2-minute bars, about the last five minutes
- * (the reference strip's bright tail). The older bars are the idle grey.
+ * The newest buckets that decide the Failed area's colour: three 2-minute buckets, about the
+ * last five minutes. Any failure in them turns the area red.
  */
-const HIGHLIGHT_BARS = 3;
+const RECENT_BUCKETS = 3;
 
 type TrendKey = "requests" | "succeeded" | "failed";
 type Trends = Record<TrendKey, Pick<StatTileProps, "delta" | "trend">>;
@@ -67,26 +67,26 @@ function deltaFor(
 }
 
 /**
- * The trend slots: 15 two-minute bars of the last half hour from the live series (shared with
- * the live tiles, so no extra request). The Failed bars are red, and only while the newest ones
- * hold failures; otherwise they all stay grey.
+ * The trend slots: an area over 15 two-minute buckets of the last half hour from the live series
+ * (shared with the live tiles, so no extra request). Requests and Succeeded are purple; the
+ * Failed area is red only while the newest buckets hold failures, otherwise grey.
  */
-function barTrends(series: Partial<ObserveSeries>, animate: boolean): Record<TrendKey, ReactNode> {
+function areaTrends(series: Partial<ObserveSeries>, animate: boolean): Record<TrendKey, ReactNode> {
   const bars = outcomeBars(series.rpm ?? [], series.errRate ?? []);
-  const failing = bars.failed.slice(-HIGHLIGHT_BARS).some((bar) => bar.value > 0);
-  const sparkline = (data: Bars, color?: string, highlight = HIGHLIGHT_BARS) => (
+  const failing = bars.failed.slice(-RECENT_BUCKETS).some((bar) => bar.value > 0);
+  const sparkline = (data: Bars, color?: string, idle = false) => (
     <LazySparkline
       animate={animate}
       color={color}
       data={data}
       height={STAT_TREND_HEIGHT.aside}
-      highlight={highlight}
+      idle={idle}
     />
   );
   return {
     requests: sparkline(bars.requests),
     succeeded: sparkline(bars.succeeded),
-    failed: sparkline(bars.failed, FAILED_COLOR, failing ? HIGHLIGHT_BARS : 0),
+    failed: sparkline(bars.failed, FAILED_COLOR, !failing),
   };
 }
 
@@ -253,8 +253,8 @@ export function StatusCards(): JSX.Element {
   const trends = useMemo<Trends>(() => {
     let nodes: Partial<Record<TrendKey, ReactNode>> = {};
     if (overview) {
-      // An older server sends no series: the bars then draw as the flat empty stubs.
-      nodes = barTrends(overview.series ?? {}, animate);
+      // An older server sends no series: the area then draws as a flat line.
+      nodes = areaTrends(overview.series ?? {}, animate);
     } else if (livePending) {
       // Until the series loads, the aside slot holds a placeholder, so nothing shifts.
       const pending = <TrendPlaceholder />;
@@ -288,9 +288,8 @@ export function StatusCards(): JSX.Element {
   } else if (!data) {
     strip = (
       <StatGroup aria-hidden="true" columns="kpi" joined>
-        {Array.from({ length: 4 }, (_, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders never reorder.
-          <StatTileSkeleton key={index} metrics={4} trendPlacement="aside" />
+        {PLACEHOLDERS.map((tile) => (
+          <StatTileSkeleton key={tile.label} metrics={4} trendPlacement="aside" />
         ))}
       </StatGroup>
     );

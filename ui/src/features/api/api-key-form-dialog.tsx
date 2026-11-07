@@ -207,7 +207,7 @@ export function ApiKeyFormDialog({
           <Alert variant="error">
             <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
             <AlertTitle>{editing ? t("form.saveFailed") : t("form.createFailed")}</AlertTitle>
-            <AlertDescription className="break-words">
+            <AlertDescription className="wrap-break-word">
               {errorMessage(mutation.error, t)}
             </AlertDescription>
           </Alert>

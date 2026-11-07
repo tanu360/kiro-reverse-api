@@ -35,7 +35,7 @@ function idItem(label: string, value: string | number | undefined): KeyValueItem
   return { label, value: String(value), mono: true, copy: true, span: 2 };
 }
 
-export interface RequestDetailSheetProps {
+interface RequestDetailSheetProps {
   record: RequestRecord | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;

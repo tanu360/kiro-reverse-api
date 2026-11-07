@@ -5,7 +5,7 @@ import { useId } from "react";
 import { type SpringConfig, useChartConfig } from "../chart-config-context";
 import { chartCssVars } from "../chart-context";
 
-export interface TooltipDotProps {
+interface TooltipDotProps {
   x: number;
   y: number;
   visible: boolean;
@@ -49,10 +49,7 @@ const DEFAULT_HALO_OPACITY = 0.3;
 /** Entrance spring for the core + halo radius (position uses the tooltip spring). */
 const HALO_SPRING = { type: "spring", stiffness: 420, damping: 28 } as const;
 
-function ringCornerRadius(
-  halfExtent: number,
-  cornerRadiusFraction: number
-): number {
+function ringCornerRadius(halfExtent: number, cornerRadiusFraction: number): number {
   const side = halfExtent * 2;
   return side * Math.max(0, Math.min(0.5, cornerRadiusFraction));
 }
@@ -172,10 +169,7 @@ export function TooltipDot({
   }
 
   const outlineWidth = strokeWidth ?? 0;
-  const outline =
-    outlineWidth > 0
-      ? { stroke: strokeColor, strokeWidth: outlineWidth }
-      : undefined;
+  const outline = outlineWidth > 0 ? { stroke: strokeColor, strokeWidth: outlineWidth } : undefined;
   const haloRadius = Math.max(0, size * haloScale);
   const showHalo = haloRadius > size && haloOpacity > 0;
   const blurHalo = showHalo && haloBlur > 0;
@@ -238,5 +232,3 @@ export function TooltipDot({
 }
 
 TooltipDot.displayName = "TooltipDot";
-
-export default TooltipDot;

@@ -2,12 +2,12 @@
 
 import { Autocomplete as AutocompletePrimitive } from "@base-ui/react/autocomplete";
 import { Dialog as CommandDialogPrimitive } from "@base-ui/react/dialog";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Search01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
-import { cn } from "@/lib/utils";
-import { Kbd } from "@/components/ui/kbd";
 import { AutocompleteCollection } from "@/components/ui/autocomplete";
+import { Kbd } from "@/components/ui/kbd";
+import { cn } from "@/lib/utils";
 
 /*
  * Kiro patch: a Raycast-style palette. A 640 px sheet hung under the header trigger (16 px from
@@ -20,27 +20,11 @@ import { AutocompleteCollection } from "@/components/ui/autocomplete";
 
 const OPEN_EASE = "ease-[cubic-bezier(0.2,0.8,0.2,1)]";
 
-export const CommandDialog: typeof CommandDialogPrimitive.Root =
-  CommandDialogPrimitive.Root;
+export const CommandDialog: typeof CommandDialogPrimitive.Root = CommandDialogPrimitive.Root;
 
-export const CommandDialogPortal: typeof CommandDialogPrimitive.Portal =
-  CommandDialogPrimitive.Portal;
+const CommandDialogPortal: typeof CommandDialogPrimitive.Portal = CommandDialogPrimitive.Portal;
 
-export const CommandCreateHandle: typeof CommandDialogPrimitive.createHandle =
-  CommandDialogPrimitive.createHandle;
-
-export function CommandDialogTrigger(
-  props: CommandDialogPrimitive.Trigger.Props,
-): React.ReactElement {
-  return (
-    <CommandDialogPrimitive.Trigger
-      data-slot="command-dialog-trigger"
-      {...props}
-    />
-  );
-}
-
-export function CommandDialogBackdrop({
+function CommandDialogBackdrop({
   className,
   ...props
 }: CommandDialogPrimitive.Backdrop.Props): React.ReactElement {
@@ -56,16 +40,13 @@ export function CommandDialogBackdrop({
   );
 }
 
-export function CommandDialogViewport({
+function CommandDialogViewport({
   className,
   ...props
 }: CommandDialogPrimitive.Viewport.Props): React.ReactElement {
   return (
     <CommandDialogPrimitive.Viewport
-      className={cn(
-        "fixed inset-0 z-50",
-        className,
-      )}
+      className={cn("fixed inset-0 z-50", className)}
       data-slot="command-dialog-viewport"
       {...props}
     />
@@ -202,10 +183,7 @@ export function CommandGroupLabel({
 }: AutocompletePrimitive.GroupLabel.Props): React.ReactElement {
   return (
     <AutocompletePrimitive.GroupLabel
-      className={cn(
-        "snap-end px-3 font-medium text-muted-foreground text-xs leading-8",
-        className,
-      )}
+      className={cn("snap-end px-3 font-medium text-muted-foreground text-xs leading-8", className)}
       data-slot="command-group-label"
       {...props}
     />
@@ -238,37 +216,11 @@ export function CommandItemNote({
 }: React.ComponentProps<"span">): React.ReactElement {
   return (
     <span
-      className={cn("ms-auto shrink-0 ps-2 text-meta text-muted-foreground tabular-nums", className)}
-      data-slot="command-item-note"
-      {...props}
-    />
-  );
-}
-
-export function CommandSeparator({
-  className,
-  ...props
-}: AutocompletePrimitive.Separator.Props): React.ReactElement {
-  return (
-    <AutocompletePrimitive.Separator
-      className={cn("my-2 h-px bg-popup-border", className)}
-      data-slot="command-separator"
-      {...props}
-    />
-  );
-}
-
-export function CommandShortcut({
-  className,
-  ...props
-}: React.ComponentProps<"kbd">): React.ReactElement {
-  return (
-    <kbd
       className={cn(
-        "ms-auto font-medium font-sans text-muted-foreground text-xs tracking-normal",
+        "ms-auto shrink-0 ps-2 text-meta text-muted-foreground tabular-nums",
         className,
       )}
-      data-slot="command-shortcut"
+      data-slot="command-item-note"
       {...props}
     />
   );
@@ -300,7 +252,7 @@ export function CommandFooterPill({
   return (
     <span
       className={cn(
-        "pointer-events-auto flex h-10 items-center rounded-full border border-foreground/12 bg-popover/64 shadow-[inset_0_1px_0_rgb(255_255_255/12%)] backdrop-blur-[16px] backdrop-saturate-160",
+        "pointer-events-auto flex h-10 items-center rounded-full border border-foreground/12 bg-popover/64 shadow-[inset_0_1px_0_rgb(255_255_255/12%)] backdrop-blur-lg backdrop-saturate-160",
         className,
       )}
       data-slot="command-footer-pill"
@@ -328,5 +280,3 @@ export function CommandHint({
     </span>
   );
 }
-
-export { CommandDialogPrimitive };

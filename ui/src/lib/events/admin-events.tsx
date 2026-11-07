@@ -28,7 +28,7 @@ export interface EventSourceLike {
   onopen: ((event: Event) => void) | null;
 }
 
-export type AdminEventsStatus = "connecting" | "open" | "closed";
+type AdminEventsStatus = "connecting" | "open" | "closed";
 
 // `account_updated` and `accounts_refreshed` are not listed: Go never publishes them.
 const EVENT_TYPES: readonly AdminEventType[] = [

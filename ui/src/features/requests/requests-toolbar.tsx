@@ -12,7 +12,7 @@ import { useT } from "@/lib/i18n";
 import { REQUEST_SORTS, type RequestSort } from "@/routes/-search";
 import { defaultSortDesc, PAGE_SIZES } from "./request-model";
 
-export const SEARCH_DEBOUNCE_MS = 250;
+const SEARCH_DEBOUNCE_MS = 250;
 
 /** Below this filter-row width (the @md container step, 28rem) the placeholder is the short one. */
 const SHORT_PLACEHOLDER_BELOW = 448;
@@ -33,7 +33,7 @@ const SORT_LABEL_KEYS: Record<RequestSort, string> = {
   duration: "duration",
 };
 
-export interface RequestsToolbarProps {
+interface RequestsToolbarProps {
   /** The search held in the URL. */
   search: string;
   status: StatusValue;

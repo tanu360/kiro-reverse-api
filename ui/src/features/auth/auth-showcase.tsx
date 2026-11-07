@@ -336,7 +336,7 @@ function PaperPlane(): JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute w-[clamp(5rem,8vw,8rem)] origin-[29.17%_100%] -translate-x-[29.17%] -translate-y-full rotate-[14deg]"
+      className="pointer-events-none absolute w-[clamp(5rem,8vw,8rem)] origin-[29.17%_100%] translate-x-[-29.17%] -translate-y-full rotate-14"
       style={{ left: `${FLIGHT_END.x}%`, top: `${FLIGHT_END.y}%` }}
     >
       <svg
@@ -393,7 +393,7 @@ function AccountsPreview(): JSX.Element {
     >
       <div
         className={cn(
-          "flex min-w-[40rem] flex-col gap-5 p-6",
+          "flex min-w-160 flex-col gap-5 p-6",
           // Width steps (the panel is 52% of the window, 56% from xl).
           "[--zoom-w:0.76] min-[1280px]:[--zoom-w:1] min-[1400px]:[--zoom-w:1.1] min-[1800px]:[--zoom-w:1.3]",
           // Height steps, as ranges so their order in the stylesheet cannot matter.
@@ -430,7 +430,7 @@ function AccountsPreview(): JSX.Element {
           {stats.map((stat) => (
             // The app's panel look (components/ui/card.tsx): an outline over a faint fill.
             <div
-              className="rounded-xl border border-border/60 bg-muted/40 px-3.5 py-3 dark:bg-white/[0.03]"
+              className="rounded-xl border border-border/60 bg-muted/40 px-3.5 py-3 dark:bg-white/3"
               key={stat.label}
             >
               <dt className="truncate text-muted-foreground text-xs">{stat.label}</dt>

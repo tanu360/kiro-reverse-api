@@ -10,6 +10,7 @@ import { TableSkeleton } from "@/components/shared/loading-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { TokenCell } from "@/components/shared/token-cell";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { modelMixQuery } from "@/lib/api/observe";
 import type { ModelMixEntry } from "@/lib/api/types";
 import { formatCredits, formatNumber } from "@/lib/format";
@@ -19,7 +20,6 @@ import { modelSlices } from "./aggregate";
 import { MODEL_COLORS, OTHER_MODEL_COLOR } from "./colors";
 import type { RingSlice } from "./model-mix-donut";
 import { useTotalsFailed } from "./status-cards";
-import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 const ModelMixDonut = lazy(() => import("./model-mix-donut"));
 

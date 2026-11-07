@@ -1,10 +1,14 @@
-/* ThemeProvider adds this class for one frame while it swaps the theme. */
-.no-transitions,
-.no-transitions *,
-.no-transitions ::before,
-.no-transitions ::after {
-  /* biome-ignore lint/complexity/noImportantStyles: must beat every component transition. */
-  transition: none !important;
+/*
+ * ThemeProvider adds this class to <html> for one frame while it swaps the theme. Unlayered, so
+ * it wins over every Tailwind layer; :root.no-transitions outranks any single-class unlayered
+ * rule (e.g. .animated-icon). Components keep their transitions in classes, not inline styles,
+ * so this reaches them.
+ */
+:root.no-transitions,
+:root.no-transitions *,
+:root.no-transitions ::before,
+:root.no-transitions ::after {
+  transition: none;
 }
 
 /*

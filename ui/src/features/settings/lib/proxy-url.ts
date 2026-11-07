@@ -18,7 +18,7 @@ export interface ProxyModel {
 
 const SCHEMES: readonly ProxyScheme[] = ["socks5", "socks5h", "http", "https"];
 
-export const DIRECT_PROXY: ProxyModel = {
+const DIRECT_PROXY: ProxyModel = {
   type: "none",
   scheme: "socks5",
   host: "",

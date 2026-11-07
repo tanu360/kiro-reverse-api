@@ -17,6 +17,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { heatmapQuery } from "@/lib/api/observe";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -31,7 +32,6 @@ import {
 } from "./aggregate";
 import { FAILED_COLOR, PREVIOUS_COLOR, SUCCEEDED_COLOR } from "./colors";
 import { useTotalsFailed } from "./status-cards";
-import { usePrefersReducedMotion } from "./use-reduced-motion";
 
 const TrafficChart = lazy(() => import("./traffic-chart"));
 

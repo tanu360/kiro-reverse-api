@@ -25,7 +25,7 @@ import {
 // shows or hides (`isActive`), or when their own props / the stable slice
 // change.
 
-export interface HighlightSegmentResult {
+interface HighlightSegmentResult {
   xSpring: ReturnType<typeof useSpring>;
   widthSpring: ReturnType<typeof useSpring>;
   isActive: boolean;
@@ -52,21 +52,12 @@ export function useHighlightSegment({
   const resolveBounds = useCallback(
     (hover: ChartHoverContextValue): SegmentBounds =>
       enabled
-        ? computeSegmentBounds(
-            data,
-            xScale,
-            xAccessor,
-            hover.tooltipData,
-            hover.selection,
-            span
-          )
+        ? computeSegmentBounds(data, xScale, xAccessor, hover.tooltipData, hover.selection, span)
         : INACTIVE_SEGMENT,
-    [enabled, data, xScale, xAccessor, span]
+    [enabled, data, xScale, xAccessor, span],
   );
 
-  const isActive = useChartHoverSelector(
-    (hover) => resolveBounds(hover).isActive
-  );
+  const isActive = useChartHoverSelector((hover) => resolveBounds(hover).isActive);
 
   const xSpring = useSpring(0, highlightSpring);
   const widthSpring = useSpring(0, highlightSpring);

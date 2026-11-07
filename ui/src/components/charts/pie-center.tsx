@@ -14,7 +14,7 @@ import {
 } from "./chart-stat-flow";
 import { usePieHover, usePieStable } from "./pie-context";
 
-export interface PieCenterProps {
+interface PieCenterProps {
   /** Label shown below the value. Default: "Total" when not hovering */
   defaultLabel?: string;
   /** Format options for NumberFlow. Default: standard notation */
@@ -67,8 +67,7 @@ export function PieCenter({
   const { hoveredIndex } = usePieHover();
 
   const effectiveHoveredIndex = geometryScrubbing ? null : hoveredIndex;
-  const hoveredData =
-    effectiveHoveredIndex === null ? null : data[effectiveHoveredIndex];
+  const hoveredData = effectiveHoveredIndex === null ? null : data[effectiveHoveredIndex];
   const displayValue = hoveredData ? hoveredData.value : totalValue;
   const displayLabel = hoveredData ? hoveredData.label : defaultLabel;
 
@@ -85,11 +84,7 @@ export function PieCenter({
   if (children) {
     return (
       <div
-        className={cn(
-          chartCenterContainerClassName,
-          "flex items-center justify-center",
-          className
-        )}
+        className={cn(chartCenterContainerClassName, "flex items-center justify-center", className)}
         style={{ width: centerSize, height: centerSize }}
       >
         {children({
@@ -109,7 +104,7 @@ export function PieCenter({
       className={cn(
         chartCenterContainerClassName,
         "flex flex-col items-center justify-center text-center",
-        className
+        className,
       )}
       style={{ width: centerSize, height: centerSize }}
     >
@@ -127,5 +122,3 @@ export function PieCenter({
 }
 
 PieCenter.displayName = "PieCenter";
-
-export default PieCenter;

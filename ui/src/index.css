@@ -559,10 +559,15 @@
   @variant dark {
     border-color: color-mix(in srgb, var(--color-white) 8%, transparent);
   }
+}
 
-  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-    /* biome-ignore lint/complexity/noImportantStyles: the fallback must beat the glass mix. */
-    background: var(--popover) !important;
+/*
+ * Where backdrop-filter is missing, the glass falls back to the solid popover. Unlayered, so it
+ * wins over the glass mix and every background utility on the surface (all in the utilities layer).
+ */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .dialog-glass {
+    background: var(--popover);
   }
 }
 
@@ -1199,10 +1204,9 @@
 }
 
 /*
- * Bklit UI chart variables (merged by the shadcn CLI from @bklit/chart-context). One purple plus
- * neutrals, with red as the only alert series: chart-1 is Kiro purple, chart-2 a paler purple,
- * chart-3..5 greys stepping down toward the card and chart-other below them (the model mix
- * ramp; never green or red for a category). Labels, grid and comparison lines use the app's own greys and hairline.
+ * Bklit UI chart variables (merged by the shadcn CLI from @bklit/chart-context). chart-1 is Kiro
+ * purple and chart-2..5 plus chart-other the categorical series (see the :root block below),
+ * with red as the only alert series. Labels, grid and comparison lines use the app's own greys and hairline.
  * chart-scale-01..05 is the volume ramp for heatmap cells and idle bars: 01 is empty, 02..05 run
  * from a faint to the full purple.
  */
@@ -1249,16 +1253,18 @@
 :root {
   --chart-1: var(--primary);
   /*
-   * The categorical series (model-mix donut, traffic-by-account bars): one family of purples and
-   * blues that still stay apart side by side, no grey and no red (a share is not bad news).
-   * chart-1 is the brand purple, chart-2 the purple mixed toward the text colour (lavender in
-   * dark, deep violet in light), chart-3 fuchsia, chart-4 periwinkle and chart-5 blue;
+   * The categorical series (model-mix donut, traffic-by-account bars): cool hues around the brand
+   * purple, no grey and no red (a share is not bad news). chart-1 is the brand purple, chart-2
+   * orchid, chart-3 blue, chart-4 teal and chart-5 indigo, all at one calm lightness (OKLCH L
+   * 0.5-0.64, C 0.12-0.18) so no slice shouts. The order is the colour-blind safety: every pair
+   * of neighbours (stacked segments, donut slices) stays apart under protan and deutan vision
+   * (OKLab delta E >= 12.4) and to the normal eye (>= 17), and each clears 3:1 on the white card.
    * chart-other, for the rest, is a soft tint of the brand purple.
    */
-  --chart-2: color-mix(in oklab, var(--primary) 60%, var(--foreground));
-  --chart-3: var(--color-fuchsia-600);
-  --chart-4: var(--color-indigo-400);
-  --chart-5: var(--color-blue-500);
+  --chart-2: #cd509f;
+  --chart-3: #1289e7;
+  --chart-4: #01a38f;
+  --chart-5: #504fc6;
   --chart-other: color-mix(in oklab, var(--primary) 32%, var(--card));
   --chart-positive: var(--success);
   --chart-negative: var(--destructive);
@@ -1296,10 +1302,14 @@
 }
 
 .dark {
-  /* The series' lighter steps of the same hues, so they read on the near-black card. */
-  --chart-3: var(--color-fuchsia-400);
-  --chart-4: var(--color-indigo-300);
-  --chart-5: var(--color-sky-400);
+  /*
+   * The series' lighter steps of the same hues, so they read on the near-black card (OKLCH L
+   * 0.54-0.66; neighbours stay >= 8.8 apart colour-blind and >= 15.6 to the normal eye).
+   */
+  --chart-2: #d562af;
+  --chart-3: #3690e3;
+  --chart-4: #1ba995;
+  --chart-5: #5b5ece;
   --chart-other: color-mix(in oklab, var(--primary) 38%, var(--card));
   /* Ring spokes and loading strokes: a mid grey that still reads on the dark card. */
   --chart-foreground: color-mix(in oklab, var(--foreground) 45%, transparent);
@@ -1366,13 +1376,18 @@
   }
 }
 
+/*
+ * Reduced motion: every animation and transition finishes at once. Unlayered, so it wins over
+ * every Tailwind layer; the :root prefix brings it level with the single-class unlayered rules
+ * above (e.g. .sidebar-stage-twinkle), and being last it wins those ties. Components keep their
+ * transitions in classes, not inline styles, so this reaches them.
+ */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat every animation. */
-    animation-duration: 0.01ms !important;
-    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat every transition. */
-    transition-duration: 0.01ms !important;
+  :root,
+  :root *,
+  :root ::before,
+  :root ::after {
+    animation-duration: 0.01ms;
+    transition-duration: 0.01ms;
   }
 }

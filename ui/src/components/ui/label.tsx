@@ -22,7 +22,8 @@ export function Label({
   const defaultProps = {
     className: cn(
       "inline-flex items-center gap-2 font-medium text-foreground text-sm/5",
-      variant === "option" && "min-h-10 cursor-pointer pointer-coarse:min-h-11 font-normal text-muted-foreground",
+      variant === "option" &&
+        "min-h-10 cursor-pointer pointer-coarse:min-h-11 font-normal text-muted-foreground",
       className,
     ),
     "data-slot": "label",

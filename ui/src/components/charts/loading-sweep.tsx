@@ -3,19 +3,9 @@
 import { scaleLinear } from "d3-scale";
 import type { CurveFactory } from "d3-shape";
 import { m, useReducedMotion } from "motion/react";
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { chartCssVars, useChartStable } from "./chart-context";
-import {
-  LINE_LOADING_PULSE_EASE,
-  LOADING_LABEL_EXIT_S,
-} from "./line-loading-timing";
+import { LINE_LOADING_PULSE_EASE, LOADING_LABEL_EXIT_S } from "./line-loading-timing";
 import { areaClosedD, LinePath, linePathD } from "./line-path";
 
 /**
@@ -60,32 +50,28 @@ function hashFract(n: number): number {
 }
 
 /** Deterministic heights (percentages of the available height) for a seed. */
-export function getSkeletonHeights(
+function getSkeletonHeights(
   count: number,
   seed = 0,
   min = HEIGHT_MIN_PCT,
-  max = HEIGHT_MAX_PCT
+  max = HEIGHT_MAX_PCT,
 ): number[] {
   const range = max - min;
   return Array.from(
     { length: count },
-    (_, i) => min + Math.floor(hashFract((i + 1) * 12.9898 + seed) * range)
+    (_, i) => min + Math.floor(hashFract((i + 1) * 12.9898 + seed) * range),
   );
 }
 
 /** Deterministic up/down (±1) per bar for the "center" baseline. */
 function getSkeletonSigns(count: number, seed = 0): number[] {
   return Array.from({ length: count }, (_, i) =>
-    hashFract((i + 1) * 78.233 + seed) < 0.5 ? -1 : 1
+    hashFract((i + 1) * 78.233 + seed) < 0.5 ? -1 : 1,
   );
 }
 
 /** Bell-curve opacity stops (sin squared) for the shimmer band's soft edges. */
-function generateEasedGradientStops(
-  steps = 17,
-  minOpacity = 0.05,
-  maxOpacity = 0.9
-) {
+function generateEasedGradientStops(steps = 17, minOpacity = 0.05, maxOpacity = 0.9) {
   return Array.from({ length: steps }, (_, i) => {
     const t = i / (steps - 1);
     const eased = Math.sin(t * Math.PI) ** 2;
@@ -125,19 +111,14 @@ function LoadingSweepMask({
       }
       lastXRef.current = xValue;
     },
-    [onSweepComplete]
+    [onSweepComplete],
   );
 
   return (
     <>
       <linearGradient id={`${chartId}-grad`} x1="0" x2="1" y1="0" y2="0">
         {gradientStops.map(({ offset, opacity }) => (
-          <stop
-            key={offset}
-            offset={offset}
-            stopColor="white"
-            stopOpacity={opacity}
-          />
+          <stop key={offset} offset={offset} stopColor="white" stopOpacity={opacity} />
         ))}
       </linearGradient>
       <pattern
@@ -175,7 +156,7 @@ function LoadingSweepMask({
 
 // ─── Line / Area loading sweep (its own re-randomizing silhouette) ───────────
 
-export interface LineLoadingSweepProps {
+interface LineLoadingSweepProps {
   /** Curve factory from the host `<Line>` / `<Area>`, so the silhouette matches
    * the chart's interpolation (step, smooth, linear, …). */
   curve: CurveFactory;
@@ -224,10 +205,7 @@ export function LineLoadingSweep({
       setTick((prev) => prev + 1);
     }
   }, [isLoop]);
-  const heights = useMemo(
-    () => getSkeletonHeights(pointCount, tick),
-    [pointCount, tick]
-  );
+  const heights = useMemo(() => getSkeletonHeights(pointCount, tick), [pointCount, tick]);
 
   // With reduced motion there is no fade to await, so signal the handoff
   // immediately or the phase machine would stall mid-transition.
@@ -270,16 +248,8 @@ export function LineLoadingSweep({
 
   const areaGradient = withArea ? (
     <linearGradient id={`${chartId}-area`} x1="0" x2="0" y1="0" y2="1">
-      <stop
-        offset="0%"
-        stopColor={stroke}
-        stopOpacity={AREA_FILL_TOP_OPACITY}
-      />
-      <stop
-        offset="100%"
-        stopColor={stroke}
-        stopOpacity={AREA_FILL_BOTTOM_OPACITY}
-      />
+      <stop offset="0%" stopColor={stroke} stopOpacity={AREA_FILL_TOP_OPACITY} />
+      <stop offset="100%" stopColor={stroke} stopOpacity={AREA_FILL_BOTTOM_OPACITY} />
     </linearGradient>
   ) : null;
 
@@ -391,7 +361,7 @@ function SkeletonBars({
   );
 }
 
-export interface BarLoadingSkeletonProps {
+interface BarLoadingSkeletonProps {
   innerWidth: number;
   innerHeight: number;
   /** Number of skeleton bars. Default: 12 */
@@ -428,14 +398,8 @@ export function BarLoadingSkeleton({
   const chartId = `bar-sweep-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const [tick, setTick] = useState(0);
   const onSweepComplete = useCallback(() => setTick((prev) => prev + 1), []);
-  const heights = useMemo(
-    () => getSkeletonHeights(barCount, tick),
-    [barCount, tick]
-  );
-  const signs = useMemo(
-    () => getSkeletonSigns(barCount, tick),
-    [barCount, tick]
-  );
+  const heights = useMemo(() => getSkeletonHeights(barCount, tick), [barCount, tick]);
+  const signs = useMemo(() => getSkeletonSigns(barCount, tick), [barCount, tick]);
 
   if (innerWidth <= 0 || innerHeight <= 0) {
     return null;

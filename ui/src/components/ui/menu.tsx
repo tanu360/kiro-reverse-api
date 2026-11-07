@@ -1,8 +1,6 @@
 "use client";
 
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronRightIcon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
 import { withMarqueeText } from "@/components/ui/marquee-text";
 import {
@@ -13,8 +11,6 @@ import {
   POPUP_ROW_CLASS,
   POPUP_ROW_META_CLASS,
   POPUP_SEPARATOR_CLASS,
-  POPUP_SWITCH_THUMB_CLASS,
-  POPUP_SWITCH_TRACK_CLASS,
 } from "@/components/ui/popup-row";
 import { cn } from "@/lib/utils";
 
@@ -26,12 +22,9 @@ import { cn } from "@/lib/utils";
 const MENU_ACTION_ROW =
   "data-inset:ps-8.5 data-[variant=destructive]:text-destructive-foreground [&>svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:[&>svg:not([class*='text-'])]:text-current";
 
-export const MenuCreateHandle: typeof MenuPrimitive.createHandle =
-  MenuPrimitive.createHandle;
-
 export const Menu: typeof MenuPrimitive.Root = MenuPrimitive.Root;
 
-export const MenuPortal: typeof MenuPrimitive.Portal = MenuPrimitive.Portal;
+const MenuPortal: typeof MenuPrimitive.Portal = MenuPrimitive.Portal;
 
 export function MenuTrigger({
   className,
@@ -39,11 +32,7 @@ export function MenuTrigger({
   ...props
 }: MenuPrimitive.Trigger.Props): React.ReactElement {
   return (
-    <MenuPrimitive.Trigger
-      className={className}
-      data-slot="menu-trigger"
-      {...props}
-    >
+    <MenuPrimitive.Trigger className={className} data-slot="menu-trigger" {...props}>
       {children}
     </MenuPrimitive.Trigger>
   );
@@ -106,9 +95,7 @@ export function MenuPopup({
   );
 }
 
-export function MenuGroup(
-  props: MenuPrimitive.Group.Props,
-): React.ReactElement {
+export function MenuGroup(props: MenuPrimitive.Group.Props): React.ReactElement {
   return <MenuPrimitive.Group data-slot="menu-group" {...props} />;
 }
 
@@ -124,11 +111,7 @@ export function MenuItem({
 }): React.ReactElement {
   return (
     <MenuPrimitive.Item
-      className={cn(
-        POPUP_ROW_CLASS,
-        MENU_ACTION_ROW,
-        className,
-      )}
+      className={cn(POPUP_ROW_CLASS, MENU_ACTION_ROW, className)}
       data-inset={inset}
       data-slot="menu-item"
       data-variant={variant}
@@ -139,76 +122,7 @@ export function MenuItem({
   );
 }
 
-export function MenuLinkItem({
-  className,
-  inset,
-  variant = "default",
-  closeOnClick = true,
-  ...props
-}: MenuPrimitive.LinkItem.Props & {
-  inset?: boolean;
-  variant?: "default" | "destructive";
-}): React.ReactElement {
-  return (
-    <MenuPrimitive.LinkItem
-      className={cn(
-        POPUP_ROW_CLASS,
-        MENU_ACTION_ROW,
-        className,
-      )}
-      closeOnClick={closeOnClick}
-      data-inset={inset}
-      data-slot="menu-link-item"
-      data-variant={variant}
-      {...props}
-    />
-  );
-}
-
-export function MenuCheckboxItem({
-  className,
-  children,
-  checked,
-  variant = "default",
-  ...props
-}: MenuPrimitive.CheckboxItem.Props & {
-  variant?: "default" | "switch";
-}): React.ReactElement {
-  return (
-    <MenuPrimitive.CheckboxItem
-      checked={checked}
-      className={cn(
-        POPUP_ROW_CLASS,
-        variant === "switch"
-          ? "justify-between gap-4 pe-1.5 data-checked:text-foreground"
-          : POPUP_CHECK_ROW_CLASS,
-        className,
-      )}
-      data-slot="menu-checkbox-item"
-      {...props}
-    >
-      {variant === "switch" ? (
-        <>
-          <span className="min-w-0">{children}</span>
-          <MenuPrimitive.CheckboxItemIndicator className={POPUP_SWITCH_TRACK_CLASS} keepMounted>
-            <span className={POPUP_SWITCH_THUMB_CLASS} />
-          </MenuPrimitive.CheckboxItemIndicator>
-        </>
-      ) : (
-        <>
-          <span className="flex min-w-0 items-center gap-2.5">{withMarqueeText(children)}</span>
-          <MenuPrimitive.CheckboxItemIndicator className={POPUP_INDICATOR_CLASS}>
-            <CheckedDot />
-          </MenuPrimitive.CheckboxItemIndicator>
-        </>
-      )}
-    </MenuPrimitive.CheckboxItem>
-  );
-}
-
-export function MenuRadioGroup(
-  props: MenuPrimitive.RadioGroup.Props,
-): React.ReactElement {
+export function MenuRadioGroup(props: MenuPrimitive.RadioGroup.Props): React.ReactElement {
   return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />;
 }
 
@@ -257,11 +171,7 @@ export function MenuGroupLabel({
 }): React.ReactElement {
   return (
     <MenuPrimitive.GroupLabel
-      className={cn(
-        POPUP_GROUP_LABEL_CLASS,
-        "data-inset:ps-8.5",
-        className,
-      )}
+      className={cn(POPUP_GROUP_LABEL_CLASS, "data-inset:ps-8.5", className)}
       data-inset={inset}
       data-slot="menu-label"
       {...props}
@@ -281,96 +191,3 @@ export function MenuSeparator({
     />
   );
 }
-
-export function MenuShortcut({
-  className,
-  ...props
-}: React.ComponentProps<"kbd">): React.ReactElement {
-  return (
-    <kbd
-      className={cn(
-        "ms-auto font-medium font-sans text-muted-foreground text-xs tracking-normal",
-        className,
-      )}
-      data-slot="menu-shortcut"
-      {...props}
-    />
-  );
-}
-
-export function MenuSub(
-  props: MenuPrimitive.SubmenuRoot.Props,
-): React.ReactElement {
-  return <MenuPrimitive.SubmenuRoot data-slot="menu-sub" {...props} />;
-}
-
-export function MenuSubTrigger({
-  className,
-  inset,
-  children,
-  ...props
-}: MenuPrimitive.SubmenuTrigger.Props & {
-  inset?: boolean;
-}): React.ReactElement {
-  return (
-    <MenuPrimitive.SubmenuTrigger
-      className={cn(
-        POPUP_ROW_CLASS,
-        "data-inset:ps-8.5 data-popup-open:bg-accent [&_svg:not([class*='text-'])]:text-muted-foreground",
-        className,
-      )}
-      data-inset={inset}
-      data-slot="menu-sub-trigger"
-      {...props}
-    >
-      {children}
-      <HugeiconsIcon icon={ChevronRightIcon} aria-hidden="true" className="-me-1 ms-auto size-4" />
-    </MenuPrimitive.SubmenuTrigger>
-  );
-}
-
-export function MenuSubPopup({
-  className,
-  sideOffset = 0,
-  alignOffset,
-  align = "start",
-  ...props
-}: MenuPrimitive.Popup.Props & {
-  align?: MenuPrimitive.Positioner.Props["align"];
-  sideOffset?: MenuPrimitive.Positioner.Props["sideOffset"];
-  alignOffset?: MenuPrimitive.Positioner.Props["alignOffset"];
-}): React.ReactElement {
-  const defaultAlignOffset = align !== "center" ? -5 : undefined;
-
-  return (
-    <MenuPopup
-      align={align}
-      alignOffset={alignOffset ?? defaultAlignOffset}
-      className={className}
-      data-slot="menu-sub-content"
-      side="inline-end"
-      sideOffset={sideOffset}
-      {...props}
-    />
-  );
-}
-
-export {
-  MenuPrimitive,
-  MenuCreateHandle as DropdownMenuCreateHandle,
-  Menu as DropdownMenu,
-  MenuPortal as DropdownMenuPortal,
-  MenuTrigger as DropdownMenuTrigger,
-  MenuPopup as DropdownMenuContent,
-  MenuGroup as DropdownMenuGroup,
-  MenuItem as DropdownMenuItem,
-  MenuCheckboxItem as DropdownMenuCheckboxItem,
-  MenuRadioGroup as DropdownMenuRadioGroup,
-  MenuRadioItem as DropdownMenuRadioItem,
-  MenuGroupLabel as DropdownMenuLabel,
-  MenuSeparator as DropdownMenuSeparator,
-  MenuShortcut as DropdownMenuShortcut,
-  MenuSub as DropdownMenuSub,
-  MenuSubTrigger as DropdownMenuSubTrigger,
-  MenuSubPopup as DropdownMenuSubContent,
-};

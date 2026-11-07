@@ -3,36 +3,24 @@
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { XIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type React from "react";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-export const DialogCreateHandle: typeof DialogPrimitive.createHandle =
-  DialogPrimitive.createHandle;
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 export const Dialog: typeof DialogPrimitive.Root = DialogPrimitive.Root;
 
-export const DialogPortal: typeof DialogPrimitive.Portal =
-  DialogPrimitive.Portal;
+const DialogPortal: typeof DialogPrimitive.Portal = DialogPrimitive.Portal;
 
-export function DialogTrigger(
-  props: DialogPrimitive.Trigger.Props,
-): React.ReactElement {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
-}
-
-export function DialogClose(
-  props: DialogPrimitive.Close.Props,
-): React.ReactElement {
+export function DialogClose(props: DialogPrimitive.Close.Props): React.ReactElement {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
-export function DialogBackdrop({
+function DialogBackdrop({
   className,
   ...props
 }: DialogPrimitive.Backdrop.Props): React.ReactElement {
@@ -54,7 +42,7 @@ export function DialogBackdrop({
  */
 export type DialogSize = "sm" | "md" | "lg" | "xl" | "2xl";
 
-export const DIALOG_SIZE_CLASS: Record<DialogSize, string> = {
+const DIALOG_SIZE_CLASS: Record<DialogSize, string> = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-lg",
@@ -71,7 +59,7 @@ export const DIALOG_SIZE_CLASS: Record<DialogSize, string> = {
  */
 export type DialogAnchor = "center" | "top";
 
-export function DialogViewport({
+function DialogViewport({
   className,
   anchor = "center",
   ...props
@@ -84,7 +72,8 @@ export function DialogViewport({
         "fixed inset-0 z-50 grid grid-rows-[1fr_auto_1fr] justify-items-center p-4 max-sm:px-(--modal-gap-x) max-sm:py-(--modal-gap-y)",
         // Top-anchored (the tall pickers): a 6dvh lead, at least 48 px, so an eight-row list
         // still fits a 768 px laptop screen. On phones it fills the 90dvh box (DialogPopup).
-        anchor === "top" && "max-sm:grid-rows-[0_1fr_0] sm:grid-rows-[minmax(--spacing(12),6dvh)_auto_1fr]",
+        anchor === "top" &&
+          "max-sm:grid-rows-[0_1fr_0] sm:grid-rows-[minmax(--spacing(12),6dvh)_auto_1fr]",
         className,
       )}
       data-anchor={anchor}
@@ -98,7 +87,7 @@ export function DialogViewport({
  * The close X: a ghost icon button in the top corner, its centre on the title's line (the header
  * is padded 24 px and the 18 px title is 25 px tall, so the line's centre sits 36 px down).
  */
-export const OVERLAY_CLOSE_CLASS = "absolute end-4 top-4.5 z-1 sm:top-5";
+export const OVERLAY_CLOSE_CLASS = "absolute inset-e-4 top-4.5 z-1 sm:top-5";
 
 export function DialogPopup({
   className,
@@ -130,7 +119,7 @@ export function DialogPopup({
         <DialogPrimitive.Popup
           className={cn(
             // t3code dialog-styles.ts DIALOG_POPUP_CLASS: frosted glass (index.css dialog-glass).
-            "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 -translate-y-[calc(1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
+            "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 translate-y-[calc(-1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
             DIALOG_SIZE_CLASS[size],
             // A `top` dialog on phones fills its 90dvh row (the grid stretches it); the footer
             // keeps to the bottom edge when a step is short.
@@ -264,9 +253,3 @@ export function DialogPanel({
     </ScrollArea>
   );
 }
-
-export {
-  DialogPrimitive,
-  DialogBackdrop as DialogOverlay,
-  DialogPopup as DialogContent,
-};

@@ -7,12 +7,7 @@
 // `YAxis`, so the chart shells keep it outside the series reveal clip with no extra wiring.
 
 import { scaleLinear } from "d3-scale";
-import {
-  AnimatePresence,
-  m,
-  useReducedMotion,
-  type Variants,
-} from "motion/react";
+import { AnimatePresence, m, useReducedMotion, type Variants } from "motion/react";
 import { memo, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { numberFormat } from "@/lib/format";
@@ -23,10 +18,7 @@ import {
   useYScale,
 } from "./chart-context";
 import { normalizeYAxisId } from "./y-axis-scales";
-import {
-  resolveYAxisTickCount,
-  Y_AXIS_DEFAULT_TICK_COUNT,
-} from "./y-axis-ticks";
+import { resolveYAxisTickCount, Y_AXIS_DEFAULT_TICK_COUNT } from "./y-axis-ticks";
 
 /** Vertical drift (px) of labels fading in / out on a y-domain change. */
 const Y_AXIS_LABEL_SHIFT_PX = 8;
@@ -50,7 +42,7 @@ const Y_AXIS_LABEL_GAP_PX = 8;
 export function niceTicks(
   max: number,
   count = 4,
-  { integer = false }: { integer?: boolean } = {}
+  { integer = false }: { integer?: boolean } = {},
 ): number[] {
   if (!(Number.isFinite(max) && max > 0)) {
     return [0, 1];
@@ -94,7 +86,7 @@ const labelVariants: Variants = {
   }),
 };
 
-export interface YAxisProps {
+interface YAxisProps {
   /** Scale group id (Recharts `yAxisId`). Default: `"left"`. */
   yAxisId?: string | number;
   /** Which side of the plot the labels sit on, inside that chart margin. Default: `"left"`. */
@@ -118,7 +110,7 @@ export interface YAxisProps {
 function formatLabel(
   value: number,
   formatLargeNumbers: boolean,
-  formatValue?: (value: number) => string
+  formatValue?: (value: number) => string,
 ): string {
   if (formatValue) {
     return formatValue(value);
@@ -136,7 +128,7 @@ function formatLabel(
 function resolveReferenceDataRange(
   y1: number | undefined,
   y2: number | undefined,
-  domain: [number, number]
+  domain: [number, number],
 ): [number, number] {
   const dMin = Math.min(domain[0], domain[1]);
   const dMax = Math.max(domain[0], domain[1]);
@@ -149,7 +141,7 @@ function resolveTickLabelColor(
   tickY: number,
   axisId: string,
   yScale: ReturnType<typeof useYScale>,
-  referenceAreas: ReturnType<typeof useChartStable>["referenceAreas"]
+  referenceAreas: ReturnType<typeof useChartStable>["referenceAreas"],
 ): string | undefined {
   for (const area of referenceAreas) {
     if (!area.axisLabelColor) {
@@ -161,7 +153,7 @@ function resolveTickLabelColor(
     const [low, high] = resolveReferenceDataRange(
       area.y1,
       area.y2,
-      yScale.domain() as [number, number]
+      yScale.domain() as [number, number],
     );
     const topPixel = yScale(high) ?? 0;
     const bottomPixel = yScale(low) ?? 0;
@@ -221,7 +213,7 @@ const YAxisInner = memo(function YAxisInner({
       tickValuesKey === undefined
         ? settledYScale.ticks(resolveYAxisTickCount(numTicks))
         : tickValuesKey.split(",").filter(Boolean).map(Number),
-    [settledYScale, numTicks, tickValuesKey]
+    [settledYScale, numTicks, tickValuesKey],
   );
 
   const ticks = useMemo(() => {
@@ -231,23 +223,10 @@ const YAxisInner = memo(function YAxisInner({
         value,
         y,
         label: formatLabel(value, formatLargeNumbers, formatValue),
-        labelColor: resolveTickLabelColor(
-          y - margin.top,
-          axisId,
-          yScale,
-          referenceAreas
-        ),
+        labelColor: resolveTickLabelColor(y - margin.top, axisId, yScale, referenceAreas),
       };
     });
-  }, [
-    tickValues,
-    yScale,
-    margin.top,
-    formatLargeNumbers,
-    formatValue,
-    axisId,
-    referenceAreas,
-  ]);
+  }, [tickValues, yScale, margin.top, formatLargeNumbers, formatValue, axisId, referenceAreas]);
 
   return createPortal(
     <div className="pointer-events-none absolute inset-0" data-slot="chart-y-axis">
@@ -258,15 +237,10 @@ const YAxisInner = memo(function YAxisInner({
           // half-height edge label when the chart margin is tight.
           top: -Y_AXIS_LABEL_CLIP_BLEED_PX,
           bottom: -Y_AXIS_LABEL_CLIP_BLEED_PX,
-          ...(isLeft
-            ? { left: 0, width: margin.left }
-            : { right: 0, width: margin.right }),
+          ...(isLeft ? { left: 0, width: margin.left } : { right: 0, width: margin.right }),
         }}
       >
-        <AnimatePresence
-          custom={{ drift, reducedMotion } satisfies LabelMotion}
-          initial={false}
-        >
+        <AnimatePresence custom={{ drift, reducedMotion } satisfies LabelMotion} initial={false}>
           {ticks.map((tick, index) => {
             // Cascade in the direction of travel: bottom-up while labels
             // rise, top-down while they fall.
@@ -306,9 +280,7 @@ const YAxisInner = memo(function YAxisInner({
               >
                 <span
                   className="chart-tick whitespace-nowrap"
-                  style={
-                    tick.labelColor ? { color: tick.labelColor } : undefined
-                  }
+                  style={tick.labelColor ? { color: tick.labelColor } : undefined}
                 >
                   {tick.label}
                 </span>
@@ -318,10 +290,8 @@ const YAxisInner = memo(function YAxisInner({
         </AnimatePresence>
       </div>
     </div>,
-    container
+    container,
   );
 });
 
 YAxis.displayName = "YAxis";
-
-export default YAxis;

@@ -21,7 +21,7 @@ function isTabbable(element: HTMLElement): boolean {
 }
 
 /** Keyboard-reachable elements inside `root`, in DOM order. */
-export function tabbableElements(root: HTMLElement): HTMLElement[] {
+function tabbableElements(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(isTabbable);
 }
 

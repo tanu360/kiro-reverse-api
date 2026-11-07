@@ -13,7 +13,7 @@ import { flushSync } from "react-dom";
 import "./theme-transitions.css";
 
 export type Theme = "system" | "light" | "dark";
-export type ResolvedTheme = "light" | "dark";
+type ResolvedTheme = "light" | "dark";
 
 export const THEME_STORAGE_KEY = "kiro_theme";
 export const THEMES: readonly Theme[] = ["system", "light", "dark"];

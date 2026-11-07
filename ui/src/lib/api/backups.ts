@@ -15,7 +15,7 @@ import type {
 const backupPath = (id: string, suffix = "") => `/backups/${encodeURIComponent(id)}${suffix}`;
 
 /** Always ?autoInclude=true; a null list becomes []. */
-export async function listBackups(): Promise<BackupEntry[]> {
+async function listBackups(): Promise<BackupEntry[]> {
   const res = await apiRequest<BackupListResponse>("/backups", { query: { autoInclude: "true" } });
   return res.backups ?? [];
 }
@@ -25,7 +25,7 @@ export function backupsQuery() {
 }
 
 /** A never-configured schedule is `{}`; every field is omitted when unset. */
-export async function getBackupSchedule(): Promise<BackupSchedule> {
+async function getBackupSchedule(): Promise<BackupSchedule> {
   const res = await apiRequest<BackupScheduleResponse>("/backups/schedule");
   return res.schedule ?? {};
 }

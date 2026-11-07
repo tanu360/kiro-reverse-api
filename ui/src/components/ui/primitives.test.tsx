@@ -8,7 +8,13 @@ import { Button } from "./button";
 import { Dialog, DialogPopup, DialogTitle } from "./dialog";
 import { Drawer, DrawerPopup, DrawerTitle } from "./drawer";
 import { Input } from "./input";
-import { NumberField, NumberFieldDecrement, NumberFieldGroup, NumberFieldIncrement, NumberFieldInput } from "./number-field";
+import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from "./number-field";
 import { SegmentedControl, SegmentedControlItem } from "./segmented-control";
 import { Select, SelectTrigger, SelectValue } from "./select";
 import { Sheet, SheetPopup, SheetTitle } from "./sheet";
@@ -94,24 +100,26 @@ describe("Input", () => {
   });
 });
 
+/** A button that starts loading on its first click. */
+function SaveButton({ onSave }: { onSave: () => void }) {
+  const [saving, setSaving] = useState(false);
+  return (
+    <Button
+      loading={saving}
+      onClick={() => {
+        onSave();
+        setSaving(true);
+      }}
+    >
+      Save
+    </Button>
+  );
+}
+
 describe("Button", () => {
   it("keeps focus while loading, is busy, and ignores further clicks", async () => {
     const onSave = vi.fn();
-    function SaveButton() {
-      const [saving, setSaving] = useState(false);
-      return (
-        <Button
-          loading={saving}
-          onClick={() => {
-            onSave();
-            setSaving(true);
-          }}
-        >
-          Save
-        </Button>
-      );
-    }
-    const { user } = renderWithProviders(<SaveButton />);
+    const { user } = renderWithProviders(<SaveButton onSave={onSave} />);
     const button = screen.getByRole("button", { name: "Save" });
     await user.click(button);
     expect(onSave).toHaveBeenCalledTimes(1);

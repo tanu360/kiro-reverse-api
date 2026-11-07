@@ -19,8 +19,6 @@ import { intFmt } from "./chart-formatters";
 import { useOptionalChartLegendHover } from "./chart-legend-hover";
 import { ShareBar } from "./share-bar";
 
-export { ShareBar, type ShareBarProps } from "./share-bar";
-
 export type LegendMarkerVariant = "dot" | "line" | "dashed";
 
 export interface LegendItemData {
@@ -38,13 +36,13 @@ export interface LegendItemData {
   key?: string;
 }
 
-export interface LegendContextValue {
+interface LegendContextValue {
   items: LegendItemData[];
   hoveredIndex: number | null;
   setHoveredIndex: (index: number | null) => void;
 }
 
-export interface LegendItemContextValue {
+interface LegendItemContextValue {
   item: LegendItemData;
   index: number;
   /** This item is hovered. */
@@ -58,7 +56,7 @@ export interface LegendItemContextValue {
 const LegendContext = createContext<LegendContextValue | null>(null);
 const LegendItemContext = createContext<LegendItemContextValue | null>(null);
 
-export function useLegend(): LegendContextValue {
+function useLegend(): LegendContextValue {
   const context = useContext(LegendContext);
   if (!context) {
     throw new Error("useLegend must be used within a <Legend> component.");
@@ -74,7 +72,7 @@ export function useLegendItem(): LegendItemContextValue {
   return context;
 }
 
-export interface LegendProps {
+interface LegendProps {
   /** One entry per series, in the order the series are declared in the chart. */
   items: LegendItemData[];
   /** Controlled hovered index. Default: the surrounding `ChartLegendHoverProvider`, else internal. */
@@ -143,15 +141,13 @@ export function Legend({
           orientation === "horizontal"
             ? "flex-wrap items-center gap-x-4 gap-y-1"
             : "flex-col gap-1",
-          className
+          className,
         )}
         data-slot="chart-legend"
       >
         {items.map((item, index) => {
           const percentage =
-            item.maxValue && item.value !== undefined
-              ? (item.value / item.maxValue) * 100
-              : 0;
+            item.maxValue && item.value !== undefined ? (item.value / item.maxValue) * 100 : 0;
           return (
             <LegendItemContext.Provider
               key={item.key ?? item.label}
@@ -174,7 +170,7 @@ export function Legend({
 
 Legend.displayName = "Legend";
 
-export interface LegendItemProps {
+interface LegendItemProps {
   /** Layout classes only (e.g. `flex-col items-stretch` for a row with a progress bar). */
   className?: string;
   /** LegendMarker, LegendLabel, LegendValue, LegendProgress. */
@@ -191,7 +187,7 @@ export function LegendItem({ className, children }: LegendItemProps) {
       className={cn(
         "flex min-w-0 items-center gap-1.5 transition-opacity duration-150 ease-out motion-reduce:transition-none",
         isFaded && "opacity-50",
-        className
+        className,
       )}
       data-faded={isFaded ? "" : undefined}
       data-hovered={isHovered ? "" : undefined}
@@ -206,7 +202,7 @@ export function LegendItem({ className, children }: LegendItemProps) {
 
 LegendItem.displayName = "LegendItem";
 
-export interface LegendMarkerProps {
+interface LegendMarkerProps {
   /** Marker shape. Default: the item's `marker`, else `"dot"`. */
   variant?: LegendMarkerVariant;
   className?: string;
@@ -252,7 +248,7 @@ export function LegendMarker({ variant, className }: LegendMarkerProps) {
 
 LegendMarker.displayName = "LegendMarker";
 
-export interface LegendLabelProps {
+interface LegendLabelProps {
   className?: string;
 }
 
@@ -265,7 +261,7 @@ export function LegendLabel({ className }: LegendLabelProps) {
       className={cn(
         "min-w-0 truncate text-meta text-muted-foreground transition-colors duration-150",
         isHovered && "text-foreground",
-        className
+        className,
       )}
     >
       {item.label}
@@ -275,7 +271,7 @@ export function LegendLabel({ className }: LegendLabelProps) {
 
 LegendLabel.displayName = "LegendLabel";
 
-export interface LegendValueProps {
+interface LegendValueProps {
   className?: string;
   /** Also show value / maxValue as a percentage. Default: false */
   showPercentage?: boolean;
@@ -301,14 +297,12 @@ export function LegendValue({
     <span
       className={cn(
         "inline-flex items-baseline gap-1.5 font-medium text-foreground text-meta tabular-nums",
-        className
+        className,
       )}
     >
       <span>{formatValue(item.value)}</span>
       {showPercentage && item.maxValue ? (
-        <span className="font-normal text-muted-foreground">
-          {formatPercentage(percentage)}
-        </span>
+        <span className="font-normal text-muted-foreground">{formatPercentage(percentage)}</span>
       ) : null}
     </span>
   );
@@ -316,7 +310,7 @@ export function LegendValue({
 
 LegendValue.displayName = "LegendValue";
 
-export interface LegendProgressProps {
+interface LegendProgressProps {
   /** Layout classes only. */
   className?: string;
 }
@@ -325,22 +319,15 @@ export interface LegendProgressProps {
  * The item's {@link ShareBar} (value / maxValue). Decorative: pair it with LegendValue. Outside a
  * Legend (a table cell, a card), use `ShareBar` itself.
  */
-export function LegendProgress({ className }: LegendProgressProps) {
+function LegendProgress({ className }: LegendProgressProps) {
   const { item } = useLegendItem();
   if (!item.maxValue || item.value === undefined) {
     return null;
   }
 
   return (
-    <ShareBar
-      className={className}
-      color={item.color}
-      max={item.maxValue}
-      value={item.value}
-    />
+    <ShareBar className={className} color={item.color} max={item.maxValue} value={item.value} />
   );
 }
 
 LegendProgress.displayName = "LegendProgress";
-
-export default Legend;

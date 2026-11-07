@@ -65,13 +65,7 @@ export function StatusBadge({ record }: { record: RequestRecord }): JSX.Element 
 }
 
 /** A masked API key in mono, cut with an ellipsis (the full mask as a tooltip when cut). */
-export function ApiKeyCode({
-  value,
-  className,
-}: {
-  value?: string;
-  className?: string;
-}): JSX.Element {
+function ApiKeyCode({ value, className }: { value?: string; className?: string }): JSX.Element {
   const masked = normalizeApiKeyMask(value);
   if (!masked) return <Muted />;
   return <TruncatedText className={cn("font-mono text-meta", className)}>{masked}</TruncatedText>;
@@ -97,14 +91,16 @@ function ErrorCell({ record }: { record: RequestRecord }): JSX.Element {
       <Tooltip>
         <TooltipTrigger
           render={
-            // `wrap-anywhere`, not `break-words`: an unbroken token (a JSON body, a URL) would
+            // `wrap-anywhere`, not `wrap-break-word`: an unbroken token (a JSON body, a URL) would
             // otherwise set the column's minimum width and scroll the table sideways at 1440 px.
             <span className="line-clamp-2 whitespace-normal text-meta text-muted-foreground leading-snug wrap-anywhere" />
           }
         >
           {message}
         </TooltipTrigger>
-        <TooltipPopup className="max-w-sm whitespace-pre-wrap break-words">{message}</TooltipPopup>
+        <TooltipPopup className="max-w-sm whitespace-pre-wrap wrap-break-word">
+          {message}
+        </TooltipPopup>
       </Tooltip>
     </div>
   );
@@ -188,7 +184,7 @@ function CreditsCell({ record }: { record: RequestRecord }): JSX.Element {
  * Time over date: two short lines keep the column narrow. `inline` puts them on one line (a
  * card's title). The year shows on older rows, so no tooltip is needed.
  */
-export function TimeCell({
+function TimeCell({
   ts,
   lang,
   inline = false,

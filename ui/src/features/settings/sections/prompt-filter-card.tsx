@@ -47,7 +47,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { promptFilterQuery, updatePromptFilter } from "@/lib/api/settings";
 import type { PromptFilterConfig, PromptFilterRule } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, keyByText } from "@/lib/utils";
 import { useDraft } from "../lib/dirty";
 import {
   isRegexRule,
@@ -269,11 +269,11 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
         <SettingsEmptyRow>{t("promptFilter.noRules")}</SettingsEmptyRow>
       ) : (
         <ol className="[&>li+li]:border-border-subtle [&>li+li]:border-t">
-          {rules.map((rule, index) => (
+          {/* Ids come from the server unchecked and may repeat: a repeat is numbered. */}
+          {keyByText(rules, (rule) => rule.id).map(({ key, item: rule }, index) => (
             <RuleRow
               index={index}
-              // biome-ignore lint/suspicious/noArrayIndexKey: ids come from the server unchecked and may repeat; rules never reorder, so the index keeps keys unique.
-              key={`${rule.id}:${index}`}
+              key={key}
               onDelete={() => removeRule(index)}
               onEdit={() => openEditor(index)}
               onToggle={(enabled) => setRule(index, { enabled })}
@@ -335,7 +335,7 @@ function RuleRow({
         <div className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span
             className={cn(
-              "line-clamp-2 min-w-0 font-medium text-sm [overflow-wrap:anywhere]",
+              "line-clamp-2 min-w-0 font-medium text-sm wrap-anywhere",
               rule.name.trim() ? "text-foreground" : "text-muted-foreground",
             )}
           >

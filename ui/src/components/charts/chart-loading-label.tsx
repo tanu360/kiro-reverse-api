@@ -1,6 +1,7 @@
 "use client";
 
 import { m } from "motion/react";
+import { useUiT } from "@/components/ui/messages";
 import { cn } from "@/lib/utils";
 import { ShimmeringText } from "../shimmering-text";
 import {
@@ -8,9 +9,8 @@ import {
   LOADING_LABEL_EXIT_S,
   LOADING_LABEL_EXIT_Y_PX,
 } from "./line-loading-timing";
-import { useUiT } from "@/components/ui/messages";
 
-export interface ChartLoadingLabelProps {
+interface ChartLoadingLabelProps {
   /** Label shown centered over the chart. */
   text?: string;
   className?: string;
@@ -39,7 +39,7 @@ export function ChartLoadingLabel({
       aria-live="polite"
       className={cn(
         "pointer-events-none absolute inset-0 flex items-center justify-center",
-        className
+        className,
       )}
       initial={false}
       role="status"
@@ -55,5 +55,3 @@ export function ChartLoadingLabel({
     </m.div>
   );
 }
-
-export default ChartLoadingLabel;

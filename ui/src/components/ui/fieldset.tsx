@@ -8,13 +8,7 @@ export function Fieldset({
   className,
   ...props
 }: FieldsetPrimitive.Root.Props): React.ReactElement {
-  return (
-    <FieldsetPrimitive.Root
-      className={className}
-      data-slot="fieldset"
-      {...props}
-    />
-  );
+  return <FieldsetPrimitive.Root className={className} data-slot="fieldset" {...props} />;
 }
 export function FieldsetLegend({
   className,
@@ -30,5 +24,3 @@ export function FieldsetLegend({
     />
   );
 }
-
-export { FieldsetPrimitive };

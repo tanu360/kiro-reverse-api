@@ -60,7 +60,9 @@ export function ErrorState({
           <HugeiconsIcon icon={AlertCircleIcon} aria-hidden="true" />
         </EmptyMedia>
         <EmptyTitle>{title ?? t("state.errorTitle")}</EmptyTitle>
-        {message ? <EmptyDescription className="break-words">{message}</EmptyDescription> : null}
+        {message ? (
+          <EmptyDescription className="wrap-break-word">{message}</EmptyDescription>
+        ) : null}
       </EmptyHeader>
       {onRetry ? (
         <EmptyContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { type CSSProperties, memo, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   selectTooltipData,
@@ -17,8 +17,15 @@ import {
 } from "./responsive-chart-label-count";
 
 const X_AXIS_POSITION_TWEEN_MS = DEFAULT_Y_DOMAIN_TWEEN_MS;
+/**
+ * The label slide while the x domain tweens. Classes apply it and the label fade (not inline
+ * styles), so the global reduced-motion and theme-swap overrides win over them.
+ */
+const LABEL_SLIDE_VAR = {
+  "--x-axis-label-slide": `left ${X_AXIS_POSITION_TWEEN_MS}ms cubic-bezier(${LINE_LOADING_PULSE_EASE.join(", ")})`,
+} as CSSProperties;
 
-export interface XAxisProps {
+interface XAxisProps {
   /** Number of ticks to show (including first and last). Default: 5. */
   numTicks?: ChartLabelCount;
   /** Half the date ticker pill plus half a label, for the fade calculation. Default: 40 */
@@ -55,11 +62,7 @@ export interface XAxisProps {
  * Local-time round ticks in `[start, end]`: every `stepMinutes` from midnight (15 -> :00, :15,
  * :30, :45; 60 -> each hour; 240 -> 00:00, 04:00, ...). Pass to `XAxis tickValues`.
  */
-export function roundTimeTicks(
-  start: Date,
-  end: Date,
-  stepMinutes: number
-): Date[] {
+export function roundTimeTicks(start: Date, end: Date, stepMinutes: number): Date[] {
   const step = Math.max(1, Math.round(stepMinutes));
   const endTime = end.getTime();
   if (!(Number.isFinite(start.getTime()) && Number.isFinite(endTime))) {
@@ -118,7 +121,7 @@ function xAxisLabelOpacity(
   x: number,
   crosshairX: number | null,
   hoveredLabel: string | null,
-  tickerHalfWidth: number
+  tickerHalfWidth: number,
 ): number {
   if (crosshairX === null) {
     return 1;
@@ -149,23 +152,19 @@ const XAxisLabel = memo(function XAxisLabel({
 }: XAxisLabelProps) {
   return (
     <div
-      className="absolute whitespace-nowrap"
+      className={
+        animatePosition
+          ? "absolute whitespace-nowrap [transition:var(--x-axis-label-slide)]"
+          : "absolute whitespace-nowrap"
+      }
       style={{
+        ...LABEL_SLIDE_VAR,
         left: x,
         bottom: 12,
         transform: labelShift(x, bounds),
-        transition: animatePosition
-          ? `left ${X_AXIS_POSITION_TWEEN_MS}ms cubic-bezier(${LINE_LOADING_PULSE_EASE.join(", ")})`
-          : undefined,
       }}
     >
-      <span
-        className="chart-tick block"
-        style={{
-          opacity,
-          transition: "opacity 0.4s ease-in-out",
-        }}
-      >
+      <span className="chart-tick block [transition:opacity_0.4s_ease-in-out]" style={{ opacity }}>
         {label}
       </span>
     </div>
@@ -217,7 +216,7 @@ function indicesForTickCount(length: number, tickCount: number): number[] {
   }
 
   const rawIndices = Array.from({ length: tickCount }, (_, index) =>
-    Math.round((index / (tickCount - 1)) * span)
+    Math.round((index / (tickCount - 1)) * span),
   );
 
   const indices = [...new Set(rawIndices)].sort((a, b) => a - b);
@@ -254,7 +253,7 @@ function dedupeIndicesByLabel(
   indices: number[],
   data: Record<string, unknown>[],
   dateLabels: string[],
-  xAccessor: (d: Record<string, unknown>) => Date
+  xAccessor: (d: Record<string, unknown>) => Date,
 ): number[] {
   const seenLabels = new Set<string>();
   const deduped: number[] = [];
@@ -312,7 +311,7 @@ function smallestGapEdgePreference(indices: number[]): number {
 function scoreTickLayout(
   indices: number[],
   resolveXPx: (index: number) => number,
-  targetCount: number
+  targetCount: number,
 ): TickLayoutScore {
   if (indices.length < 2) {
     return {
@@ -335,17 +334,14 @@ function scoreTickLayout(
 
   const minGap = Math.min(...pixelGaps);
   const maxGap = Math.max(...pixelGaps);
-  const meanGap =
-    pixelGaps.reduce((sum, gap) => sum + gap, 0) / pixelGaps.length;
-  const spreadRatio =
-    meanGap > 0 ? (maxGap - minGap) / meanGap : maxGap - minGap;
+  const meanGap = pixelGaps.reduce((sum, gap) => sum + gap, 0) / pixelGaps.length;
+  const spreadRatio = meanGap > 0 ? (maxGap - minGap) / meanGap : maxGap - minGap;
   const countDistance = Math.abs(indices.length - targetCount);
 
   const gaps = indexGaps(indices);
   const smallestGap = Math.min(...gaps);
   const smallestGapIndex = gaps.indexOf(smallestGap);
-  const interiorPenalty =
-    smallestGapIndex > 0 && smallestGapIndex < gaps.length - 1 ? 0.08 : 0;
+  const interiorPenalty = smallestGapIndex > 0 && smallestGapIndex < gaps.length - 1 ? 0.08 : 0;
 
   const symmetryPenalty =
     gaps.reduce((penalty, gap, index) => {
@@ -353,11 +349,7 @@ function scoreTickLayout(
     }, 0) / gaps.length;
 
   return {
-    score:
-      spreadRatio +
-      0.1 * countDistance +
-      interiorPenalty +
-      symmetryPenalty * 0.02,
+    score: spreadRatio + 0.1 * countDistance + interiorPenalty + symmetryPenalty * 0.02,
     symmetryPenalty,
     countDistance,
     edgePreference: smallestGapEdgePreference(indices),
@@ -368,7 +360,7 @@ function isBetterTickLayout(
   next: TickLayoutScore,
   best: TickLayoutScore,
   nextCountDistance: number,
-  bestCountDistance: number
+  bestCountDistance: number,
 ): boolean {
   if (next.score < best.score - 1e-6) {
     return true;
@@ -395,7 +387,7 @@ function isBetterTickLayout(
  * Picks tick indices with the most even on-screen spacing. Tries
  * `targetCount ± 1` and evaluates every gap layout when feasible.
  */
-export function selectEvenlySpacedIndices(
+function selectEvenlySpacedIndices(
   length: number,
   targetCount: number,
   options?: {
@@ -403,7 +395,7 @@ export function selectEvenlySpacedIndices(
     dateLabels?: string[];
     xAccessor?: (d: Record<string, unknown>) => Date;
     resolveXPx?: (index: number) => number;
-  }
+  },
 ): number[] {
   if (length <= 0) {
     return [];
@@ -428,12 +420,7 @@ export function selectEvenlySpacedIndices(
     for (const rawIndices of allIndexLayouts(length, tickCount)) {
       const indices =
         options?.data && options.dateLabels && options.xAccessor
-          ? dedupeIndicesByLabel(
-              rawIndices,
-              options.data,
-              options.dateLabels,
-              options.xAccessor
-            )
+          ? dedupeIndicesByLabel(rawIndices, options.data, options.dateLabels, options.xAccessor)
           : rawIndices;
 
       if (indices.length < 2) {
@@ -443,14 +430,7 @@ export function selectEvenlySpacedIndices(
       const layoutScore = scoreTickLayout(indices, resolveXPx, targetCount);
       const countDistance = Math.abs(indices.length - targetCount);
 
-      if (
-        isBetterTickLayout(
-          layoutScore,
-          bestScore,
-          countDistance,
-          bestCountDistance
-        )
-      ) {
+      if (isBetterTickLayout(layoutScore, bestScore, countDistance, bestCountDistance)) {
         bestIndices = indices;
         bestScore = layoutScore;
         bestCountDistance = countDistance;
@@ -632,7 +612,7 @@ function buildFilteredTicks({
 function domainExtendsPastData(
   data: Record<string, unknown>[],
   xAccessor: (d: Record<string, unknown>) => Date,
-  xScale: { domain: () => Date[] }
+  xScale: { domain: () => Date[] },
 ): boolean {
   if (data.length === 0) {
     return false;
@@ -655,7 +635,7 @@ function appendProjectionTailTicks(
     (date: Date): number | undefined;
   },
   marginLeft: number,
-  maxExtraTicks: number
+  maxExtraTicks: number,
 ): AxisTick[] {
   if (data.length === 0 || maxExtraTicks <= 0) {
     return ticks;
@@ -679,9 +659,7 @@ function appendProjectionTailTicks(
   const extraCount = Math.min(maxExtraTicks, 3);
 
   for (let i = 1; i <= extraCount; i++) {
-    const date = new Date(
-      startTime + (i / (extraCount + 1)) * (endTime - startTime)
-    );
+    const date = new Date(startTime + (i / (extraCount + 1)) * (endTime - startTime));
     const label = shortDateFmt.format(date);
     if (seenLabels.has(label)) {
       continue;
@@ -748,16 +726,14 @@ const XAxisInner = memo(function XAxisInner({
       formatTick
         ? data.map((row) => formatTick(xAccessor(row)))
         : (labelsProp ?? contextDateLabels),
-    [formatTick, data, xAccessor, labelsProp, contextDateLabels]
+    [formatTick, data, xAccessor, labelsProp, contextDateLabels],
   );
   const resolvedNumTicks = useMemo(
     () => resolveResponsiveChartLabelCount(numTicks, width, 5),
-    [numTicks, width]
+    [numTicks, width],
   );
   // Keyed on the times, so an inline `tickValues={[…]}` array stays cheap.
-  const tickValuesKey = tickValuesProp
-    ?.map((date) => date.getTime())
-    .join(",");
+  const tickValuesKey = tickValuesProp?.map((date) => date.getTime()).join(",");
   const tickValues = useMemo(
     () =>
       tickValuesKey === undefined
@@ -766,7 +742,7 @@ const XAxisInner = memo(function XAxisInner({
             .split(",")
             .filter(Boolean)
             .map((time) => new Date(Number(time))),
-    [tickValuesKey]
+    [tickValuesKey],
   );
 
   const labelsToShow = useMemo(() => {
@@ -831,7 +807,7 @@ const XAxisInner = memo(function XAxisInner({
         xAccessor,
         xScale,
         margin.left,
-        Math.max(1, resolvedNumTicks - dataTicks.length + 1)
+        Math.max(1, resolvedNumTicks - dataTicks.length + 1),
       );
     }
 
@@ -854,15 +830,12 @@ const XAxisInner = memo(function XAxisInner({
     if (clamp === "none") {
       return null;
     }
-    return clamp === "plot"
-      ? [margin.left, margin.left + innerWidth]
-      : [0, width];
+    return clamp === "plot" ? [margin.left, margin.left + innerWidth] : [0, width];
   }, [clamp, margin.left, innerWidth, width]);
 
   const crosshairX = tooltipData ? tooltipData.x + margin.left : null;
   const hoveredLabel = tooltipData
-    ? (dateLabels[tooltipData.index] ??
-      shortDateFmt.format(xAccessor(tooltipData.point)))
+    ? (dateLabels[tooltipData.index] ?? shortDateFmt.format(xAccessor(tooltipData.point)))
     : null;
 
   return createPortal(
@@ -873,21 +846,13 @@ const XAxisInner = memo(function XAxisInner({
           bounds={bounds}
           key={`${item.date.getTime()}-${item.x}`}
           label={item.label}
-          opacity={xAxisLabelOpacity(
-            item.label,
-            item.x,
-            crosshairX,
-            hoveredLabel,
-            tickerHalfWidth
-          )}
+          opacity={xAxisLabelOpacity(item.label, item.x, crosshairX, hoveredLabel, tickerHalfWidth)}
           x={item.x}
         />
       ))}
     </div>,
-    container
+    container,
   );
 });
 
 XAxis.displayName = "XAxis";
-
-export default XAxis;

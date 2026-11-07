@@ -17,7 +17,7 @@ import type {
   ThinkingConfigUpdate,
 } from "./types";
 
-export function getSettings(): Promise<Settings> {
+function getSettings(): Promise<Settings> {
   return apiRequest("/settings");
 }
 
@@ -33,7 +33,7 @@ export function updateSettings(patch: SettingsPatch): Promise<SuccessResponse> {
   return apiRequest("/settings", { method: "POST", body: patch });
 }
 
-export function getThinkingConfig(): Promise<ThinkingConfig> {
+function getThinkingConfig(): Promise<ThinkingConfig> {
   return apiRequest("/thinking");
 }
 
@@ -46,7 +46,7 @@ export function updateThinkingConfig(body: ThinkingConfigUpdate): Promise<Succes
   return apiRequest("/thinking", { method: "POST", body });
 }
 
-export async function getModelMappings(): Promise<ModelMappingsResponse> {
+async function getModelMappings(): Promise<ModelMappingsResponse> {
   const res = await apiRequest<ModelMappingsResponse>("/model-mappings");
   return { mappings: res.mappings ?? [], defaults: res.defaults ?? [] };
 }
@@ -60,7 +60,7 @@ export function updateModelMappings(body: ModelMappingsUpdate): Promise<SuccessR
   return apiRequest("/model-mappings", { method: "POST", body });
 }
 
-export function getEndpointConfig(): Promise<EndpointConfig> {
+function getEndpointConfig(): Promise<EndpointConfig> {
   return apiRequest("/endpoint");
 }
 
@@ -72,7 +72,7 @@ export function updateEndpointConfig(body: EndpointConfigUpdate): Promise<Succes
   return apiRequest("/endpoint", { method: "POST", body });
 }
 
-export function getProxyConfig(): Promise<ProxyConfig> {
+function getProxyConfig(): Promise<ProxyConfig> {
   return apiRequest("/proxy");
 }
 
@@ -84,7 +84,7 @@ export function updateProxyConfig(body: ProxyConfigUpdate): Promise<SuccessRespo
   return apiRequest("/proxy", { method: "POST", body });
 }
 
-export async function getPromptFilter(): Promise<PromptFilterConfig> {
+async function getPromptFilter(): Promise<PromptFilterConfig> {
   const res = await apiRequest<PromptFilterConfig>("/prompt-filter");
   return { ...res, rules: res.rules ?? [] };
 }

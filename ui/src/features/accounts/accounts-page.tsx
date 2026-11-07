@@ -67,6 +67,18 @@ function useDialogTarget(): [DialogTarget | null, (id: string) => void, () => vo
   return [target, open, close];
 }
 
+/**
+ * The time in whole seconds, read again only when `tick` changes (a fetch's `dataUpdatedAt`), so
+ * everything computed from one fetch shares one clock.
+ */
+function useClockAt(tick: number): number {
+  const [clock, setClock] = useState(() => ({ tick, nowSec: Math.floor(Date.now() / 1000) }));
+  if (clock.tick === tick) return clock.nowSec;
+  const next = { tick, nowSec: Math.floor(Date.now() / 1000) };
+  setClock(next);
+  return next.nowSec;
+}
+
 export function AccountsPage(): JSX.Element {
   const { t } = useT("accounts");
   const { t: tc } = useT();
@@ -106,8 +118,7 @@ export function AccountsPage(): JSX.Element {
   const sort = search.sort;
   const desc = search.order ? search.order === "desc" : sort ? defaultSortDesc(sort) : false;
   // One clock per fetch, so the token-expiry status does not change between filter and sort.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: dataUpdatedAt is the clock tick.
-  const nowSec = useMemo(() => Math.floor(Date.now() / 1000), [query.dataUpdatedAt]);
+  const nowSec = useClockAt(query.dataUpdatedAt);
   const filtered = useMemo(
     () => filterAccounts(accounts, filters, nowSec),
     [accounts, filters, nowSec],

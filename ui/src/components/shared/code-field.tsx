@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/input-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, keyByText } from "@/lib/utils";
 
 /**
  * The value with a break opportunity after each "/", so a long URL wraps at its path segments.
@@ -21,9 +21,8 @@ import { cn } from "@/lib/utils";
 function breakAtSlashes(value: string): ReactNode {
   const parts = value.split("/");
   if (parts.length === 1) return value;
-  return parts.map((part, index) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder.
-    <Fragment key={index}>
+  return keyByText(parts, (part) => part).map(({ key, item: part }, index) => (
+    <Fragment key={key}>
       {part}
       {index < parts.length - 1 ? (
         <>

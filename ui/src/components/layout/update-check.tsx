@@ -27,7 +27,7 @@ const AVAILABLE_TOAST_ID = "update-available";
  * that the header button's dot carries the notice, so the toast does not cover the page (the
  * sticky Settings chips on a phone) on every visit.
  */
-export const ANNOUNCED_VERSION_KEY = "kiro_update_announced";
+const ANNOUNCED_VERSION_KEY = "kiro_update_announced";
 const UP_TO_DATE_TOAST_MS = 3600;
 
 interface UpdateCheckValue {

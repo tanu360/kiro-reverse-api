@@ -43,7 +43,7 @@ import {
  * token, no credits left), orange needs attention, grey is the admin's own switch, green is
  * healthy.
  */
-export const STATUS_PILL: Record<AccountStatus, { tone: BadgeTone; icon: IconSvgElement }> = {
+const STATUS_PILL: Record<AccountStatus, { tone: BadgeTone; icon: IconSvgElement }> = {
   banned: { tone: "destructive", icon: CircleXIcon },
   suspended: { tone: "warning", icon: PauseCircleIcon },
   noToken: { tone: "destructive", icon: CircleMinusIcon },

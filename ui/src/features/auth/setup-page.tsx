@@ -125,7 +125,7 @@ function GeneratedPassword({
        */}
       {failed ? null : (
         <p className="grid text-meta [&>span]:col-start-1 [&>span]:row-start-1 [&>span]:transition-opacity [&>span]:duration-150">
-          <span className="text-muted-foreground group-has-[[data-copied]]/pw:opacity-0 group-has-[[data-copy-password]:focus-visible]/pw:opacity-0 group-has-[[data-copy-password]:hover]/pw:opacity-0">
+          <span className="text-muted-foreground group-has-data-copied/pw:opacity-0 group-has-[[data-copy-password]:focus-visible]/pw:opacity-0 group-has-[[data-copy-password]:hover]/pw:opacity-0">
             {t("generatedPasswordLabel")}
           </span>
           <span
@@ -136,7 +136,7 @@ function GeneratedPassword({
           </span>
           <span
             aria-hidden="true"
-            className="text-success-foreground opacity-0 group-has-[[data-copied]]/pw:opacity-100"
+            className="text-success-foreground opacity-0 group-has-data-copied/pw:opacity-100"
           >
             {tShared("toast.copied")}
           </span>

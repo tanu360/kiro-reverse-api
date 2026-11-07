@@ -2,12 +2,12 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
+import { MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import type * as React from "react";
-import { cn } from "@/lib/utils";
 import { type Button, buttonVariants } from "@/components/ui/button";
 import { useUiT } from "@/components/ui/messages";
+import { cn } from "@/lib/utils";
 
 export function Pagination({
   className,
@@ -37,13 +37,11 @@ export function PaginationContent({
   );
 }
 
-export function PaginationItem({
-  ...props
-}: React.ComponentProps<"li">): React.ReactElement {
+export function PaginationItem({ ...props }: React.ComponentProps<"li">): React.ReactElement {
   return <li data-slot="pagination-item" {...props} />;
 }
 
-export type PaginationLinkProps = {
+type PaginationLinkProps = {
   isActive?: boolean;
   size?: React.ComponentProps<typeof Button>["size"];
 } & useRender.ComponentProps<"a">;
@@ -75,42 +73,6 @@ export function PaginationLink({
     props: mergeProps<"a">(defaultProps, props),
     render,
   });
-}
-
-export function PaginationPrevious({
-  className,
-  ...props
-}: React.ComponentProps<typeof PaginationLink>): React.ReactElement {
-  const { t } = useUiT();
-  return (
-    <PaginationLink
-      aria-label={t("pagination.previousPage")}
-      className={cn("max-sm:aspect-square max-sm:p-0", className)}
-      size="default"
-      {...props}
-    >
-      <HugeiconsIcon icon={ChevronLeftIcon} className="sm:-ms-1" />
-      <span className="max-sm:hidden">{t("pagination.previous")}</span>
-    </PaginationLink>
-  );
-}
-
-export function PaginationNext({
-  className,
-  ...props
-}: React.ComponentProps<typeof PaginationLink>): React.ReactElement {
-  const { t } = useUiT();
-  return (
-    <PaginationLink
-      aria-label={t("pagination.nextPage")}
-      className={cn("max-sm:aspect-square max-sm:p-0", className)}
-      size="default"
-      {...props}
-    >
-      <span className="max-sm:hidden">{t("pagination.next")}</span>
-      <HugeiconsIcon icon={ChevronRightIcon} className="sm:-me-1" />
-    </PaginationLink>
-  );
 }
 
 export function PaginationEllipsis({

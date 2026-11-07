@@ -96,9 +96,7 @@ type ToastData = {
 };
 
 function getSwipeDirection(position: ToastPosition): SwipeDirection[] {
-  const verticalDirection: SwipeDirection = position.startsWith("top")
-    ? "up"
-    : "down";
+  const verticalDirection: SwipeDirection = position.startsWith("top") ? "up" : "down";
 
   if (position.includes("center")) {
     return [verticalDirection];
@@ -111,10 +109,7 @@ function getSwipeDirection(position: ToastPosition): SwipeDirection[] {
   return ["right", verticalDirection];
 }
 
-function upsertReplayClassName(toast: {
-  type?: string;
-  updateKey?: number;
-}): string | undefined {
+function upsertReplayClassName(toast: { type?: string; updateKey?: number }): string | undefined {
   const k = toast.updateKey ?? 0;
   if (k <= 0) return undefined;
   const isEven = k % 2 === 0;
@@ -161,9 +156,7 @@ function Toasts({
         data-slot="toast-viewport"
       >
         {toasts.map((toast) => {
-          const Icon = toast.type
-            ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
-            : null;
+          const Icon = toast.type ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS] : null;
           const toastData = toast.data as ToastData | undefined;
 
           return (
@@ -243,86 +236,9 @@ function Toasts({
   );
 }
 
-function AnchoredToasts({
-  portalProps,
-}: {
-  portalProps?: React.ComponentProps<typeof Toast.Portal>;
-}): React.ReactElement {
-  const { toasts } = Toast.useToastManager();
+export const toastManager: ReturnType<typeof Toast.createToastManager> = Toast.createToastManager();
 
-  return (
-    <Toast.Portal data-slot="toast-portal-anchored" {...portalProps}>
-      <Toast.Viewport
-        className="outline-none"
-        data-slot="toast-viewport-anchored"
-      >
-        {toasts.map((toast) => {
-          const Icon = toast.type
-            ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
-            : null;
-          const toastData = toast.data as ToastData | undefined;
-          const tooltipStyle = toastData?.tooltipStyle ?? false;
-          const positionerProps = toast.positionerProps;
-
-          if (!positionerProps?.anchor) {
-            return null;
-          }
-
-          return (
-            <Toast.Positioner
-              key={toast.id}
-              className="z-60 max-w-[min(--spacing(64),var(--available-width))]"
-              data-slot="toast-positioner"
-              sideOffset={positionerProps.sideOffset ?? 4}
-              toast={toast}
-            >
-              <Toast.Root
-                className={cn(
-                  // The tooltip and toast sheet (index.css popup-surface), 8 px corners either way.
-                  "popup-surface relative rounded-lg text-balance text-popover-foreground text-xs transition-[scale,opacity] duration-100 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-safe:data-ending-style:scale-98 motion-safe:data-starting-style:scale-98",
-                  upsertReplayClassName(toast),
-                )}
-                {...toastData?.rootProps}
-                data-slot="toast-popup"
-                toast={toast}
-              >
-                {tooltipStyle ? (
-                  <Toast.Content className="pointer-events-auto px-2 py-1">
-                    <Toast.Title data-slot="toast-title" />
-                  </Toast.Content>
-                ) : (
-                  <Toast.Content className="pointer-events-auto flex items-center justify-between gap-3 overflow-hidden px-3.5 py-3 text-sm">
-                    <ToastBody
-                      action={
-                        toast.actionProps && (
-                          <Toast.Action
-                            className={buttonVariants({ size: "sm" })}
-                            data-slot="toast-action"
-                          >
-                            {toast.actionProps.children}
-                          </Toast.Action>
-                        )
-                      }
-                      icon={Icon}
-                    />
-                  </Toast.Content>
-                )}
-              </Toast.Root>
-            </Toast.Positioner>
-          );
-        })}
-      </Toast.Viewport>
-    </Toast.Portal>
-  );
-}
-
-export const toastManager: ReturnType<typeof Toast.createToastManager> =
-  Toast.createToastManager();
-
-export const anchoredToastManager: ReturnType<typeof Toast.createToastManager> =
-  Toast.createToastManager();
-
-export type ToastPosition =
+type ToastPosition =
   | "top-left"
   | "top-center"
   | "top-right"
@@ -330,7 +246,7 @@ export type ToastPosition =
   | "bottom-center"
   | "bottom-right";
 
-export interface ToastProviderProps extends Toast.Provider.Props {
+interface ToastProviderProps extends Toast.Provider.Props {
   position?: ToastPosition;
   portalProps?: React.ComponentProps<typeof Toast.Portal>;
 }
@@ -348,22 +264,3 @@ export function ToastProvider({
     </Toast.Provider>
   );
 }
-
-export interface AnchoredToastProviderProps extends Toast.Provider.Props {
-  portalProps?: React.ComponentProps<typeof Toast.Portal>;
-}
-
-export function AnchoredToastProvider({
-  children,
-  portalProps,
-  ...props
-}: AnchoredToastProviderProps): React.ReactElement {
-  return (
-    <Toast.Provider toastManager={anchoredToastManager} {...props}>
-      {children}
-      <AnchoredToasts portalProps={portalProps} />
-    </Toast.Provider>
-  );
-}
-
-export { Toast as ToastPrimitive };

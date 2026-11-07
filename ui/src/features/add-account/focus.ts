@@ -1,10 +1,10 @@
 import { type RefObject, useCallback, useEffect, useState } from "react";
 
 /** An element to focus: a ref, or a lookup that runs once the next step has rendered. */
-export type FocusTarget = RefObject<HTMLElement | null> | (() => HTMLElement | null | undefined);
+type FocusTarget = RefObject<HTMLElement | null> | (() => HTMLElement | null | undefined);
 
 /** Focuses `element` and scrolls its whole field (label, control, error) into view. */
-export function focusField(element: HTMLElement | null | undefined): void {
+function focusField(element: HTMLElement | null | undefined): void {
   if (!element) return;
   element.focus();
   // On phones the drawer body scrolls; keep the error under the control in view as well.

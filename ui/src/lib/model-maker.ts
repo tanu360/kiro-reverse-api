@@ -1,7 +1,7 @@
 import type { ModelMaker } from "@/components/shared/model-logos";
 
 /** A model maker, or Kiro for its own `auto` routing. */
-export type ModelOrigin = ModelMaker | "kiro";
+type ModelOrigin = ModelMaker | "kiro";
 
 /*
  * Name patterns, most specific first. A routed name such as `openrouter/anthropic/claude-opus-4`

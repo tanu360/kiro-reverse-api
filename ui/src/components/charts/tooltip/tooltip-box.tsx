@@ -94,12 +94,11 @@ export interface TooltipBoxProps {
 // Kiro: the one popup sheet (index.css --popup-*: the chart tooltip background is --popup), its
 // hairline, corner and soft drop, as menus and selects. The sheet is opaque, so there is no
 // backdrop blur.
-export const TOOLTIP_PANEL_CLASS_NAME =
+const TOOLTIP_PANEL_CLASS_NAME =
   "relative min-w-40 rounded-lg border border-popup-border text-chart-tooltip-foreground shadow-(--popup-shadow)";
 
 /** Clips content to the panel's inner radius. */
-export const TOOLTIP_PANEL_INNER_CLASS_NAME =
-  "overflow-hidden rounded-[calc(var(--radius-lg)-1px)]";
+const TOOLTIP_PANEL_INNER_CLASS_NAME = "overflow-hidden rounded-[calc(var(--radius-lg)-1px)]";
 
 /** Panel scale/fade-in on show. */
 const PANEL_ENTRANCE_SPRING = {
@@ -127,14 +126,9 @@ interface PanelSizes {
   clipHeight: number;
 }
 
-const mixNumber = (from: number, to: number, progress: number) =>
-  from + (to - from) * progress;
+const mixNumber = (from: number, to: number, progress: number) => from + (to - from) * progress;
 
-function mixPanelSizes(
-  from: PanelSizes,
-  to: PanelSizes,
-  progress: number
-): PanelSizes {
+function mixPanelSizes(from: PanelSizes, to: PanelSizes, progress: number): PanelSizes {
   return {
     panelWidth: mixNumber(from.panelWidth, to.panelWidth, progress),
     panelHeight: mixNumber(from.panelHeight, to.panelHeight, progress),
@@ -165,8 +159,7 @@ function correctedRadius(r: number, width: number, height: number): string {
   return `${x}% / ${y}%`;
 }
 
-const ratio = (drawn: number, layout: number) =>
-  layout === 0 ? 1 : drawn / layout;
+const ratio = (drawn: number, layout: number) => (layout === 0 ? 1 : drawn / layout);
 
 interface PanelRadii {
   panel: number | null;
@@ -210,15 +203,11 @@ function readPanelSizes(panel: HTMLElement, clip: HTMLElement): PanelSizes {
  * scaled to its own drawn size, the content counter-scaled to 1.
  */
 function drawPanelTween(
-  {
-    panel,
-    clip,
-    content,
-  }: { panel: HTMLElement; clip: HTMLElement; content: HTMLElement },
+  { panel, clip, content }: { panel: HTMLElement; clip: HTMLElement; content: HTMLElement },
   radii: PanelRadii,
   from: PanelSizes,
   target: PanelSizes,
-  progress: number
+  progress: number,
 ) {
   const drawn = mixPanelSizes(from, target, progress);
   const scaleX = ratio(drawn.panelWidth, target.panelWidth);
@@ -228,25 +217,14 @@ function drawPanelTween(
   panel.style.transform = `scale(${scaleX}, ${scaleY})`;
   const offsetX = clip.offsetLeft / scaleX - clip.offsetLeft;
   const offsetY = clip.offsetTop / scaleY - clip.offsetTop;
-  const translate =
-    offsetX || offsetY ? `translate3d(${offsetX}px, ${offsetY}px, 0px) ` : "";
-  clip.style.transform = `${translate}scale(${clipScaleX / scaleX}, ${
-    clipScaleY / scaleY
-  })`;
+  const translate = offsetX || offsetY ? `translate3d(${offsetX}px, ${offsetY}px, 0px) ` : "";
+  clip.style.transform = `${translate}scale(${clipScaleX / scaleX}, ${clipScaleY / scaleY})`;
   content.style.transform = `scale(${1 / clipScaleX}, ${1 / clipScaleY})`;
   if (radii.panel !== null) {
-    panel.style.borderRadius = correctedRadius(
-      radii.panel,
-      drawn.panelWidth,
-      drawn.panelHeight
-    );
+    panel.style.borderRadius = correctedRadius(radii.panel, drawn.panelWidth, drawn.panelHeight);
   }
   if (radii.clip !== null) {
-    clip.style.borderRadius = correctedRadius(
-      radii.clip,
-      drawn.clipWidth,
-      drawn.clipHeight
-    );
+    clip.style.borderRadius = correctedRadius(radii.clip, drawn.clipWidth, drawn.clipHeight);
   }
 }
 
@@ -275,7 +253,7 @@ function usePanelSizeTween(
   panelRef: RefObject<HTMLDivElement | null>,
   clipRef: RefObject<HTMLDivElement | null>,
   contentRef: RefObject<HTMLDivElement | null>,
-  enabled: boolean
+  enabled: boolean,
 ) {
   const checkRef = useRef<(() => void) | null>(null);
 
@@ -327,8 +305,7 @@ function usePanelSizeTween(
       if (samePanelSizes(next, target)) {
         return;
       }
-      from =
-        from && progress < 1 ? mixPanelSizes(from, target, progress) : target;
+      from = from && progress < 1 ? mixPanelSizes(from, target, progress) : target;
       target = next;
       stop();
       radii ??= {
@@ -356,8 +333,7 @@ function usePanelSizeTween(
     };
 
     checkRef.current = check;
-    const observer =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);
     observer?.observe(panel);
     observer?.observe(clip);
     return () => {
@@ -394,7 +370,7 @@ const ORIGIN_TOP_LEFT: React.CSSProperties = { transformOrigin: "0 0" };
  * reduced motion. Callers pass `false` under reduced motion and when the
  * position is not animated.
  */
-export function TooltipPanel({
+function TooltipPanel({
   animateSize,
   entrance,
   transformOrigin,
@@ -415,12 +391,7 @@ export function TooltipPanel({
   const contentRef = useRef<HTMLDivElement>(null);
   // `MotionConfig reducedMotion` made Motion's layout tween instant.
   const reducedMotionConfig = useReducedMotionConfig() === true;
-  usePanelSizeTween(
-    panelRef,
-    clipRef,
-    contentRef,
-    animateSize && !reducedMotionConfig
-  );
+  usePanelSizeTween(panelRef, clipRef, contentRef, animateSize && !reducedMotionConfig);
 
   return (
     <m.div
@@ -437,11 +408,7 @@ export function TooltipPanel({
         style={{ ...style, ...ORIGIN_TOP_LEFT }}
         transition={PANEL_ENTRANCE_SPRING}
       >
-        <div
-          className={TOOLTIP_PANEL_INNER_CLASS_NAME}
-          ref={clipRef}
-          style={ORIGIN_TOP_LEFT}
-        >
+        <div className={TOOLTIP_PANEL_INNER_CLASS_NAME} ref={clipRef} style={ORIGIN_TOP_LEFT}>
           <div ref={contentRef} style={ORIGIN_TOP_LEFT}>
             {children}
           </div>
@@ -452,11 +419,7 @@ export function TooltipPanel({
 }
 
 /** Spring to `value`, or jump there (no animation) when `snap`. */
-function moveTo(
-  spring: MotionValue<number>,
-  value: number,
-  snap: boolean
-): void {
+function moveTo(spring: MotionValue<number>, value: number, snap: boolean): void {
   if (snap) {
     spring.jump(value);
   } else {
@@ -510,10 +473,7 @@ function resolveTooltipTarget({
   return {
     flipped,
     left,
-    top: Math.max(
-      offset,
-      Math.min(y - height / 2, containerHeight - height - offset)
-    ),
+    top: Math.max(offset, Math.min(y - height / 2, containerHeight - height - offset)),
   };
 }
 
@@ -593,7 +553,7 @@ function TooltipBoxInner({
       offset,
       containerWidth,
       containerHeight,
-    })
+    }),
   );
   const [flip, setFlip] = useState(() => ({
     flipped: initialTarget.flipped,
@@ -627,9 +587,7 @@ function TooltipBoxInner({
       containerHeight,
     });
     setFlip((prev) =>
-      prev.flipped === target.flipped
-        ? prev
-        : { flipped: target.flipped, key: prev.key + 1 }
+      prev.flipped === target.flipped ? prev : { flipped: target.flipped, key: prev.key + 1 },
     );
     const tx = target.left;
     const ty = target.top;
@@ -669,17 +627,14 @@ function TooltipBoxInner({
 
   const flipKey = replayOnFlip ? flip.key : 0;
 
-  const finalLeft = animate
-    ? (leftOverride ?? animatedLeft)
-    : staticPosition.left;
+  const finalLeft = animate ? (leftOverride ?? animatedLeft) : staticPosition.left;
   const finalTop = animate ? (topOverride ?? animatedTop) : staticPosition.top;
   const isFlipped = flippedOverride ?? shouldFlipX;
   const transformOrigin = isFlipped ? "right top" : "left top";
 
   // Internal classes only (no caller className): no tailwind-merge needed.
   const panelClassName = `${TOOLTIP_PANEL_CLASS_NAME}${
-    panelStyle?.backgroundColor === undefined &&
-    backgroundColor === chartCssVars.tooltipBackground
+    panelStyle?.backgroundColor === undefined && backgroundColor === chartCssVars.tooltipBackground
       ? " bg-chart-tooltip-background"
       : ""
   }`;
@@ -697,14 +652,11 @@ function TooltipBoxInner({
         ref={tooltipRef}
         style={{ left: staticPosition.left, top: staticPosition.top }}
       >
-        <div
-          className={panelClassName}
-          style={{ transformOrigin, ...panelStyleResolved }}
-        >
+        <div className={panelClassName} style={{ transformOrigin, ...panelStyleResolved }}>
           <div className={TOOLTIP_PANEL_INNER_CLASS_NAME}>{children}</div>
         </div>
       </div>,
-      container
+      container,
     );
   }
 
@@ -723,9 +675,7 @@ function TooltipBoxInner({
         // layout animation would read as a move, and "no motion" means none.
         animateSize={animateSize && animate && !reducedMotion}
         className={panelClassName}
-        entrance={
-          reducedMotion ? false : { scale: 0.85, x: isFlipped ? 20 : -20 }
-        }
+        entrance={reducedMotion ? false : { scale: 0.85, x: isFlipped ? 20 : -20 }}
         key={flipKey}
         style={panelStyleResolved}
         transformOrigin={transformOrigin}
@@ -733,10 +683,8 @@ function TooltipBoxInner({
         {children}
       </TooltipPanel>
     </m.div>,
-    container
+    container,
   );
 }
 
 TooltipBox.displayName = "TooltipBox";
-
-export default TooltipBox;

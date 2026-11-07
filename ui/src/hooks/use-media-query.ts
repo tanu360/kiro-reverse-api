@@ -56,7 +56,7 @@ function getServerSnapshot(): boolean {
   return false;
 }
 
-export type MediaQueryInput = {
+type MediaQueryInput = {
   min?: Breakpoint | number;
   max?: Breakpoint | number;
   /** Touch-like input (finger). Use "fine" for mouse/trackpad. */
@@ -93,7 +93,7 @@ export function useIsMobile(): boolean {
  * Below lg (1024 px) the sidebar is an off-canvas sheet; from lg up it is persistent. This is
  * wider than useIsMobile, because at 768 a persistent sidebar leaves the pages too little room.
  */
-export const SIDEBAR_SHEET_QUERY = "max-lg";
+const SIDEBAR_SHEET_QUERY = "max-lg";
 
 export function useSidebarIsSheet(): boolean {
   return useMediaQuery(SIDEBAR_SHEET_QUERY);

@@ -1,19 +1,10 @@
-import {
-  Children,
-  Fragment,
-  isValidElement,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { Children, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 import { isChartClipPassthrough } from "./chart-child-passthrough";
 import type { ProjectionPoint } from "./projection-utils";
-import {
-  projectionDateExtents,
-  projectionValueExtents,
-} from "./projection-utils";
+import { projectionDateExtents, projectionValueExtents } from "./projection-utils";
 import { normalizeYAxisId } from "./y-axis-scales";
 
-export interface ProjectionLineConfig {
+interface ProjectionLineConfig {
   yAxisId: string;
   data: ProjectionPoint[];
 }
@@ -25,18 +16,14 @@ interface ProjectionLineConfigProps {
 
 function getChildComponentName(child: ReactElement) {
   const childType = child.type as { displayName?: string; name?: string };
-  return typeof child.type === "function"
-    ? childType.displayName || childType.name || ""
-    : "";
+  return typeof child.type === "function" ? childType.displayName || childType.name || "" : "";
 }
 
 function isProjectionLineElement(child: ReactElement): boolean {
   return getChildComponentName(child) === "ProjectionLine";
 }
 
-function normalizeProjectionData(
-  data: ProjectionPoint[] | undefined
-): ProjectionPoint[] {
+function normalizeProjectionData(data: ProjectionPoint[] | undefined): ProjectionPoint[] {
   if (!data?.length) {
     return [];
   }
@@ -47,9 +34,7 @@ function normalizeProjectionData(
 }
 
 /** Collect {@link ProjectionLine} props from chart children for domain extension. */
-export function extractProjectionLineConfigs(
-  children: ReactNode
-): ProjectionLineConfig[] {
+export function extractProjectionLineConfigs(children: ReactNode): ProjectionLineConfig[] {
   const configs: ProjectionLineConfig[] = [];
 
   const visit = (node: ReactNode) => {
@@ -94,11 +79,9 @@ export function extractProjectionLineConfigs(
 export function mergeProjectionYDomain(
   domain: [number, number],
   configs: ProjectionLineConfig[],
-  yAxisId: string
+  yAxisId: string,
 ): [number, number] {
-  const paths = configs
-    .filter((config) => config.yAxisId === yAxisId)
-    .map((config) => config.data);
+  const paths = configs.filter((config) => config.yAxisId === yAxisId).map((config) => config.data);
   const extents = projectionValueExtents(paths);
   if (!extents) {
     return domain;
@@ -118,7 +101,7 @@ export function mergeProjectionYDomain(
 
 export function mergeProjectionXDomainMax(
   maxTime: number,
-  configs: ProjectionLineConfig[]
+  configs: ProjectionLineConfig[],
 ): number {
   const paths = configs.map((config) => config.data);
   const extents = projectionDateExtents(paths);

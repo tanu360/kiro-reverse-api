@@ -20,7 +20,7 @@ import { subscribeSession } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 
-export interface RouterContext {
+interface RouterContext {
   queryClient: QueryClient;
 }
 
@@ -91,7 +91,9 @@ function RootError({ error }: ErrorComponentProps): JSX.Element {
       {apiError ? (
         <Alert className="mb-1" variant="error">
           <AnimatedIcon icon={CircleXIcon} aria-hidden="true" playOnMount />
-          <AlertDescription className="break-words">{errorMessage(apiError, t)}</AlertDescription>
+          <AlertDescription className="wrap-break-word">
+            {errorMessage(apiError, t)}
+          </AlertDescription>
         </Alert>
       ) : null}
       <Button className="w-full" onClick={() => void router.invalidate()} size="lg">

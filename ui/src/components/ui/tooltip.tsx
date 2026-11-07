@@ -4,17 +4,11 @@ import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import type React from "react";
 import { cn } from "@/lib/utils";
 
-export const TooltipCreateHandle: typeof TooltipPrimitive.createHandle =
-  TooltipPrimitive.createHandle;
-
-export const TooltipProvider: typeof TooltipPrimitive.Provider =
-  TooltipPrimitive.Provider;
+export const TooltipProvider: typeof TooltipPrimitive.Provider = TooltipPrimitive.Provider;
 
 export const Tooltip: typeof TooltipPrimitive.Root = TooltipPrimitive.Root;
 
-export function TooltipTrigger(
-  props: TooltipPrimitive.Trigger.Props,
-): React.ReactElement {
+export function TooltipTrigger(props: TooltipPrimitive.Trigger.Props): React.ReactElement {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
@@ -69,5 +63,3 @@ export function TooltipPopup({
     </TooltipPrimitive.Portal>
   );
 }
-
-export { TooltipPrimitive, TooltipPopup as TooltipContent };
