@@ -341,10 +341,10 @@ export function ApiKeysCard(): JSX.Element {
       <RefreshButton
         fetching={keys.isFetching}
         onRefresh={() => void keys.refetch()}
-        size="sm"
         variant="icon"
       />
-      <Button onClick={openCreate} ref={createRef} size="sm">
+      {/* The primary action at the page's button size, as Add account. */}
+      <Button onClick={openCreate} ref={createRef}>
         <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
         {t("keys.create")}
       </Button>

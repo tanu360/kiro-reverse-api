@@ -313,8 +313,9 @@ export function StatusCards(): JSX.Element {
       className="flex min-w-0 flex-col gap-2"
       data-state={!data && status.isError ? "error" : undefined}
     >
-      {strip}
+      {/* The strip's heading: close over the totals it qualifies, the page's 16 px beat above. */}
       <p className="text-meta text-muted-foreground">{t("stats.sinceReset")}</p>
+      {strip}
     </section>
   );
 }

@@ -269,7 +269,9 @@ export function BackupsPage(): JSX.Element {
       data-empty-focus={inEmptyState ? "" : undefined}
       loading={create.isPending}
       onClick={startCreate}
-      size="sm"
+      // The header's primary action at the page's button size (as Add account); the empty
+      // state's repeat stays small.
+      size={inEmptyState ? "sm" : "default"}
       variant={inEmptyState ? "secondary" : "default"}
     >
       <HugeiconsIcon icon={PlusIcon} aria-hidden="true" />
@@ -319,7 +321,6 @@ export function BackupsPage(): JSX.Element {
             <RefreshButton
               fetching={list.isFetching && !list.isPending}
               onRefresh={() => void invalidate()}
-              size="sm"
               variant="icon"
             />
             {createButton(false)}
