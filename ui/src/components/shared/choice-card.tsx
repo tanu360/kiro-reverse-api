@@ -112,12 +112,15 @@ export function ChoiceList({
 export function ChoiceRow({
   icon,
   title,
+  badge,
   description,
   className,
   ...props
 }: Omit<ComponentProps<"button">, "title" | "children"> & {
   icon: IconSvgElement;
   title: ReactNode;
+  /** After the title, on its line (a Recommended badge). */
+  badge?: ReactNode;
   description?: ReactNode;
 }): JSX.Element {
   return (
@@ -134,7 +137,10 @@ export function ChoiceRow({
       >
         <IconChip icon={icon} size="md" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="font-medium text-foreground text-sm">{title}</span>
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium text-foreground text-sm">{title}</span>
+            {badge}
+          </span>
           {description ? (
             <span className="text-muted-foreground text-xs leading-normal">{description}</span>
           ) : null}
@@ -142,53 +148,9 @@ export function ChoiceRow({
         <HugeiconsIcon
           icon={ChevronRightIcon}
           aria-hidden="true"
-          className="size-4 shrink-0 text-icon-muted rtl:-scale-x-100"
+          className="size-4 shrink-0 text-icon-muted transition-[translate,color] group-hover/choice-row:translate-x-0.5 group-hover/choice-row:text-foreground rtl:-scale-x-100 rtl:group-hover/choice-row:-translate-x-0.5"
         />
       </button>
     </li>
-  );
-}
-
-/**
- * A choice as a tile in a two-column grid (the Add account methods): a button with an icon chip,
- * a title with an optional badge, and a short description. On phones the icon sits over the title
- * and the description is left out, so two tiles fit side by side; from sm up the icon is beside
- * the text and the description shows. Tiles in a row share the row's height.
- */
-export function ChoiceTile({
-  icon,
-  title,
-  badge,
-  description,
-  className,
-  ...props
-}: Omit<ComponentProps<"button">, "title" | "children"> & {
-  icon: IconSvgElement;
-  title: ReactNode;
-  badge?: ReactNode;
-  description?: ReactNode;
-}): JSX.Element {
-  return (
-    <button
-      className={cn(
-        "group/choice-tile flex min-w-0 cursor-pointer flex-col items-start gap-2.5 rounded-xl border border-border bg-card p-3 text-start outline-none transition-[background-color,border-color,scale] hover:border-border-strong/50 hover:bg-accent focus-outline active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64 sm:flex-row sm:gap-3",
-        className,
-      )}
-      type="button"
-      {...props}
-    >
-      <IconChip icon={icon} size="md" />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="font-medium text-foreground text-sm/5">{title}</span>
-          {badge}
-        </span>
-        {description ? (
-          <span className="text-muted-foreground text-xs leading-normal max-sm:hidden">
-            {description}
-          </span>
-        ) : null}
-      </span>
-    </button>
   );
 }

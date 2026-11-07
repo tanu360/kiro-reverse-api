@@ -1,10 +1,6 @@
 {
   "title": "Add account",
   "description": "Choose how to sign in or what to import.",
-  "groups.aws": "AWS sign-in",
-  "groups.browser": "Browser sign-in",
-  "groups.kiro": "From Kiro",
-  "groups.files": "Keys and exports",
   "recommended": "Recommended",
   "cancel": "Cancel",
   "add": "Add",

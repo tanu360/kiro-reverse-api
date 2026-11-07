@@ -1,10 +1,6 @@
 {
   "title": "Adicionar conta",
   "description": "Escolha como entrar ou o que importar.",
-  "groups.aws": "Login da AWS",
-  "groups.browser": "Login pelo navegador",
-  "groups.kiro": "Do Kiro",
-  "groups.files": "Chaves e exportações",
   "recommended": "Recomendado",
   "cancel": "Cancelar",
   "add": "Adicionar",
