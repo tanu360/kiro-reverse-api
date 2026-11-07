@@ -11,10 +11,12 @@ const sources = import.meta.glob<string>("/src/**/*.{ts,tsx}", {
   import: "default",
 });
 
-// Not shipped UI code: tests and their helpers, MSW fixtures and the generated route tree.
+// Not shipped UI code: tests and their helpers, MSW fixtures, the dev-only design showcases
+// (src/dev) and the generated route tree.
 const SKIPPED = [
   /\.test\.tsx?$/,
   /^src\/test\//,
+  /^src\/dev\//,
   /^src\/lib\/mocks\//,
   /^src\/features\/[^/]+\/mocks\.ts$/,
   /^src\/routeTree\.gen\.ts$/,
