@@ -28,7 +28,8 @@ export const METHODS: ReadonlyArray<{ id: AddAccountMethod; icon: IconSvgElement
 ];
 
 /**
- * The eight ways to add an account, as one divided card of rows that open their flow. AWS
+ * The eight ways to add an account, as one flush list of rows straight on the dialog (no card
+ * around them, no box around the icons) that open their flow. AWS
  * Builder ID, the usual way in, carries the Recommended badge.
  */
 export function MethodList({
@@ -39,7 +40,7 @@ export function MethodList({
   const { t } = useT("add-account");
   return (
     <>
-      <ChoiceList>
+      <ChoiceList flush>
         {METHODS.map(({ id, icon }) => (
           <ChoiceRow
             badge={

@@ -1,6 +1,5 @@
 import { type FormEvent, type JSX, useEffect, useRef, useState } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
-import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { pollBuilderId, startBuilderId } from "@/lib/api/auth-flows";
 import { isApiError } from "@/lib/api/errors";
@@ -114,10 +113,10 @@ export function BuilderIdFlow(): JSX.Element {
     return (
       <div className="flex flex-col gap-4">
         {/* The code is the new step's main content, so it takes focus when the step opens. */}
-        <Card
-          className="items-center text-center outline-none focus-outline"
+        {/* No card around the code: it stands on the dialog, large and centred. */}
+        <div
+          className="flex flex-col items-center gap-1 rounded-xl py-2 text-center outline-none focus-outline"
           ref={codeRef}
-          size="sm"
           tabIndex={-1}
         >
           <span className="sr-only">{t("builderid.userCode")}</span>
@@ -136,7 +135,7 @@ export function BuilderIdFlow(): JSX.Element {
             />
           </span>
           <FlowNote>{t("builderid.verifyCode")}</FlowNote>
-        </Card>
+        </div>
         <UrlBox label={t("builderid.verifyUrl")} url={code.verificationUri} />
         <p
           aria-live="polite"

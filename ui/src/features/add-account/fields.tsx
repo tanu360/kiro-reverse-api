@@ -11,7 +11,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * A sign-in link as one quiet line instead of a field: the label, then the URL in mono cut to a
+ * A sign-in link as one quiet line instead of a field (no box around it): the label, then the URL in mono cut to a
  * single line (Open and Copy carry the full address), with Open as a secondary
  * button and a copy icon at its end. A long OAuth URL no longer fills the step.
  */
@@ -20,7 +20,7 @@ export function UrlBox({ label, url }: { label: string; url: string }): JSX.Elem
   return (
     <div className="flex w-full min-w-0 flex-col gap-2">
       <span className="font-medium text-foreground text-sm">{label}</span>
-      <div className="flex min-w-0 items-center gap-1 rounded-lg bg-accent py-1 ps-3 pe-1">
+      <div className="flex min-w-0 items-center gap-1">
         <span className="min-w-0 flex-1 truncate font-mono text-meta text-muted-foreground">
           {url}
         </span>
