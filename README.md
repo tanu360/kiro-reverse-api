@@ -50,85 +50,76 @@ If this project helps you, a Star would mean a lot.
 ## 🖼 Preview
 
 <p align="center">
-  <img alt="Kiro Proxy admin panel, light and dark" src="screenshots/hero.webp" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/login-dark.webp">
+    <img alt="Login" src="screenshots/en/login-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Login</b> — sign-in with theme and language switches</sub>
 </p>
 
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/login-dark.webp">
-        <img alt="Login" src="screenshots/en/login-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Login</b> — sign-in with theme and language switches</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/overview-dark.webp">
-        <img alt="Overview" src="screenshots/en/overview-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Overview</b> — live traffic, credits and errors across accounts</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/accounts-dark.webp">
-        <img alt="Accounts" src="screenshots/en/accounts-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Accounts</b> — plan credits, status tabs, filters, batch actions and export</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/requests-dark.webp">
-        <img alt="Requests" src="screenshots/en/requests-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Requests</b> — status tabs, search, sorting and a detail view</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/api-dark.webp">
-        <img alt="API" src="screenshots/en/api-light.webp" width="100%">
-      </picture>
-      <br><sub><b>API</b> — API access, per-client keys with limits, highlighted client setup</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/backups-dark.webp">
-        <img alt="Backups" src="screenshots/en/backups-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Backups</b> — manual and scheduled backups, one-click restore</sub>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/overview-dark.webp">
+    <img alt="Overview" src="screenshots/en/overview-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Overview</b> — live traffic, credits and errors across accounts</sub>
+</p>
 
-<table>
-  <tr>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-1-dark.webp">
-        <img alt="Settings" src="screenshots/en/settings-1-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Settings</b> — usage, stream integrity, routing, auto-continue</sub>
-    </td>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-2-dark.webp">
-        <img alt="Settings" src="screenshots/en/settings-2-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Settings</b> — thinking and model mappings</sub>
-    </td>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-3-dark.webp">
-        <img alt="Settings" src="screenshots/en/settings-3-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Settings</b> — Kiro endpoint, admin password, outbound proxy</sub>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/accounts-dark.webp">
+    <img alt="Accounts" src="screenshots/en/accounts-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Accounts</b> — plan credits, status tabs, filters, batch actions and export</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/requests-dark.webp">
+    <img alt="Requests" src="screenshots/en/requests-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Requests</b> — status tabs, search, sorting and a detail view</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/api-dark.webp">
+    <img alt="API" src="screenshots/en/api-light.webp" width="100%">
+  </picture>
+  <br><sub><b>API</b> — API access, per-client keys with limits, highlighted client setup</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/backups-dark.webp">
+    <img alt="Backups" src="screenshots/en/backups-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Backups</b> — manual and scheduled backups, one-click restore</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-1-dark.webp">
+    <img alt="Settings" src="screenshots/en/settings-1-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Settings</b> — usage, stream integrity, routing, auto-continue</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-2-dark.webp">
+    <img alt="Settings" src="screenshots/en/settings-2-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Settings</b> — thinking and model mappings</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/settings-3-dark.webp">
+    <img alt="Settings" src="screenshots/en/settings-3-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Settings</b> — Kiro endpoint, admin password, outbound proxy</sub>
+</p>
 
 ---
 

@@ -50,85 +50,76 @@ Se este projeto ajuda você, uma Star significaria muito.
 ## 🖼 Prévia
 
 <p align="center">
-  <img alt="Painel do Kiro Proxy, claro e escuro" src="screenshots/hero.webp" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/login-dark.webp">
+    <img alt="Entrar" src="screenshots/pt-BR/login-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Entrar</b> — login com seletores de tema e idioma</sub>
 </p>
 
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/login-dark.webp">
-        <img alt="Entrar" src="screenshots/pt-BR/login-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Entrar</b> — login com seletores de tema e idioma</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/overview-dark.webp">
-        <img alt="Visão geral" src="screenshots/pt-BR/overview-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Visão geral</b> — tráfego ao vivo, créditos e erros de todas as contas</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/accounts-dark.webp">
-        <img alt="Contas" src="screenshots/pt-BR/accounts-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Contas</b> — créditos do plano, abas de status, filtros, ações em lote e exportação</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/requests-dark.webp">
-        <img alt="Requisições" src="screenshots/pt-BR/requests-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Requisições</b> — abas de status, busca, ordenação e visão de detalhes</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/api-dark.webp">
-        <img alt="API" src="screenshots/pt-BR/api-light.webp" width="100%">
-      </picture>
-      <br><sub><b>API</b> — acesso à API, chaves por cliente com limites, configuração do cliente destacada</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/backups-dark.webp">
-        <img alt="Backups" src="screenshots/pt-BR/backups-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Backups</b> — backups manuais e agendados, restauração com um clique</sub>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/overview-dark.webp">
+    <img alt="Visão geral" src="screenshots/pt-BR/overview-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Visão geral</b> — tráfego ao vivo, créditos e erros de todas as contas</sub>
+</p>
 
-<table>
-  <tr>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/settings-1-dark.webp">
-        <img alt="Configurações" src="screenshots/pt-BR/settings-1-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Configurações</b> — uso, integridade do stream, roteamento, autocontinuar</sub>
-    </td>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/settings-2-dark.webp">
-        <img alt="Configurações" src="screenshots/pt-BR/settings-2-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Configurações</b> — raciocínio e mapeamento de modelos</sub>
-    </td>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/settings-3-dark.webp">
-        <img alt="Configurações" src="screenshots/pt-BR/settings-3-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Configurações</b> — endpoint do Kiro, senha de administrador, proxy de saída</sub>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/accounts-dark.webp">
+    <img alt="Contas" src="screenshots/pt-BR/accounts-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Contas</b> — créditos do plano, abas de status, filtros, ações em lote e exportação</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/requests-dark.webp">
+    <img alt="Requisições" src="screenshots/pt-BR/requests-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Requisições</b> — abas de status, busca, ordenação e visão de detalhes</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/api-dark.webp">
+    <img alt="API" src="screenshots/pt-BR/api-light.webp" width="100%">
+  </picture>
+  <br><sub><b>API</b> — acesso à API, chaves por cliente com limites, configuração do cliente destacada</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/backups-dark.webp">
+    <img alt="Backups" src="screenshots/pt-BR/backups-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Backups</b> — backups manuais e agendados, restauração com um clique</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/settings-1-dark.webp">
+    <img alt="Configurações" src="screenshots/pt-BR/settings-1-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Configurações</b> — uso, integridade do stream, roteamento, autocontinuar</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/settings-2-dark.webp">
+    <img alt="Configurações" src="screenshots/pt-BR/settings-2-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Configurações</b> — raciocínio e mapeamento de modelos</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/settings-3-dark.webp">
+    <img alt="Configurações" src="screenshots/pt-BR/settings-3-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Configurações</b> — endpoint do Kiro, senha de administrador, proxy de saída</sub>
+</p>
 
 ---
 

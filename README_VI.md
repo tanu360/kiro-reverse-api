@@ -50,85 +50,76 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 ## 🖼 Xem trước
 
 <p align="center">
-  <img alt="Bảng quản trị Kiro Proxy, sáng và tối" src="screenshots/hero.webp" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/login-dark.webp">
+    <img alt="Đăng nhập" src="screenshots/vi/login-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Đăng nhập</b> — trang đăng nhập với nút chuyển giao diện và ngôn ngữ</sub>
 </p>
 
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/login-dark.webp">
-        <img alt="Đăng nhập" src="screenshots/vi/login-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Đăng nhập</b> — trang đăng nhập với nút chuyển giao diện và ngôn ngữ</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/overview-dark.webp">
-        <img alt="Tổng quan" src="screenshots/vi/overview-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Tổng quan</b> — lưu lượng, credit và lỗi trực tiếp trên các tài khoản</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/accounts-dark.webp">
-        <img alt="Tài khoản" src="screenshots/vi/accounts-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Tài khoản</b> — credit gói, tab trạng thái, bộ lọc, thao tác hàng loạt và xuất</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/requests-dark.webp">
-        <img alt="Yêu cầu" src="screenshots/vi/requests-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Yêu cầu</b> — tab trạng thái, tìm kiếm, sắp xếp và xem chi tiết</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/api-dark.webp">
-        <img alt="API" src="screenshots/vi/api-light.webp" width="100%">
-      </picture>
-      <br><sub><b>API</b> — truy cập API, key riêng cho từng client kèm giới hạn, thiết lập client có tô sáng</sub>
-    </td>
-    <td width="50%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/backups-dark.webp">
-        <img alt="Sao lưu" src="screenshots/vi/backups-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Sao lưu</b> — sao lưu thủ công và theo lịch, khôi phục bằng một cú nhấp</sub>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/overview-dark.webp">
+    <img alt="Tổng quan" src="screenshots/vi/overview-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Tổng quan</b> — lưu lượng, credit và lỗi trực tiếp trên các tài khoản</sub>
+</p>
 
-<table>
-  <tr>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/settings-1-dark.webp">
-        <img alt="Cài đặt" src="screenshots/vi/settings-1-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Cài đặt</b> — mức sử dụng, toàn vẹn stream, định tuyến, tự động viết tiếp</sub>
-    </td>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/settings-2-dark.webp">
-        <img alt="Cài đặt" src="screenshots/vi/settings-2-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Cài đặt</b> — thinking và ánh xạ model</sub>
-    </td>
-    <td width="33%" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/settings-3-dark.webp">
-        <img alt="Cài đặt" src="screenshots/vi/settings-3-light.webp" width="100%">
-      </picture>
-      <br><sub><b>Cài đặt</b> — endpoint Kiro, mật khẩu quản trị, proxy outbound</sub>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/accounts-dark.webp">
+    <img alt="Tài khoản" src="screenshots/vi/accounts-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Tài khoản</b> — credit gói, tab trạng thái, bộ lọc, thao tác hàng loạt và xuất</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/requests-dark.webp">
+    <img alt="Yêu cầu" src="screenshots/vi/requests-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Yêu cầu</b> — tab trạng thái, tìm kiếm, sắp xếp và xem chi tiết</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/api-dark.webp">
+    <img alt="API" src="screenshots/vi/api-light.webp" width="100%">
+  </picture>
+  <br><sub><b>API</b> — truy cập API, key riêng cho từng client kèm giới hạn, thiết lập client có tô sáng</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/backups-dark.webp">
+    <img alt="Sao lưu" src="screenshots/vi/backups-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Sao lưu</b> — sao lưu thủ công và theo lịch, khôi phục bằng một cú nhấp</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/settings-1-dark.webp">
+    <img alt="Cài đặt" src="screenshots/vi/settings-1-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Cài đặt</b> — mức sử dụng, toàn vẹn stream, định tuyến, tự động viết tiếp</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/settings-2-dark.webp">
+    <img alt="Cài đặt" src="screenshots/vi/settings-2-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Cài đặt</b> — thinking và ánh xạ model</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/settings-3-dark.webp">
+    <img alt="Cài đặt" src="screenshots/vi/settings-3-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Cài đặt</b> — endpoint Kiro, mật khẩu quản trị, proxy outbound</sub>
+</p>
 
 ---
 
