@@ -1249,17 +1249,17 @@
 :root {
   --chart-1: var(--primary);
   /*
-   * The categorical ramp (model mix): every step is at least 3:1 on the card, and after the
-   * purple each one is quieter than the one before. chart-2 is the purple mixed toward the text
-   * colour (a light lavender in dark, a deep violet in light); chart-3..5 step the text colour
-   * down toward the card (dark 7 / 4.9 / 3.3:1, light 6.6 / 4.4 / 3:1). chart-other, for the
-   * rest of the models, sits below them all.
+   * The categorical series (model-mix donut, traffic-by-account bars): five hues that stay
+   * apart side by side, all in the purple family (never green or red: a share is not good or
+   * bad news), each at least 3:1 on the card. chart-1 is the brand purple, chart-2 the purple
+   * mixed toward the text colour (lavender in dark, deep violet in light), chart-3 fuchsia,
+   * chart-4 indigo and chart-5 a neutral grey; chart-other, for the rest, is the quietest grey.
    */
   --chart-2: color-mix(in oklab, var(--primary) 60%, var(--foreground));
-  --chart-3: color-mix(in oklab, var(--foreground) 66%, var(--card));
-  --chart-4: color-mix(in oklab, var(--foreground) 54%, var(--card));
-  --chart-5: color-mix(in oklab, var(--foreground) 42%, var(--card));
-  --chart-other: color-mix(in oklab, var(--foreground) 30%, var(--card));
+  --chart-3: var(--color-fuchsia-600);
+  --chart-4: var(--color-indigo-500);
+  --chart-5: color-mix(in oklab, var(--foreground) 50%, var(--card));
+  --chart-other: color-mix(in oklab, var(--foreground) 26%, var(--card));
   --chart-positive: var(--success);
   --chart-negative: var(--destructive);
   /* The card the charts sit on, so dot outlines and ring gaps cut cleanly into it. */
@@ -1296,6 +1296,9 @@
 }
 
 .dark {
+  /* The series' lighter steps of the same hues, so they read on the near-black card. */
+  --chart-3: var(--color-fuchsia-400);
+  --chart-4: var(--color-indigo-400);
   /* Ring spokes and loading strokes: a mid grey that still reads on the dark card. */
   --chart-foreground: color-mix(in oklab, var(--foreground) 45%, transparent);
   --chart-marker-background: oklch(0.25 0.01 260);

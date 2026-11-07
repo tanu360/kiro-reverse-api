@@ -17,13 +17,13 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { modelSlices } from "./aggregate";
 import { MODEL_COLORS, OTHER_MODEL_COLOR } from "./colors";
-import type { RingSlice } from "./model-mix-ring";
+import type { RingSlice } from "./model-mix-donut";
 import { useTotalsFailed } from "./status-cards";
 import { usePrefersReducedMotion } from "./use-reduced-motion";
 
-const ModelMixRing = lazy(() => import("./model-mix-ring"));
+const ModelMixDonut = lazy(() => import("./model-mix-donut"));
 
-/** Five models on the ring (plus "Other") and five rows in the table: the same five. */
+/** Five models in the donut (plus "Other") and five rows in the table: the same five. */
 const RING_MODELS = MODEL_COLORS.length;
 const TABLE_ROWS = RING_MODELS;
 
@@ -54,8 +54,8 @@ function ModelName({ row }: { row: MixRow }): JSX.Element {
 }
 
 /**
- * Ring of the top models by credits beside a ranked table, cumulative since start or the last
- * reset. Hovering a table row lights its ring, and hovering a ring dims the other rows.
+ * Donut of the top models by credits beside a ranked table, cumulative since start or the last
+ * reset. Hovering a table row lifts its slice, and hovering a slice dims the other rows.
  */
 export function ModelMixCard(): JSX.Element {
   const { t, lang } = useT("overview");
@@ -84,7 +84,7 @@ export function ModelMixCard(): JSX.Element {
   }, [models, otherLabel]);
 
   const columns = useMemo<DataTableColumn<MixRow>[]>(() => {
-    // While a ring or row is hovered, every cell of the other rows dims, as the ring does.
+    // While a slice or row is hovered, every cell of the other rows dims.
     const focus = (index: number, className: string | undefined, children: ReactNode) => (
       <div
         className={cn(
@@ -223,7 +223,7 @@ export function ModelMixCard(): JSX.Element {
             <Suspense
               fallback={<Skeleton className="mx-auto aspect-square w-full max-w-56 rounded-full" />}
             >
-              <ModelMixRing
+              <ModelMixDonut
                 centerLabel={t(credits ? "modelMix.centerCredits" : "modelMix.centerRequests")}
                 fractionDigits={credits ? 2 : 0}
                 hoveredIndex={hovered}
@@ -234,8 +234,11 @@ export function ModelMixCard(): JSX.Element {
               />
             </Suspense>
           </figure>
-          {/* Hover only mirrors the ring; the rows carry the data. */}
-          <div className="min-w-0 flex-1">
+          {/*
+            Hover only mirrors the ring; the rows carry the data. A hairline parts the table from
+            the ring: down the card's full height beside it, across the card when stacked.
+          */}
+          <div className="min-w-0 flex-1 border-border-subtle border-t @4xl:self-stretch @4xl:border-s @4xl:border-t-0">
             <DataTable
               caption={t("modelMix.title")}
               cardLayout="divided"

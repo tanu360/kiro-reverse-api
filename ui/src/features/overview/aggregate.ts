@@ -194,36 +194,6 @@ export function modelSlices(
 }
 
 /**
- * A heat cell's volume step on the chart-scale ramp: 1 for an empty minute, then 2 to 5 in
- * quarters of the busiest displayed minute (any traffic is at least 2, so it never reads as
- * empty).
- */
-export function heatLevel(reqs: number, maxReq: number): 1 | 2 | 3 | 4 | 5 {
-  if (!(reqs > 0)) return 1;
-  const quarter = Math.ceil(Math.min(1, reqs / Math.max(1, maxReq)) * 4);
-  return (1 + Math.max(1, quarter)) as 2 | 3 | 4 | 5;
-}
-
-/** Share of a minute's requests that failed at which its cell turns red (the alert colour). */
-export const HEAT_FAIL_SHARE = 0.25;
-
-/**
- * How a minute's failures show: none, a thin red bar under the threshold, or a red cell. A minute
- * with failed attempts (`retries`) but no requests of its own, as when every attempt on an
- * account failed over to another one, gets the thin bar, so it does not read as idle.
- */
-export function heatFailure(
-  reqs: number,
-  failures: number,
-  retries = 0,
-): "none" | "some" | "alert" {
-  if (failures > 0) {
-    return failures / Math.max(reqs, failures) >= HEAT_FAIL_SHARE ? "alert" : "some";
-  }
-  return retries > 0 && !(reqs > 0) ? "some" : "none";
-}
-
-/**
  * The accounts the server sent for top=N, in its order (busiest first by requests plus failed
  * attempts over the last `windowMin` minutes), at most `limit`. A row with neither in the window
  * is left out, should one come; a row with only failed attempts stays, as the server counts it.

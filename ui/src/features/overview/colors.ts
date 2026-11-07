@@ -7,9 +7,9 @@ export const FAILED_COLOR = "var(--chart-negative)";
 export const PREVIOUS_COLOR = "var(--chart-comparison)";
 
 /**
- * Model-mix ring and table dots: the top five models on the purple-to-grey ramp, then "Other"
- * in the quietest step, below chart-5. Never green or red: a model's share is not good or bad
- * news.
+ * Series colours for the model-mix donut and table dots and the traffic-by-account bars: five
+ * purple-family hues (index.css --chart-1..5), then "Other" in the quietest grey. Never green or
+ * red: a share is not good or bad news.
  */
 export const MODEL_COLORS = [
   "var(--chart-1)",

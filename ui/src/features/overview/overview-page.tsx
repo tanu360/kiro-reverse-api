@@ -17,8 +17,8 @@ import { LiveTiles } from "./live-tiles";
 import { ModelMixCard } from "./model-mix-card";
 import { RecentActivity } from "./recent-activity";
 import { StatusCards } from "./status-cards";
+import { TrafficByAccount } from "./traffic-by-account";
 import { TrafficCard } from "./traffic-card";
-import { TrafficHeatmap } from "./traffic-heatmap";
 
 /** Reflects the SSE connection that drives the live refresh. */
 function LiveBadge(): JSX.Element {
@@ -122,7 +122,7 @@ export function OverviewPage(): JSX.Element {
       <TrafficCard />
       {/* Full-width rows: paired, the short heatmap card stretched to the model mix's height
           and left a large blank area. Both time views now sit together under the totals. */}
-      <TrafficHeatmap />
+      <TrafficByAccount />
       <ModelMixCard />
       <RecentActivity />
     </div>

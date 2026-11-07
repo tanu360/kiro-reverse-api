@@ -3,8 +3,6 @@ import type { HeatmapCell, ModelMixEntry } from "@/lib/api/types";
 import {
   bucketGlobal,
   busyAccounts,
-  heatFailure,
-  heatLevel,
   hourDelta,
   mergeCells,
   modelSlices,
@@ -227,39 +225,6 @@ describe("modelSlices", () => {
 
   it("returns no slices without models", () => {
     expect(modelSlices([], 4, "Other")).toEqual({ slices: [], total: 0, metric: "reqs" });
-  });
-});
-
-describe("heatLevel", () => {
-  it("keeps 1 for an empty minute and steps 2 to 5 by quarters of the busiest", () => {
-    expect(heatLevel(0, 10)).toBe(1);
-    expect(heatLevel(1, 100)).toBe(2);
-    expect(heatLevel(25, 100)).toBe(2);
-    expect(heatLevel(26, 100)).toBe(3);
-    expect(heatLevel(75, 100)).toBe(4);
-    expect(heatLevel(100, 100)).toBe(5);
-  });
-
-  it("treats a maximum below 1 as 1 and caps at 5", () => {
-    expect(heatLevel(1, 0)).toBe(5);
-    expect(heatLevel(20, 10)).toBe(5);
-  });
-});
-
-describe("heatFailure", () => {
-  it("turns a cell red only from a quarter of its requests failing", () => {
-    expect(heatFailure(10, 0)).toBe("none");
-    expect(heatFailure(10, 2)).toBe("some");
-    expect(heatFailure(8, 2)).toBe("alert");
-    expect(heatFailure(0, 3)).toBe("alert");
-  });
-
-  it("marks a minute with failed attempts but no requests of its own with the thin bar", () => {
-    expect(heatFailure(0, 0, 4)).toBe("some");
-    // With requests the fill already shows the minute; the failures alone pick the mark.
-    expect(heatFailure(5, 0, 4)).toBe("none");
-    expect(heatFailure(4, 1, 2)).toBe("alert");
-    expect(heatFailure(0, 0, 0)).toBe("none");
   });
 });
 

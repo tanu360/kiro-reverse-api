@@ -242,7 +242,7 @@ describe("OverviewPage", () => {
     );
     await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    await within(heatmap).findByText("All accounts");
+    await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" });
     await waitFor(() => expect(urls.length).toBeGreaterThanOrEqual(2));
     const shapes = urls.map((url) => ({
       windowMin: url.searchParams.get("windowMin"),
@@ -319,13 +319,14 @@ describe("OverviewPage", () => {
     await renderApp("/", { privacy: false });
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
     expect(await within(heatmap).findByText("Top 5 of 6 · last 60 min")).toBeInTheDocument();
-    expect(within(heatmap).getByText("failover@example.com")).toBeInTheDocument();
-    // Its failed minute is marked, not left to read as idle.
-    const failing = within(heatmap).getByRole("img", { name: /^failover@example\.com:/ });
-    expect(failing.querySelectorAll('[data-failed="some"]').length).toBeGreaterThan(0);
+    // It keeps its legend row (with no successful requests) instead of dropping out.
+    const legend = await within(heatmap).findByRole("list", {
+      name: "Accounts in the last 60 min",
+    });
+    expect(within(legend).getByText("failover@example.com")).toBeInTheDocument();
   });
 
-  it("updates the heatmap tooltip with live data while the pointer stays on a cell", async () => {
+  it("updates the traffic-by-account legend with live data", async () => {
     let newest = 7;
     mockServer.use(
       http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
@@ -335,7 +336,7 @@ describe("OverviewPage", () => {
           accountId: "_global_",
           cells: [
             { offset: 0, reqs: newest, failures: 0 },
-            { offset: 5, reqs: 100, failures: 0 },
+            { offset: 5, reqs: 100, failures: 2 },
           ],
         };
         if (params.get("scope") === "global") {
@@ -346,18 +347,16 @@ describe("OverviewPage", () => {
     );
     const { queryClient } = await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    await within(heatmap).findByText("All accounts");
-    const cell = heatmap.querySelector<HTMLElement>('[data-cell="0:1:0"]');
-    if (!cell) throw new Error("no cell for the global row's newest minute");
-    fireEvent.pointerMove(cell);
-    const requestsRow = async () =>
-      (await within(heatmap).findByText("Requests")).closest(".justify-between")?.textContent;
-    expect(await requestsRow()).toBe("Requests7");
+    const legend = await within(heatmap).findByRole("list", {
+      name: "Accounts in the last 60 min",
+    });
+    // No busy accounts: the whole hour is "Other accounts", with its failures beside it.
+    const other = () => within(legend).getByText("Other accounts").closest("li")?.textContent;
+    expect(other()).toBe("Other accounts1072 failed");
 
-    // A live refetch while the pointer has not moved: the tooltip reads the new count.
     newest = 31;
     await queryClient.refetchQueries({ queryKey: heatmapQuery(60, { top: 5 }).queryKey });
-    await waitFor(async () => expect(await requestsRow()).toBe("Requests31"));
+    await waitFor(() => expect(other()).toBe("Other accounts1312 failed"));
   });
 
   it("lists at most 10 recent errors", async () => {
@@ -378,7 +377,7 @@ describe("OverviewPage", () => {
       expect(within(table).getAllByRole("row").length).toBeGreaterThan(1);
     });
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    await within(heatmap).findByText("All accounts");
+    await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" });
     const html = document.body.innerHTML;
     // API-key accounts carry a label instead of an address; privacy mode masks only addresses.
     const emails = mockDb.accounts.map((a) => a.email).filter((email) => email.includes("@"));
@@ -425,7 +424,9 @@ describe("OverviewPage", () => {
 
     expect(await statCard("Accounts")).toBeInTheDocument();
     const heatmap = screen.getByRole("region", { name: "Traffic by account" });
-    expect(await within(heatmap).findByText("All accounts")).toBeInTheDocument();
+    expect(
+      await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" }),
+    ).toBeInTheDocument();
     expect(within(heatmap).queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
@@ -504,22 +505,21 @@ describe("OverviewPage", () => {
     expect(await screen.findByText(/Accounts with requests in the last 5 min/)).toBeInTheDocument();
   });
 
-  it("draws the account heatmap without a sideways scroller", async () => {
+  it("draws traffic by account as stacked bars with a legend of the busiest accounts", async () => {
     await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    await within(heatmap).findByText("All accounts");
-    expect(heatmap.querySelector('[class*="overflow-x-auto"]')).toBeNull();
-    expect(heatmap.querySelector('[class*="min-w-[26rem]"]')).toBeNull();
-    // The newest minute stays on screen with its label.
-    expect(within(heatmap).getByText("Now")).toBeInTheDocument();
-    // Quiet minutes are neutral, not a faint tint of the traffic colour.
-    const quiet = heatmap.querySelectorAll<HTMLElement>("[data-empty]");
-    expect(quiet.length).toBeGreaterThan(0);
-    for (const cell of quiet) {
-      expect(cell).toHaveClass("bg-chart-scale-01");
-      expect(cell.style.backgroundColor).toBe("");
-    }
-    // A row total sits beside each row; the old "N more accounts" footer is gone.
+    const legend = await within(heatmap).findByRole("list", {
+      name: "Accounts in the last 60 min",
+    });
+    expect(
+      within(heatmap).getByRole("img", {
+        name: "Requests per account in two-minute bars over the last 60 min",
+      }),
+    ).toBeInTheDocument();
+    // The five busiest accounts and the rest as "Other accounts", each with its hour's requests.
+    const items = within(legend).getAllByRole("listitem");
+    expect(items.length).toBeGreaterThan(1);
+    expect(items.length).toBeLessThanOrEqual(6);
     expect(within(heatmap).getByRole("link", { name: "View all accounts" })).toHaveAttribute(
       "href",
       "/admin/accounts",
@@ -543,7 +543,7 @@ describe("OverviewPage", () => {
     expect(
       await within(heatmap).findByText("No account activity in the last hour"),
     ).toBeInTheDocument();
-    expect(within(heatmap).queryByText("All accounts")).toBeNull();
+    expect(within(heatmap).queryByRole("list", { name: "Accounts in the last 60 min" })).toBeNull();
   });
 
   it("keeps error messages out of the tab order and uses one dash for missing values", async () => {
