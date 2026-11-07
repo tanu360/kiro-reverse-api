@@ -10,12 +10,10 @@ const sources = import.meta.glob<string>("/src/**/*.{ts,tsx}", {
 });
 
 // Not shipped or not UI: tests and their helpers, MSW fixtures (dev-only mock data that never
-// reaches dist), the dev-only design showcases (src/dev, served by vite dev only) and the
-// generated route tree.
+// reaches dist) and the generated route tree.
 const SKIPPED = [
   /\.test\.tsx?$/,
   /^src\/test\//,
-  /^src\/dev\//,
   /^src\/lib\/mocks\//,
   /^src\/features\/[^/]+\/mocks\.ts$/,
   /^src\/routeTree\.gen\.ts$/,
