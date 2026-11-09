@@ -1880,42 +1880,19 @@ function backupsFull(now: number): BackupEntry[] {
 // ---------------------------------------------------------------------------
 
 /** Many valid rules (lowercase unique sources, no chains) including a 256-byte source. */
+/**
+ * The defaults plus a handful of believable client aliases: about a screen of rules, so the
+ * Settings card reads as a real install's (the small seed in fixtures.ts keeps the defaults).
+ */
 function modelMappingsFull(): ModelMappingRule[] {
-  const longKey = `org-internal/${"very-long-model-alias-".repeat(12)}`.slice(0, 256);
   return [
     ...defaultModelMappings(),
     { key: "gpt-4o", value: "claude-sonnet-5" },
     { key: "gpt-4o-mini", value: "claude-haiku-4.5" },
-    { key: "gpt-4.1", value: "claude-sonnet-4.6" },
-    { key: "gpt-4.1-mini", value: "claude-haiku-4.5" },
-    { key: "gpt-4.1-nano", value: "claude-haiku-4.5" },
-    { key: "o1", value: "claude-opus-5-thinking" },
-    { key: "o1-mini", value: "claude-sonnet-4.5-thinking" },
     { key: "o3", value: "claude-opus-4.8-thinking" },
-    { key: "o3-mini", value: "claude-sonnet-5-thinking" },
-    { key: "o4-mini", value: "claude-sonnet-5-thinking" },
-    { key: "gpt-5-codex", value: "claude-sonnet-5" },
-    { key: "gpt-5.1", value: "claude-opus-5" },
-    { key: "gpt-5.1-codex-max", value: "claude-opus-5-thinking" },
-    { key: "codex-mini-latest", value: "claude-haiku-4.5" },
-    { key: "claude-3-7-sonnet-20250219", value: "claude-sonnet-4.6" },
-    { key: "claude-sonnet-4-5-20250929", value: "claude-sonnet-4.5" },
-    { key: "claude-opus-4-1-20250805", value: "claude-opus-4.6" },
-    { key: "claude-haiku-4-5-20251001", value: "claude-haiku-4.5" },
-    { key: "claude-instant-1.2", value: "claude-haiku-4.5" },
-    { key: "claude-2.1", value: "claude-sonnet-4.5" },
     { key: "gemini-2.5-pro", value: "claude-opus-5" },
-    { key: "gemini-2.5-flash", value: "claude-haiku-4.5" },
     { key: "deepseek-chat", value: "claude-sonnet-4.5" },
-    { key: "deepseek-reasoner", value: "claude-sonnet-4.5-thinking" },
     { key: "default", value: "auto" },
-    { key: "kiro-auto", value: "auto" },
-    { key: "anthropic/claude-3.5-sonnet", value: "claude-sonnet-5" },
-    { key: "openrouter/anthropic/claude-opus-4", value: "claude-opus-5" },
-    { key: "us.anthropic.claude-3-5-sonnet-20241022-v2:0", value: "claude-sonnet-5" },
-    { key: "モデル-高速", value: "claude-haiku-4.5" },
-    { key: "future-flagship", value: "claude-opus-6" },
-    { key: longKey, value: "claude-sonnet-4.6-1m-context-extended-thinking-preview-20261015" },
   ];
 }
 

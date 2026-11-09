@@ -452,7 +452,7 @@ describe("full dataset (the browser default, polished for screenshots)", () => {
 
   it("seeds valid model mappings and every settings variant", () => {
     const keys = full.modelMappings.map((m) => m.key);
-    expect(keys.length).toBeGreaterThanOrEqual(40);
+    expect(keys.length).toBeGreaterThanOrEqual(12);
     expect(new Set(keys).size).toBe(keys.length);
     for (const { key, value } of full.modelMappings) {
       expect(key).toBe(key.toLowerCase());
