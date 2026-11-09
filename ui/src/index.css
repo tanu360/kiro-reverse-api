@@ -471,21 +471,20 @@
 /*
  * The segmented control (components/ui/segmented-control.tsx, and the default tabs list): a
  * faint tint in the pill so it reads as one control, and the chosen segment raised out of it on
- * a solid thumb with a hairline edge and a soft shadow. Dark mode lifts the thumb with white
- * instead, where a shadow would not show.
+ * a solid thumb with a soft shadow. No hairline ring on the thumb: 1 px inside the track's own
+ * edge it doubled that edge into a thick line at the ends. Dark mode lifts the thumb with white.
  */
 :root {
   --segment-track: color-mix(in oklab, var(--foreground) 3.5%, transparent);
   --segment-thumb: var(--color-white);
   --segment-thumb-shadow:
-    0 0 0 1px color-mix(in oklab, var(--foreground) 9%, transparent),
-    0 1px 2px color-mix(in oklab, var(--foreground) 10%, transparent);
+    0 1px 2px color-mix(in oklab, var(--foreground) 12%, transparent),
+    0 0 1px color-mix(in oklab, var(--foreground) 18%, transparent);
 }
 .dark {
   --segment-track: color-mix(in oklab, var(--color-white) 3%, transparent);
   --segment-thumb: color-mix(in oklab, var(--color-white) 12%, transparent);
-  --segment-thumb-shadow:
-    0 0 0 1px color-mix(in oklab, var(--color-white) 8%, transparent), 0 1px 2px rgb(0 0 0 / 0.4);
+  --segment-thumb-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
 /*

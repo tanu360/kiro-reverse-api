@@ -10,20 +10,22 @@ export type SegmentedControlSize = "default" | "lg" | "sm" | "icon";
 /**
  * Item heights; the track adds its 1 px padding and 1 px border on each side (+4 px), so with a
  * mouse each size is the height of the matching button (phone / sm and up / coarse pointer):
- *   sm       items 28 / 24 / 36   track 32 / 28 / 40   (the sm and icon-sm buttons beside it)
+ *   sm       items 28 / 24 / 28   track 32 / 28 / 32   (the sm and icon-sm buttons beside it)
  *   default  items 32 / 28 / 36   track 36 / 32 / 40
  *   lg       items 40 / 36 / 40   track 44 / 40 / 44
  *   icon     square default items, for icon-only segments (the sign-in theme toggle)
- * On a coarse pointer no strip is under 40 px, whatever its size: a filter, a range or a tab is a
- * finger's tap, so sm grows to the default's touch height there. A real height, not an ::after
- * hit box: content after a tab list would paint over an overflowing box. pointer-coarse sorts
- * after the sm: sizes, so it wins on touch tablets too.
+ * On a coarse pointer the default and lg strips are 40 px or more, a finger's tap. sm stays a
+ * 32 px pill there (iOS's segmented height): it sits in card headers beside the title, where a
+ * 40 px pill crowded the title onto two lines. A real height, not an ::after hit box: content
+ * after a tab list would paint over an overflowing box. pointer-coarse sorts after the sm:
+ * sizes, so it wins on touch tablets too.
  */
 export const segmentedControlItemSizeClassNames: Record<SegmentedControlSize, string> = {
   default: "h-8 px-[calc(--spacing(2.5)-1px)] sm:h-7 pointer-coarse:h-9",
   icon: "size-8 p-0 sm:size-7 pointer-coarse:size-9",
   lg: "h-10 px-[calc(--spacing(3.5)-1px)] sm:h-9 pointer-coarse:h-10",
-  sm: "h-7 px-[calc(--spacing(2)-1px)] sm:h-6 pointer-coarse:h-9",
+  // Phones: 12 px labels, so a two-word pill and a card title share a 390 px header line.
+  sm: "h-7 px-[calc(--spacing(2)-1px)] max-sm:text-xs sm:h-6 pointer-coarse:h-7",
 };
 
 export const segmentedControlItemLayoutClassName =
