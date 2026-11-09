@@ -184,8 +184,12 @@ export default function TrafficChart({
       <HatchPattern color={SUCCEEDED_COLOR} id={ids.succeeded} />
       <HatchPattern color={RETRIED_COLOR} id={ids.retried} />
       <HatchPattern color={FAILED_COLOR} id={ids.failed} />
-      <BarColumnTrack />
-      <YAxis numTicks={4} side="right" />
+      {/*
+        An empty chart keeps only its time axis: no columns (their stripes ran through the "No
+        traffic" notice), no count scale over nothing and no flat previous-hour line.
+      */}
+      {empty ? null : <BarColumnTrack />}
+      {empty ? null : <YAxis numTicks={4} side="right" />}
       <Bar
         animate={!reducedMotion}
         dataKey="succeeded"
@@ -208,7 +212,7 @@ export default function TrafficChart({
         stroke={FAILED_COLOR}
       />
       {hasPrevious ? <Bar animate={false} dataKey="headroom" fill="transparent" /> : null}
-      {hasPrevious ? <TrendLine dataKey="previous" /> : null}
+      {hasPrevious && !empty ? <TrendLine dataKey="previous" /> : null}
       <BarXAxis maxLabels={{ base: 3, sm: 4, md: 6 }} />
       {/* An empty chart has nothing to inspect: no tooltip over its empty state. */}
       {empty ? null : (

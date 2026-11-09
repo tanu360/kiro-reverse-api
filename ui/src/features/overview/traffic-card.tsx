@@ -211,7 +211,8 @@ export function TrafficCard(): JSX.Element {
         </p>
         {legend}
         <div className="relative">
-          <div aria-hidden="true">
+          {/* Empty, the bare axes recede, so the notice over them is what reads. */}
+          <div aria-hidden="true" className={cn(empty && "opacity-40")}>
             <Suspense fallback={placeholder}>
               <TrafficChart
                 bars={bars}
