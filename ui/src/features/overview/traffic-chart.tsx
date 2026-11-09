@@ -6,6 +6,7 @@ import { BarXAxis } from "@/components/charts/bar-x-axis";
 import { useChartStable } from "@/components/charts/chart-context";
 import { ChartTooltip, TooltipContent, type TooltipRow } from "@/components/charts/tooltip";
 import { YAxis } from "@/components/charts/y-axis";
+import { useIsMobile } from "@/hooks/use-media-query";
 import { formatNumber, formatTime } from "@/lib/format";
 import type { Lang } from "@/lib/i18n";
 import type { TrafficPoint } from "./aggregate";
@@ -139,6 +140,7 @@ export default function TrafficChart({
   status?: "loading" | "ready";
   empty?: boolean;
 }): JSX.Element {
+  const phone = useIsMobile();
   const id = useId().replace(/:/g, "");
   const ids = { succeeded: `ok-${id}`, retried: `rt-${id}`, failed: `bad-${id}` };
   const hasPrevious = bars.some((bar) => bar.previous !== undefined);
@@ -169,7 +171,8 @@ export default function TrafficChart({
     <BarChart
       animationDuration={reducedMotion ? 0 : undefined}
       aspectRatio="auto"
-      barGap={0.35}
+      // Narrower gaps on a phone, so its fewer bars read as bars, not hairlines.
+      barGap={phone ? 0.22 : 0.35}
       className={PLOT_HEIGHT}
       data={data}
       margin={MARGIN}

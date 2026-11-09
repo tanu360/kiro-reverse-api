@@ -17,6 +17,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
+import { useIsMobile } from "@/hooks/use-media-query";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { heatmapQuery } from "@/lib/api/observe";
 import { formatNumber } from "@/lib/format";
@@ -37,6 +38,8 @@ import { useTotalsFailed } from "./totals";
 const TrafficChart = lazy(() => import("./traffic-chart"));
 
 const RANGES: readonly OverviewRange[] = ["1h", "6h", "24h"];
+/** Bucket minutes on a phone: 15 bars for 1 h, 18 for 6 h, 24 for 24 h. */
+const PHONE_BUCKET_MIN: Readonly<Record<OverviewRange, number>> = { "1h": 4, "6h": 20, "24h": 60 };
 /** The plot's height, sized by the card's width (SectionCard is a container), not the viewport. */
 export const PLOT_HEIGHT = "h-64 @2xl:h-72";
 
@@ -80,7 +83,10 @@ export function TrafficCard(): JSX.Element {
   const navigate = useNavigate({ from: "/" });
   const reducedMotion = usePrefersReducedMotion();
   const totalsFailed = useTotalsFailed();
-  const { windowMin, bucketMin } = RANGE_WINDOWS[range];
+  // Phones draw half as many bars (or fewer), each wider: 30 two-minute bars were slivers there.
+  const phone = useIsMobile();
+  const { windowMin } = RANGE_WINDOWS[range];
+  const bucketMin = phone ? PHONE_BUCKET_MIN[range] : RANGE_WINDOWS[range].bucketMin;
   const hourView = range === "1h";
   // Only the global row is read (scope=global: no per-account rows on the wire). The 1 h view
   // reads the two-hour heatmap the status cards already load (same key, no extra request), and
@@ -254,7 +260,7 @@ export function TrafficCard(): JSX.Element {
             ))}
           </SegmentedControl>
         }
-        description={t(`traffic.description.${range}`)}
+        description={t(`traffic.description.${range}`, { n: formatNumber(bucketMin, lang) })}
         descriptionVariant="inline"
         icon={ChartLineData02Icon}
         id="overview-traffic"

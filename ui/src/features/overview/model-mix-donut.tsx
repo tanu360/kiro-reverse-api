@@ -51,7 +51,10 @@ export default function ModelMixDonut({
       data={data}
       hoveredIndex={hoveredIndex}
       hoverOffset={6}
-      innerRadius={76}
+      // The ring is 22 % of the radius at any size (shadcn's donut is 25 %; 30 % read heavy with
+      // the rounded, gapped slices), not a fixed 76 px hole that left a hairline ring in the
+      // half-width card.
+      innerRadius={0.78}
       onHoverChange={onHoverChange}
       padAngle={0.03}
     >

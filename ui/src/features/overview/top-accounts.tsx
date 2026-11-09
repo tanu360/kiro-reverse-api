@@ -51,14 +51,7 @@ const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
  * The success rate as a ring: green from 95 %, orange from 85 %, red below, and an empty track
  * before the first request. The figure beside it carries the number, so the ring is decorative.
  */
-function SuccessRing({
-  rate,
-  showRate = false,
-}: {
-  rate: number | null;
-  /** The rate inside the ring, for the phone card, where no figure sits beside it. */
-  showRate?: boolean;
-}): JSX.Element {
+function SuccessRing({ rate }: { rate: number | null }): JSX.Element {
   const tone =
     rate === null
       ? undefined
@@ -69,7 +62,7 @@ function SuccessRing({
           : "stroke-destructive";
   return (
     <span className="relative grid size-9 shrink-0 place-items-center">
-      <svg aria-hidden="true" className="absolute inset-0 size-9 -rotate-90" viewBox="0 0 36 36">
+      <svg aria-hidden="true" className="absolute inset-0 size-full -rotate-90" viewBox="0 0 36 36">
         <circle
           className="stroke-chart-scale-01"
           cx="18"
@@ -91,11 +84,6 @@ function SuccessRing({
           />
         )}
       </svg>
-      {showRate && rate !== null ? (
-        <span className="font-medium text-2xs text-muted-foreground tabular-nums">
-          {Math.round(rate * 100)}%
-        </span>
-      ) : null}
     </span>
   );
 }
@@ -108,7 +96,7 @@ function SuccessCell({ account }: { account: Account }): JSX.Element {
   return (
     <div className="flex min-w-0 items-center gap-3">
       <SuccessRing rate={rate} />
-      <div className="flex min-w-0 flex-col">
+      <div className="flex min-w-0 flex-col gap-1">
         <span className="font-medium tabular-nums">
           {rate === null
             ? t("topAccounts.noRequests")
@@ -130,7 +118,7 @@ function LastUsedCell({ account }: { account: Account }): JSX.Element {
   const { lang } = useT();
   if (!account.lastUsed) return <span className="text-muted-foreground">{EMPTY}</span>;
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col gap-1">
       <span className="tabular-nums">{formatTime(account.lastUsed, lang)}</span>
       <RelativeTime className="text-meta text-muted-foreground" value={account.lastUsed} />
     </div>
@@ -147,26 +135,26 @@ function TopAccountCard({
   onTest: (account: Account) => void;
   onDetails: (account: Account) => void;
 }): JSX.Element {
-  const { t, lang } = useT("overview");
+  const { t } = useT("overview");
   const { t: ta } = useT("accounts");
   const name = useAccountName()(account);
-  const failed = Math.min(account.errorCount, account.requestCount);
+  const rate = successRate(account);
   return (
     <ListCard
       action={
         <AccountRowActions account={account} onDetails={onDetails} onTest={onTest} variant="menu" />
       }
-      leading={<SuccessRing rate={successRate(account)} showRate />}
+      leading={<SuccessRing rate={rate} />}
       meta={
         // The status leads the meta line, as on the Accounts page cards, so the title keeps its
         // one line and the pill never drops under it.
         <span className="flex min-w-0 items-center gap-1.5">
           <StatusPill account={account} size="sm" />
+          {/* The rate the ring draws; the request counts are in the table and the sheet. */}
           <span className="truncate tabular-nums">
-            {t("topAccounts.requests", {
-              succeeded: formatNumber(account.requestCount - failed, lang),
-              total: formatNumber(account.requestCount, lang),
-            })}
+            {rate === null
+              ? t("topAccounts.noRequests")
+              : t("topAccounts.success", { percent: Math.floor(rate * 100) })}
           </span>
           <span aria-hidden="true">·</span>
           <RelativeTime style="narrow" value={account.lastUsed} />
@@ -175,7 +163,8 @@ function TopAccountCard({
       onOpen={() => onDetails(account)}
       openLabel={ta("openDetails", { email: name.text })}
       title={
-        <span className="flex min-w-0 items-center gap-2">
+        // pe-0.5: the AWS mark draws 2 px past its box, which the title's truncation clipped.
+        <span className="flex min-w-0 items-center gap-2 pe-0.5">
           <span className={cn("truncate", name.mono && "font-mono text-meta")}>{name.text}</span>
           <AuthIcon account={account} />
         </span>
@@ -280,7 +269,7 @@ export function TopAccounts(): JSX.Element {
   let body: JSX.Element;
   if (query.isError && !accounts) {
     body = (
-      <div className="px-4 py-4 sm:px-5">
+      <div className="px-4 py-4 sm:px-6">
         <ErrorState
           compact
           error={query.error}

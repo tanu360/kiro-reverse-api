@@ -223,7 +223,7 @@ export function ModelMixCard(): JSX.Element {
         <div className="flex min-w-0 flex-col @lg:flex-row @lg:items-center">
           <figure
             aria-label={t(credits ? "modelMix.chartLabel" : "modelMix.chartLabelRequests")}
-            className="w-full max-w-64 shrink-0 self-center px-4 py-4 sm:px-5 @lg:max-w-56"
+            className="w-full max-w-64 shrink-0 self-center px-4 py-4 sm:px-6 @lg:max-w-56"
           >
             <Suspense
               fallback={<Skeleton className="mx-auto aspect-square w-full max-w-56 rounded-full" />}

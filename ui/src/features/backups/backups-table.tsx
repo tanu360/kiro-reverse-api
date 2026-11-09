@@ -49,7 +49,7 @@ function isoTime(unixSec: number): string {
 function TimeCell({ entry }: { entry: BackupEntry }): JSX.Element {
   const { lang } = useT("backups");
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col gap-1">
       <time className="whitespace-nowrap" dateTime={isoTime(entry.createdAt)}>
         {formatDateTime(entry.createdAt, lang)}
       </time>

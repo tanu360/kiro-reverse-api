@@ -283,18 +283,18 @@ describe("OverviewPage", () => {
   it("writes the traffic range to the router search", async () => {
     const { user, router } = await renderApp("/");
     const ranges = await screen.findByRole("radiogroup", { name: "Time range" });
-    await user.click(within(ranges).getByRole("radio", { name: "6 h" }));
+    await user.click(within(ranges).getByRole("radio", { name: "6h" }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ range: "6h" });
     });
-    expect(await screen.findByText("Requests per 5 min, last 6 h")).toBeInTheDocument();
+    expect(await screen.findByText("Requests per 5 min, last 6 hours")).toBeInTheDocument();
   });
 
   it("falls back to the 1 h range for an unknown ?range= instead of crashing", async () => {
     await renderApp("/?range=7d");
     const traffic = await screen.findByRole("region", { name: "Traffic" });
     expect(within(traffic).getByText("Requests per 2 min, last hour")).toBeInTheDocument();
-    expect(within(traffic).getByRole("radio", { name: "1 h" })).toHaveAttribute(
+    expect(within(traffic).getByRole("radio", { name: "1h" })).toHaveAttribute(
       "aria-checked",
       "true",
     );

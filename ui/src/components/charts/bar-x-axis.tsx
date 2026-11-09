@@ -3,7 +3,6 @@
 import { m } from "motion/react";
 import { memo, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "@/lib/utils";
 import { useChart, useChartPortalContainer, useChartStable } from "./chart-context";
 import {
   type ChartLabelCount,
@@ -25,9 +24,23 @@ interface BarXAxisLabelProps {
   crosshairX: number | null;
   isHovering: boolean;
   tickerHalfWidth: number;
+  /** The plot's left and right edge: a label centred on its bar shifts just enough to stay in. */
+  bounds: readonly [number, number];
 }
 
-function BarXAxisLabel({ label, x, crosshairX, isHovering, tickerHalfWidth }: BarXAxisLabelProps) {
+/** Centred on the bar, shifted inside `bounds` (as the time axis does with its labels). */
+function labelShift(x: number, [min, max]: readonly [number, number]): string {
+  return `translateX(clamp(${min - x}px, -50%, calc(${max - x}px - 100%)))`;
+}
+
+function BarXAxisLabel({
+  label,
+  x,
+  crosshairX,
+  isHovering,
+  tickerHalfWidth,
+  bounds,
+}: BarXAxisLabelProps) {
   const fadeBuffer = 20;
   const fadeRadius = tickerHalfWidth + fadeBuffer;
 
@@ -41,21 +54,16 @@ function BarXAxisLabel({ label, x, crosshairX, isHovering, tickerHalfWidth }: Ba
     }
   }
 
-  // Zero-width container approach for perfect centering
+  // The time axis's tick type (mono, 11 px, the label colour), so the bar chart's times read like
+  // the counts beside them; a label at either end stays over the plot instead of the padding.
   return (
     <div
-      className="absolute"
-      style={{
-        left: x,
-        bottom: 12,
-        width: 0,
-        display: "flex",
-        justifyContent: "center",
-      }}
+      className="absolute whitespace-nowrap"
+      style={{ left: x, bottom: 12, transform: labelShift(x, bounds) }}
     >
       <m.span
         animate={{ opacity }}
-        className={cn("whitespace-nowrap text-chart-label text-xs")}
+        className="chart-tick block"
         initial={{ opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeInOut" }}
       >
@@ -86,6 +94,10 @@ const BarXAxisInner = memo(function BarXAxisInner({
   container,
 }: BarXAxisProps & { container: HTMLDivElement }) {
   const { margin, tooltipData, barScale, bandWidth, barXAccessor, data, width } = useChart();
+  const bounds = useMemo<readonly [number, number]>(
+    () => [margin.left, Math.max(margin.left, width - margin.right)],
+    [margin.left, margin.right, width],
+  );
 
   const resolvedMaxLabels = useMemo(
     () => resolveResponsiveChartLabelCount(maxLabels, width, 12),
@@ -127,6 +139,7 @@ const BarXAxisInner = memo(function BarXAxisInner({
           isHovering={isHovering}
           key={`${item.label}-${item.x}`}
           label={item.label}
+          bounds={bounds}
           tickerHalfWidth={tickerHalfWidth}
           x={item.x}
         />

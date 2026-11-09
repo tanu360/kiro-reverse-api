@@ -163,9 +163,10 @@ function AttentionItem({
 }): JSX.Element {
   const name = useAccountName()(row.account);
   return (
-    <li className="flex items-center gap-3 px-4 py-2.5 sm:px-5" data-status={row.status}>
+    // 14 px, as every list and table row; without it the row took the page's 16 px.
+    <li className="flex items-center gap-3 px-4 py-3 text-sm sm:px-6" data-status={row.status}>
       <AuthChip account={row.account} />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         {/* One line: the name gives way (truncates) before the status pill would wrap. */}
         <div className="flex min-w-0 items-center gap-2">
           <TruncatedText className={cn("font-medium", name.mono && "font-mono text-meta")}>
@@ -221,7 +222,7 @@ export function NeedsAttention(): JSX.Element {
     body = (
       <ul aria-hidden="true" className="flex flex-col">
         {[0, 1, 2].map((index) => (
-          <li className="flex items-center gap-3 px-4 py-2.5 sm:px-5" key={index}>
+          <li className="flex items-center gap-3 px-4 py-2.5 sm:px-6" key={index}>
             <Skeleton className="size-8 rounded-full" />
             <div className="flex flex-1 flex-col gap-1.5">
               <Skeleton className="h-4 w-40" />
@@ -233,7 +234,7 @@ export function NeedsAttention(): JSX.Element {
     );
   } else if (query.isError && !query.data) {
     body = (
-      <div className="px-4 py-4 sm:px-5">
+      <div className="px-4 py-4 sm:px-6">
         <ErrorState
           compact
           error={query.error}
@@ -244,7 +245,7 @@ export function NeedsAttention(): JSX.Element {
     );
   } else if (rows.length === 0) {
     body = (
-      <div className="px-4 py-6 sm:px-5">
+      <div className="px-4 py-6 sm:px-6">
         <EmptyState
           description={t("attention.emptyBody")}
           icon={CheckmarkCircle02Icon}

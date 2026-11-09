@@ -173,7 +173,7 @@ function KpiCard({
 }): JSX.Element {
   return (
     <Card className="min-w-0" data-slot="kpi-card">
-      <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+      <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-6">
         <div className="flex min-h-5 min-w-0 items-center gap-1.5 text-meta text-muted-foreground">
           <HugeiconsIcon aria-hidden="true" className="size-4 shrink-0" icon={icon} />
           <span className="min-w-0 truncate">{label}</span>
@@ -203,7 +203,7 @@ function KpiCard({
       <CardFooter className="p-0 sm:p-0">
         <Link
           {...link}
-          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-4 py-2.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline sm:px-5"
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-4 py-2.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline sm:px-6"
         >
           <span className="min-w-0 truncate">{linkLabel}</span>
           <HugeiconsIcon aria-hidden="true" className="size-4 shrink-0" icon={ArrowUpRight01Icon} />

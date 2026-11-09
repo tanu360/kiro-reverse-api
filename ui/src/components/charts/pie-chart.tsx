@@ -44,7 +44,11 @@ interface PieChartProps {
   data: PieData[];
   /** Chart size in pixels. If not provided, uses parent container size */
   size?: number;
-  /** Inner radius for donut charts. Default: 0 (solid pie) */
+  /**
+   * Inner radius for donut charts. Default: 0 (solid pie). A value between 0 and 1 is a share of
+   * the outer radius, so the ring keeps its proportions at any size (a fixed pixel radius turned
+   * the ring into a thin line in a narrow card).
+   */
   innerRadius?: number;
   /** Padding angle between slices in radians. Default: 0 */
   padAngle?: number;
@@ -205,7 +209,8 @@ const PieChartCore = memo(function PieChartCore({
   // Calculate radii with padding based on hover offset to prevent clipping
   const padding = hoverOffset;
   const outerRadius = center - padding;
-  const innerRadius = innerRadiusProp;
+  const innerRadius =
+    innerRadiusProp > 0 && innerRadiusProp < 1 ? outerRadius * innerRadiusProp : innerRadiusProp;
 
   // Calculate total value
   const totalValue = useMemo(() => data.reduce((sum, d) => sum + d.value, 0), [data]);
