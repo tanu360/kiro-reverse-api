@@ -1,83 +1,98 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { delay, HttpResponse, http } from "msw";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { accountStatus } from "@/features/accounts/account-model";
 import { heatmapQuery } from "@/lib/api/observe";
+import { formatPercent } from "@/lib/format";
 import { mockDb } from "@/lib/mocks/db";
 import { buildStatus } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderApp } from "@/test/render";
+import { attentionRows } from "./needs-attention";
+import { topAccounts } from "./top-accounts";
 
-// /observe/recent-requests belongs to the Requests feature's mocks.
-beforeEach(() => {
-  mockServer.use(
-    http.get(apiUrl("/observe/recent-requests"), ({ request }) => {
-      const pageSize = Number(new URL(request.url).searchParams.get("pageSize") ?? 25);
-      return HttpResponse.json({
-        requests: mockDb.requests.slice(0, pageSize),
-        total: mockDb.requests.length,
-        page: 1,
-        pageSize,
-        sort: "time",
-        order: "desc",
-        persistent: true,
-      });
-    }),
-  );
-});
-
-/** A tile of the joined KPI strip (the four /status totals). */
-async function statCard(label: string): Promise<HTMLElement> {
-  const region = await screen.findByRole("region", { name: "Totals" });
-  const title = await within(region).findByText(label, { selector: "p" });
-  const card = title.closest<HTMLElement>('[data-slot="stat-tile"]');
-  if (!card) throw new Error(`no stat tile for ${label}`);
+/** One of the four KPI cards, found by its label in the "Key figures" row. */
+async function kpiCard(label: string): Promise<HTMLElement> {
+  const row = await screen.findByRole("region", { name: "Key figures" });
+  const title = await within(row).findByText(label);
+  const card = title.closest<HTMLElement>('[data-slot="kpi-card"]');
+  if (!card) throw new Error(`no KPI card for ${label}`);
   return card;
 }
 
-/** The six live tiles: separate StatTile cards in the "Live traffic" region. */
-function liveTiles(container: HTMLElement): NodeListOf<HTMLElement> {
-  return container.querySelectorAll<HTMLElement>(
-    'section[aria-label="Live traffic"] [data-slot="stat-tile"]',
-  );
+/** The accounts the fixture counts as active, as the Accounts card does. */
+function activeCount(): number {
+  const now = Date.now() / 1000;
+  return mockDb.accounts.filter((account) => accountStatus(account, now) === "active").length;
 }
 
-function metricValue(card: HTMLElement, label: string): string {
-  const term = within(card).getByText(label);
-  return term.closest("div")?.querySelector("dd")?.textContent ?? "";
-}
-
-function errorsTable(): Promise<HTMLElement> {
-  return screen.findByRole("table", { name: "Recent errors" });
-}
+const BANNER = "Could not load the totals and live traffic";
 
 describe("OverviewPage", () => {
   // The first test renders the whole app cold; on a loaded machine that can pass 5 s.
-  it("shows the four status cards with values from /status", { timeout: 20_000 }, async () => {
+  it("shows account health and plan credits on the KPI cards", { timeout: 20_000 }, async () => {
     await renderApp("/");
     const status = buildStatus(mockDb);
 
-    const accounts = await statCard("Accounts");
-    expect(within(accounts).getByText(String(mockDb.accounts.length))).toBeInTheDocument();
-    expect(metricValue(accounts, "Available")).toBe(`${status.available} / ${status.accounts}`);
+    const accounts = await kpiCard("Accounts");
+    expect(
+      await within(accounts).findByText(`/ ${mockDb.accounts.length} available`),
+    ).toBeInTheDocument();
+    // The bar's key: each health group with its count.
+    const legendValue = (label: string) =>
+      within(accounts).getByText(label, { selector: "dt" }).closest("div")?.querySelector("dd")
+        ?.textContent;
+    expect(legendValue("Available")).toBe(String(activeCount()));
+    for (const part of ["Attention", "Banned", "Disabled"]) {
+      expect(legendValue(part)).toMatch(/^\d+$/);
+    }
 
-    const failed = await statCard("Failed");
-    expect(metricValue(failed, "Unavailable")).toBe(String(status.accounts - status.available));
+    const credits = await kpiCard("Plan credits");
+    expect(
+      within(credits).getByText(
+        formatPercent(status.accountCreditsUsed, status.accountCreditsLimit, "en"),
+      ),
+    ).toBeInTheDocument();
 
-    expect(await statCard("Requests")).toBeInTheDocument();
-    expect(await statCard("Succeeded")).toBeInTheDocument();
+    expect(await kpiCard("Requests")).toBeInTheDocument();
+    expect(await kpiCard("Failed")).toBeInTheDocument();
   });
 
-  it("keeps the six sections in order, the totals as one joined strip", async () => {
-    const { container } = await renderApp("/");
-    await statCard("Accounts");
+  it("links every KPI card to the page behind its number", async () => {
+    await renderApp("/");
+    const row = await screen.findByRole("region", { name: "Key figures" });
+    const links: [string, string][] = [
+      ["Review accounts needing attention", "/admin/accounts?status=attention"],
+      ["View accounts", "/admin/accounts"],
+      ["View requests", "/admin/requests"],
+      ["View failed requests", "/admin/requests?status=failed"],
+    ];
+    for (const [name, href] of links) {
+      expect(within(row).getByRole("link", { name })).toHaveAttribute("href", href);
+    }
+  });
+
+  it("puts the hour-over-hour change under the requests figure", async () => {
+    await renderApp("/");
+    const requests = await kpiCard("Requests");
+    await waitFor(() => {
+      const delta = requests.querySelector('[data-slot="kpi-delta"]');
+      const text = delta?.textContent ?? within(requests).queryByText(/hour before/)?.textContent;
+      expect(text).toMatch(/vs last hour$|No requests the hour before/);
+    });
+  });
+
+  it("keeps the sections in order", async () => {
+    await renderApp("/");
+    await kpiCard("Accounts");
     const order = [
-      "Totals",
-      "Live traffic",
+      "Key figures",
       "Traffic",
+      "Needs attention",
       "Traffic by account",
       "Model mix",
-      "Recent activity",
+      "Accounts",
     ];
     const names = screen.getAllByRole("region").map((region) => {
       const labelledBy = region.getAttribute("aria-labelledby");
@@ -86,150 +101,12 @@ describe("OverviewPage", () => {
         : region.getAttribute("aria-label");
     });
     expect(names.filter((name) => name && order.includes(name))).toEqual(order);
-    const totals = screen.getByRole("region", { name: "Totals" });
-    expect(totals.querySelectorAll('[data-slot="stat-group-card"]')).toHaveLength(1);
-    await waitFor(() => expect(liveTiles(container)).toHaveLength(6));
-    // The live tiles are separate cards, not a second joined strip.
-    const live = screen.getByRole("region", { name: "Live traffic" });
-    expect(live.querySelector('[data-slot="stat-group-card"]')).toBeNull();
-  });
-
-  it("colours the Failed icon, never its value", async () => {
-    await renderApp("/");
-    const failed = await statCard("Failed");
-    expect(failed).toHaveAttribute("data-tone", "danger");
-    const value = failed.querySelector('[data-slot="stat-value"]');
-    expect(value).toHaveClass("text-foreground");
-    expect(value).not.toHaveClass("text-destructive-foreground");
-  });
-
-  it("shows no success or failure rate, and no error red, before any request", async () => {
-    mockServer.use(
-      http.get(apiUrl("/status"), () =>
-        HttpResponse.json({
-          ...buildStatus(mockDb),
-          totalRequests: 0,
-          successRequests: 0,
-          failedRequests: 0,
-        }),
-      ),
-    );
-    await renderApp("/");
-    const failed = await statCard("Failed");
-    expect(metricValue(failed, "Failure rate")).toBe("—");
-    const rate = within(failed).getByText("Failure rate").closest("div")?.querySelector("dd");
-    expect(rate).toHaveClass("text-muted-foreground");
-    expect(rate).not.toHaveClass("text-destructive-foreground");
-    expect(metricValue(await statCard("Succeeded"), "Success rate")).toBe("—");
   });
 
   it("shows the SSE state in the live badge", async () => {
     await renderApp("/");
     // Vitest has no EventSource, so the events provider stays closed.
     expect(await screen.findByText("Offline")).toBeInTheDocument();
-  });
-
-  it("shows six live tiles and the 5-minute error rate as a percentage", async () => {
-    const { container } = await renderApp("/");
-    await waitFor(() => {
-      expect(liveTiles(container)).toHaveLength(6);
-    });
-    const live = screen.getByRole("region", { name: "Live traffic" });
-    const errRate = within(live).getByText("Errors (5 min)").closest('[data-slot="stat-tile"]');
-    expect(errRate).not.toBeNull();
-    expect(errRate?.querySelector('[data-slot="stat-value"]')?.textContent).toMatch(/^\d+\.\d%$/);
-  });
-
-  it("draws the live series as bar sparklines and active accounts against available ones", async () => {
-    const flat = (value: number) => Array.from({ length: 30 }, () => value);
-    // The error rate doubles in the newest minutes: its newest bar and icon turn red.
-    const errRate = [...flat(0.1).slice(2), 0.2, 0.2];
-    mockServer.use(
-      http.get(apiUrl("/observe/overview"), () =>
-        HttpResponse.json({
-          startedAt: 1_700_000_000,
-          nowUnix: 1_700_003_600,
-          rpm1: 12,
-          rpm5Avg: 10,
-          errRate5: 0.12,
-          inTpm5: 4000,
-          outTpm5: 900,
-          credits5: 1,
-          credits60: 7.5,
-          errors60: 3,
-          successes60: 40,
-          retries60: 1,
-          activeAccts: 2,
-          totalAccts: 9,
-          totalModels: 3,
-          enabledAccts: 6,
-          availableAccts: 4,
-          series: {
-            rpm: flat(10),
-            errRate,
-            inTpm: flat(4000),
-            outTpm: flat(900),
-            credits: flat(1),
-          },
-        }),
-      ),
-    );
-    const { container } = await renderApp("/");
-    const live = await screen.findByRole("region", { name: "Live traffic" });
-    await waitFor(() => expect(liveTiles(container)).toHaveLength(6));
-    const tiles = [...liveTiles(container)];
-    // Every tile fills its trend slot: bars for the five series (lazy chart code), a meter for
-    // Active accounts. jsdom has no layout, so the sparkline draws its box without the svg.
-    await waitFor(() => {
-      for (const tile of tiles) {
-        expect(tile.querySelector('[data-slot="stat-trend"]')?.childElementCount).toBe(1);
-      }
-    });
-    const active = within(live).getByText("Active accounts").closest('[data-slot="stat-tile"]');
-    expect(active?.querySelector('[data-slot="stat-value"]')?.textContent).toBe("2 / 4");
-    expect(active?.querySelector('[data-slot="meter-indicator"]')).not.toBeNull();
-    const errors = within(live).getByText("Errors (5 min)").closest('[data-slot="stat-tile"]');
-    expect(errors).toHaveAttribute("data-tone", "danger");
-    expect(errors?.querySelector('[data-slot="stat-value"]')).toHaveClass("text-foreground");
-  });
-
-  it("draws the totals' last half hour as bars from the live series, Accounts as a meter", async () => {
-    // The heatmap never answers: the bars must come from the live series alone.
-    mockServer.use(
-      http.get(apiUrl("/observe/account-heatmap"), async () => {
-        await delay("infinite");
-        return HttpResponse.json({});
-      }),
-    );
-    await renderApp("/");
-    const trend = (tile: HTMLElement) => tile.querySelector('[data-slot="stat-trend"]');
-    for (const label of ["Requests", "Succeeded", "Failed"]) {
-      const tile = await statCard(label);
-      // The lazy sparkline replaces the loading placeholder in the reserved aside slot (the
-      // 48 px column beside the value and the delta). jsdom has no layout, so the sparkline
-      // draws its box without the svg.
-      expect(trend(tile)).toHaveAttribute("data-placement", "aside");
-      await waitFor(() => {
-        expect(trend(tile)?.childElementCount).toBe(1);
-        expect(trend(tile)?.querySelector('[data-slot="skeleton"]')).toBeNull();
-      });
-      // No heatmap yet, so no hour-over-hour delta; the bars do not wait for it.
-      expect(tile.querySelector('[data-slot="stat-delta"]')).toBeNull();
-    }
-    const accounts = await statCard("Accounts");
-    expect(trend(accounts)).toHaveAttribute("data-placement", "aside");
-    expect(trend(accounts)?.querySelector('[data-slot="meter-indicator"]')).not.toBeNull();
-  });
-
-  it("puts the hour-over-hour delta on the totals' delta line", async () => {
-    await renderApp("/");
-    const requests = await statCard("Requests");
-    const delta = await waitFor(() => {
-      const node = requests.querySelector('[data-slot="stat-delta"]');
-      expect(node).not.toBeNull();
-      return node;
-    });
-    expect(delta?.textContent).toMatch(/^[+-−]?\d[\d.,]*%\s+vs last hour$/);
   });
 
   it("asks for the global row only, except for the top five accounts in the heatmap", async () => {
@@ -249,11 +126,35 @@ describe("OverviewPage", () => {
       scope: url.searchParams.get("scope"),
       top: url.searchParams.get("top"),
     }));
-    // The status-card trends and the 1 h chart share one global-only two-hour request.
+    // The KPI cards and the 1 h chart share one global-only two-hour request.
     expect(shapes).toContainEqual({ windowMin: "120", scope: "global", top: null });
     expect(shapes).toContainEqual({ windowMin: "60", scope: null, top: "5" });
     // Nothing asks for every account's row any more.
     expect(shapes.filter((shape) => shape.scope === null && shape.top === null)).toEqual([]);
+  });
+
+  it("lists the busiest accounts and switches them to credits", async () => {
+    const { user } = await renderApp("/");
+    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
+    const list = await within(heatmap).findByRole("list", {
+      name: "Accounts in the last 60 min",
+    });
+    // The five busiest accounts and the rest as one more row.
+    const items = within(list).getAllByRole("listitem");
+    expect(items.length).toBeGreaterThan(1);
+    expect(items.length).toBeLessThanOrEqual(6);
+
+    const measure = within(heatmap).getByRole("radiogroup", { name: "Measure" });
+    expect(within(measure).getByRole("radio", { name: "Requests" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(within(list).queryAllByText(/^\d[\d,]* requests?$/)).toHaveLength(0);
+    await user.click(within(measure).getByRole("radio", { name: "Credits" }));
+    // In credits each row shows its credits, with its request count under them.
+    await waitFor(() => {
+      expect(within(list).getAllByText(/^\d[\d,]* requests?$/)).toHaveLength(items.length);
+    });
   });
 
   it("counts the busy accounts beyond the top five beside the heatmap title", async () => {
@@ -319,14 +220,14 @@ describe("OverviewPage", () => {
     await renderApp("/", { privacy: false });
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
     expect(await within(heatmap).findByText("Top 5 of 6 · last 60 min")).toBeInTheDocument();
-    // It keeps its legend row (with no successful requests) instead of dropping out.
-    const legend = await within(heatmap).findByRole("list", {
+    // It keeps its row (with no successful requests) instead of dropping out.
+    const list = await within(heatmap).findByRole("list", {
       name: "Accounts in the last 60 min",
     });
-    expect(within(legend).getByText("failover@example.com")).toBeInTheDocument();
+    expect(within(list).getByText("failover@example.com")).toBeInTheDocument();
   });
 
-  it("updates the traffic-by-account legend with live data", async () => {
+  it("updates the traffic-by-account rows with live data", async () => {
     let newest = 7;
     mockServer.use(
       http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
@@ -347,11 +248,11 @@ describe("OverviewPage", () => {
     );
     const { queryClient } = await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    const legend = await within(heatmap).findByRole("list", {
+    const list = await within(heatmap).findByRole("list", {
       name: "Accounts in the last 60 min",
     });
     // No busy accounts: the whole hour is "Other accounts", with its failures beside it.
-    const other = () => within(legend).getByText("Other accounts").closest("li")?.textContent;
+    const other = () => within(list).getByText("Other accounts").closest("li")?.textContent;
     expect(other()).toBe("Other accounts1072 failed");
 
     newest = 31;
@@ -359,47 +260,24 @@ describe("OverviewPage", () => {
     await waitFor(() => expect(other()).toBe("Other accounts1312 failed"));
   });
 
-  it("lists at most 10 recent errors", async () => {
+  it("shows an empty state in the heatmap without traffic", async () => {
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
+        const windowMin = Number(new URL(request.url).searchParams.get("windowMin") ?? 60);
+        return HttpResponse.json({
+          windowMin,
+          nowUnix: 1_700_000_000,
+          global: { accountId: "_global_", cells: [] },
+          accounts: null,
+        });
+      }),
+    );
     await renderApp("/");
-    const table = await errorsTable();
-    await waitFor(() => {
-      expect(within(table).getAllByRole("row").length).toBeGreaterThan(1);
-    });
-    // The header row plus at most 10 data rows.
-    expect(within(table).getAllByRole("row").length).toBeLessThanOrEqual(11);
-    expect(mockDb.errors.length).toBeGreaterThan(10);
-  });
-
-  it("masks every email with privacy on", async () => {
-    await renderApp("/", { privacy: true });
-    const table = await errorsTable();
-    await waitFor(() => {
-      expect(within(table).getAllByRole("row").length).toBeGreaterThan(1);
-    });
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" });
-    const html = document.body.innerHTML;
-    // API-key accounts carry a label instead of an address; privacy mode masks only addresses.
-    const emails = mockDb.accounts.map((a) => a.email).filter((email) => email.includes("@"));
-    expect(emails.length).toBeGreaterThan(0);
-    for (const email of emails) {
-      expect(html).not.toContain(email);
-    }
-  });
-
-  it("shows the full email with privacy off", async () => {
-    await renderApp("/", { privacy: false });
-    const table = await errorsTable();
-    const email = mockDb.errors[0].email as string;
-    await waitFor(() => {
-      expect(within(table).getAllByText(email).length).toBeGreaterThan(0);
-    });
-  });
-
-  it("links the recent errors to the failed requests", async () => {
-    await renderApp("/");
-    const link = await screen.findByRole("link", { name: "View all in Requests" });
-    expect(link).toHaveAttribute("href", "/admin/requests?status=failed");
+    expect(
+      await within(heatmap).findByText("No account activity in the last hour"),
+    ).toBeInTheDocument();
+    expect(within(heatmap).queryByRole("list", { name: "Accounts in the last 60 min" })).toBeNull();
   });
 
   it("writes the traffic range to the router search", async () => {
@@ -412,80 +290,6 @@ describe("OverviewPage", () => {
     expect(await screen.findByText("Requests per 5 min, last 6 h")).toBeInTheDocument();
   });
 
-  it("shows a model-mix load failure only in that card", async () => {
-    mockServer.use(
-      http.get(apiUrl("/observe/model-mix"), () => jsonError(500, "model mix exploded")),
-    );
-    await renderApp("/");
-    const modelMix = await screen.findByRole("region", { name: "Model mix" });
-    expect(await within(modelMix).findByRole("alert")).toBeInTheDocument();
-    expect(within(modelMix).getByText("Could not load the model mix")).toBeInTheDocument();
-    expect(within(modelMix).getByRole("button", { name: "Try again" })).toBeInTheDocument();
-
-    expect(await statCard("Accounts")).toBeInTheDocument();
-    const heatmap = screen.getByRole("region", { name: "Traffic by account" });
-    expect(
-      await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" }),
-    ).toBeInTheDocument();
-    expect(within(heatmap).queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("alert")).toHaveLength(1);
-  });
-
-  it("recovers the status cards with Retry after /status fails", async () => {
-    mockServer.use(
-      http.get(apiUrl("/status"), () => jsonError(500, "status exploded"), { once: true }),
-    );
-    const { user } = await renderApp("/");
-    const title = await screen.findByText("Could not load the totals and live traffic");
-    const banner = title.closest<HTMLElement>('[role="alert"]');
-    if (!banner) throw new Error("the banner is not an alert");
-    // The cards keep their titles instead of collapsing into an untitled error block.
-    const accounts = await statCard("Accounts");
-    expect(within(accounts).getByText("—")).toBeInTheDocument();
-
-    await user.click(within(banner).getByRole("button", { name: "Try again" }));
-    await waitFor(() => {
-      expect(screen.queryByText("Could not load the totals and live traffic")).toBeNull();
-    });
-    const recovered = await statCard("Accounts");
-    expect(metricValue(recovered, "Available")).toMatch(/^\d+ \/ \d+$/);
-  });
-
-  it("shows one error banner, not one per card group, when /status and the tiles fail", async () => {
-    mockServer.use(
-      http.get(apiUrl("/status"), () => jsonError(500, "status exploded")),
-      http.get(apiUrl("/observe/overview"), () => jsonError(500, "overview exploded")),
-    );
-    const { container } = await renderApp("/");
-    await screen.findByText("Could not load the totals and live traffic");
-    await waitFor(() => {
-      expect(liveTiles(container)).toHaveLength(6);
-    });
-    const tiles = screen.getByRole("region", { name: "Live traffic" });
-    expect(within(tiles).getByText("Requests/min")).toBeInTheDocument();
-    expect(within(tiles).queryByRole("alert")).toBeNull();
-    const totals = screen.getByRole("region", { name: "Totals" });
-    expect(within(totals).queryByRole("alert")).toBeNull();
-    for (const label of ["Accounts", "Requests", "Succeeded", "Failed"]) {
-      expect(await statCard(label)).toBeInTheDocument();
-    }
-    expect(within(totals).queryAllByRole("button")).toHaveLength(0);
-    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
-  });
-
-  it("quiets the section errors to Not loaded under the totals banner, with one Retry", async () => {
-    mockServer.use(
-      http.get(apiUrl("/status"), () => jsonError(500, "status exploded")),
-      http.get(apiUrl("/observe/model-mix"), () => jsonError(500, "model mix exploded")),
-    );
-    await renderApp("/");
-    await screen.findByText("Could not load the totals and live traffic");
-    const modelMix = screen.getByRole("region", { name: "Model mix" });
-    expect(await within(modelMix).findByText("Not loaded")).toBeInTheDocument();
-    expect(within(modelMix).queryByRole("alert")).toBeNull();
-    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
-  });
-
   it("falls back to the 1 h range for an unknown ?range= instead of crashing", async () => {
     await renderApp("/?range=7d");
     const traffic = await screen.findByRole("region", { name: "Traffic" });
@@ -494,36 +298,7 @@ describe("OverviewPage", () => {
       "aria-checked",
       "true",
     );
-    expect(await statCard("Accounts")).toBeInTheDocument();
-  });
-
-  it("opens the live-tile hint on click, so touch screens can read it", async () => {
-    await renderApp("/");
-    const trigger = await screen.findByRole("button", { name: "Active accounts" });
-    // A bare click with no hover first, as a tap sends; a hover-only tooltip stays closed.
-    fireEvent.click(trigger);
-    expect(await screen.findByText(/Accounts with requests in the last 5 min/)).toBeInTheDocument();
-  });
-
-  it("draws traffic by account as stacked bars with a legend of the busiest accounts", async () => {
-    await renderApp("/");
-    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    const legend = await within(heatmap).findByRole("list", {
-      name: "Accounts in the last 60 min",
-    });
-    expect(
-      within(heatmap).getByRole("img", {
-        name: "Requests per account in two-minute bars over the last 60 min",
-      }),
-    ).toBeInTheDocument();
-    // The five busiest accounts and the rest as "Other accounts", each with its hour's requests.
-    const items = within(legend).getAllByRole("listitem");
-    expect(items.length).toBeGreaterThan(1);
-    expect(items.length).toBeLessThanOrEqual(6);
-    expect(within(heatmap).getByRole("link", { name: "View all accounts" })).toHaveAttribute(
-      "href",
-      "/admin/accounts",
-    );
+    expect(await kpiCard("Accounts")).toBeInTheDocument();
   });
 
   it("keeps the traffic chart when only the previous hour had requests", async () => {
@@ -553,59 +328,205 @@ describe("OverviewPage", () => {
     expect(await within(quiet).findByText("No traffic yet")).toBeInTheDocument();
   });
 
-  it("shows an empty state in the heatmap without traffic", async () => {
+  it("lists the accounts that need attention, worst first, each with one fix", async () => {
+    const rows = attentionRows(mockDb.accounts, Date.now() / 1000);
+    expect(rows.length).toBeGreaterThan(1);
+    await renderApp("/", { privacy: false });
+    const card = await screen.findByRole("region", { name: "Needs attention" });
+    expect(await within(card).findByText(`${rows.length} accounts`)).toBeInTheDocument();
+    const items = await within(card).findAllByRole("listitem");
+    expect(items).toHaveLength(Math.min(5, rows.length));
+    items.forEach((item, index) => {
+      const row = rows[index];
+      expect(item).toHaveAttribute("data-status", row.status);
+      // A new token for an expired, missing or suspended one; otherwise the details.
+      const refreshes = ["expired", "noToken", "suspended"].includes(row.status);
+      expect(within(item).getAllByRole("button")).toHaveLength(1);
+      expect(
+        within(item).getByRole("button", { name: refreshes ? "Refresh token" : "Details" }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      within(card).getByRole("link", { name: "View all accounts that need attention" }),
+    ).toHaveAttribute("href", "/admin/accounts?status=attention");
+  });
+
+  it("refreshes the token from a needs-attention row", async () => {
+    const rows = attentionRows(mockDb.accounts, Date.now() / 1000);
+    const index = rows.findIndex((row) => ["expired", "noToken", "suspended"].includes(row.status));
+    if (index < 0 || index >= 5) throw new Error("fixture has no refreshable account in view");
+    const refreshed: string[] = [];
     mockServer.use(
-      http.get(apiUrl("/observe/account-heatmap"), ({ request }) => {
-        const windowMin = Number(new URL(request.url).searchParams.get("windowMin") ?? 60);
-        return HttpResponse.json({
-          windowMin,
-          nowUnix: 1_700_000_000,
-          global: { accountId: "_global_", cells: [] },
-          accounts: null,
-        });
+      http.post(apiUrl("/accounts/:id/refresh"), ({ params }) => {
+        refreshed.push(String(params.id));
+        return undefined;
+      }),
+    );
+    const { user } = await renderApp("/");
+    const card = await screen.findByRole("region", { name: "Needs attention" });
+    const items = await within(card).findAllByRole("listitem");
+    await user.click(within(items[index]).getByRole("button", { name: "Refresh token" }));
+    await waitFor(() => expect(refreshed).toEqual([rows[index].account.id]));
+  });
+
+  it("shows an empty state when every account is healthy", async () => {
+    const healthy = mockDb.accounts.filter(
+      (account) => accountStatus(account, Date.now() / 1000) === "active",
+    );
+    mockServer.use(http.get(apiUrl("/accounts"), () => HttpResponse.json(healthy)));
+    await renderApp("/");
+    const card = await screen.findByRole("region", { name: "Needs attention" });
+    expect(await within(card).findByText("Every account is healthy")).toBeInTheDocument();
+    expect(within(card).queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  it("lists the five busiest accounts with their success rate", async () => {
+    const busiest = topAccounts(mockDb.accounts);
+    const first = busiest[0];
+    const failed = Math.min(first.errorCount, first.requestCount);
+    const rate = Math.floor(((first.requestCount - failed) / first.requestCount) * 100);
+    await renderApp("/");
+    const card = await screen.findByRole("region", { name: "Accounts" });
+    const table = await within(card).findByRole("table", { name: "Accounts" });
+    await waitFor(() => {
+      // The header row plus one row per account.
+      expect(within(table).getAllByRole("row")).toHaveLength(busiest.length + 1);
+    });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(within(rows[0]).getByText(`${rate}% success`)).toBeInTheDocument();
+    expect(
+      within(rows[0]).getByText(
+        `${(first.requestCount - failed).toLocaleString("en")}/${first.requestCount.toLocaleString("en")} requests`,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText(`${busiest.length} of ${mockDb.accounts.length} accounts`),
+    ).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "View all accounts" })).toHaveAttribute(
+      "href",
+      "/admin/accounts?sort=requests&order=desc",
+    );
+  });
+
+  it("masks every email with privacy on", async () => {
+    await renderApp("/", { privacy: true });
+    const accounts = await screen.findByRole("region", { name: "Accounts" });
+    const table = await within(accounts).findByRole("table", { name: "Accounts" });
+    await waitFor(() => expect(within(table).getAllByRole("row").length).toBeGreaterThan(1));
+    const attention = screen.getByRole("region", { name: "Needs attention" });
+    await within(attention).findAllByRole("listitem");
+    const heatmap = screen.getByRole("region", { name: "Traffic by account" });
+    await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" });
+    const html = document.body.innerHTML;
+    // API-key accounts carry a label instead of an address; privacy mode masks only addresses.
+    const emails = mockDb.accounts.map((a) => a.email).filter((email) => email.includes("@"));
+    expect(emails.length).toBeGreaterThan(0);
+    for (const email of emails) {
+      expect(html).not.toContain(email);
+    }
+  });
+
+  it("shows the full email with privacy off", async () => {
+    const email = topAccounts(mockDb.accounts)
+      .map((account) => account.email)
+      .find((value) => value.includes("@"));
+    if (!email) throw new Error("fixture has no busy account with an address");
+    await renderApp("/", { privacy: false });
+    const accounts = await screen.findByRole("region", { name: "Accounts" });
+    const table = await within(accounts).findByRole("table", { name: "Accounts" });
+    expect(await within(table).findByText(email)).toBeInTheDocument();
+  });
+
+  it("shows a model-mix load failure only in that card", async () => {
+    mockServer.use(
+      http.get(apiUrl("/observe/model-mix"), () => jsonError(500, "model mix exploded")),
+    );
+    await renderApp("/");
+    const modelMix = await screen.findByRole("region", { name: "Model mix" });
+    expect(await within(modelMix).findByRole("alert")).toBeInTheDocument();
+    expect(within(modelMix).getByText("Could not load the model mix")).toBeInTheDocument();
+    expect(within(modelMix).getByRole("button", { name: "Try again" })).toBeInTheDocument();
+
+    expect(await kpiCard("Accounts")).toBeInTheDocument();
+    const heatmap = screen.getByRole("region", { name: "Traffic by account" });
+    expect(
+      await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" }),
+    ).toBeInTheDocument();
+    expect(within(heatmap).queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+
+  it("recovers the KPI cards with Retry after /status fails", async () => {
+    mockServer.use(
+      http.get(apiUrl("/status"), () => jsonError(500, "status exploded"), { once: true }),
+    );
+    const { user } = await renderApp("/");
+    const title = await screen.findByText(BANNER);
+    const banner = title.closest<HTMLElement>('[role="alert"]');
+    if (!banner) throw new Error("the banner is not an alert");
+    // The cards keep their titles and show a dash instead of an untitled error block.
+    const credits = await kpiCard("Plan credits");
+    expect(within(credits).getByText("—")).toBeInTheDocument();
+
+    await user.click(within(banner).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.queryByText(BANNER)).toBeNull());
+    const status = buildStatus(mockDb);
+    const recovered = await kpiCard("Plan credits");
+    expect(
+      await within(recovered).findByText(
+        formatPercent(status.accountCreditsUsed, status.accountCreditsLimit, "en"),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows one error banner, not one per card, when /status and the overview fail", async () => {
+    mockServer.use(
+      http.get(apiUrl("/status"), () => jsonError(500, "status exploded")),
+      http.get(apiUrl("/observe/overview"), () => jsonError(500, "overview exploded")),
+    );
+    await renderApp("/");
+    await screen.findByText(BANNER);
+    const row = screen.getByRole("region", { name: "Key figures" });
+    for (const label of ["Accounts", "Plan credits", "Requests", "Failed"]) {
+      expect(await kpiCard(label)).toBeInTheDocument();
+    }
+    expect(within(row).queryByRole("alert")).toBeNull();
+    expect(within(row).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
+  });
+
+  it("quiets the section errors to Not loaded under the totals banner, with one Retry", async () => {
+    mockServer.use(
+      http.get(apiUrl("/status"), () => jsonError(500, "status exploded")),
+      http.get(apiUrl("/observe/model-mix"), () => jsonError(500, "model mix exploded")),
+    );
+    await renderApp("/");
+    await screen.findByText(BANNER);
+    const modelMix = screen.getByRole("region", { name: "Model mix" });
+    expect(await within(modelMix).findByText("Not loaded")).toBeInTheDocument();
+    expect(within(modelMix).queryByRole("alert")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
+  });
+
+  it("keeps the KPI cards loading while the heatmap is pending", async () => {
+    // The heatmap never answers: the hour cards wait without inventing a figure.
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), async () => {
+        await delay("infinite");
+        return HttpResponse.json({});
       }),
     );
     await renderApp("/");
-    const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
+    const row = await screen.findByRole("region", { name: "Key figures" });
+    expect(row).toHaveAttribute("aria-busy", "true");
+    // /status still fills the plan credits.
+    const status = buildStatus(mockDb);
+    const credits = await kpiCard("Plan credits");
     expect(
-      await within(heatmap).findByText("No account activity in the last hour"),
-    ).toBeInTheDocument();
-    expect(within(heatmap).queryByRole("list", { name: "Accounts in the last 60 min" })).toBeNull();
-  });
-
-  it("keeps error messages out of the tab order and uses one dash for missing values", async () => {
-    mockServer.use(
-      http.get(apiUrl("/observe/recent-errors"), () =>
-        HttpResponse.json({
-          errors: [
-            {
-              ts: 1_700_000_000,
-              accountId: "",
-              email: "",
-              model: "-",
-              status: 401,
-              message: "Invalid or missing API key",
-            },
-          ],
-        }),
+      await within(credits).findByText(
+        formatPercent(status.accountCreditsUsed, status.accountCreditsLimit, "en"),
       ),
-    );
-    await renderApp("/");
-    const table = await errorsTable();
-    const message = await within(table).findByText("Invalid or missing API key");
-    expect(message).not.toHaveAttribute("tabindex");
-    const row = message.closest("tr") as HTMLElement;
-    expect(within(row).queryByText("-")).toBeNull();
-    expect(within(row).getAllByText("—").length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("formats a failed request's badge like the Requests page", async () => {
-    const { user } = await renderApp("/");
-    await user.click(await screen.findByRole("tab", { name: "Requests" }));
-    const table = await screen.findByRole("table", { name: "Recent requests" });
-    const failed = mockDb.requests.slice(0, 10).find((r) => !r.success && r.status);
-    if (!failed) throw new Error("fixture has no failed request in the first 10");
-    expect(await within(table).findAllByText(`Failed ${failed.status}`)).not.toHaveLength(0);
-    expect(within(table).queryByText(/Failed · /)).toBeNull();
+    ).toBeInTheDocument();
+    expect(row.querySelectorAll('[data-slot="kpi-delta"]')).toHaveLength(0);
   });
 });

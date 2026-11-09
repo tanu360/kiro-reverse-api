@@ -77,8 +77,11 @@ export function Card({
  * A title-only header is 48 px with or without actions.
  */
 // Literal class strings (Tailwind only sees classes written out in full).
+// A segmented pill in the actions (a range, a metric) stays top right even on a phone: the
+// heading then yields down to 6rem, drops its end padding (the gap already parts it from the
+// pill) and its inline description wraps under the title.
 const HEADER_CLASS =
-  "flex flex-wrap items-start gap-3 px-4 py-3 sm:px-5 [&:has([data-slot$=-description][data-variant=stacked])]:py-4";
+  "flex flex-wrap items-start gap-3 px-4 py-3 sm:px-5 [&:has([data-slot$=-description][data-variant=stacked])]:py-4 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:basis-24 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:pe-0";
 const HEADING_CLASS =
   "flex min-w-0 flex-1 basis-40 flex-col gap-1 pe-3 [&:has(>[data-slot$=-description][data-variant=inline])]:flex-row [&:has(>[data-slot$=-description][data-variant=inline])]:flex-wrap [&:has(>[data-slot$=-description][data-variant=inline])]:items-baseline [&:has(>[data-slot$=-description][data-variant=inline])]:gap-x-2 [&:has(>[data-slot$=-description][data-variant=inline])]:gap-y-0.5";
 const TITLE_CLASS =

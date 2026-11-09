@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { modelSlices } from "./aggregate";
 import { MODEL_COLORS, OTHER_MODEL_COLOR } from "./colors";
 import type { RingSlice } from "./model-mix-donut";
-import { useTotalsFailed } from "./status-cards";
+import { useTotalsFailed } from "./totals";
 
 const ModelMixDonut = lazy(() => import("./model-mix-donut"));
 
@@ -121,6 +121,9 @@ export function ModelMixCard(): JSX.Element {
       {
         id: "tokens",
         header: t("modelMix.tokens"),
+        // The narrowest tables (a phone, the half-width card) keep model, requests and credits.
+        className: "hidden @md/data-table:table-cell",
+        headerClassName: "hidden @md/data-table:table-cell",
         cell: (row, index) =>
           focus(
             index,
@@ -128,7 +131,6 @@ export function ModelMixCard(): JSX.Element {
             <TokenCell
               cacheReadTokens={row.entry.cacheReadTokens}
               cacheWriteTokens={row.entry.cacheWriteTokens}
-              detailClassName="min-w-48"
               inTokens={row.entry.inTokens}
               outTokens={row.entry.outTokens}
             />,
@@ -185,7 +187,7 @@ export function ModelMixCard(): JSX.Element {
       );
     } else {
       body = (
-        <div aria-hidden="true" className="flex flex-col items-center gap-4 @4xl:flex-row">
+        <div aria-hidden="true" className="flex flex-col items-center gap-4 @lg:flex-row">
           <Skeleton className="aspect-square w-full max-w-56 shrink-0 rounded-full" />
           <TableSkeleton columns={4} rows={TABLE_ROWS} />
         </div>
@@ -214,11 +216,14 @@ export function ModelMixCard(): JSX.Element {
             title={t("errors.modelMix")}
           />
         ) : null}
-        {/* Ring beside the table only when the card fits both (56rem); otherwise stacked. */}
-        <div className="flex min-w-0 flex-col @4xl:flex-row @4xl:items-center">
+        {/*
+          Ring beside the table once the card fits both (32rem, the half-width column of the
+          dashboard); stacked on a phone.
+        */}
+        <div className="flex min-w-0 flex-col @lg:flex-row @lg:items-center">
           <figure
             aria-label={t(credits ? "modelMix.chartLabel" : "modelMix.chartLabelRequests")}
-            className="w-full max-w-64 shrink-0 self-center px-4 py-4 sm:px-5"
+            className="w-full max-w-64 shrink-0 self-center px-4 py-4 sm:px-5 @lg:max-w-56"
           >
             <Suspense
               fallback={<Skeleton className="mx-auto aspect-square w-full max-w-56 rounded-full" />}
@@ -238,11 +243,11 @@ export function ModelMixCard(): JSX.Element {
             Hover only mirrors the ring; the rows carry the data. A hairline parts the table from
             the ring: down the card's full height beside it, across the card when stacked.
           */}
-          <div className="min-w-0 flex-1 border-border-subtle border-t @4xl:self-stretch @4xl:border-s @4xl:border-t-0">
+          <div className="min-w-0 flex-1 border-border-subtle border-t @lg:self-stretch @lg:border-s @lg:border-t-0">
             <DataTable
               caption={t("modelMix.title")}
               cardLayout="divided"
-              cardsBelow="lg"
+              cardsBelow="xs"
               columns={columns}
               data={mix.rows}
               density="comfortable"

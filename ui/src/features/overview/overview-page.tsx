@@ -13,10 +13,10 @@ import { statusQuery } from "@/lib/api/system";
 import { useAdminEventsStatus } from "@/lib/events/admin-events";
 import { useT } from "@/lib/i18n";
 import { toastError } from "@/lib/toast";
-import { LiveTiles } from "./live-tiles";
+import { KpiCards } from "./kpi-cards";
 import { ModelMixCard } from "./model-mix-card";
-import { RecentActivity } from "./recent-activity";
-import { StatusCards } from "./status-cards";
+import { NeedsAttention } from "./needs-attention";
+import { TopAccounts } from "./top-accounts";
 import { TrafficByAccount } from "./traffic-by-account";
 import { TrafficCard } from "./traffic-card";
 
@@ -75,7 +75,7 @@ function TotalsErrorBanner(): JSX.Element | null {
           loading={retrying || status.isFetching || live.isFetching}
           onClick={() => void retry()}
           size="sm"
-          variant="secondary"
+          variant="tone"
         >
           <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
           {tc("actions.retry")}
@@ -117,14 +117,17 @@ export function OverviewPage(): JSX.Element {
         title={t("title")}
       />
       <TotalsErrorBanner />
-      <StatusCards />
-      <LiveTiles />
-      <TrafficCard />
-      {/* Full-width rows: paired, the short heatmap card stretched to the model mix's height
-          and left a large blank area. Both time views now sit together under the totals. */}
-      <TrafficByAccount />
-      <ModelMixCard />
-      <RecentActivity />
+      <KpiCards />
+      {/* Traffic beside the accounts that need a look; one column below 64rem of main. */}
+      <div className="grid gap-4 @5xl/main:grid-cols-[minmax(0,1fr)_25rem]">
+        <TrafficCard />
+        <NeedsAttention />
+      </div>
+      <div className="grid gap-4 @5xl/main:grid-cols-2">
+        <TrafficByAccount />
+        <ModelMixCard />
+      </div>
+      <TopAccounts />
     </div>
   );
 }

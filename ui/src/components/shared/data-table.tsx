@@ -125,7 +125,7 @@ interface DataTableProps<T> {
   density?: "compact" | "comfortable";
 }
 
-type CardsBelow = "lg" | "2xl" | "3xl" | "4xl" | "5xl";
+type CardsBelow = "xs" | "lg" | "2xl" | "3xl" | "4xl" | "5xl";
 
 /** Set by DataTableCard: a DataTable inside it is inset without the prop. */
 export const DataTableInsetContext = createContext(false);
@@ -138,6 +138,8 @@ const DENSITY_CLASS = { compact: undefined, comfortable: "[&_tbody_td]:py-3" } a
 // Container-query switch between the cards and the table: both are rendered, CSS shows one.
 // Static strings, so Tailwind sees every class.
 const CARD_SWITCH: Record<CardsBelow, { cards: string; table: string }> = {
+  // A short table beside a chart (the model mix in a half-width card) stays a table to 20rem.
+  xs: { cards: "@xs/data-table:hidden", table: "hidden @xs/data-table:block" },
   lg: { cards: "@lg/data-table:hidden", table: "hidden @lg/data-table:block" },
   "2xl": { cards: "@2xl/data-table:hidden", table: "hidden @2xl/data-table:block" },
   "3xl": { cards: "@3xl/data-table:hidden", table: "hidden @3xl/data-table:block" },

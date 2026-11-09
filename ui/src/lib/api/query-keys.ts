@@ -30,8 +30,6 @@ export const queryKeys = {
         : (["observe", "heatmap", windowMin] as const);
     },
     modelMix: () => ["observe", "model-mix"] as const,
-    recentErrors: (limit: number) => ["observe", "recent-errors", limit] as const,
-    recentRequests: (pageSize: number) => ["observe", "recent-requests", pageSize] as const,
   },
   requests: {
     all: ["requests"] as const,

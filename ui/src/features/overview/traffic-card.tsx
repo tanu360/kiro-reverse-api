@@ -17,7 +17,6 @@ import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import { Separator } from "@/components/ui/separator";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { heatmapQuery } from "@/lib/api/observe";
 import { formatNumber } from "@/lib/format";
@@ -26,13 +25,14 @@ import { cn } from "@/lib/utils";
 import type { OverviewRange } from "@/routes/-search";
 import {
   bucketGlobal,
+  bucketRetries,
   HOUR,
   HOUR_PAIR_WINDOW,
   RANGE_WINDOWS,
   withPreviousWindow,
 } from "./aggregate";
-import { FAILED_COLOR, PREVIOUS_COLOR, SUCCEEDED_COLOR } from "./colors";
-import { useTotalsFailed } from "./status-cards";
+import { FAILED_COLOR, PREVIOUS_COLOR, RETRIED_COLOR, SUCCEEDED_COLOR } from "./colors";
+import { useTotalsFailed } from "./totals";
 
 const TrafficChart = lazy(() => import("./traffic-chart"));
 
@@ -68,9 +68,9 @@ function TrafficLegendItem({
 }
 
 /**
- * Port of Studio's performance overview: succeeded and failed requests over 1, 6 or 24 h, with
- * the previous hour dashed under the 1 h view. The range sits in the header; the legend joins it
- * on wide cards and opens the panel on narrower ones, so the header is the same for every range.
+ * Port of Studio's performance overview: succeeded, retried and failed requests over 1, 6 or
+ * 24 h as hatched stacked bars, with the previous hour dashed over the 1 h view. The range pill
+ * sits in the header, top right at every width; the legend with its totals opens the panel.
  */
 export function TrafficCard(): JSX.Element {
   const { t, lang } = useT("overview");
@@ -91,27 +91,30 @@ export function TrafficCard(): JSX.Element {
   );
   const data = query.data;
 
-  const points = useMemo(() => {
+  const bars = useMemo(() => {
     if (!data) return [];
-    return hourView
+    const points = hourView
       ? withPreviousWindow(data.global.cells, data.nowUnix, bucketMin, HOUR)
       : bucketGlobal(data.global.cells, data.nowUnix, bucketMin, windowMin);
+    const retries = bucketRetries(data.global.cells, bucketMin, hourView ? HOUR : windowMin);
+    return points.map((point, index) => ({ ...point, retried: retries[index] ?? 0 }));
   }, [data, hourView, bucketMin, windowMin]);
   const totals = useMemo(
     () =>
-      points.reduce(
+      bars.reduce(
         (sum, p) => ({
           succeeded: sum.succeeded + p.succeeded,
+          retried: sum.retried + p.retried,
           failed: sum.failed + p.failed,
           previous: sum.previous + (p.previous ?? 0),
         }),
-        { succeeded: 0, failed: 0, previous: 0 },
+        { succeeded: 0, retried: 0, failed: 0, previous: 0 },
       ),
-    [points],
+    [bars],
   );
   // Empty only when nothing at all is drawn: in the 1 h view the previous hour's dashed line
   // alone is still traffic to show, so it keeps the chart instead of "No traffic yet".
-  const empty = totals.succeeded + totals.failed + totals.previous === 0;
+  const empty = totals.succeeded + totals.retried + totals.failed + totals.previous === 0;
 
   const setRange = (value: unknown) => {
     if (!isRange(value)) return;
@@ -122,6 +125,7 @@ export function TrafficCard(): JSX.Element {
 
   const labels = {
     succeeded: t("traffic.succeeded"),
+    retried: t("traffic.retried"),
     failed: t("traffic.failed"),
     previous: t("traffic.previous"),
     bucket: t("traffic.bucket", { n: formatNumber(bucketMin, lang) }),
@@ -131,13 +135,9 @@ export function TrafficCard(): JSX.Element {
   // data), so switching the range does not move the card.
   const known = (n: number) => (data ? n : undefined);
   const legendItems: LegendItemData[] = [
-    {
-      label: labels.succeeded,
-      color: SUCCEEDED_COLOR,
-      marker: "line",
-      value: known(totals.succeeded),
-    },
-    { label: labels.failed, color: FAILED_COLOR, marker: "line", value: known(totals.failed) },
+    { label: labels.succeeded, color: SUCCEEDED_COLOR, value: known(totals.succeeded) },
+    { label: labels.retried, color: RETRIED_COLOR, value: known(totals.retried) },
+    { label: labels.failed, color: FAILED_COLOR, value: known(totals.failed) },
     {
       key: PREVIOUS_KEY,
       label: labels.previous,
@@ -151,14 +151,12 @@ export function TrafficCard(): JSX.Element {
       <TrafficLegendItem reservePrevious={!hourView} />
     </Legend>
   );
-  // No legend beside an error that left nothing to draw.
-  const showLegend = data !== undefined || !query.isError;
   const loadingChart = (
     <TrafficChart
+      bars={[]}
       bucketMin={bucketMin}
       labels={labels}
       lang={lang}
-      points={[]}
       reducedMotion={reducedMotion}
       status="loading"
     />
@@ -181,7 +179,7 @@ export function TrafficCard(): JSX.Element {
     } else {
       body = (
         <div className="flex flex-col gap-3">
-          <div className="@4xl:hidden">{legend}</div>
+          {legend}
           <div aria-hidden="true">
             <Suspense fallback={placeholder}>{loadingChart}</Suspense>
           </div>
@@ -205,17 +203,16 @@ export function TrafficCard(): JSX.Element {
             failed: formatNumber(totals.failed, lang),
           })}
         </p>
-        {/* Narrow cards: the legend opens the panel; wide ones carry it in the header. */}
-        <div className="@4xl:hidden">{legend}</div>
+        {legend}
         <div className="relative">
           <div aria-hidden="true">
             <Suspense fallback={placeholder}>
               <TrafficChart
+                bars={bars}
                 bucketMin={bucketMin}
                 empty={empty}
                 labels={labels}
                 lang={lang}
-                points={points}
                 reducedMotion={reducedMotion}
               />
             </Suspense>
@@ -239,33 +236,23 @@ export function TrafficCard(): JSX.Element {
     <ChartLegendHoverProvider>
       <SectionCard
         actions={
-          <>
-            {showLegend ? (
-              // A hairline between the legend and the range, so the pill does not read as a
-              // legend entry.
-              <div className="hidden items-center gap-4 @4xl:flex">
-                {legend}
-                <Separator className="h-4" orientation="vertical" />
-              </div>
-            ) : null}
-            {/* A radio group: one tab stop, the arrow keys move the range. */}
-            <SegmentedControl
-              render={
-                <RadioGroupPrimitive
-                  aria-label={t("traffic.range")}
-                  onValueChange={setRange}
-                  value={range}
-                />
-              }
-              size="sm"
-            >
-              {RANGES.map((value) => (
-                <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
-                  {t(`traffic.range.${value}`)}
-                </SegmentedControlItem>
-              ))}
-            </SegmentedControl>
-          </>
+          // A radio group: one tab stop, the arrow keys move the range.
+          <SegmentedControl
+            render={
+              <RadioGroupPrimitive
+                aria-label={t("traffic.range")}
+                onValueChange={setRange}
+                value={range}
+              />
+            }
+            size="sm"
+          >
+            {RANGES.map((value) => (
+              <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
+                {t(`traffic.range.${value}`)}
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
         }
         description={t(`traffic.description.${range}`)}
         descriptionVariant="inline"

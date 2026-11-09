@@ -5,6 +5,10 @@ export const SUCCEEDED_COLOR = "var(--chart-1)";
 export const FAILED_COLOR = "var(--chart-negative)";
 /** The dashed previous-window line: a quiet grey, never a series colour. */
 export const PREVIOUS_COLOR = "var(--chart-comparison)";
+/** Retried upstream attempts: amber, a warning rather than a failure. */
+export const RETRIED_COLOR = "var(--warning)";
+/** The empty column behind each traffic bar: the meters' track (index.css --chart-scale-01). */
+export const TRACK_COLOR = "var(--chart-scale-01)";
 
 /**
  * Series colours for the model-mix donut and table dots and the traffic-by-account bars: purple,

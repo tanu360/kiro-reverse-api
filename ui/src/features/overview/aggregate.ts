@@ -63,6 +63,27 @@ export function bucketGlobal(
 }
 
 /**
+ * Retried upstream attempts per bucket, aligned with `bucketGlobal`'s points (oldest first).
+ * The proxy counts a retry apart from the request it belongs to, so these are not part of
+ * `reqs`.
+ */
+export function bucketRetries(
+  cells: readonly HeatmapCell[],
+  bucketMin: number,
+  windowMin: number,
+): number[] {
+  const size = Math.max(1, Math.floor(bucketMin));
+  const count = Math.ceil(Math.max(0, windowMin) / size);
+  const retries = Array.from({ length: count }, () => 0);
+  for (const cell of cells) {
+    const bucket = Math.floor(cell.offset / size);
+    if (cell.offset < 0 || bucket >= count) continue;
+    retries[count - 1 - bucket] += cell.retries ?? 0;
+  }
+  return retries;
+}
+
+/**
  * The current window with the previous one laid under it: each point also carries the succeeded
  * count of the bucket exactly `windowMin` minutes earlier. `cells` must cover both windows
  * (offsets 0 to 2 x windowMin - 1), as the cached two-hour heatmap does for the 1 h view.
@@ -103,66 +124,6 @@ export function hourDelta(cells: readonly HeatmapCell[], value: CellValue = requ
     else if (cell.offset < 2 * HOUR) previous += value(cell);
   }
   return { current, previous, delta: previous === 0 ? null : (current - previous) / previous };
-}
-
-/** Minutes in the live series (/observe/overview `series`): the last half hour, oldest first. */
-const SERIES_MINUTES = 30;
-
-/**
- * Minutes per sparkline bar: the 30 per-minute points become 15 bars, wide enough to read in
- * the 48 to 96 px trend slot. Bars are cut from the newest end, so the last one always holds the
- * current (partial) minute.
- */
-const BAR_MINUTES = 2;
-
-export type Bars = { value: number }[];
-
-/**
- * Sums per-minute `values` (oldest first) into BAR_MINUTES-wide bars, oldest first. A short
- * or missing series is padded with empty minutes at the old end, so there are always 15 bars.
- */
-export function sumBars(values: readonly number[]): Bars {
-  const length = Math.max(values.length, SERIES_MINUTES);
-  const missing = length - values.length;
-  const bars: Bars = [];
-  for (let end = length; end > 0; end -= BAR_MINUTES) {
-    let sum = 0;
-    for (let index = Math.max(0, end - BAR_MINUTES); index < end; index += 1) {
-      sum += values[index - missing] ?? 0;
-    }
-    bars.unshift({ value: sum });
-  }
-  return bars;
-}
-
-/** Failed requests per minute: requests times that minute's error rate (0..1). */
-function failuresPerMinute(rpm: readonly number[], errRate: readonly number[]): number[] {
-  return rpm.map((reqs, index) => Math.min(reqs, Math.round(reqs * (errRate[index] ?? 0))));
-}
-
-/** The error rate per bar: failures over requests across its minutes (0 for an empty bar). */
-export function rateBars(rpm: readonly number[], errRate: readonly number[]): Bars {
-  const requests = sumBars(rpm);
-  const failures = sumBars(rpm.map((reqs, index) => reqs * (errRate[index] ?? 0)));
-  return requests.map((bar, index) => ({
-    value: bar.value > 0 ? failures[index].value / bar.value : 0,
-  }));
-}
-
-/**
- * The KPI strip's bars from the live series: all requests, the ones that succeeded and the ones
- * that failed (requests times the error rate), per bar.
- */
-export function outcomeBars(
-  rpm: readonly number[],
-  errRate: readonly number[],
-): { requests: Bars; succeeded: Bars; failed: Bars } {
-  const failed = failuresPerMinute(rpm, errRate);
-  return {
-    requests: sumBars(rpm),
-    succeeded: sumBars(rpm.map((reqs, index) => Math.max(0, reqs - failed[index]))),
-    failed: sumBars(failed),
-  };
 }
 
 interface ModelSlice {
@@ -210,39 +171,4 @@ export function busyAccounts<T extends { cells: readonly HeatmapCell[] }>(
       ),
     )
     .slice(0, Math.max(0, limit));
-}
-
-/** Offsets 0..windowMin-1 oldest-first (oldest on the left); missing minutes are zeros. */
-export function windowCells(cells: readonly HeatmapCell[], windowMin: number): HeatmapCell[] {
-  const byOffset = new Map(cells.map((cell) => [cell.offset, cell]));
-  return Array.from({ length: windowMin }, (_, index) => {
-    const offset = windowMin - 1 - index;
-    const cell = byOffset.get(offset);
-    return {
-      offset,
-      reqs: cell?.reqs ?? 0,
-      failures: cell?.failures ?? 0,
-      retries: cell?.retries ?? 0,
-    };
-  });
-}
-
-/**
- * Oldest-first cells merged `size` at a time, still oldest first: counts summed, `offset` the
- * newest minute of each group. Groups are cut from the newest end, so the current minute always
- * shares the last group.
- */
-export function mergeCells(cells: readonly HeatmapCell[], size: number): HeatmapCell[] {
-  const step = Math.max(1, Math.floor(size));
-  const merged: HeatmapCell[] = [];
-  for (let end = cells.length; end > 0; end -= step) {
-    const group = cells.slice(Math.max(0, end - step), end);
-    merged.unshift({
-      offset: Math.min(...group.map((cell) => cell.offset)),
-      reqs: group.reduce((sum, cell) => sum + cell.reqs, 0),
-      failures: group.reduce((sum, cell) => sum + cell.failures, 0),
-      retries: group.reduce((sum, cell) => sum + (cell.retries ?? 0), 0),
-    });
-  }
-  return merged;
 }

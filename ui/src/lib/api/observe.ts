@@ -1,16 +1,13 @@
 import { queryOptions } from "@tanstack/react-query";
 import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
-import { getRecentRequests } from "./requests";
 import type {
   HeatmapCell,
   HeatmapData,
   HeatmapResponse,
   ModelMixEntry,
   ModelMixResponse,
-  ObserveError,
   ObserveOverview,
-  RecentErrorsResponse,
 } from "./types";
 
 function getObserveOverview(): Promise<ObserveOverview> {
@@ -76,13 +73,6 @@ async function getModelMix(): Promise<ModelMixEntry[]> {
   return res.models ?? [];
 }
 
-async function getRecentErrors(limit: number): Promise<ObserveError[]> {
-  const res = await apiRequest<RecentErrorsResponse>("/observe/recent-errors", {
-    query: { limit },
-  });
-  return res.errors ?? [];
-}
-
 /** The SSE poll fallback for the overview: one small JSON a minute, only while the tab is shown. */
 const OVERVIEW_POLL_MS = 60_000;
 
@@ -115,20 +105,5 @@ export function modelMixQuery() {
   return queryOptions({
     queryKey: queryKeys.observe.modelMix(),
     queryFn: getModelMix,
-  });
-}
-
-export function recentErrorsQuery(limit: number) {
-  return queryOptions({
-    queryKey: queryKeys.observe.recentErrors(limit),
-    queryFn: () => getRecentErrors(limit),
-  });
-}
-
-/** Overview's recent-activity preview: page 1 of the requests list under an observe key. */
-export function recentRequestsPreviewQuery(pageSize: number) {
-  return queryOptions({
-    queryKey: queryKeys.observe.recentRequests(pageSize),
-    queryFn: () => getRecentRequests({ page: 1, pageSize }),
   });
 }

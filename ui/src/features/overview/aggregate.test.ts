@@ -2,16 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { HeatmapCell, ModelMixEntry } from "@/lib/api/types";
 import {
   bucketGlobal,
+  bucketRetries,
   busyAccounts,
   hourDelta,
-  mergeCells,
   modelSlices,
-  outcomeBars,
   peakCount,
   RANGE_WINDOWS,
-  rateBars,
-  sumBars,
-  windowCells,
   withPreviousWindow,
 } from "./aggregate";
 
@@ -110,6 +106,19 @@ describe("bucketGlobal", () => {
   });
 });
 
+describe("bucketRetries", () => {
+  it("sums retries per bucket, oldest first, and leaves cells past the window out", () => {
+    const retried: HeatmapCell[] = [
+      { offset: 0, reqs: 1, failures: 0, retries: 2 },
+      { offset: 1, reqs: 0, failures: 0, retries: 1 },
+      { offset: 3, reqs: 0, failures: 0 },
+      { offset: 5, reqs: 0, failures: 0, retries: 4 },
+      { offset: 6, reqs: 0, failures: 0, retries: 9 },
+    ];
+    expect(bucketRetries(retried, 2, 6)).toEqual([4, 0, 3]);
+  });
+});
+
 describe("hourDelta", () => {
   it("compares the current hour (offsets 0-59) with the previous one (60-119)", () => {
     const input = zeros(120);
@@ -140,43 +149,6 @@ describe("hourDelta", () => {
       previous: 0,
       delta: null,
     });
-  });
-});
-
-describe("sumBars", () => {
-  it("sums 30 oldest-first minutes into 15 two-minute bars, the newest minute last", () => {
-    const minutes = Array.from({ length: 30 }, (_, index) => index);
-    const bars = sumBars(minutes);
-    expect(bars).toHaveLength(15);
-    expect(bars[0]).toEqual({ value: 0 + 1 });
-    expect(bars[14]).toEqual({ value: 28 + 29 });
-  });
-
-  it("pads a short or missing series with empty minutes at the old end", () => {
-    expect(sumBars([])).toEqual(Array.from({ length: 15 }, () => ({ value: 0 })));
-    const bars = sumBars([5, 1, 2]);
-    expect(bars).toHaveLength(15);
-    expect(bars.at(-1)).toEqual({ value: 3 });
-    expect(bars.at(-2)).toEqual({ value: 5 });
-    expect(bars.slice(0, -2).every((bar) => bar.value === 0)).toBe(true);
-  });
-});
-
-describe("rateBars", () => {
-  it("weights each minute's error rate by its requests, 0 for an empty bar", () => {
-    const bars = rateBars([10, 30, 0, 0], [0.5, 0.1, 0, 0]);
-    expect(bars.at(-2)?.value).toBeCloseTo((5 + 3) / 40);
-    expect(bars.at(-1)).toEqual({ value: 0 });
-  });
-});
-
-describe("outcomeBars", () => {
-  it("splits each bar's requests into succeeded and failed by the error rate", () => {
-    const { requests, succeeded, failed } = outcomeBars([10, 30, 4, 0], [0.5, 0.1, 0.25, 0]);
-    expect(requests.slice(-2)).toEqual([{ value: 40 }, { value: 4 }]);
-    expect(failed.slice(-2)).toEqual([{ value: 8 }, { value: 1 }]);
-    expect(succeeded.slice(-2)).toEqual([{ value: 32 }, { value: 3 }]);
-    expect(requests).toHaveLength(15);
   });
 });
 
@@ -252,47 +224,6 @@ describe("busyAccounts", () => {
       row("b", [{ offset: 0, reqs: 1, failures: 0 }]),
     ];
     expect(busyAccounts(accounts, 60, 1).map((account) => account.accountId)).toEqual(["a"]);
-  });
-});
-
-describe("windowCells", () => {
-  it("returns the first windowMin offsets oldest-first and fills gaps", () => {
-    const input: HeatmapCell[] = [
-      { offset: 0, reqs: 1, failures: 0 },
-      { offset: 2, reqs: 3, failures: 1 },
-      { offset: 5, reqs: 9, failures: 0 },
-    ];
-    expect(windowCells(input, 3)).toEqual([
-      { offset: 2, reqs: 3, failures: 1, retries: 0 },
-      { offset: 1, reqs: 0, failures: 0, retries: 0 },
-      { offset: 0, reqs: 1, failures: 0, retries: 0 },
-    ]);
-  });
-
-  it("carries the failed attempts through", () => {
-    const input: HeatmapCell[] = [{ offset: 1, reqs: 0, failures: 0, retries: 3 }];
-    expect(windowCells(input, 2)).toEqual([
-      { offset: 1, reqs: 0, failures: 0, retries: 3 },
-      { offset: 0, reqs: 0, failures: 0, retries: 0 },
-    ]);
-  });
-});
-
-describe("mergeCells", () => {
-  it("sums oldest-first cells in groups cut from the newest end", () => {
-    const input: HeatmapCell[] = [
-      { offset: 4, reqs: 1, failures: 0 },
-      { offset: 3, reqs: 2, failures: 1, retries: 1 },
-      { offset: 2, reqs: 3, failures: 0, retries: 2 },
-      { offset: 1, reqs: 4, failures: 2 },
-      { offset: 0, reqs: 5, failures: 0 },
-    ];
-    expect(mergeCells(input, 2)).toEqual([
-      { offset: 4, reqs: 1, failures: 0, retries: 0 },
-      { offset: 2, reqs: 5, failures: 1, retries: 3 },
-      { offset: 0, reqs: 9, failures: 2, retries: 0 },
-    ]);
-    expect(mergeCells(windowCells(input, 60), 2)).toHaveLength(30);
   });
 });
 
