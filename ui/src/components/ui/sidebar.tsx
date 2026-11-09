@@ -48,9 +48,9 @@ const sidebarMenuButtonVariants = cva(
     },
     variants: {
       size: {
-        // Kiro patch: the nav row, 36 px, and 40 px in the sheet (below lg), where rows are touch
-        // targets.
-        default: "h-9 rounded-lg px-(--sidebar-row-content-inset) py-1.5 text-sm max-lg:h-10",
+        // Kiro patch: the nav row, 32 px (shadcn's sidebar row), and 40 px in the sheet (below
+        // lg), where rows are touch targets.
+        default: "h-8 rounded-lg px-(--sidebar-row-content-inset) py-1.5 text-sm max-lg:h-10",
         lg: "h-12 rounded-lg px-(--sidebar-row-content-inset) py-2 text-sm group-data-[collapsible=icon]:p-0!",
         sm: "h-7 rounded-lg px-(--sidebar-row-content-inset) py-2 text-xs",
       },

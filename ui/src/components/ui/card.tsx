@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 /*
  * One card chrome for the app, taken from the Settings groups: an opaque card surface (--card)
  * under the --border hairline, 12 px radius, no shadow (shadows belong to floating layers).
- * Sections inside it share one rhythm: 16 px inline padding on phones and 20 px from sm up,
- * a 12 px (title only) or 16 px (title and description) header, a 16 px panel and a slim footer.
+ * Sections inside it share one rhythm: 16 px inline padding on phones and 24 px from sm up,
+ * a 12 px (16 px from sm) header, a 16 px (24 px from sm) panel and a slim footer.
  * Dividers between sections are the subtle hairline (--border-subtle).
  */
 const cardVariants = cva(
@@ -73,15 +73,17 @@ export function Card({
  * (title over a stacked description, or title and an inline description on one baseline) and
  * the actions at the end. Actions wrap below on a narrow card instead of squeezing the title.
  * Items sit at the top, so the chip and the actions line up with the title line (24 px) even
- * when a description or meta wraps under it; a stacked description moves the padding to 16 px.
- * A title-only header is 48 px with or without actions.
+ * when a description or meta wraps under it. The padding is 16 px at the sides on phones and
+ * 24 px from sm (the card's own), 12 px above and below on phones and 16 px from sm; a stacked
+ * description moves it to 16 px on phones too. A title-only header is 48 px on phones and 56 px
+ * from sm, with or without actions.
  */
 // Literal class strings (Tailwind only sees classes written out in full).
 // A segmented pill in the actions (a range, a metric) stays top right even on a phone: the
 // heading then yields down to 6rem, drops its end padding (the gap already parts it from the
 // pill) and its inline description wraps under the title.
 const HEADER_CLASS =
-  "flex flex-wrap items-start gap-3 px-4 py-3 sm:px-5 [&:has([data-slot$=-description][data-variant=stacked])]:py-4 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:basis-24 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:pe-0";
+  "flex flex-wrap items-start gap-3 px-4 py-3 sm:px-6 sm:py-4 [&:has([data-slot$=-description][data-variant=stacked])]:py-4 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:basis-24 [&:has(>[data-slot=card-action]_[data-slot=segmented-control])>[data-slot=card-heading]]:pe-0";
 const HEADING_CLASS =
   "flex min-w-0 flex-1 basis-40 flex-col gap-1 pe-3 [&:has(>[data-slot$=-description][data-variant=inline])]:flex-row [&:has(>[data-slot$=-description][data-variant=inline])]:flex-wrap [&:has(>[data-slot$=-description][data-variant=inline])]:items-baseline [&:has(>[data-slot$=-description][data-variant=inline])]:gap-x-2 [&:has(>[data-slot$=-description][data-variant=inline])]:gap-y-0.5";
 const TITLE_CLASS =
@@ -90,7 +92,7 @@ const descriptionVariants = cva("", {
   defaultVariants: { variant: "stacked" },
   variants: {
     variant: {
-      inline: "text-meta text-muted-foreground",
+      inline: "text-muted-foreground text-sm",
       stacked: "max-w-2xl text-pretty text-muted-foreground text-xs leading-normal",
     },
   },
@@ -141,9 +143,9 @@ function useWrappedActions(): {
 
   return { ref, wrapped };
 }
-const PANEL_CLASS = "min-w-0 flex-1 px-4 py-4 sm:px-5";
+const PANEL_CLASS = "min-w-0 flex-1 px-4 py-4 sm:p-6";
 const FOOTER_CLASS =
-  "flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-meta text-muted-foreground sm:px-5";
+  "flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-meta text-muted-foreground sm:px-6";
 
 /**
  * The header's icon: a 28 px chip that takes 24 px of layout (the title row's height), so it
@@ -230,7 +232,7 @@ export function CardTitle({
 }
 
 /**
- * `stacked` (default): a 12 px hint under the title, at most 42rem wide. `inline`: a 13 px muted
+ * `stacked` (default): a 12 px hint under the title, at most 42rem wide. `inline`: a 14 px muted
  * subtitle that follows the title on its baseline.
  */
 export function CardDescription({

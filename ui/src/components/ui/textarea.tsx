@@ -9,7 +9,7 @@ export type TextareaProps = React.ComponentPropsWithoutRef<"textarea"> &
   React.RefAttributes<HTMLTextAreaElement> & {
     size?: "sm" | "default" | "lg" | number;
     /**
-     * `mono`: Geist Mono at 13 px from sm up (16 px on phones, so iOS does not zoom), for JSON,
+     * `mono`: Geist Mono at 14 px from sm up (16 px on phones, so iOS does not zoom), for JSON,
      * tokens and keys. With `wrap="off"` long lines scroll instead of wrapping.
      */
     variant?: "default" | "mono";
@@ -59,7 +59,7 @@ export function Textarea({
               !singleLine && "min-h-17.5 max-sm:min-h-20.5",
               singleLine && size === "default" && "pointer-coarse:py-[calc(--spacing(2)-1px)]",
               props.wrap === "off" ? "overflow-x-auto whitespace-pre" : "wrap-anywhere",
-              variant === "mono" && "font-mono sm:text-meta",
+              variant === "mono" && "font-mono",
               size === "sm" && "px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1)-1px)]",
               size === "sm" && !singleLine && "min-h-16.5 max-sm:min-h-19.5",
               size === "lg" && "py-[calc(--spacing(2)-1px)]",

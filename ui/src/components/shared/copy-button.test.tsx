@@ -42,12 +42,13 @@ describe("CopyButton", () => {
     const button = screen.getByRole("button", { name: "Copy key" });
     expect(button).not.toHaveClass("size-10");
     expect(button).not.toHaveClass("md:size-8");
-    expect(button).toHaveClass("size-9", "sm:size-8");
+    expect(button).toHaveClass("size-9");
+    expect(button).not.toHaveClass("sm:size-8");
   });
 
   it("passes a smaller icon size through", () => {
     renderWithProviders(<CopyButton label="Copy key" size="icon-sm" value="sk-123" />);
-    expect(screen.getByRole("button", { name: "Copy key" })).toHaveClass("size-8", "sm:size-7");
+    expect(screen.getByRole("button", { name: "Copy key" })).toHaveClass("size-8");
   });
 
   it("shows its label as a small outline button", async () => {
@@ -57,7 +58,7 @@ describe("CopyButton", () => {
     );
     const button = screen.getByRole("button", { name: "Copy link" });
     expect(button).not.toHaveAttribute("aria-label");
-    expect(button).toHaveClass("h-8", "sm:h-7");
+    expect(button).toHaveClass("h-8");
     await user.click(button);
     await waitFor(() => expect(button).toHaveAttribute("data-copied"));
   });

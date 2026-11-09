@@ -35,10 +35,10 @@ function breakAtSlashes(value: string): ReactNode {
 
 /*
  * The multiline value: a 20 px line with 4 px above and below, in a group that is at least a
- * field's height (36 / 32 / coarse 40, border included), so one line measures exactly like an
+ * field's height (36 / coarse 40, border included), so one line measures exactly like an
  * input beside it and the box grows only when the value wraps.
  */
-const MULTILINE_GROUP = "min-h-9 sm:min-h-8 pointer-coarse:min-h-10";
+const MULTILINE_GROUP = "min-h-9 pointer-coarse:min-h-10";
 const MULTILINE_TEXT =
   "block min-w-0 flex-1 cursor-text select-all whitespace-normal py-1 ps-3 font-mono text-foreground text-meta leading-5 outline-none";
 

@@ -41,7 +41,7 @@ export function ErrorState({
   if (notLoaded) {
     return (
       <div
-        className="flex min-w-0 items-center justify-center px-4 py-6 text-center text-meta text-muted-foreground"
+        className="flex min-w-0 items-center justify-center px-4 py-6 text-center text-muted-foreground text-sm"
         data-slot="error-state"
         data-state="not-loaded"
         role="status"

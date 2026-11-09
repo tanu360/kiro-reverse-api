@@ -18,7 +18,7 @@ const emptyMediaVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        icon: "relative size-9 rounded-lg border border-border bg-card text-foreground [&_svg:not([class*='size-'])]:size-4.5",
+        icon: "relative size-9 rounded-lg border border-border bg-card text-foreground [&_svg:not([class*='size-'])]:size-4",
       },
       tone: {
         default: "",

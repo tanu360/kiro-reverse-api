@@ -30,7 +30,7 @@ export function DataTableCard({
     <Card className={cn("min-w-0 gap-0 overflow-hidden", className)}>
       {toolbar ? (
         <div
-          className="flex min-w-0 flex-col gap-3 border-border-subtle border-b px-4 py-3 sm:px-5"
+          className="flex min-w-0 flex-col gap-3 border-border-subtle border-b px-4 py-3 sm:px-6"
           data-slot="data-table-card-toolbar"
         >
           {toolbar}
@@ -41,7 +41,7 @@ export function DataTableCard({
       </div>
       {footer ? (
         <div
-          className="border-border-subtle border-t px-4 py-2.5 sm:px-5"
+          className="border-border-subtle border-t px-4 py-2.5 sm:px-6"
           data-slot="data-table-card-footer"
         >
           {footer}

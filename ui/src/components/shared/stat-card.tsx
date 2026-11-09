@@ -88,7 +88,7 @@ export function formatDelta(fraction: number, lang?: Lang): string {
 type Placement = "joined" | "separate" | "standalone";
 const PlacementContext = createContext<Placement>("standalone");
 
-const tileVariants = cva("min-w-0 p-4 sm:p-5", {
+const tileVariants = cva("min-w-0 p-4 sm:p-6", {
   variants: {
     placement: {
       joined: "row-span-4 grid grid-rows-subgrid gap-y-0 bg-card",
@@ -224,11 +224,11 @@ const VALUE_SIZE = { display: "text-display", kpi: "text-kpi" } as const;
 /*
  * The metrics grid under its hairline. In a joined group the rows share subgrid tracks, so the
  * hairlines line up at the top of the metrics row; in a lone card it sinks to the bottom. The
- * hairline runs to the tile's edges (it bleeds through the tile's 16 / 20 px padding, which the
+ * hairline runs to the tile's edges (it bleeds through the tile's 16 / 24 px padding, which the
  * grid puts back inside), so across a joined strip it meets the column dividers as one line.
  */
 const METRICS_CLASS =
-  "-mx-4 grid grid-cols-2 gap-3 border-border-subtle border-t px-4 pt-3 sm:-mx-5 sm:px-5";
+  "-mx-4 grid grid-cols-2 gap-3 border-border-subtle border-t px-4 pt-3 sm:-mx-6 sm:px-6";
 
 /*
  * The aside trend. The value row and the delta row are each a `stat-row` container (a subgrid

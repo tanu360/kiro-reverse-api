@@ -13,10 +13,10 @@ describe("table pagination", () => {
     expect(screen.getByRole("button", { name: "Next" }).textContent).toBe("");
     const current = screen.getByRole("button", { name: "Page 5" });
     expect(current).toHaveAttribute("aria-current", "page");
-    // The current page is the bold one; the others keep the regular weight and no fill.
-    expect(current).toHaveClass("font-semibold");
+    // The current page takes the text colour; the others stay muted with no fill.
+    expect(current).toHaveClass("text-foreground");
     expect(current).not.toHaveClass("bg-accent");
-    expect(screen.getByRole("button", { name: "Page 4" })).not.toHaveClass("font-semibold");
+    expect(screen.getByRole("button", { name: "Page 4" })).not.toHaveClass("text-foreground");
     expect(screen.queryByRole("button", { name: "Page 2" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Page 10" }));
     expect(onPageChange).toHaveBeenCalledWith(10);

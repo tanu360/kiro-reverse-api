@@ -170,7 +170,7 @@ export function AreaValueLabels({ series }: { series: AreaProps[] }) {
             mask={area.fadeValueLabels ? `url(#${id}-${label.seriesIndex}-mask)` : undefined}
           >
             <text
-              className="font-medium text-[10px]"
+              className="font-medium text-2xs"
               fill={
                 area.valueLabelColor ??
                 area.stroke ??

@@ -241,7 +241,7 @@ export function AccountsToolbar({
 
         {loading ? (
           // The filter row's height: a control's (its scroll bar takes no room of its own).
-          <Skeleton className="h-9 w-40 sm:h-8 pointer-coarse:h-10" />
+          <Skeleton className="h-9 w-40 pointer-coarse:h-10" />
         ) : (
           <>
             {hasControls ? (

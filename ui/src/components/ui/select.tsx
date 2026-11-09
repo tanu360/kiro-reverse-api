@@ -20,12 +20,12 @@ export const Select: typeof SelectPrimitive.Root = SelectPrimitive.Root;
 /*
  * The trigger is a form field (index.css --field-*, the sign-in password field's soft fill): a
  * faint tint, a hairline border, a deeper tint on hover and while open, and a soft purple border
- * on keyboard focus, with no ring. Sizes match the input and the button: 36 / 32 px by default,
- * 44 / 40 px lg (the sign-in field), 32 / 28 px sm, and 40 px on a coarse pointer (44 lg), with
- * a 44 px hit area (the ::after layer).
+ * on keyboard focus, with no ring. Sizes match the input and the button: 36 px by default and
+ * 32 px sm on phones and desktops alike, 44 / 40 px lg (the sign-in field), and on a coarse
+ * pointer 40 / 36 px (44 lg), with a 44 px hit area (the ::after layer).
  */
 export const selectTriggerVariants = cva(
-  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-base text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 sm:text-sm pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-base text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 sm:text-sm pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
       fit: "field",
@@ -41,10 +41,11 @@ export const selectTriggerVariants = cva(
         field: "w-full min-w-0",
       },
       size: {
-        // Touch screens get a real 40 px trigger, as the input (pointer-coarse sorts after sm:).
-        default: "min-h-9 px-[calc(--spacing(3)-1px)] sm:min-h-8 pointer-coarse:min-h-10",
+        // Touch screens get a real 40 / 36 px trigger, as the input (pointer-coarse sorts after
+        // sm:).
+        default: "min-h-9 px-[calc(--spacing(3)-1px)] pointer-coarse:min-h-10",
         lg: "min-h-11 px-[calc(--spacing(3)-1px)] sm:min-h-10 pointer-coarse:min-h-11",
-        sm: "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:min-h-7 pointer-coarse:min-h-10",
+        sm: "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] pointer-coarse:min-h-9",
       },
     },
   },
@@ -140,7 +141,7 @@ export function SelectPopup({
             className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50% before:from-popup"
             data-slot="select-scroll-up-arrow"
           >
-            <HugeiconsIcon icon={ChevronUpIcon} className="relative size-4.5 sm:size-4" />
+            <HugeiconsIcon icon={ChevronUpIcon} className="relative size-4" />
           </SelectPrimitive.ScrollUpArrow>
           {/* The one popup sheet (index.css popup-surface), the same as menus. */}
           {/* At least as wide as the trigger, growing to fit its longest option up to
@@ -167,7 +168,7 @@ export function SelectPopup({
             className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50% before:from-popup"
             data-slot="select-scroll-down-arrow"
           >
-            <HugeiconsIcon icon={ChevronDownIcon} className="relative size-4.5 sm:size-4" />
+            <HugeiconsIcon icon={ChevronDownIcon} className="relative size-4" />
           </SelectPrimitive.ScrollDownArrow>
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>

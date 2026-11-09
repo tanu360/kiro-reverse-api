@@ -44,7 +44,7 @@ export function NumberFieldGroup({
   return (
     <NumberFieldPrimitive.Group
       className={cn(
-        "relative flex w-full justify-between rounded-lg border border-field-border bg-field text-base text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-within:border-field-border-focus focus-within:bg-field-focus has-aria-invalid:border-destructive/36 has-autofill:bg-foreground/4 focus-within:has-aria-invalid:border-destructive/64 data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm dark:has-autofill:bg-foreground/8 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "relative flex w-full justify-between rounded-lg border border-field-border bg-field text-base text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-within:border-field-border-focus focus-within:bg-field-focus has-aria-invalid:border-destructive/36 has-autofill:bg-foreground/4 focus-within:has-aria-invalid:border-destructive/64 data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm dark:has-autofill:bg-foreground/8 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       data-slot="number-field-group"
@@ -102,9 +102,9 @@ export function NumberFieldInput({
     <NumberFieldPrimitive.Input
       aria-roledescription={t("numberField.roleDescription")}
       className={cn(
-        // The field heights of input.tsx, border included: 36 / 32 by default, 32 / 28 sm,
-        // 44 / 40 lg, and 40 on a coarse pointer (44 lg).
-        "h-8.5 in-data-[size=lg]:h-10.5 in-data-[size=sm]:h-7.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground tabular-nums in-data-[size=lg]:leading-10.5 in-data-[size=sm]:leading-7.5 leading-8.5 outline-none [transition:background-color_5000000s_ease-in-out_0s] sm:h-7.5 sm:in-data-[size=lg]:h-9.5 sm:in-data-[size=sm]:h-6.5 sm:in-data-[size=lg]:leading-9.5 sm:in-data-[size=sm]:leading-6.5 sm:leading-7.5 pointer-coarse:h-9.5 pointer-coarse:leading-9.5 pointer-coarse:in-data-[size=lg]:h-10.5 pointer-coarse:in-data-[size=lg]:leading-10.5",
+        // The field heights of input.tsx, border included: 36 by default and 32 sm on phones and
+        // desktops alike, 44 / 40 lg, and 40 / 36 on a coarse pointer (44 lg).
+        "h-8.5 in-data-[size=lg]:h-10.5 in-data-[size=sm]:h-7.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground tabular-nums in-data-[size=lg]:leading-10.5 in-data-[size=sm]:leading-7.5 leading-8.5 outline-none [transition:background-color_5000000s_ease-in-out_0s] sm:in-data-[size=lg]:h-9.5 sm:in-data-[size=lg]:leading-9.5 pointer-coarse:h-9.5 pointer-coarse:leading-9.5 pointer-coarse:in-data-[size=sm]:h-8.5 pointer-coarse:in-data-[size=sm]:leading-8.5 pointer-coarse:in-data-[size=lg]:h-10.5 pointer-coarse:in-data-[size=lg]:leading-10.5",
         className,
       )}
       data-slot="number-field-input"

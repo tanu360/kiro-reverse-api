@@ -87,7 +87,7 @@ export function PaginationEllipsis({
       data-slot="pagination-ellipsis"
       {...props}
     >
-      <HugeiconsIcon icon={MoreHorizontalIcon} className="size-5 sm:size-4" />
+      <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
       <span className="sr-only">{t("pagination.more")}</span>
     </span>
   );

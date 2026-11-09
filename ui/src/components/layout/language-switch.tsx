@@ -94,12 +94,12 @@ function LanguageSelect({ className }: { className?: string }): JSX.Element {
         <TooltipTrigger
           render={
             // A bare label, no border or fill: only the text colour moves on hover and while
-            // the list is open. As tall as the theme toggle across the row (36 / 32 px, 40 on
+            // the list is open. As tall as the theme toggle across the row (36 px, 40 on
             // touch).
             <SelectPrimitive.Trigger
               aria-label={triggerLabel}
               className={cn(
-                "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground sm:h-8 pointer-coarse:h-10",
+                "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground pointer-coarse:h-10",
                 className,
               )}
             />

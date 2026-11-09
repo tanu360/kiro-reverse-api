@@ -365,7 +365,7 @@ function RowSkeleton({
 }
 
 /** A field's placeholder at the field's height on every pointer. */
-const FIELD_SKELETON = "h-9 w-full sm:h-8 pointer-coarse:h-10";
+const FIELD_SKELETON = "h-9 w-full pointer-coarse:h-10";
 
 /** The three rows (switch, frequency, keep) and the Save button, before the schedule loads. */
 function ScheduleSkeleton(): JSX.Element {
@@ -403,7 +403,7 @@ export function ScheduleCard(): JSX.Element {
       description={t("schedule.description")}
       footer={
         query.isError ? undefined : (
-          <Skeleton aria-hidden="true" className="ms-auto h-8 w-18 sm:h-7 pointer-coarse:h-9" />
+          <Skeleton aria-hidden="true" className="ms-auto h-8 w-18 pointer-coarse:h-9" />
         )
       }
       icon={TimeScheduleIcon}

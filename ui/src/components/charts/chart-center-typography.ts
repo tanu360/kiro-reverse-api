@@ -1,8 +1,11 @@
 export const chartCenterContainerClassName = "@container/chart-center size-full min-w-0";
 
-/** Primary stat — ~22% of center width, clamped between text-sm and text-3xl. Tabular figures. */
+/**
+ * Primary stat — ~22% of center width, clamped between 12 px and the 24 px KPI step. Tabular
+ * figures.
+ */
 export const chartCenterValueClassName =
-  "font-semibold tabular-nums tracking-tight leading-none text-[clamp(0.75rem,22cqw,1.875rem)]";
+  "font-semibold tabular-nums tracking-tight leading-none text-[clamp(0.75rem,22cqw,1.5rem)]";
 
 /** Supporting label — ~9% of center width, clamped between 10px and text-xs, muted. */
 export const chartCenterLabelClassName =

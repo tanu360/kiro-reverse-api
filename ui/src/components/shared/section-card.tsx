@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * The single card shell for page sections (Overview, API, Backups, Settings), built on the Card
- * slots so every section has the same chrome: an optional icon chip, a 15 px semibold h2, a
- * description (stacked 12 px hint, or an inline 13 px subtitle on the title's baseline), an
+ * slots so every section has the same chrome: an optional icon chip, a 16 px semibold h2, a
+ * description (stacked 12 px hint, or an inline 14 px subtitle on the title's baseline), an
  * optional meta (a count or state after the title) and the actions on the right. A hairline
  * separates the header from the content and the content from the footer.
  */

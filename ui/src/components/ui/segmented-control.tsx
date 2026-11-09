@@ -8,40 +8,43 @@ import { cn } from "@/lib/utils";
 export type SegmentedControlSize = "default" | "lg" | "sm" | "icon";
 
 /**
- * Item heights; the track adds its 1 px padding and 1 px border on each side (+4 px), so with a
- * mouse each size is the height of the matching button (phone / sm and up / coarse pointer):
- *   sm       items 28 / 24 / 28   track 32 / 28 / 32   (the sm and icon-sm buttons beside it)
- *   default  items 32 / 28 / 36   track 36 / 32 / 40
- *   lg       items 40 / 36 / 40   track 44 / 40 / 44
+ * Item heights; the track adds its 1 px padding and 1 px border on each side (+4 px), so each
+ * size is the height of the matching button, on phones and desktops alike (coarse pointer in
+ * brackets; lg is phone / sm and up / coarse pointer, as the sign-in button):
+ *   sm       items 28 (28)        track 32 (32)        (the sm and icon-sm buttons beside it)
+ *   default  items 32 (36)        track 36 (40)        (the default button)
+ *   lg       items 40 / 36 / 40   track 44 / 40 / 44   (the sign-in button)
  *   icon     square default items, for icon-only segments (the sign-in theme toggle)
- * On a coarse pointer the default and lg strips are 40 px or more, a finger's tap. sm stays a
- * 32 px pill there (iOS's segmented height): it sits in card headers beside the title, where a
- * 40 px pill crowded the title onto two lines. A real height, not an ::after hit box: content
- * after a tab list would paint over an overflowing box. pointer-coarse sorts after the sm:
- * sizes, so it wins on touch tablets too.
+ * Labels are 14 px (sm: 12 px on phones), icons 16 px. On a coarse pointer the default and lg
+ * strips are 40 px or more, a finger's tap. sm stays a 32 px strip there (iOS's segmented
+ * height): it sits in card headers beside the title, where a 40 px strip crowded the title onto
+ * two lines. A real height, not an ::after hit box: content after a tab list would paint over an
+ * overflowing box. pointer-coarse sorts after the sm: sizes, so it wins on touch tablets too.
  */
 export const segmentedControlItemSizeClassNames: Record<SegmentedControlSize, string> = {
-  default: "h-8 px-[calc(--spacing(2.5)-1px)] sm:h-7 pointer-coarse:h-9",
-  icon: "size-8 p-0 sm:size-7 pointer-coarse:size-9",
+  default: "h-8 px-[calc(--spacing(3)-1px)] pointer-coarse:h-9",
+  icon: "size-8 p-0 pointer-coarse:size-9",
   lg: "h-10 px-[calc(--spacing(3.5)-1px)] sm:h-9 pointer-coarse:h-10",
-  // Phones: 12 px labels, so a two-word pill and a card title share a 390 px header line.
-  sm: "h-7 px-[calc(--spacing(2)-1px)] max-sm:text-xs sm:h-6 pointer-coarse:h-7",
+  // Phones: 12 px labels, so a two-word switch and a card title share a 390 px header line.
+  sm: "h-7 px-[calc(--spacing(2)-1px)] max-sm:text-xs pointer-coarse:h-7",
 };
 
 export const segmentedControlItemLayoutClassName =
-  "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0";
+  "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0";
 
 /**
- * The sign-in theme toggle is the segmented control: a faintly tinted pill in the field hairline
- * and, 1 px inside it, the chosen segment raised on a round thumb (index.css --segment-thumb,
- * with its hairline edge and soft shadow in --segment-thumb-shadow).
+ * The sign-in theme toggle is the segmented control: a faintly tinted rounded rectangle in the
+ * field hairline and, 2 px inside it (1 px border + 1 px padding), the chosen segment raised on a
+ * thumb (index.css --segment-thumb and its soft shadow). Corners are concentric, as Apple draws
+ * its segmented control: the track's 8 px radius less the 2 px inset gives the thumb and the
+ * items 6 px. A full pill read too round for a tab switch.
  */
 export const segmentedControlIndicatorSurfaceClassName =
-  "rounded-full bg-(--segment-thumb) shadow-(--segment-thumb-shadow)";
+  "rounded-md bg-(--segment-thumb) shadow-(--segment-thumb-shadow)";
 
 /** The frame round the segments (and the default tabs list). */
 export const segmentedControlTrackClassName =
-  "relative z-0 flex w-fit items-center justify-center gap-0 rounded-full border border-field-border bg-(--segment-track) p-px";
+  "relative z-0 flex w-fit items-center justify-center gap-0 rounded-lg border border-field-border bg-(--segment-track) p-px";
 
 /**
  * The thumb's slide to the chosen segment: a strong ease-out, so it leaves at once and settles
@@ -62,7 +65,7 @@ const SegmentedControlContext: React.Context<SegmentedControlSize> =
   React.createContext<SegmentedControlSize>("default");
 
 /**
- * A row of mutually exclusive choices in a pill (the sign-in theme toggle). Items mark the chosen
+ * A row of mutually exclusive choices in a rounded track (the sign-in theme toggle). Items mark the chosen
  * one with data-checked, aria-current="page" or data-pressed, and a sliding indicator follows it.
  *
  * As a radio group (coss p-radio-group-7), for a value with keyboard arrows:
@@ -123,7 +126,7 @@ export function SegmentedControlItem({
 
   const defaultProps = {
     className: cn(
-      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium text-meta text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline-inner disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
+      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline-inner disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
       // The chosen item's own thumb, until the sliding indicator has measured it.
       "data-checked:bg-(--segment-thumb) data-checked:text-foreground data-checked:shadow-(--segment-thumb-shadow)",
       "aria-[current=page]:bg-(--segment-thumb) aria-[current=page]:text-foreground aria-[current=page]:shadow-(--segment-thumb-shadow)",

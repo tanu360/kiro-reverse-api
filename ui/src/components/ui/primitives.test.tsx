@@ -87,16 +87,19 @@ describe("Switch", () => {
 });
 
 describe("Input", () => {
-  it("is 40 px tall on touch screens at every size, border included", () => {
+  it("grows to the touch heights of the buttons, border included: 40 px, 36 px sm", () => {
     renderWithProviders(
       <>
         <Input aria-label="Search" />
         <Input aria-label="Rule" size="sm" />
       </>,
     );
-    for (const name of ["Search", "Rule"]) {
-      expect(screen.getByRole("textbox", { name }).className).toContain("pointer-coarse:h-9.5");
-    }
+    expect(screen.getByRole("textbox", { name: "Search" }).className).toContain(
+      "pointer-coarse:h-9.5",
+    );
+    expect(screen.getByRole("textbox", { name: "Rule" }).className).toContain(
+      "pointer-coarse:h-8.5",
+    );
   });
 });
 

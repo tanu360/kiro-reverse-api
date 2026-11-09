@@ -18,7 +18,7 @@ const iconChipVariants = cva(
     variants: {
       size: {
         sm: "size-7 [&_svg]:size-4",
-        md: "size-9 [&_svg]:size-4.5",
+        md: "size-9 [&_svg]:size-4",
       },
       tone: {
         default: "",

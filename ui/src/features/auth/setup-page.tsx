@@ -214,7 +214,7 @@ function CopyablePassword({ value }: { value: string }): JSX.Element {
     <>
       <button
         className={cn(
-          "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-bold font-mono text-foreground text-xl tabular-nums tracking-widest transition-[color,scale] duration-150 active:scale-[0.98] pointer-coarse:py-2",
+          "focus-outline min-w-0 cursor-pointer break-all rounded-md px-2 py-1 font-mono font-semibold text-foreground text-xl tabular-nums tracking-widest transition-[color,scale] duration-150 active:scale-[0.98] pointer-coarse:py-2",
           "hover:text-info-foreground focus-visible:text-info-foreground",
           copied && "text-success-foreground hover:text-success-foreground",
         )}

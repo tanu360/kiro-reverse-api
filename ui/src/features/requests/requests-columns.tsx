@@ -272,7 +272,7 @@ export function RequestCard({
 const COMPACT_PADDING = "px-2 @7xl/requests:px-2.5";
 // Below a 64rem container Credits is the last column shown (Duration and Error are hidden), so it
 // takes the card's end padding, as the inset gives the real last cell.
-const CREDITS_END = "pe-4 sm:pe-5 @5xl/requests:pe-2 @7xl/requests:pe-2.5";
+const CREDITS_END = "pe-4 sm:pe-6 @5xl/requests:pe-2 @7xl/requests:pe-2.5";
 const WIDE_ONLY = "hidden @5xl/requests:table-cell";
 
 function withCompactPadding(

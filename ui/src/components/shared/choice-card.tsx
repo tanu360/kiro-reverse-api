@@ -160,7 +160,7 @@ export function ChoiceRow({
       >
         <IconChip className="in-data-flush:hidden" icon={icon} size="md" />
         <span className="hidden size-9 shrink-0 items-center justify-center text-muted-foreground transition-colors group-hover/choice-row:text-foreground in-data-flush:flex">
-          <HugeiconsIcon aria-hidden="true" className="size-5" icon={icon} />
+          <HugeiconsIcon aria-hidden="true" className="size-4" icon={icon} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

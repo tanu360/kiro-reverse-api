@@ -20,7 +20,7 @@ export interface KeyValueItem {
   value: ReactNode;
   /** Spans two columns once the grid has two. */
   span?: 1 | 2;
-  /** An ID, key or URL: mono 13 px on one line, cut with an ellipsis (full text as a tooltip). */
+  /** An ID, key or URL: mono 12 px on one line, cut with an ellipsis (full text as a tooltip). */
   mono?: boolean;
   /**
    * A copy button right after the value. `true` copies the value itself (a string or number);

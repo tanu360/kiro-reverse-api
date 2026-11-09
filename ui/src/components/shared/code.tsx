@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 /*
  * `inline` is the inline-code utility (index.css): 0.85 em of the running text, for prose.
- * `id` is the same chip at a fixed 13 px (font-mono text-meta), for keys and IDs in tables, cards
+ * `id` is the same chip at a fixed 12 px (font-mono text-meta), for keys and IDs in tables, cards
  * and sheets, so one ID reads at one size whatever the text around it.
  */
 const VARIANT_CLASS = {
@@ -21,7 +21,7 @@ export function Code({
   className,
 }: {
   children: ReactNode;
-  /** `inline` in prose (sized by the text around it); `id` for a key or ID in a list (13 px). */
+  /** `inline` in prose (sized by the text around it); `id` for a key or ID in a list (12 px). */
   variant?: "inline" | "id";
   /** Layout only. */
   className?: string;

@@ -36,7 +36,7 @@ export const badgeVariants = cva(
     variants: {
       size: {
         // min-w-5 keeps a one-digit count round.
-        sm: "h-5 min-w-5 justify-center px-1.5 text-2xs has-[>svg:first-child]:ps-1 has-[>[data-slot=badge-dot]:first-child]:ps-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-5 min-w-5 justify-center px-1.5 text-xs has-[>svg:first-child]:ps-1 has-[>[data-slot=badge-dot]:first-child]:ps-1.5 [&_svg:not([class*='size-'])]:size-3",
         // The disc nearly fills the pill (a 2 px inset), as in the reference; line icons stay a
         // step smaller so they sit with the 12 px label instead of shouting over it.
         default:

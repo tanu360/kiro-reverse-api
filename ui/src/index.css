@@ -306,34 +306,40 @@
 
 @theme {
   /*
-   * The type scale, set by the sign-in pages. Body copy is text-sm (14 px) and small labels
-   * text-xs (12 px); these add the steps between and above them:
-   *   display  28 px  the sign-in h1 (from sm up) and a status card's number
-   *   title    22 px  a page's h1 (from sm up)
-   *   kpi      24 px  a live tile's number
-   *   subtitle 18 px  dialog, alert dialog, sheet and drawer titles
-   *   heading  15 px  section, card, empty and error state titles
-   *   meta     13 px  footer lines, stat captions, table heads, key labels, mono values
-   *   2xs      11 px  small pills, chart ticks
-   * Line heights follow the page's 1.5 unless the step is a title. Only the large steps tighten
-   * their tracking; body text keeps Geist's own spacing. lib/utils.ts lists these steps for cn(),
-   * so a new step goes there too.
+   * The type scale (shadcn new-york's, as the efferd dashboard reference uses it). Three steps
+   * carry almost everything: 12 px secondary, 14 px body, 16 px titles.
+   *   meta     12 px  secondary text: meta lines, hints, timestamps, legends, captions, footers,
+   *                   KPI labels and deltas (badges use text-xs, the same 12 px)
+   *   (sm)     14 px  body: table cells and heads, card descriptions, control labels, row names
+   *   heading  16 px  card, section, empty and error state titles (semibold)
+   *   subtitle 16 px  dialog, alert dialog, sheet and drawer titles (semibold)
+   *   title    20 px  a page's h1 (semibold)
+   *   kpi      24 px  a KPI or live tile figure (semibold)
+   *   display  28 px  the sign-in h1 and the device code; nothing else
+   *   2xs      11 px  chart ticks and the smallest pills only
+   * Weights: 400 for text, 500 for controls, names, table heads and badges, 600 only for titles
+   * and KPI figures; no bold outside the sign-in showcase art.
+   * Spacing: a card pads 16 px on phones and 24 px from sm; its header 12 px tall on phones,
+   * 16 px from sm; list rows run about 64 px with 16 px icons and a 12 px gap.
+   * Line heights follow the page's 1.5 unless the step is a title; 12 px text sits on 16 px.
+   * Only the large steps tighten their tracking; body text keeps Geist's own spacing.
+   * lib/utils.ts lists these steps for cn(), so a new step goes there too.
    */
   --text-display: 1.75rem;
   --text-display--line-height: 1.25;
   --text-display--letter-spacing: -0.02em;
-  --text-title: 1.375rem;
-  --text-title--line-height: 1.25;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.3;
   --text-title--letter-spacing: -0.015em;
   --text-kpi: 1.5rem;
   --text-kpi--line-height: 1.1;
   --text-kpi--letter-spacing: -0.02em;
-  --text-subtitle: 1.125rem;
-  --text-subtitle--line-height: 1.375;
-  --text-heading: 0.9375rem;
+  --text-subtitle: 1rem;
+  --text-subtitle--line-height: 1.5;
+  --text-heading: 1rem;
   --text-heading--line-height: 1.5;
-  --text-meta: 0.8125rem;
-  --text-meta--line-height: 1.5;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: calc(1 / 0.75);
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
 }

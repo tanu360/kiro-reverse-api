@@ -48,8 +48,8 @@ export function TabsList({
         "relative z-0 flex w-fit items-center justify-center gap-x-0.5 text-muted-foreground",
         "data-[orientation=vertical]:flex-col",
         variant === "default"
-          ? // The segmented control's frame (the sign-in theme toggle): round tabs in a hairline pill.
-            cn(segmentedControlTrackClassName, "*:data-[slot=tabs-tab]:rounded-full")
+          ? // The segmented control's frame (the sign-in theme toggle): 6 px tabs in an 8 px track.
+            cn(segmentedControlTrackClassName, "*:data-[slot=tabs-tab]:rounded-md")
           : // Page-level tabs: left-aligned over a full-width hairline, the active one underlined.
             "w-max min-w-full justify-start gap-x-1 data-[orientation=horizontal]:border-b data-[orientation=vertical]:px-1 data-[orientation=horizontal]:py-1 *:data-[slot=tabs-tab]:grow-0 *:data-[slot=tabs-tab]:hover:bg-accent",
         className,
@@ -98,7 +98,7 @@ export function TabsTab({
   return (
     <TabsPrimitive.Tab
       className={cn(
-        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-meta outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-outline-inner data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64",
+        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-sm outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-outline-inner data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64",
         segmentedControlItemLayoutClassName,
         segmentedControlItemSizeClassNames[resolvedSize],
         // Phones: a little less side padding, so three or four tabs fit at 360 px.

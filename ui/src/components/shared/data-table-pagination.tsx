@@ -30,14 +30,15 @@ import { cn } from "@/lib/utils";
 const PAGER_CHEVRON_CLASS =
   "rounded-full border-input bg-(--field) text-foreground before:rounded-full hover:bg-(--field-hover) data-pressed:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
 /*
- * The page numbers and the ellipsis share one box, the icon button's (36 / 32 / coarse 40), so
- * the numbers keep an even beat; a wide number ("1,024") grows its box into a pill instead of
- * spilling out of the circle. The numbers are quiet buttons with no fill; the current page is the
- * bold one. Proportional digits: Geist's tabular 1 has a foot that reads as another typeface.
+ * The page numbers and the ellipsis share one box, the icon button's (36 / coarse 40), so the
+ * numbers keep an even beat; a wide number ("1,024") grows its box into a pill instead of
+ * spilling out of the circle. The numbers are quiet buttons with no fill, all in the buttons'
+ * medium weight; the current page is the one in the text colour. Proportional digits: Geist's
+ * tabular 1 has a foot that reads as another typeface.
  */
-const PAGE_BOX = "min-w-9 sm:min-w-8 pointer-coarse:min-w-10";
+const PAGE_BOX = "min-w-9 pointer-coarse:min-w-10";
 const PAGE = cn(PAGE_BOX, "rounded-full px-1.5 before:rounded-full");
-const PAGE_ACTIVE = "font-semibold text-foreground";
+const PAGE_ACTIVE = "text-foreground";
 
 /**
  * The pager's previous/next button, for any prev/next pair that should match the table
@@ -104,7 +105,7 @@ export function DataTablePagination({
   return (
     // w-full: in a card footer (a flex row) the pager is the only child, so without it the root
     // shrinks to its content and the count and the pager sit together at the start.
-    <div className="flex w-full flex-wrap items-center justify-between gap-3 text-meta">
+    <div className="flex w-full flex-wrap items-center justify-between gap-3 text-sm">
       <p aria-live="polite" className="text-muted-foreground tabular-nums">
         {t("table.pageInfo", {
           start: formatNumber(start, lang),
@@ -134,7 +135,7 @@ export function DataTablePagination({
               value={String(pageSize)}
             >
               {/*
-                The default step (36 / 32 / coarse 40) matches the icon buttons beside it. The
+                The default step (36 / coarse 40) matches the icon buttons beside it. The
                 trigger is wider than index.css popup-width's icon cut-off (3rem), so the list
                 fits its numbers instead of taking an icon menu's 11rem over the pager.
               */}

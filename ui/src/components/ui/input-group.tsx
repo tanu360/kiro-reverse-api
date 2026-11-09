@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
  */
 const inputGroupAddonVariants = cva(
   // The addon's own icons (direct children) take the field's icon size; a button in the addon
-  // sizes its icon itself (an xs Upload button keeps its 14 px icon).
-  "flex h-auto cursor-text select-none items-center justify-center gap-2 text-muted-foreground leading-none [&>kbd]:rounded-sm in-[[data-slot=input-group]:has([data-slot=input-control],[data-slot=textarea-control])]:[&>svg:not([class*='size-'])]:size-4.5 sm:in-[[data-slot=input-group]:has([data-slot=input-control],[data-slot=textarea-control])]:[&>svg:not([class*='size-'])]:size-4 [&_svg]:-mx-0.5 not-has-[button]:**:[svg:not([class*='opacity-'])]:opacity-80",
+  // sizes its icon itself (an xs Upload button keeps its 12 px icon).
+  "flex h-auto cursor-text select-none items-center justify-center gap-2 text-muted-foreground leading-none [&>kbd]:rounded-sm in-[[data-slot=input-group]:has([data-slot=input-control],[data-slot=textarea-control])]:[&>svg:not([class*='size-'])]:size-4 [&_svg]:-mx-0.5 not-has-[button]:**:[svg:not([class*='opacity-'])]:opacity-80",
   {
     defaultVariants: {
       align: "inline-start",
@@ -104,7 +104,7 @@ export function InputGroupText({
   return (
     <span
       className={cn(
-        "flex items-center gap-2 truncate text-muted-foreground in-[[data-slot=input-group]:has([data-slot=input-control],[data-slot=textarea-control])]:[&_svg:not([class*='size-'])]:size-4.5 sm:in-[[data-slot=input-group]:has([data-slot=input-control],[data-slot=textarea-control])]:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5",
+        "flex items-center gap-2 truncate text-muted-foreground in-[[data-slot=input-group]:has([data-slot=input-control],[data-slot=textarea-control])]:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5",
         className,
       )}
       {...props}

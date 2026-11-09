@@ -34,7 +34,7 @@ export const PRIMARY_FINISH: string =
   "grain-overlay [--grain-overlay-opacity:0.1] not-disabled:not-aria-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [&_svg:not([class*='opacity-'])]:opacity-80";
 
 export const buttonVariants = cva(
-  "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-medium text-sm outline-none transition-[box-shadow,scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:not-aria-busy:opacity-64 aria-busy:cursor-progress sm:text-meta [&_svg:not([class*='text-'])]:text-(--control-icon-color) [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0 [&>[data-slot=button-loading-indicator]+svg]:hidden",
+  "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-medium text-sm outline-none transition-[box-shadow,scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:not-aria-busy:opacity-64 aria-busy:cursor-progress [&_svg:not([class*='text-'])]:text-(--control-icon-color) [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0 [&>[data-slot=button-loading-indicator]+svg]:hidden",
   {
     defaultVariants: {
       size: "default",
@@ -42,31 +42,30 @@ export const buttonVariants = cva(
     },
     variants: {
       /*
-       * One control height scale (phone below sm / sm and up / coarse pointer), shared with the
-       * fields (input.tsx, select.tsx, number-field.tsx) and the segmented control:
-       *   xs       28 / 24 px, 12 / 11 px text   inline and field-addon actions (Upload)
-       *   sm       32 / 28 / 36 px, 13 / 12 px   actions inside a card, row or toolbar (Save, Edit, Add)
-       *   default  36 / 32 / 40 px, 14 / 13 px   page-header actions and dialog footers
-       *   lg       44 / 40 / 44 px, 16 / 14 px   the sign-in button beside the 40 px sign-in field
-       * Text is phone / sm-and-up. A text button's icon is 16 px (sm: 14 px from sm up; xs: 14 px),
-       * an icon button's 18 px on phones and 16 px from sm up.
-       * Icon buttons are square: icon-xs 28 / 24, icon-sm 32 / 28 / 36, icon 36 / 32 / 40,
-       * icon-lg 44 / 40. A coarse pointer grows the control itself (pointer-coarse sorts after
-       * sm:), and every size keeps the 44 px ::after hit area, so no call site sizes for touch.
+       * One control height scale, shadcn's new-york scale, the same on phones and desktops
+       * (a coarse pointer in brackets), shared with the fields (input.tsx, select.tsx,
+       * number-field.tsx) and the segmented control:
+       *   xs       24 px, 12 px text          inline and field-addon actions (Upload)
+       *   sm       32 (36) px, 14 px text     actions inside a card, row or toolbar (Save, Edit, Add)
+       *   default  36 (40) px, 14 px text     page-header actions and dialog footers
+       *   lg       44 / 40 / 44 px, 16 / 14 px   the sign-in button beside the sign-in field
+       *            (phone / sm and up / coarse pointer)
+       * A text button pads 16 px, 12 px beside an icon (sm: 12 / 10 px; xs: 8 px). Icons are
+       * 16 px (xs: 12 px). Icon buttons are square: icon-xs 24, icon-sm 32 (36), icon 36 (40),
+       * icon-lg 40 (44). A coarse pointer grows the control itself, and every size keeps the
+       * 44 px ::after hit area, so no call site sizes for touch.
        */
       size: {
         default:
-          "h-9 px-[calc(--spacing(3)-1px)] sm:h-8 pointer-coarse:h-10 [&_svg:not([class*='size-'])]:size-4",
-        icon: "size-9 sm:size-8 pointer-coarse:size-10",
-        "icon-lg": "size-11 sm:size-10",
-        "icon-sm": "size-8 sm:size-7 pointer-coarse:size-9",
-        "icon-xs":
-          "size-7 sm:size-6 not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-4 sm:not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-3.5",
+          "h-9 px-[calc(--spacing(4)-1px)] has-[>svg]:px-[calc(--spacing(3)-1px)] pointer-coarse:h-10",
+        icon: "size-9 pointer-coarse:size-10",
+        "icon-lg": "size-10 pointer-coarse:size-11",
+        "icon-sm": "size-8 pointer-coarse:size-9",
+        "icon-xs": "size-6 not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-3",
         // The sign-in button keeps the larger text (16 px on phones, 14 px from sm up).
         lg: "h-11 px-[calc(--spacing(3.5)-1px)] text-base sm:h-10 sm:text-sm pointer-coarse:h-11",
-        // 13 px text in the 32 px phone button, 12 px in the 28 px desktop one.
-        sm: "h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] text-meta sm:h-7 sm:text-xs pointer-coarse:h-9 [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5",
-        xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-xs sm:h-6 sm:text-2xs [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        sm: "h-8 gap-1.5 px-[calc(--spacing(3)-1px)] has-[>svg]:px-[calc(--spacing(2.5)-1px)] pointer-coarse:h-9",
+        xs: "h-6 gap-1 px-[calc(--spacing(2)-1px)] text-xs [&_svg:not([class*='size-'])]:size-3",
       },
       // Hover is the guarded `hover:` variant (only where the pointer can hover), never a bare
       // :hover, so a tapped button on a touch screen does not keep its hover fill; data-pressed

@@ -11,9 +11,9 @@ import { useT } from "@/lib/i18n";
  * actions stay beside the title on a phone and wrap only when they do not fit. The decision
  * follows the space the header actually has, not the viewport.
  *
- * The app's type scale starts here, after the sign-in pages: a calm semibold title (20 px on
- * phones, 22 px from sm up) over a 14 px muted description. Cards step down to a 15 px title
- * (SectionCard), tables to 13 px headers over 14 px cells, and meta lines to 12-13 px.
+ * The app's type scale starts here (index.css): a semibold 20 px title over a 14 px muted
+ * description. Cards step down to a 16 px title (SectionCard), tables to 14 px heads and cells,
+ * and meta lines to 12 px.
  */
 export function PageHeader({
   title,
@@ -30,14 +30,12 @@ export function PageHeader({
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
       <div className="flex min-w-48 grow basis-0 flex-col gap-1.5">
         {/*
-          The title row is always the buttons' height (36 / 32 / coarse 40, the default Button
+          The title row is always the buttons' height (36 / coarse 40, the default Button
           step), so the title centres on the actions beside it and the first card starts at the
           same height on every page, with or without actions.
         */}
-        <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 sm:min-h-8 pointer-coarse:min-h-10">
-          <h1 className="text-balance font-semibold text-xl leading-tight sm:text-title">
-            {title}
-          </h1>
+        <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 pointer-coarse:min-h-10">
+          <h1 className="text-balance font-semibold text-title">{title}</h1>
           {meta}
         </div>
         {description ? (

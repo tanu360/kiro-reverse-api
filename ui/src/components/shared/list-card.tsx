@@ -9,7 +9,7 @@ import { cn, placeholderKeys } from "@/lib/utils";
  * The list item that replaces a table row on narrow containers (API keys, Backups, Accounts,
  * Requests, Overview activity). One anatomy everywhere:
  *   header  leading slot (checkbox, logo) · title · badge … trailing slot (row kebab)
- *   meta    a muted 13 px line
+ *   meta    a muted 12 px line
  *   body    the caller's content (a stats grid, a meter)
  *   footer  pushed to the bottom (mt-auto), so cards in one grid row line up
  * "card" is a small Card (size sm: p-3, gap-2); "row" is the same content with no border or fill, for rows
@@ -19,7 +19,7 @@ import { cn, placeholderKeys } from "@/lib/utils";
 const CARD_OPEN_HOVER = "has-[[data-slot=list-card-open]:hover]:bg-(--card-hover)";
 // The selected tint is laid over the card's own fill as an image, so the card stays opaque.
 const CARD_SELECTED = "border-primary/40 bg-linear-to-b from-(--row-selected) to-(--row-selected)";
-const ROW_CLASS = "relative flex min-w-0 flex-col gap-2 px-4 py-3 transition-colors sm:px-5";
+const ROW_CLASS = "relative flex min-w-0 flex-col gap-3 px-4 py-4 transition-colors sm:px-6";
 const ROW_OPEN_HOVER = "has-[[data-slot=list-card-open]:hover]:bg-(--row-hover)";
 const ROW_SELECTED = "bg-(--row-selected)";
 
@@ -38,7 +38,7 @@ interface ListCardProps {
   badge?: ReactNode;
   /** The trailing slot: the row's kebab menu or one icon action. */
   action?: ReactNode;
-  /** A muted 13 px line under the header. */
+  /** A muted 12 px line under the header. */
   meta?: ReactNode;
   /** Pinned to the bottom of the item. */
   footer?: ReactNode;
@@ -247,7 +247,7 @@ export function ListCardSkeleton({
     return (
       <div
         aria-hidden="true"
-        className={cn("flex min-w-0 flex-col gap-2 px-4 py-3 sm:px-5", className)}
+        className={cn("flex min-w-0 flex-col gap-3 px-4 py-4 sm:px-6", className)}
         data-slot="list-card-skeleton"
       >
         {content}
