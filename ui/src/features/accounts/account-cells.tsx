@@ -6,12 +6,14 @@ import {
   CircleXIcon,
   Clock01Icon,
   HourglassIcon,
+  KeyRoundIcon,
   PauseCircleIcon,
   WeightIcon,
   ZapIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import type { JSX, ReactNode } from "react";
+import type { ComponentType, JSX, ReactNode } from "react";
+import { AwsLogo, GithubLogo, GoogleLogo, MicrosoftLogo } from "@/components/shared/brand-logos";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge, type BadgeProps, type BadgeTone } from "@/components/ui/badge";
@@ -25,6 +27,7 @@ import { cn } from "@/lib/utils";
 import type { AccountStatus } from "@/routes/-search";
 import {
   accountStatus,
+  authKey,
   authLabel,
   creditTone,
   formatCreditAmount,
@@ -168,14 +171,80 @@ export function AccountFlags({ account }: { account: Account }): JSX.Element | n
   return <span className="flex shrink-0 items-center gap-1.5">{flags}</span>;
 }
 
-/** Plan and sign-in method as one muted line ("Team primary · Pro · Builder ID"). */
-export function accountMeta(account: Account, t: ReturnType<typeof useT>["t"]): string {
-  return [account.nickname, planLabel(account, t), authLabel(account, t)]
+/**
+ * Plan and sign-in method as one muted line ("Team primary · Pro · Builder ID"). Pass
+ * `withAuth: false` where an AuthIcon already names the method.
+ */
+export function accountMeta(
+  account: Account,
+  t: ReturnType<typeof useT>["t"],
+  withAuth = true,
+): string {
+  return [account.nickname, planLabel(account, t), withAuth ? authLabel(account, t) : ""]
     .filter((part) => part && part !== EMPTY)
     .join(" · ");
 }
 
-/** Email (masked under privacy) with flags, over a muted nickname, plan and auth line. */
+const AUTH_LOGOS: Readonly<Record<string, ComponentType<{ className?: string }>>> = {
+  google: GoogleLogo,
+  github: GithubLogo,
+  builderId: AwsLogo,
+  enterprise: AwsLogo,
+  microsoft: MicrosoftLogo,
+};
+
+/** Whether AuthIcon draws a mark for this account's sign-in method. */
+export function hasAuthIcon(account: Account): boolean {
+  const key = authKey(account);
+  return key === "apiKey" || key in AUTH_LOGOS;
+}
+
+/**
+ * Whether the mark alone names the method, so the meta line can leave the word out. Builder ID
+ * and Enterprise share the AWS mark, so they keep their word.
+ */
+export function authIconNamesMethod(account: Account): boolean {
+  return hasAuthIcon(account) && AUTH_LOGOS[authKey(account)] !== AwsLogo;
+}
+
+/**
+ * The sign-in method's mark (Google, GitHub, AWS for Builder ID and Enterprise, Microsoft, a key
+ * for API keys) after the email, with the method's name as a tooltip and as screen reader text.
+ * Nothing for a method without a mark: the meta line names it in words instead.
+ */
+export function AuthIcon({ account }: { account: Account }): JSX.Element | null {
+  const { t } = useT("accounts");
+  const key = authKey(account);
+  const Logo = AUTH_LOGOS[key];
+  let mark: JSX.Element;
+  if (key === "apiKey") {
+    mark = (
+      <HugeiconsIcon
+        aria-hidden="true"
+        className="size-3.5 text-muted-foreground"
+        icon={KeyRoundIcon}
+      />
+    );
+  } else if (Logo) {
+    // The AWS wordmark fills less of its square than a glyph does: drawn larger, the negative
+    // margin keeps its footprint at size-3.5.
+    mark = <Logo className={Logo === AwsLogo ? "-m-0.5 size-4.5" : "size-3.5"} />;
+  } else {
+    return null;
+  }
+  const label = authLabel(account, t);
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+        {mark}
+        <span className="sr-only">{label}</span>
+      </TooltipTrigger>
+      <TooltipPopup>{label}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/** Email (masked under privacy), sign-in mark and flags, over a muted nickname and plan line. */
 export function AccountIdentity({
   account,
   className,
@@ -188,10 +257,11 @@ export function AccountIdentity({
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <div className="flex min-w-0 items-center gap-2">
         <AccountName account={account} />
+        <AuthIcon account={account} />
         <AccountFlags account={account} />
       </div>
       <span className="block truncate text-meta text-muted-foreground leading-tight">
-        {accountMeta(account, t)}
+        {accountMeta(account, t, !authIconNamesMethod(account))}
       </span>
     </div>
   );

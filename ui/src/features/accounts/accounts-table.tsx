@@ -14,7 +14,10 @@ import { ACCOUNT_SORTS, type AccountSort } from "@/routes/-search";
 import {
   AccountFlags,
   AccountIdentity,
+  AuthIcon,
   accountMeta,
+  authIconNamesMethod,
+  hasAuthIcon,
   LastUsedText,
   StatusPill,
   TokenExpiryText,
@@ -219,6 +222,7 @@ function AccountCard({
           />
         </span>
       }
+      badge={hasAuthIcon(account) ? <AuthIcon account={account} /> : undefined}
       leading={
         <Checkbox
           aria-label={t("selectAccount", { email: name.text })}
@@ -230,7 +234,7 @@ function AccountCard({
         // The status leads the meta line, so the header row leaves the name its width.
         <span className="flex min-w-0 items-center gap-2">
           <StatusPill account={account} size="sm" />
-          <span className="truncate">{accountMeta(account, t)}</span>
+          <span className="truncate">{accountMeta(account, t, !authIconNamesMethod(account))}</span>
           <AccountFlags account={account} />
         </span>
       }
