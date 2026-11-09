@@ -1,3 +1,5 @@
+import { ArrowRight02Icon, DatabaseAddIcon, DatabaseIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX } from "react";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { EMPTY, formatCompact, formatNumber } from "@/lib/format";
@@ -5,10 +7,12 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * Token use in two fixed lines, so every row of a table is the same height: the total with
- * "In X · Out Y" beside it, then "Cache read A, write B" when the request used the cache.
- * Neither line wraps; the breakdown and the cache line truncate, and the tooltip carries every
- * exact count.
+ * Token use in two fixed lines, so every row of a table is the same height: the total, then
+ * "input → output" (as OpenRouter's activity log reads) with a database mark and the cached
+ * count after it when the request read from the cache (a database-plus mark and the written
+ * count when it only wrote). The mark keeps the line short enough for the Requests column; the
+ * tooltip names every count, and screen readers hear "N cached" / "N to cache". The second line
+ * is always there and never wraps; it truncates.
  */
 export function TokenCell({
   inTokens,
@@ -58,24 +62,35 @@ export function TokenCell({
           />
         }
       >
-        {/*
-          One line: the breakdown truncates rather than wrapping under the total, so a narrow
-          column keeps every row two lines tall (the tooltip has the exact counts).
-        */}
-        <span className="flex max-w-full flex-nowrap items-baseline gap-x-2">
-          <span className="shrink-0 font-medium">{total === 0 ? "0" : formatCompact(total)}</span>
-          <span className="min-w-0 truncate whitespace-nowrap text-meta text-muted-foreground leading-none">
-            {`${t("tokens.in")} ${formatCompact(inTokens)} · ${t("tokens.out")} ${formatCompact(outTokens)}`}
-          </span>
+        <span className="font-medium">{total === 0 ? "0" : formatCompact(total)}</span>
+        <span className="flex min-w-0 max-w-full items-center gap-1 whitespace-nowrap text-meta text-muted-foreground leading-none">
+          <span className="sr-only">{t("tokens.in")}</span>
+          <span>{formatCompact(inTokens)}</span>
+          <HugeiconsIcon
+            aria-hidden="true"
+            className="size-3 shrink-0 text-muted-foreground/70"
+            icon={ArrowRight02Icon}
+          />
+          <span className="sr-only">{t("tokens.out")}</span>
+          <span>{formatCompact(outTokens)}</span>
+          {hasCache ? (
+            <span className="ms-1.5 flex min-w-0 items-center gap-1">
+              <span className="sr-only">
+                {cacheReadTokens > 0
+                  ? t("tokens.cached", { n: formatCompact(cacheReadTokens) })
+                  : t("tokens.toCache", { n: formatCompact(cacheWriteTokens) })}
+              </span>
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-3 shrink-0 text-muted-foreground/70"
+                icon={cacheReadTokens > 0 ? DatabaseIcon : DatabaseAddIcon}
+              />
+              <span aria-hidden="true" className="min-w-0 truncate">
+                {formatCompact(cacheReadTokens > 0 ? cacheReadTokens : cacheWriteTokens)}
+              </span>
+            </span>
+          ) : null}
         </span>
-        {hasCache ? (
-          <span className="block max-w-full truncate whitespace-nowrap text-meta text-muted-foreground leading-none">
-            {t("tokens.cacheDetail", {
-              read: formatCompact(cacheReadTokens),
-              write: formatCompact(cacheWriteTokens),
-            })}
-          </span>
-        ) : null}
       </TooltipTrigger>
       <TooltipPopup>
         <dl className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 py-0.5">

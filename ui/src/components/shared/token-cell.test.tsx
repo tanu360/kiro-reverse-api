@@ -17,42 +17,54 @@ describe("TokenCell", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "After" }));
   });
 
-  it("shows the total with in/out on one line and the cache on a second, never wrapping", () => {
+  it("shows the total over input → output and the cached count, never wrapping", () => {
     renderWithProviders(<TokenCell cacheReadTokens={9900} inTokens={14500} outTokens={688} />);
-    const inOut = screen.getByText("In 14.5K · Out 688");
-    expect(inOut.className).toContain("whitespace-nowrap");
-    expect(inOut.parentElement?.textContent).toBe("15.2KIn 14.5K · Out 688");
-    const cache = screen.getByText("Cache read 9.9K, write 0");
-    expect(cache.className).toContain("truncate");
-    expect(cache.className).toContain("whitespace-nowrap");
+    const total = screen.getByText("15.2K");
+    expect(total).toHaveClass("font-medium");
+    const flow = screen.getByText("14.5K").parentElement;
+    if (!flow) throw new Error("no token line");
+    expect(flow.className).toContain("whitespace-nowrap");
+    // Screen readers hear the labels the arrow and the database mark stand for.
+    expect(flow.textContent).toBe("In14.5KOut6889.9K cached9.9K");
+    expect(screen.getByText("9.9K cached")).toHaveClass("sr-only");
+    expect(screen.getByText("9.9K")).toHaveClass("truncate");
     // No width cap or floor of its own: a narrow card column keeps it inside its border.
-    const cell = cache.parentElement;
+    const cell = total.parentElement;
     if (!cell) throw new Error("no token cell");
     expect(cell.className).not.toContain("min-w-48");
     expect(cell.className).not.toContain("max-w-60");
     expect(cell.className).toContain("tabular-nums");
   });
 
-  it("leaves out the cache line when the request used no cache", () => {
+  it("shows the written count when the request only wrote to the cache", () => {
+    renderWithProviders(<TokenCell cacheWriteTokens={5000} inTokens={39400} outTokens={2200} />);
+    expect(screen.getByText("5K to cache")).toHaveClass("sr-only");
+    expect(screen.getByText("5K")).toBeInTheDocument();
+  });
+
+  it("leaves out the cache mark when the request used no cache", () => {
     renderWithProviders(<TokenCell inTokens={1200} outTokens={300} />);
-    expect(screen.getByText("In 1.2K · Out 300")).toBeInTheDocument();
-    expect(screen.queryByText(/Cache read/)).not.toBeInTheDocument();
+    expect(screen.getByText("1.2K")).toBeInTheDocument();
+    expect(screen.getByText("300")).toBeInTheDocument();
+    expect(screen.queryByText(/cache/)).not.toBeInTheDocument();
   });
 
   it("takes a width floor for a table column", () => {
     renderWithProviders(<TokenCell detailClassName="min-w-48" inTokens={1} outTokens={2} />);
-    expect(screen.getByText("In 1 · Out 2").closest(".min-w-48")).not.toBeNull();
+    expect(screen.getByText("3").closest(".min-w-48")).not.toBeNull();
   });
 
   it("shows a muted dash for a failed request that used nothing", () => {
     renderWithProviders(<TokenCell inTokens={0} muteZero outTokens={0} />);
     const dash = screen.getByText("—");
     expect(dash).toHaveClass("text-muted-foreground");
-    expect(screen.queryByText(/In 0/)).not.toBeInTheDocument();
+    expect(screen.queryByText("In")).not.toBeInTheDocument();
   });
 
   it("shows 0 without muteZero", () => {
     renderWithProviders(<TokenCell inTokens={0} outTokens={0} />);
-    expect(screen.getByText("0")).toBeInTheDocument();
+    // The total, then 0 → 0.
+    expect(screen.getAllByText("0")).toHaveLength(3);
+    expect(screen.getAllByText("0")[0]).toHaveClass("font-medium");
   });
 });
