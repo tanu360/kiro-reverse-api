@@ -3,13 +3,12 @@ import {
   EllipsisVerticalIcon,
   LogOutIcon,
   RefreshCwIcon,
-  UserShield01Icon,
 } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type JSX, useCallback, useState } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
-import { GithubLogo } from "@/components/shared/brand-logos";
+import { GithubLogo, KiroMark } from "@/components/shared/brand-logos";
 import {
   Menu,
   MenuGroup,
@@ -129,11 +128,12 @@ function SidebarUserMenu(): JSX.Element {
           }
         >
           {/*
-           * The admin's mark in a chip, as tall as the two lines beside it, like a workspace avatar;
-           * in the icon rail the chip is the whole button.
+           * The Kiro ghost, bare (no chip, no border) in the sidebar's text colour, so it follows
+           * the theme. Its 32 px box is as tall as the two lines beside it; in the icon rail the
+           * box is the whole button.
            */}
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2">
-            <AnimatedIcon icon={UserShield01Icon} aria-hidden="true" className="size-4" />
+          <span className="flex size-8 shrink-0 items-center justify-center text-sidebar-foreground">
+            <KiroMark className="size-5" />
           </span>
           <span className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium text-sidebar-foreground">{t("shell.admin")}</span>

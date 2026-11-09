@@ -86,6 +86,23 @@ export function KiroLogo({ className, ...props }: LogoProps): JSX.Element {
 }
 
 /**
+ * The Kiro ghost alone, in one colour: KiroLogo's ghost and eyes as a single path, the eyes cut
+ * out (evenodd) so the surface shows through. No tile and no brand colour: it paints in
+ * `currentColor`, so it follows the theme like a text icon. The viewBox is cropped to the ghost.
+ */
+export function KiroMark(props: LogoProps): JSX.Element {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="4 4 16 16" {...props}>
+      <path
+        d="M7.97 16.376c-1.644 3.642 1.86 4.556 4.443 2.424.76 2.39 3.608.607 4.631-1.247 2.251-4.084 1.342-8.249 1.108-9.108-1.6-5.859-9.6-5.869-10.976.03-.323 1.033-.328 2.206-.507 3.423-.09.617-.16 1.009-.393 1.655-.139.373-.323.7-.62 1.257-.458.865-.264 2.53 2.101 1.665l.224-.1h-.01l-.001.001zM12.722 10.985c-.656 0-.755-.785-.755-1.252 0-.423.074-.756.218-.97a.61.61 0 01.537-.283c.229 0 .428.095.567.289.159.218.243.55.243.964 0 .785-.303 1.252-.805 1.252h-.005zm2.703 0c-.656 0-.755-.785-.755-1.252 0-.423.074-.756.219-.97a.61.61 0 01.536-.283c.229 0 .428.095.567.289.159.218.243.55.243.964 0 .785-.303 1.252-.805 1.252h-.005z"
+        fill="currentColor"
+        fillRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+/**
  * Amazon Q. Source: thesvg.org `amazon-q`, via Iconify `thesvg-color:amazon-q`; MIT. The
  * viewBox is cropped from the source's 842 x 595 artboard to the square around the hexagon.
  */
