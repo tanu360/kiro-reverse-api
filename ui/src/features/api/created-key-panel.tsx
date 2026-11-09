@@ -33,7 +33,7 @@ export function CreatedKeyPanel({
       </AlertDescription>
       {/* Right of the text from sm, under it on phones: its edge lines up with the copy field. */}
       <AlertAction>
-        <Button onClick={onDismiss} size="sm" variant="secondary">
+        <Button onClick={onDismiss} size="sm" variant="tone">
           {t("created.dismiss")}
         </Button>
       </AlertAction>
