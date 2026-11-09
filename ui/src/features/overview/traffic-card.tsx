@@ -17,6 +17,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
+import { Separator } from "@/components/ui/separator";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { heatmapQuery } from "@/lib/api/observe";
 import { formatNumber } from "@/lib/format";
@@ -239,7 +240,14 @@ export function TrafficCard(): JSX.Element {
       <SectionCard
         actions={
           <>
-            {showLegend ? <div className="hidden @4xl:flex">{legend}</div> : null}
+            {showLegend ? (
+              // A hairline between the legend and the range, so the pill does not read as a
+              // legend entry.
+              <div className="hidden items-center gap-4 @4xl:flex">
+                {legend}
+                <Separator className="h-4" orientation="vertical" />
+              </div>
+            ) : null}
             {/* A radio group: one tab stop, the arrow keys move the range. */}
             <SegmentedControl
               render={
