@@ -27,6 +27,7 @@
   "discardBody": "The schedule has changes that are not saved. Leaving this page discards them.",
   "discardAction": "Discard changes",
   "list.title": "Saved backups",
+  "list.description": "Newest first. Download one to keep a copy off the server; a restore signs you out.",
   "list.meta_one": "{n} backup · {size}",
   "list.meta_other": "{n} backups · {size}",
   "list.caption": "Backups, newest first",

@@ -27,6 +27,7 @@
   "discardBody": "O agendamento tem alterações que não foram salvas. Sair desta página as descarta.",
   "discardAction": "Descartar alterações",
   "list.title": "Backups salvos",
+  "list.description": "Mais recentes primeiro. Baixe um para guardar uma cópia fora do servidor; restaurar encerra sua sessão.",
   "list.meta_one": "{n} backup · {size}",
   "list.meta_other": "{n} backups · {size}",
   "list.caption": "Backups, mais recentes primeiro",

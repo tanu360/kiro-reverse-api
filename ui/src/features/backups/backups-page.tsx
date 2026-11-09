@@ -318,6 +318,7 @@ export function BackupsPage(): JSX.Element {
             </Button>
           </>
         }
+        description={t("list.description")}
         icon={ArchiveIcon}
         id="backup-list"
         // Nothing to count with no backups: the empty state under it says so.

@@ -27,6 +27,7 @@
   "discardBody": "定时备份有尚未保存的更改。离开此页面将放弃这些更改。",
   "discardAction": "放弃更改",
   "list.title": "已保存的备份",
+  "list.description": "最新的排在前面。下载备份可在服务器之外保留副本；恢复后需要重新登录。",
   "list.meta_other": "{n} 份备份 · {size}",
   "list.caption": "备份列表，最新的在前",
   "time": "时间",

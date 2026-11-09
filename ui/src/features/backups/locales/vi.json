@@ -27,6 +27,7 @@
   "discardBody": "Lịch sao lưu có thay đổi chưa được lưu. Rời khỏi trang này sẽ bỏ các thay đổi đó.",
   "discardAction": "Bỏ thay đổi",
   "list.title": "Bản sao lưu đã lưu",
+  "list.description": "Mới nhất ở trên. Tải xuống để giữ một bản sao ngoài máy chủ; khôi phục sẽ đăng xuất bạn.",
   "list.meta_other": "{n} bản sao lưu · {size}",
   "list.caption": "Bản sao lưu, mới nhất trước",
   "time": "Thời gian",
