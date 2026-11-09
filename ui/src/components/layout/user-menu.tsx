@@ -1,9 +1,4 @@
-import {
-  CircleArrowUp02Icon,
-  EllipsisVerticalIcon,
-  LogOutIcon,
-  RefreshCwIcon,
-} from "@hugeicons/core-free-icons";
+import { EllipsisVerticalIcon, LogOutIcon, RefreshCwIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type JSX, useCallback, useState } from "react";
@@ -48,25 +43,20 @@ export function useSignOut(): () => Promise<void> {
 /** `onCheckSettled` closes the menu once a manual check has its answer. */
 function UserMenuItems({ onCheckSettled }: { onCheckSettled: () => void }): JSX.Element {
   const { t } = useT();
-  const { checking, checkNow, latest, openDialog } = useUpdateCheck();
+  const { checking, checkNow, latest } = useUpdateCheck();
   const handleSignOut = useSignOut();
   return (
     <>
       <MenuGroup>
         <MenuGroupLabel>{t("shell.admin")}</MenuGroupLabel>
-        {latest ? (
-          <MenuItem onClick={openDialog}>
-            <AnimatedIcon
-              icon={CircleArrowUp02Icon}
-              aria-hidden="true"
-              className="text-warning-foreground"
-            />
-            {t("shell.update.available", { latest: stripV(latest.version) })}
-          </MenuItem>
-        ) : (
-          // Stays open while it checks: the spinner takes the icon's place, the label stays and
-          // aria-busy marks the row (a second click does nothing). The menu closes when the
-          // answer is in, just before its toast or the update dialog shows.
+        {/*
+         * Only while no newer release is known: once one is, the bell above the Admin row names
+         * it, so the menu carries no copy. Stays open while it checks: the spinner takes the
+         * icon's place, the label stays and aria-busy marks the row (a second click does
+         * nothing). The menu closes when the answer is in, just before its toast or the update
+         * dialog shows.
+         */}
+        {latest ? null : (
           <MenuItem
             aria-busy={checking || undefined}
             closeOnClick={false}
@@ -96,7 +86,8 @@ function UserMenuItems({ onCheckSettled }: { onCheckSettled: () => void }): JSX.
 
 /**
  * The "Admin" user row in the sidebar footer, the version number under the name: Check for
- * updates, GitHub and Sign out. The header has no copy of it; the sidebar row is the one way in.
+ * updates (until a newer release is known), GitHub and Sign out. The header has no copy of it;
+ * the sidebar row is the one way in.
  */
 export function UserMenu(): JSX.Element {
   return <SidebarUserMenu />;

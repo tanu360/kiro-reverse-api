@@ -115,6 +115,19 @@ describe("UserMenu", () => {
   });
 });
 
+describe("UserMenu with a newer release known", () => {
+  it("drops Check for updates and carries no copy of the update", async () => {
+    fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "", download: "https://x" });
+    const { user } = renderMenu();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SILENT_CHECK_DELAY_MS + 100);
+    });
+    await user.click(screen.getByRole("button", { name: "Admin menu" }));
+    const items = await screen.findAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual(["GitHub", "Sign out"]);
+  });
+});
+
 describe("UserMenu manual check", () => {
   it("keeps the menu open with a busy row while it checks, then closes it", async () => {
     let answer: (value: { version: string }) => void = () => {};

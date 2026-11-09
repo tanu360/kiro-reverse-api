@@ -5,9 +5,8 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { fetchRemoteVersion } from "@/lib/api/system";
 import { toast } from "@/lib/toast";
 import { renderWithProviders } from "@/test/render";
+import { NavFooter } from "./nav-footer";
 import { SILENT_CHECK_DELAY_MS, UpdateCheckProvider } from "./update-check";
-import { UpdateIndicator } from "./update-indicator";
-import { UserMenu } from "./user-menu";
 
 vi.mock("@/lib/api/system", () => ({
   versionQuery: () =>
@@ -26,12 +25,11 @@ vi.mock("@/lib/toast", () => ({
 
 const fetchRemote = vi.mocked(fetchRemoteVersion);
 
-function renderHeader() {
+function renderFooter() {
   return renderWithProviders(
     <UpdateCheckProvider>
-      <UpdateIndicator />
       <SidebarProvider>
-        <UserMenu />
+        <NavFooter />
       </SidebarProvider>
     </UpdateCheckProvider>,
   );
@@ -53,36 +51,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("UpdateIndicator", () => {
-  it("renders nothing while no newer release is known", async () => {
+describe("NavFooter update bell", () => {
+  it("shows no row while the running version is the latest", async () => {
     fetchRemote.mockResolvedValue({ version: "2.1.0" });
-    renderHeader();
+    renderFooter();
     await passSilentCheck();
-    expect(screen.queryByRole("button", { name: /Update available/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Update available|Check for updates/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Admin menu" })).toBeInTheDocument();
   });
 
-  it("stays in the header after the toast and opens the update dialog", async () => {
+  it("names a newer release and opens the update dialog", async () => {
     fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "Fixes", download: "https://x" });
-    const { user } = renderHeader();
+    const { user } = renderFooter();
     await passSilentCheck();
 
-    const button = await screen.findByRole("button", { name: "Update available: 2.2.0" });
-    await user.click(button);
+    await user.click(await screen.findByRole("button", { name: "Update available: 2.2.0" }));
     expect(await screen.findByText("Version update")).toBeInTheDocument();
     // The toast would cover the dialog footer (a bottom drawer on phones).
     expect(toast.dismiss).toHaveBeenCalledWith("update-available");
-  });
-
-  it("names the update in the Admin menu instead of Check for updates", async () => {
-    fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "", download: "https://x" });
-    const { user } = renderHeader();
-    await passSilentCheck();
-    await screen.findByRole("button", { name: "Update available: 2.2.0" });
-
-    await user.click(screen.getByRole("button", { name: "Admin menu" }));
-    expect(
-      await screen.findByRole("menuitem", { name: "Update available: 2.2.0" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Check for updates" })).not.toBeInTheDocument();
   });
 });

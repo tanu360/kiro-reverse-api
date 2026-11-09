@@ -17,7 +17,6 @@ import { LanguageSwitch } from "./language-switch";
 import { activeNavItem, activeNavView, type NavItem, type NavView } from "./nav-items";
 import { PrivacyToggle } from "./privacy-toggle";
 import { ThemeSwitch } from "./theme-switch";
-import { UpdateIndicator } from "./update-indicator";
 
 /**
  * Port of the Studio Admin dashboard header: sticky and 48 px, painted like t3code's page headers
@@ -74,11 +73,10 @@ export function SiteHeader(): JSX.Element {
           </div>
           <div className="-me-2 flex shrink-0 items-center justify-end gap-0.5 pointer-coarse:-me-2.5 sm:gap-1">
             <CommandMenuTrigger className="sm:hidden" variant="icon" />
-            <UpdateIndicator />
             <PrivacyToggle />
             {/*
-             * Phones: hidden, to leave the page title room beside five touch icons while an
-             * update is known. Language stays one tap away in the ⌘K palette (its Language group).
+             * Phones: hidden, to leave the page title room beside the touch icons. Language stays
+             * one tap away in the ⌘K palette (its Language group).
              */}
             <LanguageSwitch className="max-sm:hidden" />
             <ThemeSwitch variant="menu" />

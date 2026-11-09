@@ -24,7 +24,7 @@ const AVAILABLE_TOAST_MS = 5200;
 const AVAILABLE_TOAST_ID = "update-available";
 /**
  * The release the silent check last announced with a toast. Each release gets one toast; after
- * that the header button's dot carries the notice, so the toast does not cover the page (the
+ * that the sidebar bell's dot carries the notice, so the toast does not cover the page (the
  * sticky Settings chips on a phone) on every visit.
  */
 const ANNOUNCED_VERSION_KEY = "kiro_update_announced";
@@ -36,8 +36,7 @@ interface UpdateCheckValue {
   checking: boolean;
   /**
    * Manual check: spinner while busy, toast when up to date or failed, dialog when newer.
-   * `onSettled` runs once the answer is in, just before that toast or dialog shows (the Admin
-   * menu closes there, so its spinner row stays up while the check runs).
+   * `onSettled` runs once the answer is in, just before that toast or dialog shows.
    */
   checkNow: (onSettled?: () => void) => void;
   openDialog: () => void;
@@ -150,7 +149,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
   );
 }
 
-/** The small dot that marks a newer release on the badge, the rail and the header button. */
+/** The small dot that marks a newer release on the sidebar bell, in the row and the rail. */
 export function UpdateDot({ className }: { className?: string }): JSX.Element {
   return (
     <span
