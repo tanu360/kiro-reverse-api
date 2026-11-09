@@ -11,8 +11,6 @@ import {
   MenuRadioItem,
   MenuTrigger,
 } from "@/components/ui/menu";
-import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
-import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 import { THEMES, type Theme, useTheme } from "./theme-provider";
@@ -25,16 +23,16 @@ function nextTheme(theme: Theme): Theme {
 }
 
 /**
- * `icon`: one button that steps through the modes. `menu`: a button that opens the modes as a
- * radio menu, like the language menu beside it (the app header). `segmented`: all three modes
- * side by side as a radio group in the segmented icon track, the current one highlighted, for the
- * sign-in pages' top row.
+ * `icon`: one quiet button that steps through the modes (system → light → dark), for the sign-in,
+ * 404 and error pages' top row; like the language trigger beside it, hovering only moves the
+ * colour. `menu`: a button that opens the modes as a radio menu, like the language menu beside it
+ * (the app header).
  */
 export function ThemeSwitch({
   variant = "icon",
   className,
 }: {
-  variant?: "icon" | "menu" | "segmented";
+  variant?: "icon" | "menu";
   className?: string;
 }): JSX.Element {
   const { t } = useT();
@@ -43,48 +41,6 @@ export function ThemeSwitch({
   const Icon = THEME_ICONS[theme];
   // The menu variant's button: the reveal grows from it, as the menu item is gone by then.
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
-
-  if (variant === "segmented") {
-    // A radio group (coss p-radio-group-7): one tab stop, arrow keys move the choice.
-    return (
-      <SegmentedControl
-        className={className}
-        render={
-          <RadioGroupPrimitive
-            aria-label={t("shell.theme.title")}
-            onValueChange={(value, details) =>
-              setTheme(
-                value as Theme,
-                (details.event.target as Element | null)?.closest("[role=radio]"),
-              )
-            }
-            value={theme}
-          />
-        }
-        size="icon"
-      >
-        {THEMES.map((mode) => {
-          const ModeIcon = THEME_ICONS[mode];
-          const modeLabel = t(`shell.theme.${mode}`);
-          return (
-            <Tooltip key={mode}>
-              <TooltipTrigger
-                render={
-                  <SegmentedControlItem
-                    aria-label={modeLabel}
-                    render={<RadioPrimitive.Root value={mode} />}
-                  />
-                }
-              >
-                <AnimatedIcon icon={ModeIcon} aria-hidden="true" />
-              </TooltipTrigger>
-              <TooltipPopup>{modeLabel}</TooltipPopup>
-            </Tooltip>
-          );
-        })}
-      </SegmentedControl>
-    );
-  }
 
   if (variant === "menu") {
     return (

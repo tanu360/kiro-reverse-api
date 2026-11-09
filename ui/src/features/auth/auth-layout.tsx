@@ -29,12 +29,13 @@ export function AuthLayout({
        */}
       <div className="grid min-w-0 flex-1 grid-rows-[1fr_auto_1fr]">
         {/*
-         * Language and theme, two separate controls of one height: language at the left, theme
-         * at the right, both on the column's 16 px phone gutter.
+         * Language and theme, two bare controls of one height (36 px, 40 on touch): language at
+         * the left, theme at the right as one button that steps system → light → dark. Neither
+         * has a fill or border; hovering only moves the colour.
          */}
         <div className="row-start-1 flex items-center justify-between gap-2 self-start px-4 pt-4 sm:px-10 sm:pt-6 lg:pt-0">
           <LanguageSwitch variant="flag" />
-          <ThemeSwitch variant="segmented" />
+          <ThemeSwitch />
         </div>
         <main className="row-start-2 px-4 py-12 sm:px-10" id="main">
           <div className="mx-auto flex w-full max-w-90 flex-col gap-8">{children}</div>

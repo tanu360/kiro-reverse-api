@@ -56,12 +56,9 @@ describe("LoginPage", () => {
     expect(screen.getByRole("combobox", { name: "Language: English" })).toHaveTextContent(
       "English",
     );
-    const theme = screen.getByRole("radiogroup", { name: "Theme" });
-    expect(
-      within(theme)
-        .getAllByRole("radio")
-        .map((radio) => radio.getAttribute("aria-label")),
-    ).toEqual(["System", "Light", "Dark"]);
+    // One theme button that steps through the modes.
+    expect(screen.getByRole("button", { name: "Theme: System" })).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Theme" })).not.toBeInTheDocument();
     expect(within(screen.getByRole("contentinfo")).queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(screen.queryByText(PASSWORD)).not.toBeInTheDocument();
