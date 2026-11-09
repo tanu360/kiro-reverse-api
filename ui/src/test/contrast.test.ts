@@ -330,7 +330,7 @@ function ratio(theme: Theme, fg: string, surfaces: string[]): number {
 
 describe("theme token contrast", () => {
   it("reads the tokens of both themes", () => {
-    expect(expand("var(--background)", vars.dark)).toBe("#09090a");
+    expect(expand("var(--background)", vars.dark)).toBe("#0f0f10");
     expect(vars.light.get("--background")).toBe("var(--color-zinc-50)");
     expect(vars.dark.get("--muted-foreground")).not.toBe(vars.light.get("--muted-foreground"));
   });

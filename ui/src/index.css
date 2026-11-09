@@ -160,9 +160,10 @@
    * is 4.66:1; 88 % toward white would drop it to 3.7:1).
    */
   --primary-hover: color-mix(in oklab, var(--primary) 92%, var(--color-white));
-  --background: #09090a;
-  --surface-solid: #111113;
-  --surface-2: #1a1a1d;
+  /* Near-black, not #000: a lifted ladder keeps page, card and chip apart and softens halation. */
+  --background: #0f0f10;
+  --surface-solid: #161618;
+  --surface-2: #1f1f22;
   --foreground: var(--color-neutral-100);
   --card: var(--surface-solid);
   --card-foreground: var(--color-neutral-100);

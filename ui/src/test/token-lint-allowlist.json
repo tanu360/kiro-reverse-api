@@ -2,7 +2,7 @@
   {
     "file": "src/components/layout/theme-provider.tsx",
     "rule": "hex",
-    "match": "#09090a",
+    "match": "#0f0f10",
     "reason": "Browser chrome colour for <meta name=theme-color>; it must be a literal and mirrors --background (index.css)."
   },
   {

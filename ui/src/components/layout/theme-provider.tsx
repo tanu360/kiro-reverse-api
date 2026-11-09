@@ -29,7 +29,7 @@ const REVEAL_MS = 400;
  * The browser chrome's colour (mobile address bar, PWA title bar): the page background of the
  * theme on screen (index.css --background), so a forced theme does not sit under the OS one.
  */
-export const THEME_COLORS: Record<ResolvedTheme, string> = { dark: "#09090a", light: "#fafafa" };
+export const THEME_COLORS: Record<ResolvedTheme, string> = { dark: "#0f0f10", light: "#fafafa" };
 
 /** Leaves one <meta name="theme-color"> (index.html ships a light and a dark media variant). */
 function writeThemeColor(theme: ResolvedTheme): void {
