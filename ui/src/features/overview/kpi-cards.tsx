@@ -72,9 +72,10 @@ function SegmentBar({ parts }: { parts: readonly Part[] }): JSX.Element {
 /** The bar's key: a dot, the label and the value, two to a row. */
 function PartLegend({ parts }: { parts: readonly Part[] }): JSX.Element {
   return (
-    <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-meta" data-slot="kpi-legend">
+    <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-meta" data-slot="kpi-legend">
       {parts.map((part) => (
-        <div className="flex min-w-0 items-center gap-2" key={part.key}>
+        // 6 px between dot, label and value, so a label like "Outside" fits a 238 px card.
+        <div className="flex min-w-0 items-center gap-1.5" key={part.key}>
           <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", part.tone)} />
           <dt className="min-w-0 truncate text-muted-foreground">{part.label}</dt>
           <dd className="ms-auto font-medium tabular-nums">{part.shown}</dd>

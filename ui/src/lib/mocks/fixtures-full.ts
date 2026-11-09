@@ -412,15 +412,16 @@ function randomAccount(
   const trial = plan === FREE && rng() < 0.3;
 
   // Health
+  // A healthy fleet for screenshots: nine in ten serving, a handful in each other state.
   const health = weighted(rng, [
-    ["healthy", 82],
-    ["cleared", 5],
-    ["expired", 4],
-    ["banned", 2],
-    ["suspended", 1],
-    ["disabledBan", 1],
-    ["adminOff", 3],
-    ["silent", 2],
+    ["healthy", 91],
+    ["cleared", 4],
+    ["expired", 2.5],
+    ["banned", 0.2],
+    ["suspended", 0.3],
+    ["disabledBan", 0.2],
+    ["adminOff", 1],
+    ["silent", 0.8],
     ["noToken", 0],
   ] as const);
   const tier = weighted(rng, [
@@ -449,7 +450,7 @@ function randomAccount(
   const offline = ["banned", "suspended", "disabledBan", "adminOff", "silent"].includes(health);
   if (offline && lastUsed > banTime) lastUsed = requestCount > 0 ? banTime - int(rng, 1, 600) : 0;
 
-  const errorRate = offline ? 0.05 + rng() * 0.3 : rng() * 0.06;
+  const errorRate = offline ? 0.05 + rng() * 0.3 : rng() * 0.02;
   const tokensPerRequest = int(rng, 4_000, 40_000);
   const totalTokens = requestCount * tokensPerRequest;
 
@@ -1448,7 +1449,7 @@ function makeRequest(
   else if (episode === "drained" || !account)
     failure = rng() < 0.9 || !account ? "no_accounts" : null;
   else if (episode === "throttle")
-    failure = rng() < 0.55 ? (rng() < 0.85 ? "rate_limit" : "quota") : null;
+    failure = rng() < 0.22 ? (rng() < 0.85 ? "rate_limit" : "quota") : null;
   else if (episode === "outage") {
     failure =
       rng() < 0.75
@@ -1458,9 +1459,10 @@ function makeRequest(
             ["timeout", 2],
           ] as const)
         : null;
-  } else if (account.banTime && ts > account.banTime - 30 * MINUTE && rng() < 0.5) {
+  } else if (account.banTime && ts > account.banTime - 30 * MINUTE && rng() < 0.3) {
     failure = account.banStatus === "SUSPENDED" ? "suspended" : "auth";
-  } else if (rng() < 0.055) {
+  } else if (rng() < 0.012) {
+    // About one request in a hundred fails outside the incidents: a healthy proxy's error rate.
     failure = weighted(rng, FAILURE_WEIGHTS);
   }
 
