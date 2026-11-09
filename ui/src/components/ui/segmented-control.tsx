@@ -30,15 +30,23 @@ export const segmentedControlItemLayoutClassName =
   "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0";
 
 /**
- * The sign-in theme toggle is the segmented control: a pill frame in the field hairline, 1 px
- * inside it, and a round highlight in the neutral button's hover tint (index.css
- * --neutral-button-hover) with no shadow, the same tint a selected tab takes.
+ * The sign-in theme toggle is the segmented control: a faintly tinted pill in the field hairline
+ * and, 1 px inside it, the chosen segment raised on a round thumb (index.css --segment-thumb,
+ * with its hairline edge and soft shadow in --segment-thumb-shadow).
  */
-export const segmentedControlIndicatorSurfaceClassName = "rounded-full bg-(--neutral-button-hover)";
+export const segmentedControlIndicatorSurfaceClassName =
+  "rounded-full bg-(--segment-thumb) shadow-(--segment-thumb-shadow)";
 
 /** The frame round the segments (and the default tabs list). */
 export const segmentedControlTrackClassName =
-  "relative z-0 flex w-fit items-center justify-center gap-0 rounded-full border border-field-border bg-transparent p-px";
+  "relative z-0 flex w-fit items-center justify-center gap-0 rounded-full border border-field-border bg-(--segment-track) p-px";
+
+/**
+ * The thumb's slide to the chosen segment: a strong ease-out, so it leaves at once and settles
+ * softly (the built-in ease-in-out starts too slowly to feel like it followed the click).
+ */
+export const segmentedControlSlideClassName =
+  "transition-[width,height,translate] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none";
 
 /** `field`: the track takes the field fill, to sit among inputs and selects in a toolbar. */
 type SegmentedControlSurface = "none" | "field";
@@ -114,11 +122,11 @@ export function SegmentedControlItem({
   const defaultProps = {
     className: cn(
       "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium text-meta text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline-inner disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
-      // The chosen item's own fill, until the sliding indicator has measured it.
-      "data-checked:bg-(--neutral-button-hover) data-checked:text-foreground",
-      "aria-[current=page]:bg-(--neutral-button-hover) aria-[current=page]:text-foreground",
-      "data-pressed:bg-(--neutral-button-hover) data-pressed:text-foreground",
-      "[:has(>[data-slot=segmented-control-indicator]:not([hidden]))>&]:bg-transparent!",
+      // The chosen item's own thumb, until the sliding indicator has measured it.
+      "data-checked:bg-(--segment-thumb) data-checked:text-foreground data-checked:shadow-(--segment-thumb-shadow)",
+      "aria-[current=page]:bg-(--segment-thumb) aria-[current=page]:text-foreground aria-[current=page]:shadow-(--segment-thumb-shadow)",
+      "data-pressed:bg-(--segment-thumb) data-pressed:text-foreground data-pressed:shadow-(--segment-thumb-shadow)",
+      "[:has(>[data-slot=segmented-control-indicator]:not([hidden]))>&]:bg-transparent! [:has(>[data-slot=segmented-control-indicator]:not([hidden]))>&]:shadow-none!",
       segmentedControlItemLayoutClassName,
       segmentedControlItemSizeClassNames[resolvedSize],
       className,
@@ -237,7 +245,8 @@ function SegmentedControlIndicator(): React.ReactElement {
     <span
       aria-hidden="true"
       className={cn(
-        "pointer-events-none absolute top-0 left-0 -z-1 h-(--active-item-height) w-(--active-item-width) translate-x-(--active-item-left) translate-y-(--active-item-top) transition-[width,height,translate] duration-200 ease-in-out motion-reduce:transition-none",
+        "pointer-events-none absolute top-0 left-0 -z-1 h-(--active-item-height) w-(--active-item-width) translate-x-(--active-item-left) translate-y-(--active-item-top)",
+        segmentedControlSlideClassName,
         segmentedControlIndicatorSurfaceClassName,
       )}
       data-slot="segmented-control-indicator"
