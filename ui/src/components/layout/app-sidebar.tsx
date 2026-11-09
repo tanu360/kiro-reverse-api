@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { JSX } from "react";
 import { AppIcon } from "@/components/shared/app-icon";
+import { KiroLogo } from "@/components/shared/brand-logos";
 import {
   Sidebar,
   SidebarContent,
@@ -47,7 +48,12 @@ export function AppSidebar(): JSX.Element {
               render={<Link to="/" />}
               tooltip={appName}
             >
-              <AppIcon className="size-5 shrink-0 rounded-sm" size={20} />
+              {/* Expanded: the app icon beside the name. The icon rail shows the coloured Kiro tile. */}
+              <AppIcon
+                className="size-5 shrink-0 rounded-sm group-data-[collapsible=icon]:hidden"
+                size={20}
+              />
+              <KiroLogo className="hidden size-5 shrink-0 group-data-[collapsible=icon]:block" />
               <span className="font-semibold text-base text-sidebar-foreground">{appName}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
