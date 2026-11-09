@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Checks the commits being pushed, not the working tree: each pushed commit is checked out in a
+# temporary worktree and must lint, typecheck and build there. A commit that sweeps in a staged
+# change from unfinished work (a deleted file still imported elsewhere) builds fine in the working
+# tree but not in CI; this catches it before the push.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Skip in an emergency:   git push --no-verify
+set -euo pipefail
+
+repo=$(git rev-parse --show-toplevel)
+zero=0000000000000000000000000000000000000000
+checked=""
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # A deleted branch, or a commit already checked in this push.
+  [ "$local_sha" = "$zero" ] && continue
+  case " $checked " in *" $local_sha "*) continue ;; esac
+  checked="$checked $local_sha"
+
+  # Only the tip is checked: CI builds the tip, and each commit before it was checked on its push.
+  short=$(git rev-parse --short "$local_sha")
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/kiro-pre-push.XXXXXX")
+  cleanup() { git -C "$repo" worktree remove --force "$tmp" >/dev/null 2>&1 || rm -rf "$tmp"; }
+  trap cleanup EXIT
+  git -C "$repo" worktree add --detach --quiet "$tmp" "$local_sha"
+
+  echo "pre-push: checking $short ($local_ref)"
+
+  if [ -d "$repo/ui/node_modules" ] && [ -f "$tmp/ui/package.json" ]; then
+    ln -s "$repo/ui/node_modules" "$tmp/ui/node_modules"
+    (cd "$tmp/ui" && npx --no-install biome check src >/dev/null) ||
+      { echo "pre-push: $short fails the UI lint (cd ui && npx biome check src)"; exit 1; }
+    (cd "$tmp/ui" && npx --no-install tsc -b --noEmit) ||
+      { echo "pre-push: $short does not typecheck (cd ui && npx tsc -b --noEmit)"; exit 1; }
+  else
+    echo "pre-push: ui/node_modules missing, UI checks skipped (run pnpm install in ui/)"
+  fi
+
+  if command -v go >/dev/null 2>&1; then
+    (cd "$tmp" && go build ./... && go vet ./...) ||
+      { echo "pre-push: $short does not build (go build ./... && go vet ./...)"; exit 1; }
+  fi
+
+  cleanup
+  trap - EXIT
+done
+
+exit 0
