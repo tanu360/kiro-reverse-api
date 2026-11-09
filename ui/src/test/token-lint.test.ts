@@ -34,10 +34,11 @@ const SKIPPED = [
 ];
 
 // Places that own a sticky layer by design: DataTable's pinned columns, the site header, the
-// Settings section nav and the Accounts batch toolbar.
+// app shell's scroll-edge fades, the Settings section nav and the Accounts batch toolbar.
 const STICKY_OWNERS = [
   /^src\/components\/shared\/data-table\.tsx$/,
   /^src\/components\/layout\/site-header\.tsx$/,
+  /^src\/components\/layout\/app-shell\.tsx$/,
   /^src\/features\/settings\/settings-page\.tsx$/,
   /^src\/features\/accounts\/batch-bar\.tsx$/,
 ];

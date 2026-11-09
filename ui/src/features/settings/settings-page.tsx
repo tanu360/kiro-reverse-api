@@ -293,11 +293,12 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   }
 
   // Below xl: one sticky chip row under the header, bleeding to the page edges; its ends fade
-  // while there are more chips past them.
+  // while there are more chips past them. It covers the shell's top scroll fade, so it carries
+  // its own below it, as tall as the 16 px gap to the first card.
   return (
     <nav
       aria-label={t("sections")}
-      className="sticky top-12 z-30 -mx-4 bg-background pt-1 md:-mx-6"
+      className="sticky top-12 z-30 -mx-4 bg-background pt-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-linear-to-b after:from-background md:-mx-6"
     >
       <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade scrollbarGutter>
         {/* The top 4px of padding sits inside the scroller, so a chip's focus ring is not clipped. */}
