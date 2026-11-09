@@ -43,7 +43,8 @@ import {
 } from "./backups-table";
 import { ScheduleCard } from "./schedule-card";
 
-const PAGE_SIZE = 25;
+/** Ten backups a page, so the saved list stays about a screen tall. */
+const PAGE_SIZE = 10;
 
 /**
  * Tracks which rows have a request in flight, and which action. A second action on a busy row

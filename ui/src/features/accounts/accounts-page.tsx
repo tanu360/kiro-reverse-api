@@ -42,7 +42,7 @@ import { ExportDialog } from "./export-dialog";
 import { TestAccountDialog } from "./test-account-dialog";
 
 const NO_ACCOUNTS: Account[] = [];
-const PAGE_SIZES = [25, 50, 100];
+const PAGE_SIZES = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
 
 /** Keeps the last target after close, so a dialog's content stays during its exit animation. */

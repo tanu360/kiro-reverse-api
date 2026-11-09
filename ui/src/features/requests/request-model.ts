@@ -13,7 +13,7 @@ export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 25;
 export const DEFAULT_SORT: RequestSort = "time";
 export const DEFAULT_ORDER = "desc" as const;
-export const PAGE_SIZES = [25, 50, 100] as const;
+export const PAGE_SIZES = [10, 25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
 
 const ERROR_TYPES: readonly RequestErrorType[] = [

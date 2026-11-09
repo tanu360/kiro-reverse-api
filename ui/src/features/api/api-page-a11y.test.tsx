@@ -63,14 +63,15 @@ describe("API keys layout", () => {
     expect(trigger.closest("td")).toHaveClass("sticky", "right-0");
   });
 
-  it("pages the table 25 keys at a time in the card footer", async () => {
+  it("pages the table 10 keys at a time in the card footer", async () => {
     seedManyKeys();
     const { user } = renderWithProviders(<ApiPage />);
     await screen.findAllByText("client-0");
-    expect(within(keysTable()).getAllByRole("row")).toHaveLength(26);
-    expect(screen.getByText("1–25 of 30")).toBeInTheDocument();
+    expect(within(keysTable()).getAllByRole("row")).toHaveLength(11);
+    expect(screen.getByText("1–10 of 30")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(within(keysTable()).getAllByRole("row")).toHaveLength(6);
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(within(keysTable()).getAllByRole("row")).toHaveLength(11);
     expect(within(keysTable()).getByText("client-29")).toBeInTheDocument();
   });
 });

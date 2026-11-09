@@ -52,12 +52,12 @@ import { CreatedKeyPanel } from "./created-key-panel";
 
 /**
  * The keys turn into cards below DataTable's `cardsBelow="4xl"` (a 56rem container: the table
- * needs about 850 px), two to a row from 42rem. Script only needs the same width for the page
- * size: ten cards a page, twenty-five table rows.
+ * needs about 850 px), two to a row from 42rem. Ten keys a page in either layout, so the card
+ * stays about a screen tall.
  */
 const CARDS_BELOW_PX = 896;
 const CARD_PAGE_SIZE = 10;
-const TABLE_PAGE_SIZE = 25;
+const TABLE_PAGE_SIZE = 10;
 
 interface DialogState {
   open: boolean;

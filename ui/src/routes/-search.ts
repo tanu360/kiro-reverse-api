@@ -54,7 +54,7 @@ export interface AccountsSearch {
   sort?: AccountSort;
   order?: "asc" | "desc";
   page?: number;
-  pageSize?: 25 | 50 | 100;
+  pageSize?: 10 | 25 | 50 | 100;
 }
 
 /** Matches research RequestSort and the Requests table column ids. */
@@ -72,7 +72,7 @@ export type RequestSort = (typeof REQUEST_SORTS)[number];
 
 export interface RequestsSearch {
   page?: number;
-  pageSize?: 25 | 50 | 100;
+  pageSize?: 10 | 25 | 50 | 100;
   search?: string;
   status?: "success" | "failed";
   sort?: RequestSort;
@@ -84,7 +84,7 @@ interface LoginSearch {
 }
 
 const OVERVIEW_RANGES: readonly OverviewRange[] = ["1h", "6h", "24h"];
-const PAGE_SIZES: readonly NonNullable<RequestsSearch["pageSize"]>[] = [25, 50, 100];
+const PAGE_SIZES: readonly NonNullable<RequestsSearch["pageSize"]>[] = [10, 25, 50, 100];
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
