@@ -6,7 +6,6 @@ import { CodeBlock } from "@/components/shared/code-block";
 import { SectionCard } from "@/components/shared/section-card";
 import { ROW_DESCRIPTION } from "@/components/shared/settings-rows";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { settingsQuery } from "@/lib/api/settings";
 import type { CodeLanguage } from "@/lib/highlight";
@@ -104,15 +103,16 @@ export function ClientSnippetsCard(): JSX.Element {
             <AlertDescription>{t("snippets.anyKeyWorks")}</AlertDescription>
           </Alert>
         ) : null}
-        {/* Four tabs fit one row on a 390 px phone; a narrower card scrolls them, faded at the edge. */}
-        <ScrollArea className="h-auto max-w-full" clampContentMinWidth={false} scrollFade>
-          <TabsList>
-            <TabsTab value="curl">{t("snippets.curl")}</TabsTab>
-            <TabsTab value="claude-code">{t("snippets.claudeCode")}</TabsTab>
-            <TabsTab value="codex">{t("snippets.codex")}</TabsTab>
-            <TabsTab value="openai-sdk">{t("snippets.openaiSdk")}</TabsTab>
-          </TabsList>
-        </ScrollArea>
+        {/*
+          Underlined over a full-width hairline, so the strip reads as tabs with their panel under
+          it. A card too narrow for all four scrolls the strip sideways, faded at the edge.
+        */}
+        <TabsList variant="underline">
+          <TabsTab value="curl">{t("snippets.curl")}</TabsTab>
+          <TabsTab value="claude-code">{t("snippets.claudeCode")}</TabsTab>
+          <TabsTab value="codex">{t("snippets.codex")}</TabsTab>
+          <TabsTab value="openai-sdk">{t("snippets.openaiSdk")}</TabsTab>
+        </TabsList>
         <div className={PANEL_STACK}>
           <StackedPanel className="flex min-w-0 flex-col gap-3" value="curl">
             <Snippet
