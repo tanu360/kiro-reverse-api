@@ -1421,6 +1421,8 @@ function makeRequest(
   ts: number,
   ageMin: number,
   episode: Episode,
+  /** This failure, instead of drawing whether and how the request fails. */
+  forced?: RequestErrorType,
 ): RequestRecord {
   const { rng } = ctx;
   const legacy = ageMin > 25 * 1440 && rng() < 0.3;
@@ -1445,7 +1447,8 @@ function makeRequest(
   const account = traffic?.account;
 
   let failure: RequestErrorType | null = null;
-  if (episode === "keyScan") failure = "auth";
+  if (forced) failure = forced;
+  else if (episode === "keyScan") failure = "auth";
   else if (episode === "drained" || !account)
     failure = rng() < 0.9 || !account ? "no_accounts" : null;
   else if (episode === "throttle")
@@ -1702,6 +1705,13 @@ function seedFullRequests(now: number, traffic: Traffic[], keys: StoredKey[]): R
       records.push(makeRequest(ctx, start + int(rng, 0, lastSecond), age, episode));
     }
   }
+  // One failure of every type two to four days back, from its own PRNG: the random draw fails
+  // about one request in a hundred, too few to promise each type at every hour of the day.
+  const cover: RequestContext = { ...ctx, rng: createRng(1102) };
+  FAILURE_WEIGHTS.forEach(([type], index) => {
+    const age = 2 * 1440 + 600 + index * 97;
+    records.push(makeRequest(cover, currentMinute - age * 60 + 17, age, null, type));
+  });
   records.push(
     ...edgeRequests(
       now,
