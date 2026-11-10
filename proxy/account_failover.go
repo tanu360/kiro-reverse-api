@@ -120,6 +120,11 @@ func isProfileUnavailableErrorMessage(msg string) bool {
 
 func isAuthErrorMessage(msg string) bool {
 	msg = strings.ToLower(msg)
+	//! An upstream client-version gate is not an auth failure: banning on it disables
+	//! the account for good and hides "update the client version" behind a 503.
+	if strings.Contains(msg, "feature_not_supported") || strings.Contains(msg, "no longer supported") {
+		return false
+	}
 	return strings.Contains(msg, "http 401") ||
 		strings.Contains(msg, "http 403") ||
 		strings.Contains(msg, "unauthorized") ||
