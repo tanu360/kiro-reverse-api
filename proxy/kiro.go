@@ -363,8 +363,6 @@ func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payloa
 	if payload != nil && strings.TrimSpace(payload.ProfileArn) == "" && !isAPIKey {
 		if profileArn, err := resolveProfileArnContext(ctx, account); err == nil {
 			payload.ProfileArn = profileArn
-		} else if isProfileArnResolutionSoftError(err) {
-			logger.Debugf("[ProfileArn] Skipped profile ARN resolution for %s: %v", accountEmailForLog(account), err)
 		} else {
 			logger.Warnf("[ProfileArn] Failed to resolve profile ARN for %s: %v", accountEmailForLog(account), err)
 		}

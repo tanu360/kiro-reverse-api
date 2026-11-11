@@ -63,7 +63,6 @@ func TestResolveProfileArnRefreshFallbackRunsOncePerSuppressionWindow(t *testing
 		body       string
 		wantLookup int32
 	}{
-		{name: "builder id unsupported", provider: "BuilderId", status: http.StatusForbidden, body: builderIDUnsupportedBody, wantLookup: 1},
 		{name: "rejected lookup", provider: "Enterprise", status: http.StatusBadRequest, body: profileRequestBodyInvalid, wantLookup: 2},
 	}
 	for _, tc := range cases {

@@ -23,20 +23,18 @@ const (
 	//! returns a reduced catalog (no Claude) for those client versions.
 	kiroModelAPIBase = "https://q.us-east-1.amazonaws.com"
 
-	profileArnUnsupportedCooldown = 24 * time.Hour
-	profileLookupFailureTTL       = 10 * time.Minute
-	maxProfilePages               = 20
-	maxModelPages                 = 20
-	maxProfileResponseBytes       = 1 << 20
-	maxProfileErrorBytes          = 64 << 10
+	//! Kiro IDE, kiro-cli and KiroCrew name this fixed profile for every AWS Builder ID sign-in.
+	//! Builder ID owns no profile and ListAvailableProfiles answers it 403, yet clients >= 0.11.133 must name one.
+	builderIDProfileArn = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX"
+
+	profileLookupFailureTTL = 10 * time.Minute
+	maxProfilePages         = 20
+	maxModelPages           = 20
+	maxProfileResponseBytes = 1 << 20
+	maxProfileErrorBytes    = 64 << 10
 )
 
-var (
-	profileArnResolutionCooldowns sync.Map
-
-	errProfileArnLookupSuppressed  = errors.New("profile ARN resolution skipped: previous Builder ID profile lookup was unsupported")
-	errProfileArnLookupUnsupported = errors.New("profile ARN unsupported for Builder ID account")
-)
+var profileArnResolutionCooldowns sync.Map
 
 func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
 	ensureRestProfileArn(account)
@@ -172,28 +170,22 @@ func resolveProfileArnContext(ctx context.Context, account *config.Account) (str
 	if config.IsAPIKeyAccount(account) {
 		return "", nil
 	}
-	if profileArn := strings.TrimSpace(account.ProfileArn); profileArn != "" {
+	if profileArn := requestProfileArn(account); profileArn != "" {
 		return profileArn, nil
 	}
 
-	suppressed := isProfileArnResolutionSuppressed(account)
-	var lookupErr error
-	if !suppressed {
-		profileArn, err := resolveProfileArnAcrossRegions(ctx, account)
-		if err == nil {
-			cacheResolvedProfileArn(account, profileArn)
-			return profileArn, nil
-		}
-		lookupErr = err
+	profileArn, lookupErr := resolveProfileArnAcrossRegions(ctx, account)
+	if lookupErr == nil {
+		cacheResolvedProfileArn(account, profileArn)
+		return profileArn, nil
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 
-	//! AWS refresh responses can carry profileArn, so refresh stays the fallback even for Builder ID. Entra refresh never does.
+	//! AWS refresh responses can carry profileArn, so refresh stays the fallback. Entra refresh never does.
 	//! A forced refresh rotates the refresh token and holds the account refresh lock, so it runs once per failure window, not per call.
-	unsupported := suppressed || isBuilderIDProfileUnsupportedError(account, lookupErr)
-	if account.RefreshToken != "" && !config.IsExternalIdpAccount(account) && claimProfileArnRefreshFallback(account, unsupported) {
+	if account.RefreshToken != "" && !config.IsExternalIdpAccount(account) && claimProfileArnRefreshFallback(account) {
 		var refreshedArn string
 		var refreshErr error
 		if storedAccount(account.ID) != nil {
@@ -223,16 +215,27 @@ func resolveProfileArnContext(ctx context.Context, account *config.Account) (str
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-
-	if suppressed {
-		return "", errProfileArnLookupSuppressed
-	}
-	if isBuilderIDProfileUnsupportedError(account, lookupErr) {
-		suppressProfileArnResolution(account)
-		logger.Debugf("[ProfileArn] Builder ID profile lookup unsupported for %s: %v", accountEmailForLog(account), lookupErr)
-		return "", errProfileArnLookupUnsupported
-	}
 	return "", fmt.Errorf("no available Kiro profile: %w", lookupErr)
+}
+
+func isBuilderIDAccount(account *config.Account) bool {
+	return account != nil && strings.EqualFold(strings.TrimSpace(account.Provider), "BuilderId")
+}
+
+// requestProfileArn is the profile ARN a request for account names without a
+// lookup: the stored ARN, else the fixed Builder ID profile. The fixed ARN is
+// request-scoped and never stored, as Kiro does.
+func requestProfileArn(account *config.Account) string {
+	if account == nil || config.IsAPIKeyAccount(account) {
+		return ""
+	}
+	if profileArn := strings.TrimSpace(account.ProfileArn); profileArn != "" {
+		return profileArn
+	}
+	if isBuilderIDAccount(account) {
+		return builderIDProfileArn
+	}
+	return ""
 }
 
 func cacheResolvedProfileArn(account *config.Account, profileArn string) {
@@ -244,28 +247,12 @@ func cacheResolvedProfileArn(account *config.Account, profileArn string) {
 
 func ensureRestProfileArn(account *config.Account) {
 	//! REST calls worked without an ARN before, so a failed lookup degrades to that instead of failing the call.
-	if account == nil || strings.TrimSpace(account.ProfileArn) != "" || config.IsAPIKeyAccount(account) {
+	if account == nil || config.IsAPIKeyAccount(account) || requestProfileArn(account) != "" {
 		return
 	}
 	if _, err := ResolveProfileArn(account); err != nil {
-		if isProfileArnResolutionSoftError(err) {
-			logger.Debugf("[ProfileArn] Continuing REST request without profile ARN for %s: %v", accountEmailForLog(account), err)
-			return
-		}
 		logger.Warnf("[ProfileArn] Continuing REST request without profile ARN for %s: %v", accountEmailForLog(account), err)
 	}
-}
-
-func isBuilderIDProfileUnsupportedError(account *config.Account, err error) bool {
-	if account == nil || err == nil || !strings.EqualFold(strings.TrimSpace(account.Provider), "BuilderId") {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "HTTP 403") && strings.Contains(msg, "AWS Builder ID is not supported for this operation")
-}
-
-func isProfileArnResolutionSoftError(err error) bool {
-	return errors.Is(err, errProfileArnLookupSuppressed) || errors.Is(err, errProfileArnLookupUnsupported)
 }
 
 func profileArnCooldownKey(account *config.Account) string {
@@ -279,13 +266,6 @@ func profileArnCooldownKey(account *config.Account) string {
 		}
 	}
 	return ""
-}
-
-func suppressProfileArnResolution(account *config.Account) {
-	//! Builder ID cannot list profiles; without a cooldown every request would re-probe and log the same 403.
-	if key := profileArnCooldownKey(account); key != "" {
-		profileArnResolutionCooldowns.Store(key, time.Now().Add(profileArnUnsupportedCooldown))
-	}
 }
 
 func profileLookupFailureKey(account *config.Account, region string) string {
@@ -331,15 +311,12 @@ func cachedProfileLookupFailure(account *config.Account, region string) error {
 	return failure.err
 }
 
-func claimProfileArnRefreshFallback(account *config.Account, unsupported bool) bool {
+func claimProfileArnRefreshFallback(account *config.Account) bool {
 	key := profileArnRefreshFallbackKey(account)
 	if key == "" {
 		return true
 	}
 	window := profileLookupFailureTTL
-	if unsupported {
-		window = profileArnUnsupportedCooldown
-	}
 	now := time.Now()
 	for {
 		value, loaded := profileArnResolutionCooldowns.LoadOrStore(key, now.Add(window))
@@ -361,22 +338,6 @@ func releaseProfileArnRefreshFallback(account *config.Account) {
 	}
 }
 
-func isProfileArnResolutionSuppressed(account *config.Account) bool {
-	key := profileArnCooldownKey(account)
-	if key == "" {
-		return false
-	}
-	value, ok := profileArnResolutionCooldowns.Load(key)
-	if !ok {
-		return false
-	}
-	if until, ok := value.(time.Time); !ok || time.Now().After(until) {
-		profileArnResolutionCooldowns.Delete(key)
-		return false
-	}
-	return true
-}
-
 func resolveProfileArnAcrossRegions(ctx context.Context, account *config.Account) (string, error) {
 	var probeErrors []error
 	for _, region := range kiroProfileRegionCandidates(account) {
@@ -390,9 +351,6 @@ func resolveProfileArnAcrossRegions(ctx context.Context, account *config.Account
 		profileArn, err := listAvailableProfilesWithRetry(ctx, account, region)
 		if err == nil {
 			return profileArn, nil
-		}
-		if isBuilderIDProfileUnsupportedError(account, err) {
-			return "", err
 		}
 		if ctx.Err() == nil && !isTransientProfileFetchError(err) {
 			rememberProfileLookupFailure(account, region, err)
@@ -551,6 +509,10 @@ func DiscoverKiroProfiles(ctx context.Context, account *config.Account) ([]KiroP
 	if account == nil {
 		return nil, fmt.Errorf("account is nil")
 	}
+	//! Builder ID has exactly one profile, the fixed one, and ListAvailableProfiles answers it 403.
+	if isBuilderIDAccount(account) {
+		return []KiroProfile{{ARN: builderIDProfileArn, Name: "AWS Builder ID", Region: defaultKiroRegion}}, nil
+	}
 	var profiles []KiroProfile
 	seen := make(map[string]bool)
 	var probeErrors []error
@@ -583,7 +545,7 @@ func withProfileArnQuery(rawURL string, account *config.Account) string {
 	if account == nil {
 		return rawURL
 	}
-	profileArn := strings.TrimSpace(account.ProfileArn)
+	profileArn := requestProfileArn(account)
 	if profileArn == "" {
 		return rawURL
 	}

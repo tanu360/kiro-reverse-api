@@ -159,7 +159,7 @@ func performKiroWebSearch(ctx context.Context, account *config.Account, query st
 	reqCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	if !config.IsAPIKeyAccount(account) {
-		if _, err := resolveProfileArnContext(reqCtx, account); err != nil && !isProfileArnResolutionSoftError(err) {
+		if _, err := resolveProfileArnContext(reqCtx, account); err != nil {
 			return nil, err
 		}
 	}
@@ -188,7 +188,7 @@ func performKiroWebSearch(ctx context.Context, account *config.Account, query st
 	req.Header.Set("Amz-Sdk-Invocation-Id", uuid.NewString())
 	if !config.IsAPIKeyAccount(account) && account != nil {
 		//! Kiro IDE names the profile on MCP calls; API keys carry no profile.
-		if arn, _, ok := parseKiroProfileArn(account.ProfileArn); ok {
+		if arn, _, ok := parseKiroProfileArn(requestProfileArn(account)); ok {
 			req.Header.Set("x-amzn-kiro-profile-arn", arn)
 		}
 	}

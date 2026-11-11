@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	neturl "net/url"
 	"strings"
 	"time"
 
@@ -49,9 +48,7 @@ func FetchOverageStatus(account *config.Account) (*OverageSnapshot, error) {
 
 	ensureRestProfileArn(account)
 	rawURL := regionalizeURL(kiroQAPIBase+"/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST&isEmailRequired=true", account)
-	if profileArn := strings.TrimSpace(account.ProfileArn); profileArn != "" {
-		rawURL += "&profileArn=" + neturl.QueryEscape(profileArn)
-	}
+	rawURL = withProfileArnQuery(rawURL, account)
 
 	req, err := http.NewRequest("GET", rawURL, nil)
 	if err != nil {

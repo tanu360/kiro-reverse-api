@@ -4,18 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"kiro-proxy/auth"
 	"kiro-proxy/config"
 	"net/http"
-	"net/http/httptest"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
 )
-
-const builderIDUnsupportedBody = `{"message":"AWS Builder ID is not supported for this operation.","reason":null}`
 
 func clearProfileArnResolutionCooldowns() {
 	profileArnResolutionCooldowns.Range(func(key, _ interface{}) bool {
@@ -188,54 +184,14 @@ func TestListAvailableProfilesFollowsNextToken(t *testing.T) {
 	}
 }
 
-func TestResolveProfileArnSuppressesBuilderIDUnsupportedLookup(t *testing.T) {
-	clearProfileArnResolutionCooldowns()
-	t.Cleanup(clearProfileArnResolutionCooldowns)
-
-	var calls int32
-	stubRestTransport(t, func(req *http.Request) (*http.Response, error) {
-		atomic.AddInt32(&calls, 1)
-		return jsonResponse(http.StatusForbidden, builderIDUnsupportedBody), nil
-	})
-
-	account := &config.Account{ID: "builder-1", Email: "builder@example.com", AccessToken: "token", Provider: "BuilderId"}
-	if _, err := ResolveProfileArn(account); !isProfileArnResolutionSoftError(err) {
-		t.Fatalf("expected Builder ID unsupported error, got %v", err)
-	}
-	if got := atomic.LoadInt32(&calls); got != 1 {
-		t.Fatalf("expected one lookup and no second-region probe, got %d", got)
-	}
-	if _, err := ResolveProfileArn(account); !isProfileArnResolutionSoftError(err) {
-		t.Fatalf("expected suppressed lookup error, got %v", err)
-	}
-	if got := atomic.LoadInt32(&calls); got != 1 {
-		t.Fatalf("expected no repeated lookup during cooldown, got %d", got)
-	}
-}
-
-func TestResolveProfileArnKeepsRefreshFallbackForBuilderID(t *testing.T) {
+func TestBuilderIDUsesFixedProfileArnWithoutLookup(t *testing.T) {
 	clearProfileArnResolutionCooldowns()
 	t.Cleanup(clearProfileArnResolutionCooldowns)
 	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
-	stubRestTransport(t, func(*http.Request) (*http.Response, error) {
-		return jsonResponse(http.StatusForbidden, builderIDUnsupportedBody), nil
-	})
-
-	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"accessToken":"new-access","refreshToken":"new-refresh","expiresIn":3600,"profileArn":"arn:aws:codewhisperer:us-east-1:123456789012:profile/from-refresh"}`))
-	}))
-	t.Cleanup(authServer.Close)
-	oldTokenURL := auth.GetOIDCTokenURLForTest()
-	auth.SetOIDCTokenURLForTest(func(string) string { return authServer.URL })
-	t.Cleanup(func() { auth.SetOIDCTokenURLForTest(oldTokenURL) })
-	oldAuthClient := auth.SetGlobalAuthClientForTest(authServer.Client())
-	t.Cleanup(func() { auth.SetGlobalAuthClientForTest(oldAuthClient) })
-
-	account := &config.Account{
-		ID:           "builder-refresh-1",
+	stored := config.Account{
+		ID:           "builder-1",
 		Email:        "builder@example.com",
 		AccessToken:  "token",
 		RefreshToken: "refresh-token",
@@ -244,23 +200,50 @@ func TestResolveProfileArnKeepsRefreshFallbackForBuilderID(t *testing.T) {
 		AuthMethod:   "idc",
 		Provider:     "BuilderId",
 		Region:       "us-east-1",
+		Enabled:      true,
 	}
-	got, err := ResolveProfileArn(account)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err := config.AddAccount(stored); err != nil {
+		t.Fatalf("add account: %v", err)
 	}
-	if got != "arn:aws:codewhisperer:us-east-1:123456789012:profile/from-refresh" {
-		t.Fatalf("expected refresh fallback ARN, got %q", got)
+
+	var usageProfileArn string
+	stubRestTransport(t, func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/getUsageLimits" {
+			t.Fatalf("Builder ID must not look up profiles, got %s", req.URL.Path)
+		}
+		usageProfileArn = req.URL.Query().Get("profileArn")
+		return jsonResponse(http.StatusOK, `{}`), nil
+	})
+
+	account := stored
+	if got, err := ResolveProfileArn(&account); err != nil || got != builderIDProfileArn {
+		t.Fatalf("expected the fixed Builder ID profile, got %q, %v", got, err)
 	}
-	if isProfileArnResolutionSuppressed(account) {
-		t.Fatalf("a refresh fallback success must not suppress future lookups")
+	profiles, err := DiscoverKiroProfiles(context.Background(), &account)
+	if err != nil || len(profiles) != 1 || profiles[0].ARN != builderIDProfileArn || profiles[0].Region != "us-east-1" {
+		t.Fatalf("expected only the fixed Builder ID profile, got %+v, %v", profiles, err)
+	}
+	if _, err := GetUsageLimits(&account); err != nil {
+		t.Fatalf("GetUsageLimits: %v", err)
+	}
+	if usageProfileArn != builderIDProfileArn {
+		t.Fatalf("expected usage request to name the fixed Builder ID profile, got %q", usageProfileArn)
+	}
+	if account.ProfileArn != "" || config.GetAccounts()[0].ProfileArn != "" {
+		t.Fatalf("the fixed Builder ID profile must stay request-scoped and never be stored")
+	}
+
+	pinned := stored
+	pinned.ProfileArn = "arn:aws:codewhisperer:us-east-1:123456789012:profile/stored"
+	if got, err := ResolveProfileArn(&pinned); err != nil || got != pinned.ProfileArn {
+		t.Fatalf("a stored profile must win over the fixed Builder ID profile, got %q, %v", got, err)
 	}
 }
 
 func TestRefreshAccountInfoDoesNotBanWhenProfileLookupFails(t *testing.T) {
 	for name, lookup := range map[string]*http.Response{
-		"builder id unsupported": jsonResponse(http.StatusForbidden, builderIDUnsupportedBody),
-		"generic 403":            jsonResponse(http.StatusForbidden, `{"message":"forbidden"}`),
+		"generic 403":     jsonResponse(http.StatusForbidden, `{"message":"forbidden"}`),
+		"rejected lookup": jsonResponse(http.StatusBadRequest, profileRequestBodyInvalid),
 	} {
 		t.Run(name, func(t *testing.T) {
 			clearProfileArnResolutionCooldowns()
@@ -268,7 +251,7 @@ func TestRefreshAccountInfoDoesNotBanWhenProfileLookupFails(t *testing.T) {
 			if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 				t.Fatalf("init config: %v", err)
 			}
-			account := config.Account{ID: "acct-" + strings.ReplaceAll(name, " ", "-"), Email: "user@example.com", AccessToken: "token", Provider: "BuilderId", Enabled: true}
+			account := config.Account{ID: "acct-" + strings.ReplaceAll(name, " ", "-"), Email: "user@example.com", AccessToken: "token", Provider: "Enterprise", Enabled: true}
 			if err := config.AddAccount(account); err != nil {
 				t.Fatalf("add account: %v", err)
 			}
