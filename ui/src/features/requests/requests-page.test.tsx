@@ -273,7 +273,10 @@ describe("RequestsPage", () => {
     await user.click(row);
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Request details")).toBeInTheDocument();
+    // The model names the request, as a log line's path does.
+    expect(
+      within(dialog).getByRole("heading", { level: 2, name: failed.model || "Request details" }),
+    ).toBeInTheDocument();
     expect(within(dialog).getByTestId("request-message")).toHaveTextContent(masked);
     expect(within(dialog).getByText(String(failed.id))).toBeInTheDocument();
     expect(within(dialog).getByText(failed.accountId)).toBeInTheDocument();
@@ -284,19 +287,74 @@ describe("RequestsPage", () => {
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0));
     await user.click(within(bodyRows()[0]).getAllByRole("cell")[4]);
     const dialog = await screen.findByRole("dialog");
-    // The sheet title is the dialog's own heading; each card is an h2 under it.
+    // The sheet title is the dialog's own heading (first); each card is an h2 under it, the
+    // numbers card under a screen-reader-only name.
     const headings = within(dialog)
       .getAllByRole("heading", { level: 2 })
       .map((heading) => heading.textContent)
-      .filter((text) => text !== "Request details");
-    // The first failure used no tokens, so there is no Tokens section (a dash in the table).
-    expect(headings).toEqual(["Request", "IDs"]);
+      .slice(1);
+    expect(headings).toEqual(["Summary", "Request"]);
+    // The first failure used no tokens, so there is no token breakdown (a dash in the table).
+    expect(within(dialog).queryByText("Cache read")).not.toBeInTheDocument();
     // The error is the notice at the head of the panel, before the numbers and the cards.
     const panel = dialog.querySelector('[data-slot="sheet-panel"]');
     expect(panel?.firstElementChild).toHaveAttribute("data-slot", "alert");
     expect(within(dialog).getByRole("button", { name: "Copy message" })).toBeInTheDocument();
     expect(within(dialog).queryByText("Status code")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Copy Request ID" })).toBeInTheDocument();
+    // The request's ID heads its card as plain text, with no copy button.
+    const request = within(dialog).getByRole("region", { name: "Request" });
+    expect(within(request).getByText(/^Request ID/).parentElement).toHaveTextContent(/#\d+$/);
+    expect(within(dialog).queryByRole("button", { name: "Copy Request ID" })).toBeNull();
+  });
+
+  it("splits a request's tokens into input and output with the cache counts", async () => {
+    const { user } = await renderApp("/requests?status=success");
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0));
+    await user.click(within(bodyRows()[0]).getAllByRole("cell")[4]);
+    const dialog = await screen.findByRole("dialog");
+    const summary = within(dialog).getByRole("region", { name: "Summary" });
+    for (const label of ["Duration", "Credits", "Tokens", "Input", "Output", "Cache read"]) {
+      expect(within(summary).getByText(label)).toBeInTheDocument();
+    }
+    // Facts and IDs read label over value, with copy buttons on the account and key IDs.
+    const request = within(dialog).getByRole("region", { name: "Request" });
+    expect(within(request).getByText("Status code")).toBeInTheDocument();
+    expect(within(request).getByRole("button", { name: "Copy Account ID" })).toBeInTheDocument();
+  });
+
+  it("opens the account's own sheet over the request, and Escape closes only that", async () => {
+    const { user } = await renderApp("/requests?status=success");
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0));
+    await user.click(within(bodyRows()[0]).getAllByRole("cell")[4]);
+    const dialog = await screen.findByRole("dialog");
+    await user.click(await within(dialog).findByRole("button", { name: "Open account" }));
+    // The account sheet loads lazily; while it is open the request sheet under it is inert.
+    expect(
+      await screen.findByRole("button", { name: "Refresh token" }, { timeout: 5000 }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(2);
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Refresh token" })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("dialog")).toBe(dialog);
+  });
+
+  it("offers no account to open for an auth failure", async () => {
+    const { user } = await renderApp("/requests");
+    await waitForRows();
+    const row = bodyRows().find((candidate) =>
+      within(candidate).queryByText("Invalid or missing API key"),
+    );
+    if (!row) throw new Error("auth failure row missing");
+    await user.click(within(row).getAllByRole("cell")[4]);
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("heading", { level: 2, name: "Request details" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Open account" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Copy as JSON" })).toBeInTheDocument();
   });
 
   it("opens the sheet with Enter and steps to the next row", async () => {
