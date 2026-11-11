@@ -7,6 +7,7 @@ import (
 	"io"
 	"kiro-proxy/config"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -58,13 +59,13 @@ func StartBuilderIdLogin(region string) (*BuilderIdSession, error) {
 	client := httpClient()
 	regResp, err := client.Do(regReq)
 	if err != nil {
-		return nil, fmt.Errorf("register client failed: %v", err)
+		return nil, flowErrorDetail(CodeSSORegisterFailed, "register client failed", err.Error())
 	}
 	defer regResp.Body.Close()
 
 	if regResp.StatusCode != 200 {
 		respBody, _ := io.ReadAll(regResp.Body)
-		return nil, fmt.Errorf("register client failed: %d %s", regResp.StatusCode, string(respBody))
+		return nil, flowErrorDetail(CodeSSORegisterFailed, "register client failed", fmt.Sprintf("%d %s", regResp.StatusCode, string(respBody)))
 	}
 
 	var regResult struct {
@@ -72,7 +73,7 @@ func StartBuilderIdLogin(region string) (*BuilderIdSession, error) {
 		ClientSecret string `json:"clientSecret"`
 	}
 	if err := json.NewDecoder(regResp.Body).Decode(&regResult); err != nil {
-		return nil, fmt.Errorf("parse register response failed: %v", err)
+		return nil, flowErrorDetail(CodeSSORegisterFailed, "parse register response failed", err.Error())
 	}
 
 	authPayload := map[string]string{
@@ -87,13 +88,13 @@ func StartBuilderIdLogin(region string) (*BuilderIdSession, error) {
 
 	authResp, err := client.Do(authReq)
 	if err != nil {
-		return nil, fmt.Errorf("device authorization failed: %v", err)
+		return nil, flowErrorDetail(CodeSSORegisterFailed, "device authorization failed", err.Error())
 	}
 	defer authResp.Body.Close()
 
 	if authResp.StatusCode != 200 {
 		respBody, _ := io.ReadAll(authResp.Body)
-		return nil, fmt.Errorf("device authorization failed: %d %s", authResp.StatusCode, string(respBody))
+		return nil, flowErrorDetail(CodeSSORegisterFailed, "device authorization failed", fmt.Sprintf("%d %s", authResp.StatusCode, string(respBody)))
 	}
 
 	var authResult struct {
@@ -105,7 +106,7 @@ func StartBuilderIdLogin(region string) (*BuilderIdSession, error) {
 		ExpiresIn               int    `json:"expiresIn"`
 	}
 	if err := json.NewDecoder(authResp.Body).Decode(&authResult); err != nil {
-		return nil, fmt.Errorf("parse auth response failed: %v", err)
+		return nil, flowErrorDetail(CodeSSORegisterFailed, "parse auth response failed", err.Error())
 	}
 
 	if authResult.Interval == 0 {
@@ -147,14 +148,14 @@ func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, c
 	builderIdMu.RUnlock()
 
 	if !exists {
-		return "", "", "", "", "", 0, "", fmt.Errorf("session not found or expired")
+		return "", "", "", "", "", 0, "", flowError(CodeSSOSessionExpired, "session not found or expired")
 	}
 
 	if time.Now().After(session.ExpiresAt) {
 		builderIdMu.Lock()
 		delete(builderIdSessions, sessionID)
 		builderIdMu.Unlock()
-		return "", "", "", "", "", 0, "", fmt.Errorf("authorization expired")
+		return "", "", "", "", "", 0, "", flowError(CodeSSOTimeout, "authorization expired")
 	}
 
 	oidcBase, err := oidcBaseURL(session.Region)
@@ -176,7 +177,7 @@ func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, c
 	client := httpClient()
 	tokenResp, err := client.Do(tokenReq)
 	if err != nil {
-		return "", "", "", "", "", 0, "", fmt.Errorf("token request failed: %v", err)
+		return "", "", "", "", "", 0, "", flowErrorDetail(CodeSSOCheckFailed, "token request failed", err.Error())
 	}
 	defer tokenResp.Body.Close()
 
@@ -187,7 +188,7 @@ func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, c
 			ExpiresIn    int    `json:"expiresIn"`
 		}
 		if err := json.NewDecoder(tokenResp.Body).Decode(&tokenResult); err != nil {
-			return "", "", "", "", "", 0, "", fmt.Errorf("parse token response failed: %v", err)
+			return "", "", "", "", "", 0, "", flowErrorDetail(CodeSSOCheckFailed, "parse token response failed", err.Error())
 		}
 
 		builderIdMu.Lock()
@@ -218,18 +219,18 @@ func PollBuilderIdAuth(sessionID string) (accessToken, refreshToken, clientID, c
 			builderIdMu.Lock()
 			delete(builderIdSessions, sessionID)
 			builderIdMu.Unlock()
-			return "", "", "", "", "", 0, "", fmt.Errorf("device code expired")
+			return "", "", "", "", "", 0, "", flowError(CodeSSOTimeout, "device code expired")
 		case "access_denied":
 			builderIdMu.Lock()
 			delete(builderIdSessions, sessionID)
 			builderIdMu.Unlock()
-			return "", "", "", "", "", 0, "", fmt.Errorf("user denied authorization")
+			return "", "", "", "", "", 0, "", flowError(CodeSSODenied, "user denied authorization")
 		default:
-			return "", "", "", "", "", 0, "", fmt.Errorf("authorization error: %s", errResult.Error)
+			return "", "", "", "", "", 0, "", flowErrorDetail(CodeSSODenied, "authorization error", errResult.Error)
 		}
 	}
 
-	return "", "", "", "", "", 0, "", fmt.Errorf("unexpected response: %d", tokenResp.StatusCode)
+	return "", "", "", "", "", 0, "", flowErrorDetail(CodeSSOCheckFailed, "unexpected response", strconv.Itoa(tokenResp.StatusCode))
 }
 
 func GetBuilderIdSession(sessionID string) *BuilderIdSession {

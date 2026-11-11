@@ -12,6 +12,16 @@ import (
 // keys with no enabled key, so every client would get 401.
 var ErrApiKeyLockout = errors.New("would lock out every client")
 
+// API key errors the admin API reports with a code.
+var (
+	ErrApiKeyNotFound      = errors.New("api key not found")
+	ErrApiKeyEmpty         = errors.New("api key value must not be empty")
+	ErrApiKeyExists        = errors.New("api key already exists")
+	ErrApiKeyCollision     = errors.New("api key value collides with existing entry")
+	ErrTokenLimitNegative  = errors.New("token limit must be zero or positive")
+	ErrCreditLimitNegative = errors.New("credit limit must be zero or positive")
+)
+
 func ListApiKeys() []ApiKeyEntry {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
@@ -47,14 +57,14 @@ func AddApiKey(entry ApiKeyEntry) (ApiKeyEntry, error) {
 	entry.Name = strings.TrimSpace(entry.Name)
 	entry.Key = strings.TrimSpace(entry.Key)
 	if entry.Key == "" {
-		return ApiKeyEntry{}, errors.New("api key value must not be empty")
+		return ApiKeyEntry{}, ErrApiKeyEmpty
 	}
 	if err := validateApiKeyLimits(entry.TokenLimit, entry.CreditLimit); err != nil {
 		return ApiKeyEntry{}, err
 	}
 	for _, existing := range cfg.ApiKeys {
 		if existing.Key == entry.Key {
-			return ApiKeyEntry{}, errors.New("api key already exists")
+			return ApiKeyEntry{}, ErrApiKeyExists
 		}
 	}
 	if entry.ID == "" {
@@ -96,7 +106,7 @@ func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 		}
 	}
 	if idx < 0 {
-		return errors.New("api key not found")
+		return ErrApiKeyNotFound
 	}
 	if guard && !patch.Enabled && removingKeyLocksOutLocked(cfg.ApiKeys[idx]) {
 		return ErrApiKeyLockout
@@ -109,11 +119,11 @@ func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 	if patch.Key != "" {
 		newKey = strings.TrimSpace(patch.Key)
 		if newKey == "" {
-			return errors.New("api key value must not be empty")
+			return ErrApiKeyEmpty
 		}
 		for j := range cfg.ApiKeys {
 			if j != idx && cfg.ApiKeys[j].Key == newKey {
-				return errors.New("api key value collides with existing entry")
+				return ErrApiKeyCollision
 			}
 		}
 	}
@@ -130,10 +140,10 @@ func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 
 func validateApiKeyLimits(tokenLimit int64, creditLimit float64) error {
 	if tokenLimit < 0 {
-		return errors.New("token limit must be zero or positive")
+		return ErrTokenLimitNegative
 	}
 	if creditLimit < 0 {
-		return errors.New("credit limit must be zero or positive")
+		return ErrCreditLimitNegative
 	}
 	return nil
 }
@@ -232,7 +242,7 @@ func RecordApiKeyUsage(id string, tokens int64, credits float64) error {
 			return saveLocked()
 		}
 	}
-	return errors.New("api key not found")
+	return ErrApiKeyNotFound
 }
 
 func ReserveApiKeyUsage(id string, tokens int64, credits float64) error {
@@ -264,7 +274,7 @@ func ReserveApiKeyRequestUsage(id string, tokens int64) (float64, error) {
 		}
 		return credits, nil
 	}
-	return 0, errors.New("api key not found")
+	return 0, ErrApiKeyNotFound
 }
 
 func reserveApiKeyUsageLocked(id string, tokens int64, credits float64) error {
@@ -279,7 +289,7 @@ func reserveApiKeyUsageLocked(id string, tokens int64, credits float64) error {
 		}
 		return reserveApiKeyUsageAtIndexLocked(i, tokens, credits)
 	}
-	return errors.New("api key not found")
+	return ErrApiKeyNotFound
 }
 
 func reserveApiKeyUsageAtIndexLocked(i int, tokens int64, credits float64) error {
@@ -325,7 +335,7 @@ func ReleaseApiKeyUsageReservation(id string, tokens int64, credits float64) err
 		}
 		return saveLocked()
 	}
-	return errors.New("api key not found")
+	return ErrApiKeyNotFound
 }
 
 func FinalizeApiKeyUsageReservation(id string, reservedTokens int64, reservedCredits float64, actualTokens int64, actualCredits float64) error {
@@ -359,7 +369,7 @@ func FinalizeApiKeyUsageReservation(id string, reservedTokens int64, reservedCre
 		cfg.ApiKeys[i].LastUsedAt = time.Now().Unix()
 		return saveLocked()
 	}
-	return errors.New("api key not found")
+	return ErrApiKeyNotFound
 }
 
 func ResetApiKeyUsage(id string) error {
@@ -376,7 +386,7 @@ func ResetApiKeyUsage(id string) error {
 			return saveLocked()
 		}
 	}
-	return errors.New("api key not found")
+	return ErrApiKeyNotFound
 }
 
 func GenerateApiKeyValue() string {

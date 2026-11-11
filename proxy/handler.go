@@ -646,13 +646,13 @@ func (h *Handler) sweepModelsCache() {
 		if err := h.ensureValidToken(account); err != nil {
 			logger.Warnf("[ModelsCache] Skip %s token refresh failed: %v", account.Email, err)
 			h.handleBackgroundAccountFailure(account, err)
-			results[i].Error = "token refresh failed: " + err.Error()
+			results[i].fail(&tokenRefreshError{prefix: "token refresh failed", err: err})
 			return
 		}
 
 		models, err := ListAvailableModels(account)
 		if err != nil {
-			results[i].Error = err.Error()
+			results[i].fail(err)
 			//! Listing models is housekeeping on a timer, not traffic. Disabling or
 			//! cooling an account here takes it out of rotation over a request no
 			//! client made; real requests decide account health.
@@ -687,7 +687,7 @@ func (h *Handler) sweepModelsCache() {
 
 func (h *Handler) fetchAndCacheAccountModels(account *config.Account) error {
 	if err := h.ensureValidToken(account); err != nil {
-		return fmt.Errorf("token refresh failed: %w", err)
+		return &tokenRefreshError{prefix: "token refresh failed", err: err}
 	}
 	models, err := ListAvailableModels(account)
 	if err != nil {
@@ -718,15 +718,13 @@ func (h *Handler) apiRefreshAccountModels(w http.ResponseWriter, _ *http.Request
 		}
 	}
 	if account == nil {
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
 
 	h.useLatestToken(account)
 	if err := h.fetchAndCacheAccountModels(account); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusInternalServerError, err, codeModelsRefreshFailed)
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -2635,8 +2633,7 @@ func accountStats(poolStats map[string]config.Account, stored config.Account) co
 func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 	var account config.Account
 	if err := json.NewDecoder(r.Body).Decode(&account); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
@@ -2645,15 +2642,13 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	region, err := config.NormalizeAWSRegion(account.Region)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 	account.Region = region
 
 	if err := config.AddAccount(account); err != nil {
-		w.WriteHeader(addAccountErrorStatus(err))
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, addAccountErrorStatus(err), err, "")
 		return
 	}
 
@@ -2682,8 +2677,7 @@ func (h *Handler) apiDeleteAccount(w http.ResponseWriter, _ *http.Request, id st
 func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id string) {
 	var updates map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
@@ -2696,8 +2690,7 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 		}
 	}
 	if existing == nil {
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
 
@@ -2763,20 +2756,17 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 func (h *Handler) apiGetAccountOverage(w http.ResponseWriter, r *http.Request, id string) {
 	account := findAccountByID(id)
 	if account == nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
 
 	if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErrorDetail(w, http.StatusBadGateway, codeTokenRefreshFailed, err.Error(), err.Error())
 		return
 	}
 	snap, err := FetchOverageStatus(account)
 	if err != nil {
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadGateway, err, codeOverageFailed)
 		return
 	}
 	if err := PersistOverageSnapshot(id, snap); err != nil {
@@ -2791,32 +2781,27 @@ func (h *Handler) apiSetAccountOverage(w http.ResponseWriter, r *http.Request, i
 		Enabled bool `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
 	account := findAccountByID(id)
 	if account == nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
 	if body.Enabled && strings.EqualFold(account.OverageCapability, "NOT_OVERAGE_CAPABLE") {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account is not overage capable"})
+		writeAdminError(w, http.StatusBadRequest, codeNotOverageCapable, "Account is not overage capable")
 		return
 	}
 
 	if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErrorDetail(w, http.StatusBadGateway, codeTokenRefreshFailed, err.Error(), err.Error())
 		return
 	}
 	snap, err := SetOverageStatus(account, body.Enabled)
 	if err != nil {
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadGateway, err, codeOverageFailed)
 		return
 	}
 	if err := PersistOverageSnapshot(id, snap); err != nil {
@@ -2855,13 +2840,11 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 		Action string   `json:"action"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 	if len(req.IDs) == 0 {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "No account IDs provided"})
+		writeAdminError(w, http.StatusBadRequest, codeNoAccountIDs, "No account IDs provided")
 		return
 	}
 
@@ -2880,11 +2863,14 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// accountResult is one account's outcome in a batch or sweep response.
+// accountResult is one account's outcome in a batch or sweep response. Code and
+// Detail are Error's admin API code and upstream part, when it has one.
 type accountResult struct {
 	ID     string `json:"id"`
 	OK     bool   `json:"ok"`
 	Error  string `json:"error,omitempty"`
+	Code   string `json:"code,omitempty"`
+	Detail string `json:"detail,omitempty"`
 	Status string `json:"status,omitempty"`
 }
 
@@ -2896,7 +2882,7 @@ const (
 )
 
 func notFoundResult(id string) accountResult {
-	return accountResult{ID: id, Error: "Account not found", Status: accountStatusNotFound}
+	return accountResult{ID: id, Error: "Account not found", Code: codeAccountNotFound, Status: accountStatusNotFound}
 }
 
 func countResults(results []accountResult) (ok, failed int) {
@@ -2956,7 +2942,7 @@ func (h *Handler) batchSetEnabled(w http.ResponseWriter, ids []string, enabled b
 			a.SilentTime = 0
 		}
 		if err := config.UpdateAccount(a.ID, a); err != nil {
-			results[slots[i]].Error = err.Error()
+			results[slots[i]].fail(err)
 			continue
 		}
 		results[slots[i]].OK = true
@@ -2990,7 +2976,7 @@ func (h *Handler) batchRefresh(w http.ResponseWriter, r *http.Request, ids []str
 		_, suspended, err := h.refreshAccountNow(r.Context(), account)
 		switch {
 		case err != nil:
-			res.Error = err.Error()
+			res.fail(err)
 		case suspended:
 			res.OK = true
 			res.Status = accountStatusSuspended
@@ -3026,7 +3012,7 @@ func (h *Handler) batchRefreshModels(w http.ResponseWriter, ids []string) {
 		h.useLatestToken(account)
 		res := &results[slots[i]]
 		if err := h.fetchAndCacheAccountModels(account); err != nil {
-			res.Error = err.Error()
+			res.fail(err)
 			return
 		}
 		res.OK = true
@@ -3048,7 +3034,7 @@ func (h *Handler) batchDelete(w http.ResponseWriter, ids []string) {
 	matched, slots, results := matchAccounts(ids)
 	for i, a := range matched {
 		if err := config.DeleteAccount(a.ID); err != nil {
-			results[slots[i]].Error = err.Error()
+			results[slots[i]].fail(err)
 			continue
 		}
 		results[slots[i]].OK = true
@@ -3069,27 +3055,23 @@ func (h *Handler) apiStartIamSso(w http.ResponseWriter, r *http.Request) {
 		Region   string `json:"region"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
 	if req.StartUrl == "" {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "startUrl is required"})
+		writeAdminError(w, http.StatusBadRequest, codeStartURLRequired, "startUrl is required")
 		return
 	}
 	region, err := config.NormalizeAWSRegion(req.Region)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	sessionID, authorizeUrl, expiresIn, err := auth.StartIamSsoLogin(req.StartUrl, region)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
@@ -3106,15 +3088,13 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 		CallbackUrl string `json:"callbackUrl"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
 	accessToken, refreshToken, clientID, clientSecret, region, expiresIn, err := auth.CompleteIamSsoLogin(req.SessionID, req.CallbackUrl)
 	if err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 
@@ -3157,15 +3137,13 @@ func (h *Handler) apiStartBuilderIdLogin(w http.ResponseWriter, r *http.Request)
 	json.NewDecoder(r.Body).Decode(&req)
 	region, err := config.NormalizeAWSRegion(req.Region)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	session, err := auth.StartBuilderIdLogin(region)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
@@ -3182,18 +3160,16 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"sessionId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
 	accessToken, refreshToken, clientID, clientSecret, region, expiresIn, status, err := auth.PollBuilderIdAuth(req.SessionID)
 	if err != nil {
+		body := adminErrorBody(err, "")
+		body["success"] = false
 		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
+		json.NewEncoder(w).Encode(body)
 		return
 	}
 
@@ -3252,20 +3228,17 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 		Region      string `json:"region"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
 	if req.BearerToken == "" {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "bearerToken is required"})
+		writeAdminError(w, http.StatusBadRequest, codeBearerTokenRequired, "bearerToken is required")
 		return
 	}
 	region, err := config.NormalizeAWSRegion(req.Region)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 	req.Region = region
@@ -3351,8 +3324,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		Scopes        string `json:"scopes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
@@ -3380,15 +3352,13 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.RefreshToken == "" {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "refreshToken or kiroApiKey is required"})
+		writeAdminError(w, http.StatusBadRequest, codeRefreshTokenRequired, "refreshToken or kiroApiKey is required")
 		return
 	}
 
 	region, err := config.NormalizeAWSRegion(req.Region)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 	req.Region = region
@@ -3411,8 +3381,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	if req.ProfileArn != "" {
 		canonical, _, ok := parseKiroProfileArn(req.ProfileArn)
 		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "profileArn is invalid"})
+			writeAdminError(w, http.StatusBadRequest, codeProfileArnInvalid, "profileArn is invalid")
 			return
 		}
 		profileArn = canonical
@@ -3427,8 +3396,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	if config.IsExternalIdpAccount(tempAccount) {
 		if err := completeMicrosoftImport(tempAccount, req.UserID, req.AccessToken, req.TokenEndpoint, req.IssuerURL, req.Scopes); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeAdminErr(w, http.StatusBadRequest, err, codeMicrosoftCredential)
 			return
 		}
 		req.ClientID = tempAccount.ClientID
@@ -3437,8 +3405,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	accessToken, newRefreshToken, expiresAt, newProfileArn, err := auth.RefreshToken(tempAccount)
 	if err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Token refresh failed: " + err.Error()})
+		writeAdminErrorDetail(w, http.StatusBadRequest, codeTokenRefreshFailed, "Token refresh failed: "+err.Error(), err.Error())
 		return
 	}
 	if newRefreshToken != "" {
@@ -3456,8 +3423,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 			probe := *tempAccount
 			probe.AccessToken = accessToken
 			if err := verifyOfferedProfile(r.Context(), &probe, profileArn); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+				writeAdminErr(w, http.StatusBadRequest, err, "")
 				return
 			}
 		}
@@ -3520,13 +3486,11 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) importKiroAPIKeyAccount(w http.ResponseWriter, account config.Account) {
 	//! No OAuth refresh and no profile lookup: the key is the credential, and it never expires.
 	if err := config.NormalizeAPIKeyAccount(&account); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 	if err := config.AddAccount(account); err != nil {
-		w.WriteHeader(addAccountErrorStatus(err))
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, addAccountErrorStatus(err), err, "")
 		return
 	}
 
@@ -3586,8 +3550,7 @@ func (h *Handler) apiUpdatePromptFilter(w http.ResponseWriter, r *http.Request) 
 		Rules                 *[]config.PromptFilterRule `json:"rules,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
@@ -3629,15 +3592,16 @@ func (h *Handler) apiUpdateModelMappings(w http.ResponseWriter, r *http.Request)
 		Mappings []config.ModelMappingRule `json:"mappings"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 	if err := config.UpdateModelMappings(req.Mappings); err != nil {
 		var mappingErr *config.ModelMappingError
 		if errors.As(err, &mappingErr) {
+			body := adminErrorBody(err, "")
+			body["index"] = mappingErr.Index
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error(), "index": mappingErr.Index})
+			json.NewEncoder(w).Encode(body)
 			return
 		}
 		w.WriteHeader(500)
@@ -3660,20 +3624,17 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		StructuredToolHistory  *bool  `json:"structuredToolHistory,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
 	if req.AutoContinueMax != nil && (*req.AutoContinueMax < 1 || *req.AutoContinueMax > config.MaxAutoContinueMax) {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("autoContinueMax must be between 1 and %d", config.MaxAutoContinueMax)})
+		writeAdminError(w, http.StatusBadRequest, codeAutoContinueMaxRange, fmt.Sprintf("autoContinueMax must be between 1 and %d", config.MaxAutoContinueMax))
 		return
 	}
 
 	if req.Password != "" && utf8.RuneCountInString(req.Password) < config.MinAdminPasswordLength {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Password must be at least %d characters", config.MinAdminPasswordLength)})
+		writeAdminError(w, http.StatusBadRequest, codePasswordTooShort, fmt.Sprintf("Password must be at least %d characters", config.MinAdminPasswordLength))
 		return
 	}
 
@@ -3776,14 +3737,12 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 		}
 	}
 	if account == nil {
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
 
 	if err := h.ensureValidToken(account); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Token refresh failed: " + err.Error()})
+		writeAdminErrorDetail(w, http.StatusInternalServerError, codeTokenRefreshFailed, "Token refresh failed: "+err.Error(), err.Error())
 		return
 	}
 
@@ -3851,16 +3810,14 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id string) {
 	account := findAccountByID(id)
 	if account == nil {
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
 
 	defer h.pool.Reload()
 	info, suspended, err := h.refreshAccountNow(r.Context(), account)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusInternalServerError, err, "")
 		return
 	}
 	if suspended {
@@ -3894,7 +3851,7 @@ func (h *Handler) refreshAccountNow(ctx context.Context, account *config.Account
 
 	if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {
 		if err := refreshTokenIfNeeded(); err != nil {
-			return nil, false, fmt.Errorf("token refresh failed: %w", err)
+			return nil, false, &tokenRefreshError{prefix: "token refresh failed", err: err}
 		}
 	}
 
@@ -3939,8 +3896,7 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 	}
 
 	if account == nil {
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
 
@@ -4019,14 +3975,12 @@ func (h *Handler) apiGetAccountModels(w http.ResponseWriter, r *http.Request, id
 	}
 
 	if account == nil {
-		w.WriteHeader(404)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Account not found"})
+		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
 
 	if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
-		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErrorDetail(w, http.StatusBadGateway, codeTokenRefreshFailed, err.Error(), err.Error())
 		return
 	}
 	models, err := ListAvailableModels(account)
@@ -4076,8 +4030,7 @@ func (h *Handler) apiUpdateThinkingConfig(w http.ResponseWriter, r *http.Request
 		ClaudeFormat string `json:"claudeFormat"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
@@ -4116,15 +4069,13 @@ func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request
 		EndpointFallback  *bool  `json:"endpointFallback"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
 	valid := map[string]bool{"auto": true, "kiro": true, "codewhisperer": true, "amazonq": true}
 	if !valid[req.PreferredEndpoint] {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid endpoint, must be: auto, kiro, codewhisperer, or amazonq"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidEndpoint, "Invalid endpoint, must be: auto, kiro, codewhisperer, or amazonq")
 		return
 	}
 
@@ -4158,8 +4109,7 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 		ProxyURL string `json:"proxyURL"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
@@ -4168,8 +4118,7 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 			!strings.HasPrefix(req.ProxyURL, "https://") &&
 			!strings.HasPrefix(req.ProxyURL, "socks5://") &&
 			!strings.HasPrefix(req.ProxyURL, "socks5h://") {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(map[string]string{"error": "proxyURL must start with http://, https://, socks5://, or socks5h://"})
+			writeAdminError(w, http.StatusBadRequest, codeProxyURLScheme, "proxyURL must start with http://, https://, socks5://, or socks5h://")
 			return
 		}
 	}

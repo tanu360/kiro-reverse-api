@@ -26,11 +26,10 @@ func writeBackupError(w http.ResponseWriter, err error) {
 	var fileErr *config.BackupFileError
 	switch {
 	case errors.Is(err, config.ErrBackupNotFound):
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error(), "code": "backup_not_found"})
+		writeAdminError(w, http.StatusNotFound, codeBackupNotFound, err.Error())
 	case errors.As(err, &fileErr):
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error(), "code": fileErr.Code})
+		//! The parse failure is the detail the UI shows under its "not a usable backup" text.
+		writeAdminErrorDetail(w, http.StatusBadRequest, fileErr.Code, err.Error(), err.Error())
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -54,8 +53,7 @@ func (h *Handler) apiBackupsCreate(w http.ResponseWriter, r *http.Request) {
 		Note string `json:"note"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 	if req.Kind == "" {
@@ -118,30 +116,26 @@ func (h *Handler) apiBackupsRestoreUpload(w http.ResponseWriter, r *http.Request
 	ct := r.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to parse multipart"})
+			writeAdminError(w, http.StatusBadRequest, codeBackupUploadFailed, "Failed to parse multipart")
 			return
 		}
 		file, header, err := r.FormFile("file")
 		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(map[string]string{"error": "No file uploaded"})
+			writeAdminError(w, http.StatusBadRequest, codeBackupUploadFailed, "No file uploaded")
 			return
 		}
 		defer file.Close()
 		note = header.Filename
 		data, err = io.ReadAll(file)
 		if err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read file"})
+			writeAdminError(w, http.StatusInternalServerError, codeBackupUploadFailed, "Failed to read file")
 			return
 		}
 	} else {
 		var err error
 		data, err = io.ReadAll(r.Body)
 		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read body"})
+			writeAdminError(w, http.StatusBadRequest, codeBackupUploadFailed, "Failed to read body")
 			return
 		}
 		note = "uploaded"
@@ -186,8 +180,7 @@ func (h *Handler) apiBackupsScheduleGet(w http.ResponseWriter, _ *http.Request) 
 func (h *Handler) apiBackupsScheduleUpdate(w http.ResponseWriter, r *http.Request) {
 	var sched config.BackupSchedule
 	if err := json.NewDecoder(r.Body).Decode(&sched); err != nil {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 	//! The scheduler skips an unknown cadence without a word, so it never reaches config.

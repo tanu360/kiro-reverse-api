@@ -15,6 +15,7 @@ var (
 	ErrInvalidKiroAPIKey   = errors.New("kiroApiKey contains invalid characters")
 	ErrInvalidKiroRegion   = errors.New("invalid Kiro API key region")
 	ErrDuplicateKiroAPIKey = errors.New("this Kiro API key is already added")
+	ErrKiroAPIKeySeparator = errors.New("kiroApiKey has more than one '|' separator")
 
 	kiroAPIKeyRegionPattern = regexp.MustCompile(`^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$`)
 )
@@ -44,7 +45,7 @@ func SplitKiroAPIKeyAndRegion(raw string) (key, region string, err error) {
 	}
 	parts := strings.Split(trimmed, "|")
 	if len(parts) > 2 {
-		return "", "", errors.New("kiroApiKey has more than one '|' separator")
+		return "", "", ErrKiroAPIKeySeparator
 	}
 	key = strings.TrimSpace(parts[0])
 	if key == "" {

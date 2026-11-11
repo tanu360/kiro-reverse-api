@@ -51,7 +51,7 @@ func StartIamSsoLogin(startUrl, region string) (sessionID, authorizeUrl string, 
 
 	clientID, clientSecret, err := registerOIDCClient(oidcBase, startUrl, redirectUri)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("注册客户端失败: %w", err)
+		return "", "", 0, wrapFlowError(CodeSSORegisterFailed, "注册客户端失败", err)
 	}
 
 	codeVerifier := generateCodeVerifier()
@@ -96,19 +96,19 @@ func CompleteIamSsoLogin(sessionID, callbackUrl string) (accessToken, refreshTok
 	sessionsMu.RUnlock()
 
 	if !ok {
-		return "", "", "", "", "", 0, fmt.Errorf("会话不存在或已过期")
+		return "", "", "", "", "", 0, flowError(CodeSSOSessionExpired, "会话不存在或已过期")
 	}
 
 	if time.Now().After(session.ExpiresAt) {
 		sessionsMu.Lock()
 		delete(sessions, sessionID)
 		sessionsMu.Unlock()
-		return "", "", "", "", "", 0, fmt.Errorf("会话已过期")
+		return "", "", "", "", "", 0, flowError(CodeSSOSessionExpired, "会话已过期")
 	}
 
 	parsedUrl, err := url.Parse(callbackUrl)
 	if err != nil {
-		return "", "", "", "", "", 0, fmt.Errorf("无效的回调 URL")
+		return "", "", "", "", "", 0, flowError(CodeInvalidCallbackURL, "无效的回调 URL")
 	}
 
 	code := parsedUrl.Query().Get("code")
@@ -116,15 +116,15 @@ func CompleteIamSsoLogin(sessionID, callbackUrl string) (accessToken, refreshTok
 	errorParam := parsedUrl.Query().Get("error")
 
 	if errorParam != "" {
-		return "", "", "", "", "", 0, fmt.Errorf("授权失败: %s", errorParam)
+		return "", "", "", "", "", 0, flowErrorDetail(CodeSSODenied, "授权失败", errorParam)
 	}
 
 	if state != session.State {
-		return "", "", "", "", "", 0, fmt.Errorf("状态不匹配，可能存在安全风险")
+		return "", "", "", "", "", 0, flowError(CodeSSOStateMismatch, "状态不匹配，可能存在安全风险")
 	}
 
 	if code == "" {
-		return "", "", "", "", "", 0, fmt.Errorf("未收到授权码")
+		return "", "", "", "", "", 0, flowError(CodeSSONoCode, "未收到授权码")
 	}
 
 	oidcBase, err := oidcBaseURL(session.Region)
@@ -140,7 +140,7 @@ func CompleteIamSsoLogin(sessionID, callbackUrl string) (accessToken, refreshTok
 		session.RedirectUri,
 	)
 	if err != nil {
-		return "", "", "", "", "", 0, err
+		return "", "", "", "", "", 0, &FlowError{Code: CodeSSOCheckFailed, Text: err.Error(), Detail: err.Error(), Err: err}
 	}
 
 	sessionsMu.Lock()

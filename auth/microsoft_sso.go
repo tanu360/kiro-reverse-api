@@ -132,7 +132,7 @@ func StartMicrosoftSSOLogin() (sessionID, authorizationURL string, expiresIn int
 		for _, expired := range expiredSessions {
 			discardDetachedMicrosoftSSOSession(expired)
 		}
-		return "", "", 0, fmt.Errorf("too many Microsoft SSO sessions; cancel an existing login and try again")
+		return "", "", 0, flowError(CodeMicrosoftTooManySessions, "too many Microsoft SSO sessions; cancel an existing login and try again")
 	}
 	microsoftSSOSessions[session.ID] = session
 	// timer is protected by microsoftSSOSessionsMu. Creating it before
@@ -163,7 +163,7 @@ func StartMicrosoftSSOLogin() (sessionID, authorizationURL string, expiresIn int
 func ContinueMicrosoftSSOLogin(sessionID, callbackURL string) (*MicrosoftSSOProgress, error) {
 	session := getMicrosoftSSOSession(strings.TrimSpace(sessionID))
 	if session == nil {
-		return nil, fmt.Errorf("unknown or expired Microsoft SSO session")
+		return nil, flowError(CodeSSOSessionExpired, "unknown or expired Microsoft SSO session")
 	}
 
 	session.mu.Lock()
@@ -177,11 +177,11 @@ func ContinueMicrosoftSSOLogin(sessionID, callbackURL string) (*MicrosoftSSOProg
 	}()
 
 	if session.canceled.Load() {
-		return nil, fmt.Errorf("unknown or expired Microsoft SSO session")
+		return nil, flowError(CodeSSOSessionExpired, "unknown or expired Microsoft SSO session")
 	}
 	if time.Now().After(session.ExpiresAt) {
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("this Microsoft SSO session has expired")
+		return nil, flowError(CodeSSOSessionExpired, "this Microsoft SSO session has expired")
 	}
 
 	switch session.stage {
@@ -190,7 +190,7 @@ func ContinueMicrosoftSSOLogin(sessionID, callbackURL string) (*MicrosoftSSOProg
 	case microsoftSSOWaitingForProvider:
 		return continueMicrosoftProviderLeg(session, callbackURL)
 	default:
-		return nil, fmt.Errorf("this Microsoft SSO session is in an invalid state")
+		return nil, flowError(CodeSSOSessionExpired, "this Microsoft SSO session is in an invalid state")
 	}
 }
 
@@ -212,7 +212,7 @@ func continueMicrosoftPortalLeg(session *microsoftSSOSession, rawURL string) (*M
 	} else if errCode != "" {
 		description, _ := optionalSingleQueryValue(q, "error_description")
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("sign-in to Kiro failed: %s%s", errCode, formatOAuthDescription(description))
+		return nil, flowErrorDetail(CodeKiroSignInFailed, "sign-in to Kiro failed", errCode+formatOAuthDescription(description))
 	}
 
 	// Some Kiro portal builds omit state from the external-IdP descriptor. In
@@ -221,7 +221,7 @@ func continueMicrosoftPortalLeg(session *microsoftSSOSession, rawURL string) (*M
 	if state, err := optionalSingleQueryValue(q, "state"); err != nil {
 		return nil, err
 	} else if state != "" && !constantTimeEqual(state, session.PortalState) {
-		return nil, fmt.Errorf("callback state from Kiro does not match this login session")
+		return nil, flowError(CodeSSOStateMismatch, "callback state from Kiro does not match this login session")
 	}
 
 	loginOption, err := requiredSingleQueryValue(q, "login_option")
@@ -229,7 +229,7 @@ func continueMicrosoftPortalLeg(session *microsoftSSOSession, rawURL string) (*M
 		return nil, err
 	}
 	if !strings.EqualFold(loginOption, MicrosoftSSOAuthMethod) {
-		return nil, fmt.Errorf("this login method only accepts Microsoft Enterprise SSO callbacks")
+		return nil, flowError(CodeMicrosoftNotEnterprise, "this login method only accepts Microsoft Enterprise SSO callbacks")
 	}
 	issuerURL, err := requiredSingleQueryValue(q, "issuer_url")
 	if err != nil {
@@ -265,7 +265,7 @@ func continueMicrosoftPortalLeg(session *microsoftSSOSession, rawURL string) (*M
 	}
 	if session.canceled.Load() {
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("this Microsoft SSO session was canceled")
+		return nil, flowError(CodeMicrosoftCanceled, "this Microsoft SSO session was canceled")
 	}
 	verifier, err := randomURLSafe(32)
 	if err != nil {
@@ -312,7 +312,7 @@ func continueMicrosoftProviderLeg(session *microsoftSSOSession, rawURL string) (
 	}
 	leg := session.providerLeg
 	if leg == nil {
-		return nil, fmt.Errorf("this Microsoft SSO session has no provider state")
+		return nil, flowError(CodeSSOSessionExpired, "this Microsoft SSO session has no provider state")
 	}
 	q := callback.Query()
 	state, err := requiredSingleQueryValue(q, "state")
@@ -320,14 +320,14 @@ func continueMicrosoftProviderLeg(session *microsoftSSOSession, rawURL string) (
 		return nil, err
 	}
 	if !constantTimeEqual(state, leg.State) {
-		return nil, fmt.Errorf("callback state from Microsoft does not match this login session")
+		return nil, flowError(CodeSSOStateMismatch, "callback state from Microsoft does not match this login session")
 	}
 	if errCode, err := optionalSingleQueryValue(q, "error"); err != nil {
 		return nil, err
 	} else if errCode != "" {
 		description, _ := optionalSingleQueryValue(q, "error_description")
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("authorization with Microsoft failed: %s%s", errCode, formatOAuthDescription(description))
+		return nil, flowErrorDetail(CodeMicrosoftDenied, "authorization with Microsoft failed", errCode+formatOAuthDescription(description))
 	}
 	code, err := requiredSingleQueryValue(q, "code")
 	if err != nil {
@@ -345,12 +345,12 @@ func continueMicrosoftProviderLeg(session *microsoftSSOSession, rawURL string) (
 	}
 	if session.canceled.Load() {
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("this Microsoft SSO session was canceled")
+		return nil, flowError(CodeMicrosoftCanceled, "this Microsoft SSO session was canceled")
 	}
 	metadata := parseExternalTokenMetadata(token.AccessToken)
 	if !externalTokenTenantMatches(metadata, leg.IssuerURL) {
 		retireMicrosoftSSOSessionLocked(session)
-		return nil, fmt.Errorf("tenant of the Microsoft access token does not match the login issuer")
+		return nil, flowError(CodeMicrosoftTenantMismatch, "tenant of the Microsoft access token does not match the login issuer")
 	}
 
 	email, userID := externalIdpIdentity(metadata, leg.IssuerURL)
@@ -372,14 +372,14 @@ func continueMicrosoftProviderLeg(session *microsoftSSOSession, rawURL string) (
 func parseMicrosoftLoopbackCallback(rawURL, expectedPath string) (*url.URL, error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
-		return nil, fmt.Errorf("callback URL is required")
+		return nil, flowError(CodeInvalidCallbackURL, "callback URL is required")
 	}
 	if len(rawURL) > microsoftSSOMaxCallbackLen {
-		return nil, fmt.Errorf("callback URL is too long")
+		return nil, flowError(CodeInvalidCallbackURL, "callback URL is too long")
 	}
 	u, err := url.Parse(rawURL)
 	if err != nil || !u.IsAbs() || u.Opaque != "" {
-		return nil, fmt.Errorf("callback URL is invalid")
+		return nil, flowError(CodeInvalidCallbackURL, "callback URL is invalid")
 	}
 	if !strings.EqualFold(u.Scheme, "http") ||
 		!strings.EqualFold(u.Hostname(), "localhost") ||
@@ -387,7 +387,12 @@ func parseMicrosoftLoopbackCallback(rawURL, expectedPath string) (*url.URL, erro
 		u.User != nil ||
 		u.Fragment != "" ||
 		u.Path != expectedPath {
-		return nil, fmt.Errorf("callback URL must be %s%s", microsoftLoopbackBaseURL, expectedPath)
+		expected := microsoftLoopbackBaseURL + expectedPath
+		return nil, &FlowError{
+			Code:   CodeCallbackURLWrongAddress,
+			Text:   "callback URL must be " + expected,
+			Params: map[string]string{"expected": expected},
+		}
 	}
 	return u, nil
 }
@@ -398,7 +403,7 @@ func requiredSingleQueryValue(q url.Values, key string) (string, error) {
 		return "", err
 	}
 	if value == "" {
-		return "", fmt.Errorf("callback URL is missing %s", key)
+		return "", flowError(CodeInvalidCallbackURL, "callback URL is missing "+key)
 	}
 	return value, nil
 }
@@ -409,7 +414,7 @@ func optionalSingleQueryValue(q url.Values, key string) (string, error) {
 		return "", nil
 	}
 	if len(values) != 1 {
-		return "", fmt.Errorf("callback URL contains duplicate %s values", key)
+		return "", flowError(CodeInvalidCallbackURL, "callback URL contains duplicate "+key+" values")
 	}
 	return strings.TrimSpace(values[0]), nil
 }
@@ -620,10 +625,10 @@ func exchangeMicrosoftAuthorizationCode(client *http.Client, leg *microsoftProvi
 	form.Set("scope", leg.Scopes)
 	token, err := postExternalIdpToken(context.Background(), client, leg.TokenEndpoint, leg.IssuerURL, form)
 	if err != nil {
-		return nil, fmt.Errorf("token exchange with Microsoft failed: %w", err)
+		return nil, wrapFlowError(CodeMicrosoftTokenFailed, "token exchange with Microsoft failed", err)
 	}
 	if token.RefreshToken == "" {
-		return nil, fmt.Errorf("token exchange with Microsoft did not return a refresh token")
+		return nil, &FlowError{Code: CodeMicrosoftTokenFailed, Text: "token exchange with Microsoft did not return a refresh token", Detail: "no refresh_token"}
 	}
 	return token, nil
 }

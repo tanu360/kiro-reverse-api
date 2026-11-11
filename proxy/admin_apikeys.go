@@ -67,8 +67,7 @@ func (h *Handler) apiListApiKeys(w http.ResponseWriter, _ *http.Request) {
 func (h *Handler) apiGetApiKey(w http.ResponseWriter, _ *http.Request, id string) {
 	entry := config.GetApiKeyEntry(id)
 	if entry == nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "API key not found"})
+		writeAdminError(w, http.StatusNotFound, codeAPIKeyNotFound, "API key not found")
 		return
 	}
 	json.NewEncoder(w).Encode(toApiKeyDetailView(*entry))
@@ -85,8 +84,7 @@ type apiKeyCreateRequest struct {
 func (h *Handler) apiCreateApiKey(w http.ResponseWriter, r *http.Request) {
 	var req apiKeyCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
@@ -107,8 +105,7 @@ func (h *Handler) apiCreateApiKey(w http.ResponseWriter, r *http.Request) {
 		CreditLimit: req.CreditLimit,
 	})
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 
@@ -132,15 +129,13 @@ type apiKeyUpdateRequest struct {
 func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id string) {
 	existing := config.GetApiKeyEntry(id)
 	if existing == nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "API key not found"})
+		writeAdminError(w, http.StatusNotFound, codeAPIKeyNotFound, "API key not found")
 		return
 	}
 
 	var req apiKeyUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 
@@ -165,8 +160,7 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 			writeAPIKeyLockout(w)
 			return
 		}
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 	updated := config.GetApiKeyEntry(id)
@@ -188,8 +182,7 @@ func (h *Handler) apiDeleteApiKey(w http.ResponseWriter, _ *http.Request, id str
 			writeAPIKeyLockout(w)
 			return
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusInternalServerError, err, "")
 		return
 	}
 	publishEvent(eventAPIKeysChanged, id)
@@ -198,8 +191,7 @@ func (h *Handler) apiDeleteApiKey(w http.ResponseWriter, _ *http.Request, id str
 
 func (h *Handler) apiResetApiKeyUsage(w http.ResponseWriter, _ *http.Request, id string) {
 	if err := config.ResetApiKeyUsage(id); err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusNotFound, err, "")
 		return
 	}
 	publishEvent(eventAPIKeysChanged, id)

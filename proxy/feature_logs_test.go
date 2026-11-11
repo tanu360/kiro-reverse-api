@@ -81,13 +81,13 @@ func TestWriteMicrosoftAddedLogsOutcome(t *testing.T) {
 	logs := captureLogs(t)
 	account := config.Account{ID: "ms-log", Email: "dev.user@contoso.onmicrosoft.com", Region: "us-east-1"}
 
-	h.writeMicrosoftAdded(httptest.NewRecorder(), account, "")
+	h.writeMicrosoftAdded(httptest.NewRecorder(), account, microsoftWarning{})
 	if want := "INFO  "; !strings.Contains(logs.String(), want) ||
 		!strings.Contains(logs.String(), "[MicrosoftSSO] Added dev.user@contoso.onmicrosoft.com (region us-east-1)") {
 		t.Fatalf("missing info line for a complete login:\n%s", logs)
 	}
 
-	h.writeMicrosoftAdded(httptest.NewRecorder(), account, "profile lookup failed")
+	h.writeMicrosoftAdded(httptest.NewRecorder(), account, microsoftWarning{text: "profile lookup failed", code: codeMicrosoftProfilePending})
 	if !strings.Contains(logs.String(), "WARN  ") ||
 		!strings.Contains(logs.String(), "[MicrosoftSSO] dev.user@contoso.onmicrosoft.com: profile lookup failed") {
 		t.Fatalf("missing warning line for a login without a profile:\n%s", logs)

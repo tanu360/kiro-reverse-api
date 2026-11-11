@@ -538,8 +538,11 @@ func DiscoverKiroProfiles(ctx context.Context, account *config.Account) ([]KiroP
 	if len(probeErrors) > 0 {
 		return nil, errors.Join(probeErrors...)
 	}
-	return nil, fmt.Errorf("no available Kiro profile")
+	return nil, errNoKiroProfile
 }
+
+// errNoKiroProfile is a profile list that Kiro answered with no profile.
+var errNoKiroProfile = errors.New("no available Kiro profile")
 
 func withProfileArnQuery(rawURL string, account *config.Account) string {
 	if account == nil {

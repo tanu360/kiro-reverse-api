@@ -28,6 +28,11 @@ const (
 var (
 	errMicrosoftSSOCanceled   = errors.New("this Microsoft SSO login was canceled")
 	errMicrosoftAccountExists = errors.New("this Microsoft account is already added")
+	errProfileNotOffered      = errors.New("profileArn was not offered for this credential")
+	errMicrosoftTooManyChoice = &auth.FlowError{
+		Code: auth.CodeMicrosoftTooManySessions,
+		Text: "too many pending Microsoft profile selections; cancel one and try again",
+	}
 )
 
 // microsoftFlows holds what lives between the last SSO callback and the saved
@@ -130,7 +135,7 @@ func (f *microsoftFlows) storeSelectionLocked(sessionID string, account config.A
 		}
 	}
 	if len(f.selections) >= microsoftMaxSelections {
-		return "", errors.New("too many pending Microsoft profile selections; cancel one and try again")
+		return "", errMicrosoftTooManyChoice
 	}
 	id := uuid.NewString()
 	f.selections[id] = &microsoftSelection{
@@ -158,24 +163,25 @@ func (f *microsoftFlows) addAccountLocked(sessionID string, account config.Accou
 	return config.AddAccount(account)
 }
 
-func writeMicrosoftError(w http.ResponseWriter, status int, message string) {
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
-}
-
 func writeMicrosoftAddError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, errMicrosoftSSOCanceled), errors.Is(err, errMicrosoftAccountExists):
-		writeMicrosoftError(w, http.StatusConflict, err.Error())
+		writeAdminErr(w, http.StatusConflict, err, "")
 	default:
-		writeMicrosoftError(w, http.StatusInternalServerError, err.Error())
+		writeAdminErr(w, http.StatusInternalServerError, err, "")
 	}
 }
 
-func (h *Handler) writeMicrosoftAdded(w http.ResponseWriter, account config.Account, warning string) {
+// microsoftWarning is the note a saved login carries: the English text, and the
+// code and upstream detail the admin UI translates it by.
+type microsoftWarning struct {
+	text, code, detail string
+}
+
+func (h *Handler) writeMicrosoftAdded(w http.ResponseWriter, account config.Account, warning microsoftWarning) {
 	h.pool.Reload()
-	if warning != "" {
-		logger.Warnf("[MicrosoftSSO] %s: %s", account.Email, warning)
+	if warning.text != "" {
+		logger.Warnf("[MicrosoftSSO] %s: %s", account.Email, warning.text)
 	} else {
 		logger.Infof("[MicrosoftSSO] Added %s (region %s)", account.Email, account.Region)
 	}
@@ -184,8 +190,12 @@ func (h *Handler) writeMicrosoftAdded(w http.ResponseWriter, account config.Acco
 		"stage":   "complete",
 		"account": map[string]interface{}{"id": account.ID, "email": account.Email},
 	}
-	if warning != "" {
-		response["warning"] = warning
+	if warning.text != "" {
+		response["warning"] = warning.text
+		response["warningCode"] = warning.code
+		if warning.detail != "" {
+			response["warningDetail"] = warning.detail
+		}
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -193,7 +203,7 @@ func (h *Handler) writeMicrosoftAdded(w http.ResponseWriter, account config.Acco
 func (h *Handler) apiStartMicrosoftSSO(w http.ResponseWriter, _ *http.Request) {
 	sessionID, authorizeURL, expiresIn, err := auth.StartMicrosoftSSOLogin()
 	if err != nil {
-		writeMicrosoftError(w, http.StatusInternalServerError, err.Error())
+		writeAdminErr(w, http.StatusInternalServerError, err, "")
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -214,18 +224,18 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeMicrosoftError(w, http.StatusBadRequest, "Invalid JSON")
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 	sessionID := strings.TrimSpace(req.SessionID)
 	if sessionID == "" || strings.TrimSpace(req.CallbackURL) == "" {
-		writeMicrosoftError(w, http.StatusBadRequest, "sessionId and callbackUrl are required")
+		writeAdminError(w, http.StatusBadRequest, auth.CodeInvalidCallbackURL, "sessionId and callbackUrl are required")
 		return
 	}
 
 	progress, err := auth.ContinueMicrosoftSSOLogin(sessionID, req.CallbackURL)
 	if err != nil {
-		writeMicrosoftError(w, http.StatusBadRequest, err.Error())
+		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
 	if progress.AuthorizationURL != "" {
@@ -237,7 +247,7 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if progress.Result == nil {
-		writeMicrosoftError(w, http.StatusInternalServerError, "Microsoft SSO returned no credential")
+		writeAdminError(w, http.StatusInternalServerError, auth.CodeMicrosoftTokenFailed, "Microsoft SSO returned no credential")
 		return
 	}
 
@@ -263,7 +273,7 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 	flows := microsoftSSOFlows
 	ctx, ok := flows.beginDiscovery(r.Context(), sessionID)
 	if !ok {
-		writeMicrosoftError(w, http.StatusConflict, errMicrosoftSSOCanceled.Error())
+		writeAdminErr(w, http.StatusConflict, errMicrosoftSSOCanceled, "")
 		return
 	}
 	profiles, profileErr := DiscoverKiroProfiles(ctx, &account)
@@ -275,13 +285,13 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 	flows.mu.Lock()
 	defer flows.mu.Unlock()
 	if flows.canceledLocked(sessionID, time.Now()) {
-		writeMicrosoftError(w, http.StatusConflict, errMicrosoftSSOCanceled.Error())
+		writeAdminErr(w, http.StatusConflict, errMicrosoftSSOCanceled, "")
 		return
 	}
 	if len(profiles) > 1 {
 		selectionID, err := flows.storeSelectionLocked(sessionID, account, profiles, time.Now())
 		if err != nil {
-			writeMicrosoftError(w, http.StatusServiceUnavailable, err.Error())
+			writeAdminErr(w, http.StatusServiceUnavailable, err, "")
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -292,14 +302,18 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 		})
 		return
 	}
-	warning := ""
+	var warning microsoftWarning
 	if len(profiles) == 1 {
 		account.ProfileArn = profiles[0].ARN
 	} else {
 		//! The credential is good; request-time resolution retries the profile, so keep the login.
-		warning = "The account was added, but its Kiro profile could not be resolved yet"
+		warning = microsoftWarning{
+			text: "The account was added, but its Kiro profile could not be resolved yet",
+			code: codeMicrosoftProfilePending,
+		}
 		if profileErr != nil {
-			warning += ": " + profileErr.Error()
+			warning.text += ": " + profileErr.Error()
+			warning.detail = profileErr.Error()
 		}
 	}
 	if err := flows.addAccountLocked(sessionID, account); err != nil {
@@ -316,7 +330,7 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeMicrosoftError(w, http.StatusBadRequest, "Invalid JSON")
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 	selectionID := strings.TrimSpace(req.SelectionID)
@@ -328,7 +342,7 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 	sel := flows.selections[selectionID]
 	if sel == nil || !time.Now().Before(sel.expiresAt) {
 		delete(flows.selections, selectionID)
-		writeMicrosoftError(w, http.StatusBadRequest, "Microsoft profile selection not found or expired")
+		writeAdminError(w, http.StatusBadRequest, auth.CodeSSOSessionExpired, "Microsoft profile selection not found or expired")
 		return
 	}
 	//! Only an ARN Kiro listed for this token may be pinned; the client cannot name an arbitrary one.
@@ -340,7 +354,7 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 		}
 	}
 	if !offered {
-		writeMicrosoftError(w, http.StatusBadRequest, "Selected Kiro profile was not offered for this login")
+		writeAdminError(w, http.StatusBadRequest, codeProfileNotAvailable, "Selected Kiro profile was not offered for this login")
 		return
 	}
 
@@ -354,7 +368,7 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 		return
 	}
 	delete(flows.selections, selectionID)
-	h.writeMicrosoftAdded(w, account, "")
+	h.writeMicrosoftAdded(w, account, microsoftWarning{})
 }
 
 func (h *Handler) apiCancelMicrosoftSSO(w http.ResponseWriter, r *http.Request) {
@@ -364,7 +378,7 @@ func (h *Handler) apiCancelMicrosoftSSO(w http.ResponseWriter, r *http.Request) 
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
-		writeMicrosoftError(w, http.StatusBadRequest, "Invalid JSON")
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
 		return
 	}
 	microsoftSSOFlows.cancel(strings.TrimSpace(req.SessionID), strings.TrimSpace(req.SelectionID))
@@ -456,12 +470,12 @@ func verifyOfferedProfile(ctx context.Context, account *config.Account, profileA
 	defer cancel()
 	profiles, err := DiscoverKiroProfiles(ctx, account)
 	if err != nil {
-		return errors.New("Unable to verify profileArn against Kiro profiles: " + err.Error())
+		return &profileVerifyError{err: err}
 	}
 	for _, profile := range profiles {
 		if profile.ARN == profileArn {
 			return nil
 		}
 	}
-	return errors.New("profileArn was not offered for this credential")
+	return errProfileNotOffered
 }
