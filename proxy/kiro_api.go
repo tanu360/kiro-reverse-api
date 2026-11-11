@@ -17,7 +17,12 @@ import (
 )
 
 const (
-	kiroRestAPIBase               = "https://codewhisperer.us-east-1.amazonaws.com"
+	kiroRestAPIBase = "https://codewhisperer.us-east-1.amazonaws.com"
+
+	//! Kiro IDE >= 0.12 asks the Amazon Q host for models; the CodeWhisperer host now
+	//! returns a reduced catalog (no Claude) for those client versions.
+	kiroModelAPIBase = "https://q.us-east-1.amazonaws.com"
+
 	profileArnUnsupportedCooldown = 24 * time.Hour
 	profileLookupFailureTTL       = 10 * time.Minute
 	maxProfilePages               = 20
@@ -96,7 +101,7 @@ func GetUserInfo(account *config.Account) (*UserInfoResponse, error) {
 
 func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 	ensureRestProfileArn(account)
-	baseURL := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&maxResults=50", kiroRestAPIBase)
+	baseURL := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&maxResults=50", kiroModelAPIBase)
 	baseURL = regionalizeURL(baseURL, account)
 	baseURL = withProfileArnQuery(baseURL, account)
 	client := GetRestClientForProxy(ResolveAccountProxyURL(account))

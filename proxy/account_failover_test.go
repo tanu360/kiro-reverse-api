@@ -30,6 +30,60 @@ func TestAccountFailureClassifiers(t *testing.T) {
 	}
 }
 
+func TestVersionGateIsNotAuthenticationFailure(t *testing.T) {
+	versionGateMessages := []string{
+		`HTTP 403 from Kiro IDE: {"message":"This version of Kiro is no longer supported. Please update to the latest version of Kiro to continue.","reason":"FEATURE_NOT_SUPPORTED"}`,
+		"upstream returned FEATURE_NOT_SUPPORTED",
+		"This version of Kiro is no longer supported",
+	}
+	for _, msg := range versionGateMessages {
+		if isAuthErrorMessage(msg) {
+			t.Fatalf("version gate must not be classified as an auth failure: %q", msg)
+		}
+	}
+	if !isAuthErrorMessage("HTTP 403: forbidden") {
+		t.Fatalf("a plain 403 must still count as an auth failure")
+	}
+}
+
+func TestVersionGateFailureDoesNotDisableAccount(t *testing.T) {
+	dir := t.TempDir()
+	if err := db.ResetForTest(dir); err != nil {
+		t.Fatalf("reset db: %v", err)
+	}
+	if err := config.Init(filepath.Join(dir, "kiro.db")); err != nil {
+		t.Fatalf("config init: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	account := config.Account{
+		ID:      "acct-version-gate",
+		Email:   "gate@example.com",
+		Enabled: true,
+	}
+	if err := config.AddAccount(account); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+
+	p := accountpool.GetPool()
+	p.Reload()
+	h := &Handler{pool: p}
+	h.handleAccountFailure(&account, errors.New("HTTP 403 from Kiro IDE: This version of Kiro is no longer supported. Please update to the latest version of Kiro to continue. / FEATURE_NOT_SUPPORTED"))
+
+	accounts := config.GetAccounts()
+	if len(accounts) != 1 {
+		t.Fatalf("expected one account, got %#v", accounts)
+	}
+	if !accounts[0].Enabled {
+		t.Fatalf("version gate must not disable the account: %#v", accounts[0])
+	}
+	if accounts[0].BanStatus != "" || accounts[0].BanReason != "" {
+		t.Fatalf("version gate must not mark a ban status: %#v", accounts[0])
+	}
+}
+
 func TestProfileUnavailableFailureDoesNotDisableAccount(t *testing.T) {
 	dir := t.TempDir()
 	if err := db.ResetForTest(dir); err != nil {

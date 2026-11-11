@@ -1112,6 +1112,10 @@ func UpdateLogLevel(level string) error {
 	return Save()
 }
 
+// defaultKiroVersion tracks the current Kiro IDE release. Bump it when Kiro ships a new
+// IDE build: the upstream API rejects stale KiroIDE-<version> user agents.
+const defaultKiroVersion = "1.4.121"
+
 type KiroClientConfig struct {
 	KiroVersion   string
 	SystemVersion string
@@ -1122,7 +1126,9 @@ func GetKiroClientConfig() KiroClientConfig {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 
-	kiroVersion := "0.11.107"
+	//! Mirror the Kiro IDE build that the proxy impersonates; the upstream client-version
+	//! gate rejects old ones with 403 FEATURE_NOT_SUPPORTED. Override with config.kiroVersion.
+	kiroVersion := defaultKiroVersion
 	if cfg != nil && cfg.KiroVersion != "" {
 		kiroVersion = cfg.KiroVersion
 	}
