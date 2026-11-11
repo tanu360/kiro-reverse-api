@@ -19,15 +19,15 @@
   "importSuccess_other": "已添加 {count} 个账号。",
   "importPartial_other": "已添加 {count} 个账号，{failed} 个失败。",
   "moreFailures_other": "另有 {count} 个失败。",
-  "continueWith": "使用 {name} 继续",
   "stepAdded": "账号已添加",
   "stepDone": "（已完成）",
-  "otherWays": "其他方式",
+  "method": "方式",
 
   "methods.builderid.title": "AWS Builder ID",
   "methods.builderid.description": "使用 AWS Builder ID 添加个人账号。",
   "methods.iam.title": "IAM Identity Center（企业 SSO）",
   "methods.iam.description": "使用 IAM Identity Center SSO 添加企业账号。",
+  "methods.iam.short": "IAM Identity Center",
   "methods.microsoft.title": "Microsoft SSO",
   "methods.microsoft.description": "使用 Microsoft Entra ID（Azure AD）登录添加账号。",
   "methods.sso.title": "SSO Token",
@@ -139,14 +139,6 @@
   "apikey.regionHint": "用于未带区域后缀的 API Key：",
   "apikey.keyMissing": "请至少输入一个 Kiro API Key。",
 
-  "kind.browser": "在浏览器中登录",
-  "kind.file": "粘贴或上传 JSON 文件",
-  "kind.token": "粘贴浏览器中的 Token",
-  "kind.key": "粘贴 Kiro CLI 密钥",
-
-  "stepper.label": "进度",
-  "stepper.choose": "选择方式",
-  "stepper.signIn": "登录",
-  "stepper.import": "导入",
-  "stepper.done": "完成"
+  "group.signIn": "登录",
+  "group.import": "导入"
 }

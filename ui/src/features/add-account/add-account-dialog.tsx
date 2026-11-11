@@ -1,6 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { refreshAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { AddedAccountRef } from "@/lib/api/types";
@@ -15,8 +23,7 @@ import { IamFlow } from "./flows/iam-flow";
 import { LocalCacheFlow } from "./flows/local-cache-flow";
 import { MicrosoftFlow } from "./flows/microsoft-flow";
 import { SsoTokenFlow } from "./flows/sso-token-flow";
-import { firstStepControl, isCoarsePointer } from "./focus";
-import { MethodList, MethodStepper } from "./method-list";
+import { MethodHead, MethodRail, MethodSelect } from "./method-list";
 
 export type AddAccountMethod =
   | "builderid"
@@ -35,10 +42,6 @@ interface AddAccountDialogProps {
   onAdded?: (accountIds: string[]) => void;
 }
 
-function footerSubmit(footer: HTMLElement | null): HTMLElement | null {
-  return footer?.querySelector<HTMLElement>('button[type="submit"]') ?? null;
-}
-
 const FLOWS: Record<AddAccountMethod, () => JSX.Element> = {
   builderid: BuilderIdFlow,
   iam: IamFlow,
@@ -51,10 +54,11 @@ const FLOWS: Record<AddAccountMethod, () => JSX.Element> = {
 };
 
 /**
- * The add-account wizard: a method list, then one flow, with a back arrow in the header. Every
- * way out (X, Escape, backdrop, Cancel, Back, success, unmount) resets the shared FlowSessions,
- * which cancels the Microsoft login, stops Builder ID polling, forgets the IAM session and drops
- * late responses.
+ * The add-account dialog as a split pane: every method in a rail at the start (a select at the
+ * top on phones), the chosen method's steps beside it, so switching methods is one click and
+ * there is no list-then-form step. Every way out (X, Escape, backdrop, Cancel, a method switch,
+ * success, unmount) resets the shared FlowSessions, which cancels the Microsoft login, stops
+ * Builder ID polling, forgets the IAM session and drops late responses.
  */
 export function AddAccountDialog({
   open,
@@ -65,22 +69,17 @@ export function AddAccountDialog({
   const { t } = useT("add-account");
   const queryClient = useQueryClient();
   const [sessions] = useState(() => new FlowSessions());
-  const [method, setMethod] = useState<AddAccountMethod | null>(initialMethod ?? null);
+  const [method, setMethod] = useState<AddAccountMethod>(initialMethod ?? "builderid");
   // A new key remounts the flow, so each visit starts from its first step.
   const [flowKey, setFlowKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [footer, setFooter] = useState<HTMLDivElement | null>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  // Set when the user moves between the list and a flow: the clicked control unmounts, so focus
-  // must move into the new step. "list:<method>" returns to the method that was open.
-  const focusNext = useRef<string | null>(null);
-
-  // Each time the dialog opens, start over at the requested method (or the list).
+  // Each time the dialog opens, start over at the requested method (Builder ID by default).
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setMethod(initialMethod ?? null);
+      setMethod(initialMethod ?? "builderid");
       setFlowKey((key) => key + 1);
       setBusy(false);
     }
@@ -127,44 +126,17 @@ export function AddAccountDialog({
     [queryClient, sessions],
   );
 
+  // Switching methods drops whatever the open one had started. Focus stays on the rail item (or
+  // the select), so a keyboard user can keep moving through the methods.
   const selectMethod = useCallback(
     (next: AddAccountMethod) => {
       sessions.reset();
-      focusNext.current = "flow";
       setMethod(next);
       setFlowKey((key) => key + 1);
+      setBusy(false);
     },
     [sessions],
   );
-
-  const methodRef = useRef(method);
-  methodRef.current = method;
-  const back = useCallback(() => {
-    sessions.reset();
-    focusNext.current = `list:${methodRef.current ?? ""}`;
-    setMethod(null);
-    setBusy(false);
-  }, [sessions]);
-
-  // Runs after every commit and acts only on a pending move: the handlers that set focusNext
-  // also change the step, so the commit that shows the new step is the next one.
-  useEffect(() => {
-    const next = focusNext.current;
-    const body = bodyRef.current;
-    focusNext.current = null;
-    if (!next || !body) return;
-    if (next.startsWith("list:")) {
-      const button = body.querySelector<HTMLElement>(`[data-method="${next.slice(5)}"]`);
-      (button ?? body.querySelector<HTMLElement>("[data-method]"))?.focus();
-      return;
-    }
-    // On touch screens a focused text field opens the keyboard over the drawer, so focus the
-    // step itself there; the next swipe or Tab reaches its first field.
-    const target = isCoarsePointer()
-      ? body
-      : (firstStepControl(body) ?? footerSubmit(footer) ?? body);
-    target.focus();
-  });
 
   const cancel = useCallback(() => handleOpenChange(false), [handleOpenChange]);
 
@@ -179,37 +151,46 @@ export function AddAccountDialog({
     [sessions, finishAdd, cancel, footer],
   );
 
-  const Flow = method ? FLOWS[method] : null;
+  const Flow = FLOWS[method];
+  // While a request runs, Escape and outside presses do nothing and the X is disabled; Cancel
+  // still closes (it resets the sessions, which drops the late response).
+  const onDialogOpenChange = (next: boolean, details?: { reason?: string }) => {
+    if (!next && busy && details?.reason === "escape-key") return;
+    handleOpenChange(next);
+  };
   return (
-    <ResponsiveDialog
-      // Hung from the top, so the title stays put while the steps change height. The header ends
-      // with the wizard's progress line.
-      anchor="top"
-      backLabel={t("common:actions.back")}
-      description={method ? t(`methods.${method}.description`) : t("description")}
-      dismissible={!busy}
-      footer={
-        // The flows portal their buttons in here: Cancel and the step's action share one row of
-        // two equal halves at every width, and a lone button spans the row. The method list has
-        // none (its X closes it), so the bare footer is only the dialog's bottom padding.
-        <div
-          className="col-span-2 grid flex-1 grid-cols-2 gap-2 [&>:last-child:nth-child(odd)]:col-span-2"
-          ref={setFooter}
-        />
-      }
-      footerVariant="bare"
-      headerAddon={<MethodStepper method={method} />}
-      onBack={method ? back : undefined}
-      onOpenChange={handleOpenChange}
-      open={open}
-      size="lg"
-      title={method ? t(`methods.${method}.title`) : t("title")}
-    >
-      <div className="outline-none" ref={bodyRef} tabIndex={-1}>
-        <FlowProvider value={context}>
-          {Flow ? <Flow key={flowKey} /> : <MethodList onSelect={selectMethod} />}
-        </FlowProvider>
-      </div>
-    </ResponsiveDialog>
+    <Dialog disablePointerDismissal={busy} onOpenChange={onDialogOpenChange} open={open}>
+      <DialogPopup
+        // Hung from the top, so the title stays put while the methods change height.
+        anchor="top"
+        closeProps={{ disabled: busy }}
+        size="3xl"
+      >
+        <DialogHeader>
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("description")}</DialogDescription>
+        </DialogHeader>
+        {/* A fixed height from sm up, so switching methods never resizes the dialog. */}
+        <div className="flex min-h-0 flex-1 border-border-subtle border-t sm:h-128 sm:flex-initial">
+          <MethodRail busy={busy} method={method} onSelect={selectMethod} />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <DialogPanel className="in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-6">
+              <MethodSelect busy={busy} method={method} onSelect={selectMethod} />
+              <MethodHead method={method} />
+              <FlowProvider value={context}>
+                <Flow key={flowKey} />
+              </FlowProvider>
+            </DialogPanel>
+          </div>
+        </div>
+        <DialogFooter>
+          {/* The flows portal Cancel and their action in here (one row of two on phones). */}
+          <div
+            className="contents max-sm:[&>:last-child:nth-child(odd)]:col-span-2"
+            ref={setFooter}
+          />
+        </DialogFooter>
+      </DialogPopup>
+    </Dialog>
   );
 }

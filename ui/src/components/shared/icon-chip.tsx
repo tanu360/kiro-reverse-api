@@ -19,8 +19,6 @@ const iconChipVariants = cva(
       size: {
         sm: "size-7 [&_svg]:size-4",
         md: "size-9 [&_svg]:size-4",
-        // A dialog's heading mark (the add-account steps): 44 px, a 24 px mark.
-        lg: "size-11 rounded-xl [&_svg]:size-6",
       },
       tone: {
         default: "",

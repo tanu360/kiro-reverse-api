@@ -38,9 +38,10 @@ function DialogBackdrop({
 
 /**
  * Dialog widths, named after the Tailwind max-w step they use (sm 384, md 448, lg 512, xl 576,
- * 2xl 672 px). ResponsiveDialog takes the same names, so `size="xl"` is 576 px everywhere.
+ * 2xl 672, 3xl 768 px). ResponsiveDialog takes the same names, so `size="xl"` is 576 px
+ * everywhere. 3xl is for a dialog with a side rail (add account).
  */
-export type DialogSize = "sm" | "md" | "lg" | "xl" | "2xl";
+export type DialogSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
 const DIALOG_SIZE_CLASS: Record<DialogSize, string> = {
   sm: "max-w-sm",
@@ -48,6 +49,7 @@ const DIALOG_SIZE_CLASS: Record<DialogSize, string> = {
   lg: "max-w-lg",
   xl: "max-w-xl",
   "2xl": "max-w-2xl",
+  "3xl": "max-w-3xl",
 };
 
 /**

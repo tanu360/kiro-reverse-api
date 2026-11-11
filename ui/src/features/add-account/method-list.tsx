@@ -4,156 +4,201 @@ import {
   FolderOpenIcon,
   ShieldHalfIcon,
   TerminalIcon,
-  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { type JSX, useId } from "react";
+import { type JSX, type ReactNode, useId } from "react";
 import { AwsLogo, MicrosoftLogo } from "@/components/shared/brand-logos";
-import { ChoiceList, ChoiceRow } from "@/components/shared/choice-card";
 import { IconChip } from "@/components/shared/icon-chip";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { AddAccountMethod } from "./add-account-dialog";
 
-/** What a method asks of the user, shown under its name in the list. */
-type MethodKind = "browser" | "file" | "token" | "key";
-
-/** Every way but Builder ID, which has the recommended card above them. */
-const OTHER_WAYS: ReadonlyArray<{
+interface MethodMeta {
   id: AddAccountMethod;
-  kind: MethodKind;
+  group: "signIn" | "import";
   icon?: IconSvgElement;
   Logo?: typeof AwsLogo;
-}> = [
-  { id: "iam", kind: "browser", Logo: AwsLogo },
-  { id: "microsoft", kind: "browser", Logo: MicrosoftLogo },
-  { id: "local", kind: "file", icon: FolderOpenIcon },
-  { id: "credentials", kind: "file", icon: CodeIcon },
-  { id: "sso", kind: "token", icon: ShieldHalfIcon },
-  { id: "cookie", kind: "token", icon: CookieIcon },
-  { id: "apikey", kind: "key", icon: TerminalIcon },
+}
+
+/** Every method, in rail order: the browser sign-ins, then the imports. */
+const METHODS: ReadonlyArray<MethodMeta> = [
+  { id: "builderid", group: "signIn", Logo: AwsLogo },
+  { id: "iam", group: "signIn", Logo: AwsLogo },
+  { id: "microsoft", group: "signIn", Logo: MicrosoftLogo },
+  { id: "local", group: "import", icon: FolderOpenIcon },
+  { id: "credentials", group: "import", icon: CodeIcon },
+  { id: "sso", group: "import", icon: ShieldHalfIcon },
+  { id: "cookie", group: "import", icon: CookieIcon },
+  { id: "apikey", group: "import", icon: TerminalIcon },
 ];
 
-/** The browser sign-ins; every other method imports credentials the user already has. */
-const SIGN_IN_METHODS: ReadonlySet<AddAccountMethod> = new Set(["builderid", "iam", "microsoft"]);
+const GROUPS = ["signIn", "import"] as const;
 
-const STEP_MARK = {
-  done: "bg-info-surface text-info-foreground",
-  current: "bg-primary text-primary-foreground",
-  todo: "border border-border text-muted-foreground",
-} as const;
+function meta(method: AddAccountMethod): MethodMeta {
+  return METHODS.find((item) => item.id === method) ?? METHODS[0];
+}
+
+/** A method's mark: its brand logo, or its icon. */
+function Mark({ method, className }: { method: AddAccountMethod; className?: string }): ReactNode {
+  const { Logo, icon } = meta(method);
+  if (Logo) return <Logo className={className} />;
+  return icon ? <HugeiconsIcon aria-hidden="true" className={className} icon={icon} /> : null;
+}
+
+/** The method's name in the rail and the select: IAM Identity Center without its long suffix. */
+function useMethodLabel(): (method: AddAccountMethod) => string {
+  const { t } = useT("add-account");
+  return (method) => (method === "iam" ? t("methods.iam.short") : t(`methods.${method}.title`));
+}
 
 /**
- * The wizard's progress line under the title: choose a method, sign in (or import), done. On the
- * list the first step is current; inside a method the first is ticked and the second current.
- * The last never shows as current: the dialog closes once the account is added.
+ * The methods as a side rail from sm up, grouped under Sign in and Import: each a row with its
+ * mark and name, the open one filled. While a request runs only the open one stays enabled, like
+ * the disabled close X.
  */
-export function MethodStepper({ method }: { method: AddAccountMethod | null }): JSX.Element {
+export function MethodRail({
+  method,
+  busy,
+  onSelect,
+}: {
+  method: AddAccountMethod;
+  busy: boolean;
+  onSelect: (method: AddAccountMethod) => void;
+}): JSX.Element {
   const { t } = useT("add-account");
-  const at = method ? 1 : 0;
-  const labels = [
-    t("stepper.choose"),
-    method && !SIGN_IN_METHODS.has(method) ? t("stepper.import") : t("stepper.signIn"),
-    t("stepper.done"),
-  ];
+  const label = useMethodLabel();
+  const id = useId();
   return (
-    <ol aria-label={t("stepper.label")} className="mt-2 flex items-center gap-2">
-      {labels.map((label, index) => {
-        const state = index < at ? "done" : index === at ? "current" : "todo";
-        return (
-          <li
-            aria-current={state === "current" ? "step" : undefined}
-            className={cn(
-              "flex min-w-0 items-center gap-2 font-medium text-meta",
-              state === "current" ? "text-foreground" : "text-muted-foreground",
-              // The rule to the next step.
-              index < labels.length - 1 && "after:h-px after:w-6 after:bg-border sm:after:w-8",
-            )}
-            key={label}
+    <nav
+      aria-label={t("method")}
+      className="flex w-60 shrink-0 flex-col overflow-y-auto border-border-subtle border-e bg-surface-inset p-3 max-sm:hidden"
+    >
+      {GROUPS.map((group) => (
+        <div className="flex flex-col gap-0.5 not-first:mt-3" key={group}>
+          <h3
+            className="px-2.5 pt-1 pb-1.5 font-medium text-meta text-muted-foreground"
+            id={`${id}-${group}`}
           >
-            <span
-              aria-hidden="true"
-              className={cn(
-                "flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-2xs tabular-nums",
-                STEP_MARK[state],
-              )}
-            >
-              {state === "done" ? (
-                <HugeiconsIcon className="size-3" icon={Tick02Icon} strokeWidth={2} />
-              ) : (
-                index + 1
-              )}
-            </span>
-            {/* On phones only the current step keeps its label; the others are their numbers. */}
-            <span className={cn("truncate", state !== "current" && "max-sm:sr-only")}>
-              {label}
-              {state === "done" ? <span className="sr-only"> {t("stepDone")}</span> : null}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+            {t(`group.${group}`)}
+          </h3>
+          <ul aria-labelledby={`${id}-${group}`} className="flex flex-col gap-0.5">
+            {METHODS.filter((item) => item.group === group).map((item) => {
+              const current = item.id === method;
+              return (
+                <li key={item.id}>
+                  <button
+                    aria-current={current ? "true" : undefined}
+                    className={cn(
+                      "flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-start font-medium text-sm outline-none transition-colors focus-outline disabled:pointer-events-none disabled:opacity-64",
+                      current
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    )}
+                    data-method={item.id}
+                    disabled={busy && !current}
+                    onClick={() => {
+                      if (!current) onSelect(item.id);
+                    }}
+                    type="button"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex size-4 shrink-0 items-center justify-center"
+                    >
+                      <Mark className="size-4" method={item.id} />
+                    </span>
+                    <span className="min-w-0 truncate">{label(item.id)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+/** The method picker on phones, where there is no room for the rail: a select over the pane. */
+export function MethodSelect({
+  method,
+  busy,
+  onSelect,
+}: {
+  method: AddAccountMethod;
+  busy: boolean;
+  onSelect: (method: AddAccountMethod) => void;
+}): JSX.Element {
+  const { t } = useT("add-account");
+  const label = useMethodLabel();
+  const items = METHODS.map((item) => ({ value: item.id, label: label(item.id) }));
+  return (
+    <Field className="mb-5 sm:hidden">
+      <FieldLabel>{t("method")}</FieldLabel>
+      <Select
+        disabled={busy}
+        items={items}
+        onValueChange={(value) => {
+          if (value && value !== method) onSelect(value as AddAccountMethod);
+        }}
+        value={method}
+      >
+        <SelectTrigger>
+          <SelectValue>
+            {(value: AddAccountMethod) => (
+              <span className="flex min-w-0 items-center gap-2">
+                <Mark className="size-4" method={value} />
+                <span className="truncate">{label(value)}</span>
+              </span>
+            )}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectPopup>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              <Mark className="size-4" method={item.value} />
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectPopup>
+      </Select>
+    </Field>
   );
 }
 
 /**
- * The eight ways to add an account, guided: AWS Builder ID, the usual way in, as one recommended
- * card that says what happens and has its own button; the other seven under "Other ways" as one
- * list of rows, each naming what it asks for (a browser sign-in, a file, a token, a key).
+ * The open method's heading at the top of the pane: its mark in a chip, its name (Builder ID
+ * with the Recommended badge) and what it adds, over a hairline.
  */
-export function MethodList({
-  onSelect,
-}: {
-  onSelect: (method: AddAccountMethod) => void;
-}): JSX.Element {
+export function MethodHead({ method }: { method: AddAccountMethod }): JSX.Element {
   const { t } = useT("add-account");
-  const otherWaysId = useId();
   return (
-    <div className="flex flex-col gap-5">
-      <Card className="flex flex-col gap-4 p-5">
-        <div className="flex items-start gap-3">
-          <IconChip size="lg">
-            <AwsLogo />
-          </IconChip>
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className="font-semibold text-base">{t("methods.builderid.title")}</h3>
-              <Badge size="sm" tone="primary">
-                {t("recommended")}
-              </Badge>
-            </div>
-            <p className="text-muted-foreground text-sm">{t("methods.builderid.description")}</p>
-          </div>
+    <div className="mb-5 flex items-start gap-3.5 border-border-subtle border-b pb-5">
+      <IconChip size="md">
+        <Mark method={method} />
+      </IconChip>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h3 className="font-semibold text-base">{t(`methods.${method}.title`)}</h3>
+          {method === "builderid" ? (
+            <Badge size="sm" tone="primary">
+              {t("recommended")}
+            </Badge>
+          ) : null}
         </div>
-        <p className="text-muted-foreground text-sm">{t("builderid.startNote")}</p>
-        <Button className="w-full" data-method="builderid" onClick={() => onSelect("builderid")}>
-          {t("continueWith", { name: t("methods.builderid.title") })}
-        </Button>
-      </Card>
-      <section aria-labelledby={otherWaysId} className="flex flex-col gap-2">
-        <h3 className="flex items-center gap-1.5 font-medium text-meta" id={otherWaysId}>
-          {t("otherWays")}
-          <span className="font-normal text-muted-foreground tabular-nums">
-            {OTHER_WAYS.length}
-          </span>
-        </h3>
-        <ChoiceList>
-          {OTHER_WAYS.map(({ id, kind, icon, Logo }) => (
-            <ChoiceRow
-              data-method={id}
-              description={t(`kind.${kind}`)}
-              icon={icon}
-              key={id}
-              mark={Logo ? <Logo /> : undefined}
-              onClick={() => onSelect(id)}
-              title={t(`methods.${id}.title`)}
-            />
-          ))}
-        </ChoiceList>
-      </section>
+        <p className="text-pretty text-muted-foreground text-sm">
+          {t(`methods.${method}.description`)}
+        </p>
+      </div>
     </div>
   );
 }

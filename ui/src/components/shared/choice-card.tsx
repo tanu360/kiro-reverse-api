@@ -132,16 +132,13 @@ export function ChoiceList({
  */
 export function ChoiceRow({
   icon,
-  mark,
   title,
   badge,
   description,
   className,
   ...props
 }: Omit<ComponentProps<"button">, "title" | "children"> & {
-  /** The icon in the chip; `mark` instead draws a brand logo there. */
-  icon?: IconSvgElement;
-  mark?: ReactNode;
+  icon: IconSvgElement;
   title: ReactNode;
   /** After the title, on its line (a Recommended badge). */
   badge?: ReactNode;
@@ -161,14 +158,9 @@ export function ChoiceRow({
         type="button"
         {...props}
       >
-        <IconChip className="in-data-flush:hidden" icon={icon} size="md">
-          {mark}
-        </IconChip>
-        <span
-          aria-hidden="true"
-          className="hidden size-9 shrink-0 items-center justify-center text-muted-foreground transition-colors group-hover/choice-row:text-foreground in-data-flush:flex [&_svg]:size-4"
-        >
-          {icon ? <HugeiconsIcon className="size-4" icon={icon} /> : mark}
+        <IconChip className="in-data-flush:hidden" icon={icon} size="md" />
+        <span className="hidden size-9 shrink-0 items-center justify-center text-muted-foreground transition-colors group-hover/choice-row:text-foreground in-data-flush:flex">
+          <HugeiconsIcon aria-hidden="true" className="size-4" icon={icon} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

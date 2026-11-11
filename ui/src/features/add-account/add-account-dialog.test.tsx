@@ -103,30 +103,41 @@ async function expectCurrentStep(title: string): Promise<void> {
 }
 
 describe("AddAccountDialog", () => {
-  it("lists the eight methods and opens one, then goes back", async () => {
+  it("lists the eight methods in the rail, opens Builder ID, and switches with one click", async () => {
     const { user } = renderWithProviders(<Harness />);
     const dialog = await screen.findByRole("dialog", { name: "Add account" });
+    const rail = within(dialog).getByRole("navigation", { name: "Method" });
     for (const name of [
-      "Continue with AWS Builder ID",
-      /IAM Identity Center \(Enterprise SSO\)/,
-      /Microsoft SSO/,
-      /SSO token/,
-      /Kiro local cache/,
-      /Credentials JSON/,
-      /Kiro web cookie/,
-      /Kiro API key/,
+      "AWS Builder ID",
+      "IAM Identity Center",
+      "Microsoft SSO",
+      "Kiro local cache",
+      "Credentials JSON",
+      "SSO token",
+      "Kiro web cookie",
+      "Kiro API key",
     ]) {
-      expect(within(dialog).getByRole("button", { name })).toBeInTheDocument();
+      expect(within(rail).getByRole("button", { name })).toBeInTheDocument();
     }
-    await user.click(screen.getByRole("button", { name: /Kiro API key/ }));
-    expect(await screen.findByRole("dialog", { name: "Kiro API key" })).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "Back" }));
-    expect(await screen.findByRole("dialog", { name: "Add account" })).toBeInTheDocument();
+    expect(within(rail).getByRole("button", { name: "AWS Builder ID" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(screen.getByRole("heading", { name: "AWS Builder ID" })).toBeInTheDocument();
+
+    await user.click(within(rail).getByRole("button", { name: "Kiro API key" }));
+    expect(await screen.findByRole("heading", { name: "Kiro API key" })).toBeInTheDocument();
+    expect(within(rail).getByRole("button", { name: "Kiro API key" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    // The dialog keeps its name; only the pane changes.
+    expect(screen.getByRole("dialog", { name: "Add account" })).toBeInTheDocument();
   });
 
   it("opens straight into initialMethod", async () => {
     renderWithProviders(<Harness initialMethod="cookie" />);
-    expect(await screen.findByRole("dialog", { name: "Kiro web cookie" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Kiro web cookie" })).toBeInTheDocument();
   });
 });
 
@@ -365,7 +376,7 @@ describe("IAM Identity Center", () => {
       "Could not add the account: The callback URL is not valid. Copy the full address again.",
     );
     expect(
-      screen.getByRole("dialog", { name: "IAM Identity Center (Enterprise SSO)" }),
+      screen.getByRole("heading", { name: "IAM Identity Center (Enterprise SSO)" }),
     ).toBeVisible();
     expect(screen.getByRole("textbox", { name: "Callback URL" })).toHaveValue(
       "http://127.0.0.1/oauth/callback?error=denied",
@@ -424,7 +435,7 @@ describe("SSO token", () => {
     expect(imports.count).toBe(1);
 
     await user.keyboard("{Escape}");
-    expect(screen.getByRole("dialog", { name: "SSO token" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "SSO token" })).toBeInTheDocument();
 
     pending.release();
     await expectClosed();
@@ -481,21 +492,24 @@ describe("Credentials JSON", () => {
 });
 
 describe("Focus after a failed submit or a step change", () => {
-  it("moves into the chosen flow, and back to that method on Back", async () => {
+  it("keeps focus on the rail when switching methods, and locks the rail while a request runs", async () => {
     const { user } = renderWithProviders(<Harness />);
-    await user.click(await screen.findByRole("button", { name: /IAM Identity Center/ }));
-    await waitFor(() => expect(screen.getByRole("textbox", { name: "Start URL" })).toHaveFocus());
+    const rail = await screen.findByRole("navigation", { name: "Method" });
+    const iam = within(rail).getByRole("button", { name: "IAM Identity Center" });
+    await user.click(iam);
+    expect(await screen.findByRole("textbox", { name: "Start URL" })).toBeInTheDocument();
+    expect(iam).toHaveFocus();
 
-    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(within(rail).getByRole("button", { name: "Microsoft SSO" }));
+    await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
+    await screen.findByRole("textbox", { name: "Callback URL" });
+    deferred("/auth/microsoft-sso/complete", { success: true, stage: "complete" });
+    await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/leg1");
+    await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /IAM Identity Center/ })).toHaveFocus(),
+      expect(within(rail).getByRole("button", { name: "AWS Builder ID" })).toBeDisabled(),
     );
-
-    // Microsoft starts with no field, so its submit button takes focus.
-    await user.click(screen.getByRole("button", { name: /Microsoft SSO/ }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Start sign-in" })).toHaveFocus(),
-    );
+    expect(within(rail).getByRole("button", { name: "Microsoft SSO" })).toBeEnabled();
   });
 
   it("IAM: focuses the first invalid field, the new step and the field to fix", async () => {

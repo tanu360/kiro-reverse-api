@@ -35,10 +35,6 @@ interface ResponsiveDialogProps {
   anchor?: DialogAnchor;
   /** Shows a back arrow before the title (a step flow's way back); the footer keeps the actions. */
   onBack?: () => void;
-  /** More header content under the description (a wizard's progress line). */
-  headerAddon?: ReactNode;
-  /** `bare` drops the footer's band and hairline, for a footer that holds the step's buttons. */
-  footerVariant?: "default" | "bare";
   /** The back arrow's accessible name; defaults to the common "Back". */
   backLabel?: string;
   /**
@@ -107,8 +103,6 @@ export function ResponsiveDialog({
   anchor = "center",
   onBack,
   backLabel,
-  headerAddon,
-  footerVariant = "default",
   dismissible = true,
   initialFocus,
   finalFocus,
@@ -134,10 +128,9 @@ export function ResponsiveDialog({
         <DialogHeader>
           <TitleRow backLabel={back} onBack={onBack} title={title} Title={DialogTitle} />
           {description ? <DialogDescription>{description}</DialogDescription> : null}
-          {headerAddon}
         </DialogHeader>
         <DialogPanel>{children}</DialogPanel>
-        {footer ? <DialogFooter variant={footerVariant}>{footer}</DialogFooter> : null}
+        {footer ? <DialogFooter>{footer}</DialogFooter> : null}
       </DialogPopup>
     </Dialog>
   );

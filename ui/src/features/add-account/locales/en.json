@@ -22,15 +22,15 @@
   "importPartial_other": "Added {count} accounts, {failed} failed.",
   "moreFailures_one": "{count} more failure.",
   "moreFailures_other": "{count} more failures.",
-  "continueWith": "Continue with {name}",
   "stepAdded": "Account added",
   "stepDone": "(done)",
-  "otherWays": "Other ways",
+  "method": "Method",
 
   "methods.builderid.title": "AWS Builder ID",
   "methods.builderid.description": "Add a personal account with AWS Builder ID.",
   "methods.iam.title": "IAM Identity Center (Enterprise SSO)",
   "methods.iam.description": "Add an enterprise account with IAM Identity Center SSO.",
+  "methods.iam.short": "IAM Identity Center",
   "methods.microsoft.title": "Microsoft SSO",
   "methods.microsoft.description": "Add an account with a Microsoft Entra ID (Azure AD) sign-in.",
   "methods.sso.title": "SSO token",
@@ -142,14 +142,6 @@
   "apikey.regionHint": "Used for keys without a region suffix:",
   "apikey.keyMissing": "Enter at least one Kiro API key.",
 
-  "kind.browser": "Sign in in your browser",
-  "kind.file": "Paste or upload a JSON file",
-  "kind.token": "Paste a token from your browser",
-  "kind.key": "Paste a Kiro CLI key",
-
-  "stepper.label": "Progress",
-  "stepper.choose": "Choose method",
-  "stepper.signIn": "Sign in",
-  "stepper.import": "Import",
-  "stepper.done": "Done"
+  "group.signIn": "Sign in",
+  "group.import": "Import"
 }
