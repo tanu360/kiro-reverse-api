@@ -1,59 +1,41 @@
 import {
   AlertCircleIcon,
-  ArrowDataTransferVerticalIcon,
+  ArrowDown01Icon,
+  ArrowRight01Icon,
   CircleCheckIcon,
   CircleXIcon,
-  Coins01Icon,
-  FlaskConicalIcon,
   InformationCircleIcon,
   PlayIcon,
-  Timer01Icon,
-  UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, type KeyboardEvent, memo, useEffect, useId, useRef, useState } from "react";
+import { type JSX, memo, useEffect, useId, useRef, useState } from "react";
 import { CodeBlock } from "@/components/shared/code-block";
-import { EMPTY_SIZING } from "@/components/shared/empty-state";
-import { IconChip } from "@/components/shared/icon-chip";
+import { CopyButton } from "@/components/shared/copy-button";
 import { ModelLogo } from "@/components/shared/model-logo";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
-import { TruncatedText } from "@/components/shared/truncated-text";
-import {
-  Autocomplete,
-  AutocompleteEmpty,
-  AutocompleteInput,
-  AutocompleteItem,
-  AutocompleteList,
-  AutocompletePopup,
-} from "@/components/ui/autocomplete";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardHeader,
-  CardHeading,
-  CardPanel,
-  CardTitle,
-} from "@/components/ui/card";
-import { EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { getAccountModelsCached, testAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, TestAccountResponse } from "@/lib/api/types";
-import { formatClockTime, formatCreditsExact, formatDecimal, formatNumber } from "@/lib/format";
+import { EMPTY, formatClockTime, formatCreditsExact, formatDecimal } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
-import { StatusPill } from "./account-cells";
 import { authLabel, planLabel } from "./account-model";
+import { TestModelPicker } from "./test-model-picker";
 
 /** The old UI's fallback when nothing is cached (the server's own default differs). */
 const DEFAULT_TEST_MODEL = "claude-sonnet-4.6";
+/** The steps kept per model; older ones drop off the top. */
 export const MAX_LOG_LINES = 100;
+/** How many models one batch tests at the same time; the rest wait their turn. */
+const TEST_CONCURRENCY = 3;
 
 type LogType = "info" | "ok" | "warn" | "err";
 interface LogLine {
@@ -65,10 +47,24 @@ interface LogLine {
   keep?: string;
 }
 
-/** The latest finished run, for the result card; the step list keeps every run. */
-type Outcome =
+/** One model's latest run. A model with no entry has not run yet. */
+type ModelRun =
+  | { kind: "queued" }
+  | { kind: "running"; started: number }
   | { kind: "ok"; seconds: string; result: TestAccountResponse }
   | { kind: "err"; seconds: string; reason: string };
+
+type DetailTab = "response" | "steps";
+
+/*
+ * One grid for the column heads and every row, so the columns line up: the model takes the rest,
+ * then status, time, credits and the chevron. Phones keep the model, time and chevron: the
+ * status moves under the name and the credits column goes, so the name is never cut.
+ */
+const ROW_GRID =
+  "grid grid-cols-[minmax(0,1fr)_auto_--spacing(12)_--spacing(16)_--spacing(4)] items-center gap-3 px-3 max-sm:grid-cols-[minmax(0,1fr)_--spacing(10)_--spacing(4)] max-sm:gap-2";
+/** The open row's panel keeps one height across its tabs and states, so nothing below moves. */
+const DETAIL_HEIGHT = "h-56";
 
 /** The line text with its `keep` part (first match) on one line; the rest wraps as usual. */
 function LogText({ text, keep }: { text: string; keep?: string }): JSX.Element {
@@ -99,23 +95,19 @@ const STEP_TEXT_CLASS: Record<LogType, string | undefined> = {
   err: "text-destructive-foreground",
 };
 
-/*
- * Fixed heights, so nothing moves between idle, running and done: the result card's body fits
- * the stat chips over a three-line well (a longer reply scrolls inside the well), and the step
- * list shows about four steps (more on a phone, where steps wrap) and scrolls. The result body
- * is `flex-none`: as a growing flex item of the card its basis would win over the height.
- */
-const RESULT_HEIGHT = "h-44";
-const STEPS_HEIGHT = "h-32 max-sm:h-40";
-
 function defaultModel(models: string[]): string {
   if (models.length === 0 || models.includes(DEFAULT_TEST_MODEL)) return DEFAULT_TEST_MODEL;
   return models[0];
 }
 
-/** "1.2 s elapsed" since `started`, ticking every 100 ms (only this line re-renders). */
-function Elapsed({ started }: { started: number }): JSX.Element {
-  const { t } = useT("accounts");
+/** Seconds since `started`, ticking every 100 ms (only this text re-renders). */
+function Elapsed({
+  started,
+  format,
+}: {
+  started: number;
+  format: (seconds: string) => string;
+}): JSX.Element {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 100);
@@ -123,40 +115,8 @@ function Elapsed({ started }: { started: number }): JSX.Element {
   }, []);
   return (
     <span className="tabular-nums">
-      {t("test.elapsed", { seconds: formatDecimal(Math.max(0, now - started) / 1000, 1) })}
+      {format(formatDecimal(Math.max(0, now - started) / 1000, 1))}
     </span>
-  );
-}
-
-/** The idle and running body: the empty-state tile, title and hint, centred in the card. */
-function ResultState({
-  media,
-  title,
-  description,
-}: {
-  media: JSX.Element;
-  title: string;
-  description: JSX.Element | string;
-}): JSX.Element {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center">
-      <EmptyHeader>
-        <EmptyMedia className={EMPTY_SIZING.compact.media} variant="icon">
-          {media}
-        </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
-        <EmptyDescription>{description}</EmptyDescription>
-      </EmptyHeader>
-    </div>
-  );
-}
-
-/** A small stat next to the result (latency, tokens, credits): an outline chip with a line icon. */
-function StatChip({ icon, children }: { icon: IconSvgElement; children: string }): JSX.Element {
-  return (
-    <Badge icon={icon} iconStyle="line" size="sm" variant="outline">
-      {children}
-    </Badge>
   );
 }
 
@@ -185,7 +145,222 @@ const Step = memo(function Step({ line }: { line: LogLine }): JSX.Element {
   );
 });
 
-/** Sends a real "say ok" request through one account and logs the outcome. Spends credits. */
+/** The Status cell: Not run, Queued, Running, Succeeded or Failed. */
+function RunBadge({ run }: { run: ModelRun | undefined }): JSX.Element {
+  const { t } = useT("accounts");
+  if (!run) return <Badge size="sm">{t("test.status.notRun")}</Badge>;
+  switch (run.kind) {
+    case "queued":
+      return <Badge size="sm">{t("test.status.queued")}</Badge>;
+    case "running":
+      return (
+        <Badge live size="sm" tone="info">
+          {t("test.status.running")}
+        </Badge>
+      );
+    case "ok":
+      return (
+        <Badge icon={CircleCheckIcon} size="sm" tone="success">
+          {t("test.status.ok")}
+        </Badge>
+      );
+    case "err":
+      return (
+        <Badge icon={CircleXIcon} size="sm" tone="destructive">
+          {t("test.status.failed")}
+        </Badge>
+      );
+  }
+}
+
+/** A model as plain text: its logo and its id, with no chip around it. */
+function ModelName({ model, className }: { model: string; className?: string }): JSX.Element {
+  return (
+    <span className={cn("flex min-w-0 items-center gap-2", className)}>
+      <ModelLogo model={model} />
+      <span className="truncate font-mono text-foreground text-meta">{model}</span>
+    </span>
+  );
+}
+
+/** The reply as the server sent it, less the `success` flag and an empty `reasoning`. */
+function responseJson(result: TestAccountResponse): string {
+  const { success: _success, reasoning, ...rest } = result;
+  return JSON.stringify(reasoning ? { ...rest, reasoning } : rest, null, 2);
+}
+
+/** A quiet centred state inside the open row's panel: Not run yet, Queued or Waiting. */
+function DetailState({
+  icon,
+  title,
+  description,
+}: {
+  icon: JSX.Element;
+  title: string;
+  description: JSX.Element | string;
+}): JSX.Element {
+  return (
+    <div
+      className={cn(
+        DETAIL_HEIGHT,
+        "flex flex-col items-center justify-center gap-1 bg-surface-inset px-4 text-center",
+      )}
+    >
+      <span className="mb-1 text-muted-foreground">{icon}</span>
+      <span className="font-medium text-sm">{title}</span>
+      <span className="text-meta text-muted-foreground">{description}</span>
+    </div>
+  );
+}
+
+/**
+ * The tapped row's Response and Steps: the tabs, the model and a copy button on one strip, then
+ * the raw response (or the error) as JSON, or that model's steps.
+ */
+function Inspector({
+  id,
+  model,
+  run,
+  steps,
+  tab,
+  onTabChange,
+}: {
+  id: string;
+  model: string;
+  run: ModelRun | undefined;
+  steps: readonly LogLine[];
+  tab: DetailTab;
+  onTabChange: (tab: DetailTab) => void;
+}): JSX.Element {
+  const { t } = useT("accounts");
+  const stepsRef = useRef<HTMLOListElement | null>(null);
+
+  useEffect(() => {
+    if (tab !== "steps" || steps.length === 0) return;
+    const log = stepsRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [tab, steps]);
+
+  const json =
+    run?.kind === "ok"
+      ? responseJson(run.result)
+      : run?.kind === "err"
+        ? JSON.stringify({ error: run.reason }, null, 2)
+        : null;
+
+  return (
+    <section
+      aria-label={model}
+      className="overflow-hidden rounded-xl border border-border"
+      data-slot="test-inspector"
+      id={id}
+    >
+      <Tabs
+        className="gap-0"
+        onValueChange={(value) => onTabChange(value as DetailTab)}
+        value={tab}
+      >
+        <div className="flex min-w-0 items-center gap-2 border-border-subtle border-b pe-1">
+          <TabsList aria-label={model} className="border-b-0 px-1" size="sm" variant="underline">
+            <TabsTab value="response">{t("test.response")}</TabsTab>
+            <TabsTab value="steps">
+              {t("testLog.title")}
+              <Badge className="tabular-nums" size="sm">
+                {steps.length}
+              </Badge>
+            </TabsTab>
+          </TabsList>
+          <ModelName className="ms-auto max-sm:hidden" model={model} />
+          {json ? (
+            <CopyButton
+              className="max-sm:ms-auto"
+              label={run?.kind === "err" ? t("test.copyError") : t("test.copyResponse")}
+              size="icon-sm"
+              value={json}
+              variant="quiet"
+            />
+          ) : null}
+        </div>
+        <TabsPanel value="response">
+          {run?.kind === "ok" && !run.result.stopReason ? (
+            // The Steps tab explains it (common on Enterprise accounts).
+            <div className="border-border-subtle border-b bg-surface-inset px-3 py-2">
+              <Badge icon={AlertCircleIcon} size="sm" tone="warning">
+                {t("test.noStopReason")}
+              </Badge>
+            </div>
+          ) : null}
+          {json ? (
+            <CodeBlock
+              bare
+              className={cn(DETAIL_HEIGHT, "overflow-y-auto")}
+              code={json}
+              copyLabel={t("test.copyResponse")}
+              language="json"
+              title={t("test.response")}
+              wrap
+            />
+          ) : run?.kind === "running" ? (
+            <DetailState
+              description={
+                <Elapsed
+                  format={(seconds) => t("test.elapsed", { seconds })}
+                  started={run.started}
+                />
+              }
+              icon={<Spinner aria-hidden="true" />}
+              title={t("test.waitingTitle")}
+            />
+          ) : run?.kind === "queued" ? (
+            <DetailState
+              description={t("test.queuedHint")}
+              icon={<HugeiconsIcon aria-hidden="true" className="size-5" icon={PlayIcon} />}
+              title={t("test.status.queued")}
+            />
+          ) : (
+            <DetailState
+              description={t("test.notRunHint")}
+              icon={<HugeiconsIcon aria-hidden="true" className="size-5" icon={PlayIcon} />}
+              title={t("test.notRunTitle")}
+            />
+          )}
+        </TabsPanel>
+        <TabsPanel value="steps">
+          {steps.length === 0 ? (
+            <p
+              className={cn(
+                DETAIL_HEIGHT,
+                "flex items-center justify-center bg-surface-inset px-4 text-center text-muted-foreground text-sm",
+              )}
+            >
+              {t("testLog.empty")}
+            </p>
+          ) : (
+            <ol
+              aria-label={t("testLog.title")}
+              className={cn(
+                DETAIL_HEIGHT,
+                "scrollbar-y flex flex-col overflow-y-auto bg-surface-inset p-3 font-mono text-meta leading-relaxed",
+              )}
+              ref={stepsRef}
+              role="log"
+            >
+              {steps.map((line) => (
+                <Step key={line.id} line={line} />
+              ))}
+            </ol>
+          )}
+        </TabsPanel>
+      </Tabs>
+    </section>
+  );
+}
+
+/**
+ * Sends a real "say ok" request through one account for each picked model, a few at a time, and
+ * lists every model's outcome. Tapping a row opens its response and steps. Spends credits per
+ * model.
+ */
 export function TestAccountDialog({
   account,
   open,
@@ -199,8 +374,10 @@ export function TestAccountDialog({
   const { t: tc } = useT();
   const displayEmail = useDisplayEmail();
   const maskText = useMaskText();
-  const fieldId = useId();
-  const stepsId = useId();
+  const inspectorId = useId();
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const cached = useQuery({
     queryKey: queryKeys.accounts.modelsCached(account.id),
@@ -214,28 +391,53 @@ export function TestAccountDialog({
   });
   const models = cached.data ?? [];
 
-  const [model, setModel] = useState<string | null>(null);
-  const [lines, setLines] = useState<LogLine[]>([]);
-  const [outcome, setOutcome] = useState<Outcome | null>(null);
-  // When the running test started; null while idle.
-  const [started, setStarted] = useState<number | null>(null);
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
-  const runningRef = useRef(false);
+  // Model names typed in by hand, after the cached ones.
+  const [added, setAdded] = useState<string[]>([]);
+  // The picked models; null until the first change, which means "just the default model".
+  const [picked, setPicked] = useState<ReadonlySet<string> | null>(null);
+  const [runs, setRuns] = useState<Record<string, ModelRun>>({});
+  const [steps, setSteps] = useState<Record<string, LogLine[]>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [tab, setTab] = useState<DetailTab>("response");
+  const [batching, setBatching] = useState(false);
+  const batchingRef = useRef(false);
   const nextIdRef = useRef(0);
-  const logRef = useRef<HTMLOListElement | null>(null);
-  const running = started !== null;
 
-  const modelValue = model ?? (cached.isPending ? "" : defaultModel(models));
+  // Without a cached list the default model is still offered, so one tap tests it.
+  const base = cached.isPending ? [] : models.length > 0 ? models : [DEFAULT_TEST_MODEL];
+  const options = [...base, ...added.filter((model) => !base.includes(model))];
+  const selected: ReadonlySet<string> =
+    picked ?? new Set(cached.isPending ? [] : [defaultModel(models)]);
+  const rows = options.filter((model) => selected.has(model));
+  const openModel = expanded !== null && rows.includes(expanded) ? expanded : null;
+
   const email = displayEmail(account.email, account.id);
   const proxy = account.proxyURL || t("test.globalProxy");
 
-  useEffect(() => {
-    if (lines.length === 0) return;
-    const log = logRef.current;
-    if (log) log.scrollTop = log.scrollHeight;
-  }, [lines]);
+  const setChecked = (model: string, checked: boolean) => {
+    setPicked((current) => {
+      const next = new Set(current ?? selected);
+      if (checked) next.add(model);
+      else next.delete(model);
+      return next;
+    });
+  };
+  const setMany = (models: readonly string[], checked: boolean) => {
+    setPicked((current) => {
+      const next = new Set(current ?? selected);
+      for (const model of models) {
+        if (checked) next.add(model);
+        else next.delete(model);
+      }
+      return next;
+    });
+  };
+  const addModel = (model: string) => {
+    if (!options.includes(model)) setAdded((current) => [...current, model]);
+    setChecked(model, true);
+  };
 
-  const append = (type: LogType, text: string, keep?: string) => {
+  const append = (model: string, type: LogType, text: string, keep?: string) => {
     const line: LogLine = {
       id: nextIdRef.current++,
       time: formatClockTime(new Date()),
@@ -243,23 +445,26 @@ export function TestAccountDialog({
       text,
       keep,
     };
-    setLines((current) => [...current, line].slice(-MAX_LOG_LINES));
+    setSteps((current) => ({
+      ...current,
+      [model]: [...(current[model] ?? []), line].slice(-MAX_LOG_LINES),
+    }));
   };
+  const setRun = (model: string, run: ModelRun) =>
+    setRuns((current) => ({ ...current, [model]: run }));
 
-  const run = async () => {
-    if (runningRef.current || cached.isPending) return;
-    runningRef.current = true;
-    const target = modelValue.trim() || DEFAULT_TEST_MODEL;
+  const testOne = async (model: string) => {
     const startedAt = Date.now();
-    setStarted(startedAt);
-    append("info", t("testLog.start", { email, model: target, proxy }), target);
+    setRun(model, { kind: "running", started: startedAt });
+    append(model, "info", t("testLog.start", { email, model, proxy }), model);
     const seconds = () => formatDecimal((Date.now() - startedAt) / 1000, 1);
     try {
-      const result = await testAccount(account.id, { model: target });
+      const result = await testAccount(account.id, { model });
       const took = seconds();
-      setOutcome({ kind: "ok", seconds: took, result });
-      append("ok", t("testLog.success", { email, seconds: took, reply: result.reply }));
+      setRun(model, { kind: "ok", seconds: took, result });
+      append(model, "ok", t("testLog.success", { email, seconds: took, reply: result.reply }));
       append(
+        model,
         "info",
         t("testLog.details", {
           stopReason: result.stopReason || t("testLog.noStopReason"),
@@ -269,24 +474,51 @@ export function TestAccountDialog({
           context: formatDecimal(Number(result.contextUsage), 1),
         }),
       );
-      if (!result.stopReason) append("warn", t("testLog.noStopReasonHint"));
+      if (!result.stopReason) append(model, "warn", t("testLog.noStopReasonHint"));
     } catch (error) {
       const took = seconds();
       const reason = maskText(errorMessage(error, t));
-      setOutcome({ kind: "err", seconds: took, reason });
-      append("err", t("testLog.failed", { email, seconds: took, reason }));
-    } finally {
-      runningRef.current = false;
-      setStarted(null);
+      setRun(model, { kind: "err", seconds: took, reason });
+      append(model, "err", t("testLog.failed", { email, seconds: took, reason }));
     }
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    // Enter picks a highlighted suggestion while the list is open; otherwise it runs the test.
-    if (event.key !== "Enter" || suggestionsOpen) return;
-    event.preventDefault();
-    void run();
+  /** Tests the picked models, a few at a time; the rest show Queued until their turn. */
+  const run = async () => {
+    if (batchingRef.current || cached.isPending || rows.length === 0) return;
+    batchingRef.current = true;
+    setBatching(true);
+    const queue = [...rows];
+    setRuns((current) => {
+      const next = { ...current };
+      for (const model of queue) next[model] = { kind: "queued" };
+      return next;
+    });
+    const worker = async () => {
+      for (let model = queue.shift(); model !== undefined; model = queue.shift()) {
+        await testOne(model);
+      }
+    };
+    try {
+      await Promise.all(
+        Array.from({ length: Math.min(TEST_CONCURRENCY, queue.length) }, () => worker()),
+      );
+    } finally {
+      batchingRef.current = false;
+      setBatching(false);
+    }
   };
+
+  const toggle = (model: string) => setExpanded((current) => (current === model ? null : model));
+
+  // The status line over the rows, once any of them has run.
+  const outcomes = rows.map((model) => runs[model]).filter((item) => item !== undefined);
+  const succeeded = outcomes.filter((item) => item.kind === "ok");
+  const failed = outcomes.filter((item) => item.kind === "err").length;
+  const pending = outcomes.filter((item) => item.kind === "queued" || item.kind === "running");
+  const credits = succeeded.reduce((total, item) => total + item.result.credits, 0);
+  const times = succeeded.map((item) => Number(item.seconds)).sort((a, b) => a - b);
+  const median = times.length > 0 ? times[Math.floor((times.length - 1) / 2)] : null;
 
   const status = cached.isPending
     ? t("test.modelsLoading")
@@ -296,7 +528,7 @@ export function TestAccountDialog({
 
   return (
     <ResponsiveDialog
-      description={t("test.hint")}
+      description={`${email} · ${planLabel(account, t)} · ${authLabel(account, t)} · ${proxy}`}
       footer={
         <Button onClick={() => onOpenChange(false)} variant="ghost">
           {tc("actions.close")}
@@ -307,205 +539,217 @@ export function TestAccountDialog({
       size="lg"
       title={t("test.title")}
     >
-      <div className="flex flex-col gap-5">
-        {/* Who the test runs as: the account and its state, then its plan, sign-in and proxy. */}
-        <div className="flex min-w-0 items-center gap-3">
-          <IconChip icon={UserCircleIcon} size="md" />
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex min-w-0 items-center gap-2">
-              <TruncatedText className="font-medium text-sm">{email}</TruncatedText>
-              <StatusPill account={account} plain size="sm" />
-            </div>
-            <TruncatedText className="text-meta text-muted-foreground">
-              {`${planLabel(account, t)} · ${authLabel(account, t)} · ${proxy}`}
-            </TruncatedText>
-          </div>
-        </div>
-
-        {/* The model and the Run button on one row, at one height. */}
-        <Field>
-          <FieldLabel htmlFor={fieldId}>{t("test.model")}</FieldLabel>
-          <div className="flex w-full min-w-0 items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <Autocomplete
-                // A whole model id in the field (the default, or a pick) lists every cached model;
-                // typing anything else filters the list as usual.
-                filter={models.includes(modelValue) ? null : undefined}
-                items={models}
-                onOpenChange={setSuggestionsOpen}
-                onValueChange={(value) => setModel(value)}
-                openOnInputClick
-                value={modelValue}
-              >
-                <AutocompleteInput
-                  autoComplete="off"
-                  disabled={cached.isPending}
-                  id={fieldId}
-                  onKeyDown={onKeyDown}
-                  placeholder={t("test.modelPlaceholder")}
-                  showTrigger={models.length > 0}
-                  spellCheck={false}
-                  // Its own name: inside a Field the trigger would take the field's label instead.
-                  triggerProps={{
-                    "aria-label": t("test.showModels"),
-                    "aria-labelledby": undefined,
-                  }}
-                  variant="code"
-                />
-                <AutocompletePopup>
-                  <AutocompleteEmpty>{t("test.noModelMatches")}</AutocompleteEmpty>
-                  <AutocompleteList>
-                    {(item: string) => (
-                      <AutocompleteItem key={item} value={item}>
-                        <ModelLogo model={item} />
-                        <span className="font-mono text-meta">{item}</span>
-                      </AutocompleteItem>
-                    )}
-                  </AutocompleteList>
-                </AutocompletePopup>
-              </Autocomplete>
-            </div>
-            {/* While it runs the spinner takes the icon's place and the label stays: no shift. */}
-            <Button disabled={cached.isPending} loading={running} onClick={() => void run()}>
-              <HugeiconsIcon icon={PlayIcon} aria-hidden="true" />
-              {t("test.run")}
-            </Button>
-          </div>
-          <FieldDescription
-            aria-live="polite"
-            className={cached.isError ? "text-warning-foreground" : undefined}
-          >
-            {status}
-          </FieldDescription>
-        </Field>
-
-        <Card divided>
-          <CardHeader>
-            <CardHeading>
-              <CardTitle render={(props) => <h3 {...props} />}>{t("test.result")}</CardTitle>
-            </CardHeading>
-            {/* The pill is the live part: "Running", then "Succeeded" or "Failed". */}
-            <CardAction aria-live="polite">
-              {running ? (
-                <Badge live tone="info">
-                  {t("test.status.running")}
-                </Badge>
-              ) : outcome?.kind === "ok" ? (
-                <Badge icon={CircleCheckIcon} tone="success">
-                  {t("test.status.ok")}
-                </Badge>
-              ) : outcome?.kind === "err" ? (
-                <Badge icon={CircleXIcon} tone="destructive">
-                  {t("test.status.failed")}
-                </Badge>
-              ) : null}
-            </CardAction>
-          </CardHeader>
-          <CardPanel className={cn(RESULT_HEIGHT, "flex flex-none flex-col gap-3")}>
-            {started !== null ? (
-              <ResultState
-                description={<Elapsed started={started} />}
-                media={<Spinner aria-hidden="true" />}
-                title={t("test.waitingTitle")}
-              />
-            ) : outcome?.kind === "ok" ? (
-              <>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <StatChip icon={Timer01Icon}>
-                    {t("test.seconds", { seconds: outcome.seconds })}
-                  </StatChip>
-                  <StatChip icon={ArrowDataTransferVerticalIcon}>
-                    {t("test.tokens", {
-                      input: formatNumber(outcome.result.inputTokens, lang),
-                      output: formatNumber(outcome.result.outputTokens, lang),
-                    })}
-                  </StatChip>
-                  <StatChip icon={Coins01Icon}>
-                    {t("test.credits", {
-                      credits: formatCreditsExact(outcome.result.credits, lang),
-                    })}
-                  </StatChip>
-                  {/* The step list explains it (common on Enterprise accounts). */}
-                  {outcome.result.stopReason ? null : (
-                    <Badge icon={AlertCircleIcon} size="sm" tone="warning">
-                      {t("test.noStopReason")}
-                    </Badge>
-                  )}
-                </div>
-                {/* The well fills the rest of the card and scrolls a long reply. */}
-                <CodeBlock
-                  className="min-h-0 flex-1"
-                  code={outcome.result.reply}
-                  copyLabel={t("test.copyReply")}
-                  title={t("test.reply")}
-                  wrap
-                />
-              </>
-            ) : outcome?.kind === "err" ? (
-              <>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <StatChip icon={Timer01Icon}>
-                    {t("test.seconds", { seconds: outcome.seconds })}
-                  </StatChip>
-                </div>
-                <CodeBlock
-                  className="min-h-0 flex-1"
-                  code={outcome.reason}
-                  copyLabel={t("test.copyError")}
-                  title={t("test.error")}
-                  wrap
-                />
-              </>
-            ) : (
-              <ResultState
-                description={t("test.idleHint")}
-                media={<HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />}
-                title={t("test.idleTitle")}
-              />
-            )}
-          </CardPanel>
-        </Card>
-
-        {/* The steps of every run, oldest first: a quiet timeline with no frame of its own. */}
-        <section aria-labelledby={stepsId} className="flex flex-col gap-2">
-          <div className="flex min-h-8 items-center justify-between gap-2">
-            <h3 className="font-medium text-foreground text-sm" id={stepsId}>
-              {t("testLog.title")}
-            </h3>
-            <Button
-              disabled={lines.length === 0}
-              onClick={() => setLines([])}
-              size="sm"
-              variant="ghost"
+      <div className="flex flex-col gap-3">
+        {/* The request bar: the verb, the picked models as plain text, and the run button. */}
+        <div
+          className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-input bg-field px-1 has-aria-expanded:border-ring"
+          ref={barRef}
+        >
+          {/* Phones skip the verb, so the picked model's name keeps its room. */}
+          <span className="flex h-7.5 shrink-0 items-center rounded-md bg-(--pill-primary-bg) px-2 font-medium font-mono text-(--pill-primary-fg) text-meta uppercase max-sm:hidden">
+            {t("test.verb")}
+          </span>
+          <Popover onOpenChange={setPickerOpen} open={pickerOpen}>
+            <PopoverTrigger
+              aria-label={t("test.pickModels")}
+              className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-1 text-start outline-none focus-visible:outline-1 focus-visible:outline-ring disabled:cursor-default"
+              disabled={cached.isPending}
             >
-              {t("testLog.clear")}
-            </Button>
-          </div>
-          {lines.length === 0 ? (
-            <p
-              className={cn(
-                STEPS_HEIGHT,
-                "flex items-center justify-center text-center text-muted-foreground text-sm",
+              {rows.length === 0 ? (
+                <span className="truncate text-muted-foreground text-sm">
+                  {cached.isPending ? t("test.modelsLoading") : t("test.noPicked")}
+                </span>
+              ) : (
+                // The first pick in full, then how many more: a second name would only fit cut.
+                <>
+                  <ModelName model={rows[0]} />
+                  {rows.length > 1 ? (
+                    <span className="shrink-0 text-meta text-muted-foreground tabular-nums">
+                      {t("test.morePicked", { count: rows.length - 1 })}
+                    </span>
+                  ) : null}
+                </>
               )}
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="ms-auto size-4 shrink-0 text-muted-foreground"
+                icon={ArrowDown01Icon}
+              />
+            </PopoverTrigger>
+            {/* As wide as the bar, hung just under it. */}
+            <PopoverPopup
+              align="start"
+              anchor={barRef}
+              className="w-(--anchor-width) rounded-xl"
+              flush
+              initialFocus={searchRef}
+              sideOffset={6}
             >
-              {t("testLog.empty")}
+              <TestModelPicker
+                // Not while a batch runs: the bar's button shows it running.
+                canRun={!cached.isPending && rows.length > 0 && !batching}
+                count={rows.length}
+                models={options}
+                onAdd={addModel}
+                onRun={() => {
+                  setPickerOpen(false);
+                  void run();
+                }}
+                onSet={setMany}
+                onToggle={setChecked}
+                picked={selected}
+                runs={runs}
+                searchRef={searchRef}
+              />
+            </PopoverPopup>
+          </Popover>
+          {/* While it runs the spinner takes the icon's place and the label stays: no shift. */}
+          <Button
+            disabled={cached.isPending || rows.length === 0}
+            loading={batching}
+            onClick={() => void run()}
+            size="sm"
+          >
+            <HugeiconsIcon aria-hidden="true" icon={PlayIcon} />
+            {t("test.runSelected", { count: rows.length })}
+          </Button>
+        </div>
+        <p
+          className={cn(
+            "-mt-1 text-meta text-muted-foreground",
+            cached.isError && "text-warning-foreground",
+          )}
+        >
+          {`${status} · ${t("test.hint")}`}
+        </p>
+
+        {/* The status line, summed over the picked models. */}
+        {outcomes.length > 0 ? (
+          <p
+            aria-live="polite"
+            className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-meta text-muted-foreground tabular-nums"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
+              {t("test.summary.ok", { count: succeeded.length })}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-destructive" />
+              {t("test.summary.failed", { count: failed })}
+            </span>
+            {pending.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
+                {t("test.summary.running", { count: pending.length })}
+              </span>
+            ) : null}
+            {median !== null ? (
+              <span>{t("test.summary.median", { seconds: formatDecimal(median, 1) })}</span>
+            ) : null}
+            <span>{t("test.credits", { credits: formatCreditsExact(credits, lang) })}</span>
+          </p>
+        ) : null}
+
+        {/* One row per picked model; a tapped row opens below the list. */}
+        <div className="overflow-hidden rounded-xl border border-border">
+          <div
+            aria-hidden="true"
+            className={cn(
+              ROW_GRID,
+              "h-8 border-border-subtle border-b bg-(--row-head) text-meta text-muted-foreground",
+            )}
+          >
+            <span>{t("test.column.model")}</span>
+            <span className="max-sm:hidden">{t("test.column.status")}</span>
+            <span className="text-end">{t("test.column.latency")}</span>
+            <span className="text-end max-sm:hidden">{t("test.column.credits")}</span>
+            <span />
+          </div>
+          {rows.length === 0 ? (
+            <p className="px-3 py-4 text-center text-muted-foreground text-sm">
+              {cached.isPending ? t("test.modelsLoading") : t("test.noRows")}
             </p>
           ) : (
-            <ol
-              aria-label={t("testLog.title")}
-              className={cn(
-                STEPS_HEIGHT,
-                "scrollbar-y scroll-fade-y flex flex-col overflow-y-auto font-mono text-meta leading-relaxed",
-              )}
-              ref={logRef}
-              role="log"
-            >
-              {lines.map((line) => (
-                <Step key={line.id} line={line} />
-              ))}
-            </ol>
+            <ul className="divide-y divide-border-subtle">
+              {rows.map((model) => {
+                const item = runs[model];
+                const isOpen = openModel === model;
+                return (
+                  <li key={model}>
+                    <button
+                      aria-controls={isOpen ? inspectorId : undefined}
+                      aria-expanded={isOpen}
+                      className={cn(
+                        "relative flex w-full cursor-pointer flex-col text-start outline-none hover:bg-(--row-hover) focus-visible:bg-(--row-hover) focus-visible:outline-1 focus-visible:outline-ring focus-visible:-outline-offset-1",
+                        // The open row: tinted, with a short purple bar at its start edge.
+                        isOpen &&
+                          "bg-(--row-hover) before:absolute before:inset-y-2 before:start-0 before:w-0.5 before:rounded-full before:bg-primary",
+                      )}
+                      data-model={model}
+                      onClick={() => toggle(model)}
+                      type="button"
+                    >
+                      <span className={cn(ROW_GRID, "min-h-10 w-full max-sm:py-2")}>
+                        <span className="flex min-w-0 flex-col gap-1.5">
+                          <ModelName model={model} />
+                          <span className="flex ps-6 sm:hidden">
+                            <RunBadge run={item} />
+                          </span>
+                        </span>
+                        <span className="max-sm:hidden">
+                          <RunBadge run={item} />
+                        </span>
+                        <span className="text-end text-meta tabular-nums">
+                          {item?.kind === "running" ? (
+                            <Elapsed
+                              format={(seconds) => t("test.seconds", { seconds })}
+                              started={item.started}
+                            />
+                          ) : item?.kind === "ok" || item?.kind === "err" ? (
+                            t("test.seconds", { seconds: item.seconds })
+                          ) : (
+                            <span className="text-muted-foreground">{EMPTY}</span>
+                          )}
+                        </span>
+                        <span className="text-end text-meta tabular-nums max-sm:hidden">
+                          {item?.kind === "ok" ? (
+                            formatCreditsExact(item.result.credits, lang)
+                          ) : (
+                            <span className="text-muted-foreground">{EMPTY}</span>
+                          )}
+                        </span>
+                        <HugeiconsIcon
+                          aria-hidden="true"
+                          className={cn(
+                            "size-4 text-muted-foreground transition-transform motion-reduce:transition-none",
+                            isOpen && "rotate-90 text-foreground",
+                          )}
+                          icon={ArrowRight01Icon}
+                        />
+                      </span>
+                      {item?.kind === "err" ? (
+                        <span className="-mt-1 block ps-9 pe-3 pb-2.5 font-mono text-destructive-foreground text-meta leading-relaxed wrap-anywhere">
+                          {item.reason}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
-        </section>
+        </div>
+
+        {openModel ? (
+          <Inspector
+            id={inspectorId}
+            model={openModel}
+            onTabChange={setTab}
+            run={runs[openModel]}
+            steps={steps[openModel] ?? []}
+            tab={tab}
+          />
+        ) : null}
       </div>
     </ResponsiveDialog>
   );

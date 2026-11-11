@@ -76,7 +76,8 @@ function lineText(line: ThemedToken[]): string {
  * it. The code is mono on the inset well and scrolls sideways inside the block, so long lines
  * never widen the page; while it scrolls, the block is a named region. `wrap` wraps long lines
  * instead (anywhere, keeping line breaks), for prose-like text
- * such as an error message.
+ * such as an error message. `bare` drops the strip and the frame, for a panel that shows its own
+ * title and copy button (the account tester's response).
  */
 export function CodeBlock({
   code,
@@ -86,6 +87,7 @@ export function CodeBlock({
   regionLabel,
   wrap = false,
   language,
+  bare = false,
   className,
 }: {
   code: string;
@@ -98,6 +100,8 @@ export function CodeBlock({
   wrap?: boolean;
   /** Highlights the code as this language (the colours are the --code-token-* tokens). */
   language?: CodeLanguage;
+  /** No title strip and no frame: the caller shows the title and the copy button. */
+  bare?: boolean;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
@@ -136,23 +140,28 @@ export function CodeBlock({
   return (
     <figure
       className={cn(
-        "flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-inset",
+        "flex min-w-0 flex-col overflow-hidden bg-surface-inset",
+        !bare && "rounded-lg border border-border",
         className,
       )}
       data-slot="code-block"
     >
-      <div className="flex min-h-9 items-center justify-between gap-2 border-border-subtle border-b bg-surface-2 py-0.5 ps-3 pe-1">
-        <figcaption className="min-w-0 truncate font-medium text-meta text-muted-foreground">
-          {title}
-        </figcaption>
-        <CopyButton
-          copiedMessage={copiedMessage}
-          label={copyLabel}
-          size="icon-sm"
-          value={code}
-          variant="quiet"
-        />
-      </div>
+      {bare ? (
+        <figcaption className="sr-only">{title}</figcaption>
+      ) : (
+        <div className="flex min-h-9 items-center justify-between gap-2 border-border-subtle border-b bg-surface-2 py-0.5 ps-3 pe-1">
+          <figcaption className="min-w-0 truncate font-medium text-meta text-muted-foreground">
+            {title}
+          </figcaption>
+          <CopyButton
+            copiedMessage={copiedMessage}
+            label={copyLabel}
+            size="icon-sm"
+            value={code}
+            variant="quiet"
+          />
+        </div>
+      )}
       {/*
         While the code scrolls sideways, the section is named, which makes it a region landmark
         around the scroller (browsers make a scrolling box a tab stop themselves, so arrow keys

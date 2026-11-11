@@ -26,6 +26,7 @@ export function PopoverPopup({
   sideOffset = 4,
   alignOffset = 0,
   tooltipStyle = false,
+  flush = false,
   anchor,
   collisionPadding = 16,
   portalProps,
@@ -39,6 +40,8 @@ export function PopoverPopup({
   sideOffset?: PopoverPrimitive.Positioner.Props["sideOffset"];
   alignOffset?: PopoverPrimitive.Positioner.Props["alignOffset"];
   tooltipStyle?: boolean;
+  /** No inner padding: the content lays out its own rows and edges (the tester's model picker). */
+  flush?: boolean;
   anchor?: PopoverPrimitive.Positioner.Props["anchor"];
 }): React.ReactElement {
   return (
@@ -73,7 +76,9 @@ export function PopoverPopup({
               "relative size-full max-h-(--available-height) overflow-clip max-sm:max-h-[min(var(--available-height),90dvh)] px-(--viewport-inline-padding) has-data-[slot=calendar]:p-2 data-instant:transition-none **:data-current:data-ending-style:opacity-0 **:data-current:data-starting-style:opacity-0 **:data-previous:data-ending-style:opacity-0 **:data-previous:data-starting-style:opacity-0 **:data-current:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-previous:w-[calc(var(--popup-width)-2*var(--viewport-inline-padding)-2px)] **:data-current:opacity-100 **:data-previous:opacity-100 **:data-current:transition-opacity **:data-previous:transition-opacity",
               tooltipStyle
                 ? "py-1 [--viewport-inline-padding:--spacing(2)]"
-                : "not-data-transitioning:overflow-y-auto py-4 [--viewport-inline-padding:--spacing(4)]",
+                : flush
+                  ? "not-data-transitioning:overflow-y-auto [--viewport-inline-padding:0px]"
+                  : "not-data-transitioning:overflow-y-auto py-4 [--viewport-inline-padding:--spacing(4)]",
             )}
             data-slot="popover-viewport"
           >
