@@ -4,8 +4,9 @@
 // Kiro patches: Hugeicons instead of lucide-react (the project's icon library), a translated
 // region label from the `ui` namespace, the one floating sheet (index.css popup-surface), a close
 // button on every toast, the page gutter as its inset, room under the app header
-// (--toast-top-offset) and above the batch bar (--toast-stack-offset), and a place under the
-// modal layer while a dialog, sheet or drawer is open.
+// (--toast-top-offset) and above the batch bar (--toast-stack-offset), a place under the
+// modal layer while a dialog, sheet or drawer is open, no shadow, an 8 px stack gap, and the
+// title in its icon's colour.
 import { Toast } from "@base-ui/react/toast";
 import {
   AlertCircleIcon,
@@ -41,9 +42,12 @@ type SwipeDirection = "up" | "down" | "left" | "right";
 const UNDER_MODALS =
   "[body:has([data-slot=dialog-popup],[data-slot=alert-dialog-popup],[data-slot=sheet-popup],[data-slot=drawer-popup],[data-slot=command-dialog-popup],[data-slot=sidebar][data-mobile=true])_&]:z-40";
 
-/** The status icon: coloured by the toast's type (error and warning only; success and info are plain). */
-const TOAST_ICON_CLASS =
-  "in-data-[type=loading]:animate-spin in-data-[type=error]:text-destructive in-data-[type=info]:text-info in-data-[type=success]:text-success in-data-[type=warning]:text-warning in-data-[type=loading]:text-muted-foreground";
+/**
+ * The toast's tone: the status icon and the title share one text colour, the type's readable
+ * foreground (the pill text tokens). Loading and untyped toasts keep the popover text colour.
+ */
+const TOAST_TONE_CLASS =
+  "in-data-[type=error]:text-destructive-foreground in-data-[type=info]:text-info-foreground in-data-[type=success]:text-success-foreground in-data-[type=warning]:text-warning-foreground";
 
 /** The toast body: icon, title and description, then the action and the close button. */
 function ToastBody({
@@ -62,11 +66,18 @@ function ToastBody({
             className="[&>svg]:h-lh [&>svg]:w-4 [&_svg]:pointer-events-none [&_svg]:shrink-0"
             data-slot="toast-icon"
           >
-            <HugeiconsIcon aria-hidden="true" className={TOAST_ICON_CLASS} icon={icon} />
+            <HugeiconsIcon
+              aria-hidden="true"
+              className={cn("in-data-[type=loading]:animate-spin", TOAST_TONE_CLASS)}
+              icon={icon}
+            />
           </div>
         )}
         <div className="flex min-w-0 flex-col gap-0.5">
-          <Toast.Title className="wrap-anywhere font-medium" data-slot="toast-title" />
+          <Toast.Title
+            className={cn("wrap-anywhere font-medium", TOAST_TONE_CLASS)}
+            data-slot="toast-title"
+          />
           <Toast.Description
             className="wrap-anywhere text-muted-foreground"
             data-slot="toast-description"
@@ -163,7 +174,7 @@ function Toasts({
             <Toast.Root
               key={toast.id}
               className={cn(
-                "popup-surface absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full select-none rounded-lg text-popover-foreground [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
+                "popup-surface absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full select-none rounded-lg text-popover-foreground [--popup-shadow:none] [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
                 // Base positioning using data-position
                 "data-[position*=right]:right-0 data-[position*=right]:left-auto",
                 "data-[position*=left]:right-auto data-[position*=left]:left-0",
@@ -175,7 +186,7 @@ function Toasts({
                 "data-[position*=top]:after:top-full",
                 "data-[position*=bottom]:after:bottom-full",
                 // Define some variables
-                "[--toast-calc-height:var(--toast-frontmost-height,var(--toast-height))] [--toast-gap:--spacing(3)] [--toast-peek:--spacing(3)] [--toast-scale:calc(max(0,1-(var(--toast-index)*.1)))] [--toast-shrink:calc(1-var(--toast-scale))]",
+                "[--toast-calc-height:var(--toast-frontmost-height,var(--toast-height))] [--toast-gap:--spacing(2)] [--toast-peek:--spacing(2)] [--toast-scale:calc(max(0,1-(var(--toast-index)*.1)))] [--toast-shrink:calc(1-var(--toast-scale))]",
                 // Define offset-y variable
                 "data-[position*=top]:[--toast-calc-offset-y:calc(var(--toast-offset-y)+var(--toast-index)*var(--toast-gap)+var(--toast-swipe-movement-y))]",
                 "data-[position*=bottom]:[--toast-calc-offset-y:calc(var(--toast-offset-y)*-1+var(--toast-index)*var(--toast-gap)*-1+var(--toast-swipe-movement-y))]",
