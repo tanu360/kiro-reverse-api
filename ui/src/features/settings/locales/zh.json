@@ -2,6 +2,7 @@
   "title": "设置",
   "description": "此代理的请求处理、访问与维护。每张卡片单独保存。",
   "groups.requests": "请求与响应",
+  "groups.models": "模型",
   "groups.server": "服务器与访问",
   "groups.safety": "安全与维护",
   "sections": "设置分区",

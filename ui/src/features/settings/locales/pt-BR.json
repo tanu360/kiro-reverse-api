@@ -2,6 +2,7 @@
   "title": "Configurações",
   "description": "Tratamento de requisições, acesso e manutenção deste proxy. Cada cartão é salvo separadamente.",
   "groups.requests": "Solicitações e respostas",
+  "groups.models": "Modelos",
   "groups.server": "Servidor e acesso",
   "groups.safety": "Segurança e manutenção",
   "sections": "Seções de configurações",

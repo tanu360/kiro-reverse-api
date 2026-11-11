@@ -2,6 +2,7 @@
   "title": "Cài đặt",
   "description": "Xử lý yêu cầu, quyền truy cập và bảo trì cho proxy này. Mỗi thẻ được lưu riêng.",
   "groups.requests": "Yêu cầu và phản hồi",
+  "groups.models": "Mô hình",
   "groups.server": "Máy chủ và truy cập",
   "groups.safety": "An toàn và bảo trì",
   "sections": "Các mục cài đặt",

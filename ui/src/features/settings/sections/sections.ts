@@ -14,7 +14,7 @@ import {
 } from "@hugeicons/core-free-icons";
 
 /** Nav groups in page order; each has a `groups.<id>` label in the settings locale. */
-export const SETTINGS_GROUPS = ["requests", "server", "safety"] as const;
+export const SETTINGS_GROUPS = ["requests", "models", "server", "safety"] as const;
 
 /** Card anchors in page order, with the title key and icon the section nav shows. */
 export const SETTINGS_SECTIONS = [
@@ -28,12 +28,12 @@ export const SETTINGS_SECTIONS = [
   { id: "settings-routing", titleKey: "routing", icon: Route02Icon, group: "requests" },
   { id: "settings-auto-continue", titleKey: "autoContinue", icon: RepeatIcon, group: "requests" },
   { id: "settings-tool-history", titleKey: "toolHistory", icon: Wrench01Icon, group: "requests" },
-  { id: "settings-thinking", titleKey: "thinkingSettings", icon: AiBrain01Icon, group: "requests" },
+  { id: "settings-thinking", titleKey: "thinkingSettings", icon: AiBrain01Icon, group: "models" },
   {
     id: "settings-model-mappings",
     titleKey: "modelMappings",
     icon: ArrowDataTransferHorizontalIcon,
-    group: "requests",
+    group: "models",
   },
   { id: "settings-endpoint", titleKey: "endpointSettings", icon: CloudServerIcon, group: "server" },
   {

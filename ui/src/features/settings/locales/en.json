@@ -2,6 +2,7 @@
   "title": "Settings",
   "description": "Request handling, access and maintenance for this proxy. Each card saves on its own.",
   "groups.requests": "Requests & responses",
+  "groups.models": "Models",
   "groups.server": "Server & access",
   "groups.safety": "Safety & maintenance",
   "sections": "Settings sections",
