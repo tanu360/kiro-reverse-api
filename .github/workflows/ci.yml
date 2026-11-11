@@ -12,6 +12,8 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # A whole run takes about seven minutes; a network stall fails it here instead of after six hours.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -58,6 +60,7 @@ jobs:
       # outage (apt failing to resolve archive.ubuntu.com) no longer fails the build.
       - name: Install Playwright Chromium
         working-directory: ui
+        timeout-minutes: 10
         run: |
           pnpm exec playwright install chromium
           if ! node -e "require('@playwright/test').chromium.launch().then((b) => b.close())"; then
