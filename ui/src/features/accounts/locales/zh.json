@@ -219,7 +219,6 @@
   "test.selectAll": "全选",
   "test.clearSelection": "清除",
   "test.runSelected": "测试 {count} 个",
-  "test.verb": "测试",
   "test.pickModels": "要测试的模型",
   "test.noPicked": "选择模型",
   "test.noRows": "请在上方选择一个或多个模型。",

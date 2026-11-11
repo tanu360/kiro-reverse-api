@@ -196,6 +196,13 @@ describe("TestAccountDialog", () => {
     await user.click(chips[2]);
     expect(chips[2]).toHaveAttribute("aria-pressed", "true");
     expect(pickerModels(picker)).toEqual(["deepseek-3.2"]);
+
+    // Select all picks the models in view: here only the one maker's.
+    const selectAll = within(picker).getByRole("button", { name: "Select all" });
+    await user.click(selectAll);
+    expect(rowModels(dialog)).toContain("deepseek-3.2");
+    expect(rowModels(dialog)).not.toContain("qwen3-coder-next");
+    expect(selectAll).toBeDisabled();
   });
 
   it("filters the picker by what is typed", async () => {

@@ -219,7 +219,6 @@
   "test.selectAll": "Chọn tất cả",
   "test.clearSelection": "Bỏ chọn",
   "test.runSelected": "Kiểm tra {count}",
-  "test.verb": "Kiểm tra",
   "test.pickModels": "Model cần kiểm tra",
   "test.noPicked": "Chọn model",
   "test.noRows": "Chọn một hoặc nhiều model ở trên.",

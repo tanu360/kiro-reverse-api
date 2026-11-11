@@ -231,7 +231,6 @@
   "test.selectAll": "Select all",
   "test.clearSelection": "Clear",
   "test.runSelected": "Test {count}",
-  "test.verb": "Test",
   "test.pickModels": "Models to test",
   "test.noPicked": "Pick a model",
   "test.noRows": "Pick one or more models above.",

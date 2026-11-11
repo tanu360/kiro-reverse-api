@@ -40,7 +40,10 @@ export function PopoverPopup({
   sideOffset?: PopoverPrimitive.Positioner.Props["sideOffset"];
   alignOffset?: PopoverPrimitive.Positioner.Props["alignOffset"];
   tooltipStyle?: boolean;
-  /** No inner padding: the content lays out its own rows and edges (the tester's model picker). */
+  /**
+   * No inner padding and no scroll of its own: the content lays out its rows and edges, and keeps
+   * within --available-height with its own scroller (the tester's model picker).
+   */
   flush?: boolean;
   anchor?: PopoverPrimitive.Positioner.Props["anchor"];
 }): React.ReactElement {
@@ -77,7 +80,7 @@ export function PopoverPopup({
               tooltipStyle
                 ? "py-1 [--viewport-inline-padding:--spacing(2)]"
                 : flush
-                  ? "not-data-transitioning:overflow-y-auto [--viewport-inline-padding:0px]"
+                  ? "[--viewport-inline-padding:0px]"
                   : "not-data-transitioning:overflow-y-auto py-4 [--viewport-inline-padding:--spacing(4)]",
             )}
             data-slot="popover-viewport"

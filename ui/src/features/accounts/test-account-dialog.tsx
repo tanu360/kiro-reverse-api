@@ -540,19 +540,15 @@ export function TestAccountDialog({
       title={t("test.title")}
     >
       <div className="flex flex-col gap-3">
-        {/* The request bar: the verb, the picked models as plain text, and the run button. */}
+        {/* The request bar: the picked models as plain text, and the run button. */}
         <div
           className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-input bg-field px-1 has-aria-expanded:border-ring"
           ref={barRef}
         >
-          {/* Phones skip the verb, so the picked model's name keeps its room. */}
-          <span className="flex h-7.5 shrink-0 items-center rounded-md bg-(--pill-primary-bg) px-2 font-medium font-mono text-(--pill-primary-fg) text-meta uppercase max-sm:hidden">
-            {t("test.verb")}
-          </span>
           <Popover onOpenChange={setPickerOpen} open={pickerOpen}>
             <PopoverTrigger
               aria-label={t("test.pickModels")}
-              className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-1 text-start outline-none focus-visible:outline-1 focus-visible:outline-ring disabled:cursor-default"
+              className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-start outline-none focus-visible:outline-1 focus-visible:outline-ring disabled:cursor-default"
               disabled={cached.isPending}
             >
               {rows.length === 0 ? (

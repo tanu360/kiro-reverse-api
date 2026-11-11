@@ -110,8 +110,10 @@ function RunHint({ run }: { run: PickerRun | undefined }): JSX.Element | null {
  * The tester's model picker, a palette hung under the request bar: a search row that also takes
  * a model name that is not cached, chips that narrow the list to one maker, the models grouped by
  * maker (each with its mark, its latest result and a check when picked), and a foot with the pick
- * count and the run button. The search field drives the list from the keyboard (↑ ↓ move, Enter
- * picks), as a combobox over a multi-select listbox; clicks keep the focus in it.
+ * count, Select all (the models in view), Clear and the run button. Only the list scrolls, with no
+ * scrollbar, so the search row and the foot stay in sight. The search field drives the list from
+ * the keyboard (↑ ↓ move, Enter picks), as a combobox over a multi-select listbox; clicks keep the
+ * focus in it.
  */
 export function TestModelPicker({
   models,
@@ -129,7 +131,7 @@ export function TestModelPicker({
   picked: ReadonlySet<string>;
   runs: Readonly<Record<string, PickerRun>>;
   onToggle: (model: string, checked: boolean) => void;
-  /** Picks (or drops) several models at once: a maker's group, or all of them. */
+  /** Picks (or drops) several models at once: the models in view, or all of them. */
   onSet: (models: readonly string[], checked: boolean) => void;
   onAdd: (model: string) => void;
   onRun: () => void;
@@ -159,8 +161,10 @@ export function TestModelPicker({
     }))
     .filter((group) => group.models.length > 0);
   const canAdd = typed !== "" && !models.includes(typed);
+  const inView = shown.flatMap((group) => group.models);
+  const allInViewPicked = inView.every((model) => picked.has(model));
   // Every option in order, for the arrow keys: the shown models, then "Add" for a typed name.
-  const options = [...shown.flatMap((group) => group.models), ...(canAdd ? [null] : [])];
+  const options = [...inView, ...(canAdd ? [null] : [])];
   const activeIndex = Math.min(active, options.length - 1);
   const domId = (index: number) => `${optionId}-${index}`;
 
@@ -250,7 +254,8 @@ export function TestModelPicker({
   };
 
   return (
-    <div className="flex w-full flex-col">
+    // As tall as the room under the bar allows: the list gives way, the rows around it never do.
+    <div className="flex max-h-[min(var(--available-height),30rem)] w-full flex-col">
       <div className="flex h-12 shrink-0 items-center gap-2.5 border-border-subtle border-b ps-3.5 pe-3 text-muted-foreground">
         <HugeiconsIcon aria-hidden="true" className="size-4 shrink-0" icon={Search01Icon} />
         <input
@@ -310,34 +315,20 @@ export function TestModelPicker({
       <div
         aria-label={t("test.pickModels")}
         aria-multiselectable="true"
-        className="scrollbar-y flex max-h-80 flex-col overflow-y-auto px-1.5 pt-1 pb-1.5"
+        className="scrollbar-none scroll-fade-y flex min-h-0 flex-col overflow-y-auto px-1.5 pt-1 pb-1.5"
         id={listId}
         role="listbox"
       >
-        {shown.map((group) => {
-          const all = group.models.every((model) => picked.has(model));
-          return (
-            // A fieldset is the group role: the one child, besides options, a listbox may own.
-            <fieldset aria-label={group.name} className="m-0 min-w-0 border-0 p-0" key={group.key}>
-              <div className="flex items-center justify-between gap-2 px-2 pt-2.5 pb-1 text-meta text-muted-foreground">
-                <span>
-                  <span className="font-medium text-foreground">{group.name}</span>
-                  <span className="tabular-nums">{` · ${group.models.length}`}</span>
-                </span>
-                <button
-                  className="cursor-pointer rounded-sm font-medium text-(--pill-primary-fg) outline-none hover:underline focus-visible:focus-outline"
-                  onClick={() => onSet(group.models, !all)}
-                  onMouseDown={keepSearchFocus}
-                  tabIndex={-1}
-                  type="button"
-                >
-                  {all ? t("test.clearSelection") : t("test.selectAll")}
-                </button>
-              </div>
-              {group.models.map(option)}
-            </fieldset>
-          );
-        })}
+        {shown.map((group) => (
+          // A fieldset is the group role: the one child, besides options, a listbox may own.
+          <fieldset aria-label={group.name} className="m-0 min-w-0 border-0 p-0" key={group.key}>
+            <div className="px-2 pt-2.5 pb-1 text-meta text-muted-foreground">
+              <span className="font-medium text-foreground">{group.name}</span>
+              <span className="tabular-nums">{` · ${group.models.length}`}</span>
+            </div>
+            {group.models.map(option)}
+          </fieldset>
+        ))}
         {canAdd
           ? (() => {
               index += 1;
@@ -376,6 +367,16 @@ export function TestModelPicker({
 
       <div className="flex h-12 shrink-0 items-center gap-3 border-border-subtle border-t ps-3.5 pe-2 text-meta text-muted-foreground">
         <span className="tabular-nums">{t("test.pickedCount", { count })}</span>
+        {/* The models in view: all of them, or one maker's, or what the search matched. */}
+        <Button
+          disabled={allInViewPicked}
+          onClick={() => onSet(inView, true)}
+          onMouseDown={keepSearchFocus}
+          size="xs"
+          variant="ghost"
+        >
+          {t("test.selectAll")}
+        </Button>
         <Button
           disabled={picked.size === 0}
           onClick={() => onSet([...picked], false)}
