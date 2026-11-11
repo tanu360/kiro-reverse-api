@@ -13,7 +13,7 @@
   "access.keepEditing": "继续编辑",
   "keys.title": "API Key",
   "keys.description": "为每个客户端创建一个 API Key。可设置 Token 或 Credits 限额，0 表示不限。",
-  "keys.metaDisabled": "{total} · {disabled} 个已停用",
+  "keys.metaDisabled": "{total} · {disabled} 个已禁用",
   "keys.create": "创建 API Key",
   "keys.loadFailed": "无法加载 API Key",
   "keys.emptyTitle": "暂无 API Key",

@@ -49,6 +49,7 @@
   "preRestoreSavedHint_other": "Rollback point saved {n} accounts before the restore.",
   "download": "Download",
   "downloadHint": "The file contains passwords and tokens in plain text. Store it safely.",
+  "actionHint": "{label}. {hint}",
   "downloaded": "The backup was downloaded.",
   "restore": "Restore",
   "delete": "Delete",

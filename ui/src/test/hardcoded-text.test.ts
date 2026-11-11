@@ -112,6 +112,51 @@ describe("scanSource", () => {
     ).toEqual(["prop aria-label composed: {…}: {…}. {…}"]);
   });
 
+  it("flags defaults, visible-named variables, glued JSX, joins and composed templates", () => {
+    expect(
+      scan(`
+        export function Center({ defaultLabel = "Total", escapeLabel = "Esc" }) {
+          const emptyMessage = "No data";
+          const note = failures.join("; ");
+          const line = \`\${t("count")} items\`;
+          return (
+            <p>
+              {t("windows")}: <Code>~/.aws</Code>
+              <span>{label}</span>. {hint}
+            </p>
+          );
+        }
+        function name(title = "Untitled") {}
+      `),
+    ).toEqual([
+      "property defaultLabel: Total",
+      "variable emptyMessage: No data",
+      "join composed: {…}; {…}",
+      "template composed: {…} items",
+      "jsx-text composed: :",
+      "jsx-text composed: .",
+      "default title: Untitled",
+    ]);
+  });
+
+  it("allows lists, ratios and meta lines joined without sentence punctuation", () => {
+    expect(
+      scan(`
+        export function A() {
+          const meta = \`\${t("trial")} · \${hint}\`;
+          const ease = \`cubic-bezier(\${points.join(", ")})\`;
+          return (
+            <p title={meta}>
+              {used} / {limit}
+              {figures.join(" · ")}
+              {count}{" "}
+            </p>
+          );
+        }
+      `),
+    ).toEqual([]);
+  });
+
   it("allows translation calls, keys, tokens, code, numbers and non-visible props", () => {
     expect(
       scan(`

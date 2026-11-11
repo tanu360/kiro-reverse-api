@@ -2,7 +2,7 @@
   "title": "Requests",
   "description": "Every request to the proxy, newest first.",
   "search": "Search requests",
-  "searchPlaceholder": "Search account, API key, model, or error",
+  "searchPlaceholder": "Search account, API key, model or error",
   "searchPlaceholderShort": "Search",
   "searchHint": "Search also matches the full API key, so a match may not show in the masked API key column.",
   "searchHintLabel": "About search",

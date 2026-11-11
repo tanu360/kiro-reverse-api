@@ -5,7 +5,6 @@ import {
   cloneElement,
   createContext,
   type FormEvent,
-  Fragment,
   type JSX,
   type ReactElement,
   type ReactNode,
@@ -26,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { errorMessage } from "@/lib/api/server-errors";
 import { type TFunction, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { cn, keyByText } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useReportDirty } from "../lib/unsaved";
 import { SETTINGS_SECTIONS } from "./sections";
 
@@ -318,10 +317,4 @@ export function RowAction({
 }
 
 /** Fills `{name}` placeholders of a translated template with React nodes (code spans). */
-export function fillNodes(template: string, nodes: Record<string, ReactNode>): ReactNode[] {
-  return keyByText(template.split(/(\{\w+\})/), (part) => part).map(({ key, item: part }) => {
-    const name = /^\{(\w+)\}$/.exec(part)?.[1];
-    const node = name !== undefined && Object.hasOwn(nodes, name) ? nodes[name] : part;
-    return <Fragment key={key}>{node}</Fragment>;
-  });
-}
+export { fillNodes } from "@/lib/i18n";

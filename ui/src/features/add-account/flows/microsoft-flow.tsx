@@ -10,7 +10,7 @@ import {
   selectMicrosoftProfile,
   startMicrosoftSso,
 } from "@/lib/api/auth-flows";
-import { errorMessage } from "@/lib/api/server-errors";
+import { errorMessage, serverCodeMessage } from "@/lib/api/server-errors";
 import type { KiroProfile, MicrosoftSelectProfileResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
@@ -87,7 +87,10 @@ export function MicrosoftFlow(): JSX.Element {
     sessions.microsoftSessionId = "";
     sessions.microsoftSelectionId = "";
     toast.success(t("success", { name: display(res.account.email, res.account.id) }));
-    if (res.warning) toast.warning(res.warning);
+    if (res.warning) {
+      const detail = { detail: res.warningDetail };
+      toast.warning(serverCodeMessage(res.warningCode, detail, t) ?? res.warning);
+    }
     finishAdd([res.account]);
   };
 
@@ -218,7 +221,7 @@ export function MicrosoftFlow(): JSX.Element {
               disabled={busy}
               inputMode="url"
               onChange={(event) => setCallbackUrl(event.target.value)}
-              placeholder="http://localhost:3128/..."
+              placeholder="http://localhost:3128/…"
               ref={callbackRef}
               spellCheck={false}
               value={callbackUrl}

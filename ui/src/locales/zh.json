@@ -129,5 +129,7 @@
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "登录",
   "shell.page.setup": "初始设置",
-  "text.joinSentences": "{first}{second}"
+  "text.joinSentences": "{first}{second}",
+  "text.joinList": "{first}；{second}",
+  "text.labelValue": "{label}：{value}"
 }

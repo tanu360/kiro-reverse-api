@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useUiT } from "@/components/ui/messages";
 import { cn } from "@/lib/utils";
 import {
   chartCenterContainerClassName,
@@ -15,7 +16,7 @@ import {
 import { usePieHover, usePieStable } from "./pie-context";
 
 interface PieCenterProps {
-  /** Label shown below the value. Default: "Total" when not hovering */
+  /** Label shown below the value when not hovering. Default: "Total" in the UI language */
   defaultLabel?: string;
   /** Format options for NumberFlow. Default: standard notation */
   formatOptions?: ChartStatFlowFormat;
@@ -54,7 +55,7 @@ interface PieCenterProps {
  * on top of the SVG slices.
  */
 export function PieCenter({
-  defaultLabel = "Total",
+  defaultLabel: labelProp,
   formatOptions = defaultChartStatFlowFormat,
   children,
   className = "",
@@ -63,6 +64,8 @@ export function PieCenter({
   prefix,
   suffix,
 }: PieCenterProps) {
+  const { t } = useUiT();
+  const defaultLabel = labelProp ?? t("pie.total");
   const { data, totalValue, innerRadius, geometryScrubbing } = usePieStable();
   const { hoveredIndex } = usePieHover();
 

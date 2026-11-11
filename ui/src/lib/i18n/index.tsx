@@ -1,5 +1,6 @@
 import {
   createContext,
+  Fragment,
   type JSX,
   type ReactNode,
   useCallback,
@@ -9,6 +10,7 @@ import {
   useState,
 } from "react";
 import { readStorage, writeStorage } from "@/lib/storage";
+import { keyByText } from "@/lib/utils";
 
 /** A language the UI ships with. */
 export type SupportedLang = "en" | "zh" | "vi" | "pt-BR";
@@ -252,4 +254,23 @@ export function useT(namespace: string = DEFAULT_NAMESPACE): { t: TFunction; lan
 
 export function useLanguage(): { lang: Lang; setLang: (lang: Lang) => void } {
   return useContext(LanguageContext);
+}
+
+/**
+ * Fills the `{name}` placeholders of a translated template with React nodes (code spans, a
+ * bold label), so the sentence keeps each language's word order and punctuation. Pass t(key)
+ * without params: the placeholders stay in the text.
+ */
+export function fillNodes(template: string, nodes: Record<string, ReactNode>): ReactNode[] {
+  return keyByText(template.split(/(\{\w+\})/), (part) => part).map(({ key, item: part }) => {
+    const name = /^\{(\w+)\}$/.exec(part)?.[1];
+    const node = name !== undefined && Object.hasOwn(nodes, name) ? nodes[name] : part;
+    return <Fragment key={key}>{node}</Fragment>;
+  });
+}
+
+/** Messages as one line, with the language's list separator ("a; b", "a；b" in Chinese). */
+export function joinList(t: TFunction, parts: readonly string[]): string {
+  if (parts.length === 0) return "";
+  return parts.reduce((first, second) => t("common:text.joinList", { first, second }));
 }

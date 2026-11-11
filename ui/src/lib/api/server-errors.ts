@@ -1,13 +1,81 @@
-import type { TFunction } from "@/lib/i18n";
+import type { TFunction, TParams } from "@/lib/i18n";
 import { isApiError } from "./errors";
 import type { ServerErrorCode } from "./types";
 
+const BACKUP_UNREADABLE = "errors:serverError.backupUnreadable";
+
 /**
  * ApiErrorBody.code -> translation key. A code wins over the message, so the server can reword
- * its English text without breaking the UI.
+ * its English text without breaking the UI. invalid_cadence and invalid_keep stay unmapped: the
+ * schedule form marks the field instead.
  */
 export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string>>> = {
   api_key_lockout: "errors:serverError.apiKeyLockout",
+  invalid_json: "errors:serverError.invalidJSON",
+  account_not_found: "errors:serverError.accountNotFound",
+  api_key_not_found: "errors:serverError.apiKeyNotFound",
+  no_account_ids: "errors:serverError.noAccountIds",
+  not_overage_capable: "errors:serverError.notOverageCapable",
+  overage_failed: "errors:serverError.overageFailed",
+  models_refresh_failed: "errors:serverError.modelsRefreshFailed",
+  invalid_region: "errors:serverError.invalidRegion",
+  start_url_required: "errors:serverError.startUrlRequired",
+  bearer_token_required: "errors:serverError.bearerTokenRequired",
+  refresh_token_required: "errors:serverError.refreshTokenRequired",
+  kiro_api_key_empty: "errors:serverError.kiroApiKeyEmpty",
+  kiro_api_key_invalid: "errors:serverError.kiroApiKeyInvalid",
+  kiro_api_key_region: "errors:serverError.kiroApiKeyRegion",
+  kiro_api_key_region_unsupported: "errors:serverError.kiroApiKeyRegionUnsupported",
+  kiro_api_key_duplicate: "errors:serverError.kiroApiKeyDuplicate",
+  token_refresh_failed: "errors:serverError.tokenRefreshFailed",
+  profile_arn_invalid: "errors:serverError.profileArnInvalid",
+  profile_not_available: "errors:serverError.profileNotAvailable",
+  profile_verify_failed: "errors:serverError.profileVerifyFailed",
+  no_kiro_profile: "errors:serverError.noKiroProfile",
+  api_key_account_no_profile: "errors:serverError.apiKeyAccountNoProfile",
+  auto_continue_max_range: "errors:serverError.autoContinueMaxRange",
+  password_too_short: "errors:serverError.passwordTooShort",
+  invalid_endpoint: "errors:serverError.invalidEndpoint",
+  proxy_url_scheme: "errors:serverError.proxyUrlScheme",
+  api_key_empty: "errors:serverError.apiKeyEmpty",
+  api_key_exists: "errors:serverError.apiKeyExists",
+  api_key_collision: "errors:serverError.apiKeyCollision",
+  token_limit_negative: "errors:serverError.tokenLimitNegative",
+  credit_limit_negative: "errors:serverError.creditLimitNegative",
+  backup_not_found: "errors:serverError.backupNotFound",
+  backup_invalid_json: BACKUP_UNREADABLE,
+  backup_unsupported_format: BACKUP_UNREADABLE,
+  backup_unsupported_version: BACKUP_UNREADABLE,
+  backup_schema_mismatch: BACKUP_UNREADABLE,
+  backup_upload_failed: "errors:serverError.backupUploadFailed",
+  model_mappings_too_many: "errors:serverError.modelMappingsTooMany",
+  model_mapping_empty: "errors:serverError.modelMappingEmpty",
+  model_mapping_no_source: "errors:serverError.modelMappingNoSource",
+  model_mapping_no_target: "errors:serverError.modelMappingNoTarget",
+  model_id_too_long: "errors:serverError.modelIdTooLong",
+  model_id_invalid_chars: "errors:serverError.modelIdInvalidChars",
+  model_mapping_self: "errors:serverError.modelMappingSelf",
+  model_mapping_duplicate: "errors:serverError.modelMappingDuplicate",
+  model_mapping_chain: "errors:serverError.modelMappingChain",
+  sso_register_failed: "errors:serverError.ssoRegisterFailed",
+  sso_session_expired: "errors:serverError.ssoSessionExpired",
+  sso_timeout: "errors:serverError.ssoTimeout",
+  sso_denied: "errors:serverError.ssoDenied",
+  sso_check_failed: "errors:serverError.ssoCheckFailed",
+  sso_state_mismatch: "errors:serverError.ssoStateMismatch",
+  sso_no_code: "errors:serverError.ssoNoCode",
+  invalid_callback_url: "errors:serverError.invalidCallbackUrl",
+  callback_url_wrong_address: "errors:serverError.callbackUrlWrongAddress",
+  kiro_sign_in_failed: "errors:serverError.kiroSignInFailed",
+  microsoft_too_many_sessions: "errors:serverError.microsoftTooManySessions",
+  microsoft_not_enterprise: "errors:serverError.microsoftNotEnterprise",
+  microsoft_canceled: "errors:serverError.microsoftCanceled",
+  microsoft_duplicate: "errors:serverError.microsoftDuplicate",
+  microsoft_denied: "errors:serverError.microsoftDenied",
+  microsoft_token_failed: "errors:serverError.microsoftTokenFailed",
+  microsoft_tenant_mismatch: "errors:serverError.microsoftTenantMismatch",
+  microsoft_credential_invalid: "errors:serverError.microsoftCredentialInvalid",
+  microsoft_profile_unresolved: "errors:serverError.microsoftProfileUnresolved",
 };
 
 /** The `code` of an ApiError's JSON body, or null. */
@@ -20,8 +88,36 @@ export function serverErrorCode(error: unknown): string | null {
 }
 
 /**
- * Exact server error message -> 'errors:<key>'. The server sends English text with no codes.
- * Pairs rather than an object, so every message stays a quoted string as the server sends it.
+ * The text for a server code, or null for an unmapped one. The string and number `fields` of
+ * the body (or batch row) fill the text's placeholders; a non-empty `detail`, upstream text the
+ * server passes through, follows as "(Details: …)".
+ */
+export function serverCodeMessage(
+  code: string | null | undefined,
+  fields: object,
+  t: TFunction,
+): string | null {
+  const key = code ? SERVER_ERROR_CODES[code as ServerErrorCode] : undefined;
+  if (!key) return null;
+  const params: TParams = {};
+  for (const [name, value] of Object.entries(fields)) {
+    if (typeof value === "string" || typeof value === "number") params[name] = value;
+  }
+  const text = t(key, params);
+  const raw: unknown = (fields as { detail?: unknown }).detail;
+  const detail = typeof raw === "string" ? raw.trim() : "";
+  return detail
+    ? t("common:text.joinSentences", {
+        first: text,
+        second: t("errors:serverError.detail", { detail }),
+      })
+    : text;
+}
+
+/**
+ * Exact server error message -> 'errors:<key>', for a body without a code: the sign-in 401 and
+ * 429, and a server older than the codes. Pairs rather than an object, so every message stays a
+ * quoted string as the server sends it.
  */
 export const SERVER_ERROR_KEYS: readonly (readonly [message: string, key: string])[] = [
   ["Invalid JSON", "errors:serverError.invalidJSON"],
@@ -85,8 +181,9 @@ export function serverErrorKey(message: string): string | null {
 }
 
 /**
- * Chinese messages from the AWS sign-in code (auth/iam_sso.go, auth/sso_token.go) -> key.
- * They can be wrapped ("token 1: token 验证失败: 401 Unauthorized"), so each is found inside
+ * Chinese messages from the AWS sign-in code (auth/sso_token.go; auth/iam_sso.go also sends a
+ * code now) -> key. The SSO token import sends them without a code, one per token in `errors`
+ * or "; "-joined in `error`. They can be wrapped ("token 1: token 验证失败: 401 Unauthorized"), so each is found inside
  * the message. The text after "<phrase>:" is passed as {detail}. Longest phrase first, so
  * "批准授权失败" wins over "授权失败".
  */
@@ -125,6 +222,14 @@ export function serverErrorPhrase(message: string): { key: string; detail: strin
   return null;
 }
 
+/**
+ * A server message that came without a code (an SSO token import's per-token `errors`) in the
+ * UI language when it is a known one, else verbatim.
+ */
+export function serverMessageText(message: string, t: TFunction): string {
+  return translateServerMessage(message, t) ?? message;
+}
+
 /** One server message (or one "; "-joined part of it) in the UI language, or null. */
 function translateServerMessage(message: string, t: TFunction): string | null {
   const key = serverErrorKey(message);
@@ -142,14 +247,14 @@ function translateServerMessage(message: string, t: TFunction): string | null {
 
 /**
  * User-facing message for any thrown value: the network message for status 0, the translation
- * of a known server message, an unknown server message verbatim, else the fallback.
+ * of a known code or server message, an unknown server message verbatim, else the fallback.
  */
 export function errorMessage(error: unknown, t: TFunction, fallbackKey = "errors:generic"): string {
   if (!isApiError(error)) return t(fallbackKey);
   if (error.status === 0) return t("errors:network");
-  const code = serverErrorCode(error);
-  const codeKey = code ? SERVER_ERROR_CODES[code as ServerErrorCode] : undefined;
-  if (codeKey) return t(codeKey);
+  const body = typeof error.body === "object" && error.body !== null ? error.body : {};
+  const coded = serverCodeMessage(serverErrorCode(error), body, t);
+  if (coded) return coded;
   const message = error.serverMessage.trim();
   if (!message) return t(fallbackKey);
   const exact = serverErrorKey(message);

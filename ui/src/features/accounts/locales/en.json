@@ -93,6 +93,8 @@
   "batch.export": "Export selected",
   "batch.notFound": "Account not found",
   "batch.moreFailures": "and {count} more",
+  "batch.failureShared": "{name} and {count} more: {reason}",
+  "batch.failureItem": "{name}: {reason}",
   "batch.confirmEnable_one": "Enable {count} account?",
   "batch.confirmEnable_other": "Enable {count} accounts?",
   "batch.confirmDisable_one": "Disable {count} account?",

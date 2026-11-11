@@ -85,7 +85,7 @@ export function ApiKeyFlow(): JSX.Element {
           disabled={pending}
           onChange={(event) => setKeys(event.target.value)}
           ref={keysRef}
-          placeholder={"ksk_...\nksk_...|eu-central-1"}
+          placeholder={"ksk_…\nksk_…|eu-central-1"}
           spellCheck={false}
           value={keys}
           variant="mono"

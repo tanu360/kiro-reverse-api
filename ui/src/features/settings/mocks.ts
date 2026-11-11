@@ -83,52 +83,88 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
   return patch;
 }
 
-function validateModelId(id: string): string | null {
+function validateModelId(id: string): { error: string; code: string } | null {
   if (new TextEncoder().encode(id).length > MAX_MODEL_ID_BYTES) {
-    return `model ID ${JSON.stringify(id.slice(0, 32))}... is longer than ${MAX_MODEL_ID_BYTES} bytes`;
+    return {
+      error: `model ID ${JSON.stringify(id.slice(0, 32))}... is longer than ${MAX_MODEL_ID_BYTES} bytes`,
+      code: "model_id_too_long",
+    };
   }
   // Go: unicode.IsSpace || unicode.IsControl
   if (/[\s\p{Cc}]/u.test(id)) {
-    return `model ID ${JSON.stringify(id)} contains whitespace or control characters`;
+    return {
+      error: `model ID ${JSON.stringify(id)} contains whitespace or control characters`,
+      code: "model_id_invalid_chars",
+    };
   }
   return null;
 }
 
+/** The error body fields besides `error`: the code and its placeholders (config.ModelMappingError). */
+type MappingFields = { index: number; code: string; model?: string; max?: number };
+
 type MappingResult =
   | { ok: true; rules: ModelMappingRule[] }
-  | { ok: false; error: string; index: number };
+  | ({ ok: false; error: string } & MappingFields);
 
 /** config.normalizeModelMappings: keys trimmed and lowercased, values trimmed. */
 function normalizeMappings(input: ModelMappingRule[]): MappingResult {
   if (input.length > MAX_MAPPINGS) {
-    return { ok: false, index: -1, error: `at most ${MAX_MAPPINGS} model mappings are allowed` };
+    return {
+      ok: false,
+      index: -1,
+      code: "model_mappings_too_many",
+      max: MAX_MAPPINGS,
+      error: `at most ${MAX_MAPPINGS} model mappings are allowed`,
+    };
   }
   const cleaned: ModelMappingRule[] = [];
   for (const [i, mapping] of input.entries()) {
     const key = mapping.key.trim().toLowerCase();
     const value = mapping.value.trim();
-    if (!key && !value) return { ok: false, index: i, error: `model mapping ${i + 1} is empty` };
+    if (!key && !value) {
+      return {
+        ok: false,
+        index: i,
+        code: "model_mapping_empty",
+        error: `model mapping ${i + 1} is empty`,
+      };
+    }
     if (!key) {
       return {
         ok: false,
         index: i,
+        code: "model_mapping_no_source",
         error: `mapping to ${JSON.stringify(value)} has no source model`,
       };
     }
     if (!value) {
-      return { ok: false, index: i, error: `mapping ${JSON.stringify(key)} has no target model` };
+      return {
+        ok: false,
+        index: i,
+        code: "model_mapping_no_target",
+        error: `mapping ${JSON.stringify(key)} has no target model`,
+      };
     }
     for (const id of [key, value]) {
       const problem = validateModelId(id);
-      if (problem) return { ok: false, index: i, error: problem };
+      if (problem) return { ok: false, index: i, max: MAX_MODEL_ID_BYTES, ...problem };
     }
     if (key === value.toLowerCase()) {
-      return { ok: false, index: i, error: `mapping ${JSON.stringify(key)} points to itself` };
+      return {
+        ok: false,
+        index: i,
+        code: "model_mapping_self",
+        model: key,
+        error: `mapping ${JSON.stringify(key)} points to itself`,
+      };
     }
     if (cleaned.some((previous) => previous.key === key)) {
       return {
         ok: false,
         index: i,
+        code: "model_mapping_duplicate",
+        model: key,
         error: `source ${JSON.stringify(key)} is mapped more than once`,
       };
     }
@@ -139,6 +175,8 @@ function normalizeMappings(input: ModelMappingRule[]): MappingResult {
       return {
         ok: false,
         index: i,
+        code: "model_mapping_chain",
+        model: mapping.value,
         error: `target ${JSON.stringify(mapping.value)} is also a mapping source; mappings resolve in one hop`,
       };
     }
@@ -276,7 +314,10 @@ export const handlers: HttpHandler[] = [
     const input = body ? readMappings(body) : null;
     if (!input) return invalidJson();
     const result = normalizeMappings(input);
-    if (!result.ok) return jsonError(400, result.error, { index: result.index });
+    if (!result.ok) {
+      const { ok: _ok, error, ...fields } = result;
+      return jsonError(400, error, fields);
+    }
     mockDb.modelMappings = result.rules;
     return saved();
   }),

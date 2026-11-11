@@ -15,7 +15,7 @@
   "labelOpenAI": "OpenAI API",
   "labelCodex": "Codex",
   "tagline": "所有 Kiro 账号，一个 {openai} 与 {anthropic} API。",
-  "disclaimer": "与 Amazon、AWS 或 Kiro 无关。",
+  "disclaimer": "与 Amazon、AWS 或 Kiro 无隶属关系。",
   "setupTitle": "欢迎使用 Kiro Proxy",
   "firstRunPassword": "登录后请在设置中修改密码。",
   "firstRunPasswordLabel": "首次运行管理员密码",

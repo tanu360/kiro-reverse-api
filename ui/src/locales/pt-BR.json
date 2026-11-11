@@ -113,7 +113,7 @@
   "shell.update.newVersionMessage": "Há uma versão mais recente do Kiro Proxy disponível.",
   "shell.update.current": "Atual",
   "shell.update.latest": "Mais recente",
-  "shell.update.changelog": "Changelog",
+  "shell.update.changelog": "Notas da versão",
   "shell.update.openGithub": "Abrir no GitHub",
   "shell.update.howTo": "Como atualizar",
   "shell.update.viaCompose": "Docker Compose, no seu clone do repositório",
@@ -129,5 +129,7 @@
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Entrar",
   "shell.page.setup": "Configuração inicial",
-  "text.joinSentences": "{first} {second}"
+  "text.joinSentences": "{first} {second}",
+  "text.joinList": "{first}; {second}",
+  "text.labelValue": "{label}: {value}"
 }

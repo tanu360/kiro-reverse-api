@@ -9,6 +9,7 @@
   "sparkline.summaryUp_other": "{count} 个数据点，从 {first} 到 {last}，上升 {change}%",
   "sparkline.summaryDown_other": "{count} 个数据点，从 {first} 到 {last}，下降 {change}%",
   "chart.loading": "正在加载…",
+  "pie.total": "合计",
   "spinner.loading": "正在加载…",
   "toast.region": "通知",
   "sidebar.toggle": "切换侧边栏",

@@ -47,9 +47,7 @@ describe("LoginPage", () => {
     );
     expect(screen.queryByText("Self-hosted · No telemetry")).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole("contentinfo")).getByText(
-        "Not affiliated with Amazon, AWS, or Kiro.",
-      ),
+      within(screen.getByRole("contentinfo")).getByText("Not affiliated with Amazon, AWS or Kiro."),
     ).toBeInTheDocument();
     // Language and theme are separate controls at the top; the footer holds only text, and the
     // app icon sits over the heading.

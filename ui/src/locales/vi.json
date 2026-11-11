@@ -108,7 +108,7 @@
   "shell.update.view": "Xem",
   "shell.update.upToDate": "Kiro Proxy đang ở bản mới nhất.",
   "shell.update.checkFailed": "Không thể kiểm tra cập nhật.",
-  "shell.update.checkFailedDetail": "GitHub không phản hồi. Thử lại sau.",
+  "shell.update.checkFailedDetail": "GitHub không phản hồi. Hãy thử lại sau.",
   "shell.update.title": "Cập nhật phiên bản",
   "shell.update.newVersionMessage": "Đã có phiên bản Kiro Proxy mới hơn.",
   "shell.update.current": "Hiện tại",
@@ -116,7 +116,7 @@
   "shell.update.changelog": "Nhật ký thay đổi",
   "shell.update.openGithub": "Mở trên GitHub",
   "shell.update.howTo": "Cách cập nhật",
-  "shell.update.viaCompose": "Docker Compose, chạy trong bản clone của repo",
+  "shell.update.viaCompose": "Docker Compose, trong bản clone repository của bạn",
   "shell.update.viaImage": "Docker image: pull về rồi tạo lại container với cùng volume",
   "shell.notFound.title": "Không tìm thấy trang",
   "shell.notFound.description": "Địa chỉ này không khớp với trang nào.",
@@ -129,5 +129,7 @@
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Đăng nhập",
   "shell.page.setup": "Thiết lập",
-  "text.joinSentences": "{first} {second}"
+  "text.joinSentences": "{first} {second}",
+  "text.joinList": "{first}; {second}",
+  "text.labelValue": "{label}: {value}"
 }

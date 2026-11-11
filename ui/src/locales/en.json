@@ -129,5 +129,7 @@
   "shell.documentTitle": "{page} · Kiro Proxy",
   "shell.page.login": "Sign in",
   "shell.page.setup": "Setup",
-  "text.joinSentences": "{first} {second}"
+  "text.joinSentences": "{first} {second}",
+  "text.joinList": "{first}; {second}",
+  "text.labelValue": "{label}: {value}"
 }

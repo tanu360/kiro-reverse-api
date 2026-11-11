@@ -272,7 +272,10 @@ describe("Microsoft SSO", () => {
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     await expectClosed();
     await expectToast(/^Added the account /);
-    await expectToast(/Kiro profile could not be resolved yet/);
+    // Translated from warningCode, with the upstream reason as the detail.
+    await expectToast(
+      "The account was added, but its Kiro profile could not be found yet. It is looked up again on the next request. (Details: no available Kiro profile)",
+    );
   });
 
   it("cancels the server session when the dialog closes mid-flow", async () => {

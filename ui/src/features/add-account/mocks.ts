@@ -274,7 +274,9 @@ export const handlers: HttpHandler[] = [
       ...(callbackUrl.includes("noprofile")
         ? {
             warning:
-              "The account was added, but its Kiro profile could not be resolved yet: no Kiro profile found",
+              "The account was added, but its Kiro profile could not be resolved yet: no available Kiro profile",
+            warningCode: "microsoft_profile_unresolved",
+            warningDetail: "no available Kiro profile",
           }
         : {}),
     });

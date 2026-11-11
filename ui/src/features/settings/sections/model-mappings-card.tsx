@@ -55,6 +55,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { isApiError } from "@/lib/api/errors";
 import { queryKeys } from "@/lib/api/query-keys";
+import { errorMessage } from "@/lib/api/server-errors";
 import { modelMappingsQuery, updateModelMappings } from "@/lib/api/settings";
 import type { ModelMappingRule, ModelMappingsResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
@@ -160,7 +161,7 @@ function ModelMappingsForm({ data }: { data: ModelMappingsResponse }): JSX.Eleme
         if (local === null) return;
         const row = sentFrom[local];
         setErrorRowId(row.id);
-        setServerError(error.serverMessage);
+        setServerError(errorMessage(error, t));
         setFilter("");
         setPendingFocus({ rowId: row.id });
       },

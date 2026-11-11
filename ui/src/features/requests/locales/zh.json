@@ -45,11 +45,11 @@
   "empty.title": "暂无请求",
   "empty.body": "客户端调用代理后，请求会显示在这里。",
   "outOfRange.title": "此页没有请求",
-  "outOfRange.body": "列表的页数已经变少。",
+  "outOfRange.body": "列表页数已减少。",
   "outOfRange.action": "转到第一页",
-  "memoryNote": "正在显示内存中最近的 200 个请求。历史记录不可用。",
+  "memoryNote": "正在显示内存中最近 200 条请求。历史记录不可用。",
   "loadError": "无法加载请求",
-  "card.tokens": "{value} token",
+  "card.tokens": "{value} Token",
   "card.credits": "{value} Credits",
   "tokens.input": "输入",
   "tokens.output": "输出",
@@ -72,5 +72,5 @@
   "detail.copyJson": "复制为 JSON",
   "detail.previous": "上一个请求",
   "detail.next": "下一个请求",
-  "detail.position": "本页第 {index} 个，共 {count} 个"
+  "detail.position": "本页第 {index} 条，共 {count} 条"
 }

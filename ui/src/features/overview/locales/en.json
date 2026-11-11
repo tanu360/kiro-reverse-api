@@ -92,7 +92,7 @@
   "attention.viewAll": "View all accounts that need attention",
   "attention.empty": "Every account is healthy",
   "attention.emptyBody": "Banned accounts, expired tokens and spent plans show up here.",
-  "attention.reason.noToken": "No access token, sign in again",
+  "attention.reason.noToken": "No access token. Sign in again.",
   "attention.reason.outOfCredits": "Plan limit reached",
   "attention.reason.outOfCreditsReset": "Plan limit reached, resets {date}",
   "attention.reason.expired": "Token expired {time}",

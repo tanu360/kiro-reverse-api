@@ -50,6 +50,7 @@
   "preRestoreSavedHint_other": "O ponto de reversão salvou {n} contas antes da restauração.",
   "download": "Baixar",
   "downloadHint": "O arquivo contém senhas e tokens em texto simples. Guarde-o com segurança.",
+  "actionHint": "{label}. {hint}",
   "downloaded": "O backup foi baixado.",
   "restore": "Restaurar",
   "delete": "Excluir",

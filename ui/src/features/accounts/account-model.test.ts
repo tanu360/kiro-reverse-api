@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccountFull, ExportData, ModelInfo } from "@/lib/api/types";
+import { type TParams, translate } from "@/lib/i18n";
 import { makeAccount, makeAccountFull, makeModelInfo } from "@/lib/mocks/fixtures";
 import {
   accountStatus,
@@ -474,8 +475,8 @@ describe("statusGroup / statusFilterGroup", () => {
 });
 
 describe("describeFailures", () => {
-  const tp = (key: string, params?: Record<string, unknown>) =>
-    params ? `${key}:${JSON.stringify(params)}` : key;
+  // The real English text, so the list separator and the "name: reason" form are checked too.
+  const tp = (key: string, params?: TParams) => translate("en", "accounts", key, params);
   const nameOf = (id: string) => `name-${id}`;
 
   it("is empty when nothing failed", () => {
@@ -492,11 +493,49 @@ describe("describeFailures", () => {
       { id: "e", ok: false, error: "x" },
       { id: "f", ok: false, error: "y" },
     ];
-    expect(describeFailures(results, nameOf, tp).split("\n")).toEqual([
-      "name-a: token expired",
-      "name-c: batch.notFound",
-      "name-d",
-      'batch.moreFailures:{"count":2}',
-    ]);
+    expect(describeFailures(results, nameOf, tp)).toBe(
+      "name-a: token expired; name-c: Account not found; name-d; and 2 more",
+    );
+  });
+
+  it("shows an error shared by several accounts once", () => {
+    const results = [
+      { id: "a", ok: false, error: "token expired" },
+      { id: "b", ok: false, error: "rate limited" },
+      { id: "c", ok: false, error: "token expired" },
+      { id: "d", ok: false },
+      { id: "e", ok: false },
+      { id: "f", ok: false, error: "token expired" },
+      { id: "g", ok: false, error: "x" },
+      { id: "h", ok: false, error: "x" },
+    ];
+    expect(describeFailures(results, nameOf, tp)).toBe(
+      "name-a and 2 more: token expired; name-b: rate limited; name-d; and 3 more",
+    );
+  });
+
+  it("shows a row's code in the UI language, not the server's English", () => {
+    const tz = (key: string, params?: TParams) => translate("zh", "accounts", key, params);
+    const results = [
+      {
+        id: "a",
+        ok: false,
+        error: "token refresh failed: invalid_grant",
+        code: "token_refresh_failed" as const,
+        detail: "invalid_grant",
+      },
+      { id: "b", ok: false, error: "Account not found", status: "not_found" as const },
+    ];
+    const text = describeFailures(results, nameOf, tz);
+    expect(text).toContain(
+      tz("batch.failureItem", {
+        name: "name-a",
+        reason: "无法刷新该账号的 Token。（详情：invalid_grant）",
+      }),
+    );
+    expect(text).toContain(
+      tz("batch.failureItem", { name: "name-b", reason: tz("batch.notFound") }),
+    );
+    expect(text).not.toMatch(/token refresh failed|Account not found/);
   });
 });

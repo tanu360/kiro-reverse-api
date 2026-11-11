@@ -1,5 +1,6 @@
 // Pure helpers for the Accounts page. Rules keep the old admin panel's behaviour unless noted.
 
+import { serverCodeMessage } from "@/lib/api/server-errors";
 import type {
   Account,
   AccountActionResult,
@@ -8,7 +9,7 @@ import type {
   ModelInfo,
 } from "@/lib/api/types";
 import { belowStep, dateTimeFormat, EMPTY, numberFormat, roundsToZero } from "@/lib/format";
-import type { Lang, TFunction } from "@/lib/i18n";
+import { joinList, type Lang, type TFunction } from "@/lib/i18n";
 import {
   ACCOUNT_STATUSES,
   type AccountSort,
@@ -565,22 +566,41 @@ export function overageCapable(account: Pick<Account, "overageCapability">): boo
 const FAILURE_NAMES_SHOWN = 3;
 
 /**
- * The failed rows of a batch or sweep answer as one toast description: "name: error" for the
- * first few, then "and N more". `nameOf` gives the display name (masked under privacy); an id
- * with no account falls back to the id. Empty when nothing failed.
+ * The failed rows of a batch or sweep answer as one toast description. Rows that share an error
+ * show it once ("name and 4 more: error"), so a sweep where every account hit the same upstream
+ * error reads as one line. The first few reasons are listed, then "and N more" counts the
+ * accounts left out. `nameOf` gives the display name (masked under privacy); an id with no
+ * account falls back to the id. Empty when nothing failed.
  */
 export function describeFailures(
   results: readonly AccountActionResult[] | undefined,
   nameOf: (id: string) => string,
   t: TFunction,
 ): string {
-  const failed = (results ?? []).filter((result) => !result.ok);
-  if (failed.length === 0) return "";
-  const named = failed.slice(0, FAILURE_NAMES_SHOWN).map((result) => {
-    const reason = result.error || (result.status === "not_found" ? t("batch.notFound") : "");
-    return reason ? `${nameOf(result.id)}: ${reason}` : nameOf(result.id);
+  const groups = new Map<string, { reason: string; ids: string[] }>();
+  for (const result of results ?? []) {
+    if (result.ok) continue;
+    // The row's code picks the text; `error`, the server's English, is left for an unknown code.
+    const reason =
+      serverCodeMessage(result.code, result, t) ??
+      (result.status === "not_found" ? t("batch.notFound") : result.error || "");
+    //! A row with no reason has nothing to share, so it keeps a line of its own.
+    const key = reason ? `reason:${reason}` : `id:${result.id}`;
+    const group = groups.get(key);
+    if (group) group.ids.push(result.id);
+    else groups.set(key, { reason, ids: [result.id] });
+  }
+  if (groups.size === 0) return "";
+  const entries = [...groups.values()];
+  const lines = entries.slice(0, FAILURE_NAMES_SHOWN).map(({ reason, ids }) => {
+    const name = nameOf(ids[0]);
+    if (ids.length > 1) return t("batch.failureShared", { name, count: ids.length - 1, reason });
+    return reason ? t("batch.failureItem", { name, reason }) : name;
   });
-  const rest = failed.length - named.length;
-  if (rest > 0) named.push(t("batch.moreFailures", { count: rest }));
-  return named.join("\n");
+  const rest = entries
+    .slice(FAILURE_NAMES_SHOWN)
+    .reduce((total, group) => total + group.ids.length, 0);
+  if (rest > 0) lines.push(t("batch.moreFailures", { count: rest }));
+  // One line: a toast description does not keep line breaks.
+  return joinList(t, lines);
 }

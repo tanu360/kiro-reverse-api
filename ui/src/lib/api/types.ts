@@ -11,11 +11,18 @@ export interface SuccessResponse {
 }
 
 /**
- * Codes the server sends in ApiErrorBody.code.
+ * Codes the server sends in ApiErrorBody.code (proxy/admin_errors.go, auth/errors.go), next to
+ * the English `error`. `detail` is upstream text shown after the translation; other string or
+ * number fields fill its placeholders. Batch rows (AccountActionResult) carry the same codes.
  * - api_key_lockout (409): the change would leave requireApiKey on with no enabled key.
  * - backup_not_found (404): unknown backup id.
- * - backup_* (400): an upload or stored backup the restore cannot read.
+ * - backup_* (400): an upload or stored backup the restore cannot read (`detail`: why).
  * - invalid_cadence / invalid_keep (400): POST /backups/schedule out of range.
+ * - token_refresh_failed, models_refresh_failed, overage_failed, profile_verify_failed,
+ *   kiro_sign_in_failed, microsoft_denied, microsoft_token_failed, microsoft_credential_invalid,
+ *   sso_* : `detail` is the upstream reason.
+ * - callback_url_wrong_address: `expected` is the callback URL the step needs.
+ * - model_*: also `index`; `model` (duplicate, self, chain) or `max` (too many, ID too long).
  */
 export type ServerErrorCode =
   | "api_key_lockout"
@@ -24,8 +31,68 @@ export type ServerErrorCode =
   | "backup_unsupported_format"
   | "backup_unsupported_version"
   | "backup_schema_mismatch"
+  | "backup_upload_failed"
   | "invalid_cadence"
-  | "invalid_keep";
+  | "invalid_keep"
+  | "invalid_json"
+  | "account_not_found"
+  | "api_key_not_found"
+  | "no_account_ids"
+  | "not_overage_capable"
+  | "overage_failed"
+  | "models_refresh_failed"
+  | "invalid_region"
+  | "start_url_required"
+  | "bearer_token_required"
+  | "refresh_token_required"
+  | "kiro_api_key_empty"
+  | "kiro_api_key_invalid"
+  | "kiro_api_key_region"
+  | "kiro_api_key_region_unsupported"
+  | "kiro_api_key_duplicate"
+  | "token_refresh_failed"
+  | "profile_arn_invalid"
+  | "profile_not_available"
+  | "profile_verify_failed"
+  | "no_kiro_profile"
+  | "api_key_account_no_profile"
+  | "auto_continue_max_range"
+  | "password_too_short"
+  | "invalid_endpoint"
+  | "proxy_url_scheme"
+  | "api_key_empty"
+  | "api_key_exists"
+  | "api_key_collision"
+  | "token_limit_negative"
+  | "credit_limit_negative"
+  | "model_mappings_too_many"
+  | "model_mapping_empty"
+  | "model_mapping_no_source"
+  | "model_mapping_no_target"
+  | "model_id_too_long"
+  | "model_id_invalid_chars"
+  | "model_mapping_self"
+  | "model_mapping_duplicate"
+  | "model_mapping_chain"
+  | "sso_register_failed"
+  | "sso_session_expired"
+  | "sso_timeout"
+  | "sso_denied"
+  | "sso_check_failed"
+  | "sso_state_mismatch"
+  | "sso_no_code"
+  | "invalid_callback_url"
+  | "callback_url_wrong_address"
+  | "kiro_sign_in_failed"
+  | "microsoft_too_many_sessions"
+  | "microsoft_not_enterprise"
+  | "microsoft_canceled"
+  | "microsoft_duplicate"
+  | "microsoft_denied"
+  | "microsoft_token_failed"
+  | "microsoft_tenant_mismatch"
+  | "microsoft_credential_invalid"
+  | "microsoft_profile_unresolved";
 
 // ---------------------------------------------------------------------------
 // Session and first run
@@ -167,7 +234,15 @@ export interface KiroProfile {
 export type MicrosoftCompleteResponse =
   | { success: true; stage: "microsoft"; authorizeUrl: string }
   | { success: true; stage: "profile"; selectionId: string; profiles: KiroProfile[] }
-  | { success: true; stage: "complete"; account: AddedAccountRef; warning?: string };
+  | {
+      success: true;
+      stage: "complete";
+      account: AddedAccountRef;
+      /** English; `warningCode` (a ServerErrorCode) and `warningDetail` are what the UI shows. */
+      warning?: string;
+      warningCode?: ServerErrorCode;
+      warningDetail?: string;
+    };
 export interface MicrosoftSelectProfileRequest {
   selectionId: string;
   profileArn: string;
@@ -352,12 +427,14 @@ export interface BatchAccountsRequest {
 /**
  * One requested id's outcome, in request order (duplicates dropped). `status` is "not_found"
  * for an unknown id, and "suspended" (with ok:true) when a refresh found the account suspended
- * and marked it.
+ * and marked it. `error` is English; `code` and `detail`, when sent, are what the UI shows.
  */
 export interface AccountActionResult {
   id: string;
   ok: boolean;
   error?: string;
+  code?: ServerErrorCode;
+  detail?: string;
   status?: "not_found" | "suspended";
 }
 export interface BatchEnableDisableResponse {

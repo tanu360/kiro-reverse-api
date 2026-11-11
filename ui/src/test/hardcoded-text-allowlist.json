@@ -41,7 +41,7 @@
   },
   {
     "file": "src/features/add-account/flows/api-key-flow.tsx",
-    "text": "ksk_... ksk_...|eu-central-1",
+    "text": "ksk_… ksk_…|eu-central-1",
     "reason": "Kiro API key format example (key prefix and region id), typed as data."
   },
   {
@@ -61,7 +61,7 @@
   },
   {
     "file": "src/features/add-account/flows/microsoft-flow.tsx",
-    "text": "http://localhost:3128/...",
+    "text": "http://localhost:3128/…",
     "reason": "Example callback URL; URLs are data values."
   }
 ]

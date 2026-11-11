@@ -1,4 +1,4 @@
-import type { TFunction } from "@/lib/i18n";
+import { joinList, type TFunction } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 
 const RESULT_TOAST_MS = 5200;
@@ -11,10 +11,10 @@ export function showBatchResult(t: TFunction, added: number, failures: string[])
     return;
   }
   const hidden = failures.length - SHOWN_FAILURES;
-  const description = [
+  const description = joinList(t, [
     ...failures.slice(0, SHOWN_FAILURES),
     ...(hidden > 0 ? [t("moreFailures", { count: hidden })] : []),
-  ].join("; ");
+  ]);
   toast.warning(t("importPartial", { count: added, failed: failures.length }), {
     description,
     duration: RESULT_TOAST_MS,

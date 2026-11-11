@@ -44,7 +44,15 @@ function eachRequested(
 ): AccountActionResult[] {
   return [...new Set(ids)].map((id) => {
     const account = findAccount(id);
-    if (!account) return { id, ok: false, error: "Account not found", status: "not_found" };
+    if (!account) {
+      return {
+        id,
+        ok: false,
+        error: "Account not found",
+        code: "account_not_found",
+        status: "not_found",
+      };
+    }
     return { id, ...act(account) };
   });
 }

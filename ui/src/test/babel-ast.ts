@@ -14,6 +14,8 @@ type JSXElement = Extract<Expression, { type: "JSXElement" }>;
 type JSXOpeningElement = JSXElement["openingElement"];
 type ObjectExpression = Extract<Expression, { type: "ObjectExpression" }>;
 type TemplateLiteral = Extract<Expression, { type: "TemplateLiteral" }>;
+type VariableDeclaration = Extract<Statement, { type: "VariableDeclaration" }>;
+type FunctionParam = Extract<Expression, { type: "ArrowFunctionExpression" }>["params"][number];
 
 /** The Babel node types the scanners read fields from. */
 type BabelNode =
@@ -24,7 +26,9 @@ type BabelNode =
   | JSXOpeningElement["name"]
   | JSXOpeningElement["attributes"][number]
   | ObjectExpression["properties"][number]
-  | TemplateLiteral["quasis"][number];
+  | TemplateLiteral["quasis"][number]
+  | VariableDeclaration["declarations"][number]
+  | FunctionParam;
 
 export type NodeOf<T extends BabelNode["type"]> = Extract<BabelNode, { type: T }>;
 

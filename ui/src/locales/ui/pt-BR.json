@@ -12,6 +12,7 @@
   "sparkline.summaryDown_one": "{count} ponto, de {first} a {last}, queda de {change}%",
   "sparkline.summaryDown_other": "{count} pontos, de {first} a {last}, queda de {change}%",
   "chart.loading": "Carregando…",
+  "pie.total": "Total",
   "spinner.loading": "Carregando…",
   "toast.region": "Notificações",
   "sidebar.toggle": "Alternar barra lateral",

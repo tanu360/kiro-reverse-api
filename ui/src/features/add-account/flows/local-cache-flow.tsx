@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
-import { useT } from "@/lib/i18n";
+import { fillNodes, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { FlowGuide, FormField, SubmitButton } from "../fields";
@@ -163,10 +163,16 @@ export function LocalCacheFlow(): JSX.Element {
       <Card size="sm">
         <FlowGuide list title={t("local.fileLocation")}>
           <li>
-            {t("local.windows")}: <Code>%USERPROFILE%\.aws\sso\cache\</Code>
+            {fillNodes(t("common:text.labelValue"), {
+              label: t("local.windows"),
+              value: <Code>%USERPROFILE%\.aws\sso\cache\</Code>,
+            })}
           </li>
           <li>
-            {t("local.macosLinux")}: <Code>~/.aws/sso/cache/</Code>
+            {fillNodes(t("common:text.labelValue"), {
+              label: t("local.macosLinux"),
+              value: <Code>~/.aws/sso/cache/</Code>,
+            })}
           </li>
         </FlowGuide>
       </Card>

@@ -15,7 +15,7 @@
   "labelOpenAI": "OpenAI API",
   "labelCodex": "Codex",
   "tagline": "All your Kiro accounts, one {openai} & {anthropic} API.",
-  "disclaimer": "Not affiliated with Amazon, AWS, or Kiro.",
+  "disclaimer": "Not affiliated with Amazon, AWS or Kiro.",
   "setupTitle": "Welcome to Kiro Proxy",
   "firstRunPassword": "Sign in, then change the password in Settings.",
   "firstRunPasswordLabel": "First-run admin password",

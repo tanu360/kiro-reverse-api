@@ -214,6 +214,17 @@ function templates(node: AstNode | null | undefined): NodeOf<"TemplateLiteral">[
 // Sentence punctuation between interpolations: a sentence built from parts.
 const COMPOSED_GLUE = /[:.,;!?。，：；！？]/;
 
+// Punctuation-only JSX text next to an interpolation ("{label}: <Code>…</Code>", "{a}. {b}"):
+// Chinese writes "：", "。" and full-width parentheses, so the punctuation belongs in the key.
+const JSX_GLUE = /[:.;!?()。：；！？（）]/;
+
+// A `.join()` separator that ends a sentence or clause ("; ", ". "): a list of messages glued in
+// English punctuation. Commas and middle dots stay allowed (CSS lists, "a · b" meta lines).
+const JOIN_GLUE = /[.;:!?]\s|[。；：！？]/;
+
+// The translation functions: t, tc, tShared, tAuth… and the tRef.current of a stable callback.
+const TRANSLATE_CALLEE = /^(?:t(?:[a-z]|[A-Z]\w*)?|tRef\.current)$/;
+
 // Type positions: a string there is a type, not text.
 const TYPE_NODES = new Set([
   "TSTypeAnnotation",
@@ -245,6 +256,32 @@ function calleeName(node: AstNode | null | undefined): string {
   return "";
 }
 
+/** True for `t("key")`, `tc("key")`, `tRef.current("key")`: a translated string. */
+function isTranslateCall(node: AstNode | null | undefined): boolean {
+  return isNode(node, "CallExpression") && TRANSLATE_CALLEE.test(calleeName(node.callee));
+}
+
+/** The text of a JSX child that is only punctuation glue (no letters), else null. */
+function glueText(node: AstNode): string | null {
+  let text: string | null = null;
+  if (isNode(node, "JSXText")) text = node.value;
+  else if (isNode(node, "JSXExpressionContainer") && isNode(node.expression, "StringLiteral")) {
+    text = node.expression.value;
+  }
+  if (text === null || /\p{L}/u.test(text) || !JSX_GLUE.test(text)) return null;
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/** A JSX child that renders a value: an element, or an expression that is not a plain string. */
+function isInterpolation(node: AstNode): boolean {
+  if (isNode(node, "JSXElement") || isNode(node, "JSXFragment")) return true;
+  return (
+    isNode(node, "JSXExpressionContainer") &&
+    node.expression.type !== "JSXEmptyExpression" &&
+    !isNode(node.expression, "StringLiteral")
+  );
+}
+
 export function scanSource(code: string, file: string): Finding[] {
   const ast = parse(code, {
     sourceType: "module",
@@ -260,6 +297,18 @@ export function scanSource(code: string, file: string): Finding[] {
     findings.push({ file, line: node.loc?.start.line ?? 0, kind, text: value });
   };
 
+  const reportComposed = (kind: string, node: Pick<AstNode, "loc">, glue: string) => {
+    findings.push({
+      file,
+      line: node.loc?.start.line ?? 0,
+      kind,
+      text: glue.replace(/\s+/g, " ").trim(),
+    });
+  };
+
+  // Templates already judged as a visible value, so the anywhere-rule below skips them.
+  const checked = new Set<AstNode>();
+
   const reportExpression = (
     kind: string,
     expression: AstNode | null | undefined,
@@ -269,15 +318,21 @@ export function scanSource(code: string, file: string): Finding[] {
     // `${t("a")}: ${value}.` glues translated parts with punctuation that differs by language
     // ("：" and "。" in Chinese). The whole sentence must be one key with placeholders.
     for (const template of templates(expression)) {
+      checked.add(template);
       const glue = template.quasis.map((quasi) => quasi.value.cooked ?? "").join("{…}");
       if (template.expressions.length > 0 && COMPOSED_GLUE.test(glue.replace(/\{…\}/g, ""))) {
-        findings.push({
-          file,
-          line: template.loc?.start.line ?? 0,
-          kind: `${kind} composed`,
-          text: glue.replace(/\s+/g, " ").trim(),
-        });
+        reportComposed(`${kind} composed`, template, glue);
       }
+    }
+  };
+
+  // `{label}: <Code>…</Code>` or `{a}. {b}`: punctuation glued between rendered parts.
+  const reportJsxGlue = (children: readonly AstNode[]) => {
+    for (const [index, child] of children.entries()) {
+      const glue = glueText(child);
+      if (glue === null) continue;
+      const others = children.filter((_, other) => other !== index);
+      if (others.some(isInterpolation)) reportComposed("jsx-text composed", child, glue);
     }
   };
 
@@ -289,6 +344,9 @@ export function scanSource(code: string, file: string): Finding[] {
 
     if (isNode(node, "JSXElement")) {
       if (CODE_ELEMENTS.has(jsxName(node.openingElement.name))) code = true;
+      if (!code) reportJsxGlue(node.children);
+    } else if (isNode(node, "JSXFragment")) {
+      if (!code) reportJsxGlue(node.children);
     } else if (isNode(node, "JSXText")) {
       if (!code) report("jsx-text", node, node.value, true);
     } else if (isNode(node, "JSXAttribute")) {
@@ -307,11 +365,33 @@ export function scanSource(code: string, file: string): Finding[] {
       }
     } else if (isNode(node, "ObjectProperty")) {
       const name = propName(node);
-      if (!types && name && isVisibleName(name))
-        reportExpression(`property ${name}`, node.value, false);
+      // A destructured prop's default counts too: ({ label = "Total" }) => …
+      const value = isNode(node.value, "AssignmentPattern") ? node.value.right : node.value;
+      if (!types && name && isVisibleName(name)) reportExpression(`property ${name}`, value, false);
+    } else if (isNode(node, "AssignmentPattern")) {
+      // A parameter default: (title = "Untitled") => …; destructured ones are handled above.
+      if (!types && parent !== "ObjectProperty" && isNode(node.left, "Identifier")) {
+        if (isVisibleName(node.left.name))
+          reportExpression(`default ${node.left.name}`, node.right, false);
+      }
+    } else if (isNode(node, "VariableDeclarator")) {
+      // const emptyMessage = "No data": a visible-named variable that holds literal text.
+      if (!types && isNode(node.id, "Identifier") && isVisibleName(node.id.name)) {
+        reportExpression(`variable ${node.id.name}`, node.init, false);
+      }
     } else if (isNode(node, "AssignmentExpression")) {
       const target = calleeName(node.left);
       if (target === "document.title") reportExpression("document.title", node.right, true);
+    } else if (isNode(node, "TemplateLiteral")) {
+      // Anywhere else, a template that glues translated text to words or sentence punctuation
+      // (`${t("count")} items`, `${t("a")}: ${b}`) is a sentence built from parts.
+      if (!types && !checked.has(node) && node.expressions.some(isTranslateCall)) {
+        const glue = node.quasis.map((quasi) => quasi.value.cooked ?? "").join("{…}");
+        const rest = glue.replace(/\{…\}/g, "");
+        if (COMPOSED_GLUE.test(rest) || /\p{L}/u.test(rest)) {
+          reportComposed("template composed", node, glue);
+        }
+      }
     } else if (isNode(node, "CallExpression")) {
       const callee = calleeName(node.callee);
       const [object, method] = callee.split(".");
@@ -320,6 +400,13 @@ export function scanSource(code: string, file: string): Finding[] {
         callee,
       );
       if (isToast || isDialog) reportExpression(callee, node.arguments[0], true);
+      // messages.join("; "): a list of sentences in English punctuation.
+      const [separator] = node.arguments;
+      if (callee.endsWith(".join") && isNode(separator, "StringLiteral")) {
+        if (JOIN_GLUE.test(separator.value)) {
+          reportComposed("join composed", node, `{…}${separator.value}{…}`);
+        }
+      }
     }
 
     for (const [key, child] of fields(node)) {

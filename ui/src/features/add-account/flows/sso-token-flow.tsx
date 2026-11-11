@@ -2,7 +2,7 @@ import { type FormEvent, type JSX, useRef, useState } from "react";
 import { Code } from "@/components/shared/code";
 import { Textarea } from "@/components/ui/textarea";
 import { importSsoToken } from "@/lib/api/auth-flows";
-import { errorMessage } from "@/lib/api/server-errors";
+import { errorMessage, serverMessageText } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FlowGuide, FormField, RegionField, SubmitButton } from "../fields";
@@ -43,7 +43,9 @@ export function SsoTokenFlow(): JSX.Element {
     try {
       const res = await importSsoToken({ bearerToken: tokens, region: parsed.region });
       if (!sessions.isCurrent(generation)) return;
-      showBatchResult(t, res.accounts.length, res.errors);
+      // Each token's error is the AWS sign-in code's Chinese message, sent without a code.
+      const failures = res.errors.map((message) => serverMessageText(message, t));
+      showBatchResult(t, res.accounts.length, failures);
       finishAdd(res.accounts);
     } catch (error) {
       if (sessions.isCurrent(generation)) {

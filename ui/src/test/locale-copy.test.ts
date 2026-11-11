@@ -78,6 +78,20 @@ describe("Chinese copy", () => {
     expect(bad).toEqual([]);
   });
 
+  it("uses full-width ，。；：？！ next to Hanzi and the ellipsis character", () => {
+    const bad = zh
+      .filter(([, text]) => /\p{Script=Han}[,.;:?!]|[,;:?!]\p{Script=Han}|\.\.\./u.test(text))
+      .map(([key]) => key);
+    expect(bad).toEqual([]);
+  });
+
+  it("writes Token and 禁用, never 令牌, lowercase token or 停用", () => {
+    const bad = zh
+      .filter(([, text]) => /令牌|停用|(?<![\w-])token(?![\w.-])/.test(text))
+      .map(([key]) => key);
+    expect(bad).toEqual([]);
+  });
+
   it("keeps the glossary terms: API Key, Kiro Profile, 刷新 Token, 管理员密码", () => {
     const bad = zh
       .filter(([, text]) =>
@@ -93,5 +107,37 @@ describe("Chinese copy", () => {
     expect(
       zh.filter(([, text]) => /中…$/.test(text) && !/^正在/.test(text)).map(([key]) => key),
     ).toEqual([]);
+  });
+});
+
+describe("Vietnamese copy", () => {
+  const vi = entries("vi");
+
+  it("uses the ellipsis character, not three dots", () => {
+    expect(vi.filter(([, text]) => text.includes("...")).map(([key]) => key)).toEqual([]);
+  });
+
+  it("writes xóa, hủy, khóa, tùy with the modern tone mark, and model, not mô hình", () => {
+    const bad = vi
+      .filter(([, text]) => /(?:xoá|huỷ|khoá|tuỳ|hoá)(?!\p{L})|mô hình/iu.test(text))
+      .map(([key]) => key);
+    expect(bad).toEqual([]);
+  });
+});
+
+describe("Portuguese copy", () => {
+  const pt = entries("pt-BR");
+
+  it("uses the ellipsis character, not three dots", () => {
+    expect(pt.filter(([, text]) => text.includes("...")).map(([key]) => key)).toEqual([]);
+  });
+
+  it("keeps the glossary terms: requisição, habilitar/desabilitar, perfil do Kiro", () => {
+    const bad = pt
+      .filter(([, text]) =>
+        /solicitaç|\b(?:des)?ativ(?:ar|ad[ao]s?)\b|\bperf(?:il|is) Kiro\b/i.test(text),
+      )
+      .map(([key]) => key);
+    expect(bad).toEqual([]);
   });
 });

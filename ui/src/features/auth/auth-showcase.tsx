@@ -5,6 +5,7 @@ import { NAV_ITEMS } from "@/components/layout/nav-items";
 import { AppIcon } from "@/components/shared/app-icon";
 import { ClaudeLogo, CodexLogo, OpenAILogo } from "@/components/shared/brand-logos";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { numberFormat } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -363,8 +364,8 @@ function AccountsPreview(): JSX.Element {
   const { t: tShared, lang } = useT();
   const { t: tAccounts } = useT("accounts");
   const { t: tOverview } = useT("overview");
-  const number = new Intl.NumberFormat(lang);
-  const percent = new Intl.NumberFormat(lang, { style: "percent", maximumFractionDigits: 1 });
+  const number = numberFormat(lang);
+  const percent = numberFormat(lang, { style: "percent", maximumFractionDigits: 1 });
 
   const stats: { label: string; value: string; extra: JSX.Element }[] = [
     { label: tOverview("stats.accounts"), value: number.format(7), extra: <AvatarStack /> },

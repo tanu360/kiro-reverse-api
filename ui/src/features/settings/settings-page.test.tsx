@@ -209,7 +209,8 @@ describe("SettingsPage", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
       await user.click(within(card).getByRole("button", { name: "Save" }));
 
-      const reason = 'source "gpt-5" is mapped more than once';
+      // The server's code (model_mapping_duplicate) and model, not its English `error`.
+      const reason = "gpt-5 is mapped more than once.";
       expect(await within(card).findByText(reason)).toBeInTheDocument();
       // Error toasts are high priority: the text also lands in an announcement region.
       expect(

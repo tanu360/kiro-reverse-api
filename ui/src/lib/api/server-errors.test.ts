@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { type TFunction, translate } from "@/lib/i18n";
 import en from "@/locales/errors/en.json";
+import ptBR from "@/locales/errors/pt-BR.json";
+import vi from "@/locales/errors/vi.json";
 import zh from "@/locales/errors/zh.json";
 import { ApiError } from "./errors";
 import {
@@ -8,9 +10,11 @@ import {
   SERVER_ERROR_CODES,
   SERVER_ERROR_KEYS,
   SERVER_ERROR_PHRASES,
+  serverCodeMessage,
   serverErrorCode,
   serverErrorKey,
   serverErrorPhrase,
+  serverMessageText,
 } from "./server-errors";
 
 // Echoes the key so assertions show which translation was chosen.
@@ -180,11 +184,74 @@ describe("server error codes", () => {
   });
 
   it("keeps an unmapped code's message", () => {
+    // The schedule form marks the field for invalid_keep instead of showing a message.
     const error = new ApiError({
-      status: 404,
-      serverMessage: "backup not found: abc",
-      body: { error: "backup not found: abc", code: "backup_not_found" },
+      status: 400,
+      serverMessage: "keep must be between 1 and 200",
+      body: { error: "keep must be between 1 and 200", code: "invalid_keep" },
     });
-    expect(errorMessage(error, t)).toBe("backup not found: abc");
+    expect(errorMessage(error, t)).toBe("keep must be between 1 and 200");
+  });
+
+  it("maps every code to an errors:serverError key present in all four locales", () => {
+    const locales = { en, zh, vi, "pt-BR": ptBR } as Record<string, Record<string, string>>;
+    for (const key of Object.values(SERVER_ERROR_CODES)) {
+      expect(key).toMatch(/^errors:serverError\.[a-zA-Z]+$/);
+      const name = key.slice("errors:".length);
+      for (const [lang, dict] of Object.entries(locales))
+        expect(dict, `${lang} ${name}`).toHaveProperty([name]);
+    }
+  });
+
+  it("fills placeholders from the body and appends the upstream detail", () => {
+    const enT: TFunction = (key, params) => translate("en", "common", key, params);
+    const zhT: TFunction = (key, params) => translate("zh", "common", key, params);
+    const refresh = new ApiError({
+      status: 500,
+      serverMessage: "Token refresh failed: HTTP 400: invalid_grant",
+      body: {
+        error: "Token refresh failed: HTTP 400: invalid_grant",
+        code: "token_refresh_failed",
+        detail: "HTTP 400: invalid_grant",
+      },
+    });
+    expect(errorMessage(refresh, enT)).toBe(
+      "Could not refresh the account's token. (Details: HTTP 400: invalid_grant)",
+    );
+    expect(errorMessage(refresh, zhT)).toBe(
+      "无法刷新该账号的 Token。（详情：HTTP 400: invalid_grant）",
+    );
+
+    const duplicate = new ApiError({
+      status: 400,
+      serverMessage: 'source "gpt-5" is mapped more than once',
+      body: { code: "model_mapping_duplicate", model: "gpt-5", index: 3 },
+    });
+    expect(errorMessage(duplicate, zhT)).toBe("gpt-5 被映射了多次。");
+
+    const wrongAddress = new ApiError({
+      status: 400,
+      serverMessage: "callback URL must be http://localhost:3128/oauth/callback",
+      body: {
+        code: "callback_url_wrong_address",
+        expected: "http://localhost:3128/oauth/callback",
+      },
+    });
+    expect(errorMessage(wrongAddress, enT)).toBe(
+      "This is not the expected callback URL. It must start with http://localhost:3128/oauth/callback.",
+    );
+  });
+
+  it("translates a batch row by its code, and leaves a row without one to the caller", () => {
+    const row = { id: "a", ok: false, code: "account_not_found", error: "Account not found" };
+    expect(serverCodeMessage(row.code, row, t)).toBe("t(errors:serverError.accountNotFound)");
+    expect(serverCodeMessage(undefined, { error: "HTTP 500" }, t)).toBeNull();
+  });
+});
+
+describe("serverMessageText", () => {
+  it("translates a known message without a code and keeps any other", () => {
+    expect(serverMessageText("授权超时", t)).toBe("t(errors:serverError.ssoTimeout)");
+    expect(serverMessageText("disk full", t)).toBe("disk full");
   });
 });

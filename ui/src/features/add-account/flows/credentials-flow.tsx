@@ -3,7 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { AddedAccountRef } from "@/lib/api/types";
-import { useT } from "@/lib/i18n";
+import { joinList, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FlowGuide, FormField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
@@ -73,7 +73,7 @@ export function CredentialsFlow(): JSX.Element {
       if (!sessions.isCurrent(generation)) return;
       if (added.length === 0) {
         toast.error(t("allFailed", { error: failures[0] ?? "" }), {
-          description: failures.length > 1 ? failures.slice(1, 3).join("; ") : undefined,
+          description: failures.length > 1 ? joinList(t, failures.slice(1, 3)) : undefined,
         });
         focusAfter(jsonRef);
         return;

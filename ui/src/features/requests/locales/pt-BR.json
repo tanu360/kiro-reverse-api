@@ -40,7 +40,7 @@
   "errorType.invalid_request": "Requisição inválida",
   "errorType.rate_limit": "Limite de requisições atingido",
   "errorType.timeout": "Tempo esgotado",
-  "errorType.upstream": "Erro upstream",
+  "errorType.upstream": "Erro no upstream",
   "errorType.unknown": "Desconhecido",
   "empty.title": "Nenhuma requisição por enquanto",
   "empty.body": "As requisições aparecem aqui quando um cliente chama o proxy.",

@@ -38,9 +38,9 @@
   "methods.apikey.description": "使用 Kiro CLI API Key（ksk_…）添加无界面账号。",
 
   "builderid.startNote": "你将获得一个验证码，需在 AWS 页面中输入。",
-  "builderid.verifyCode": "请在下方链接中输入此验证码。",
+  "builderid.verifyCode": "请打开下方链接并输入此验证码。",
   "builderid.userCode": "验证码",
-  "builderid.copyCode": "复制代码",
+  "builderid.copyCode": "复制验证码",
   "builderid.verifyUrl": "验证链接",
   "builderid.waiting": "正在等待授权…",
   "builderid.reconnecting": "连接中断，正在重试…",

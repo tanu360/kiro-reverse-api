@@ -13,7 +13,7 @@
   "access.keepEditing": "Continuar editando",
   "keys.title": "Chaves de API",
   "keys.description": "Crie uma chave por cliente. Defina limites de tokens ou créditos; 0 significa ilimitado.",
-  "keys.metaDisabled": "{total} · {disabled} desativadas",
+  "keys.metaDisabled": "{total} · {disabled} desabilitadas",
   "keys.create": "Criar chave de API",
   "keys.loadFailed": "Não foi possível carregar as chaves de API",
   "keys.emptyTitle": "Nenhuma chave de API por enquanto",
@@ -100,11 +100,11 @@
   "snippets.openaiChat": "OpenAI Chat Completions API",
   "snippets.shell": "Shell",
   "snippets.claudeCodeHint": "Execute em um shell e depois inicie o Claude Code no mesmo shell.",
-  "snippets.codexHint": "Adicione a {file}. O Codex lê a chave de {env}.",
+  "snippets.codexHint": "Adicione ao arquivo {file}. O Codex lê a chave de {env}.",
   "snippets.sdkLanguage": "Linguagem do SDK",
   "snippets.python": "Python",
   "snippets.typescript": "TypeScript",
-  "snippets.copy": "Copiar snippet de {name}",
+  "snippets.copy": "Copiar código de {name}",
   "snippets.codeRegion": "Código {name}",
   "snippets.sdkWithLanguage": "{sdk} ({language})"
 }

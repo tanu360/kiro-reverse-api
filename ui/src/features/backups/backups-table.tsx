@@ -21,7 +21,7 @@ import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/compone
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BackupEntry } from "@/lib/api/types";
 import { EMPTY, formatBytes, formatDateTime } from "@/lib/format";
-import { type TFunction, useT } from "@/lib/i18n";
+import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { accountsCell, kindLabel, kindTone, noteText } from "./backup-model";
 
@@ -161,6 +161,7 @@ function RowIconButton({
   focusId?: string;
   onClick: () => void;
 }): JSX.Element {
+  const { t } = useT("backups");
   return (
     <Tooltip>
       <TooltipTrigger
@@ -181,13 +182,12 @@ function RowIconButton({
         <HugeiconsIcon icon={Icon} aria-hidden="true" />
       </TooltipTrigger>
       <TooltipPopup className="max-w-64">
-        {hint ? (
-          <>
-            <span className="font-medium">{label}</span>. {hint}
-          </>
-        ) : (
-          label
-        )}
+        {hint
+          ? fillNodes(t("actionHint"), {
+              label: <span className="font-medium">{label}</span>,
+              hint,
+            })
+          : label}
       </TooltipPopup>
     </Tooltip>
   );
@@ -258,7 +258,10 @@ function BackupCard({
         <div className="flex items-baseline-last justify-between gap-3">
           <KindBadge kind={entry.kind} t={t} />
           <span className="min-w-0 text-end text-meta text-muted-foreground">
-            {t("accountsInBackup")}: <AccountsCell entry={entry} t={t} />
+            {fillNodes(t("common:text.labelValue"), {
+              label: t("accountsInBackup"),
+              value: <AccountsCell entry={entry} t={t} />,
+            })}
           </span>
         </div>
       }
