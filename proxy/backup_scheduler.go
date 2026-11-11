@@ -56,6 +56,17 @@ func backupInterval(cadence string) int64 {
 	}
 }
 
+// trustedLastRun is the schedule's last run as the scheduler counts it: 0 when
+// it never ran, or when the stored time is later than now.
+func trustedLastRun(sched config.BackupSchedule, now int64) int64 {
+	//! A lastRun ahead of the clock (the clock was set back, or it was stored while the clock ran
+	//! ahead) would hold every backup until that date plus a whole interval, so it counts as never run.
+	if sched.LastRun > now {
+		return 0
+	}
+	return sched.LastRun
+}
+
 // nextScheduledBackup is when the scheduler will take the next backup: the
 // later of lastRun+interval and now, rounded up to the next tick. Zero while
 // the schedule is off or its cadence unknown.
@@ -65,8 +76,8 @@ func nextScheduledBackup(sched config.BackupSchedule, now time.Time) int64 {
 		return 0
 	}
 	due := now
-	if sched.LastRun > 0 {
-		if at := time.Unix(sched.LastRun+interval, 0); at.After(due) {
+	if lastRun := trustedLastRun(sched, now.Unix()); lastRun > 0 {
+		if at := time.Unix(lastRun+interval, 0); at.After(due) {
 			due = at
 		}
 	}
@@ -83,7 +94,7 @@ func (h *Handler) maybeRunScheduledBackup() {
 	if interval == 0 {
 		return
 	}
-	if sched.LastRun > 0 && now-sched.LastRun < interval {
+	if lastRun := trustedLastRun(sched, now); lastRun > 0 && now-lastRun < interval {
 		return
 	}
 	logger.Infof("[Backup] Running scheduled backup (cadence: %s)", sched.Cadence)

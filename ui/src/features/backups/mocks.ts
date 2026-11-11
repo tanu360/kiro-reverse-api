@@ -33,9 +33,11 @@ function isCadence(value: unknown): value is BackupCadence {
 function nextRun(schedule: BackupSchedule): number | undefined {
   if (!schedule.enabled || !isCadence(schedule.cadence)) return undefined;
   const now = mockNowUnix();
-  const due = schedule.lastRun
-    ? Math.max(schedule.lastRun + INTERVAL_SECONDS[schedule.cadence], now)
-    : now;
+  // Like Go's trustedLastRun: a lastRun ahead of the clock counts as never run.
+  const due =
+    schedule.lastRun && schedule.lastRun <= now
+      ? Math.max(schedule.lastRun + INTERVAL_SECONDS[schedule.cadence], now)
+      : now;
   return Math.ceil(due / TICK_SECONDS) * TICK_SECONDS;
 }
 

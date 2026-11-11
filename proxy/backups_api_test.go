@@ -77,6 +77,43 @@ func TestNextScheduledBackup(t *testing.T) {
 	if got := nextScheduledBackup(config.BackupSchedule{Cadence: "daily"}, now); got != 0 {
 		t.Fatalf("disabled nextRun = %d, want 0", got)
 	}
+	//! A lastRun ahead of the clock is not trusted: the backup is due now, not at lastRun+interval.
+	future := config.BackupSchedule{Enabled: true, Cadence: "daily", LastRun: tick + 19*86400}
+	if got, want := nextScheduledBackup(future, now), tick+300; got != want {
+		t.Fatalf("future lastRun nextRun = %d, want %d", got, want)
+	}
+}
+
+func TestScheduledBackupRunsWhenLastRunIsInTheFuture(t *testing.T) {
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	if err := config.UpdateBackupSchedule(config.BackupSchedule{Enabled: true, Cadence: "daily", Keep: 5}); err != nil {
+		t.Fatalf("save schedule: %v", err)
+	}
+	future := time.Now().Add(19 * 24 * time.Hour).Unix()
+	if err := config.MarkScheduleRan(future); err != nil {
+		t.Fatalf("mark ran: %v", err)
+	}
+	h := &Handler{}
+	before := time.Now().Unix()
+	h.maybeRunScheduledBackup()
+	list, err := config.ListBackups(true)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	scheduled := 0
+	for _, entry := range list {
+		if entry.Kind == "scheduled" {
+			scheduled++
+		}
+	}
+	if scheduled != 1 {
+		t.Fatalf("scheduled backups = %d, want 1", scheduled)
+	}
+	if got := config.GetBackupSchedule().LastRun; got < before || got > time.Now().Unix() {
+		t.Fatalf("lastRun = %d, want now (%d)", got, before)
+	}
 }
 
 func TestBackupScheduleLoweringKeepPrunes(t *testing.T) {
