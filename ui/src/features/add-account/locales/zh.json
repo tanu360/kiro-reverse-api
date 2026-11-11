@@ -21,7 +21,7 @@
   "moreFailures_other": "另有 {count} 个失败。",
   "continueWith": "使用 {name} 继续",
   "stepAdded": "账号已添加",
-  "stepDone": "已完成",
+  "stepDone": "（已完成）",
   "otherWays": "其他方式",
 
   "methods.builderid.title": "AWS Builder ID",
@@ -72,7 +72,7 @@
   "microsoft.stepPortal": "登录 Kiro 门户",
   "microsoft.stepProvider": "使用 Microsoft 登录",
   "microsoft.stepProfile": "选择 Kiro Profile",
-  "microsoft.stepProfileNote": "仅在账号有多个 Profile 时需要。",
+  "microsoft.stepProfileNote": "仅在账号有多个 Kiro Profile 时需要。",
 
   "sso.howToGet": "如何获取 Token",
   "sso.step1": "打开并登录",

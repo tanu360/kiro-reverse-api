@@ -12,6 +12,9 @@ import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
 import { showBatchResult } from "../result-toast";
 
+/** The AWS access portal, where the SSO cookie is set (a host name, the same in every language). */
+const SSO_START = "view.awsapps.com/start";
+
 /** Bulk import of x-amz-sso_authn tokens. The server imports them in one long request. */
 export function SsoTokenFlow(): JSX.Element {
   const { t } = useT("add-account");
@@ -63,8 +66,8 @@ export function SsoTokenFlow(): JSX.Element {
       <FlowGuide title={t("sso.howToGet")}>
         <li>
           {t("sso.step1")}{" "}
-          <GuideLink href="https://view.awsapps.com/start" logo={<AwsLogo className="size-4" />}>
-            view.awsapps.com/start
+          <GuideLink href={`https://${SSO_START}`} logo={<AwsLogo className="size-4" />}>
+            {SSO_START}
           </GuideLink>
         </li>
         <li>{t("sso.step2")}</li>

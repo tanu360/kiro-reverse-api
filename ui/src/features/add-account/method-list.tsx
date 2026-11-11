@@ -90,7 +90,7 @@ export function MethodStepper({ method }: { method: AddAccountMethod | null }): 
             {/* On phones only the current step keeps its label; the others are their numbers. */}
             <span className={cn("truncate", state !== "current" && "max-sm:sr-only")}>
               {label}
-              {state === "done" ? <span className="sr-only"> ({t("stepDone")})</span> : null}
+              {state === "done" ? <span className="sr-only"> {t("stepDone")}</span> : null}
             </span>
           </li>
         );

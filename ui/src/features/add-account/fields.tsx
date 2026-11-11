@@ -257,7 +257,7 @@ export function FlowSteps({ steps }: { steps: FlowStepItem[] }): JSX.Element {
                 )}
               >
                 {step.title}
-                {step.state === "done" ? <span className="sr-only"> ({t("stepDone")})</span> : null}
+                {step.state === "done" ? <span className="sr-only"> {t("stepDone")}</span> : null}
               </p>
               {step.children}
             </div>

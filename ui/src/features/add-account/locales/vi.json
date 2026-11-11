@@ -21,7 +21,7 @@
   "moreFailures_other": "Còn {count} lỗi khác.",
   "continueWith": "Tiếp tục với {name}",
   "stepAdded": "Đã thêm tài khoản",
-  "stepDone": "xong",
+  "stepDone": "(xong)",
   "otherWays": "Cách khác",
   "methods.builderid.title": "AWS Builder ID",
   "methods.builderid.description": "Thêm tài khoản cá nhân bằng AWS Builder ID.",

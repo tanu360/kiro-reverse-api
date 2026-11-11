@@ -24,7 +24,7 @@
   "moreFailures_other": "{count} more failures.",
   "continueWith": "Continue with {name}",
   "stepAdded": "Account added",
-  "stepDone": "done",
+  "stepDone": "(done)",
   "otherWays": "Other ways",
 
   "methods.builderid.title": "AWS Builder ID",

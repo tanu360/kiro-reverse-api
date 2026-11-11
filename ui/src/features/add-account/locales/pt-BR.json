@@ -24,7 +24,7 @@
   "moreFailures_other": "Mais {count} falhas.",
   "continueWith": "Continuar com {name}",
   "stepAdded": "Conta adicionada",
-  "stepDone": "concluído",
+  "stepDone": "(concluído)",
   "otherWays": "Outras formas",
   "methods.builderid.title": "AWS Builder ID",
   "methods.builderid.description": "Adicione uma conta pessoal com o AWS Builder ID.",
