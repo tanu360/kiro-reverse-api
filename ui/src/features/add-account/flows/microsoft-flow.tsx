@@ -15,7 +15,7 @@ import type { KiroProfile, MicrosoftSelectProfileResponse } from "@/lib/api/type
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FlowGuide, FlowNote, FormField, SubmitButton, UrlBox } from "../fields";
+import { FlowNote, type FlowStepItem, FlowSteps, FormField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { stepFocus, useFocusAfter } from "../focus";
 
@@ -166,6 +166,91 @@ export function MicrosoftFlow(): JSX.Element {
         ? t("microsoft.selectProfile")
         : t("completeSignIn");
 
+  // The paste step of the leg in progress: its sign-in link, what to expect, then the field.
+  const pasteStep = (
+    <>
+      <UrlBox label={t("iam.loginUrl")} url={authorizeUrl} />
+      {/* A step note, not the field hint: it stays in view while the field shows an error. */}
+      <FlowNote>
+        {t("microsoft.callbackInstructions")} <Code>http://localhost:3128</Code>
+      </FlowNote>
+      <FormField error={fieldError} label={t("callbackUrl")}>
+        <Input
+          autoCapitalize="off"
+          autoComplete="off"
+          disabled={busy}
+          inputMode="url"
+          onChange={(event) => setCallbackUrl(event.target.value)}
+          placeholder="http://localhost:3128/…"
+          ref={callbackRef}
+          spellCheck={false}
+          value={callbackUrl}
+        />
+      </FormField>
+    </>
+  );
+  const profileStep = (
+    <Field className="w-full" invalid={Boolean(fieldError)}>
+      <FieldLabel className="sr-only">{t("microsoft.profileLabel")}</FieldLabel>
+      <FieldDescription>{t("microsoft.selectProfileDesc")}</FieldDescription>
+      <RadioGroup
+        aria-label={t("microsoft.profileLabel")}
+        className="w-full gap-2"
+        disabled={busy}
+        onValueChange={(value) => setSelectedArn(String(value))}
+        ref={profilesRef}
+        value={selectedArn}
+      >
+        {/* Each card is a FieldItem, so its radio keeps the card's own id inside the Field. */}
+        {profiles.map((profile) => (
+          <FieldItem key={profile.arn}>
+            <ChoiceCard
+              control={(id) => <Radio id={id} value={profile.arn} />}
+              description={profile.region}
+              title={profile.name || t("microsoft.unnamedProfile")}
+            >
+              <span className="break-all font-mono text-meta text-muted-foreground">
+                {profile.arn}
+              </span>
+            </ChoiceCard>
+          </FieldItem>
+        ))}
+      </RadioGroup>
+      <FieldError match={Boolean(fieldError)}>{fieldError}</FieldError>
+    </Field>
+  );
+  // Two browser sign-ins, each followed by a paste, then a profile choice when there are several.
+  // Before the first request every step is still to come, and the first says what each paste is.
+  const order = ["kiro", "microsoft", "profile"] as const;
+  const at = stage === "idle" ? -1 : order.indexOf(stage);
+  const stateOf = (index: number): FlowStepItem["state"] =>
+    index < at ? "done" : index === at ? "current" : "todo";
+  const steps: FlowStepItem[] = [
+    {
+      state: stateOf(0),
+      title: t("microsoft.stepPortal"),
+      children:
+        stage === "kiro" ? (
+          pasteStep
+        ) : stage === "idle" ? (
+          <FlowNote>
+            {t("microsoft.pasteStep")} <Code>http://localhost:3128</Code>
+          </FlowNote>
+        ) : null,
+    },
+    {
+      state: stateOf(1),
+      title: t("microsoft.stepProvider"),
+      children: stage === "microsoft" ? pasteStep : null,
+    },
+    {
+      state: stateOf(2),
+      title: t("microsoft.stepProfile"),
+      children:
+        stage === "profile" ? profileStep : <FlowNote>{t("microsoft.stepProfileNote")}</FlowNote>,
+    },
+  ];
+
   return (
     // tabIndex -1: a step change focuses the form itself on touch screens (see stepFocus).
     <form
@@ -175,69 +260,7 @@ export function MicrosoftFlow(): JSX.Element {
       onSubmit={onSubmit}
       tabIndex={-1}
     >
-      {stage === "profile" ? (
-        <Field className="w-full" invalid={Boolean(fieldError)}>
-          <FieldLabel>{t("microsoft.profileLabel")}</FieldLabel>
-          <FieldDescription>{t("microsoft.selectProfileDesc")}</FieldDescription>
-          <RadioGroup
-            aria-label={t("microsoft.profileLabel")}
-            className="w-full gap-2"
-            disabled={busy}
-            onValueChange={(value) => setSelectedArn(String(value))}
-            ref={profilesRef}
-            value={selectedArn}
-          >
-            {/* Each card is a FieldItem, so its radio keeps the card's own id inside the Field. */}
-            {profiles.map((profile) => (
-              <FieldItem key={profile.arn}>
-                <ChoiceCard
-                  control={(id) => <Radio id={id} value={profile.arn} />}
-                  description={profile.region}
-                  title={profile.name || t("microsoft.unnamedProfile")}
-                >
-                  <span className="break-all font-mono text-meta text-muted-foreground">
-                    {profile.arn}
-                  </span>
-                </ChoiceCard>
-              </FieldItem>
-            ))}
-          </RadioGroup>
-          <FieldError match={Boolean(fieldError)}>{fieldError}</FieldError>
-        </Field>
-      ) : stage !== "idle" ? (
-        <>
-          <UrlBox
-            label={stage === "microsoft" ? t("microsoft.providerStep") : t("microsoft.portalStep")}
-            url={authorizeUrl}
-          />
-          {/* A step note, not the field hint: it stays in view while the field shows an error. */}
-          <FlowNote>
-            {t("microsoft.callbackInstructions")} <Code>http://localhost:3128</Code>
-          </FlowNote>
-          <FormField error={fieldError} label={t("callbackUrl")}>
-            <Input
-              autoCapitalize="off"
-              autoComplete="off"
-              disabled={busy}
-              inputMode="url"
-              onChange={(event) => setCallbackUrl(event.target.value)}
-              placeholder="http://localhost:3128/…"
-              ref={callbackRef}
-              spellCheck={false}
-              value={callbackUrl}
-            />
-          </FormField>
-        </>
-      ) : (
-        // Before the first request, say what follows: two browser sign-ins and two pastes.
-        <FlowGuide list title={t("microsoft.guideTitle")}>
-          <li>{t("microsoft.portalStep")}</li>
-          <li>{t("microsoft.providerStep")}</li>
-          <li>
-            {t("microsoft.pasteStep")} <Code>http://localhost:3128</Code>
-          </li>
-        </FlowGuide>
-      )}
+      <FlowSteps steps={steps} />
       <FlowFooter>
         <SubmitButton busy={busy} formId={formId} label={submitLabel} />
       </FlowFooter>

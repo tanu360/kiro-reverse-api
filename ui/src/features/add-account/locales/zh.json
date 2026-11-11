@@ -19,6 +19,10 @@
   "importSuccess_other": "已添加 {count} 个账号。",
   "importPartial_other": "已添加 {count} 个账号，{failed} 个失败。",
   "moreFailures_other": "另有 {count} 个失败。",
+  "continueWith": "使用 {name} 继续",
+  "stepAdded": "账号已添加",
+  "stepDone": "已完成",
+  "otherWays": "其他方式",
 
   "methods.builderid.title": "AWS Builder ID",
   "methods.builderid.description": "使用 AWS Builder ID 添加个人账号。",
@@ -27,7 +31,7 @@
   "methods.microsoft.title": "Microsoft SSO",
   "methods.microsoft.description": "使用 Microsoft Entra ID（Azure AD）登录添加账号。",
   "methods.sso.title": "SSO Token",
-  "methods.sso.description": "使用浏览器中的 x-amz-sso_authn Token 添加账号。",
+  "methods.sso.description": "使用浏览器中的 x‑amz‑sso_authn Token 添加账号。",
   "methods.local.title": "Kiro 本地缓存",
   "methods.local.description": "使用 Kiro IDE 本地缓存文件添加账号。",
   "methods.credentials.title": "凭证 JSON",
@@ -44,6 +48,9 @@
   "builderid.verifyUrl": "验证链接",
   "builderid.waiting": "正在等待授权…",
   "builderid.reconnecting": "连接中断，正在重试…",
+  "builderid.stepCode": "获取一次性代码",
+  "builderid.stepApprove": "在 AWS 页面上批准",
+  "builderid.openPage": "打开 AWS 页面",
 
   "iam.startUrl": "Start URL",
   "iam.startUrlPlaceholder": "https://d-1234567890.awsapps.com/start",
@@ -52,10 +59,9 @@
   "iam.completeLogin": "请在浏览器中完成登录，然后粘贴回调 URL。",
   "iam.summary": "正在通过 {url}（{region}）登录。",
   "iam.callbackUrlPlaceholder": "http://127.0.0.1:52341/?code=…",
+  "iam.stepOpen": "在 AWS 页面上登录",
+  "iam.stepPaste": "粘贴回调 URL",
 
-  "microsoft.guideTitle": "登录流程",
-  "microsoft.portalStep": "第 1 步：登录 Kiro 门户",
-  "microsoft.providerStep": "第 2 步：使用 Microsoft 登录",
   "microsoft.pasteStep": "每次登录后，粘贴浏览器最终停留的地址，该地址开头为",
   "microsoft.callbackInstructions": "打开链接并完成登录。浏览器随后会显示一个无法打开的页面，这是正常的。复制地址栏中的完整地址并粘贴到下方，该地址开头为",
   "microsoft.selectProfileDesc": "此账号有多个 Kiro Profile。请选择代理要使用的 Kiro Profile。",
@@ -63,6 +69,10 @@
   "microsoft.selectProfile": "使用此 Kiro Profile",
   "microsoft.profileRequired": "请先选择 Kiro Profile。",
   "microsoft.unnamedProfile": "未命名 Kiro Profile",
+  "microsoft.stepPortal": "登录 Kiro 门户",
+  "microsoft.stepProvider": "使用 Microsoft 登录",
+  "microsoft.stepProfile": "选择 Kiro Profile",
+  "microsoft.stepProfileNote": "仅在账号有多个 Profile 时需要。",
 
   "sso.howToGet": "如何获取 Token",
   "sso.step1": "打开并登录",
@@ -127,5 +137,16 @@
   "apikey.keysLabel": "Kiro API Key",
   "apikey.keysHint": "每行一个。如需为某个 API Key 指定区域，写法为",
   "apikey.regionHint": "用于未带区域后缀的 API Key：",
-  "apikey.keyMissing": "请至少输入一个 Kiro API Key。"
+  "apikey.keyMissing": "请至少输入一个 Kiro API Key。",
+
+  "kind.browser": "在浏览器中登录",
+  "kind.file": "粘贴或上传 JSON 文件",
+  "kind.token": "粘贴浏览器中的 Token",
+  "kind.key": "粘贴 Kiro CLI 密钥",
+
+  "stepper.label": "进度",
+  "stepper.choose": "选择方式",
+  "stepper.signIn": "登录",
+  "stepper.import": "导入",
+  "stepper.done": "完成"
 }

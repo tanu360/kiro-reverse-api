@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useState } from "react";
@@ -95,21 +95,28 @@ async function expectToast(text: string | RegExp): Promise<void> {
   expect((await screen.findAllByText(text)).length).toBeGreaterThan(0);
 }
 
+/** Waits until the checklist step with this title is the current one. */
+async function expectCurrentStep(title: string): Promise<void> {
+  await waitFor(() =>
+    expect(screen.getByText(title).closest("li")).toHaveAttribute("aria-current", "step"),
+  );
+}
+
 describe("AddAccountDialog", () => {
   it("lists the eight methods and opens one, then goes back", async () => {
     const { user } = renderWithProviders(<Harness />);
     const dialog = await screen.findByRole("dialog", { name: "Add account" });
-    for (const title of [
-      "AWS Builder ID",
-      "IAM Identity Center (Enterprise SSO)",
-      "Microsoft SSO",
-      "SSO token",
-      "Kiro local cache",
-      "Credentials JSON",
-      "Kiro web cookie",
-      "Kiro API key",
+    for (const name of [
+      "Continue with AWS Builder ID",
+      /IAM Identity Center \(Enterprise SSO\)/,
+      /Microsoft SSO/,
+      /SSO token/,
+      /Kiro local cache/,
+      /Credentials JSON/,
+      /Kiro web cookie/,
+      /Kiro API key/,
     ]) {
-      expect(dialog).toHaveTextContent(title);
+      expect(within(dialog).getByRole("button", { name })).toBeInTheDocument();
     }
     await user.click(screen.getByRole("button", { name: /Kiro API key/ }));
     expect(await screen.findByRole("dialog", { name: "Kiro API key" })).toBeInTheDocument();
@@ -222,12 +229,12 @@ describe("Microsoft SSO", () => {
     const onAdded = vi.fn();
     const { user } = renderWithProviders(<Harness initialMethod="microsoft" onAdded={onAdded} />);
 
-    expect(await screen.findByText("How sign-in works")).toBeInTheDocument();
+    expect(await screen.findByText(/After each sign-in, paste the address/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start sign-in" }));
     // The idle guide repeats the step labels, so wait for the step's own field.
     const callback = await screen.findByRole("textbox", { name: "Callback URL" });
-    expect(screen.getByText("Step 1: sign in to the Kiro portal")).toBeInTheDocument();
-    expect(screen.queryByText("How sign-in works")).not.toBeInTheDocument();
+    await expectCurrentStep("Sign in to the Kiro portal");
+    expect(screen.queryByText(/After each sign-in, paste the address/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     expect(await screen.findByText("Paste the callback URL first.")).toBeInTheDocument();
@@ -236,7 +243,7 @@ describe("Microsoft SSO", () => {
 
     await user.type(callback, "http://localhost:3128/signin/callback?login_option=external_idp");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
-    expect(await screen.findByText("Step 2: sign in with Microsoft")).toBeInTheDocument();
+    await expectCurrentStep("Sign in with Microsoft");
     const second = screen.getByRole("textbox", { name: "Callback URL" });
     expect(second).toHaveValue("");
 
@@ -267,7 +274,7 @@ describe("Microsoft SSO", () => {
     await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
     await user.type(await screen.findByRole("textbox", { name: "Callback URL" }), "http://x/leg1");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
-    await screen.findByText("Step 2: sign in with Microsoft");
+    await expectCurrentStep("Sign in with Microsoft");
     await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/?noprofile");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     await expectClosed();
@@ -563,7 +570,7 @@ describe("Focus after a failed submit or a step change", () => {
       const region = await screen.findByRole("textbox", { name: "Region" });
       await user.clear(region);
       await user.type(region, "eu-west-9{Enter}");
-      const code = await screen.findByText("ABCD-EFGH", { selector: "kbd" });
+      const code = await screen.findByText("ABCD-EFGH", { selector: "kbd > span" });
       // The code card (the copy button sits beside the code inside it) takes focus.
       await waitFor(() => expect(code.closest("[tabindex='-1']")).toHaveFocus());
 
@@ -588,7 +595,7 @@ describe("Focus after a failed submit or a step change", () => {
     await waitFor(() => expect(callback).toHaveFocus());
 
     await user.type(callback, "http://x/leg1{Enter}");
-    await screen.findByText("Step 2: sign in with Microsoft");
+    await expectCurrentStep("Sign in with Microsoft");
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "Callback URL" })).toHaveFocus(),
     );
@@ -604,7 +611,7 @@ describe("Focus after a failed submit or a step change", () => {
     await user.click(await screen.findByRole("button", { name: "Start sign-in" }));
     await user.type(await screen.findByRole("textbox", { name: "Callback URL" }), "http://x/leg1");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
-    await screen.findByText("Step 2: sign in with Microsoft");
+    await expectCurrentStep("Sign in with Microsoft");
     await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/?profiles=2");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     await screen.findAllByRole("radio");

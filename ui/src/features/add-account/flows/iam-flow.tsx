@@ -6,7 +6,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FlowNote, FormField, RegionField, SubmitButton, UrlBox } from "../fields";
+import { FlowNote, FlowSteps, FormField, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { stepFocus, useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
@@ -112,22 +112,39 @@ export function IamFlow(): JSX.Element {
               {t("iam.summary", { url: startUrl.trim(), region: region.trim() })}
             </TruncatedText>
           </FlowNote>
-          <UrlBox label={t("iam.loginUrl")} url={authorizeUrl} />
-          {/* A step note, not the field hint: it stays in view while the field shows an error. */}
-          <FlowNote>{t("iam.completeLogin")}</FlowNote>
-          <FormField error={errors.callback} label={t("callbackUrl")}>
-            <Input
-              autoCapitalize="off"
-              autoComplete="off"
-              disabled={pending}
-              inputMode="url"
-              onChange={(event) => setCallbackUrl(event.target.value)}
-              placeholder={t("iam.callbackUrlPlaceholder")}
-              ref={callbackRef}
-              spellCheck={false}
-              value={callbackUrl}
-            />
-          </FormField>
+          <FlowSteps
+            steps={[
+              {
+                state: "done",
+                title: t("iam.stepOpen"),
+                children: <UrlBox label={t("iam.loginUrl")} url={authorizeUrl} />,
+              },
+              {
+                state: "current",
+                title: t("iam.stepPaste"),
+                children: (
+                  <>
+                    {/* A step note, not the field hint: it stays in view while the field shows an error. */}
+                    <FlowNote>{t("iam.completeLogin")}</FlowNote>
+                    <FormField error={errors.callback} label={t("callbackUrl")}>
+                      <Input
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        disabled={pending}
+                        inputMode="url"
+                        onChange={(event) => setCallbackUrl(event.target.value)}
+                        placeholder={t("iam.callbackUrlPlaceholder")}
+                        ref={callbackRef}
+                        spellCheck={false}
+                        value={callbackUrl}
+                      />
+                    </FormField>
+                  </>
+                ),
+              },
+              { state: "todo", title: t("stepAdded") },
+            ]}
+          />
         </>
       ) : (
         <>

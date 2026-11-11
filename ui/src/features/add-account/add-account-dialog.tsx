@@ -16,7 +16,7 @@ import { LocalCacheFlow } from "./flows/local-cache-flow";
 import { MicrosoftFlow } from "./flows/microsoft-flow";
 import { SsoTokenFlow } from "./flows/sso-token-flow";
 import { firstStepControl, isCoarsePointer } from "./focus";
-import { MethodList } from "./method-list";
+import { MethodList, MethodStepper } from "./method-list";
 
 export type AddAccountMethod =
   | "builderid"
@@ -182,23 +182,27 @@ export function AddAccountDialog({
   const Flow = method ? FLOWS[method] : null;
   return (
     <ResponsiveDialog
-      // Hung from the top, so the title stays put while the steps change height.
+      // Hung from the top, so the title stays put while the steps change height. The header ends
+      // with the wizard's progress line.
       anchor="top"
       backLabel={t("common:actions.back")}
-      description={t(method ? `methods.${method}.description` : "description")}
+      description={method ? t(`methods.${method}.description`) : t("description")}
       dismissible={!busy}
       footer={
-        // The flows portal their buttons in here. The box itself does not lay out: the buttons
-        // are the footer's own items (one row of two on phones), and a lone Cancel spans it.
+        // The flows portal their buttons in here: Cancel and the step's action share one row of
+        // two equal halves at every width, and a lone button spans the row. The method list has
+        // none (its X closes it), so the bare footer is only the dialog's bottom padding.
         <div
-          className="contents max-sm:[&>:last-child:nth-child(odd)]:col-span-2"
+          className="col-span-2 grid flex-1 grid-cols-2 gap-2 [&>:last-child:nth-child(odd)]:col-span-2"
           ref={setFooter}
         />
       }
+      footerVariant="bare"
+      headerAddon={<MethodStepper method={method} />}
       onBack={method ? back : undefined}
       onOpenChange={handleOpenChange}
       open={open}
-      size="xl"
+      size="lg"
       title={method ? t(`methods.${method}.title`) : t("title")}
     >
       <div className="outline-none" ref={bodyRef} tabIndex={-1}>

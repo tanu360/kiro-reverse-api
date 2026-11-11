@@ -1,6 +1,7 @@
-import { ExternalLinkIcon } from "@hugeicons/core-free-icons";
+import { ArrowUpRight01Icon, ExternalLinkIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, type Ref, useEffect, useId, useRef } from "react";
+import { AwsLogo, GithubLogo, GoogleLogo, MicrosoftLogo } from "@/components/shared/brand-logos";
 import { CopyButton } from "@/components/shared/copy-button";
 import { ROW_DESCRIPTION } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,16 @@ import { cn } from "@/lib/utils";
  * single line (Open and Copy carry the full address), with Open as a secondary
  * button and a copy icon at its end. A long OAuth URL no longer fills the step.
  */
-export function UrlBox({ label, url }: { label: string; url: string }): JSX.Element {
+export function UrlBox({
+  label,
+  url,
+  showOpen = true,
+}: {
+  label: string;
+  url: string;
+  /** False when the step's main button already opens the link (Builder ID's footer). */
+  showOpen?: boolean;
+}): JSX.Element {
   const { t } = useT("add-account");
   return (
     <div className="flex w-full min-w-0 flex-col gap-2">
@@ -24,18 +34,91 @@ export function UrlBox({ label, url }: { label: string; url: string }): JSX.Elem
         <span className="min-w-0 flex-1 truncate font-mono text-meta text-muted-foreground">
           {url}
         </span>
-        <Button
-          render={<a href={url} rel="noopener noreferrer" target="_blank" />}
-          size="sm"
-          variant="secondary"
-        >
-          <HugeiconsIcon icon={ExternalLinkIcon} aria-hidden="true" />
-          {t("open")}
-        </Button>
+        {showOpen ? (
+          <ExternalLink className="ms-1" href={url}>
+            <HugeiconsIcon aria-hidden="true" icon={ExternalLinkIcon} />
+            {t("open")}
+          </ExternalLink>
+        ) : null}
         <CopyButton label={t("copyLink")} size="icon-sm" value={url} variant="quiet" />
       </div>
     </div>
   );
+}
+
+/**
+ * A link out of the dialog as plain text: no fill, no border and no underline at rest or on
+ * hover, where only the colour turns to the primary. Opens in a new tab.
+ */
+export function ExternalLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: ReactNode;
+  /** Layout only. */
+  className?: string;
+}): JSX.Element {
+  return (
+    <a
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-sm font-medium text-foreground text-sm outline-none transition-colors hover:text-primary focus-outline [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
+        className,
+      )}
+      href={href}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      {children}
+    </a>
+  );
+}
+
+/**
+ * A page to visit inside a guide step: the site's logo, the address, and a small arrow that says
+ * it opens elsewhere, as one plain link on the step's line.
+ */
+export function GuideLink({
+  href,
+  logo,
+  children,
+}: {
+  href: string;
+  /** The site's brand mark (the Kiro or AWS logo), before the address. */
+  logo: ReactNode;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    // gap-1: the 4 px between the logo and the address matches the word space before the
+    // logo, so the mark sits evenly between the step's text and the link's.
+    <ExternalLink className="gap-1 align-bottom" href={href}>
+      {logo}
+      {children}
+      <HugeiconsIcon
+        aria-hidden="true"
+        className="size-3 text-muted-foreground"
+        icon={ArrowUpRight01Icon}
+      />
+    </ExternalLink>
+  );
+}
+
+/** A sign-in provider's own logo, before its name in a picker. */
+export function ProviderLogo({ provider }: { provider: string }): JSX.Element | null {
+  switch (provider) {
+    case "BuilderId":
+    case "Enterprise":
+      return <AwsLogo className="size-4" />;
+    case "Google":
+      return <GoogleLogo className="size-4" />;
+    case "Github":
+      return <GithubLogo className="size-4" />;
+    case "Microsoft":
+      return <MicrosoftLogo className="size-4" />;
+    default:
+      return null;
+  }
 }
 
 /**
@@ -75,9 +158,14 @@ export function FlowNote({ children }: { children: ReactNode }): JSX.Element {
   return <p className={ROW_DESCRIPTION}>{children}</p>;
 }
 
+/** Numbered guide steps: each item starts with its number in a small ring (CSS counters). */
+const GUIDE_STEPS =
+  "[counter-reset:flow-guide] *:relative *:ps-7 *:[counter-increment:flow-guide] *:before:absolute *:before:start-0 *:before:top-0.5 *:before:flex *:before:size-4.5 *:before:items-center *:before:justify-center *:before:rounded-full *:before:border *:before:border-border *:before:bg-card *:before:font-semibold *:before:text-2xs *:before:text-foreground *:before:content-[counter(flow-guide)]";
+
 /**
- * Where to find the value a flow asks for: a heading in the form-label style over numbered steps
- * (or, with `list`, bullet points) in muted body text. Items carry host and file names in Code.
+ * Where to find the value a flow asks for: a soft inset box with a heading in the form-label
+ * style over numbered steps (or, with `list`, bullet points) in muted body text. Items carry host
+ * and file names in Code.
  */
 export function FlowGuide({
   title,
@@ -93,19 +181,90 @@ export function FlowGuide({
   const id = useId();
   const List = list ? "ul" : "ol";
   return (
-    <section aria-labelledby={id} className="flex min-w-0 flex-col gap-2">
+    <section
+      aria-labelledby={id}
+      className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-border-subtle bg-surface-inset px-4 py-3.5"
+    >
       <Label id={id} render={<p />}>
         {title}
       </Label>
       <List
         className={cn(
-          "flex flex-col gap-1.5 ps-5 text-muted-foreground text-sm",
-          list ? "list-disc" : "list-decimal",
+          "flex flex-col gap-2 text-muted-foreground text-sm",
+          list ? "list-disc ps-5" : GUIDE_STEPS,
         )}
       >
         {children}
       </List>
     </section>
+  );
+}
+
+export type FlowStepState = "done" | "current" | "todo";
+
+export interface FlowStepItem {
+  state: FlowStepState;
+  /** Unique within the flow; it keys the step. */
+  title: string;
+  /** What the step shows: a code, a link, a field. A step still to come usually has none. */
+  children?: ReactNode;
+}
+
+const STEP_MARK: Record<FlowStepState, string> = {
+  done: "bg-info-surface text-info-foreground",
+  current: "bg-primary text-primary-foreground",
+  todo: "border border-border text-muted-foreground",
+};
+
+/**
+ * A sign-in as a short checklist: each step a numbered ring (a tick once done, filled while
+ * current) joined by a hairline, its title, then whatever the step needs. The current step is
+ * `aria-current="step"`; a done step says so to screen readers.
+ */
+export function FlowSteps({ steps }: { steps: FlowStepItem[] }): JSX.Element {
+  const { t } = useT("add-account");
+  return (
+    <ol className="flex flex-col">
+      {steps.map((step, index) => {
+        const last = index === steps.length - 1;
+        return (
+          <li
+            aria-current={step.state === "current" ? "step" : undefined}
+            className="flex gap-3.5"
+            data-state={step.state}
+            key={step.title}
+          >
+            <span aria-hidden="true" className="flex flex-col items-center">
+              <span
+                className={cn(
+                  "flex size-6 shrink-0 items-center justify-center rounded-full font-semibold text-meta tabular-nums",
+                  STEP_MARK[step.state],
+                )}
+              >
+                {step.state === "done" ? (
+                  <HugeiconsIcon className="size-3.5" icon={Tick02Icon} strokeWidth={2} />
+                ) : (
+                  index + 1
+                )}
+              </span>
+              {last ? null : <span className="mt-1.5 w-px flex-1 bg-border" />}
+            </span>
+            <div className={cn("flex min-w-0 flex-1 flex-col gap-2 pt-0.5", !last && "pb-5")}>
+              <p
+                className={cn(
+                  "font-medium text-sm",
+                  step.state === "todo" && "text-muted-foreground",
+                )}
+              >
+                {step.title}
+                {step.state === "done" ? <span className="sr-only"> ({t("stepDone")})</span> : null}
+              </p>
+              {step.children}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

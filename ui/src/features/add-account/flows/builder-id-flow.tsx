@@ -1,5 +1,8 @@
+import { ExternalLinkIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { type FormEvent, type JSX, useEffect, useRef, useState } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { pollBuilderId, startBuilderId } from "@/lib/api/auth-flows";
 import { isApiError } from "@/lib/api/errors";
@@ -7,7 +10,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FlowNote, RegionField, SubmitButton, UrlBox } from "../fields";
+import { FlowNote, FlowSteps, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
@@ -112,47 +115,84 @@ export function BuilderIdFlow(): JSX.Element {
   if (code) {
     return (
       <div className="flex flex-col gap-4">
-        {/* The code is the new step's main content, so it takes focus when the step opens. */}
-        {/* No card around the code: it stands on the dialog, large and centred. */}
-        <div
-          className="flex flex-col items-center gap-1 rounded-xl py-2 text-center outline-none focus-outline"
-          ref={codeRef}
-          tabIndex={-1}
-        >
-          <span className="sr-only">{t("builderid.userCode")}</span>
-          {/* The code stays centred; the copy button sits in the right-hand column beside it. */}
-          <span className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-1">
-            <span aria-hidden="true" />
-            <kbd className="select-all font-mono font-semibold text-display tracking-widest tabular-nums">
-              {code.userCode}
-            </kbd>
-            <CopyButton
-              className="justify-self-start"
-              label={t("builderid.copyCode")}
-              size="icon-sm"
-              value={code.userCode}
-              variant="quiet"
-            />
-          </span>
-          <FlowNote>{t("builderid.verifyCode")}</FlowNote>
-        </div>
-        <UrlBox label={t("builderid.verifyUrl")} url={code.verificationUri} />
-        <p
-          aria-live="polite"
-          className="flex items-center justify-center gap-2 text-muted-foreground text-sm"
-          role="status"
-        >
-          <Spinner aria-hidden="true" className="size-4" />
-          {reconnecting ? t("builderid.reconnecting") : t("builderid.waiting")}
-        </p>
-        <FlowFooter />
+        <FlowSteps
+          steps={[
+            {
+              state: "done",
+              title: t("builderid.stepCode"),
+              children: (
+                // The code is the new step's main content, so it takes focus when the step opens.
+                <div
+                  className="flex max-w-full items-center gap-2 self-start rounded-lg outline-none focus-outline"
+                  ref={codeRef}
+                  tabIndex={-1}
+                >
+                  <span className="sr-only">{t("builderid.userCode")}</span>
+                  <UserCode code={code.userCode} />
+                  <CopyButton
+                    label={t("builderid.copyCode")}
+                    size="icon-sm"
+                    value={code.userCode}
+                    variant="quiet"
+                  />
+                </div>
+              ),
+            },
+            {
+              state: "current",
+              title: t("builderid.stepApprove"),
+              children: (
+                <>
+                  <FlowNote>{t("builderid.verifyCode")}</FlowNote>
+                  <UrlBox
+                    label={t("builderid.verifyUrl")}
+                    showOpen={false}
+                    url={code.verificationUri}
+                  />
+                </>
+              ),
+            },
+            {
+              state: "todo",
+              title: t("stepAdded"),
+              children: (
+                <p
+                  aria-live="polite"
+                  className="flex items-center gap-2 text-muted-foreground text-sm"
+                  role="status"
+                >
+                  <Spinner aria-hidden="true" className="size-4" />
+                  {reconnecting ? t("builderid.reconnecting") : t("builderid.waiting")}
+                </p>
+              ),
+            },
+          ]}
+        />
+        <FlowFooter>
+          <Button
+            render={<a href={code.verificationUri} rel="noopener noreferrer" target="_blank" />}
+          >
+            {t("builderid.openPage")}
+            <HugeiconsIcon aria-hidden="true" icon={ExternalLinkIcon} />
+          </Button>
+        </FlowFooter>
       </div>
     );
   }
 
   return (
-    <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onStart}>
-      <FlowNote>{t("builderid.startNote")}</FlowNote>
+    <form className="flex flex-col gap-5" id={formId} noValidate onSubmit={onStart}>
+      <FlowSteps
+        steps={[
+          {
+            state: "current",
+            title: t("builderid.stepCode"),
+            children: <FlowNote>{t("builderid.startNote")}</FlowNote>,
+          },
+          { state: "todo", title: t("builderid.stepApprove") },
+          { state: "todo", title: t("stepAdded") },
+        ]}
+      />
       <RegionField
         disabled={starting}
         error={regionError}
@@ -164,5 +204,34 @@ export function BuilderIdFlow(): JSX.Element {
         <SubmitButton busy={starting} formId={formId} label={t("startSignIn")} />
       </FlowFooter>
     </form>
+  );
+}
+
+/**
+ * The device code as one tile per character (the dash between the halves stays plain), mono and
+ * large, so it reads at a glance; on a narrow phone the tiles shrink to fit the line. Screen
+ * readers get the code once, whole.
+ */
+function UserCode({ code }: { code: string }): JSX.Element {
+  const chars = Array.from(code, (char, position) => ({ char, id: `${position}${char}` }));
+  return (
+    <kbd className="flex min-w-0 items-center gap-1 font-mono font-semibold text-xl sm:gap-1.5">
+      <span className="sr-only">{code}</span>
+      {chars.map(({ char, id }) =>
+        char === "-" ? (
+          <span aria-hidden="true" className="px-0.5 text-muted-foreground" key={id}>
+            –
+          </span>
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex h-10 w-8 min-w-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-2"
+            key={id}
+          >
+            {char}
+          </span>
+        ),
+      )}
+    </kbd>
   );
 }

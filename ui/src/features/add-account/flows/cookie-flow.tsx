@@ -1,6 +1,6 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
+import { KiroLogo } from "@/components/shared/brand-logos";
 import { Code } from "@/components/shared/code";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectItem,
@@ -14,7 +14,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FlowGuide, FormField, SubmitButton } from "../fields";
+import { FlowGuide, FormField, GuideLink, ProviderLogo, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 
@@ -81,12 +81,9 @@ export function CookieFlow(): JSX.Element {
       <FlowGuide title={t("cookie.howToGet")}>
         <li>
           {t("cookie.step1")}{" "}
-          <Button
-            render={<a href={link} rel="noopener noreferrer" target="_blank" />}
-            variant="link-inline"
-          >
-            {link}
-          </Button>
+          <GuideLink href={link} logo={<KiroLogo className="size-4" />}>
+            {link.replace(/^https:\/\//, "")}
+          </GuideLink>
         </li>
         <li>
           {t("cookie.step2")} <Code>{host}</Code>
@@ -105,11 +102,21 @@ export function CookieFlow(): JSX.Element {
           value={provider}
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue>
+              {(value: string) => (
+                <span className="flex min-w-0 items-center gap-2">
+                  <ProviderLogo provider={value} />
+                  <span className="truncate">
+                    {items.find((item) => item.value === value)?.label}
+                  </span>
+                </span>
+              )}
+            </SelectValue>
           </SelectTrigger>
           <SelectPopup>
             {items.map((item) => (
               <SelectItem key={item.value} value={item.value}>
+                <ProviderLogo provider={item.value} />
                 {item.label}
               </SelectItem>
             ))}

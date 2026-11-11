@@ -4,7 +4,6 @@ import { type ChangeEvent, type FormEvent, type JSX, type Ref, useRef, useState 
 import { Code } from "@/components/shared/code";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import {
   Select,
@@ -18,7 +17,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { fillNodes, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { FlowGuide, FormField, SubmitButton } from "../fields";
+import { FlowGuide, FormField, ProviderLogo, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import {
@@ -160,22 +159,20 @@ export function LocalCacheFlow(): JSX.Element {
 
   return (
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
-      <Card size="sm">
-        <FlowGuide list title={t("local.fileLocation")}>
-          <li>
-            {fillNodes(t("common:text.labelValue"), {
-              label: t("local.windows"),
-              value: <Code>%USERPROFILE%\.aws\sso\cache\</Code>,
-            })}
-          </li>
-          <li>
-            {fillNodes(t("common:text.labelValue"), {
-              label: t("local.macosLinux"),
-              value: <Code>~/.aws/sso/cache/</Code>,
-            })}
-          </li>
-        </FlowGuide>
-      </Card>
+      <FlowGuide list title={t("local.fileLocation")}>
+        <li>
+          {fillNodes(t("common:text.labelValue"), {
+            label: t("local.windows"),
+            value: <Code>%USERPROFILE%\.aws\sso\cache\</Code>,
+          })}
+        </li>
+        <li>
+          {fillNodes(t("common:text.labelValue"), {
+            label: t("local.macosLinux"),
+            value: <Code>~/.aws/sso/cache/</Code>,
+          })}
+        </li>
+      </FlowGuide>
       <FormField label={t("local.provider")}>
         <Select
           disabled={pending}
@@ -188,11 +185,21 @@ export function LocalCacheFlow(): JSX.Element {
           value={provider}
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue>
+              {(value: string) => (
+                <span className="flex min-w-0 items-center gap-2">
+                  <ProviderLogo provider={value} />
+                  <span className="truncate">
+                    {items.find((item) => item.value === value)?.label}
+                  </span>
+                </span>
+              )}
+            </SelectValue>
           </SelectTrigger>
           <SelectPopup>
             {items.map((item) => (
               <SelectItem key={item.value} value={item.value}>
+                <ProviderLogo provider={item.value} />
                 {item.label}
               </SelectItem>
             ))}

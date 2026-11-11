@@ -1,11 +1,12 @@
 import { type FormEvent, type JSX, useRef, useState } from "react";
+import { AwsLogo } from "@/components/shared/brand-logos";
 import { Code } from "@/components/shared/code";
 import { Textarea } from "@/components/ui/textarea";
 import { importSsoToken } from "@/lib/api/auth-flows";
 import { errorMessage, serverMessageText } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { FlowGuide, FormField, RegionField, SubmitButton } from "../fields";
+import { FlowGuide, FormField, GuideLink, RegionField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
@@ -61,7 +62,10 @@ export function SsoTokenFlow(): JSX.Element {
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
       <FlowGuide title={t("sso.howToGet")}>
         <li>
-          {t("sso.step1")} <Code>view.awsapps.com/start</Code>
+          {t("sso.step1")}{" "}
+          <GuideLink href="https://view.awsapps.com/start" logo={<AwsLogo className="size-4" />}>
+            view.awsapps.com/start
+          </GuideLink>
         </li>
         <li>{t("sso.step2")}</li>
         <li>

@@ -19,6 +19,8 @@ const iconChipVariants = cva(
       size: {
         sm: "size-7 [&_svg]:size-4",
         md: "size-9 [&_svg]:size-4",
+        // A dialog's heading mark (the add-account steps): 44 px, a 24 px mark.
+        lg: "size-11 rounded-xl [&_svg]:size-6",
       },
       tone: {
         default: "",
@@ -31,11 +33,14 @@ const iconChipVariants = cva(
 type IconChipProps = Omit<React.ComponentProps<"span">, "children"> &
   VariantProps<typeof iconChipVariants> & {
     /** The icon to draw. Decorative: the chip is hidden from assistive tech. */
-    icon: IconSvgElement;
+    icon?: IconSvgElement;
+    /** A mark that is not a Hugeicons icon (a brand logo), drawn instead of `icon`. */
+    children?: React.ReactNode;
   };
 
 export function IconChip({
   icon,
+  children,
   size,
   tone,
   className,
@@ -49,7 +54,7 @@ export function IconChip({
       data-tone={tone ?? "default"}
       {...props}
     >
-      <HugeiconsIcon icon={icon} />
+      {icon ? <HugeiconsIcon icon={icon} /> : children}
     </span>
   );
 }
