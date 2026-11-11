@@ -47,7 +47,7 @@ interface ChangelogLine {
 }
 
 /** One list item per non-empty changelog line: its emoji marker, a "Fixed:" tag, the text. */
-function parseChangelog(changelog: string): ChangelogLine[] {
+export function parseChangelog(changelog: string): ChangelogLine[] {
   const lines = changelog
     .split(/\r?\n/)
     .map((line) => line.trim().replace(LEADING_BULLET, ""))

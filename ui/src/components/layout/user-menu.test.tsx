@@ -124,7 +124,12 @@ describe("UserMenu with a newer release known", () => {
     });
     await user.click(screen.getByRole("button", { name: "Admin menu" }));
     const items = await screen.findAllByRole("menuitem");
-    expect(items.map((item) => item.textContent)).toEqual(["GitHub", "Sign out"]);
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Help & docs",
+      "Report an issue",
+      "GitHub",
+      "Sign out",
+    ]);
   });
 });
 
@@ -167,5 +172,17 @@ describe("UserMenu links", () => {
     const github = await screen.findByRole("menuitem", { name: "GitHub" });
     expect(github).toHaveAttribute("href", "https://github.com/tanu360/kiro-reverse-api");
     expect(github).toHaveAttribute("target", "_blank");
+  });
+
+  it("opens the README and the issue tracker on GitHub in a new tab", async () => {
+    fetchRemote.mockResolvedValue({ version: "2.1.0" });
+    const { user } = renderMenu();
+    await user.click(screen.getByRole("button", { name: "Admin menu" }));
+    const docs = await screen.findByRole("menuitem", { name: "Help & docs" });
+    const issue = screen.getByRole("menuitem", { name: "Report an issue" });
+    expect(docs).toHaveAttribute("href", "https://github.com/tanu360/kiro-reverse-api#readme");
+    expect(issue).toHaveAttribute("href", "https://github.com/tanu360/kiro-reverse-api/issues");
+    expect(docs).toHaveAttribute("target", "_blank");
+    expect(issue).toHaveAttribute("target", "_blank");
   });
 });

@@ -1,4 +1,11 @@
-import { EllipsisVerticalIcon, LogOutIcon, RefreshCwIcon } from "@hugeicons/core-free-icons";
+import {
+  BookOpen01Icon,
+  BubbleChatQuestionIcon,
+  EllipsisVerticalIcon,
+  LogOutIcon,
+  RefreshCwIcon,
+} from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type JSX, useCallback, useState } from "react";
@@ -23,6 +30,17 @@ import { useUpdateCheck } from "./update-check";
 import { stripV } from "./update-dialog";
 
 export const GITHUB_URL = "https://github.com/tanu360/kiro-reverse-api";
+
+/** The Help items: the repository's README and its issue tracker, each in a new tab. */
+const HELP_LINKS: { id: string; label: string; href: string; icon: IconSvgElement }[] = [
+  { id: "docs", label: "shell.help.docs", href: `${GITHUB_URL}#readme`, icon: BookOpen01Icon },
+  {
+    id: "issue",
+    label: "shell.help.issue",
+    href: `${GITHUB_URL}/issues`,
+    icon: BubbleChatQuestionIcon,
+  },
+];
 
 /** DELETE /session (errors ignored), then the sign-in page. No confirm (old UI parity). */
 export function useSignOut(): () => Promise<void> {
@@ -70,6 +88,12 @@ function UserMenuItems({ onCheckSettled }: { onCheckSettled: () => void }): JSX.
             {t("shell.update.check")}
           </MenuItem>
         )}
+        {HELP_LINKS.map((link) => (
+          <MenuItem key={link.id} render={<a href={link.href} rel="noopener" target="_blank" />}>
+            <AnimatedIcon icon={link.icon} aria-hidden="true" />
+            {t(link.label)}
+          </MenuItem>
+        ))}
         <MenuItem render={<a href={GITHUB_URL} rel="noopener" target="_blank" />}>
           <GithubLogo className="size-4" />
           {t("shell.github")}
@@ -86,8 +110,8 @@ function UserMenuItems({ onCheckSettled }: { onCheckSettled: () => void }): JSX.
 
 /**
  * The "Admin" user row in the sidebar footer, the version number under the name: Check for
- * updates (until a newer release is known), GitHub and Sign out. The header has no copy of it;
- * the sidebar row is the one way in.
+ * updates (until a newer release is known), Help & docs, Report an issue, GitHub and Sign out.
+ * The header has no copy of it; the sidebar row is the one way in.
  */
 export function UserMenu(): JSX.Element {
   return <SidebarUserMenu />;

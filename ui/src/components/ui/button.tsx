@@ -22,7 +22,8 @@ import { cn } from "@/lib/utils";
  * purple button wears the sign-in finish (grain and rim).
  * Kiro adds the sticker variants, `quiet` and `quiet-destructive` (icon buttons that change
  * only their colour on hover), `quiet-warning` (an amber icon with an amber hover fill),
- * `link-inline`, and `on-primary` / `on-primary-danger` for the purple batch toolbar.
+ * `link-inline`, `link-action`, and `on-primary` / `on-primary-danger` for the purple batch
+ * toolbar.
  */
 /**
  * The sign-in button finish, on the purple main action only: the faint film grain (index.css
@@ -101,6 +102,11 @@ export const buttonVariants = cva(
         // solid on hover. The Button drops the size classes for it.
         "link-inline":
           "h-auto whitespace-normal rounded-sm border-0 p-0 text-[length:inherit] text-foreground underline decoration-dotted underline-offset-3 sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 hover:decoration-solid data-pressed:decoration-solid",
+        // A standalone text action with a trailing arrow (the sidebar update card's "See what's
+        // new"): the text's own size, no box and no underline; the icon nudges 2 px toward the
+        // end on hover. The Button drops the size classes for it, as for `link-inline`.
+        "link-action":
+          "h-auto gap-1 rounded-sm border-0 p-0 text-[length:inherit] text-foreground sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 [&_svg]:mx-0 [&_svg]:transition-transform [&_svg]:duration-150 [&_svg]:ease-out hover:[&_svg]:translate-x-0.5 data-pressed:[&_svg]:translate-x-0.5 motion-reduce:[&_svg]:transition-none",
         // A field-like trigger (the Accounts filter selects in their label group): a faint
         // foreground tint with a hairline border, a step past a field's, and a step deeper on
         // hover (index.css --neutral-button-*). Supporting actions use `secondary`.
@@ -181,9 +187,13 @@ export function Button({
     ) : (
       children
     ),
-    // An inline link takes the sentence's size, so it drops the size scale.
+    // An inline link or text action takes the surrounding text's size, so it drops the scale.
     className: cn(
-      buttonVariants({ className, size: variant === "link-inline" ? null : size, variant }),
+      buttonVariants({
+        className,
+        size: variant === "link-inline" || variant === "link-action" ? null : size,
+        variant,
+      }),
     ),
     "aria-busy": loading || undefined,
     // Loading wins over the caller's value: merged later, an explicit aria-disabled={undefined}

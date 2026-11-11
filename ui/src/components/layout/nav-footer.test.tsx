@@ -51,21 +51,31 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("NavFooter update bell", () => {
-  it("shows no row while the running version is the latest", async () => {
+describe("NavFooter update card", () => {
+  it("shows no card or bell while the running version is the latest", async () => {
     fetchRemote.mockResolvedValue({ version: "2.1.0" });
     renderFooter();
     await passSilentCheck();
-    expect(screen.queryByRole("button", { name: /Update available|Check for updates/ })).toBeNull();
+    expect(screen.queryByText("New version")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Update available/ })).toBeNull();
     expect(screen.getByRole("button", { name: "Admin menu" })).toBeInTheDocument();
   });
 
-  it("names a newer release and opens the update dialog", async () => {
-    fetchRemote.mockResolvedValue({ version: "v2.2.0", changelog: "Fixes", download: "https://x" });
+  it("names the release with its first changelog line and opens the update dialog", async () => {
+    fetchRemote.mockResolvedValue({
+      version: "v2.2.0",
+      changelog: "🎨 New: a brand-new admin panel\n🛠️ Fixed: restores",
+      download: "https://x",
+    });
     const { user } = renderFooter();
     await passSilentCheck();
 
-    await user.click(await screen.findByRole("button", { name: "Update available: 2.2.0" }));
+    expect(await screen.findByText("Kiro Proxy 2.2.0")).toBeInTheDocument();
+    expect(screen.getByText("a brand-new admin panel")).toBeInTheDocument();
+    // The icon rail's bell, hidden by CSS while expanded, opens the same dialog.
+    expect(screen.getByRole("button", { name: "Update available: 2.2.0" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "See what's new" }));
     expect(await screen.findByText("Version update")).toBeInTheDocument();
     // The toast would cover the dialog footer (a bottom drawer on phones).
     expect(toast.dismiss).toHaveBeenCalledWith("update-available");
