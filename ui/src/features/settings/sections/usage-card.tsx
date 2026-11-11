@@ -4,10 +4,9 @@ import { SwitchField } from "@/components/shared/settings-rows";
 import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { useDraft } from "../lib/dirty";
-import { useGeneralSettingsSave } from "./general-settings";
+import { useInstantSetting } from "./general-settings";
 import { SECTION_ID } from "./sections";
-import { SaveFooter, SectionQuery, SettingsSection } from "./settings-section";
+import { SectionQuery, SettingsSection } from "./settings-section";
 
 export function UsageCard(): JSX.Element {
   const { t } = useT("settings");
@@ -22,27 +21,14 @@ export function UsageCard(): JSX.Element {
 function UsageForm({ settings }: { settings: Settings }): JSX.Element {
   const { t } = useT("settings");
   // Missing means off.
-  const draft = useDraft({ allowOverUsage: settings.allowOverUsage === true });
-  const { save, saving } = useGeneralSettingsSave(draft);
+  const allowOverUsage = useInstantSetting("allowOverUsage", settings.allowOverUsage === true);
 
   return (
-    <SettingsSection
-      footer={
-        <SaveFooter
-          dirty={draft.dirty}
-          onReload={draft.reload}
-          saving={saving}
-          serverChanged={draft.serverChanged}
-        />
-      }
-      id={SECTION_ID.usage}
-      onSubmit={() => save(draft.value)}
-      title={t("usageSettings")}
-    >
+    <SettingsSection id={SECTION_ID.usage} title={t("usageSettings")}>
       <SwitchField
-        checked={draft.value.allowOverUsage}
+        checked={allowOverUsage.checked}
         description={t("allowOverUsageHint")}
-        onCheckedChange={(allowOverUsage) => draft.set({ allowOverUsage })}
+        onCheckedChange={allowOverUsage.onCheckedChange}
         title={t("allowOverUsage")}
       />
     </SettingsSection>

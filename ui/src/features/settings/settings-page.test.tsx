@@ -68,20 +68,57 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
   });
 
-  it("sends only the Usage field on its Save", async () => {
+  it("saves the Usage switch as it is flipped, with no Save of its own", async () => {
     const { user } = await renderPage();
     const usage = section(SECTION_ID.usage);
-    const save = within(usage).getByRole("button", { name: "Save" });
-    expect(save).toHaveAttribute("aria-disabled", "true");
+    expect(within(usage).queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
 
-    await user.click(within(usage).getByRole("switch", { name: "Allow overage" }));
-    await user.click(save);
+    const toggle = within(usage).getByRole("switch", { name: "Allow overage" });
+    await user.click(toggle);
 
     expect(await screen.findByText("Settings saved")).toBeInTheDocument();
     expect(await writes()).toEqual([
       { method: "POST", path: "/settings", body: { allowOverUsage: true } },
     ]);
     expect(mockDb.settings.allowOverUsage).toBe(true);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(toggle).toHaveFocus();
+  });
+
+  it("puts a switch back when its save fails", async () => {
+    mockServer.use(
+      http.post(apiUrl("/settings"), () =>
+        HttpResponse.json({ error: "settings store unavailable" }, { status: 500 }),
+      ),
+    );
+    const { user } = await renderPage();
+    const toggle = within(section(SECTION_ID.routing)).getByRole("switch", {
+      name: "Keep conversations on one account",
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    await user.click(toggle);
+
+    expect(await screen.findAllByText(/Could not save settings/)).not.toHaveLength(0);
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+  });
+
+  it("sends only the Auto-continue fields on its Save", async () => {
+    const { user } = await renderPage();
+    const card = section(SECTION_ID.autoContinue);
+    const save = within(card).getByRole("button", { name: "Save" });
+    expect(save).toHaveAttribute("aria-disabled", "true");
+
+    await user.click(
+      within(card).getByRole("switch", { name: "Continue answers cut off by the output limit" }),
+    );
+    await user.click(save);
+
+    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+    expect(await writes()).toEqual([
+      { method: "POST", path: "/settings", body: { autoContinue: true, autoContinueMax: 3 } },
+    ]);
+    expect(mockDb.settings.autoContinue).toBe(true);
   });
 
   it("shows a field error for 11 continuations and sends nothing", async () => {

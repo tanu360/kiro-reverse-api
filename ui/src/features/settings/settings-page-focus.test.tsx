@@ -45,10 +45,12 @@ function nav(): HTMLElement {
 describe("settings focus", () => {
   it("keeps focus on Save after a save, with Save blocked while clean", async () => {
     const { user } = await renderPage();
-    const usage = section(SECTION_ID.usage);
-    const save = within(usage).getByRole("button", { name: "Save" });
+    const card = section(SECTION_ID.autoContinue);
+    const save = within(card).getByRole("button", { name: "Save" });
 
-    await user.click(within(usage).getByRole("switch", { name: "Allow overage" }));
+    await user.click(
+      within(card).getByRole("switch", { name: "Continue answers cut off by the output limit" }),
+    );
     expect(save).not.toHaveAttribute("aria-disabled");
     await user.click(save);
 
@@ -208,9 +210,11 @@ describe("settings focus", () => {
     it("marks a card with unsaved edits", async () => {
       const { user } = await renderPage();
       expect(within(nav()).queryByText("(unsaved changes)")).not.toBeInTheDocument();
-      await user.click(screen.getByRole("switch", { name: "Allow overage" }));
-      const usage = within(nav()).getByRole("link", { name: /Usage/ });
-      expect(within(usage).getByText("(unsaved changes)")).toBeInTheDocument();
+      await user.click(
+        screen.getByRole("switch", { name: "Continue answers cut off by the output limit" }),
+      );
+      const link = within(nav()).getByRole("link", { name: /Auto-continue/ });
+      expect(within(link).getByText("(unsaved changes)")).toBeInTheDocument();
     });
   });
 
@@ -253,7 +257,9 @@ describe("settings focus", () => {
 describe("leaving with unsaved edits", () => {
   it("asks before leaving and stays when you keep editing", async () => {
     const { user, router } = await renderApp("/settings");
-    await user.click(await screen.findByRole("switch", { name: "Allow overage" }));
+    await user.click(
+      await screen.findByRole("switch", { name: "Continue answers cut off by the output limit" }),
+    );
 
     const [apiLink] = screen.getAllByRole("link", { name: "API" });
     await user.click(apiLink);
@@ -262,10 +268,9 @@ describe("leaving with unsaved edits", () => {
 
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(router.state.location.pathname).toBe("/settings");
-    expect(screen.getByRole("switch", { name: "Allow overage" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    expect(
+      screen.getByRole("switch", { name: "Continue answers cut off by the output limit" }),
+    ).toHaveAttribute("aria-checked", "true");
 
     await user.click(apiLink);
     const again = await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
