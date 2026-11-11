@@ -256,7 +256,7 @@ func NewHandler() *Handler {
 }
 
 func (h *Handler) backgroundRefresh() {
-	ticker := time.NewTicker(30 * time.Minute)
+	ticker := time.NewTicker(backgroundRefreshEvery)
 	defer ticker.Stop()
 
 	time.Sleep(10 * time.Second)
@@ -288,8 +288,10 @@ func (h *Handler) refreshAllAccounts() {
 			return
 		}
 
-		if account.ExpiresAt > 0 && time.Now().Unix() > account.ExpiresAt-tokenRefreshSkewSeconds {
-			if err := refreshStoredAccount(context.Background(), account, false); err != nil {
+		if tokenExpiresBeforeNextSweep(account, time.Now().Unix()) {
+			//! force: without it the refresh is skipped while the token is outside the 2-minute skew.
+			//! A token another caller already rotated is still left alone.
+			if err := refreshStoredAccount(context.Background(), account, true); err != nil {
 				logger.Warnf("[BackgroundRefresh] Token refresh failed for %s: %v", account.Email, err)
 				return
 			}

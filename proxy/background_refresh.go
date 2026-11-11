@@ -1,9 +1,25 @@
 package proxy
 
 import (
-	"kiro-proxy/config"
 	"sync"
+	"time"
+
+	"kiro-proxy/config"
 )
+
+// backgroundRefreshEvery is how often the housekeeping sweep runs.
+const backgroundRefreshEvery = 30 * time.Minute
+
+// tokenExpiresBeforeNextSweep reports whether the account's access token runs
+// out (within the usual skew) before the sweep after this one.
+func tokenExpiresBeforeNextSweep(account *config.Account, now int64) bool {
+	//! Refreshing only tokens already inside the skew left a token with minutes to spare expired
+	//! until the next sweep, so the admin saw "Token expired" on idle accounts for up to half an hour.
+	if account.ExpiresAt == 0 {
+		return false
+	}
+	return now > account.ExpiresAt-tokenRefreshSkewSeconds-int64(backgroundRefreshEvery.Seconds())
+}
 
 // backgroundRefreshWorkers bounds how many accounts one housekeeping sweep
 // talks to upstream at once. A serial sweep over hundreds of accounts outlasts

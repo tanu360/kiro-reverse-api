@@ -109,3 +109,26 @@ func TestSweepGroupJoinsConcurrentCallers(t *testing.T) {
 		t.Fatalf("sweep after the first finished ran %d times total, want 2", runs)
 	}
 }
+
+func TestSweepRefreshesTokensThatExpireBeforeTheNextSweep(t *testing.T) {
+	const now int64 = 1_800_000_000
+	every := int64(backgroundRefreshEvery.Seconds())
+	cases := []struct {
+		name      string
+		expiresAt int64
+		want      bool
+	}{
+		{"no expiry", 0, false},
+		{"already expired", now - 60, true},
+		//! The 11:53 sweep left a token with 4.5 minutes; it then sat expired until 12:23.
+		{"expires before the next sweep", now + 270, true},
+		{"expires just after the next sweep, inside the skew", now + every + tokenRefreshSkewSeconds - 1, true},
+		{"outlives the next sweep", now + every + tokenRefreshSkewSeconds + 1, false},
+	}
+	for _, c := range cases {
+		acc := &config.Account{ExpiresAt: c.expiresAt}
+		if got := tokenExpiresBeforeNextSweep(acc, now); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}
