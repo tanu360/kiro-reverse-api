@@ -60,7 +60,6 @@
   "detail.open": "Request details, {time}",
   "detail.request": "Request",
   "detail.ids": "IDs",
-  "detail.result": "Result",
   "detail.statusCode": "Status code",
   "detail.accountId": "Account ID",
   "detail.apiKeyId": "API key ID",

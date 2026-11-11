@@ -60,7 +60,6 @@
   "detail.open": "Detalhes da requisição, {time}",
   "detail.request": "Requisição",
   "detail.ids": "IDs",
-  "detail.result": "Resultado",
   "detail.statusCode": "Código de status",
   "detail.accountId": "ID da conta",
   "detail.apiKeyId": "ID da chave de API",

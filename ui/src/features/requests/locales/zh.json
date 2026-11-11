@@ -60,7 +60,6 @@
   "detail.open": "请求详情，{time}",
   "detail.request": "请求",
   "detail.ids": "ID",
-  "detail.result": "结果",
   "detail.statusCode": "状态码",
   "detail.accountId": "账号 ID",
   "detail.apiKeyId": "API Key ID",

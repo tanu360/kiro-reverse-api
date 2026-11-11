@@ -60,7 +60,6 @@
   "detail.open": "Chi tiết yêu cầu, {time}",
   "detail.request": "Yêu cầu",
   "detail.ids": "ID",
-  "detail.result": "Kết quả",
   "detail.statusCode": "Mã trạng thái",
   "detail.accountId": "ID tài khoản",
   "detail.apiKeyId": "ID API key",

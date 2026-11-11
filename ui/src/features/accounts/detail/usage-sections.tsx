@@ -1,8 +1,9 @@
 import { CreditCardIcon } from "@hugeicons/core-free-icons";
-import { type JSX, type ReactNode, useId } from "react";
+import { type JSX, useId } from "react";
 import { CreditAmount } from "@/components/shared/credit-amount";
 import { PropertyList, PropertyRow } from "@/components/shared/property-list";
 import { SectionCard } from "@/components/shared/section-card";
+import { StatStrip, type StatStripItem } from "@/components/shared/stat-strip";
 import { Card } from "@/components/ui/card";
 import type { Account } from "@/lib/api/types";
 import { formatCompact, formatDateTime, formatNumber } from "@/lib/format";
@@ -24,7 +25,7 @@ export function StatisticsSection({ account }: { account: Account }): JSX.Elemen
   const { t, lang } = useT("accounts");
   const headingId = useId();
   const hasUsage = account.usageLimit > 0 || account.trialUsageLimit > 0;
-  const stats: Array<{ label: string; value: ReactNode }> = [
+  const stats: StatStripItem[] = [
     { label: t("detail.requests"), value: formatNumber(account.requestCount, lang) },
     { label: t("detail.errors"), value: formatNumber(account.errorCount, lang) },
     { label: t("detail.totalTokens"), value: formatCompact(account.totalTokens) },
@@ -54,22 +55,7 @@ export function StatisticsSection({ account }: { account: Account }): JSX.Elemen
           <UsageMeter account={account} labelled />
         </div>
       ) : null}
-      <dl
-        className={cn(
-          "grid grid-cols-2 @md:grid-cols-4",
-          hasUsage && "border-border-subtle border-t",
-        )}
-      >
-        {stats.map((stat) => (
-          <div
-            className="flex min-w-0 flex-col gap-1 border-border-subtle px-4 py-3 not-first:@md:border-s even:border-s nth-[n+3]:border-t sm:px-6 nth-[n+3]:@md:border-t-0"
-            key={stat.label}
-          >
-            <dt className="truncate text-meta text-muted-foreground">{stat.label}</dt>
-            <dd className="truncate font-semibold text-base tabular-nums">{stat.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <StatStrip className={cn(hasUsage && "border-border-subtle border-t")} items={stats} />
     </Card>
   );
 }

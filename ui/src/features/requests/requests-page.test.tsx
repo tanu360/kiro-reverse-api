@@ -284,11 +284,17 @@ describe("RequestsPage", () => {
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0));
     await user.click(within(bodyRows()[0]).getAllByRole("cell")[4]);
     const dialog = await screen.findByRole("dialog");
+    // The sheet title is the dialog's own heading; each card is an h2 under it.
     const headings = within(dialog)
-      .getAllByRole("heading", { level: 3 })
-      .map((heading) => heading.textContent);
+      .getAllByRole("heading", { level: 2 })
+      .map((heading) => heading.textContent)
+      .filter((text) => text !== "Request details");
     // The first failure used no tokens, so there is no Tokens section (a dash in the table).
-    expect(headings).toEqual(["Error", "Request", "Account", "IDs"]);
+    expect(headings).toEqual(["Request", "IDs"]);
+    // The error is the notice at the head of the panel, before the numbers and the cards.
+    const panel = dialog.querySelector('[data-slot="sheet-panel"]');
+    expect(panel?.firstElementChild).toHaveAttribute("data-slot", "alert");
+    expect(within(dialog).getByRole("button", { name: "Copy message" })).toBeInTheDocument();
     expect(within(dialog).queryByText("Status code")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Copy Request ID" })).toBeInTheDocument();
   });

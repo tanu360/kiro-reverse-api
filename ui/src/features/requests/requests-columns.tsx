@@ -45,19 +45,31 @@ function Muted({ children = EMPTY }: { children?: string }): JSX.Element {
  * A success is quiet (a green dot and a muted label); a failure is the page's one red pill, with
  * the HTTP status in it.
  */
-export function StatusBadge({ record }: { record: RequestRecord }): JSX.Element {
+export function StatusBadge({
+  record,
+  size,
+}: {
+  record: RequestRecord;
+  /** The Badge size; `sm` (20 px) beside the detail sheet's meta line. */
+  size?: "sm";
+}): JSX.Element {
   const { t } = useT("requests");
   if (record.success) {
     return (
-      // The pill's metrics (24 px, 12 px medium label), without the pill.
-      <span className="inline-flex h-6 items-center gap-2 font-medium text-muted-foreground text-xs">
+      // The pill's metrics (24 px, or 20 px small; 12 px medium label), without the pill.
+      <span
+        className={cn(
+          "inline-flex shrink-0 items-center gap-2 font-medium text-muted-foreground text-xs",
+          size === "sm" ? "h-5" : "h-6",
+        )}
+      >
         <StatusDot tone="success" />
         {t("ok")}
       </span>
     );
   }
   return (
-    <Badge icon={CircleXIcon} tone="destructive">
+    <Badge icon={CircleXIcon} size={size} tone="destructive">
       {t("fail")}
       {record.status ? ` ${record.status}` : ""}
     </Badge>
