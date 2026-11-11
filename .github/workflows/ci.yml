@@ -53,9 +53,16 @@ jobs:
 
       # The Playwright suites (smoke, shell, accounts and locale layout, pseudo-locale) run against
       # the mock-mode dev server that playwright.config.ts starts on its own port (6391).
+      # The runner image already carries Chrome's system libraries, so the browser installs on its
+      # own and apt runs only when a test launch says a library is missing: an Ubuntu mirror
+      # outage (apt failing to resolve archive.ubuntu.com) no longer fails the build.
       - name: Install Playwright Chromium
         working-directory: ui
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          pnpm exec playwright install chromium
+          if ! node -e "require('@playwright/test').chromium.launch().then((b) => b.close())"; then
+            pnpm exec playwright install-deps chromium
+          fi
 
       - name: E2E UI
         working-directory: ui
