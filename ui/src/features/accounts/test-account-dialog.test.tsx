@@ -63,7 +63,7 @@ describe("TestAccountDialog", () => {
     await waitFor(() => expect(logLines(dialog)).toHaveLength(4));
     const [start, ok, details, warn] = logLines(dialog);
     expect(start).toHaveTextContent("da***@no***.com · claude-sonnet-4.6 · Global proxy");
-    expect(ok).toHaveTextContent(/da\*\*\*@no\*\*\*\.com OK \(\d+\.\d s\) Reply: ok/);
+    expect(ok).toHaveTextContent(/da\*\*\*@no\*\*\*\.com OK \(\d+\.\ds\) Reply: ok/);
     expect(ok).toHaveAttribute("data-type", "ok");
     expect(details).toHaveTextContent("stop reason none | in/out 13/2");
     expect(warn).toHaveAttribute("data-type", "warn");
@@ -82,7 +82,7 @@ describe("TestAccountDialog", () => {
 
     expect(await within(dialog).findByText("Succeeded")).toBeInTheDocument();
     expect(within(dialog).queryByText("No test run yet")).not.toBeInTheDocument();
-    expect(within(dialog).getByText(/^\d+\.\d s$/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^\d+\.\ds$/)).toBeInTheDocument();
     const reply = well(dialog, "Reply");
     expect(reply).toHaveTextContent("ok");
     expect(within(reply).getByRole("button", { name: "Copy reply" })).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe("TestAccountDialog", () => {
     const { dialog, user } = await openDialog(accountBy((a) => a.banStatus === "BANNED"));
     await user.click(within(dialog).getByRole("button", { name: "Test" }));
     expect(await within(dialog).findByText("Failed")).toBeInTheDocument();
-    expect(within(dialog).getByText(/^\d+\.\d s$/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^\d+\.\ds$/)).toBeInTheDocument();
     expect(well(dialog, "Error")).toHaveTextContent(/AccessDenied/);
   });
 
@@ -115,7 +115,7 @@ describe("TestAccountDialog", () => {
     await waitFor(() => expect(logLines(dialog)).toHaveLength(2));
     const failure = logLines(dialog)[1];
     expect(failure).toHaveAttribute("data-type", "err");
-    expect(failure).toHaveTextContent(/jl\*\*\*@pr\*\*\*\.com Failed \(\d+\.\d s\): AccessDenied/);
+    expect(failure).toHaveTextContent(/jl\*\*\*@pr\*\*\*\.com Failed \(\d+\.\ds\): AccessDenied/);
   });
 
   it(`keeps at most ${MAX_LOG_LINES} log lines`, async () => {

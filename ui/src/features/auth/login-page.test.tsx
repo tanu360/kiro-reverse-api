@@ -146,7 +146,7 @@ describe("LoginPage", () => {
       await user.type(passwordInput(), "wrong-password");
       await user.click(submitButton());
 
-      const notice = await screen.findByText("Too many attempts. Try again in 3 s.");
+      const notice = await screen.findByText("Too many attempts. Try again in 3s.");
       expect(notice.closest("[aria-live='polite']")).not.toBeNull();
       // aria-disabled, not native disabled: the clicked button keeps focus while locked.
       expect(submitButton()).toHaveAttribute("aria-disabled", "true");
@@ -155,7 +155,7 @@ describe("LoginPage", () => {
       await act(async () => {
         vi.advanceTimersByTime(1_000);
       });
-      expect(screen.getByText("Too many attempts. Try again in 2 s.")).toBeInTheDocument();
+      expect(screen.getByText("Too many attempts. Try again in 2s.")).toBeInTheDocument();
       expect(submitButton()).toHaveAttribute("aria-disabled", "true");
 
       await act(async () => {

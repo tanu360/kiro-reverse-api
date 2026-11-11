@@ -2,7 +2,7 @@
   "generic": "Something went wrong. Try again.",
   "network": "Could not connect to the proxy.",
   "sessionExpired": "Your session expired. Sign in again.",
-  "rateLimited": "Too many attempts. Try again in {seconds} s.",
+  "rateLimited": "Too many attempts. Try again in {seconds}s.",
   "serverError.invalidJSON": "The request was not valid JSON.",
   "serverError.unauthorized": "Not signed in. Sign in again.",
   "serverError.notFound": "Not found.",

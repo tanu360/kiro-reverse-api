@@ -51,7 +51,7 @@ describe("errors namespace", () => {
     expect(translate("en", "common", "errors:network")).toBe("Could not connect to the proxy.");
     expect(translate("zh", "common", "errors:serverError.apiKeyNotFound")).toBe("未找到 API Key。");
     expect(translate("en", "errors", "rateLimited", { seconds: 30 })).toBe(
-      "Too many attempts. Try again in 30 s.",
+      "Too many attempts. Try again in 30s.",
     );
   });
 });
