@@ -1,5 +1,5 @@
 import { screen, waitFor, within } from "@testing-library/react";
-import { http } from "msw";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import type { Account } from "@/lib/api/types";
 import { mockDb } from "@/lib/mocks/db";
@@ -7,6 +7,7 @@ import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { AccountDetailSheet } from "./account-detail-sheet";
+import { isApiKeyAccount, supportsKiroProfiles } from "./account-model";
 
 function accountBy(predicate: (account: Account) => boolean): Account {
   const account = mockDb.accounts.find(predicate);
@@ -17,6 +18,8 @@ function accountBy(predicate: (account: Account) => boolean): Account {
 const dana = () => accountBy((a) => a.email.startsWith("dana."));
 const apiKeyAccount = () => accountBy((a) => a.authMethod === "api_key");
 const notCapable = () => accountBy((a) => a.overageCapability === "NOT_OVERAGE_CAPABLE");
+const noProfiles = () =>
+  accountBy((a) => !isApiKeyAccount(a) && !supportsKiroProfiles(a) && !a.profileArnPinned);
 
 function capture(method: "get" | "post" | "put", path: string): unknown[] {
   const bodies: unknown[] = [];
@@ -34,7 +37,7 @@ async function openSheet(account: Account) {
     <AccountDetailSheet accountId={account.id} onOpenChange={() => {}} open />,
   );
   const sheet = await screen.findByRole("dialog");
-  await within(sheet).findByText("Basic info");
+  await within(sheet).findByRole("region", { name: "Account" });
   return { ...view, sheet };
 }
 
@@ -42,14 +45,23 @@ function section(sheet: HTMLElement, title: string): HTMLElement {
   return within(sheet).getByRole("region", { name: title });
 }
 
-/** Opens a row's Edit dialog ("Edit Machine ID") and returns the dialog. */
+/** The row being edited in place, if any. */
+function editingRow(sheet: HTMLElement): HTMLElement | null {
+  return sheet.querySelector<HTMLElement>('[data-slot="inline-edit-row"][data-editing]');
+}
+
+/** Opens a row's inline edit ("Edit Machine ID") and returns the row in its edit view. */
 async function openEditor(
   sheet: HTMLElement,
   user: Awaited<ReturnType<typeof openSheet>>["user"],
   title: string,
 ): Promise<HTMLElement> {
   await user.click(within(sheet).getByRole("button", { name: `Edit ${title}` }));
-  return screen.findByRole("dialog", { name: title });
+  return waitFor(() => {
+    const row = editingRow(sheet);
+    if (!row) throw new Error("no row in edit view");
+    return row;
+  });
 }
 
 describe("AccountDetailSheet", () => {
@@ -59,24 +71,36 @@ describe("AccountDetailSheet", () => {
     // Masked by the default privacy mode, as in the list.
     expect(sheet).toHaveAccessibleName("da***@no***.com");
     expect(sheet).toHaveAccessibleDescription(`${account.nickname} · Pro · Enterprise`);
-    const basic = section(sheet, "Basic info");
-    // The email is the title, not a row of the basic info.
-    expect(within(basic).queryByText("Email")).not.toBeInTheDocument();
-    expect(within(basic).getByRole("button", { name: "Copy User ID" })).toBeInTheDocument();
+    const facts = section(sheet, "Account");
+    // The email is the title, and the plan and sign-in the meta line: neither is a fact again.
+    expect(within(facts).queryByText("Email")).not.toBeInTheDocument();
+    expect(within(facts).queryByText("Pro")).not.toBeInTheDocument();
+    expect(within(facts).getByRole("button", { name: "Copy User ID" })).toBeInTheDocument();
+  });
+
+  it("puts the row's actions under the title", async () => {
+    const account = dana();
+    const { sheet, user } = await openSheet(account);
+    expect(within(sheet).getByRole("button", { name: "Refresh token" })).toBeInTheDocument();
+    expect(within(sheet).getByRole("switch", { name: "Enable da***@no***.com" })).toBeChecked();
+    await user.click(within(sheet).getByRole("button", { name: "More actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Copy JSON" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(within(sheet).getByRole("button", { name: "Test" }));
+    await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(2));
   });
 
   it("shows a field error for an invalid machine ID and sends nothing", async () => {
     const puts = capture("put", "/accounts/:id");
     const { sheet, user } = await openSheet(dana());
-    const dialog = await openEditor(sheet, user, "Machine ID");
-    const input = within(dialog).getByPlaceholderText("UUID");
+    const row = await openEditor(sheet, user, "Machine ID");
+    const input = within(row).getByPlaceholderText("UUID");
     await user.clear(input);
     await user.type(input, "not-a-uuid");
-    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await user.click(within(row).getByRole("button", { name: "Save" }));
     expect(
-      await within(dialog).findByText(
-        "Enter a UUID or 32 hex characters, or leave the field empty.",
-      ),
+      await within(row).findByText("Enter a UUID or 32 hex characters, or leave the field empty."),
     ).toBeInTheDocument();
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(puts).toEqual([]);
@@ -84,10 +108,10 @@ describe("AccountDetailSheet", () => {
 
   it("fills the machine ID from the dice button", async () => {
     const { sheet, user } = await openSheet(dana());
-    const dialog = await openEditor(sheet, user, "Machine ID");
-    const input = within(dialog).getByPlaceholderText("UUID") as HTMLInputElement;
+    const row = await openEditor(sheet, user, "Machine ID");
+    const input = within(row).getByPlaceholderText("UUID") as HTMLInputElement;
     await user.clear(input);
-    await user.click(within(dialog).getByRole("button", { name: "Generate random machine ID" }));
+    await user.click(within(row).getByRole("button", { name: "Generate random machine ID" }));
     await waitFor(() =>
       expect(input.value).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
@@ -95,36 +119,66 @@ describe("AccountDetailSheet", () => {
     );
   });
 
-  it("saves the weight as a JSON number and closes the dialog", async () => {
+  it("saves the weight as a JSON number and closes the edit", async () => {
     const puts = capture("put", "/accounts/:id");
     const { sheet, user } = await openSheet(dana());
-    const dialog = await openEditor(sheet, user, "Weight");
-    const input = within(dialog).getByRole("textbox", { name: "Weight" });
+    const row = await openEditor(sheet, user, "Weight");
+    const input = within(row).getByRole("textbox", { name: "Weight" });
+    // The edit starts in the field.
+    expect(input).toHaveFocus();
     await user.clear(input);
-    await user.type(input, "4");
-    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await user.type(input, "4{Enter}");
     await waitFor(() => expect(puts).toEqual([{ weight: 4 }]));
     expect(await screen.findByText("The change was saved.")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Weight" })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(editingRow(sheet)).toBeNull());
+    // Focus goes back to the row.
+    expect(within(sheet).getByRole("button", { name: "Edit Weight" })).toHaveFocus();
   });
 
   it("drops an edit on Cancel and starts the next one from the saved value", async () => {
     const puts = capture("put", "/accounts/:id");
     const account = dana();
     const { sheet, user } = await openSheet(account);
-    let dialog = await openEditor(sheet, user, "Nickname");
-    const input = within(dialog).getByPlaceholderText("Team primary");
+    let row = await openEditor(sheet, user, "Nickname");
+    const input = within(row).getByPlaceholderText("Team primary");
     await user.clear(input);
     await user.type(input, "Scratch");
-    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Nickname" })).not.toBeInTheDocument(),
-    );
-    dialog = await openEditor(sheet, user, "Nickname");
-    expect(within(dialog).getByPlaceholderText("Team primary")).toHaveValue(account.nickname);
+    await user.click(within(row).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(editingRow(sheet)).toBeNull());
+    row = await openEditor(sheet, user, "Nickname");
+    expect(within(row).getByPlaceholderText("Team primary")).toHaveValue(account.nickname);
     expect(puts).toEqual([]);
+  });
+
+  it("drops an edit on Escape and keeps the sheet open", async () => {
+    const puts = capture("put", "/accounts/:id");
+    const { sheet, user } = await openSheet(dana());
+    const row = await openEditor(sheet, user, "Account proxy");
+    await user.type(within(row).getByPlaceholderText("socks5://host:port"), "socks5://x:1");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(editingRow(sheet)).toBeNull());
+    expect(sheet).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBe(sheet);
+    expect(puts).toEqual([]);
+  });
+
+  it("shows the global proxy an account without its own uses, without its password", async () => {
+    const account = accountBy((a) => !a.proxyURL);
+    const { sheet } = await openSheet(account);
+    const facts = section(sheet, "Account");
+    // The seed's global proxy is socks5://user:p%40ss@127.0.0.1:1080.
+    expect(await within(facts).findByText("socks5://user@127.0.0.1:1080")).toBeInTheDocument();
+    expect(within(facts).getByText("Global")).toBeInTheDocument();
+    expect(facts).not.toHaveTextContent("p%40ss");
+  });
+
+  it("shows Direct when there is no global proxy either", async () => {
+    mockServer.use(http.get(apiUrl("/proxy"), () => HttpResponse.json({ proxyURL: "" })));
+    const account = accountBy((a) => !a.proxyURL);
+    const { sheet } = await openSheet(account);
+    const facts = section(sheet, "Account");
+    expect(await within(facts).findByText("Direct")).toBeInTheDocument();
+    expect(within(facts).getByText("Global")).toBeInTheDocument();
   });
 
   it("reverts the overage switch when AWS fails", async () => {
@@ -149,6 +203,11 @@ describe("AccountDetailSheet", () => {
       within(overage).getByRole("switch", { name: "Enable overage upstream" }),
     ).toHaveAttribute("data-disabled");
     expect(within(overage).getByText("Not available for this account")).toBeInTheDocument();
+  });
+
+  it("hides the Kiro profile section for sign-ins without profiles", async () => {
+    const { sheet } = await openSheet(noProfiles());
+    expect(within(sheet).queryByRole("region", { name: "Kiro profile" })).not.toBeInTheDocument();
   });
 
   it("hides the Kiro profile section for API key accounts", async () => {
@@ -201,22 +260,19 @@ describe("AccountDetailSheet", () => {
     expect(document.activeElement?.tagName).not.toBe("INPUT");
   });
 
-  it("shows the plan as the list does, the credits meter first and dates in the UI locale", async () => {
+  it("puts the credits meter first, with the reset date in the UI locale under it", async () => {
     const account = dana();
     const { sheet } = await openSheet(account);
-    const subscription = section(sheet, "Subscription");
-    expect(within(subscription).getByText("Pro")).toBeInTheDocument();
-    expect(within(subscription).queryByText("KIRO PRO")).not.toBeInTheDocument();
     const [year, month, day] = account.nextResetDate.split("-").map(Number);
     const reset = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(
       new Date(Date.UTC(year, month - 1, day)),
     );
-    expect(within(subscription).getByText(reset)).toBeInTheDocument();
-    // Plan credits lead the sheet in the meter, over the lifetime numbers.
+    // Plan credits lead the sheet in the meter, over the last day and the lifetime numbers.
     const statistics = section(sheet, "Statistics");
     expect(within(statistics).getByRole("meter", { name: "Plan credits" })).toBeInTheDocument();
     expect(within(statistics).getByText("450 / 1,000")).toBeInTheDocument();
-    expect(within(subscription).queryByText("450 / 1,000")).not.toBeInTheDocument();
+    expect(within(statistics).getByText(new RegExp(`^Resets ${reset} · `))).toBeInTheDocument();
+    expect(within(statistics).getByText("Last 24 hours")).toBeInTheDocument();
     // Same one-decimal credits as the list ("312.5", not "312.48").
     expect(within(statistics).getByText("312.5")).toBeInTheDocument();
   });

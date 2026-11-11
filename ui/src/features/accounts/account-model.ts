@@ -391,6 +391,17 @@ export function formatResetDate(value: string, lang?: Lang): string {
   }).format(date);
 }
 
+/** A reset date as unix seconds (a bare `YYYY-MM-DD` is midnight UTC); null when it is unparsable. */
+export function resetDateSec(value: string): number | null {
+  const text = (value ?? "").trim();
+  if (!text) return null;
+  const dateOnly = DATE_ONLY_PATTERN.exec(text);
+  const ms = dateOnly
+    ? Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(text).getTime();
+  return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
+}
+
 /** Plan name as the list badge shows it; an unknown type falls back to the server's title. */
 export function planLabel(
   account: Pick<Account, "subscriptionType" | "subscriptionTitle">,
@@ -456,6 +467,14 @@ const PROXY_PATTERN = /^(socks5|socks5h|http|https):\/\//;
 export function isValidMachineId(value: string): boolean {
   const trimmed = value.trim();
   return trimmed === "" || UUID_PATTERN.test(trimmed) || HEX32_PATTERN.test(trimmed);
+}
+
+/**
+ * A proxy URL to show on screen: the password goes, the user name stays
+ * (`socks5://user:secret@host:1080` reads `socks5://user@host:1080`).
+ */
+export function proxyDisplayUrl(url: string): string {
+  return url.trim().replace(/^([a-z][a-z0-9+.-]*:\/\/)([^:@/]*):[^@/]*@/i, "$1$2@");
 }
 
 /** Empty (global proxy) or a socks5, socks5h, http or https URL. */

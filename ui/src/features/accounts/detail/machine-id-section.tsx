@@ -4,14 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupTextarea,
-} from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { generateMachineId } from "@/lib/api/system";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
@@ -21,7 +15,9 @@ import { EditableFieldRow, useSaveAccountField } from "./detail-section";
 
 /**
  * A UUID or 32 hex characters, or empty. The dice button at the field's end fills a random UUID
- * from the server; a spinner takes the dice's place while the server answers.
+ * from the server; a spinner takes the dice's place while the server answers. The edit takes the
+ * whole row (`wide`), so a UUID fits on one line in the desktop sheet; a phone's 16 px mono line
+ * (no zoom on focus) is still narrower than one, and there the field scrolls rather than wraps.
  */
 export function MachineIdRow({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
@@ -29,8 +25,6 @@ export function MachineIdRow({ account }: { account: Account }): JSX.Element {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(account.machineId);
   const [error, setError] = useState<string | null>(null);
-  // A phone's 16 px mono line is narrower than a UUID: there the id wraps instead of clipping.
-  const phone = useMediaQuery("max-sm");
 
   const generate = useMutation({
     mutationFn: generateMachineId,
@@ -72,40 +66,20 @@ export function MachineIdRow({ account }: { account: Account }): JSX.Element {
       saving={save.isPending}
       title={t("detail.machineId")}
       value={account.machineId}
+      wide
     >
       <Field invalid={error !== null}>
         <FieldLabel className="sr-only">{t("detail.machineId")}</FieldLabel>
+        {/* One line at every width, never wrapped: the row gives the field its whole width. */}
         <InputGroup>
-          {phone ? (
-            <InputGroupTextarea
-              autoComplete="off"
-              // The group sizes a textarea for several lines (a taller box, roomier padding); this
-              // one keeps the single-line textarea's padding and hugs the id on one or two lines.
-              className="*:min-h-0! *:py-1.25! pointer-coarse:*:py-1.75!"
-              // One line of text: a pasted line break goes, and Enter saves as in the input.
-              onChange={(event) => onChange(event.target.value.replace(/[\r\n]+/g, ""))}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }}
-              placeholder={t("detail.machineIdPlaceholder")}
-              // The single-line mode: the box hugs the id (one or two lines), no empty third line.
-              rows={1}
-              spellCheck={false}
-              value={value}
-              variant="mono"
-            />
-          ) : (
-            <InputGroupInput
-              autoComplete="off"
-              onChange={(event) => onChange(event.target.value)}
-              placeholder={t("detail.machineIdPlaceholder")}
-              spellCheck={false}
-              value={value}
-              variant="code"
-            />
-          )}
+          <InputGroupInput
+            autoComplete="off"
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={t("detail.machineIdPlaceholder")}
+            spellCheck={false}
+            value={value}
+            variant="code"
+          />
           <InputGroupAddon align="inline-end">
             <Tooltip>
               <TooltipTrigger

@@ -1,11 +1,6 @@
-import { PencilEdit01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
-import { type FormEvent, type JSX, type ReactNode, useId } from "react";
-import { PropertyRow } from "@/components/shared/property-list";
-import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import type { JSX, ReactNode } from "react";
+import { InlineEditRow } from "@/components/shared/property-list";
 import { updateAccount } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { UpdateAccountRequest } from "@/lib/api/types";
@@ -33,15 +28,16 @@ export function useSaveAccountField(accountId: string) {
 }
 
 /**
- * One editable field of the sheet: a PropertyRow (label, saved value) with a pencil button at its
- * end, named "Edit" plus the label; the form lives in a small dialog with Cancel and Save, where
- * the field's hint sits under the control. The caller owns the draft (reset it in `onEdit`) and
- * closes the dialog once the save lands.
+ * One editable field of the sheet, edited in place (InlineEditRow): the label and saved value,
+ * the whole row a button that swaps the value for the field's controls with Save and Cancel at
+ * their end. The field's hint and error sit under its control. The caller owns the draft (reset
+ * it in `onEdit`) and closes the edit once the save lands.
  */
 export function EditableFieldRow({
   title,
   value,
   mono = false,
+  wide = false,
   open,
   onEdit,
   onOpenChange,
@@ -50,77 +46,35 @@ export function EditableFieldRow({
   children,
 }: {
   title: string;
-  /** The saved value; empty shows a dash. */
-  value: string;
+  /** The saved value (text, or a node such as the proxy's inherited value); empty shows a dash. */
+  value: ReactNode;
   /** An ID or a URL: set in mono. */
   mono?: boolean;
+  /** The edit view gives its controls the whole row (InlineEditRow `wide`). */
+  wide?: boolean;
+  /** The edit view is showing. */
   open: boolean;
   onEdit: () => void;
   onOpenChange: (open: boolean) => void;
   /** Called on Save (or Enter in a field) while no save is running. */
   onSubmit: () => void;
   saving: boolean;
-  /** The dialog's form controls. */
+  /** The edit view's form controls. */
   children: ReactNode;
 }): JSX.Element {
-  const { t } = useT();
-  const editId = useId();
-  const labelId = useId();
-  const formId = useId();
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    if (!saving) onSubmit();
-  };
-
   return (
-    <>
-      <PropertyRow
-        action={
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  aria-labelledby={`${editId} ${labelId}`}
-                  onClick={onEdit}
-                  size="icon-sm"
-                  variant="ghost"
-                />
-              }
-            >
-              <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
-              <span className="sr-only" id={editId}>
-                {t("actions.edit")}
-              </span>
-            </TooltipTrigger>
-            <TooltipPopup>{t("actions.edit")}</TooltipPopup>
-          </Tooltip>
-        }
-        label={title}
-        labelId={labelId}
-        mono={mono}
-        value={value}
-      />
-      <ResponsiveDialog
-        footer={
-          <>
-            <Button onClick={() => onOpenChange(false)} variant="ghost">
-              {t("actions.cancel")}
-            </Button>
-            <Button form={formId} loading={saving} type="submit">
-              {t("actions.save")}
-            </Button>
-          </>
-        }
-        onOpenChange={onOpenChange}
-        open={open}
-        size="md"
-        title={title}
-      >
-        <form className="grid gap-4" id={formId} noValidate onSubmit={submit}>
-          {children}
-        </form>
-      </ResponsiveDialog>
-    </>
+    <InlineEditRow
+      editing={open}
+      label={title}
+      mono={mono}
+      onCancel={() => onOpenChange(false)}
+      onEdit={onEdit}
+      onSubmit={onSubmit}
+      saving={saving}
+      value={value}
+      wide={wide}
+    >
+      {children}
+    </InlineEditRow>
   );
 }

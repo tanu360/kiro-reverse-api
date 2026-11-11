@@ -18,6 +18,7 @@ import {
   isValidMachineId,
   isValidProxyUrl,
   planLabel,
+  proxyDisplayUrl,
   sortAccounts,
   sortModels,
   statusFilterGroup,
@@ -270,6 +271,20 @@ describe("usagePercent / creditTone", () => {
     expect(creditTone(70.1)).toBe("warning");
     expect(creditTone(90)).toBe("warning");
     expect(creditTone(90.1)).toBe("destructive");
+  });
+});
+
+describe("proxyDisplayUrl", () => {
+  it("drops the password and keeps the user name", () => {
+    expect(proxyDisplayUrl("socks5://user:p%40ss@127.0.0.1:1080")).toBe(
+      "socks5://user@127.0.0.1:1080",
+    );
+    expect(proxyDisplayUrl("http://:secret@proxy:3128")).toBe("http://@proxy:3128");
+  });
+
+  it("leaves a URL without credentials as it is", () => {
+    expect(proxyDisplayUrl("socks5h://host:1080")).toBe("socks5h://host:1080");
+    expect(proxyDisplayUrl("http://user@proxy:3128")).toBe("http://user@proxy:3128");
   });
 });
 

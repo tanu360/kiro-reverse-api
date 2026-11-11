@@ -6,13 +6,13 @@ import { cn } from "@/lib/utils";
 
 /*
  * Columns follow the grid's own width (container queries), not the viewport, so every grid in
- * one sheet or card switches at the same width: 1 column under 20rem, 2 from @xs (a phone sheet's
- * 358 px content still pairs Input with Output), 3 from @2xl.
+ * one sheet or card switches at the same width: 1 column under 16rem, 2 from @3xs (a card in the
+ * phone sheet is about 285 px inside its padding and still pairs its facts), 3 from @2xl.
  */
 const COLUMN_CLASS = {
   1: "grid-cols-1",
-  2: "grid-cols-1 @xs:grid-cols-2",
-  3: "grid-cols-1 @xs:grid-cols-2 @2xl:grid-cols-3",
+  2: "grid-cols-1 @3xs:grid-cols-2",
+  3: "grid-cols-1 @3xs:grid-cols-2 @2xl:grid-cols-3",
 } as const;
 
 export interface KeyValueItem {
@@ -20,7 +20,10 @@ export interface KeyValueItem {
   value: ReactNode;
   /** Spans two columns once the grid has two. */
   span?: 1 | 2;
-  /** An ID, key or URL: mono 12 px on one line, cut with an ellipsis (full text as a tooltip). */
+  /**
+   * An ID, key or URL: mono at the body size of the other values, on one line, cut with an
+   * ellipsis (full text as a tooltip).
+   */
   mono?: boolean;
   /**
    * A copy button right after the value. `true` copies the value itself (a string or number);
@@ -40,9 +43,9 @@ function copyText(item: KeyValueItem): string | null {
 function Value({ item }: { item: KeyValueItem }): ReactNode {
   if (!item.mono) return item.value;
   if (typeof item.value === "string") {
-    return <TruncatedText className="font-mono text-meta">{item.value}</TruncatedText>;
+    return <TruncatedText className="font-mono">{item.value}</TruncatedText>;
   }
-  return <span className="block min-w-0 truncate font-mono text-meta">{item.value}</span>;
+  return <span className="block min-w-0 truncate font-mono">{item.value}</span>;
 }
 
 export function KeyValueGrid({
@@ -62,7 +65,7 @@ export function KeyValueGrid({
             <div
               className={cn(
                 "flex min-w-0 flex-col gap-1",
-                item.span === 2 && columns > 1 && "@xs:col-span-2",
+                item.span === 2 && columns > 1 && "@3xs:col-span-2",
               )}
               key={item.label}
             >

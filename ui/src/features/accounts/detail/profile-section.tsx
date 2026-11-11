@@ -24,9 +24,10 @@ function defaultArn(result: AccountProfilesResponse): string {
 }
 
 /**
- * Kiro profile pinning. The caller hides it for api_key accounts (the server answers 400).
- * Builder ID and social logins have no profiles, so loading is disabled for them; a pinned
- * account keeps it, so it can still return to automatic.
+ * Kiro profile pinning. The sheet shows it only where profiles exist (IAM Identity Center and
+ * Microsoft sign-ins), never for api_key accounts (the server answers 400). An account pinned
+ * before keeps it whatever its sign-in, with loading disabled where there are no profiles, so it
+ * can still return to automatic.
  */
 export function ProfileSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");

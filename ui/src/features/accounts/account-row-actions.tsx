@@ -16,6 +16,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
+import { cn } from "@/lib/utils";
 import { isBanned } from "./account-model";
 import {
   useCopyAccountJson,
@@ -63,6 +64,26 @@ export function EnabledSwitch({ account }: { account: Account }): JSX.Element {
   );
 }
 
+/** Copy JSON, then Delete after a separator: the end of every account menu. */
+function ManageMenuItems({ account }: { account: Account }): JSX.Element {
+  const { t } = useT("accounts");
+  const copyJson = useCopyAccountJson();
+  const remove = useDeleteAccount();
+  return (
+    <>
+      <MenuItem onClick={() => void copyJson(account.id)}>
+        <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
+        {t("actions.copyJson")}
+      </MenuItem>
+      <MenuSeparator />
+      <MenuItem onClick={() => void remove(account)} variant="destructive">
+        <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
+        {t("actions.delete")}
+      </MenuItem>
+    </>
+  );
+}
+
 function IconAction({
   label,
   onClick,
@@ -101,22 +122,7 @@ export function AccountRowActions({
 }: RowActionHandlers & { account: Account; variant?: "inline" | "menu" }): JSX.Element {
   const { t } = useT("accounts");
   const refresh = useRefreshAccount(account.id);
-  const copyJson = useCopyAccountJson();
-  const remove = useDeleteAccount();
-
-  const menuItems = (
-    <>
-      <MenuItem onClick={() => void copyJson(account.id)}>
-        <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
-        {t("actions.copyJson")}
-      </MenuItem>
-      <MenuSeparator />
-      <MenuItem onClick={() => void remove(account)} variant="destructive">
-        <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
-        {t("actions.delete")}
-      </MenuItem>
-    </>
-  );
+  const menuItems = <ManageMenuItems account={account} />;
 
   if (variant === "menu") {
     return (
@@ -194,6 +200,66 @@ export function AccountRowActions({
           {menuItems}
         </MenuPopup>
       </Menu>
+    </div>
+  );
+}
+
+/**
+ * The detail sheet's actions, under its title: Test and Refresh token as labelled buttons, then
+ * the Enabled switch and the More menu (Copy JSON, Delete) at the end, the row's own actions
+ * with words. The switch's word is left out on phones, where the row needs the room; the switch
+ * keeps its full name for screen readers either way.
+ */
+export function AccountSheetActions({
+  account,
+  onTest,
+  className,
+}: {
+  account: Account;
+  onTest: () => void;
+  /** Layout classes only. */
+  className?: string;
+}): JSX.Element {
+  const { t } = useT("accounts");
+  const refresh = useRefreshAccount(account.id);
+  return (
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      <Button onClick={onTest} size="sm" variant="secondary">
+        <HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />
+        {t("actions.test")}
+      </Button>
+      <Button
+        loading={refresh.isPending}
+        onClick={() => refresh.mutate()}
+        size="sm"
+        variant="secondary"
+      >
+        <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
+        {t("actions.refreshToken")}
+      </Button>
+      <div className="ms-auto flex items-center gap-2">
+        <span aria-hidden="true" className="text-muted-foreground max-sm:hidden">
+          {t("columns.enabled")}
+        </span>
+        <EnabledSwitch account={account} />
+        <Menu>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <MenuTrigger
+                  render={<Button aria-label={t("actions.more")} size="icon-sm" variant="quiet" />}
+                />
+              }
+            >
+              <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipPopup>{t("actions.more")}</TooltipPopup>
+          </Tooltip>
+          <MenuPopup align="end">
+            <ManageMenuItems account={account} />
+          </MenuPopup>
+        </Menu>
+      </div>
     </div>
   );
 }

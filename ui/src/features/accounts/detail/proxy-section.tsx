@@ -1,12 +1,19 @@
+import { useQuery } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { proxyQuery } from "@/lib/api/settings";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { isValidProxyUrl } from "../account-model";
+import { isValidProxyUrl, proxyDisplayUrl } from "../account-model";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
 
-/** The account's own proxy URL; empty falls back to the global proxy. */
+/**
+ * The account's own proxy URL; empty falls back to the global proxy. The row shows what the
+ * account really uses: its own URL, or the global one with a Global badge, or Direct when there
+ * is no global proxy either. Passwords never show; the edit field holds the URL as saved.
+ */
 export function ProxyRow({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
   const save = useSaveAccountField(account.id);
@@ -26,7 +33,6 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
 
   return (
     <EditableFieldRow
-      mono
       onEdit={() => {
         setValue(account.proxyURL);
         setError(null);
@@ -37,7 +43,9 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
       open={open}
       saving={save.isPending}
       title={t("detail.proxyURL")}
-      value={account.proxyURL}
+      value={<ProxyValue proxyURL={account.proxyURL} />}
+      // A proxy URL is as long as a machine ID: the edit takes the whole row, label above.
+      wide
     >
       <Field invalid={error !== null}>
         <FieldLabel className="sr-only">{t("detail.proxyURL")}</FieldLabel>
@@ -56,5 +64,24 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
         <FieldDescription>{t("detail.proxyHint")}</FieldDescription>
       </Field>
     </EditableFieldRow>
+  );
+}
+
+function ProxyValue({ proxyURL }: { proxyURL: string }): JSX.Element {
+  const { t } = useT("accounts");
+  // The global proxy is read only when the account has none of its own.
+  const global = useQuery({ ...proxyQuery(), enabled: !proxyURL }).data;
+  if (proxyURL) return <span className="font-mono">{proxyDisplayUrl(proxyURL)}</span>;
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      {global === undefined ? null : global.proxyURL ? (
+        <span className="min-w-0 truncate font-mono">{proxyDisplayUrl(global.proxyURL)}</span>
+      ) : (
+        <span className="min-w-0 truncate">{t("detail.proxyDirect")}</span>
+      )}
+      <Badge size="sm" tone="neutral">
+        {t("detail.proxyGlobal")}
+      </Badge>
+    </span>
   );
 }

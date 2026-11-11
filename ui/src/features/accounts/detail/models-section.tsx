@@ -9,6 +9,7 @@ import { SettingsEmptyRow } from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { getAccountModels, refreshAccountModels } from "@/lib/api/accounts";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
@@ -45,29 +46,34 @@ export function ModelsSection({ accountId }: { accountId: string }): JSX.Element
   return (
     <SectionCard
       actions={
-        <Button
-          loading={load.isPending}
-          onClick={() => load.mutate()}
-          size="sm"
-          variant="secondary"
-        >
-          <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
-          {t("detail.loadModels")}
-        </Button>
-      }
-      // The route-cache refresh sits in the footer (action on the right), so the header keeps
-      // one row in the sheet's narrow card.
-      footer={
-        <Button
-          className="ms-auto"
-          loading={refresh.isPending}
-          onClick={() => refresh.mutate()}
-          size="sm"
-          variant="secondary"
-        >
-          <HugeiconsIcon icon={ListRestartIcon} aria-hidden="true" />
-          {t("detail.refreshModelCache")}
-        </Button>
+        // Both actions in the header: the route-cache refresh as an icon beside Load models.
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label={t("detail.refreshModelCache")}
+                  loading={refresh.isPending}
+                  onClick={() => refresh.mutate()}
+                  size="icon-sm"
+                  variant="secondary"
+                />
+              }
+            >
+              <HugeiconsIcon icon={ListRestartIcon} aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipPopup>{t("detail.refreshModelCache")}</TooltipPopup>
+          </Tooltip>
+          <Button
+            loading={load.isPending}
+            onClick={() => load.mutate()}
+            size="sm"
+            variant="secondary"
+          >
+            <HugeiconsIcon icon={ScanSearchIcon} aria-hidden="true" />
+            {t("detail.loadModels")}
+          </Button>
+        </div>
       }
       icon={BoxesIcon}
       slim

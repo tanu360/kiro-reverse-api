@@ -1,30 +1,35 @@
-import { CreditCardIcon } from "@hugeicons/core-free-icons";
-import { type JSX, useId } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { type JSX, lazy, Suspense, useId, useState } from "react";
 import { CreditAmount } from "@/components/shared/credit-amount";
-import { PropertyList, PropertyRow } from "@/components/shared/property-list";
-import { SectionCard } from "@/components/shared/section-card";
 import { StatStrip, type StatStripItem } from "@/components/shared/stat-strip";
 import { Card } from "@/components/ui/card";
-import type { Account } from "@/lib/api/types";
-import { formatCompact, formatDateTime, formatNumber } from "@/lib/format";
-import { type Lang, useT } from "@/lib/i18n";
+import { Skeleton } from "@/components/ui/skeleton";
+import { heatmapQuery } from "@/lib/api/observe";
+import type { Account, HeatmapCell } from "@/lib/api/types";
+import { formatCompact, formatNumber, formatPercent, formatRelativeTime } from "@/lib/format";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { UsageMeter } from "../account-cells";
-import { formatCreditAmount, formatResetDate, planLabel } from "../account-model";
+import { formatCreditAmount, formatResetDate, resetDateSec } from "../account-model";
 
-function credits(current: number, limit: number, lang: Lang): string {
-  return `${formatCreditAmount(current, lang)} / ${formatCreditAmount(limit, lang)}`;
-}
+/** 24 one-hour buckets: the account's last day of traffic. */
+const HOURS = 24;
+/** The area chart's height in px. */
+const CHART_HEIGHT = 48;
+
+const ActivityChart = lazy(() => import("./activity-chart"));
 
 /**
- * The sheet's opening card: the credits meter (plan, or trial for a trial-only account) over the
- * four lifetime numbers. Four across from a 28rem card, two by two below it (a phone sheet). The
- * section keeps the "Statistics" name for screen readers; the numbers carry their own labels.
+ * The sheet's opening card: the credits meter (plan, or trial for a trial-only account) with the
+ * reset date, the last 24 hours of requests, then the four lifetime numbers. Four across from a
+ * 28rem card, two by two below it (a phone sheet). The section keeps the "Statistics" name for
+ * screen readers; the numbers carry their own labels.
  */
 export function StatisticsSection({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
   const headingId = useId();
   const hasUsage = account.usageLimit > 0 || account.trialUsageLimit > 0;
+  const resetSec = account.usageLimit > 0 ? resetDateSec(account.nextResetDate) : null;
   const stats: StatStripItem[] = [
     { label: t("detail.requests"), value: formatNumber(account.requestCount, lang) },
     { label: t("detail.errors"), value: formatNumber(account.errorCount, lang) },
@@ -53,46 +58,106 @@ export function StatisticsSection({ account }: { account: Account }): JSX.Elemen
       {hasUsage ? (
         <div className="px-4 py-4 sm:px-6">
           <UsageMeter account={account} labelled />
+          {resetSec !== null ? (
+            <p className="mt-2 text-meta text-muted-foreground">
+              {t("detail.resets", {
+                date: formatResetDate(account.nextResetDate, lang),
+                relative: formatRelativeTime(resetSec, lang),
+              })}
+            </p>
+          ) : null}
         </div>
       ) : null}
-      <StatStrip className={cn(hasUsage && "border-border-subtle border-t")} items={stats} />
+      <ActivityStrip
+        accountId={account.id}
+        className={cn(hasUsage && "border-border-subtle border-t")}
+      />
+      <StatStrip className="border-border-subtle border-t" items={stats} />
     </Card>
   );
 }
 
 /**
- * The plan and its dates. Plan credits sit in the meter above; a trial's credits, state and
- * expiry follow when the account has one.
+ * The account's requests over the last 24 hours as an area chart, oldest on the left, failures
+ * in red along its foot, from the same per-account heatmap as the Overview (hourly buckets,
+ * polled once a minute). The line above gives the day's count and success rate, or the hovered
+ * hour's numbers while the pointer is on the chart. Left out when the heatmap cannot load: the
+ * lifetime numbers below still stand.
  */
-export function SubscriptionSection({ account }: { account: Account }): JSX.Element {
+function ActivityStrip({
+  accountId,
+  className,
+}: {
+  accountId: string;
+  className?: string;
+}): JSX.Element | null {
   const { t, lang } = useT("accounts");
-  const trial = account.trialUsageLimit > 0;
+  const query = useQuery(heatmapQuery(HOURS * 60, { bucketMin: 60, live: false }));
+  const [hovered, setHovered] = useState<number | null>(null);
+  if (query.isError) return null;
+
+  const row = query.data?.accounts.find((item) => item.accountId === accountId);
+  // Offset 0 is the current hour: reverse so the newest point is on the right.
+  const cells: HeatmapCell[] = row
+    ? row.cells.slice(0, HOURS).reverse()
+    : Array.from({ length: HOURS }, (_, index) => ({
+        offset: HOURS - 1 - index,
+        reqs: 0,
+        failures: 0,
+      }));
+  const total = cells.reduce((sum, cell) => sum + cell.reqs, 0);
+  const failures = cells.reduce((sum, cell) => sum + cell.failures, 0);
+  const point = hovered === null ? undefined : cells[hovered];
+
+  let summary: string;
+  if (point) {
+    const when = formatRelativeTime(Date.now() / 1000 - point.offset * 3600, lang);
+    const requests = formatNumber(point.reqs, lang);
+    summary =
+      point.failures > 0
+        ? t("detail.activityPointFailed", {
+            when,
+            requests,
+            failures: formatNumber(point.failures, lang),
+          })
+        : t("detail.activityPoint", { when, requests });
+  } else {
+    summary =
+      total > 0
+        ? t("detail.activitySummary", {
+            requests: formatNumber(total, lang),
+            rate: formatPercent(total - failures, total, lang),
+          })
+        : t("detail.activityNone");
+  }
+
+  const placeholder = <Skeleton className="w-full" style={{ height: CHART_HEIGHT }} />;
   return (
-    <SectionCard icon={CreditCardIcon} slim title={t("detail.subscription")}>
-      <PropertyList>
-        <PropertyRow label={t("detail.plan")} value={planLabel(account, t)} />
-        <PropertyRow
-          label={t("detail.tokenExpiry")}
-          value={account.expiresAt ? formatDateTime(account.expiresAt, lang) : ""}
-        />
-        <PropertyRow
-          label={t("detail.resetDate")}
-          value={formatResetDate(account.nextResetDate, lang)}
-        />
-        {trial ? (
-          <>
-            <PropertyRow
-              label={t("detail.trialCredits")}
-              value={credits(account.trialUsageCurrent, account.trialUsageLimit, lang)}
-            />
-            <PropertyRow label={t("detail.trialStatus")} value={account.trialStatus} />
-            <PropertyRow
-              label={t("detail.trialExpiry")}
-              value={account.trialExpiresAt ? formatDateTime(account.trialExpiresAt, lang) : ""}
-            />
-          </>
-        ) : null}
-      </PropertyList>
-    </SectionCard>
+    <div className={cn("px-4 py-3.5 sm:px-6", className)}>
+      <div className="flex items-baseline justify-between gap-3 text-meta text-muted-foreground">
+        <span>{t("detail.activity")}</span>
+        {query.isPending ? (
+          <Skeleton className="h-3 w-32" />
+        ) : (
+          <span className="truncate tabular-nums">{summary}</span>
+        )}
+      </div>
+      <div className="mt-2">
+        {query.isPending ? (
+          placeholder
+        ) : (
+          <Suspense fallback={placeholder}>
+            <ActivityChart data={cells} height={CHART_HEIGHT} onHover={setHovered} />
+          </Suspense>
+        )}
+      </div>
+      <div
+        aria-hidden="true"
+        className="mt-1.5 flex justify-between text-meta text-muted-foreground"
+      >
+        <span>{t("detail.activityStart")}</span>
+        <span>{t("detail.activityEnd")}</span>
+      </div>
+    </div>
   );
 }

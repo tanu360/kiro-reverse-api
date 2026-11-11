@@ -2,7 +2,8 @@ import { CloudDownloadIcon, ZapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
-import { PropertyList, PropertyRow } from "@/components/shared/property-list";
+import { KeyValueGrid, type KeyValueItem } from "@/components/shared/key-value-grid";
+import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { SwitchField } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { getAccountOverage, setAccountOverage } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, OverageResponse } from "@/lib/api/types";
-import { formatDateTime, formatUsd } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { overageCapable, overageEnabled } from "../account-model";
@@ -39,7 +40,7 @@ function useMergeOverage(accountId: string): (snapshot: OverageResponse) => void
 
 /** Both calls reach real AWS. No confirm for the toggle (old UI parity). */
 export function OverageSection({ account }: { account: Account }): JSX.Element {
-  const { t, lang } = useT("accounts");
+  const { t } = useT("accounts");
   const merge = useMergeOverage(account.id);
   // The switch shows the requested state while the call runs, then the cached snapshot again.
   const [pending, setPending] = useState<boolean | null>(null);
@@ -87,6 +88,20 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
         ? t("detail.overageDisabled")
         : t("detail.overageUnknown");
 
+  const facts: KeyValueItem[] = [
+    { label: t("detail.overageStatus"), value: statusLabel },
+    { label: t("detail.overageCap"), value: formatUsd(account.overageCap) },
+    { label: t("detail.overageRate"), value: formatUsd(account.overageRate) },
+    { label: t("detail.overageCurrent"), value: formatUsd(account.currentOverages) },
+    {
+      label: t("detail.overageCheckedAt"),
+      value: <RelativeTime value={account.overageCheckedAt} />,
+    },
+  ];
+  if (!capable) {
+    facts.push({ label: t("detail.overageCapability"), value: t("detail.overageNotCapable") });
+  }
+
   return (
     <SectionCard
       actions={
@@ -111,25 +126,10 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
         onCheckedChange={(checked) => toggle.mutate(checked)}
         title={t("detail.overageSwitch")}
       />
-      <PropertyList>
-        <PropertyRow label={t("detail.overageStatus")} value={statusLabel} />
-        <PropertyRow label={t("detail.overageCap")} value={formatUsd(account.overageCap)} />
-        <PropertyRow label={t("detail.overageRate")} value={formatUsd(account.overageRate)} />
-        <PropertyRow
-          label={t("detail.overageCurrent")}
-          value={formatUsd(account.currentOverages)}
-        />
-        <PropertyRow
-          label={t("detail.overageCheckedAt")}
-          value={account.overageCheckedAt ? formatDateTime(account.overageCheckedAt, lang) : ""}
-        />
-        {capable ? null : (
-          <PropertyRow
-            label={t("detail.overageCapability")}
-            value={t("detail.overageNotCapable")}
-          />
-        )}
-      </PropertyList>
+      {/* Label over value, two across: the four numbers and the sync time in three short rows. */}
+      <div className="px-4 py-4 sm:px-6">
+        <KeyValueGrid items={facts} />
+      </div>
     </SectionCard>
   );
 }
