@@ -3,11 +3,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
 import { ChoiceCard } from "@/components/shared/choice-card";
-import { KeyValueGrid } from "@/components/shared/key-value-grid";
+import { PropertyList, PropertyRow } from "@/components/shared/property-list";
 import { SectionCard } from "@/components/shared/section-card";
+import { SETTINGS_ROW_X } from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CardPanel } from "@/components/ui/card";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { getAccountProfiles, setAccountProfile } from "@/lib/api/accounts";
@@ -15,6 +15,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, AccountProfilesResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { supportsKiroProfiles } from "../account-model";
 import { useInvalidateAccounts } from "../use-account-actions";
 
@@ -117,18 +118,25 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
       slim
       title={t("detail.profile")}
     >
-      <CardPanel>
-        <KeyValueGrid
-          items={[
-            { label: t("detail.profileRegion"), value: account.activeRegion || "us-east-1" },
-            {
-              label: t("detail.profileMode"),
-              value: account.profileArnPinned ? t("detail.profilePinned") : t("detail.profileAuto"),
-            },
-          ]}
-        />
-        {/* Always in the tree, so screen readers hear the list, the wait or the error arrive. */}
-        <div aria-live="polite">
+      <div className="min-w-0">
+        <PropertyList>
+          <PropertyRow
+            label={t("detail.profileRegion")}
+            value={account.activeRegion || "us-east-1"}
+          />
+          <PropertyRow
+            label={t("detail.profileMode")}
+            value={account.profileArnPinned ? t("detail.profilePinned") : t("detail.profileAuto")}
+          />
+        </PropertyList>
+        {/*
+         * Always in the tree, so screen readers hear the list, the wait or the error arrive. Empty
+         * it takes no room; with content it sits under a hairline like the rows above it.
+         */}
+        <div
+          aria-live="polite"
+          className={cn(SETTINGS_ROW_X, "border-border-subtle not-empty:border-t not-empty:pb-4")}
+        >
           {load.isPending ? (
             <p className="mt-4 flex items-center gap-2 text-muted-foreground text-sm">
               <Spinner aria-hidden="true" className="size-4" />
@@ -179,7 +187,7 @@ export function ProfileSection({ account }: { account: Account }): JSX.Element {
             </RadioGroup>
           ) : null}
         </div>
-      </CardPanel>
+      </div>
     </SectionCard>
   );
 }

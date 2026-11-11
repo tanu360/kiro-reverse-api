@@ -1,12 +1,10 @@
 import { UserCircleIcon } from "@hugeicons/core-free-icons";
 import { type JSX, useState } from "react";
-import { KeyValueGrid } from "@/components/shared/key-value-grid";
+import { PropertyList, PropertyRow } from "@/components/shared/property-list";
 import { SectionCard } from "@/components/shared/section-card";
-import { CardPanel } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { Account } from "@/lib/api/types";
-import { EMPTY } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { authLabel } from "../account-model";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
@@ -15,28 +13,22 @@ import { ProxyRow } from "./proxy-section";
 import { WeightRow } from "./weight-section";
 
 /**
- * The account's facts (the email is the sheet's title) over its editable fields: nickname,
- * machine ID, weight and proxy, each a row with an Edit dialog.
+ * The account's facts (the email is the sheet's title), then its editable fields: nickname,
+ * machine ID, weight and proxy, each a row with a pencil button that opens its Edit dialog.
  */
 export function BasicSection({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
   return (
     <SectionCard icon={UserCircleIcon} slim title={t("detail.basicInfo")}>
-      <CardPanel>
-        <KeyValueGrid
-          items={[
-            account.userId
-              ? { label: t("detail.userId"), value: account.userId, mono: true, copy: true }
-              : { label: t("detail.userId"), value: EMPTY },
-            { label: t("detail.authMethod"), value: authLabel(account, t) },
-            { label: t("detail.region"), value: account.region || "us-east-1" },
-          ]}
-        />
-      </CardPanel>
-      <NicknameRow account={account} />
-      <MachineIdRow account={account} />
-      <WeightRow account={account} />
-      <ProxyRow account={account} />
+      <PropertyList>
+        <PropertyRow copy label={t("detail.userId")} mono value={account.userId} />
+        <PropertyRow label={t("detail.authMethod")} value={authLabel(account, t)} />
+        <PropertyRow label={t("detail.region")} value={account.region || "us-east-1"} />
+        <NicknameRow account={account} />
+        <MachineIdRow account={account} />
+        <WeightRow account={account} />
+        <ProxyRow account={account} />
+      </PropertyList>
     </SectionCard>
   );
 }

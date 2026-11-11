@@ -26,7 +26,6 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
 
   return (
     <EditableFieldRow
-      hint={t("detail.proxyHint")}
       mono
       onEdit={() => {
         setValue(account.proxyURL);

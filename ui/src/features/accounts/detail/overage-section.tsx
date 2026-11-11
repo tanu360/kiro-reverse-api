@@ -2,16 +2,15 @@ import { CloudDownloadIcon, ZapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
-import { KeyValueGrid } from "@/components/shared/key-value-grid";
+import { PropertyList, PropertyRow } from "@/components/shared/property-list";
 import { SectionCard } from "@/components/shared/section-card";
 import { SwitchField } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
-import { CardPanel } from "@/components/ui/card";
 import { getAccountOverage, setAccountOverage } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, OverageResponse } from "@/lib/api/types";
-import { EMPTY, formatDateTime, formatUsd } from "@/lib/format";
+import { formatDateTime, formatUsd } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { overageCapable, overageEnabled } from "../account-model";
@@ -112,25 +111,25 @@ export function OverageSection({ account }: { account: Account }): JSX.Element {
         onCheckedChange={(checked) => toggle.mutate(checked)}
         title={t("detail.overageSwitch")}
       />
-      <CardPanel>
-        <KeyValueGrid
-          items={[
-            { label: t("detail.overageStatus"), value: statusLabel },
-            { label: t("detail.overageCap"), value: formatUsd(account.overageCap) },
-            { label: t("detail.overageRate"), value: formatUsd(account.overageRate) },
-            { label: t("detail.overageCurrent"), value: formatUsd(account.currentOverages) },
-            {
-              label: t("detail.overageCheckedAt"),
-              value: account.overageCheckedAt
-                ? formatDateTime(account.overageCheckedAt, lang)
-                : EMPTY,
-            },
-            ...(capable
-              ? []
-              : [{ label: t("detail.overageCapability"), value: t("detail.overageNotCapable") }]),
-          ]}
+      <PropertyList>
+        <PropertyRow label={t("detail.overageStatus")} value={statusLabel} />
+        <PropertyRow label={t("detail.overageCap")} value={formatUsd(account.overageCap)} />
+        <PropertyRow label={t("detail.overageRate")} value={formatUsd(account.overageRate)} />
+        <PropertyRow
+          label={t("detail.overageCurrent")}
+          value={formatUsd(account.currentOverages)}
         />
-      </CardPanel>
+        <PropertyRow
+          label={t("detail.overageCheckedAt")}
+          value={account.overageCheckedAt ? formatDateTime(account.overageCheckedAt, lang) : ""}
+        />
+        {capable ? null : (
+          <PropertyRow
+            label={t("detail.overageCapability")}
+            value={t("detail.overageNotCapable")}
+          />
+        )}
+      </PropertyList>
     </SectionCard>
   );
 }

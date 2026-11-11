@@ -199,7 +199,7 @@ describe("AccountDetailSheet", () => {
     expect(document.activeElement?.tagName).not.toBe("INPUT");
   });
 
-  it("shows the plan as the list does and the reset date and credits in the UI locale", async () => {
+  it("shows the plan as the list does, the credits meter first and dates in the UI locale", async () => {
     const account = dana();
     const { sheet } = await openSheet(account);
     const subscription = section(sheet, "Subscription");
@@ -210,8 +210,12 @@ describe("AccountDetailSheet", () => {
       new Date(Date.UTC(year, month - 1, day)),
     );
     expect(within(subscription).getByText(reset)).toBeInTheDocument();
-    expect(within(subscription).getByText("450 / 1,000")).toBeInTheDocument();
+    // Plan credits lead the sheet in the meter, over the lifetime numbers.
+    const statistics = section(sheet, "Statistics");
+    expect(within(statistics).getByRole("meter", { name: "Plan credits" })).toBeInTheDocument();
+    expect(within(statistics).getByText("450 / 1,000")).toBeInTheDocument();
+    expect(within(subscription).queryByText("450 / 1,000")).not.toBeInTheDocument();
     // Same one-decimal credits as the list ("312.5", not "312.48").
-    expect(within(section(sheet, "Statistics")).getByText("312.5")).toBeInTheDocument();
+    expect(within(statistics).getByText("312.5")).toBeInTheDocument();
   });
 });

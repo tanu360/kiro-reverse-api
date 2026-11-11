@@ -8,6 +8,7 @@ import {
   HourglassIcon,
   KeyRoundIcon,
   PauseCircleIcon,
+  UserIcon,
   WeightIcon,
   ZapIcon,
 } from "@hugeicons/core-free-icons";
@@ -244,6 +245,42 @@ export function AuthIcon({ account }: { account: Account }): JSX.Element | null 
   );
 }
 
+/**
+ * The detail sheet's avatar: the sign-in method's mark, 20 px on a 40 px tile one step above the
+ * sheet (the IconChip surface), or a person for a method without a mark. Decorative: the meta
+ * line names the method.
+ */
+export function AuthAvatar({
+  account,
+  className,
+}: {
+  account: Account;
+  /** Layout only. */
+  className?: string;
+}): JSX.Element {
+  const key = authKey(account);
+  const Logo = AUTH_LOGOS[key];
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "flex size-10 shrink-0 items-center justify-center rounded-xl border border-border-subtle bg-surface-2 text-muted-foreground",
+        className,
+      )}
+      data-slot="auth-avatar"
+    >
+      {key === "apiKey" ? (
+        <HugeiconsIcon className="size-5" icon={KeyRoundIcon} />
+      ) : Logo ? (
+        // The AWS wordmark fills less of its square than a glyph does, so it is drawn larger.
+        <Logo className={Logo === AwsLogo ? "size-6.5" : "size-5"} />
+      ) : (
+        <HugeiconsIcon className="size-5" icon={UserIcon} />
+      )}
+    </span>
+  );
+}
+
 /** Email (masked under privacy), sign-in mark and flags, over a muted nickname and plan line. */
 export function AccountIdentity({
   account,
@@ -274,9 +311,15 @@ export function AccountIdentity({
  */
 export function UsageMeter({
   account,
+  labelled = false,
   className,
 }: {
   account: Account;
+  /**
+   * The detail sheet's meter: the label always shown and the line at 14 px, where no column
+   * header names it.
+   */
+  labelled?: boolean;
   /** Layout only: the meter fills its box (the table column, or a card row). */
   className?: string;
 }): JSX.Element {
@@ -289,12 +332,18 @@ export function UsageMeter({
   const pct = usagePercent(hasPlan ? account.usagePercent : account.trialUsagePercent);
   return (
     <Meter className={cn("w-full min-w-32 gap-1.5", className)} max={100} min={0} value={pct}>
-      <div className="flex items-baseline justify-between gap-2 text-meta leading-none">
-        <span className="flex min-w-0 items-baseline gap-1.5">
+      <div
+        className={cn(
+          "flex items-baseline justify-between gap-2 leading-none",
+          labelled ? "text-sm" : "text-meta",
+        )}
+      >
+        <span className={cn("flex min-w-0 items-baseline", labelled ? "gap-2" : "gap-1.5")}>
           <MeterLabel
             className={cn(
-              "shrink-0 font-normal text-meta text-muted-foreground",
-              hasPlan && "sr-only",
+              "shrink-0 font-normal text-muted-foreground",
+              labelled ? "text-sm" : "text-meta",
+              hasPlan && !labelled && "sr-only",
             )}
           >
             {hasPlan ? t("planCredits") : t("trialCredits")}

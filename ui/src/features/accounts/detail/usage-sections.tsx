@@ -1,72 +1,112 @@
-import { ChartColumnIcon, CreditCardIcon } from "@hugeicons/core-free-icons";
-import type { JSX } from "react";
+import { CreditCardIcon } from "@hugeicons/core-free-icons";
+import { type JSX, type ReactNode, useId } from "react";
 import { CreditAmount } from "@/components/shared/credit-amount";
-import { KeyValueGrid } from "@/components/shared/key-value-grid";
+import { PropertyList, PropertyRow } from "@/components/shared/property-list";
 import { SectionCard } from "@/components/shared/section-card";
+import { Card } from "@/components/ui/card";
 import type { Account } from "@/lib/api/types";
-import { EMPTY, formatCompact, formatDateTime, formatNumber } from "@/lib/format";
+import { formatCompact, formatDateTime, formatNumber } from "@/lib/format";
 import { type Lang, useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import { UsageMeter } from "../account-cells";
 import { formatCreditAmount, formatResetDate, planLabel } from "../account-model";
 
 function credits(current: number, limit: number, lang: Lang): string {
   return `${formatCreditAmount(current, lang)} / ${formatCreditAmount(limit, lang)}`;
 }
 
-export function SubscriptionSection({ account }: { account: Account }): JSX.Element {
+/**
+ * The sheet's opening card: the credits meter (plan, or trial for a trial-only account) over the
+ * four lifetime numbers. Four across from a 28rem card, two by two below it (a phone sheet). The
+ * section keeps the "Statistics" name for screen readers; the numbers carry their own labels.
+ */
+export function StatisticsSection({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
-  const items = [
-    { label: t("detail.plan"), value: planLabel(account, t) },
+  const headingId = useId();
+  const hasUsage = account.usageLimit > 0 || account.trialUsageLimit > 0;
+  const stats: Array<{ label: string; value: ReactNode }> = [
+    { label: t("detail.requests"), value: formatNumber(account.requestCount, lang) },
+    { label: t("detail.errors"), value: formatNumber(account.errorCount, lang) },
+    { label: t("detail.totalTokens"), value: formatCompact(account.totalTokens) },
     {
-      label: t("detail.tokenExpiry"),
-      value: account.expiresAt ? formatDateTime(account.expiresAt, lang) : EMPTY,
+      label: t("detail.totalCredits"),
+      value: (
+        <CreditAmount
+          digits={1}
+          format={(value) => formatCreditAmount(value, lang)}
+          value={account.totalCredits}
+        />
+      ),
     },
-    {
-      label: t("detail.planCredits"),
-      value: credits(account.usageCurrent, account.usageLimit, lang),
-    },
-    { label: t("detail.resetDate"), value: formatResetDate(account.nextResetDate, lang) },
   ];
-  if (account.trialUsageLimit > 0) {
-    items.push(
-      {
-        label: t("detail.trialCredits"),
-        value: credits(account.trialUsageCurrent, account.trialUsageLimit, lang),
-      },
-      { label: t("detail.trialStatus"), value: account.trialStatus || EMPTY },
-      {
-        label: t("detail.trialExpiry"),
-        value: account.trialExpiresAt ? formatDateTime(account.trialExpiresAt, lang) : EMPTY,
-      },
-    );
-  }
   return (
-    <SectionCard icon={CreditCardIcon} title={t("detail.subscription")}>
-      <KeyValueGrid items={items} />
-    </SectionCard>
+    <Card
+      aria-labelledby={headingId}
+      className="@container min-w-0"
+      data-slot="section-card"
+      render={<section />}
+    >
+      <h2 className="sr-only" id={headingId}>
+        {t("detail.statistics")}
+      </h2>
+      {hasUsage ? (
+        <div className="px-4 py-4 sm:px-6">
+          <UsageMeter account={account} labelled />
+        </div>
+      ) : null}
+      <dl
+        className={cn(
+          "grid grid-cols-2 @md:grid-cols-4",
+          hasUsage && "border-border-subtle border-t",
+        )}
+      >
+        {stats.map((stat) => (
+          <div
+            className="flex min-w-0 flex-col gap-1 border-border-subtle px-4 py-3 not-first:@md:border-s even:border-s nth-[n+3]:border-t sm:px-6 nth-[n+3]:@md:border-t-0"
+            key={stat.label}
+          >
+            <dt className="truncate text-meta text-muted-foreground">{stat.label}</dt>
+            <dd className="truncate font-semibold text-base tabular-nums">{stat.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
   );
 }
 
-export function StatisticsSection({ account }: { account: Account }): JSX.Element {
+/**
+ * The plan and its dates. Plan credits sit in the meter above; a trial's credits, state and
+ * expiry follow when the account has one.
+ */
+export function SubscriptionSection({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
+  const trial = account.trialUsageLimit > 0;
   return (
-    <SectionCard icon={ChartColumnIcon} title={t("detail.statistics")}>
-      <KeyValueGrid
-        items={[
-          { label: t("detail.requests"), value: formatNumber(account.requestCount, lang) },
-          { label: t("detail.errors"), value: formatNumber(account.errorCount, lang) },
-          { label: t("detail.totalTokens"), value: formatCompact(account.totalTokens) },
-          {
-            label: t("detail.totalCredits"),
-            value: (
-              <CreditAmount
-                digits={1}
-                format={(value) => formatCreditAmount(value, lang)}
-                value={account.totalCredits}
-              />
-            ),
-          },
-        ]}
-      />
+    <SectionCard icon={CreditCardIcon} slim title={t("detail.subscription")}>
+      <PropertyList>
+        <PropertyRow label={t("detail.plan")} value={planLabel(account, t)} />
+        <PropertyRow
+          label={t("detail.tokenExpiry")}
+          value={account.expiresAt ? formatDateTime(account.expiresAt, lang) : ""}
+        />
+        <PropertyRow
+          label={t("detail.resetDate")}
+          value={formatResetDate(account.nextResetDate, lang)}
+        />
+        {trial ? (
+          <>
+            <PropertyRow
+              label={t("detail.trialCredits")}
+              value={credits(account.trialUsageCurrent, account.trialUsageLimit, lang)}
+            />
+            <PropertyRow label={t("detail.trialStatus")} value={account.trialStatus} />
+            <PropertyRow
+              label={t("detail.trialExpiry")}
+              value={account.trialExpiresAt ? formatDateTime(account.trialExpiresAt, lang) : ""}
+            />
+          </>
+        ) : null}
+      </PropertyList>
     </SectionCard>
   );
 }

@@ -29,7 +29,6 @@ export function WeightRow({ account }: { account: Account }): JSX.Element {
 
   return (
     <EditableFieldRow
-      hint={t("detail.weightHint")}
       onEdit={() => {
         setWeight(account.weight);
         setOpen(true);
