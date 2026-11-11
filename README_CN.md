@@ -83,6 +83,14 @@
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/requests-detail-dark.webp">
+    <img alt="请求详情" src="screenshots/zh/requests-detail-light.webp" width="100%">
+  </picture>
+  <br><sub><b>请求详情</b> — 点击一行打开的详情面板：耗时、Credits、Token 与 ID</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/api-dark.webp">
     <img alt="接口" src="screenshots/zh/api-light.webp" width="100%">
   </picture>

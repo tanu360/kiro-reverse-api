@@ -83,6 +83,14 @@ Se este projeto ajuda você, uma Star significaria muito.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/requests-detail-dark.webp">
+    <img alt="Detalhes da requisição" src="screenshots/pt-BR/requests-detail-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Detalhes da requisição</b> — o painel que cada linha abre: duração, créditos, tokens e IDs</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/api-dark.webp">
     <img alt="API" src="screenshots/pt-BR/api-light.webp" width="100%">
   </picture>

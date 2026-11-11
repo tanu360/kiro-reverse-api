@@ -83,6 +83,14 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/requests-detail-dark.webp">
+    <img alt="Chi tiết yêu cầu" src="screenshots/vi/requests-detail-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Chi tiết yêu cầu</b> — bảng mở ra khi bấm một dòng: thời lượng, credit, token và ID</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/api-dark.webp">
     <img alt="API" src="screenshots/vi/api-light.webp" width="100%">
   </picture>

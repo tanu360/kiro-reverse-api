@@ -83,6 +83,14 @@ If this project helps you, a Star would mean a lot.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/requests-detail-dark.webp">
+    <img alt="Request details" src="screenshots/en/requests-detail-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Request details</b> — the sheet a row opens: duration, credits, tokens and IDs</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/api-dark.webp">
     <img alt="API" src="screenshots/en/api-light.webp" width="100%">
   </picture>
