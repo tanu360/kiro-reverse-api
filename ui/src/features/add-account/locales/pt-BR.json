@@ -12,7 +12,7 @@
   "completeSignIn": "Concluir login",
   "callbackUrl": "URL de callback",
   "callbackRequired": "Cole a URL de callback primeiro.",
-  "success": "Conta adicionada: {name}",
+  "success": "A conta {name} foi adicionada.",
   "startFailed": "Não foi possível iniciar o login: {error}",
   "failed": "Não foi possível adicionar a conta: {error}",
   "allFailed": "Não foi possível adicionar nenhuma conta: {error}",

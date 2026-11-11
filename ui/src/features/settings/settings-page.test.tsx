@@ -76,7 +76,7 @@ describe("SettingsPage", () => {
     const toggle = within(usage).getByRole("switch", { name: "Allow overage" });
     await user.click(toggle);
 
-    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
     expect(await writes()).toEqual([
       { method: "POST", path: "/settings", body: { allowOverUsage: true } },
     ]);
@@ -114,7 +114,7 @@ describe("SettingsPage", () => {
     );
     await user.click(save);
 
-    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
     expect(await writes()).toEqual([
       { method: "POST", path: "/settings", body: { autoContinue: true, autoContinueMax: 3 } },
     ]);
@@ -146,7 +146,7 @@ describe("SettingsPage", () => {
     await user.clear(within(card).getByLabelText("Trigger suffix"));
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    await screen.findByText("Settings saved");
+    await screen.findByText("Your settings were saved.");
     expect(await writes()).toEqual([
       {
         method: "POST",
@@ -304,7 +304,7 @@ describe("SettingsPage", () => {
       await user.click(screen.getByRole("menuitem", { name: "Move down" }));
       await user.click(within(card).getByRole("button", { name: "Save" }));
 
-      await screen.findByText("Settings saved");
+      await screen.findByText("Your settings were saved.");
       const [write] = await writes("/model-mappings");
       const defaults = defaultModelMappings();
       expect((write.body as { mappings: unknown[] }).mappings).toEqual([
@@ -369,7 +369,7 @@ describe("SettingsPage", () => {
       expect(within(dialog).getByText("All other signed-in sessions end.")).toBeInTheDocument();
       await user.click(within(dialog).getByRole("button", { name: "Change password" }));
 
-      expect(await screen.findByText("Password changed")).toBeInTheDocument();
+      expect(await screen.findByText("Your password was changed.")).toBeInTheDocument();
       expect(await writes()).toEqual([
         { method: "POST", path: "/settings", body: { password: "correct horse" } },
         { method: "POST", path: "/session", body: { password: "correct horse" } },
@@ -418,7 +418,7 @@ describe("SettingsPage", () => {
       await user.type(within(dialog).getByLabelText("Password"), "p:ss");
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-      await screen.findByText("Settings saved");
+      await screen.findByText("Your settings were saved.");
       expect(await writes()).toEqual([
         {
           method: "POST",
@@ -441,7 +441,7 @@ describe("SettingsPage", () => {
       const confirm = await screen.findByRole("alertdialog");
       await user.click(within(confirm).getByRole("button", { name: "Remove proxy" }));
 
-      await screen.findByText("Settings saved");
+      await screen.findByText("Your settings were saved.");
       expect(await writes()).toEqual([{ method: "POST", path: "/proxy", body: { proxyURL: "" } }]);
       expect(await within(card).findByText("Direct connection")).toBeInTheDocument();
       expect(within(card).getByRole("button", { name: "Set up proxy" })).toBeInTheDocument();
@@ -478,7 +478,7 @@ describe("SettingsPage", () => {
     ).toBeInTheDocument();
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    await screen.findByText("Settings saved");
+    await screen.findByText("Your settings were saved.");
     const [write] = await writes("/prompt-filter");
     const body = write.body as { rules: Array<Record<string, unknown>> };
     expect(Object.keys(body).sort()).toEqual([
@@ -530,7 +530,7 @@ describe("SettingsPage", () => {
     for (const control of within(card).getAllByRole("switch")) expect(control).toBeChecked();
     await user.click(within(card).getByRole("button", { name: "Save" }));
 
-    await screen.findByText("Settings saved");
+    await screen.findByText("Your settings were saved.");
     const [write] = await writes("/prompt-filter");
     expect(write.body).toMatchObject({
       filterClaudeCode: true,
@@ -554,7 +554,7 @@ describe("SettingsPage", () => {
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Reset" }));
 
-    expect(await screen.findByText("Statistics reset")).toBeInTheDocument();
+    expect(await screen.findByText("The statistics were reset.")).toBeInTheDocument();
     expect(await writes()).toEqual([{ method: "POST", path: "/stats/reset", body: null }]);
     expect(mockDb.requests).toEqual([]);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.status });

@@ -6,7 +6,7 @@
   "groups.server": "Servidor e acesso",
   "groups.safety": "Segurança e manutenção",
   "sections": "Seções de configurações",
-  "saved": "Configurações salvas",
+  "saved": "Suas configurações foram salvas.",
   "saveFailed": "Não foi possível salvar as configurações: {reason}",
   "learnMore": "Saiba mais",
   "stateOn": "Ativo",
@@ -107,7 +107,7 @@
   "passwordTooShort": "A senha deve ter pelo menos 8 caracteres.",
   "confirmPasswordTitle": "Alterar a senha de administrador?",
   "confirmPasswordBody": "Todas as outras sessões conectadas são encerradas.",
-  "passwordChanged": "Senha alterada",
+  "passwordChanged": "Sua senha foi alterada.",
   "proxySettings": "Proxy de saída",
   "proxyHint": "Envie o tráfego do Kiro e de login por um proxy SOCKS5, HTTP ou HTTPS. As alterações valem na hora, sem reiniciar.",
   "proxyType": "Tipo de proxy",
@@ -184,6 +184,6 @@
   "confirmResetTitle": "Redefinir todas as estatísticas?",
   "confirmResetBody": "O histórico de requisições e os logs de erro são excluídos. O uso por conta e por chave é mantido. Não é possível desfazer.",
   "confirmResetAction": "Redefinir",
-  "statsReset": "Estatísticas redefinidas",
+  "statsReset": "As estatísticas foram redefinidas.",
   "resetFailed": "Não foi possível redefinir as estatísticas: {reason}"
 }

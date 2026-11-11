@@ -180,7 +180,7 @@ describe("ApiPage", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Reset usage" }));
     await waitFor(() => expect(sent("POST", `/api-keys/${teamA?.id}/reset-usage`)).toHaveLength(1));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    expect(await screen.findByText("Usage reset")).toBeInTheDocument();
+    expect(await screen.findByText("The key's usage was reset.")).toBeInTheDocument();
   });
 
   it("deletes a key only after the confirm", async () => {
@@ -244,7 +244,7 @@ describe("ApiPage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(settingsPosts).toEqual([{ requireApiKey: true }]));
     expect(await screen.findByText("Clients must send an API key")).toBeInTheDocument();
-    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
   });
 
   it("shows the six endpoint URLs on window.location.origin", async () => {

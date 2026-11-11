@@ -130,7 +130,7 @@ describe("BackupsPage", () => {
     );
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create backup" }));
-    expect(await findToast("Backup created")).toBeInTheDocument();
+    expect(await findToast("The backup was created.")).toBeInTheDocument();
     expect(body).toEqual({
       kind: "manual",
       note: expect.stringMatching(/^manual backup \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/),
@@ -152,7 +152,7 @@ describe("BackupsPage", () => {
     await user.clear(keep);
     await user.type(keep, "500");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(await findToast("Schedule saved")).toBeInTheDocument();
+    expect(await findToast("The schedule was saved.")).toBeInTheDocument();
     expect(body).toEqual({ enabled: true, cadence: "daily", keep: 200 });
   });
 
@@ -253,7 +253,7 @@ describe("BackupsPage", () => {
       within(dialog()).getByRole("heading", { name: "Restore from broken.json?" }),
     ).toBeInTheDocument();
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
-    expect(await findToast("Could not restore from this file")).toBeInTheDocument();
+    expect(await findToast("Could not restore from this file.")).toBeInTheDocument();
     expect(
       screen.getAllByText(
         "It is not a Kiro Proxy backup. Choose a file you downloaded from Backups. Details: backup content is not valid JSON",
@@ -268,7 +268,7 @@ describe("BackupsPage", () => {
     const input = screen.getByTestId("backup-upload-input") as HTMLInputElement;
     await user.upload(input, new File([JSON.stringify({ hello: "world" })], "other.json"));
     await user.click(within(dialog()).getByRole("button", { name: "Restore" }));
-    expect(await findToast("Could not restore from this file")).toBeInTheDocument();
+    expect(await findToast("Could not restore from this file.")).toBeInTheDocument();
     expect(screen.queryByText("unsupported backup format: expected kiro-proxy-backup")).toBeNull();
   });
 
@@ -340,7 +340,7 @@ describe("BackupsPage", () => {
       ),
     ).toBeInTheDocument();
     await user.click(within(dialog()).getByRole("button", { name: "Delete" }));
-    expect(await findToast("Backup deleted")).toBeInTheDocument();
+    expect(await findToast("The backup was deleted.")).toBeInTheDocument();
     await waitFor(() => expect(dataRows()).toHaveLength(4));
     expect(mockDb.backups.some((row) => row.id === first.id)).toBe(false);
   });
@@ -431,7 +431,7 @@ describe("BackupsPage focus", () => {
     expect(pending).toHaveFocus();
     await user.click(pending);
     release();
-    expect(await findToast("Backup created")).toBeInTheDocument();
+    expect(await findToast("The backup was created.")).toBeInTheDocument();
     expect(calls).toBe(1);
     expect(screen.getByRole("button", { name: "Create backup" })).toHaveFocus();
   });
@@ -463,7 +463,7 @@ describe("BackupsPage focus", () => {
     const download = within(dataRows()[0]).getByRole("button", { name: "Download" });
     await user.click(download);
     expect(download).not.toBeDisabled();
-    expect(await findToast("Backup downloaded")).toBeInTheDocument();
+    expect(await findToast("The backup was downloaded.")).toBeInTheDocument();
     expect(
       screen.getAllByText("The file contains passwords and tokens in plain text. Store it safely.")
         .length,
@@ -533,7 +533,7 @@ describe("ScheduleCard", () => {
     await user.type(keep, "30");
     const save = screen.getByRole("button", { name: "Save" });
     await user.click(save);
-    expect(await findToast("Schedule saved")).toBeInTheDocument();
+    expect(await findToast("The schedule was saved.")).toBeInTheDocument();
     await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
     expect(save).toBeInTheDocument();
     expect(save).toHaveFocus();
@@ -555,11 +555,11 @@ describe("ScheduleCard", () => {
     await user.type(keep, "5");
     const save = screen.getByRole("button", { name: "Save" });
     await user.click(save);
-    const title = await findToast("Schedule saved, but old backups were not removed");
+    const title = await findToast("The schedule was saved, but old backups were not removed.");
     const toastRoot = title.closest('[data-slot="toast"]') ?? title.parentElement;
     expect(toastRoot).toHaveTextContent(/next save or scheduled run tries again/);
     expect(toastRoot).toHaveTextContent("remove backup: disk full");
-    expect(screen.queryByText("Schedule saved")).toBeNull();
+    expect(screen.queryByText("The schedule was saved.")).toBeNull();
     await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
     expect(keep).toHaveValue("5");
   });
@@ -583,7 +583,7 @@ describe("ScheduleCard", () => {
     await user.click(screen.getByRole("combobox", { name: "Frequency" }));
     await user.click(await screen.findByRole("option", { name: "Weekly" }));
     await user.click(save);
-    expect(await findToast("Schedule saved")).toBeInTheDocument();
+    expect(await findToast("The schedule was saved.")).toBeInTheDocument();
     expect(body).toEqual({ enabled: true, cadence: "weekly", keep: 300 });
   });
 

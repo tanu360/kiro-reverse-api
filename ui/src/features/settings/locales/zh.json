@@ -6,7 +6,7 @@
   "groups.server": "服务器与访问",
   "groups.safety": "安全与维护",
   "sections": "设置分区",
-  "saved": "设置已保存",
+  "saved": "设置已保存。",
   "saveFailed": "无法保存设置：{reason}",
   "learnMore": "了解更多",
   "stateOn": "开启",
@@ -106,7 +106,7 @@
   "passwordTooShort": "密码至少需要 8 个字符。",
   "confirmPasswordTitle": "修改管理员密码？",
   "confirmPasswordBody": "其他所有已登录的会话都会结束。",
-  "passwordChanged": "密码已修改",
+  "passwordChanged": "密码已修改。",
   "proxySettings": "出站代理",
   "proxyHint": "通过 SOCKS5、HTTP 或 HTTPS 代理发送 Kiro 和登录流量。更改立即生效，无需重启。",
   "proxyType": "代理类型",
@@ -183,6 +183,6 @@
   "confirmResetTitle": "重置所有统计？",
   "confirmResetBody": "请求历史和错误日志会被删除。各账号和各 API Key 的用量保留。此操作无法撤销。",
   "confirmResetAction": "重置",
-  "statsReset": "统计已重置",
+  "statsReset": "统计已重置。",
   "resetFailed": "无法重置统计：{reason}"
 }

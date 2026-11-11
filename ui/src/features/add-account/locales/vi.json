@@ -12,7 +12,7 @@
   "completeSignIn": "Hoàn tất đăng nhập",
   "callbackUrl": "Callback URL",
   "callbackRequired": "Dán callback URL trước.",
-  "success": "Đã thêm tài khoản: {name}",
+  "success": "Đã thêm tài khoản {name}.",
   "startFailed": "Không thể bắt đầu đăng nhập: {error}",
   "failed": "Không thể thêm tài khoản: {error}",
   "allFailed": "Không thêm được tài khoản nào: {error}",

@@ -166,7 +166,7 @@ describe("Builder ID", () => {
     expect(onAdded).toHaveBeenCalledWith([id]);
     expect(polls.count).toBe(3);
     await waitFor(() => expect(refreshed).toEqual([id]));
-    await expectToast(/^Account added: /);
+    await expectToast(/^Added the account /);
   });
 
   it("stops polling when the dialog closes", async () => {
@@ -271,7 +271,7 @@ describe("Microsoft SSO", () => {
     await user.type(screen.getByRole("textbox", { name: "Callback URL" }), "http://x/?noprofile");
     await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
     await expectClosed();
-    await expectToast(/^Account added: /);
+    await expectToast(/^Added the account /);
     await expectToast(/Kiro profile could not be resolved yet/);
   });
 

@@ -12,7 +12,7 @@
   "completeSignIn": "Complete sign-in",
   "callbackUrl": "Callback URL",
   "callbackRequired": "Paste the callback URL first.",
-  "success": "Account added: {name}",
+  "success": "Added the account {name}.",
   "startFailed": "Could not start sign-in: {error}",
   "failed": "Could not add the account: {error}",
   "allFailed": "Could not add any account: {error}",

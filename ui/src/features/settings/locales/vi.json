@@ -6,7 +6,7 @@
   "groups.server": "Máy chủ và truy cập",
   "groups.safety": "An toàn và bảo trì",
   "sections": "Các mục cài đặt",
-  "saved": "Đã lưu cài đặt",
+  "saved": "Đã lưu cài đặt của bạn.",
   "saveFailed": "Không thể lưu cài đặt: {reason}",
   "learnMore": "Tìm hiểu thêm",
   "stateOn": "Bật",
@@ -106,7 +106,7 @@
   "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự.",
   "confirmPasswordTitle": "Đổi mật khẩu quản trị?",
   "confirmPasswordBody": "Mọi phiên đăng nhập khác sẽ kết thúc.",
-  "passwordChanged": "Đã đổi mật khẩu",
+  "passwordChanged": "Đã đổi mật khẩu của bạn.",
   "proxySettings": "Proxy outbound",
   "proxyHint": "Gửi lưu lượng Kiro và đăng nhập qua proxy SOCKS5, HTTP hoặc HTTPS. Thay đổi áp dụng ngay, không cần khởi động lại.",
   "proxyType": "Loại proxy",
@@ -183,6 +183,6 @@
   "confirmResetTitle": "Đặt lại toàn bộ thống kê?",
   "confirmResetBody": "Lịch sử yêu cầu và nhật ký lỗi sẽ bị xóa. Mức sử dụng theo tài khoản và theo key được giữ lại. Không thể hoàn tác thao tác này.",
   "confirmResetAction": "Đặt lại",
-  "statsReset": "Đã đặt lại thống kê",
+  "statsReset": "Đã đặt lại thống kê.",
   "resetFailed": "Không thể đặt lại thống kê: {reason}"
 }

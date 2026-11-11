@@ -53,7 +53,7 @@ export function CopyButton({
       toast.error(t("toast.copyFailed"));
       return;
     }
-    toast.success(copiedMessage ?? t("toast.copied"));
+    toast.success(copiedMessage ?? t("toast.copiedToClipboard"));
     setCopied(true);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {

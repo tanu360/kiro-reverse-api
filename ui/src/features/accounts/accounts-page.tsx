@@ -186,7 +186,7 @@ export function AccountsPage(): JSX.Element {
 
   const onExport = (ids?: string[]) => {
     if (accounts.length === 0) {
-      toast.warning(t("empty.title"));
+      toast.warning(t("export.noAccounts"));
       return;
     }
     setExportState({ open: true, ids });

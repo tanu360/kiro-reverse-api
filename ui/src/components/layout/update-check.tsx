@@ -85,7 +85,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
           const version = stripV(newer.version);
           if (readStorage(ANNOUNCED_VERSION_KEY) === version) return;
           writeStorage(ANNOUNCED_VERSION_KEY, version);
-          toast.warning(tRef.current("shell.update.available", { latest: version }), {
+          toast.warning(tRef.current("shell.update.availableToast", { latest: version }), {
             id: AVAILABLE_TOAST_ID,
             duration: AVAILABLE_TOAST_MS,
             action: { label: tRef.current("shell.update.view"), onClick: openDialog },

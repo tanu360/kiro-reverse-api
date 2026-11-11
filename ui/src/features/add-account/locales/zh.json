@@ -12,7 +12,7 @@
   "completeSignIn": "完成登录",
   "callbackUrl": "回调 URL",
   "callbackRequired": "请先粘贴回调 URL。",
-  "success": "已添加账号：{name}",
+  "success": "已添加账号 {name}。",
   "startFailed": "无法开始登录：{error}",
   "failed": "无法添加账号：{error}",
   "allFailed": "未能添加任何账号：{error}",

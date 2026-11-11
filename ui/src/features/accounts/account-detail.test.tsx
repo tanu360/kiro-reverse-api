@@ -104,7 +104,7 @@ describe("AccountDetailSheet", () => {
     await user.type(input, "4");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(puts).toEqual([{ weight: 4 }]));
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(await screen.findByText("The change was saved.")).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Weight" })).not.toBeInTheDocument(),
     );
@@ -172,7 +172,9 @@ describe("AccountDetailSheet", () => {
 
     const sandboxArn = "arn:aws:codewhisperer:us-east-1:381492027763:profile/HV4N8TQW2JDE";
     await waitFor(() => expect(pins).toEqual([{ profileArn: sandboxArn }]));
-    expect(await screen.findByText("Pinned to us-east-1")).toBeInTheDocument();
+    expect(
+      await screen.findByText("The account now uses the us-east-1 profile."),
+    ).toBeInTheDocument();
     await waitFor(() => expect(lists.length).toBeGreaterThan(0));
     await waitFor(() =>
       expect(

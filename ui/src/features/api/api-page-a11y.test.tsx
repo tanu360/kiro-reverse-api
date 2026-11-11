@@ -96,7 +96,7 @@ describe("API keys focus", () => {
     expect(trigger).toBeEnabled();
     await waitFor(() => expect(trigger).toHaveFocus());
     release();
-    expect(await screen.findByText("Usage reset")).toBeInTheDocument();
+    expect(await screen.findByText("The key's usage was reset.")).toBeInTheDocument();
     expect(trigger).toHaveFocus();
     expect(trigger).not.toHaveAttribute("aria-busy");
   });
@@ -106,7 +106,7 @@ describe("API keys focus", () => {
     const trigger = within(keysTable()).getByRole("button", { name: "Actions for team-a" });
     await user.click(trigger);
     await user.click(await screen.findByRole("menuitem", { name: "Disable" }));
-    expect(await screen.findByText("API key disabled")).toBeInTheDocument();
+    expect(await screen.findByText("The API key was disabled.")).toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
@@ -160,7 +160,7 @@ describe("API access", () => {
     await user.click(screen.getByRole("switch", { name: "Require an API key" }));
     expect(save).not.toHaveAttribute("aria-disabled");
     await user.click(save);
-    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
     await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
     expect(save).toHaveFocus();
     expect(save).toBeEnabled();

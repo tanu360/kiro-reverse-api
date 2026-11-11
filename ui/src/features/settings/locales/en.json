@@ -6,7 +6,7 @@
   "groups.server": "Server & access",
   "groups.safety": "Safety & maintenance",
   "sections": "Settings sections",
-  "saved": "Settings saved",
+  "saved": "Your settings were saved.",
   "saveFailed": "Could not save settings: {reason}",
   "learnMore": "Learn more",
   "stateOn": "On",
@@ -107,7 +107,7 @@
   "passwordTooShort": "Password must be at least 8 characters.",
   "confirmPasswordTitle": "Change the admin password?",
   "confirmPasswordBody": "All other signed-in sessions end.",
-  "passwordChanged": "Password changed",
+  "passwordChanged": "Your password was changed.",
   "proxySettings": "Outbound proxy",
   "proxyHint": "Send Kiro and sign-in traffic through a SOCKS5, HTTP or HTTPS proxy. Changes apply right away, without a restart.",
   "proxyType": "Proxy type",
@@ -184,6 +184,6 @@
   "confirmResetTitle": "Reset all statistics?",
   "confirmResetBody": "Request history and error logs are deleted. Per-account and per-key usage stay. This cannot be undone.",
   "confirmResetAction": "Reset",
-  "statsReset": "Statistics reset",
+  "statsReset": "The statistics were reset.",
   "resetFailed": "Could not reset statistics: {reason}"
 }

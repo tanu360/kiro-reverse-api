@@ -54,7 +54,7 @@ describe("settings focus", () => {
     expect(save).not.toHaveAttribute("aria-disabled");
     await user.click(save);
 
-    await screen.findByText("Settings saved");
+    await screen.findByText("Your settings were saved.");
     expect(save).toHaveAttribute("aria-disabled", "true");
     expect(save).not.toBeDisabled();
     expect(save).toHaveFocus();
@@ -156,7 +156,7 @@ describe("settings focus", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
       await user.click(within(card).getByRole("button", { name: "Save" }));
 
-      await screen.findByText("Settings saved");
+      await screen.findByText("Your settings were saved.");
       // The server lowercases keys; the refetched copy replaces the clean draft in place.
       await waitFor(() =>
         expect(within(card).getAllByRole("listitem")[0]).toHaveTextContent("gpt-x"),

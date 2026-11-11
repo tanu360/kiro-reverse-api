@@ -60,7 +60,7 @@ describe("ExportDialog", () => {
         authMethod: "api_key",
       },
     ]);
-    expect(await screen.findByText("Credentials copied")).toBeInTheDocument();
+    expect(await screen.findByText("The credentials were copied.")).toBeInTheDocument();
   });
 
   it("downloads the full export as kiro-accounts-<date>.json", async () => {
