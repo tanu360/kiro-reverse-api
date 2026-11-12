@@ -147,6 +147,12 @@ func (a *structuredAttempt) callback() *KiroStreamCallback {
 		//! Inline <thinking> blocks are reasoning, not part of the JSON answer.
 		a.splitter.Push(text, a.recordAnswer, a.recordThinking)
 	}
+	if !a.forwardThinking {
+		//! A retry's reasoning is dropped, so its signature and redacted blocks go too: they
+		//! would sign the first attempt's thinking text with the retry's signature.
+		cb.OnThinkingSignature = nil
+		cb.OnRedactedThinking = nil
+	}
 	cb.OnToolUse = func(toolUse KiroToolUse) { a.toolUses = append(a.toolUses, toolUse) }
 	cb.onFollowupPayload = func(payload *KiroPayload) { a.followup = payload }
 	cb.OnStopReason = func(reason string) { a.stopReason = reason }

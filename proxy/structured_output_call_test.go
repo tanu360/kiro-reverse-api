@@ -101,6 +101,30 @@ func TestStructuredOutputRetryUsesFirstWhenRetryHasNoJSON(t *testing.T) {
 	}
 }
 
+func TestStructuredOutputRetryDropsItsSignatureAndRedacted(t *testing.T) {
+	initStructuredConfigForTest(t)
+	script := &scriptedKiro{hops: []scriptedHop{
+		{thinking: []string{"first plan"}, signature: "S1", redacted: []string{"R1"}, text: []string{`{"name":"Ann"}`}, stop: "end_turn"},
+		{thinking: []string{"second plan"}, signature: "S2", redacted: []string{"R2"}, text: []string{`{"name":"Ann","age":30}`}, stop: "end_turn"},
+	}}
+	rec := &continueRecorder{}
+	var signatures, redacted []string
+	cb := rec.callback()
+	cb.OnThinkingSignature = func(signature string) { signatures = append(signatures, signature) }
+	cb.OnRedactedThinking = func(data string) { redacted = append(redacted, data) }
+
+	if err := callKiroAutoContinue(t.Context(), nil, structuredTestPayload(personSpec()), cb, script.call); err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	if len(script.payloads) != 2 || rec.text != `{"name":"Ann","age":30}` {
+		t.Fatalf("calls=%d text=%q, want one retry and its answer", len(script.payloads), rec.text)
+	}
+	//! The client keeps the first attempt's thinking, so only that attempt's extras may sign it.
+	if rec.thinking != "first plan" || strings.Join(signatures, ",") != "S1" || strings.Join(redacted, ",") != "R1" {
+		t.Fatalf("thinking=%q signatures=%q redacted=%q, want only the first attempt's", rec.thinking, signatures, redacted)
+	}
+}
+
 func TestStructuredOutputSkipsWhenToolUse(t *testing.T) {
 	tool := KiroToolUse{ToolUseID: "t1", Name: "lookup", Input: map[string]interface{}{"q": "x"}}
 	rec, script, err := runStructuredScript(t, structuredTestPayload(personSpec()),
