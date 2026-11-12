@@ -138,17 +138,87 @@ func TestParseEventStreamReasoningExtrasNilCallbacksNoOp(t *testing.T) {
 	}
 }
 
-func TestParseEventStreamRedactedOnlyIsReasoning(t *testing.T) {
-	redactedOnly := parseFrames(t, &KiroStreamCallback{},
-		awsEventStreamFrame(t, "reasoningContentEvent", map[string]interface{}{"redactedContent": fixtureRedacted}),
-		meteringFrame(t),
-	)
-	reasoningOnly := parseFrames(t, &KiroStreamCallback{},
-		awsEventStreamFrame(t, "reasoningContentEvent", map[string]interface{}{"text": "thinking..."}),
-		meteringFrame(t),
-	)
-	if !errors.Is(redactedOnly, errUpstreamTruncatedResponse) || !errors.Is(reasoningOnly, errUpstreamTruncatedResponse) {
-		t.Fatalf("redacted-only=%v reasoning-only=%v, want both truncated (not empty)", redactedOnly, reasoningOnly)
+func redactedOnlyFrames(t *testing.T, stopReason string) [][]byte {
+	t.Helper()
+	frames := [][]byte{awsEventStreamFrame(t, "reasoningContentEvent", map[string]interface{}{"redactedContent": fixtureRedacted})}
+	if stopReason != "" {
+		frames = append(frames, awsEventStreamFrame(t, "metadataEvent", map[string]interface{}{"stopReason": stopReason}))
+	}
+	return append(frames, meteringFrame(t))
+}
+
+func TestParseEventStreamRedactedOnlyCountsWhenDelivered(t *testing.T) {
+	//! Redacted reasoning counts as output only for a caller that delivers it; for any other
+	//! caller a turn that sent nothing else must stay an empty stream, so it is retried.
+	delivered := func() *KiroStreamCallback { return &KiroStreamCallback{OnRedactedThinking: func(string) {}} }
+	for _, tc := range []struct {
+		name     string
+		callback *KiroStreamCallback
+		stop     string
+		want     error
+	}{
+		{"delivered, no stop reason", delivered(), "", errUpstreamTruncatedResponse},
+		{"delivered, end_turn", delivered(), "end_turn", nil},
+		{"dropped, no stop reason", &KiroStreamCallback{}, "", errEmptyKiroStream},
+		{"dropped, end_turn", &KiroStreamCallback{}, "end_turn", errEmptyKiroStream},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := parseFrames(t, tc.callback, redactedOnlyFrames(t, tc.stop)...); !errors.Is(err, tc.want) {
+				t.Fatalf("err = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}
+
+// redactedOnlyThenAnswer serves a turn with only redacted reasoning and end_turn, then a plain answer.
+func redactedOnlyThenAnswer(t *testing.T, calls *atomic.Int32) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		if calls.Add(1) == 1 {
+			writeFrames(w, redactedOnlyFrames(t, "end_turn")...)
+			return
+		}
+		writeFrames(w, answerFrame(t, "second try"), meteringFrame(t))
+	}
+}
+
+func TestRedactedOnlyTurnRetriedWhereClientCannotSeeIt(t *testing.T) {
+	requests := map[string]string{
+		"/v1/chat/completions": `{"model":"claude-sonnet-4.5-thinking","stream":%t,"messages":[{"role":"user","content":"hi"}]}`,
+		"/v1/responses":        `{"model":"claude-sonnet-4.5-thinking","stream":%t,"store":false,"input":"hi"}`,
+		"/v1/messages think":   `{"model":"claude-sonnet-4.5","max_tokens":2048,"stream":%t,"thinking":{"type":"enabled","budget_tokens":1024},"messages":[{"role":"user","content":"hi"}]}`,
+		"/v1/messages off":     `{"model":"claude-sonnet-4.5","max_tokens":64,"stream":%t,"messages":[{"role":"user","content":"hi"}]}`,
+	}
+	for name, body := range requests {
+		for _, stream := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s-stream=%t", name, stream), func(t *testing.T) {
+				var calls atomic.Int32
+				h := newStreamTestHandler(t, redactedOnlyThenAnswer(t, &calls))
+				if strings.HasSuffix(name, " think") {
+					if err := config.UpdateThinkingConfig("-thinking", "reasoning_content", "think"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				path, _, _ := strings.Cut(name, " ")
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(fmt.Sprintf(body, stream))))
+				got := rec.Body.String()
+				if rec.Code != http.StatusOK || calls.Load() != 2 || !strings.Contains(got, "second try") || strings.Contains(got, fixtureRedacted) {
+					t.Fatalf("status=%d calls=%d body=%s, want the retried answer and no redacted data", rec.Code, calls.Load(), got)
+				}
+			})
+		}
+	}
+}
+
+func TestClaudeRedactedOnlyTurnIsAnswer(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		var calls atomic.Int32
+		h := newStreamTestHandler(t, redactedOnlyThenAnswer(t, &calls))
+		rec := postThinkingClaude(t, h, stream, "", nil)
+		got := rec.Body.String()
+		if rec.Code != http.StatusOK || calls.Load() != 1 || !strings.Contains(got, `"redacted_thinking"`) || !strings.Contains(got, fixtureRedacted) {
+			t.Fatalf("stream=%t status=%d calls=%d body=%s, want one call with a redacted_thinking block", stream, rec.Code, calls.Load(), got)
+		}
 	}
 }
 

@@ -13,15 +13,24 @@ func reasoningEventExtras(event map[string]interface{}, callback *KiroStreamCall
 		emitted = true
 		callback.OnThinkingSignature(signature)
 	}
-	if redacted, ok := event["redactedContent"].(string); ok && redacted != "" {
-		//! Encrypted reasoning is still reasoning: a turn that sent only this is not empty.
+	if redacted, ok := event["redactedContent"].(string); ok && redacted != "" && callback.OnRedactedThinking != nil {
+		//! Encrypted reasoning counts as reasoning only when the client gets a block for it.
+		//! OpenAI handlers and text formats drop it, so a turn that sent only this stays
+		//! an empty stream there and is retried rather than served as an empty answer.
 		turn.sawReasoning = true
-		if callback.OnRedactedThinking != nil {
-			emitted = true
-			callback.OnRedactedThinking(redacted)
-		}
+		emitted = true
+		callback.OnRedactedThinking(redacted)
 	}
 	return emitted
+}
+
+// dropDisabledClaudeThinkingExtras clears the signature and redacted callbacks when the
+// response has no place for them, so the stream parser does not count dropped content.
+func dropDisabledClaudeThinkingExtras(callback *KiroStreamCallback, thinking bool, format string) {
+	if !claudeThinkingExtrasEnabled(thinking, format) {
+		callback.OnThinkingSignature = nil
+		callback.OnRedactedThinking = nil
+	}
 }
 
 // claudeThinkingExtrasEnabled reports whether a response can carry signatures and

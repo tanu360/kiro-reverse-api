@@ -1344,12 +1344,12 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
 				OnThinkingSignature: func(signature string) {
-					if claudeThinkingExtrasEnabled(thinking, thinkingFormat) && thinkingSource != thinkingSourceTagBlock {
+					if thinkingSource != thinkingSourceTagBlock {
 						pendingThinkingSignature = signature
 					}
 				},
 				OnRedactedThinking: func(data string) {
-					if !claudeThinkingExtrasEnabled(thinking, thinkingFormat) || !allowReasoningSource(&thinkingSource) {
+					if !allowReasoningSource(&thinkingSource) {
 						return
 					}
 					processClaudeText("", false, true)
@@ -1361,6 +1361,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 					h.sendSSE(w, flusher, "content_block_stop", map[string]interface{}{"type": "content_block_stop", "index": idx})
 				},
 			}
+			dropDisabledClaudeThinkingExtras(callback, thinking, thinkingFormat)
 
 			err := callKiroAutoContinue(r.Context(), account, payload, callback, CallKiroAPIContext)
 			if err != nil {
@@ -1609,6 +1610,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				OnThinkingSignature: func(signature string) { thinkingSignature = signature },
 				OnRedactedThinking:  func(data string) { redactedThinking = append(redactedThinking, data) },
 			}
+			dropDisabledClaudeThinkingExtras(callback, thinking, thinkingOpts.Format)
 
 			err := callKiroAutoContinue(r.Context(), account, payload, callback, CallKiroAPIContext)
 			if err != nil {
@@ -1670,9 +1672,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			}
 
 			resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
-			if claudeThinkingExtrasEnabled(thinking, thinkingFormat) {
-				resp.Content = applyClaudeThinkingExtras(resp.Content, thinkingSignature, redactedThinking)
-			}
+			resp.Content = applyClaudeThinkingExtras(resp.Content, thinkingSignature, redactedThinking)
 			resp.StopReason = mapClaudeStopReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
 			resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
 			resp.Usage.CacheCreationInputTokens = cacheUsage.CacheCreationInputTokens
