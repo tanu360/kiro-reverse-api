@@ -248,7 +248,7 @@
   "duplicates.reason.email": "相同的邮箱和登录方式",
   "duplicates.suggested": "建议保留",
   "duplicates.needsAttention": "需要处理",
-  "duplicates.refreshed": "{time}刷新",
+  "duplicates.refreshed": "刷新于 {time}",
   "duplicates.requests_other": "{count} 次请求",
   "duplicates.merge": "合并",
   "duplicates.mergeSuccess_other": "重复账号已合并，移除了 {count} 个账号。",
