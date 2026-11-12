@@ -3,6 +3,9 @@ package proxy
 import (
 	"strings"
 	"sync/atomic"
+	"time"
+
+	"kiro-proxy/logger"
 )
 
 //! A substring mapping rule such as "gpt-5" also matches models Kiro serves itself
@@ -46,4 +49,37 @@ func nativeModelID(model string) (string, bool) {
 	}
 	id, ok := (*ids)[key]
 	return id, ok
+}
+
+// modelsCacheRetryDelays spaces the retries after a boot sweep that cached no models.
+// They add up to 15 minutes, half the regular sweep interval.
+var modelsCacheRetryDelays = []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute}
+
+// retryEmptyModelsCache sweeps the models again, after each delay, while the cache is still empty.
+func (h *Handler) retryEmptyModelsCache(delays []time.Duration) {
+	//! The native set is filled only by a sweep. When the boot sweep fails for every account
+	//! (token refresh or network down at start), substring rules would hijack native models
+	//! until the 30-minute timer. Retrying sooner shortens that window to about a minute.
+	for _, delay := range delays {
+		if h.modelsCacheFilled() {
+			return
+		}
+		logger.Infof("[ModelsCache] No models cached yet, retrying in %s", delay)
+		timer := time.NewTimer(delay)
+		select {
+		case <-timer.C:
+		case <-h.stopRefresh:
+			timer.Stop()
+			return
+		}
+		if !h.modelsCacheFilled() {
+			h.refreshModelsCache()
+		}
+	}
+}
+
+func (h *Handler) modelsCacheFilled() bool {
+	h.modelsCacheMu.RLock()
+	defer h.modelsCacheMu.RUnlock()
+	return len(h.cachedModels) > 0
 }

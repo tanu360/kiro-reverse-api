@@ -262,6 +262,7 @@ func (h *Handler) backgroundRefresh() {
 	time.Sleep(10 * time.Second)
 	h.refreshModelsCache()
 	h.refreshAllAccounts()
+	go h.retryEmptyModelsCache(modelsCacheRetryDelays)
 
 	for {
 		select {

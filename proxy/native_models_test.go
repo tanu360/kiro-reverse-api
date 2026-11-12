@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // seedNativeModels publishes ids as the models Kiro lists and clears them when the test ends.
@@ -272,4 +274,80 @@ func TestModelsCacheWritesPublishNativeModels(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newModelsRetryTestHandler serves ListAvailableModels from list and counts the calls.
+func newModelsRetryTestHandler(t *testing.T, list func(call int32) (*http.Response, error)) (*Handler, *atomic.Int32) {
+	t.Helper()
+	h := newResponsesTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
+		t.Errorf("inference endpoint called while listing models")
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	t.Cleanup(func() { publishNativeModels(nil) })
+	t.Cleanup(func() { h.pool.SetModelList("responses-account", nil) })
+	var calls atomic.Int32
+	stubRestTransport(t, func(r *http.Request) (*http.Response, error) {
+		if strings.Contains(r.URL.Path, "ListAvailableModels") {
+			return list(calls.Add(1))
+		}
+		return jsonResponse(http.StatusNotFound, `{}`), nil
+	})
+	return h, &calls
+}
+
+func TestRetryEmptyModelsCacheSweepsUntilFilled(t *testing.T) {
+	publishNativeModels(nil)
+	h, calls := newModelsRetryTestHandler(t, func(call int32) (*http.Response, error) {
+		if call == 1 {
+			return jsonResponse(http.StatusInternalServerError, `{}`), nil
+		}
+		return jsonResponse(http.StatusOK, `{"models":[{"modelId":"gpt-5.6-sol"}]}`), nil
+	})
+
+	h.retryEmptyModelsCache([]time.Duration{time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond})
+
+	//! First retry fails, second fills the cache, the rest must not sweep again.
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("ListAvailableModels calls = %d, want 2", got)
+	}
+	if got, ok := nativeModelID("gpt-5.6-sol"); !ok || got != "gpt-5.6-sol" {
+		t.Fatalf("nativeModelID after retry = (%q, %v), want (gpt-5.6-sol, true)", got, ok)
+	}
+	if got := MapModel("gpt-5.6-sol"); got != "gpt-5.6-sol" {
+		t.Fatalf("MapModel(gpt-5.6-sol) = %q, want gpt-5.6-sol", got)
+	}
+}
+
+func TestRetryEmptyModelsCacheSkipsWhenFilledOrStopped(t *testing.T) {
+	ok := func(int32) (*http.Response, error) {
+		return jsonResponse(http.StatusOK, `{"models":[{"modelId":"gpt-5.6-sol"}]}`), nil
+	}
+
+	t.Run("cache already filled", func(t *testing.T) {
+		h, calls := newModelsRetryTestHandler(t, ok)
+		h.cachedModels = []ModelInfo{{ModelId: "claude-sonnet-4.5"}}
+		h.retryEmptyModelsCache([]time.Duration{time.Millisecond, time.Millisecond})
+		if got := calls.Load(); got != 0 {
+			t.Fatalf("ListAvailableModels calls = %d, want 0", got)
+		}
+	})
+
+	t.Run("handler stopped", func(t *testing.T) {
+		h, calls := newModelsRetryTestHandler(t, ok)
+		h.stopRefresh = make(chan struct{})
+		close(h.stopRefresh)
+		done := make(chan struct{})
+		go func() {
+			h.retryEmptyModelsCache([]time.Duration{time.Hour})
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("retryEmptyModelsCache did not return after stop")
+		}
+		if got := calls.Load(); got != 0 {
+			t.Fatalf("ListAvailableModels calls = %d, want 0", got)
+		}
+	})
 }
