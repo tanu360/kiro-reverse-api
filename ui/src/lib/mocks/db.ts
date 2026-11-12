@@ -1,3 +1,4 @@
+import type { LogRetention } from "@/lib/api/log-retention";
 import type {
   Account,
   AccountFull,
@@ -60,6 +61,8 @@ export interface MockDb {
   endpoint: EndpointConfig;
   proxy: ProxyConfig;
   promptFilter: PromptFilterConfig;
+  /** GET /log-retention; the handler reads oldestRequestTs off `requests`. */
+  logRetention: LogRetention;
   startedAt: number;
   /** '2.1.0' */
   version: string;
@@ -155,6 +158,20 @@ function baseDb(): Pick<
   };
 }
 
+/** The default 90 days, with a cleanup three hours ago when `ran`. */
+function seedLogRetention(now: number, ran: boolean): LogRetention {
+  return {
+    days: 90,
+    defaultDays: 90,
+    maxDays: 3650,
+    lastRunAt: ran ? now - 3 * 3600 : 0,
+    lastPrunedRequests: ran ? 412 : 0,
+    lastPrunedErrors: ran ? 37 : 0,
+    archivedRequests: ran ? 18_240 : 0,
+    oldestRequestTs: 0,
+  };
+}
+
 /** Large and varied: every union value, extremes and 30 days of traffic (fixtures-full.ts). */
 function seedFullDb(now: number): MockDb {
   const data = seedFullDataset(now);
@@ -162,6 +179,7 @@ function seedFullDb(now: number): MockDb {
     ...baseDb(),
     ...data,
     modelMix: buildModelMix(data.requests, data.errors),
+    logRetention: seedLogRetention(now, true),
     // An update is out, so the update notice shows.
     remoteVersion: { version: "2.2.0", changelog: REMOTE_CHANGELOG },
   };
@@ -185,6 +203,7 @@ function seedEmptyDb(now: number): MockDb {
     endpoint: defaultEndpoint(),
     proxy: { proxyURL: "" },
     promptFilter: defaultPromptFilter(),
+    logRetention: seedLogRetention(now, false),
     startedAt: now - 42,
   };
 }
@@ -231,6 +250,7 @@ function seedDb(scenario: MockScenario): MockDb {
         },
       ],
     },
+    logRetention: seedLogRetention(now, true),
     // The process "started" before the oldest seeded request, so every request counts.
     startedAt: now - 26 * 3600,
   };

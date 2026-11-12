@@ -99,6 +99,32 @@ CREATE TABLE IF NOT EXISTS backup_blobs (
   id   TEXT PRIMARY KEY REFERENCES backup_entries(id) ON DELETE CASCADE,
   data BLOB NOT NULL
 );
+
+-- Totals of the requests and errors rows that log retention pruned, so the
+-- all-time stats still count them. One row per group the stats read by.
+CREATE TABLE IF NOT EXISTS request_rollup (
+  model              TEXT NOT NULL DEFAULT '',
+  account_id         TEXT NOT NULL DEFAULT '',
+  api_key_id         TEXT NOT NULL DEFAULT '',
+  success            INTEGER NOT NULL DEFAULT 0,
+  request_count      INTEGER NOT NULL DEFAULT 0,
+  in_tokens          INTEGER NOT NULL DEFAULT 0,
+  out_tokens         INTEGER NOT NULL DEFAULT 0,
+  total_tokens       INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+  credits            REAL NOT NULL DEFAULT 0,
+  last_ts            INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (model, account_id, api_key_id, success)
+);
+
+CREATE TABLE IF NOT EXISTS error_rollup (
+  model       TEXT NOT NULL DEFAULT '',
+  account_id  TEXT NOT NULL DEFAULT '',
+  error_count INTEGER NOT NULL DEFAULT 0,
+  last_ts     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (model, account_id)
+);
 `
 
 const pragmas = `

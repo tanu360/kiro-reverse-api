@@ -64,7 +64,12 @@ const CHANGE_INVALIDATIONS: Record<ChangeEventType, ReadonlyArray<readonly unkno
   accounts_changed: [queryKeys.accounts.list(), queryKeys.status, queryKeys.observe.overview()],
   api_keys_changed: [queryKeys.apiKeys.all],
   settings_changed: [queryKeys.settings.all, queryKeys.observe.overview()],
-  stats_reset: [queryKeys.status, queryKeys.observe.all, queryKeys.requests.all],
+  stats_reset: [
+    queryKeys.status,
+    queryKeys.observe.all,
+    queryKeys.requests.all,
+    queryKeys.settings.logRetention(),
+  ],
   backup_deleted: [queryKeys.backups.all],
 };
 

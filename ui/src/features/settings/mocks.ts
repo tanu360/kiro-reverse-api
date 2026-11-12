@@ -22,6 +22,7 @@ function saved(): Response {
   return HttpResponse.json(OK);
 }
 const MAX_AUTO_CONTINUE = 10;
+const MAX_LOG_RETENTION_DAYS = 3650;
 const MIN_PASSWORD_RUNES = 8;
 const MAX_MAPPINGS = 200;
 const MAX_MODEL_ID_BYTES = 256;
@@ -399,6 +400,34 @@ export const handlers: HttpHandler[] = [
     return saved();
   }),
 
+  http.get(apiUrl("/log-retention"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const times = mockDb.requests.map((r) => r.ts);
+    return HttpResponse.json({
+      ...mockDb.logRetention,
+      oldestRequestTs: times.length > 0 ? Math.min(...times) : 0,
+    });
+  }),
+
+  http.post(apiUrl("/log-retention"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    const days = body ? optional(body, "days", isInteger) : null;
+    if (days === null) return invalidJson();
+    if (days === undefined || days < 0 || days > MAX_LOG_RETENTION_DAYS) {
+      return jsonError(400, `days must be between 0 and ${MAX_LOG_RETENTION_DAYS}`, {
+        code: "log_retention_range",
+      });
+    }
+    // Go also starts a prune at once; the mock keeps its rows.
+    mockDb.logRetention.days = days;
+    return saved();
+  }),
+
   http.post(apiUrl("/stats/reset"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;
@@ -406,6 +435,7 @@ export const handlers: HttpHandler[] = [
     mockDb.requests = [];
     mockDb.errors = [];
     mockDb.modelMix = [];
+    mockDb.logRetention.archivedRequests = 0;
     mockDb.startedAt = mockNowUnix();
     publishMockEvent("stats_reset");
     return HttpResponse.json(OK);

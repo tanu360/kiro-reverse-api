@@ -180,6 +180,8 @@ type Config struct {
 	TotalTokens     int     `json:"totalTokens,omitempty"`
 	TotalCredits    float64 `json:"totalCredits,omitempty"`
 
+	LogRetentionDays *int `json:"logRetentionDays,omitempty"`
+
 	Backup BackupConfig `json:"backup,omitempty"`
 }
 
