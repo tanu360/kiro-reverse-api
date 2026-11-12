@@ -17,6 +17,8 @@ import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 //   Kiro profiles, `noprofile` completes with a warning.
 // - SSO token: a line `bad` fails; only bad lines fail the whole request.
 // - Credentials: a Kiro API key already added is a 409.
+// - Re-login (reloginAccountId): an unknown account is a 404 before anything starts; an imported
+//   credential containing `other-user` signs in as someone else (409, then confirm or discard).
 
 const REGION_RE = /^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$/;
 const API_KEY_REGIONS = ["us-east-1", "eu-central-1"];
@@ -26,17 +28,30 @@ const BUILDER_ID_PENDING_POLLS = 2;
 interface BuilderIdSession {
   polls: number;
   region: string;
+  reloginAccountId?: string;
 }
 
 interface MicrosoftSession {
   kind: "session";
   leg: "kiro" | "microsoft";
+  reloginAccountId?: string;
 }
 
 interface MicrosoftSelection {
   kind: "selection";
   profiles: KiroProfile[];
+  reloginAccountId?: string;
 }
+
+interface StashedLogin {
+  accountId: string;
+  overrides: Partial<Account>;
+  secrets: Record<string, string>;
+}
+
+const RELOGIN_MISMATCH_MARK = "other-user";
+/** Logins that signed in as another user, waiting for confirm or discard. */
+const reloginStash = new Map<string, StashedLogin>();
 
 let sequence = 0;
 
@@ -67,6 +82,75 @@ function addAccount(
   return { id: account.id, email: account.email };
 }
 
+/** 404 for a re-login of an account that does not exist; null for a plain add or a real one. */
+function missingTarget(accountId: string): Response | null {
+  if (!accountId || mockDb.accounts.some((account) => account.id === accountId)) return null;
+  return jsonError(404, "Account not found", { code: "account_not_found" });
+}
+
+/** Replaces an account's login in place, like proxy/account_relogin.go's merge. */
+function replaceLogin(
+  accountId: string,
+  overrides: Partial<Account>,
+  secrets: Record<string, string>,
+): AddedAccountRef {
+  const account = mockDb.accounts.find((item) => item.id === accountId);
+  if (!account) throw new Error(`no account ${accountId}`);
+  const held = Boolean(account.banStatus) && account.banStatus !== "ACTIVE";
+  Object.assign(account, {
+    ...overrides,
+    email: overrides.email || account.email,
+    expiresAt: overrides.expiresAt ?? Math.floor(Date.now() / 1000) + 3600,
+    hasToken: true,
+    ...(held ? { enabled: true, banStatus: "ACTIVE", banReason: "", banTime: 0 } : {}),
+  });
+  mockDb.secrets[account.id] = { ...mockDb.secrets[account.id], ...secrets };
+  return { id: account.id, email: account.email };
+}
+
+/**
+ * Adds the login, or with a re-login target replaces that account's login in place. `extra` is
+ * the flow's own success fields (Builder ID's `completed`, Microsoft's `stage`).
+ */
+function saveLogin(
+  reloginAccountId: string,
+  overrides: Partial<Account>,
+  secrets: Record<string, string> = {},
+  extra: Record<string, unknown> = {},
+): Response {
+  if (!reloginAccountId) {
+    return HttpResponse.json({ success: true, ...extra, account: addAccount(overrides, secrets) });
+  }
+  const target = mockDb.accounts.find((account) => account.id === reloginAccountId);
+  if (!target) return jsonError(404, "Account not found", { code: "account_not_found" });
+  if (Object.values(secrets).some((value) => value.includes(RELOGIN_MISMATCH_MARK))) {
+    const pendingId = newId();
+    reloginStash.set(pendingId, { accountId: target.id, overrides, secrets });
+    return HttpResponse.json(
+      {
+        success: false,
+        error: "the new sign-in belongs to a different user than this account",
+        code: "relogin_identity_mismatch",
+        pendingId,
+        accountId: target.id,
+        currentEmail: target.email,
+        incomingEmail: "someone.else@northwind-labs.dev",
+        expiresIn: 600,
+      },
+      { status: 409 },
+    );
+  }
+  return HttpResponse.json({
+    success: true,
+    ...extra,
+    relogin: true,
+    identityVerified: true,
+    identityReplaced: false,
+    // The same user signed in again, so the account keeps its email.
+    account: replaceLogin(target.id, { ...overrides, email: target.email }, secrets),
+  });
+}
+
 function newEmail(prefix: string): string {
   return `${prefix}.${sequence + 1}@northwind-labs.dev`;
 }
@@ -94,13 +178,13 @@ function builderIdState(id: string): BuilderIdSession | undefined {
   return mockDb.pending.builderId[id] as BuilderIdSession | undefined;
 }
 
-function addMicrosoftAccount(profileArn = ""): AddedAccountRef {
-  return addAccount({
+function microsoftLogin(profileArn = ""): Partial<Account> {
+  return {
     email: newEmail("entra.user"),
     authMethod: "external_idp",
     provider: "AzureAD",
     profileArn,
-  });
+  };
 }
 
 function importApiKey(body: CredentialsImportRequest): Response {
@@ -115,10 +199,16 @@ function importApiKey(body: CredentialsImportRequest): Response {
   if (!API_KEY_REGIONS.includes(region)) {
     return jsonError(400, "unsupported Kiro API key region: use us-east-1 or eu-central-1");
   }
-  if (Object.values(mockDb.secrets).some((secret) => secret.kiroApiKey === key)) {
+  const target = body.reloginAccountId ?? "";
+  if (
+    Object.entries(mockDb.secrets).some(
+      ([id, secret]) => id !== target && secret.kiroApiKey === key,
+    )
+  ) {
     return jsonError(409, "this Kiro API key is already added");
   }
-  const account = addAccount(
+  return saveLogin(
+    target,
     {
       authMethod: "api_key",
       provider: "APIKey",
@@ -128,7 +218,6 @@ function importApiKey(body: CredentialsImportRequest): Response {
     },
     { kiroApiKey: key, accessToken: key, refreshToken: "" },
   );
-  return HttpResponse.json({ success: true, account });
 }
 
 function importRefreshToken(body: CredentialsImportRequest): Response {
@@ -143,7 +232,8 @@ function importRefreshToken(body: CredentialsImportRequest): Response {
     : hint === "idc" || (body.clientId && body.clientSecret)
       ? "idc"
       : "social";
-  const account = addAccount(
+  return saveLogin(
+    body.reloginAccountId ?? "",
     {
       email: newEmail(authMethod === "social" ? "social.user" : "idc.user"),
       authMethod,
@@ -155,7 +245,6 @@ function importRefreshToken(body: CredentialsImportRequest): Response {
     },
     { refreshToken, accessToken: body.accessToken ?? "" },
   );
-  return HttpResponse.json({ success: true, account });
 }
 
 export const handlers: HttpHandler[] = [
@@ -170,9 +259,13 @@ export const handlers: HttpHandler[] = [
     if (!startUrl) return jsonError(400, "startUrl is required");
     const region = normalizeRegion(body.region);
     if (!region) return jsonError(400, "invalid region");
+    const reloginAccountId = text(body.reloginAccountId);
+    const missing = missingTarget(reloginAccountId);
+    if (missing) return missing;
     const sessionId = newId();
-    mockDb.pending.iam[sessionId] = { startUrl, region };
+    mockDb.pending.iam[sessionId] = { startUrl, region, reloginAccountId };
     return HttpResponse.json({
+      ...(reloginAccountId ? { reloginAccountId } : {}),
       sessionId,
       authorizeUrl: `https://oidc.${region}.amazonaws.com/authorize?response_type=code&client_id=mock-${sessionId.slice(0, 8)}&redirect_uri=http%3A%2F%2F127.0.0.1%2Foauth%2Fcallback&state=${sessionId}&code_challenge_method=S256`,
       expiresIn: 600,
@@ -185,21 +278,22 @@ export const handlers: HttpHandler[] = [
     await mockDelay();
     const body = await readJson(request);
     if (!body) return jsonError(400, "Invalid JSON");
-    const session = mockDb.pending.iam[text(body.sessionId)] as { region: string } | undefined;
+    const session = mockDb.pending.iam[text(body.sessionId)] as
+      | { region: string; reloginAccountId?: string }
+      | undefined;
     if (!session) return jsonError(400, "会话不存在或已过期");
     const callbackUrl = text(body.callbackUrl);
     if (!callbackUrl.includes("code=") || !callbackUrl.includes("state=")) {
       return jsonError(400, "无效的回调 URL");
     }
     delete mockDb.pending.iam[text(body.sessionId)];
-    const account = addAccount({
+    return saveLogin(session.reloginAccountId ?? "", {
       email: newEmail("enterprise.user"),
       authMethod: "idc",
       provider: "Enterprise",
       region: session.region,
       activeRegion: session.region,
     });
-    return HttpResponse.json({ success: true, account });
   }),
 
   // Microsoft SSO
@@ -207,10 +301,14 @@ export const handlers: HttpHandler[] = [
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
+    const reloginAccountId = text((await readJson(request))?.reloginAccountId);
+    const missing = missingTarget(reloginAccountId);
+    if (missing) return missing;
     const sessionId = newId();
-    const session: MicrosoftSession = { kind: "session", leg: "kiro" };
+    const session: MicrosoftSession = { kind: "session", leg: "kiro", reloginAccountId };
     mockDb.pending.microsoft[sessionId] = session;
     return HttpResponse.json({
+      ...(reloginAccountId ? { reloginAccountId } : {}),
       sessionId,
       authorizeUrl: `https://app.kiro.dev/signin?redirect_uri=http%3A%2F%2Flocalhost%3A3128&state=${sessionId}&login_option=external_idp`,
       expiresIn: 600,
@@ -246,6 +344,7 @@ export const handlers: HttpHandler[] = [
       const selectionId = newId();
       const selection: MicrosoftSelection = {
         kind: "selection",
+        reloginAccountId: session.reloginAccountId,
         profiles: [
           {
             arn: "arn:aws:codewhisperer:eu-central-1:381492027763:profile/QK7M2XRZ9PLA",
@@ -266,11 +365,8 @@ export const handlers: HttpHandler[] = [
         profiles: selection.profiles,
       });
     }
-    const account = addMicrosoftAccount();
-    return HttpResponse.json({
-      success: true,
+    return saveLogin(session.reloginAccountId ?? "", microsoftLogin(), undefined, {
       stage: "complete",
-      account,
       ...(callbackUrl.includes("noprofile")
         ? {
             warning:
@@ -298,10 +394,8 @@ export const handlers: HttpHandler[] = [
       return jsonError(400, "Selected Kiro profile was not offered for this login");
     }
     delete mockDb.pending.microsoft[selectionId];
-    return HttpResponse.json({
-      success: true,
+    return saveLogin(selection.reloginAccountId ?? "", microsoftLogin(profileArn), undefined, {
       stage: "complete",
-      account: addMicrosoftAccount(profileArn),
     });
   }),
 
@@ -323,10 +417,14 @@ export const handlers: HttpHandler[] = [
     const body = (await readJson(request)) ?? {};
     const region = normalizeRegion(body.region);
     if (!region) return jsonError(400, "invalid region");
+    const reloginAccountId = text(body.reloginAccountId);
+    const missing = missingTarget(reloginAccountId);
+    if (missing) return missing;
     const sessionId = newId();
-    const session: BuilderIdSession = { polls: 0, region };
+    const session: BuilderIdSession = { polls: 0, region, reloginAccountId };
     mockDb.pending.builderId[sessionId] = session;
     return HttpResponse.json({
+      ...(reloginAccountId ? { reloginAccountId } : {}),
       sessionId,
       userCode: "ABCD-EFGH",
       verificationUri: "https://view.awsapps.com/start/#/device?user_code=ABCD-EFGH",
@@ -356,14 +454,18 @@ export const handlers: HttpHandler[] = [
       return HttpResponse.json({ success: true, completed: false, status: "pending", interval: 1 });
     }
     delete mockDb.pending.builderId[sessionId];
-    const account = addAccount({
-      email: newEmail("builder.dev"),
-      authMethod: "idc",
-      provider: "BuilderId",
-      region: session.region,
-      activeRegion: session.region,
-    });
-    return HttpResponse.json({ success: true, completed: true, account });
+    return saveLogin(
+      session.reloginAccountId ?? "",
+      {
+        email: newEmail("builder.dev"),
+        authMethod: "idc",
+        provider: "BuilderId",
+        region: session.region,
+        activeRegion: session.region,
+      },
+      {},
+      { completed: true },
+    );
   }),
 
   // SSO token (bulk)
@@ -381,6 +483,21 @@ export const handlers: HttpHandler[] = [
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean);
+    const reloginAccountId = text(body.reloginAccountId);
+    if (reloginAccountId) {
+      const missing = missingTarget(reloginAccountId);
+      if (missing) return missing;
+      if (lines.length > 1) {
+        return jsonError(400, "re-login takes exactly one credential", {
+          code: "relogin_single_credential",
+        });
+      }
+      return saveLogin(
+        reloginAccountId,
+        { authMethod: "idc", provider: "", region, activeRegion: region },
+        { accessToken: lines[0] },
+      );
+    }
     const accounts: AddedAccountRef[] = [];
     const errors: string[] = [];
     lines.forEach((line, index) => {
@@ -402,6 +519,42 @@ export const handlers: HttpHandler[] = [
     });
   }),
 
+  // Re-login that signed in as another user: "Replace identity" or discard
+  http.post(apiUrl("/accounts/:id/relogin/confirm"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const pendingId = text((await readJson(request))?.pendingId);
+    const stashed = reloginStash.get(pendingId);
+    if (!stashed || stashed.accountId !== params.id) {
+      return jsonError(404, "Re-login not found or expired", { code: "relogin_pending_not_found" });
+    }
+    reloginStash.delete(pendingId);
+    if (!mockDb.accounts.some((account) => account.id === stashed.accountId)) {
+      return jsonError(404, "Account not found", { code: "account_not_found" });
+    }
+    const account = replaceLogin(
+      stashed.accountId,
+      { ...stashed.overrides, email: "someone.else@northwind-labs.dev" },
+      stashed.secrets,
+    );
+    return HttpResponse.json({
+      success: true,
+      relogin: true,
+      identityVerified: true,
+      identityReplaced: true,
+      account,
+    });
+  }),
+
+  http.post(apiUrl("/accounts/:id/relogin/discard"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const pendingId = text((await readJson(request))?.pendingId);
+    if (reloginStash.get(pendingId)?.accountId === params.id) reloginStash.delete(pendingId);
+    return HttpResponse.json({ success: true });
+  }),
+
   // Credentials (local cache, credentials JSON, web cookie, Kiro API keys)
   http.post(apiUrl("/auth/credentials"), async ({ request }) => {
     const denied = requireAuth(request);
@@ -409,6 +562,8 @@ export const handlers: HttpHandler[] = [
     await mockDelay();
     const body = (await readJson(request)) as CredentialsImportRequest | null;
     if (!body) return jsonError(400, "Invalid JSON");
+    const missing = missingTarget(body.reloginAccountId ?? "");
+    if (missing) return missing;
     const method = (body.authMethod ?? "").toLowerCase();
     const apiKeyPath =
       Boolean(body.kiroApiKey) ||

@@ -4,6 +4,7 @@
   "actions.add": "Adicionar conta",
   "actions.export": "Exportar",
   "actions.refreshToken": "Atualizar token",
+  "actions.relogin": "Entrar novamente",
   "actions.test": "Testar",
   "actions.details": "Detalhes",
   "actions.copyJson": "Copiar JSON",

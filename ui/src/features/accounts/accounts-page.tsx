@@ -41,6 +41,7 @@ import { BatchBar } from "./batch-bar";
 import { BatchTagDialog } from "./batch-tag-dialog";
 import { DuplicatesNotice } from "./duplicates-notice";
 import { ExportDialog } from "./export-dialog";
+import { ReloginProvider } from "./relogin-context";
 import { TestAccountDialog } from "./test-account-dialog";
 
 const NO_ACCOUNTS: Account[] = [];
@@ -105,6 +106,7 @@ export function AccountsPage(): JSX.Element {
   });
   const [detail, openDetail, closeDetail] = useDialogTarget();
   const [test, openTest, closeTest] = useDialogTarget();
+  const [relogin, openRelogin, closeRelogin] = useDialogTarget();
 
   // Drop selected ids that are gone after a refetch. The selection survives filter changes.
   useEffect(() => {
@@ -201,6 +203,7 @@ export function AccountsPage(): JSX.Element {
 
   const onTest = useCallback((account: Account) => openTest(account.id), [openTest]);
   const onDetails = useCallback((account: Account) => openDetail(account.id), [openDetail]);
+  const onRelogin = useCallback((account: Account) => openRelogin(account.id), [openRelogin]);
 
   const hasFilters =
     Boolean(filters.q) || FILTER_DIMENSIONS.some((dimension) => filters[dimension] !== undefined);
@@ -234,6 +237,9 @@ export function AccountsPage(): JSX.Element {
     );
 
   const testAccount = test ? accounts.find((account) => account.id === test.id) : undefined;
+  const reloginAccount = relogin
+    ? accounts.find((account) => account.id === relogin.id)
+    : undefined;
   // Loaded and empty: the card holds only the empty state, and there is nothing to refresh.
   const noAccounts = !query.isPending && !query.isError && accounts.length === 0;
   const loadFailed = query.isError && !query.data;
@@ -310,7 +316,7 @@ export function AccountsPage(): JSX.Element {
     ) : null;
 
   return (
-    <>
+    <ReloginProvider onRelogin={onRelogin}>
       <PageHeader
         actions={
           // One refresh only: Refresh models, then Add account. The list itself refetches on
@@ -415,6 +421,16 @@ export function AccountsPage(): JSX.Element {
         open={tagState.open}
       />
       <AddAccountDialog onOpenChange={setAddOpen} open={search.add === true} />
-    </>
+      {relogin && reloginAccount ? (
+        <AddAccountDialog
+          key={`relogin-${relogin.session}`}
+          onOpenChange={(open) => {
+            if (!open) closeRelogin();
+          }}
+          open={relogin.open}
+          relogin={reloginAccount}
+        />
+      ) : null}
+    </ReloginProvider>
   );
 }

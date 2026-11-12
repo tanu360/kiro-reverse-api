@@ -4,6 +4,7 @@
   "actions.add": "添加账号",
   "actions.export": "导出",
   "actions.refreshToken": "刷新 Token",
+  "actions.relogin": "重新登录",
   "actions.test": "测试",
   "actions.details": "详情",
   "actions.copyJson": "复制 JSON",

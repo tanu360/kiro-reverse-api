@@ -1,7 +1,7 @@
 import { createContext, type JSX, type ReactNode, useContext, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
-import type { AddedAccountRef } from "@/lib/api/types";
+import type { Account, AddedAccountRef } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import type { FlowSessions } from "./flow-sessions";
 
@@ -15,6 +15,8 @@ export interface FlowContextValue {
   cancel: () => void;
   /** The dialog footer, where flows render their buttons. */
   footer: HTMLElement | null;
+  /** The account a re-login replaces the login of, or null when adding (see useReloginFlow). */
+  relogin: Account | null;
 }
 
 const FlowContext = createContext<FlowContextValue | null>(null);

@@ -13,12 +13,14 @@ import {
   mapCredential,
   parseCredentialsJson,
 } from "../lib/credentials-mapping";
+import { useReloginFlow } from "../relogin";
 import { showBatchResult } from "../result-toast";
 
 /** Credentials JSON: one request per item, in order. Failures keep their reasons. */
 export function CredentialsFlow(): JSX.Element {
   const { t } = useT("add-account");
   const { sessions, finishAdd } = useFlow();
+  const relogin = useReloginFlow();
   const formId = useFormId();
   const [json, setJson] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,41 @@ export function CredentialsFlow(): JSX.Element {
     if (items.length === 0) {
       setError(t("credentials.noItems"));
       focusAfter(jsonRef);
+      return;
+    }
+    if (relogin.target && items.length > 1) {
+      setError(t("relogin.singleOnly"));
+      focusAfter(jsonRef);
+      return;
+    }
+    if (relogin.target) {
+      const mapped = mapCredential(items[0]);
+      if (mapped.kind === "missingRefreshToken") {
+        setError(
+          t("credentials.failureItem", { index: 1, reason: t("credentials.missingRefreshToken") }),
+        );
+        focusAfter(jsonRef);
+        return;
+      }
+      setError(null);
+      const generation = sessions.generation;
+      setPending(true);
+      try {
+        const res = await importCredentials({
+          ...mapped.payload,
+          reloginAccountId: relogin.accountId,
+        });
+        if (!sessions.isCurrent(generation)) return;
+        relogin.announce(res);
+        finishAdd([res.account]);
+      } catch (caught) {
+        if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(caught))) {
+          toast.error(t(relogin.failedKey, { error: errorMessage(caught, t) }));
+          focusAfter(jsonRef);
+        }
+      } finally {
+        setPending(false);
+      }
       return;
     }
     setError(null);
@@ -105,7 +142,11 @@ export function CredentialsFlow(): JSX.Element {
         />
       </FormField>
       <FlowFooter>
-        <SubmitButton busy={pending} formId={formId} label={t("add")} />
+        <SubmitButton
+          busy={pending}
+          formId={formId}
+          label={relogin.target ? t("relogin.submit") : t("add")}
+        />
       </FlowFooter>
     </form>
   );

@@ -212,18 +212,34 @@ func (h *Handler) writeMicrosoftSaved(w http.ResponseWriter, account config.Acco
 	json.NewEncoder(w).Encode(response)
 }
 
-func (h *Handler) apiStartMicrosoftSSO(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) apiStartMicrosoftSSO(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ReloginAccountID string `json:"reloginAccountId"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
+		return
+	}
+	if req.ReloginAccountID != "" && !reloginTargetOK(w, req.ReloginAccountID) {
+		return
+	}
 	sessionID, authorizeURL, expiresIn, err := auth.StartMicrosoftSSOLogin()
 	if err != nil {
 		writeAdminErr(w, http.StatusInternalServerError, err, "")
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"sessionId":    sessionID,
 		"authorizeUrl": authorizeURL,
 		"expiresIn":    expiresIn,
 		"stage":        "kiro",
-	})
+	}
+	if req.ReloginAccountID != "" {
+		reloginSessions.bind(sessionID, req.ReloginAccountID)
+		response["reloginAccountId"] = req.ReloginAccountID
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 // apiCompleteMicrosoftSSO takes one pasted callback URL. The Kiro portal
@@ -328,6 +344,11 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 			warning.detail = profileErr.Error()
 		}
 	}
+	if target := reloginSessions.target(sessionID); target != "" {
+		reloginSessions.forget(sessionID)
+		h.writeReloginFlowsLocked(w, r, target, account, microsoftWarningFields(map[string]interface{}{"stage": "complete"}, warning))
+		return
+	}
 	stored, updated, err := flows.saveAccountLocked(sessionID, account)
 	if err != nil {
 		writeMicrosoftAddError(w, err)
@@ -373,6 +394,15 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 
 	account := sel.account
 	account.ProfileArn = profileARN
+	if target := reloginSessions.target(sel.sessionID); target != "" && !flows.canceledLocked(sel.sessionID, time.Now()) {
+		//! Marks the admin's pick, so it wins over a pinned profile (see mergeRelogin).
+		account.ProfileArnPinned = true
+		if h.writeReloginFlowsLocked(w, r, target, account, map[string]interface{}{"stage": "complete"}) {
+			delete(flows.selections, selectionID)
+			reloginSessions.forget(sel.sessionID)
+		}
+		return
+	}
 	stored, updated, err := flows.saveAccountLocked(sel.sessionID, account)
 	if err != nil {
 		if errors.Is(err, errMicrosoftSSOCanceled) {
@@ -396,6 +426,7 @@ func (h *Handler) apiCancelMicrosoftSSO(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	microsoftSSOFlows.cancel(strings.TrimSpace(req.SessionID), strings.TrimSpace(req.SelectionID))
+	reloginSessions.forget(strings.TrimSpace(req.SessionID))
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 

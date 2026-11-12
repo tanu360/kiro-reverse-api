@@ -25,6 +25,8 @@ export interface SuccessResponse {
  *   kiro_sign_in_failed, microsoft_denied, microsoft_token_failed, microsoft_credential_invalid,
  *   sso_* : `detail` is the upstream reason.
  * - callback_url_wrong_address: `expected` is the callback URL the step needs.
+ * - relogin_identity_mismatch (409): the new sign-in is another user; the body is a
+ *   ReloginMismatchBody, and the login waits for POST /accounts/{id}/relogin/confirm or /discard.
  * - model_*: also `index`; `model` (duplicate, self, chain) or `max` (too many, ID too long).
  */
 export type ServerErrorCode =
@@ -108,7 +110,10 @@ export type ServerErrorCode =
   | "microsoft_token_failed"
   | "microsoft_tenant_mismatch"
   | "microsoft_credential_invalid"
-  | "microsoft_profile_unresolved";
+  | "microsoft_profile_unresolved"
+  | "relogin_identity_mismatch"
+  | "relogin_pending_not_found"
+  | "relogin_single_credential";
 
 // ---------------------------------------------------------------------------
 // Session and first run
@@ -215,12 +220,36 @@ export interface AddedAccountRef {
 export interface AddAccountResponse {
   success: true;
   account: AddedAccountRef;
+  /** Set when the request carried reloginAccountId: the account was logged in again in place. */
+  relogin?: boolean;
+  /** Re-login only: false when no user id or email could be compared. */
+  identityVerified?: boolean;
+  /** Re-login only: true after a confirmed "Replace identity". */
+  identityReplaced?: boolean;
+}
+/** 409 relogin_identity_mismatch; the emails are "" when unknown. */
+export interface ReloginMismatchBody {
+  success: false;
+  error: string;
+  code: "relogin_identity_mismatch";
+  pendingId: string;
+  accountId: string;
+  currentEmail: string;
+  incomingEmail: string;
+  /** seconds the stashed login waits for confirm or discard */
+  expiresIn: number;
+}
+/** POST /accounts/{id}/relogin/confirm and /discard */
+export interface ReloginPendingRequest {
+  pendingId: string;
 }
 
 // IAM SSO
 export interface IamSsoStartRequest {
   startUrl: string;
   region?: string;
+  /** Log this existing account in again instead of adding one. */
+  reloginAccountId?: string;
 }
 export interface IamSsoStartResponse {
   sessionId: string;
@@ -234,6 +263,10 @@ export interface IamSsoCompleteRequest {
 export type IamSsoCompleteResponse = AddAccountResponse;
 
 // Microsoft SSO
+export interface MicrosoftStartRequest {
+  /** Log this existing account in again instead of adding one. */
+  reloginAccountId?: string;
+}
 export interface MicrosoftStartResponse {
   sessionId: string;
   authorizeUrl: string;
@@ -256,6 +289,9 @@ export type MicrosoftCompleteResponse =
       success: true;
       stage: "complete";
       account: AddedAccountRef;
+      relogin?: boolean;
+      identityVerified?: boolean;
+      identityReplaced?: boolean;
       /** English; `warningCode` (a ServerErrorCode) and `warningDetail` are what the UI shows. */
       warning?: string;
       warningCode?: ServerErrorCode;
@@ -277,6 +313,8 @@ export interface MicrosoftCancelRequest {
 // BuilderID device code
 export interface BuilderIdStartRequest {
   region?: string;
+  /** Log this existing account in again instead of adding one. */
+  reloginAccountId?: string;
 }
 export interface BuilderIdStartResponse {
   sessionId: string;
@@ -289,19 +327,23 @@ export interface BuilderIdPollRequest {
 }
 export type BuilderIdPollResponse =
   | { success: true; completed: false; status: "pending" | "slow_down"; interval: number }
-  | { success: true; completed: true; account: AddedAccountRef };
+  | ({ success: true; completed: true } & Omit<AddAccountResponse, "success">);
 
 // SSO token (bulk)
 export interface SsoTokenImportRequest {
   /** newline-separated */
   bearerToken: string;
   region?: string;
+  /** Log this existing account in again; then exactly one token. */
+  reloginAccountId?: string;
 }
 export interface SsoTokenImportResponse {
   success: true;
   accounts: AddedAccountRef[];
   errors: string[] | null;
 }
+/** /auth/sso-token with reloginAccountId answers like the other re-logins. */
+export type SsoTokenReloginResponse = AddAccountResponse;
 
 // Credentials import
 export interface CredentialsImportRequest {
@@ -323,6 +365,8 @@ export interface CredentialsImportRequest {
   tokenEndpoint?: string;
   issuerUrl?: string;
   scopes?: string;
+  /** Log this existing account in again instead of adding one. */
+  reloginAccountId?: string;
 }
 export type CredentialsImportResponse = AddAccountResponse;
 

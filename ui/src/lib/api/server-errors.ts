@@ -88,6 +88,9 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   microsoft_tenant_mismatch: "errors:serverError.microsoftTenantMismatch",
   microsoft_credential_invalid: "errors:serverError.microsoftCredentialInvalid",
   microsoft_profile_unresolved: "errors:serverError.microsoftProfileUnresolved",
+  relogin_identity_mismatch: "errors:serverError.reloginIdentityMismatch",
+  relogin_pending_not_found: "errors:serverError.reloginPendingNotFound",
+  relogin_single_credential: "errors:serverError.reloginSingleCredential",
 };
 
 /** The `code` of an ApiError's JSON body, or null. */

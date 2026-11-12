@@ -4,13 +4,13 @@ import { Input } from "@/components/ui/input";
 import { completeIamSso, startIamSso } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
-import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { FlowNote, FlowSteps, FormField, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { stepFocus, useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
-import { savedTitle } from "../result-toast";
+import { reloginRegion } from "../lib/relogin-method";
+import { useReloginFlow } from "../relogin";
 
 /**
  * IAM Identity Center SSO: start a login, open the URL, then paste the failed 127.0.0.1
@@ -18,11 +18,11 @@ import { savedTitle } from "../result-toast";
  */
 export function IamFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const display = useDisplayEmail();
   const { sessions, finishAdd } = useFlow();
+  const relogin = useReloginFlow();
   const formId = useFormId();
   const [startUrl, setStartUrl] = useState("");
-  const [region, setRegion] = useState("us-east-1");
+  const [region, setRegion] = useState(() => reloginRegion(relogin.target));
   const [callbackUrl, setCallbackUrl] = useState("");
   const [authorizeUrl, setAuthorizeUrl] = useState("");
   const [errors, setErrors] = useState<{ startUrl?: string; region?: string; callback?: string }>(
@@ -49,7 +49,11 @@ export function IamFlow(): JSX.Element {
     const generation = sessions.generation;
     setPending(true);
     try {
-      const res = await startIamSso({ startUrl: startUrl.trim(), region: parsed.region });
+      const res = await startIamSso({
+        startUrl: startUrl.trim(),
+        region: parsed.region,
+        reloginAccountId: relogin.accountId,
+      });
       if (!sessions.isCurrent(generation)) return;
       sessions.iamSession = res.sessionId;
       setAuthorizeUrl(res.authorizeUrl);
@@ -77,13 +81,20 @@ export function IamFlow(): JSX.Element {
     try {
       const res = await completeIamSso({ sessionId: sessions.iamSession, callbackUrl: callback });
       if (!sessions.isCurrent(generation)) return;
-      toast.success(savedTitle(t, res.account, display(res.account.email, res.account.id)));
+      relogin.announce(res);
       finishAdd([res.account]);
     } catch (error) {
-      if (sessions.isCurrent(generation)) {
-        toast.error(t("failed", { error: errorMessage(error, t) }));
-        focusAfter(callbackRef);
+      if (!sessions.isCurrent(generation)) return;
+      if (await relogin.resolveMismatch(error)) {
+        // The server used up the session; a new attempt starts from the first step.
+        sessions.iamSession = "";
+        setAuthorizeUrl("");
+        setCallbackUrl("");
+        focusAfter(startUrlRef);
+        return;
       }
+      toast.error(t(relogin.failedKey, { error: errorMessage(error, t) }));
+      focusAfter(callbackRef);
     } finally {
       setPending(false);
     }
