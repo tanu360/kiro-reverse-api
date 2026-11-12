@@ -127,6 +127,43 @@ func TestStructuredOutputNoRetryOnMaxTokens(t *testing.T) {
 	}
 }
 
+func TestStructuredOutputRetryStopReasonWithoutUpstreamReason(t *testing.T) {
+	//! IdC / Enterprise accounts send no stop reason; both answers together pass max_tokens.
+	payload := structuredTestPayload(personSpec())
+	payload.InferenceConfig = &InferenceConfig{MaxTokens: 1024}
+	rec, script, err := runStructuredScript(t, payload,
+		scriptedHop{text: []string{`{"name":"Ann"}`}, in: 40, out: 600},
+		scriptedHop{text: []string{`{"name":"Ann","age":30}`}, in: 60, out: 600},
+	)
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	if len(script.payloads) != 2 || rec.text != `{"name":"Ann","age":30}` || rec.out != 1200 {
+		t.Fatalf("calls=%d text=%q out=%d, want one retry with summed output", len(script.payloads), rec.text, rec.out)
+	}
+	if stop := inferMaxTokensStop(rec.stop, rec.out, 1024); isOutputCapStopReason(stop) {
+		t.Fatalf("stop = %q (handler reads %q), want a complete answer", rec.stop, stop)
+	}
+
+	//! The used attempt itself reaching the cap is still a cut-off.
+	payload = structuredTestPayload(personSpec())
+	payload.InferenceConfig = &InferenceConfig{MaxTokens: 1024}
+	rec, _, err = runStructuredScript(t, payload,
+		scriptedHop{text: []string{`{"name":"Ann"}`}, out: 300},
+		scriptedHop{text: []string{`{"name":"Ann","age":30}`}, out: 1024},
+	)
+	if err != nil || rec.text != `{"name":"Ann","age":30}` || rec.stop != "max_tokens" {
+		t.Fatalf("text=%q stop=%q err=%v, want max_tokens for a used retry at the cap", rec.text, rec.stop, err)
+	}
+}
+
+func TestStructuredCheckBuildsProblemsFromRootTypeMatch(t *testing.T) {
+	check := checkStructuredAnswer(`{"name":"Ann"} (see [1])`, personSpec())
+	if check.valid || check.text != `{"name":"Ann"}` || strings.Join(check.errs, "|") != `$: missing required property "age"` {
+		t.Fatalf("check = %#v, want the near-miss object and its real problem", check)
+	}
+}
+
 func TestStructuredOutputRetryUpstreamErrorKeepsFirstAnswer(t *testing.T) {
 	rec, script, err := runStructuredScript(t, structuredTestPayload(personSpec()),
 		scriptedHop{text: []string{"Result:\n```json\n{\"name\":\"Ann\"}\n```"}, stop: "end_turn", credits: 0.1},

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -18,6 +19,9 @@ const (
 	maxSchemaErrors        = 5
 	// maxSchemaRefHops bounds $ref hops taken without moving into the value, which ends cycles.
 	maxSchemaRefHops = 32
+	// maxSchemaSteps bounds the work of one validation over every anyOf/oneOf probe and every
+	// $ref path together. Self-referencing or nested unions would otherwise cost 2^depth.
+	maxSchemaSteps = 100_000
 )
 
 type jsonCandidate struct {
@@ -41,7 +45,8 @@ func decodeJSONNumbers(text string) (interface{}, bool) {
 
 // extractStructuredJSON returns the JSON value an answer carries: the whole answer (or the one
 // fenced block it is) when that parses, else the last value in it that matches the schema,
-// else the last value that parses. The text is returned as the model wrote it.
+// else the last value whose root type the schema allows, else the last value that parses.
+// The text is returned as the model wrote it.
 func extractStructuredJSON(text string, spec *structuredOutputSpec) (string, bool) {
 	trimmed := strings.TrimSpace(text)
 	whole := []string{trimmed}
@@ -55,20 +60,27 @@ func extractStructuredJSON(text string, spec *structuredOutputSpec) (string, boo
 	}
 
 	candidates := scanJSONValues(trimmed)
-	parsed := ""
+	fallback, fallbackTyped := "", false
+	//! One budget for every candidate: a costly schema must not be paid once per bracket in prose.
+	steps := maxSchemaSteps
 	for i := len(candidates) - 1; i >= 0; i-- {
 		candidate := candidates[i]
 		if !structuredRootAllowed(candidate.value, spec) {
 			continue
 		}
-		if parsed == "" {
-			parsed = candidate.text
-		}
-		if spec == nil || spec.Schema == nil || len(validateJSONSchema(candidate.value, spec.Schema, spec.Strict)) == 0 {
+		if spec == nil || spec.Schema == nil {
 			return candidate.text, true
 		}
+		if errs, _ := validateJSONSchemaWithin(candidate.value, spec.Schema, spec.Strict, &steps); len(errs) == 0 {
+			return candidate.text, true
+		}
+		//! A citation such as [1] after a near-miss object must not stand in for the answer.
+		typed := jsonTypeMatches(candidate.value, spec.Schema["type"])
+		if fallback == "" || (typed && !fallbackTyped) {
+			fallback, fallbackTyped = candidate.text, typed
+		}
 	}
-	return parsed, parsed != ""
+	return fallback, fallback != ""
 }
 
 func structuredRootAllowed(value interface{}, spec *structuredOutputSpec) bool {
@@ -127,10 +139,36 @@ func scanJSONValues(text string) []jsonCandidate {
 	return found
 }
 
-type schemaValidator struct {
+// schemaRun is the state one validation shares with every anyOf/oneOf probe it starts.
+type schemaRun struct {
 	root   map[string]interface{}
 	strict bool
-	errs   []string
+	// steps is the work left; once it runs out the rest of the value goes unchecked.
+	steps     *int
+	exhausted bool
+	// memo holds anyOf/oneOf branch results, so a recursive union visits each node once.
+	memo map[schemaMemoKey]bool
+}
+
+type schemaMemoKey struct {
+	schema  uintptr
+	value   interface{}
+	refHops int
+}
+
+// schemaValueRef stands in for an object or array in a memo key; the decoded value outlives
+// the validation, so its address identifies it.
+type schemaValueRef struct {
+	array bool
+	ptr   uintptr
+	n     int
+}
+
+type schemaValidator struct {
+	run *schemaRun
+	// probe only needs a yes or no, so it stops at the first problem and formats none.
+	probe bool
+	errs  []string
 }
 
 // validateJSONSchema checks a value decoded with UseNumber against the common JSON Schema
@@ -138,15 +176,47 @@ type schemaValidator struct {
 // anyOf, oneOf, allOf and local $ref. Other keywords are ignored. additionalProperties:false is
 // enforced only when strict. It returns at most maxSchemaErrors problems.
 func validateJSONSchema(value interface{}, schema map[string]interface{}, strict bool) []string {
+	steps := maxSchemaSteps
+	errs, _ := validateJSONSchemaWithin(value, schema, strict, &steps)
+	return errs
+}
+
+// validateJSONSchemaWithin is validateJSONSchema drawing on a step budget the caller may share
+// across values. complete is false when the budget ran out: the problems found up to then are
+// real, and the part of the value left unchecked counts as matching.
+func validateJSONSchemaWithin(value interface{}, schema map[string]interface{}, strict bool, steps *int) (errs []string, complete bool) {
 	if schema == nil {
-		return nil
+		return nil, true
 	}
-	v := &schemaValidator{root: schema, strict: strict}
+	run := &schemaRun{root: schema, strict: strict, steps: steps}
+	v := &schemaValidator{run: run}
 	v.check(value, schema, "$", 0)
-	return v.errs
+	return v.errs, !run.exhausted
+}
+
+func (v *schemaValidator) stopped() bool {
+	return len(v.errs) >= maxSchemaErrors || (v.probe && len(v.errs) > 0)
+}
+
+// spend takes n steps from the shared budget and reports whether the work may go ahead.
+func (v *schemaValidator) spend(n int) bool {
+	run := v.run
+	if run.exhausted || *run.steps < n {
+		run.exhausted = true
+		*run.steps = 0
+		return false
+	}
+	*run.steps -= n
+	return true
 }
 
 func (v *schemaValidator) fail(path, format string, args ...interface{}) {
+	if v.probe {
+		if len(v.errs) == 0 {
+			v.errs = append(v.errs, path)
+		}
+		return
+	}
 	if len(v.errs) < maxSchemaErrors {
 		v.errs = append(v.errs, path+": "+fmt.Sprintf(format, args...))
 	}
@@ -159,13 +229,42 @@ func (v *schemaValidator) matches(value interface{}, schema interface{}, refHops
 		allowed, isBool := schema.(bool)
 		return !isBool || allowed
 	}
-	probe := &schemaValidator{root: v.root, strict: v.strict}
+	key, keyed := memoKeyFor(branch, value, refHops)
+	if keyed {
+		if result, seen := v.run.memo[key]; seen {
+			return result
+		}
+	}
+	probe := &schemaValidator{run: v.run, probe: true}
 	probe.check(value, branch, "$", refHops)
-	return len(probe.errs) == 0
+	result := len(probe.errs) == 0
+	if keyed && !v.run.exhausted {
+		//! A probe cut short by the budget proves nothing, so only finished ones are kept.
+		if v.run.memo == nil {
+			v.run.memo = make(map[schemaMemoKey]bool)
+		}
+		v.run.memo[key] = result
+	}
+	return result
+}
+
+func memoKeyFor(schema map[string]interface{}, value interface{}, refHops int) (schemaMemoKey, bool) {
+	key := schemaMemoKey{schema: reflect.ValueOf(schema).Pointer(), refHops: refHops}
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		key.value = schemaValueRef{ptr: reflect.ValueOf(typed).Pointer()}
+	case []interface{}:
+		key.value = schemaValueRef{array: true, ptr: reflect.ValueOf(typed).Pointer(), n: len(typed)}
+	case string, json.Number, bool, float64, nil:
+		key.value = value
+	default:
+		return key, false
+	}
+	return key, true
 }
 
 func (v *schemaValidator) check(value interface{}, schema map[string]interface{}, path string, refHops int) {
-	if len(v.errs) >= maxSchemaErrors || refHops > maxSchemaRefHops {
+	if v.stopped() || refHops > maxSchemaRefHops || !v.spend(1) {
 		return
 	}
 	if ref, ok := schema["$ref"].(string); ok {
@@ -175,7 +274,7 @@ func (v *schemaValidator) check(value interface{}, schema map[string]interface{}
 	}
 	for _, keyword := range []string{"anyOf", "oneOf"} {
 		branches, ok := schema[keyword].([]interface{})
-		if !ok || len(branches) == 0 {
+		if !ok || len(branches) == 0 || v.stopped() {
 			continue
 		}
 		matched := false
@@ -196,11 +295,14 @@ func (v *schemaValidator) check(value interface{}, schema map[string]interface{}
 			}
 		}
 	}
+	if v.stopped() {
+		return
+	}
 	if want, ok := schema["type"]; ok && !jsonTypeMatches(value, want) {
 		v.fail(path, "expected %s, got %s", describeSchemaType(want), jsonTypeName(value))
 		return
 	}
-	if options, ok := schema["enum"].([]interface{}); ok {
+	if options, ok := schema["enum"].([]interface{}); ok && v.spend(len(options)) {
 		found := false
 		for _, option := range options {
 			if jsonValuesEqual(value, option) {
@@ -215,12 +317,19 @@ func (v *schemaValidator) check(value interface{}, schema map[string]interface{}
 	if want, ok := schema["const"]; ok && !jsonValuesEqual(value, want) {
 		v.fail(path, "must equal %s", compactJSON(want))
 	}
+	if v.stopped() {
+		return
+	}
 
 	switch typed := value.(type) {
 	case map[string]interface{}:
-		v.checkObject(typed, schema, path)
+		if v.spend(len(typed)) {
+			v.checkObject(typed, schema, path)
+		}
 	case []interface{}:
-		v.checkArray(typed, schema, path)
+		if v.spend(len(typed)) {
+			v.checkArray(typed, schema, path)
+		}
 	}
 }
 
@@ -240,6 +349,9 @@ func (v *schemaValidator) checkObject(object map[string]interface{}, schema map[
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
+		if v.stopped() {
+			return
+		}
 		child := jsonChildPath(path, key)
 		if sub, ok := properties[key]; ok {
 			if subSchema, ok := sub.(map[string]interface{}); ok {
@@ -251,7 +363,7 @@ func (v *schemaValidator) checkObject(object map[string]interface{}, schema map[
 		}
 		switch extra := schema["additionalProperties"].(type) {
 		case bool:
-			if !extra && v.strict {
+			if !extra && v.run.strict {
 				v.fail(path, "unexpected property %q", key)
 			}
 		case map[string]interface{}:
@@ -267,6 +379,9 @@ func (v *schemaValidator) checkArray(items []interface{}, schema map[string]inte
 		prefix = tuple
 	}
 	for i, item := range items {
+		if v.stopped() {
+			return
+		}
 		child := path + "[" + strconv.Itoa(i) + "]"
 		if i < len(prefix) {
 			if sub, ok := prefix[i].(map[string]interface{}); ok {
@@ -283,12 +398,12 @@ func (v *schemaValidator) checkArray(items []interface{}, schema map[string]inte
 // resolve follows a local reference such as #/$defs/name; remote references are not checked.
 func (v *schemaValidator) resolve(ref string) (map[string]interface{}, bool) {
 	if ref == "#" {
-		return v.root, true
+		return v.run.root, true
 	}
 	if !strings.HasPrefix(ref, "#/") {
 		return nil, false
 	}
-	var node interface{} = v.root
+	var node interface{} = v.run.root
 	for _, part := range strings.Split(ref[2:], "/") {
 		part = strings.ReplaceAll(strings.ReplaceAll(part, "~1", "/"), "~0", "~")
 		switch typed := node.(type) {

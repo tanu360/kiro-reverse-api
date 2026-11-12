@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 func decodeClaudeRequestForTest(t *testing.T, body string) *ClaudeRequest {
@@ -247,6 +248,8 @@ func TestExtractStructuredJSONFromMessyText(t *testing.T) {
 		{"two objects take the last", `{"name":"Old","age":1} then corrected {"name":"New","age":2}`, person, `{"name":"New","age":2}`, true},
 		{"last valid beats a later invalid", `{"name":"Good","age":3} and also {"name":"bad"}`, person, `{"name":"Good","age":3}`, true},
 		{"nothing valid validates", `draft {"name":"x"}`, person, `{"name":"x"}`, true},
+		{"citation after a near miss", `{"name":"Ann"} (see [1])`, person, `{"name":"Ann"}`, true},
+		{"no root type match takes the last", `[1] then [2]`, person, `[2]`, true},
 		{"array root for json_object", "[1,2]", object, "", false},
 		{"array root", "The list: [\"a\", \"b\"].", anyValue, `["a", "b"]`, true},
 		{"scalar root whole text", `"just a string"`, anyValue, `"just a string"`, true},
@@ -320,6 +323,63 @@ func TestValidateJSONSchema(t *testing.T) {
 	if len(many) != maxSchemaErrors {
 		t.Fatalf("errors = %d, want the cap of %d", len(many), maxSchemaErrors)
 	}
+}
+
+func TestValidateJSONSchemaBoundedWork(t *testing.T) {
+	one, _ := decodeJSONNumbers(`1`)
+	for _, tc := range []struct {
+		name     string
+		schema   string
+		value    interface{}
+		want     []string
+		complete bool
+	}{
+		{"self-referencing anyOf", `{"anyOf":[{"$ref":"#"},{"$ref":"#"}],"type":"string"}`, one,
+			[]string{"$: does not match any allowed schema (anyOf)", "$: expected string, got integer"}, true},
+		{"self-referencing allOf", `{"allOf":[{"$ref":"#"},{"$ref":"#"}]}`, one, nil, false},
+		{"recursive union tree", treeUnionSchema, treeUnionValue(40, "b"), nil, true},
+		{"recursive union tree, bad leaf", treeUnionSchema, treeUnionValue(40, "c"),
+			[]string{"$: does not match any allowed schema (anyOf)"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			steps := maxSchemaSteps
+			done := make(chan struct{})
+			var got []string
+			var complete bool
+			go func() {
+				defer close(done)
+				got, complete = validateJSONSchemaWithin(tc.value, mustSchema(tc.schema), false, &steps)
+			}()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatalf("validation still running after 5s")
+			}
+			if strings.Join(got, "|") != strings.Join(tc.want, "|") || complete != tc.complete {
+				t.Fatalf("errors = %q complete = %t, want %q %t", got, complete, tc.want, tc.complete)
+			}
+		})
+	}
+
+	//! A spent budget leaves every later candidate unchecked rather than paying again per candidate.
+	spent := 0
+	if errs, complete := validateJSONSchemaWithin(one, mustSchema(`{"type":"string"}`), false, &spent); errs != nil || complete {
+		t.Fatalf("errs=%q complete=%t, want an unchecked value with no budget", errs, complete)
+	}
+}
+
+// treeUnionSchema is a discriminated union whose children recurse into the root schema.
+const treeUnionSchema = `{"anyOf":[
+	{"type":"object","properties":{"kind":{"const":"a"},"children":{"type":"array","items":{"$ref":"#"}}},"required":["kind"]},
+	{"type":"object","properties":{"kind":{"const":"b"},"children":{"type":"array","items":{"$ref":"#"}}},"required":["kind"]}]}`
+
+// treeUnionValue nests depth "b" nodes and ends in a leaf of the given kind.
+func treeUnionValue(depth int, leafKind string) interface{} {
+	var node interface{} = map[string]interface{}{"kind": leafKind}
+	for i := 0; i < depth; i++ {
+		node = map[string]interface{}{"kind": "b", "children": []interface{}{node}}
+	}
+	return node
 }
 
 func TestJSONFenceStripperStream(t *testing.T) {

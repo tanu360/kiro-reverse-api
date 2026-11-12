@@ -23,9 +23,10 @@ func callKiroStructured(ctx context.Context, account *config.Account, payload *K
 		return err
 	}
 	first.flush()
+	maxTokens := requestedMaxTokens(&inner)
 	if len(first.toolUses) > 0 {
 		//! A tool call is not the final answer; the turn reaches the client unchanged.
-		finishStructured(callback, first, first.answer.String(), first)
+		finishStructured(callback, maxTokens, first, first.answer.String(), first)
 		return nil
 	}
 
@@ -34,7 +35,7 @@ func callKiroStructured(ctx context.Context, account *config.Account, payload *K
 		if !firstCheck.valid {
 			logger.Infof("[StructuredOutput] Answer did not match the requested JSON (%d problems); no retry possible", len(firstCheck.errs))
 		}
-		finishStructured(callback, first, firstCheck.best(first.answer.String()), first)
+		finishStructured(callback, maxTokens, first, firstCheck.best(first.answer.String()), first)
 		return nil
 	}
 
@@ -51,13 +52,13 @@ func callKiroStructured(ctx context.Context, account *config.Account, payload *K
 			return err
 		}
 		logger.Warnf("[StructuredOutput] Retry failed, keeping the first answer: %v", err)
-		finishStructured(callback, first, firstCheck.best(first.answer.String()), first, retry)
+		finishStructured(callback, maxTokens, first, firstCheck.best(first.answer.String()), first, retry)
 		return nil
 	}
 	retry.flush()
 	if len(retry.toolUses) > 0 {
 		logger.Warnf("[StructuredOutput] Retry called a tool instead of answering; keeping the first answer")
-		finishStructured(callback, first, firstCheck.best(first.answer.String()), first, retry)
+		finishStructured(callback, maxTokens, first, firstCheck.best(first.answer.String()), first, retry)
 		return nil
 	}
 
@@ -66,11 +67,11 @@ func callKiroStructured(ctx context.Context, account *config.Account, payload *K
 	//! Best first: the retry's JSON (checked or not), then the first answer's, then the retry's text.
 	switch {
 	case retryCheck.found:
-		finishStructured(callback, retry, retryCheck.text, first, retry)
+		finishStructured(callback, maxTokens, retry, retryCheck.text, first, retry)
 	case firstCheck.found:
-		finishStructured(callback, first, firstCheck.text, first, retry)
+		finishStructured(callback, maxTokens, first, firstCheck.text, first, retry)
 	default:
-		finishStructured(callback, retry, retryCheck.best(retry.answer.String()), first, retry)
+		finishStructured(callback, maxTokens, retry, retryCheck.best(retry.answer.String()), first, retry)
 	}
 	return nil
 }
@@ -95,7 +96,12 @@ func checkStructuredAnswer(answer string, spec *structuredOutputSpec) structured
 	check := structuredCheck{text: text, found: true}
 	if spec.Schema != nil {
 		value, _ := decodeJSONNumbers(text)
-		check.errs = validateJSONSchema(value, spec.Schema, spec.Strict)
+		steps := maxSchemaSteps
+		var complete bool
+		check.errs, complete = validateJSONSchemaWithin(value, spec.Schema, spec.Strict, &steps)
+		if !complete {
+			logger.Warnf("[StructuredOutput] JSON schema too costly to check in %d steps; the rest of the answer is unchecked", maxSchemaSteps)
+		}
 	}
 	check.valid = len(check.errs) == 0
 	return check
@@ -174,7 +180,7 @@ func (a *structuredAttempt) canRetry(payload *KiroPayload) bool {
 }
 
 // finishStructured hands the chosen answer to the handler with usage summed over every attempt.
-func finishStructured(callback *KiroStreamCallback, used *structuredAttempt, text string, attempts ...*structuredAttempt) {
+func finishStructured(callback *KiroStreamCallback, maxTokens int, used *structuredAttempt, text string, attempts ...*structuredAttempt) {
 	if text != "" && callback.OnText != nil {
 		callback.OnText(text, false)
 	}
@@ -186,12 +192,16 @@ func finishStructured(callback *KiroStreamCallback, used *structuredAttempt, tex
 	totalIn, totalOut := 0, 0
 	totalCredits, totalContext := 0.0, 0.0
 	totalCacheRead, totalCacheWrite := 0, 0
+	usedOut := used.outputTokens
 	for _, attempt := range attempts {
 		out := attempt.outputTokens
 		if out <= 0 && len(attempts) > 1 {
 			//! With no count from Kiro the handler estimates output from the final text alone,
 			//! which would leave the discarded attempt unbilled.
 			out = estimateApproxTokens(attempt.answer.String() + attempt.thinking.String())
+		}
+		if attempt == used {
+			usedOut = out
 		}
 		totalIn += attempt.inputTokens
 		totalOut += out
@@ -200,8 +210,17 @@ func finishStructured(callback *KiroStreamCallback, used *structuredAttempt, tex
 		totalCacheRead += attempt.cacheRead
 		totalCacheWrite += attempt.cacheWrite
 	}
+	stopReason := used.stopReason
+	if len(attempts) > 1 && strings.TrimSpace(stopReason) == "" {
+		//! IdC / Enterprise accounts send no stop reason, and the handler would read summed
+		//! output at the cap as a cut-off. Only the used attempt's own output says that.
+		stopReason = inferMaxTokensStop("", usedOut, maxTokens)
+		if stopReason == "" {
+			stopReason = "end_turn"
+		}
+	}
 	if callback.OnStopReason != nil {
-		callback.OnStopReason(used.stopReason)
+		callback.OnStopReason(stopReason)
 	}
 	if callback.OnCredits != nil && totalCredits > 0 {
 		callback.OnCredits(totalCredits)
