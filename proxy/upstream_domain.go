@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"kiro-proxy/auth"
 	"kiro-proxy/config"
 	"net/url"
 	"strings"
@@ -31,6 +32,20 @@ func applyAPIDomain(rawURL, region string) string {
 	}
 	u.Host = kiroDataPlaneHost(region)
 	return u.String()
+}
+
+// regionOverrideMismatch reports whether a global region override sends this account's calls
+// somewhere other than its own region. Kiro answers a wrong data-plane region with 403
+// "Invalid token" and a wrong OIDC region fails the refresh, so an auth error then says nothing
+// about the account. A ban would outlive clearing the override, so callers only cool it.
+func regionOverrideMismatch(account *config.Account) bool {
+	if account == nil {
+		return false
+	}
+	if region := config.GetAPIRegionOverride(); region != "" && region != kiroAccountRegion(account, "") {
+		return true
+	}
+	return auth.AuthRegionOverrideMismatch(account)
 }
 
 func isAmazonawsDataPlaneHost(host string) bool {

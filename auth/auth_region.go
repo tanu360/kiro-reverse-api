@@ -14,3 +14,24 @@ func oidcRefreshRegion(account *config.Account) string {
 	}
 	return account.Region
 }
+
+// AuthRegionOverrideMismatch reports whether the authRegion override sends this account's
+// token refresh to a region other than its own. A refresh there fails however good the
+// refresh token is, so the caller must not treat that failure as a dead account.
+func AuthRegionOverrideMismatch(account *config.Account) bool {
+	override := config.GetAuthRegionOverride()
+	if override == "" || !usesOIDCRefresh(account) {
+		return false
+	}
+	own, err := config.NormalizeAWSRegion(account.Region)
+	return err != nil || own != override
+}
+
+// usesOIDCRefresh mirrors the dispatch in RefreshTokenContext: only Builder ID and
+// IAM Identity Center accounts refresh through oidcRefreshRegion.
+func usesOIDCRefresh(account *config.Account) bool {
+	return account != nil &&
+		!config.IsAPIKeyAccount(account) &&
+		!config.IsExternalIdpAccount(account) &&
+		account.AuthMethod != "social"
+}

@@ -49,6 +49,11 @@ func kiroRegionForProfile(account *config.Account, profileArn string) string {
 	if region := config.GetAPIRegionOverride(); region != "" {
 		return region
 	}
+	return kiroAccountRegion(account, profileArn)
+}
+
+// kiroAccountRegion is the account's own data-plane region, ignoring the apiRegion override.
+func kiroAccountRegion(account *config.Account, profileArn string) string {
 	//! An API key has no IDE profile: its Region alone names the data plane, so a stale ARN cannot redirect it.
 	if config.IsAPIKeyAccount(account) {
 		if region := strings.ToLower(strings.TrimSpace(account.Region)); kiroRegionPattern.MatchString(region) {
