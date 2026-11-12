@@ -71,10 +71,10 @@ func resizePayloadImages(p *KiroPayload) {
 	if !on {
 		return
 	}
-	decodes := resizeMaxDecodesPerPayload
+	allow := newResizeAllowance()
 	cur := &p.ConversationState.CurrentMessage.UserInputMessage
 	for i := range cur.Images {
-		resizeImage(&cur.Images[i], lim, &decodes)
+		resizeImage(&cur.Images[i], lim, allow)
 	}
 	seen := 0
 	history := p.ConversationState.History
@@ -84,7 +84,7 @@ func resizePayloadImages(p *KiroPayload) {
 			continue
 		}
 		for j := len(msg.Images) - 1; j >= 0 && seen < maxHistoryImages; j-- {
-			resizeImage(&msg.Images[j], lim, &decodes)
+			resizeImage(&msg.Images[j], lim, allow)
 			seen++
 		}
 	}
@@ -94,14 +94,24 @@ func resizePayloadImages(p *KiroPayload) {
 // image is over a limit. It reports whether img changed. An image that cannot be
 // decoded, or whose re-encode would not help, is left untouched.
 func resizeKiroImage(img *KiroImage, lim imageResizeLimits) bool {
-	decodes := 1
-	return resizeImage(img, lim, &decodes)
+	return resizeImage(img, lim, newResizeAllowance())
+}
+
+// resizeAllowance is what one payload may spend on full decodes: a number of them, and
+// one deadline for every wait on the memory budget together.
+type resizeAllowance struct {
+	decodes  int
+	deadline time.Time
+}
+
+func newResizeAllowance() *resizeAllowance {
+	return &resizeAllowance{decodes: resizeMaxDecodesPerPayload, deadline: time.Now().Add(resizeBudgetWait)}
 }
 
 // resizeImage is resizeKiroImage drawing on a request's allowance of full decodes.
 // An image skipped for the allowance or a full memory budget is not cached, so a
 // later request can still resize it.
-func resizeImage(img *KiroImage, lim imageResizeLimits, decodes *int) bool {
+func resizeImage(img *KiroImage, lim imageResizeLimits, allow *resizeAllowance) bool {
 	data := img.Source.Bytes
 	if data == "" {
 		return false
@@ -134,14 +144,16 @@ func resizeImage(img *KiroImage, lim imageResizeLimits, decodes *int) bool {
 		imageResizeCache.put(key, resizeCacheEntry{unchanged: true})
 		return false
 	}
-	if *decodes <= 0 {
+	if allow.decodes <= 0 {
 		logger.Debugf("[ImageResize] %dx%d %s left as is: %d images already decoded for this request", w, h, img.Format, resizeMaxDecodesPerPayload)
 		return false
 	}
-	*decodes--
+	allow.decodes--
 	start := time.Now()
-	if !resizeBudget.acquire(cost, resizeBudgetWait) {
-		logger.Debugf("[ImageResize] %dx%d %s left as is: no memory budget for %d MB after %s", w, h, img.Format, cost>>20, resizeBudgetWait)
+	//! The wait is the payload's, not the image's: eight images each waiting the full
+	//! resizeBudgetWait would hold the request for over a minute before it goes upstream.
+	if !resizeBudget.acquire(cost, max(time.Until(allow.deadline), 0)) {
+		logger.Debugf("[ImageResize] %dx%d %s left as is: no memory budget for %d MB within %s of the request", w, h, img.Format, cost>>20, resizeBudgetWait)
 		return false
 	}
 	out, format, ow, oh, ok := downscaleImage(raw, lim)
@@ -162,8 +174,9 @@ func resizeImage(img *KiroImage, lim imageResizeLimits, decodes *int) bool {
 var resizeDecodes atomic.Int64
 
 // resizeBudget is shared by every request's full decodes. resizeBudgetWait bounds
-// how long an image waits for it before it goes upstream as is: the translator has
-// no request context, so a cancelled request cannot stop waiting any sooner.
+// how long one payload's images wait for it, all together, before they go upstream
+// as they are: the translator has no request context, so a cancelled request cannot
+// stop waiting any sooner.
 var (
 	resizeBudget     = newMemoryBudget(resizeMemoryBudget)
 	resizeBudgetWait = 10 * time.Second
@@ -392,6 +405,9 @@ func (b *memoryBudget) acquire(n int64, wait time.Duration) bool {
 		}
 		freed := b.freed
 		b.mu.Unlock()
+		if wait <= 0 {
+			return false
+		}
 		if timeout == nil {
 			timer := time.NewTimer(wait)
 			defer timer.Stop()
