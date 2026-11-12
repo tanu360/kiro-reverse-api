@@ -303,7 +303,12 @@ export function TestModelPicker({
               >
                 {group.key ? <ModelLogo model={group.models[0]} /> : null}
                 {group.name}
-                <span className={cn("tabular-nums", on ? "opacity-64" : "text-muted-foreground")}>
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    on ? "opacity-80 dark:opacity-64" : "text-muted-foreground",
+                  )}
+                >
                   {group.models.length}
                 </span>
               </button>
