@@ -27,6 +27,10 @@ func TestNormalizeAccountTags(t *testing.T) {
 	if got := NormalizeAccountTags(many); len(got) != MaxAccountTags || got[0] != "t0" || got[MaxAccountTags-1] != "t9" {
 		t.Fatalf("expected the first %d tags, got %q", MaxAccountTags, got)
 	}
+	// The UI splits its tag field on these, so a stored tag must not hold one.
+	if got := NormalizeAccountTags([]string{"eu,west", "東京、大阪", "a，b", ", ,"}); !reflect.DeepEqual(got, []string{"eu west", "東京 大阪", "a b"}) {
+		t.Fatalf("separators must become spaces, got %q", got)
+	}
 	if got := NormalizeAccountTags([]string{" ", ""}); got != nil {
 		t.Fatalf("no tag left must be nil, got %#v", got)
 	}

@@ -255,19 +255,35 @@ func TestExportImportRoundTripKeepsNotesAndTags(t *testing.T) {
 	}
 }
 
-func TestExportTagObjectsDedupesAcrossAccounts(t *testing.T) {
-	got := exportTagObjects([]config.Account{
+func TestExportTagObjectsCoversEveryAccountsIDs(t *testing.T) {
+	accounts := []config.Account{
 		{Tags: []string{"zeta", "Alpha"}},
 		{Tags: []string{"alpha", "beta"}},
+		{Tags: []string{"beta"}},
 		{},
-	})
+	}
+	got := exportTagObjects(accounts)
 	want := []interface{}{
 		map[string]string{"id": "Alpha", "name": "Alpha"},
+		map[string]string{"id": "alpha", "name": "alpha"},
 		map[string]string{"id": "beta", "name": "beta"},
 		map[string]string{"id": "zeta", "name": "zeta"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("exportTagObjects = %v", got)
+	}
+	// Every per-account id must resolve through the top-level list, as a Kiro Account
+	// Manager style importer resolves them.
+	ids := make(map[string]bool)
+	for _, obj := range got {
+		ids[obj.(map[string]string)["id"]] = true
+	}
+	for _, a := range accounts {
+		for _, tag := range a.Tags {
+			if !ids[tag] {
+				t.Fatalf("account tag %q has no top-level entry in %v", tag, got)
+			}
+		}
 	}
 	if empty := exportTagObjects(nil); empty == nil || len(empty) != 0 {
 		t.Fatalf("no tags must export [], got %#v", empty)

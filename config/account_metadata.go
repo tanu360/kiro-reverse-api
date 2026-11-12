@@ -41,10 +41,16 @@ func NormalizeAccountNotes(notes string) string {
 	return strings.TrimSpace(truncateRunes(notes, MaxAccountNotesRunes))
 }
 
-// NormalizeAccountTag makes one short single-line label: control characters go, whitespace
-// runs collapse to one space, and the result is trimmed and cut to MaxAccountTagRunes runes.
+// NormalizeAccountTag makes one short single-line label: control characters go, the tag
+// separators the admin UI splits on (comma, full-width comma, enumeration comma) become
+// spaces, whitespace runs collapse to one space, and the result is trimmed and cut to
+// MaxAccountTagRunes runes. A stored tag never holds a separator, so editing the
+// comma-separated list cannot split it.
 func NormalizeAccountTag(tag string) string {
 	tag = strings.Map(func(r rune) rune {
+		if isAccountTagSeparator(r) {
+			return ' '
+		}
 		if unicode.IsControl(r) && !unicode.IsSpace(r) {
 			return -1
 		}
@@ -166,6 +172,11 @@ func preserveAccountMetadata(account *Account, current Account) {
 func normalizeAccountMetadata(account *Account) {
 	account.Notes = NormalizeAccountNotes(account.Notes)
 	account.Tags = NormalizeAccountTags(account.Tags)
+}
+
+// isAccountTagSeparator matches the UI's TAG_SEPARATOR (ui/src/features/accounts/account-metadata.ts).
+func isAccountTagSeparator(r rune) bool {
+	return r == ',' || r == '，' || r == '、'
 }
 
 func containsTagFold(tags []string, tag string) bool {

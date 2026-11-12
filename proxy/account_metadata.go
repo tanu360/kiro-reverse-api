@@ -113,23 +113,27 @@ func (h *Handler) batchTags(w http.ResponseWriter, ids []string, add bool, rawTa
 }
 
 // exportTagObjects is the export's top-level tag list in the Kiro Account Manager shape. Each
-// account's `tags` holds tag ids, and a tag's id is its name. Sorted case-insensitively, one
-// entry per name in any case.
+// account's `tags` holds tag ids, and a tag's id is its name. Every exact spelling gets its
+// own entry, so each account's ids resolve even when two accounts spell a tag in different
+// cases. Sorted case-insensitively, then by spelling.
 func exportTagObjects(accounts []config.Account) []interface{} {
 	seen := make(map[string]bool)
 	var names []string
 	for _, a := range accounts {
 		for _, tag := range a.Tags {
-			key := strings.ToLower(tag)
-			if tag == "" || seen[key] {
+			if tag == "" || seen[tag] {
 				continue
 			}
-			seen[key] = true
+			seen[tag] = true
 			names = append(names, tag)
 		}
 	}
-	sort.SliceStable(names, func(i, j int) bool {
-		return strings.ToLower(names[i]) < strings.ToLower(names[j])
+	sort.Slice(names, func(i, j int) bool {
+		li, lj := strings.ToLower(names[i]), strings.ToLower(names[j])
+		if li != lj {
+			return li < lj
+		}
+		return names[i] < names[j]
 	})
 	out := make([]interface{}, 0, len(names))
 	for _, name := range names {
