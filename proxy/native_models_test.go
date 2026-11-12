@@ -11,7 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 // seedNativeModels publishes ids as the models Kiro lists and clears them when the test ends.
@@ -276,78 +275,52 @@ func TestModelsCacheWritesPublishNativeModels(t *testing.T) {
 	}
 }
 
-// newModelsRetryTestHandler serves ListAvailableModels from list and counts the calls.
-func newModelsRetryTestHandler(t *testing.T, list func(call int32) (*http.Response, error)) (*Handler, *atomic.Int32) {
-	t.Helper()
+func TestListModelsForHousekeepingRetriesWhileAnAccountFails(t *testing.T) {
+	publishNativeModels(nil)
 	h := newResponsesTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
 		t.Errorf("inference endpoint called while listing models")
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 	t.Cleanup(func() { publishNativeModels(nil) })
-	t.Cleanup(func() { h.pool.SetModelList("responses-account", nil) })
-	var calls atomic.Int32
-	stubRestTransport(t, func(r *http.Request) (*http.Response, error) {
-		if strings.Contains(r.URL.Path, "ListAvailableModels") {
-			return list(calls.Add(1))
-		}
-		return jsonResponse(http.StatusNotFound, `{}`), nil
-	})
-	return h, &calls
-}
-
-func TestRetryEmptyModelsCacheSweepsUntilFilled(t *testing.T) {
-	publishNativeModels(nil)
-	h, calls := newModelsRetryTestHandler(t, func(call int32) (*http.Response, error) {
-		if call == 1 {
-			return jsonResponse(http.StatusInternalServerError, `{}`), nil
-		}
-		return jsonResponse(http.StatusOK, `{"models":[{"modelId":"gpt-5.6-sol"}]}`), nil
-	})
-
-	h.retryEmptyModelsCache([]time.Duration{time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond})
-
-	//! First retry fails, second fills the cache, the rest must not sweep again.
-	if got := calls.Load(); got != 2 {
-		t.Fatalf("ListAvailableModels calls = %d, want 2", got)
+	if err := config.AddAccount(config.Account{ID: "pro-account", Enabled: true, AccessToken: "token-pro", ProfileArn: "arn:aws:codewhisperer:profile/pro"}); err != nil {
+		t.Fatalf("add account: %v", err)
 	}
-	if got, ok := nativeModelID("gpt-5.6-sol"); !ok || got != "gpt-5.6-sol" {
-		t.Fatalf("nativeModelID after retry = (%q, %v), want (gpt-5.6-sol, true)", got, ok)
+	h.pool.Reload()
+	t.Cleanup(func() {
+		h.pool.SetModelList("responses-account", nil)
+		h.pool.SetModelList("pro-account", nil)
+	})
+	var proDown atomic.Bool
+	proDown.Store(true)
+	stubRestTransport(t, func(r *http.Request) (*http.Response, error) {
+		if !strings.Contains(r.URL.Path, "ListAvailableModels") {
+			return jsonResponse(http.StatusNotFound, `{}`), nil
+		}
+		if strings.Contains(r.Header.Get("Authorization"), "token-pro") {
+			if proDown.Load() {
+				return jsonResponse(http.StatusInternalServerError, `{}`), nil
+			}
+			return jsonResponse(http.StatusOK, `{"models":[{"modelId":"gpt-5.6-sol"}]}`), nil
+		}
+		return jsonResponse(http.StatusOK, `{"models":[{"modelId":"claude-sonnet-4.5"}]}`), nil
+	})
+
+	//! One account listed, so the cache is not empty, but the failed one still needs a retry.
+	if !h.listModelsForHousekeeping() {
+		t.Fatal("a listing with a failed account must ask for a retry")
+	}
+	if _, ok := nativeModelID("claude-sonnet-4.5"); !ok {
+		t.Fatal("the account that listed is missing from the native set")
+	}
+	if _, ok := nativeModelID("gpt-5.6-sol"); ok {
+		t.Fatal("gpt-5.6-sol is native before the account that lists it answered")
+	}
+
+	proDown.Store(false)
+	if h.listModelsForHousekeeping() {
+		t.Fatal("a listing with no failed account asked for a retry")
 	}
 	if got := MapModel("gpt-5.6-sol"); got != "gpt-5.6-sol" {
-		t.Fatalf("MapModel(gpt-5.6-sol) = %q, want gpt-5.6-sol", got)
+		t.Fatalf("MapModel(gpt-5.6-sol) after the retry = %q, want gpt-5.6-sol", got)
 	}
-}
-
-func TestRetryEmptyModelsCacheSkipsWhenFilledOrStopped(t *testing.T) {
-	ok := func(int32) (*http.Response, error) {
-		return jsonResponse(http.StatusOK, `{"models":[{"modelId":"gpt-5.6-sol"}]}`), nil
-	}
-
-	t.Run("cache already filled", func(t *testing.T) {
-		h, calls := newModelsRetryTestHandler(t, ok)
-		h.cachedModels = []ModelInfo{{ModelId: "claude-sonnet-4.5"}}
-		h.retryEmptyModelsCache([]time.Duration{time.Millisecond, time.Millisecond})
-		if got := calls.Load(); got != 0 {
-			t.Fatalf("ListAvailableModels calls = %d, want 0", got)
-		}
-	})
-
-	t.Run("handler stopped", func(t *testing.T) {
-		h, calls := newModelsRetryTestHandler(t, ok)
-		h.stopRefresh = make(chan struct{})
-		close(h.stopRefresh)
-		done := make(chan struct{})
-		go func() {
-			h.retryEmptyModelsCache([]time.Duration{time.Hour})
-			close(done)
-		}()
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			t.Fatal("retryEmptyModelsCache did not return after stop")
-		}
-		if got := calls.Load(); got != 0 {
-			t.Fatalf("ListAvailableModels calls = %d, want 0", got)
-		}
-	})
 }

@@ -266,9 +266,6 @@ func NewHandler() *Handler {
 }
 
 func (h *Handler) backgroundRefresh() {
-	//! The boot listing runs 10 s in; the retry loop waits a minute first, so it
-	//! only acts when that listing came back empty.
-	go h.retryEmptyModelsCache(modelsCacheRetryDelays)
 	h.runHousekeeping(h.stopRefresh)
 }
 

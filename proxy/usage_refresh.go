@@ -44,14 +44,15 @@ func (h *Handler) applyUsageRefreshInterval(w http.ResponseWriter, minutes *int)
 // listing on its fixed cadence and the usage sweep on the admin's interval.
 func (h *Handler) runHousekeeping(stop <-chan struct{}) {
 	go h.rescheduleOnConfigEvents(stop)
-	runHousekeepingJobs(stop, h.usageRefresh, h.refreshModelsCache, h.refreshAllAccounts)
+	runHousekeepingJobs(stop, h.usageRefresh, h.listModelsForHousekeeping, h.refreshAllAccounts)
 }
 
 // runHousekeepingJobs lists models usageRefreshStartDelay after start and then
-// every modelsListEvery, beside the usage scheduler, until stop is closed. The
-// two jobs take turns, so they never talk to upstream at the same time (both
-// are due together at boot), as when they ran in one loop.
-func runHousekeepingJobs(stop <-chan struct{}, usage *refreshScheduler, listModels func(), refreshUsage func(every time.Duration)) {
+// every modelsListEvery (sooner after a listing that asks for a retry), beside
+// the usage scheduler, until stop is closed. The two jobs take turns, so they
+// never talk to upstream at the same time (both are due together at boot), as
+// when they ran in one loop.
+func runHousekeepingJobs(stop <-chan struct{}, usage *refreshScheduler, listModels func() (retry bool), refreshUsage func(every time.Duration)) {
 	//! The models listing must not follow the usage interval. It is what calls
 	//! pool.SetModelList, and an account with no list is treated as offering every
 	//! model, so with the sweep Off a restart left free accounts picked for Pro-only
@@ -74,28 +75,16 @@ func runHousekeepingJobs(stop <-chan struct{}, usage *refreshScheduler, listMode
 	listed := make(chan struct{})
 	go func() {
 		defer close(listed)
-		runEvery(stop, usageRefreshStartDelay, modelsListEvery, func() { inTurn(listModels) })
+		runModelsListing(stop, usageRefreshStartDelay, modelsListEvery, modelsListRetryDelays, func() bool {
+			retry := false
+			inTurn(func() { retry = listModels() })
+			return retry
+		})
 	}()
 	usage.run(stop, usageRefreshStartDelay, func(every time.Duration) {
 		inTurn(func() { refreshUsage(every) })
 	})
 	<-listed
-}
-
-// runEvery calls job startDelay after it starts, then every `every` after the
-// previous call ended, until stop is closed.
-func runEvery(stop <-chan struct{}, startDelay, every time.Duration, job func()) {
-	timer := time.NewTimer(startDelay)
-	defer timer.Stop()
-	for {
-		select {
-		case <-timer.C:
-			job()
-			timer.Reset(every)
-		case <-stop:
-			return
-		}
-	}
 }
 
 // rescheduleOnConfigEvents pokes the sweep loop whenever the stored interval
