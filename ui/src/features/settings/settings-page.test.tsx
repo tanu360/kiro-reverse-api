@@ -139,6 +139,53 @@ describe("SettingsPage", () => {
     expect(await writes()).toEqual([]);
   });
 
+  it("image resize card saves the toggle and limits and rejects out-of-range values", async () => {
+    const { user } = await renderPage();
+    const card = section(SECTION_ID.imageResize);
+    const toggle = within(card).getByRole("switch", {
+      name: "Shrink large images before sending them",
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    const dimension = within(card).getByLabelText("Maximum width or height");
+    const size = within(card).getByLabelText("Maximum file size");
+
+    await user.clear(dimension);
+    await user.type(dimension, "4097");
+    await user.clear(size);
+    await user.type(size, "49");
+    await user.click(within(card).getByRole("button", { name: "Save" }));
+
+    expect(
+      await within(card).findByText(
+        "Maximum width or height must be a whole number between 256 and 4096.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText("Maximum file size must be a whole number between 50 and 4096."),
+    ).toBeInTheDocument();
+    expect(dimension).toHaveAttribute("aria-invalid", "true");
+    expect(size).toHaveAttribute("aria-invalid", "true");
+    expect(await writes()).toEqual([]);
+
+    await user.clear(dimension);
+    await user.type(dimension, "1024");
+    await user.clear(size);
+    await user.type(size, "300");
+    await user.click(toggle);
+    await user.click(within(card).getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    expect(await writes()).toEqual([
+      {
+        method: "POST",
+        path: "/settings",
+        body: { imageResize: false, imageResizeMaxDimension: 1024, imageResizeMaxKB: 300 },
+      },
+    ]);
+    expect(mockDb.settings.imageResize).toBe(false);
+    expect(mockDb.settings.imageResizeMaxKB).toBe(300);
+  });
+
   it("sends the default suffix when the Thinking suffix is empty", async () => {
     const { user } = await renderPage();
     const card = section(SECTION_ID.thinking);

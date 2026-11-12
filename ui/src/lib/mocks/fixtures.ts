@@ -1384,6 +1384,9 @@ export function defaultSettings(): Settings {
     autoContinue: false,
     autoContinueMax: 3,
     structuredToolHistory: true,
+    imageResize: true,
+    imageResizeMaxDimension: 1568,
+    imageResizeMaxKB: 400,
   };
 }
 

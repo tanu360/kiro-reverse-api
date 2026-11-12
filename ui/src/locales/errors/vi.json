@@ -21,6 +21,8 @@
   "serverError.tooManyPasswordAttempts": "Nhập sai mật khẩu quá nhiều lần. Hãy đợi một phút rồi thử lại.",
   "serverError.passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự.",
   "serverError.autoContinueMaxRange": "Số lần viết tiếp tối đa phải từ 1 đến 10.",
+  "serverError.imageResizeDimensionRange": "Chiều rộng hoặc chiều cao tối đa phải từ 256 đến 4096 pixel.",
+  "serverError.imageResizeSizeRange": "Dung lượng tệp tối đa phải từ 50 đến 4096 KB.",
   "serverError.notOverageCapable": "Tài khoản này không hỗ trợ vượt mức.",
   "serverError.apiKeyAccountNoProfile": "Tài khoản dùng Kiro API key không có Kiro profile. Khu vực của các tài khoản này được đặt khi nhập.",
   "serverError.profileNotAvailable": "Kiro profile đã chọn không khả dụng cho tài khoản này.",

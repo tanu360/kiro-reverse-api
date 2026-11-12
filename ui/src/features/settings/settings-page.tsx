@@ -34,6 +34,7 @@ import { AdminPasswordCard } from "./sections/admin-password-card";
 import { AutoContinueCard } from "./sections/auto-continue-card";
 import { DangerZoneCard } from "./sections/danger-zone-card";
 import { EndpointCard } from "./sections/endpoint-card";
+import { ImageResizeCard } from "./sections/image-resize-card";
 import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
@@ -210,6 +211,7 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
     "settings-routing": settings?.sessionAffinity,
     "settings-auto-continue": settings?.autoContinue,
     "settings-tool-history": settings?.structuredToolHistory,
+    "settings-image-resize": settings ? settings.imageResize !== false : undefined,
     "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,
   };
   const [active, pin] = useActiveSection(wide ? SPY_OFFSET : SPY_OFFSET + CHIP_ROW_HEIGHT);
@@ -377,6 +379,7 @@ function SettingsContent(): JSX.Element {
           <RoutingCard />
           <AutoContinueCard />
           <ToolHistoryCard />
+          <ImageResizeCard />
           <ThinkingCard />
           <ModelMappingsCard />
           <EndpointCard />

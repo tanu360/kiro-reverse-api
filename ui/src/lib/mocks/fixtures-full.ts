@@ -2016,6 +2016,9 @@ export function seedFullDataset(now: number): FullDataset {
       autoContinue: true,
       autoContinueMax: 10,
       structuredToolHistory: false,
+      imageResize: false,
+      imageResizeMaxDimension: 2048,
+      imageResizeMaxKB: 800,
     },
     thinking: {
       suffix: "-reasoning-extended",

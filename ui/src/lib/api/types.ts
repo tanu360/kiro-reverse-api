@@ -57,6 +57,8 @@ export type ServerErrorCode =
   | "no_kiro_profile"
   | "api_key_account_no_profile"
   | "auto_continue_max_range"
+  | "image_resize_dimension_range"
+  | "image_resize_size_range"
   | "password_too_short"
   | "invalid_endpoint"
   | "proxy_url_scheme"
@@ -912,6 +914,12 @@ export interface Settings {
   autoContinueMax: number;
   /** default true */
   structuredToolHistory: boolean;
+  /** default true */
+  imageResize: boolean;
+  /** longest side in px, 256..4096, default 1568 */
+  imageResizeMaxDimension: number;
+  /** decoded file size in KB, 50..4096, default 400 */
+  imageResizeMaxKB: number;
 }
 export interface SettingsPatch {
   requireApiKey?: boolean;
@@ -924,6 +932,11 @@ export interface SettingsPatch {
   /** integer 1..10 */
   autoContinueMax?: number;
   structuredToolHistory?: boolean;
+  imageResize?: boolean;
+  /** integer 256..4096 */
+  imageResizeMaxDimension?: number;
+  /** integer 50..4096 */
+  imageResizeMaxKB?: number;
 }
 
 export type ThinkingFormat = "reasoning_content" | "thinking" | "think";
