@@ -131,6 +131,7 @@ func withApiKeyContext(r *http.Request, entry *config.ApiKeyEntry) *http.Request
 	if entry == nil {
 		return r
 	}
+	noteResponseKeyID(r.Context(), entry.ID)
 	return r.WithContext(context.WithValue(r.Context(), apiKeyContextKey{}, apiKeyContextValue{
 		id:      entry.ID,
 		key:     entry.Key,

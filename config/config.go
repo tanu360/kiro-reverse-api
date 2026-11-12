@@ -190,6 +190,8 @@ type Config struct {
 
 	ModelMappings []ModelMappingRule `json:"modelMappings,omitempty"`
 
+	ResponseHeaders []ResponseHeaderRule `json:"responseHeaders,omitempty"`
+
 	LogLevel string `json:"logLevel,omitempty"`
 
 	MaxRetriesPerAccount int `json:"maxRetriesPerAccount,omitempty"`

@@ -14,6 +14,7 @@ import {
   RepeatIcon,
   Route02Icon,
   SecurityCheckIcon,
+  Tag01Icon,
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 
@@ -53,6 +54,12 @@ export const SETTINGS_SECTIONS = [
     id: "settings-count-tokens",
     titleKey: "countTokens.title",
     icon: CalculatorIcon,
+    group: "server",
+  },
+  {
+    id: "settings-response-headers",
+    titleKey: "responseHeaders",
+    icon: Tag01Icon,
     group: "server",
   },
   {
@@ -99,6 +106,7 @@ export const SECTION_ID = {
   adminPassword: "settings-admin-password",
   outboundProxy: "settings-outbound-proxy",
   countTokens: "settings-count-tokens",
+  responseHeaders: "settings-response-headers",
   promptFilter: "settings-prompt-filter",
   logRetention: "settings-log-retention",
   dangerZone: "settings-danger-zone",

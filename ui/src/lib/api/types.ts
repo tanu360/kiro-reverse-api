@@ -855,6 +855,8 @@ export interface RequestRecord {
   errorType?: RequestErrorType;
   /** upstream attempts in order; absent on rows logged before the chain existed */
   attempts?: RequestAttempt[];
+  /** "req_" + 24 hex, the {request_id} the client got; absent on rows logged before it */
+  requestId?: string;
 }
 export interface RecentRequestsParams {
   /** >= 1, default 1 */

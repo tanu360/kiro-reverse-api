@@ -40,6 +40,7 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "Invalid JSON")
 		return
 	}
+	noteResponseModel(r.Context(), req.Model)
 
 	var previousMessages []OpenAIMessage
 	if req.PreviousResponseID != "" {

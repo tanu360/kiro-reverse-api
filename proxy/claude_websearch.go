@@ -351,6 +351,8 @@ func (h *Handler) handleClaudeDirectWebSearch(w http.ResponseWriter, r *http.Req
 	defer apiKeyReservation.release()
 
 	results, account, err := h.searchWebWithFailover(r.Context(), model, query)
+	//! Only here: the loop path searches after its final round and must keep the answering account.
+	noteResponseAccount(r.Context(), account)
 	if err != nil {
 		if isContextCanceledError(err) {
 			recordClientDisconnect(r.Context(), apiKeyReservation, account, model)

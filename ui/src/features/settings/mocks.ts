@@ -1,5 +1,6 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
 import type { CountTokensAuthType, CountTokensConfig } from "@/lib/api/count-tokens";
+import type { ResponseHeaderRule } from "@/lib/api/response-headers";
 import type {
   ApiDomain,
   ModelMappingRule,
@@ -14,6 +15,12 @@ import { publishMockEvent } from "@/lib/mocks/events";
 import { defaultModelMappings } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 import { maskCountTokensKey, sameCountTokensOrigin, validCountTokensUrl } from "./lib/count-tokens";
+import {
+  listProblem,
+  MAX_RESPONSE_HEADERS,
+  normalizeHeaders,
+  RESPONSE_HEADER_VARIABLES,
+} from "./lib/response-headers";
 
 // Mirrors the Go admin API (proxy/handler.go, config/model_mapping_validation.go): the same
 // validation order, error strings and patch semantics.
@@ -278,6 +285,50 @@ function readRules(value: unknown): PromptFilterRule[] | null {
     rules.push(rule);
   }
   return rules;
+}
+
+/** Go's decode of {"headers":[...]}: absent or null is an empty list; a wrong type is null. */
+function readResponseHeaders(value: unknown): ResponseHeaderRule[] | null {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) return null;
+  const rules: ResponseHeaderRule[] = [];
+  for (const item of value) {
+    const fields = item === null ? {} : item;
+    if (!isRecord(fields)) return null;
+    const name = fields.name ?? "";
+    const text = fields.value ?? "";
+    const enabled = fields.enabled ?? false;
+    if (!isString(name) || !isString(text) || !isBool(enabled)) return null;
+    rules.push({ name, value: text, enabled });
+  }
+  return rules;
+}
+
+/** config/response_headers.go's English reason for a refused list. */
+function responseHeaderReason(code: string, index: number, name: string, variable: string): string {
+  const quoted = JSON.stringify(name);
+  switch (code) {
+    case "response_headers_too_many":
+      return `at most ${MAX_RESPONSE_HEADERS} response headers are allowed`;
+    case "response_header_name_empty":
+      return `header ${index + 1} has no name`;
+    case "response_header_name_too_long":
+      return "header name is longer than 128 characters";
+    case "response_header_name_forbidden":
+      return `header ${quoted} is managed by the proxy and cannot be set`;
+    case "response_header_name_invalid":
+      return `header name ${quoted} is not a valid HTTP token`;
+    case "response_header_name_duplicate":
+      return `header ${quoted} is listed more than once`;
+    case "response_header_value_empty":
+      return `header ${quoted} has no value`;
+    case "response_header_value_too_long":
+      return `value of header ${quoted} is longer than 512 bytes`;
+    case "response_header_unknown_variable":
+      return `header ${quoted} uses unknown variable {${variable}}`;
+    default:
+      return `value of header ${quoted} contains line breaks or control characters`;
+  }
 }
 
 export const handlers: HttpHandler[] = [
@@ -600,6 +651,40 @@ export const handlers: HttpHandler[] = [
     }
     // Go also starts a prune at once; the mock keeps its rows.
     mockDb.logRetention.days = days;
+    return saved();
+  }),
+
+  http.get(apiUrl("/response-headers"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json({
+      headers: mockDb.responseHeaders.map((rule) => ({ ...rule })),
+      variables: [...RESPONSE_HEADER_VARIABLES],
+      max: MAX_RESPONSE_HEADERS,
+    });
+  }),
+
+  // Replaces the whole list; a refused entry answers 400 with its code, index and params.
+  http.post(apiUrl("/response-headers"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    const input = body ? readResponseHeaders(body.headers) : null;
+    if (!input) return invalidJson();
+    const problem = listProblem(input);
+    if (problem) {
+      const { index, code, params } = problem;
+      const name = index >= 0 ? normalizeHeaders([input[index]])[0].name : "";
+      const variable = typeof params?.variable === "string" ? params.variable : "";
+      return jsonError(400, responseHeaderReason(code, index, name, variable), {
+        code,
+        index,
+        ...params,
+      });
+    }
+    mockDb.responseHeaders = normalizeHeaders(input);
     return saved();
   }),
 

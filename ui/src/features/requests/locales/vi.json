@@ -72,6 +72,7 @@
   "detail.accountId": "ID tài khoản",
   "detail.apiKeyId": "ID API key",
   "detail.requestId": "ID yêu cầu",
+  "detail.traceId": "Mã truy vết",
   "detail.ofInput": "{percent} của đầu vào",
   "detail.message": "Thông báo",
   "detail.noMessage": "Không có thông báo",

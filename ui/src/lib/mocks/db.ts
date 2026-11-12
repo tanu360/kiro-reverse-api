@@ -1,5 +1,6 @@
 import type { CountTokensAuthType } from "@/lib/api/count-tokens";
 import type { LogRetention } from "@/lib/api/log-retention";
+import type { ResponseHeaderRule } from "@/lib/api/response-headers";
 import type {
   Account,
   AccountFull,
@@ -70,6 +71,7 @@ export interface MockDb {
   promptFilter: PromptFilterConfig;
   /** GET /log-retention; the handler reads oldestRequestTs off `requests`. */
   logRetention: LogRetention;
+  responseHeaders: ResponseHeaderRule[];
   startedAt: number;
   /** '2.1.0' */
   version: string;
@@ -164,7 +166,8 @@ const REMOTE_CHANGELOG = [
 function baseDb(): Pick<
   MockDb,
   "adminPassword" | "firstRunPending" | "failedLogins" | "version" | "remoteVersion" | "pending"
-> {
+> &
+  Pick<MockDb, "responseHeaders"> {
   return {
     adminPassword: mockAdminPassword(),
     firstRunPending: mockFirstRunPending(),
@@ -173,6 +176,8 @@ function baseDb(): Pick<
     // Same as the running version: no update notice in tests, screenshots or axe runs.
     remoteVersion: { version: "2.1.0", changelog: "" },
     pending: { iam: {}, microsoft: {}, builderId: {} },
+    // A fresh install sends no custom headers.
+    responseHeaders: [],
   };
 }
 

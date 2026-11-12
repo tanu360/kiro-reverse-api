@@ -51,6 +51,7 @@ export const queryKeys = {
     logRetention: () => ["settings", "log-retention"] as const,
     countTokens: () => ["settings", "count-tokens"] as const,
     promptFilter: () => ["settings", "prompt-filter"] as const,
+    responseHeaders: () => ["settings", "response-headers"] as const,
   },
   backups: {
     all: ["backups"] as const,

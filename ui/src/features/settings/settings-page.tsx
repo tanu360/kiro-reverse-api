@@ -41,6 +41,7 @@ import { LogRetentionCard } from "./sections/log-retention-card";
 import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
+import { ResponseHeadersCard } from "./sections/response-headers-card";
 import { RoutingCard } from "./sections/routing-card";
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "./sections/sections";
 import { StreamIntegrityCard } from "./sections/stream-integrity-card";
@@ -393,6 +394,7 @@ function SettingsContent(): JSX.Element {
           <AdminPasswordCard />
           <OutboundProxyCard />
           <CountTokensCard />
+          <ResponseHeadersCard />
           <PromptFilterCard />
           <LogRetentionCard />
           <DangerZoneCard />
