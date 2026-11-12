@@ -152,14 +152,29 @@ func evalBanned(acc config.Account, st alertState, now int64) (send bool, next a
 	return true, next
 }
 
-// evalAllUnavailable decides the no-account-available alert. since is when the
+// alertPoolSize counts the accounts the admin has not switched off: the enabled
+// ones and the banned ones. Every ban path also clears Enabled, so counting
+// only enabled accounts would hide an outage that bans caused; a manual
+// switch-off (DISABLED) is an admin choice and does not count.
+func alertPoolSize(accounts []config.Account) int {
+	n := 0
+	for _, acc := range accounts {
+		if acc.Enabled || acc.BanStatus == "BANNED" {
+			n++
+		}
+	}
+	return n
+}
+
+// evalAllUnavailable decides the no-account-available alert. pooled is
+// alertPoolSize, available the accounts that can serve now. since is when the
 // outage was first seen (0 = none), kept in memory by the caller. The alert
 // fires once the outage has lasted alertUnavailableGrace, once per outage and
 // at most once per cooldown; it re-arms when an account is available again.
 // wait is how long until the grace runs out, for a re-check (0 = none needed).
-func evalAllUnavailable(enabled, available int, since int64, cooldown time.Duration, st alertState, now int64) (send bool, nextSince int64, next alertState, wait time.Duration) {
+func evalAllUnavailable(pooled, available int, since int64, cooldown time.Duration, st alertState, now int64) (send bool, nextSince int64, next alertState, wait time.Duration) {
 	next = st
-	if enabled == 0 || available > 0 {
+	if pooled == 0 || available > 0 {
 		next.Level = 0
 		return false, 0, next, 0
 	}
@@ -270,15 +285,15 @@ func bannedMessage(acc config.Account, now int64) alertMessage {
 	}
 }
 
-func allUnavailableMessage(enabled int, since, now int64) alertMessage {
+func allUnavailableMessage(pooled int, since, now int64) alertMessage {
 	return alertMessage{
 		Event:    alertEventAllUnavailable,
 		Severity: "critical",
 		Title:    "No account available",
-		Text:     fmt.Sprintf("None of the %d enabled accounts can serve requests (banned, cooling down or out of credits) since %s.", enabled, time.Unix(since, 0).UTC().Format(time.RFC3339)),
+		Text:     fmt.Sprintf("None of the %d accounts in the pool can serve requests (banned, suspended, cooling down or out of credits) since %s.", pooled, time.Unix(since, 0).UTC().Format(time.RFC3339)),
 		Data: map[string]any{
-			"enabled": enabled,
-			"since":   since,
+			"accounts": pooled,
+			"since":    since,
 		},
 		TS: now,
 	}

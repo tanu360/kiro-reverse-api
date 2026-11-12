@@ -55,16 +55,18 @@ type alertsView struct {
 }
 
 // alertChannelInput is a channel in a POST. A blank secret on a known channel
-// of the same type keeps the stored one.
+// of the same type keeps the stored one. ClearSecret removes the stored
+// signing secret instead (a secret sent with it replaces it, as usual).
 type alertChannelInput struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"`
-	Name     string `json:"name"`
-	Enabled  *bool  `json:"enabled"`
-	URL      string `json:"url"`
-	BotToken string `json:"botToken"`
-	ChatID   string `json:"chatId"`
-	Secret   string `json:"secret"`
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	Name        string `json:"name"`
+	Enabled     *bool  `json:"enabled"`
+	URL         string `json:"url"`
+	BotToken    string `json:"botToken"`
+	ChatID      string `json:"chatId"`
+	Secret      string `json:"secret"`
+	ClearSecret bool   `json:"clearSecret"`
 }
 
 // alertsUpdate is a POST /alerts body: every field is optional, and channels,
@@ -183,6 +185,10 @@ func (h *Handler) apiUpdateAlerts(w http.ResponseWriter, r *http.Request) {
 		}
 		merged := config.MergeAlertChannels(c.Channels, incoming)
 		for i, ch := range merged {
+			//! merged, incoming and the request list share their order, one entry each.
+			if (*req.Channels)[i].ClearSecret {
+				merged[i].Secret = incoming[i].Secret
+			}
 			if err := validateAlertChannelSecrets(i, ch); err != nil {
 				return err
 			}

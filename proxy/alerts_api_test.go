@@ -165,6 +165,33 @@ func TestAlertsAPIKeepsSecretsOnBlankUpdate(t *testing.T) {
 	}
 }
 
+func TestAlertsAPIClearsSigningSecret(t *testing.T) {
+	initAlertsTest(t)
+	view := decodeAlerts(t, alertsCall(t, http.MethodPost, "/alerts", alertsSecretsBody))
+	hookID := view.Channels[0].ID
+	webhook := func(extra string) string {
+		return `{"channels":[{"id":"` + hookID + `","type":"webhook","name":"Ops hook"` + extra + `}]}`
+	}
+
+	// clearSecret with a new secret replaces it, as a plain secret would.
+	view = decodeAlerts(t, alertsCall(t, http.MethodPost, "/alerts", webhook(`,"secret":"NEW-SECRET","clearSecret":true`)))
+	if !view.Channels[0].SecretSet || config.GetAlertsConfig().Channels[0].Secret != "NEW-SECRET" {
+		t.Fatalf("replaced = %+v", config.GetAlertsConfig().Channels[0])
+	}
+	//! clearSecret with a blank secret removes it; the URL is kept.
+	view = decodeAlerts(t, alertsCall(t, http.MethodPost, "/alerts", webhook(`,"clearSecret":true`)))
+	stored := config.GetAlertsConfig().Channels[0]
+	if view.Channels[0].SecretSet || stored.Secret != "" || stored.URL == "" || !view.Channels[0].URLSet {
+		t.Fatalf("cleared = %+v / %+v", view.Channels[0], stored)
+	}
+	// Without the flag, a blank secret still keeps what is stored.
+	decodeAlerts(t, alertsCall(t, http.MethodPost, "/alerts", webhook(`,"secret":"KEPT"`)))
+	decodeAlerts(t, alertsCall(t, http.MethodPost, "/alerts", webhook(`,"secret":""`)))
+	if got := config.GetAlertsConfig().Channels[0].Secret; got != "KEPT" {
+		t.Fatalf("blank update secret = %q", got)
+	}
+}
+
 func TestAlertsAPIRemovedChannelDropsLastResult(t *testing.T) {
 	initAlertsTest(t)
 	view := decodeAlerts(t, alertsCall(t, http.MethodPost, "/alerts", alertsSecretsBody))

@@ -38,8 +38,11 @@ const (
 	alertRetries = 3
 	// alertTextLimit keeps a message under Discord's 2000-character content limit.
 	alertTextLimit = 1900
-	// alertErrorBodyLimit is how much of a failed response's body the error keeps.
-	alertErrorBodyLimit = 200
+	// alertErrorBodyLimit is how much of a failed response's body is read for
+	// the error. The whole read is scrubbed before it is cut to alertErrorTextLimit.
+	alertErrorBodyLimit = 4 << 10
+	// alertErrorTextLimit is how long a scrubbed error may be in a last result.
+	alertErrorTextLimit = 300
 	// alertSignatureHeader carries the webhook body's HMAC-SHA256 when a secret is set.
 	alertSignatureHeader = "X-Kiro-Proxy-Signature"
 )
@@ -158,11 +161,11 @@ func doAlertAttempt(ctx context.Context, client *http.Client, ch config.AlertCha
 		return alertAttempt{err: err}
 	}
 	defer resp.Body.Close()
-	head, _ := io.ReadAll(io.LimitReader(resp.Body, alertErrorBodyLimit))
+	head, _ := io.ReadAll(io.LimitReader(resp.Body, alertErrorBodyLimit+1))
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	out := alertAttempt{status: resp.StatusCode}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		detail := strings.TrimSpace(strings.ToValidUTF8(string(head), ""))
+		detail := alertErrorBody(head, ch)
 		if detail != "" {
 			out.err = fmt.Errorf("HTTP %d: %s", resp.StatusCode, detail)
 		} else {
@@ -173,6 +176,21 @@ func doAlertAttempt(ctx context.Context, client *http.Client, ch config.AlertCha
 		}
 	}
 	return out
+}
+
+// alertErrorBody is a failed response's body as error text, still unscrubbed:
+// scrubAlertError replaces the secrets in all of it and only then cuts it. A
+// body longer than the read limit also loses the tail a secret could be cut
+// in, since a cut secret no longer matches and would survive the scrub.
+func alertErrorBody(head []byte, ch config.AlertChannel) string {
+	if len(head) > alertErrorBodyLimit {
+		keep := alertErrorBodyLimit
+		for _, secret := range alertSecrets(ch) {
+			keep = min(keep, alertErrorBodyLimit-len(secret)+1)
+		}
+		head = head[:max(keep, 0)]
+	}
+	return strings.TrimSpace(strings.ToValidUTF8(string(head), ""))
 }
 
 // parseRetryAfter reads seconds (Discord sends fractions) or an HTTP date.
@@ -266,8 +284,8 @@ func scrubAlertError(err error, ch config.AlertChannel) string {
 	for _, secret := range alertSecrets(ch) {
 		text = strings.ReplaceAll(text, secret, "***")
 	}
-	if len(text) > 300 {
-		text = strings.ToValidUTF8(text[:300], "") + "…"
+	if len(text) > alertErrorTextLimit {
+		text = strings.ToValidUTF8(text[:alertErrorTextLimit], "") + "…"
 	}
 	return text
 }

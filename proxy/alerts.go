@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,8 +17,9 @@ import (
  * sweep and after account changes, never on the request path: refreshAllAccounts
  * kicks the alerter, and every accounts_changed event (bans, cooldowns, usage
  * updates) does too. Kicks are debounced, and a slow safety tick catches
- * cooldowns that run out without an event. Messages go through one queue to a
- * sender goroutine, so a slow or broken channel never holds up an evaluation.
+ * cooldowns that run out without an event. Each enabled channel gets its own
+ * outbox and sender goroutine, so a slow or broken channel never holds up an
+ * evaluation, and never delays another channel.
  */
 
 const (
@@ -27,8 +29,10 @@ const (
 	alertDebounceQuiet = 3 * time.Second
 	// alertDebounceMax caps how long a stream of kicks can hold one off.
 	alertDebounceMax = 30 * time.Second
-	// alertQueueSize is how many messages may wait for the sender.
-	alertQueueSize = 32
+	// alertOutboxLimit is how many messages may wait for one channel. Only a
+	// channel that has been failing for hours gets this far behind; it then
+	// loses its oldest messages, never a channel that keeps up.
+	alertOutboxLimit = 1000
 )
 
 // alertKick wakes the alerter; one pending kick is enough.
@@ -43,13 +47,24 @@ func kickAlerts() {
 }
 
 type alerter struct {
-	queue chan alertMessage
-
 	// evalMu serializes evaluations; it guards unavailableSince.
 	evalMu sync.Mutex
 	// unavailableSince is when the pool was first seen with no account able to
 	// serve (0 = it can serve). In memory only: a restart starts the grace again.
 	unavailableSince int64
+
+	// sendMu guards outboxes: per channel id, the messages waiting for it.
+	sendMu   sync.Mutex
+	outboxes map[string]*alertOutbox
+	// wake tells run that an outbox has new messages; one pending signal is enough.
+	wake chan struct{}
+}
+
+// alertOutbox is one channel's waiting messages, oldest first, and whether a
+// sender is working through them.
+type alertOutbox struct {
+	msgs    []alertMessage
+	sending bool
 }
 
 var (
@@ -65,16 +80,19 @@ func getAlerter() *alerter {
 }
 
 func newAlerter() *alerter {
-	return &alerter{queue: make(chan alertMessage, alertQueueSize)}
+	return &alerter{outboxes: make(map[string]*alertOutbox), wake: make(chan struct{}, 1)}
 }
 
 // evaluate runs every switched-on rule over accounts and returns the messages
 // to send. Each rule's dedup and cooldown state is read from and written to
 // alert_state before anything is sent: a message counts as sent once queued,
-// so a channel that keeps failing cannot cause a resend storm. wait > 0 asks
-// for another evaluation after that long (an outage still in its grace).
-// Nothing is evaluated, and no state used up, while no channel is enabled.
-func (a *alerter) evaluate(cfg config.AlertsConfig, accounts []config.Account, enabled, available int, now int64) (msgs []alertMessage, wait time.Duration, err error) {
+// so a channel that keeps failing cannot cause a resend storm. enqueue takes
+// every message it is given, so none of them is lost between the two. pooled
+// and available are the outage rule's counts (alertPoolSize and the accounts
+// able to serve). wait > 0 asks for another evaluation after that long (an
+// outage still in its grace). Nothing is evaluated, and no state used up,
+// while no channel is enabled.
+func (a *alerter) evaluate(cfg config.AlertsConfig, accounts []config.Account, pooled, available int, now int64) (msgs []alertMessage, wait time.Duration, err error) {
 	a.evalMu.Lock()
 	defer a.evalMu.Unlock()
 	if len(cfg.EnabledChannels()) == 0 {
@@ -125,12 +143,12 @@ func (a *alerter) evaluate(cfg config.AlertsConfig, accounts []config.Account, e
 	}
 
 	if cfg.AllUnavailableOn() {
-		send, since, next, recheck := evalAllUnavailable(enabled, available, a.unavailableSince, cooldown, states[alertKeyAllUnavailable], now)
+		send, since, next, recheck := evalAllUnavailable(pooled, available, a.unavailableSince, cooldown, states[alertKeyAllUnavailable], now)
 		a.unavailableSince = since
 		put(alertKeyAllUnavailable, next)
 		wait = recheck
 		if send {
-			msgs = append(msgs, allUnavailableMessage(enabled, since, now))
+			msgs = append(msgs, allUnavailableMessage(pooled, since, now))
 		}
 	} else {
 		a.unavailableSince = 0
@@ -154,38 +172,87 @@ func (a *alerter) evaluate(cfg config.AlertsConfig, accounts []config.Account, e
 	return msgs, wait, nil
 }
 
-// enqueue hands messages to the sender. A full queue drops the message: the
-// alerter must never block an evaluation on a slow channel.
+// enqueue adds messages to the outbox of every enabled channel. It never
+// blocks and, below alertOutboxLimit, never drops: the rule state of these
+// messages is already saved, so a message left out here would be lost for good.
 func (a *alerter) enqueue(msgs []alertMessage) {
-	for _, msg := range msgs {
-		select {
-		case a.queue <- msg:
-		default:
-			logger.Warnf("[Alerts] Send queue full, dropped a %s alert", msg.Event)
+	if len(msgs) == 0 {
+		return
+	}
+	channels := config.GetAlertsConfig().EnabledChannels()
+	if len(channels) == 0 {
+		return
+	}
+	a.sendMu.Lock()
+	for _, ch := range channels {
+		box := a.outboxes[ch.ID]
+		if box == nil {
+			box = &alertOutbox{}
+			a.outboxes[ch.ID] = box
 		}
+		box.msgs = append(box.msgs, msgs...)
+		if over := len(box.msgs) - alertOutboxLimit; over > 0 {
+			box.msgs = slices.Clone(box.msgs[over:])
+			logger.Warnf("[Alerts] %s channel %q is %d alerts behind, dropped the %d oldest", ch.Type, ch.Name, alertOutboxLimit, over)
+		}
+	}
+	a.sendMu.Unlock()
+	select {
+	case a.wake <- struct{}{}:
+	default:
 	}
 }
 
-// run sends queued messages until ctx ends. Each message goes to every enabled
-// channel at once; the channel list is read at send time, so an edit or a
-// disabled channel applies to messages already queued.
+// run starts a sender for each outbox with waiting messages, until ctx ends;
+// it then waits for the senders to stop.
 func (a *alerter) run(ctx context.Context, client func() *http.Client) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case msg := <-a.queue:
-			channels := config.GetAlertsConfig().EnabledChannels()
-			if len(channels) == 0 {
-				continue
+		case <-a.wake:
+			a.sendMu.Lock()
+			for id, box := range a.outboxes {
+				if !box.sending && len(box.msgs) > 0 {
+					box.sending = true
+					wg.Go(func() { a.drain(ctx, client, id) })
+				}
 			}
-			var wg sync.WaitGroup
-			for _, ch := range channels {
-				wg.Go(func() {
-					a.deliver(ctx, client(), ch, msg, alertRetries)
-				})
+			a.sendMu.Unlock()
+		}
+	}
+}
+
+// drain sends one channel's outbox in order until it is empty. The channel is
+// read from the config before each message, so an edit applies to messages
+// already waiting, and a channel switched off or removed meanwhile gets none.
+func (a *alerter) drain(ctx context.Context, client func() *http.Client, id string) {
+	for {
+		a.sendMu.Lock()
+		box := a.outboxes[id]
+		if ctx.Err() != nil || len(box.msgs) == 0 {
+			box.sending = false
+			if len(box.msgs) == 0 {
+				delete(a.outboxes, id)
 			}
-			wg.Wait()
+			a.sendMu.Unlock()
+			return
+		}
+		msg := box.msgs[0]
+		box.msgs[0] = alertMessage{}
+		box.msgs = box.msgs[1:]
+		left := len(box.msgs)
+		a.sendMu.Unlock()
+
+		ch, ok := config.GetAlertsConfig().Channel(id)
+		if !ok || !ch.Enabled {
+			continue
+		}
+		result := a.deliver(ctx, client(), ch, msg, alertRetries)
+		//! One refresh at the end of a burst, and one per failure: a failing channel is slow anyway.
+		if left == 0 || !result.OK {
 			publishEvent(eventSettingsChanged, "alerts")
 		}
 	}
@@ -211,11 +278,13 @@ func (a *alerter) deliver(ctx context.Context, client *http.Client, ch config.Al
 func (h *Handler) evaluateAlerts(now time.Time) time.Duration {
 	a := getAlerter()
 	cfg := config.GetAlertsConfig()
-	var enabled, available int
+	accounts := config.GetAccounts()
+	var pooled, available int
 	if len(cfg.EnabledChannels()) > 0 {
-		enabled, available = h.accountAvailabilityNow()
+		_, available = h.accountAvailabilityNow()
+		pooled = alertPoolSize(accounts)
 	}
-	msgs, wait, err := a.evaluate(cfg, config.GetAccounts(), enabled, available, now.Unix())
+	msgs, wait, err := a.evaluate(cfg, accounts, pooled, available, now.Unix())
 	if err != nil {
 		logger.Warnf("[Alerts] Evaluation failed: %v", err)
 		return wait

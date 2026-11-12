@@ -291,6 +291,40 @@ func TestAlertErrorsNeverContainSecrets(t *testing.T) {
 	}
 }
 
+func TestAlertErrorBodyScrubbedBeforeItIsCut(t *testing.T) {
+	fastAlertRetries(t)
+	const secretPath = "/hook/s3cr3t-path-token-abcdef"
+	var pad atomic.Value
+	// A receiver whose error page repeats the request path after some padding.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(pad.Load().(string) + r.URL.Path + " not found"))
+	}))
+	defer srv.Close()
+	ch := config.AlertChannel{Type: config.AlertChannelWebhook, URL: srv.URL + secretPath}
+
+	for name, padding := range map[string]string{
+		//! The secret starts inside the first 200 bytes and ends past them: the old cut kept its start.
+		"across the display cut": strings.Repeat("x", 185),
+		//! Whitespace trims away, so a secret cut at the read limit would lead the error text.
+		"across the read limit": strings.Repeat(" ", alertErrorBodyLimit-10),
+	} {
+		pad.Store(padding)
+		r := sendAlert(context.Background(), srv.Client(), ch, testAlertMessage(1), 0)
+		if r.OK || r.Status != http.StatusBadRequest {
+			t.Fatalf("%s: %+v", name, r)
+		}
+		for _, part := range []string{"s3cr3t", "/hook/s", "/hook"} {
+			if strings.Contains(r.Error, part) {
+				t.Fatalf("%s: error keeps %q: %q", name, part, r.Error)
+			}
+		}
+		if len(r.Error) > alertErrorTextLimit+len("…") {
+			t.Fatalf("%s: error not cut: %d bytes", name, len(r.Error))
+		}
+	}
+}
+
 func TestAlertTargetHint(t *testing.T) {
 	for _, tc := range []struct {
 		ch   config.AlertChannel

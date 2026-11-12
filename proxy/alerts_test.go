@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -47,9 +48,9 @@ func eventsOf(msgs []alertMessage) []string {
 	return out
 }
 
-func mustEvaluate(t *testing.T, a *alerter, cfg config.AlertsConfig, accounts []config.Account, enabled, available int, now int64) ([]alertMessage, time.Duration) {
+func mustEvaluate(t *testing.T, a *alerter, cfg config.AlertsConfig, accounts []config.Account, pooled, available int, now int64) ([]alertMessage, time.Duration) {
 	t.Helper()
-	msgs, wait, err := a.evaluate(cfg, accounts, enabled, available, now)
+	msgs, wait, err := a.evaluate(cfg, accounts, pooled, available, now)
 	if err != nil {
 		t.Fatalf("evaluate: %v", err)
 	}
@@ -280,10 +281,10 @@ func TestAllUnavailableAlertGraceAndRearm(t *testing.T) {
 	cfg := usageOnly(testAlertsConfig(), alertEventAllUnavailable)
 	const t0 = int64(1_800_000_000)
 	steps := []struct {
-		at                 int64
-		enabled, available int
-		send               bool
-		wait               time.Duration
+		at                int64
+		pooled, available int
+		send              bool
+		wait              time.Duration
 	}{
 		{t0, 3, 0, false, 60 * time.Second}, // grace starts
 		{t0 + 30, 3, 0, false, 30 * time.Second},
@@ -293,14 +294,47 @@ func TestAllUnavailableAlertGraceAndRearm(t *testing.T) {
 		{t0 + 200, 3, 0, false, 60 * time.Second},
 		{t0 + 260, 3, 0, false, 0},      // a second outage inside the cooldown
 		{t0 + 60 + 3600, 3, 0, true, 0}, // cooldown over, still down
-		{t0 + 9000, 0, 0, false, 0},     // nothing enabled: an admin choice, not an outage
+		{t0 + 9000, 0, 0, false, 0},     // every account switched off: an admin choice, not an outage
 		{t0 + 9100, 3, 0, false, 60 * time.Second},
 	}
 	for i, step := range steps {
-		msgs, wait := mustEvaluate(t, a, cfg, nil, step.enabled, step.available, step.at)
+		msgs, wait := mustEvaluate(t, a, cfg, nil, step.pooled, step.available, step.at)
 		if (len(msgs) == 1) != step.send || len(msgs) > 1 || wait != step.wait {
 			t.Fatalf("step %d: msgs=%+v wait=%v, want send=%v wait=%v", i, eventsOf(msgs), wait, step.send, step.wait)
 		}
+	}
+}
+
+func TestAllUnavailableAlertWhenBansEmptyThePool(t *testing.T) {
+	initAlertsTest(t)
+	a := newAlerter()
+	cfg := usageOnly(testAlertsConfig(), alertEventAllUnavailable)
+	const t0 = int64(1_800_000_000)
+	//! Every ban path also switches the account off (Enabled=false).
+	banned := func(id string) config.Account {
+		return config.Account{ID: id, BanStatus: "BANNED", BanReason: "AWS temporarily suspended", BanTime: t0 - 7200}
+	}
+	manual := config.Account{ID: "off", BanStatus: "DISABLED", BanTime: t0 - 7200}
+	accounts := []config.Account{banned("a1"), banned("a2"), banned("a3"), manual}
+
+	enabled, available := accountAvailability(accounts, false, nil)
+	if enabled != 0 || available != 0 {
+		t.Fatalf("availability = %d enabled, %d available", enabled, available)
+	}
+	pooled := alertPoolSize(accounts)
+	if pooled != 3 {
+		t.Fatalf("pool size = %d, want 3 (the banned accounts, not the one switched off)", pooled)
+	}
+	if msgs, wait := mustEvaluate(t, a, cfg, accounts, pooled, available, t0); len(msgs) != 0 || wait != alertUnavailableGrace {
+		t.Fatalf("grace: msgs=%v wait=%v", eventsOf(msgs), wait)
+	}
+	msgs, _ := mustEvaluate(t, a, cfg, accounts, pooled, available, t0+60)
+	if len(msgs) != 1 || msgs[0].Event != alertEventAllUnavailable || msgs[0].Data["accounts"] != 3 {
+		t.Fatalf("outage = %+v", msgs)
+	}
+	//! Only accounts the admin switched off: no outage.
+	if n := alertPoolSize([]config.Account{manual}); n != 0 {
+		t.Fatalf("pool size of a switched-off pool = %d", n)
 	}
 }
 
@@ -398,6 +432,104 @@ func TestAlertSenderDeliversToEveryEnabledChannel(t *testing.T) {
 	defer mu.Unlock()
 	if got["/a"] != alertEventPoolUsage || got["/b"] != alertEventPoolUsage || got["/off"] != "" {
 		t.Fatalf("received = %v", got)
+	}
+}
+
+func TestAlertBurstReachesEveryChannelInOrder(t *testing.T) {
+	initAlertsTest(t)
+	srv, received := alertReceiver(t)
+	if err := config.UpdateAlertsConfig(func(c *config.AlertsConfig) error {
+		c.Channels = []config.AlertChannel{{ID: "ch_burst", Type: config.AlertChannelWebhook, Enabled: true, URL: srv.URL + "/hook"}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	//! More messages than one evaluation used to fit in the queue (32): none may be lost.
+	const n = 80
+	msgs := make([]alertMessage, n)
+	for i := range msgs {
+		msgs[i] = accountUsageMessage(usageAccount(fmt.Sprintf("a%02d", i), 90, 100, ""), 90, 1000)
+	}
+	a := newAlerter()
+	a.enqueue(msgs)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go a.run(ctx, alertHTTPClient)
+
+	deadline := time.Now().Add(10 * time.Second)
+	for len(received()) < n {
+		if time.Now().After(deadline) {
+			t.Fatalf("received %d of %d", len(received()), n)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for i, got := range received() {
+		var msg alertMessage
+		if err := json.Unmarshal(got.body, &msg); err != nil || msg.Data["accountId"] != fmt.Sprintf("a%02d", i) {
+			t.Fatalf("message %d = %s (%v)", i, got.body, err)
+		}
+	}
+}
+
+func TestSlowAlertChannelDoesNotHoldOthers(t *testing.T) {
+	initAlertsTest(t)
+	release := make(chan struct{})
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	defer slow.Close()
+	defer close(release)
+	fast, received := alertReceiver(t)
+	if err := config.UpdateAlertsConfig(func(c *config.AlertsConfig) error {
+		c.Channels = []config.AlertChannel{
+			{ID: "ch_slow", Type: config.AlertChannelWebhook, Enabled: true, URL: slow.URL + "/hook"},
+			{ID: "ch_fast", Type: config.AlertChannelWebhook, Enabled: true, URL: fast.URL + "/hook"},
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	a := newAlerter()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		a.run(ctx, alertHTTPClient)
+		close(done)
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+	a.enqueue([]alertMessage{poolUsageMessage(80, 100, 1, 80, 1000), poolUsageMessage(90, 100, 1, 90, 1001), poolUsageMessage(100, 100, 1, 100, 1002)})
+
+	//! The slow channel is stuck on its first message for the whole 10 s attempt timeout.
+	deadline := time.Now().Add(3 * time.Second)
+	for len(received()) < 3 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the healthy channel got %d of 3 while the other one hung", len(received()))
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestAlertOutboxDropsOnlyItsOldest(t *testing.T) {
+	initAlertsTest(t)
+	if err := config.UpdateAlertsConfig(func(c *config.AlertsConfig) error {
+		c.Channels = []config.AlertChannel{{ID: "ch_dead", Type: config.AlertChannelWebhook, Enabled: true, URL: "http://127.0.0.1:1/hook"}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	a := newAlerter()
+	for i := range alertOutboxLimit + 5 {
+		a.enqueue([]alertMessage{{Event: alertEventPoolUsage, TS: int64(i)}})
+	}
+	box := a.outboxes["ch_dead"]
+	if box == nil || len(box.msgs) != alertOutboxLimit || box.msgs[0].TS != 5 || box.msgs[alertOutboxLimit-1].TS != alertOutboxLimit+4 {
+		t.Fatalf("outbox = %d messages", len(box.msgs))
 	}
 }
 
