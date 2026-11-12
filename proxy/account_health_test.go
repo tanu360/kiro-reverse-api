@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -355,13 +356,13 @@ func TestPickAccountHealsEmptyPool(t *testing.T) {
 	t.Cleanup(func() { healer = old })
 	h := &Handler{pool: p, affinity: newSessionAffinity()}
 
-	if acc := h.pickAccount(testKiroPayload(), "claude-sonnet-4.5", map[string]bool{"other": true}); acc != nil {
+	if acc := h.pickAccount(context.Background(), testKiroPayload(), "claude-sonnet-4.5", map[string]bool{"other": true}); acc != nil {
 		t.Fatalf("a retry picked %s", acc.ID)
 	}
 	if storedHealAccount(t, "pick-a").Enabled {
 		t.Fatal("a request that already excluded accounts healed")
 	}
-	acc := h.pickAccount(testKiroPayload(), "claude-sonnet-4.5", nil)
+	acc := h.pickAccount(context.Background(), testKiroPayload(), "claude-sonnet-4.5", nil)
 	if acc == nil || acc.ID != "pick-a" {
 		t.Fatalf("fresh pick after heal = %v, want pick-a", acc)
 	}
