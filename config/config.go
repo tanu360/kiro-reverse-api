@@ -181,6 +181,8 @@ type Config struct {
 	TotalCredits    float64 `json:"totalCredits,omitempty"`
 
 	Backup BackupConfig `json:"backup,omitempty"`
+
+	Alerts AlertsConfig `json:"alerts,omitzero"`
 }
 
 type AccountInfo struct {
