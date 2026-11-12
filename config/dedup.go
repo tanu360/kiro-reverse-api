@@ -243,6 +243,7 @@ func betterKeeper(a, b *Account) bool {
 // API key that is already stored is refused with ErrDuplicateKiroAPIKey: the
 // key never changes, so there is nothing to update.
 func UpsertAccount(account Account) (stored Account, updated bool, err error) {
+	normalizeAccountMetadata(&account)
 	if IsAPIKeyAccount(&account) {
 		if err := NormalizeAPIKeyAccount(&account); err != nil {
 			return Account{}, false, err
@@ -346,8 +347,9 @@ func fillIfEmpty(dst *string, value string) {
 // applyIncoming moves a fresh login onto the stored account. The login is the
 // newest proof of the credential, so its token set replaces the old one; the
 // ID, machine ID, weight, proxy, enabled and ban state, counters and a pinned
-// profile stay the operator's. The one exception is a ban for a rejected
-// token, which a fresh token cures.
+// profile stay the operator's, and so do notes and tags, which only gain the
+// login's. The one exception is a ban for a rejected token, which a fresh
+// token cures.
 func applyIncoming(dst *Account, src Account) {
 	freshToken := strings.TrimSpace(src.AccessToken) != "" || strings.TrimSpace(src.RefreshToken) != ""
 	if freshToken {
@@ -380,6 +382,7 @@ func applyIncoming(dst *Account, src Account) {
 	fillIfEmpty(&dst.UserId, src.UserId)
 	fillIfEmpty(&dst.Provider, src.Provider)
 	fillIfEmpty(&dst.Nickname, src.Nickname)
+	absorbIncomingMetadata(dst, src)
 }
 
 // MergeAccounts keeps keepID and deletes removeIDs in one save. The kept
@@ -511,5 +514,6 @@ func absorbDonors(keeper *Account, donors []Account) {
 		if !keeper.ProfileArnPinned {
 			fillIfEmpty(&keeper.ProfileArn, donor.ProfileArn)
 		}
+		absorbDonorMetadata(keeper, donor)
 	}
 }
