@@ -799,6 +799,31 @@ export type RequestSort =
   | "credits"
   | "duration";
 
+/** One upstream try of a request, oldest first in RequestRecord.attempts. */
+export interface RequestAttempt {
+  accountId: string;
+  email?: string;
+  /** Kiro endpoint name ("Kiro IDE"), "web_search" for an MCP search, absent before Kiro was reached */
+  endpoint?: string;
+  /** ms after the request arrived */
+  startMs: number;
+  durationMs: number;
+  success: boolean;
+  /** only when !success */
+  status?: number;
+  errorType?: RequestErrorType;
+  /** <= 200 bytes */
+  message?: string;
+  /** failed, and the next attempt ran on another account */
+  failover?: boolean;
+  /** failed after the upstream stream had sent output */
+  midStream?: boolean;
+  /** failed, and its job stopped trying (a web search query): the next attempt is other work */
+  gaveUp?: boolean;
+  /** on the last attempt only: attempts dropped before it by the 10-attempt cap */
+  skipped?: number;
+}
+
 export interface RequestRecord {
   /** only when persistent */
   id?: number;
@@ -826,6 +851,8 @@ export interface RequestRecord {
   durationMs?: number;
   /** only when !success */
   errorType?: RequestErrorType;
+  /** upstream attempts in order; absent on rows logged before the chain existed */
+  attempts?: RequestAttempt[];
 }
 export interface RecentRequestsParams {
   /** >= 1, default 1 */

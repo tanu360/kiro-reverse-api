@@ -16,6 +16,7 @@ const (
 type requestTrace struct {
 	startedAt time.Time
 	endpoint  string
+	attempts  attemptChain
 }
 
 type requestTraceKey struct{}

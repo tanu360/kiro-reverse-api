@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS requests (
   duration_ms INTEGER NOT NULL DEFAULT 0,
   error_type TEXT NOT NULL DEFAULT '',
   cache_read_tokens INTEGER NOT NULL DEFAULT 0,
-  cache_write_tokens INTEGER NOT NULL DEFAULT 0
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+  attempts_json TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests(ts DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_success ON requests(success);
@@ -210,6 +211,7 @@ func Get() (*sql.DB, error) {
 var requestColumnMigrations = []struct{ name, definition string }{
 	{"cache_read_tokens", "INTEGER NOT NULL DEFAULT 0"},
 	{"cache_write_tokens", "INTEGER NOT NULL DEFAULT 0"},
+	{"attempts_json", "TEXT NOT NULL DEFAULT ''"},
 }
 
 func addMissingColumns(db *sql.DB, table string, columns []struct{ name, definition string }) error {

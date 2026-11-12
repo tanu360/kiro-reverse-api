@@ -999,6 +999,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
+			traceAttemptStart(r.Context(), account, "")
 			if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
 				if r.Context().Err() != nil {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -1007,7 +1008,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
@@ -1352,7 +1353,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(r.Context(), account, model, 0, err)
 				if !messageStarted {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 						retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
@@ -1490,10 +1491,11 @@ func recordClientDisconnect(ctx context.Context, apiKeyReservation *apiKeyUsageR
 	recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, 0, 0, 0, false, clientClosedRequestStatus, clientDisconnectedMessage)
 }
 
-func recordAttemptError(account *config.Account, model string, status int, err error) {
+func recordAttemptError(ctx context.Context, account *config.Account, model string, status int, err error) {
 	if account == nil || err == nil {
 		return
 	}
+	traceAttemptFailed(ctx, account, status, err)
 	getObserveStore().RecordFailure(account.ID, model)
 	getObserveStore().RecordError(account.ID, account.Email, model, status, err.Error())
 }
@@ -1528,6 +1530,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
+			traceAttemptStart(r.Context(), account, "")
 			if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
 				if r.Context().Err() != nil {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -1536,7 +1539,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
@@ -1595,7 +1598,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
@@ -1783,6 +1786,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
+			traceAttemptStart(r.Context(), account, "")
 			if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
 				if r.Context().Err() != nil {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -1791,7 +1795,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
@@ -2100,7 +2104,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(r.Context(), account, model, 0, err)
 				if !responseStarted {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 						retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
@@ -2202,6 +2206,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
+			traceAttemptStart(r.Context(), account, "")
 			if err := h.ensureValidTokenContext(r.Context(), account); err != nil {
 				if r.Context().Err() != nil {
 					recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
@@ -2210,7 +2215,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
@@ -2261,7 +2266,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
 					continue
