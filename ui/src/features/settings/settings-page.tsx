@@ -37,6 +37,7 @@ import { EndpointCard } from "./sections/endpoint-card";
 import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
+import { ResponseHeadersCard } from "./sections/response-headers-card";
 import { RoutingCard } from "./sections/routing-card";
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "./sections/sections";
 import { StreamIntegrityCard } from "./sections/stream-integrity-card";
@@ -382,6 +383,7 @@ function SettingsContent(): JSX.Element {
           <EndpointCard />
           <AdminPasswordCard />
           <OutboundProxyCard />
+          <ResponseHeadersCard />
           <PromptFilterCard />
           <DangerZoneCard />
         </div>

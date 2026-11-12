@@ -10,6 +10,7 @@ import {
   RepeatIcon,
   Route02Icon,
   SecurityCheckIcon,
+  Tag01Icon,
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 
@@ -43,6 +44,12 @@ export const SETTINGS_SECTIONS = [
     group: "server",
   },
   { id: "settings-outbound-proxy", titleKey: "proxySettings", icon: GlobalIcon, group: "server" },
+  {
+    id: "settings-response-headers",
+    titleKey: "responseHeaders",
+    icon: Tag01Icon,
+    group: "server",
+  },
   {
     id: "settings-prompt-filter",
     titleKey: "promptFilter",
@@ -78,6 +85,7 @@ export const SECTION_ID = {
   endpoint: "settings-endpoint",
   adminPassword: "settings-admin-password",
   outboundProxy: "settings-outbound-proxy",
+  responseHeaders: "settings-response-headers",
   promptFilter: "settings-prompt-filter",
   dangerZone: "settings-danger-zone",
 } as const satisfies Record<string, SectionId>;

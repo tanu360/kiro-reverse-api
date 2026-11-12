@@ -48,6 +48,7 @@ export const queryKeys = {
     endpoint: () => ["settings", "endpoint"] as const,
     proxy: () => ["settings", "proxy"] as const,
     promptFilter: () => ["settings", "prompt-filter"] as const,
+    responseHeaders: () => ["settings", "response-headers"] as const,
   },
   backups: {
     all: ["backups"] as const,
