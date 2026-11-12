@@ -42,6 +42,8 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   api_key_collision: "errors:serverError.apiKeyCollision",
   token_limit_negative: "errors:serverError.tokenLimitNegative",
   credit_limit_negative: "errors:serverError.creditLimitNegative",
+  call_limit_negative: "errors:serverError.callLimitNegative",
+  api_key_unknown_account: "errors:serverError.apiKeyUnknownAccount",
   backup_not_found: "errors:serverError.backupNotFound",
   backup_invalid_json: BACKUP_UNREADABLE,
   backup_unsupported_format: BACKUP_UNREADABLE,

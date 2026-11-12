@@ -1,5 +1,6 @@
 import {
   AlertCircleIcon,
+  ArrowReloadHorizontalIcon,
   CircleCheckIcon,
   CircleSlashIcon,
   Delete02Icon,
@@ -10,6 +11,7 @@ import {
   PowerIcon,
   PowerOffIcon,
   Undo02Icon,
+  UsersIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +38,7 @@ import {
   apiKeysQuery,
   deleteApiKey,
   getApiKey,
+  regenerateApiKey,
   resetApiKeyUsage,
   updateApiKey,
 } from "@/lib/api/api-keys";
@@ -46,7 +49,7 @@ import { formatCredits, formatNumber, formatRelativeTime } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { isLimitReached, wouldLockOutClients } from "./api-key-form";
+import { limitReachedReason, wouldLockOutClients } from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
 import { CreatedKeyPanel } from "./created-key-panel";
 
@@ -92,7 +95,8 @@ export function ApiKeysCard(): JSX.Element {
     target: { mode: "create" },
     session: 0,
   });
-  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  // The full secret from the last create or regenerate, shown once.
+  const [createdKey, setCreatedKey] = useState<{ key: string; regenerated: boolean } | null>(null);
   const [page, setPage] = useState(1);
   const bodyRef = useRef<HTMLDivElement>(null);
   const width = useElementWidth(bodyRef);
@@ -181,6 +185,18 @@ export function ApiKeysCard(): JSX.Element {
     onSettled: invalidate,
   });
 
+  const regenerate = useMutation({
+    mutationFn: (apiKey: ApiKey) => regenerateApiKey(apiKey.id),
+    onSuccess: (result) => {
+      setCreatedKey({ key: result.key, regenerated: true });
+      toast.success(t("keys.regenerated"));
+    },
+    onError: (error) => {
+      toastError(error, t);
+    },
+    onSettled: invalidate,
+  });
+
   const remove = useMutation({
     mutationFn: (apiKey: ApiKey) => deleteApiKey(apiKey.id),
     onSuccess: () => {
@@ -221,6 +237,19 @@ export function ApiKeysCard(): JSX.Element {
     toggle.mutate(apiKey);
   };
 
+  // The old value stops working at once, so it always asks.
+  const onRegenerate = async (apiKey: ApiKey) => {
+    const ok = await confirm({
+      title: t("keys.confirmRegenerateTitle", { name: keyName(apiKey, t) }),
+      description: t("keys.confirmRegenerateBody"),
+      confirmLabel: t("keys.regenerate"),
+      variant: "danger",
+    });
+    if (!ok) return;
+    setCreatedKey(null);
+    regenerate.mutate(apiKey);
+  };
+
   const onDelete = async (apiKey: ApiKey) => {
     const lockout = wouldLockOutClients(list, apiKey.id, requireApiKey);
     const ok = await confirm({
@@ -242,6 +271,7 @@ export function ApiKeysCard(): JSX.Element {
   const busyId =
     (toggle.isPending && toggle.variables?.id) ||
     (reset.isPending && reset.variables?.id) ||
+    (regenerate.isPending && regenerate.variables?.id) ||
     (remove.isPending && remove.variables?.id) ||
     null;
 
@@ -252,6 +282,7 @@ export function ApiKeysCard(): JSX.Element {
       editing={editingId === apiKey.id}
       onDelete={() => void onDelete(apiKey)}
       onEdit={() => openEdit(apiKey)}
+      onRegenerate={() => void onRegenerate(apiKey)}
       onReset={() => reset.mutate(apiKey)}
       onToggle={() => void onToggle(apiKey)}
       triggerRef={triggerRef(apiKey.id)}
@@ -330,7 +361,7 @@ export function ApiKeysCard(): JSX.Element {
     >
       {/* The limit badge sits in the body, so the title keeps the header width beside one badge. */}
       <div className="flex flex-col items-start gap-2">
-        {isLimitReached(apiKey) ? <LimitBadge /> : null}
+        <AccessBadges apiKey={apiKey} />
         <KeyUsage apiKey={apiKey} />
       </div>
     </ListCard>
@@ -401,7 +432,11 @@ export function ApiKeysCard(): JSX.Element {
     >
       {createdKey ? (
         <CardPanel>
-          <CreatedKeyPanel apiKey={createdKey} onDismiss={() => setCreatedKey(null)} />
+          <CreatedKeyPanel
+            apiKey={createdKey.key}
+            onDismiss={() => setCreatedKey(null)}
+            regenerated={createdKey.regenerated}
+          />
         </CardPanel>
       ) : null}
       <div className="min-w-0" ref={bodyRef}>
@@ -429,7 +464,7 @@ export function ApiKeysCard(): JSX.Element {
       </div>
       <ApiKeyFormDialog
         key={dialog.session}
-        onCreated={setCreatedKey}
+        onCreated={(key) => setCreatedKey({ key, regenerated: false })}
         onOpenChange={(open) => setDialog((prev) => ({ ...prev, open }))}
         open={dialog.open}
         target={dialog.target}
@@ -463,8 +498,26 @@ function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <StatusBadge apiKey={apiKey} />
-      {isLimitReached(apiKey) ? <LimitBadge /> : null}
+      <AccessBadges apiKey={apiKey} />
     </span>
+  );
+}
+
+/** A reached limit and the account binding; nothing for an unbound key within its limits. */
+function AccessBadges({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
+  const { t, lang } = useT("api");
+  const reason = limitReachedReason(apiKey);
+  const bound = apiKey.accountIds?.length ?? 0;
+  if (!reason && bound === 0) return null;
+  return (
+    <>
+      {reason ? <LimitBadge reason={reason} /> : null}
+      {bound > 0 ? (
+        <Badge icon={UsersIcon} tone="neutral">
+          {t("keys.boundAccounts", { count: bound, n: formatNumber(bound, lang) })}
+        </Badge>
+      ) : null}
+    </>
   );
 }
 
@@ -481,7 +534,7 @@ function StatusBadge({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   );
 }
 
-function LimitBadge(): JSX.Element {
+function LimitBadge({ reason }: { reason: "disabled" | "calls" }): JSX.Element {
   const { t } = useT("api");
   return (
     // A popover, not a tooltip: a tap opens it too, so touch users can read the hint.
@@ -496,7 +549,7 @@ function LimitBadge(): JSX.Element {
         {t("keys.limitReached")}
       </PopoverTrigger>
       <PopoverPopup className="max-w-64" tooltipStyle>
-        {t("keys.limitReachedHint")}
+        {reason === "calls" ? t("keys.callLimitReachedHint") : t("keys.limitReachedHint")}
       </PopoverPopup>
     </Popover>
   );
@@ -546,7 +599,9 @@ function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const { t, lang } = useT("api");
   const tokenLimit = apiKey.tokenLimit ?? 0;
   const creditLimit = apiKey.creditLimit ?? 0;
-  if (!tokenLimit && !creditLimit) {
+  const callLimit = apiKey.callLimit ?? 0;
+  const successfulCalls = apiKey.successfulCalls ?? 0;
+  if (!tokenLimit && !creditLimit && !callLimit) {
     // The UsageLine size, so the column (and a card's body) never jumps from 12 to 14 px.
     return <span className="text-muted-foreground text-xs">{t("common:unlimited")}</span>;
   }
@@ -574,6 +629,16 @@ function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
         })}
         used={apiKey.creditsUsed}
       />
+      <UsageLine
+        format={tokens}
+        label={t("keys.calls")}
+        limit={callLimit}
+        meterLabel={t("keys.callsUsage", {
+          used: tokens(successfulCalls),
+          limit: tokens(callLimit),
+        })}
+        used={successfulCalls}
+      />
     </div>
   );
 }
@@ -584,6 +649,7 @@ function KeyActions({
   editing,
   onEdit,
   onToggle,
+  onRegenerate,
   onReset,
   onDelete,
   triggerRef,
@@ -593,6 +659,7 @@ function KeyActions({
   editing: boolean;
   onEdit: () => void;
   onToggle: () => void;
+  onRegenerate: () => void;
   onReset: () => void;
   onDelete: () => void;
   triggerRef: (element: HTMLButtonElement | null) => (() => void) | undefined;
@@ -627,6 +694,10 @@ function KeyActions({
             <HugeiconsIcon icon={PowerIcon} aria-hidden="true" />
           )}
           {apiKey.enabled ? t("common:actions.disable") : t("common:actions.enable")}
+        </MenuItem>
+        <MenuItem disabled={busy} onClick={onRegenerate}>
+          <HugeiconsIcon icon={ArrowReloadHorizontalIcon} aria-hidden="true" />
+          {t("keys.regenerate")}
         </MenuItem>
         <MenuItem disabled={busy} onClick={onReset}>
           <HugeiconsIcon icon={Undo02Icon} aria-hidden="true" />

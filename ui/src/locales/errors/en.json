@@ -31,6 +31,8 @@
   "serverError.apiKeyCollision": "This API key value is already used by another key.",
   "serverError.tokenLimitNegative": "The token limit must be 0 or more.",
   "serverError.creditLimitNegative": "The credit limit must be 0 or more.",
+  "serverError.callLimitNegative": "The call limit must be 0 or more.",
+  "serverError.apiKeyUnknownAccount": "One of the selected accounts no longer exists. Reload and pick again.",
   "serverError.microsoftCanceled": "The Microsoft sign-in was canceled. Start again.",
   "serverError.microsoftDuplicate": "This Microsoft account is already added.",
   "serverError.apiKeyLockout": "API keys are required, and no key would stay enabled, so every client would be locked out.",

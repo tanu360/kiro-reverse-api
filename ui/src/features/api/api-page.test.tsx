@@ -111,6 +111,8 @@ describe("ApiPage", () => {
       enabled: true,
       tokenLimit: 0,
       creditLimit: 0,
+      callLimit: 0,
+      accountIds: [],
     });
 
     await user.click(within(panel).getByRole("button", { name: "Copy new API key" }));
@@ -181,6 +183,110 @@ describe("ApiPage", () => {
     await waitFor(() => expect(sent("POST", `/api-keys/${teamA?.id}/reset-usage`)).toHaveLength(1));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(await screen.findByText("The key's usage was reset.")).toBeInTheDocument();
+  });
+
+  it("regenerates a key only after the confirm and shows the new key once", async () => {
+    const { user } = await renderPage();
+    const teamA = mockDb.apiKeys[0];
+    const oldKey = teamA?.key;
+    const path = `/api-keys/${teamA?.id}/regenerate`;
+    const openConfirm = async () => {
+      await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Regenerate key" }));
+      return screen.findByRole("alertdialog");
+    };
+
+    let confirm = await openConfirm();
+    expect(within(confirm).getByText("Regenerate team-a?")).toBeInTheDocument();
+    expect(within(confirm).getByText(/The current key stops working at once/)).toBeInTheDocument();
+    await user.click(within(confirm).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(sent("POST", path)).toHaveLength(0);
+    expect(mockDb.apiKeys[0]?.key).toBe(oldKey);
+
+    confirm = await openConfirm();
+    await user.click(within(confirm).getByRole("button", { name: "Regenerate key" }));
+    const panel = await screen.findByTestId("created-key-panel");
+    expect(sent("POST", path)).toHaveLength(1);
+    const newKey = mockDb.apiKeys[0]?.key ?? "";
+    expect(newKey).toMatch(/^sk-[0-9a-f]{64}$/);
+    expect(newKey).not.toBe(oldKey);
+    expect(within(panel).getByText(newKey)).toBeInTheDocument();
+    expect(within(panel).getByText(/The old key no longer works/)).toBeInTheDocument();
+    // Same key: id, name and usage stay.
+    expect(mockDb.apiKeys[0]).toMatchObject({
+      id: teamA?.id,
+      name: "team-a",
+      tokensUsed: 1_874_210,
+    });
+
+    await user.click(within(panel).getByRole("button", { name: "Copy new API key" }));
+    expect(copyTextMock).toHaveBeenCalledWith(newKey);
+    await user.click(within(panel).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByTestId("created-key-panel")).not.toBeInTheDocument();
+    expect(screen.queryByText(newKey)).not.toBeInTheDocument();
+  });
+
+  it("binds a key to picked accounts (search, masked under privacy)", async () => {
+    const { user } = renderWithProviders(<ApiPage />, { privacy: true });
+    await screen.findAllByText("team-a");
+    const dana = mockDb.accounts[0];
+    await user.click(screen.getByRole("button", { name: "Create API key" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
+
+    // "Only selected" with nothing picked would mean every account: the form refuses it.
+    await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
+    expect(
+      await within(dialog).findByText("Pick at least one account, or choose All accounts."),
+    ).toBeInTheDocument();
+    const search = within(dialog).getByRole("searchbox", { name: "Search accounts" });
+    expect(search).toHaveFocus();
+    expect(sent("POST", "/api-keys")).toHaveLength(0);
+
+    // Privacy mode hides the address, and the search cannot find the hidden part.
+    await user.type(search, "whitfield");
+    expect(within(dialog).getByText("No matches")).toBeInTheDocument();
+    await user.clear(search);
+    await user.type(search, "team primary");
+    const option = within(dialog).getByRole("checkbox", { name: /da\*\*\*@no\*\*\*\.com/ });
+    expect(within(dialog).queryByText(dana?.email ?? "", { exact: false })).not.toBeInTheDocument();
+    await user.click(option);
+    expect(option).toBeChecked();
+    expect(within(dialog).getByText(`1 of ${mockDb.accounts.length} selected`)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
+    await screen.findByTestId("created-key-panel");
+    expect(sent("POST", "/api-keys")[0]?.body).toMatchObject({ accountIds: [dana?.id] });
+    expect(mockDb.apiKeys.at(-1)?.accountIds).toEqual([dana?.id]);
+    expect(await within(keysTable()).findByText("1 account")).toBeInTheDocument();
+  });
+
+  it("shows successful calls against the call limit", async () => {
+    const teamA = mockDb.apiKeys[0];
+    const localDev = mockDb.apiKeys[3];
+    if (!teamA || !localDev) throw new Error("missing seeded keys");
+    teamA.callLimit = 20;
+    teamA.successfulCalls = 20;
+    localDev.callLimit = 5;
+    localDev.successfulCalls = 2;
+    const { user } = await renderPage();
+
+    const teamRow = row("team-a");
+    expect(within(teamRow).getByText("Calls")).toBeInTheDocument();
+    expect(within(teamRow).getByText("20 / 20")).toBeInTheDocument();
+    expect(within(teamRow).getByLabelText("Successful calls: 20 of 20")).toBeInTheDocument();
+    expect(within(row("local-dev")).getByText("2 / 5")).toBeInTheDocument();
+
+    // A used-up call limit flags the key, with its own hint: the key stays enabled.
+    const badge = within(teamRow).getByRole("button", { name: "Limit reached" });
+    await user.click(badge);
+    expect(
+      await screen.findByText(
+        "The key used all its successful calls, so clients get 429. Raise the call limit or reset usage.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(teamRow).getByText("Enabled")).toBeInTheDocument();
   });
 
   it("deletes a key only after the confirm", async () => {

@@ -7,6 +7,7 @@ import {
   EMPTY_API_KEY_FORM,
   formValuesFromKey,
   isLimitReached,
+  limitReachedReason,
   parseApiKeyForm,
   wouldLockOutClients,
 } from "./api-key-form";
@@ -33,7 +34,14 @@ describe("parseApiKeyForm", () => {
     const parsed = parseApiKeyForm(values({ name: "team-a" }));
     expect(parsed).toEqual({
       ok: true,
-      value: { name: "team-a", key: "", tokenLimit: 0, creditLimit: 0 },
+      value: {
+        name: "team-a",
+        key: "",
+        tokenLimit: 0,
+        creditLimit: 0,
+        callLimit: 0,
+        accountIds: [],
+      },
     });
   });
 
@@ -84,6 +92,8 @@ describe("request payloads", () => {
       enabled: true,
       tokenLimit: 10,
       creditLimit: 0,
+      callLimit: 0,
+      accountIds: [],
     });
   });
 
@@ -95,6 +105,8 @@ describe("request payloads", () => {
       enabled: true,
       tokenLimit: 0,
       creditLimit: 0,
+      callLimit: 0,
+      accountIds: [],
       key: "sk-mine",
     });
   });
@@ -107,6 +119,8 @@ describe("request payloads", () => {
       key: "",
       tokenLimit: 0,
       creditLimit: 2.5,
+      callLimit: 0,
+      accountIds: [],
     });
   });
 
@@ -124,8 +138,66 @@ describe("formValuesFromKey", () => {
       key: "",
       tokenLimit: 5,
       creditLimit: 1.25,
+      callLimit: 0,
+      accountScope: "all",
+      accountIds: [],
     });
     expect(formValuesFromKey(key())).toEqual(EMPTY_API_KEY_FORM);
+    expect(formValuesFromKey(key({ accountIds: [] }))).toEqual(EMPTY_API_KEY_FORM);
+  });
+
+  it("starts a bound key on its accounts and its call limit", () => {
+    expect(formValuesFromKey(key({ accountIds: ["a", "gone"], callLimit: 50 }))).toMatchObject({
+      callLimit: 50,
+      accountScope: "selected",
+      accountIds: ["a", "gone"],
+    });
+  });
+});
+
+describe("call limit and accounts", () => {
+  it("takes a whole call limit and rejects fractions and negatives", () => {
+    const parsed = parseApiKeyForm(values({ callLimit: 25 }));
+    expect(parsed.ok && parsed.value.callLimit).toBe(25);
+    expect(parseApiKeyForm(values({ callLimit: null }))).toMatchObject({
+      ok: true,
+      value: { callLimit: 0 },
+    });
+    for (const callLimit of [1.5, -1, Number.NaN]) {
+      expect(parseApiKeyForm(values({ callLimit }))).toEqual({
+        ok: false,
+        error: "invalidLimits",
+        field: "callLimit",
+      });
+    }
+  });
+
+  it("needs an account when only selected accounts may be used", () => {
+    expect(parseApiKeyForm(values({ accountScope: "selected", accountIds: [] }))).toEqual({
+      ok: false,
+      error: "noAccounts",
+      field: "accountIds",
+    });
+  });
+
+  it("sends the picks once each, and [] for every account", () => {
+    const picked = parseApiKeyForm(
+      values({ accountScope: "selected", accountIds: ["a", "b", "a"], callLimit: 3 }),
+    );
+    if (!picked.ok) throw new Error("expected valid form");
+    expect(buildCreateRequest(picked.value)).toMatchObject({
+      accountIds: ["a", "b"],
+      callLimit: 3,
+    });
+    expect(buildUpdateRequest(picked.value)).toMatchObject({
+      accountIds: ["a", "b"],
+      callLimit: 3,
+    });
+
+    // Picks kept from before a switch to every account are not sent.
+    const all = parseApiKeyForm(values({ accountScope: "all", accountIds: ["a"] }));
+    if (!all.ok) throw new Error("expected valid form");
+    expect(buildUpdateRequest(all.value).accountIds).toEqual([]);
   });
 });
 
@@ -138,6 +210,16 @@ describe("isLimitReached", () => {
     expect(isLimitReached(key({ tokenLimit: 100, tokensUsed: 100 }))).toBe(true);
     expect(isLimitReached(key({ creditLimit: 5, creditsUsed: 5.01 }))).toBe(true);
     expect(isLimitReached(key({ tokenLimit: 100, tokensUsed: 99, creditLimit: 5 }))).toBe(false);
+  });
+
+  it("tells a used-up call limit from a limit that disabled the key", () => {
+    expect(limitReachedReason(key({ callLimit: 10, successfulCalls: 10 }))).toBe("calls");
+    expect(limitReachedReason(key({ callLimit: 10, successfulCalls: 9 }))).toBeNull();
+    expect(limitReachedReason(key({ callLimit: 0, successfulCalls: 99 }))).toBeNull();
+    expect(
+      limitReachedReason(key({ tokenLimit: 1, tokensUsed: 1, callLimit: 1, successfulCalls: 1 })),
+    ).toBe("disabled");
+    expect(isLimitReached(key({ callLimit: 1, successfulCalls: 1 }))).toBe(true);
   });
 });
 

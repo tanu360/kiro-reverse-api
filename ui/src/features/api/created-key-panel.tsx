@@ -7,15 +7,18 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 
 /**
- * The full secret from the last create. It lives only in the parent's state: never stored or
- * cached, and gone on the next create, on edit, on Dismiss and when the page unmounts.
+ * The full secret from the last create or regenerate. It lives only in the parent's state: never
+ * stored or cached, and gone on the next create, on edit, on Dismiss and when the page unmounts.
  */
 export function CreatedKeyPanel({
   apiKey,
   onDismiss,
+  regenerated = false,
 }: {
   apiKey: string;
   onDismiss: () => void;
+  /** The secret replaced an existing key's value, so the old one no longer works. */
+  regenerated?: boolean;
 }): JSX.Element {
   const { t } = useT("api");
   return (
@@ -23,7 +26,7 @@ export function CreatedKeyPanel({
       <HugeiconsIcon icon={KeyRoundIcon} aria-hidden="true" />
       <AlertTitle>{t("created.title")}</AlertTitle>
       <AlertDescription>
-        <p>{t("created.body")}</p>
+        <p>{regenerated ? t("created.regeneratedBody") : t("created.body")}</p>
         <CopyField
           copyLabel={t("created.copy")}
           label={t("created.title")}

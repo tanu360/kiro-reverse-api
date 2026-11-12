@@ -65,6 +65,8 @@ export type ServerErrorCode =
   | "api_key_collision"
   | "token_limit_negative"
   | "credit_limit_negative"
+  | "call_limit_negative"
+  | "api_key_unknown_account"
   | "model_mappings_too_many"
   | "model_mapping_empty"
   | "model_mapping_no_source"
@@ -856,6 +858,12 @@ export interface ApiKey {
   tokensUsed: number;
   creditsUsed: number;
   requestsCount: number;
+  /** Accounts the key may use; empty or omitted = every account. Ids of deleted accounts stay. */
+  accountIds?: string[];
+  /** int, omitted/0 = unlimited */
+  callLimit?: number;
+  /** Requests that finished OK; model lists and token counts do not count. */
+  successfulCalls?: number;
 }
 export interface ApiKeyListResponse {
   apiKeys: ApiKey[];
@@ -871,6 +879,10 @@ export interface ApiKeyCreateRequest {
   tokenLimit?: number;
   /** >= 0 */
   creditLimit?: number;
+  /** [] or omitted = every account; 400 `api_key_unknown_account` for an id no account has */
+  accountIds?: string[];
+  /** int >= 0 */
+  callLimit?: number;
 }
 export interface ApiKeyCreateResponse {
   success: true;
@@ -886,12 +898,22 @@ export interface ApiKeyUpdateRequest {
   enabled?: boolean;
   tokenLimit?: number;
   creditLimit?: number;
+  /** Replaces the list; [] = every account. Omitted keeps it. */
+  accountIds?: string[];
+  callLimit?: number;
 }
 export interface ApiKeyUpdateResponse {
   success: true;
   apiKey: ApiKey;
 }
 export type ApiKeyResetUsageResponse = { success: true; apiKey?: ApiKey };
+/** POST /api-keys/{id}/regenerate: the new secret once; id, limits and usage stay. */
+export interface ApiKeyRegenerateResponse {
+  success: true;
+  id: string;
+  key: string;
+  apiKey: ApiKey;
+}
 
 // ---------------------------------------------------------------------------
 // Settings
