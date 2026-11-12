@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { refreshAccount } from "@/lib/api/accounts";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { AddedAccountRef } from "@/lib/api/types";
+import type { Account, AddedAccountRef } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { useDisplayEmail } from "@/lib/privacy";
 import { type FlowContextValue, FlowProvider } from "./flow-context";
 import { FlowSessions } from "./flow-sessions";
 import { ApiKeyFlow } from "./flows/api-key-flow";
@@ -23,6 +24,7 @@ import { IamFlow } from "./flows/iam-flow";
 import { LocalCacheFlow } from "./flows/local-cache-flow";
 import { MicrosoftFlow } from "./flows/microsoft-flow";
 import { SsoTokenFlow } from "./flows/sso-token-flow";
+import { reloginMethod } from "./lib/relogin-method";
 import { MethodHead, MethodRail, MethodSelect } from "./method-list";
 
 export type AddAccountMethod =
@@ -40,6 +42,11 @@ interface AddAccountDialogProps {
   onOpenChange: (open: boolean) => void;
   initialMethod?: AddAccountMethod;
   onAdded?: (accountIds: string[]) => void;
+  /**
+   * Log this account in again instead of adding one: the method it signed in with opens first,
+   * every flow sends its id as reloginAccountId, and success replaces its login in place.
+   */
+  relogin?: Account;
 }
 
 const FLOWS: Record<AddAccountMethod, () => JSX.Element> = {
@@ -65,11 +72,14 @@ export function AddAccountDialog({
   onOpenChange,
   initialMethod,
   onAdded,
+  relogin,
 }: AddAccountDialogProps): JSX.Element {
   const { t } = useT("add-account");
+  const display = useDisplayEmail();
   const queryClient = useQueryClient();
   const [sessions] = useState(() => new FlowSessions());
-  const [method, setMethod] = useState<AddAccountMethod>(initialMethod ?? "builderid");
+  const startMethod = initialMethod ?? (relogin ? reloginMethod(relogin) : "builderid");
+  const [method, setMethod] = useState<AddAccountMethod>(startMethod);
   // A new key remounts the flow, so each visit starts from its first step.
   const [flowKey, setFlowKey] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -79,7 +89,7 @@ export function AddAccountDialog({
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setMethod(initialMethod ?? "builderid");
+      setMethod(startMethod);
       setFlowKey((key) => key + 1);
       setBusy(false);
     }
@@ -91,8 +101,8 @@ export function AddAccountDialog({
     return () => sessions.reset();
   }, [open, sessions]);
 
-  const latest = useRef({ onOpenChange, onAdded });
-  latest.current = { onOpenChange, onAdded };
+  const latest = useRef({ onOpenChange, onAdded, relogin });
+  latest.current = { onOpenChange, onAdded, relogin };
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -112,7 +122,8 @@ export function AddAccountDialog({
         queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.status }),
       ]);
-      if (ids.length === 0) return;
+      // A re-login is checked by the server itself, and the list hears the result over SSE.
+      if (ids.length === 0 || latest.current.relogin) return;
       // Fetch usage and subscription for each new account, one at a time, as the old UI did.
       for (const id of ids) {
         try {
@@ -147,8 +158,9 @@ export function AddAccountDialog({
       setBusy,
       cancel,
       footer,
+      relogin: relogin ?? null,
     }),
-    [sessions, finishAdd, cancel, footer],
+    [sessions, finishAdd, cancel, footer, relogin],
   );
 
   const Flow = FLOWS[method];
@@ -167,8 +179,14 @@ export function AddAccountDialog({
         size="3xl"
       >
         <DialogHeader>
-          <DialogTitle>{t("title")}</DialogTitle>
-          <DialogDescription className="sr-only">{t("description")}</DialogDescription>
+          <DialogTitle>{relogin ? t("relogin.title") : t("title")}</DialogTitle>
+          {relogin ? (
+            <DialogDescription>
+              {t("relogin.target", { name: display(relogin.email, relogin.id) })}
+            </DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">{t("description")}</DialogDescription>
+          )}
         </DialogHeader>
         {/* A fixed height from sm up, so switching methods never resizes the dialog. */}
         <div className="flex min-h-0 flex-1 border-border-subtle border-t sm:h-128 sm:flex-initial">

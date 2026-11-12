@@ -12,21 +12,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
-import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { FlowGuide, FormField, GuideLink, ProviderLogo, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
-
-type CookieProvider = "Google" | "Github";
+import { type CookieProvider, reloginCookieProvider } from "../lib/relogin-method";
+import { useReloginFlow } from "../relogin";
 
 /** Kiro web cookie: the RefreshToken cookie of app.kiro.dev, a social sign-in. */
 export function CookieFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const display = useDisplayEmail();
   const { sessions, finishAdd } = useFlow();
+  const relogin = useReloginFlow();
   const formId = useFormId();
-  const [provider, setProvider] = useState<CookieProvider>("Google");
+  const [provider, setProvider] = useState<CookieProvider>(() =>
+    reloginCookieProvider(relogin.target),
+  );
   const [refreshToken, setRefreshToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -54,13 +55,14 @@ export function CookieFlow(): JSX.Element {
         clientSecret: "",
         authMethod: "social",
         provider,
+        reloginAccountId: relogin.accountId,
       });
       if (!sessions.isCurrent(generation)) return;
-      toast.success(t("success", { name: display(res.account.email, res.account.id) }));
+      relogin.announce(res);
       finishAdd([res.account]);
     } catch (caught) {
-      if (sessions.isCurrent(generation)) {
-        toast.error(t("failed", { error: errorMessage(caught, t) }));
+      if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(caught))) {
+        toast.error(t(relogin.failedKey, { error: errorMessage(caught, t) }));
         focusAfter(tokenRef);
       }
     } finally {
@@ -136,7 +138,11 @@ export function CookieFlow(): JSX.Element {
         />
       </FormField>
       <FlowFooter>
-        <SubmitButton busy={pending} formId={formId} label={t("add")} />
+        <SubmitButton
+          busy={pending}
+          formId={formId}
+          label={relogin.target ? t("relogin.submit") : t("add")}
+        />
       </FlowFooter>
     </form>
   );

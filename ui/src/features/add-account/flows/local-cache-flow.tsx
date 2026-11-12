@@ -15,7 +15,6 @@ import {
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import { fillNodes, useT } from "@/lib/i18n";
-import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { FlowGuide, FormField, ProviderLogo, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
@@ -28,6 +27,7 @@ import {
   type LocalProvider,
   localCacheErrorField,
 } from "../lib/local-cache";
+import { useReloginFlow } from "../relogin";
 
 /**
  * A JSON textarea with an Upload button in its bottom bar that reads a .json file into it.
@@ -99,8 +99,8 @@ function JsonFileInput({
 /** Kiro IDE local cache: kiro-auth-token.json plus, for IdC, the {hash}.json client file. */
 export function LocalCacheFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const display = useDisplayEmail();
   const { sessions, finishAdd } = useFlow();
+  const relogin = useReloginFlow();
   const formId = useFormId();
   const [provider, setProvider] = useState<LocalProvider>("BuilderId");
   const [tokenJson, setTokenJson] = useState("");
@@ -128,13 +128,16 @@ export function LocalCacheFlow(): JSX.Element {
     const generation = sessions.generation;
     setPending(true);
     try {
-      const res = await importCredentials(built.payload);
+      const res = await importCredentials({
+        ...built.payload,
+        reloginAccountId: relogin.accountId,
+      });
       if (!sessions.isCurrent(generation)) return;
-      toast.success(t("success", { name: display(res.account.email, res.account.id) }));
+      relogin.announce(res);
       finishAdd([res.account]);
     } catch (error) {
-      if (sessions.isCurrent(generation)) {
-        toast.error(t("failed", { error: errorMessage(error, t) }));
+      if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(error))) {
+        toast.error(t(relogin.failedKey, { error: errorMessage(error, t) }));
         focusAfter(tokenRef);
       }
     } finally {
@@ -251,7 +254,11 @@ export function LocalCacheFlow(): JSX.Element {
         </FormField>
       ) : null}
       <FlowFooter>
-        <SubmitButton busy={pending} formId={formId} label={t("add")} />
+        <SubmitButton
+          busy={pending}
+          formId={formId}
+          label={relogin.target ? t("relogin.submit") : t("add")}
+        />
       </FlowFooter>
     </form>
   );

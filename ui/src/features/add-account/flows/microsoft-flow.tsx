@@ -13,11 +13,11 @@ import {
 import { errorMessage, serverCodeMessage } from "@/lib/api/server-errors";
 import type { KiroProfile, MicrosoftSelectProfileResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { FlowNote, type FlowStepItem, FlowSteps, FormField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { stepFocus, useFocusAfter } from "../focus";
+import { useReloginFlow } from "../relogin";
 
 type Stage = "idle" | "kiro" | "microsoft" | "profile";
 
@@ -28,8 +28,8 @@ type Stage = "idle" | "kiro" | "microsoft" | "profile";
  */
 export function MicrosoftFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const display = useDisplayEmail();
   const { sessions, finishAdd } = useFlow();
+  const relogin = useReloginFlow();
   const formId = useFormId();
   const [stage, setStage] = useState<Stage>("idle");
   const [authorizeUrl, setAuthorizeUrl] = useState("");
@@ -72,10 +72,17 @@ export function MicrosoftFlow(): JSX.Element {
       }
       apply(res);
     } catch (error) {
-      if (sessions.isCurrent(generation)) {
-        toast.error(t("failed", { error: errorMessage(error, t) }));
-        onError();
+      if (!sessions.isCurrent(generation)) return;
+      if (await relogin.resolveMismatch(error)) {
+        // The server finished this login; a new attempt starts from the first step.
+        sessions.cancelMicrosoft();
+        setStage("idle");
+        setAuthorizeUrl("");
+        setCallbackUrl("");
+        return;
       }
+      toast.error(t(relogin.failedKey, { error: errorMessage(error, t) }));
+      onError();
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -86,7 +93,7 @@ export function MicrosoftFlow(): JSX.Element {
     // The server closed the login when it saved the account; there is nothing to cancel.
     sessions.microsoftSessionId = "";
     sessions.microsoftSelectionId = "";
-    toast.success(t("success", { name: display(res.account.email, res.account.id) }));
+    relogin.announce(res);
     if (res.warning) {
       const detail = { detail: res.warningDetail };
       toast.warning(serverCodeMessage(res.warningCode, detail, t) ?? res.warning);
@@ -95,13 +102,16 @@ export function MicrosoftFlow(): JSX.Element {
   };
 
   const start = () =>
-    step(startMicrosoftSso, (res) => {
-      sessions.microsoftSessionId = res.sessionId;
-      setAuthorizeUrl(res.authorizeUrl);
-      setCallbackUrl("");
-      setStage("kiro");
-      focusAfter(stepFocus(formId, callbackRef));
-    });
+    step(
+      () => startMicrosoftSso({ reloginAccountId: relogin.accountId }),
+      (res) => {
+        sessions.microsoftSessionId = res.sessionId;
+        setAuthorizeUrl(res.authorizeUrl);
+        setCallbackUrl("");
+        setStage("kiro");
+        focusAfter(stepFocus(formId, callbackRef));
+      },
+    );
 
   const complete = () => {
     const callback = callbackUrl.trim();

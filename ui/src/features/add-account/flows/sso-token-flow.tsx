@@ -2,7 +2,7 @@ import { type FormEvent, type JSX, useRef, useState } from "react";
 import { AwsLogo } from "@/components/shared/brand-logos";
 import { Code } from "@/components/shared/code";
 import { Textarea } from "@/components/ui/textarea";
-import { importSsoToken } from "@/lib/api/auth-flows";
+import { importSsoToken, reloginSsoToken } from "@/lib/api/auth-flows";
 import { errorMessage, serverMessageText } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
@@ -10,6 +10,8 @@ import { FlowGuide, FormField, GuideLink, RegionField, SubmitButton } from "../f
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
+import { reloginRegion } from "../lib/relogin-method";
+import { useReloginFlow } from "../relogin";
 import { showBatchResult } from "../result-toast";
 
 /** The AWS access portal, where the SSO cookie is set (a host name, the same in every language). */
@@ -19,9 +21,10 @@ const SSO_START = "view.awsapps.com/start";
 export function SsoTokenFlow(): JSX.Element {
   const { t } = useT("add-account");
   const { sessions, finishAdd } = useFlow();
+  const relogin = useReloginFlow();
   const formId = useFormId();
   const [tokens, setTokens] = useState("");
-  const [region, setRegion] = useState("us-east-1");
+  const [region, setRegion] = useState(() => reloginRegion(relogin.target));
   const [errors, setErrors] = useState<{ tokens?: string; region?: string }>({});
   const [pending, setPending] = useState(false);
   useReportBusy(pending);
@@ -33,8 +36,13 @@ export function SsoTokenFlow(): JSX.Element {
     event.preventDefault();
     if (pending) return;
     const parsed = parseRegion(region);
+    const lines = tokens.split("\n").filter((line) => line.trim()).length;
     const nextErrors = {
-      tokens: tokens.trim() ? undefined : t("sso.tokenRequired"),
+      tokens: !lines
+        ? t("sso.tokenRequired")
+        : relogin.target && lines > 1
+          ? t("relogin.singleOnly")
+          : undefined,
       region: parsed.ok ? undefined : t("regionInvalid"),
     };
     setErrors(nextErrors);
@@ -44,6 +52,26 @@ export function SsoTokenFlow(): JSX.Element {
     }
     const generation = sessions.generation;
     setPending(true);
+    if (relogin.accountId) {
+      try {
+        const res = await reloginSsoToken({
+          bearerToken: tokens,
+          region: parsed.region,
+          reloginAccountId: relogin.accountId,
+        });
+        if (!sessions.isCurrent(generation)) return;
+        relogin.announce(res);
+        finishAdd([res.account]);
+      } catch (error) {
+        if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(error))) {
+          toast.error(t(relogin.failedKey, { error: errorMessage(error, t) }));
+          focusAfter(tokensRef);
+        }
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
     try {
       const res = await importSsoToken({ bearerToken: tokens, region: parsed.region });
       if (!sessions.isCurrent(generation)) return;
@@ -94,7 +122,11 @@ export function SsoTokenFlow(): JSX.Element {
         value={region}
       />
       <FlowFooter>
-        <SubmitButton busy={pending} formId={formId} label={t("add")} />
+        <SubmitButton
+          busy={pending}
+          formId={formId}
+          label={relogin.target ? t("relogin.submit") : t("add")}
+        />
       </FlowFooter>
     </form>
   );

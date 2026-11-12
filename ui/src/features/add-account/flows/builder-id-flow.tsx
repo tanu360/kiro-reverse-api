@@ -8,12 +8,13 @@ import { pollBuilderId, startBuilderId } from "@/lib/api/auth-flows";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
-import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { FlowNote, FlowSteps, RegionField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
+import { reloginRegion } from "../lib/relogin-method";
+import { useReloginFlow } from "../relogin";
 
 const DEFAULT_INTERVAL_S = 5;
 /** Network failures in a row before polling gives up. */
@@ -27,10 +28,10 @@ interface DeviceCode {
 /** AWS Builder ID device-code sign-in: show the code, then poll until the user approves it. */
 export function BuilderIdFlow(): JSX.Element {
   const { t } = useT("add-account");
-  const display = useDisplayEmail();
   const { sessions, finishAdd } = useFlow();
+  const relogin = useReloginFlow();
   const formId = useFormId();
-  const [region, setRegion] = useState("us-east-1");
+  const [region, setRegion] = useState(() => reloginRegion(relogin.target));
   const [regionError, setRegionError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [code, setCode] = useState<DeviceCode | null>(null);
@@ -41,8 +42,8 @@ export function BuilderIdFlow(): JSX.Element {
   const codeRef = useRef<HTMLDivElement>(null);
 
   // The poll chain reads the latest render's helpers, not the ones from when it started.
-  const latest = useRef({ t, display, finishAdd, focusAfter });
-  latest.current = { t, display, finishAdd, focusAfter };
+  const latest = useRef({ t, relogin, finishAdd, focusAfter });
+  latest.current = { t, relogin, finishAdd, focusAfter };
 
   // Stop polling if this view goes away while the dialog stays open.
   useEffect(() => () => sessions.stopBuilderId(), [sessions]);
@@ -52,13 +53,13 @@ export function BuilderIdFlow(): JSX.Element {
       sessions.builderIdTimer = null;
       const sessionId = sessions.builderIdSession;
       if (!sessionId || !sessions.isCurrent(generation)) return;
-      const { t: tr, display: show, finishAdd: finish, focusAfter: refocus } = latest.current;
+      const { t: tr, relogin: again, finishAdd: finish, focusAfter: refocus } = latest.current;
       try {
         const res = await pollBuilderId({ sessionId });
         if (!sessions.isCurrent(generation) || sessions.builderIdSession !== sessionId) return;
         if (res.completed) {
           sessions.stopBuilderId();
-          toast.success(tr("success", { name: show(res.account.email, res.account.id) }));
+          again.announce(res);
           finish([res.account]);
           return;
         }
@@ -75,7 +76,9 @@ export function BuilderIdFlow(): JSX.Element {
         sessions.stopBuilderId();
         setCode(null);
         setReconnecting(false);
-        toast.error(tr("failed", { error: errorMessage(error, tr) }));
+        if (!(await again.resolveMismatch(error))) {
+          toast.error(tr(again.failedKey, { error: errorMessage(error, tr) }));
+        }
         // Back on the first step; the code view and its focus are gone.
         refocus(regionRef);
       }
@@ -95,7 +98,10 @@ export function BuilderIdFlow(): JSX.Element {
     setStarting(true);
     const generation = sessions.generation;
     try {
-      const res = await startBuilderId({ region: parsed.region });
+      const res = await startBuilderId({
+        region: parsed.region,
+        reloginAccountId: relogin.accountId,
+      });
       if (!sessions.isCurrent(generation)) return;
       sessions.stopBuilderId();
       sessions.builderIdSession = res.sessionId;

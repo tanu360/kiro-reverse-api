@@ -11,12 +11,14 @@ import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseApiKeyLines } from "../lib/api-key-lines";
 import { parseRegion } from "../lib/region";
+import { useReloginFlow } from "../relogin";
 import { showBatchResult } from "../result-toast";
 
 /** Kiro CLI API keys, one per line, imported one request at a time. */
 export function ApiKeyFlow(): JSX.Element {
   const { t } = useT("add-account");
   const { sessions, finishAdd } = useFlow();
+  const relogin = useReloginFlow();
   const formId = useFormId();
   const [keys, setKeys] = useState("");
   const [region, setRegion] = useState("us-east-1");
@@ -34,7 +36,11 @@ export function ApiKeyFlow(): JSX.Element {
     const parsed = parseRegion(region);
     const requests = parseApiKeyLines(keys, parsed.ok ? parsed.region : "");
     const nextErrors = {
-      keys: requests.length ? undefined : t("apikey.keyMissing"),
+      keys: !requests.length
+        ? t("apikey.keyMissing")
+        : relogin.target && requests.length > 1
+          ? t("relogin.singleOnly")
+          : undefined,
       region: parsed.ok ? undefined : t("regionInvalid"),
     };
     setErrors(nextErrors);
@@ -44,6 +50,25 @@ export function ApiKeyFlow(): JSX.Element {
     }
     const generation = sessions.generation;
     setPending(true);
+    if (relogin.target) {
+      try {
+        const res = await importCredentials({
+          ...requests[0],
+          reloginAccountId: relogin.accountId,
+        });
+        if (!sessions.isCurrent(generation)) return;
+        relogin.announce(res);
+        finishAdd([res.account]);
+      } catch (caught) {
+        if (sessions.isCurrent(generation) && !(await relogin.resolveMismatch(caught))) {
+          toast.error(t(relogin.failedKey, { error: errorMessage(caught, t) }));
+          focusAfter(keysRef);
+        }
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
     const added: AddedAccountRef[] = [];
     const failures: string[] = [];
     try {
@@ -104,7 +129,11 @@ export function ApiKeyFlow(): JSX.Element {
         value={region}
       />
       <FlowFooter>
-        <SubmitButton busy={pending} formId={formId} label={t("add")} />
+        <SubmitButton
+          busy={pending}
+          formId={formId}
+          label={relogin.target ? t("relogin.submit") : t("add")}
+        />
       </FlowFooter>
     </form>
   );

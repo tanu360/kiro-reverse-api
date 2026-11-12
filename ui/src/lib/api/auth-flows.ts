@@ -15,10 +15,12 @@ import type {
   MicrosoftCompleteResponse,
   MicrosoftSelectProfileRequest,
   MicrosoftSelectProfileResponse,
+  MicrosoftStartRequest,
   MicrosoftStartResponse,
   SsoTokenImportRequest,
   SsoTokenImportResponse,
   SsoTokenImportResult,
+  SsoTokenReloginResponse,
 } from "./types";
 
 export function startIamSso(req: IamSsoStartRequest): Promise<IamSsoStartResponse> {
@@ -29,8 +31,10 @@ export function completeIamSso(req: IamSsoCompleteRequest): Promise<IamSsoComple
   return apiRequest("/auth/iam-sso/complete", { method: "POST", body: req });
 }
 
-export function startMicrosoftSso(): Promise<MicrosoftStartResponse> {
-  return apiRequest("/auth/microsoft-sso/start", { method: "POST", body: {} });
+export function startMicrosoftSso(
+  req: MicrosoftStartRequest = {},
+): Promise<MicrosoftStartResponse> {
+  return apiRequest("/auth/microsoft-sso/start", { method: "POST", body: req });
 }
 
 export function completeMicrosoftSso(
@@ -70,6 +74,13 @@ export async function importSsoToken(req: SsoTokenImportRequest): Promise<SsoTok
     body: req,
   });
   return { ...res, accounts: res.accounts ?? [], errors: res.errors ?? [] };
+}
+
+/** One SSO token logged into an existing account: the answer names that account, not a batch. */
+export function reloginSsoToken(
+  req: SsoTokenImportRequest & { reloginAccountId: string },
+): Promise<SsoTokenReloginResponse> {
+  return apiRequest("/auth/sso-token", { method: "POST", body: req });
 }
 
 export function importCredentials(
