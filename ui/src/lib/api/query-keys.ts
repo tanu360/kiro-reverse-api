@@ -46,6 +46,7 @@ export const queryKeys = {
     thinking: () => ["settings", "thinking"] as const,
     modelMappings: () => ["settings", "model-mappings"] as const,
     endpoint: () => ["settings", "endpoint"] as const,
+    upstream: () => ["settings", "upstream"] as const,
     proxy: () => ["settings", "proxy"] as const,
     promptFilter: () => ["settings", "prompt-filter"] as const,
   },

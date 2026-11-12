@@ -13,6 +13,7 @@ import type {
   RequestRecord,
   Settings,
   ThinkingConfig,
+  UpstreamConfig,
 } from "@/lib/api/types";
 import {
   buildModelMix,
@@ -58,6 +59,8 @@ export interface MockDb {
   thinking: ThinkingConfig;
   modelMappings: ModelMappingRule[];
   endpoint: EndpointConfig;
+  /** apiRegions is not stored: the handler adds it */
+  upstream: Omit<UpstreamConfig, "apiRegions">;
   proxy: ProxyConfig;
   promptFilter: PromptFilterConfig;
   startedAt: number;
@@ -142,7 +145,13 @@ const REMOTE_CHANGELOG = [
 /** The common fields every scenario shares. */
 function baseDb(): Pick<
   MockDb,
-  "adminPassword" | "firstRunPending" | "failedLogins" | "version" | "remoteVersion" | "pending"
+  | "adminPassword"
+  | "firstRunPending"
+  | "failedLogins"
+  | "version"
+  | "remoteVersion"
+  | "pending"
+  | "upstream"
 > {
   return {
     adminPassword: mockAdminPassword(),
@@ -152,6 +161,7 @@ function baseDb(): Pick<
     // Same as the running version: no update notice in tests, screenshots or axe runs.
     remoteVersion: { version: "2.1.0", changelog: "" },
     pending: { iam: {}, microsoft: {}, builderId: {} },
+    upstream: { apiDomain: "amazonaws", authRegion: "", apiRegion: "" },
   };
 }
 

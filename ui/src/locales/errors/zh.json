@@ -27,6 +27,7 @@
   "serverError.profileArnInvalid": "Kiro Profile ARN 无效。",
   "serverError.proxyUrlScheme": "代理地址必须以 http://、https://、socks5:// 或 socks5h:// 开头。",
   "serverError.invalidEndpoint": "请选择端点：auto、kiro、codewhisperer 或 amazonq。",
+  "serverError.invalidApiDomain": "请选择 API 域名：amazonaws 或 kiro。",
   "serverError.apiKeyExists": "该 API Key 已存在。",
   "serverError.apiKeyCollision": "该 API Key 值已被其他 API Key 使用。",
   "serverError.tokenLimitNegative": "Token 限额必须大于或等于 0。",

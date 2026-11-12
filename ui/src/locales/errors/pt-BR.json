@@ -27,6 +27,7 @@
   "serverError.profileArnInvalid": "O ARN do perfil do Kiro não é válido.",
   "serverError.proxyUrlScheme": "A URL do proxy deve começar com http://, https://, socks5:// ou socks5h://.",
   "serverError.invalidEndpoint": "Escolha um endpoint: auto, kiro, codewhisperer ou amazonq.",
+  "serverError.invalidApiDomain": "Escolha um domínio de API: amazonaws ou kiro.",
   "serverError.apiKeyExists": "Esta chave de API já existe.",
   "serverError.apiKeyCollision": "Este valor de chave de API já é usado por outra chave.",
   "serverError.tokenLimitNegative": "O limite de tokens deve ser 0 ou mais.",

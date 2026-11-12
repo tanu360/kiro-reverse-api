@@ -27,6 +27,7 @@
   "serverError.profileArnInvalid": "ARN của Kiro profile không hợp lệ.",
   "serverError.proxyUrlScheme": "URL proxy phải bắt đầu bằng http://, https://, socks5:// hoặc socks5h://.",
   "serverError.invalidEndpoint": "Chọn một endpoint: auto, kiro, codewhisperer hoặc amazonq.",
+  "serverError.invalidApiDomain": "Chọn một tên miền API: amazonaws hoặc kiro.",
   "serverError.apiKeyExists": "API key này đã tồn tại.",
   "serverError.apiKeyCollision": "Giá trị API key này đã được một key khác sử dụng.",
   "serverError.tokenLimitNegative": "Giới hạn token phải từ 0 trở lên.",

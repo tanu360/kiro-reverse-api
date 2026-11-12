@@ -42,6 +42,7 @@ import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "./sections/sections";
 import { StreamIntegrityCard } from "./sections/stream-integrity-card";
 import { ThinkingCard } from "./sections/thinking-card";
 import { ToolHistoryCard } from "./sections/tool-history-card";
+import { UpstreamCard } from "./sections/upstream-card";
 import { UsageCard } from "./sections/usage-card";
 
 type SectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
@@ -380,6 +381,7 @@ function SettingsContent(): JSX.Element {
           <ThinkingCard />
           <ModelMappingsCard />
           <EndpointCard />
+          <UpstreamCard />
           <AdminPasswordCard />
           <OutboundProxyCard />
           <PromptFilterCard />

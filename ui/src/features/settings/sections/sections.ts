@@ -6,6 +6,7 @@ import {
   Coins01Icon,
   FilterHorizontalIcon,
   GlobalIcon,
+  Location01Icon,
   LockPasswordIcon,
   RepeatIcon,
   Route02Icon,
@@ -36,6 +37,7 @@ export const SETTINGS_SECTIONS = [
     group: "models",
   },
   { id: "settings-endpoint", titleKey: "endpointSettings", icon: CloudServerIcon, group: "server" },
+  { id: "settings-upstream", titleKey: "upstream.title", icon: Location01Icon, group: "server" },
   {
     id: "settings-admin-password",
     titleKey: "adminPassword",
@@ -76,6 +78,7 @@ export const SECTION_ID = {
   thinking: "settings-thinking",
   modelMappings: "settings-model-mappings",
   endpoint: "settings-endpoint",
+  upstream: "settings-upstream",
   adminPassword: "settings-admin-password",
   outboundProxy: "settings-outbound-proxy",
   promptFilter: "settings-prompt-filter",
