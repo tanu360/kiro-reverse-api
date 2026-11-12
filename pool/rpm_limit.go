@@ -100,6 +100,14 @@ func (p *AccountPool) AtRPMLimit() map[string]bool {
 // An account that is also cooling down or out of credits does not count, since
 // the limit ending would not free it.
 func (p *AccountPool) BlockedByRPMLimit(model string) bool {
+	return p.BlockedByRPMLimitAllowed(model, nil)
+}
+
+// BlockedByRPMLimitAllowed is BlockedByRPMLimit for one client API key: only
+// the accounts in allowed count, and nil allowed means every account. A bound
+// key whose own accounts are cooling down is not blocked by the limit, even
+// when unbound accounts are at it.
+func (p *AccountPool) BlockedByRPMLimitAllowed(model string, allowed map[string]bool) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if config.GetAccountRPMLimit() <= 0 {
@@ -115,6 +123,9 @@ func (p *AccountPool) BlockedByRPMLimit(model string) bool {
 			continue
 		}
 		seen[acc.ID] = true
+		if allowed != nil && !allowed[acc.ID] {
+			continue
+		}
 		if p.eligibleLocked(acc, model, nil, now, allowOverUsage) && p.rpmLimitedLocked(acc.ID) {
 			return true
 		}

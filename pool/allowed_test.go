@@ -146,3 +146,26 @@ func TestAllowedOffersModel(t *testing.T) {
 		t.Fatal("nil allowlist asks the whole pool")
 	}
 }
+
+func TestAllowedKnowsModel(t *testing.T) {
+	p := newTestPool(config.Account{ID: "a"}, config.Account{ID: "b"})
+	p.SetModelList("a", []string{"claude-haiku-4.5", "claude-opus-4.5"})
+	p.SetModelList("b", []string{"claude-haiku-4.5"})
+
+	if p.AllowedKnowsModel(AllowedSet([]string{"b"}), "claude-opus-4.5") {
+		t.Fatal("only a, outside the list, offers claude-opus-4.5: want unknown for this key (404)")
+	}
+	if !p.AllowedKnowsModel(AllowedSet([]string{"b"}), "claude-haiku-4.5") {
+		t.Fatal("b lists claude-haiku-4.5")
+	}
+	// None of the key's accounts is in the pool: a capacity problem, not an unknown model.
+	if !p.AllowedKnowsModel(AllowedSet([]string{"gone"}), "claude-opus-4.5") {
+		t.Fatal("an allowlist with no pooled account must not blame the model")
+	}
+	if !p.AllowedKnowsModel(AllowedSet([]string{"b"}), "") {
+		t.Fatal("an empty model is never unknown")
+	}
+	if !p.AllowedKnowsModel(nil, "claude-opus-4.5") {
+		t.Fatal("nil allowlist asks the whole pool")
+	}
+}

@@ -1,6 +1,10 @@
 package pool
 
-import "kiro-proxy/config"
+import (
+	"strings"
+
+	"kiro-proxy/config"
+)
 
 // Account allowlists: a client API key may be bound to some accounts, and its
 // requests must never land on any other. The pickers below turn every account
@@ -104,4 +108,39 @@ func (p *AccountPool) AllowedOffersModel(allowed map[string]bool, model string) 
 		}
 	}
 	return false
+}
+
+// AllowedKnowsModel is the model check behind a "no account" error for one
+// key. Like OffersModel it answers true when none of the key's accounts is in
+// the pool (all disabled or removed), so that request gets a capacity error
+// (503), not 404. Otherwise it is AllowedOffersModel: a model none of the
+// key's accounts lists is unknown to this key, even when other accounts serve
+// it, matching what its /v1/models shows.
+func (p *AccountPool) AllowedKnowsModel(allowed map[string]bool, model string) bool {
+	if allowed == nil {
+		return p.OffersModel(model)
+	}
+	if strings.TrimSpace(model) == "" {
+		return true
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	pooled := false
+	for _, id := range p.enabledIDs {
+		if allowed[id] {
+			pooled = true
+			if p.accountHasModel(id, model) {
+				return true
+			}
+		}
+	}
+	for i := range p.accounts {
+		if id := p.accounts[i].ID; allowed[id] {
+			pooled = true
+			if p.accountHasModel(id, model) {
+				return true
+			}
+		}
+	}
+	return !pooled
 }

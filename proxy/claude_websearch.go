@@ -361,7 +361,7 @@ func (h *Handler) handleClaudeDirectWebSearch(w http.ResponseWriter, r *http.Req
 		status, errType, message := http.StatusBadGateway, "api_error", err.Error()
 		if errors.Is(err, errNoWebSearchAccounts) {
 			//! No account was tried: 404, 429 (RPM limit) or 503, the same answer as a chat request.
-			status, errType, message = h.noAccountError(model, "api_error")
+			status, errType, message = h.noAccountError(r.Context(), model, "api_error")
 		}
 		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, status, message)
 		h.sendClaudeError(w, status, errType, "Web search failed: "+message)
@@ -412,7 +412,7 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 			status, errType, message := http.StatusInternalServerError, "api_error", err.Error()
 			if errors.Is(err, errNoClaudeAccounts) {
 				//! Same answer as the plain Claude path, so clients see one message for an empty pool or unknown model.
-				status, errType, message = h.noAccountError(req.Model, "api_error")
+				status, errType, message = h.noAccountError(ctx, req.Model, "api_error")
 			}
 			finish(false, status, message)
 			h.sendClaudeError(w, status, errType, message)

@@ -243,7 +243,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 	}
 
 	if lastErr == nil {
-		status, errType, message := h.noAccountError(model, "server_error")
+		status, errType, message := h.noAccountError(ctx, model, "server_error")
 		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
 		h.sendOpenAIError(w, status, errType, message)
 		return
@@ -692,7 +692,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 	}
 
 	if lastErr == nil {
-		status, errType, message := h.noAccountError(model, "server_error")
+		status, errType, message := h.noAccountError(ctx, model, "server_error")
 		recordFinalRequestForApiKey(ctx, apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
 		h.sendOpenAIError(w, status, errType, message)
 		return

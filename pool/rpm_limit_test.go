@@ -218,6 +218,22 @@ func TestBlockedByRPMLimitOnlyWhenRPMIsTheReason(t *testing.T) {
 	}
 }
 
+func TestBlockedByRPMLimitAllowedCountsOnlyTheKeysAccounts(t *testing.T) {
+	setRPMLimitForTest(t, 1)
+	p := newTestPool(config.Account{ID: "a"}, config.Account{ID: "b"})
+	p.GetNextForModelAllowed("", nil, map[string]bool{"a": true})
+	p.cooldowns["b"] = time.Now().Add(time.Hour)
+	if !p.BlockedByRPMLimitAllowed("", nil) {
+		t.Fatal("unbound: BlockedByRPMLimitAllowed = false, want true (a is at the limit)")
+	}
+	if p.BlockedByRPMLimitAllowed("", map[string]bool{"b": true}) {
+		t.Fatal("key bound to b: BlockedByRPMLimitAllowed = true, want false (b cools down, a is not its account)")
+	}
+	if !p.BlockedByRPMLimitAllowed("", map[string]bool{"a": true}) {
+		t.Fatal("key bound to a: BlockedByRPMLimitAllowed = false, want true")
+	}
+}
+
 func TestRPMLimitConcurrentPicksNeverExceed(t *testing.T) {
 	const limit = 7
 	setRPMLimitForTest(t, limit)

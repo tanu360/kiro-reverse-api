@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -57,7 +58,7 @@ func TestKnownModelOnBusyPoolStaysUnavailable(t *testing.T) {
 	})
 	h.pool.SetModelList("responses-account", []string{"claude-sonnet-4.5"})
 	t.Cleanup(func() { h.pool.SetModelList("responses-account", nil) })
-	status, errType, _ := h.noAccountError("claude-sonnet-4.5", "server_error")
+	status, errType, _ := h.noAccountError(context.Background(), "claude-sonnet-4.5", "server_error")
 	if status != http.StatusServiceUnavailable || errType != "server_error" {
 		t.Fatalf("noAccountError(known) = %d %s, want 503 server_error", status, errType)
 	}
