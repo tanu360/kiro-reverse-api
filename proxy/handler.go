@@ -258,8 +258,7 @@ func NewHandler() *Handler {
 }
 
 func (h *Handler) backgroundRefresh() {
-	go h.rescheduleOnConfigEvents(h.stopRefresh)
-	h.usageRefresh.run(h.stopRefresh, usageRefreshStartDelay, h.housekeepingSweep())
+	h.runHousekeeping(h.stopRefresh)
 }
 
 // refreshAllAccounts is the account half of the housekeeping sweep; every is the

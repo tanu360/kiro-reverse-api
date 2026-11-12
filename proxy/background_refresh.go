@@ -11,9 +11,11 @@ import (
 // waits, so it does not compete with the listener coming up.
 const usageRefreshStartDelay = 10 * time.Second
 
-// modelsRefreshFloor is the least time between two models listings from the
-// housekeeping sweep, however short the usage interval is.
-const modelsRefreshFloor = 30 * time.Minute
+// modelsListEvery is how often the background models listing runs. It keeps
+// this fixed cadence whatever the usage interval is, Off included: the
+// per-account lists it fills steer model-aware account selection and live only
+// in memory.
+const modelsListEvery = 30 * time.Minute
 
 // tokenExpiresBeforeNextSweep reports whether the account's access token runs
 // out (within the usual skew) before the next sweep, which starts `every` after this one.

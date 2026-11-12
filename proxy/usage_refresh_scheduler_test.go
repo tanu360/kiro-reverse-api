@@ -370,3 +370,172 @@ func TestRefreshSchedulerLogsIntervalChanges(t *testing.T) {
 		t.Errorf("logged the 5m change %d times, want 1:\n%s", n, out)
 	}
 }
+
+// housekeepingRig runs runHousekeepingJobs over a settable usage interval and
+// records when each job starts. Use it only inside a synctest bubble.
+type housekeepingRig struct {
+	t        *testing.T
+	start    time.Time
+	interval atomic.Int64
+	usage    *refreshScheduler
+	takes    time.Duration // how long each job lasts on the fake clock
+
+	mu       sync.Mutex
+	listings []time.Duration
+	sweeps   []time.Duration
+	inFlight int
+	overlap  bool
+
+	stop chan struct{}
+	done chan struct{}
+}
+
+func startHousekeepingRig(t *testing.T, interval, takes time.Duration) *housekeepingRig {
+	t.Helper()
+	r := &housekeepingRig{t: t, start: time.Now(), takes: takes, stop: make(chan struct{}), done: make(chan struct{})}
+	r.interval.Store(int64(interval))
+	r.usage = newRefreshScheduler(func() time.Duration { return time.Duration(r.interval.Load()) })
+	go func() {
+		defer close(r.done)
+		runHousekeepingJobs(r.stop, r.usage,
+			func() { r.job(&r.listings) },
+			func(time.Duration) { r.job(&r.sweeps) })
+	}()
+	synctest.Wait()
+	return r
+}
+
+func (r *housekeepingRig) job(starts *[]time.Duration) {
+	r.mu.Lock()
+	*starts = append(*starts, time.Since(r.start))
+	r.inFlight++
+	if r.inFlight > 1 {
+		r.overlap = true
+	}
+	r.mu.Unlock()
+
+	time.Sleep(r.takes)
+
+	r.mu.Lock()
+	r.inFlight--
+	r.mu.Unlock()
+}
+
+func (r *housekeepingRig) set(interval time.Duration) {
+	r.interval.Store(int64(interval))
+	r.usage.Reschedule()
+	synctest.Wait()
+}
+
+func (r *housekeepingRig) at(offset time.Duration) {
+	r.t.Helper()
+	time.Sleep(offset - time.Since(r.start))
+	synctest.Wait()
+}
+
+func (r *housekeepingRig) counts() (listings, sweeps int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.listings), len(r.sweeps)
+}
+
+func (r *housekeepingRig) close() {
+	close(r.stop)
+	<-r.done
+}
+
+func TestHousekeepingListsModelsWhileUsageSweepIsOff(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := startHousekeepingRig(t, 0, 0)
+		defer r.close()
+
+		r.at(10 * time.Second)
+		if l, s := r.counts(); l != 1 || s != 0 {
+			t.Fatalf("at boot: %d listings, %d sweeps; want the boot listing and no sweep", l, s)
+		}
+		r.at(10*time.Second + 2*time.Hour)
+		if l, s := r.counts(); l != 5 || s != 0 {
+			t.Fatalf("after 2h off: %d listings, %d sweeps; want 5 listings, no sweep", l, s)
+		}
+	})
+}
+
+func TestHousekeepingListsModelsEveryThirtyMinutesWhateverTheInterval(t *testing.T) {
+	for _, interval := range []time.Duration{5 * time.Minute, 30 * time.Minute, 24 * time.Hour} {
+		t.Run(shortInterval(interval), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				r := startHousekeepingRig(t, interval, 0)
+				defer r.close()
+
+				r.at(10*time.Second + 2*time.Hour)
+				r.mu.Lock()
+				defer r.mu.Unlock()
+				want := []time.Duration{10 * time.Second}
+				for i := 1; i <= 4; i++ {
+					want = append(want, 10*time.Second+time.Duration(i)*modelsListEvery)
+				}
+				if len(r.listings) != len(want) {
+					t.Fatalf("listings at %v, want %v", r.listings, want)
+				}
+				for i := range want {
+					if r.listings[i] != want[i] {
+						t.Fatalf("listings at %v, want %v", r.listings, want)
+					}
+				}
+				if wantSweeps := 1 + int(2*time.Hour/interval); len(r.sweeps) != wantSweeps {
+					t.Fatalf("%d usage sweeps, want %d", len(r.sweeps), wantSweeps)
+				}
+			})
+		})
+	}
+}
+
+func TestHousekeepingIntervalChangeLeavesModelsListingAlone(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := startHousekeepingRig(t, 30*time.Minute, 0)
+		defer r.close()
+
+		r.at(10*time.Second + 5*time.Minute)
+		r.set(0)
+		r.set(5 * time.Minute) // overdue: sweeps at once
+		r.set(0)
+		r.at(10*time.Second + 30*time.Minute)
+		if l, s := r.counts(); l != 2 || s != 2 {
+			t.Fatalf("%d listings, %d sweeps; want 2 listings (boot, +30m) and 2 sweeps (boot, on again)", l, s)
+		}
+	})
+}
+
+func TestHousekeepingJobsNeverOverlap(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Both jobs are due at boot, and each lasts a minute.
+		r := startHousekeepingRig(t, 5*time.Minute, time.Minute)
+		defer r.close()
+
+		r.at(10*time.Second + 2*time.Hour)
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.overlap {
+			t.Fatal("the models listing and the usage sweep ran at the same time")
+		}
+		if len(r.listings) < 4 || len(r.sweeps) < 15 {
+			t.Fatalf("%d listings, %d sweeps; both jobs should keep running", len(r.listings), len(r.sweeps))
+		}
+	})
+}
+
+func TestHousekeepingJobWaitingForItsTurnGivesUpOnStop(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Both jobs are due at boot and each lasts an hour, so one waits.
+		r := startHousekeepingRig(t, 5*time.Minute, time.Hour)
+
+		r.at(20 * time.Second)
+		if l, s := r.counts(); l+s != 1 {
+			t.Fatalf("%d listings, %d sweeps after boot; want exactly one job running", l, s)
+		}
+		r.close()
+		if l, s := r.counts(); l+s != 1 {
+			t.Fatalf("%d listings, %d sweeps after stop; the waiting job must not start", l, s)
+		}
+	})
+}

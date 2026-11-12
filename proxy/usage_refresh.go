@@ -40,31 +40,62 @@ func (h *Handler) applyUsageRefreshInterval(w http.ResponseWriter, minutes *int)
 	return true
 }
 
-// housekeepingSweep returns the sweep the scheduler runs: the models list, then
-// every account's usage and tokens.
-func (h *Handler) housekeepingSweep() func(every time.Duration) {
-	var modelsListedAt time.Time
-	return func(every time.Duration) {
-		h.modelsCacheMu.RLock()
-		cachedAt := h.modelsCacheTime
-		h.modelsCacheMu.RUnlock()
-		if now := time.Now(); modelsListDue(now, modelsListedAt, cachedAt) {
-			modelsListedAt = now
-			h.refreshModelsCache()
-		}
-		h.refreshAllAccounts(every)
-	}
+// runHousekeeping runs the background jobs until stop is closed: the models
+// listing on its fixed cadence and the usage sweep on the admin's interval.
+func (h *Handler) runHousekeeping(stop <-chan struct{}) {
+	go h.rescheduleOnConfigEvents(stop)
+	runHousekeepingJobs(stop, h.usageRefresh, h.refreshModelsCache, h.refreshAllAccounts)
 }
 
-// modelsListDue reports whether a sweep should list models again. The list
-// rarely changes, so a 5-minute usage interval must not list models every 5
-// minutes: it is listed when both the last attempt and the cached list (which
-// /v1/models and the admin page also fill) are at least modelsRefreshFloor old.
-func modelsListDue(now, lastAttempt time.Time, cachedAt int64) bool {
-	if !lastAttempt.IsZero() && now.Sub(lastAttempt) < modelsRefreshFloor {
-		return false
+// runHousekeepingJobs lists models usageRefreshStartDelay after start and then
+// every modelsListEvery, beside the usage scheduler, until stop is closed. The
+// two jobs take turns, so they never talk to upstream at the same time (both
+// are due together at boot), as when they ran in one loop.
+func runHousekeepingJobs(stop <-chan struct{}, usage *refreshScheduler, listModels func(), refreshUsage func(every time.Duration)) {
+	//! The models listing must not follow the usage interval. It is what calls
+	//! pool.SetModelList, and an account with no list is treated as offering every
+	//! model, so with the sweep Off a restart left free accounts picked for Pro-only
+	//! models. A long interval also kept an upgraded account's old list for hours.
+	//
+	// A one-slot channel rather than a sync.Mutex: a job waiting for its turn
+	// gives up when stop closes, and synctest counts a goroutine blocked on a
+	// channel (unlike one blocked on a mutex) as idle, so the fake clock moves.
+	turn := make(chan struct{}, 1)
+	inTurn := func(job func()) {
+		select {
+		case turn <- struct{}{}:
+		case <-stop:
+			return
+		}
+		defer func() { <-turn }()
+		job()
 	}
-	return now.Unix()-cachedAt >= int64(modelsRefreshFloor.Seconds())
+
+	listed := make(chan struct{})
+	go func() {
+		defer close(listed)
+		runEvery(stop, usageRefreshStartDelay, modelsListEvery, func() { inTurn(listModels) })
+	}()
+	usage.run(stop, usageRefreshStartDelay, func(every time.Duration) {
+		inTurn(func() { refreshUsage(every) })
+	})
+	<-listed
+}
+
+// runEvery calls job startDelay after it starts, then every `every` after the
+// previous call ended, until stop is closed.
+func runEvery(stop <-chan struct{}, startDelay, every time.Duration, job func()) {
+	timer := time.NewTimer(startDelay)
+	defer timer.Stop()
+	for {
+		select {
+		case <-timer.C:
+			job()
+			timer.Reset(every)
+		case <-stop:
+			return
+		}
+	}
 }
 
 // rescheduleOnConfigEvents pokes the sweep loop whenever the stored interval

@@ -159,25 +159,3 @@ func TestUsageInfoFreshUsesHalfInterval(t *testing.T) {
 		}
 	}
 }
-
-func TestModelsListDueKeepsThirtyMinuteFloor(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	cases := []struct {
-		name        string
-		lastAttempt time.Time
-		cachedAt    int64
-		want        bool
-	}{
-		{"never listed", time.Time{}, 0, true},
-		{"listed 5 minutes ago", now.Add(-5 * time.Minute), now.Add(-5 * time.Minute).Unix(), false},
-		{"attempt failed 5 minutes ago, cache empty", now.Add(-5 * time.Minute), 0, false},
-		{"/v1/models filled the cache 10 minutes ago", time.Time{}, now.Add(-10 * time.Minute).Unix(), false},
-		{"both 30 minutes old", now.Add(-30 * time.Minute), now.Add(-30 * time.Minute).Unix(), true},
-		{"attempt old, cache recent", now.Add(-time.Hour), now.Add(-time.Minute).Unix(), false},
-	}
-	for _, c := range cases {
-		if got := modelsListDue(now, c.lastAttempt, c.cachedAt); got != c.want {
-			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
-		}
-	}
-}
