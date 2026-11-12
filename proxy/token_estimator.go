@@ -25,6 +25,9 @@ func estimateImageDataTokens(data string) int {
 	if w <= 0 || h <= 0 {
 		return maxImageTokens
 	}
+	if lim, on := currentImageResizeLimits(); on {
+		w, h = fitWithin(w, h, lim.maxDim)
+	}
 	tokens := int(math.Ceil(float64(w) * float64(h) / 750))
 	return min(max(tokens, 1), maxImageTokens)
 }

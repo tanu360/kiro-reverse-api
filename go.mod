@@ -6,6 +6,7 @@ ignore ./ui/node_modules
 
 require (
 	github.com/google/uuid v1.6.0
+	golang.org/x/image v0.44.0
 	modernc.org/sqlite v1.50.1
 )
 

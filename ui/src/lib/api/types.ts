@@ -63,6 +63,8 @@ export type ServerErrorCode =
   | "log_retention_range"
   | "routing_mode_invalid"
   | "priority_range"
+  | "image_resize_dimension_range"
+  | "image_resize_size_range"
   | "password_too_short"
   | "invalid_endpoint"
   | "invalid_api_domain"
@@ -985,6 +987,12 @@ export interface Settings {
   structuredToolHistory: boolean;
   /** minutes between background usage sweeps: 0 = off, else 5..1440; default 30 */
   usageRefreshIntervalMinutes: number;
+  /** default true */
+  imageResize: boolean;
+  /** longest side in px, 256..4096, default 1568 */
+  imageResizeMaxDimension: number;
+  /** decoded file size in KB, 50..4096, default 400 */
+  imageResizeMaxKB: number;
 }
 export interface SettingsPatch {
   requireApiKey?: boolean;
@@ -1000,6 +1008,11 @@ export interface SettingsPatch {
   structuredToolHistory?: boolean;
   /** integer: 0 (off) or 5..1440 */
   usageRefreshIntervalMinutes?: number;
+  imageResize?: boolean;
+  /** integer 256..4096 */
+  imageResizeMaxDimension?: number;
+  /** integer 50..4096 */
+  imageResizeMaxKB?: number;
 }
 
 export type ThinkingFormat = "reasoning_content" | "thinking" | "think";

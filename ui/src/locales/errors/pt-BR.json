@@ -23,6 +23,8 @@
   "serverError.autoContinueMaxRange": "O máximo de continuações deve ficar entre 1 e 10.",
   "serverError.routingModeInvalid": "Escolha um modo de roteamento: ponderado ou prioridade.",
   "serverError.priorityRange": "A prioridade deve ser um número inteiro entre 0 e 999.",
+  "serverError.imageResizeDimensionRange": "A largura ou altura máxima deve ficar entre 256 e 4096 pixels.",
+  "serverError.imageResizeSizeRange": "O tamanho máximo do arquivo deve ficar entre 50 e 4096 KB.",
   "serverError.notOverageCapable": "Esta conta não pode usar excedente.",
   "serverError.apiKeyAccountNoProfile": "Contas com chave de API do Kiro não têm perfil do Kiro. A região é definida na importação.",
   "serverError.profileNotAvailable": "O perfil do Kiro selecionado não está disponível para esta conta.",

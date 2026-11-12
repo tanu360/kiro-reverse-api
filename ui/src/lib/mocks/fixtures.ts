@@ -1387,6 +1387,9 @@ export function defaultSettings(): Settings {
     autoContinueMax: 3,
     structuredToolHistory: true,
     usageRefreshIntervalMinutes: 30,
+    imageResize: true,
+    imageResizeMaxDimension: 1568,
+    imageResizeMaxKB: 400,
   };
 }
 

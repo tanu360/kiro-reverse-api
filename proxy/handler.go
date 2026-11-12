@@ -3579,6 +3579,10 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"structuredToolHistory":  config.GetStructuredToolHistory(),
 
 		"usageRefreshIntervalMinutes": config.GetUsageRefreshIntervalMinutes(),
+
+		"imageResize":             config.GetImageResize(),
+		"imageResizeMaxDimension": config.GetImageResizeMaxDimension(),
+		"imageResizeMaxKB":        config.GetImageResizeMaxKB(),
 	})
 }
 
@@ -3669,6 +3673,10 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 		UsageRefreshIntervalMinutes *int `json:"usageRefreshIntervalMinutes,omitempty"`
 		routingSettingsPatch
+
+		ImageResize             *bool `json:"imageResize,omitempty"`
+		ImageResizeMaxDimension *int  `json:"imageResizeMaxDimension,omitempty"`
+		ImageResizeMaxKB        *int  `json:"imageResizeMaxKB,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
@@ -3683,6 +3691,11 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if rejectInvalidRoutingMode(w, req.RoutingMode) {
+		return
+	}
+
+	if code, msg := validateImageResizePatch(req.ImageResizeMaxDimension, req.ImageResizeMaxKB); code != "" {
+		writeAdminError(w, http.StatusBadRequest, code, msg)
 		return
 	}
 
@@ -3761,6 +3774,12 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !h.applyUsageRefreshInterval(w, req.UsageRefreshIntervalMinutes) {
+		return
+	}
+
+	if err := applyImageResizePatch(req.ImageResize, req.ImageResizeMaxDimension, req.ImageResizeMaxKB); err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 

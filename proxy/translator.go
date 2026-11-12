@@ -330,6 +330,7 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		}
 	}
 
+	resizePayloadImages(payload)
 	limitHistoryImages(payload.ConversationState.History)
 	truncatePayloadToLimit(payload, systemPrompt != "")
 
@@ -1282,6 +1283,7 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 		}
 	}
 
+	resizePayloadImages(payload)
 	limitHistoryImages(payload.ConversationState.History)
 	truncatePayloadToLimit(payload, systemPrompt != "")
 

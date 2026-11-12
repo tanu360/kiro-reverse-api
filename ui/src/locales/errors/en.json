@@ -23,6 +23,8 @@
   "serverError.autoContinueMaxRange": "Maximum continuations must be between 1 and 10.",
   "serverError.routingModeInvalid": "Choose a routing mode: weighted or priority.",
   "serverError.priorityRange": "Priority must be a whole number between 0 and 999.",
+  "serverError.imageResizeDimensionRange": "Maximum width or height must be between 256 and 4096 pixels.",
+  "serverError.imageResizeSizeRange": "Maximum file size must be between 50 and 4096 KB.",
   "serverError.notOverageCapable": "This account cannot use overage.",
   "serverError.apiKeyAccountNoProfile": "Kiro API key accounts have no Kiro profile. Their region is set at import.",
   "serverError.profileNotAvailable": "The selected Kiro profile is not available for this account.",

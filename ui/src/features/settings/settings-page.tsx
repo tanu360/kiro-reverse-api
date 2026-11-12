@@ -36,6 +36,7 @@ import { AutoContinueCard } from "./sections/auto-continue-card";
 import { CountTokensCard } from "./sections/count-tokens-card";
 import { DangerZoneCard } from "./sections/danger-zone-card";
 import { EndpointCard } from "./sections/endpoint-card";
+import { ImageResizeCard } from "./sections/image-resize-card";
 import { LogRetentionCard } from "./sections/log-retention-card";
 import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
@@ -215,6 +216,7 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
     "settings-routing": settings?.sessionAffinity,
     "settings-auto-continue": settings?.autoContinue,
     "settings-tool-history": settings?.structuredToolHistory,
+    "settings-image-resize": settings ? settings.imageResize !== false : undefined,
     "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,
     "settings-count-tokens": countTokens ? Boolean(countTokens.countTokensApiUrl) : undefined,
   };
@@ -383,6 +385,7 @@ function SettingsContent(): JSX.Element {
           <RoutingCard />
           <AutoContinueCard />
           <ToolHistoryCard />
+          <ImageResizeCard />
           <ThinkingCard />
           <ModelMappingsCard />
           <EndpointCard />

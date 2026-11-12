@@ -27,6 +27,8 @@ function saved(): Response {
 }
 const MAX_AUTO_CONTINUE = 10;
 const MAX_LOG_RETENTION_DAYS = 3650;
+const IMAGE_RESIZE_DIMENSION = { min: 256, max: 4096 };
+const IMAGE_RESIZE_KB = { min: 50, max: 4096 };
 const MIN_PASSWORD_RUNES = 8;
 const MAX_MAPPINGS = 200;
 const MAX_MODEL_ID_BYTES = 256;
@@ -93,6 +95,7 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
     "sessionAffinity",
     "autoContinue",
     "structuredToolHistory",
+    "imageResize",
   ] as const;
   for (const key of boolKeys) {
     const value = optional(body, key, isBool);
@@ -109,10 +112,37 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
   const routingMode = optional(body, "routingMode", isString);
   if (routingMode === null) return null;
   if (routingMode !== undefined) patch.routingMode = routingMode as RoutingMode;
+  const maxDimension = optional(body, "imageResizeMaxDimension", isInteger);
+  if (maxDimension === null) return null;
+  if (maxDimension !== undefined) patch.imageResizeMaxDimension = maxDimension;
+  const maxKB = optional(body, "imageResizeMaxKB", isInteger);
+  if (maxKB === null) return null;
+  if (maxKB !== undefined) patch.imageResizeMaxKB = maxKB;
   const password = optional(body, "password", isString);
   if (password === null) return null;
   if (password !== undefined) patch.password = password;
   return patch;
+}
+
+/** Go's validateImageResizePatch (proxy/admin_image_resize.go): dimension first, then size. */
+function imageResizeRangeError(patch: SettingsPatch): Response | null {
+  const dim = patch.imageResizeMaxDimension;
+  if (dim !== undefined && (dim < IMAGE_RESIZE_DIMENSION.min || dim > IMAGE_RESIZE_DIMENSION.max)) {
+    return jsonError(
+      400,
+      `imageResizeMaxDimension must be between ${IMAGE_RESIZE_DIMENSION.min} and ${IMAGE_RESIZE_DIMENSION.max}`,
+      { code: "image_resize_dimension_range" },
+    );
+  }
+  const kb = patch.imageResizeMaxKB;
+  if (kb !== undefined && (kb < IMAGE_RESIZE_KB.min || kb > IMAGE_RESIZE_KB.max)) {
+    return jsonError(
+      400,
+      `imageResizeMaxKB must be between ${IMAGE_RESIZE_KB.min} and ${IMAGE_RESIZE_KB.max}`,
+      { code: "image_resize_size_range" },
+    );
+  }
+  return null;
 }
 
 function validateModelId(id: string): { error: string; code: string } | null {
@@ -282,6 +312,8 @@ export const handlers: HttpHandler[] = [
         code: "routing_mode_invalid",
       });
     }
+    const resizeError = imageResizeRangeError(patch);
+    if (resizeError) return resizeError;
     if (patch.password && [...patch.password].length < MIN_PASSWORD_RUNES) {
       return jsonError(400, "Password must be at least 8 characters");
     }

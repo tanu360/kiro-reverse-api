@@ -36,6 +36,8 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   auto_continue_max_range: "errors:serverError.autoContinueMaxRange",
   routing_mode_invalid: "errors:serverError.routingModeInvalid",
   priority_range: "errors:serverError.priorityRange",
+  image_resize_dimension_range: "errors:serverError.imageResizeDimensionRange",
+  image_resize_size_range: "errors:serverError.imageResizeSizeRange",
   password_too_short: "errors:serverError.passwordTooShort",
   invalid_endpoint: "errors:serverError.invalidEndpoint",
   invalid_api_domain: "errors:serverError.invalidApiDomain",
