@@ -114,7 +114,9 @@ func (p *AccountPool) HealView(now time.Time) HealView {
 			continue
 		}
 		seen[acc.ID] = true
-		if p.canServeLocked(acc, "", nil, now, allowOverUsage) {
+		//! eligibleLocked, not canServeLocked: an account held only by the RPM limit is healthy,
+		//! and the RPM check writes its state, which this read lock does not allow.
+		if p.eligibleLocked(acc, "", nil, now, allowOverUsage) {
 			view.Servable = true
 			continue
 		}
