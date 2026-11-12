@@ -16,6 +16,13 @@ describe("normalizeTag / normalizeTags", () => {
     expect([...normalizeTag("🙂".repeat(MAX_TAG_LENGTH + 1))]).toHaveLength(MAX_TAG_LENGTH);
   });
 
+  it("turns the separators the tag field splits on into spaces, as the server does", () => {
+    expect(normalizeTag("eu,west")).toBe("eu west");
+    expect(normalizeTag("東京、大阪")).toBe("東京 大阪");
+    expect(normalizeTag("a，b")).toBe("a b");
+    expect(normalizeTag(" , ")).toBe("");
+  });
+
   it("drops empty tags and duplicates in any case, keeping the first spelling and MAX_TAGS", () => {
     expect(normalizeTags(["Team-A", " team-a ", "", "backup"])).toEqual(["Team-A", "backup"]);
     const many = Array.from({ length: MAX_TAGS + 2 }, (_, i) => `t${i}`);

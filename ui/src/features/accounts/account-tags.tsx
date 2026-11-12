@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * An account's tags as small neutral pills (emails in them masked under privacy). The first
  * `max` show; the rest fold into a "+N" pill whose tooltip, and screen reader text, lists them.
  * A long tag is cut with an ellipsis. `wrap` lets the pills wrap where the row has room to grow
- * (the detail sheet); a list row keeps them on one line.
+ * (the detail sheet); a list row keeps them on one line, clipped at the row's edge.
  */
 export function TagBadges({
   tags,
@@ -28,7 +28,11 @@ export function TagBadges({
   const rest = tags.slice(max).map((tag) => mask(tag));
   return (
     <span
-      className={cn("flex min-w-0 shrink-0 items-center gap-1", wrap && "shrink flex-wrap")}
+      // A list row clips the pills at its cell edge instead of letting them spill over.
+      className={cn(
+        "flex min-w-0 shrink items-center gap-1",
+        wrap ? "flex-wrap" : "overflow-hidden",
+      )}
       data-slot="account-tags"
     >
       {shown.map((tag) => (

@@ -10,15 +10,23 @@ export const MAX_TAGS = 10;
 /** A tag is cut at this many characters (code points, as the server counts runes). */
 export const MAX_TAG_LENGTH = 24;
 
-/** Commas separate tags; the CJK full-width comma and the enumeration comma count too. */
+/**
+ * Commas separate tags; the CJK full-width comma and the enumeration comma count too. The
+ * server (isAccountTagSeparator) turns them into spaces, so no stored tag holds one.
+ */
 const TAG_SEPARATOR = /[,，、]/;
+const TAG_SEPARATORS = /[,，、]/g;
 
-/** Control characters go (a newline or tab becomes a space), whitespace runs collapse. */
+/**
+ * Control characters go (a newline or tab becomes a space), a separator becomes a space,
+ * whitespace runs collapse.
+ */
 function cleanTag(raw: string): string {
   return (
     raw
       // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it strips.
       .replace(/[\u0000-\u001f\u007f-\u009f]/g, (char) => (/\s/.test(char) ? " " : ""))
+      .replace(TAG_SEPARATORS, " ")
       .replace(/\s+/g, " ")
       .trim()
   );

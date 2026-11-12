@@ -1372,16 +1372,17 @@ export function makeExport(accounts: Account[]): ExportData {
   };
 }
 
-/** Every tag once (ignoring case), sorted, as {id, name} with the name as the id (Go exportTagObjects). */
+/**
+ * Every exact tag spelling once, sorted ignoring case, as {id, name} with the name as the id
+ * (Go exportTagObjects), so every account's tag ids resolve.
+ */
 function exportTags(accounts: Account[]): { id: string; name: string }[] {
-  const byKey = new Map<string, string>();
+  const names = new Set<string>();
   for (const account of accounts) {
-    for (const tag of account.tags) {
-      if (!byKey.has(tag.toLowerCase())) byKey.set(tag.toLowerCase(), tag);
-    }
+    for (const tag of account.tags) names.add(tag);
   }
-  return [...byKey.values()]
-    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+  return [...names]
+    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()) || (a < b ? -1 : a > b ? 1 : 0))
     .map((name) => ({ id: name, name }));
 }
 

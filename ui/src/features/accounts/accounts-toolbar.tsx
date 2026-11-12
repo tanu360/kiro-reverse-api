@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { useMaskText } from "@/lib/privacy";
 import {
   ACCOUNT_SORTS,
   type AccountSort,
@@ -54,12 +55,23 @@ const SELECT_DIMENSIONS: readonly FilterSelectDimension[] = [
 /** The radio value of "All" in a select, and of the All tab. */
 const ALL = "all";
 
-/** One filter as "Label: Value ▾", with All and each value (and its count) in the menu. */
+/**
+ * A select's option values carry this prefix in the menu, so a value that reads "all" (a tag
+ * named All) never collides with the All row.
+ */
+const OPTION_PREFIX = "=";
+
+/**
+ * One filter as "Label: Value ▾", with All and each value (and its count) in the menu. With
+ * `masked` (tags, which an operator types freely), emails in the labels are masked under
+ * privacy, as the tag badges are.
+ */
 function FilterSelect({
   label,
   options,
   value,
   total,
+  masked = false,
   onValueChange,
 }: {
   label: string;
@@ -68,21 +80,26 @@ function FilterSelect({
   value: string | undefined;
   /** The count next to All. */
   total: number;
+  masked?: boolean;
   onValueChange: (value: string | undefined) => void;
 }): JSX.Element {
   const { t, lang } = useT("accounts");
+  const mask = useMaskText();
+  const show = (text: string) => (masked ? mask(text) : text);
   const current =
     value === undefined
       ? t("filter.all")
-      : (options.find((option) => option.value === value)?.label ?? value);
+      : show(options.find((option) => option.value === value)?.label ?? value);
   // Each row shows its count; a pick closes the menu, as in a select.
   return (
     <Menu>
       <FilterTrigger label={label} value={current} />
       <MenuPopup align="start">
         <MenuRadioGroup
-          onValueChange={(next) => onValueChange(next === ALL ? undefined : String(next))}
-          value={value ?? ALL}
+          onValueChange={(next) =>
+            onValueChange(next === ALL ? undefined : String(next).slice(OPTION_PREFIX.length))
+          }
+          value={value === undefined ? ALL : OPTION_PREFIX + value}
         >
           <MenuRadioItem closeOnClick meta={formatNumber(total, lang)} value={ALL}>
             {t("filter.all")}
@@ -93,9 +110,9 @@ function FilterSelect({
               closeOnClick
               key={option.value}
               meta={formatNumber(option.count, lang)}
-              value={option.value}
+              value={OPTION_PREFIX + option.value}
             >
-              {option.label}
+              {show(option.label)}
             </MenuRadioItem>
           ))}
         </MenuRadioGroup>
@@ -292,6 +309,7 @@ export function AccountsToolbar({
                       label={
                         dimension === "tag" ? t("metadata.tagFilter") : t(`filter.dim.${dimension}`)
                       }
+                      masked={dimension === "tag"}
                       onValueChange={(value) => onFiltersChange({ [dimension]: value })}
                       options={options[dimension]}
                       total={accounts.length}

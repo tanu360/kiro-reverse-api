@@ -283,17 +283,20 @@ export function AuthAvatar({
 }
 
 /**
- * Email (masked under privacy), sign-in mark and flags, over a muted nickname and plan line with
- * the first two tags after it.
+ * Email (masked under privacy), sign-in mark and flags, over a muted nickname and plan line.
+ * With `showTags` (the accounts table) the first two tags follow that line.
  */
 export function AccountIdentity({
   account,
+  showTags = false,
   className,
 }: {
   account: Account;
+  showTags?: boolean;
   className?: string;
 }): JSX.Element {
   const { t } = useT("accounts");
+  const meta = accountMeta(account, t, !authIconNamesMethod(account));
   return (
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <div className="flex min-w-0 items-center gap-2">
@@ -301,12 +304,16 @@ export function AccountIdentity({
         <AuthIcon account={account} />
         <AccountFlags account={account} />
       </div>
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="block min-w-0 truncate text-meta text-muted-foreground leading-tight">
-          {accountMeta(account, t, !authIconNamesMethod(account))}
-        </span>
-        <TagBadges max={2} tags={account.tags} />
-      </div>
+      {showTags ? (
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="block min-w-0 truncate text-meta text-muted-foreground leading-tight">
+            {meta}
+          </span>
+          <TagBadges max={2} tags={account.tags} />
+        </div>
+      ) : (
+        <span className="block truncate text-meta text-muted-foreground leading-tight">{meta}</span>
+      )}
     </div>
   );
 }

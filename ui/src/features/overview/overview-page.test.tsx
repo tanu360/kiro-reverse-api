@@ -408,6 +408,16 @@ describe("OverviewPage", () => {
     );
   });
 
+  it("keeps tags out of the top accounts rows", async () => {
+    const first = topAccounts(mockDb.accounts)[0];
+    first.tags = ["overview-tag"];
+    await renderApp("/");
+    const card = await screen.findByRole("region", { name: "Accounts" });
+    const table = await within(card).findByRole("table", { name: "Accounts" });
+    await waitFor(() => expect(within(table).getAllByRole("row").length).toBeGreaterThan(1));
+    expect(within(table).queryByText("overview-tag")).not.toBeInTheDocument();
+  });
+
   it("masks every email with privacy on", async () => {
     await renderApp("/", { privacy: true });
     const accounts = await screen.findByRole("region", { name: "Accounts" });

@@ -100,7 +100,7 @@ export function AccountsTable({
         // size it (inline-size containment), so a long address truncates (with a tooltip)
         // instead of widening the column, and loading rows measure the same as data rows.
         cell: (account) => (
-          <AccountIdentity account={account} className="w-full contain-inline-size" />
+          <AccountIdentity account={account} className="w-full contain-inline-size" showTags />
         ),
       },
       {

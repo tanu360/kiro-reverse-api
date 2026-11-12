@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
+import { maskEmailsInText } from "@/lib/privacy";
 import { renderApp } from "@/test/render";
 
 // The whole app renders per test, and DataTable renders the rows twice (table and cards, one
@@ -476,6 +477,33 @@ describe("AccountsPage tags", () => {
     await user.click(await screen.findByRole("menuitemradio", { name: /^All/ }));
     await waitFor(() => expect(bodyRows(table)).toHaveLength(mockDb.accounts.length));
     expect(router.state.location.search).not.toHaveProperty("tag");
+  });
+
+  it("filters by a tag named All without mistaking it for the All row", async () => {
+    const { dana } = tagFixtures();
+    dana.tags = ["All"];
+    const { table, user, router } = await renderAccounts();
+    await user.click(screen.getByRole("button", { name: "Tag: All" }));
+    const rows = await screen.findAllByRole("menuitemradio", { name: /^All/ });
+    // The All row and the tag: only the All row is checked while no tag is picked.
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((row) => row.getAttribute("aria-checked") === "true")).toHaveLength(1);
+    await user.click(rows[1]);
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ tag: "all" }));
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
+  });
+
+  it("masks an email inside a tag in the Tag select under privacy", async () => {
+    const { dana } = tagFixtures();
+    dana.tags = ["ops@example.com"];
+    const masked = maskEmailsInText("ops@example.com");
+    const { user } = await renderAccounts("/accounts?tag=ops@example.com");
+    const trigger = await screen.findByRole("button", { name: `Tag: ${masked}` });
+    await user.click(trigger);
+    expect(
+      await screen.findByRole("menuitemradio", { name: (name) => name.startsWith(masked) }),
+    ).toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain("ops@example.com");
   });
 
   it("finds an account by a word of its notes", async () => {
