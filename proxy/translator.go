@@ -57,6 +57,9 @@ func ParseModelAndThinking(model string, thinkingSuffix string) (string, bool) {
 			return strings.TrimSpace(m.Value), thinking
 		}
 	}
+	if native, ok := nativeModelID(model); ok {
+		return native, thinking
+	}
 
 	for _, m := range config.GetModelMappings() {
 		key := strings.ToLower(strings.TrimSpace(m.Key))

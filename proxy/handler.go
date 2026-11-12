@@ -683,6 +683,7 @@ func (h *Handler) sweepModelsCache() {
 	if len(aggregated) > 0 {
 		h.modelsCacheMu.Lock()
 		h.cachedModels = aggregated
+		publishNativeModels(h.cachedModels)
 		h.modelsCacheTime = time.Now().Unix()
 		h.modelsCacheMu.Unlock()
 		logger.Infof("[ModelsCache] Cached %d models", len(aggregated))
@@ -705,6 +706,7 @@ func (h *Handler) fetchAndCacheAccountModels(account *config.Account) error {
 
 	h.modelsCacheMu.Lock()
 	h.cachedModels = mergeUniqueModels(h.cachedModels, models)
+	publishNativeModels(h.cachedModels)
 	h.modelsCacheTime = time.Now().Unix()
 	h.modelsCacheMu.Unlock()
 
@@ -4001,6 +4003,7 @@ func (h *Handler) apiGetAccountModels(w http.ResponseWriter, r *http.Request, id
 	h.pool.SetModelList(id, modelIDs)
 	h.modelsCacheMu.Lock()
 	h.cachedModels = mergeUniqueModels(h.cachedModels, models)
+	publishNativeModels(h.cachedModels)
 	h.modelsCacheTime = time.Now().Unix()
 	h.modelsCacheMu.Unlock()
 
