@@ -42,12 +42,56 @@ export function isMicrosoftCredential(item: CredentialSource): boolean {
   );
 }
 
-/** One Kiro Account Manager export entry: `credentials.x` wins over the entry's own `x`. */
-function fromAccountManager(entry: unknown): CredentialSource {
+/**
+ * An export's top-level `tags` list as id to name. Kiro Account Manager files give each tag a
+ * UUID id; this server's exports use the name as the id.
+ */
+function tagNames(value: unknown): Map<string, string> {
+  const names = new Map<string, string>();
+  if (!Array.isArray(value)) return names;
+  for (const tag of value) {
+    if (!isRecord(tag)) continue;
+    const id = textField(tag.id);
+    const name = textField(tag.name);
+    if (id && name) names.set(id, name);
+  }
+  return names;
+}
+
+/** An entry's tag ids as names; an id the top-level list does not know is kept as it is. */
+function entryTags(value: unknown, names: ReadonlyMap<string, string>): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((tag) => (isRecord(tag) ? textField(tag.name) : textField(tag)))
+    .map((tag) => names.get(tag) ?? tag)
+    .filter((tag) => tag.trim() !== "");
+}
+
+/** Text that may be absent: "" for anything but a string. */
+function optionalText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+/**
+ * One Kiro Account Manager export entry: `credentials.x` wins over the entry's own `x`. The
+ * nickname, notes and tags come along, with tag ids resolved through `names`.
+ */
+function fromAccountManager(
+  entry: unknown,
+  names: ReadonlyMap<string, string> = new Map(),
+): CredentialSource {
   const account = isRecord(entry) ? entry : {};
   const credentials = isRecord(account.credentials) ? account.credentials : {};
   const pick = (key: string) => textField(credentials[key]) || textField(account[key]);
+  const metadata: CredentialSource = {};
+  const nickname = optionalText(account.nickname);
+  const notes = optionalText(account.notes);
+  const tags = entryTags(account.tags, names);
+  if (nickname) metadata.nickname = nickname;
+  if (notes) metadata.notes = notes;
+  if (tags.length > 0) metadata.tags = tags;
   return {
+    ...metadata,
     refreshToken: pick("refreshToken"),
     accessToken: pick("accessToken"),
     kiroApiKey: pick("kiroApiKey"),
@@ -70,13 +114,36 @@ function fromAccountManager(entry: unknown): CredentialSource {
  */
 export function parseCredentialsJson(text: string): CredentialSource[] {
   const json: unknown = JSON.parse(text.trim());
-  if (isRecord(json) && Array.isArray(json.accounts)) return json.accounts.map(fromAccountManager);
+  if (isRecord(json) && Array.isArray(json.accounts)) {
+    const names = tagNames(json.tags);
+    return json.accounts.map((entry) => fromAccountManager(entry, names));
+  }
   const items = Array.isArray(json) ? json : [json];
   return items.map((item) => (isRecord(item) ? item : {}));
 }
 
-/** The request for one item, mapped exactly like the old admin panel did. */
+/** The nickname, notes and tags an item carries, for any import request; empty ones are left out. */
+function metadataFields(
+  item: CredentialSource,
+): Pick<CredentialsImportRequest, "nickname" | "notes" | "tags"> {
+  const fields: Pick<CredentialsImportRequest, "nickname" | "notes" | "tags"> = {};
+  const nickname = optionalText(item.nickname).trim();
+  const notes = optionalText(item.notes).trim();
+  const tags = Array.isArray(item.tags)
+    ? item.tags.map(textField).filter((tag) => tag.trim() !== "")
+    : [];
+  if (nickname) fields.nickname = nickname;
+  if (notes) fields.notes = notes;
+  if (tags.length > 0) fields.tags = tags;
+  return fields;
+}
+
+/**
+ * The request for one item, mapped exactly like the old admin panel did, plus the nickname,
+ * notes and tags it carries.
+ */
 export function mapCredential(item: CredentialSource): MappedCredential {
+  const metadata = metadataFields(item);
   const refreshToken = textField(item.refreshToken);
   const accessToken = textField(item.accessToken);
   const region = textField(item.region);
@@ -87,7 +154,10 @@ export function mapCredential(item: CredentialSource): MappedCredential {
   const apiKey =
     textField(item.kiroApiKey) || (looksLikeApiKey && !refreshToken ? accessToken : "");
   if (apiKey) {
-    return { kind: "request", payload: { kiroApiKey: apiKey, authMethod: "api_key", region } };
+    return {
+      kind: "request",
+      payload: { kiroApiKey: apiKey, authMethod: "api_key", region, ...metadata },
+    };
   }
 
   if (!refreshToken) return { kind: "missingRefreshToken" };
@@ -108,6 +178,7 @@ export function mapCredential(item: CredentialSource): MappedCredential {
         tokenEndpoint: textField(item.tokenEndpoint),
         issuerUrl: textField(item.issuerUrl),
         scopes: textField(item.scopes),
+        ...metadata,
       },
     };
   }
@@ -126,6 +197,7 @@ export function mapCredential(item: CredentialSource): MappedCredential {
       authMethod,
       provider,
       region: region || "us-east-1",
+      ...metadata,
     },
   };
 }

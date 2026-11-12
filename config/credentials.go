@@ -255,6 +255,7 @@ func UpdateCredential(acc Account) error {
 	for i := range credentials {
 		if credentials[i].ID == acc.ID {
 			preserveAccountCredentials(&acc, credentials[i])
+			preserveAccountMetadata(&acc, credentials[i])
 			credentials[i] = acc
 			return saveCredentialsLocked()
 		}

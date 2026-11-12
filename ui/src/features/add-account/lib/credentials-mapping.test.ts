@@ -2,6 +2,40 @@ import { describe, expect, it } from "vitest";
 import { isMicrosoftCredential, mapCredential, parseCredentialsJson } from "./credentials-mapping";
 
 describe("parseCredentialsJson", () => {
+  it("carries nickname, notes and tags from a Kiro Account Manager export, resolving tag ids", () => {
+    const text = JSON.stringify({
+      accounts: [
+        {
+          nickname: "Primary",
+          notes: "Owner: ops",
+          tags: ["7d0c6a8e-uuid", "kept-as-is", "", 5],
+          credentials: { refreshToken: "r1" },
+        },
+        { tags: "not-a-list", credentials: { refreshToken: "r2" } },
+      ],
+      tags: [{ id: "7d0c6a8e-uuid", name: "Team-A", color: "#fff" }, { id: "no-name" }],
+    });
+    const [first, second] = parseCredentialsJson(text);
+    expect(first).toMatchObject({
+      nickname: "Primary",
+      notes: "Owner: ops",
+      tags: ["Team-A", "kept-as-is", "5"],
+    });
+    expect(second).not.toHaveProperty("tags");
+    expect(second).not.toHaveProperty("nickname");
+
+    const mapped = mapCredential(first);
+    expect(mapped).toEqual({
+      kind: "request",
+      payload: expect.objectContaining({
+        refreshToken: "r1",
+        nickname: "Primary",
+        notes: "Owner: ops",
+        tags: ["Team-A", "kept-as-is", "5"],
+      }),
+    });
+  });
+
   it("wraps a single object in a list", () => {
     expect(parseCredentialsJson('{"refreshToken":"r1"}')).toEqual([{ refreshToken: "r1" }]);
   });
@@ -166,5 +200,23 @@ describe("mapCredential", () => {
   it("counts an item without a refresh token as failed", () => {
     expect(mapCredential({ provider: "Google" })).toEqual({ kind: "missingRefreshToken" });
     expect(mapCredential({})).toEqual({ kind: "missingRefreshToken" });
+  });
+});
+
+describe("mapCredential metadata", () => {
+  it("passes nickname, notes and tags on every kind of request, and leaves empty ones out", () => {
+    const metadata = { nickname: " Ops ", notes: "note", tags: ["a", " "] };
+    const apiKey = mapCredential({ kiroApiKey: "ksk_x", region: "us-east-1", ...metadata });
+    const microsoft = mapCredential({ refreshToken: "r", authMethod: "external_idp", ...metadata });
+    const social = mapCredential({ refreshToken: "r", ...metadata });
+    for (const mapped of [apiKey, microsoft, social]) {
+      expect(mapped).toMatchObject({
+        kind: "request",
+        payload: { nickname: "Ops", notes: "note", tags: ["a"] },
+      });
+    }
+    const bare = mapCredential({ refreshToken: "r", nickname: "", notes: "  ", tags: [] });
+    expect(bare.kind === "request" && Object.keys(bare.payload)).not.toContain("tags");
+    expect(bare.kind === "request" && Object.keys(bare.payload)).not.toContain("notes");
   });
 });

@@ -2651,6 +2651,8 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 			"email":             a.Email,
 			"userId":            a.UserId,
 			"nickname":          a.Nickname,
+			"notes":             a.Notes,
+			"tags":              tagsOrEmpty(a.Tags),
 			"authMethod":        a.AuthMethod,
 			"provider":          a.Provider,
 			"region":            a.Region,
@@ -2779,6 +2781,16 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	}
 	if existing == nil {
 		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
+		return
+	}
+	metadata, err := parseMetadataPatch(updates)
+	if err != nil {
+		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, err.Error())
+		return
+	}
+	if err := metadata.apply(id); err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -2929,6 +2941,7 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IDs    []string `json:"ids"`
 		Action string   `json:"action"`
+		Tag    string   `json:"tag"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
@@ -2948,6 +2961,8 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 		h.batchRefreshModels(w, req.IDs)
 	case "delete":
 		h.batchDelete(w, req.IDs)
+	case "addTag", "removeTag":
+		h.batchTags(w, req.IDs, req.Action == "addTag", req.Tag)
 	default:
 		w.WriteHeader(400)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid action: " + req.Action})
@@ -3410,6 +3425,9 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		UserID       string `json:"userId"`
 		ProfileArn   string `json:"profileArn"`
 
+		Notes string   `json:"notes"`
+		Tags  []string `json:"tags"`
+
 		TokenEndpoint string `json:"tokenEndpoint"`
 		IssuerURL     string `json:"issuerUrl"`
 		Scopes        string `json:"scopes"`
@@ -3433,6 +3451,8 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 			ID:         auth.GenerateAccountID(),
 			Email:      strings.TrimSpace(req.Email),
 			Nickname:   strings.TrimSpace(req.Nickname),
+			Notes:      req.Notes,
+			Tags:       req.Tags,
 			KiroApiKey: req.KiroApiKey,
 			AuthMethod: config.AuthMethodAPIKey,
 			Provider:   strings.TrimSpace(req.Provider),
@@ -3533,6 +3553,8 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		Email:         email,
 		UserId:        userID,
 		Nickname:      strings.TrimSpace(req.Nickname),
+		Notes:         req.Notes,
+		Tags:          req.Tags,
 		AccessToken:   accessToken,
 		RefreshToken:  req.RefreshToken,
 		ClientID:      req.ClientID,
@@ -4054,6 +4076,8 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		"email":             account.Email,
 		"userId":            account.UserId,
 		"nickname":          account.Nickname,
+		"notes":             account.Notes,
+		"tags":              tagsOrEmpty(account.Tags),
 		"accessToken":       account.AccessToken,
 		"refreshToken":      account.RefreshToken,
 		"kiroApiKey":        account.KiroApiKey,
@@ -4344,6 +4368,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 		ID           string             `json:"id"`
 		Email        string             `json:"email"`
 		Nickname     string             `json:"nickname,omitempty"`
+		Notes        string             `json:"notes,omitempty"`
 		Idp          string             `json:"idp"`
 		UserId       string             `json:"userId,omitempty"`
 		ProfileArn   string             `json:"profileArn,omitempty"`
@@ -4398,6 +4423,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 			ID:         a.ID,
 			Email:      a.Email,
 			Nickname:   a.Nickname,
+			Notes:      a.Notes,
 			Idp:        idp,
 			UserId:     a.UserId,
 			ProfileArn: a.ProfileArn,
@@ -4427,7 +4453,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 				PercentUsed: a.UsagePercent,
 				LastUpdated: time.Now().UnixMilli(),
 			},
-			Tags:       []string{},
+			Tags:       tagsOrEmpty(a.Tags),
 			Status:     "active",
 			CreatedAt:  time.Now().UnixMilli(),
 			LastUsedAt: time.Now().UnixMilli(),
@@ -4439,7 +4465,7 @@ func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 		ExportedAt: time.Now().UnixMilli(),
 		Accounts:   exportAccounts,
 		Groups:     []interface{}{},
-		Tags:       []interface{}{},
+		Tags:       exportTagObjects(accounts),
 	}
 
 	json.NewEncoder(w).Encode(data)

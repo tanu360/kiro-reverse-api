@@ -27,6 +27,7 @@ import {
 } from "./account-cells";
 import { defaultSortDesc } from "./account-model";
 import { AccountRowActions, EnabledSwitch, type RowActionHandlers } from "./account-row-actions";
+import { TagBadges } from "./account-tags";
 
 /**
  * Low-priority columns show only when the table is wide enough for them: Requests from a 56rem
@@ -100,7 +101,7 @@ export function AccountsTable({
         // size it (inline-size containment), so a long address truncates (with a tooltip)
         // instead of widening the column, and loading rows measure the same as data rows.
         cell: (account) => (
-          <AccountIdentity account={account} className="w-full contain-inline-size" />
+          <AccountIdentity account={account} className="w-full contain-inline-size" showTags />
         ),
       },
       {
@@ -208,8 +209,9 @@ export function AccountsTable({
 
 /**
  * One account as a row of the card list: the checkbox and name with the switch and menu at the
- * end; the status pill leading the nickname, plan and sign-in line; usage across the full width;
- * the live requests line; three quiet stats. A tap anywhere else opens the details.
+ * end; the status pill leading the nickname, plan and sign-in line, then the first tag; usage
+ * across the full width; the live requests line; three quiet stats. A tap anywhere else opens the
+ * details.
  */
 function AccountCard({
   account,
@@ -245,6 +247,7 @@ function AccountCard({
         <span className="flex min-w-0 items-center gap-2">
           <StatusPill account={account} size="sm" />
           <span className="truncate">{accountMeta(account, t, !authIconNamesMethod(account))}</span>
+          <TagBadges max={1} tags={account.tags} />
           <AccountFlags account={account} />
         </span>
       }

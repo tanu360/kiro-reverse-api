@@ -6,6 +6,7 @@ import type {
   AccountFull,
   AccountInfo,
   BatchAction,
+  BatchTagAction,
   UpdateAccountRequest,
 } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
@@ -19,6 +20,7 @@ import {
   makeTestResult,
 } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
+import { MAX_NOTES, MAX_TAGS, normalizeTag, normalizeTags, tagKey } from "./account-metadata";
 
 // Accounts endpoints over mockDb, with the Go server's semantics (research area-accounts §1).
 
@@ -37,6 +39,8 @@ function invalidPriority(body: Record<string, unknown>): boolean {
   const value = body.priority;
   return !Number.isInteger(value) || (value as number) < 0 || (value as number) > MAX_PRIORITY;
 }
+
+const TAG_ACTIONS: readonly BatchTagAction[] = ["addTag", "removeTag"];
 
 /** accounts_changed after every account write, as the Go config hook sends it. */
 function accountsChanged(id = "*"): void {
@@ -124,6 +128,13 @@ function applyUpdate(account: Account, body: Record<string, unknown>): void {
   if (typeof patch.weight === "number") account.weight = Math.trunc(patch.weight);
   if (typeof patch.priority === "number") account.priority = patch.priority;
   if (typeof patch.proxyURL === "string") account.proxyURL = patch.proxyURL;
+  // The server normalizes and clamps both (config/account_metadata.go).
+  if (typeof patch.notes === "string") {
+    account.notes = patch.notes.replace(/\r\n?/g, "\n").trim().slice(0, MAX_NOTES).trim();
+  }
+  if (Array.isArray(patch.tags)) {
+    account.tags = normalizeTags(patch.tags.filter((tag) => typeof tag === "string"));
+  }
   if (typeof patch.silent === "boolean") {
     if (patch.silent) {
       account.enabled = false;
@@ -235,6 +246,28 @@ export const handlers: HttpHandler[] = [
     if (!body) return jsonError(400, "Invalid JSON");
     const ids = Array.isArray(body.ids) ? body.ids.filter((id) => typeof id === "string") : [];
     if (ids.length === 0) return jsonError(400, "No account IDs provided");
+    const tagAction = body.action as BatchTagAction;
+    if (TAG_ACTIONS.includes(tagAction)) {
+      const tag = normalizeTag(typeof body.tag === "string" ? body.tag : "");
+      if (!tag) return jsonError(400, "tag is required");
+      await mockDelay();
+      const results = eachRequested(ids, (account) => {
+        const has = account.tags.some((existing) => tagKey(existing) === tagKey(tag));
+        if (tagAction === "removeTag") {
+          account.tags = account.tags.filter((existing) => tagKey(existing) !== tagKey(tag));
+          return { ok: true };
+        }
+        if (has) return { ok: true };
+        if (account.tags.length >= MAX_TAGS) {
+          return { ok: false, error: `Account already has ${MAX_TAGS} tags`, status: "tag_limit" };
+        }
+        account.tags = [...account.tags, tag];
+        return { ok: true };
+      });
+      accountsChanged();
+      const { ok, failed } = countOk(results);
+      return HttpResponse.json({ success: true, count: ok, failed, results });
+    }
     const action = body.action as BatchAction;
     if (!BATCH_ACTIONS.includes(action)) return jsonError(400, `Invalid action: ${body.action}`);
     await mockDelay();

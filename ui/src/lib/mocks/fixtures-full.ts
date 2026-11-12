@@ -591,10 +591,12 @@ function edgeAccounts(now: number): Account[] {
     {
       email: "zoe.lindqvist@copperleaf.com",
       nickname: "Dublin team",
+      notes: "Owned by zoe.lindqvist@copperleaf.com. Rotate the refresh token every quarter.",
+      tags: ["team-eu", "primary"],
       region: "eu-west-1",
       activeRegion: "eu-west-1",
     },
-    { email: "noor.haddad@helix.health", nickname: "Support" },
+    { email: "noor.haddad@helix.health", nickname: "Support", tags: ["support"] },
     {
       email: "kai.tanaka@proton.me",
       nickname: "",
@@ -653,6 +655,8 @@ function edgeAccounts(now: number): Account[] {
     {
       email: "platform@northwind.studio",
       nickname: "Platform",
+      notes: "Suspended upstream; ticket open with AWS support.",
+      tags: ["platform", "primary", "load-test", "ci"],
       subscriptionType: POWER.type,
       subscriptionTitle: POWER.title,
       usageCurrent: 9_412.37,
@@ -755,6 +759,7 @@ function edgeAccounts(now: number): Account[] {
     {
       email: "agent-fleet-apac",
       nickname: "APAC",
+      tags: ["team-apac", "backup"],
       authMethod: "api_key",
       provider: "APIKey",
       region: "ap-southeast-1",

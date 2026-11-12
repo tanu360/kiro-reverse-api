@@ -201,6 +201,32 @@ describe("filterAccounts / filterOptions", () => {
     expect(supportsKiroProfiles({ provider: "", authMethod: "api_key" })).toBe(false);
   });
 
+  it("searches notes and tags too", () => {
+    const tagged = [
+      makeAccount({ id: "n", email: "n@example.com", notes: "Owner: Ops\nrotate in May" }),
+      makeAccount({ id: "t", email: "t@example.com", tags: ["Team-A", "backup"] }),
+      makeAccount({ id: "x", email: "x@example.com" }),
+    ];
+    expect(ids(filterAccounts(tagged, { q: "ROTATE" }, NOW_SEC))).toEqual(["n"]);
+    expect(ids(filterAccounts(tagged, { q: "team-a" }, NOW_SEC))).toEqual(["t"]);
+    expect(ids(filterAccounts(tagged, { q: "back" }, NOW_SEC))).toEqual(["t"]);
+  });
+
+  it("filters by tag ignoring case and counts each tag once per account", () => {
+    const tagged = [
+      makeAccount({ id: "p", tags: ["Team-A", "backup"] }),
+      makeAccount({ id: "q", tags: ["team-a"] }),
+      makeAccount({ id: "r", tags: [] }),
+    ];
+    expect(ids(filterAccounts(tagged, { tag: "TEAM-A" }, NOW_SEC))).toEqual(["p", "q"]);
+    expect(ids(filterAccounts(tagged, { tag: "backup", q: "nobody" }, NOW_SEC))).toEqual([]);
+    expect(filterOptions(tagged, "tag", t, NOW_SEC)).toEqual([
+      { value: "backup", label: "backup", count: 1 },
+      { value: "team-a", label: "Team-A", count: 2 },
+    ]);
+    expect(filterOptions([makeAccount({ id: "s" })], "tag", t, NOW_SEC)).toEqual([]);
+  });
+
   it("knows which accounts are banned, and that DISABLED is not a ban", () => {
     expect(isBanned(accounts[2])).toBe(true);
     expect(isBanned(accounts[3])).toBe(true);

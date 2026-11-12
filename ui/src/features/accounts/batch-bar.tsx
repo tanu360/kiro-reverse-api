@@ -6,6 +6,7 @@ import {
   EllipsisVerticalIcon,
   Layers01Icon,
   Refresh01Icon,
+  Tag01Icon,
   XIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
@@ -69,6 +70,7 @@ export function BatchBar({
   accounts,
   onClear,
   onExport,
+  onTags,
 }: {
   selectedIds: string[];
   /** The whole list, to name failed accounts in a result toast. */
@@ -76,6 +78,8 @@ export function BatchBar({
   onClear: () => void;
   /** Opens the export dialog with the selection checked. */
   onExport: () => void;
+  /** Opens the dialog that adds or removes a tag on the selection. */
+  onTags: () => void;
 }): JSX.Element {
   const { t } = useT("accounts");
   const confirm = useConfirm();
@@ -210,6 +214,10 @@ export function BatchBar({
                 <HugeiconsIcon icon={Layers01Icon} aria-hidden="true" />
                 {t("batch.refreshModels")}
               </MenuItem>
+              <MenuItem onClick={onTags}>
+                <HugeiconsIcon icon={Tag01Icon} aria-hidden="true" />
+                {t("metadata.batchTags")}
+              </MenuItem>
               <MenuItem onClick={onExport}>
                 <HugeiconsIcon icon={Download01Icon} aria-hidden="true" />
                 {t("batch.export")}
@@ -230,6 +238,14 @@ export function BatchBar({
             {actionButton("disable", t("batch.disableShort"), t("batch.disable"))}
             {actionButton("refresh", t("batch.refresh"))}
             {actionButton("refreshModels", t("batch.refreshModels"))}
+            <ToolbarButton
+              disabled={busy}
+              onClick={onTags}
+              render={<Button size="sm" variant="on-primary" />}
+            >
+              <HugeiconsIcon icon={Tag01Icon} aria-hidden="true" />
+              {t("metadata.batchTags")}
+            </ToolbarButton>
             <ToolbarButton
               aria-label={t("batch.export")}
               disabled={busy}

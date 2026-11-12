@@ -62,6 +62,14 @@ describe("validateAccountsSearch", () => {
       validateAccountsSearch({ enabled: "yes", sort: "tokens", order: "up", page: 0, pageSize: 7 }),
     ).toEqual({});
   });
+
+  it("keeps a tag as text and drops an empty or non-text one", () => {
+    expect(validateAccountsSearch({ tag: "Team-A" })).toEqual({ tag: "Team-A" });
+    // The default search parser JSON-decodes a numeric tag.
+    expect(validateAccountsSearch({ tag: 2024 })).toEqual({ tag: "2024" });
+    expect(validateAccountsSearch({ tag: "" })).toEqual({});
+    expect(validateAccountsSearch({ tag: ["a"] })).toEqual({});
+  });
 });
 
 describe("validateRequestsSearch", () => {

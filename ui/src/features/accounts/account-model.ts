@@ -17,6 +17,7 @@ import {
   type AccountStatusFilter,
   type AccountsSearch,
 } from "@/routes/-search";
+import { hasTag, tagKey } from "./account-metadata";
 
 const DAY_MS = 86_400_000;
 
@@ -187,17 +188,21 @@ function regionKey(account: Pick<Account, "region">): string {
   return account.region || "us-east-1";
 }
 
-export type FilterDimension = "status" | "plan" | "auth" | "region" | "enabled";
+export type FilterDimension = "status" | "plan" | "auth" | "region" | "enabled" | "tag";
 export const FILTER_DIMENSIONS: readonly FilterDimension[] = [
   "status",
   "plan",
   "auth",
   "region",
   "enabled",
+  "tag",
 ];
 export type AccountFilters = Pick<AccountsSearch, "q" | FilterDimension>;
 
-function dimensionValue(account: Account, dimension: FilterDimension, nowSec: number): string {
+/** The dimensions with one value per account; an account has any number of tags. */
+type SingleValueDimension = Exclude<FilterDimension, "tag">;
+
+function dimensionValue(account: Account, dimension: SingleValueDimension, nowSec: number): string {
   switch (dimension) {
     case "status":
       return accountStatus(account, nowSec);
@@ -212,9 +217,33 @@ function dimensionValue(account: Account, dimension: FilterDimension, nowSec: nu
   }
 }
 
+function matchesDimension(
+  account: Account,
+  dimension: FilterDimension,
+  filter: string,
+  nowSec: number,
+): boolean {
+  if (dimension === "tag") return hasTag(account, filter);
+  const value = dimensionValue(account, dimension, nowSec);
+  return dimension === "status"
+    ? matchesStatus(value as AccountStatus, filter as AccountStatusFilter)
+    : value === filter;
+}
+
+/** The query against the email, nickname, notes and every tag, ignoring case. */
+function matchesQuery(account: Account, needle: string): boolean {
+  return (
+    account.email.toLowerCase().includes(needle) ||
+    account.nickname.toLowerCase().includes(needle) ||
+    (account.notes ?? "").toLowerCase().includes(needle) ||
+    (account.tags ?? []).some((tag) => tag.toLowerCase().includes(needle))
+  );
+}
+
 /**
- * Every set filter must match; the query is a case-insensitive substring of email or nickname.
- * A status filter of `attention` matches any problem status.
+ * Every set filter must match; the query is a case-insensitive substring of the email, nickname,
+ * notes or a tag. A status filter of `attention` matches any problem status, and a tag filter
+ * matches the tag in any case.
  */
 export function filterAccounts(
   accounts: Account[],
@@ -225,16 +254,10 @@ export function filterAccounts(
   const active = FILTER_DIMENSIONS.filter((dimension) => filters[dimension] !== undefined);
   return accounts.filter(
     (account) =>
-      active.every((dimension) => {
-        const value = dimensionValue(account, dimension, nowSec);
-        const filter = filters[dimension] as string;
-        return dimension === "status"
-          ? matchesStatus(value as AccountStatus, filter as AccountStatusFilter)
-          : value === filter;
-      }) &&
-      (!needle ||
-        account.email.toLowerCase().includes(needle) ||
-        account.nickname.toLowerCase().includes(needle)),
+      active.every((dimension) =>
+        matchesDimension(account, dimension, filters[dimension] as string, nowSec),
+      ) &&
+      (!needle || matchesQuery(account, needle)),
   );
 }
 
@@ -242,6 +265,26 @@ export interface FilterOption {
   value: string;
   label: string;
   count: number;
+}
+
+/**
+ * Every tag across the list, with how many accounts have it. Spellings that differ only in case
+ * are one tag: the value is the lowercase key and the label the first spelling met.
+ */
+function tagOptions(accounts: Account[]): FilterOption[] {
+  const options = new Map<string, FilterOption>();
+  for (const account of accounts) {
+    const counted = new Set<string>();
+    for (const tag of account.tags ?? []) {
+      const key = tagKey(tag);
+      if (counted.has(key)) continue;
+      counted.add(key);
+      const option = options.get(key);
+      if (option) option.count++;
+      else options.set(key, { value: key, label: tag, count: 1 });
+    }
+  }
+  return [...options.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /**
@@ -254,6 +297,7 @@ export function filterOptions(
   t: TFunction,
   nowSec: number,
 ): FilterOption[] {
+  if (dimension === "tag") return tagOptions(accounts);
   const options = new Map<string, FilterOption>();
   for (const account of accounts) {
     const value = dimensionValue(account, dimension, nowSec);
@@ -277,7 +321,7 @@ export function filterOptions(
 
 function optionLabel(
   account: Account,
-  dimension: FilterDimension,
+  dimension: SingleValueDimension,
   value: string,
   t: TFunction,
 ): string {

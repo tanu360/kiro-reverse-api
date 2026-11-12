@@ -187,6 +187,8 @@ export function makeAccount(overrides: Partial<Account> = {}): Account {
     email: "",
     userId: "",
     nickname: "",
+    notes: "",
+    tags: [],
     authMethod: "social",
     provider: "Google",
     region: "us-east-1",
@@ -1330,6 +1332,7 @@ export function makeExport(accounts: Account[]): ExportData {
         id: account.id,
         email: account.email,
         ...(account.nickname ? { nickname: account.nickname } : {}),
+        ...(account.notes ? { notes: account.notes } : {}),
         idp: account.provider || account.authMethod,
         ...(account.userId ? { userId: account.userId } : {}),
         ...(account.profileArn ? { profileArn: account.profileArn } : {}),
@@ -1359,15 +1362,29 @@ export function makeExport(accounts: Account[]): ExportData {
           percentUsed: round(account.usagePercent * 100, 2),
           lastUpdated: nowMs,
         },
-        tags: [],
+        tags: [...account.tags],
         status: "active",
         createdAt: nowMs,
         lastUsedAt: nowMs,
       };
     }),
     groups: [],
-    tags: [],
+    tags: exportTags(accounts),
   };
+}
+
+/**
+ * Every exact tag spelling once, sorted ignoring case, as {id, name} with the name as the id
+ * (Go exportTagObjects), so every account's tag ids resolve.
+ */
+function exportTags(accounts: Account[]): { id: string; name: string }[] {
+  const names = new Set<string>();
+  for (const account of accounts) {
+    for (const tag of account.tags) names.add(tag);
+  }
+  return [...names]
+    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()) || (a < b ? -1 : a > b ? 1 : 0))
+    .map((name) => ({ id: name, name }));
 }
 
 // ---------------------------------------------------------------------------
