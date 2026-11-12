@@ -365,8 +365,11 @@ export function TestModelPicker({
         ) : null}
       </div>
 
-      <div className="flex h-12 shrink-0 items-center gap-3 border-border-subtle border-t ps-3.5 pe-2 text-meta text-muted-foreground">
-        <span className="tabular-nums">{t("test.pickedCount", { count })}</span>
+      <div className="flex h-12 shrink-0 items-center gap-3 border-border-subtle border-t ps-3.5 pe-2 text-meta text-muted-foreground max-sm:ps-2">
+        {/* Phones skip the count, which the Test button repeats, so the row fits in every language. */}
+        <span className="shrink-0 tabular-nums max-sm:hidden">
+          {t("test.pickedCount", { count })}
+        </span>
         {/* The models in view: all of them, or one maker's, or what the search matched. */}
         <Button
           disabled={allInViewPicked}
@@ -386,9 +389,16 @@ export function TestModelPicker({
         >
           {t("test.clearSelection")}
         </Button>
-        <span className="ms-auto flex items-center gap-3 max-sm:hidden">
-          <CommandHint keys={["↑", "↓"]} label={tc("shell.command.move")} />
-          <CommandHint keys={["↵"]} label={t("test.keyPick")} />
+        {/*
+          The key hints only while they fit (Portuguese and Vietnamese labels run long): after an
+          empty first item they wrap, as one, onto a second line the row's height hides.
+        */}
+        <span className="flex h-5 min-w-0 flex-1 flex-wrap items-center justify-end overflow-hidden max-sm:hidden">
+          <span aria-hidden="true" className="h-full" />
+          <span className="flex shrink-0 items-center gap-3">
+            <CommandHint keys={["↑", "↓"]} label={tc("shell.command.move")} />
+            <CommandHint keys={["↵"]} label={t("test.keyPick")} />
+          </span>
         </span>
         <Button className="max-sm:ms-auto" disabled={!canRun} onClick={onRun} size="xs">
           <HugeiconsIcon aria-hidden="true" icon={PlayIcon} />
