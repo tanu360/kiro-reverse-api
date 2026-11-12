@@ -480,3 +480,47 @@ func TestMergeAccountsMovesBoundApiKeysToTheKeeper(t *testing.T) {
 		}
 	})
 }
+
+// IAM SSO and SSO-token logins store no provider; Builder ID device login
+// stores "BuilderId". An empty provider is unknown, so one Kiro user found
+// through both paths is still one account. Two set, different providers stay
+// apart.
+func TestDuplicateGroupsTreatEmptyProviderAsUnknown(t *testing.T) {
+	groups := FindDuplicateGroups([]Account{
+		{ID: "a", Provider: "BuilderId", AuthMethod: "idc", UserId: "u-1", Email: "u@example.com"},
+		{ID: "b", Provider: "", AuthMethod: "idc", UserId: "u-1", Email: "u@example.com"},
+		{ID: "c", Provider: "BuilderId", AuthMethod: "idc", Email: "v@example.com"},
+		{ID: "d", Provider: "", AuthMethod: "idc", Email: "v@example.com"},
+		{ID: "e", Provider: "Google", AuthMethod: "social", UserId: "u-9", Email: "w@example.com"},
+		{ID: "f", Provider: "Github", AuthMethod: "social", UserId: "u-9", Email: "w@example.com"},
+	})
+	if got, want := groupIDs(groups), [][]string{{"a", "b"}, {"c", "d"}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("groups = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(groups[0].Reasons, []string{DuplicateReasonUserID}) || !reflect.DeepEqual(groups[1].Reasons, []string{DuplicateReasonEmail}) {
+		t.Fatalf("reasons = %v / %v", groups[0].Reasons, groups[1].Reasons)
+	}
+}
+
+func TestUpsertAccountMatchesAcrossEmptyProvider(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		if err := AddAccount(Account{ID: "a1", Email: "u@example.com", UserId: "user-1", AuthMethod: "idc", Provider: "BuilderId", RefreshToken: "rt-old", ClientID: "c1", Enabled: true}); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		stored, updated, err := UpsertAccount(Account{ID: "a2", Email: "u@example.com", UserId: "user-1", AuthMethod: "idc", RefreshToken: "rt-new", ClientID: "c2", Enabled: true})
+		if err != nil {
+			t.Fatalf("upsert: %v", err)
+		}
+		if !updated || stored.ID != "a1" || stored.Provider != "BuilderId" || stored.RefreshToken != "rt-new" {
+			t.Fatalf("upsert with no provider = %+v updated=%v, want a1 updated", stored, updated)
+		}
+		if n := len(GetAccounts()); n != 1 {
+			t.Fatalf("stored %d accounts, want 1", n)
+		}
+		// A credentials import without a provider, after the token rotated.
+		stored, updated, err = UpsertAccount(Account{ID: "a3", Email: "u@example.com", UserId: "user-1", AuthMethod: "idc", RefreshToken: "rt-rotated", Enabled: true})
+		if err != nil || !updated || stored.ID != "a1" {
+			t.Fatalf("second upsert = %+v updated=%v err=%v, want a1 updated", stored, updated, err)
+		}
+	})
+}

@@ -82,7 +82,8 @@ func duplicateReason(a, b *Account) string {
 	if IsAPIKeyAccount(a) || IsAPIKeyAccount(b) {
 		return ""
 	}
-	if folded(a.Provider) != folded(b.Provider) {
+	//! An empty provider is unknown, not different: IAM SSO and SSO-token logins store none, Builder ID device login stores "BuilderId".
+	if bothSetAndDiffer(folded(a.Provider), folded(b.Provider)) {
 		return ""
 	}
 	if sameValue(a.UserId, b.UserId) {
