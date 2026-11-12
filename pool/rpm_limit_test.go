@@ -267,3 +267,24 @@ func TestRPMLimitConcurrentPicksNeverExceed(t *testing.T) {
 		}
 	}
 }
+
+func TestReleaseRPMStartGivesBackOnlyARecentStart(t *testing.T) {
+	now := setRPMLimitForTest(t, 1)
+	p := newTestPool(config.Account{ID: "a"})
+	before := *now
+	if p.GetNext() == nil {
+		t.Fatal("first pick = none")
+	}
+	if p.GetNext() != nil {
+		t.Fatal("second pick = account, want none at a limit of 1")
+	}
+	p.ReleaseRPMStart("a", before)
+	if p.GetNext() == nil {
+		t.Fatal("pick after the start was given back = none")
+	}
+	// A start taken before since is never given back.
+	p.ReleaseRPMStart("a", before.Add(time.Second))
+	if p.GetNext() != nil {
+		t.Fatal("an older start was given back")
+	}
+}

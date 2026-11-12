@@ -285,6 +285,8 @@ func splitWebSearchToolUses(toolUses []KiroToolUse) (search, client []KiroToolUs
 }
 
 func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string) ([]WebSearchResult, *config.Account, error) {
+	carry := rpmCarryFrom(ctx)
+	since := carry.begin()
 	excluded := make(map[string]bool)
 	var lastErr error
 	var lastAccount *config.Account
@@ -308,6 +310,7 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 		results, err := performKiroWebSearch(ctx, account, query)
 		if err == nil {
 			traceAttemptOK(ctx)
+			carry.done(account.ID, since)
 			return results, account, nil
 		}
 		if ctx.Err() != nil {
@@ -382,7 +385,9 @@ func (h *Handler) handleClaudeDirectWebSearch(w http.ResponseWriter, r *http.Req
 
 func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request, req *ClaudeRequest, thinking bool, thinkingOpts claudeThinkingResponseOptions, estimatedInputTokens int, apiKeyReservation *apiKeyUsageReservation) {
 	defer apiKeyReservation.release()
-	ctx := r.Context()
+	//! One client request, one RPM-limit start, however many rounds and searches it runs.
+	ctx := withRPMCarry(r.Context(), h.pool)
+	carry := rpmCarryFrom(ctx)
 
 	working := *req
 	working.Messages = append([]ClaudeMessage(nil), req.Messages...)
@@ -400,6 +405,7 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 		if roundIdx > 0 {
 			estimatedInputTokens = estimateClaudeRequestInputTokens(cloneClaudeRequestForThinking(&working, thinking))
 		}
+		since := carry.begin()
 		round, account, err := h.callClaudeRoundWithFailover(ctx, &working, thinking, estimatedInputTokens)
 		if account != nil {
 			lastAccount = account
@@ -418,6 +424,7 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 			h.sendClaudeError(w, status, errType, message)
 			return
 		}
+		carry.done(account.ID, since)
 		usage.add(account.ID, round.inputTokens, round.outputTokens, round.credits)
 		//! The client request is counted once, by recordWebSearchLoop after the last round.
 		h.pool.RecordSuccess(account.ID)

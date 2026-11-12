@@ -54,6 +54,30 @@ func (p *AccountPool) noteRPMStartLocked(id string) {
 	p.rpm.m[id] = starts
 }
 
+// ReleaseRPMStart gives back one start the account took at or after since. A
+// client request that makes several upstream calls (the web search loop)
+// calls it before it picks again, so it counts as one request, not one per
+// call. A start older than since is never given back: it may be another
+// request's, and the caller's own start has already left the window.
+func (p *AccountPool) ReleaseRPMStart(id string, since time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if config.GetAccountRPMLimit() <= 0 {
+		p.rpm.m = nil
+		return
+	}
+	starts := p.rpm.trimLocked(id, rpmNow())
+	n := len(starts)
+	if n == 0 || starts[n-1] < since.UnixNano() {
+		return
+	}
+	if n == 1 {
+		delete(p.rpm.m, id)
+		return
+	}
+	p.rpm.m[id] = starts[:n-1]
+}
+
 // trimLocked drops the account's starts at or before now minus the window and
 // returns what is left.
 func (r *rpmStarts) trimLocked(id string, now time.Time) []int64 {
