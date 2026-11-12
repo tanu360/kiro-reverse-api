@@ -112,22 +112,71 @@ func TestSweepGroupJoinsConcurrentCallers(t *testing.T) {
 
 func TestSweepRefreshesTokensThatExpireBeforeTheNextSweep(t *testing.T) {
 	const now int64 = 1_800_000_000
-	every := int64(backgroundRefreshEvery.Seconds())
+	for _, interval := range []time.Duration{5 * time.Minute, 30 * time.Minute} {
+		every := int64(interval.Seconds())
+		cases := []struct {
+			name      string
+			expiresAt int64
+			want      bool
+		}{
+			{"no expiry", 0, false},
+			{"already expired", now - 60, true},
+			//! The 11:53 sweep left a token with 4.5 minutes; it then sat expired until 12:23.
+			{"expires before the next sweep", now + 270, true},
+			{"expires just after the next sweep, inside the skew", now + every + tokenRefreshSkewSeconds - 1, true},
+			{"outlives the next sweep", now + every + tokenRefreshSkewSeconds + 1, false},
+		}
+		for _, c := range cases {
+			acc := &config.Account{ExpiresAt: c.expiresAt}
+			if got := tokenExpiresBeforeNextSweep(acc, now, interval); got != c.want {
+				t.Errorf("every %s, %s: got %v, want %v", interval, c.name, got, c.want)
+			}
+		}
+	}
+}
+
+func TestUsageInfoFreshUsesHalfInterval(t *testing.T) {
+	const now int64 = 1_800_000_000
 	cases := []struct {
-		name      string
-		expiresAt int64
-		want      bool
+		name        string
+		lastRefresh int64
+		every       time.Duration
+		want        bool
 	}{
-		{"no expiry", 0, false},
-		{"already expired", now - 60, true},
-		//! The 11:53 sweep left a token with 4.5 minutes; it then sat expired until 12:23.
-		{"expires before the next sweep", now + 270, true},
-		{"expires just after the next sweep, inside the skew", now + every + tokenRefreshSkewSeconds - 1, true},
-		{"outlives the next sweep", now + every + tokenRefreshSkewSeconds + 1, false},
+		{"never refreshed", 0, 30 * time.Minute, false},
+		{"refreshed by hand a minute ago", now - 60, 30 * time.Minute, true},
+		{"just under half the interval", now - 899, 30 * time.Minute, true},
+		{"half the interval", now - 900, 30 * time.Minute, false},
+		//! The old full-interval cut-off skipped this one: the previous sweep's refresh
+		//! landed seconds after that sweep began, so it was just under 30 minutes old.
+		{"refreshed by the previous sweep", now - 1790, 30 * time.Minute, false},
+		{"5-minute interval, 2 minutes ago", now - 120, 5 * time.Minute, true},
+		{"5-minute interval, previous sweep", now - 290, 5 * time.Minute, false},
 	}
 	for _, c := range cases {
-		acc := &config.Account{ExpiresAt: c.expiresAt}
-		if got := tokenExpiresBeforeNextSweep(acc, now); got != c.want {
+		if got := usageInfoFresh(c.lastRefresh, now, c.every); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestModelsListDueKeepsThirtyMinuteFloor(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	cases := []struct {
+		name        string
+		lastAttempt time.Time
+		cachedAt    int64
+		want        bool
+	}{
+		{"never listed", time.Time{}, 0, true},
+		{"listed 5 minutes ago", now.Add(-5 * time.Minute), now.Add(-5 * time.Minute).Unix(), false},
+		{"attempt failed 5 minutes ago, cache empty", now.Add(-5 * time.Minute), 0, false},
+		{"/v1/models filled the cache 10 minutes ago", time.Time{}, now.Add(-10 * time.Minute).Unix(), false},
+		{"both 30 minutes old", now.Add(-30 * time.Minute), now.Add(-30 * time.Minute).Unix(), true},
+		{"attempt old, cache recent", now.Add(-time.Hour), now.Add(-time.Minute).Unix(), false},
+	}
+	for _, c := range cases {
+		if got := modelsListDue(now, c.lastAttempt, c.cachedAt); got != c.want {
 			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
 		}
 	}

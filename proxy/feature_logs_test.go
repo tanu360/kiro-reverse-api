@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 type syncBuffer struct {
@@ -68,7 +69,7 @@ func TestRefreshAllAccountsLogsSweepSummary(t *testing.T) {
 	h := affinityTestHandler(t, "sweep-a", "sweep-b")
 	logs := captureLogs(t)
 
-	h.refreshAllAccounts()
+	h.refreshAllAccounts(30 * time.Minute)
 
 	want := "[BackgroundRefresh] Sweep finished: 2 accounts in "
 	if !strings.Contains(logs.String(), want) || !strings.Contains(logs.String(), "(2 workers)") {

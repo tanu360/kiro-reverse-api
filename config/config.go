@@ -174,6 +174,9 @@ type Config struct {
 	RetryBaseDelayMs     int `json:"retryBaseDelayMs,omitempty"`
 	RetryMaxDelayMs      int `json:"retryMaxDelayMs,omitempty"`
 
+	// UsageRefreshIntervalMinutes: nil is the default (30); 0 is off, so it is a pointer.
+	UsageRefreshIntervalMinutes *int `json:"usageRefreshIntervalMinutes,omitempty"`
+
 	TotalRequests   int     `json:"totalRequests,omitempty"`
 	SuccessRequests int     `json:"successRequests,omitempty"`
 	FailedRequests  int     `json:"failedRequests,omitempty"`
