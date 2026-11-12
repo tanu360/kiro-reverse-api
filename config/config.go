@@ -29,6 +29,9 @@ type Account struct {
 	Email    string `json:"email,omitempty"`
 	UserId   string `json:"userId,omitempty"`
 	Nickname string `json:"nickname,omitempty"`
+	//! Operator metadata: only EditAccountMetadata writes it, so stale snapshots cannot wipe it.
+	Notes string   `json:"notes,omitempty"`
+	Tags  []string `json:"tags,omitempty"`
 
 	AccessToken  string `json:"accessToken"`
 	RefreshToken string `json:"refreshToken"`
@@ -396,6 +399,7 @@ func GetEnabledAccounts() []Account {
 }
 
 func AddAccount(account Account) (err error) {
+	normalizeAccountMetadata(&account)
 	defer func() {
 		if err == nil {
 			notifyAccountsChanged(account.ID)
@@ -440,6 +444,7 @@ func UpdateAccount(id string, account Account) (err error) {
 	for i, a := range cfg.Accounts {
 		if a.ID == id {
 			preserveAccountCredentials(&account, a)
+			preserveAccountMetadata(&account, a)
 			cfg.Accounts[i] = account
 			return Save()
 		}
