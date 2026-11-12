@@ -64,6 +64,7 @@
   "detail.accountId": "ID da conta",
   "detail.apiKeyId": "ID da chave de API",
   "detail.requestId": "ID da requisição",
+  "detail.traceId": "ID de rastreio",
   "detail.ofInput": "{percent} da entrada",
   "detail.message": "Mensagem",
   "detail.noMessage": "Sem mensagem",

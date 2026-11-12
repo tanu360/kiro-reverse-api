@@ -64,6 +64,7 @@
   "detail.accountId": "Account ID",
   "detail.apiKeyId": "API key ID",
   "detail.requestId": "Request ID",
+  "detail.traceId": "Trace ID",
   "detail.ofInput": "{percent} of input",
   "detail.message": "Message",
   "detail.noMessage": "No message",

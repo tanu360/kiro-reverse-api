@@ -810,6 +810,8 @@ export interface RequestRecord {
   durationMs?: number;
   /** only when !success */
   errorType?: RequestErrorType;
+  /** "req_" + 24 hex, the {request_id} the client got; absent on rows logged before it */
+  requestId?: string;
 }
 export interface RecentRequestsParams {
   /** >= 1, default 1 */

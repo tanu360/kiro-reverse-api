@@ -64,6 +64,7 @@
   "detail.accountId": "账号 ID",
   "detail.apiKeyId": "API Key ID",
   "detail.requestId": "请求 ID",
+  "detail.traceId": "追踪 ID",
   "detail.ofInput": "占输入的 {percent}",
   "detail.message": "消息",
   "detail.noMessage": "无消息",

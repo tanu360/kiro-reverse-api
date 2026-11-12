@@ -191,6 +191,7 @@ export function RequestDetailSheet({
     const ids: KeyValueItem[] = [
       idItem(t("detail.accountId"), record.accountId),
       idItem(t("detail.apiKeyId"), record.apiKeyId),
+      idItem(t("detail.traceId"), record.requestId),
     ];
 
     body = (

@@ -80,6 +80,7 @@ function matches(record: RequestRecord, query: NormalizedQuery): boolean {
     record.message,
     record.endpoint,
     record.errorType,
+    record.requestId,
   ].some((field) => (field ?? "").toLowerCase().includes(needle));
 }
 
