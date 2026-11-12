@@ -38,6 +38,7 @@ import {
 } from "@/lib/format";
 import { type Lang, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
+import { AttemptsCard } from "./request-attempts";
 import { isKnownErrorType, normalizeApiKeyMask, rowKey } from "./request-model";
 import { endpointLabel, StatusBadge } from "./requests-columns";
 
@@ -225,6 +226,8 @@ export function RequestDetailSheet({
           </div>
         </SectionCard>
 
+        <AttemptsCard attempts={record.attempts} />
+
         {failed ? null : notice}
       </ResponsiveSheetPanel>
     );
@@ -351,6 +354,11 @@ function recordJson(record: RequestRecord, maskText: (text?: string) => string):
       email: record.email ? maskText(record.email) : record.email,
       apiKeyMasked: normalizeApiKeyMask(record.apiKeyMasked) || record.apiKeyMasked,
       message: record.message ? maskText(record.message) : record.message,
+      attempts: record.attempts?.map((attempt) => ({
+        ...attempt,
+        email: attempt.email ? maskText(attempt.email) : attempt.email,
+        message: attempt.message ? maskText(attempt.message) : attempt.message,
+      })),
     },
     null,
     2,
