@@ -20,8 +20,10 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { ApiKey } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { AccountPicker } from "./account-picker";
 import {
   type ApiKeyFormData,
+  type ApiKeyFormField,
   type ApiKeyFormValues,
   type ApiKeyLimitField,
   buildCreateRequest,
@@ -36,6 +38,12 @@ export type ApiKeyDialogTarget = { mode: "create" } | { mode: "edit"; apiKey: Ap
 const CREDIT_FORMAT: Intl.NumberFormatOptions = {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+};
+
+const LIMIT_ERRORS: Readonly<Record<ApiKeyLimitField, string>> = {
+  tokenLimit: "form.invalidTokenLimit",
+  creditLimit: "form.invalidCreditLimit",
+  callLimit: "form.invalidCallLimit",
 };
 
 /**
@@ -60,12 +68,20 @@ export function ApiKeyFormDialog({
   const [values, setValues] = useState<ApiKeyFormValues>(() =>
     target.mode === "edit" ? formValuesFromKey(target.apiKey) : EMPTY_API_KEY_FORM,
   );
-  // The one limit field that failed validation: only it turns red, and Base UI wires its
+  // The one field that failed validation: only it turns red, and Base UI wires its
   // FieldError into that input's aria-describedby.
-  const [limitsError, setLimitsError] = useState<ApiKeyLimitField | null>(null);
+  const [limitsError, setLimitsError] = useState<ApiKeyFormField | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const tokenLimitRef = useRef<HTMLInputElement>(null);
   const creditLimitRef = useRef<HTMLInputElement>(null);
+  const callLimitRef = useRef<HTMLInputElement>(null);
+  const accountSearchRef = useRef<HTMLInputElement>(null);
+  const fieldRefs = {
+    tokenLimit: tokenLimitRef,
+    creditLimit: creditLimitRef,
+    callLimit: callLimitRef,
+    accountIds: accountSearchRef,
+  } as const;
   const formId = useId();
 
   const mutation = useMutation({
@@ -87,7 +103,8 @@ export function ApiKeyFormDialog({
 
   const set = <K extends keyof ApiKeyFormValues>(field: K, value: ApiKeyFormValues[K]) => {
     setValues((prev) => ({ ...prev, [field]: value }));
-    if (field === "tokenLimit" || field === "creditLimit") setLimitsError(null);
+    if (field === "accountScope") setLimitsError(null);
+    else if (field === limitsError) setLimitsError(null);
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -97,7 +114,7 @@ export function ApiKeyFormDialog({
     if (!parsed.ok) {
       setLimitsError(parsed.field);
       // Straight to the bad field, so nobody has to hunt for the red one.
-      (parsed.field === "tokenLimit" ? tokenLimitRef : creditLimitRef).current?.focus();
+      fieldRefs[parsed.field].current?.focus();
       return;
     }
     mutation.mutate(parsed.value);
@@ -106,7 +123,7 @@ export function ApiKeyFormDialog({
   const limitError = (field: ApiKeyLimitField) =>
     limitsError === field ? (
       <FieldError match role="alert">
-        {field === "tokenLimit" ? t("form.invalidTokenLimit") : t("form.invalidCreditLimit")}
+        {t(LIMIT_ERRORS[field])}
       </FieldError>
     ) : null;
   const submitLabel = editing ? t("common:actions.save") : t("form.submitCreate");
@@ -187,8 +204,32 @@ export function ApiKeyFormDialog({
             </NumberField>
             {limitError("creditLimit")}
           </Field>
+          <Field className="mt-2" invalid={limitsError === "callLimit"}>
+            <FieldLabel>{t("form.callLimit")}</FieldLabel>
+            <NumberField
+              min={0}
+              onValueChange={(value) => set("callLimit", value)}
+              step={1}
+              value={values.callLimit}
+            >
+              <NumberFieldGroup>
+                <NumberFieldDecrement />
+                <NumberFieldInput ref={callLimitRef} />
+                <NumberFieldIncrement />
+              </NumberFieldGroup>
+            </NumberField>
+            {limitError("callLimit")}
+          </Field>
           <FieldHint className="sm:col-span-2">{t("form.limitsHint")}</FieldHint>
         </div>
+        <AccountPicker
+          invalid={limitsError === "accountIds"}
+          onScopeChange={(scope) => set("accountScope", scope)}
+          onSelectedChange={(ids) => set("accountIds", ids)}
+          scope={values.accountScope}
+          searchRef={accountSearchRef}
+          selected={values.accountIds}
+        />
         <Field>
           <FieldLabel>{t("form.customKey")}</FieldLabel>
           <Input

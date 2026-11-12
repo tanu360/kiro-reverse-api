@@ -65,10 +65,10 @@ type codexModelMessages struct {
 	InstructionsVariables map[string]string `json:"instructions_variables"`
 }
 
-func (h *Handler) handleCodexModels(w http.ResponseWriter, _ *http.Request) {
-	models := buildCodexModelsResponse(h.cachedModelsSnapshot(false))
+func (h *Handler) handleCodexModels(w http.ResponseWriter, r *http.Request) {
+	models := buildCodexModelsResponse(h.filterModelInfosForAPIKey(r.Context(), h.cachedModelsSnapshot(false)))
 	if len(models) == 0 {
-		models = buildCodexModelsResponse(fallbackCodexModelInfos())
+		models = buildCodexModelsResponse(h.filterModelInfosForAPIKey(r.Context(), fallbackCodexModelInfos()))
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

@@ -53,6 +53,8 @@ const (
 	codeAPIKeyCollision         = "api_key_collision"
 	codeTokenLimitNegative      = "token_limit_negative"
 	codeCreditLimitNegative     = "credit_limit_negative"
+	codeCallLimitNegative       = "call_limit_negative"
+	codeAPIKeyUnknownAccount    = "api_key_unknown_account"
 	codeBackupNotFound          = "backup_not_found"
 	codeBackupUploadFailed      = "backup_upload_failed"
 	codeRoutingModeInvalid      = "routing_mode_invalid"
@@ -141,6 +143,10 @@ func adminErrorFields(err error) (code, detail string, params map[string]interfa
 		return codeTokenLimitNegative, "", nil
 	case errors.Is(err, config.ErrCreditLimitNegative):
 		return codeCreditLimitNegative, "", nil
+	case errors.Is(err, config.ErrCallLimitNegative):
+		return codeCallLimitNegative, "", nil
+	case errors.Is(err, config.ErrApiKeyUnknownAccount):
+		return codeAPIKeyUnknownAccount, "", nil
 	case errors.Is(err, errMicrosoftSSOCanceled):
 		return auth.CodeMicrosoftCanceled, "", nil
 	case errors.Is(err, errMicrosoftAccountExists):

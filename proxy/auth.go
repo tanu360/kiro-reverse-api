@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"kiro-proxy/config"
+	"kiro-proxy/pool"
 )
 
 type apiKeyContextKey struct{}
@@ -13,6 +14,8 @@ type apiKeyContextKey struct{}
 type apiKeyContextValue struct {
 	id  string
 	key string
+	// allowed is the key's account allowlist as a set, taken at auth; nil is every account.
+	allowed map[string]bool
 }
 
 type apiKeyUsageReservation struct {
@@ -70,6 +73,9 @@ func (h *Handler) authenticate(r *http.Request) (*config.ApiKeyEntry, error) {
 		}
 		return nil, newAuthError(http.StatusTooManyRequests, "rate_limit_error", "credit limit exceeded")
 	}
+	if err := config.ApiKeyCallLimitError(*entry); err != nil {
+		return nil, newAuthError(http.StatusTooManyRequests, "rate_limit_error", err.Error())
+	}
 	return entry, nil
 }
 
@@ -126,8 +132,9 @@ func withApiKeyContext(r *http.Request, entry *config.ApiKeyEntry) *http.Request
 		return r
 	}
 	return r.WithContext(context.WithValue(r.Context(), apiKeyContextKey{}, apiKeyContextValue{
-		id:  entry.ID,
-		key: entry.Key,
+		id:      entry.ID,
+		key:     entry.Key,
+		allowed: pool.AllowedSet(entry.AccountIDs),
 	}))
 }
 

@@ -37,6 +37,8 @@
   "serverError.apiKeyCollision": "该 API Key 值已被其他 API Key 使用。",
   "serverError.tokenLimitNegative": "Token 限额必须大于或等于 0。",
   "serverError.creditLimitNegative": "Credits 限额必须大于或等于 0。",
+  "serverError.callLimitNegative": "调用次数限额必须大于或等于 0。",
+  "serverError.apiKeyUnknownAccount": "所选账号中有一个已不存在。请刷新后重新选择。",
   "serverError.microsoftCanceled": "Microsoft 登录已取消，请重新开始。",
   "serverError.microsoftDuplicate": "该 Microsoft 账号已添加。",
   "serverError.apiKeyLockout": "当前要求 API Key，但这样将没有任何已启用的 API Key，所有客户端都将无法访问。",

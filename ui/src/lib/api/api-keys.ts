@@ -7,6 +7,7 @@ import type {
   ApiKeyCreateResponse,
   ApiKeyDetailResponse,
   ApiKeyListResponse,
+  ApiKeyRegenerateResponse,
   ApiKeyResetUsageResponse,
   ApiKeyUpdateRequest,
   ApiKeyUpdateResponse,
@@ -49,4 +50,9 @@ export function deleteApiKey(id: string): Promise<SuccessResponse> {
 
 export function resetApiKeyUsage(id: string): Promise<ApiKeyResetUsageResponse> {
   return apiRequest(keyPath(id, "/reset-usage"), { method: "POST" });
+}
+
+/** A fresh secret for the key; the old one stops working at once. */
+export function regenerateApiKey(id: string): Promise<ApiKeyRegenerateResponse> {
+  return apiRequest(keyPath(id, "/regenerate"), { method: "POST" });
 }

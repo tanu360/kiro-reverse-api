@@ -127,7 +127,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
-		account := h.pickAccount(payload, model, excluded)
+		account := h.pickAccount(ctx, payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -272,7 +272,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
-		account := h.pickAccount(payload, model, excluded)
+		account := h.pickAccount(ctx, payload, model, excluded)
 		if account == nil {
 			break
 		}

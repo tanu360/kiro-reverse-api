@@ -62,6 +62,14 @@ func AddApiKey(entry ApiKeyEntry) (ApiKeyEntry, error) {
 	if err := validateApiKeyLimits(entry.TokenLimit, entry.CreditLimit); err != nil {
 		return ApiKeyEntry{}, err
 	}
+	if err := validateApiKeyCallLimit(entry.CallLimit); err != nil {
+		return ApiKeyEntry{}, err
+	}
+	accountIDs, err := normalizeApiKeyAccountIDsLocked(entry.AccountIDs, nil)
+	if err != nil {
+		return ApiKeyEntry{}, err
+	}
+	entry.AccountIDs = accountIDs
 	for _, existing := range cfg.ApiKeys {
 		if existing.Key == entry.Key {
 			return ApiKeyEntry{}, ErrApiKeyExists
@@ -114,6 +122,13 @@ func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 	if err := validateApiKeyLimits(patch.TokenLimit, patch.CreditLimit); err != nil {
 		return err
 	}
+	if err := validateApiKeyCallLimit(patch.CallLimit); err != nil {
+		return err
+	}
+	accountIDs, err := normalizeApiKeyAccountIDsLocked(patch.AccountIDs, cfg.ApiKeys[idx].AccountIDs)
+	if err != nil {
+		return err
+	}
 	name := strings.TrimSpace(patch.Name)
 	newKey := ""
 	if patch.Key != "" {
@@ -135,6 +150,8 @@ func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 	cfg.ApiKeys[idx].Enabled = patch.Enabled
 	cfg.ApiKeys[idx].TokenLimit = patch.TokenLimit
 	cfg.ApiKeys[idx].CreditLimit = patch.CreditLimit
+	cfg.ApiKeys[idx].CallLimit = patch.CallLimit
+	cfg.ApiKeys[idx].AccountIDs = accountIDs
 	return Save()
 }
 
@@ -170,6 +187,7 @@ func deleteApiKey(id string, guard bool) error {
 				return ErrApiKeyLockout
 			}
 			cfg.ApiKeys = append(cfg.ApiKeys[:i], cfg.ApiKeys[i+1:]...)
+			delete(apiKeyPendingCalls, id)
 			return Save()
 		}
 	}
@@ -238,6 +256,7 @@ func RecordApiKeyUsage(id string, tokens int64, credits float64) error {
 				cfg.ApiKeys[i].CreditsUsed += credits
 			}
 			cfg.ApiKeys[i].RequestsCount++
+			cfg.ApiKeys[i].SuccessfulCalls++
 			cfg.ApiKeys[i].LastUsedAt = time.Now().Unix()
 			return saveLocked()
 		}
@@ -269,7 +288,11 @@ func ReserveApiKeyRequestUsage(id string, tokens int64) (float64, error) {
 		if cfg.ApiKeys[i].CreditLimit > 0 && cfg.ApiKeys[i].CreditsUsed >= cfg.ApiKeys[i].CreditLimit {
 			return 0, errors.New("credit limit exceeded")
 		}
+		if err := reserveCallSlotLocked(i); err != nil {
+			return 0, err
+		}
 		if err := reserveApiKeyUsageAtIndexLocked(i, tokens, credits); err != nil {
+			releaseCallSlotLocked(id)
 			return 0, err
 		}
 		return credits, nil
@@ -321,6 +344,7 @@ func ReleaseApiKeyUsageReservation(id string, tokens int64, credits float64) err
 	if cfg == nil {
 		return errors.New("config not initialized")
 	}
+	releaseCallSlotLocked(id)
 	for i := range cfg.ApiKeys {
 		if cfg.ApiKeys[i].ID != id {
 			continue
@@ -347,6 +371,7 @@ func FinalizeApiKeyUsageReservation(id string, reservedTokens int64, reservedCre
 	if cfg == nil {
 		return errors.New("config not initialized")
 	}
+	releaseCallSlotLocked(id)
 	for i := range cfg.ApiKeys {
 		if cfg.ApiKeys[i].ID != id {
 			continue
@@ -366,6 +391,8 @@ func FinalizeApiKeyUsageReservation(id string, reservedTokens int64, reservedCre
 			cfg.ApiKeys[i].Enabled = false
 		}
 		cfg.ApiKeys[i].RequestsCount++
+		//! The one place a call counts: it runs once per request that finished OK.
+		cfg.ApiKeys[i].SuccessfulCalls++
 		cfg.ApiKeys[i].LastUsedAt = time.Now().Unix()
 		return saveLocked()
 	}
@@ -383,6 +410,7 @@ func ResetApiKeyUsage(id string) error {
 			cfg.ApiKeys[i].TokensUsed = 0
 			cfg.ApiKeys[i].CreditsUsed = 0
 			cfg.ApiKeys[i].RequestsCount = 0
+			cfg.ApiKeys[i].SuccessfulCalls = 0
 			return saveLocked()
 		}
 	}

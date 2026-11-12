@@ -514,7 +514,7 @@ func (h *Handler) handleStats(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(h.statusPayload(false))
 }
 
-func (h *Handler) handleModels(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 
 	h.modelsCacheMu.RLock()
 	cached := h.cachedModels
@@ -532,6 +532,7 @@ func (h *Handler) handleModels(w http.ResponseWriter, _ *http.Request) {
 	if len(models) == 0 {
 		models = fallbackAnthropicModels(thinkingSuffix)
 	}
+	models = h.filterModelMapsForAPIKey(r.Context(), models, thinkingSuffix)
 
 	//! gpt-4o and gpt-4 are not listed by hand: no account serves them and no default
 	//! mapping points them anywhere, so they only failed. A model mapping still adds them.
@@ -992,7 +993,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
-		account := h.pickAccount(payload, model, excluded)
+		account := h.pickAccount(r.Context(), payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -1521,7 +1522,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
-		account := h.pickAccount(payload, model, excluded)
+		account := h.pickAccount(r.Context(), payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -1776,7 +1777,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
-		account := h.pickAccount(payload, model, excluded)
+		account := h.pickAccount(r.Context(), payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -2195,7 +2196,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
-		account := h.pickAccount(payload, model, excluded)
+		account := h.pickAccount(r.Context(), payload, model, excluded)
 		if account == nil {
 			break
 		}
@@ -2532,6 +2533,9 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/api-keys/") && strings.HasSuffix(path, "/reset-usage") && r.Method == "POST":
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/api-keys/"), "/reset-usage")
 		h.apiResetApiKeyUsage(w, r, id)
+	case strings.HasPrefix(path, "/api-keys/") && strings.HasSuffix(path, "/regenerate") && r.Method == "POST":
+		id := strings.TrimSuffix(strings.TrimPrefix(path, "/api-keys/"), "/regenerate")
+		h.apiRegenerateApiKey(w, r, id)
 	case strings.HasPrefix(path, "/api-keys/") && r.Method == "GET":
 		h.apiGetApiKey(w, r, strings.TrimPrefix(path, "/api-keys/"))
 	case strings.HasPrefix(path, "/api-keys/") && r.Method == "PUT":

@@ -123,6 +123,12 @@ type ApiKeyEntry struct {
 	TokensUsed    int64   `json:"tokensUsed,omitempty"`
 	CreditsUsed   float64 `json:"creditsUsed,omitempty"`
 	RequestsCount int64   `json:"requestsCount,omitempty"`
+
+	// AccountIDs limits the key to these accounts; empty means every account.
+	AccountIDs []string `json:"accountIds,omitempty"`
+	// CallLimit caps SuccessfulCalls; 0 means unlimited.
+	CallLimit       int64 `json:"callLimit,omitempty"`
+	SuccessfulCalls int64 `json:"successfulCalls,omitempty"`
 }
 
 type Config struct {

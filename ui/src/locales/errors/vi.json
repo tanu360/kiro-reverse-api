@@ -37,6 +37,8 @@
   "serverError.apiKeyCollision": "Giá trị API key này đã được một key khác sử dụng.",
   "serverError.tokenLimitNegative": "Giới hạn token phải từ 0 trở lên.",
   "serverError.creditLimitNegative": "Giới hạn credit phải từ 0 trở lên.",
+  "serverError.callLimitNegative": "Giới hạn lượt gọi phải từ 0 trở lên.",
+  "serverError.apiKeyUnknownAccount": "Một trong các tài khoản đã chọn không còn tồn tại. Hãy tải lại và chọn lại.",
   "serverError.microsoftCanceled": "Đăng nhập Microsoft đã bị hủy. Hãy bắt đầu lại.",
   "serverError.microsoftDuplicate": "Tài khoản Microsoft này đã được thêm.",
   "serverError.apiKeyLockout": "API key là bắt buộc nhưng sẽ không còn key nào được bật, nên mọi client sẽ bị chặn.",

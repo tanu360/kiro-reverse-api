@@ -37,6 +37,8 @@
   "serverError.apiKeyCollision": "Este valor de chave de API já é usado por outra chave.",
   "serverError.tokenLimitNegative": "O limite de tokens deve ser 0 ou mais.",
   "serverError.creditLimitNegative": "O limite de créditos deve ser 0 ou mais.",
+  "serverError.callLimitNegative": "O limite de chamadas deve ser 0 ou mais.",
+  "serverError.apiKeyUnknownAccount": "Uma das contas selecionadas não existe mais. Recarregue e escolha de novo.",
   "serverError.microsoftCanceled": "O login da Microsoft foi cancelado. Comece novamente.",
   "serverError.microsoftDuplicate": "Esta conta Microsoft já foi adicionada.",
   "serverError.apiKeyLockout": "As chaves de API são obrigatórias e nenhuma ficaria habilitada, então todos os clientes seriam bloqueados.",

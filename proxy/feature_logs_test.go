@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"net/http/httptest"
@@ -50,14 +51,14 @@ func TestPickAccountLogsOnlyWhenConversationLeavesBoundAccount(t *testing.T) {
 	conv := payloadFor("conversation")
 	h.affinity.Bind(affinityKey(conv), "aff-a")
 
-	if acc := h.pickAccount(conv, "", nil); acc == nil || acc.ID != "aff-a" {
+	if acc := h.pickAccount(context.Background(), conv, "", nil); acc == nil || acc.ID != "aff-a" {
 		t.Fatalf("bound turn went to %v, want aff-a", acc)
 	}
 	if strings.Contains(logs.String(), "[SessionAffinity]") {
 		t.Fatalf("a turn that stayed on its account logged a move:\n%s", logs)
 	}
 
-	h.pickAccount(conv, "", map[string]bool{"aff-a": true})
+	h.pickAccount(context.Background(), conv, "", map[string]bool{"aff-a": true})
 	want := "[SessionAffinity] Bound account aff-a unavailable, conversation moved to aff-b@example.com"
 	if !strings.Contains(logs.String(), want) {
 		t.Fatalf("missing %q in logs:\n%s", want, logs)

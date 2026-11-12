@@ -21,6 +21,10 @@ type apiKeyView struct {
 	TokensUsed    int64   `json:"tokensUsed"`
 	CreditsUsed   float64 `json:"creditsUsed"`
 	RequestsCount int64   `json:"requestsCount"`
+	// AccountIDs is always an array; empty means every account.
+	AccountIDs      []string `json:"accountIds"`
+	CallLimit       int64    `json:"callLimit,omitempty"`
+	SuccessfulCalls int64    `json:"successfulCalls"`
 }
 
 // apiKeyLockoutCode marks a 409 for a change that would leave a proxy that
@@ -46,7 +50,18 @@ func toApiKeyView(entry config.ApiKeyEntry) apiKeyView {
 		TokensUsed:    entry.TokensUsed,
 		CreditsUsed:   entry.CreditsUsed,
 		RequestsCount: entry.RequestsCount,
+
+		AccountIDs:      apiKeyViewAccountIDs(entry),
+		CallLimit:       entry.CallLimit,
+		SuccessfulCalls: entry.SuccessfulCalls,
 	}
+}
+
+func apiKeyViewAccountIDs(entry config.ApiKeyEntry) []string {
+	if ids := config.ApiKeyAccountIDs(entry); ids != nil {
+		return ids
+	}
+	return []string{}
 }
 
 func toApiKeyDetailView(entry config.ApiKeyEntry) apiKeyView {
@@ -79,6 +94,9 @@ type apiKeyCreateRequest struct {
 	Enabled     *bool   `json:"enabled,omitempty"`
 	TokenLimit  int64   `json:"tokenLimit,omitempty"`
 	CreditLimit float64 `json:"creditLimit,omitempty"`
+
+	AccountIDs []string `json:"accountIds,omitempty"`
+	CallLimit  int64    `json:"callLimit,omitempty"`
 }
 
 func (h *Handler) apiCreateApiKey(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +121,8 @@ func (h *Handler) apiCreateApiKey(w http.ResponseWriter, r *http.Request) {
 		Enabled:     enabled,
 		TokenLimit:  req.TokenLimit,
 		CreditLimit: req.CreditLimit,
+		AccountIDs:  req.AccountIDs,
+		CallLimit:   req.CallLimit,
 	})
 	if err != nil {
 		writeAdminErr(w, http.StatusBadRequest, err, "")
@@ -124,6 +144,9 @@ type apiKeyUpdateRequest struct {
 	Enabled     *bool    `json:"enabled,omitempty"`
 	TokenLimit  *int64   `json:"tokenLimit,omitempty"`
 	CreditLimit *float64 `json:"creditLimit,omitempty"`
+	// AccountIDs replaces the allowlist when present; [] binds the key to every account.
+	AccountIDs *[]string `json:"accountIds,omitempty"`
+	CallLimit  *int64    `json:"callLimit,omitempty"`
 }
 
 func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id string) {
@@ -140,6 +163,9 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 	}
 
 	patch := *existing
+	// existing was read before the update takes the config lock. "" keeps the
+	// stored value, so a key regenerated in between is not written back.
+	patch.Key = ""
 	if req.Name != nil {
 		patch.Name = *req.Name
 	}
@@ -154,6 +180,12 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 	}
 	if req.CreditLimit != nil {
 		patch.CreditLimit = *req.CreditLimit
+	}
+	if req.AccountIDs != nil {
+		patch.AccountIDs = *req.AccountIDs
+	}
+	if req.CallLimit != nil {
+		patch.CallLimit = *req.CallLimit
 	}
 	if err := config.UpdateApiKeyGuarded(id, patch); err != nil {
 		if errors.Is(err, config.ErrApiKeyLockout) {
