@@ -186,6 +186,10 @@ func (h *Handler) writeMicrosoftAdded(w http.ResponseWriter, account config.Acco
 // an account already stored.
 func (h *Handler) writeMicrosoftSaved(w http.ResponseWriter, account config.Account, warning microsoftWarning, updated bool) {
 	h.pool.Reload()
+	//! An update keeps the stored profile when this login could not resolve one, so nothing is pending.
+	if updated && warning.code == codeMicrosoftProfilePending && strings.TrimSpace(account.ProfileArn) != "" {
+		warning = microsoftWarning{}
+	}
 	if warning.text != "" {
 		logger.Warnf("[MicrosoftSSO] %s: %s", account.Email, warning.text)
 	} else if updated {

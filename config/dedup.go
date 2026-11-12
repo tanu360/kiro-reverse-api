@@ -20,6 +20,10 @@ var duplicateReasonOrder = []string{
 	DuplicateReasonEmail,
 }
 
+// AuthFailureBanReason is the ban reason the proxy sets when Kiro rejects an
+// account's token. A fresh login cures it, so an upsert lifts this ban only.
+const AuthFailureBanReason = "Authentication failed - token invalid or expired"
+
 var (
 	// ErrAccountNotFound is a merge that names an account no longer stored.
 	ErrAccountNotFound = errors.New("account not found")
@@ -295,6 +299,8 @@ func upsertCredential(account Account) (Account, bool, error) {
 
 // upsertInto returns a new slice, so a failed save leaves the stored list as it was.
 func upsertInto(list []Account, incoming Account) ([]Account, Account, bool, error) {
+	target := -1
+	var best Account
 	for i := range list {
 		if duplicateReason(&list[i], &incoming) == "" {
 			continue
@@ -302,13 +308,27 @@ func upsertInto(list []Account, incoming Account) ([]Account, Account, bool, err
 		if IsAPIKeyAccount(&incoming) || IsAPIKeyAccount(&list[i]) {
 			return nil, Account{}, false, ErrDuplicateKiroAPIKey
 		}
+		//! With copies already stored, the login lands on the copy a merge would keep, ranked as it will be once updated.
+		candidate := list[i]
+		applyIncoming(&candidate, incoming)
+		if target < 0 || betterKeeper(&candidate, &best) {
+			target, best = i, candidate
+		}
+	}
+	if target >= 0 {
 		next := append([]Account(nil), list...)
-		applyIncoming(&next[i], incoming)
-		return next, next[i], true, nil
+		next[target] = best
+		return next, best, true, nil
 	}
 	next := make([]Account, 0, len(list)+1)
 	next = append(append(next, list...), incoming)
 	return next, incoming, false, nil
+}
+
+// IsAuthFailureBan is an account the proxy banned because Kiro rejected its
+// token, and that the operator has not silenced.
+func IsAuthFailureBan(a *Account) bool {
+	return a != nil && !a.Silent && a.BanStatus == "BANNED" && a.BanReason == AuthFailureBanReason
 }
 
 func setIfPresent(dst *string, value string) {
@@ -326,11 +346,20 @@ func fillIfEmpty(dst *string, value string) {
 // applyIncoming moves a fresh login onto the stored account. The login is the
 // newest proof of the credential, so its token set replaces the old one; the
 // ID, machine ID, weight, proxy, enabled and ban state, counters and a pinned
-// profile stay the operator's.
+// profile stay the operator's. The one exception is a ban for a rejected
+// token, which a fresh token cures.
 func applyIncoming(dst *Account, src Account) {
-	if strings.TrimSpace(src.AccessToken) != "" || strings.TrimSpace(src.RefreshToken) != "" {
+	freshToken := strings.TrimSpace(src.AccessToken) != "" || strings.TrimSpace(src.RefreshToken) != ""
+	if freshToken {
 		dst.AccessToken = src.AccessToken
 		dst.ExpiresAt = src.ExpiresAt
+	}
+	//! A re-login is how users fix a dead token; an operator's disable, a silence and a suspension stay.
+	if freshToken && IsAuthFailureBan(dst) {
+		dst.Enabled = true
+		dst.BanStatus = "ACTIVE"
+		dst.BanReason = ""
+		dst.BanTime = 0
 	}
 	setIfPresent(&dst.RefreshToken, src.RefreshToken)
 	if strings.TrimSpace(src.ClientID) != "" {

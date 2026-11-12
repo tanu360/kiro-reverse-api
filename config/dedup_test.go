@@ -279,6 +279,98 @@ func TestUpsertAccountRejectsDuplicateAPIKey(t *testing.T) {
 	})
 }
 
+func TestUpsertAccountLiftsOnlyAnAuthFailureBan(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		seed := []Account{
+			{ID: "dead", AuthMethod: "idc", Provider: "BuilderId", UserId: "u-dead", RefreshToken: "rt-dead",
+				Enabled: false, BanStatus: "BANNED", BanReason: AuthFailureBanReason, BanTime: 123},
+			{ID: "suspended", AuthMethod: "idc", Provider: "BuilderId", UserId: "u-suspended", RefreshToken: "rt-s",
+				Enabled: false, BanStatus: "BANNED", BanReason: "AWS temporarily suspended - unusual user activity detected", BanTime: 123},
+			{ID: "off", AuthMethod: "idc", Provider: "BuilderId", UserId: "u-off", RefreshToken: "rt-off",
+				Enabled: false, BanStatus: "DISABLED", BanTime: 123},
+			{ID: "silenced", AuthMethod: "idc", Provider: "BuilderId", UserId: "u-silenced", RefreshToken: "rt-silenced",
+				Enabled: false, Silent: true, BanStatus: "BANNED", BanReason: AuthFailureBanReason, BanTime: 123},
+		}
+		for _, a := range seed {
+			if err := AddAccount(a); err != nil {
+				t.Fatalf("seed %s: %v", a.ID, err)
+			}
+		}
+		for _, a := range seed {
+			stored, updated, err := UpsertAccount(Account{
+				ID: "login-" + a.ID, AuthMethod: "idc", Provider: "BuilderId", UserId: a.UserId,
+				AccessToken: "at-fresh", RefreshToken: "rt-fresh-" + a.ID, ExpiresAt: 900, Enabled: true,
+			})
+			if err != nil || !updated || stored.ID != a.ID {
+				t.Fatalf("relogin of %s saved %q updated=%v err=%v", a.ID, stored.ID, updated, err)
+			}
+		}
+		byID := map[string]Account{}
+		for _, a := range GetAccounts() {
+			byID[a.ID] = a
+		}
+		if got := byID["dead"]; !got.Enabled || got.BanStatus != "ACTIVE" || got.BanReason != "" || got.BanTime != 0 ||
+			!IsHealthyAccount(&got) {
+			t.Fatalf("a fresh login must lift the auth-failure ban: %+v", got)
+		}
+		for _, want := range seed[1:] {
+			id, got := want.ID, byID[want.ID]
+			if got.Enabled || got.BanStatus != want.BanStatus || got.BanReason != want.BanReason || got.Silent != want.Silent {
+				t.Fatalf("%s state changed: %+v", id, got)
+			}
+			if got.RefreshToken != "rt-fresh-"+id {
+				t.Fatalf("%s did not take the new token: %+v", id, got)
+			}
+		}
+	})
+}
+
+func TestUpsertAccountUpdatesTheCopyAMergeWouldKeep(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		for _, a := range []Account{
+			{ID: "stale", AuthMethod: "social", Provider: "Google", UserId: "u-1", RefreshToken: "rt-stale",
+				Enabled: false, BanStatus: "DISABLED", LastRefresh: 900},
+			{ID: "healthy", AuthMethod: "social", Provider: "Google", UserId: "u-1", RefreshToken: "rt-healthy",
+				Enabled: true, LastRefresh: 100},
+			{ID: "other", AuthMethod: "social", Provider: "Google", UserId: "u-2", RefreshToken: "rt-other", Enabled: true},
+		} {
+			if err := AddAccount(a); err != nil {
+				t.Fatalf("seed %s: %v", a.ID, err)
+			}
+		}
+		stored, updated, err := UpsertAccount(Account{
+			ID: "login", AuthMethod: "social", Provider: "Google", UserId: "u-1",
+			AccessToken: "at-fresh", RefreshToken: "rt-fresh", ExpiresAt: 900, Enabled: true,
+		})
+		if err != nil || !updated || stored.ID != "healthy" {
+			t.Fatalf("relogin saved %q updated=%v err=%v, want the healthy copy", stored.ID, updated, err)
+		}
+		byID := map[string]Account{}
+		for _, a := range GetAccounts() {
+			byID[a.ID] = a
+		}
+		if len(byID) != 3 || byID["healthy"].RefreshToken != "rt-fresh" || byID["stale"].RefreshToken != "rt-stale" {
+			t.Fatalf("accounts after relogin = %+v", byID)
+		}
+
+		//! A copy banned for its dead token ranks as it will be once the login revives it.
+		if err := SetAccountBanStatus("healthy", "DISABLED", ""); err != nil {
+			t.Fatalf("disable: %v", err)
+		}
+		if err := AddAccount(Account{ID: "revivable", AuthMethod: "social", Provider: "Google", UserId: "u-1",
+			RefreshToken: "rt-dead", BanStatus: "BANNED", BanReason: AuthFailureBanReason, LastRefresh: 50}); err != nil {
+			t.Fatalf("seed revivable: %v", err)
+		}
+		stored, updated, err = UpsertAccount(Account{
+			ID: "login-2", AuthMethod: "social", Provider: "Google", UserId: "u-1",
+			RefreshToken: "rt-fresh-2", ExpiresAt: 950, Enabled: true,
+		})
+		if err != nil || !updated || stored.ID != "revivable" || !stored.Enabled {
+			t.Fatalf("second relogin saved %+v updated=%v err=%v, want the revived copy", stored, updated, err)
+		}
+	})
+}
+
 func TestMergeAccountsSumsCountersAndRemovesOthers(t *testing.T) {
 	forEachStore(t, func(t *testing.T) {
 		var notified []string

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -145,6 +146,49 @@ func TestMicrosoftReloginUpdatesExistingAccount(t *testing.T) {
 	h.writeMicrosoftSaved(rec, stored, microsoftWarning{}, updated)
 	if resp := decodeSaved(t, rec); resp.Account.ID != "entra" || !resp.Account.Updated {
 		t.Fatalf("relogin answered %+v", resp.Account)
+	}
+}
+
+func TestMicrosoftReloginKeepsStoredProfileWithoutPendingWarning(t *testing.T) {
+	h := newMicrosoftHandlerForTest(t)
+	pending := microsoftWarning{text: "The account was added, but its Kiro profile could not be resolved yet", code: codeMicrosoftProfilePending}
+	warningOf := func(account config.Account, updated bool) string {
+		rec := httptest.NewRecorder()
+		h.writeMicrosoftSaved(rec, account, pending, updated)
+		var resp map[string]interface{}
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode %s: %v", rec.Body.String(), err)
+		}
+		code, _ := resp["warningCode"].(string)
+		return code
+	}
+	resolved := config.Account{ID: "entra", Email: "me@contoso.com", ProfileArn: "arn:aws:codewhisperer:us-east-1:1:profile/P"}
+	if code := warningOf(resolved, true); code != "" {
+		t.Fatalf("an update that kept the stored profile warned %q", code)
+	}
+	if code := warningOf(resolved, false); code != codeMicrosoftProfilePending {
+		t.Fatalf("a new account warned %q, want %q", code, codeMicrosoftProfilePending)
+	}
+	unresolved := resolved
+	unresolved.ProfileArn = ""
+	if code := warningOf(unresolved, true); code != codeMicrosoftProfilePending {
+		t.Fatalf("an update with no stored profile warned %q, want %q", code, codeMicrosoftProfilePending)
+	}
+}
+
+func TestAuthFailureBanUsesTheReasonAnUpsertLifts(t *testing.T) {
+	account := config.Account{ID: "dead", Email: "dead@example.com", AuthMethod: "idc", Provider: "BuilderId", UserId: "u-dead",
+		RefreshToken: "rt-dead", Enabled: true}
+	h := newDedupHandler(t, account)
+	h.handleAccountFailure(&account, errors.New("HTTP 401: unauthorized"))
+	banned := config.GetAccounts()[0]
+	if banned.Enabled || !config.IsAuthFailureBan(&banned) {
+		t.Fatalf("auth failure stored %q/%q, want the ban an upsert lifts", banned.BanStatus, banned.BanReason)
+	}
+	stored, updated, err := config.UpsertAccount(config.Account{ID: "relogin", AuthMethod: "idc", Provider: "BuilderId",
+		UserId: "u-dead", AccessToken: "at-fresh", RefreshToken: "rt-fresh", Enabled: true})
+	if err != nil || !updated || stored.ID != "dead" || !stored.Enabled || stored.BanStatus != "ACTIVE" {
+		t.Fatalf("relogin saved %+v updated=%v err=%v, want the banned account revived", stored, updated, err)
 	}
 }
 
