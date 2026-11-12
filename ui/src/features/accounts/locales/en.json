@@ -4,6 +4,7 @@
   "actions.add": "Add account",
   "actions.export": "Export",
   "actions.refreshToken": "Refresh token",
+  "actions.relogin": "Sign in again",
   "actions.test": "Test",
   "actions.details": "Details",
   "actions.copyJson": "Copy JSON",

@@ -4,6 +4,7 @@
   "actions.add": "Thêm tài khoản",
   "actions.export": "Xuất",
   "actions.refreshToken": "Làm mới token",
+  "actions.relogin": "Đăng nhập lại",
   "actions.test": "Kiểm tra",
   "actions.details": "Chi tiết",
   "actions.copyJson": "Sao chép JSON",

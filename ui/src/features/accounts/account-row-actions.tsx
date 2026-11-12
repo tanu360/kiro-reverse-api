@@ -3,6 +3,7 @@ import {
   Delete02Icon,
   EllipsisVerticalIcon,
   FlaskConicalIcon,
+  Login03Icon,
   PanelRightOpenIcon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
@@ -18,6 +19,7 @@ import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { isBanned } from "./account-model";
+import { useOpenRelogin } from "./relogin-context";
 import {
   useCopyAccountJson,
   useDeleteAccount,
@@ -64,13 +66,23 @@ export function EnabledSwitch({ account }: { account: Account }): JSX.Element {
   );
 }
 
-/** Copy JSON, then Delete after a separator: the end of every account menu. */
+/**
+ * Sign in again (when the page can open it), Copy JSON, then Delete after a separator: the end of
+ * every account menu.
+ */
 function ManageMenuItems({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
   const copyJson = useCopyAccountJson();
   const remove = useDeleteAccount();
+  const openRelogin = useOpenRelogin();
   return (
     <>
+      {openRelogin ? (
+        <MenuItem onClick={() => openRelogin(account)}>
+          <HugeiconsIcon icon={Login03Icon} aria-hidden="true" />
+          {t("actions.relogin")}
+        </MenuItem>
+      ) : null}
       <MenuItem onClick={() => void copyJson(account.id)}>
         <HugeiconsIcon icon={Copy01Icon} aria-hidden="true" />
         {t("actions.copyJson")}
