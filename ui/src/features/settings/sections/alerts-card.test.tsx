@@ -142,7 +142,9 @@ describe("AlertsCard", () => {
     await user.click(screen.getByRole("button", { name: "Add channel" }));
     let dialog = await screen.findByRole("dialog", { name: "Add channel" });
     // A new channel has no saved secret to remove.
-    expect(within(dialog).queryByRole("checkbox", { name: "Remove the saved secret" })).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("checkbox", { name: "Remove the saved secret" }),
+    ).not.toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Name"), "Receiver");
     await user.type(within(dialog).getByLabelText("Webhook URL"), "https://hooks.example.com/x");
     await user.type(within(dialog).getByLabelText("Signing secret"), "s3cret");
@@ -180,7 +182,9 @@ describe("AlertsCard", () => {
     await user.click(screen.getByRole("button", { name: "Edit Receiver" }));
     dialog = await screen.findByRole("dialog", { name: "Edit channel" });
     expect(within(dialog).getByLabelText("Signing secret")).not.toHaveAttribute("placeholder");
-    expect(within(dialog).queryByRole("checkbox", { name: "Remove the saved secret" })).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("checkbox", { name: "Remove the saved secret" }),
+    ).not.toBeInTheDocument();
   });
 
   it("names a field the server rejected by its own rule, not as required", async () => {

@@ -1,6 +1,6 @@
+import type { AccountHealth } from "@/lib/api/account-health";
 import type { LogRetention } from "@/lib/api/log-retention";
 import type { ResponseHeaderRule } from "@/lib/api/response-headers";
-import type { AccountHealth } from "@/lib/api/account-health";
 import type {
   Account,
   AccountFull,
