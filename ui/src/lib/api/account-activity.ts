@@ -56,6 +56,8 @@ export function accountActivityQuery() {
  * One account's slice of the shared poll. Every row reads the same query, and the selected slice
  * keeps its identity while its numbers stay the same, so a poll re-renders only the rows whose
  * numbers moved. An account the server has not listed yet (just added) reads as idle.
+ * Rows mounted at different times still poll as one: every fetch of the query restarts each
+ * observer's refetchInterval timer (QueryObserver.onQueryUpdate), so there is one 5 s schedule.
  */
 export function useAccountActivity(accountId: string) {
   const select = useCallback(

@@ -355,3 +355,40 @@ func TestNoAccountErrorAllAtRPMLimitIs429(t *testing.T) {
 		t.Fatalf("noAccountError with the limit off and the account cooling down = %d, want 503", status)
 	}
 }
+
+func TestDirectWebSearchAllAtRPMLimitIs429(t *testing.T) {
+	h := newStreamTestHandler(t, func(http.ResponseWriter, *http.Request) {
+		t.Error("direct web search must not call the model")
+	})
+	stubMCPWebSearch(t, http.StatusOK, mcpOneResult)
+	clearRPMStarts(h.pool)
+	t.Cleanup(func() { clearRPMStarts(h.pool) })
+	if err := config.UpdateAccountRPMLimit(1); err != nil {
+		t.Fatalf("set limit: %v", err)
+	}
+
+	send := func() *httptest.ResponseRecorder {
+		return postClaudeMessages(t, h, `{"model":"claude-sonnet-4.5","max_tokens":64,
+			"tools":[{"type":"web_search_20250305","name":"web_search"}],
+			"messages":[{"role":"user","content":"Perform a web search for the query: go"}]}`)
+	}
+	if rec := send(); rec.Code != http.StatusOK {
+		t.Fatalf("first search: status %d body %s", rec.Code, rec.Body.String())
+	}
+	rec := send()
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second search in the same minute: status %d body %s, want 429", rec.Code, rec.Body.String())
+	}
+	var payload struct {
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode %s: %v", rec.Body.String(), err)
+	}
+	if payload.Error.Type != "rate_limit_error" || !strings.Contains(payload.Error.Message, "1 requests per minute") {
+		t.Fatalf("error = %+v, want rate_limit_error naming the limit", payload.Error)
+	}
+}
