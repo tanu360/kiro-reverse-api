@@ -75,6 +75,9 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 	if msg := validateClaudeToolChoice(req); msg != "" {
 		return msg
 	}
+	if msg := validateClaudeStructuredOutput(req); msg != "" {
+		return msg
+	}
 	if len(req.Messages) == 0 {
 		return "messages must not be empty"
 	}
@@ -180,6 +183,9 @@ func resolveClaudeThinkingResponseOptions(thinking *ClaudeThinkingConfig, defaul
 
 func validateOpenAIRequestShape(req *OpenAIRequest) string {
 	if msg := validateOpenAIToolChoice(req); msg != "" {
+		return msg
+	}
+	if msg := validateChatResponseFormat(req); msg != "" {
 		return msg
 	}
 	if len(req.Messages) == 0 {
@@ -932,6 +938,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 
 	kiroPayload := ClaudeToKiro(&req, thinking)
 	h.applyReasoningEffort(kiroPayload, req.Model, claudeOutputEffort(&req))
+	attachStructuredOutput(kiroPayload, claudeStructuredOutputSpec(&req), req.Stream)
 
 	if req.Stream {
 		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile, apiKeyReservation)
@@ -1739,6 +1746,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 
 	kiroPayload := OpenAIToKiro(&req, thinking)
 	h.applyReasoningEffort(kiroPayload, req.Model, req.ReasoningEffort)
+	attachStructuredOutput(kiroPayload, chatStructuredOutputSpec(&req), req.Stream)
 
 	if req.Stream {
 		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)

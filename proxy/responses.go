@@ -29,6 +29,8 @@ type OpenAIResponsesReasoning struct {
 
 type OpenAIResponsesText struct {
 	Format map[string]interface{} `json:"format,omitempty"`
+	// formatRaw is format as the client wrote it; set by UnmarshalJSON in structured_output.go.
+	formatRaw json.RawMessage
 }
 
 type OpenAIResponsesTool struct {
@@ -54,13 +56,15 @@ type responsesPreparedRequest struct {
 	Metadata         map[string]interface{}
 	PreviousResponse string
 	ToolIdentities   map[string]responsesToolIdentity
+	StructuredOutput *structuredOutputSpec
 }
 
 func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessage) (*responsesPreparedRequest, string) {
 	if strings.TrimSpace(req.Model) == "" {
 		return nil, "model is required"
 	}
-	if msg := validateResponsesTextFormat(req.Text); msg != "" {
+	structuredOutput, msg := parseResponsesTextFormat(req.Text)
+	if msg != "" {
 		return nil, msg
 	}
 
@@ -90,9 +94,6 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 	messagesForKiro = append(messagesForKiro, previous...)
 	if instructionText := strings.TrimSpace(extractOpenAIMessageText(responsesContentToOpenAIContent(req.Instructions))); instructionText != "" {
 		messagesForKiro = append(messagesForKiro, OpenAIMessage{Role: "system", Content: instructionText})
-	}
-	if formatInstruction := responsesTextFormatInstruction(req.Text); formatInstruction != "" {
-		messagesForKiro = append(messagesForKiro, OpenAIMessage{Role: "system", Content: formatInstruction})
 	}
 	messagesForKiro = append(messagesForKiro, currentMessages...)
 
@@ -128,6 +129,7 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		Metadata:         req.Metadata,
 		PreviousResponse: req.PreviousResponseID,
 		ToolIdentities:   identities,
+		StructuredOutput: structuredOutput,
 	}, ""
 }
 
@@ -136,37 +138,6 @@ func reqReasoningEffort(req *OpenAIResponsesRequest) string {
 		return ""
 	}
 	return req.Reasoning.Effort
-}
-
-func validateResponsesTextFormat(text *OpenAIResponsesText) string {
-	if text == nil || len(text.Format) == 0 {
-		return ""
-	}
-	formatType, _ := text.Format["type"].(string)
-	switch strings.ToLower(strings.TrimSpace(formatType)) {
-	case "", "text", "json_schema", "json_object":
-		return ""
-	}
-	return "unsupported text.format type: " + formatType
-}
-
-func responsesTextFormatInstruction(text *OpenAIResponsesText) string {
-	if text == nil || len(text.Format) == 0 {
-		return ""
-	}
-	formatType, _ := text.Format["type"].(string)
-	switch strings.ToLower(strings.TrimSpace(formatType)) {
-	case "json_schema":
-		b, err := json.Marshal(text.Format)
-		if err != nil {
-			return "Respond only with valid JSON matching the requested JSON schema. Do not include markdown fences or extra text."
-		}
-		return "Respond only with valid JSON matching this JSON schema. Do not include markdown fences or extra text.\n" + string(b)
-	case "json_object":
-		return "Respond only with a valid JSON object. Do not include markdown fences or extra text."
-	default:
-		return ""
-	}
 }
 
 func convertResponsesTools(tools []OpenAIResponsesTool, toolChoice interface{}) ([]OpenAITool, string) {
