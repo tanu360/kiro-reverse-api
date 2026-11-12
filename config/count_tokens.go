@@ -90,9 +90,31 @@ func ValidateCountTokensKey(key string) error {
 	return nil
 }
 
+// SameCountTokensOrigin reports whether two URLs have the same scheme, host and port (a
+// default port counts as none). A URL that does not parse matches nothing.
+func SameCountTokensOrigin(a, b string) bool {
+	oa, okA := countTokensOrigin(a)
+	ob, okB := countTokensOrigin(b)
+	return okA && okB && oa == ob
+}
+
+func countTokensOrigin(raw string) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" {
+		return "", false
+	}
+	scheme := strings.ToLower(u.Scheme)
+	port := u.Port()
+	if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
+		port = ""
+	}
+	return scheme + "://" + strings.ToLower(u.Hostname()) + "|" + port, true
+}
+
 // UpdateCountTokensSettings saves the external service. An empty apiURL turns it off and drops
-// the URL, key and auth type. A nil or empty apiKey keeps the saved key; clearKey drops it, and
-// a new key given in the same call replaces it.
+// the URL, key and auth type. A nil or empty apiKey keeps the saved key while the scheme, host
+// and port stay the same; a URL on another origin drops it, so a saved key never goes to a host
+// it was not given for. clearKey drops it, and a new key given in the same call replaces it.
 func UpdateCountTokensSettings(apiURL, authType string, apiKey *string, clearKey bool) error {
 	apiURL = strings.TrimSpace(apiURL)
 	if apiURL == "" {
@@ -122,11 +144,11 @@ func UpdateCountTokensSettings(apiURL, authType string, apiKey *string, clearKey
 
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
-	cfg.CountTokensApiURL = apiURL
-	cfg.CountTokensAuthType = authType
-	if clearKey {
+	if clearKey || !SameCountTokensOrigin(cfg.CountTokensApiURL, apiURL) {
 		cfg.CountTokensApiKey = ""
 	}
+	cfg.CountTokensApiURL = apiURL
+	cfg.CountTokensAuthType = authType
 	if newKey != "" {
 		cfg.CountTokensApiKey = newKey
 	}

@@ -161,6 +161,7 @@
   "countTokens.optional": "Opcional",
   "countTokens.apiKeyKeep": "Deixe em branco para manter a chave salva ({key})",
   "countTokens.apiKeyClear": "Apagar a chave salva",
+  "countTokens.apiKeyHostChanged": "O host mudou, então a chave salva será apagada. Digite a chave de novo para enviá-la.",
   "countTokens.fallbackNote": "Se a API falhar, responder com erro ou demorar mais de 5 segundos, a estimativa local é usada.",
   "countTokens.forwardNote": "A requisição do cliente é enviada como chegou, só sem o sufixo de thinking no nome do modelo. A chave que o cliente enviou a este proxy nunca é repassada.",
   "countTokens.applyNote": "Ao salvar, vale a partir da próxima requisição count_tokens, sem reiniciar.",

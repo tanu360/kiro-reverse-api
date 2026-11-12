@@ -43,13 +43,13 @@ describe("CountTokensCard", () => {
     await user.click(await screen.findByRole("button", { name: "Set up counting API" }));
     const dialog = await screen.findByRole("dialog", { name: "Set up counting API" });
 
-    await user.type(
-      within(dialog).getByLabelText("API URL"),
-      "https://count.example/v1/messages/count_tokens",
-    );
+    // Long values are pasted: typing them key by key takes seconds on a loaded runner.
+    await user.click(within(dialog).getByLabelText("API URL"));
+    await user.paste("https://count.example/v1/messages/count_tokens");
     await user.click(within(dialog).getByRole("combobox", { name: "Send the key as" }));
     await user.click(await screen.findByRole("option", { name: "Authorization: Bearer" }));
-    await user.type(within(dialog).getByLabelText("API key"), "sk-ant-api03-secret-WXYZ");
+    await user.click(within(dialog).getByLabelText("API key"));
+    await user.paste("sk-ant-api03-secret-WXYZ");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await screen.findByText("Your settings were saved.");
@@ -78,7 +78,8 @@ describe("CountTokensCard", () => {
     await user.click(await screen.findByRole("button", { name: "Set up counting API" }));
     const dialog = await screen.findByRole("dialog", { name: "Set up counting API" });
 
-    await user.type(within(dialog).getByLabelText("API URL"), "https://user:pw@count.example");
+    await user.click(within(dialog).getByLabelText("API URL"));
+    await user.paste("https://user:pw@count.example");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(
@@ -127,6 +128,48 @@ describe("CountTokensCard", () => {
       },
     ]);
     expect(mockDb.countTokens.key).toBe("");
+  });
+
+  it("drops the saved key when the URL moves to another host", async () => {
+    mockDb.countTokens = {
+      url: "https://count.example/v1/messages/count_tokens",
+      authType: "x-api-key",
+      key: "sk-saved-key-0123-abcd",
+    };
+    const { user } = renderWithProviders(<CountTokensCard />);
+    expect(await screen.findByText("Sends the key as x-api-key (••••abcd)")).toBeInTheDocument();
+    await user.click(within(card()).getByRole("button", { name: "Edit" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit counting API" });
+    const urlInput = within(dialog).getByLabelText("API URL");
+
+    // A new path on the same host keeps the key.
+    await user.clear(urlInput);
+    await user.paste("https://count.example/v2/count");
+    expect(
+      within(dialog).getByText("Leave blank to keep the saved key (••••abcd)"),
+    ).toBeInTheDocument();
+
+    // Another host: the form says the key goes and stops offering the checkbox.
+    await user.clear(urlInput);
+    await user.paste("http://counter.example:8787/count");
+    expect(
+      within(dialog).getByText(
+        "The host changed, so the saved key will be removed. Enter the key again to send it.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox", { name: "Remove the saved key" })).toBeNull();
+    expect(within(dialog).getByLabelText("API key")).toBeEnabled();
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(await within(card()).findByText("No key sent")).toBeInTheDocument();
+    expect(await Promise.all(posts)).toEqual([
+      { countTokensApiUrl: "http://counter.example:8787/count", countTokensAuthType: "x-api-key" },
+    ]);
+    expect(mockDb.countTokens).toEqual({
+      url: "http://counter.example:8787/count",
+      authType: "x-api-key",
+      key: "",
+    });
   });
 
   it("removes the API after confirmation", async () => {

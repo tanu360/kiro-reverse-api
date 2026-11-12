@@ -20,6 +20,15 @@ export function validCountTokensUrl(raw: string): boolean {
   return url.hostname !== "" && url.username === "" && url.password === "";
 }
 
+/**
+ * config.SameCountTokensOrigin: the same scheme, host and port. The server keeps a saved key
+ * only while the URL stays on its origin; a URL that does not parse matches nothing.
+ */
+export function sameCountTokensOrigin(a: string, b: string): boolean {
+  if (!validCountTokensUrl(a) || !validCountTokensUrl(b)) return false;
+  return new URL(a).origin === new URL(b).origin;
+}
+
 /** proxy/count_tokens_remote.go maskCountTokensKey: the last 4 of a key of 12 or more. */
 export function maskCountTokensKey(key: string): string {
   if (!key) return "";

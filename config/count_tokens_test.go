@@ -44,17 +44,46 @@ func TestCountTokensSettingsPersistAndKeepKey(t *testing.T) {
 		t.Fatalf("persisted = %+v, want %+v", got, want)
 	}
 
-	// A blank or missing key keeps the saved one.
+	// A blank or missing key keeps the saved one while the origin stays: a new path, the
+	// default port spelled out, the host in capitals.
 	blank := ""
-	if err := UpdateCountTokensSettings("http://127.0.0.1:9000/count", CountTokensAuthXAPIKey, &blank, false); err != nil {
+	if err := UpdateCountTokensSettings("https://COUNT.example:443/v2/count", CountTokensAuthXAPIKey, &blank, false); err != nil {
 		t.Fatalf("save with blank key: %v", err)
 	}
-	if err := UpdateCountTokensSettings("http://127.0.0.1:9000/count", "", nil, false); err != nil {
+	if err := UpdateCountTokensSettings("https://count.example/v2/count?beta=true", "", nil, false); err != nil {
 		t.Fatalf("save with no key: %v", err)
 	}
 	got := GetCountTokensSettings()
-	if got.APIKey != want.APIKey || got.APIURL != "http://127.0.0.1:9000/count" || got.AuthType != CountTokensAuthXAPIKey {
+	if got.APIKey != want.APIKey || got.APIURL != "https://count.example/v2/count?beta=true" || got.AuthType != CountTokensAuthXAPIKey {
 		t.Fatalf("after edits = %+v, want the saved key kept", got)
+	}
+
+	// Another scheme, host or port without a new key drops the saved key: it was given for
+	// the old host only.
+	for _, moved := range []string{
+		"http://count.example/v2/count",
+		"https://counter.example/v2/count",
+		"https://count.example:8443/v2/count",
+	} {
+		reset := want.APIKey
+		if err := UpdateCountTokensSettings("https://count.example/v2/count", CountTokensAuthXAPIKey, &reset, false); err != nil {
+			t.Fatalf("reset: %v", err)
+		}
+		if err := UpdateCountTokensSettings(moved, CountTokensAuthXAPIKey, &blank, false); err != nil {
+			t.Fatalf("move to %s: %v", moved, err)
+		}
+		if got := GetCountTokensSettings(); got.APIKey != "" || got.APIURL != moved {
+			t.Fatalf("after a move to %s = %+v, want the key dropped", moved, got)
+		}
+	}
+	// A new key given with the new host is saved.
+	moved := "sk-moved-key-0123456789"
+	if err := UpdateCountTokensSettings("http://127.0.0.1:9000/count", CountTokensAuthXAPIKey, &moved, false); err != nil {
+		t.Fatalf("move with a key: %v", err)
+	}
+	got = GetCountTokensSettings()
+	if got.APIKey != moved || got.APIURL != "http://127.0.0.1:9000/count" {
+		t.Fatalf("after a move with a key = %+v", got)
 	}
 
 	// clearKey drops it; a new key in the same call replaces it.

@@ -46,7 +46,11 @@ import {
 } from "@/lib/api/count-tokens";
 import { queryKeys } from "@/lib/api/query-keys";
 import { useT } from "@/lib/i18n";
-import { maskCountTokensKey, validCountTokensUrl } from "../lib/count-tokens";
+import {
+  maskCountTokensKey,
+  sameCountTokensOrigin,
+  validCountTokensUrl,
+} from "../lib/count-tokens";
 import { SECTION_ID } from "./sections";
 import { SectionQuery, SettingsGroup, useSectionSave } from "./settings-section";
 
@@ -69,7 +73,9 @@ function applyUpdate(prev: CountTokensConfig, body: CountTokensConfigUpdate): Co
   const url = body.countTokensApiUrl ?? prev.countTokensApiUrl;
   if (!url) return LOCAL;
   const key = body.countTokensApiKey ?? "";
-  const keySet = key ? true : body.clearApiKey ? false : prev.countTokensApiKeySet;
+  // A blank key keeps the saved one only while the URL stays on the same origin.
+  const kept = !body.clearApiKey && sameCountTokensOrigin(prev.countTokensApiUrl, url);
+  const keySet = key ? true : kept && prev.countTokensApiKeySet;
   return {
     countTokensApiUrl: url,
     countTokensAuthType: body.countTokensAuthType ?? prev.countTokensAuthType,
@@ -211,7 +217,8 @@ function CountTokensPanel({ config }: { config: CountTokensConfig }): JSX.Elemen
 /**
  * The form: the API URL, how the key is sent and the key itself. The saved key never comes back
  * from the server, so the key field starts empty: blank keeps the saved key, and a checkbox
- * removes it.
+ * removes it. A URL on another scheme, host or port drops the saved key on the server, so the
+ * form says so instead of offering to keep it.
  */
 function CountTokensEditor({
   initial,
@@ -231,6 +238,13 @@ function CountTokensEditor({
   const [key, setKey] = useState("");
   const [clearKey, setClearKey] = useState(false);
   const [urlError, setUrlError] = useState(false);
+  // Only a valid URL on another origin counts as moved; a half-typed one can't be saved anyway.
+  const trimmedUrl = url.trim();
+  const moved =
+    validCountTokensUrl(trimmedUrl) &&
+    !sameCountTokensOrigin(initial.countTokensApiUrl, trimmedUrl);
+  const keepable = savedKey && !moved;
+  const clearing = keepable && clearKey;
 
   return (
     <DialogPopup size="xl">
@@ -240,16 +254,15 @@ function CountTokensEditor({
         onSubmit={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          const trimmed = url.trim();
-          if (!validCountTokensUrl(trimmed)) {
+          if (!validCountTokensUrl(trimmedUrl)) {
             setUrlError(true);
             return;
           }
           const body: CountTokensConfigUpdate = {
-            countTokensApiUrl: trimmed,
+            countTokensApiUrl: trimmedUrl,
             countTokensAuthType: authType,
           };
-          if (clearKey) body.clearApiKey = true;
+          if (clearing) body.clearApiKey = true;
           else if (key.trim()) body.countTokensApiKey = key.trim();
           onSave(body);
         }}
@@ -299,23 +312,25 @@ function CountTokensEditor({
                 </SelectPopup>
               </Select>
             </div>
-            <Field className="min-w-0 items-stretch" disabled={clearKey}>
+            <Field className="min-w-0 items-stretch" disabled={clearing}>
               <FieldLabel>{t("countTokens.apiKey")}</FieldLabel>
               <PasswordInput
                 autoComplete="new-password"
-                disabled={clearKey}
+                disabled={clearing}
                 onChange={setKey}
-                value={clearKey ? "" : key}
+                value={clearing ? "" : key}
               />
               <FieldDescription>
-                {savedKey
+                {keepable
                   ? t("countTokens.apiKeyKeep", { key: initial.countTokensApiKeyMasked })
-                  : t("countTokens.optional")}
+                  : savedKey
+                    ? t("countTokens.apiKeyHostChanged")
+                    : t("countTokens.optional")}
               </FieldDescription>
             </Field>
           </div>
 
-          {savedKey ? (
+          {keepable ? (
             <Label className="self-start" variant="option">
               <Checkbox
                 checked={clearKey}

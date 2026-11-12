@@ -3,6 +3,8 @@ package proxy
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +12,8 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,9 +26,51 @@ import (
 // and answers with its count. Any failure (error, timeout, non-2xx, a body without a count)
 // falls back to the local estimate, so a down service never fails a client.
 
-// countTokensHopHeader marks a request this proxy forwarded. A count_tokens request that
-// carries it is answered locally, so a URL pointing back at this proxy cannot recurse.
+// countTokensHopHeader lists the proxies a forwarded count_tokens request went through, as a
+// comma-separated list of process IDs. A request that already names this process, or has passed
+// countTokensMaxHops proxies, is answered locally, so a URL pointing back at this proxy (or a
+// loop through others) cannot recurse. A chain to another proxy with its own counter still works.
 const countTokensHopHeader = "X-Kiro-Proxy-Count-Hop"
+
+const countTokensMaxHops = 8
+
+// countTokensHopID names this process in the hop header: random, so no other proxy has it.
+var countTokensHopID = newCountTokensHopID()
+
+func newCountTokensHopID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// countTokensHops reads the hop header. Entries that cannot be a process ID are dropped, so a
+// client cannot push arbitrary text through to the external service.
+func countTokensHops(h http.Header) []string {
+	var hops []string
+	for _, value := range h.Values(countTokensHopHeader) {
+		for _, entry := range strings.Split(value, ",") {
+			entry = strings.TrimSpace(entry)
+			if validCountTokensHopID(entry) {
+				hops = append(hops, entry)
+			}
+		}
+	}
+	return hops
+}
+
+func validCountTokensHopID(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
 
 // countTokensMaxAnswerBytes caps the external answer; a real one is a few dozen bytes.
 const countTokensMaxAnswerBytes = 64 << 10
@@ -57,7 +103,7 @@ func countTokensRemoteClient() *http.Client {
 }
 
 // forwardCountTokens asks the external service for the request's input tokens. It reports
-// false when no service is set, the request already came from this proxy, or the call failed
+// false when no service is set, the request already passed through this proxy, or the call failed
 // in any way; the caller then answers with the local estimate. The client's body goes as it
 // came, except that the model loses the thinking suffix. Model mappings are not applied: the
 // service speaks Anthropic's API and knows Anthropic's model IDs, not Kiro's.
@@ -67,12 +113,17 @@ func forwardCountTokens(r *http.Request, body []byte, thinkingSuffix string) (in
 		return 0, false
 	}
 	host := countTokensURLHost(settings.APIURL)
-	if r.Header.Get(countTokensHopHeader) != "" {
-		logger.Debugf("[CountTokens] request came from a proxy hop; using local estimate")
+	hops := countTokensHops(r.Header)
+	if slices.Contains(hops, countTokensHopID) {
+		logger.Debugf("[CountTokens] request came back to this proxy; using local estimate")
+		return 0, false
+	}
+	if len(hops) >= countTokensMaxHops {
+		logger.Debugf("[CountTokens] request passed %d proxies; using local estimate", len(hops))
 		return 0, false
 	}
 
-	n, err := callCountTokensAPI(r, settings, body, thinkingSuffix)
+	n, err := callCountTokensAPI(r, settings, body, thinkingSuffix, strings.Join(append(hops, countTokensHopID), ","))
 	if err != nil {
 		if r.Context().Err() != nil {
 			// The client left; nothing to report.
@@ -85,7 +136,7 @@ func forwardCountTokens(r *http.Request, body []byte, thinkingSuffix string) (in
 	return n, true
 }
 
-func callCountTokensAPI(r *http.Request, settings config.CountTokensSettings, body []byte, thinkingSuffix string) (int, error) {
+func callCountTokensAPI(r *http.Request, settings config.CountTokensSettings, body []byte, thinkingSuffix, hops string) (int, error) {
 	payload, err := countTokensForwardBody(body, thinkingSuffix)
 	if err != nil {
 		return 0, err
@@ -107,7 +158,7 @@ func callCountTokensAPI(r *http.Request, settings config.CountTokensSettings, bo
 	if beta := r.Header.Get("anthropic-beta"); beta != "" {
 		req.Header.Set("anthropic-beta", beta)
 	}
-	req.Header.Set(countTokensHopHeader, "1")
+	req.Header.Set(countTokensHopHeader, hops)
 	// Only the configured key goes out, never the key the client sent to this proxy.
 	if settings.APIKey != "" {
 		if settings.AuthType == config.CountTokensAuthBearer {
@@ -228,7 +279,8 @@ func (h *Handler) apiGetCountTokens(w http.ResponseWriter, _ *http.Request) {
 
 // apiUpdateCountTokens saves the external counter. An omitted field keeps its saved value; an
 // empty URL turns the service off and drops the key. An empty or omitted key keeps the saved
-// one; clearApiKey drops it.
+// one while the URL stays on the same scheme, host and port, and is dropped when it moves;
+// clearApiKey drops it.
 func (h *Handler) apiUpdateCountTokens(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		APIURL   *string `json:"countTokensApiUrl"`

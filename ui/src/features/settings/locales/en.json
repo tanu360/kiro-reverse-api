@@ -161,6 +161,7 @@
   "countTokens.optional": "Optional",
   "countTokens.apiKeyKeep": "Leave blank to keep the saved key ({key})",
   "countTokens.apiKeyClear": "Remove the saved key",
+  "countTokens.apiKeyHostChanged": "The host changed, so the saved key will be removed. Enter the key again to send it.",
   "countTokens.fallbackNote": "When the API fails, answers with an error or takes more than 5 seconds, the local estimate is used.",
   "countTokens.forwardNote": "The client's request goes as it came, with the model's thinking suffix removed. The key the client sent to this proxy is never forwarded.",
   "countTokens.applyNote": "Saving applies to the next count_tokens request, without a restart.",

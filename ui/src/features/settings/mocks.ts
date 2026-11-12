@@ -11,7 +11,7 @@ import { claimMockPassword, mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { publishMockEvent } from "@/lib/mocks/events";
 import { defaultModelMappings } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
-import { maskCountTokensKey, validCountTokensUrl } from "./lib/count-tokens";
+import { maskCountTokensKey, sameCountTokensOrigin, validCountTokensUrl } from "./lib/count-tokens";
 
 // Mirrors the Go admin API (proxy/handler.go, config/model_mapping_validation.go): the same
 // validation order, error strings and patch semantics.
@@ -391,7 +391,8 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json(countTokensConfig());
   }),
 
-  // apiUpdateCountTokens: omitted fields keep their value, an empty URL clears everything.
+  // apiUpdateCountTokens: omitted fields keep their value, an empty URL clears everything, and a
+  // URL on another origin drops the saved key.
   http.post(apiUrl("/count-tokens"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;
@@ -429,7 +430,8 @@ export const handlers: HttpHandler[] = [
         code: "count_tokens_key_invalid",
       });
     }
-    let nextKey = clearKey ? "" : current.key;
+    // A blank key survives only while the URL stays on the same origin.
+    let nextKey = clearKey || !sameCountTokensOrigin(current.url, url) ? "" : current.key;
     if (key) nextKey = key;
     mockDb.countTokens = { url, authType: authType as CountTokensAuthType, key: nextKey };
     return saved();

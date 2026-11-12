@@ -160,6 +160,7 @@
   "countTokens.optional": "Không bắt buộc",
   "countTokens.apiKeyKeep": "Để trống để giữ key đã lưu ({key})",
   "countTokens.apiKeyClear": "Xóa key đã lưu",
+  "countTokens.apiKeyHostChanged": "Host đã thay đổi nên key đã lưu sẽ bị xóa. Nhập lại key để tiếp tục gửi.",
   "countTokens.fallbackNote": "Khi API lỗi, trả về mã lỗi hoặc mất hơn 5 giây, proxy dùng ước tính cục bộ.",
   "countTokens.forwardNote": "Yêu cầu của client được gửi nguyên vẹn, chỉ bỏ hậu tố thinking khỏi tên model. Key mà client gửi cho proxy này không bao giờ được chuyển tiếp.",
   "countTokens.applyNote": "Khi lưu, thay đổi áp dụng từ yêu cầu count_tokens tiếp theo, không cần khởi động lại.",

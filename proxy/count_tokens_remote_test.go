@@ -114,7 +114,7 @@ func TestCountTokensForwardsToExternalAPI(t *testing.T) {
 		if got.header.Get("anthropic-version") != "2023-06-01" || got.header.Get("anthropic-beta") != "token-counting-2024-11-01" {
 			t.Fatalf("%s: anthropic headers = %v", path, got.header)
 		}
-		if got.header.Get("Content-Type") != "application/json" || got.header.Get(countTokensHopHeader) != "1" {
+		if got.header.Get("Content-Type") != "application/json" || got.header.Get(countTokensHopHeader) != countTokensHopID {
 			t.Fatalf("%s: content type or hop header missing: %v", path, got.header)
 		}
 		var body map[string]json.RawMessage
@@ -291,11 +291,25 @@ func TestCountTokensHopHeaderSkipsExternal(t *testing.T) {
 	server, seen := fakeCountTokensService(t, http.StatusOK, `{"input_tokens":4242}`)
 	setCountTokensService(t, server.URL, config.CountTokensAuthXAPIKey, "")
 
-	if _, n := postCountTokens(t, h, "/v1/messages/count_tokens", map[string]string{countTokensHopHeader: "1"}); n != local {
-		t.Fatalf("answer with the hop header = %d, want the local estimate %d", n, local)
+	// A request that already passed through this process, or through too many proxies, is
+	// answered locally.
+	tooMany := strings.TrimSuffix(strings.Repeat("proxy-x,", countTokensMaxHops), ",")
+	for _, hops := range []string{countTokensHopID, "proxy-a, " + countTokensHopID, tooMany} {
+		if _, n := postCountTokens(t, h, "/v1/messages/count_tokens", map[string]string{countTokensHopHeader: hops}); n != local {
+			t.Fatalf("answer with hops %q = %d, want the local estimate %d", hops, n, local)
+		}
 	}
 	if len(seen) != 0 {
-		t.Fatalf("a request with the hop header reached the external service")
+		t.Fatalf("a request that came back reached the external service")
+	}
+
+	// A request from another proxy still goes to this proxy's own service, with this process
+	// added to the list; entries that cannot be a process ID are not passed on.
+	if _, n := postCountTokens(t, h, "/v1/messages/count_tokens", map[string]string{countTokensHopHeader: "proxy-a, bad id ,1"}); n != 4242 {
+		t.Fatalf("answer from a proxy chain = %d, want the external 4242", n)
+	}
+	if got := (<-seen).header.Get(countTokensHopHeader); got != "proxy-a,1,"+countTokensHopID {
+		t.Fatalf("forwarded hops = %q", got)
 	}
 
 	// A URL pointing back at this proxy: one hop, answered there with the local estimate (of
@@ -363,13 +377,21 @@ func TestCountTokensAdminAPIMasksKey(t *testing.T) {
 		t.Fatalf("after save: %d %v", code, got)
 	}
 
-	// Edit with a blank key keeps it; a short key masks to dots only.
-	if code, _, raw := call(http.MethodPost, `{"countTokensApiUrl":"http://127.0.0.1:9000/count","countTokensAuthType":"x-api-key","countTokensApiKey":""}`); code != http.StatusOK {
+	// An edit with a blank key keeps it on the same host and drops it on another host.
+	if code, _, raw := call(http.MethodPost, `{"countTokensApiUrl":"https://count.example/v2/count_tokens","countTokensAuthType":"x-api-key","countTokensApiKey":""}`); code != http.StatusOK {
 		t.Fatalf("edit: %d %s", code, raw)
 	}
 	if s := config.GetCountTokensSettings(); s.APIKey != key || s.AuthType != config.CountTokensAuthXAPIKey {
 		t.Fatalf("after a blank-key edit: %+v", s)
 	}
+	if code, _, raw := call(http.MethodPost, `{"countTokensApiUrl":"http://127.0.0.1:9000/count","countTokensApiKey":""}`); code != http.StatusOK {
+		t.Fatalf("move: %d %s", code, raw)
+	}
+	if _, got, raw := call(http.MethodGet, ""); got["countTokensApiKeySet"] != false || got["countTokensApiUrl"] != "http://127.0.0.1:9000/count" {
+		t.Fatalf("after a move to another host: %s", raw)
+	}
+
+	// A short key masks to dots only.
 	if code, _, raw := call(http.MethodPost, `{"countTokensApiKey":"short-key"}`); code != http.StatusOK {
 		t.Fatalf("key only: %d %s", code, raw)
 	}
