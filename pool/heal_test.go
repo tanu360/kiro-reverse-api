@@ -153,6 +153,24 @@ func TestClearTransientKeepsQuotaAndRetryAfter(t *testing.T) {
 	}
 }
 
+func TestClearTransientKeepsThrottleBackoff(t *testing.T) {
+	p := newTestPool(config.Account{ID: "storm", AccessToken: "t"})
+	for i := 0; i < 4; i++ {
+		p.RecordThrottleError("storm", 0)
+	}
+	if cleared := p.ClearTransient([]string{"storm"}); !slices.Equal(cleared, []string{"storm"}) {
+		t.Fatalf("cleared = %v, want storm", cleared)
+	}
+	if !p.CooldownUntil("storm").IsZero() {
+		t.Fatal("the throttle cooldown survived the heal")
+	}
+	//! The fifth throttle in a row waits the full ten minutes, heal or no heal.
+	p.RecordThrottleError("storm", 0)
+	if left := time.Until(p.CooldownUntil("storm")); left < 9*time.Minute {
+		t.Fatalf("backoff after a heal = %v, want the ladder to keep climbing", left)
+	}
+}
+
 func TestHealViewReportsServableAndCooled(t *testing.T) {
 	now := time.Now()
 	p := newTestPool(

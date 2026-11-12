@@ -142,17 +142,24 @@ func rotatable(acc *config.Account, now time.Time, allowOverUsage bool) bool {
 	return !isOverUsageLimit(*acc) || isUpstreamOverageEnabled(*acc) || allowOverUsage
 }
 
-// ClearTransient resets the error counts of ids and drops their healable
-// cooldowns. Quota, retry-hint and disable cooldowns stay. It returns the ids
-// whose cooldown it dropped.
+// ClearTransient drops the healable cooldowns of ids and resets their error
+// counts, except under a throttle backoff, which keeps its count. Quota,
+// retry-hint and disable cooldowns stay. It returns the ids whose cooldown it
+// dropped.
 func (p *AccountPool) ClearTransient(ids []string) []string {
 	now := time.Now()
 	p.mu.Lock()
 	var cleared []string
 	for _, id := range ids {
-		delete(p.errorCounts, id)
 		until, ok := p.cooldowns[id]
-		if !ok || !now.Before(until) || !p.cooldownKinds[id].Healable() {
+		active := ok && now.Before(until)
+		kind := p.cooldownKinds[id]
+		//! A throttle heal keeps the error count: the backoff goes on climbing if the
+		//! upstream still throttles, instead of falling back to its first minute.
+		if !active || kind != CooldownThrottle {
+			delete(p.errorCounts, id)
+		}
+		if !active || !kind.Healable() {
 			continue
 		}
 		delete(p.cooldowns, id)
