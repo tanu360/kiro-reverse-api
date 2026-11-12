@@ -75,6 +75,22 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/accounts-detail-dark.webp">
+    <img alt="Chi tiết tài khoản" src="screenshots/vi/accounts-detail-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Chi tiết tài khoản</b> — bảng mở ra khi bấm một dòng: credit gói, 24 giờ qua, tổng số và cài đặt</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/accounts-tester-dark.webp">
+    <img alt="Kiểm tra model" src="screenshots/vi/accounts-tester-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Kiểm tra model</b> — kiểm tra một model hoặc mọi model đã lưu cùng lúc; chạm vào một dòng để xem phản hồi và các bước</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/requests-dark.webp">
     <img alt="Yêu cầu" src="screenshots/vi/requests-light.webp" width="100%">
   </picture>

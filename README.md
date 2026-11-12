@@ -75,6 +75,22 @@ If this project helps you, a Star would mean a lot.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/accounts-detail-dark.webp">
+    <img alt="Account details" src="screenshots/en/accounts-detail-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Account details</b> — the sheet a row opens: plan credits, the last 24 hours, totals and settings</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/accounts-tester-dark.webp">
+    <img alt="Model tester" src="screenshots/en/accounts-tester-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Model tester</b> — test one model or every cached model at once; tap a row for its response and steps</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/requests-dark.webp">
     <img alt="Requests" src="screenshots/en/requests-light.webp" width="100%">
   </picture>

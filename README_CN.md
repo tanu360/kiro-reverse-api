@@ -75,6 +75,22 @@
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/accounts-detail-dark.webp">
+    <img alt="账号详情" src="screenshots/zh/accounts-detail-light.webp" width="100%">
+  </picture>
+  <br><sub><b>账号详情</b> — 点击一行打开的详情面板：套餐 Credits、最近 24 小时、汇总与设置</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/accounts-tester-dark.webp">
+    <img alt="模型测试" src="screenshots/zh/accounts-tester-light.webp" width="100%">
+  </picture>
+  <br><sub><b>模型测试</b> — 一次测试一个或全部已缓存的模型；点击一行查看响应与步骤</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/requests-dark.webp">
     <img alt="请求" src="screenshots/zh/requests-light.webp" width="100%">
   </picture>

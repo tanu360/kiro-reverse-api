@@ -75,6 +75,22 @@ Se este projeto ajuda você, uma Star significaria muito.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/accounts-detail-dark.webp">
+    <img alt="Detalhes da conta" src="screenshots/pt-BR/accounts-detail-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Detalhes da conta</b> — o painel que cada linha abre: créditos do plano, últimas 24 horas, totais e configurações</sub>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/accounts-tester-dark.webp">
+    <img alt="Teste de modelos" src="screenshots/pt-BR/accounts-tester-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Teste de modelos</b> — teste um modelo ou todos os modelos em cache de uma vez; toque numa linha para ver a resposta e as etapas</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/requests-dark.webp">
     <img alt="Requisições" src="screenshots/pt-BR/requests-light.webp" width="100%">
   </picture>
