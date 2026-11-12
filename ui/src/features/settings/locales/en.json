@@ -55,7 +55,7 @@
   "formatThinkingClaude": "<thinking> (Claude)",
   "formatThinkOpenAI": "<think> (OpenAI)",
   "modelMappings": "Model mapping",
-  "modelMappingsHint": "Map client model names to Kiro model IDs. Rules run in order, and the first rule whose text appears in the model name wins.",
+  "modelMappingsHint": "Map client model names to Kiro model IDs. Rules run in order, and the first rule whose text appears in the model name wins. A model Kiro serves itself only follows a rule with its full name.",
   "modelMappings.add": "Add mapping",
   "modelMappings.reset": "Reset to defaults",
   "modelMappings.resetTitle": "Reset to the default mappings?",

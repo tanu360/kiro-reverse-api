@@ -55,7 +55,7 @@
   "formatThinkingClaude": "<thinking> (Claude)",
   "formatThinkOpenAI": "<think> (OpenAI)",
   "modelMappings": "Mapeamento de modelos",
-  "modelMappingsHint": "Mapeie nomes de modelo do cliente para IDs de modelo do Kiro. As regras são aplicadas em ordem, e vence a primeira regra cujo texto aparece no nome do modelo.",
+  "modelMappingsHint": "Mapeie nomes de modelo do cliente para IDs de modelo do Kiro. As regras são aplicadas em ordem, e vence a primeira regra cujo texto aparece no nome do modelo. Um modelo que o próprio Kiro oferece só é redirecionado por uma regra com o nome completo dele.",
   "modelMappings.add": "Adicionar mapeamento",
   "modelMappings.reset": "Redefinir para o padrão",
   "modelMappings.resetTitle": "Redefinir para os mapeamentos padrão?",

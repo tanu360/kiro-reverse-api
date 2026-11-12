@@ -55,7 +55,7 @@
   "formatThinkingClaude": "<thinking> (Claude)",
   "formatThinkOpenAI": "<think> (OpenAI)",
   "modelMappings": "Ánh xạ model",
-  "modelMappingsHint": "Ánh xạ tên model của client sang ID model của Kiro. Các quy tắc chạy theo thứ tự, và quy tắc đầu tiên có chuỗi xuất hiện trong tên model sẽ được dùng.",
+  "modelMappingsHint": "Ánh xạ tên model của client sang ID model của Kiro. Các quy tắc chạy theo thứ tự, và quy tắc đầu tiên có chuỗi xuất hiện trong tên model sẽ được dùng. Model do Kiro tự cung cấp chỉ được chuyển hướng khi quy tắc ghi đúng tên đầy đủ của nó.",
   "modelMappings.add": "Thêm ánh xạ",
   "modelMappings.reset": "Đặt lại về mặc định",
   "modelMappings.resetTitle": "Đặt lại về ánh xạ mặc định?",

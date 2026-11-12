@@ -55,7 +55,7 @@
   "formatThinkingClaude": "<thinking> (Claude)",
   "formatThinkOpenAI": "<think> (OpenAI)",
   "modelMappings": "模型映射",
-  "modelMappingsHint": "将客户端模型名称映射到 Kiro 模型 ID。规则按顺序检查，模型名称包含其匹配文本的第一条规则生效。",
+  "modelMappingsHint": "将客户端模型名称映射到 Kiro 模型 ID。规则按顺序检查，模型名称包含其匹配文本的第一条规则生效。Kiro 自身提供的模型只有在规则填写其完整名称时才会被重定向。",
   "modelMappings.add": "添加映射",
   "modelMappings.reset": "重置为默认",
   "modelMappings.resetTitle": "重置为默认映射？",
