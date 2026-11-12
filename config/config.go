@@ -150,6 +150,10 @@ type Config struct {
 
 	StructuredToolHistory *bool `json:"structuredToolHistory,omitempty"`
 
+	ImageResize             *bool `json:"imageResize,omitempty"`
+	ImageResizeMaxDimension int   `json:"imageResizeMaxDimension,omitempty"`
+	ImageResizeMaxKB        int   `json:"imageResizeMaxKB,omitempty"`
+
 	FirstRunPasswordPending bool `json:"firstRunPasswordPending,omitempty"`
 
 	ProxyURL string `json:"proxyURL,omitempty"`

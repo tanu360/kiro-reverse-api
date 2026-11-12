@@ -3539,6 +3539,10 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"autoContinue":           config.GetAutoContinue(),
 		"autoContinueMax":        config.GetAutoContinueMax(),
 		"structuredToolHistory":  config.GetStructuredToolHistory(),
+
+		"imageResize":             config.GetImageResize(),
+		"imageResizeMaxDimension": config.GetImageResizeMaxDimension(),
+		"imageResizeMaxKB":        config.GetImageResizeMaxKB(),
 	})
 }
 
@@ -3626,6 +3630,10 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		AutoContinue           *bool  `json:"autoContinue,omitempty"`
 		AutoContinueMax        *int   `json:"autoContinueMax,omitempty"`
 		StructuredToolHistory  *bool  `json:"structuredToolHistory,omitempty"`
+
+		ImageResize             *bool `json:"imageResize,omitempty"`
+		ImageResizeMaxDimension *int  `json:"imageResizeMaxDimension,omitempty"`
+		ImageResizeMaxKB        *int  `json:"imageResizeMaxKB,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
@@ -3634,6 +3642,11 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.AutoContinueMax != nil && (*req.AutoContinueMax < 1 || *req.AutoContinueMax > config.MaxAutoContinueMax) {
 		writeAdminError(w, http.StatusBadRequest, codeAutoContinueMaxRange, fmt.Sprintf("autoContinueMax must be between 1 and %d", config.MaxAutoContinueMax))
+		return
+	}
+
+	if code, msg := validateImageResizePatch(req.ImageResizeMaxDimension, req.ImageResizeMaxKB); code != "" {
+		writeAdminError(w, http.StatusBadRequest, code, msg)
 		return
 	}
 
@@ -3705,6 +3718,12 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
+	}
+
+	if err := applyImageResizePatch(req.ImageResize, req.ImageResizeMaxDimension, req.ImageResizeMaxKB); err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
 	}
 
 	publishEvent(eventSettingsChanged, "")
