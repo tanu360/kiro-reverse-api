@@ -47,6 +47,7 @@ export const queryKeys = {
     modelMappings: () => ["settings", "model-mappings"] as const,
     endpoint: () => ["settings", "endpoint"] as const,
     proxy: () => ["settings", "proxy"] as const,
+    logRetention: () => ["settings", "log-retention"] as const,
     promptFilter: () => ["settings", "prompt-filter"] as const,
   },
   backups: {

@@ -4,6 +4,7 @@ import {
   ArrowDataTransferHorizontalIcon,
   CloudServerIcon,
   Coins01Icon,
+  Database01Icon,
   FilterHorizontalIcon,
   GlobalIcon,
   LockPasswordIcon,
@@ -50,6 +51,12 @@ export const SETTINGS_SECTIONS = [
     group: "safety",
   },
   {
+    id: "settings-log-retention",
+    titleKey: "logRetention",
+    icon: Database01Icon,
+    group: "safety",
+  },
+  {
     id: "settings-danger-zone",
     titleKey: "dangerZone",
     icon: Alert02Icon,
@@ -79,5 +86,6 @@ export const SECTION_ID = {
   adminPassword: "settings-admin-password",
   outboundProxy: "settings-outbound-proxy",
   promptFilter: "settings-prompt-filter",
+  logRetention: "settings-log-retention",
   dangerZone: "settings-danger-zone",
 } as const satisfies Record<string, SectionId>;

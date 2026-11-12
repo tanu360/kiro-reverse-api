@@ -34,6 +34,7 @@ import { AdminPasswordCard } from "./sections/admin-password-card";
 import { AutoContinueCard } from "./sections/auto-continue-card";
 import { DangerZoneCard } from "./sections/danger-zone-card";
 import { EndpointCard } from "./sections/endpoint-card";
+import { LogRetentionCard } from "./sections/log-retention-card";
 import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
@@ -383,6 +384,7 @@ function SettingsContent(): JSX.Element {
           <AdminPasswordCard />
           <OutboundProxyCard />
           <PromptFilterCard />
+          <LogRetentionCard />
           <DangerZoneCard />
         </div>
       </div>

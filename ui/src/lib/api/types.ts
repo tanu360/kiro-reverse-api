@@ -18,6 +18,7 @@ export interface SuccessResponse {
  * - backup_not_found (404): unknown backup id.
  * - backup_* (400): an upload or stored backup the restore cannot read (`detail`: why).
  * - invalid_cadence / invalid_keep (400): POST /backups/schedule out of range.
+ * - log_retention_range (400): POST /log-retention days outside 0..3650.
  * - token_refresh_failed, models_refresh_failed, overage_failed, profile_verify_failed,
  *   kiro_sign_in_failed, microsoft_denied, microsoft_token_failed, microsoft_credential_invalid,
  *   sso_* : `detail` is the upstream reason.
@@ -57,6 +58,7 @@ export type ServerErrorCode =
   | "no_kiro_profile"
   | "api_key_account_no_profile"
   | "auto_continue_max_range"
+  | "log_retention_range"
   | "password_too_short"
   | "invalid_endpoint"
   | "proxy_url_scheme"
