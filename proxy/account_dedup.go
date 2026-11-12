@@ -11,6 +11,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
+	"kiro-proxy/proxypool"
 )
 
 // codeDuplicatesChanged is a merge whose accounts no longer form one duplicate
@@ -187,6 +188,8 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	h.pool.Reload()
+	//! The kept account keeps its own pool proxy; the removed copies give theirs up.
+	proxypool.Default().ForgetAccounts(removeIDs...)
 
 	moved, err := moveAccountHistory(keepID, removeIDs)
 	if err != nil {
