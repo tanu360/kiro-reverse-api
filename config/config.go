@@ -154,6 +154,12 @@ type Config struct {
 
 	ProxyURL string `json:"proxyURL,omitempty"`
 
+	// Outbound proxy pool (config/proxy_pool.go): proxies accounts without a proxy of their own are spread over.
+	ProxyPool                 []PoolProxy `json:"proxyPool,omitempty"`
+	ProxyPoolMode             string      `json:"proxyPoolMode,omitempty"`
+	ProxyDirectFallback       bool        `json:"proxyDirectFallback,omitempty"`
+	ProxyPoolCheckIntervalMin *int        `json:"proxyPoolCheckIntervalMin,omitempty"`
+
 	AutoContinue    bool `json:"autoContinue,omitempty"`
 	AutoContinueMax int  `json:"autoContinueMax,omitempty"`
 
@@ -326,6 +332,9 @@ func Get() *Config {
 	}
 	if cfg.ModelMappings != nil {
 		copyCfg.ModelMappings = append([]ModelMappingRule(nil), cfg.ModelMappings...)
+	}
+	if cfg.ProxyPool != nil {
+		copyCfg.ProxyPool = append([]PoolProxy(nil), cfg.ProxyPool...)
 	}
 	return &copyCfg
 }
