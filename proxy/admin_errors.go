@@ -59,6 +59,11 @@ const (
 	codeBackupUploadFailed      = "backup_upload_failed"
 	codeRoutingModeInvalid      = "routing_mode_invalid"
 	codePriorityRange           = "priority_range"
+	codeAlertThresholdsInvalid  = "alert_thresholds_invalid"
+	codeAlertCooldownRange      = "alert_cooldown_range"
+	codeAlertChannelInvalid     = "alert_channel_invalid"
+	codeAlertChannelLimit       = "alert_channel_limit"
+	codeAlertChannelNotFound    = "alert_channel_not_found"
 )
 
 // writeAdminError writes {"error": message, "code": code} with status.

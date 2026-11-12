@@ -33,6 +33,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsaved";
 import { AdminPasswordCard } from "./sections/admin-password-card";
+import { AlertsCard } from "./sections/alerts-card";
 import { AutoContinueCard } from "./sections/auto-continue-card";
 import { DangerZoneCard } from "./sections/danger-zone-card";
 import { EndpointCard } from "./sections/endpoint-card";
@@ -394,6 +395,7 @@ function SettingsContent(): JSX.Element {
           <OutboundProxyCard />
           <ProxyPoolCard />
           <ResponseHeadersCard />
+          <AlertsCard />
           <PromptFilterCard />
           <LogRetentionCard />
           <DangerZoneCard />

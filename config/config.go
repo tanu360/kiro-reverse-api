@@ -218,6 +218,8 @@ type Config struct {
 	LogRetentionDays *int `json:"logRetentionDays,omitempty"`
 
 	Backup BackupConfig `json:"backup,omitempty"`
+
+	Alerts AlertsConfig `json:"alerts,omitzero"`
 }
 
 type AccountInfo struct {

@@ -11,6 +11,7 @@ import {
   Location01Icon,
   LockPasswordIcon,
   NetworkIcon,
+  Notification01Icon,
   RepeatIcon,
   Route02Icon,
   SecurityCheckIcon,
@@ -62,6 +63,7 @@ export const SETTINGS_SECTIONS = [
     icon: Tag01Icon,
     group: "server",
   },
+  { id: "settings-alerts", titleKey: "alerts:title", icon: Notification01Icon, group: "server" },
   {
     id: "settings-prompt-filter",
     titleKey: "promptFilter",
@@ -107,6 +109,7 @@ export const SECTION_ID = {
   outboundProxy: "settings-outbound-proxy",
   proxyPool: "settings-proxy-pool",
   responseHeaders: "settings-response-headers",
+  alerts: "settings-alerts",
   promptFilter: "settings-prompt-filter",
   logRetention: "settings-log-retention",
   dangerZone: "settings-danger-zone",
