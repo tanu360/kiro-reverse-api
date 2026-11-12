@@ -2413,6 +2413,10 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiAddAccount(w, r)
 	case path == "/accounts/batch" && r.Method == "POST":
 		h.apiBatchAccounts(w, r)
+	case path == "/accounts/duplicates" && r.Method == "GET":
+		h.apiListDuplicateAccounts(w, r)
+	case path == "/accounts/duplicates/merge" && r.Method == "POST":
+		h.apiMergeDuplicateAccounts(w, r)
 
 	//! Match models/refresh before the generic /refresh route.
 	case path == "/accounts/models/refresh" && r.Method == "POST":
@@ -2651,21 +2655,22 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	account.Region = region
 
-	if err := config.AddAccount(account); err != nil {
+	stored, updated, err := config.UpsertAccount(account)
+	if err != nil {
 		writeAdminErr(w, addAccountErrorStatus(err), err, "")
 		return
 	}
 
 	h.pool.Reload()
 
-	if account.Enabled && account.AccessToken != "" {
+	if stored.Enabled && stored.AccessToken != "" {
 		go func(acc config.Account) {
 			if err := h.fetchAndCacheAccountModels(&acc); err != nil {
 				logger.Warnf("[ModelsCache] Auto-refresh failed for new account %s: %v", acc.Email, err)
 			}
-		}(account)
+		}(stored)
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": account.ID})
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "id": stored.ID, "updated": updated})
 }
 
 func (h *Handler) apiDeleteAccount(w http.ResponseWriter, _ *http.Request, id string) {
@@ -3102,11 +3107,12 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, _, _ := auth.GetUserInfo(accessToken)
+	email, userID, _ := auth.GetUserInfo(accessToken)
 
 	account := config.Account{
 		ID:           auth.GenerateAccountID(),
 		Email:        email,
+		UserId:       userID,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ClientID:     clientID,
@@ -3118,7 +3124,8 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 		MachineId:    config.GenerateMachineId(),
 	}
 
-	if err := config.AddAccount(account); err != nil {
+	stored, updated, err := config.UpsertAccount(account)
+	if err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -3127,10 +3134,7 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 	h.pool.Reload()
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"account": map[string]interface{}{
-			"id":    account.ID,
-			"email": account.Email,
-		},
+		"account": accountSavedRef(stored, updated),
 	})
 }
 
@@ -3192,11 +3196,12 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, _, _ := auth.GetUserInfo(accessToken)
+	email, userID, _ := auth.GetUserInfo(accessToken)
 
 	account := config.Account{
 		ID:           auth.GenerateAccountID(),
 		Email:        email,
+		UserId:       userID,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ClientID:     clientID,
@@ -3209,7 +3214,8 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 		MachineId:    config.GenerateMachineId(),
 	}
 
-	if err := config.AddAccount(account); err != nil {
+	stored, updated, err := config.UpsertAccount(account)
+	if err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -3219,10 +3225,7 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":   true,
 		"completed": true,
-		"account": map[string]interface{}{
-			"id":    account.ID,
-			"email": account.Email,
-		},
+		"account":   accountSavedRef(stored, updated),
 	})
 }
 
@@ -3263,11 +3266,12 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		email, _, _ := auth.GetUserInfo(accessToken)
+		email, userID, _ := auth.GetUserInfo(accessToken)
 
 		account := config.Account{
 			ID:           auth.GenerateAccountID(),
 			Email:        email,
+			UserId:       userID,
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
 			ClientID:     clientID,
@@ -3279,15 +3283,13 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 			MachineId:    config.GenerateMachineId(),
 		}
 
-		if err := config.AddAccount(account); err != nil {
+		stored, updated, err := config.UpsertAccount(account)
+		if err != nil {
 			errors = append(errors, err.Error())
 			continue
 		}
 
-		imported = append(imported, map[string]interface{}{
-			"id":    account.ID,
-			"email": account.Email,
-		})
+		imported = append(imported, accountSavedRef(stored, updated))
 	}
 
 	h.pool.Reload()
@@ -3432,7 +3434,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		email, _, _ = auth.GetUserInfo(accessToken)
+		email, userID, _ = auth.GetUserInfo(accessToken)
 	}
 	if email == "" {
 		email = strings.TrimSpace(req.Email)
@@ -3462,16 +3464,18 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		Scopes:        tempAccount.Scopes,
 	}
 
+	var stored config.Account
+	var updated bool
 	if config.IsExternalIdpAccount(&account) {
 		//! Same lock and duplicate check as interactive login, so an import cannot add a second copy of one Entra user.
 		microsoftSSOFlows.mu.Lock()
-		err = microsoftSSOFlows.addAccountLocked("", account)
+		stored, updated, err = microsoftSSOFlows.saveAccountLocked("", account)
 		microsoftSSOFlows.mu.Unlock()
 		if err != nil {
 			writeMicrosoftAddError(w, err)
 			return
 		}
-	} else if err := config.AddAccount(account); err != nil {
+	} else if stored, updated, err = config.UpsertAccount(account); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -3480,10 +3484,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	h.pool.Reload()
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"account": map[string]interface{}{
-			"id":    account.ID,
-			"email": account.Email,
-		},
+		"account": accountSavedRef(stored, updated),
 	})
 }
 
@@ -3493,7 +3494,8 @@ func (h *Handler) importKiroAPIKeyAccount(w http.ResponseWriter, account config.
 		writeAdminErr(w, http.StatusBadRequest, err, "")
 		return
 	}
-	if err := config.AddAccount(account); err != nil {
+	stored, updated, err := config.UpsertAccount(account)
+	if err != nil {
 		writeAdminErr(w, addAccountErrorStatus(err), err, "")
 		return
 	}
@@ -3503,13 +3505,10 @@ func (h *Handler) importKiroAPIKeyAccount(w http.ResponseWriter, account config.
 		if err := h.fetchAndCacheAccountModels(&acc); err != nil {
 			logger.Warnf("[ModelsCache] Auto-refresh failed for new API key account %s: %v", acc.Email, err)
 		}
-	}(account)
+	}(stored)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"account": map[string]interface{}{
-			"id":    account.ID,
-			"email": account.Email,
-		},
+		"account": accountSavedRef(stored, updated),
 	})
 }
 

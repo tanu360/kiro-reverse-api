@@ -38,7 +38,7 @@ var (
 // microsoftFlows holds what lives between the last SSO callback and the saved
 // account: in-flight profile discoveries, profile choices waiting on the
 // operator, and tombstones for canceled sessions. One mutex covers all three,
-// and it is held across the final "not canceled?" check and AddAccount, so a
+// and it is held across the final "not canceled?" check and UpsertAccount, so a
 // cancel can never lose the race against a save.
 type microsoftFlows struct {
 	mu          sync.Mutex
@@ -147,20 +147,20 @@ func (f *microsoftFlows) storeSelectionLocked(sessionID string, account config.A
 	return id, nil
 }
 
-// addAccountLocked saves one finished login unless its session was canceled.
-func (f *microsoftFlows) addAccountLocked(sessionID string, account config.Account) error {
+// saveAccountLocked saves one finished login unless its session was canceled.
+// A login of an Entra user that is already stored refreshes that account
+// (updated is true) instead of adding a second copy of one quota.
+func (f *microsoftFlows) saveAccountLocked(sessionID string, account config.Account) (config.Account, bool, error) {
 	if f.canceledLocked(sessionID, time.Now()) {
-		return errMicrosoftSSOCanceled
+		return config.Account{}, false, errMicrosoftSSOCanceled
 	}
-	//! The Entra object ID is stable across logins; a second copy would double-spend one quota.
-	if account.UserId != "" {
-		for _, existing := range config.GetAccounts() {
-			if config.IsExternalIdpAccount(&existing) && existing.UserId == account.UserId {
-				return errMicrosoftAccountExists
-			}
-		}
-	}
-	return config.AddAccount(account)
+	return config.UpsertAccount(account)
+}
+
+// addAccountLocked is saveAccountLocked for a caller that needs only the error.
+func (f *microsoftFlows) addAccountLocked(sessionID string, account config.Account) error {
+	_, _, err := f.saveAccountLocked(sessionID, account)
+	return err
 }
 
 func writeMicrosoftAddError(w http.ResponseWriter, err error) {
@@ -179,16 +179,24 @@ type microsoftWarning struct {
 }
 
 func (h *Handler) writeMicrosoftAdded(w http.ResponseWriter, account config.Account, warning microsoftWarning) {
+	h.writeMicrosoftSaved(w, account, warning, false)
+}
+
+// writeMicrosoftSaved answers a saved login; updated is a login that refreshed
+// an account already stored.
+func (h *Handler) writeMicrosoftSaved(w http.ResponseWriter, account config.Account, warning microsoftWarning, updated bool) {
 	h.pool.Reload()
 	if warning.text != "" {
 		logger.Warnf("[MicrosoftSSO] %s: %s", account.Email, warning.text)
+	} else if updated {
+		logger.Infof("[MicrosoftSSO] Updated %s (region %s)", account.Email, account.Region)
 	} else {
 		logger.Infof("[MicrosoftSSO] Added %s (region %s)", account.Email, account.Region)
 	}
 	response := map[string]interface{}{
 		"success": true,
 		"stage":   "complete",
-		"account": map[string]interface{}{"id": account.ID, "email": account.Email},
+		"account": accountSavedRef(account, updated),
 	}
 	if warning.text != "" {
 		response["warning"] = warning.text
@@ -316,11 +324,12 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 			warning.detail = profileErr.Error()
 		}
 	}
-	if err := flows.addAccountLocked(sessionID, account); err != nil {
+	stored, updated, err := flows.saveAccountLocked(sessionID, account)
+	if err != nil {
 		writeMicrosoftAddError(w, err)
 		return
 	}
-	h.writeMicrosoftAdded(w, account, warning)
+	h.writeMicrosoftSaved(w, stored, warning, updated)
 }
 
 func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Request) {
@@ -360,7 +369,8 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 
 	account := sel.account
 	account.ProfileArn = profileARN
-	if err := flows.addAccountLocked(sel.sessionID, account); err != nil {
+	stored, updated, err := flows.saveAccountLocked(sel.sessionID, account)
+	if err != nil {
 		if errors.Is(err, errMicrosoftSSOCanceled) {
 			delete(flows.selections, selectionID)
 		}
@@ -368,7 +378,7 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 		return
 	}
 	delete(flows.selections, selectionID)
-	h.writeMicrosoftAdded(w, account, microsoftWarning{})
+	h.writeMicrosoftSaved(w, stored, microsoftWarning{}, updated)
 }
 
 func (h *Handler) apiCancelMicrosoftSSO(w http.ResponseWriter, r *http.Request) {

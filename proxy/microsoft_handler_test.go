@@ -473,10 +473,20 @@ func TestExternalIdpJSONImportRefreshesAndRoundTripsCompleteFields(t *testing.T)
 		"scopes":        scopes,
 	})
 	// The Entra object ID only shows after a refresh, so the duplicate is
-	// caught then, before anything is saved.
-	if duplicateRecorder.Code != http.StatusConflict {
-		t.Fatalf("duplicate Entra user import status = %d, want 409; body=%s",
+	// caught then, and the stored account takes the new credential.
+	if duplicateRecorder.Code != http.StatusOK {
+		t.Fatalf("duplicate Entra user import status = %d, want 200; body=%s",
 			duplicateRecorder.Code, duplicateRecorder.Body.String())
+	}
+	var duplicateResponse struct {
+		Account struct {
+			ID      string `json:"id"`
+			Updated bool   `json:"updated"`
+		} `json:"account"`
+	}
+	decodeHandlerMicrosoftJSON(t, duplicateRecorder, &duplicateResponse)
+	if duplicateResponse.Account.ID != accountID || !duplicateResponse.Account.Updated {
+		t.Fatalf("duplicate Entra user import answered %+v, want the stored account updated", duplicateResponse.Account)
 	}
 	if len(config.GetAccounts()) != 1 {
 		t.Fatal("duplicate Entra user import persisted a second account")
