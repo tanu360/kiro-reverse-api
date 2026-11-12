@@ -93,7 +93,9 @@ describe("LogRetentionCard", () => {
     await user.click(toggle);
     await user.click(save);
     expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
-    expect(await writes()).toEqual([{ method: "POST", path: "/log-retention", body: { days: 90 } }]);
+    expect(await writes()).toEqual([
+      { method: "POST", path: "/log-retention", body: { days: 90 } },
+    ]);
   });
 
   it.each(["0", "4000"])("shows a field error for %s days and sends nothing", async (value) => {
@@ -116,7 +118,9 @@ describe("LogRetentionCard", () => {
     await user.click(save);
 
     expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
-    expect(await writes()).toEqual([{ method: "POST", path: "/log-retention", body: { days: 30 } }]);
+    expect(await writes()).toEqual([
+      { method: "POST", path: "/log-retention", body: { days: 30 } },
+    ]);
     expect(mockDb.logRetention.days).toBe(30);
     await waitFor(() => expect(days).toHaveValue("30"));
   });
