@@ -163,6 +163,9 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 	}
 
 	patch := *existing
+	// existing was read before the update takes the config lock. "" keeps the
+	// stored value, so a key regenerated in between is not written back.
+	patch.Key = ""
 	if req.Name != nil {
 		patch.Name = *req.Name
 	}

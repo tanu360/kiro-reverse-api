@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -388,6 +389,59 @@ func TestRegenerateApiKeyInvalidatesOldValue(t *testing.T) {
 	h.ServeHTTP(rec, adminRequestForTest(t, h, http.MethodPost, "/admin/api/api-keys/missing/regenerate"))
 	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), codeAPIKeyNotFound) {
 		t.Fatalf("missing key: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+// regenerateOnRead is a PUT body that regenerates key id when the handler
+// starts reading it, so after the handler has read the stored entry and before
+// it writes the update back.
+type regenerateOnRead struct {
+	t     *testing.T
+	id    string
+	body  io.Reader
+	once  sync.Once
+	fresh string
+}
+
+func (r *regenerateOnRead) Read(p []byte) (int, error) {
+	r.once.Do(func() {
+		entry, err := config.RegenerateApiKey(r.id)
+		if err != nil {
+			r.t.Errorf("regenerate: %v", err)
+			return
+		}
+		r.fresh = entry.Key
+	})
+	return r.body.Read(p)
+}
+
+func TestUpdateApiKeyKeepsValueRegeneratedMidRequest(t *testing.T) {
+	h := modelTestHandler(t)
+	key := addTestKey(t, config.ApiKeyEntry{Name: "laptop", Key: "sk-before-race"})
+	requireKeys(t)
+
+	// The UI's enable toggle and scripted edits send no "key" field. ServeHTTP
+	// buffers the body before routing, so the handler is called directly.
+	body := &regenerateOnRead{t: t, id: key.ID, body: strings.NewReader(`{"name":"renamed","enabled":true}`)}
+	req := httptest.NewRequest(http.MethodPut, "/admin/api/api-keys/"+key.ID, io.NopCloser(body))
+	rec := httptest.NewRecorder()
+	h.apiUpdateApiKey(rec, req, key.ID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if body.fresh == "" {
+		t.Fatal("the handler never read the body, so nothing was regenerated")
+	}
+
+	stored := config.GetApiKeyEntry(key.ID)
+	if stored == nil || stored.Key != body.fresh || stored.Name != "renamed" {
+		t.Fatalf("stored entry = %+v, want the regenerated key %q and the new name", stored, body.fresh)
+	}
+	if old := serveWithKey(h, http.MethodGet, "/v1/models", key.Key, ""); old.Code != http.StatusUnauthorized {
+		t.Fatalf("old value after the update: status=%d, want 401", old.Code)
+	}
+	if rec := serveWithKey(h, http.MethodGet, "/v1/models", body.fresh, ""); rec.Code != http.StatusOK {
+		t.Fatalf("regenerated value: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
 
