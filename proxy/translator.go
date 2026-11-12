@@ -137,6 +137,7 @@ type ClaudeContentBlock struct {
 	Text      string       `json:"text,omitempty"`
 	Thinking  string       `json:"thinking,omitempty"`
 	Signature string       `json:"signature,omitempty"`
+	Data      string       `json:"data,omitempty"`
 	ID        string       `json:"id,omitempty"`
 	Name      string       `json:"name,omitempty"`
 	Input     interface{}  `json:"input,omitempty"`
@@ -199,6 +200,7 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 	var currentToolResults []KiroToolResult
 
 	messages := normalizeClaudeMessageRoles(req.Messages)
+	thinkingReplay := newClaudeThinkingReplay(req.Messages, modelID, thinking)
 	for i, msg := range messages {
 		isLast := i == len(messages)-1
 
@@ -233,7 +235,7 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 				})
 			}
 		case "assistant":
-			content, toolUses := extractClaudeAssistantContent(msg.Content)
+			content, toolUses := extractClaudeAssistantHistory(msg.Content, thinkingReplay.next())
 			history = append(history, KiroHistoryMessage{
 				AssistantResponseMessage: &KiroAssistantResponseMessage{
 					Content:  content,

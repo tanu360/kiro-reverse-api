@@ -242,6 +242,10 @@ type KiroStreamCallback struct {
 	OnStopReason   func(reason string)
 	//! Called only when Kiro itself reports cache counts; both are already part of OnComplete's input total.
 	OnCacheUsage func(cacheReadTokens, cacheWriteTokens int)
+	// OnThinkingSignature receives a reasoning block's signature; it belongs to the thinking block open now or next.
+	OnThinkingSignature func(signature string)
+	// OnRedactedThinking receives one block of encrypted reasoning, in stream order.
+	OnRedactedThinking func(data string)
 
 	// markupTools maps declared upstream tool names to parameter types; leaked call markup for them is rescued.
 	markupTools map[string]map[string]string
@@ -661,6 +665,9 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 					emitted = true
 					callback.OnText(text, true)
 				}
+			}
+			if reasoningEventExtras(event, callback, &turn) {
+				emitted = true
 			}
 		case "toolUseEvent":
 			if toolErr := handleToolUseEvent(event, pending, callback); toolErr != nil {

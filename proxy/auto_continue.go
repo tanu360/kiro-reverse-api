@@ -148,6 +148,11 @@ func (h *continuationHop) callback() *KiroStreamCallback {
 			h.downstream.OnToolUse(toolUse)
 		}
 	}
+	if h.continuation {
+		//! Continuation hops drop their reasoning, so its signature and redacted blocks go too.
+		cb.OnThinkingSignature = nil
+		cb.OnRedactedThinking = nil
+	}
 	cb.onFollowupPayload = func(payload *KiroPayload) { h.followup = payload }
 	cb.OnStopReason = func(reason string) { h.stopReason = reason }
 	cb.OnCredits = func(credits float64) { h.credits += credits }

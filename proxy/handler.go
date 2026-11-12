@@ -1027,10 +1027,16 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			var upstreamStopReason string
 			activeBlockIndex := -1
 			activeBlockType := ""
+			// pendingThinkingSignature waits for the thinking block it signs to close.
+			var pendingThinkingSignature string
 
 			closeActiveBlock := func() {
 				if activeBlockIndex < 0 {
 					return
+				}
+				if activeBlockType == "thinking" && pendingThinkingSignature != "" {
+					h.sendSSE(w, flusher, "content_block_delta", claudeSignatureDeltaEvent(activeBlockIndex, pendingThinkingSignature))
+					pendingThinkingSignature = ""
 				}
 				h.sendSSE(w, flusher, "content_block_stop", map[string]interface{}{
 					"type":  "content_block_stop",
@@ -1337,6 +1343,23 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				OnCacheUsage: func(read, write int) {
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
+				OnThinkingSignature: func(signature string) {
+					if claudeThinkingExtrasEnabled(thinking, thinkingFormat) && thinkingSource != thinkingSourceTagBlock {
+						pendingThinkingSignature = signature
+					}
+				},
+				OnRedactedThinking: func(data string) {
+					if !claudeThinkingExtrasEnabled(thinking, thinkingFormat) || !allowReasoningSource(&thinkingSource) {
+						return
+					}
+					processClaudeText("", false, true)
+					ensureMessageStart()
+					closeActiveBlock()
+					idx := nextContentIndex
+					nextContentIndex++
+					h.sendSSE(w, flusher, "content_block_start", claudeRedactedThinkingStartEvent(idx, data))
+					h.sendSSE(w, flusher, "content_block_stop", map[string]interface{}{"type": "content_block_stop", "index": idx})
+				},
 			}
 
 			err := callKiroAutoContinue(r.Context(), account, payload, callback, CallKiroAPIContext)
@@ -1552,6 +1575,8 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			var upstreamCache cacheTokenCounts
 			var realInputTokens int
 			var upstreamStopReason string
+			var thinkingSignature string
+			var redactedThinking []string
 
 			callback := &KiroStreamCallback{
 				OnText: func(text string, isThinking bool) {
@@ -1580,6 +1605,9 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				OnCacheUsage: func(read, write int) {
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
+				//! All reasoning merges into one thinking block, so it carries the last signature.
+				OnThinkingSignature: func(signature string) { thinkingSignature = signature },
+				OnRedactedThinking:  func(data string) { redactedThinking = append(redactedThinking, data) },
 			}
 
 			err := callKiroAutoContinue(r.Context(), account, payload, callback, CallKiroAPIContext)
@@ -1642,6 +1670,9 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			}
 
 			resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
+			if claudeThinkingExtrasEnabled(thinking, thinkingFormat) {
+				resp.Content = applyClaudeThinkingExtras(resp.Content, thinkingSignature, redactedThinking)
+			}
 			resp.StopReason = mapClaudeStopReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
 			resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
 			resp.Usage.CacheCreationInputTokens = cacheUsage.CacheCreationInputTokens
