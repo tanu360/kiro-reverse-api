@@ -79,6 +79,32 @@ func TestRPMLimitSkipsAccountAtLimit(t *testing.T) {
 	}
 }
 
+// Priority mode sends every request to the first account until it reaches the
+// limit, then to the next priority for the rest of the minute.
+func TestRPMLimitAppliesInPriorityMode(t *testing.T) {
+	now := setRPMLimitForTest(t, 2)
+	if err := config.UpdateRoutingMode(config.RoutingModePriority); err != nil {
+		t.Fatalf("UpdateRoutingMode: %v", err)
+	}
+	t.Cleanup(func() { _ = config.UpdateRoutingMode(config.RoutingModeWeighted) })
+	p := newTestPool(config.Account{ID: "a", Priority: 0}, config.Account{ID: "b", Priority: 1})
+
+	got := pickIDs(p, 5)
+	want := []string{"a", "a", "b", "b", ""}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("picks = %v, want %v", got, want)
+		}
+	}
+	if !p.BlockedByRPMLimit("") {
+		t.Fatal("BlockedByRPMLimit = false, want true when every account is at the limit")
+	}
+	*now = now.Add(time.Minute)
+	if acc := p.GetNext(); acc == nil || acc.ID != "a" {
+		t.Fatalf("pick a minute later = %v, want a back first", acc)
+	}
+}
+
 func TestRPMLimitWindowSlides(t *testing.T) {
 	now := setRPMLimitForTest(t, 1)
 	p := newTestPool(config.Account{ID: "a"})

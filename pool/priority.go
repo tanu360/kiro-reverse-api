@@ -14,7 +14,8 @@ import (
 // It scans the pool in place on every pick, so there is no second ordering to
 // go stale. An account's weight slots count once and never change its rank.
 // The rotation cursor is left alone, so switching back to weighted resumes the
-// rotation where it stopped.
+// rotation where it stopped. The pick counts as a start for the RPM limit, as
+// a weighted pick does.
 func (p *AccountPool) firstByPriorityLocked(model string, excluded map[string]bool) *config.Account {
 	allowOverUsage := config.GetAllowOverUsage()
 	now := time.Now()
@@ -39,5 +40,6 @@ func (p *AccountPool) firstByPriorityLocked(model string, excluded map[string]bo
 		return nil
 	}
 	accCopy := *best
+	p.noteRPMStartLocked(accCopy.ID)
 	return &accCopy
 }
