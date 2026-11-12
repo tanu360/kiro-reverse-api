@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { JSX } from "react";
 import { AppIcon } from "@/components/shared/app-icon";
-import { KiroLogo } from "@/components/shared/brand-logos";
 import {
   Sidebar,
   SidebarContent,
@@ -48,12 +47,16 @@ export function AppSidebar(): JSX.Element {
               render={<Link to="/" />}
               tooltip={appName}
             >
-              {/* Expanded: the app icon beside the name. The icon rail shows the coloured Kiro tile. */}
+              {/*
+               * The app icon, in both states: the icon rail hides only the name beside it. The
+               * rail's 32 px button leaves 16 px inside its padding, and the base img rule
+               * (max-width: 100%) would squeeze the 20 px icon to that width; max-w-none keeps
+               * it square and -mx-0.5 centres it over the padding.
+               */}
               <AppIcon
-                className="size-5 shrink-0 rounded-sm group-data-[collapsible=icon]:hidden"
+                className="size-5 max-w-none shrink-0 rounded-sm group-data-[collapsible=icon]:-mx-0.5"
                 size={20}
               />
-              <KiroLogo className="hidden size-5 shrink-0 group-data-[collapsible=icon]:block" />
               <span className="font-semibold text-base text-sidebar-foreground">{appName}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
