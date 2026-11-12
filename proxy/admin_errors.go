@@ -51,6 +51,11 @@ const (
 	codeCreditLimitNegative     = "credit_limit_negative"
 	codeBackupNotFound          = "backup_not_found"
 	codeBackupUploadFailed      = "backup_upload_failed"
+	codeAlertThresholdsInvalid  = "alert_thresholds_invalid"
+	codeAlertCooldownRange      = "alert_cooldown_range"
+	codeAlertChannelInvalid     = "alert_channel_invalid"
+	codeAlertChannelLimit       = "alert_channel_limit"
+	codeAlertChannelNotFound    = "alert_channel_not_found"
 )
 
 // writeAdminError writes {"error": message, "code": code} with status.

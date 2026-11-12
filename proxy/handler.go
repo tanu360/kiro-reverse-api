@@ -252,6 +252,7 @@ func NewHandler() *Handler {
 
 	go h.backgroundBackupScheduler()
 	go h.backgroundCooldownSaver()
+	go h.backgroundAlerts()
 	return h
 }
 
@@ -313,6 +314,7 @@ func (h *Handler) refreshAllAccounts() {
 	h.pool.Reload()
 	logger.Infof("[BackgroundRefresh] Sweep finished: %d accounts in %s (%d workers)",
 		len(accounts), time.Since(start).Round(time.Millisecond), max(1, min(backgroundRefreshWorkers, len(accounts))))
+	kickAlerts()
 }
 
 func (h *Handler) validateApiKey(r *http.Request) bool {
@@ -2553,6 +2555,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiBackupsGet(w, r, strings.TrimPrefix(path, "/backups/"))
 	case strings.HasPrefix(path, "/backups/") && r.Method == "DELETE":
 		h.apiBackupsDelete(w, r, strings.TrimPrefix(path, "/backups/"))
+	case path == "/alerts" || strings.HasPrefix(path, "/alerts/"):
+		h.handleAlertsAPI(w, r, path)
 	default:
 		w.WriteHeader(404)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Not Found"})
