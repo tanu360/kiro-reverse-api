@@ -14,13 +14,14 @@ func (p *AccountPool) SaveCooldowns() error {
 	p.mu.RLock()
 	now := time.Now()
 	type kv struct {
-		id  string
-		exp int64
+		id   string
+		exp  int64
+		kind CooldownKind
 	}
 	active := make([]kv, 0, len(p.cooldowns))
 	for id, t := range p.cooldowns {
 		if t.After(now) {
-			active = append(active, kv{id, t.Unix()})
+			active = append(active, kv{id, t.Unix(), p.cooldownKinds[id]})
 		}
 	}
 	p.mu.RUnlock()
@@ -39,12 +40,12 @@ func (p *AccountPool) SaveCooldowns() error {
 		return err
 	}
 	if len(active) > 0 {
-		stmt, err := tx.Prepare(`INSERT INTO cooldowns(account_id, expires_at) VALUES(?, ?)`)
+		stmt, err := tx.Prepare(`INSERT INTO cooldowns(account_id, expires_at, kind) VALUES(?, ?, ?)`)
 		if err != nil {
 			return err
 		}
 		for _, kv := range active {
-			if _, err := stmt.Exec(kv.id, kv.exp); err != nil {
+			if _, err := stmt.Exec(kv.id, kv.exp, string(kv.kind)); err != nil {
 				stmt.Close()
 				return err
 			}
@@ -63,7 +64,7 @@ func (p *AccountPool) loadCooldowns() error {
 		return err
 	}
 	now := time.Now().Unix()
-	rows, err := d.Query(`SELECT account_id, expires_at FROM cooldowns WHERE expires_at > ?`, now)
+	rows, err := d.Query(`SELECT account_id, expires_at, kind FROM cooldowns WHERE expires_at > ?`, now)
 	if err != nil {
 		return err
 	}
@@ -74,12 +75,13 @@ func (p *AccountPool) loadCooldowns() error {
 
 	loaded := 0
 	for rows.Next() {
-		var id string
+		var id, kind string
 		var exp int64
-		if err := rows.Scan(&id, &exp); err != nil {
+		if err := rows.Scan(&id, &exp, &kind); err != nil {
 			return err
 		}
 		p.cooldowns[id] = time.Unix(exp, 0)
+		p.setKindLocked(id, CooldownKind(kind))
 		loaded++
 	}
 	if err := rows.Err(); err != nil {
