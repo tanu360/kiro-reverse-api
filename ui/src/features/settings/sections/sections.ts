@@ -7,6 +7,7 @@ import {
   FilterHorizontalIcon,
   GlobalIcon,
   LockPasswordIcon,
+  NetworkIcon,
   RepeatIcon,
   Route02Icon,
   SecurityCheckIcon,
@@ -44,6 +45,12 @@ export const SETTINGS_SECTIONS = [
   },
   { id: "settings-outbound-proxy", titleKey: "proxySettings", icon: GlobalIcon, group: "server" },
   {
+    id: "settings-proxy-pool",
+    titleKey: "proxy-pool:card.title",
+    icon: NetworkIcon,
+    group: "server",
+  },
+  {
     id: "settings-prompt-filter",
     titleKey: "promptFilter",
     icon: FilterHorizontalIcon,
@@ -78,6 +85,7 @@ export const SECTION_ID = {
   endpoint: "settings-endpoint",
   adminPassword: "settings-admin-password",
   outboundProxy: "settings-outbound-proxy",
+  proxyPool: "settings-proxy-pool",
   promptFilter: "settings-prompt-filter",
   dangerZone: "settings-danger-zone",
 } as const satisfies Record<string, SectionId>;
