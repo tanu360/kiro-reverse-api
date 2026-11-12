@@ -304,9 +304,15 @@ func mergeRelogin(current, incoming config.Account, identityReplaced bool) confi
 		}
 	}
 
+	//! A pinned profile is the operator's choice and survives a sign-in of the same user and
+	//! method. A profile the admin picked in this sign-in (incoming.ProfileArnPinned, set by the
+	//! Microsoft profile step) is the newer choice: it replaces the pinned one and stays pinned.
 	keepPin := current.ProfileArnPinned && current.ProfileArn != "" && !identityReplaced &&
 		sameLoginMethod(current, incoming) && !config.IsAPIKeyAccount(&incoming)
-	if !keepPin {
+	switch {
+	case keepPin && incoming.ProfileArnPinned && incoming.ProfileArn != "":
+		merged.ProfileArn = incoming.ProfileArn
+	case !keepPin:
 		merged.ProfileArn = incoming.ProfileArn
 		merged.ProfileArnPinned = false
 	}

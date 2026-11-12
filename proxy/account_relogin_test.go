@@ -294,9 +294,8 @@ func TestReloginIdentityMismatchStashesThenConfirm(t *testing.T) {
 		t.Fatalf("confirm status = %d, body=%s", rec.Code, rec.Body.String())
 	}
 	got := storedRelogin(t, "acc-1")
-	// The add flows keep only the email of the user lookup; the old user id goes, and the next
-	// usage refresh fills in the new one.
-	if got.AccessToken != "at-other" || got.Email != "someone@example.com" || got.UserId != "" {
+	// The user lookup's id replaces the old user's.
+	if got.AccessToken != "at-other" || got.Email != "someone@example.com" || got.UserId != "user-2" {
 		t.Fatalf("confirm did not replace the identity: %+v", got)
 	}
 	if got.SubscriptionType != "" || got.UsageLimit != 0 || got.UsageCurrent != 0 {
@@ -541,21 +540,17 @@ func TestReloginAPIKeyReplacesKeyAndRejectsDuplicate(t *testing.T) {
 	}
 }
 
-func TestReloginMicrosoftCompleteSavesIntoTarget(t *testing.T) {
-	h, _, _ := newReloginHandler(t)
-	addReloginTarget(t, config.Account{
-		ID: "entra-1", Email: "enterprise@example.com", UserId: handlerMicrosoftObjectID, Nickname: "Entra",
-		AccessToken: "old", RefreshToken: "old-refresh", ClientID: handlerMicrosoftClientID,
-		AuthMethod: auth.MicrosoftSSOAuthMethod, Provider: auth.MicrosoftSSOProvider, Region: "us-east-1",
-		Enabled: false, BanStatus: "BANNED", BanReason: "Authentication failed - token invalid or expired",
-	})
-
+// reloginMicrosoftSignIn runs a Microsoft re-login of targetID through both callbacks: the Entra
+// user oid/email signs in, and Kiro offers profileARNs in us-east-1. It returns the session id,
+// the second leg's response and the new access token.
+func reloginMicrosoftSignIn(t *testing.T, h *Handler, targetID, oid, email string, profileARNs ...string) (string, *httptest.ResponseRecorder, map[string]interface{}, string) {
+	t.Helper()
 	issuerURL := handlerMicrosoftIssuerURL()
 	tokenEndpoint := handlerMicrosoftTokenEndpoint()
 	scopes := handlerMicrosoftScopes()
 	accessToken := handlerMicrosoftJWT(t, map[string]interface{}{
-		"iss": issuerURL, "oid": handlerMicrosoftObjectID,
-		"preferred_username": "enterprise@example.com", "exp": time.Now().Add(time.Hour).Unix(),
+		"iss": issuerURL, "oid": oid,
+		"preferred_username": email, "exp": time.Now().Add(time.Hour).Unix(),
 	})
 	prevAuth := auth.SetGlobalAuthClientForTest(&http.Client{Timeout: time.Second, Transport: handlerMicrosoftRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		switch {
@@ -571,20 +566,21 @@ func TestReloginMicrosoftCompleteSavesIntoTarget(t *testing.T) {
 		return nil, fmt.Errorf("unexpected auth request: %s %s", request.Method, request.URL)
 	})})
 	t.Cleanup(func() { auth.SetGlobalAuthClientForTest(prevAuth) })
-	const usProfile = "arn:aws:codewhisperer:us-east-1:123456789012:profile/us-profile"
 	stubRestTransport(t, func(request *http.Request) (*http.Response, error) {
 		if request.URL.Path != "/ListAvailableProfiles" {
 			return nil, fmt.Errorf("unexpected Kiro REST request: %s", request.URL)
 		}
 		profiles := []map[string]string{}
 		if request.URL.Hostname() == "codewhisperer.us-east-1.amazonaws.com" {
-			profiles = append(profiles, map[string]string{"arn": usProfile, "profileName": "US"})
+			for i, arn := range profileARNs {
+				profiles = append(profiles, map[string]string{"arn": arn, "profileName": fmt.Sprintf("P%d", i)})
+			}
 		}
 		return handlerMicrosoftJSONResponse(request, http.StatusOK, map[string]interface{}{"profiles": profiles}), nil
 	})
 
-	rec, body := callRelogin(t, h.apiStartMicrosoftSSO, map[string]interface{}{"reloginAccountId": "entra-1"})
-	if rec.Code != http.StatusOK || body["reloginAccountId"] != "entra-1" {
+	rec, body := callRelogin(t, h.apiStartMicrosoftSSO, map[string]interface{}{"reloginAccountId": targetID})
+	if rec.Code != http.StatusOK || body["reloginAccountId"] != targetID {
 		t.Fatalf("start status = %d, body=%s", rec.Code, rec.Body.String())
 	}
 	sessionID := body["sessionId"].(string)
@@ -592,7 +588,7 @@ func TestReloginMicrosoftCompleteSavesIntoTarget(t *testing.T) {
 	portalState := mustHandlerMicrosoftURL(t, body["authorizeUrl"].(string)).Query().Get("state")
 	portalCallback := url.URL{Scheme: "http", Host: "localhost:3128", Path: "/signin/callback", RawQuery: url.Values{
 		"state": {portalState}, "login_option": {auth.MicrosoftSSOAuthMethod}, "issuer_url": {issuerURL},
-		"client_id": {handlerMicrosoftClientID}, "scopes": {scopes}, "login_hint": {"enterprise@example.com"},
+		"client_id": {handlerMicrosoftClientID}, "scopes": {scopes}, "login_hint": {email},
 	}.Encode()}
 	first := callMicrosoftCompleteHandler(t, h, sessionID, portalCallback.String())
 	var firstBody map[string]interface{}
@@ -607,6 +603,31 @@ func TestReloginMicrosoftCompleteSavesIntoTarget(t *testing.T) {
 	second := callMicrosoftCompleteHandler(t, h, sessionID, providerCallback.String())
 	var done map[string]interface{}
 	decodeHandlerMicrosoftJSON(t, second, &done)
+	return sessionID, second, done, accessToken
+}
+
+// entraUserID is the stored user id of an Entra login: <issuer>.<oid>.
+func entraUserID(oid string) string {
+	return handlerMicrosoftIssuerURL() + "." + oid
+}
+
+func entraReloginTarget(id, oid, email string) config.Account {
+	return config.Account{
+		ID: id, Email: email, UserId: entraUserID(oid), Nickname: "Entra",
+		AccessToken: "old", RefreshToken: "old-refresh", ClientID: handlerMicrosoftClientID,
+		AuthMethod: auth.MicrosoftSSOAuthMethod, Provider: auth.MicrosoftSSOProvider, Region: "us-east-1",
+		Enabled: true,
+	}
+}
+
+func TestReloginMicrosoftCompleteSavesIntoTarget(t *testing.T) {
+	h, _, _ := newReloginHandler(t)
+	target := entraReloginTarget("entra-1", handlerMicrosoftObjectID, "enterprise@example.com")
+	target.Enabled, target.BanStatus, target.BanReason = false, "BANNED", "Authentication failed - token invalid or expired"
+	addReloginTarget(t, target)
+
+	const usProfile = "arn:aws:codewhisperer:us-east-1:123456789012:profile/us-profile"
+	_, second, done, accessToken := reloginMicrosoftSignIn(t, h, "entra-1", handlerMicrosoftObjectID, "enterprise@example.com", usProfile)
 	if second.Code != http.StatusOK || done["stage"] != "complete" || done["relogin"] != true || done["identityVerified"] != true {
 		t.Fatalf("second leg status = %d, body=%s", second.Code, second.Body.String())
 	}
@@ -614,11 +635,164 @@ func TestReloginMicrosoftCompleteSavesIntoTarget(t *testing.T) {
 		t.Fatalf("accounts = %d, want 1", n)
 	}
 	got := storedRelogin(t, "entra-1")
-	if got.AccessToken != accessToken || got.RefreshToken != "new-refresh" || got.ProfileArn != usProfile || got.TokenEndpoint != tokenEndpoint {
+	if got.AccessToken != accessToken || got.RefreshToken != "new-refresh" || got.ProfileArn != usProfile || got.TokenEndpoint != handlerMicrosoftTokenEndpoint() {
 		t.Fatalf("login not replaced: %+v", got)
 	}
 	if !got.Enabled || got.BanStatus != "ACTIVE" || got.Nickname != "Entra" {
 		t.Fatalf("ban or settings wrong: %+v", got)
+	}
+}
+
+func TestReloginMicrosoftSelectProfileSavesIntoTarget(t *testing.T) {
+	const (
+		profileA = "arn:aws:codewhisperer:us-east-1:123456789012:profile/a"
+		profileB = "arn:aws:codewhisperer:us-east-1:123456789012:profile/b"
+	)
+
+	t.Run("same user: the picked profile replaces the pinned one", func(t *testing.T) {
+		h, _, _ := newReloginHandler(t)
+		target := entraReloginTarget("entra-1", handlerMicrosoftObjectID, "enterprise@example.com")
+		target.ProfileArn, target.ProfileArnPinned = profileA, true
+		addReloginTarget(t, target)
+
+		sessionID, second, done, accessToken := reloginMicrosoftSignIn(t, h, "entra-1", handlerMicrosoftObjectID, "enterprise@example.com", profileA, profileB)
+		if second.Code != http.StatusOK || done["stage"] != "profile" {
+			t.Fatalf("second leg status = %d, body=%s", second.Code, second.Body.String())
+		}
+		selectionID := done["selectionId"].(string)
+		if got := storedRelogin(t, "entra-1"); got.AccessToken != "old" {
+			t.Fatalf("the profile step saved early: %+v", got)
+		}
+
+		rec := callMicrosoftProfileSelectionHandler(t, h, selectionID, profileB)
+		var body map[string]interface{}
+		decodeHandlerMicrosoftJSON(t, rec, &body)
+		if rec.Code != http.StatusOK || body["stage"] != "complete" || body["relogin"] != true || body["identityVerified"] != true {
+			t.Fatalf("select status = %d, body=%s", rec.Code, rec.Body.String())
+		}
+		got := storedRelogin(t, "entra-1")
+		if got.AccessToken != accessToken || got.ProfileArn != profileB || !got.ProfileArnPinned || got.Nickname != "Entra" {
+			t.Fatalf("selection not saved into the target: %+v", got)
+		}
+		if n := len(config.GetAccounts()); n != 1 {
+			t.Fatalf("accounts = %d, want 1", n)
+		}
+		if pendingMicrosoftSelection(selectionID) != nil || reloginSessions.target(sessionID) != "" {
+			t.Fatal("selection or binding kept after a saved re-login")
+		}
+	})
+
+	t.Run("other user: stashed, then confirmed", func(t *testing.T) {
+		h, _, _ := newReloginHandler(t)
+		addReloginTarget(t, entraReloginTarget("entra-1", "11111111-2222-4333-8444-555555555555", "first@example.com"))
+
+		sessionID, second, done, accessToken := reloginMicrosoftSignIn(t, h, "entra-1", handlerMicrosoftObjectID, "enterprise@example.com", profileA, profileB)
+		if second.Code != http.StatusOK || done["stage"] != "profile" {
+			t.Fatalf("second leg status = %d, body=%s", second.Code, second.Body.String())
+		}
+		selectionID := done["selectionId"].(string)
+
+		rec := callMicrosoftProfileSelectionHandler(t, h, selectionID, profileB)
+		var body map[string]interface{}
+		decodeHandlerMicrosoftJSON(t, rec, &body)
+		if rec.Code != http.StatusConflict || body["code"] != codeReloginIdentityMismatch || body["incomingEmail"] != "enterprise@example.com" {
+			t.Fatalf("select status = %d, body=%s", rec.Code, rec.Body.String())
+		}
+		if got := storedRelogin(t, "entra-1"); got.AccessToken != "old" || got.UserId != entraUserID("11111111-2222-4333-8444-555555555555") {
+			t.Fatalf("mismatch changed the account: %+v", got)
+		}
+		// The login now waits in the stash; the selection and the binding are used up.
+		if pendingMicrosoftSelection(selectionID) != nil || reloginSessions.target(sessionID) != "" {
+			t.Fatal("selection or binding kept after the login was stashed")
+		}
+
+		rec, body = callPending(h, true, "entra-1", body["pendingId"].(string))
+		if rec.Code != http.StatusOK || body["identityReplaced"] != true {
+			t.Fatalf("confirm status = %d, body=%s", rec.Code, rec.Body.String())
+		}
+		got := storedRelogin(t, "entra-1")
+		if got.AccessToken != accessToken || got.UserId != entraUserID(handlerMicrosoftObjectID) || got.Email != "enterprise@example.com" || got.ProfileArn != profileB || got.ProfileArnPinned {
+			t.Fatalf("confirm did not apply the picked login: %+v", got)
+		}
+	})
+}
+
+func TestReloginMicrosoftRefusesAnotherAccountsEntraUser(t *testing.T) {
+	const (
+		profileA = "arn:aws:codewhisperer:us-east-1:123456789012:profile/a"
+		profileB = "arn:aws:codewhisperer:us-east-1:123456789012:profile/b"
+	)
+	h, _, _ := newReloginHandler(t)
+	// The same person as a Builder ID account (same email, so the identity matches) and as an
+	// Entra account that already exists.
+	target := baseReloginAccount("acc-1")
+	target.Email = "enterprise@example.com"
+	addReloginTarget(t, target)
+	addReloginTarget(t, entraReloginTarget("entra-2", handlerMicrosoftObjectID, "enterprise@example.com"))
+
+	sessionID, second, done, accessToken := reloginMicrosoftSignIn(t, h, "acc-1", handlerMicrosoftObjectID, "enterprise@example.com", profileA, profileB)
+	if second.Code != http.StatusOK || done["stage"] != "profile" {
+		t.Fatalf("second leg status = %d, body=%s", second.Code, second.Body.String())
+	}
+	selectionID := done["selectionId"].(string)
+
+	rec := callMicrosoftProfileSelectionHandler(t, h, selectionID, profileA)
+	var body map[string]interface{}
+	decodeHandlerMicrosoftJSON(t, rec, &body)
+	if rec.Code != http.StatusConflict || body["code"] != codeMicrosoftDuplicate {
+		t.Fatalf("select status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if got := storedRelogin(t, "acc-1"); got.AccessToken != "at-old" || got.AuthMethod != "idc" || got.UserId != "user-1" {
+		t.Fatalf("duplicate changed the target: %+v", got)
+	}
+	// A refused save keeps the selection and the binding, so the admin can try again.
+	if pendingMicrosoftSelection(selectionID) == nil || reloginSessions.target(sessionID) != "acc-1" {
+		t.Fatal("a refused save used up the selection or the binding")
+	}
+
+	if err := config.DeleteAccount("entra-2"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	rec = callMicrosoftProfileSelectionHandler(t, h, selectionID, profileA)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("retry status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	got := storedRelogin(t, "acc-1")
+	if got.AccessToken != accessToken || got.UserId != entraUserID(handlerMicrosoftObjectID) || !config.IsExternalIdpAccount(&got) || got.ProfileArn != profileA {
+		t.Fatalf("retry did not save the Entra login: %+v", got)
+	}
+	if n := len(config.GetAccounts()); n != 1 {
+		t.Fatalf("accounts = %d, want 1", n)
+	}
+}
+
+func TestReloginUserIdMismatchWithoutEmail(t *testing.T) {
+	h, fake, _ := newReloginHandler(t)
+	addReloginTarget(t, baseReloginAccount("acc-1"))
+	fake.access, fake.refresh = "at-other", "rt-other"
+	fake.users["at-other"] = [2]string{"", "user-2"}
+
+	rec, body := callRelogin(t, h.apiImportCredentials, idcCredentials("acc-1"))
+	if rec.Code != http.StatusConflict || body["code"] != codeReloginIdentityMismatch {
+		t.Fatalf("credentials status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	_, body = callRelogin(t, h.apiStartBuilderIdLogin, map[string]interface{}{"region": "us-east-1", "reloginAccountId": "acc-1"})
+	rec, body = callRelogin(t, h.apiPollBuilderIdAuth, map[string]interface{}{"sessionId": body["sessionId"].(string)})
+	if rec.Code != http.StatusConflict || body["code"] != codeReloginIdentityMismatch {
+		t.Fatalf("Builder ID status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if got := storedRelogin(t, "acc-1"); got.AccessToken != "at-old" || got.UserId != "user-1" {
+		t.Fatalf("mismatch changed the account: %+v", got)
+	}
+
+	rec, body = callPending(h, true, "acc-1", body["pendingId"].(string))
+	if rec.Code != http.StatusOK || body["identityReplaced"] != true {
+		t.Fatalf("confirm status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	// The other user's email is not known yet: the old user's does not stay on the account.
+	if got := storedRelogin(t, "acc-1"); got.UserId != "user-2" || got.Email != "" {
+		t.Fatalf("confirmed identity = %q / %q", got.Email, got.UserId)
 	}
 }
 
@@ -638,6 +812,12 @@ func TestReloginKeepsPinnedProfileSameIdentity(t *testing.T) {
 	}
 	if got := storedRelogin(t, "acc-1"); got.ProfileArn != pinned || !got.ProfileArnPinned {
 		t.Fatalf("pin lost: %q pinned=%v", got.ProfileArn, got.ProfileArnPinned)
+	}
+
+	// A profile the admin picked in this sign-in replaces the pinned one and stays pinned.
+	picked := mergeRelogin(target, config.Account{AuthMethod: "idc", ProfileArn: fake.arn, ProfileArnPinned: true}, false)
+	if picked.ProfileArn != fake.arn || !picked.ProfileArnPinned {
+		t.Fatalf("picked profile lost to the pin: %q pinned=%v", picked.ProfileArn, picked.ProfileArnPinned)
 	}
 
 	// Another login method is a new credential: the pin goes, the new ARN is taken.

@@ -382,6 +382,8 @@ func (h *Handler) apiSelectMicrosoftSSOProfile(w http.ResponseWriter, r *http.Re
 	account := sel.account
 	account.ProfileArn = profileARN
 	if target := reloginSessions.target(sel.sessionID); target != "" && !flows.canceledLocked(sel.sessionID, time.Now()) {
+		//! Marks the admin's pick, so it wins over a pinned profile (see mergeRelogin).
+		account.ProfileArnPinned = true
 		if h.writeReloginFlowsLocked(w, r, target, account, map[string]interface{}{"stage": "complete"}) {
 			delete(flows.selections, selectionID)
 			reloginSessions.forget(sel.sessionID)

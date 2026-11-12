@@ -3117,7 +3117,7 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, _, _ := auth.GetUserInfo(accessToken)
+	email, userID, _ := auth.GetUserInfo(accessToken)
 
 	account := config.Account{
 		ID:           auth.GenerateAccountID(),
@@ -3135,6 +3135,7 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 
 	if target := reloginSessions.target(req.SessionID); target != "" {
 		reloginSessions.forget(req.SessionID)
+		account.UserId = userID
 		h.writeRelogin(w, r, target, account, nil)
 		return
 	}
@@ -3223,7 +3224,7 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, _, _ := auth.GetUserInfo(accessToken)
+	email, userID, _ := auth.GetUserInfo(accessToken)
 
 	account := config.Account{
 		ID:           auth.GenerateAccountID(),
@@ -3242,6 +3243,7 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 
 	if target := reloginSessions.target(req.SessionID); target != "" {
 		reloginSessions.forget(req.SessionID)
+		account.UserId = userID
 		h.writeRelogin(w, r, target, account, map[string]interface{}{"completed": true})
 		return
 	}
@@ -3308,7 +3310,7 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		email, _, _ := auth.GetUserInfo(accessToken)
+		email, userID, _ := auth.GetUserInfo(accessToken)
 
 		account := config.Account{
 			ID:           auth.GenerateAccountID(),
@@ -3325,6 +3327,7 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if req.ReloginAccountID != "" {
+			account.UserId = userID
 			h.writeRelogin(w, r, req.ReloginAccountID, account, nil)
 			return
 		}
@@ -3474,7 +3477,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		profileArn = newProfileArn
 	}
 
-	var email, userID string
+	var email, userID, kiroUserID string
 	if config.IsExternalIdpAccount(tempAccount) {
 		email, userID = auth.ExternalIdpTokenIdentity(accessToken, tempAccount.IssuerURL)
 		if profileArn != "" {
@@ -3487,7 +3490,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		email, _, _ = auth.GetUserInfo(accessToken)
+		email, kiroUserID, _ = auth.GetUserInfo(accessToken)
 	}
 	if email == "" {
 		email = strings.TrimSpace(req.Email)
@@ -3518,6 +3521,10 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.ReloginAccountID != "" {
+		//! The lookup's user id, not a pasted one, is what the identity check compares.
+		if kiroUserID != "" {
+			account.UserId = kiroUserID
+		}
 		h.writeRelogin(w, r, req.ReloginAccountID, account, nil)
 		return
 	}
