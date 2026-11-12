@@ -11,6 +11,7 @@ import {
   Image01Icon,
   Location01Icon,
   LockPasswordIcon,
+  NetworkIcon,
   RepeatIcon,
   Route02Icon,
   SecurityCheckIcon,
@@ -50,6 +51,12 @@ export const SETTINGS_SECTIONS = [
     group: "server",
   },
   { id: "settings-outbound-proxy", titleKey: "proxySettings", icon: GlobalIcon, group: "server" },
+  {
+    id: "settings-proxy-pool",
+    titleKey: "proxy-pool:card.title",
+    icon: NetworkIcon,
+    group: "server",
+  },
   {
     id: "settings-count-tokens",
     titleKey: "countTokens.title",
@@ -105,6 +112,7 @@ export const SECTION_ID = {
   upstream: "settings-upstream",
   adminPassword: "settings-admin-password",
   outboundProxy: "settings-outbound-proxy",
+  proxyPool: "settings-proxy-pool",
   countTokens: "settings-count-tokens",
   responseHeaders: "settings-response-headers",
   promptFilter: "settings-prompt-filter",

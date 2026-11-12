@@ -3,6 +3,9 @@ import { type JSX, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { routesThroughPool } from "@/features/proxy-pool/lib/pool-model";
+import { PoolProxyValue } from "@/features/proxy-pool/pool-assignment";
+import { proxyPoolQuery } from "@/lib/api/proxy-pool";
 import { proxyQuery } from "@/lib/api/settings";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
@@ -10,9 +13,10 @@ import { isValidProxyUrl, proxyDisplayUrl } from "../account-model";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
 
 /**
- * The account's own proxy URL; empty falls back to the global proxy. The row shows what the
- * account really uses: its own URL, or the global one with a Global badge, or Direct when there
- * is no global proxy either. Passwords never show; the edit field holds the URL as saved.
+ * The account's own proxy URL; empty falls back to the proxy pool (while it is on), then the
+ * global proxy. The row shows what the account really uses: its own URL, its pool proxy with a
+ * Pool badge, or the global one with a Global badge, or Direct when there is no global proxy
+ * either. Passwords never show; the edit field holds the URL as saved.
  */
 export function ProxyRow({ account }: { account: Account }): JSX.Element {
   const { t } = useT("accounts");
@@ -43,7 +47,7 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
       open={open}
       saving={save.isPending}
       title={t("detail.proxyURL")}
-      value={<ProxyValue proxyURL={account.proxyURL} />}
+      value={<ProxyValue accountId={account.id} proxyURL={account.proxyURL} />}
       // A proxy URL is as long as a machine ID: the edit takes the whole row, label above.
       wide
     >
@@ -67,11 +71,13 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
   );
 }
 
-function ProxyValue({ proxyURL }: { proxyURL: string }): JSX.Element {
+function ProxyValue({ accountId, proxyURL }: { accountId: string; proxyURL: string }): JSX.Element {
   const { t } = useT("accounts");
-  // The global proxy is read only when the account has none of its own.
+  // The pool and the global proxy are read only when the account has none of its own.
   const global = useQuery({ ...proxyQuery(), enabled: !proxyURL }).data;
+  const pool = useQuery({ ...proxyPoolQuery(), enabled: !proxyURL }).data;
   if (proxyURL) return <span className="font-mono">{proxyDisplayUrl(proxyURL)}</span>;
+  if (routesThroughPool(pool)) return <PoolProxyValue accountId={accountId} view={pool} />;
   return (
     <span className="flex min-w-0 items-center gap-2">
       {global === undefined ? null : global.proxyURL ? (

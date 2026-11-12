@@ -52,6 +52,7 @@ export const queryKeys = {
     proxy: () => ["settings", "proxy"] as const,
     logRetention: () => ["settings", "log-retention"] as const,
     countTokens: () => ["settings", "count-tokens"] as const,
+    proxyPool: () => ["settings", "proxy-pool"] as const,
     promptFilter: () => ["settings", "prompt-filter"] as const,
     responseHeaders: () => ["settings", "response-headers"] as const,
   },
