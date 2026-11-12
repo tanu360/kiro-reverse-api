@@ -79,7 +79,7 @@ func poolClientFor(proxyURL string, stream bool) (*http.Client, bool) {
 		transport.DialContext = (&net.Dialer{Timeout: poolDialTimeout, KeepAlive: 30 * time.Second}).DialContext
 		transport.TLSHandshakeTimeout = poolTLSTimeout
 	}
-	client.Transport = proxypool.Instrument(p.ID, client.Transport)
+	client.Transport = proxypool.Instrument(p.ID, proxyURL, client.Transport)
 	actual, _ := poolClients.LoadOrStore(key, client)
 	return actual.(*http.Client), true
 }

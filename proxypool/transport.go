@@ -1,14 +1,18 @@
 package proxypool
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptrace"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 // Kinds of proxy failure. Only failures before a connection to the upstream
@@ -129,51 +133,121 @@ func isConnectStatus(msg string) bool {
 	return false
 }
 
-// Instrument wraps a transport that dials through pool proxy id: a failure
-// before the connection exists marks the proxy failed and moves its accounts;
-// a new connection marks it healthy. A canceled request is never held against it.
-func Instrument(id string, base http.RoundTripper) http.RoundTripper {
+// connectTimeout bounds a request's way to its connection: the dial, the proxy
+// handshake and TLS. Go runs a SOCKS handshake with no deadline of its own and
+// gives a CONNECT a full minute, so without it a proxy that accepts and then
+// stalls holds every request until the caller gives up, and a caller that gives
+// up is never held against the proxy.
+var connectTimeout = 15 * time.Second
+
+// connectTimeoutError is the cause of a request that got no connection within connectTimeout.
+type connectTimeoutError struct{ budget time.Duration }
+
+func (e *connectTimeoutError) Error() string {
+	return fmt.Sprintf("no connection through the proxy within %s", e.budget)
+}
+
+func (e *connectTimeoutError) Timeout() bool   { return true }
+func (e *connectTimeoutError) Temporary() bool { return true }
+
+// States of a request's connection, for the race between GotConn and the connect timer.
+const (
+	connPending int32 = iota
+	connReady
+	connExpired
+)
+
+// Instrument wraps a transport that dials through pool proxy id at dialURL: a
+// failure before the connection exists, or no connection within connectTimeout,
+// marks the proxy failed and moves its accounts; a new connection marks it
+// healthy. A canceled request is never held against it, and neither is any
+// report once the proxy has been edited to another address or sign-in.
+func Instrument(id, dialURL string, base http.RoundTripper) http.RoundTripper {
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	return &instrumentedTransport{id: id, base: base}
+	return &instrumentedTransport{id: id, url: dialURL, base: base}
 }
 
 type instrumentedTransport struct {
 	id   string
+	url  string
 	base http.RoundTripper
 }
 
 func (t *instrumentedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	var connected, fresh atomic.Bool
+	parent := req.Context()
+	ctx, cancel := context.WithCancelCause(parent)
+	var state atomic.Int32
+	var fresh atomic.Bool
+	budget := connectTimeout
+	timer := time.AfterFunc(budget, func() {
+		if state.CompareAndSwap(connPending, connExpired) {
+			cancel(&connectTimeoutError{budget: budget})
+		}
+	})
 	trace := &httptrace.ClientTrace{
 		GotConn: func(info httptrace.GotConnInfo) {
-			connected.Store(true)
+			if state.CompareAndSwap(connPending, connReady) {
+				timer.Stop()
+			}
 			if !info.Reused {
 				fresh.Store(true)
 			}
 		},
 	}
-	resp, err := t.base.RoundTrip(req.WithContext(httptrace.WithClientTrace(req.Context(), trace)))
+	resp, err := t.base.RoundTrip(req.WithContext(httptrace.WithClientTrace(ctx, trace)))
+	timer.Stop()
 	if err != nil {
-		if connected.Load() || req.Context().Err() != nil {
+		cause := context.Cause(ctx)
+		cancel(nil)
+		var expired *connectTimeoutError
+		timedOut := errors.As(cause, &expired)
+		if state.Load() == connReady || (!timedOut && parent.Err() != nil) {
 			return nil, err
 		}
-		perr := newProxyError(t.id, err)
-		Default().ReportFailure(t.id, perr)
+		var perr *ProxyError
+		if timedOut {
+			perr = &ProxyError{ProxyID: t.id, Kind: KindTimeout, cause: cause}
+			//! Go keeps dialing after the request gave up (the dial outlives the request);
+			//! this cancels that dial, which a stalled SOCKS handshake would otherwise hold forever.
+			t.CloseIdleConnections()
+		} else {
+			perr = newProxyError(t.id, err)
+		}
+		Default().reportFailure(t.id, t.url, perr)
 		return nil, perr
 	}
 	//! A plain-HTTP request through an HTTP proxy gets the 407 as a response, not a CONNECT error.
 	if resp.StatusCode == http.StatusProxyAuthRequired {
 		resp.Body.Close()
+		cancel(nil)
 		perr := &ProxyError{ProxyID: t.id, Kind: KindAuth, cause: errors.New(resp.Status)}
-		Default().ReportFailure(t.id, perr)
+		Default().reportFailure(t.id, t.url, perr)
 		return nil, perr
 	}
 	if fresh.Load() {
-		Default().ReportSuccess(t.id)
+		Default().reportSuccess(t.id, t.url)
+	}
+	//! The body reads on ctx: it is released when the body is closed, not here.
+	if resp.Body == nil {
+		cancel(nil)
+	} else {
+		resp.Body = &releaseBody{ReadCloser: resp.Body, release: func() { cancel(nil) }}
 	}
 	return resp, nil
+}
+
+// releaseBody runs release once the response body is closed.
+type releaseBody struct {
+	io.ReadCloser
+	release func()
+}
+
+func (b *releaseBody) Close() error {
+	err := b.ReadCloser.Close()
+	b.release()
+	return err
 }
 
 // CloseIdleConnections lets http.Client.CloseIdleConnections reach the wrapped transport.
@@ -183,10 +257,10 @@ func (t *instrumentedTransport) CloseIdleConnections() {
 	}
 }
 
-// WrapClient returns a copy of c whose transport reports to pool proxy id. The
-// copy shares c's transport, so its connections are reused.
-func WrapClient(id string, c *http.Client) *http.Client {
+// WrapClient returns a copy of c whose transport reports to pool proxy id, dialed
+// at dialURL. The copy shares c's transport, so its connections are reused.
+func WrapClient(id, dialURL string, c *http.Client) *http.Client {
 	wrapped := *c
-	wrapped.Transport = Instrument(id, c.Transport)
+	wrapped.Transport = Instrument(id, dialURL, c.Transport)
 	return &wrapped
 }

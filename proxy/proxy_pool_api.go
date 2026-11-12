@@ -111,7 +111,7 @@ func (h *Handler) apiUpdateProxyPoolSettings(w http.ResponseWriter, r *http.Requ
 	}
 	if turningOn {
 		//! Proxies never checked count as healthy; check them now instead of at the first tick.
-		go proxypool.Default().CheckAllInBackground()
+		proxypool.Default().StartCheckAll()
 	}
 	publishEvent(eventSettingsChanged, "proxy-pool")
 	json.NewEncoder(w).Encode(proxypool.Default().View())
@@ -167,11 +167,7 @@ func (h *Handler) apiCheckPoolProxy(w http.ResponseWriter, r *http.Request, id s
 }
 
 func (h *Handler) apiCheckProxyPool(w http.ResponseWriter, r *http.Request) {
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		proxypool.Default().CheckAllInBackground()
-	}()
+	done := proxypool.Default().StartCheckAll()
 	wait, cancel := context.WithTimeout(r.Context(), proxyPoolCheckAllWait)
 	defer cancel()
 	select {

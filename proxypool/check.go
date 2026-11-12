@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,8 @@ const (
 )
 
 var (
+	// checkMu guards checkTarget and checkTLS: a test swaps them while background checks read them.
+	checkMu sync.RWMutex
 	// checkTarget is the Kiro host every check reaches through the proxy.
 	checkTarget = "https://q.us-east-1.amazonaws.com/"
 	// checkTLS is nil (system roots) outside tests.
@@ -25,9 +28,21 @@ var (
 
 // SetCheckTargetForTest points health checks at target and returns the restore.
 func SetCheckTargetForTest(target string, tlsConfig *tls.Config) func() {
+	checkMu.Lock()
 	prevTarget, prevTLS := checkTarget, checkTLS
 	checkTarget, checkTLS = target, tlsConfig
-	return func() { checkTarget, checkTLS = prevTarget, prevTLS }
+	checkMu.Unlock()
+	return func() {
+		checkMu.Lock()
+		checkTarget, checkTLS = prevTarget, prevTLS
+		checkMu.Unlock()
+	}
+}
+
+func checkDestination() (string, *tls.Config) {
+	checkMu.RLock()
+	defer checkMu.RUnlock()
+	return checkTarget, checkTLS
 }
 
 // checkProxy sends one HEAD to the Kiro host through the proxy, on a fresh
@@ -38,19 +53,20 @@ func checkProxy(ctx context.Context, fullURL string) (time.Duration, error) {
 	if err != nil {
 		return 0, &ProxyError{Kind: KindConnect, cause: err}
 	}
+	target, tlsConfig := checkDestination()
 	transport := &http.Transport{
 		Proxy:                 http.ProxyURL(proxyURL),
 		DialContext:           (&net.Dialer{Timeout: checkDialTimeout}).DialContext,
 		TLSHandshakeTimeout:   checkTLSTimeout,
 		ResponseHeaderTimeout: checkTotalTimeout,
-		TLSClientConfig:       checkTLS,
+		TLSClientConfig:       tlsConfig,
 		DisableKeepAlives:     true,
 	}
 	defer transport.CloseIdleConnections()
 
 	ctx, cancel := context.WithTimeout(ctx, checkTotalTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, checkTarget, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
 	if err != nil {
 		return 0, &ProxyError{Kind: KindConnect, cause: err}
 	}

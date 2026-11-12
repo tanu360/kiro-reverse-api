@@ -21,9 +21,10 @@ import (
 func newPoolTestAdmin(t *testing.T) *Handler {
 	t.Helper()
 	h := newRegionTestAdmin(t)
-	proxypool.Default().ResetForTest()
-	t.Cleanup(proxypool.Default().ResetForTest)
 	t.Cleanup(proxypool.SetCheckTargetForTest("http://kiro.test/", nil))
+	proxypool.Default().ResetForTest()
+	//! Runs before the check target is restored: it ends this test's background checks first.
+	t.Cleanup(proxypool.Default().ResetForTest)
 	t.Cleanup(dropPoolClients)
 	return h
 }

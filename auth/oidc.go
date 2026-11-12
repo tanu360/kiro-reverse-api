@@ -49,7 +49,7 @@ func RefreshTokenContext(ctx context.Context, account *config.Account) (string, 
 	}
 	client := GetAuthClientForProxy(route.URL)
 	if route.ProxyID != "" {
-		client = proxypool.WrapClient(route.ProxyID, client)
+		client = proxypool.WrapClient(route.ProxyID, route.URL, client)
 	}
 
 	if config.IsExternalIdpAccount(account) {

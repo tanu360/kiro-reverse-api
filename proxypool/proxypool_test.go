@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"kiro-proxy/config"
+	"kiro-proxy/db"
 )
 
 // setupPool gives the test its own database and a clean Default manager, with
@@ -24,10 +26,11 @@ func setupPool(t *testing.T, proxies ...config.PoolProxy) *Manager {
 	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
+	t.Cleanup(SetCheckTargetForTest("http://kiro.test/", nil))
 	m := Default()
 	m.ResetForTest()
+	//! Runs before the check target is restored: it ends this test's background checks first.
 	t.Cleanup(m.ResetForTest)
-	t.Cleanup(SetCheckTargetForTest("http://kiro.test/", nil))
 	if err := config.SetProxyPool(proxies); err != nil {
 		t.Fatal(err)
 	}
@@ -254,6 +257,9 @@ func TestResolveNoHealthyUnavailable(t *testing.T) {
 
 func TestResolveNoHealthyFallbackGlobalThenDirect(t *testing.T) {
 	m := setupPool(t, poolProxy("px_a", "http://10.0.0.1:3128"))
+	m.mu.Lock()
+	m.lastKick = time.Now() // no background check-all from this test
+	m.mu.Unlock()
 	setPoolSettings(t, config.ProxyPoolModeOn, true)
 	if err := config.UpdateProxySettings("http://global.example:8080"); err != nil {
 		t.Fatal(err)
@@ -273,7 +279,7 @@ func TestResolveNoHealthyFallbackGlobalThenDirect(t *testing.T) {
 
 func clientThrough(id, proxyURL string) *http.Client {
 	u, _ := url.Parse(proxyURL)
-	return &http.Client{Transport: Instrument(id, &http.Transport{Proxy: http.ProxyURL(u)})}
+	return &http.Client{Transport: Instrument(id, proxyURL, &http.Transport{Proxy: http.ProxyURL(u)})}
 }
 
 func TestInstrumentDialFailureRotatesAccount(t *testing.T) {
@@ -500,5 +506,215 @@ func TestStatePersistsAcrossReload(t *testing.T) {
 	}
 	if _, ok := m.Assignment("gone"); ok {
 		t.Fatal("a deleted account's assignment was kept")
+	}
+}
+
+func TestResolveFallbackStartsARecoveryCheck(t *testing.T) {
+	p := poolProxy("px_a", fakeProxy(t, http.StatusOK))
+	m := setupPool(t, p)
+	setPoolSettings(t, config.ProxyPoolModeOn, true)
+	acc := addAccount(t, "a1", "")
+	failAll(m, p.ID)
+	if r := m.Resolve(acc); r.Source != SourceFallback {
+		t.Fatalf("all failed with fallback: %+v", r)
+	}
+	// No periodic check runs here: only the fallback's own kick can bring the proxy back.
+	deadline := time.Now().Add(5 * time.Second)
+	for m.Health(p.ID).Status != StatusOK {
+		if time.Now().After(deadline) {
+			t.Fatal("a fallback route started no recovery check")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if r := m.Resolve(acc); r.Source != SourcePool || r.ProxyID != p.ID {
+		t.Fatalf("route after the recovery: %+v", r)
+	}
+}
+
+// stallingProxy accepts every connection, reads what the client sends and never
+// answers. closed receives once for each connection the client closes.
+func stallingProxy(t *testing.T) (string, <-chan struct{}) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := make(chan struct{}, 16)
+	conns := make(chan net.Conn, 16)
+	t.Cleanup(func() {
+		ln.Close()
+		for {
+			select {
+			case c := <-conns:
+				c.Close()
+			default:
+				return
+			}
+		}
+	})
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			select {
+			case conns <- conn:
+			default:
+			}
+			go func() {
+				_, _ = io.Copy(io.Discard, conn)
+				conn.Close()
+				select {
+				case closed <- struct{}{}:
+				default:
+				}
+			}()
+		}
+	}()
+	return ln.Addr().String(), closed
+}
+
+func TestInstrumentStalledSOCKSHandshakeTimesOut(t *testing.T) {
+	addr, closed := stallingProxy(t)
+	stalled := poolProxy("px_stalled", "socks5://"+addr)
+	live := poolProxy("px_live", fakeProxy(t, http.StatusOK))
+	m := setupPool(t, stalled, live)
+	prev := connectTimeout
+	connectTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { connectTimeout = prev })
+	acc := addAccount(t, "a1", "")
+	if r := m.Resolve(acc); r.ProxyID != stalled.ID {
+		t.Fatalf("first pick %s, want %s", r.ProxyID, stalled.ID)
+	}
+
+	// No deadline on the request and no timeout in the transport: only the connect timer ends it.
+	start := time.Now()
+	_, err := clientThrough(stalled.ID, FullURL(stalled)).Get("https://kiro.test/generate")
+	var perr *ProxyError
+	if !errors.As(err, &perr) || perr.Kind != KindTimeout {
+		t.Fatalf("stalled SOCKS handshake: %v, want a timeout ProxyError", err)
+	}
+	if took := time.Since(start); took > 5*time.Second {
+		t.Fatalf("the stalled request took %s", took)
+	}
+	if h := m.Health(stalled.ID); h.Status != StatusFailed || !strings.Contains(h.LastError, "timed out") {
+		t.Fatalf("stalled proxy health %+v", h)
+	}
+	if id, _ := m.Assignment("a1"); id != live.ID {
+		t.Fatalf("account still on %s", id)
+	}
+	// Go keeps dialing after the request gives up; the transport ends that dial too.
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stalled SOCKS dial was left running")
+	}
+}
+
+func TestReportsAboutAnEditedProxyAreDropped(t *testing.T) {
+	old := poolProxy("px_a", closedPortURL(t))
+	other := poolProxy("px_b", fakeProxy(t, http.StatusOK))
+	m := setupPool(t, old, other)
+	acc := addAccount(t, "a1", "")
+	if r := m.Resolve(acc); r.ProxyID != old.ID {
+		t.Fatalf("first pick %s", r.ProxyID)
+	}
+	m.mu.Lock()
+	gen := m.gen
+	m.mu.Unlock()
+	client := clientThrough(old.ID, FullURL(old))
+
+	// The admin corrects the address while a request and a check still use the old one.
+	fixed := old
+	fixed.URL = fakeProxy(t, http.StatusOK)
+	if err := config.SetProxyPool([]config.PoolProxy{fixed, other}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Get("http://kiro.test/generate"); !IsProxyError(err) {
+		t.Fatalf("old client: %v, want a ProxyError", err)
+	}
+	m.recordCheck(gen, old, 0, &ProxyError{Kind: KindTimeout, cause: errors.New("timed out")})
+	if h := m.Health(old.ID); h.Status == StatusFailed {
+		t.Fatalf("a result for the old address marked the edited proxy failed: %+v", h)
+	}
+	if id, _ := m.Assignment("a1"); id != old.ID {
+		t.Fatalf("a result for the old address moved the account to %s", id)
+	}
+
+	// A report about the current address still counts.
+	m.reportFailure(fixed.ID, FullURL(fixed), &ProxyError{Kind: KindConnect, cause: errors.New("refused")})
+	if h := m.Health(fixed.ID); h.Status != StatusFailed {
+		t.Fatalf("a current report was dropped: %+v", h)
+	}
+}
+
+func TestResetForTestEndsBackgroundChecks(t *testing.T) {
+	addr, _ := stallingProxy(t)
+	p := poolProxy("px_stall", "http://"+addr)
+	m := setupPool(t, p)
+	m.checkSoon(p.ID)
+	m.StartCheckAll()
+
+	start := time.Now()
+	m.ResetForTest()
+	if took := time.Since(start); took > 3*time.Second {
+		t.Fatalf("ResetForTest took %s", took)
+	}
+	m.mu.Lock()
+	running := m.bgRunning
+	m.mu.Unlock()
+	if running != 0 {
+		t.Fatalf("%d background checks outlived ResetForTest", running)
+	}
+	if h := m.Health(p.ID); h.Status != StatusUnknown {
+		t.Fatalf("a canceled check was recorded: %+v", h)
+	}
+}
+
+func TestStateLoadIsRetriedAfterAFailedRead(t *testing.T) {
+	m := setupPool(t, poolProxy("px_a", "http://10.0.0.1:3128"), poolProxy("px_b", "http://10.0.0.2:3128"))
+	a1 := addAccount(t, "a1", "")
+	a2 := addAccount(t, "a2", "")
+	failAll(m, "px_a")
+	if r := m.Resolve(a1); r.ProxyID != "px_b" {
+		t.Fatalf("a1 on %s", r.ProxyID)
+	}
+	m.Flush()
+	m.ResetForTest()
+
+	// The database cannot be read: a file sits where its directory should be.
+	dir := db.DataDir()
+	blocker := t.TempDir() + "/file"
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Init(blocker + "/db")
+	t.Cleanup(func() {
+		_ = db.Close()
+		_ = db.Init(dir)
+	})
+	if _, ok := m.Assignment("a1"); ok {
+		t.Fatal("an assignment came from an unreadable database")
+	}
+	if r := m.Resolve(a2); r.ProxyID != "px_a" {
+		t.Fatalf("a2 on %s", r.ProxyID)
+	}
+
+	// Once the database is back, the saved state is read and what changed meanwhile is kept.
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	if id, ok := m.Assignment("a1"); !ok || id != "px_b" {
+		t.Fatalf("a1 after the retry: %q %v", id, ok)
+	}
+	if id, _ := m.Assignment("a2"); id != "px_a" {
+		t.Fatalf("a2 after the retry: %q", id)
+	}
+	if h := m.Health("px_a"); h.Status != StatusFailed {
+		t.Fatalf("saved health was not read: %+v", h)
 	}
 }

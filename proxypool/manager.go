@@ -68,15 +68,23 @@ var (
 const checkParallelism = 8
 
 type Manager struct {
-	mu       sync.Mutex
-	loaded   bool
-	gen      uint64
-	health   map[string]*Health
-	assign   map[string]string
-	cursor   int
-	lastFull time.Time
-	lastKick time.Time
-	timer    *time.Timer
+	mu         sync.Mutex
+	loaded     bool
+	loadFailed bool
+	gen        uint64
+	health     map[string]*Health
+	assign     map[string]string
+	cursor     int
+	lastFull   time.Time
+	lastKick   time.Time
+	timer      *time.Timer
+
+	// Background checks run on bgCtx and are counted in bgRunning; ResetForTest
+	// cancels them and waits on bgIdle, so none outlives the test that started it.
+	bgCtx     context.Context
+	bgCancel  context.CancelFunc
+	bgRunning int
+	bgIdle    *sync.Cond
 
 	// adminMu serializes pool edits, each a read-modify-write of the config.
 	adminMu sync.Mutex
@@ -95,10 +103,27 @@ var defaultManager = newManager()
 func Default() *Manager { return defaultManager }
 
 func newManager() *Manager {
-	return &Manager{
+	m := &Manager{
 		health: make(map[string]*Health),
 		assign: make(map[string]string),
 		now:    time.Now,
+	}
+	m.bgCtx, m.bgCancel = context.WithCancel(context.Background())
+	m.bgIdle = sync.NewCond(&m.mu)
+	return m
+}
+
+// background registers one background check: it runs on the returned context
+// and calls release when it ends.
+func (m *Manager) background() (context.Context, func()) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.bgRunning++
+	return m.bgCtx, func() {
+		m.mu.Lock()
+		m.bgRunning--
+		m.bgIdle.Broadcast()
+		m.mu.Unlock()
 	}
 }
 
@@ -128,16 +153,22 @@ func (m *Manager) fire(change bool) {
 	}
 }
 
-// ResetForTest drops all in-memory state; the next call reloads it from the database.
+// ResetForTest ends every background check, then drops all in-memory state; the
+// next call reloads it from the database.
 func (m *Manager) ResetForTest() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.bgCancel()
+	for m.bgRunning > 0 {
+		m.bgIdle.Wait()
+	}
+	m.bgCtx, m.bgCancel = context.WithCancel(context.Background())
 	if m.timer != nil {
 		m.timer.Stop()
 		m.timer = nil
 	}
 	m.gen++
-	m.loaded = false
+	m.loaded, m.loadFailed = false, false
 	m.health = make(map[string]*Health)
 	m.assign = make(map[string]string)
 	m.cursor = 0
@@ -149,32 +180,42 @@ type savedState struct {
 	Assign map[string]string  `json:"assign,omitempty"`
 }
 
-func (m *Manager) ensureLoadedLocked() {
+// ensureLoadedLocked reads the saved state once and reports whether it has been
+// read. A failed read is tried again on the next call, and the saved state is
+// not written over until it has been read.
+func (m *Manager) ensureLoadedLocked() bool {
 	if m.loaded {
-		return
+		return true
 	}
-	m.loaded = true
 	raw, err := config.LoadProxyPoolState()
 	if err != nil {
-		logger.Warnf("[ProxyPool] Failed to load the pool state: %v", err)
-		return
+		if !m.loadFailed {
+			logger.Warnf("[ProxyPool] Failed to load the pool state: %v", err)
+		}
+		m.loadFailed = true
+		return false
 	}
+	m.loaded, m.loadFailed = true, false
 	if raw == "" {
-		return
+		return true
 	}
 	var state savedState
 	if err := json.Unmarshal([]byte(raw), &state); err != nil {
 		logger.Warnf("[ProxyPool] Ignoring an unreadable pool state: %v", err)
-		return
+		return true
 	}
+	//! What changed in memory while the read kept failing is newer than the saved state.
 	for id, h := range state.Health {
-		if h != nil {
+		if _, seen := m.health[id]; h != nil && !seen {
 			m.health[id] = h
 		}
 	}
 	for account, id := range state.Assign {
-		m.assign[account] = id
+		if _, seen := m.assign[account]; !seen {
+			m.assign[account] = id
+		}
 	}
+	return true
 }
 
 // Load reads the saved health and assignments now instead of on first use.
@@ -213,7 +254,10 @@ func (m *Manager) flush(gen uint64) {
 		return
 	}
 	m.timer = nil
-	m.ensureLoadedLocked()
+	if !m.ensureLoadedLocked() {
+		m.mu.Unlock()
+		return
+	}
 	//! Deleted proxies and accounts, and accounts that now have their own proxy, drop out here.
 	for id := range m.health {
 		if !proxies[id] {
@@ -322,10 +366,11 @@ func (m *Manager) Resolve(account *config.Account) Route {
 			if p, ok := m.pick(accountID, pool); ok {
 				return Route{URL: FullURL(p), ProxyID: p.ID, Source: SourcePool}
 			}
+			//! With fallback on as well: with no periodic check, nothing else would bring the proxies back.
+			m.kick()
 			if config.GetProxyDirectFallback() {
 				return Route{URL: global, Source: SourceFallback}
 			}
-			m.kick()
 			return Route{URL: UnavailableURL, Source: SourcePool, Unavailable: true}
 		}
 	}
@@ -401,9 +446,16 @@ func (m *Manager) Health(id string) Health {
 // ReportFailure marks proxy id failed and moves every account on it to the
 // next eligible proxy. Accounts stay put when there is none.
 func (m *Manager) ReportFailure(id string, cause error) {
+	m.reportFailure(id, "", cause)
+}
+
+// reportFailure is ReportFailure for a request dialed at dialURL: once the proxy
+// has been edited to another address or sign-in, the report is about the old
+// one and is dropped. An empty dialURL always counts.
+func (m *Manager) reportFailure(id, dialURL string, cause error) {
 	pool := config.GetProxyPool()
 	p, ok := findProxy(pool, id)
-	if !ok {
+	if !ok || (dialURL != "" && FullURL(p) != dialURL) {
 		return
 	}
 	m.mu.Lock()
@@ -443,6 +495,17 @@ func (m *Manager) moveAccountsLocked(pool []config.PoolProxy, id string) int {
 
 // ReportSuccess marks proxy id healthy after a new connection through it.
 func (m *Manager) ReportSuccess(id string) {
+	m.reportSuccess(id, "")
+}
+
+// reportSuccess is ReportSuccess for a connection dialed at dialURL; like
+// reportFailure, it is dropped once the proxy has been edited.
+func (m *Manager) reportSuccess(id, dialURL string) {
+	if dialURL != "" {
+		if p, ok := findProxy(config.GetProxyPool(), id); !ok || FullURL(p) != dialURL {
+			return
+		}
+	}
 	m.mu.Lock()
 	m.ensureLoadedLocked()
 	h := m.health[id]
@@ -486,6 +549,12 @@ func (m *Manager) CheckOne(ctx context.Context, id string) (Health, error) {
 	if err != nil && ctx.Err() != nil {
 		//! The caller's budget ran out or it went away: that says nothing about the proxy.
 		//! A check's own 10 s timeout runs on a child context and still counts.
+		m.mu.Lock()
+		stale := m.gen != gen
+		m.mu.Unlock()
+		if stale {
+			return Health{Status: StatusUnknown}, nil
+		}
 		return m.Health(id), nil
 	}
 	return m.recordCheck(gen, p, latency, err), nil
@@ -494,14 +563,24 @@ func (m *Manager) CheckOne(ctx context.Context, id string) (Health, error) {
 func (m *Manager) recordCheck(gen uint64, p config.PoolProxy, latency time.Duration, err error) Health {
 	pool := config.GetProxyPool()
 	m.mu.Lock()
-	m.ensureLoadedLocked()
 	if m.gen != gen {
 		m.mu.Unlock()
 		return Health{Status: StatusUnknown}
 	}
-	if _, still := findProxy(pool, p.ID); !still {
+	m.ensureLoadedLocked()
+	current, still := findProxy(pool, p.ID)
+	if !still {
 		m.mu.Unlock()
 		return Health{Status: StatusUnknown}
+	}
+	if FullURL(current) != FullURL(p) {
+		//! The proxy was edited while this check ran: the result is about the old address or sign-in.
+		out := Health{Status: StatusUnknown}
+		if h := m.health[p.ID]; h != nil {
+			out = *h
+		}
+		m.mu.Unlock()
+		return out
 	}
 	h := m.healthLocked(p.ID)
 	before := h.Status
@@ -564,17 +643,25 @@ func (m *Manager) kick() {
 	if now := m.now(); now.Sub(m.lastKick) >= kickEvery {
 		m.lastKick = now
 		m.mu.Unlock()
-		go m.CheckAllInBackground()
+		m.StartCheckAll()
 		return
 	}
 	m.mu.Unlock()
 }
 
-// CheckAllInBackground is CheckAll with its own time budget, for callers that do not wait.
-func (m *Manager) CheckAllInBackground() {
-	ctx, cancel := context.WithTimeout(context.Background(), checkAllTimeout)
-	defer cancel()
-	m.CheckAll(ctx)
+// StartCheckAll runs CheckAll in the background with its own time budget and
+// returns a channel that is closed when it ends.
+func (m *Manager) StartCheckAll() <-chan struct{} {
+	ctx, release := m.background()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer release()
+		ctx, cancel := context.WithTimeout(ctx, checkAllTimeout)
+		defer cancel()
+		m.CheckAll(ctx)
+	}()
+	return done
 }
 
 // Start runs the periodic health check: while the pool is on and the interval
@@ -600,14 +687,16 @@ func (m *Manager) tick() {
 	due := m.now().Sub(m.lastFull) >= time.Duration(interval)*time.Minute
 	m.mu.Unlock()
 	if due {
-		m.CheckAllInBackground()
+		<-m.StartCheckAll()
 	}
 }
 
 // checkSoon checks a new or edited proxy in the background.
 func (m *Manager) checkSoon(id string) {
+	ctx, release := m.background()
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), checkTotalTimeout+time.Second)
+		defer release()
+		ctx, cancel := context.WithTimeout(ctx, checkTotalTimeout+time.Second)
 		defer cancel()
 		_, _ = m.CheckOne(ctx, id)
 	}()
