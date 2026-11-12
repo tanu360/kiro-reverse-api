@@ -196,7 +196,7 @@ If this project helps you, a Star would mean a lot.
 - Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, masked API keys, and SQLite-backed history.
 - API page with client API key management (optional custom key values, enable/disable, per-key token and credit limits, usage reset) and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
 - Settings for usage, routing, auto-continue, tool history, thinking, model mappings, prompt filter, stream integrity, endpoint, outbound proxy, admin password, and statistics reset; Backups with a schedule, upload, and one-click restore.
-- Command menu (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) for pages and actions, privacy mode that masks email addresses, and an update check against GitHub releases.
+- Command menu (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) for pages and actions, privacy mode that masks email addresses, and an update check that reads `version.json` from the repo's `main` branch.
 - Changing the admin password ends every other signed-in session.
 - Light, dark, and system theme; four UI languages: English, 简体中文, Tiếng Việt, and Português (Brasil).
 - Works from phones to desktops.

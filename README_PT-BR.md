@@ -196,7 +196,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, chaves de API mascaradas e histórico guardado em SQLite.
 - Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens e créditos por chave, redefinição de uso) e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
 - Configurações de uso, roteamento, autocontinuar, histórico de ferramentas, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, proxy de saída, senha de administrador e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
-- Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações nas versões publicadas no GitHub.
+- Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações pelo `version.json` da branch `main` do repositório.
 - Alterar a senha de administrador encerra todas as outras sessões conectadas.
 - Tema claro, escuro e do sistema; quatro idiomas na interface: English, 简体中文, Tiếng Việt e Português (Brasil).
 - Funciona de celulares a desktops.

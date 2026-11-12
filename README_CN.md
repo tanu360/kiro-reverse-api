@@ -196,7 +196,7 @@
 - 请求日志支持带计数的状态标签页、搜索（也会匹配完整的 API Key）、排序、含错误分类的详情视图、脱敏 API Key，以及基于 SQLite 的历史记录。
 - 接口页管理客户端 API Key（可自定义 Key 值、启用/禁用、按 Key 设置 Token 与 Credits 限额、重置用量），并提供语法高亮的接入示例生成器：为 Anthropic Messages、OpenAI Chat Completions 与 OpenAI Responses 接口生成 curl、Python、Node.js、Go、Java、PHP、Ruby 与 C# 请求代码（官方 SDK 或纯 HTTP，可选流式）及示例响应，另含 Claude Code 与 Codex 配置。
 - 设置页涵盖用量、账号路由、自动续写、工具历史、Thinking、模型映射、System Prompt 过滤、流完整性、Kiro 端点、出站代理、管理员密码与重置统计；备份页支持定时备份、上传与一键恢复。
-- 命令菜单（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>）可快速打开页面和执行操作；隐私模式可隐藏邮箱地址；支持对照 GitHub Releases 检查更新。
+- 命令菜单（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>）可快速打开页面和执行操作；隐私模式可隐藏邮箱地址；支持读取仓库 `main` 分支上的 `version.json` 检查更新。
 - 修改管理员密码会结束其他所有已登录的会话。
 - 浅色 / 深色 / 跟随系统主题；界面支持四种语言：English、简体中文、Tiếng Việt 与 Português (Brasil)。
 - 从手机到桌面均可流畅使用。
