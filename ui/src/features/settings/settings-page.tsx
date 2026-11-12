@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/sidebar";
 import { ProxyPoolCard } from "@/features/proxy-pool/proxy-pool-card";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { countTokensQuery } from "@/lib/api/count-tokens";
 import { proxyPoolQuery } from "@/lib/api/proxy-pool";
 import { proxyQuery, settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
@@ -35,7 +34,6 @@ import { cn } from "@/lib/utils";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsaved";
 import { AdminPasswordCard } from "./sections/admin-password-card";
 import { AutoContinueCard } from "./sections/auto-continue-card";
-import { CountTokensCard } from "./sections/count-tokens-card";
 import { DangerZoneCard } from "./sections/danger-zone-card";
 import { EndpointCard } from "./sections/endpoint-card";
 import { ImageResizeCard } from "./sections/image-resize-card";
@@ -210,7 +208,6 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   const unsaved = useUnsavedChanges();
   const settings = useQuery(settingsQuery()).data;
   const proxy = useQuery(proxyQuery()).data;
-  const countTokens = useQuery(countTokensQuery()).data;
   const proxyPool = useQuery(proxyPoolQuery()).data;
   // A section that is one switch shows its saved state as a pill in its nav row, so the page
   // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
@@ -221,7 +218,6 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
     "settings-tool-history": settings?.structuredToolHistory,
     "settings-image-resize": settings ? settings.imageResize !== false : undefined,
     "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,
-    "settings-count-tokens": countTokens ? Boolean(countTokens.countTokensApiUrl) : undefined,
     "settings-proxy-pool": proxyPool ? proxyPool.mode === "on" : undefined,
   };
   const [active, pin] = useActiveSection(wide ? SPY_OFFSET : SPY_OFFSET + CHIP_ROW_HEIGHT);
@@ -397,7 +393,6 @@ function SettingsContent(): JSX.Element {
           <AdminPasswordCard />
           <OutboundProxyCard />
           <ProxyPoolCard />
-          <CountTokensCard />
           <ResponseHeadersCard />
           <PromptFilterCard />
           <LogRetentionCard />

@@ -1,4 +1,3 @@
-import type { CountTokensAuthType } from "@/lib/api/count-tokens";
 import type { LogRetention } from "@/lib/api/log-retention";
 import type { ResponseHeaderRule } from "@/lib/api/response-headers";
 import type {
@@ -66,8 +65,6 @@ export interface MockDb {
   /** apiRegions is not stored: the handler adds it */
   upstream: Omit<UpstreamConfig, "apiRegions">;
   proxy: ProxyConfig;
-  /** The external count_tokens API as Go stores it; GET answers the key masked. */
-  countTokens: MockCountTokens;
   promptFilter: PromptFilterConfig;
   /** GET /log-retention; the handler reads oldestRequestTs off `requests`. */
   logRetention: LogRetention;
@@ -82,17 +79,6 @@ export interface MockDb {
     microsoft: Record<string, unknown>;
     builderId: Record<string, { polls: number }>;
   };
-}
-
-export interface MockCountTokens {
-  url: string;
-  authType: CountTokensAuthType;
-  key: string;
-}
-
-/** No external API: count_tokens answers with the local estimate. */
-function localCountTokens(): MockCountTokens {
-  return { url: "", authType: "x-api-key", key: "" };
 }
 
 export function mockNowUnix(): number {
@@ -204,11 +190,6 @@ function seedFullDb(now: number): MockDb {
     upstream: defaultUpstream(),
     modelMix: buildModelMix(data.requests, data.errors),
     logRetention: seedLogRetention(now, true),
-    countTokens: {
-      url: "https://api.anthropic.com/v1/messages/count_tokens",
-      authType: "x-api-key",
-      key: "sk-ant-api03-mock-count-tokens-7Qf2",
-    },
     // An update is out, so the update notice shows.
     remoteVersion: { version: "2.2.0", changelog: REMOTE_CHANGELOG },
   };
@@ -232,7 +213,6 @@ function seedEmptyDb(now: number): MockDb {
     endpoint: defaultEndpoint(),
     upstream: defaultUpstream(),
     proxy: { proxyURL: "" },
-    countTokens: localCountTokens(),
     promptFilter: defaultPromptFilter(),
     logRetention: seedLogRetention(now, false),
     startedAt: now - 42,
@@ -262,7 +242,6 @@ function seedDb(scenario: MockScenario): MockDb {
     endpoint: defaultEndpoint(),
     upstream: defaultUpstream(),
     proxy: { proxyURL: "socks5://user:p%40ss@127.0.0.1:1080" },
-    countTokens: localCountTokens(),
     promptFilter: {
       ...defaultPromptFilter(),
       rules: [

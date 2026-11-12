@@ -2,7 +2,6 @@ import {
   AiBrain01Icon,
   Alert02Icon,
   ArrowDataTransferHorizontalIcon,
-  CalculatorIcon,
   CloudServerIcon,
   Coins01Icon,
   Database01Icon,
@@ -58,12 +57,6 @@ export const SETTINGS_SECTIONS = [
     group: "server",
   },
   {
-    id: "settings-count-tokens",
-    titleKey: "countTokens.title",
-    icon: CalculatorIcon,
-    group: "server",
-  },
-  {
     id: "settings-response-headers",
     titleKey: "responseHeaders",
     icon: Tag01Icon,
@@ -113,7 +106,6 @@ export const SECTION_ID = {
   adminPassword: "settings-admin-password",
   outboundProxy: "settings-outbound-proxy",
   proxyPool: "settings-proxy-pool",
-  countTokens: "settings-count-tokens",
   responseHeaders: "settings-response-headers",
   promptFilter: "settings-prompt-filter",
   logRetention: "settings-log-retention",

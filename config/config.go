@@ -178,10 +178,6 @@ type Config struct {
 
 	ProxyURL string `json:"proxyURL,omitempty"`
 
-	CountTokensApiURL   string `json:"countTokensApiUrl,omitempty"`
-	CountTokensApiKey   string `json:"countTokensApiKey,omitempty"`
-	CountTokensAuthType string `json:"countTokensAuthType,omitempty"`
-
 	// Outbound proxy pool (config/proxy_pool.go): proxies accounts without a proxy of their own are spread over.
 	ProxyPool                 []PoolProxy `json:"proxyPool,omitempty"`
 	ProxyPoolMode             string      `json:"proxyPoolMode,omitempty"`

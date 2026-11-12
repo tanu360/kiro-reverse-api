@@ -54,7 +54,6 @@ func TestRequestEndpointForPath(t *testing.T) {
 	cases := map[string]string{
 		"/v1/messages":              requestEndpointClaude,
 		"/anthropic/v1/messages":    requestEndpointClaude,
-		"/cc/v1/messages":           requestEndpointClaude,
 		"/chat/completions":         requestEndpointOpenAI,
 		"/v1/responses":             requestEndpointResponses,
 		"/v1/messages/count_tokens": "",
