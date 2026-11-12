@@ -1,4 +1,5 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
+import type { CountTokensAuthType, CountTokensConfig } from "@/lib/api/count-tokens";
 import type {
   ModelMappingRule,
   PreferredEndpoint,
@@ -10,6 +11,7 @@ import { claimMockPassword, mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { publishMockEvent } from "@/lib/mocks/events";
 import { defaultModelMappings } from "@/lib/mocks/fixtures";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
+import { maskCountTokensKey, validCountTokensUrl } from "./lib/count-tokens";
 
 // Mirrors the Go admin API (proxy/handler.go, config/model_mapping_validation.go): the same
 // validation order, error strings and patch semantics.
@@ -28,6 +30,18 @@ const MAX_MODEL_ID_BYTES = 256;
 const THINKING_FORMATS: readonly ThinkingFormat[] = ["reasoning_content", "thinking", "think"];
 const ENDPOINTS: readonly PreferredEndpoint[] = ["auto", "kiro", "codewhisperer", "amazonq"];
 const PROXY_SCHEMES = ["http://", "https://", "socks5://", "socks5h://"];
+const COUNT_TOKENS_AUTH_TYPES: readonly CountTokensAuthType[] = ["x-api-key", "bearer"];
+const MAX_COUNT_TOKENS_KEY = 4096;
+
+function countTokensConfig(): CountTokensConfig {
+  const { url, authType, key } = mockDb.countTokens;
+  return {
+    countTokensApiUrl: url,
+    countTokensAuthType: authType,
+    countTokensApiKeySet: key !== "",
+    countTokensApiKeyMasked: maskCountTokensKey(key),
+  };
+}
 
 type Json = Record<string, unknown>;
 
@@ -367,6 +381,57 @@ export const handlers: HttpHandler[] = [
       return jsonError(400, "proxyURL must start with http://, https://, socks5://, or socks5h://");
     }
     mockDb.proxy = { proxyURL: url };
+    return saved();
+  }),
+
+  http.get(apiUrl("/count-tokens"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json(countTokensConfig());
+  }),
+
+  // apiUpdateCountTokens: omitted fields keep their value, an empty URL clears everything.
+  http.post(apiUrl("/count-tokens"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    if (!body) return invalidJson();
+    const rawUrl = optional(body, "countTokensApiUrl", isString);
+    const rawAuth = optional(body, "countTokensAuthType", isString);
+    const rawKey = optional(body, "countTokensApiKey", isString);
+    const clearKey = optional(body, "clearApiKey", isBool);
+    if (rawUrl === null || rawAuth === null || rawKey === null || clearKey === null) {
+      return invalidJson();
+    }
+    const current = mockDb.countTokens;
+    const url = rawUrl === undefined ? current.url : rawUrl.trim();
+    if (!url) {
+      mockDb.countTokens = { url: "", authType: "x-api-key", key: "" };
+      return saved();
+    }
+    const authType =
+      rawAuth === undefined ? current.authType : rawAuth.trim().toLowerCase() || "x-api-key";
+    const key = (rawKey ?? "").trim();
+    if (!validCountTokensUrl(url)) {
+      return jsonError(400, "countTokensApiUrl must start with http:// or https://", {
+        code: "count_tokens_url_invalid",
+      });
+    }
+    if (!(COUNT_TOKENS_AUTH_TYPES as readonly string[]).includes(authType)) {
+      return jsonError(400, 'countTokensAuthType must be "x-api-key" or "bearer"', {
+        code: "count_tokens_auth_type",
+      });
+    }
+    if (key.length > MAX_COUNT_TOKENS_KEY || /[^\x21-\x7e]/.test(key)) {
+      return jsonError(400, "countTokensApiKey must be printable ASCII without spaces", {
+        code: "count_tokens_key_invalid",
+      });
+    }
+    let nextKey = clearKey ? "" : current.key;
+    if (key) nextKey = key;
+    mockDb.countTokens = { url, authType: authType as CountTokensAuthType, key: nextKey };
     return saved();
   }),
 

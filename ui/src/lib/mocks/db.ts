@@ -1,3 +1,4 @@
+import type { CountTokensAuthType } from "@/lib/api/count-tokens";
 import type {
   Account,
   AccountFull,
@@ -59,6 +60,8 @@ export interface MockDb {
   modelMappings: ModelMappingRule[];
   endpoint: EndpointConfig;
   proxy: ProxyConfig;
+  /** The external count_tokens API as Go stores it; GET answers the key masked. */
+  countTokens: MockCountTokens;
   promptFilter: PromptFilterConfig;
   startedAt: number;
   /** '2.1.0' */
@@ -70,6 +73,17 @@ export interface MockDb {
     microsoft: Record<string, unknown>;
     builderId: Record<string, { polls: number }>;
   };
+}
+
+export interface MockCountTokens {
+  url: string;
+  authType: CountTokensAuthType;
+  key: string;
+}
+
+/** No external API: count_tokens answers with the local estimate. */
+function localCountTokens(): MockCountTokens {
+  return { url: "", authType: "x-api-key", key: "" };
 }
 
 export function mockNowUnix(): number {
@@ -162,6 +176,11 @@ function seedFullDb(now: number): MockDb {
     ...baseDb(),
     ...data,
     modelMix: buildModelMix(data.requests, data.errors),
+    countTokens: {
+      url: "https://api.anthropic.com/v1/messages/count_tokens",
+      authType: "x-api-key",
+      key: "sk-ant-api03-mock-count-tokens-7Qf2",
+    },
     // An update is out, so the update notice shows.
     remoteVersion: { version: "2.2.0", changelog: REMOTE_CHANGELOG },
   };
@@ -184,6 +203,7 @@ function seedEmptyDb(now: number): MockDb {
     modelMappings: [],
     endpoint: defaultEndpoint(),
     proxy: { proxyURL: "" },
+    countTokens: localCountTokens(),
     promptFilter: defaultPromptFilter(),
     startedAt: now - 42,
   };
@@ -211,6 +231,7 @@ function seedDb(scenario: MockScenario): MockDb {
     modelMappings: defaultModelMappings(),
     endpoint: defaultEndpoint(),
     proxy: { proxyURL: "socks5://user:p%40ss@127.0.0.1:1080" },
+    countTokens: localCountTokens(),
     promptFilter: {
       ...defaultPromptFilter(),
       rules: [
