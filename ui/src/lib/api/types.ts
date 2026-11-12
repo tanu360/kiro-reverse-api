@@ -57,6 +57,7 @@ export type ServerErrorCode =
   | "no_kiro_profile"
   | "api_key_account_no_profile"
   | "auto_continue_max_range"
+  | "account_rpm_limit_range"
   | "password_too_short"
   | "invalid_endpoint"
   | "proxy_url_scheme"
@@ -907,6 +908,8 @@ export interface Settings {
   lenientStreamIntegrity: boolean;
   /** default true */
   sessionAffinity: boolean;
+  /** requests one account may start per minute; 0 (default) = no limit */
+  accountRpmLimit: number;
   autoContinue: boolean;
   /** 1..10, default 3 */
   autoContinueMax: number;
@@ -920,6 +923,8 @@ export interface SettingsPatch {
   allowOverUsage?: boolean;
   lenientStreamIntegrity?: boolean;
   sessionAffinity?: boolean;
+  /** integer 0..1000; 0 turns the limit off */
+  accountRpmLimit?: number;
   autoContinue?: boolean;
   /** integer 1..10 */
   autoContinueMax?: number;

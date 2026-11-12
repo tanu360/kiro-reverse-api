@@ -1381,6 +1381,7 @@ export function defaultSettings(): Settings {
     allowOverUsage: false,
     lenientStreamIntegrity: false,
     sessionAffinity: true,
+    accountRpmLimit: 0,
     autoContinue: false,
     autoContinueMax: 3,
     structuredToolHistory: true,

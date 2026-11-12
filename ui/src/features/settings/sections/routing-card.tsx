@@ -4,6 +4,7 @@ import { SwitchField } from "@/components/shared/settings-rows";
 import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { RpmLimitFooter, RpmLimitRows, useRpmLimitForm } from "./account-rpm-limit";
 import { useInstantSetting } from "./general-settings";
 import { SECTION_ID } from "./sections";
 import { Hint, SectionQuery, SettingsSection } from "./settings-section";
@@ -22,15 +23,23 @@ function RoutingForm({ settings }: { settings: Settings }): JSX.Element {
   const { t } = useT("settings");
   // Missing means on.
   const sessionAffinity = useInstantSetting("sessionAffinity", settings.sessionAffinity !== false);
+  // Session affinity saves as it is flipped; the RPM limit is a draft saved with the footer.
+  const rpmLimit = useRpmLimitForm(settings);
 
   return (
-    <SettingsSection id={SECTION_ID.routing} title={t("routing")}>
+    <SettingsSection
+      footer={<RpmLimitFooter form={rpmLimit} />}
+      id={SECTION_ID.routing}
+      onSubmit={rpmLimit.submit}
+      title={t("routing")}
+    >
       <SwitchField
         checked={sessionAffinity.checked}
         description={<Hint more={t("sessionAffinityMore")}>{t("sessionAffinityHint")}</Hint>}
         onCheckedChange={sessionAffinity.onCheckedChange}
         title={t("sessionAffinity")}
       />
+      <RpmLimitRows form={rpmLimit} />
     </SettingsSection>
   );
 }

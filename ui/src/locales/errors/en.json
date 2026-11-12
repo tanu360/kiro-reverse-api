@@ -21,6 +21,7 @@
   "serverError.tooManyPasswordAttempts": "Too many password attempts. Wait a minute and try again.",
   "serverError.passwordTooShort": "The password must be at least 8 characters.",
   "serverError.autoContinueMaxRange": "Maximum continuations must be between 1 and 10.",
+  "serverError.accountRpmLimitRange": "Requests per minute per account must be between 0 and 1000 (0 turns the limit off).",
   "serverError.notOverageCapable": "This account cannot use overage.",
   "serverError.apiKeyAccountNoProfile": "Kiro API key accounts have no Kiro profile. Their region is set at import.",
   "serverError.profileNotAvailable": "The selected Kiro profile is not available for this account.",

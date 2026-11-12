@@ -207,7 +207,6 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   const switchState: Partial<Record<SectionId, boolean | undefined>> = {
     "settings-usage": settings?.allowOverUsage,
     "settings-stream-integrity": settings?.lenientStreamIntegrity,
-    "settings-routing": settings?.sessionAffinity,
     "settings-auto-continue": settings?.autoContinue,
     "settings-tool-history": settings?.structuredToolHistory,
     "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,

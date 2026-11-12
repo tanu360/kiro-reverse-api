@@ -2013,6 +2013,7 @@ export function seedFullDataset(now: number): FullDataset {
       allowOverUsage: true,
       lenientStreamIntegrity: true,
       sessionAffinity: false,
+      accountRpmLimit: 60,
       autoContinue: true,
       autoContinueMax: 10,
       structuredToolHistory: false,

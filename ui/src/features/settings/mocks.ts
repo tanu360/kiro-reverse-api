@@ -22,6 +22,7 @@ function saved(): Response {
   return HttpResponse.json(OK);
 }
 const MAX_AUTO_CONTINUE = 10;
+const MAX_ACCOUNT_RPM_LIMIT = 1000;
 const MIN_PASSWORD_RUNES = 8;
 const MAX_MAPPINGS = 200;
 const MAX_MODEL_ID_BYTES = 256;
@@ -77,6 +78,9 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
   const max = optional(body, "autoContinueMax", isInteger);
   if (max === null) return null;
   if (max !== undefined) patch.autoContinueMax = max;
+  const rpmLimit = optional(body, "accountRpmLimit", isInteger);
+  if (rpmLimit === null) return null;
+  if (rpmLimit !== undefined) patch.accountRpmLimit = rpmLimit;
   const password = optional(body, "password", isString);
   if (password === null) return null;
   if (password !== undefined) patch.password = password;
@@ -238,6 +242,14 @@ export const handlers: HttpHandler[] = [
       (patch.autoContinueMax < 1 || patch.autoContinueMax > MAX_AUTO_CONTINUE)
     ) {
       return jsonError(400, "autoContinueMax must be between 1 and 10");
+    }
+    if (
+      patch.accountRpmLimit !== undefined &&
+      (patch.accountRpmLimit < 0 || patch.accountRpmLimit > MAX_ACCOUNT_RPM_LIMIT)
+    ) {
+      return jsonError(400, "accountRpmLimit must be between 0 and 1000", {
+        code: "account_rpm_limit_range",
+      });
     }
     if (patch.password && [...patch.password].length < MIN_PASSWORD_RUNES) {
       return jsonError(400, "Password must be at least 8 characters");

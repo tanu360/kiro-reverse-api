@@ -21,6 +21,7 @@
   "serverError.tooManyPasswordAttempts": "Muitas tentativas de senha. Aguarde um minuto e tente novamente.",
   "serverError.passwordTooShort": "A senha deve ter pelo menos 8 caracteres.",
   "serverError.autoContinueMaxRange": "O máximo de continuações deve ficar entre 1 e 10.",
+  "serverError.accountRpmLimitRange": "As requisições por minuto por conta devem ficar entre 0 e 1000 (0 desliga o limite).",
   "serverError.notOverageCapable": "Esta conta não pode usar excedente.",
   "serverError.apiKeyAccountNoProfile": "Contas com chave de API do Kiro não têm perfil do Kiro. A região é definida na importação.",
   "serverError.profileNotAvailable": "O perfil do Kiro selecionado não está disponível para esta conta.",
