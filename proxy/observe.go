@@ -357,6 +357,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 	s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
 	s.countRequestLocked(rec.TS, accountID, model, success, inTokens, outTokens, credits, cache)
 	s.mu.Unlock()
+	accountRates.record(accountID, rec.TS)
 	s.seq.Add(1)
 
 	enqueuePersistRequestRecord(rec)
@@ -899,6 +900,7 @@ func (s *observeStore) Reset() {
 	s.resetLocked()
 	s.startedAt = observeNow().Unix()
 	s.mu.Unlock()
+	accountRates.reset()
 	s.seq.Add(1)
 }
 

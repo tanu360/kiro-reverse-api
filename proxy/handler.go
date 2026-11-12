@@ -1672,7 +1672,8 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 
 // noAccountError describes a request that no account took. A model that no
 // enabled account lists is the client's mistake and gets 404; an empty or busy
-// pool is ours and keeps 503 with the API's own server error type.
+// pool is ours and keeps 503 with the API's own server error type. Accounts
+// held back only by the per-account RPM limit give 429 rate_limit_error.
 func (h *Handler) noAccountError(model, serverErrType string) (int, string, string) {
 	if !h.pool.OffersModel(model) {
 		errType := "invalid_request_error"
@@ -1680,6 +1681,9 @@ func (h *Handler) noAccountError(model, serverErrType string) (int, string, stri
 			errType = "not_found_error"
 		}
 		return http.StatusNotFound, errType, fmt.Sprintf("model %q is not available on any account", model)
+	}
+	if h.pool.BlockedByRPMLimit(model) {
+		return http.StatusTooManyRequests, "rate_limit_error", fmt.Sprintf("All accounts reached the limit of %d requests per minute", config.GetAccountRPMLimit())
 	}
 	return http.StatusServiceUnavailable, serverErrType, "No available accounts"
 }
@@ -2533,6 +2537,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiObserveRecentErrors(w, r)
 	case path == "/observe/recent-requests" && r.Method == "GET":
 		h.apiObserveRecentRequests(w, r)
+	case path == "/observe/account-activity" && r.Method == "GET":
+		h.apiAccountActivity(w, r)
 	case path == "/backups" && r.Method == "GET":
 		h.apiBackupsList(w, r)
 	case path == "/backups" && r.Method == "POST":
@@ -3536,6 +3542,7 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"allowOverUsage":         config.GetAllowOverUsage(),
 		"lenientStreamIntegrity": config.GetLenientStreamIntegrity(),
 		"sessionAffinity":        config.GetSessionAffinity(),
+		"accountRpmLimit":        config.GetAccountRPMLimit(),
 		"autoContinue":           config.GetAutoContinue(),
 		"autoContinueMax":        config.GetAutoContinueMax(),
 		"structuredToolHistory":  config.GetStructuredToolHistory(),
@@ -3623,6 +3630,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		AllowOverUsage         *bool  `json:"allowOverUsage,omitempty"`
 		LenientStreamIntegrity *bool  `json:"lenientStreamIntegrity,omitempty"`
 		SessionAffinity        *bool  `json:"sessionAffinity,omitempty"`
+		AccountRPMLimit        *int   `json:"accountRpmLimit,omitempty"`
 		AutoContinue           *bool  `json:"autoContinue,omitempty"`
 		AutoContinueMax        *int   `json:"autoContinueMax,omitempty"`
 		StructuredToolHistory  *bool  `json:"structuredToolHistory,omitempty"`
@@ -3634,6 +3642,9 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.AutoContinueMax != nil && (*req.AutoContinueMax < 1 || *req.AutoContinueMax > config.MaxAutoContinueMax) {
 		writeAdminError(w, http.StatusBadRequest, codeAutoContinueMaxRange, fmt.Sprintf("autoContinueMax must be between 1 and %d", config.MaxAutoContinueMax))
+		return
+	}
+	if !validAccountRPMLimit(w, req.AccountRPMLimit) {
 		return
 	}
 
@@ -3677,6 +3688,15 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.SessionAffinity != nil {
 		if err := config.UpdateSessionAffinity(*req.SessionAffinity); err != nil {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+	}
+
+	//! The pool reads the limit on every pick, so it applies without a Reload.
+	if req.AccountRPMLimit != nil {
+		if err := config.UpdateAccountRPMLimit(*req.AccountRPMLimit); err != nil {
 			w.WriteHeader(500)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return

@@ -148,6 +148,8 @@ type Config struct {
 
 	SessionAffinity *bool `json:"sessionAffinity,omitempty"`
 
+	AccountRPMLimit int `json:"accountRpmLimit,omitempty"`
+
 	StructuredToolHistory *bool `json:"structuredToolHistory,omitempty"`
 
 	FirstRunPasswordPending bool `json:"firstRunPasswordPending,omitempty"`
