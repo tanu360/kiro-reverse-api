@@ -340,6 +340,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if isClientAPIPath(path) {
+		var finish func()
+		w, r, finish = wrapClientResponse(w, r)
+		defer finish()
+	}
+
 	if endpoint := requestEndpointForPath(path); endpoint != "" {
 		r = withRequestTrace(r, endpoint)
 	}
@@ -855,6 +861,7 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 		h.sendClaudeError(w, 400, "invalid_request_error", "Invalid JSON")
 		return
 	}
+	noteResponseModel(r.Context(), req.Model)
 	if msg := validateClaudeThinkingConfig(req.Thinking, req.MaxTokens); msg != "" {
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
@@ -901,6 +908,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 		h.sendClaudeError(w, 400, "invalid_request_error", "Invalid JSON: "+err.Error())
 		return
 	}
+	noteResponseModel(r.Context(), req.Model)
 	if msg := validateClaudeRequestShape(&req); msg != "" {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
@@ -1719,6 +1727,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		h.sendOpenAIError(w, 400, "invalid_request_error", "Invalid JSON")
 		return
 	}
+	noteResponseModel(r.Context(), req.Model)
 	if msg := validateOpenAIRequestShape(&req); msg != "" {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
@@ -2494,6 +2503,10 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetModelMappings(w, r)
 	case path == "/model-mappings" && r.Method == "POST":
 		h.apiUpdateModelMappings(w, r)
+	case path == "/response-headers" && r.Method == "GET":
+		h.apiGetResponseHeaders(w, r)
+	case path == "/response-headers" && r.Method == "POST":
+		h.apiUpdateResponseHeaders(w, r)
 	case path == "/endpoint" && r.Method == "GET":
 		h.apiGetEndpointConfig(w, r)
 	case path == "/endpoint" && r.Method == "POST":
