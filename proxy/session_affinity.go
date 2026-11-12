@@ -101,6 +101,10 @@ func (h *Handler) pickAccount(payload *KiroPayload, model string, excluded map[s
 		preferred = h.affinity.Lookup(affinityKey(payload))
 	}
 	account := h.pool.GetPreferredForModelExcluding(preferred, model, excluded)
+	//! Only a fresh request heals: one that already excluded accounts would retry an account that just failed it.
+	if account == nil && len(excluded) == 0 && h.trySelfHeal() {
+		account = h.pool.GetPreferredForModelExcluding(preferred, model, excluded)
+	}
 	//! A move off the bound account costs the conversation its prompt cache; log it so a cache-miss spike can be traced.
 	if preferred != "" && account != nil && account.ID != preferred {
 		logger.Debugf("[SessionAffinity] Bound account %s unavailable, conversation moved to %s", preferred, account.Email)

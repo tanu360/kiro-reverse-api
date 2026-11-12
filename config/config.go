@@ -148,6 +148,10 @@ type Config struct {
 
 	SessionAffinity *bool `json:"sessionAffinity,omitempty"`
 
+	SelfHeal            *bool `json:"selfHeal,omitempty"`
+	SelfHealIntervalSec int   `json:"selfHealIntervalSec,omitempty"`
+	SelfHealMaxRounds   *int  `json:"selfHealMaxRounds,omitempty"`
+
 	StructuredToolHistory *bool `json:"structuredToolHistory,omitempty"`
 
 	FirstRunPasswordPending bool `json:"firstRunPasswordPending,omitempty"`
