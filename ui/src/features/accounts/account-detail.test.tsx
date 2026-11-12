@@ -277,3 +277,82 @@ describe("AccountDetailSheet", () => {
     expect(within(statistics).getByText("312.5")).toBeInTheDocument();
   });
 });
+
+describe("AccountDetailSheet notes and tags", () => {
+  it("saves multi-line notes and comma-separated tags from the sheet", async () => {
+    const puts = capture("put", "/accounts/:id");
+    const account = dana();
+    const { sheet, user } = await openSheet(account);
+
+    let row = await openEditor(sheet, user, "Notes");
+    const notes = within(row).getByRole("textbox", { name: "Notes" });
+    // Enter adds a line in the notes; Save stores them.
+    await user.type(notes, "Owner: ops{Enter}rotate in May");
+    expect(within(row).getByText("24 / 2,000 characters")).toBeInTheDocument();
+    await user.click(within(row).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(puts).toEqual([{ notes: "Owner: ops\nrotate in May" }]));
+    await waitFor(() => expect(editingRow(sheet)).toBeNull());
+
+    row = await openEditor(sheet, user, "Tags");
+    await user.type(
+      within(row).getByRole("textbox", { name: "Tags" }),
+      "team-a, Backup ,TEAM-A{Enter}",
+    );
+    await waitFor(() => expect(puts).toHaveLength(2));
+    expect(puts[1]).toEqual({ tags: ["team-a", "Backup"] });
+    await waitFor(() => expect(editingRow(sheet)).toBeNull());
+    const facts = section(sheet, "Account");
+    expect(await within(facts).findByText("Backup")).toBeInTheDocument();
+    expect(within(facts).getByText("team-a")).toBeInTheDocument();
+  });
+
+  it("refuses too many or too long tags and sends nothing", async () => {
+    const puts = capture("put", "/accounts/:id");
+    const { sheet, user } = await openSheet(dana());
+    const row = await openEditor(sheet, user, "Tags");
+    const input = within(row).getByRole("textbox", { name: "Tags" });
+    await user.type(input, Array.from({ length: 11 }, (_, i) => `t${i}`).join(","));
+    await user.click(within(row).getByRole("button", { name: "Save" }));
+    expect(await within(row).findByText("Use at most 10 tags.")).toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    await user.clear(input);
+    await user.type(input, "x".repeat(25));
+    await user.click(within(row).getByRole("button", { name: "Save" }));
+    expect(
+      await within(row).findByText(`“${"x".repeat(25)}” is longer than 24 characters.`),
+    ).toBeInTheDocument();
+    expect(puts).toEqual([]);
+  });
+
+  it("masks emails in the notes under privacy mode, but edits the raw text", async () => {
+    const account = dana();
+    account.notes = "Owner: ops.team@example.com";
+    account.tags = ["billing@example.com"];
+    const view = renderWithProviders(
+      <AccountDetailSheet accountId={account.id} onOpenChange={() => {}} open />,
+      { privacy: true },
+    );
+    const sheet = await screen.findByRole("dialog");
+    const facts = await within(sheet).findByRole("region", { name: "Account" });
+    expect(within(facts).getByText("Owner: op***@ex***.com")).toBeInTheDocument();
+    expect(within(facts).getByText("bi***@ex***.com")).toBeInTheDocument();
+    expect(facts).not.toHaveTextContent("ops.team@example.com");
+
+    const row = await openEditor(sheet, view.user, "Notes");
+    expect(within(row).getByRole("textbox", { name: "Notes" })).toHaveValue(
+      "Owner: ops.team@example.com",
+    );
+  });
+
+  it("shows the notes as written with privacy off", async () => {
+    const account = dana();
+    account.notes = "Owner: ops.team@example.com";
+    renderWithProviders(
+      <AccountDetailSheet accountId={account.id} onOpenChange={() => {}} open />,
+      { privacy: false },
+    );
+    const sheet = await screen.findByRole("dialog");
+    const facts = await within(sheet).findByRole("region", { name: "Account" });
+    expect(within(facts).getByText("Owner: ops.team@example.com")).toBeInTheDocument();
+  });
+});

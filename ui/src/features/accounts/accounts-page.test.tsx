@@ -448,3 +448,72 @@ describe("AccountsPage layout", () => {
     expect(screen.queryByRole("button", { name: "Refresh models" })).not.toBeInTheDocument();
   });
 });
+
+describe("AccountsPage tags", () => {
+  function tagFixtures() {
+    const dana = mockDb.accounts.find((account) => account.email === DANA);
+    const other = mockDb.accounts.find((account) => account.email !== DANA);
+    if (!dana || !other) throw new Error("fixture missing");
+    dana.tags = ["Team-A", "backup", "ci"];
+    dana.notes = "Rotate before the audit";
+    other.tags = ["team-a"];
+    return { dana, other };
+  }
+
+  it("shows tag badges, filters by a tag in the URL and clears it from the Tag select", async () => {
+    tagFixtures();
+    const { table, user, router } = await renderAccounts("/accounts?tag=TEAM-A");
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(2));
+    const danaRow = bodyRows(table).find((row) => within(row).queryByText(DANA_MASKED));
+    if (!danaRow) throw new Error("dana row missing");
+    // Two tags show, the third folds into +1.
+    expect(within(danaRow).getByText("Team-A")).toBeInTheDocument();
+    expect(within(danaRow).getByText("backup")).toBeInTheDocument();
+    expect(within(danaRow).getByText("+1")).toBeInTheDocument();
+    expect(within(danaRow).getByText("1 more tag: ci")).toHaveClass("sr-only");
+
+    await user.click(screen.getByRole("button", { name: "Tag: Team-A" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: /^All/ }));
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(mockDb.accounts.length));
+    expect(router.state.location.search).not.toHaveProperty("tag");
+  });
+
+  it("finds an account by a word of its notes", async () => {
+    tagFixtures();
+    const { table, user } = await renderAccounts();
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search by email or nickname" }),
+      "audit",
+    );
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
+    expect(within(table).getByText(DANA_MASKED)).toBeInTheDocument();
+  });
+
+  it("adds a tag to the selection from the batch toolbar and clears the selection", async () => {
+    const bodies = captureBodies("post", "/accounts/batch");
+    const { table, user } = await renderAccounts();
+    const rows = bodyRows(table).slice(0, 2);
+    for (const row of rows) await user.click(within(row).getAllByRole("checkbox")[0]);
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    await user.click(within(bar).getByRole("button", { name: "Tags" }));
+    const dialog = await screen.findByRole("dialog", { name: "Tag 2 accounts" });
+    await user.type(within(dialog).getByRole("textbox", { name: "Tag" }), "vip{Enter}");
+    expect(await screen.findByText("Tagged 2 accounts.")).toBeInTheDocument();
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ action: "addTag", tag: "vip" });
+    await waitFor(() => expect(screen.queryByText(/ selected$/)).not.toBeInTheDocument());
+    await waitFor(() => expect(within(table).getAllByText("vip")).toHaveLength(2));
+  });
+
+  it("offers Tags in the phone batch menu", async () => {
+    mockViewport(390);
+    const { list, user } = await renderCards();
+    tagFixtures();
+    const checkboxes = within(list).getAllByRole("checkbox");
+    await user.click(checkboxes[0]);
+    const bar = await screen.findByRole("toolbar", { name: "Batch actions" });
+    await user.click(within(bar).getByRole("button", { name: "More batch actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Tags" }));
+    expect(await screen.findByRole("dialog", { name: "Tag 1 account" })).toBeInTheDocument();
+  });
+});

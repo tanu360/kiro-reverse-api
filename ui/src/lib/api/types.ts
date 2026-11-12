@@ -297,6 +297,9 @@ export interface CredentialsImportRequest {
   region?: string;
   email?: string;
   nickname?: string;
+  /** Normalized and clamped by the server, like PUT /accounts/{id}. */
+  notes?: string;
+  tags?: string[];
   userId?: string;
   profileArn?: string;
   tokenEndpoint?: string;
@@ -331,6 +334,10 @@ export interface Account {
   email: string;
   userId: string;
   nickname: string;
+  /** The operator's free text, up to 2000 characters; "" when none. */
+  notes: string;
+  /** Up to 10 labels of up to 24 characters, unique ignoring case; [] when none. */
+  tags: string[];
   authMethod: AuthMethod;
   /** e.g. "Enterprise", "BuilderId", "Google", "Github", "APIKey", "Microsoft..." */
   provider: string;
@@ -416,14 +423,19 @@ export interface UpdateAccountRequest {
   proxyURL?: string;
   silent?: boolean;
   silentReason?: string;
+  /** Replaces the notes; "" clears them. Left out, they stay. */
+  notes?: string;
+  /** Replaces the tags; [] clears them. Left out, they stay. */
+  tags?: string[];
 }
 
 /** POST /accounts/batch */
 export type BatchAction = "enable" | "disable" | "refresh" | "refreshModels" | "delete";
-export interface BatchAccountsRequest {
-  ids: string[];
-  action: BatchAction;
-}
+/** Adds or removes one tag on every selected account; answers like enable and disable. */
+export type BatchTagAction = "addTag" | "removeTag";
+export type BatchAccountsRequest =
+  | { ids: string[]; action: BatchAction }
+  | { ids: string[]; action: BatchTagAction; tag: string };
 /**
  * One requested id's outcome, in request order (duplicates dropped). `status` is "not_found"
  * for an unknown id, and "suspended" (with ok:true) when a refresh found the account suspended
@@ -435,7 +447,8 @@ export interface AccountActionResult {
   error?: string;
   code?: ServerErrorCode;
   detail?: string;
-  status?: "not_found" | "suspended";
+  /** "tag_limit": an addTag row whose account already has the most tags. */
+  status?: "not_found" | "suspended" | "tag_limit";
 }
 export interface BatchEnableDisableResponse {
   success: true;
@@ -602,6 +615,7 @@ export interface ExportAccount {
   id: string;
   email: string;
   nickname?: string;
+  notes?: string;
   idp: string;
   userId?: string;
   profileArn?: string;
@@ -610,6 +624,7 @@ export interface ExportAccount {
   subscription: { type: "Free" | "Pro" | "Pro_Plus"; title?: string };
   /** lastUpdated in ms */
   usage: { current: number; limit: number; percentUsed: number; lastUpdated: number };
+  /** Tag ids; this server's ids are the tag names (see ExportData.tags). */
   tags: string[];
   status: "active";
   /** ms */
@@ -624,6 +639,7 @@ export interface ExportData {
   exportedAt: number;
   accounts: ExportAccount[];
   groups: unknown[];
+  /** Every tag in the file as {id, name}; Kiro Account Manager files use UUID ids. */
   tags: unknown[];
 }
 

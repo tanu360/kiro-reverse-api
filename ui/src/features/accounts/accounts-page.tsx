@@ -38,6 +38,7 @@ import {
 import { AccountsTable } from "./accounts-table";
 import { AccountsToolbar } from "./accounts-toolbar";
 import { BatchBar } from "./batch-bar";
+import { BatchTagDialog } from "./batch-tag-dialog";
 import { ExportDialog } from "./export-dialog";
 import { TestAccountDialog } from "./test-account-dialog";
 
@@ -96,6 +97,11 @@ export function AccountsPage(): JSX.Element {
   const [exportState, setExportState] = useState<{ open: boolean; ids?: string[] }>({
     open: false,
   });
+  // The batch tag dialog keeps the ids it opened with, so its title holds through the close.
+  const [tagState, setTagState] = useState<{ open: boolean; ids: string[] }>({
+    open: false,
+    ids: [],
+  });
   const [detail, openDetail, closeDetail] = useDialogTarget();
   const [test, openTest, closeTest] = useDialogTarget();
 
@@ -110,10 +116,10 @@ export function AccountsPage(): JSX.Element {
   }, [query.data]);
 
   // Filter, sort and page all live in the URL, so a reload or a shared link keeps the view.
-  const { q, status, plan, auth, region, enabled } = search;
+  const { q, status, plan, auth, region, enabled, tag } = search;
   const filters = useMemo<AccountFilters>(
-    () => ({ q, status, plan, auth, region, enabled }),
-    [q, status, plan, auth, region, enabled],
+    () => ({ q, status, plan, auth, region, enabled, tag }),
+    [q, status, plan, auth, region, enabled, tag],
   );
   const sort = search.sort;
   const desc = search.order ? search.order === "desc" : sort ? defaultSortDesc(sort) : false;
@@ -364,6 +370,7 @@ export function AccountsPage(): JSX.Element {
             accounts={accounts}
             onClear={() => setSelected(new Set())}
             onExport={() => onExport([...selected])}
+            onTags={() => setTagState({ open: true, ids: [...selected] })}
             selectedIds={[...selected]}
           />
         ) : null}
@@ -394,6 +401,16 @@ export function AccountsPage(): JSX.Element {
         initialSelection={exportState.ids}
         onOpenChange={(open) => setExportState((current) => ({ ...current, open }))}
         open={exportState.open}
+      />
+      <BatchTagDialog
+        accounts={accounts}
+        ids={tagState.ids}
+        onDone={() => {
+          setTagState((current) => ({ ...current, open: false }));
+          setSelected(new Set());
+        }}
+        onOpenChange={(open) => setTagState((current) => ({ ...current, open }))}
+        open={tagState.open}
       />
       <AddAccountDialog onOpenChange={setAddOpen} open={search.add === true} />
     </>

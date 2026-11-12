@@ -43,7 +43,13 @@ import {
 
 /** The dimensions with a "Label: Value" select; status has the tabs (and the Issue select). */
 type FilterSelectDimension = Exclude<FilterDimension, "status">;
-const SELECT_DIMENSIONS: readonly FilterSelectDimension[] = ["plan", "auth", "region", "enabled"];
+const SELECT_DIMENSIONS: readonly FilterSelectDimension[] = [
+  "plan",
+  "auth",
+  "region",
+  "enabled",
+  "tag",
+];
 
 /** The radio value of "All" in a select, and of the All tab. */
 const ALL = "all";
@@ -191,8 +197,10 @@ export function AccountsToolbar({
   const issue = tab === "attention" && filters.status !== "attention" ? filters.status : undefined;
   const showIssue = tab === "attention" && (issueOptions.length > 1 || issue !== undefined);
 
+  // One tag is already a choice: it splits the tagged accounts from the rest.
   const selectDimensions = SELECT_DIMENSIONS.filter(
-    (dimension) => options[dimension].length > 1 || filters[dimension] !== undefined,
+    (dimension) =>
+      options[dimension].length > (dimension === "tag" ? 0 : 1) || filters[dimension] !== undefined,
   );
   // A status tab on its own is not a refinement: its badge already gives the count, so Clear
   // and "34 of 120" show only for a search, a select or an Issue.
@@ -281,11 +289,14 @@ export function AccountsToolbar({
                   {selectDimensions.map((dimension) => (
                     <FilterSelect
                       key={dimension}
-                      label={t(`filter.dim.${dimension}`)}
+                      label={
+                        dimension === "tag" ? t("metadata.tagFilter") : t(`filter.dim.${dimension}`)
+                      }
                       onValueChange={(value) => onFiltersChange({ [dimension]: value })}
                       options={options[dimension]}
                       total={accounts.length}
-                      value={filters[dimension]}
+                      // Tag options are keyed in lowercase; a typed ?tag= may differ in case.
+                      value={dimension === "tag" ? filters.tag?.toLowerCase() : filters[dimension]}
                     />
                   ))}
                 </div>

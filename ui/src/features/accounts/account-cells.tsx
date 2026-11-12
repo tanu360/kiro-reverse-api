@@ -41,6 +41,7 @@ import {
   trialExpiry,
   usagePercent,
 } from "./account-model";
+import { TagBadges } from "./account-tags";
 
 /**
  * The one coloured pill of a row. Colour carries the meaning: red stops the account (a ban, no
@@ -281,7 +282,10 @@ export function AuthAvatar({
   );
 }
 
-/** Email (masked under privacy), sign-in mark and flags, over a muted nickname and plan line. */
+/**
+ * Email (masked under privacy), sign-in mark and flags, over a muted nickname and plan line with
+ * the first two tags after it.
+ */
 export function AccountIdentity({
   account,
   className,
@@ -297,9 +301,12 @@ export function AccountIdentity({
         <AuthIcon account={account} />
         <AccountFlags account={account} />
       </div>
-      <span className="block truncate text-meta text-muted-foreground leading-tight">
-        {accountMeta(account, t, !authIconNamesMethod(account))}
-      </span>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="block min-w-0 truncate text-meta text-muted-foreground leading-tight">
+          {accountMeta(account, t, !authIconNamesMethod(account))}
+        </span>
+        <TagBadges max={2} tags={account.tags} />
+      </div>
     </div>
   );
 }

@@ -51,6 +51,8 @@ export interface AccountsSearch {
   auth?: string;
   region?: string;
   enabled?: "on" | "off";
+  /** A tag, matched ignoring case (account-metadata.ts hasTag). */
+  tag?: string;
   sort?: AccountSort;
   order?: "asc" | "desc";
   page?: number;
@@ -136,6 +138,7 @@ export function validateAccountsSearch(input: Record<string, unknown>): Accounts
     auth: text(input.auth),
     region: text(input.region),
     enabled: oneOf(input.enabled, ["on", "off"] as const) ?? legacyEnabled,
+    tag: text(input.tag),
     sort: oneOf(input.sort, ACCOUNT_SORTS),
     order: oneOf(input.order, ["asc", "desc"] as const),
     page: pageNumber(input.page),

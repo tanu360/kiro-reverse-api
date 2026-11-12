@@ -26,6 +26,7 @@ describe("validators return every key they own", () => {
       auth: undefined,
       region: undefined,
       enabled: undefined,
+      tag: undefined,
       sort: undefined,
       order: undefined,
       page: undefined,
