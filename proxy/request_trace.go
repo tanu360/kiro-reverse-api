@@ -16,13 +16,14 @@ const (
 type requestTrace struct {
 	startedAt time.Time
 	endpoint  string
+	requestID string
 }
 
 type requestTraceKey struct{}
 
 func withRequestTrace(r *http.Request, endpoint string) *http.Request {
 	//! The clock starts before auth, so the logged duration is what the client waited.
-	trace := &requestTrace{startedAt: time.Now(), endpoint: endpoint}
+	trace := &requestTrace{startedAt: time.Now(), endpoint: endpoint, requestID: requestIDFromContext(r.Context())}
 	return r.WithContext(context.WithValue(r.Context(), requestTraceKey{}, trace))
 }
 
@@ -46,6 +47,14 @@ func (t *requestTrace) endpointName() string {
 		return ""
 	}
 	return t.endpoint
+}
+
+// requestIDValue is the id the client got in {request_id}, so a log row can be found from it.
+func (t *requestTrace) requestIDValue() string {
+	if t == nil {
+		return ""
+	}
+	return t.requestID
 }
 
 func requestEndpointForPath(path string) string {

@@ -531,3 +531,34 @@ func TestAdminResponseHeadersRejectsWithCodeAndIndex(t *testing.T) {
 		t.Fatalf("a rejected save must keep the list, got %#v", got)
 	}
 }
+
+func TestRequestLogCarriesRequestID(t *testing.T) {
+	h := newHeaderTestHandler(t, textUpstream(t))
+	s := getObserveStore()
+	setTestResponseHeaders(t, config.ResponseHeaderRule{Name: "X-Request-Id", Value: "{request_id}", Enabled: true})
+
+	ids := make([]string, 0, 2)
+	for _, body := range []string{clientTestBody(t, "claude-sonnet-4.5", false), "{not json"} {
+		rec := serveClient(h, http.MethodPost, "/v1/chat/completions", "", body)
+		id := sentHeaders(rec).Get("X-Request-Id")
+		if !requestIDPattern.MatchString(id) {
+			t.Fatalf("status=%d X-Request-Id=%q", rec.Code, id)
+		}
+		got := s.RecentRequests(1)
+		if len(got) != 1 || got[0].RequestID != id {
+			t.Fatalf("the log row must carry the id the client got (%s), got %#v", id, got)
+		}
+		ids = append(ids, id)
+	}
+
+	for _, id := range ids {
+		page := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: id})
+		if !page.Persistent || page.Total != 1 || page.Requests[0].RequestID != id {
+			t.Fatalf("search for %s: persistent=%v total=%d rows=%#v", id, page.Persistent, page.Total, page.Requests)
+		}
+	}
+	recent, err := loadRecentRequestsFromDB(10)
+	if err != nil || len(recent) < 2 || recent[0].RequestID != ids[1] || recent[1].RequestID != ids[0] {
+		t.Fatalf("reloaded rows must keep their ids: err=%v rows=%#v", err, recent)
+	}
+}

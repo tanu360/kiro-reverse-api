@@ -90,6 +90,7 @@ type requestRecord struct {
 	Endpoint     string  `json:"endpoint,omitempty"`
 	DurationMs   int64   `json:"durationMs,omitempty"`
 	ErrorType    string  `json:"errorType,omitempty"`
+	RequestID    string  `json:"requestId,omitempty"`
 }
 
 type requestQuery struct {
@@ -351,6 +352,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 		Endpoint:     trace.endpointName(),
 		DurationMs:   trace.durationMs(),
 		ErrorType:    errorType,
+		RequestID:    trace.requestIDValue(),
 	}
 	s.mu.Lock()
 	s.recentRequests[s.recentReqIdx] = rec
@@ -812,7 +814,7 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 			continue
 		}
 		if search != "" {
-			haystack := strings.ToLower(rec.Email + " " + rec.AccountID + " " + rec.APIKeyID + " " + rec.APIKey + " " + rec.APIKeyMasked + " " + rec.Model + " " + rec.Message + " " + rec.Endpoint + " " + rec.ErrorType)
+			haystack := strings.ToLower(rec.Email + " " + rec.AccountID + " " + rec.APIKeyID + " " + rec.APIKey + " " + rec.APIKeyMasked + " " + rec.Model + " " + rec.Message + " " + rec.Endpoint + " " + rec.ErrorType + " " + rec.RequestID)
 			if !strings.Contains(haystack, search) {
 				continue
 			}

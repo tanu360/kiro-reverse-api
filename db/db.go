@@ -184,6 +184,7 @@ func Get() (*sql.DB, error) {
 var requestColumnMigrations = []struct{ name, definition string }{
 	{"cache_read_tokens", "INTEGER NOT NULL DEFAULT 0"},
 	{"cache_write_tokens", "INTEGER NOT NULL DEFAULT 0"},
+	{"request_id", "TEXT NOT NULL DEFAULT ''"},
 }
 
 func addMissingColumns(db *sql.DB, table string, columns []struct{ name, definition string }) error {
