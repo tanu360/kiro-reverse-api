@@ -74,6 +74,7 @@ const CHANGE_INVALIDATIONS: Record<ChangeEventType, ReadonlyArray<readonly unkno
     queryKeys.observe.all,
     queryKeys.requests.all,
     queryKeys.settings.logRetention(),
+    queryKeys.apiKeys.all,
   ],
   backup_deleted: [queryKeys.backups.all],
 };

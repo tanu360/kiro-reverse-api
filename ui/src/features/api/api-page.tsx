@@ -5,6 +5,7 @@ import { ApiAccessCard } from "./api-access-card";
 import { ApiKeysCard } from "./api-keys-card";
 import { ClientSnippetsCard } from "./client-snippets";
 import { EndpointsCard } from "./endpoints-card";
+import { KeyUsageCard } from "./key-usage-card";
 
 /** /api: API access, API keys, endpoint URLs and client setup snippets. */
 export function ApiPage(): JSX.Element {
@@ -14,6 +15,7 @@ export function ApiPage(): JSX.Element {
       <PageHeader description={t("description")} title={t("title")} />
       <ApiAccessCard />
       <ApiKeysCard />
+      <KeyUsageCard />
       <div className="grid min-w-0 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
         <EndpointsCard />
         <ClientSnippetsCard />

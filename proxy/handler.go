@@ -2605,6 +2605,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/api-keys/") && strings.HasSuffix(path, "/regenerate") && r.Method == "POST":
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/api-keys/"), "/regenerate")
 		h.apiRegenerateApiKey(w, r, id)
+	case path == "/api-keys/usage" && r.Method == "GET":
+		h.apiApiKeyUsage(w, r)
 	case strings.HasPrefix(path, "/api-keys/") && r.Method == "GET":
 		h.apiGetApiKey(w, r, strings.TrimPrefix(path, "/api-keys/"))
 	case strings.HasPrefix(path, "/api-keys/") && r.Method == "PUT":

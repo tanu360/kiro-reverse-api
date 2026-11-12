@@ -1,4 +1,9 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
+import type {
+  ApiKeyUsageEntry,
+  ApiKeyUsageResponse,
+  ApiKeyUsageTotals,
+} from "@/lib/api/api-key-usage";
 import type { ApiKey } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { publishMockEvent } from "@/lib/mocks/events";
@@ -125,12 +130,115 @@ function lockout(): Response {
   return jsonError(409, "would lock out every client", { code: "api_key_lockout" });
 }
 
+const USAGE_RANGES: Record<string, { bucket: "hour" | "day"; seconds: number; count: number }> = {
+  "24h": { bucket: "hour", seconds: 3600, count: 24 },
+  "7d": { bucket: "day", seconds: 86400, count: 7 },
+  "30d": { bucket: "day", seconds: 86400, count: 30 },
+};
+
+function zeroUsage(): ApiKeyUsageTotals {
+  return { requests: 0, succeeded: 0, failed: 0, inTokens: 0, outTokens: 0, tokens: 0, credits: 0 };
+}
+
+function addUsage(totals: ApiKeyUsageTotals, record: (typeof mockDb.requests)[number]): void {
+  totals.requests += 1;
+  if (record.success) totals.succeeded += 1;
+  else totals.failed += 1;
+  totals.inTokens += record.inTokens;
+  totals.outTokens += record.outTokens;
+  totals.tokens += record.inTokens + record.outTokens;
+  totals.credits += record.credits;
+}
+
+/**
+ * queryApiKeyUsage (proxy/apikey_usage.go) over the mock request log. The mock records carry
+ * only a key ID, so a known ID is its key, an unknown one a deleted key and none "none"; the
+ * mock never has invalid keys.
+ */
+function buildUsage(
+  nowUnix: number,
+  range: string,
+  spec: { bucket: "hour" | "day"; seconds: number; count: number },
+  tzOffset: number,
+): ApiKeyUsageResponse {
+  const off = tzOffset * 60;
+  const current = Math.floor((nowUnix + off) / spec.seconds);
+  const first = current - spec.count + 1;
+  const from = first * spec.seconds - off;
+  const to = (current + 1) * spec.seconds - off;
+  const totals = zeroUsage();
+  const entries = new Map<string, ApiKeyUsageEntry>();
+  for (const record of mockDb.requests) {
+    if (record.ts < from || record.ts >= to) continue;
+    const index = Math.floor((record.ts + off) / spec.seconds) - first;
+    const id = record.apiKeyId ?? "";
+    const stored = id ? findKey(id) : undefined;
+    const kind = !id ? "none" : stored ? "key" : "deleted";
+    const ref = `${kind}:${id || "none"}`;
+    let entry = entries.get(ref);
+    if (!entry) {
+      entry = {
+        id: id || "none",
+        kind,
+        ...(stored?.name ? { name: stored.name } : {}),
+        ...(stored ? { keyMasked: stored.keyMasked } : {}),
+        ...(kind === "deleted" && record.apiKeyMasked ? { keyMasked: record.apiKeyMasked } : {}),
+        totals: zeroUsage(),
+        series: Array.from({ length: spec.count }, zeroUsage),
+      };
+      entries.set(ref, entry);
+    }
+    addUsage(entry.totals, record);
+    addUsage(entry.series[index], record);
+    addUsage(totals, record);
+  }
+  const keys = [...entries.values()].sort(
+    (a, b) =>
+      b.totals.requests - a.totals.requests ||
+      b.totals.credits - a.totals.credits ||
+      a.id.localeCompare(b.id),
+  );
+  return {
+    range: range as ApiKeyUsageResponse["range"],
+    bucket: spec.bucket,
+    bucketSeconds: spec.seconds,
+    tzOffset,
+    from,
+    to,
+    nowUnix,
+    buckets: Array.from({ length: spec.count }, (_, i) => from + i * spec.seconds),
+    totals,
+    keys,
+  };
+}
+
 export const handlers: HttpHandler[] = [
   http.get(apiUrl("/api-keys"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
     return HttpResponse.json({ apiKeys: mockDb.apiKeys.map(view) });
+  }),
+
+  // Before /api-keys/:id, as on the server, or "usage" would be looked up as a key ID.
+  http.get(apiUrl("/api-keys/usage"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const url = new URL(request.url);
+    const range = url.searchParams.get("range") || "24h";
+    const spec = USAGE_RANGES[range];
+    if (!spec) {
+      return jsonError(400, "range must be 24h, 7d or 30d", { code: "invalid_usage_range" });
+    }
+    const tzRaw = url.searchParams.get("tzOffset") || "0";
+    const tzOffset = Number(tzRaw);
+    if (!/^-?\d+$/.test(tzRaw) || Math.abs(tzOffset) > 840) {
+      return jsonError(400, "tzOffset must be whole minutes between -840 and 840", {
+        code: "invalid_tz_offset",
+      });
+    }
+    return HttpResponse.json(buildUsage(mockNowUnix(), range, spec, tzOffset));
   }),
 
   http.get(apiUrl("/api-keys/:id"), async ({ request, params }) => {

@@ -1,6 +1,7 @@
 import {
   AlertCircleIcon,
   ArrowReloadHorizontalIcon,
+  ChartLineData02Icon,
   CircleCheckIcon,
   CircleSlashIcon,
   Delete02Icon,
@@ -52,6 +53,8 @@ import { cn } from "@/lib/utils";
 import { limitReachedReason, wouldLockOutClients } from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
 import { CreatedKeyPanel } from "./created-key-panel";
+import { keyEntryRef } from "./key-usage-model";
+import { ApiKeyUsageSheet } from "./key-usage-sheet";
 
 /**
  * The keys turn into cards below DataTable's `cardsBelow="4xl"` (a 56rem container: the table
@@ -97,6 +100,12 @@ export function ApiKeysCard(): JSX.Element {
   });
   // The full secret from the last create or regenerate, shown once.
   const [createdKey, setCreatedKey] = useState<{ key: string; regenerated: boolean } | null>(null);
+  // The key whose usage chart is open; kept while the sheet closes, a new session per opening.
+  const [usageFor, setUsageFor] = useState<{
+    apiKey: ApiKey;
+    open: boolean;
+    session: number;
+  } | null>(null);
   const [page, setPage] = useState(1);
   const bodyRef = useRef<HTMLDivElement>(null);
   const width = useElementWidth(bodyRef);
@@ -285,6 +294,9 @@ export function ApiKeysCard(): JSX.Element {
       onRegenerate={() => void onRegenerate(apiKey)}
       onReset={() => reset.mutate(apiKey)}
       onToggle={() => void onToggle(apiKey)}
+      onUsage={() =>
+        setUsageFor((current) => ({ apiKey, open: true, session: (current?.session ?? 0) + 1 }))
+      }
       triggerRef={triggerRef(apiKey.id)}
     />
   );
@@ -469,6 +481,19 @@ export function ApiKeysCard(): JSX.Element {
         open={dialog.open}
         target={dialog.target}
       />
+      {usageFor ? (
+        <ApiKeyUsageSheet
+          entryRef={keyEntryRef(usageFor.apiKey.id)}
+          identity={{
+            kind: "key",
+            name: usageFor.apiKey.name,
+            keyMasked: usageFor.apiKey.keyMasked,
+          }}
+          key={usageFor.session}
+          onOpenChange={(open) => setUsageFor((current) => (current ? { ...current, open } : null))}
+          open={usageFor.open}
+        />
+      ) : null}
     </SectionCard>
   );
 }
@@ -652,6 +677,7 @@ function KeyActions({
   onRegenerate,
   onReset,
   onDelete,
+  onUsage,
   triggerRef,
 }: {
   apiKey: ApiKey;
@@ -662,6 +688,7 @@ function KeyActions({
   onRegenerate: () => void;
   onReset: () => void;
   onDelete: () => void;
+  onUsage: () => void;
   triggerRef: (element: HTMLButtonElement | null) => (() => void) | undefined;
 }): JSX.Element {
   const { t } = useT("api");
@@ -683,6 +710,10 @@ function KeyActions({
         <HugeiconsIcon icon={EllipsisVerticalIcon} aria-hidden="true" />
       </MenuTrigger>
       <MenuPopup align="end">
+        <MenuItem onClick={onUsage}>
+          <HugeiconsIcon icon={ChartLineData02Icon} aria-hidden="true" />
+          {t("usage.view")}
+        </MenuItem>
         <MenuItem disabled={editing} onClick={onEdit}>
           <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
           {t("common:actions.edit")}
