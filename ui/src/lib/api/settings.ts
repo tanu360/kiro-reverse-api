@@ -15,6 +15,8 @@ import type {
   SuccessResponse,
   ThinkingConfig,
   ThinkingConfigUpdate,
+  UpstreamConfig,
+  UpstreamConfigUpdate,
 } from "./types";
 
 function getSettings(): Promise<Settings> {
@@ -70,6 +72,19 @@ export function endpointQuery() {
 
 export function updateEndpointConfig(body: EndpointConfigUpdate): Promise<SuccessResponse> {
   return apiRequest("/endpoint", { method: "POST", body });
+}
+
+function getUpstreamConfig(): Promise<UpstreamConfig> {
+  return apiRequest("/upstream");
+}
+
+export function upstreamQuery() {
+  return queryOptions({ queryKey: queryKeys.settings.upstream(), queryFn: getUpstreamConfig });
+}
+
+/** Patch semantics: omitted fields keep their value, '' clears a region override. */
+export function updateUpstreamConfig(body: UpstreamConfigUpdate): Promise<SuccessResponse> {
+  return apiRequest("/upstream", { method: "POST", body });
 }
 
 function getProxyConfig(): Promise<ProxyConfig> {

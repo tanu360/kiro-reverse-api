@@ -1411,6 +1411,10 @@ export function defaultEndpoint(): EndpointConfig {
   return { preferredEndpoint: "auto", endpointFallback: true };
 }
 
+export function defaultUpstream(): MockDb["upstream"] {
+  return { apiDomain: "amazonaws", authRegion: "", apiRegion: "" };
+}
+
 export function defaultPromptFilter(): PromptFilterConfig {
   return {
     filterClaudeCode: false,

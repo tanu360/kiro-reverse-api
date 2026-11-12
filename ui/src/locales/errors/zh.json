@@ -30,6 +30,7 @@
   "serverError.countTokensAuthType": "请选择密钥的发送方式：x-api-key 或 Authorization: Bearer。",
   "serverError.countTokensKeyInvalid": "Token 计数 API 密钥只能包含可打印字符，不能有空格，最多 4096 个字符。",
   "serverError.invalidEndpoint": "请选择端点：auto、kiro、codewhisperer 或 amazonq。",
+  "serverError.invalidApiDomain": "请选择 API 域名：amazonaws 或 kiro。",
   "serverError.apiKeyExists": "该 API Key 已存在。",
   "serverError.apiKeyCollision": "该 API Key 值已被其他 API Key 使用。",
   "serverError.tokenLimitNegative": "Token 限额必须大于或等于 0。",

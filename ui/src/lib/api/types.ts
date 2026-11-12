@@ -61,6 +61,7 @@ export type ServerErrorCode =
   | "log_retention_range"
   | "password_too_short"
   | "invalid_endpoint"
+  | "invalid_api_domain"
   | "proxy_url_scheme"
   | "count_tokens_url_invalid"
   | "count_tokens_auth_type"
@@ -967,6 +968,25 @@ export interface EndpointConfig {
 export interface EndpointConfigUpdate {
   preferredEndpoint: PreferredEndpoint;
   endpointFallback?: boolean;
+}
+
+/** Host family of chat and web search: q.{region}.amazonaws.com or runtime.{region}.kiro.dev. */
+export type ApiDomain = "amazonaws" | "kiro";
+/** GET /upstream. An empty region means no override. */
+export interface UpstreamConfig {
+  apiDomain: ApiDomain;
+  /** OIDC refresh region for every account; '' = each account's own region */
+  authRegion: string;
+  /** data-plane region for every account; '' = each account's profile region */
+  apiRegion: string;
+  /** the regions apiRegion may take */
+  apiRegions: string[];
+}
+/** POST /upstream, patch semantics: an omitted field keeps its value, '' clears a region. */
+export interface UpstreamConfigUpdate {
+  apiDomain?: ApiDomain;
+  authRegion?: string;
+  apiRegion?: string;
 }
 
 /** '' | http(s)://[u[:p]@]host:port | socks5(h)://... */

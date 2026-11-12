@@ -210,7 +210,7 @@ func performKiroWebSearch(ctx context.Context, account *config.Account, query st
 
 func webSearchMCPHost(account *config.Account) string {
 	//! account.Region is the login region; MCP lives next to the profile, like every other data-plane call.
-	return "https://q." + kiroRegionForProfile(account, "") + ".amazonaws.com"
+	return "https://" + kiroDataPlaneHost(kiroRegionForProfile(account, ""))
 }
 
 func webSearchQueryFromInput(input map[string]interface{}) string {

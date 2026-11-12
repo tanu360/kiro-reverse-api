@@ -219,6 +219,10 @@ func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 		h.disableAccount(account, "BANNED", "AWS temporarily suspended - unusual user activity detected")
 	case isProfileUnavailableErrorMessage(errMsg):
 		h.pool.RecordError(account.ID, false)
+	case isAuthErrorMessage(errMsg) && regionOverrideMismatch(account):
+		//! The override, not the token, may be what failed: cool the account instead of banning it.
+		logger.Warnf("[AccountFailover] %s failed auth under a region override that does not match it; not disabling it", account.Email)
+		h.pool.RecordError(account.ID, false)
 	case isAuthErrorMessage(errMsg):
 		h.disableAccount(account, "BANNED", "Authentication failed - token invalid or expired")
 	default:

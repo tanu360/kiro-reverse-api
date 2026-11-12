@@ -279,7 +279,8 @@ func kiroEndpointURL(ep kiroEndpoint, account *config.Account, profileArn string
 	if config.IsAPIKeyAccount(account) {
 		return "https://runtime." + kiroRegionForProfile(account, "") + ".kiro.dev/"
 	}
-	return regionalizeURLForProfile(ep.URL, account, profileArn)
+	//! apiDomain swaps only the host; it is read per call, so a switch applies to the next request.
+	return applyAPIDomain(regionalizeURLForProfile(ep.URL, account, profileArn), kiroRegionForProfile(account, profileArn))
 }
 
 func getSortedEndpoints(preferred string) []kiroEndpoint {

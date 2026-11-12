@@ -1,6 +1,7 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
 import type { CountTokensAuthType, CountTokensConfig } from "@/lib/api/count-tokens";
 import type {
+  ApiDomain,
   ModelMappingRule,
   PreferredEndpoint,
   PromptFilterRule,
@@ -43,6 +44,12 @@ function countTokensConfig(): CountTokensConfig {
     countTokensApiKeyMasked: maskCountTokensKey(key),
   };
 }
+
+const API_DOMAINS: readonly ApiDomain[] = ["amazonaws", "kiro"];
+/** config.KiroServiceRegions */
+const API_REGIONS = ["us-east-1", "eu-central-1"];
+/** config.NormalizeAWSRegion */
+const AWS_REGION = /^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$/;
 
 type Json = Record<string, unknown>;
 
@@ -369,6 +376,54 @@ export const handlers: HttpHandler[] = [
       preferredEndpoint: preferred as PreferredEndpoint,
       endpointFallback: fallback ?? mockDb.endpoint.endpointFallback,
     };
+    return saved();
+  }),
+
+  http.get(apiUrl("/upstream"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json({ ...mockDb.upstream, apiRegions: [...API_REGIONS] });
+  }),
+
+  http.post(apiUrl("/upstream"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    if (!body) return invalidJson();
+    const domain = optional(body, "apiDomain", isString);
+    const apiRegion = optional(body, "apiRegion", isString);
+    const authRegion = optional(body, "authRegion", isString);
+    if (domain === null || apiRegion === null || authRegion === null) return invalidJson();
+    // Patch: an omitted field keeps its value, '' clears a region (or resets the domain).
+    const next = { ...mockDb.upstream };
+    if (domain !== undefined) {
+      const value = domain.trim().toLowerCase() || "amazonaws";
+      if (!(API_DOMAINS as readonly string[]).includes(value)) {
+        return jsonError(400, "Invalid apiDomain, must be: amazonaws or kiro", {
+          code: "invalid_api_domain",
+        });
+      }
+      next.apiDomain = value as ApiDomain;
+    }
+    if (apiRegion !== undefined) {
+      const value = apiRegion.trim().toLowerCase();
+      if (value && !API_REGIONS.includes(value)) {
+        return jsonError(400, "apiRegion must be us-east-1 or eu-central-1", {
+          code: "invalid_region",
+        });
+      }
+      next.apiRegion = value;
+    }
+    if (authRegion !== undefined) {
+      const value = authRegion.trim().toLowerCase();
+      if (value && !AWS_REGION.test(value)) {
+        return jsonError(400, "Invalid authRegion", { code: "invalid_region" });
+      }
+      next.authRegion = value;
+    }
+    mockDb.upstream = next;
     return saved();
   }),
 

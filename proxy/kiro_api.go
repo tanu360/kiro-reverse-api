@@ -595,6 +595,9 @@ func refreshAccountInfo(account *config.Account, markFailure bool) (*config.Acco
 			}
 
 			return nil, fmt.Errorf("account suspended: %w", err)
+		} else if regionOverrideMismatch(account) {
+			//! Same rule as handleAccountFailure: under a mismatched region override the error proves nothing.
+			logger.Warnf("[RefreshAccountInfo] %s failed under a region override that does not match it; not disabling it: %v", account.Email, err)
 		} else if strings.Contains(errMsg, "403") || strings.Contains(errMsg, "401") ||
 			strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "expired") {
 

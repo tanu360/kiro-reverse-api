@@ -30,6 +30,7 @@
   "serverError.countTokensAuthType": "Chọn cách gửi key: x-api-key hoặc Authorization: Bearer.",
   "serverError.countTokensKeyInvalid": "Key của API đếm token chỉ được chứa ký tự in được, không có khoảng trắng, tối đa 4096 ký tự.",
   "serverError.invalidEndpoint": "Chọn một endpoint: auto, kiro, codewhisperer hoặc amazonq.",
+  "serverError.invalidApiDomain": "Chọn một tên miền API: amazonaws hoặc kiro.",
   "serverError.apiKeyExists": "API key này đã tồn tại.",
   "serverError.apiKeyCollision": "Giá trị API key này đã được một key khác sử dụng.",
   "serverError.tokenLimitNegative": "Giới hạn token phải từ 0 trở lên.",

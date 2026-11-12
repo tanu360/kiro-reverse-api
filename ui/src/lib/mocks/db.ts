@@ -1,5 +1,5 @@
-import type { LogRetention } from "@/lib/api/log-retention";
 import type { CountTokensAuthType } from "@/lib/api/count-tokens";
+import type { LogRetention } from "@/lib/api/log-retention";
 import type {
   Account,
   AccountFull,
@@ -15,6 +15,7 @@ import type {
   RequestRecord,
   Settings,
   ThinkingConfig,
+  UpstreamConfig,
 } from "@/lib/api/types";
 import {
   buildModelMix,
@@ -23,6 +24,7 @@ import {
   defaultPromptFilter,
   defaultSettings,
   defaultThinking,
+  defaultUpstream,
   makeAccountFull,
   seedAccounts,
   seedApiKeys,
@@ -60,6 +62,8 @@ export interface MockDb {
   thinking: ThinkingConfig;
   modelMappings: ModelMappingRule[];
   endpoint: EndpointConfig;
+  /** apiRegions is not stored: the handler adds it */
+  upstream: Omit<UpstreamConfig, "apiRegions">;
   proxy: ProxyConfig;
   /** The external count_tokens API as Go stores it; GET answers the key masked. */
   countTokens: MockCountTokens;
@@ -192,6 +196,7 @@ function seedFullDb(now: number): MockDb {
   return {
     ...baseDb(),
     ...data,
+    upstream: defaultUpstream(),
     modelMix: buildModelMix(data.requests, data.errors),
     logRetention: seedLogRetention(now, true),
     countTokens: {
@@ -220,6 +225,7 @@ function seedEmptyDb(now: number): MockDb {
     thinking: defaultThinking(),
     modelMappings: [],
     endpoint: defaultEndpoint(),
+    upstream: defaultUpstream(),
     proxy: { proxyURL: "" },
     countTokens: localCountTokens(),
     promptFilter: defaultPromptFilter(),
@@ -249,6 +255,7 @@ function seedDb(scenario: MockScenario): MockDb {
     thinking: defaultThinking(),
     modelMappings: defaultModelMappings(),
     endpoint: defaultEndpoint(),
+    upstream: defaultUpstream(),
     proxy: { proxyURL: "socks5://user:p%40ss@127.0.0.1:1080" },
     countTokens: localCountTokens(),
     promptFilter: {

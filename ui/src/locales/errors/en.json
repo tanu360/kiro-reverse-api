@@ -30,6 +30,7 @@
   "serverError.countTokensAuthType": "Choose how the key is sent: x-api-key or Authorization: Bearer.",
   "serverError.countTokensKeyInvalid": "The token counting API key must be printable characters without spaces, 4096 at most.",
   "serverError.invalidEndpoint": "Choose an endpoint: auto, kiro, codewhisperer or amazonq.",
+  "serverError.invalidApiDomain": "Choose an API domain: amazonaws or kiro.",
   "serverError.apiKeyExists": "This API key already exists.",
   "serverError.apiKeyCollision": "This API key value is already used by another key.",
   "serverError.tokenLimitNegative": "The token limit must be 0 or more.",
