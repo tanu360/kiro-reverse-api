@@ -241,3 +241,21 @@ func keepOffForAdmin(acc *config.Account) {
 		acc.BanStatus = "DISABLED"
 	}
 }
+
+// authBanStatusFor is the status an auth ban on the account gets. An account an
+// admin already switched off (disabled, with no proxy ban) keeps the admin's
+// DISABLED: a BANNED auth ban written over it would let self-heal switch it
+// back on. The stored account decides, since the caller's copy can predate
+// the admin's change.
+func authBanStatusFor(id string) string {
+	for _, acc := range config.GetAccounts() {
+		if acc.ID != id {
+			continue
+		}
+		if !acc.Enabled && (acc.BanStatus == "" || acc.BanStatus == "ACTIVE" || acc.BanStatus == "DISABLED") {
+			return "DISABLED"
+		}
+		break
+	}
+	return "BANNED"
+}

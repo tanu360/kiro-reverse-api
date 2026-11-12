@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -525,5 +526,57 @@ func TestRaisingRoundCapLiftsHalt(t *testing.T) {
 	s.settingsChanged()
 	if s.snapshot().Halted {
 		t.Fatal("removing the round cap kept the halt")
+	}
+}
+
+// An account an admin switched off while it was healthy keeps that disable when
+// a later token check fails: the auth ban is recorded as DISABLED, so self-heal
+// never turns it back on.
+func TestAuthFailureOnAdminDisabledAccountStaysAdminDisabled(t *testing.T) {
+	p := setupHealTest(t,
+		config.Account{ID: "admin-off", Email: "off@example.com", Enabled: true, AccessToken: "token"},
+		config.Account{ID: "in-use", Email: "use@example.com", Enabled: true, AccessToken: "token"},
+		authBanned("proxy-banned"),
+	)
+	h := &Handler{pool: p}
+	rec := httptest.NewRecorder()
+	h.apiUpdateAccount(rec, httptest.NewRequest(http.MethodPut, "/admin/api/accounts/admin-off", strings.NewReader(`{"enabled":false}`)), "admin-off")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disable status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// A row refresh of the disabled account finds its token dead.
+	stubRestTransport(t, func(*http.Request) (*http.Response, error) {
+		return jsonResponse(http.StatusUnauthorized, `{"message":"The bearer token included in the request is invalid."}`), nil
+	})
+	off := storedHealAccount(t, "admin-off")
+	if _, _, err := h.refreshAccountNow(context.Background(), &off); err == nil {
+		t.Fatal("refresh of a dead token succeeded")
+	}
+	got := storedHealAccount(t, "admin-off")
+	if got.Enabled || got.BanStatus != "DISABLED" || got.BanReason != banReasonAuthFailed {
+		t.Fatalf("admin-disabled account after an auth failure: enabled=%v ban=%q reason=%q, want DISABLED with the auth reason", got.Enabled, got.BanStatus, got.BanReason)
+	}
+
+	// A request that picked an account before the admin switched it off.
+	stale := storedHealAccount(t, "in-use")
+	h.apiUpdateAccount(httptest.NewRecorder(), httptest.NewRequest(http.MethodPut, "/admin/api/accounts/in-use", strings.NewReader(`{"enabled":false}`)), "in-use")
+	h.handleAccountFailure(&stale, errors.New("HTTP 401: token invalid"))
+	if got := storedHealAccount(t, "in-use"); got.Enabled || got.BanStatus != "DISABLED" {
+		t.Fatalf("in-flight auth failure after an admin disable: enabled=%v ban=%q, want DISABLED", got.Enabled, got.BanStatus)
+	}
+
+	// An enabled account still gets the healable proxy ban.
+	h.apiUpdateAccount(httptest.NewRecorder(), httptest.NewRequest(http.MethodPut, "/admin/api/accounts/in-use", strings.NewReader(`{"enabled":true}`)), "in-use")
+	on := storedHealAccount(t, "in-use")
+	h.handleAccountFailure(&on, errors.New("HTTP 401: token invalid"))
+	if got := storedHealAccount(t, "in-use"); got.BanStatus != "BANNED" || got.BanReason != banReasonAuthFailed {
+		t.Fatalf("enabled account after an auth failure: ban=%q reason=%q, want BANNED", got.BanStatus, got.BanReason)
+	}
+
+	now := time.Now()
+	banned, _, ok := planSelfHeal(config.GetAccounts(), p.HealView(now), now)
+	if !ok || len(banned) != 2 || banned[0] == "admin-off" || banned[1] == "admin-off" {
+		t.Fatalf("plan = %v ok %v, want in-use and proxy-banned only", banned, ok)
 	}
 }
