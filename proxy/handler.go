@@ -42,6 +42,7 @@ type Handler struct {
 	promptCache     *promptCacheTracker
 	affinity        *sessionAffinity
 	adminSessions   *adminSessionStore
+	usageRefresh    *refreshScheduler
 }
 
 type thinkingStreamSource int
@@ -231,6 +232,7 @@ func NewHandler() *Handler {
 		promptCache:    newPromptCacheTracker(defaultPromptCacheTTL),
 		affinity:       newSessionAffinity(),
 		adminSessions:  newAdminSessionStore(),
+		usageRefresh:   newRefreshScheduler(config.GetUsageRefreshInterval),
 	}
 
 	go h.backgroundRefresh()
@@ -256,30 +258,18 @@ func NewHandler() *Handler {
 }
 
 func (h *Handler) backgroundRefresh() {
-	ticker := time.NewTicker(backgroundRefreshEvery)
-	defer ticker.Stop()
-
-	time.Sleep(10 * time.Second)
-	h.refreshModelsCache()
-	h.refreshAllAccounts()
+	//! The boot listing runs 10 s in; the retry loop waits a minute first, so it
+	//! only acts when that listing came back empty.
 	go h.retryEmptyModelsCache(modelsCacheRetryDelays)
-
-	for {
-		select {
-		case <-ticker.C:
-			h.refreshModelsCache()
-			h.refreshAllAccounts()
-		case <-h.stopRefresh:
-			return
-		}
-	}
+	h.runHousekeeping(h.stopRefresh)
 }
 
-func (h *Handler) refreshAllAccounts() {
+// refreshAllAccounts is the account half of the housekeeping sweep; every is the
+// interval in force, which decides which tokens and usage are due.
+func (h *Handler) refreshAllAccounts(every time.Duration) {
 	accounts := config.GetAccounts()
 	start := time.Now()
 	now := start.Unix()
-	const refreshInterval = 30 * 60
 
 	forEachAccount(accounts, backgroundRefreshWorkers, func(_ int, account *config.Account) {
 		if !account.Enabled || account.AccessToken == "" {
@@ -289,7 +279,7 @@ func (h *Handler) refreshAllAccounts() {
 			return
 		}
 
-		if tokenExpiresBeforeNextSweep(account, time.Now().Unix()) {
+		if tokenExpiresBeforeNextSweep(account, time.Now().Unix(), every) {
 			//! force: without it the refresh is skipped while the token is outside the 2-minute skew.
 			//! A token another caller already rotated is still left alone.
 			if err := refreshStoredAccount(context.Background(), account, true); err != nil {
@@ -298,7 +288,7 @@ func (h *Handler) refreshAllAccounts() {
 			}
 		}
 
-		if account.LastRefresh > 0 && now-account.LastRefresh < refreshInterval {
+		if usageInfoFresh(account.LastRefresh, now, every) {
 			return
 		}
 
@@ -3546,6 +3536,8 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"autoContinue":           config.GetAutoContinue(),
 		"autoContinueMax":        config.GetAutoContinueMax(),
 		"structuredToolHistory":  config.GetStructuredToolHistory(),
+
+		"usageRefreshIntervalMinutes": config.GetUsageRefreshIntervalMinutes(),
 	})
 }
 
@@ -3633,6 +3625,8 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		AutoContinue           *bool  `json:"autoContinue,omitempty"`
 		AutoContinueMax        *int   `json:"autoContinueMax,omitempty"`
 		StructuredToolHistory  *bool  `json:"structuredToolHistory,omitempty"`
+
+		UsageRefreshIntervalMinutes *int `json:"usageRefreshIntervalMinutes,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
@@ -3641,6 +3635,9 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.AutoContinueMax != nil && (*req.AutoContinueMax < 1 || *req.AutoContinueMax > config.MaxAutoContinueMax) {
 		writeAdminError(w, http.StatusBadRequest, codeAutoContinueMaxRange, fmt.Sprintf("autoContinueMax must be between 1 and %d", config.MaxAutoContinueMax))
+		return
+	}
+	if !validateUsageRefreshInterval(w, req.UsageRefreshIntervalMinutes) {
 		return
 	}
 
@@ -3712,6 +3709,10 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
+	}
+
+	if !h.applyUsageRefreshInterval(w, req.UsageRefreshIntervalMinutes) {
+		return
 	}
 
 	publishEvent(eventSettingsChanged, "")

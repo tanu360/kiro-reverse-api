@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useInstantSetting } from "./general-settings";
 import { SECTION_ID } from "./sections";
 import { SectionQuery, SettingsSection } from "./settings-section";
+import { UsageRefreshRow } from "./usage-refresh-select";
 
 export function UsageCard(): JSX.Element {
   const { t } = useT("settings");
@@ -31,6 +32,8 @@ function UsageForm({ settings }: { settings: Settings }): JSX.Element {
         onCheckedChange={allowOverUsage.onCheckedChange}
         title={t("allowOverUsage")}
       />
+      {/* Missing (an older server) means the default, 30 minutes. */}
+      <UsageRefreshRow saved={settings.usageRefreshIntervalMinutes ?? 30} />
     </SettingsSection>
   );
 }

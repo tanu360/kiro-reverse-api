@@ -78,6 +78,9 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
   const max = optional(body, "autoContinueMax", isInteger);
   if (max === null) return null;
   if (max !== undefined) patch.autoContinueMax = max;
+  const refresh = optional(body, "usageRefreshIntervalMinutes", isInteger);
+  if (refresh === null) return null;
+  if (refresh !== undefined) patch.usageRefreshIntervalMinutes = refresh;
   const password = optional(body, "password", isString);
   if (password === null) return null;
   if (password !== undefined) patch.password = password;
@@ -239,6 +242,12 @@ export const handlers: HttpHandler[] = [
       (patch.autoContinueMax < 1 || patch.autoContinueMax > MAX_AUTO_CONTINUE)
     ) {
       return jsonError(400, "autoContinueMax must be between 1 and 10");
+    }
+    const refresh = patch.usageRefreshIntervalMinutes;
+    if (refresh !== undefined && refresh !== 0 && (refresh < 5 || refresh > 1440)) {
+      return jsonError(400, "usageRefreshIntervalMinutes must be 0 (off) or between 5 and 1440", {
+        code: "usage_refresh_interval_range",
+      });
     }
     if (patch.password && [...patch.password].length < MIN_PASSWORD_RUNES) {
       return jsonError(400, "Password must be at least 8 characters");
