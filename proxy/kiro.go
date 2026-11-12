@@ -10,6 +10,7 @@ import (
 	"io"
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
+	"kiro-proxy/proxypool"
 	"net"
 	"net/http"
 	"net/url"
@@ -82,6 +83,9 @@ func init() {
 }
 
 func GetClientForProxy(proxyURL string) *http.Client {
+	if c, ok := poolClientFor(proxyURL, true); ok {
+		return c
+	}
 	if proxyURL == "" {
 		return kiroHttpStore.Load()
 	}
@@ -94,6 +98,9 @@ func GetClientForProxy(proxyURL string) *http.Client {
 }
 
 func GetRestClientForProxy(proxyURL string) *http.Client {
+	if c, ok := poolClientFor(proxyURL, false); ok {
+		return c
+	}
 	if proxyURL == "" {
 		return kiroRestHttpStore.Load()
 	}
@@ -109,11 +116,10 @@ func GetRestClientForProxy(proxyURL string) *http.Client {
 	return client
 }
 
+// ResolveAccountProxyURL is the account's route: its own proxy, then the
+// proxy pool, then the global proxy, then direct ("").
 func ResolveAccountProxyURL(account *config.Account) string {
-	if account != nil && account.ProxyURL != "" {
-		return account.ProxyURL
-	}
-	return config.GetProxyURL()
+	return proxypool.Default().ResolveURL(account)
 }
 
 func buildKiroTransport(proxyURL string) *http.Transport {

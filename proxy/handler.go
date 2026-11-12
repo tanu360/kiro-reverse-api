@@ -252,6 +252,7 @@ func NewHandler() *Handler {
 
 	go h.backgroundBackupScheduler()
 	go h.backgroundCooldownSaver()
+	startProxyPool()
 	return h
 }
 
@@ -2502,6 +2503,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetProxy(w, r)
 	case path == "/proxy" && r.Method == "POST":
 		h.apiUpdateProxy(w, r)
+	case path == "/proxy-pool" || strings.HasPrefix(path, "/proxy-pool/"):
+		h.handleProxyPoolAPI(w, r, strings.TrimPrefix(path, "/proxy-pool"))
 	case path == "/prompt-filter" && r.Method == "GET":
 		h.apiGetPromptFilter(w, r)
 	case path == "/prompt-filter" && r.Method == "POST":

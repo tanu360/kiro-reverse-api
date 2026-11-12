@@ -6,6 +6,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
+	"kiro-proxy/proxypool"
 	"strings"
 	"time"
 )
@@ -37,7 +38,7 @@ func newRequestRetryPlan() requestRetryPlan {
 }
 
 func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalAttempts int) bool {
-	if isUpstreamClientError(err) {
+	if isUpstreamClientError(err) || isNoHealthyProxyError(err) {
 		return false
 	}
 	if err == nil || accountAttempt+1 >= rp.maxPerAccount || totalAttempts >= rp.maxPerRequest || isContextCanceledError(err) {
@@ -47,7 +48,7 @@ func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalA
 }
 
 func (rp requestRetryPlan) shouldBackoffBeforeNextAccount(err error, totalAttempts int) bool {
-	if isUpstreamClientError(err) {
+	if isUpstreamClientError(err) || isNoHealthyProxyError(err) {
 		return false
 	}
 	if err == nil || totalAttempts >= rp.maxPerRequest || isContextCanceledError(err) {
@@ -195,6 +196,10 @@ func (h *Handler) handleBackgroundAccountFailure(account *config.Account, err er
 func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 	//! A client disconnect or an upstream stream hiccup says nothing about the account's health.
 	if account == nil || err == nil || isUpstreamClientError(err) || isStreamIntegrityError(err) || isContextCanceledError(err) {
+		return
+	}
+	//! A pool proxy that failed to connect moved the account already; the account itself is fine.
+	if proxypool.IsProxyError(err) {
 		return
 	}
 

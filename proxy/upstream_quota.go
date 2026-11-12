@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"errors"
+	"kiro-proxy/proxypool"
 	"net/http"
 	"strconv"
 	"strings"
@@ -94,6 +95,10 @@ func upstreamFailureStatus(err error) int {
 	var quota *upstreamQuotaError
 	if errors.As(err, &quota) {
 		return http.StatusTooManyRequests
+	}
+	//! The outbound route is down, not the server: a client may retry once a proxy recovers.
+	if proxypool.IsProxyError(err) {
+		return http.StatusServiceUnavailable
 	}
 	return http.StatusInternalServerError
 }

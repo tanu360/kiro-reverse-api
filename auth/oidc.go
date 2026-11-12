@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"kiro-proxy/config"
+	"kiro-proxy/proxypool"
 	"net/http"
 	"time"
 )
@@ -41,12 +42,15 @@ func RefreshTokenContext(ctx context.Context, account *config.Account) (string, 
 		return "", "", 0, "", fmt.Errorf("kiro API key accounts do not support token refresh")
 	}
 
-	//! Account proxy wins over global proxy so mixed-account pools can route independently.
-	proxyURL := account.ProxyURL
-	if proxyURL == "" {
-		proxyURL = config.GetProxyURL()
+	//! Same route as the account's Kiro traffic (own proxy, pool, global, direct), so it keeps one egress IP.
+	route := proxypool.Default().Resolve(account)
+	if route.Unavailable {
+		return "", "", 0, "", proxypool.NoHealthyError()
 	}
-	client := GetAuthClientForProxy(proxyURL)
+	client := GetAuthClientForProxy(route.URL)
+	if route.ProxyID != "" {
+		client = proxypool.WrapClient(route.ProxyID, client)
+	}
 
 	if config.IsExternalIdpAccount(account) {
 		return refreshExternalIdpToken(ctx, account.RefreshToken, account.ClientID, account.TokenEndpoint, account.IssuerURL, account.Scopes, client)
