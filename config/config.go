@@ -1114,7 +1114,7 @@ func UpdateLogLevel(level string) error {
 
 // defaultKiroVersion tracks the current Kiro IDE release. Bump it when Kiro ships a new
 // IDE build: the upstream API rejects stale KiroIDE-<version> user agents.
-const defaultKiroVersion = "1.4.121"
+const defaultKiroVersion = "1.4.154"
 
 type KiroClientConfig struct {
 	KiroVersion   string

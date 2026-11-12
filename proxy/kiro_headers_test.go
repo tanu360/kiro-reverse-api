@@ -20,10 +20,10 @@ func TestBuildStreamingHeaderValuesAlignsWithKiroIDEFormat(t *testing.T) {
 	if !strings.Contains(values.UserAgent, "api/codewhispererstreaming#1.0.34") {
 		t.Fatalf("expected streaming API marker in user agent, got %q", values.UserAgent)
 	}
-	if !strings.Contains(values.UserAgent, "KiroIDE-1.4.121-machine-123") {
+	if !strings.Contains(values.UserAgent, "KiroIDE-1.4.154-machine-123") {
 		t.Fatalf("expected kiro version and machine id in user agent, got %q", values.UserAgent)
 	}
-	if !strings.Contains(values.AmzUserAgent, "aws-sdk-js/1.0.34 KiroIDE-1.4.121-machine-123") {
+	if !strings.Contains(values.AmzUserAgent, "aws-sdk-js/1.0.34 KiroIDE-1.4.154-machine-123") {
 		t.Fatalf("expected x-amz-user-agent to include version and machine id, got %q", values.AmzUserAgent)
 	}
 }
