@@ -21,6 +21,8 @@
   "serverError.tooManyPasswordAttempts": "Too many password attempts. Wait a minute and try again.",
   "serverError.passwordTooShort": "The password must be at least 8 characters.",
   "serverError.autoContinueMaxRange": "Maximum continuations must be between 1 and 10.",
+  "serverError.routingModeInvalid": "Choose a routing mode: weighted or priority.",
+  "serverError.priorityRange": "Priority must be a whole number between 0 and 999.",
   "serverError.notOverageCapable": "This account cannot use overage.",
   "serverError.apiKeyAccountNoProfile": "Kiro API key accounts have no Kiro profile. Their region is set at import.",
   "serverError.profileNotAvailable": "The selected Kiro profile is not available for this account.",

@@ -12,6 +12,7 @@ import { useT } from "@/lib/i18n";
 import { formatCreditAmount } from "../account-model";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
 import { MachineIdRow } from "./machine-id-section";
+import { PriorityRow } from "./priority-section";
 import { ProxyRow } from "./proxy-section";
 import { WeightRow } from "./weight-section";
 
@@ -19,8 +20,8 @@ import { WeightRow } from "./weight-section";
  * The account's facts and its own settings in one card. The facts read as a label-over-value
  * grid, two across, so no value sits a card's width away from its label; the email, plan and
  * sign-in method are already the sheet's title and meta line, and the plan credits and reset
- * date its meter. Under them, the editable fields (nickname, machine ID, weight, proxy) are
- * edited in place.
+ * date its meter. Under them, the editable fields (nickname, machine ID, weight, priority, proxy)
+ * are edited in place.
  */
 export function AccountSection({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
@@ -52,6 +53,7 @@ export function AccountSection({ account }: { account: Account }): JSX.Element {
         <NicknameRow account={account} />
         <MachineIdRow account={account} />
         <WeightRow account={account} />
+        <PriorityRow account={account} />
         <ProxyRow account={account} />
       </InlineEditList>
     </SectionCard>

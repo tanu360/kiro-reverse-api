@@ -15,6 +15,8 @@ export interface SuccessResponse {
  * the English `error`. `detail` is upstream text shown after the translation; other string or
  * number fields fill its placeholders. Batch rows (AccountActionResult) carry the same codes.
  * - api_key_lockout (409): the change would leave requireApiKey on with no enabled key.
+ * - routing_mode_invalid / priority_range (400): POST /settings routingMode is not a known mode;
+ *   PUT or POST /accounts priority is not an integer 0..999.
  * - backup_not_found (404): unknown backup id.
  * - backup_* (400): an upload or stored backup the restore cannot read (`detail`: why).
  * - invalid_cadence / invalid_keep (400): POST /backups/schedule out of range.
@@ -57,6 +59,8 @@ export type ServerErrorCode =
   | "no_kiro_profile"
   | "api_key_account_no_profile"
   | "auto_continue_max_range"
+  | "routing_mode_invalid"
+  | "priority_range"
   | "password_too_short"
   | "invalid_endpoint"
   | "proxy_url_scheme"
@@ -355,6 +359,8 @@ export interface Account {
   machineId: string;
   /** 0 = unset (effective weight 1) */
   weight: number;
+  /** 0..999, lower first; only used in the priority routing mode */
+  priority: number;
   overageStatus: OverageStatus;
   /** 'NOT_OVERAGE_CAPABLE' | 'OVERAGE_CAPABLE' | '' */
   overageCapability: string;
@@ -413,6 +419,8 @@ export interface UpdateAccountRequest {
   nickname?: string;
   machineId?: string;
   weight?: number;
+  /** integer 0..999; anything else is 400 priority_range */
+  priority?: number;
   proxyURL?: string;
   silent?: boolean;
   silentReason?: string;
@@ -897,6 +905,12 @@ export type ApiKeyResetUsageResponse = { success: true; apiKey?: ApiKey };
 // Settings
 // ---------------------------------------------------------------------------
 
+/**
+ * How the pool picks the account for a new request: `weighted` round-robin (the default) or
+ * `priority`, the available account with the lowest Account.priority.
+ */
+export type RoutingMode = "weighted" | "priority";
+
 export interface Settings {
   requireApiKey: boolean;
   /** read-only */
@@ -907,6 +921,8 @@ export interface Settings {
   lenientStreamIntegrity: boolean;
   /** default true */
   sessionAffinity: boolean;
+  /** default weighted */
+  routingMode: RoutingMode;
   autoContinue: boolean;
   /** 1..10, default 3 */
   autoContinueMax: number;
@@ -920,6 +936,7 @@ export interface SettingsPatch {
   allowOverUsage?: boolean;
   lenientStreamIntegrity?: boolean;
   sessionAffinity?: boolean;
+  routingMode?: RoutingMode;
   autoContinue?: boolean;
   /** integer 1..10 */
   autoContinueMax?: number;

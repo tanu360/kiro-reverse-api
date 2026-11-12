@@ -34,6 +34,8 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   no_kiro_profile: "errors:serverError.noKiroProfile",
   api_key_account_no_profile: "errors:serverError.apiKeyAccountNoProfile",
   auto_continue_max_range: "errors:serverError.autoContinueMaxRange",
+  routing_mode_invalid: "errors:serverError.routingModeInvalid",
+  priority_range: "errors:serverError.priorityRange",
   password_too_short: "errors:serverError.passwordTooShort",
   invalid_endpoint: "errors:serverError.invalidEndpoint",
   proxy_url_scheme: "errors:serverError.proxyUrlScheme",

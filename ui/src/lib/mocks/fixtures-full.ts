@@ -520,6 +520,8 @@ function randomAccount(
       [int(rng, 6, 20), 5],
       [100, 1],
     ] as const),
+    // From the index, not the rng, so every other generated value stays the same. Ties included.
+    priority: index % 5,
     overageStatus,
     overageCapability,
     overageCap,
@@ -2013,6 +2015,7 @@ export function seedFullDataset(now: number): FullDataset {
       allowOverUsage: true,
       lenientStreamIntegrity: true,
       sessionAffinity: false,
+      routingMode: "priority",
       autoContinue: true,
       autoContinueMax: 10,
       structuredToolHistory: false,

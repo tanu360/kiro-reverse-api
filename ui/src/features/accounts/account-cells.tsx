@@ -41,6 +41,7 @@ import {
   trialExpiry,
   usagePercent,
 } from "./account-model";
+import { useRoutingMode } from "./use-routing-mode";
 
 /**
  * The one coloured pill of a row. Colour carries the meaning: red stops the account (a ban, no
@@ -146,11 +147,39 @@ function trialHint(account: Account, t: ReturnType<typeof useT>["t"]): string | 
   return undefined;
 }
 
-/** Weight, an active trial and overage, as quiet icons after the email. Nothing when plain. */
+/**
+ * The account's rank in the priority routing mode: its number in a small outline pill, with
+ * "Priority N" as a tooltip and as screen reader text.
+ */
+function PriorityFlag({ priority, label }: { priority: number; label: string }): JSX.Element {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<Badge size="sm" variant="outline" />}>
+        <span aria-hidden="true">{priority}</span>
+        <span className="sr-only">{label}</span>
+      </TooltipTrigger>
+      <TooltipPopup>{label}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/**
+ * Weight (or, in the priority routing mode, the priority instead), an active trial and overage,
+ * as quiet marks after the email. Nothing when plain.
+ */
 export function AccountFlags({ account }: { account: Account }): JSX.Element | null {
   const { t } = useT("accounts");
+  const priorityMode = useRoutingMode() === "priority";
   const flags: ReactNode[] = [];
-  if (account.weight >= 2) {
+  if (priorityMode) {
+    flags.push(
+      <PriorityFlag
+        key="priority"
+        label={t("priorityShort", { priority: account.priority })}
+        priority={account.priority}
+      />,
+    );
+  } else if (account.weight >= 2) {
     flags.push(
       <Flag icon={WeightIcon} key="weight" label={t("weightShort", { weight: account.weight })} />,
     );

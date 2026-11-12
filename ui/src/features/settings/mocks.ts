@@ -3,6 +3,7 @@ import type {
   ModelMappingRule,
   PreferredEndpoint,
   PromptFilterRule,
+  RoutingMode,
   SettingsPatch,
   ThinkingFormat,
 } from "@/lib/api/types";
@@ -28,6 +29,7 @@ const MAX_MODEL_ID_BYTES = 256;
 const THINKING_FORMATS: readonly ThinkingFormat[] = ["reasoning_content", "thinking", "think"];
 const ENDPOINTS: readonly PreferredEndpoint[] = ["auto", "kiro", "codewhisperer", "amazonq"];
 const PROXY_SCHEMES = ["http://", "https://", "socks5://", "socks5h://"];
+const ROUTING_MODES: readonly string[] = ["weighted", "priority"] satisfies RoutingMode[];
 
 type Json = Record<string, unknown>;
 
@@ -77,6 +79,10 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
   const max = optional(body, "autoContinueMax", isInteger);
   if (max === null) return null;
   if (max !== undefined) patch.autoContinueMax = max;
+  // Any string decodes; the handler then rejects an unknown mode with routing_mode_invalid.
+  const routingMode = optional(body, "routingMode", isString);
+  if (routingMode === null) return null;
+  if (routingMode !== undefined) patch.routingMode = routingMode as RoutingMode;
   const password = optional(body, "password", isString);
   if (password === null) return null;
   if (password !== undefined) patch.password = password;
@@ -238,6 +244,11 @@ export const handlers: HttpHandler[] = [
       (patch.autoContinueMax < 1 || patch.autoContinueMax > MAX_AUTO_CONTINUE)
     ) {
       return jsonError(400, "autoContinueMax must be between 1 and 10");
+    }
+    if (patch.routingMode !== undefined && !ROUTING_MODES.includes(patch.routingMode)) {
+      return jsonError(400, 'routingMode must be "weighted" or "priority"', {
+        code: "routing_mode_invalid",
+      });
     }
     if (patch.password && [...patch.password].length < MIN_PASSWORD_RUNES) {
       return jsonError(400, "Password must be at least 8 characters");
