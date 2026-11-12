@@ -21,12 +21,6 @@ func initRoutingAdminConfig(t *testing.T) {
 	t.Cleanup(func() { _ = config.UpdateRoutingMode(config.RoutingModeWeighted) })
 }
 
-func postSettings(h *Handler, body string) *httptest.ResponseRecorder {
-	rec := httptest.NewRecorder()
-	h.apiUpdateSettings(rec, httptest.NewRequest(http.MethodPost, "/admin/api/settings", strings.NewReader(body)))
-	return rec
-}
-
 func getSettingsMap(t *testing.T, h *Handler) map[string]interface{} {
 	t.Helper()
 	rec := httptest.NewRecorder()
