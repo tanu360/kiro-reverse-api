@@ -143,7 +143,8 @@ function attemptEndpoint(endpoint: string | undefined, t: TFunction): string {
 
 /**
  * What a failed attempt led to. The server flags a failover; another try on the same account for
- * the same job reads as a retry. Output that had already started is said either way.
+ * the same job reads as a retry, unless the job gave up and the next attempt is other work. Output
+ * that had already started is said either way.
  */
 function attemptNotes(
   attempt: RequestAttempt,
@@ -157,6 +158,7 @@ function attemptNotes(
     notes.push(t("attempts.failover"));
   } else if (
     next &&
+    !attempt.gaveUp &&
     next.accountId === attempt.accountId &&
     (next.endpoint === WEB_SEARCH) === (attempt.endpoint === WEB_SEARCH)
   ) {

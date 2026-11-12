@@ -307,6 +307,7 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 		}
 		results, err := performKiroWebSearch(ctx, account, query)
 		if err == nil {
+			traceAttemptOK(ctx)
 			return results, account, nil
 		}
 		if ctx.Err() != nil {
@@ -319,6 +320,8 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 	if lastErr == nil {
 		lastErr = errNoWebSearchAccounts
 	}
+	//! This query is done; the next query's first try is not its failover or retry.
+	traceAttemptGiveUp(ctx)
 	return nil, lastAccount, lastErr
 }
 
@@ -546,6 +549,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 			traceAttemptStart(ctx, account, "")
 			round, err := h.callClaudeRound(ctx, account, payload, req.Model, thinking, estimatedInputTokens)
 			if err == nil {
+				traceAttemptOK(ctx)
 				h.rememberAccount(payload, account)
 				return round, account, nil
 			}

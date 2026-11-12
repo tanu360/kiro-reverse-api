@@ -109,6 +109,22 @@ describe("AttemptsCard", () => {
     expect(only).not.toHaveTextContent("Retried");
   });
 
+  it("does not call the next query's try a retry after a search gave up", () => {
+    const search = { ...FAILOVER_CHAIN[0], endpoint: "web_search" };
+    renderWithProviders(
+      <AttemptsCard
+        attempts={[
+          { ...search, gaveUp: true },
+          { ...search, startMs: 1400 },
+        ]}
+      />,
+    );
+    const [first, second] = attemptItems();
+    expect(first).not.toHaveTextContent("Retried");
+    expect(first).not.toHaveTextContent("Failed over");
+    expect(second).toHaveTextContent("Web search");
+  });
+
   it("masks emails in accounts and messages under privacy mode", () => {
     renderWithProviders(<AttemptsCard attempts={FAILOVER_CHAIN} />, { privacy: true });
 

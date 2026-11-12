@@ -802,6 +802,8 @@ export interface RequestAttempt {
   failover?: boolean;
   /** failed after the upstream stream had sent output */
   midStream?: boolean;
+  /** failed, and its job stopped trying (a web search query): the next attempt is other work */
+  gaveUp?: boolean;
   /** on the last attempt only: attempts dropped before it by the 10-attempt cap */
   skipped?: number;
 }

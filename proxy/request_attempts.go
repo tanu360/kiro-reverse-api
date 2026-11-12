@@ -42,6 +42,10 @@ type requestAttempt struct {
 	Failover bool `json:"failover,omitempty"`
 	// MidStream marks a failed attempt whose upstream stream had already sent output.
 	MidStream bool `json:"midStream,omitempty"`
+	// GaveUp marks the last failed attempt of a job that stopped trying (one web
+	// search query, for example). The attempt after it starts other work, so it
+	// is neither a failover nor a retry of this one.
+	GaveUp bool `json:"gaveUp,omitempty"`
 	// Skipped is set on the last attempt only: attempts dropped before it by the cap.
 	Skipped int `json:"skipped,omitempty"`
 }
@@ -68,8 +72,8 @@ func attemptChainFromContext(ctx context.Context) (*requestTrace, *attemptChain)
 }
 
 // traceAttemptStart opens a new attempt on account. An attempt still open
-// ended without a recorded failure, so it closes as a success (a finished
-// web search round, for example).
+// ended without a recorded failure, so it closes as a success (a call site
+// that never closed its finished attempt, for example).
 func traceAttemptStart(ctx context.Context, account *config.Account, endpoint string) {
 	trace, c := attemptChainFromContext(ctx)
 	if c == nil {
@@ -122,6 +126,41 @@ func traceAttemptFailed(ctx context.Context, account *config.Account, status int
 		status = upstreamHTTPStatus(err)
 	}
 	c.closeLocked(now, false, status, err.Error())
+}
+
+// traceAttemptOK closes the open attempt as a success. Call it where an
+// attempt's work is complete before the request's final record (a buffered
+// web search round, an MCP search), so a later failure that has nothing to do
+// with it is not pinned on it.
+func traceAttemptOK(ctx context.Context) {
+	_, c := attemptChainFromContext(ctx)
+	if c == nil {
+		return
+	}
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.open && !c.done {
+		c.closeLocked(now, true, 0, "")
+	}
+}
+
+// traceAttemptGiveUp marks the last attempt as the end of a job that gave up
+// after it failed. The next attempt then starts new work and is not flagged
+// as its failover.
+func traceAttemptGiveUp(ctx context.Context) {
+	_, c := attemptChainFromContext(ctx)
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.open || c.done || len(c.items) == 0 {
+		return
+	}
+	if last := &c.items[len(c.items)-1]; !last.Success {
+		last.GaveUp = true
+	}
 }
 
 // noteAttemptEndpoint records the Kiro endpoint the open attempt is calling.
@@ -181,13 +220,14 @@ func (t *requestTrace) finishAttempts(success bool, status int, message string) 
 }
 
 // appendLocked adds an attempt and marks the one before it as a failover when
-// it failed and the new one runs on another account. Past the cap, the newest
+// it failed, its job did not give up, and the new one runs on another account
+// for the same kind of work. Past the cap, the newest
 // kept attempt makes room: the chain keeps the first attempts and the latest.
 func (c *attemptChain) appendLocked(next requestAttempt) {
 	if n := len(c.items); n > 0 {
 		prev := &c.items[n-1]
 		//! A web search giving up and the next chat round are different jobs, not a failover.
-		if !prev.Success && prev.AccountID != next.AccountID &&
+		if !prev.Success && !prev.GaveUp && prev.AccountID != next.AccountID &&
 			(prev.Endpoint == attemptEndpointWebSearch) == (next.Endpoint == attemptEndpointWebSearch) {
 			prev.Failover = true
 		}

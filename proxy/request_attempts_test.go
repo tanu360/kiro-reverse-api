@@ -344,6 +344,124 @@ func TestAttemptChainWebSearchGiveUpIsNotFailover(t *testing.T) {
 	}
 }
 
+// attemptFlags lists one flag of every attempt, in order.
+func attemptFlags(attempts []requestAttempt, flag func(requestAttempt) bool) []bool {
+	out := make([]bool, len(attempts))
+	for i, a := range attempts {
+		out[i] = flag(a)
+	}
+	return out
+}
+
+func TestAttemptChainSearchGiveUpEndsItsJob(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		accounts []string
+		failover []bool
+		gaveUp   []bool
+	}{
+		// Query A fails on one and two and gives up; query B starts on one again.
+		{"two accounts", []string{"one", "two"}, []bool{false, true, false, true, false, false}, []bool{false, false, true, false, true, false}},
+		// A one-account pool: query B on the same account is not a retry of query A.
+		{"one account", []string{"one"}, []bool{false, false, false, false}, []bool{false, true, true, false}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, trace := traceContextForTest()
+			chat := &config.Account{ID: "one"}
+			traceAttemptStart(ctx, chat, "")
+			traceAttemptOK(ctx)
+			for range 2 { // two queries, both down
+				for _, id := range tc.accounts {
+					account := &config.Account{ID: id}
+					traceAttemptStart(ctx, account, attemptEndpointWebSearch)
+					traceAttemptFailed(ctx, account, 0, errors.New("MCP HTTP 500: down"))
+				}
+				traceAttemptGiveUp(ctx)
+			}
+			traceAttemptStart(ctx, &config.Account{ID: tc.accounts[len(tc.accounts)-1]}, "")
+			attempts := trace.finishAttempts(true, http.StatusOK, "")
+
+			if got := attemptFlags(attempts, func(a requestAttempt) bool { return a.Failover }); !reflect.DeepEqual(got, tc.failover) {
+				t.Fatalf("failover flags = %v, want %v (%#v)", got, tc.failover, attempts)
+			}
+			if got := attemptFlags(attempts, func(a requestAttempt) bool { return a.GaveUp }); !reflect.DeepEqual(got, tc.gaveUp) {
+				t.Fatalf("gaveUp flags = %v, want %v (%#v)", got, tc.gaveUp, attempts)
+			}
+		})
+	}
+
+	//! Giving up with no attempt of its own leaves a finished success alone.
+	ctx, trace := traceContextForTest()
+	traceAttemptStart(ctx, &config.Account{ID: "one"}, "")
+	traceAttemptOK(ctx)
+	traceAttemptGiveUp(ctx)
+	if attempts := trace.finishAttempts(true, http.StatusOK, ""); len(attempts) != 1 || !attempts[0].Success || attempts[0].GaveUp {
+		t.Fatalf("attempts = %#v", attempts)
+	}
+}
+
+func TestAttemptChainFinishedAttemptKeepsItsSuccess(t *testing.T) {
+	ctx, trace := traceContextForTest()
+	account := &config.Account{ID: "one"}
+	traceAttemptStart(ctx, account, "")
+	traceAttemptOK(ctx) // the buffered chat round
+	traceAttemptStart(ctx, account, attemptEndpointWebSearch)
+	traceAttemptOK(ctx) // the search found results
+	//! The next round finds no account, so no attempt starts before the final record.
+	attempts := trace.finishAttempts(false, http.StatusServiceUnavailable, "no available accounts")
+
+	if len(attempts) != 2 {
+		t.Fatalf("expected 2 attempts, got %#v", attempts)
+	}
+	for i, a := range attempts {
+		if !a.Success || a.Status != 0 || a.ErrorType != "" || a.Message != "" {
+			t.Fatalf("attempt %d took the request's failure: %#v", i, a)
+		}
+	}
+}
+
+func TestAttemptChainWebSearchLoopQueriesGiveUpSeparately(t *testing.T) {
+	var rounds atomic.Int32
+	h := newAttemptChainHandler(t, 1, func(w http.ResponseWriter, _ *http.Request) {
+		if rounds.Add(1) == 1 {
+			writeFrames(w, webSearchToolUseFrame(t, "toolu_ws_a", "query a"), webSearchToolUseFrame(t, "toolu_ws_b", "query b"), meteringFrame(t))
+			return
+		}
+		writeKiroTextResponse(t, w, "Search is down.")
+	})
+	stub := stubMCPWebSearch(t, http.StatusInternalServerError, "down")
+
+	decodeClaudeMessage(t, postClaudeMessages(t, h, `{"model":"claude-sonnet-4.5","max_tokens":64,
+		"tools":[{"type":"web_search_20250305","name":"web_search"}],
+		"messages":[{"role":"user","content":"latest go?"}]}`))
+	if rounds.Load() != 2 || stub.calls.Load() != 4 {
+		t.Fatalf("model rounds=%d MCP calls=%d", rounds.Load(), stub.calls.Load())
+	}
+
+	attempts := lastRecordedAttempts(t)
+	endpoints := make([]string, len(attempts))
+	for i, a := range attempts {
+		endpoints[i] = a.Endpoint
+	}
+	ws := attemptEndpointWebSearch
+	if !reflect.DeepEqual(endpoints, []string{"test", ws, ws, ws, ws, "test"}) {
+		t.Fatalf("endpoints = %v", endpoints)
+	}
+	if got := attemptFlags(attempts, func(a requestAttempt) bool { return a.Success }); !reflect.DeepEqual(got, []bool{true, false, false, false, false, true}) {
+		t.Fatalf("success flags = %v (%#v)", got, attempts)
+	}
+	//! Each query fails over once, then gives up; the next query is not its failover.
+	if got := attemptFlags(attempts, func(a requestAttempt) bool { return a.Failover }); !reflect.DeepEqual(got, []bool{false, true, false, true, false, false}) {
+		t.Fatalf("failover flags = %v (%#v)", got, attempts)
+	}
+	if got := attemptFlags(attempts, func(a requestAttempt) bool { return a.GaveUp }); !reflect.DeepEqual(got, []bool{false, false, true, false, true, false}) {
+		t.Fatalf("gaveUp flags = %v (%#v)", got, attempts)
+	}
+	if attempts[1].AccountID == attempts[2].AccountID || attempts[3].AccountID == attempts[4].AccountID {
+		t.Fatalf("each query must try both accounts: %#v", attempts)
+	}
+}
+
 func TestAttemptChainJSONRoundTrip(t *testing.T) {
 	attempts := []requestAttempt{
 		{AccountID: "a1", Email: "a1@example.com", Endpoint: "Kiro IDE", StartMs: 0, DurationMs: 812, Status: 500,
