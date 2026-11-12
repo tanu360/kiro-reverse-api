@@ -249,7 +249,7 @@ func expandResponseHeaderTemplate(template string, values responseHeaderValues) 
 		rest = rest[open:]
 		if end := strings.IndexByte(rest, '}'); end > 0 {
 			if value, ok := responseHeaderVariable(rest[1:end], values); ok {
-				out.WriteString(sanitizeResponseHeaderValue(value, maxResponseHeaderVarBytes))
+				out.WriteString(sanitizeResponseHeaderValue(value, maxResponseHeaderVarBytes, false))
 				rest = rest[end+1:]
 				continue
 			}
@@ -257,7 +257,8 @@ func expandResponseHeaderTemplate(template string, values responseHeaderValues) 
 		out.WriteByte('{')
 		rest = rest[1:]
 	}
-	return strings.Trim(sanitizeResponseHeaderValue(out.String(), maxResponseHeaderOutBytes), " \t")
+	//! The saved template may hold HTAB (a valid field-value byte); keep it so the client sees what was saved.
+	return strings.Trim(sanitizeResponseHeaderValue(out.String(), maxResponseHeaderOutBytes, true), " \t")
 }
 
 func responseHeaderVariable(name string, values responseHeaderValues) (string, bool) {
@@ -276,10 +277,13 @@ func responseHeaderVariable(name string, values responseHeaderValues) (string, b
 	return "", false
 }
 
-// sanitizeResponseHeaderValue drops control characters (the model comes from the client) and
-// cuts the text to max bytes on a UTF-8 boundary.
-func sanitizeResponseHeaderValue(value string, max int) string {
+// sanitizeResponseHeaderValue drops control characters (the model comes from the client), HTAB
+// too unless keepTab, and cuts the text to max bytes on a UTF-8 boundary.
+func sanitizeResponseHeaderValue(value string, max int, keepTab bool) string {
 	clean := strings.Map(func(r rune) rune {
+		if r == '\t' && keepTab {
+			return r
+		}
 		if r < 0x20 || r == 0x7f || r == utf8.RuneError {
 			return -1
 		}

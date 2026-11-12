@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -157,6 +158,19 @@ func TestResponseHeaderVariableSanitized(t *testing.T) {
 	if got := expandResponseHeaderTemplate("{model}", responseHeaderValues{model: "a\xffb"}); got != "ab" {
 		t.Fatalf("invalid UTF-8 must be dropped, got %q", got)
 	}
+	if got := expandResponseHeaderTemplate("{model}", responseHeaderValues{model: "a\tb"}); got != "ab" {
+		t.Fatalf("a tab in a variable must be dropped, got %q", got)
+	}
+}
+
+func TestResponseHeaderTemplateKeepsTab(t *testing.T) {
+	//! The save check allows HTAB inside a value; the client must get the value as saved.
+	if got := expandResponseHeaderTemplate("a\tb {request_id}", responseHeaderValues{requestID: "req_1"}); got != "a\tb req_1" {
+		t.Fatalf("a saved tab must reach the client, got %q", got)
+	}
+	if got := expandResponseHeaderTemplate("\t{account_id}\t", responseHeaderValues{}); got != "" {
+		t.Fatalf("tabs around an empty variable must be trimmed, got %q", got)
+	}
 }
 
 func TestIsClientAPIPath(t *testing.T) {
@@ -295,6 +309,36 @@ func TestResponseHeadersOnErrorResponses(t *testing.T) {
 		}
 		assertAllResponseHeaderVars(t, sentHeaders(rec), "claude-sonnet-4.5", "only", "")
 	})
+}
+
+func TestResponseHeadersOnDirectWebSearch(t *testing.T) {
+	//! The direct path calls only the MCP search, never CallKiroAPIContext, yet an account served it.
+	for _, tc := range []struct {
+		name   string
+		stream bool
+		status int
+		body   string
+	}{
+		{"json", false, http.StatusOK, mcpOneResult},
+		{"sse", true, http.StatusOK, mcpOneResult},
+		{"search error", false, http.StatusForbidden, `{"message":"denied"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHeaderTestHandler(t, func(http.ResponseWriter, *http.Request) {
+				t.Error("direct web search must not call the model")
+			})
+			stubMCPWebSearch(t, tc.status, tc.body)
+			setTestResponseHeaders(t, allResponseHeaderVars...)
+			body := fmt.Sprintf(`{"model":"claude-sonnet-4.5","max_tokens":64,"stream":%t,
+				"tools":[{"type":"web_search_20250305","name":"web_search"}],
+				"messages":[{"role":"user","content":"Perform a web search for the query: go"}]}`, tc.stream)
+			rec := serveClient(h, http.MethodPost, "/v1/messages", "", body)
+			if (tc.status == http.StatusOK) != (rec.Code == http.StatusOK) {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			assertAllResponseHeaderVars(t, sentHeaders(rec), "claude-sonnet-4.5", "only", "")
+		})
+	}
 }
 
 func TestResponseHeadersOnModelsAndCountTokens(t *testing.T) {
