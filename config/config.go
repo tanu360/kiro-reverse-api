@@ -142,6 +142,11 @@ type Config struct {
 
 	EndpointFallback *bool `json:"endpointFallback,omitempty"`
 
+	// Upstream host family and region overrides; see upstream.go.
+	APIDomain  string `json:"apiDomain,omitempty"`
+	AuthRegion string `json:"authRegion,omitempty"`
+	APIRegion  string `json:"apiRegion,omitempty"`
+
 	AllowOverUsage bool `json:"allowOverUsage,omitempty"`
 
 	LenientStreamIntegrity bool `json:"lenientStreamIntegrity,omitempty"`
