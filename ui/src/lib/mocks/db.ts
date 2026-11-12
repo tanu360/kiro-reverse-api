@@ -1,5 +1,6 @@
 import type { LogRetention } from "@/lib/api/log-retention";
 import type { ResponseHeaderRule } from "@/lib/api/response-headers";
+import type { AccountHealth } from "@/lib/api/account-health";
 import type {
   Account,
   AccountFull,
@@ -69,6 +70,8 @@ export interface MockDb {
   /** GET /log-retention; the handler reads oldestRequestTs off `requests`. */
   logRetention: LogRetention;
   responseHeaders: ResponseHeaderRule[];
+  /** GET /account-health: self-heal settings and state. */
+  accountHealth: AccountHealth;
   startedAt: number;
   /** '2.1.0' */
   version: string;
@@ -151,7 +154,13 @@ const REMOTE_CHANGELOG = [
 /** The common fields every scenario shares. */
 function baseDb(): Pick<
   MockDb,
-  "adminPassword" | "firstRunPending" | "failedLogins" | "version" | "remoteVersion" | "pending"
+  | "adminPassword"
+  | "firstRunPending"
+  | "failedLogins"
+  | "version"
+  | "remoteVersion"
+  | "pending"
+  | "accountHealth"
 > &
   Pick<MockDb, "responseHeaders"> {
   return {
@@ -164,6 +173,12 @@ function baseDb(): Pick<
     pending: { iam: {}, microsoft: {}, builderId: {} },
     // A fresh install sends no custom headers.
     responseHeaders: [],
+    accountHealth: {
+      enabled: true,
+      minIntervalSec: 300,
+      maxRounds: 5,
+      state: { lastHealAt: 0, rounds: 0, halted: false, haltedAt: 0, lastHealed: 0 },
+    },
   };
 }
 

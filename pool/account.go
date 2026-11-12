@@ -16,6 +16,8 @@ type AccountPool struct {
 	currentIndex  uint64
 	lastSelected  string
 	cooldowns     map[string]time.Time
+	// cooldownKinds says what set each cooldown, so self-heal never clears a quota one.
+	cooldownKinds map[string]CooldownKind
 	errorCounts   map[string]int
 	modelLists    map[string]map[string]bool
 	// enabledIDs lists every enabled account, including over-limit ones Reload keeps out of rotation.
@@ -274,11 +276,13 @@ func (p *AccountPool) RecordSuccess(id string) {
 	p.mu.Lock()
 	cleared := time.Now().Before(p.cooldowns[id])
 	delete(p.cooldowns, id)
+	delete(p.cooldownKinds, id)
 	p.errorCounts[id] = 0
 	p.mu.Unlock()
 	if cleared {
 		notifyCooldownChanged(id)
 	}
+	notifySuccess(id)
 }
 
 func (p *AccountPool) RecordError(id string, isQuotaError bool) int {
@@ -314,6 +318,7 @@ func (p *AccountPool) RecordThrottleError(id string, retryAfter time.Duration) i
 	until := time.Now().Add(delay)
 	grew := until.After(p.cooldowns[id])
 	if grew {
+		p.setKindLocked(id, p.throttleKindLocked(id, retryAfter))
 		p.cooldowns[id] = until
 	}
 	p.mu.Unlock()
@@ -348,11 +353,13 @@ func (p *AccountPool) recordError(id string, isQuotaError bool, retryAfter time.
 		}
 		if until.After(p.cooldowns[id]) {
 			p.cooldowns[id] = until
+			p.setKindLocked(id, CooldownQuota)
 			changed = true
 		}
 	} else if count >= 3 {
 
 		p.cooldowns[id] = time.Now().Add(time.Minute)
+		p.setKindLocked(id, CooldownError)
 		changed = true
 	}
 	p.mu.Unlock()
@@ -441,6 +448,7 @@ func IsSuspensionError(err error) bool {
 	lower := strings.ToLower(err.Error())
 	return strings.Contains(lower, "temporarily_suspended") ||
 		strings.Contains(lower, "temporarily suspended") ||
+		strings.Contains(lower, "locked your account") ||
 		strings.Contains(lower, "no available kiro profile")
 }
 
@@ -453,6 +461,7 @@ func (p *AccountPool) DisableAccount(id, reason string) {
 
 	//! Keep a long cooldown as a safety net if Reload races with an in-flight request.
 	p.cooldowns[id] = time.Now().Add(24 * time.Hour)
+	p.setKindLocked(id, CooldownDisabled)
 	p.mu.Unlock()
 	_ = p.SaveCooldowns()
 	p.Reload()
@@ -461,6 +470,7 @@ func (p *AccountPool) DisableAccount(id, reason string) {
 func (p *AccountPool) MarkOverLimit(id string) {
 	p.mu.Lock()
 	p.cooldowns[id] = time.Now().Add(time.Hour)
+	p.setKindLocked(id, CooldownQuota)
 	p.mu.Unlock()
 	_ = p.SaveCooldowns()
 	p.Reload()

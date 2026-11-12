@@ -41,6 +41,7 @@ const EVENT_TYPES: readonly AdminEventType[] = [
   "api_keys_changed",
   "settings_changed",
   "stats_reset",
+  "account_heal",
 ];
 
 const OBSERVE_DEBOUNCE_MS = 1200;

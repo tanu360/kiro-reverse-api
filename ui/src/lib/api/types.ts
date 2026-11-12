@@ -21,6 +21,7 @@ export interface SuccessResponse {
  * - backup_* (400): an upload or stored backup the restore cannot read (`detail`: why).
  * - invalid_cadence / invalid_keep (400): POST /backups/schedule out of range.
  * - log_retention_range (400): POST /log-retention days outside 0..3650.
+ * - self_heal_interval_range / self_heal_rounds_range (400): POST /account-health out of range.
  * - token_refresh_failed, models_refresh_failed, overage_failed, profile_verify_failed,
  *   kiro_sign_in_failed, microsoft_denied, microsoft_token_failed, microsoft_credential_invalid,
  *   sso_* : `detail` is the upstream reason.
@@ -69,6 +70,8 @@ export type ServerErrorCode =
   | "image_resize_dimension_range"
   | "image_resize_size_range"
   | "account_rpm_limit_range"
+  | "self_heal_interval_range"
+  | "self_heal_rounds_range"
   | "password_too_short"
   | "invalid_endpoint"
   | "invalid_api_domain"
@@ -147,6 +150,8 @@ export interface FirstRunResponse {
  * - observe_tick comes at most once a second, each time with a new payload: the store's change
  *   counter as a decimal string. It follows a store write, a minute ending while the last 24 h
  *   hold traffic (every window shifts), and a change in the enabled or available account count.
+ * - account_heal is self-heal news: "healed:<accounts>", "halted:<rounds>", "recovered" (a
+ *   request succeeded after heals) or "resumed" (an admin lifted a halt).
  */
 export type AdminEventType =
   | "hello"
@@ -157,7 +162,8 @@ export type AdminEventType =
   | "accounts_changed"
   | "api_keys_changed"
   | "settings_changed"
-  | "stats_reset";
+  | "stats_reset"
+  | "account_heal";
 
 // ---------------------------------------------------------------------------
 // Stats, status, version, machine id

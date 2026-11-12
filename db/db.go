@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS settings (
 
 CREATE TABLE IF NOT EXISTS cooldowns (
   account_id TEXT PRIMARY KEY,
-  expires_at INTEGER NOT NULL
+  expires_at INTEGER NOT NULL,
+  kind TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS alert_state (
@@ -211,6 +212,11 @@ func Get() (*sql.DB, error) {
 			openErr = err
 			return
 		}
+		if err := addMissingColumns(db, "cooldowns", cooldownColumnMigrations); err != nil {
+			_ = db.Close()
+			openErr = err
+			return
+		}
 		handle = db
 	})
 	if openErr != nil {
@@ -230,6 +236,12 @@ var requestColumnMigrations = []struct{ name, definition string }{
 	{"cache_write_tokens", "INTEGER NOT NULL DEFAULT 0"},
 	{"attempts_json", "TEXT NOT NULL DEFAULT ''"},
 	{"request_id", "TEXT NOT NULL DEFAULT ''"},
+}
+
+// cooldownColumnMigrations lists cooldowns columns added after the first
+// release. An old row gets an empty kind, which self-heal never clears.
+var cooldownColumnMigrations = []struct{ name, definition string }{
+	{"kind", "TEXT NOT NULL DEFAULT ''"},
 }
 
 func addMissingColumns(db *sql.DB, table string, columns []struct{ name, definition string }) error {

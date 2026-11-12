@@ -2572,6 +2572,12 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetUpstreamConfig(w, r)
 	case path == "/upstream" && r.Method == "POST":
 		h.apiUpdateUpstreamConfig(w, r)
+	case path == "/account-health" && r.Method == "GET":
+		h.apiGetAccountHealth(w, r)
+	case path == "/account-health" && r.Method == "POST":
+		h.apiUpdateAccountHealth(w, r)
+	case path == "/account-health/resume" && r.Method == "POST":
+		h.apiResumeAccountHealth(w, r)
 	case path == "/proxy" && r.Method == "GET":
 		h.apiGetProxy(w, r)
 	case path == "/proxy" && r.Method == "POST":
@@ -2817,6 +2823,9 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 			existing.SilentReason = ""
 			existing.SilentTime = 0
 		}
+		if !v {
+			keepOffForAdmin(existing)
+		}
 	}
 	if v, ok := updates["nickname"].(string); ok {
 		existing.Nickname = v
@@ -3058,6 +3067,8 @@ func (h *Handler) batchSetEnabled(w http.ResponseWriter, ids []string, enabled b
 			a.Silent = false
 			a.SilentReason = ""
 			a.SilentTime = 0
+		} else {
+			keepOffForAdmin(&a)
 		}
 		if err := config.UpdateAccount(a.ID, a); err != nil {
 			results[slots[i]].fail(err)

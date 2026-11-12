@@ -168,6 +168,10 @@ type Config struct {
 
 	AccountRPMLimit int `json:"accountRpmLimit,omitempty"`
 
+	SelfHeal            *bool `json:"selfHeal,omitempty"`
+	SelfHealIntervalSec int   `json:"selfHealIntervalSec,omitempty"`
+	SelfHealMaxRounds   *int  `json:"selfHealMaxRounds,omitempty"`
+
 	StructuredToolHistory *bool `json:"structuredToolHistory,omitempty"`
 
 	ImageResize             *bool `json:"imageResize,omitempty"`

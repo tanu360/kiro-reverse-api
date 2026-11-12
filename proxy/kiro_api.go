@@ -578,7 +578,7 @@ func refreshAccountInfo(account *config.Account, markFailure bool) (*config.Acco
 	if err != nil {
 
 		errMsg := err.Error()
-		if strings.Contains(errMsg, "TEMPORARILY_SUSPENDED") {
+		if isSuspensionErrorMessage(errMsg) {
 
 			logger.Warnf("[RefreshAccountInfo] Account %s is temporarily suspended: %v", account.Email, err)
 

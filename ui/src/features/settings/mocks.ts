@@ -520,6 +520,56 @@ export const handlers: HttpHandler[] = [
     return saved();
   }),
 
+  http.get(apiUrl("/account-health"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json(mockDb.accountHealth);
+  }),
+
+  // A patch, as proxy/account_health_api.go: every value is checked before any is written.
+  http.post(apiUrl("/account-health"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    if (!body) return invalidJson();
+    const enabled = optional(body, "enabled", isBool);
+    const interval = optional(body, "minIntervalSec", isInteger);
+    const rounds = optional(body, "maxRounds", isInteger);
+    if (enabled === null || interval === null || rounds === null) return invalidJson();
+    if (interval !== undefined && (interval < 30 || interval > 86_400)) {
+      return jsonError(400, "minIntervalSec must be between 30 and 86400", {
+        code: "self_heal_interval_range",
+      });
+    }
+    if (rounds !== undefined && (rounds < 0 || rounds > 100)) {
+      return jsonError(400, "maxRounds must be between 0 and 100", {
+        code: "self_heal_rounds_range",
+      });
+    }
+    const health = mockDb.accountHealth;
+    mockDb.accountHealth = {
+      ...health,
+      enabled: enabled ?? health.enabled,
+      minIntervalSec: interval ?? health.minIntervalSec,
+      maxRounds: rounds ?? health.maxRounds,
+    };
+    return saved();
+  }),
+
+  http.post(apiUrl("/account-health/resume"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    mockDb.accountHealth = {
+      ...mockDb.accountHealth,
+      state: { ...mockDb.accountHealth.state, rounds: 0, halted: false, haltedAt: 0 },
+    };
+    publishMockEvent("account_heal", "resumed");
+    return HttpResponse.json(OK);
+  }),
+
   http.get(apiUrl("/proxy"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;

@@ -6,6 +6,7 @@ import {
   Coins01Icon,
   Database01Icon,
   FilterHorizontalIcon,
+  FirstAidKitIcon,
   GlobalIcon,
   Image01Icon,
   Location01Icon,
@@ -35,6 +36,7 @@ export const SETTINGS_SECTIONS = [
   { id: "settings-auto-continue", titleKey: "autoContinue", icon: RepeatIcon, group: "requests" },
   { id: "settings-tool-history", titleKey: "toolHistory", icon: Wrench01Icon, group: "requests" },
   { id: "settings-image-resize", titleKey: "imageResize", icon: Image01Icon, group: "requests" },
+  { id: "settings-self-heal", titleKey: "selfHeal", icon: FirstAidKitIcon, group: "requests" },
   { id: "settings-thinking", titleKey: "thinkingSettings", icon: AiBrain01Icon, group: "models" },
   {
     id: "settings-model-mappings",
@@ -101,6 +103,7 @@ export const SECTION_ID = {
   autoContinue: "settings-auto-continue",
   toolHistory: "settings-tool-history",
   imageResize: "settings-image-resize",
+  selfHeal: "settings-self-heal",
   thinking: "settings-thinking",
   modelMappings: "settings-model-mappings",
   endpoint: "settings-endpoint",

@@ -19,6 +19,9 @@ const (
 	eventBackupCreated   = "backup_created"
 	eventBackupRestored  = "backup_restored"
 	eventBackupDeleted   = "backup_deleted"
+	// eventAccountHeal reports self-heal: "healed:<accounts>", "halted:<rounds>",
+	// "recovered" after a success, "resumed" by an admin.
+	eventAccountHeal = "account_heal"
 )
 
 func init() {

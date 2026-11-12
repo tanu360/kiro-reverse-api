@@ -109,9 +109,12 @@ func isOverageErrorMessage(msg string) bool {
 
 func isSuspensionErrorMessage(msg string) bool {
 	msg = strings.ToLower(msg)
+	//! Kiro also answers a suspension with a 403 saying it "locked your account"; without
+	//! this match that 403 fell through to the auth case and read as a token problem.
 	return strings.Contains(msg, "temporarily_suspended") ||
 		strings.Contains(msg, "temporarily is suspended") ||
-		strings.Contains(msg, "account suspended")
+		strings.Contains(msg, "account suspended") ||
+		strings.Contains(msg, "locked your account")
 }
 
 func isProfileUnavailableErrorMessage(msg string) bool {
@@ -137,6 +140,13 @@ func isAuthErrorMessage(msg string) bool {
 		strings.Contains(msg, "access token expired") ||
 		strings.Contains(msg, "refresh token expired")
 }
+
+// Ban reasons the proxy writes. Self-heal keys on them: it may lift an auth ban
+// it set itself, never a Kiro suspension.
+const (
+	banReasonSuspended  = "AWS temporarily suspended - unusual user activity detected"
+	banReasonAuthFailed = "Authentication failed - token invalid or expired"
+)
 
 func (h *Handler) disableAccount(account *config.Account, banStatus, banReason string) {
 	if account == nil {
@@ -221,7 +231,7 @@ func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 			h.pool.RecordThrottleError(account.ID, 0)
 		}
 	case isSuspensionErrorMessage(errMsg):
-		h.disableAccount(account, "BANNED", "AWS temporarily suspended - unusual user activity detected")
+		h.disableAccount(account, "BANNED", banReasonSuspended)
 	case isProfileUnavailableErrorMessage(errMsg):
 		h.pool.RecordError(account.ID, false)
 	case isAuthErrorMessage(errMsg) && regionOverrideMismatch(account):
@@ -229,7 +239,7 @@ func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 		logger.Warnf("[AccountFailover] %s failed auth under a region override that does not match it; not disabling it", account.Email)
 		h.pool.RecordError(account.ID, false)
 	case isAuthErrorMessage(errMsg):
-		h.disableAccount(account, "BANNED", "Authentication failed - token invalid or expired")
+		h.disableAccount(account, "BANNED", banReasonAuthFailed)
 	default:
 		h.pool.RecordError(account.ID, false)
 	}
