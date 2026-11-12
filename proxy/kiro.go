@@ -165,6 +165,8 @@ type KiroPayload struct {
 
 	//! Sanitized upstream tool names are mapped back before responses reach the client.
 	ToolNameMap map[string]string `json:"-"`
+	// StructuredOutput routes the request through callKiroStructured (JSON output requests).
+	StructuredOutput *structuredOutputSpec `json:"-"`
 }
 
 type KiroUserInputMessage struct {

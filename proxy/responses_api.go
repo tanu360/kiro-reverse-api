@@ -72,6 +72,7 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)
 	h.applyReasoningEffort(kiroPayload, prepared.OpenAIRequest.Model, prepared.OpenAIRequest.ReasoningEffort)
+	attachStructuredOutput(kiroPayload, prepared.StructuredOutput, prepared.OpenAIRequest.Stream)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, prepared.OpenAIRequest.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())

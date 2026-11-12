@@ -110,6 +110,8 @@ type ClaudeRequest struct {
 	OutputConfig *ClaudeOutputConfig   `json:"output_config,omitempty"`
 	Tools        []ClaudeTool          `json:"tools,omitempty"`
 	ToolChoice   interface{}           `json:"tool_choice,omitempty"`
+	// OutputFormat is the structured-outputs beta alias of output_config.format.
+	OutputFormat json.RawMessage `json:"output_format,omitempty"`
 }
 
 type ClaudeThinkingConfig struct {
@@ -120,6 +122,8 @@ type ClaudeThinkingConfig struct {
 
 type ClaudeOutputConfig struct {
 	Effort string `json:"effort,omitempty"`
+	// Format requests JSON output; see structured_output.go.
+	Format json.RawMessage `json:"format,omitempty"`
 }
 
 // ! Effort is independent of thinking: it is forwarded as-is and never toggles thinking mode.
@@ -1019,6 +1023,8 @@ type OpenAIRequest struct {
 	Tools           []OpenAITool    `json:"tools,omitempty"`
 	ToolChoice      interface{}     `json:"tool_choice,omitempty"`
 	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
+	// ResponseFormat requests JSON output; see structured_output.go.
+	ResponseFormat json.RawMessage `json:"response_format,omitempty"`
 }
 
 type OpenAIMessage struct {

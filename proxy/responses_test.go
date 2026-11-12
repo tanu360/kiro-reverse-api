@@ -97,14 +97,28 @@ func TestResponsesJSONSchemaTextFormatAddsInstruction(t *testing.T) {
 	if msg != "" {
 		t.Fatalf("unexpected validation error: %s", msg)
 	}
-	foundFormatInstruction := false
+	spec := prepared.StructuredOutput
+	if spec == nil || spec.Kind != structuredOutputJSONSchema || spec.Name != "answer" || spec.Schema == nil {
+		t.Fatalf("structured output spec = %#v", spec)
+	}
 	for _, message := range prepared.OpenAIRequest.Messages {
-		if message.Role == "system" && strings.Contains(extractOpenAIMessageText(message.Content), "valid JSON matching this JSON schema") {
-			foundFormatInstruction = true
+		if message.Role == "system" {
+			t.Fatalf("the format must ride on the payload, not a system message: %#v", message)
 		}
 	}
-	if !foundFormatInstruction {
-		t.Fatalf("expected json_schema format instruction, got %#v", prepared.OpenAIRequest.Messages)
+	payload := OpenAIToKiro(&prepared.OpenAIRequest, false)
+	attachStructuredOutput(payload, spec, false)
+	history := payload.ConversationState.History
+	if len(history) != 2 || !strings.Contains(history[0].UserInputMessage.Content, "valid JSON that matches the JSON schema below") ||
+		!strings.Contains(history[0].UserInputMessage.Content, `"answer"`) {
+		t.Fatalf("expected the json_schema instruction in the priming turn, got %#v", history)
+	}
+	if current := payload.ConversationState.CurrentMessage.UserInputMessage.Content; !strings.HasPrefix(current, "return json\n\n") ||
+		!strings.HasSuffix(current, structuredOutputReminder(spec)) {
+		t.Fatalf("current turn = %q, want the reminder after the user text", current)
+	}
+	if payload.StructuredOutput == nil {
+		t.Fatalf("payload must carry the spec for the structured call path")
 	}
 }
 
