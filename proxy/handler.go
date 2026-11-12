@@ -351,13 +351,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 
-	case path == "/v1/messages" || path == "/messages" || path == "/anthropic/v1/messages":
+	case path == "/v1/messages" || path == "/messages" || path == "/anthropic/v1/messages" || path == "/cc/v1/messages":
 		ar := h.authenticateForClaudeRequest(w, r)
 		if ar == nil {
 			return
 		}
 		h.handleClaudeMessages(w, ar)
-	case path == "/v1/messages/count_tokens" || path == "/messages/count_tokens":
+	case path == "/v1/messages/count_tokens" || path == "/messages/count_tokens" || path == "/cc/v1/messages/count_tokens":
 		ar := h.authenticateForClaude(w, r)
 		if ar == nil {
 			return
@@ -401,7 +401,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.handleCodexModels(w, ar)
-	case path == "/api/event_logging/batch":
+	case path == "/api/event_logging/batch" || path == "/cc/api/event_logging/batch":
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write([]byte(`{"status":"ok"}`))
@@ -426,6 +426,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleStats(w, r)
 
 	case strings.HasPrefix(path, "/v1/"):
+		http.Error(w, "Not Found", 404)
+
+	//! /cc is the Claude Code base URL (an alias of /v1, see the cases above); anything else
+	//! under it is an unknown API path, not an admin UI page.
+	case strings.HasPrefix(path, "/cc/"):
 		http.Error(w, "Not Found", 404)
 
 	default:
@@ -855,6 +860,11 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := resolveClaudeThinkingMode(req.Model, req.Thinking, thinkingCfg.Suffix)
+	if n, ok := forwardCountTokens(r, body, thinkingCfg.Suffix); ok {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		json.NewEncoder(w).Encode(map[string]int{"input_tokens": n})
+		return
+	}
 	req.Model = actualModel
 	effectiveReq := cloneClaudeRequestForThinking(&req, thinking)
 
@@ -2499,6 +2509,10 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetProxy(w, r)
 	case path == "/proxy" && r.Method == "POST":
 		h.apiUpdateProxy(w, r)
+	case path == "/count-tokens" && r.Method == "GET":
+		h.apiGetCountTokens(w, r)
+	case path == "/count-tokens" && r.Method == "POST":
+		h.apiUpdateCountTokens(w, r)
 	case path == "/prompt-filter" && r.Method == "GET":
 		h.apiGetPromptFilter(w, r)
 	case path == "/prompt-filter" && r.Method == "POST":

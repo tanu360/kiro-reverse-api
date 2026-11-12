@@ -48,6 +48,7 @@ export const queryKeys = {
     endpoint: () => ["settings", "endpoint"] as const,
     proxy: () => ["settings", "proxy"] as const,
     logRetention: () => ["settings", "log-retention"] as const,
+    countTokens: () => ["settings", "count-tokens"] as const,
     promptFilter: () => ["settings", "prompt-filter"] as const,
   },
   backups: {

@@ -2,6 +2,7 @@ import {
   AiBrain01Icon,
   Alert02Icon,
   ArrowDataTransferHorizontalIcon,
+  CalculatorIcon,
   CloudServerIcon,
   Coins01Icon,
   Database01Icon,
@@ -45,6 +46,12 @@ export const SETTINGS_SECTIONS = [
   },
   { id: "settings-outbound-proxy", titleKey: "proxySettings", icon: GlobalIcon, group: "server" },
   {
+    id: "settings-count-tokens",
+    titleKey: "countTokens.title",
+    icon: CalculatorIcon,
+    group: "server",
+  },
+  {
     id: "settings-prompt-filter",
     titleKey: "promptFilter",
     icon: FilterHorizontalIcon,
@@ -85,6 +92,7 @@ export const SECTION_ID = {
   endpoint: "settings-endpoint",
   adminPassword: "settings-admin-password",
   outboundProxy: "settings-outbound-proxy",
+  countTokens: "settings-count-tokens",
   promptFilter: "settings-prompt-filter",
   logRetention: "settings-log-retention",
   dangerZone: "settings-danger-zone",

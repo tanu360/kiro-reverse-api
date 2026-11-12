@@ -26,12 +26,14 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { countTokensQuery } from "@/lib/api/count-tokens";
 import { proxyQuery, settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsaved";
 import { AdminPasswordCard } from "./sections/admin-password-card";
 import { AutoContinueCard } from "./sections/auto-continue-card";
+import { CountTokensCard } from "./sections/count-tokens-card";
 import { DangerZoneCard } from "./sections/danger-zone-card";
 import { EndpointCard } from "./sections/endpoint-card";
 import { LogRetentionCard } from "./sections/log-retention-card";
@@ -203,6 +205,7 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   const unsaved = useUnsavedChanges();
   const settings = useQuery(settingsQuery()).data;
   const proxy = useQuery(proxyQuery()).data;
+  const countTokens = useQuery(countTokensQuery()).data;
   // A section that is one switch shows its saved state as a pill in its nav row, so the page
   // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
   const switchState: Partial<Record<SectionId, boolean | undefined>> = {
@@ -212,6 +215,7 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
     "settings-auto-continue": settings?.autoContinue,
     "settings-tool-history": settings?.structuredToolHistory,
     "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,
+    "settings-count-tokens": countTokens ? Boolean(countTokens.countTokensApiUrl) : undefined,
   };
   const [active, pin] = useActiveSection(wide ? SPY_OFFSET : SPY_OFFSET + CHIP_ROW_HEIGHT);
   const listRef = useRef<HTMLDivElement>(null);
@@ -383,6 +387,7 @@ function SettingsContent(): JSX.Element {
           <EndpointCard />
           <AdminPasswordCard />
           <OutboundProxyCard />
+          <CountTokensCard />
           <PromptFilterCard />
           <LogRetentionCard />
           <DangerZoneCard />
