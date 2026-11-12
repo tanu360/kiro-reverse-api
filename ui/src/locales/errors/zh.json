@@ -9,6 +9,7 @@
   "serverError.accountNotFound": "未找到账号。",
   "serverError.apiKeyNotFound": "未找到 API Key。",
   "serverError.noAccountIds": "未选择账号。",
+  "serverError.duplicatesChanged": "这些账号已不再互为重复。请重新检查重复账号。",
   "serverError.startUrlRequired": "请填写 Start URL。",
   "serverError.bearerTokenRequired": "请填写 SSO Token。",
   "serverError.refreshTokenRequired": "请填写刷新 Token。",

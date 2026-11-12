@@ -10,6 +10,7 @@ import { FlowNote, FlowSteps, FormField, RegionField, SubmitButton, UrlBox } fro
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { stepFocus, useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
+import { savedTitle } from "../result-toast";
 
 /**
  * IAM Identity Center SSO: start a login, open the URL, then paste the failed 127.0.0.1
@@ -76,7 +77,7 @@ export function IamFlow(): JSX.Element {
     try {
       const res = await completeIamSso({ sessionId: sessions.iamSession, callbackUrl: callback });
       if (!sessions.isCurrent(generation)) return;
-      toast.success(t("success", { name: display(res.account.email, res.account.id) }));
+      toast.success(savedTitle(t, res.account, display(res.account.email, res.account.id)));
       finishAdd([res.account]);
     } catch (error) {
       if (sessions.isCurrent(generation)) {

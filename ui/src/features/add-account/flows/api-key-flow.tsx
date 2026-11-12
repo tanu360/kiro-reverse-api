@@ -61,7 +61,7 @@ export function ApiKeyFlow(): JSX.Element {
         focusAfter(keysRef);
         return;
       }
-      showBatchResult(t, added.length, failures);
+      showBatchResult(t, added, failures);
       finishAdd(added);
     } finally {
       setPending(false);

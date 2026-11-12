@@ -9,6 +9,7 @@
   "serverError.accountNotFound": "Account not found.",
   "serverError.apiKeyNotFound": "API key not found.",
   "serverError.noAccountIds": "No accounts selected.",
+  "serverError.duplicatesChanged": "These accounts are no longer duplicates of each other. Review the duplicates again.",
   "serverError.startUrlRequired": "Enter a start URL.",
   "serverError.bearerTokenRequired": "Enter an SSO token.",
   "serverError.refreshTokenRequired": "Enter a refresh token.",

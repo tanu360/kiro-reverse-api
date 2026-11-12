@@ -17,6 +17,7 @@ import { toast } from "@/lib/toast";
 import { FlowGuide, FormField, GuideLink, ProviderLogo, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
+import { savedTitle } from "../result-toast";
 
 type CookieProvider = "Google" | "Github";
 
@@ -56,7 +57,7 @@ export function CookieFlow(): JSX.Element {
         provider,
       });
       if (!sessions.isCurrent(generation)) return;
-      toast.success(t("success", { name: display(res.account.email, res.account.id) }));
+      toast.success(savedTitle(t, res.account, display(res.account.email, res.account.id)));
       finishAdd([res.account]);
     } catch (caught) {
       if (sessions.isCurrent(generation)) {

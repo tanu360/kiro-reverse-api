@@ -18,6 +18,7 @@ import { toast } from "@/lib/toast";
 import { FlowNote, type FlowStepItem, FlowSteps, FormField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { stepFocus, useFocusAfter } from "../focus";
+import { savedTitle } from "../result-toast";
 
 type Stage = "idle" | "kiro" | "microsoft" | "profile";
 
@@ -86,7 +87,7 @@ export function MicrosoftFlow(): JSX.Element {
     // The server closed the login when it saved the account; there is nothing to cancel.
     sessions.microsoftSessionId = "";
     sessions.microsoftSelectionId = "";
-    toast.success(t("success", { name: display(res.account.email, res.account.id) }));
+    toast.success(savedTitle(t, res.account, display(res.account.email, res.account.id)));
     if (res.warning) {
       const detail = { detail: res.warningDetail };
       toast.warning(serverCodeMessage(res.warningCode, detail, t) ?? res.warning);

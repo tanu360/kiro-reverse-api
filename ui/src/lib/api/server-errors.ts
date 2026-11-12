@@ -15,6 +15,7 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   account_not_found: "errors:serverError.accountNotFound",
   api_key_not_found: "errors:serverError.apiKeyNotFound",
   no_account_ids: "errors:serverError.noAccountIds",
+  duplicates_changed: "errors:serverError.duplicatesChanged",
   not_overage_capable: "errors:serverError.notOverageCapable",
   overage_failed: "errors:serverError.overageFailed",
   models_refresh_failed: "errors:serverError.modelsRefreshFailed",

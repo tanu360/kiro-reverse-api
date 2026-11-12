@@ -78,7 +78,7 @@ export function CredentialsFlow(): JSX.Element {
         focusAfter(jsonRef);
         return;
       }
-      showBatchResult(t, added.length, failures);
+      showBatchResult(t, added, failures);
       finishAdd(added);
     } finally {
       setPending(false);

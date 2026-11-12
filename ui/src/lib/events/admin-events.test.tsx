@@ -256,11 +256,12 @@ describe("change events", () => {
     return invalidate.mock.calls.map(([filters]) => filters?.queryKey);
   }
 
-  it("refetches the account list, status and overview once for a burst of accounts_changed", async () => {
+  it("refetches the account list, duplicates, status and overview once for a burst of accounts_changed", async () => {
     const keys = await invalidatedAfterBurst("accounts_changed", 5);
     // The overview's enabled / available counts follow the accounts, even with no traffic.
     expect(keys).toEqual([
       queryKeys.accounts.list(),
+      queryKeys.accounts.duplicates(),
       queryKeys.status,
       queryKeys.observe.overview(),
     ]);
@@ -300,6 +301,7 @@ describe("change events", () => {
     await advance(CHANGE_DEBOUNCE_MS / 2);
     expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([
       queryKeys.accounts.list(),
+      queryKeys.accounts.duplicates(),
       queryKeys.status,
       queryKeys.observe.overview(),
     ]);
