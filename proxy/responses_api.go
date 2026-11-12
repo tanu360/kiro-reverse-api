@@ -133,6 +133,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
+			traceAttemptStart(ctx, account, "")
 			if err := h.ensureValidTokenContext(ctx, account); err != nil {
 				if ctx.Err() != nil {
 					recordClientDisconnect(ctx, apiKeyReservation, account, model)
@@ -141,7 +142,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(ctx, account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 					continue
@@ -192,7 +193,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(ctx, account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 					continue
@@ -278,6 +279,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
+			traceAttemptStart(ctx, account, "")
 			if err := h.ensureValidTokenContext(ctx, account); err != nil {
 				if ctx.Err() != nil {
 					recordClientDisconnect(ctx, apiKeyReservation, account, model)
@@ -286,7 +288,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(ctx, account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(ctx, totalAttempts)
 					continue
@@ -600,7 +602,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				lastErr = err
 				lastAccount = account
 				h.handleAccountFailure(account, err)
-				recordAttemptError(account, model, 0, err)
+				recordAttemptError(ctx, account, model, 0, err)
 				if !started {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 						retryPlan.waitBeforeRetry(ctx, totalAttempts)

@@ -375,6 +375,7 @@ func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payloa
 	var clientErr *upstreamClientError
 endpointLoop:
 	for epIndex, ep := range endpoints {
+		noteAttemptEndpoint(ctx, ep.Name)
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -464,6 +465,7 @@ endpointLoop:
 
 			body := newIdleTimeoutBody(resp.Body, kiroStreamIdleTimeout)
 			emitted, err := parseEventStreamTracked(body, callback)
+			noteAttemptOutput(ctx, emitted)
 			body.Close()
 			if err == nil {
 				return nil

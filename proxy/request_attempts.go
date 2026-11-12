@@ -1,0 +1,297 @@
+package proxy
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+	"unicode/utf8"
+
+	"kiro-proxy/config"
+)
+
+const (
+	// maxRequestAttempts caps the chain kept on one request row: the first
+	// attempts plus the latest, with the count of the ones dropped between.
+	maxRequestAttempts = 10
+	// maxAttemptMessageBytes caps each failed attempt's error text.
+	maxAttemptMessageBytes = 200
+	// attemptEndpointWebSearch names an MCP web search attempt, which never
+	// goes through a Kiro chat endpoint.
+	attemptEndpointWebSearch = "web_search"
+)
+
+// requestAttempt is one upstream try of a client request, as stored in
+// requests.attempts_json and sent in the request log API. StartMs is the
+// offset from the moment the request arrived.
+type requestAttempt struct {
+	AccountID  string `json:"accountId"`
+	Email      string `json:"email,omitempty"`
+	Endpoint   string `json:"endpoint,omitempty"`
+	StartMs    int64  `json:"startMs"`
+	DurationMs int64  `json:"durationMs"`
+	Success    bool   `json:"success"`
+	Status     int    `json:"status,omitempty"`
+	ErrorType  string `json:"errorType,omitempty"`
+	Message    string `json:"message,omitempty"`
+	// Failover marks a failed attempt that the next one moved to another account.
+	Failover bool `json:"failover,omitempty"`
+	// MidStream marks a failed attempt whose upstream stream had already sent output.
+	MidStream bool `json:"midStream,omitempty"`
+	// Skipped is set on the last attempt only: attempts dropped before it by the cap.
+	Skipped int `json:"skipped,omitempty"`
+}
+
+// attemptChain collects a request's attempts in order. At most one attempt is
+// open; the next start, a failure or the final record closes it. The zero
+// value is ready to use.
+type attemptChain struct {
+	mu      sync.Mutex
+	items   []requestAttempt
+	open    bool
+	openAt  time.Time
+	output  bool
+	skipped int
+	done    bool
+}
+
+func attemptChainFromContext(ctx context.Context) (*requestTrace, *attemptChain) {
+	trace := requestTraceFromContext(ctx)
+	if trace == nil {
+		return nil, nil
+	}
+	return trace, &trace.attempts
+}
+
+// traceAttemptStart opens a new attempt on account. An attempt still open
+// ended without a recorded failure, so it closes as a success (a finished
+// web search round, for example).
+func traceAttemptStart(ctx context.Context, account *config.Account, endpoint string) {
+	trace, c := attemptChainFromContext(ctx)
+	if c == nil {
+		return
+	}
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.done {
+		return
+	}
+	if c.open {
+		c.closeLocked(now, true, 0, "")
+	}
+	accountID, email := accountIdentity(account)
+	next := requestAttempt{
+		AccountID: accountID,
+		Email:     email,
+		Endpoint:  endpoint,
+		StartMs:   offsetMs(trace.startedAt, now),
+	}
+	c.appendLocked(next)
+	c.open = true
+	c.openAt = now
+	c.output = false
+}
+
+// traceAttemptFailed closes the open attempt as failed. Without an open
+// attempt (a call site that never started one) it logs a zero-length one,
+// so the failure still shows in the chain.
+func traceAttemptFailed(ctx context.Context, account *config.Account, status int, err error) {
+	trace, c := attemptChainFromContext(ctx)
+	if c == nil || err == nil {
+		return
+	}
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.done {
+		return
+	}
+	if !c.open {
+		accountID, email := accountIdentity(account)
+		c.appendLocked(requestAttempt{AccountID: accountID, Email: email, StartMs: offsetMs(trace.startedAt, now)})
+		c.open = true
+		c.openAt = now
+		c.output = false
+	}
+	if status == 0 {
+		status = upstreamHTTPStatus(err)
+	}
+	c.closeLocked(now, false, status, err.Error())
+}
+
+// noteAttemptEndpoint records the Kiro endpoint the open attempt is calling.
+func noteAttemptEndpoint(ctx context.Context, name string) {
+	_, c := attemptChainFromContext(ctx)
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.open && !c.done && len(c.items) > 0 {
+		c.items[len(c.items)-1].Endpoint = name
+	}
+}
+
+// noteAttemptOutput records that the open attempt's upstream stream emitted
+// output. It only ever sets the flag: an auto-continue call that fails before
+// output does not undo the output of the call before it.
+func noteAttemptOutput(ctx context.Context, emitted bool) {
+	if !emitted {
+		return
+	}
+	_, c := attemptChainFromContext(ctx)
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.open && !c.done {
+		c.output = true
+	}
+}
+
+// finishAttempts closes any open attempt with the request's final outcome,
+// freezes the chain and returns a copy of it (nil when nothing was tried).
+// Later calls return the same chain.
+func (t *requestTrace) finishAttempts(success bool, status int, message string) []requestAttempt {
+	if t == nil {
+		return nil
+	}
+	c := &t.attempts
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.done {
+		if c.open {
+			c.closeLocked(time.Now(), success, status, message)
+		}
+		if c.skipped > 0 && len(c.items) > 0 {
+			c.items[len(c.items)-1].Skipped = c.skipped
+		}
+		c.done = true
+	}
+	if len(c.items) == 0 {
+		return nil
+	}
+	return append([]requestAttempt(nil), c.items...)
+}
+
+// appendLocked adds an attempt and marks the one before it as a failover when
+// it failed and the new one runs on another account. Past the cap, the newest
+// kept attempt makes room: the chain keeps the first attempts and the latest.
+func (c *attemptChain) appendLocked(next requestAttempt) {
+	if n := len(c.items); n > 0 {
+		prev := &c.items[n-1]
+		//! A web search giving up and the next chat round are different jobs, not a failover.
+		if !prev.Success && prev.AccountID != next.AccountID &&
+			(prev.Endpoint == attemptEndpointWebSearch) == (next.Endpoint == attemptEndpointWebSearch) {
+			prev.Failover = true
+		}
+	}
+	if len(c.items) >= maxRequestAttempts {
+		c.items = c.items[:maxRequestAttempts-1]
+		c.skipped++
+	}
+	c.items = append(c.items, next)
+}
+
+func (c *attemptChain) closeLocked(now time.Time, success bool, status int, message string) {
+	c.open = false
+	if len(c.items) == 0 {
+		return
+	}
+	a := &c.items[len(c.items)-1]
+	a.DurationMs = max(now.Sub(c.openAt).Milliseconds(), 0)
+	a.Success = success
+	if success {
+		return
+	}
+	a.Status = status
+	a.ErrorType = classifyRequestError(false, status, message)
+	a.Message = truncateUTF8(message, maxAttemptMessageBytes)
+	a.MidStream = c.output
+}
+
+func offsetMs(start, now time.Time) int64 {
+	if start.IsZero() {
+		return 0
+	}
+	return max(now.Sub(start).Milliseconds(), 0)
+}
+
+// upstreamHTTPStatus is the HTTP status an attempt's error carries: Kiro's
+// own 4xx, 429 for a quota or throttle, or the "HTTP NNN" in the message
+// (token refresh and Kiro 5xx errors). 0 when there is none, such as a
+// network failure.
+func upstreamHTTPStatus(err error) int {
+	if err == nil {
+		return 0
+	}
+	var client *upstreamClientError
+	if errors.As(err, &client) {
+		return client.status
+	}
+	var quota *upstreamQuotaError
+	if errors.As(err, &quota) {
+		return http.StatusTooManyRequests
+	}
+	msg := err.Error()
+	for i := 0; ; {
+		idx := strings.Index(msg[i:], "HTTP ")
+		if idx < 0 {
+			return 0
+		}
+		start := i + idx + len("HTTP ")
+		end := start
+		for end < len(msg) && end-start < 4 && msg[end] >= '0' && msg[end] <= '9' {
+			end++
+		}
+		if end-start == 3 {
+			if code, convErr := strconv.Atoi(msg[start:end]); convErr == nil && code >= 100 && code <= 599 {
+				return code
+			}
+		}
+		i = start
+	}
+}
+
+// truncateUTF8 cuts s to at most n bytes without splitting a character.
+func truncateUTF8(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
+}
+
+// encodeAttempts is the attempts_json column value: "" for no attempts.
+func encodeAttempts(attempts []requestAttempt) string {
+	if len(attempts) == 0 {
+		return ""
+	}
+	data, err := json.Marshal(attempts)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// decodeAttempts reads attempts_json back. A legacy or damaged value reads as
+// no attempts rather than failing the whole page.
+func decodeAttempts(raw string) []requestAttempt {
+	if raw == "" {
+		return nil
+	}
+	var attempts []requestAttempt
+	if err := json.Unmarshal([]byte(raw), &attempts); err != nil || len(attempts) == 0 {
+		return nil
+	}
+	return attempts
+}

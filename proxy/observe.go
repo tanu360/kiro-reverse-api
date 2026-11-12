@@ -90,6 +90,9 @@ type requestRecord struct {
 	Endpoint     string  `json:"endpoint,omitempty"`
 	DurationMs   int64   `json:"durationMs,omitempty"`
 	ErrorType    string  `json:"errorType,omitempty"`
+
+	// Attempts is the request's upstream attempt chain, oldest first.
+	Attempts []requestAttempt `json:"attempts,omitempty"`
 }
 
 type requestQuery struct {
@@ -328,6 +331,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 		return
 	}
 	errorType := classifyRequestError(success, status, message)
+	attempts := trace.finishAttempts(success, status, message)
 	if len(message) > 500 {
 		message = message[:500]
 	}
@@ -351,6 +355,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 		Endpoint:     trace.endpointName(),
 		DurationMs:   trace.durationMs(),
 		ErrorType:    errorType,
+		Attempts:     attempts,
 	}
 	s.mu.Lock()
 	s.recentRequests[s.recentReqIdx] = rec

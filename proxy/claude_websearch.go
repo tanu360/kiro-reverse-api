@@ -295,13 +295,14 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 		}
 		excluded[account.ID] = true
 		lastAccount = account
+		traceAttemptStart(ctx, account, attemptEndpointWebSearch)
 		if err := h.ensureValidTokenContext(ctx, account); err != nil {
 			if ctx.Err() != nil {
 				return nil, account, ctx.Err()
 			}
 			lastErr = err
 			h.handleAccountFailure(account, err)
-			recordAttemptError(account, model, 0, err)
+			recordAttemptError(ctx, account, model, 0, err)
 			continue
 		}
 		results, err := performKiroWebSearch(ctx, account, query)
@@ -313,7 +314,7 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 		}
 		//! MCP errors never touch account health: its 403 would otherwise ban an account that chats fine.
 		lastErr = err
-		recordAttemptError(account, model, 0, err)
+		recordAttemptError(ctx, account, model, 0, err)
 	}
 	if lastErr == nil {
 		lastErr = errNoWebSearchAccounts
@@ -542,6 +543,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 		}
 		for accountAttempt := 0; accountAttempt < retryPlan.maxPerAccount && totalAttempts < retryPlan.maxPerRequest; accountAttempt++ {
 			totalAttempts++
+			traceAttemptStart(ctx, account, "")
 			round, err := h.callClaudeRound(ctx, account, payload, req.Model, thinking, estimatedInputTokens)
 			if err == nil {
 				h.rememberAccount(payload, account)
@@ -553,7 +555,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 				return nil, account, err
 			}
 			h.handleAccountFailure(account, err)
-			recordAttemptError(account, req.Model, 0, err)
+			recordAttemptError(ctx, account, req.Model, 0, err)
 			if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 				retryPlan.waitBeforeRetry(ctx, totalAttempts)
 				continue
