@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/gif"
@@ -17,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"kiro-proxy/config"
 )
@@ -478,6 +480,163 @@ func TestImageResizeLRUEvictsOldest(t *testing.T) {
 		if _, ok := c.get(key(k)); !ok {
 			t.Fatalf("entry %d was evicted", k)
 		}
+	}
+}
+
+// pngHeaderOnly is a PNG signature and IHDR with no pixel data: DecodeConfig reads
+// it and a full decode fails. It stands in for images too big to build in a test.
+func pngHeaderOnly(w, h int, bitDepth, colorType byte) []byte {
+	chunk := []byte("IHDR")
+	chunk = binary.BigEndian.AppendUint32(chunk, uint32(w))
+	chunk = binary.BigEndian.AppendUint32(chunk, uint32(h))
+	chunk = append(chunk, bitDepth, colorType, 0, 0, 0)
+	out := []byte("\x89PNG\r\n\x1a\n")
+	out = binary.BigEndian.AppendUint32(out, 13)
+	out = append(out, chunk...)
+	return binary.BigEndian.AppendUint32(out, crc32.ChecksumIEEE(chunk))
+}
+
+func TestImageResizeDecodeCostCountsBitDepthAndScaler(t *testing.T) {
+	cost := func(raw []byte) int64 {
+		t.Helper()
+		c, ok := resizeDecodeCost(raw, testResizeLimits)
+		if !ok {
+			t.Fatal("resizeDecodeCost refused a small image")
+		}
+		return c
+	}
+	// 2000x1000 fits in 1568x784: decoded source + scaler buffer (1568 x 1000 x 32 B)
+	// + three 1568x784 RGBA copies.
+	const scaler, outputs = 1568 * 1000 * 32, 1568 * 784 * 4 * 3
+	if got, want := cost(pngHeaderOnly(2000, 1000, 8, 2)), int64(2000*1000*4+scaler+outputs); got != want {
+		t.Fatalf("8-bit RGB cost = %d, want %d", got, want)
+	}
+	for _, colorType := range []byte{0, 2, 6} { // Gray16, RGB64, NRGBA64
+		if got, want := cost(pngHeaderOnly(2000, 1000, 16, colorType)), int64(2000*1000*8+scaler+outputs); got != want {
+			t.Fatalf("16-bit colour type %d cost = %d, want %d (8 B/px)", colorType, got, want)
+		}
+	}
+
+	baseline := encodeTestJPEG(t, image.NewGray(image.Rect(0, 0, 64, 64)), 80)
+	sof := bytes.Index(baseline, []byte{0xFF, 0xC0})
+	if sof < 0 {
+		t.Fatal("no SOF0 marker in the test JPEG")
+	}
+	progressive := bytes.Clone(baseline)
+	progressive[sof+1] = 0xC2
+	if jpegProgressive(baseline) || !jpegProgressive(progressive) {
+		t.Fatal("jpegProgressive misread SOF0/SOF2")
+	}
+	if diff := cost(progressive) - cost(baseline); diff != 64*64*12 {
+		t.Fatalf("progressive JPEG costs %d more, want %d (16 vs 4 B/px)", diff, 64*64*12)
+	}
+}
+
+func TestImageResizeOverMemoryBudgetLeftAsIs(t *testing.T) {
+	imageResizeCache.reset()
+	t.Cleanup(imageResizeCache.reset)
+
+	// 6300x6300 (39.7 MP) is under the pixel cap. 8-bit needs ~481 MiB, under the
+	// budget, so it is decoded (and fails: no pixel data). 16-bit needs ~632 MiB.
+	for _, tc := range []struct {
+		bitDepth byte
+		decodes  int64
+	}{{8, 1}, {16, 0}} {
+		img := testKiroImage("png", pngHeaderOnly(6300, 6300, tc.bitDepth, 2))
+		before := img
+		start := resizeDecodes.Load()
+		if resizeKiroImage(&img, testResizeLimits) || img != before {
+			t.Fatalf("%d-bit header-only PNG changed", tc.bitDepth)
+		}
+		if got := resizeDecodes.Load() - start; got != tc.decodes {
+			t.Fatalf("%d-bit 6300x6300: %d full decodes, want %d", tc.bitDepth, got, tc.decodes)
+		}
+	}
+}
+
+func TestImageResizeCapsFullDecodesPerPayload(t *testing.T) {
+	useDefaultImageResizeForTest(t)
+	strip := func(i int) KiroImage {
+		return testKiroImage("png", encodeTestPNG(t, resizeTestPhoto(2000+i, 200, 7, 0)))
+	}
+	payload := &KiroPayload{}
+	cur := &payload.ConversationState.CurrentMessage.UserInputMessage
+	for i := 0; i <= resizeMaxDecodesPerPayload; i++ {
+		cur.Images = append(cur.Images, strip(i))
+	}
+	last := cur.Images[resizeMaxDecodesPerPayload]
+
+	resizePayloadImages(payload)
+
+	for i, img := range cur.Images[:resizeMaxDecodesPerPayload] {
+		if img.Format != "jpeg" {
+			t.Fatalf("image %d not resized", i)
+		}
+	}
+	if cur.Images[resizeMaxDecodesPerPayload] != last {
+		t.Fatal("the image past the per-request decode cap was resized")
+	}
+
+	// The skipped image was not cached as unchanged: the next request resizes it.
+	next := &KiroPayload{}
+	next.ConversationState.CurrentMessage.UserInputMessage.Images = []KiroImage{last}
+	resizePayloadImages(next)
+	if next.ConversationState.CurrentMessage.UserInputMessage.Images[0].Format != "jpeg" {
+		t.Fatal("the image skipped for the cap was not resized by the next request")
+	}
+
+	// Cache hits do not count against the cap.
+	many := &KiroPayload{}
+	same := strip(0)
+	for i := 0; i <= resizeMaxDecodesPerPayload; i++ {
+		many.ConversationState.CurrentMessage.UserInputMessage.Images = append(many.ConversationState.CurrentMessage.UserInputMessage.Images, same)
+	}
+	resizePayloadImages(many)
+	for i, img := range many.ConversationState.CurrentMessage.UserInputMessage.Images {
+		if img.Format != "jpeg" {
+			t.Fatalf("repeated image %d not resized from the cache", i)
+		}
+	}
+}
+
+func TestMemoryBudgetBoundsWait(t *testing.T) {
+	b := newMemoryBudget(100)
+	if !b.acquire(60, 0) {
+		t.Fatal("first acquire failed")
+	}
+	if b.acquire(60, 10*time.Millisecond) {
+		t.Fatal("acquired past the budget")
+	}
+	got := make(chan bool)
+	go func() { got <- b.acquire(60, 5*time.Second) }()
+	time.Sleep(10 * time.Millisecond)
+	b.release(60)
+	if !<-got {
+		t.Fatal("a waiter was not woken by release")
+	}
+}
+
+func TestImageResizeLeavesImageWhenBudgetStaysFull(t *testing.T) {
+	imageResizeCache.reset()
+	t.Cleanup(imageResizeCache.reset)
+	wait := resizeBudgetWait
+	resizeBudgetWait = 20 * time.Millisecond
+	t.Cleanup(func() { resizeBudgetWait = wait })
+
+	if !resizeBudget.acquire(resizeMemoryBudget, 0) {
+		t.Fatal("the resize budget is not free")
+	}
+	img := testKiroImage("png", wideStripPNG(t))
+	before := img
+	changed := resizeKiroImage(&img, testResizeLimits)
+	resizeBudget.release(resizeMemoryBudget)
+	if changed || img != before {
+		t.Fatal("resized without the memory budget")
+	}
+
+	// Not cached as unchanged: with the budget free it is resized.
+	if !resizeKiroImage(&img, testResizeLimits) {
+		t.Fatal("not resized once the budget was free")
 	}
 }
 

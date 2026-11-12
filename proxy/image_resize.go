@@ -10,7 +10,6 @@ import (
 	_ "image/gif"
 	"image/jpeg"
 	"image/png"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,8 +27,14 @@ import (
 //! re-encoded before the payload goes upstream; everything else costs one header read.
 
 const (
-	// maxResizePixels refuses decompression bombs: a 40 MP RGBA buffer is ~160 MB.
+	// maxResizePixels bounds the CPU time one decode can take (about 1-2 s at 40 MP).
 	maxResizePixels = 40_000_000
+	// resizeMemoryBudget bounds the memory all running decodes hold together, as
+	// resizeDecodeCost estimates it. An image that alone needs more is left as is.
+	resizeMemoryBudget = 512 << 20
+	// resizeMaxDecodesPerPayload caps the full decodes one request can cause; cache
+	// hits do not count. The images after that go upstream as they are.
+	resizeMaxDecodesPerPayload = 8
 	// resizeMinLongSide is the floor for the extra shrink steps that chase the byte limit.
 	resizeMinLongSide = 512
 	resizeShrinkSteps = 4
@@ -66,9 +71,10 @@ func resizePayloadImages(p *KiroPayload) {
 	if !on {
 		return
 	}
+	decodes := resizeMaxDecodesPerPayload
 	cur := &p.ConversationState.CurrentMessage.UserInputMessage
 	for i := range cur.Images {
-		resizeKiroImage(&cur.Images[i], lim)
+		resizeImage(&cur.Images[i], lim, &decodes)
 	}
 	seen := 0
 	history := p.ConversationState.History
@@ -78,7 +84,7 @@ func resizePayloadImages(p *KiroPayload) {
 			continue
 		}
 		for j := len(msg.Images) - 1; j >= 0 && seen < maxHistoryImages; j-- {
-			resizeKiroImage(&msg.Images[j], lim)
+			resizeImage(&msg.Images[j], lim, &decodes)
 			seen++
 		}
 	}
@@ -88,6 +94,14 @@ func resizePayloadImages(p *KiroPayload) {
 // image is over a limit. It reports whether img changed. An image that cannot be
 // decoded, or whose re-encode would not help, is left untouched.
 func resizeKiroImage(img *KiroImage, lim imageResizeLimits) bool {
+	decodes := 1
+	return resizeImage(img, lim, &decodes)
+}
+
+// resizeImage is resizeKiroImage drawing on a request's allowance of full decodes.
+// An image skipped for the allowance or a full memory budget is not cached, so a
+// later request can still resize it.
+func resizeImage(img *KiroImage, lim imageResizeLimits, decodes *int) bool {
 	data := img.Source.Bytes
 	if data == "" {
 		return false
@@ -115,8 +129,23 @@ func resizeKiroImage(img *KiroImage, lim imageResizeLimits) bool {
 		imageResizeCache.put(key, resizeCacheEntry{unchanged: true})
 		return false
 	}
+	cost, ok := resizeDecodeCost(raw, lim)
+	if !ok {
+		imageResizeCache.put(key, resizeCacheEntry{unchanged: true})
+		return false
+	}
+	if *decodes <= 0 {
+		logger.Debugf("[ImageResize] %dx%d %s left as is: %d images already decoded for this request", w, h, img.Format, resizeMaxDecodesPerPayload)
+		return false
+	}
+	*decodes--
 	start := time.Now()
+	if !resizeBudget.acquire(cost, resizeBudgetWait) {
+		logger.Debugf("[ImageResize] %dx%d %s left as is: no memory budget for %d MB after %s", w, h, img.Format, cost>>20, resizeBudgetWait)
+		return false
+	}
 	out, format, ow, oh, ok := downscaleImage(raw, lim)
+	resizeBudget.release(cost)
 	if !ok {
 		logger.Debugf("[ImageResize] %dx%d %s %d KB left as is", w, h, img.Format, len(raw)/1024)
 		imageResizeCache.put(key, resizeCacheEntry{unchanged: true})
@@ -132,33 +161,63 @@ func resizeKiroImage(img *KiroImage, lim imageResizeLimits) bool {
 // resizeDecodes counts full image decodes; tests use it to prove the cache works.
 var resizeDecodes atomic.Int64
 
-// resizeSem bounds concurrent full decodes, and so the memory they hold.
-var resizeSem = make(chan struct{}, max(1, runtime.NumCPU()/2))
+// resizeBudget is shared by every request's full decodes. resizeBudgetWait bounds
+// how long an image waits for it before it goes upstream as is: the translator has
+// no request context, so a cancelled request cannot stop waiting any sooner.
+var (
+	resizeBudget     = newMemoryBudget(resizeMemoryBudget)
+	resizeBudgetWait = 10 * time.Second
+)
+
+// resizeDecodeCost estimates the peak bytes downscaleImage holds for raw: the
+// decoded source, the scaler's buffer of four float64 per destination column and
+// source row, and a few copies of the output. ok is false for a format that is not
+// resized and for an image over maxResizePixels or the whole memory budget.
+func resizeDecodeCost(raw []byte, lim imageResizeLimits) (cost int64, ok bool) {
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
+		return 0, false
+	}
+	switch format {
+	case "png", "jpeg", "gif", "webp":
+	default:
+		return 0, false
+	}
+	sw, sh := int64(cfg.Width), int64(cfg.Height)
+	if sw*sh > maxResizePixels {
+		logger.Debugf("[ImageResize] %dx%d %s is over %d pixels, left as is", sw, sh, format, maxResizePixels)
+		return 0, false
+	}
+	tw, th := fitWithin(cfg.Width, cfg.Height, lim.maxDim)
+	cost = sw*sh*decodedBytesPerPixel(cfg.ColorModel, format, raw) + int64(tw)*sh*32 + int64(tw)*int64(th)*4*3
+	if cost > resizeMemoryBudget {
+		logger.Debugf("[ImageResize] %dx%d %s needs about %d MB to resize, over the %d MB budget, left as is", sw, sh, format, cost>>20, resizeMemoryBudget>>20)
+		return 0, false
+	}
+	return cost, true
+}
+
+// decodedBytesPerPixel is an upper bound on what the decoder allocates per pixel.
+// The PNG decoder reports Gray16 for a 16-bit grey image but returns NRGBA64 when
+// it has a transparent colour; lossless WebP and progressive JPEG keep a second
+// buffer (progressive coefficients are 4 B per sample per component).
+func decodedBytesPerPixel(model color.Model, format string, raw []byte) int64 {
+	switch {
+	case model == color.RGBA64Model, model == color.NRGBA64Model, model == color.Gray16Model, format == "webp":
+		return 8
+	case format == "jpeg" && jpegProgressive(raw):
+		return 16
+	}
+	return 4
+}
 
 // downscaleImage decodes raw (png, jpeg, gif first frame or webp), fits it within
 // lim.maxDim and re-encodes it: PNG when it has real transparency and fits
 // lim.maxBytes, otherwise JPEG on white. ok is false when raw cannot be decoded or
-// the result would be no better than raw.
+// the result would be no better than raw. The caller holds resizeBudget for it.
 func downscaleImage(raw []byte, lim imageResizeLimits) (out []byte, format string, w, h int, ok bool) {
-	cfg, srcFormat, err := image.DecodeConfig(bytes.NewReader(raw))
-	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
-		return nil, "", 0, 0, false
-	}
-	switch srcFormat {
-	case "png", "jpeg", "gif", "webp":
-	default:
-		return nil, "", 0, 0, false
-	}
-	if int64(cfg.Width)*int64(cfg.Height) > maxResizePixels {
-		logger.Debugf("[ImageResize] %dx%d %s is over %d pixels, left as is", cfg.Width, cfg.Height, srcFormat, maxResizePixels)
-		return nil, "", 0, 0, false
-	}
-
-	resizeSem <- struct{}{}
-	defer func() { <-resizeSem }()
-
 	resizeDecodes.Add(1)
-	src, _, err := image.Decode(bytes.NewReader(raw))
+	src, srcFormat, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
 		return nil, "", 0, 0, false
 	}
@@ -308,6 +367,50 @@ func imageHeader(data string) (w, h int, format string, err error) {
 		}
 	}
 	return 0, 0, "", err
+}
+
+// memoryBudget is a semaphore weighted in bytes whose waits are bounded.
+type memoryBudget struct {
+	mu    sync.Mutex
+	free  int64
+	freed chan struct{} // closed and replaced on every release
+}
+
+func newMemoryBudget(size int64) *memoryBudget {
+	return &memoryBudget{free: size, freed: make(chan struct{})}
+}
+
+// acquire takes n bytes, waiting up to wait for running decodes to give them back.
+func (b *memoryBudget) acquire(n int64, wait time.Duration) bool {
+	var timeout <-chan time.Time
+	for {
+		b.mu.Lock()
+		if n <= b.free {
+			b.free -= n
+			b.mu.Unlock()
+			return true
+		}
+		freed := b.freed
+		b.mu.Unlock()
+		if timeout == nil {
+			timer := time.NewTimer(wait)
+			defer timer.Stop()
+			timeout = timer.C
+		}
+		select {
+		case <-freed:
+		case <-timeout:
+			return false
+		}
+	}
+}
+
+func (b *memoryBudget) release(n int64) {
+	b.mu.Lock()
+	b.free += n
+	close(b.freed)
+	b.freed = make(chan struct{})
+	b.mu.Unlock()
 }
 
 type resizeCacheKey struct {

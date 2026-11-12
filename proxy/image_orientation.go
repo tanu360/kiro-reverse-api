@@ -12,21 +12,50 @@ import (
 // jpegOrientation returns the EXIF orientation (1..8) of a JPEG, or 1 when it has
 // none or the block cannot be read.
 func jpegOrientation(raw []byte) int {
+	orientation := 1
+	jpegSegments(raw, func(marker byte, segment []byte) bool {
+		if marker == 0xE1 && len(segment) >= 6 && string(segment[:6]) == "Exif\x00\x00" {
+			if o := exifOrientation(segment[6:]); o != 0 {
+				orientation = o
+			}
+			return false
+		}
+		return true
+	})
+	return orientation
+}
+
+// jpegProgressive reports whether a JPEG's frame header is SOF2 (progressive).
+func jpegProgressive(raw []byte) bool {
+	progressive := false
+	jpegSegments(raw, func(marker byte, _ []byte) bool {
+		if marker == 0xC2 {
+			progressive = true
+			return false
+		}
+		return true
+	})
+	return progressive
+}
+
+// jpegSegments calls fn with each marker segment before the first scan, where the
+// APPn and frame headers all are, until fn returns false or the data ends or breaks.
+func jpegSegments(raw []byte, fn func(marker byte, segment []byte) bool) {
 	if len(raw) < 4 || raw[0] != 0xFF || raw[1] != 0xD8 {
-		return 1
+		return
 	}
 	for i := 2; i+4 <= len(raw); {
 		if raw[i] != 0xFF {
-			return 1
+			return
 		}
 		marker := raw[i+1]
 		if marker == 0xFF { // fill byte
 			i++
 			continue
 		}
-		// Start of scan or end of image: the APPn segments are all before it.
+		// Start of scan or end of image.
 		if marker == 0xDA || marker == 0xD9 {
-			return 1
+			return
 		}
 		if marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7) {
 			i += 2
@@ -34,18 +63,13 @@ func jpegOrientation(raw []byte) int {
 		}
 		size := int(binary.BigEndian.Uint16(raw[i+2 : i+4]))
 		if size < 2 || i+2+size > len(raw) {
-			return 1
+			return
 		}
-		segment := raw[i+4 : i+2+size]
-		if marker == 0xE1 && len(segment) >= 6 && string(segment[:6]) == "Exif\x00\x00" {
-			if o := exifOrientation(segment[6:]); o != 0 {
-				return o
-			}
-			return 1
+		if !fn(marker, raw[i+4:i+2+size]) {
+			return
 		}
 		i += 2 + size
 	}
-	return 1
 }
 
 // exifOrientation reads tag 0x0112 from IFD0 of a TIFF block; 0 when absent.
