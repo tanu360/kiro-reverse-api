@@ -154,6 +154,10 @@ type Config struct {
 
 	ProxyURL string `json:"proxyURL,omitempty"`
 
+	CountTokensApiURL   string `json:"countTokensApiUrl,omitempty"`
+	CountTokensApiKey   string `json:"countTokensApiKey,omitempty"`
+	CountTokensAuthType string `json:"countTokensAuthType,omitempty"`
+
 	AutoContinue    bool `json:"autoContinue,omitempty"`
 	AutoContinueMax int  `json:"autoContinueMax,omitempty"`
 

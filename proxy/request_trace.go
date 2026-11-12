@@ -50,7 +50,7 @@ func (t *requestTrace) endpointName() string {
 
 func requestEndpointForPath(path string) string {
 	switch path {
-	case "/v1/messages", "/messages", "/anthropic/v1/messages":
+	case "/v1/messages", "/messages", "/anthropic/v1/messages", "/cc/v1/messages":
 		return requestEndpointClaude
 	case "/v1/chat/completions", "/chat/completions":
 		return requestEndpointOpenAI
