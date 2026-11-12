@@ -54,6 +54,8 @@ type Account struct {
 	ProxyURL string `json:"proxyURL,omitempty"`
 
 	Weight int `json:"weight,omitempty"`
+	//! Priority orders accounts in the priority routing mode: 0..999, lower first, ties in list order.
+	Priority int `json:"priority,omitempty"`
 
 	OverageStatus     string  `json:"overageStatus,omitempty"`
 	OverageCapability string  `json:"overageCapability,omitempty"`
@@ -147,6 +149,8 @@ type Config struct {
 	LenientStreamIntegrity bool `json:"lenientStreamIntegrity,omitempty"`
 
 	SessionAffinity *bool `json:"sessionAffinity,omitempty"`
+
+	RoutingMode string `json:"routingMode,omitempty"`
 
 	StructuredToolHistory *bool `json:"structuredToolHistory,omitempty"`
 
