@@ -15,6 +15,7 @@ import {
   type ApiKeyUsageTotals,
   apiKeyUsageQuery,
 } from "@/lib/api/api-key-usage";
+import { settingsQuery } from "@/lib/api/settings";
 import { formatCredits, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { placeholderKeys } from "@/lib/utils";
@@ -78,6 +79,7 @@ export function KeyUsageCard(): JSX.Element {
   const [metric, setMetric] = useState<UsageMetric>("requests");
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const query = useQuery(apiKeyUsageQuery(range));
+  const settings = useQuery(settingsQuery());
   const data = query.data;
 
   const rows = useMemo((): Row[] => {
@@ -152,6 +154,9 @@ export function KeyUsageCard(): JSX.Element {
   );
   const onlyKeyless =
     data !== undefined && data.keys.length > 0 && data.keys.every((entry) => entry.kind === "none");
+  // Keyless traffic means the requirement is off, or, with it on, clients that send no key and
+  // get a 401. No hint until the setting has loaded.
+  const requireApiKey = settings.data?.requireApiKey;
 
   const openSheet = (row: Row) => {
     if (!row.identity) return;
@@ -319,8 +324,10 @@ export function KeyUsageCard(): JSX.Element {
             );
           })}
         </ul>
-        {onlyKeyless ? (
-          <p className="text-muted-foreground text-sm">{t("usage.notTracked")}</p>
+        {onlyKeyless && requireApiKey !== undefined ? (
+          <p className="text-muted-foreground text-sm">
+            {t(requireApiKey ? "usage.keylessRejected" : "usage.notTracked")}
+          </p>
         ) : null}
       </div>
     );

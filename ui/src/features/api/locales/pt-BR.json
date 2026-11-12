@@ -85,6 +85,7 @@
   "usage.emptyTitle": "Nenhum uso neste intervalo",
   "usage.emptyBody": "As requisições aparecem aqui quando um cliente chama o proxy.",
   "usage.notTracked": "Estas requisições vieram sem chave de API. Habilite Exigir chave de API para ver o uso por chave.",
+  "usage.keylessRejected": "Estas requisições vieram sem chave de API. Exigir chave de API está habilitado, então o proxy recusa requisições sem chave: verifique se cada cliente envia a sua chave.",
   "usage.loadFailed": "Não foi possível carregar o uso das chaves",
   "usage.view": "Ver uso",
   "usage.open": "Ver uso de {name}",

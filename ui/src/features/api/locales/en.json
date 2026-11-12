@@ -85,6 +85,7 @@
   "usage.emptyTitle": "No usage in this range",
   "usage.emptyBody": "Requests appear here once a client calls the proxy.",
   "usage.notTracked": "These requests came without an API key. Turn on Require an API key to see usage per key.",
+  "usage.keylessRejected": "These requests came without an API key. Require an API key is on, so the proxy rejects keyless requests: check that each client sends its key.",
   "usage.loadFailed": "Could not load key usage",
   "usage.view": "View usage",
   "usage.open": "View usage of {name}",

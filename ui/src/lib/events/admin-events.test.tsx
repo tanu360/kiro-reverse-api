@@ -278,11 +278,13 @@ describe("change events", () => {
     ]);
   });
 
-  it("refetches status, observe and requests on stats_reset", async () => {
+  it("refetches status, observe, requests and the key usage on stats_reset", async () => {
     expect(await invalidatedAfterBurst("stats_reset")).toEqual([
       queryKeys.status,
       queryKeys.observe.all,
       queryKeys.requests.all,
+      // The usage by key sits under the API keys' key.
+      queryKeys.apiKeys.all,
     ]);
   });
 

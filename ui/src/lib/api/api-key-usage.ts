@@ -67,9 +67,9 @@ export function getApiKeyUsage(
 }
 
 /**
- * Under the API keys' key, so a key change (api_keys_changed) refetches it with the names. Not an
- * observe query: SSE ticks leave it alone (a 30-day scan each tick would be wasteful); it polls
- * every 60 s instead, which also picks up a statistics reset.
+ * Under the API keys' key, so a key change (api_keys_changed) or a statistics reset (stats_reset)
+ * refetches it. Not an observe query: SSE ticks leave it alone (a 30-day scan each tick would be
+ * wasteful); it polls every 60 s instead.
  */
 export function apiKeyUsageQuery(range: ApiKeyUsageRange, tzOffset = browserTzOffset()) {
   return queryOptions({

@@ -7,6 +7,7 @@ import type {
   ApiKeyUsageResponse,
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
+import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
@@ -161,6 +162,17 @@ describe("KeyUsageCard", () => {
     renderWithProviders(<KeyUsageCard />);
     const region = await card();
     expect(await within(region).findByText(/Turn on Require an API key/)).toBeInTheDocument();
+  });
+
+  it("points at clients without a key when keys are already required", async () => {
+    mockDb.settings.requireApiKey = true;
+    served = usage([entry("none", "none", { requests: 5, failed: 5 })]);
+    renderWithProviders(<KeyUsageCard />);
+    const region = await card();
+    expect(
+      await within(region).findByText(/Require an API key is on, so the proxy rejects/),
+    ).toBeInTheDocument();
+    expect(within(region).queryByText(/Turn on Require an API key/)).toBeNull();
   });
 
   it("masks emails in key names in privacy mode", async () => {

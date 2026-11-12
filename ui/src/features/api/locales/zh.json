@@ -81,6 +81,7 @@
   "usage.emptyTitle": "此时间范围内没有用量",
   "usage.emptyBody": "客户端调用代理后，请求会显示在这里。",
   "usage.notTracked": "这些请求未携带 API Key。开启“要求 API Key”后即可按 API Key 查看用量。",
+  "usage.keylessRejected": "这些请求未携带 API Key。“要求 API Key”已开启，代理会拒绝未携带 API Key 的请求：请检查各客户端是否发送了 API Key。",
   "usage.loadFailed": "无法加载 API Key 用量",
   "usage.view": "查看用量",
   "usage.open": "查看 {name} 的用量",

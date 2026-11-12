@@ -81,6 +81,7 @@
   "usage.emptyTitle": "Không có mức sử dụng trong khoảng này",
   "usage.emptyBody": "Yêu cầu sẽ hiện ở đây khi có client gọi proxy.",
   "usage.notTracked": "Các yêu cầu này không kèm API key. Bật Bắt buộc API key để xem mức sử dụng theo từng key.",
+  "usage.keylessRejected": "Các yêu cầu này không kèm API key. Bắt buộc API key đang bật nên proxy từ chối các yêu cầu không có key: hãy kiểm tra từng client có gửi key không.",
   "usage.loadFailed": "Không tải được mức sử dụng của key",
   "usage.view": "Xem mức sử dụng",
   "usage.open": "Xem mức sử dụng của {name}",
