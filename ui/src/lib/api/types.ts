@@ -912,6 +912,8 @@ export interface Settings {
   autoContinueMax: number;
   /** default true */
   structuredToolHistory: boolean;
+  /** minutes between background usage sweeps: 0 = off, else 5..1440; default 30 */
+  usageRefreshIntervalMinutes: number;
 }
 export interface SettingsPatch {
   requireApiKey?: boolean;
@@ -924,6 +926,8 @@ export interface SettingsPatch {
   /** integer 1..10 */
   autoContinueMax?: number;
   structuredToolHistory?: boolean;
+  /** integer: 0 (off) or 5..1440 */
+  usageRefreshIntervalMinutes?: number;
 }
 
 export type ThinkingFormat = "reasoning_content" | "thinking" | "think";

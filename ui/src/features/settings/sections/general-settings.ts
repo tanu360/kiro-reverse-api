@@ -25,7 +25,7 @@ export function useGeneralSettingsSave<D>(draft: Draft<D>): {
 }
 
 /** Writes a saved slice into the cached settings, then refetches them. */
-function writeSettingsCache(
+export function writeSettingsCache(
   queryClient: ReturnType<typeof useQueryClient>,
   patch: SettingsPatch,
 ): void {

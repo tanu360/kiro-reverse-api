@@ -1384,6 +1384,7 @@ export function defaultSettings(): Settings {
     autoContinue: false,
     autoContinueMax: 3,
     structuredToolHistory: true,
+    usageRefreshIntervalMinutes: 30,
   };
 }
 

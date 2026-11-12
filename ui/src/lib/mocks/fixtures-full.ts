@@ -2016,6 +2016,7 @@ export function seedFullDataset(now: number): FullDataset {
       autoContinue: true,
       autoContinueMax: 10,
       structuredToolHistory: false,
+      usageRefreshIntervalMinutes: 60,
     },
     thinking: {
       suffix: "-reasoning-extended",
