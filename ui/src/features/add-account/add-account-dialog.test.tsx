@@ -405,6 +405,32 @@ describe("IAM Identity Center", () => {
     });
     expect(onAdded).toHaveBeenCalledWith([lastAccountId()]);
   });
+
+  it("says the login updated the stored account when the server matched one", async () => {
+    mockRefresh();
+    const stored = mockDb.accounts[0];
+    mockServer.use(
+      http.post(apiUrl("/auth/iam-sso/complete"), () =>
+        HttpResponse.json({
+          success: true,
+          account: { id: stored.id, email: stored.email, updated: true },
+        }),
+      ),
+    );
+    const { user } = renderWithProviders(<Harness initialMethod="iam" />);
+    await user.type(
+      await screen.findByRole("textbox", { name: "Start URL" }),
+      "https://acme.awsapps.com/start",
+    );
+    await user.click(screen.getByRole("button", { name: "Start sign-in" }));
+    await user.type(
+      await screen.findByRole("textbox", { name: "Callback URL" }),
+      "http://127.0.0.1/oauth/callback?code=c&state=s",
+    );
+    await user.click(screen.getByRole("button", { name: "Complete sign-in" }));
+    await expectClosed();
+    await expectToast(/^Updated the existing account /);
+  });
 });
 
 describe("SSO token", () => {

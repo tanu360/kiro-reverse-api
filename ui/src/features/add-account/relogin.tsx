@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { useFlow } from "./flow-context";
+import { savedTitle } from "./result-toast";
 
 interface FinishedLogin {
   account: AddedAccountRef;
@@ -41,7 +42,8 @@ export function useReloginFlow(): ReloginFlow {
     (res: FinishedLogin) => {
       const name = display(res.account.email, res.account.id);
       if (!relogin) {
-        toast.success(t("success", { name }));
+        // A login of an account already stored updates it instead of adding a copy.
+        toast.success(savedTitle(t, res.account, name));
         return;
       }
       toast.success(t("relogin.success", { name }), {
