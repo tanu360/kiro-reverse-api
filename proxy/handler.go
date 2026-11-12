@@ -2450,6 +2450,10 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/full") && r.Method == "GET":
 		id := strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/full")
 		h.apiGetAccountFull(w, r, id)
+	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/relogin/confirm") && r.Method == "POST":
+		h.apiConfirmRelogin(w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/relogin/confirm"))
+	case strings.HasPrefix(path, "/accounts/") && strings.HasSuffix(path, "/relogin/discard") && r.Method == "POST":
+		h.apiDiscardRelogin(w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/accounts/"), "/relogin/discard"))
 	case strings.HasPrefix(path, "/accounts/") && r.Method == "DELETE":
 		h.apiDeleteAccount(w, r, strings.TrimPrefix(path, "/accounts/"))
 	case strings.HasPrefix(path, "/accounts/") && r.Method == "PUT":
@@ -3057,6 +3061,8 @@ func (h *Handler) apiStartIamSso(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		StartUrl string `json:"startUrl"`
 		Region   string `json:"region"`
+
+		ReloginAccountID string `json:"reloginAccountId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
@@ -3073,17 +3079,26 @@ func (h *Handler) apiStartIamSso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.ReloginAccountID != "" && !reloginTargetOK(w, req.ReloginAccountID) {
+		return
+	}
+
 	sessionID, authorizeUrl, expiresIn, err := auth.StartIamSsoLogin(req.StartUrl, region)
 	if err != nil {
 		writeAdminErr(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"sessionId":    sessionID,
 		"authorizeUrl": authorizeUrl,
 		"expiresIn":    expiresIn,
-	})
+	}
+	if req.ReloginAccountID != "" {
+		reloginSessions.bind(sessionID, req.ReloginAccountID)
+		response["reloginAccountId"] = req.ReloginAccountID
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
@@ -3118,6 +3133,12 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 		MachineId:    config.GenerateMachineId(),
 	}
 
+	if target := reloginSessions.target(req.SessionID); target != "" {
+		reloginSessions.forget(req.SessionID)
+		h.writeRelogin(w, r, target, account, nil)
+		return
+	}
+
 	if err := config.AddAccount(account); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -3137,11 +3158,16 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) apiStartBuilderIdLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Region string `json:"region"`
+
+		ReloginAccountID string `json:"reloginAccountId"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	region, err := config.NormalizeAWSRegion(req.Region)
 	if err != nil {
 		writeAdminErr(w, http.StatusBadRequest, err, "")
+		return
+	}
+	if req.ReloginAccountID != "" && !reloginTargetOK(w, req.ReloginAccountID) {
 		return
 	}
 
@@ -3151,12 +3177,17 @@ func (h *Handler) apiStartBuilderIdLogin(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"sessionId":       session.ID,
 		"userCode":        session.UserCode,
 		"verificationUri": session.VerificationUri,
 		"interval":        session.Interval,
-	})
+	}
+	if req.ReloginAccountID != "" {
+		reloginSessions.bind(session.ID, req.ReloginAccountID)
+		response["reloginAccountId"] = req.ReloginAccountID
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
@@ -3209,6 +3240,12 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 		MachineId:    config.GenerateMachineId(),
 	}
 
+	if target := reloginSessions.target(req.SessionID); target != "" {
+		reloginSessions.forget(req.SessionID)
+		h.writeRelogin(w, r, target, account, map[string]interface{}{"completed": true})
+		return
+	}
+
 	if err := config.AddAccount(account); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -3230,9 +3267,14 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		BearerToken string `json:"bearerToken"`
 		Region      string `json:"region"`
+
+		ReloginAccountID string `json:"reloginAccountId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
+		return
+	}
+	if req.ReloginAccountID != "" && !reloginTargetOK(w, req.ReloginAccountID) {
 		return
 	}
 
@@ -3248,6 +3290,9 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 	req.Region = region
 
 	tokens := strings.Split(strings.TrimSpace(req.BearerToken), "\n")
+	if req.ReloginAccountID != "" && !reloginSingleCredential(w, tokens) {
+		return
+	}
 	var imported []map[string]interface{}
 	var errors []string
 
@@ -3277,6 +3322,11 @@ func (h *Handler) apiImportSsoToken(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt:    time.Now().Unix() + int64(expiresIn),
 			Enabled:      true,
 			MachineId:    config.GenerateMachineId(),
+		}
+
+		if req.ReloginAccountID != "" {
+			h.writeRelogin(w, r, req.ReloginAccountID, account, nil)
+			return
 		}
 
 		if err := config.AddAccount(account); err != nil {
@@ -3326,9 +3376,14 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		TokenEndpoint string `json:"tokenEndpoint"`
 		IssuerURL     string `json:"issuerUrl"`
 		Scopes        string `json:"scopes"`
+
+		ReloginAccountID string `json:"reloginAccountId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
+		return
+	}
+	if req.ReloginAccountID != "" && !reloginTargetOK(w, req.ReloginAccountID) {
 		return
 	}
 
@@ -3342,7 +3397,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		req.KiroApiKey = req.AccessToken
 	}
 	if req.KiroApiKey != "" {
-		h.importKiroAPIKeyAccount(w, config.Account{
+		h.importKiroAPIKeyAccountFor(w, r, req.ReloginAccountID, config.Account{
 			ID:         auth.GenerateAccountID(),
 			Email:      strings.TrimSpace(req.Email),
 			Nickname:   strings.TrimSpace(req.Nickname),
@@ -3460,6 +3515,11 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		TokenEndpoint: tempAccount.TokenEndpoint,
 		IssuerURL:     tempAccount.IssuerURL,
 		Scopes:        tempAccount.Scopes,
+	}
+
+	if req.ReloginAccountID != "" {
+		h.writeRelogin(w, r, req.ReloginAccountID, account, nil)
+		return
 	}
 
 	if config.IsExternalIdpAccount(&account) {
