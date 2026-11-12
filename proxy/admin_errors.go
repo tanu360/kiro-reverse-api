@@ -43,6 +43,7 @@ const (
 	codeAutoContinueMaxRange    = "auto_continue_max_range"
 	codePasswordTooShort        = "password_too_short"
 	codeInvalidEndpoint         = "invalid_endpoint"
+	codeInvalidAPIDomain        = "invalid_api_domain"
 	codeProxyURLScheme          = "proxy_url_scheme"
 	codeAPIKeyEmpty             = "api_key_empty"
 	codeAPIKeyExists            = "api_key_exists"

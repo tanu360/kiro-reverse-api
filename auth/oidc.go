@@ -54,7 +54,7 @@ func RefreshTokenContext(ctx context.Context, account *config.Account) (string, 
 	if account.AuthMethod == "social" {
 		return refreshSocialToken(ctx, account.RefreshToken, client)
 	}
-	return refreshOIDCToken(ctx, account.RefreshToken, account.ClientID, account.ClientSecret, account.Region, client)
+	return refreshOIDCToken(ctx, account.RefreshToken, account.ClientID, account.ClientSecret, oidcRefreshRegion(account), client)
 }
 
 func refreshOIDCToken(ctx context.Context, refreshToken, clientID, clientSecret, region string, client *http.Client) (string, string, int64, string, error) {

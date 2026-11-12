@@ -2498,6 +2498,10 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetEndpointConfig(w, r)
 	case path == "/endpoint" && r.Method == "POST":
 		h.apiUpdateEndpointConfig(w, r)
+	case path == "/upstream" && r.Method == "GET":
+		h.apiGetUpstreamConfig(w, r)
+	case path == "/upstream" && r.Method == "POST":
+		h.apiUpdateUpstreamConfig(w, r)
 	case path == "/proxy" && r.Method == "GET":
 		h.apiGetProxy(w, r)
 	case path == "/proxy" && r.Method == "POST":
