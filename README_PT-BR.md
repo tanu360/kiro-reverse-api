@@ -248,6 +248,20 @@ docker run -d \
   ghcr.io/tanu360/kiro-reverse-api:latest
 ```
 
+### 📦 Baixar um binário
+
+Cada [release](https://github.com/tanu360/kiro-reverse-api/releases) traz um binário pronto para Linux, macOS e Windows em amd64 e arm64, com a UI de administração embutida. Não é preciso Go, Node.js nem Docker.
+
+```bash
+# Troque linux_amd64 pela sua plataforma: linux_arm64, darwin_amd64 ou darwin_arm64
+curl -LO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy_linux_amd64.tar.gz
+tar -xzf kiro-proxy_linux_amd64.tar.gz
+cd kiro-proxy_linux_amd64
+./kiro-proxy
+```
+
+No Windows, baixe `kiro-proxy_windows_amd64.zip` (ou `_arm64`), extraia e execute `kiro-proxy.exe` em um terminal. O banco de dados é criado na pasta atual; defina `DATA_DIR` para guardá-lo em outro lugar. O `SHA256SUMS.txt` da release lista o checksum de cada arquivo: confira um download com `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Os binários não são assinados: se o macOS bloquear a execução, rode `xattr -d com.apple.quarantine kiro-proxy`; o SmartScreen do Windows pode pedir confirmação na primeira execução.
+
 ### 🛠 Compilar a partir do código-fonte
 
 ```bash

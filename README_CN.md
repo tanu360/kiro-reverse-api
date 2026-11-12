@@ -248,6 +248,20 @@ docker run -d \
   ghcr.io/tanu360/kiro-reverse-api:latest
 ```
 
+### 📦 下载预编译二进制
+
+每个 [Release](https://github.com/tanu360/kiro-reverse-api/releases) 都附带可直接运行的 Linux、macOS 和 Windows 二进制文件（amd64 与 arm64），已内置管理面板，无需安装 Go、Node.js 或 Docker。
+
+```bash
+# 将 linux_amd64 换成你的平台：linux_arm64、darwin_amd64 或 darwin_arm64
+curl -LO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy_linux_amd64.tar.gz
+tar -xzf kiro-proxy_linux_amd64.tar.gz
+cd kiro-proxy_linux_amd64
+./kiro-proxy
+```
+
+Windows 用户请下载 `kiro-proxy_windows_amd64.zip`（或 `_arm64`），解压后在终端中运行 `kiro-proxy.exe`。数据库默认创建在当前目录，可通过 `DATA_DIR` 存放到其他位置。Release 中的 `SHA256SUMS.txt` 列出了每个压缩包的校验值，可用 `sha256sum -c SHA256SUMS.txt --ignore-missing` 校验下载的文件（macOS：`shasum -a 256 -c SHA256SUMS.txt --ignore-missing`）。二进制文件未签名：如果 macOS 阻止运行，请执行 `xattr -d com.apple.quarantine kiro-proxy`；Windows SmartScreen 可能在首次运行前要求确认。
+
 ### 🛠 源码编译
 
 ```bash
