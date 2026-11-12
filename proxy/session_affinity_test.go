@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"kiro-proxy/config"
 	"kiro-proxy/pool"
@@ -111,19 +112,19 @@ func TestPickAccountKeepsConversationOnServingAccount(t *testing.T) {
 	h := affinityTestHandler(t, "aff-a", "aff-b", "aff-c")
 	convA := payloadFor("conversation-a")
 
-	first := h.pickAccount(convA, "", nil)
+	first := h.pickAccount(context.Background(), convA, "", nil)
 	if first == nil {
 		t.Fatal("no account picked")
 	}
 	h.rememberAccount(convA, first)
 
 	for turn := 0; turn < 5; turn++ {
-		if acc := h.pickAccount(convA, "", nil); acc == nil || acc.ID != first.ID {
+		if acc := h.pickAccount(context.Background(), convA, "", nil); acc == nil || acc.ID != first.ID {
 			t.Fatalf("turn %d went to %v, want %s", turn, acc, first.ID)
 		}
 	}
 
-	other := h.pickAccount(payloadFor("conversation-b"), "", nil)
+	other := h.pickAccount(context.Background(), payloadFor("conversation-b"), "", nil)
 	if other == nil || other.ID == first.ID {
 		t.Fatalf("new conversation landed on %v; rotation should move past %s", other, first.ID)
 	}
@@ -136,9 +137,9 @@ func TestPickAccountRotatesWhenAffinityDisabled(t *testing.T) {
 	}
 	conv := payloadFor("conversation")
 
-	first := h.pickAccount(conv, "", nil)
+	first := h.pickAccount(context.Background(), conv, "", nil)
 	h.rememberAccount(conv, first)
-	second := h.pickAccount(conv, "", nil)
+	second := h.pickAccount(context.Background(), conv, "", nil)
 	if first.ID == second.ID {
 		t.Fatalf("affinity off but both turns went to %s", first.ID)
 	}
@@ -154,7 +155,7 @@ func TestPickAccountFailsOverAndRebinds(t *testing.T) {
 	conv := payloadFor("conversation")
 	h.affinity.Bind(affinityKey(conv), "aff-a")
 
-	retry := h.pickAccount(conv, "", map[string]bool{"aff-a": true})
+	retry := h.pickAccount(context.Background(), conv, "", map[string]bool{"aff-a": true})
 	if retry == nil || retry.ID != "aff-b" {
 		t.Fatalf("retry went to %v, want aff-b", retry)
 	}

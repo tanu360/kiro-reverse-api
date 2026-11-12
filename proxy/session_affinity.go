@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"sync"
@@ -94,13 +95,14 @@ func affinityKey(payload *KiroPayload) string {
 
 // pickAccount chooses the account for one attempt. With affinity on, a
 // follow-up turn returns to the account that served the conversation last, as
-// long as that account can still serve; otherwise round-robin decides.
-func (h *Handler) pickAccount(payload *KiroPayload, model string, excluded map[string]bool) *config.Account {
+// long as that account can still serve; otherwise round-robin decides. A
+// client key bound to some accounts (ctx) only ever gets one of those.
+func (h *Handler) pickAccount(ctx context.Context, payload *KiroPayload, model string, excluded map[string]bool) *config.Account {
 	preferred := ""
 	if config.GetSessionAffinity() {
 		preferred = h.affinity.Lookup(affinityKey(payload))
 	}
-	account := h.pool.GetPreferredForModelExcluding(preferred, model, excluded)
+	account := h.pool.GetPreferredForModelAllowed(preferred, model, excluded, allowedAccountsFromContext(ctx))
 	//! A move off the bound account costs the conversation its prompt cache; log it so a cache-miss spike can be traced.
 	if preferred != "" && account != nil && account.ID != preferred {
 		logger.Debugf("[SessionAffinity] Bound account %s unavailable, conversation moved to %s", preferred, account.Email)

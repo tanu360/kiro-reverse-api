@@ -289,7 +289,7 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 	var lastErr error
 	var lastAccount *config.Account
 	for attempt := 0; attempt < newRequestRetryPlan().maxPerRequest; attempt++ {
-		account := h.pool.GetNextForModelExcluding(model, excluded)
+		account := h.pool.GetNextForModelAllowed(model, excluded, allowedAccountsFromContext(ctx))
 		if account == nil {
 			break
 		}
@@ -536,7 +536,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
 	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
-		account := h.pickAccount(payload, req.Model, excluded)
+		account := h.pickAccount(ctx, payload, req.Model, excluded)
 		if account == nil {
 			break
 		}
