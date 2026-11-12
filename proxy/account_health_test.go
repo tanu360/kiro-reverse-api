@@ -140,9 +140,11 @@ func TestSelfHealClearsThrottleButKeepsQuotaCooldown(t *testing.T) {
 		config.Account{ID: "cool-quota", Enabled: true, AccessToken: "t", NextResetDate: "2099-01-01"},
 	)
 	t.Cleanup(func() { p.RecordSuccess("cool-quota") })
+	//! One async save at a time: a row only its own save can write proves that save
+	//! is done, so none outlives the test and races the next one's database reset.
 	p.RecordThrottleError("cool-throttle", 0)
-	p.RecordQuotaError("cool-quota", 0)
 	waitForCooldownSaved(t, "cool-throttle")
+	p.RecordQuotaError("cool-quota", 0)
 	waitForCooldownSaved(t, "cool-quota")
 	if p.GetNext() != nil {
 		t.Fatal("setup: both accounts must be cooling")
@@ -442,6 +444,66 @@ func TestAccountHealthAPIGetPatchValidateResume(t *testing.T) {
 	}
 	if got := events(); len(got) != 1 || got[0] != "resumed" {
 		t.Fatalf("events = %v, want [resumed]", got)
+	}
+}
+
+func TestSelfHealLiftsAHaltACapRaisedElsewhere(t *testing.T) {
+	p := setupHealTest(t, authBanned("restore-a"))
+	halted := config.SelfHealState{Rounds: 5, Halted: true, HaltedAt: 1}
+	if err := config.SaveSelfHealState(halted); err != nil {
+		t.Fatal(err)
+	}
+	//! A config backup restore raises the cap without the settings API.
+	ten := 10
+	if err := config.UpdateSelfHealSettings(nil, nil, &ten); err != nil {
+		t.Fatal(err)
+	}
+	if newSelfHealer().snapshot().Halted {
+		t.Fatal("the state read reports a halt the cap no longer justifies")
+	}
+	if saved, err := config.LoadSelfHealState(); err != nil || saved.Halted {
+		t.Fatalf("saved state after the read = %+v, %v; want the halt lifted", saved, err)
+	}
+
+	if err := config.SaveSelfHealState(halted); err != nil {
+		t.Fatal(err)
+	}
+	events := healEvents(t)
+	s := newTestHealer()
+	if !s.try(p) {
+		t.Fatal("a raised cap did not let the heal run")
+	}
+	if st := s.snapshot(); st.Halted || st.HaltedAt != 0 || st.Rounds != 6 {
+		t.Fatalf("state after heal = %+v, want no halt and 6 rounds", st)
+	}
+	if got := events(); strings.Join(got, ",") != "resumed,healed:1" {
+		t.Fatalf("events = %v, want resumed then healed:1", got)
+	}
+}
+
+func TestAdminDisableKeepsAuthBannedAccountOff(t *testing.T) {
+	p := setupHealTest(t, authBanned("off-one"), authBanned("off-batch"), authBanned("still-banned"),
+		config.Account{ID: "off-suspended", AccessToken: "t", BanStatus: "BANNED", BanReason: banReasonSuspended})
+	h := &Handler{pool: p}
+	rec := httptest.NewRecorder()
+	h.apiUpdateAccount(rec, httptest.NewRequest(http.MethodPut, "/admin/api/accounts/off-one", strings.NewReader(`{"enabled":false}`)), "off-one")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disable status %d: %s", rec.Code, rec.Body.String())
+	}
+	h.batchSetEnabled(httptest.NewRecorder(), []string{"off-batch", "off-suspended"}, false)
+
+	for _, id := range []string{"off-one", "off-batch"} {
+		if got := storedHealAccount(t, id); got.Enabled || got.BanStatus != "DISABLED" {
+			t.Fatalf("%s after an admin disable: enabled=%v ban=%q, want DISABLED", id, got.Enabled, got.BanStatus)
+		}
+	}
+	if got := storedHealAccount(t, "off-suspended"); got.BanStatus != "BANNED" || got.BanReason != banReasonSuspended {
+		t.Fatalf("an admin disable rewrote a Kiro suspension: %+v", got)
+	}
+	now := time.Now()
+	banned, _, ok := planSelfHeal(config.GetAccounts(), p.HealView(now), now)
+	if !ok || len(banned) != 1 || banned[0] != "still-banned" {
+		t.Fatalf("plan = %v ok %v, want only still-banned", banned, ok)
 	}
 }
 

@@ -2715,6 +2715,9 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 			existing.SilentReason = ""
 			existing.SilentTime = 0
 		}
+		if !v {
+			keepOffForAdmin(existing)
+		}
 	}
 	if v, ok := updates["nickname"].(string); ok {
 		existing.Nickname = v
@@ -2950,6 +2953,8 @@ func (h *Handler) batchSetEnabled(w http.ResponseWriter, ids []string, enabled b
 			a.Silent = false
 			a.SilentReason = ""
 			a.SilentTime = 0
+		} else {
+			keepOffForAdmin(&a)
 		}
 		if err := config.UpdateAccount(a.ID, a); err != nil {
 			results[slots[i]].fail(err)

@@ -110,6 +110,7 @@ func (s *selfHealer) try(p *pool.AccountPool) bool {
 	if s.state.Halted && capReached {
 		return false
 	}
+	s.liftStaleHaltLocked(maxRounds)
 	now := s.now()
 	//! A heal time in the future (the clock went back) restarts the interval from now
 	//! instead of blocking healing until the clock catches up.
@@ -207,13 +208,20 @@ func (s *selfHealer) settingsChanged() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.loadLocked()
-	maxRounds := config.GetSelfHealMaxRounds()
+	s.liftStaleHaltLocked(config.GetSelfHealMaxRounds())
+}
+
+// liftStaleHaltLocked lifts a halt the round cap no longer justifies. The cap
+// can rise outside the settings API too (a config backup restore), so the heal
+// path and the state read check it as well.
+func (s *selfHealer) liftStaleHaltLocked(maxRounds int) {
 	if !s.state.Halted || (maxRounds > 0 && s.state.Rounds >= maxRounds) {
 		return
 	}
 	s.state.Halted = false
 	s.state.HaltedAt = 0
 	s.persistLocked()
+	logger.Infof("[SelfHeal] Round cap is now %s; self-heal resumed", roundsLabel(maxRounds))
 	publishEvent(eventAccountHeal, "resumed")
 }
 
@@ -221,5 +229,15 @@ func (s *selfHealer) snapshot() config.SelfHealState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.loadLocked()
+	s.liftStaleHaltLocked(config.GetSelfHealMaxRounds())
 	return s.state
+}
+
+// keepOffForAdmin turns a proxy auth ban into the admin's own disable when an
+// admin switches the account off, so self-heal leaves it off. Other bans keep
+// their status: self-heal never lifts them.
+func keepOffForAdmin(acc *config.Account) {
+	if acc.BanStatus == "BANNED" && acc.BanReason == banReasonAuthFailed {
+		acc.BanStatus = "DISABLED"
+	}
 }
