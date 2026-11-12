@@ -59,8 +59,8 @@ export interface AlertsConfig {
 
 /**
  * A channel in a POST. With the `id` of a saved channel of the same type, a blank `url`,
- * `botToken` or `secret` keeps the saved value; without an id (or with an unknown one) the
- * channel is created.
+ * `botToken` or `secret` keeps the saved value, and `clearSecret` removes the saved signing
+ * secret instead; without an id (or with an unknown one) the channel is created.
  */
 export interface AlertChannelInput {
   id?: string;
@@ -71,6 +71,7 @@ export interface AlertChannelInput {
   botToken?: string;
   chatId?: string;
   secret?: string;
+  clearSecret?: boolean;
 }
 
 /** Patch semantics; `channels`, when sent, is the whole new list (a missing channel is deleted). */

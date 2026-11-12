@@ -67,11 +67,13 @@
   "botTokenInvalid": "A bot token looks like 123456:ABC-DEF.",
   "chatId": "Chat ID",
   "chatIdHint": "A user, group or channel ID, or @channelname. Message the bot once first.",
+  "chatIdInvalid": "Enter a chat ID or @channelname, with no spaces.",
   "signingSecret": "Signing secret",
   "signingSecretHint": "Optional. Each request then carries {header} with the body's HMAC-SHA256.",
   "secretKeep": "Saved. Leave blank to keep it.",
+  "removeSecret": "Remove the saved secret",
   "enabled": "Send alerts to this channel",
   "required": "Required.",
   "urlInvalid": "Enter an http:// or https:// URL.",
-  "nameTooLong": "Use at most {max} characters."
+  "tooLong": "Use at most {max} characters."
 }

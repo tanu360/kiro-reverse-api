@@ -11,6 +11,10 @@ export const COOLDOWN_MIN = 1;
 export const COOLDOWN_MAX = 1440;
 export const MAX_CHANNELS = 20;
 export const NAME_MAX = 64;
+/** The server's caps on a channel's fields (proxy/alerts_api.go), in UTF-8 bytes. */
+export const URL_MAX = 2048;
+export const SECRET_MAX = 256;
+export const CHAT_ID_MAX = 64;
 
 export type ThresholdParse = { ok: true; values: number[] } | { ok: false };
 
@@ -82,7 +86,10 @@ export function invalidRulesFields(form: RulesForm): RulesField[] {
   return invalid;
 }
 
-/** A channel being added or edited. Secrets start blank: the server never sends them. */
+/**
+ * A channel being added or edited. Secrets start blank: the server never sends them.
+ * `clearSecret` removes the saved signing secret, which a blank `secret` would keep.
+ */
 export interface ChannelDraft {
   id?: string;
   type: AlertChannelType;
@@ -92,10 +99,20 @@ export interface ChannelDraft {
   botToken: string;
   chatId: string;
   secret: string;
+  clearSecret: boolean;
 }
 
 export function newChannelDraft(type: AlertChannelType = "webhook"): ChannelDraft {
-  return { type, name: "", enabled: true, url: "", botToken: "", chatId: "", secret: "" };
+  return {
+    type,
+    name: "",
+    enabled: true,
+    url: "",
+    botToken: "",
+    chatId: "",
+    secret: "",
+    clearSecret: false,
+  };
 }
 
 export function channelDraft(channel: AlertChannel): ChannelDraft {
@@ -108,14 +125,28 @@ export function channelDraft(channel: AlertChannel): ChannelDraft {
     botToken: "",
     chatId: channel.chatId ?? "",
     secret: "",
+    clearSecret: false,
   };
 }
 
-export type ChannelField = "name" | "url" | "botToken" | "chatId";
-export type ChannelProblem = "required" | "urlInvalid" | "nameTooLong" | "botTokenInvalid";
+export type ChannelField = "name" | "url" | "botToken" | "chatId" | "secret";
+export type ChannelProblem =
+  | "required"
+  | "urlInvalid"
+  | "urlTooLong"
+  | "nameTooLong"
+  | "botTokenInvalid"
+  | "chatIdInvalid"
+  | "secretTooLong";
 export type ChannelErrors = Partial<Record<ChannelField, ChannelProblem>>;
 
 const TELEGRAM_TOKEN = /^\d+:[A-Za-z0-9_-]+$/;
+const WHITESPACE = /[ \t\r\n]/;
+
+/** The server counts these caps in UTF-8 bytes, not characters. */
+function byteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
+}
 
 export function isHttpUrl(value: string): boolean {
   try {
@@ -137,14 +168,42 @@ export function validateChannelDraft(draft: ChannelDraft, saved?: AlertChannel):
   if (draft.type === "telegram") {
     const token = draft.botToken.trim();
     if (!token && !(sameType && saved.botTokenSet)) errors.botToken = "required";
-    else if (token && !TELEGRAM_TOKEN.test(token)) errors.botToken = "botTokenInvalid";
-    if (!draft.chatId.trim()) errors.chatId = "required";
+    else if (token && (byteLength(token) > SECRET_MAX || !TELEGRAM_TOKEN.test(token))) {
+      errors.botToken = "botTokenInvalid";
+    }
+    const chatId = draft.chatId.trim();
+    if (!chatId) errors.chatId = "required";
+    else if (byteLength(chatId) > CHAT_ID_MAX || WHITESPACE.test(chatId)) {
+      errors.chatId = "chatIdInvalid";
+    }
   } else {
     const url = draft.url.trim();
     if (!url && !(sameType && saved.urlSet)) errors.url = "required";
+    else if (url && byteLength(url) > URL_MAX) errors.url = "urlTooLong";
     else if (url && !isHttpUrl(url)) errors.url = "urlInvalid";
+    if (draft.type === "webhook" && byteLength(draft.secret.trim()) > SECRET_MAX) {
+      errors.secret = "secretTooLong";
+    }
   }
   return errors;
+}
+
+/** What each field's own rule is called, for a server error the checks above did not catch. */
+const FIELD_PROBLEM: Record<ChannelField, ChannelProblem> = {
+  name: "nameTooLong",
+  url: "urlInvalid",
+  botToken: "botTokenInvalid",
+  chatId: "chatIdInvalid",
+  secret: "secretTooLong",
+};
+
+/**
+ * The problem to show for a field the server rejected: "required" when the field is blank (the
+ * saved value it relied on is gone), else that field's own rule, never "required" under a field
+ * that is filled in.
+ */
+export function serverChannelProblem(field: ChannelField, draft: ChannelDraft): ChannelProblem {
+  return validateChannelDraft(draft)[field] ?? FIELD_PROBLEM[field];
 }
 
 /** The saved channels as a POST sends them back: secrets blank, so the server keeps them. */
@@ -171,7 +230,10 @@ export function draftInput(draft: ChannelDraft): AlertChannelInput {
     input.chatId = draft.chatId.trim();
   } else {
     if (draft.url.trim()) input.url = draft.url.trim();
-    if (draft.type === "webhook" && draft.secret.trim()) input.secret = draft.secret.trim();
+    if (draft.type === "webhook") {
+      if (draft.secret.trim()) input.secret = draft.secret.trim();
+      else if (draft.clearSecret) input.clearSecret = true;
+    }
   }
   return input;
 }

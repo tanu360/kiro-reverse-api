@@ -23,6 +23,7 @@ import {
 } from "@/components/shared/settings-rows";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -85,7 +86,10 @@ import {
   type RulesField,
   type RulesForm,
   rulesForm,
+  SECRET_MAX,
+  serverChannelProblem,
   toChannelInputs,
+  URL_MAX,
   validateChannelDraft,
   withDraft,
 } from "./alerts-model";
@@ -144,7 +148,13 @@ function isRulesField(field: string | undefined): field is RulesField {
 }
 
 function isChannelField(field: string | undefined): field is ChannelField {
-  return field === "name" || field === "url" || field === "botToken" || field === "chatId";
+  return (
+    field === "name" ||
+    field === "url" ||
+    field === "botToken" ||
+    field === "chatId" ||
+    field === "secret"
+  );
 }
 
 function channelLabel(channel: { name: string; type: AlertChannelType }, t: TFunction): string {
@@ -235,8 +245,12 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
   const closeEditor = () => setEditor((prev) => ({ ...prev, open: false }));
 
   const channels = useMutation({
-    mutationFn: (vars: { inputs: AlertChannelInput[]; index: number; removedId?: string }) =>
-      updateAlerts({ channels: vars.inputs }),
+    mutationFn: (vars: {
+      inputs: AlertChannelInput[];
+      index: number;
+      draft?: ChannelDraft;
+      removedId?: string;
+    }) => updateAlerts({ channels: vars.inputs }),
     onSuccess: (data, vars) => {
       queryClient.setQueryData(alertsQueryKey, data);
       toast.success(vars.removedId ? t("channelRemoved") : t("channelSaved"));
@@ -244,9 +258,9 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
     },
     onError: (error, vars) => {
       const { code, field, index } = alertErrorFields(error);
-      if (!vars.removedId && code === "alert_channel_invalid" && index === vars.index) {
+      if (vars.draft && code === "alert_channel_invalid" && index === vars.index) {
         if (isChannelField(field)) {
-          setServerErrors({ [field]: field === "name" ? "nameTooLong" : "required" });
+          setServerErrors({ [field]: serverChannelProblem(field, vars.draft) });
           return;
         }
       }
@@ -256,7 +270,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
 
   const saveDraft = (next: ChannelDraft) => {
     const { inputs, index } = withDraft(config.channels, next);
-    channels.mutate({ inputs, index });
+    channels.mutate({ inputs, index, draft: next });
   };
 
   const onRemove = async (channel: AlertChannel) => {
@@ -636,17 +650,23 @@ function problemText(problem: ChannelProblem, t: TFunction): string {
       return t("required");
     case "urlInvalid":
       return t("urlInvalid");
+    case "urlTooLong":
+      return t("tooLong", { max: URL_MAX });
     case "nameTooLong":
-      return t("nameTooLong", { max: NAME_MAX });
+      return t("tooLong", { max: NAME_MAX });
     case "botTokenInvalid":
       return t("botTokenInvalid");
+    case "chatIdInvalid":
+      return t("chatIdInvalid");
+    case "secretTooLong":
+      return t("tooLong", { max: SECRET_MAX });
   }
 }
 
 /**
  * The add/edit form. Saved secrets are never sent to the browser: their fields start blank, say
- * so in their placeholder, and a blank one keeps the saved value. Changing the type asks for the
- * new type's secrets.
+ * so in their placeholder, and a blank one keeps the saved value. A saved signing secret can also
+ * be removed. Changing the type asks for the new type's secrets.
  */
 function ChannelEditor({
   saved,
@@ -778,18 +798,34 @@ function ChannelEditor({
           )}
 
           {draft.type === "webhook" ? (
-            <Field className="min-w-0 items-stretch">
-              <FieldLabel>{t("signingSecret")}</FieldLabel>
-              <PasswordInput
-                autoComplete="new-password"
-                onChange={(secret) => update({ secret })}
-                placeholder={keepHint(saved?.secretSet)}
-                value={draft.secret}
-              />
-              <FieldDescription>
-                {fillNodes(t("signingSecretHint"), { header: <Code>{SIGNATURE_HEADER}</Code> })}
-              </FieldDescription>
-            </Field>
+            <div className="flex min-w-0 flex-col gap-2">
+              <Field className="min-w-0 items-stretch" invalid={shown.secret !== undefined}>
+                <FieldLabel>{t("signingSecret")}</FieldLabel>
+                <PasswordInput
+                  autoComplete="new-password"
+                  disabled={draft.clearSecret}
+                  onChange={(secret) => update({ secret })}
+                  placeholder={draft.clearSecret ? undefined : keepHint(saved?.secretSet)}
+                  value={draft.secret}
+                />
+                <FieldDescription>
+                  {fillNodes(t("signingSecretHint"), { header: <Code>{SIGNATURE_HEADER}</Code> })}
+                </FieldDescription>
+                {error("secret")}
+              </Field>
+              {/* Outside the Field: a second control inside it would take the field's label. */}
+              {sameType && saved?.secretSet ? (
+                <Label className="self-start" variant="option">
+                  <Checkbox
+                    checked={draft.clearSecret}
+                    onCheckedChange={(checked) =>
+                      update({ clearSecret: checked === true, secret: "" })
+                    }
+                  />
+                  {t("removeSecret")}
+                </Label>
+              ) : null}
+            </div>
           ) : null}
 
           <div className="flex items-center justify-between gap-4">

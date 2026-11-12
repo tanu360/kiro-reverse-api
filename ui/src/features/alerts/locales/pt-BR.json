@@ -67,11 +67,13 @@
   "botTokenInvalid": "Um token de bot tem o formato 123456:ABC-DEF.",
   "chatId": "ID do chat",
   "chatIdHint": "O ID de um usuário, grupo ou canal, ou @nomedocanal. Envie uma mensagem ao bot antes.",
+  "chatIdInvalid": "Informe um ID do chat ou @nomedocanal, sem espaços.",
   "signingSecret": "Segredo de assinatura",
   "signingSecretHint": "Opcional. Com ele, cada requisição leva {header} com o HMAC-SHA256 do corpo.",
   "secretKeep": "Salvo. Deixe em branco para manter.",
+  "removeSecret": "Remover o segredo salvo",
   "enabled": "Enviar alertas para este canal",
   "required": "Obrigatório.",
   "urlInvalid": "Informe uma URL http:// ou https://.",
-  "nameTooLong": "Use no máximo {max} caracteres."
+  "tooLong": "Use no máximo {max} caracteres."
 }

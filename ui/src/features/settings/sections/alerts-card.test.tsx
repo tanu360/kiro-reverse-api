@@ -137,6 +137,81 @@ describe("AlertsCard", () => {
     expect(screen.getByText("No alert sent yet.")).toBeInTheDocument();
   });
 
+  it("removes a saved signing secret from the dialog", async () => {
+    const { user } = await renderCard();
+    await user.click(screen.getByRole("button", { name: "Add channel" }));
+    let dialog = await screen.findByRole("dialog", { name: "Add channel" });
+    // A new channel has no saved secret to remove.
+    expect(within(dialog).queryByRole("checkbox", { name: "Remove the saved secret" })).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Name"), "Receiver");
+    await user.type(within(dialog).getByLabelText("Webhook URL"), "https://hooks.example.com/x");
+    await user.type(within(dialog).getByLabelText("Signing secret"), "s3cret");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Add channel" })).not.toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Edit Receiver" }));
+    dialog = await screen.findByRole("dialog", { name: "Edit channel" });
+    const secret = within(dialog).getByLabelText("Signing secret");
+    expect(secret).toHaveAttribute("placeholder", "Saved. Leave blank to keep it.");
+    recorded = [];
+    await user.click(within(dialog).getByRole("checkbox", { name: "Remove the saved secret" }));
+    expect(secret).toBeDisabled();
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Edit channel" })).not.toBeInTheDocument(),
+    );
+    const sent = await writes();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.body).toEqual({
+      channels: [
+        {
+          id: expect.stringMatching(/^ch_/),
+          type: "webhook",
+          name: "Receiver",
+          enabled: true,
+          clearSecret: true,
+        },
+      ],
+    });
+
+    // Saved without a secret: nothing is left to keep or remove.
+    await user.click(screen.getByRole("button", { name: "Edit Receiver" }));
+    dialog = await screen.findByRole("dialog", { name: "Edit channel" });
+    expect(within(dialog).getByLabelText("Signing secret")).not.toHaveAttribute("placeholder");
+    expect(within(dialog).queryByRole("checkbox", { name: "Remove the saved secret" })).not.toBeInTheDocument();
+  });
+
+  it("names a field the server rejected by its own rule, not as required", async () => {
+    mockServer.use(
+      http.post(apiUrl("/alerts"), () =>
+        HttpResponse.json(
+          {
+            error: "chatId must be a chat id",
+            code: "alert_channel_invalid",
+            field: "chatId",
+            index: 0,
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    const { user } = await renderCard();
+    await user.click(screen.getByRole("button", { name: "Add channel" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add channel" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Type" }));
+    await user.click(await screen.findByRole("option", { name: "Telegram" }));
+    await user.type(within(dialog).getByLabelText("Bot token"), "123456:ABC-DEF");
+    await user.type(within(dialog).getByLabelText("Chat ID"), "@ops");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(
+      await within(dialog).findByText("Enter a chat ID or @channelname, with no spaces."),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText("Required.")).not.toBeInTheDocument();
+  });
+
   it("sends a test and shows the result on the row", async () => {
     const { user } = await renderCard();
     await user.click(screen.getByRole("button", { name: "Add channel" }));

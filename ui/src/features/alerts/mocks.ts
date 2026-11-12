@@ -127,12 +127,14 @@ function mergeChannels(inputs: AlertChannelInput[]): StoredChannel[] | Response 
           : "",
       chatId: input.type === "telegram" ? (input.chatId ?? "").trim() : "",
       secret:
-        input.type === "webhook" ? (input.secret ?? "").trim() || (keep ? prev.secret : "") : "",
+        input.type === "webhook"
+          ? (input.secret ?? "").trim() || (keep && !input.clearSecret ? prev.secret : "")
+          : "",
       lastResult: prev?.lastResult ?? null,
     };
     if (channel.type === "telegram") {
       if (!/^\d+:[A-Za-z0-9_-]+$/.test(channel.botToken)) return channelError(index, "botToken");
-      if (!channel.chatId) return channelError(index, "chatId");
+      if (!channel.chatId || /\s/.test(channel.chatId)) return channelError(index, "chatId");
     } else if (!/^https?:\/\/[^/]+/.test(channel.url)) {
       return channelError(index, "url");
     }

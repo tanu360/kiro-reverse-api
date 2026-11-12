@@ -65,11 +65,13 @@
   "botTokenInvalid": "Bot token có dạng 123456:ABC-DEF.",
   "chatId": "Chat ID",
   "chatIdHint": "ID của người dùng, nhóm hoặc kênh, hoặc @tenkenh. Hãy nhắn cho bot một lần trước.",
+  "chatIdInvalid": "Nhập Chat ID hoặc @tenkenh, không có khoảng trắng.",
   "signingSecret": "Khóa ký",
   "signingSecretHint": "Không bắt buộc. Khi có, mỗi yêu cầu kèm {header} chứa HMAC-SHA256 của nội dung.",
   "secretKeep": "Đã lưu. Để trống để giữ nguyên.",
+  "removeSecret": "Xóa khóa ký đã lưu",
   "enabled": "Gửi cảnh báo tới kênh này",
   "required": "Bắt buộc.",
   "urlInvalid": "Nhập URL bắt đầu bằng http:// hoặc https://.",
-  "nameTooLong": "Tối đa {max} ký tự."
+  "tooLong": "Tối đa {max} ký tự."
 }

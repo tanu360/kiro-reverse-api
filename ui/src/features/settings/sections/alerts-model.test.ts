@@ -6,6 +6,7 @@ import {
   newChannelDraft,
   parseThresholds,
   type RulesForm,
+  serverChannelProblem,
   toChannelInputs,
   validateChannelDraft,
   withDraft,
@@ -102,6 +103,44 @@ describe("validateChannelDraft", () => {
     const draft = { ...newChannelDraft(), url: "https://example.com", name: "x".repeat(65) };
     expect(validateChannelDraft(draft)).toEqual({ name: "nameTooLong" });
   });
+
+  it("checks what the server checks: chat ID spaces and the URL and secret caps", () => {
+    const telegram = { ...newChannelDraft("telegram"), botToken: "123:abc" };
+    expect(validateChannelDraft({ ...telegram, chatId: "my group" })).toEqual({
+      chatId: "chatIdInvalid",
+    });
+    expect(validateChannelDraft({ ...telegram, chatId: "x".repeat(65) })).toEqual({
+      chatId: "chatIdInvalid",
+    });
+    expect(validateChannelDraft({ ...telegram, chatId: " @ops " })).toEqual({});
+    const long = `https://example.com/${"a".repeat(2048)}`;
+    expect(validateChannelDraft({ ...newChannelDraft("discord"), url: long })).toEqual({
+      url: "urlTooLong",
+    });
+    expect(
+      validateChannelDraft({
+        ...newChannelDraft("webhook"),
+        url: "https://example.com",
+        secret: "é".repeat(129),
+      }),
+    ).toEqual({ secret: "secretTooLong" });
+  });
+});
+
+describe("serverChannelProblem", () => {
+  it("says required only for a blank field, else that field's rule", () => {
+    const draft = { ...newChannelDraft("telegram"), botToken: "123:abc", chatId: "@ops" };
+    expect(serverChannelProblem("chatId", draft)).toBe("chatIdInvalid");
+    expect(serverChannelProblem("chatId", { ...draft, chatId: "" })).toBe("required");
+    expect(serverChannelProblem("botToken", { ...draft, botToken: "" })).toBe("required");
+    const saved = channelDraft(channel());
+    expect(serverChannelProblem("url", saved)).toBe("required");
+    expect(serverChannelProblem("url", { ...saved, url: "https://ok.example.com" })).toBe(
+      "urlInvalid",
+    );
+    expect(serverChannelProblem("name", saved)).toBe("nameTooLong");
+    expect(serverChannelProblem("secret", saved)).toBe("secretTooLong");
+  });
 });
 
 describe("channel inputs", () => {
@@ -143,6 +182,31 @@ describe("channel inputs", () => {
       url: "https://hooks.example.com/a",
       secret: "s3cret",
     });
+  });
+
+  it("asks to remove a saved signing secret only while no new one is typed", () => {
+    const saved = [channel()];
+    const cleared = withDraft(saved, { ...channelDraft(channel()), clearSecret: true });
+    expect(cleared.inputs[0]).toEqual({
+      id: "ch_1",
+      type: "webhook",
+      name: "Ops",
+      enabled: true,
+      clearSecret: true,
+    });
+    const replaced = withDraft(saved, {
+      ...channelDraft(channel()),
+      clearSecret: true,
+      secret: "new",
+    });
+    expect(replaced.inputs[0]).toMatchObject({ secret: "new" });
+    expect(replaced.inputs[0]).not.toHaveProperty("clearSecret");
+    const retyped = withDraft(saved, {
+      ...channelDraft(channel()),
+      type: "slack",
+      clearSecret: true,
+    });
+    expect(retyped.inputs[0]).not.toHaveProperty("clearSecret");
   });
 
   it("leaves out the fields of other types", () => {
