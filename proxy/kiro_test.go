@@ -10,6 +10,7 @@ import (
 	"kiro-proxy/config"
 	"net/http"
 	"net/url"
+	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -212,19 +213,16 @@ func TestBuildKiroTransportUsesExplicitProxyURL(t *testing.T) {
 	assertProxyURL(t, got, "http://proxy.local:8080")
 }
 
+// net/http reads the proxy environment once per process, so any earlier test that sends a
+// request through http.ProxyFromEnvironment freezes it. Check the hook itself instead.
 func TestBuildKiroTransportFallsBackToEnvironmentProxy(t *testing.T) {
-	t.Setenv("HTTPS_PROXY", "http://env-proxy.local:2323")
-	t.Setenv("NO_PROXY", "")
-	t.Setenv("no_proxy", "")
-
 	transport := buildKiroTransport("")
-	req := &http.Request{URL: mustParseURL(t, "https://q.us-east-1.amazonaws.com")}
-
-	got, err := transport.Proxy(req)
-	if err != nil {
-		t.Fatalf("unexpected proxy error: %v", err)
+	if transport.Proxy == nil {
+		t.Fatal("expected the environment proxy hook, got nil")
 	}
-	assertProxyURL(t, got, "http://env-proxy.local:2323")
+	if reflect.ValueOf(transport.Proxy).Pointer() != reflect.ValueOf(http.ProxyFromEnvironment).Pointer() {
+		t.Fatal("expected http.ProxyFromEnvironment as the proxy hook")
+	}
 }
 
 func TestInitKiroHttpClientKeepsShortRestTimeout(t *testing.T) {
