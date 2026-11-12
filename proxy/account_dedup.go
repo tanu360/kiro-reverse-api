@@ -197,6 +197,8 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 		logger.Warnf("[Accounts] Merged duplicates into %s, but could not move their request history: %v", kept.ID, err)
 	}
 	logger.Infof("[Accounts] Merged %d duplicate account(s) into %s", len(removeIDs), kept.ID)
+	//! The merge moves keys bound to a removed copy onto the kept account; open key lists refetch.
+	publishEvent(eventAPIKeysChanged, kept.ID)
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":       true,

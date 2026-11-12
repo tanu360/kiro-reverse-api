@@ -446,3 +446,37 @@ func TestMergeAccountsTakesFreshestSameMethodToken(t *testing.T) {
 		}
 	})
 }
+
+func TestMergeAccountsMovesBoundApiKeysToTheKeeper(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		for _, id := range []string{"keep", "copy", "other"} {
+			if err := AddAccount(Account{ID: id, Email: id + "@example.com", RefreshToken: "rt-" + id, AuthMethod: "social", Provider: "Google", Enabled: true}); err != nil {
+				t.Fatalf("seed %s: %v", id, err)
+			}
+		}
+		onCopy, err := AddApiKey(ApiKeyEntry{Key: "sk-on-copy", Enabled: true, AccountIDs: []string{"copy", "other"}})
+		if err != nil {
+			t.Fatalf("add key: %v", err)
+		}
+		onBoth, err := AddApiKey(ApiKeyEntry{Key: "sk-on-both", Enabled: true, AccountIDs: []string{"keep", "copy"}})
+		if err != nil {
+			t.Fatalf("add key: %v", err)
+		}
+		unbound, err := AddApiKey(ApiKeyEntry{Key: "sk-unbound", Enabled: true})
+		if err != nil {
+			t.Fatalf("add key: %v", err)
+		}
+		if _, err := MergeAccounts("keep", []string{"copy"}, AccountCounters{}); err != nil {
+			t.Fatalf("merge: %v", err)
+		}
+		if got := GetApiKeyEntry(onCopy.ID).AccountIDs; !reflect.DeepEqual(got, []string{"keep", "other"}) {
+			t.Fatalf("key bound to the removed copy = %v, want [keep other]", got)
+		}
+		if got := GetApiKeyEntry(onBoth.ID).AccountIDs; !reflect.DeepEqual(got, []string{"keep"}) {
+			t.Fatalf("key bound to both = %v, want [keep]", got)
+		}
+		if got := GetApiKeyEntry(unbound.ID).AccountIDs; len(got) != 0 {
+			t.Fatalf("unbound key = %v, want every account", got)
+		}
+	})
+}

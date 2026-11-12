@@ -86,6 +86,78 @@ func normalizeApiKeyAccountIDsLocked(ids, previous []string, credIDs map[string]
 	return out, nil
 }
 
+// repointApiKeyAccountsLocked moves every key bound to a removed account onto
+// keepID, keeping the list order and dropping the duplicate when the key
+// already lists keepID. It returns the changed keys' previous lists by index,
+// for a rollback, or nil when no key changed. Caller holds cfgLock for writing.
+func repointApiKeyAccountsLocked(keepID string, removeIDs []string) map[int][]string {
+	remove := make(map[string]bool, len(removeIDs))
+	for _, id := range removeIDs {
+		if id != "" && id != keepID {
+			remove[id] = true
+		}
+	}
+	var previous map[int][]string
+	for i := range cfg.ApiKeys {
+		ids := cfg.ApiKeys[i].AccountIDs
+		hit := false
+		for _, id := range ids {
+			if remove[id] {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			continue
+		}
+		seen := make(map[string]bool, len(ids))
+		next := make([]string, 0, len(ids))
+		for _, id := range ids {
+			if remove[id] {
+				id = keepID
+			}
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			next = append(next, id)
+		}
+		if previous == nil {
+			previous = make(map[int][]string)
+		}
+		previous[i] = ids
+		cfg.ApiKeys[i].AccountIDs = next
+	}
+	return previous
+}
+
+// restoreApiKeyAccountsLocked undoes repointApiKeyAccountsLocked after a failed
+// save. Caller holds cfgLock for writing.
+func restoreApiKeyAccountsLocked(previous map[int][]string) {
+	for i, ids := range previous {
+		cfg.ApiKeys[i].AccountIDs = ids
+	}
+}
+
+// RepointApiKeyAccounts is repointApiKeyAccountsLocked with its own lock and
+// save, for a merge done in the credentials store.
+func RepointApiKeyAccounts(keepID string, removeIDs []string) error {
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	if cfg == nil {
+		return errors.New("config not initialized")
+	}
+	previous := repointApiKeyAccountsLocked(keepID, removeIDs)
+	if previous == nil {
+		return nil
+	}
+	if err := Save(); err != nil {
+		restoreApiKeyAccountsLocked(previous)
+		return err
+	}
+	return nil
+}
+
 func validateApiKeyCallLimit(limit int64) error {
 	if limit < 0 {
 		return ErrCallLimitNegative
