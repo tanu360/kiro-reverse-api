@@ -68,7 +68,7 @@
   "modelMappings.rowActions": "Mapping {n} actions",
   "modelMappings.filter": "Filter mappings",
   "modelMappings.noMatches": "No mapping matches “{filter}”.",
-  "modelMappings.matchHint": "Matches when this text appears anywhere in the client's model name, in any case. Rules run top to bottom; the first match wins.",
+  "modelMappings.matchHint": "Matches when this text appears anywhere in the client's model name, in any case. A model Kiro serves itself is only redirected by a rule with its full name. Rules run top to bottom; the first match wins.",
   "modelMappings.targetHint": "The Kiro model ID the request uses instead.",
   "modelMappings.apply": "Apply",
   "modelMappings.resetNote": "An empty list is not kept after a restart. The proxy then uses the defaults.",

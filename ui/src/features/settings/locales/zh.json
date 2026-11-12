@@ -67,7 +67,7 @@
   "modelMappings.rowActions": "映射 {n} 的操作",
   "modelMappings.filter": "筛选映射",
   "modelMappings.noMatches": "没有与“{filter}”匹配的映射。",
-  "modelMappings.matchHint": "客户端模型名称中任意位置包含此文本（不区分大小写）即匹配。规则从上到下执行，先匹配者生效。",
+  "modelMappings.matchHint": "客户端模型名称中任意位置包含此文本（不区分大小写）即匹配。Kiro 自身提供的模型只有在规则填写其完整名称时才会被重定向。规则从上到下执行，先匹配者生效。",
   "modelMappings.targetHint": "请求改用的 Kiro 模型 ID。",
   "modelMappings.apply": "应用",
   "modelMappings.resetNote": "空列表在重启后不会保留，代理会改用默认映射。",
