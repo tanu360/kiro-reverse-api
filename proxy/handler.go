@@ -11,7 +11,6 @@ import (
 	"io"
 	"kiro-proxy/auth"
 	"kiro-proxy/config"
-	"kiro-proxy/db"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
 	"net/http"
@@ -252,6 +251,7 @@ func NewHandler() *Handler {
 
 	go h.backgroundBackupScheduler()
 	go h.backgroundCooldownSaver()
+	go h.backgroundLogRetention()
 	return h
 }
 
@@ -2484,6 +2484,10 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiGetStats(w, r)
 	case path == "/stats/reset" && r.Method == "POST":
 		h.apiResetStats(w, r)
+	case path == "/log-retention" && r.Method == "GET":
+		h.apiGetLogRetention(w, r)
+	case path == "/log-retention" && r.Method == "POST":
+		h.apiUpdateLogRetention(w, r)
 	case path == "/generate-machine-id" && r.Method == "GET":
 		h.apiGenerateMachineId(w, r)
 	case path == "/thinking" && r.Method == "GET":
@@ -3718,9 +3722,8 @@ func (h *Handler) apiGetStats(w http.ResponseWriter, _ *http.Request) {
 func (h *Handler) apiResetStats(w http.ResponseWriter, _ *http.Request) {
 	config.UpdateStats(0, 0, 0, 0, 0)
 	getObserveStore().Reset()
-	if d, err := db.Get(); err == nil {
-		_, _ = d.Exec(`DELETE FROM requests`)
-		_, _ = d.Exec(`DELETE FROM errors`)
+	if err := resetRequestLog(); err != nil {
+		logger.Warnf("[Stats] Failed to clear the request log: %v", err)
 	}
 	publishEvent(eventStatsReset, "")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})

@@ -56,18 +56,42 @@ func queryPersistedRequestStats() (persistedRequestStats, error) {
 		return persistedRequestStats{}, err
 	}
 
+	//! One statement over the logs and the rollups of the rows log retention
+	//! pruned: it reads one snapshot, so a prune between two reads can neither
+	//! count a row twice nor miss it.
 	var stats persistedRequestStats
 	err = d.QueryRow(`SELECT
-COUNT(*),
-COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0),
-COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0),
-COALESCE(SUM(total_tokens), 0),
-COALESCE(SUM(credits), 0),
-COALESCE(SUM(CASE WHEN success = 1 THEN total_tokens ELSE 0 END), 0),
-COALESCE(SUM(CASE WHEN success = 1 THEN in_tokens ELSE 0 END), 0),
-COALESCE(SUM(CASE WHEN success = 1 THEN out_tokens ELSE 0 END), 0),
-COALESCE(SUM(CASE WHEN success = 1 THEN credits ELSE 0 END), 0)
-FROM requests`).Scan(
+r.total + a.total,
+r.ok + a.ok,
+r.failed + a.failed,
+r.tokens + a.tokens,
+r.credits + a.credits,
+r.ok_tokens + a.ok_tokens,
+r.ok_in + a.ok_in,
+r.ok_out + a.ok_out,
+r.ok_credits + a.ok_credits,
+(SELECT COUNT(*) FROM errors) + (SELECT COALESCE(SUM(error_count), 0) FROM error_rollup)
+FROM (SELECT
+COUNT(*) AS total,
+COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0) AS ok,
+COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0) AS failed,
+COALESCE(SUM(total_tokens), 0) AS tokens,
+COALESCE(SUM(credits), 0) AS credits,
+COALESCE(SUM(CASE WHEN success = 1 THEN total_tokens ELSE 0 END), 0) AS ok_tokens,
+COALESCE(SUM(CASE WHEN success = 1 THEN in_tokens ELSE 0 END), 0) AS ok_in,
+COALESCE(SUM(CASE WHEN success = 1 THEN out_tokens ELSE 0 END), 0) AS ok_out,
+COALESCE(SUM(CASE WHEN success = 1 THEN credits ELSE 0 END), 0) AS ok_credits
+FROM requests) r, (SELECT
+COALESCE(SUM(request_count), 0) AS total,
+COALESCE(SUM(CASE WHEN success = 1 THEN request_count ELSE 0 END), 0) AS ok,
+COALESCE(SUM(CASE WHEN success = 0 THEN request_count ELSE 0 END), 0) AS failed,
+COALESCE(SUM(total_tokens), 0) AS tokens,
+COALESCE(SUM(credits), 0) AS credits,
+COALESCE(SUM(CASE WHEN success = 1 THEN total_tokens ELSE 0 END), 0) AS ok_tokens,
+COALESCE(SUM(CASE WHEN success = 1 THEN in_tokens ELSE 0 END), 0) AS ok_in,
+COALESCE(SUM(CASE WHEN success = 1 THEN out_tokens ELSE 0 END), 0) AS ok_out,
+COALESCE(SUM(CASE WHEN success = 1 THEN credits ELSE 0 END), 0) AS ok_credits
+FROM request_rollup) a`).Scan(
 		&stats.TotalRequests,
 		&stats.SuccessRequests,
 		&stats.FailedRequests,
@@ -77,11 +101,8 @@ FROM requests`).Scan(
 		&stats.SuccessInTokens,
 		&stats.SuccessOutTokens,
 		&stats.SuccessCredits,
+		&stats.TotalErrorEvents,
 	)
-	if err != nil {
-		return stats, err
-	}
-	err = d.QueryRow(`SELECT COUNT(*) FROM errors`).Scan(&stats.TotalErrorEvents)
 	return stats, err
 }
 
@@ -294,18 +315,26 @@ FROM requests WHERE ts >= ? GROUP BY m, account_id`, sinceMin*60)
 // loadModelStatsFromDB sums the logged requests and retries per model, up to
 // and including the given row ids, so the model mix covers everything since
 // the last stats reset. Rows without an account (rejected before one was
-// tried) carry whatever model the client sent and are left out.
+// tried) carry whatever model the client sent and are left out. The rows log
+// retention pruned count from the rollups; each sum is one statement, so a
+// prune running meanwhile moves rows from one side to the other unseen.
 func loadModelStatsFromDB(maxRequestID, maxErrorID int64) (map[string]*modelStat, error) {
 	d, err := db.Get()
 	if err != nil {
 		return nil, err
 	}
 	stats := make(map[string]*modelStat)
-	rows, err := d.Query(`SELECT model, COUNT(*),
-COALESCE(SUM(in_tokens), 0), COALESCE(SUM(out_tokens), 0),
-COALESCE(SUM(cache_read_tokens), 0), COALESCE(SUM(cache_write_tokens), 0),
-COALESCE(SUM(credits), 0), COALESCE(MAX(ts), 0)
-FROM requests WHERE id <= ? AND model != '' AND account_id != '' GROUP BY model`, maxRequestID)
+	rows, err := d.Query(`SELECT model, SUM(n), SUM(i), SUM(o), SUM(cr), SUM(cw), SUM(c), MAX(lt) FROM (
+SELECT model, COUNT(*) AS n,
+COALESCE(SUM(in_tokens), 0) AS i, COALESCE(SUM(out_tokens), 0) AS o,
+COALESCE(SUM(cache_read_tokens), 0) AS cr, COALESCE(SUM(cache_write_tokens), 0) AS cw,
+COALESCE(SUM(credits), 0) AS c, COALESCE(MAX(ts), 0) AS lt
+FROM requests WHERE id <= ? AND model != '' AND account_id != '' GROUP BY model
+UNION ALL
+SELECT model, SUM(request_count), SUM(in_tokens), SUM(out_tokens),
+SUM(cache_read_tokens), SUM(cache_write_tokens), SUM(credits), MAX(last_ts)
+FROM request_rollup WHERE model != '' AND account_id != '' GROUP BY model
+) GROUP BY model`, maxRequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +352,11 @@ FROM requests WHERE id <= ? AND model != '' AND account_id != '' GROUP BY model`
 		return nil, err
 	}
 
-	rows, err = d.Query(`SELECT model, COUNT(*) FROM errors WHERE id <= ? AND model != '' AND account_id != '' GROUP BY model`, maxErrorID)
+	rows, err = d.Query(`SELECT model, SUM(n) FROM (
+SELECT model, COUNT(*) AS n FROM errors WHERE id <= ? AND model != '' AND account_id != '' GROUP BY model
+UNION ALL
+SELECT model, SUM(error_count) FROM error_rollup WHERE model != '' AND account_id != '' GROUP BY model
+) GROUP BY model`, maxErrorID)
 	if err != nil {
 		return nil, err
 	}
