@@ -55,6 +55,8 @@ const (
 	codeCreditLimitNegative     = "credit_limit_negative"
 	codeBackupNotFound          = "backup_not_found"
 	codeBackupUploadFailed      = "backup_upload_failed"
+	codeRoutingModeInvalid      = "routing_mode_invalid"
+	codePriorityRange           = "priority_range"
 )
 
 // writeAdminError writes {"error": message, "code": code} with status.

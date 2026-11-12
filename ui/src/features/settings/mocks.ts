@@ -5,6 +5,7 @@ import type {
   ModelMappingRule,
   PreferredEndpoint,
   PromptFilterRule,
+  RoutingMode,
   SettingsPatch,
   ThinkingFormat,
 } from "@/lib/api/types";
@@ -50,6 +51,8 @@ const API_DOMAINS: readonly ApiDomain[] = ["amazonaws", "kiro"];
 const API_REGIONS = ["us-east-1", "eu-central-1"];
 /** config.NormalizeAWSRegion */
 const AWS_REGION = /^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$/;
+
+const ROUTING_MODES: readonly string[] = ["weighted", "priority"] satisfies RoutingMode[];
 
 type Json = Record<string, unknown>;
 
@@ -102,6 +105,10 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
   const refresh = optional(body, "usageRefreshIntervalMinutes", isInteger);
   if (refresh === null) return null;
   if (refresh !== undefined) patch.usageRefreshIntervalMinutes = refresh;
+  // Any string decodes; the handler then rejects an unknown mode with routing_mode_invalid.
+  const routingMode = optional(body, "routingMode", isString);
+  if (routingMode === null) return null;
+  if (routingMode !== undefined) patch.routingMode = routingMode as RoutingMode;
   const password = optional(body, "password", isString);
   if (password === null) return null;
   if (password !== undefined) patch.password = password;
@@ -268,6 +275,11 @@ export const handlers: HttpHandler[] = [
     if (refresh !== undefined && refresh !== 0 && (refresh < 5 || refresh > 1440)) {
       return jsonError(400, "usageRefreshIntervalMinutes must be 0 (off) or between 5 and 1440", {
         code: "usage_refresh_interval_range",
+      });
+    }
+    if (patch.routingMode !== undefined && !ROUTING_MODES.includes(patch.routingMode)) {
+      return jsonError(400, 'routingMode must be "weighted" or "priority"', {
+        code: "routing_mode_invalid",
       });
     }
     if (patch.password && [...patch.password].length < MIN_PASSWORD_RUNES) {

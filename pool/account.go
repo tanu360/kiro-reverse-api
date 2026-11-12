@@ -178,6 +178,9 @@ func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool) 
 	if len(p.accounts) == 0 {
 		return nil
 	}
+	if config.GetRoutingMode() == config.RoutingModePriority {
+		return p.firstByPriorityLocked(model, excluded)
+	}
 
 	if acc := p.findNextAvailableLocked(model, excluded, true); acc != nil {
 		return acc

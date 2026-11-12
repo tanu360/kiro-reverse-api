@@ -5,6 +5,7 @@ import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useInstantSetting } from "./general-settings";
+import { RoutingModeRow } from "./routing-mode-row";
 import { SECTION_ID } from "./sections";
 import { Hint, SectionQuery, SettingsSection } from "./settings-section";
 
@@ -25,6 +26,7 @@ function RoutingForm({ settings }: { settings: Settings }): JSX.Element {
 
   return (
     <SettingsSection id={SECTION_ID.routing} title={t("routing")}>
+      <RoutingModeRow settings={settings} />
       <SwitchField
         checked={sessionAffinity.checked}
         description={<Hint more={t("sessionAffinityMore")}>{t("sessionAffinityHint")}</Hint>}

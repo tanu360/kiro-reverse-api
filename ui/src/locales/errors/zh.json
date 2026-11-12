@@ -21,6 +21,8 @@
   "serverError.tooManyPasswordAttempts": "密码尝试次数过多，请稍等一分钟后重试。",
   "serverError.passwordTooShort": "密码至少需要 8 个字符。",
   "serverError.autoContinueMaxRange": "最大续写次数必须在 1 到 10 之间。",
+  "serverError.routingModeInvalid": "请选择路由模式：加权或优先级。",
+  "serverError.priorityRange": "优先级必须是 0 到 999 之间的整数。",
   "serverError.notOverageCapable": "该账号不支持超额用量。",
   "serverError.apiKeyAccountNoProfile": "Kiro API Key 账号没有 Kiro Profile，其区域在导入时设定。",
   "serverError.profileNotAvailable": "所选 Kiro Profile 对该账号不可用。",

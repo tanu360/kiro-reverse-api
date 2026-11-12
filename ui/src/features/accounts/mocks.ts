@@ -28,6 +28,14 @@ const BATCH_ACTIONS: readonly BatchAction[] = [
   "refreshModels",
   "delete",
 ];
+const MAX_PRIORITY = 999;
+
+/** Go parseAccountPriority: a present "priority" must be an integer JSON number 0..999. */
+function invalidPriority(body: Record<string, unknown>): boolean {
+  if (!("priority" in body)) return false;
+  const value = body.priority;
+  return !Number.isInteger(value) || (value as number) < 0 || (value as number) > MAX_PRIORITY;
+}
 
 /** accounts_changed after every account write, as the Go config hook sends it. */
 function accountsChanged(id = "*"): void {
@@ -113,6 +121,7 @@ function applyUpdate(account: Account, body: Record<string, unknown>): void {
   if (typeof patch.nickname === "string") account.nickname = patch.nickname;
   if (typeof patch.machineId === "string") account.machineId = patch.machineId;
   if (typeof patch.weight === "number") account.weight = Math.trunc(patch.weight);
+  if (typeof patch.priority === "number") account.priority = patch.priority;
   if (typeof patch.proxyURL === "string") account.proxyURL = patch.proxyURL;
   if (typeof patch.silent === "boolean") {
     if (patch.silent) {
@@ -420,6 +429,11 @@ export const handlers: HttpHandler[] = [
     if (denied) return denied;
     const body = await readJson(request);
     if (!body) return jsonError(400, "Invalid JSON");
+    if (invalidPriority(body)) {
+      return jsonError(400, `priority must be an integer between 0 and ${MAX_PRIORITY}`, {
+        code: "priority_range",
+      });
+    }
     const account = findAccount(accountId(params));
     if (!account) return jsonError(404, "Account not found");
     await mockDelay();

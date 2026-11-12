@@ -2609,6 +2609,7 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 			"hasToken":          a.AccessToken != "",
 			"machineId":         a.MachineId,
 			"weight":            a.Weight,
+			"priority":          a.Priority,
 			"overageStatus":     a.OverageStatus,
 			"overageCapability": a.OverageCapability,
 			"overageCap":        a.OverageCap,
@@ -2665,6 +2666,10 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	account.Region = region
+	if !config.ValidAccountPriority(account.Priority) {
+		writePriorityRange(w)
+		return
+	}
 
 	if err := config.AddAccount(account); err != nil {
 		writeAdminErr(w, addAccountErrorStatus(err), err, "")
@@ -2697,6 +2702,11 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	var updates map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
+		return
+	}
+	priority, hasPriority, err := parseAccountPriority(updates)
+	if err != nil {
+		writePriorityRange(w)
 		return
 	}
 
@@ -2733,6 +2743,9 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	}
 	if v, ok := updates["weight"].(float64); ok {
 		existing.Weight = int(v)
+	}
+	if hasPriority {
+		existing.Priority = priority
 	}
 	if v, ok := updates["proxyURL"].(string); ok {
 		existing.ProxyURL = v
@@ -3551,6 +3564,7 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"allowOverUsage":         config.GetAllowOverUsage(),
 		"lenientStreamIntegrity": config.GetLenientStreamIntegrity(),
 		"sessionAffinity":        config.GetSessionAffinity(),
+		"routingMode":            config.GetRoutingMode(),
 		"autoContinue":           config.GetAutoContinue(),
 		"autoContinueMax":        config.GetAutoContinueMax(),
 		"structuredToolHistory":  config.GetStructuredToolHistory(),
@@ -3645,6 +3659,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		StructuredToolHistory  *bool  `json:"structuredToolHistory,omitempty"`
 
 		UsageRefreshIntervalMinutes *int `json:"usageRefreshIntervalMinutes,omitempty"`
+		routingSettingsPatch
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
@@ -3656,6 +3671,9 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !validateUsageRefreshInterval(w, req.UsageRefreshIntervalMinutes) {
+		return
+	}
+	if rejectInvalidRoutingMode(w, req.RoutingMode) {
 		return
 	}
 
@@ -3703,6 +3721,10 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
+	}
+
+	if !applyRoutingMode(w, req.RoutingMode) {
+		return
 	}
 
 	if req.AutoContinue != nil {
@@ -3956,6 +3978,7 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		"expiresAt":         account.ExpiresAt,
 		"machineId":         account.MachineId,
 		"weight":            account.Weight,
+		"priority":          account.Priority,
 		"overageStatus":     account.OverageStatus,
 		"overageCapability": account.OverageCapability,
 		"overageCap":        account.OverageCap,
