@@ -86,6 +86,7 @@
   "form.accountsRemoved": "Conta removida",
   "form.accountsDisabled": "Desabilitada",
   "form.accountsRequired": "Escolha pelo menos uma conta, ou escolha Todas as contas.",
+  "form.accountsLoadFailed": "Não foi possível carregar as contas",
   "form.submitCreate": "Criar chave de API",
   "form.submitCreating": "Criando…",
   "form.created": "A chave de API foi criada.",

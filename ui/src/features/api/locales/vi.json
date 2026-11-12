@@ -84,6 +84,7 @@
   "form.accountsRemoved": "Tài khoản đã xóa",
   "form.accountsDisabled": "Đã tắt",
   "form.accountsRequired": "Chọn ít nhất một tài khoản, hoặc chọn Tất cả tài khoản.",
+  "form.accountsLoadFailed": "Không thể tải danh sách tài khoản",
   "form.submitCreate": "Tạo API key",
   "form.submitCreating": "Đang tạo…",
   "form.created": "Đã tạo API key.",

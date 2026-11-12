@@ -84,6 +84,7 @@
   "form.accountsRemoved": "已删除的账号",
   "form.accountsDisabled": "已禁用",
   "form.accountsRequired": "至少选择一个账号，或选择所有账号。",
+  "form.accountsLoadFailed": "无法加载账号",
   "form.submitCreate": "创建 API Key",
   "form.submitCreating": "正在创建…",
   "form.created": "API Key 已创建。",

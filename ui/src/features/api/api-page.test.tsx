@@ -262,6 +262,31 @@ describe("ApiPage", () => {
     expect(await within(keysTable()).findByText("1 account")).toBeInTheDocument();
   });
 
+  it("keeps a key's accounts while the account list fails to load", async () => {
+    const teamA = mockDb.apiKeys[0];
+    const [first, second] = mockDb.accounts;
+    if (!teamA || !first || !second) throw new Error("missing seeded data");
+    teamA.accountIds = [first.id, second.id];
+    mockServer.use(
+      http.get(apiUrl("/accounts"), () => HttpResponse.json({ error: "boom" }, { status: 500 })),
+    );
+    const { user } = await renderPage();
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for team-a" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const dialog = await screen.findByRole("dialog");
+
+    // Unknown until the list loads: the picks must not look like deleted accounts.
+    expect(await within(dialog).findByText("Could not load accounts")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Removed account")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/ selected$/)).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(sent("PUT", `/api-keys/${teamA.id}`)).toHaveLength(1));
+    expect(sent("PUT", `/api-keys/${teamA.id}`)[0]?.body).toMatchObject({
+      accountIds: [first.id, second.id],
+    });
+  });
+
   it("shows successful calls against the call limit", async () => {
     const teamA = mockDb.apiKeys[0];
     const localDev = mockDb.apiKeys[3];

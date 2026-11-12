@@ -86,6 +86,7 @@
   "form.accountsRemoved": "Removed account",
   "form.accountsDisabled": "Disabled",
   "form.accountsRequired": "Pick at least one account, or choose All accounts.",
+  "form.accountsLoadFailed": "Could not load accounts",
   "form.submitCreate": "Create API key",
   "form.submitCreating": "Creating…",
   "form.created": "The API key was created.",

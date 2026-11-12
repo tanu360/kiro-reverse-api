@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, type Ref, useId, useMemo, useState } from "react";
 import { ChoiceCard, ChoiceList } from "@/components/shared/choice-card";
+import { ErrorState } from "@/components/shared/error-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldHint } from "@/components/ui/field";
 import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
@@ -22,7 +23,8 @@ const SCOPES: readonly ApiKeyAccountScope[] = ["all", "selected"];
  * it shows (the email as privacy mode displays it, the nickname, the id), so under privacy a
  * search never matches the hidden part of an address. Picks of accounts deleted since stay as
  * "Removed account" rows until unchecked: they match nothing, and dropping them silently could
- * empty the list, which would mean every account.
+ * empty the list, which would mean every account. Until the list has loaded no pick counts as
+ * removed, so a slow or failed load shows its state instead of every pick as removed.
  */
 export function AccountPicker({
   scope,
@@ -49,11 +51,12 @@ export function AccountPicker({
   const [query, setQuery] = useState("");
   const baseId = useId();
   const errorId = `${baseId}-error`;
+  const loaded = accounts.data !== undefined;
   const list = accounts.data ?? [];
 
   const picked = useMemo(() => new Set(selected), [selected]);
   const known = useMemo(() => new Set(list.map((account) => account.id)), [list]);
-  const removed = selected.filter((id) => !known.has(id));
+  const removed = loaded ? selected.filter((id) => !known.has(id)) : [];
   const needle = query.trim().toLowerCase();
   const matches = (text: string) => text.toLowerCase().includes(needle);
   const visible = needle
@@ -72,51 +75,58 @@ export function AccountPicker({
       .filter(Boolean)
       .join(" · ");
 
-  const rows =
-    visible.length + visibleRemoved.length > 0 ? (
-      <ChoiceList aria-label={t("form.accounts")} scroll>
-        {visible.map((account) => {
-          const name = accountName(account);
-          return (
-            <ChoiceCard
-              control={(id) => (
-                <Checkbox
-                  checked={picked.has(account.id)}
-                  id={id}
-                  onCheckedChange={() => toggle(account.id)}
-                />
-              )}
-              description={description(account) || undefined}
-              key={account.id}
-              title={
-                <span className={name.mono ? "font-mono text-meta" : undefined}>{name.text}</span>
-              }
-              variant="row"
-            />
-          );
-        })}
-        {visibleRemoved.map((id) => (
-          <ChoiceCard
-            control={(controlId) => (
-              <Checkbox checked id={controlId} onCheckedChange={() => toggle(id)} />
-            )}
-            key={id}
-            title={t("form.accountsRemoved")}
-            variant="row"
-          >
-            <span className="break-all font-mono text-meta text-muted-foreground">{id}</span>
-          </ChoiceCard>
-        ))}
-      </ChoiceList>
+  const rows = !loaded ? (
+    accounts.isError ? (
+      <ErrorState
+        compact
+        error={accounts.error}
+        onRetry={() => void accounts.refetch()}
+        retrying={accounts.isFetching}
+        title={t("form.accountsLoadFailed")}
+      />
     ) : (
-      <p className="py-4 text-center text-muted-foreground text-sm">
-        {accounts.isPending
-          ? tc("state.loading")
-          : list.length === 0 && removed.length === 0
-            ? t("form.accountsEmpty")
-            : tc("state.noMatches")}
-      </p>
-    );
+      <p className="py-4 text-center text-muted-foreground text-sm">{tc("state.loading")}</p>
+    )
+  ) : visible.length + visibleRemoved.length > 0 ? (
+    <ChoiceList aria-label={t("form.accounts")} scroll>
+      {visible.map((account) => {
+        const name = accountName(account);
+        return (
+          <ChoiceCard
+            control={(id) => (
+              <Checkbox
+                checked={picked.has(account.id)}
+                id={id}
+                onCheckedChange={() => toggle(account.id)}
+              />
+            )}
+            description={description(account) || undefined}
+            key={account.id}
+            title={
+              <span className={name.mono ? "font-mono text-meta" : undefined}>{name.text}</span>
+            }
+            variant="row"
+          />
+        );
+      })}
+      {visibleRemoved.map((id) => (
+        <ChoiceCard
+          control={(controlId) => (
+            <Checkbox checked id={controlId} onCheckedChange={() => toggle(id)} />
+          )}
+          key={id}
+          title={t("form.accountsRemoved")}
+          variant="row"
+        >
+          <span className="break-all font-mono text-meta text-muted-foreground">{id}</span>
+        </ChoiceCard>
+      ))}
+    </ChoiceList>
+  ) : (
+    <p className="py-4 text-center text-muted-foreground text-sm">
+      {list.length === 0 && removed.length === 0 ? t("form.accountsEmpty") : tc("state.noMatches")}
+    </p>
+  );
 
   return (
     <Fieldset className="flex min-w-0 flex-col gap-3">
@@ -164,12 +174,14 @@ export function AccountPicker({
             </p>
           ) : null}
           {rows}
-          <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
-            {t("form.accountsSelectedCount", {
-              n: selected.length,
-              total: list.length + removed.length,
-            })}
-          </p>
+          {loaded ? (
+            <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
+              {t("form.accountsSelectedCount", {
+                n: selected.length,
+                total: list.length + removed.length,
+              })}
+            </p>
+          ) : null}
         </div>
       ) : null}
       <FieldHint>{t("form.accountsHint")}</FieldHint>
