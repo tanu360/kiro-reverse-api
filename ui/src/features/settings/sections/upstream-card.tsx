@@ -59,7 +59,10 @@ function toDraft(config: Pick<UpstreamConfig, "apiDomain" | "apiRegion" | "authR
   } satisfies UpstreamDraft;
 }
 
-/** The chat host the settings lead to; `<region>` when each account keeps its own. */
+/**
+ * The Kiro IDE endpoint's host the settings lead to; `<region>` when each account keeps its own.
+ * CodeWhisperer in us-east-1 on AWS and API-key chat use other hosts, so the line names the endpoint.
+ */
 function effectiveHost(domain: ApiDomain, region: string): string {
   const shown = region === AUTO_REGION ? "<region>" : region;
   return domain === "kiro" ? `runtime.${shown}.kiro.dev` : `q.${shown}.amazonaws.com`;

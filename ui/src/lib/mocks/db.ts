@@ -22,6 +22,7 @@ import {
   defaultPromptFilter,
   defaultSettings,
   defaultThinking,
+  defaultUpstream,
   makeAccountFull,
   seedAccounts,
   seedApiKeys,
@@ -145,13 +146,7 @@ const REMOTE_CHANGELOG = [
 /** The common fields every scenario shares. */
 function baseDb(): Pick<
   MockDb,
-  | "adminPassword"
-  | "firstRunPending"
-  | "failedLogins"
-  | "version"
-  | "remoteVersion"
-  | "pending"
-  | "upstream"
+  "adminPassword" | "firstRunPending" | "failedLogins" | "version" | "remoteVersion" | "pending"
 > {
   return {
     adminPassword: mockAdminPassword(),
@@ -161,7 +156,6 @@ function baseDb(): Pick<
     // Same as the running version: no update notice in tests, screenshots or axe runs.
     remoteVersion: { version: "2.1.0", changelog: "" },
     pending: { iam: {}, microsoft: {}, builderId: {} },
-    upstream: { apiDomain: "amazonaws", authRegion: "", apiRegion: "" },
   };
 }
 
@@ -171,6 +165,7 @@ function seedFullDb(now: number): MockDb {
   return {
     ...baseDb(),
     ...data,
+    upstream: defaultUpstream(),
     modelMix: buildModelMix(data.requests, data.errors),
     // An update is out, so the update notice shows.
     remoteVersion: { version: "2.2.0", changelog: REMOTE_CHANGELOG },
@@ -193,6 +188,7 @@ function seedEmptyDb(now: number): MockDb {
     thinking: defaultThinking(),
     modelMappings: [],
     endpoint: defaultEndpoint(),
+    upstream: defaultUpstream(),
     proxy: { proxyURL: "" },
     promptFilter: defaultPromptFilter(),
     startedAt: now - 42,
@@ -220,6 +216,7 @@ function seedDb(scenario: MockScenario): MockDb {
     thinking: defaultThinking(),
     modelMappings: defaultModelMappings(),
     endpoint: defaultEndpoint(),
+    upstream: defaultUpstream(),
     proxy: { proxyURL: "socks5://user:p%40ss@127.0.0.1:1080" },
     promptFilter: {
       ...defaultPromptFilter(),
