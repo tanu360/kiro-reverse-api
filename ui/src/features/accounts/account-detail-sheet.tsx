@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, useState } from "react";
+import { type JSX, lazy, Suspense, useCallback, useState } from "react";
 import {
   ResponsiveSheet,
   ResponsiveSheetDescription,
@@ -18,7 +18,16 @@ import { ModelsSection } from "./detail/models-section";
 import { OverageSection } from "./detail/overage-section";
 import { ProfileSection } from "./detail/profile-section";
 import { StatisticsSection } from "./detail/usage-sections";
+import { ReloginProvider } from "./relogin-context";
 import { TestAccountDialog } from "./test-account-dialog";
+
+// "Sign in again" opens the add-account dialog over the sheet. Its code loads on first use, so the
+// pages that only open this sheet (Overview, Requests) do not carry it.
+const AddAccountDialog = lazy(() =>
+  import("@/features/add-account/add-account-dialog").then((module) => ({
+    default: module.AddAccountDialog,
+  })),
+);
 
 /**
  * The account's detail sheet (a right sheet from `md` up, a full-height bottom sheet below it):
@@ -46,13 +55,19 @@ export function AccountDetailSheet({
   const meta = account ? accountMeta(account, t) : "";
   // Each Test opens a fresh dialog (a new session key), over the sheet.
   const [test, setTest] = useState<{ open: boolean; session: number } | null>(null);
+  // "Sign in again" works the same way, on every page that opens the sheet.
+  const [relogin, setRelogin] = useState<{ open: boolean; session: number } | null>(null);
+  const openRelogin = useCallback(
+    () => setRelogin((current) => ({ open: true, session: (current?.session ?? 0) + 1 })),
+    [],
+  );
   const showProfile =
     account !== undefined &&
     !isApiKeyAccount(account) &&
     (supportsKiroProfiles(account) || account.profileArnPinned);
 
   return (
-    <>
+    <ReloginProvider onRelogin={openRelogin}>
       <ResponsiveSheet onOpenChange={onOpenChange} open={open && account !== undefined}>
         <ResponsiveSheetHeader className={account ? "gap-4" : undefined}>
           {account ? (
@@ -117,6 +132,18 @@ export function AccountDetailSheet({
           open={test.open}
         />
       ) : null}
-    </>
+      {relogin && account ? (
+        <Suspense fallback={null}>
+          <AddAccountDialog
+            key={`relogin-${relogin.session}`}
+            onOpenChange={(next) =>
+              setRelogin((current) => (current ? { ...current, open: next } : null))
+            }
+            open={relogin.open}
+            relogin={account}
+          />
+        </Suspense>
+      ) : null}
+    </ReloginProvider>
   );
 }

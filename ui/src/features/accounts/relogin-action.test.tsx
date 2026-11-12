@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { mockDb } from "@/lib/mocks/db";
 import { renderApp, renderWithProviders } from "@/test/render";
+import { AccountDetailSheet } from "./account-detail-sheet";
 import { AccountRowActions, AccountSheetActions } from "./account-row-actions";
 import { ReloginProvider } from "./relogin-context";
 
@@ -50,6 +51,17 @@ describe("Sign in again", () => {
     await user.click(screen.getByRole("button", { name: "More actions" }));
     expect(await screen.findByRole("menuitem", { name: "Copy JSON" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Sign in again" })).not.toBeInTheDocument();
+  });
+
+  it("opens from the detail sheet on pages without their own dialog (Overview, Requests)", async () => {
+    const account = mockDb.accounts[1];
+    const { user } = renderWithProviders(
+      <AccountDetailSheet accountId={account.id} onOpenChange={() => {}} open />,
+    );
+    const sheet = await screen.findByRole("dialog");
+    await user.click(within(sheet).getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Sign in again" }));
+    expect(await screen.findByRole("dialog", { name: "Sign in again" })).toBeInTheDocument();
   });
 
   it("opens the add-account dialog in re-login mode from the accounts table", async () => {

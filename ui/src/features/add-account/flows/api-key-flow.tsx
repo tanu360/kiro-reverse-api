@@ -11,6 +11,7 @@ import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseApiKeyLines } from "../lib/api-key-lines";
 import { parseRegion } from "../lib/region";
+import { reloginRegion } from "../lib/relogin-method";
 import { useReloginFlow } from "../relogin";
 import { showBatchResult } from "../result-toast";
 
@@ -21,7 +22,8 @@ export function ApiKeyFlow(): JSX.Element {
   const relogin = useReloginFlow();
   const formId = useFormId();
   const [keys, setKeys] = useState("");
-  const [region, setRegion] = useState("us-east-1");
+  // An API key account's region is its key's, so a pasted key without |region keeps it.
+  const [region, setRegion] = useState(() => reloginRegion(relogin.target));
   const [errors, setErrors] = useState<{ keys?: string; region?: string }>({});
   const [pending, setPending] = useState(false);
   useReportBusy(pending);

@@ -102,6 +102,23 @@ describe("AddAccountDialog in re-login mode", () => {
     expect(screen.getByRole("combobox", { name: "Provider" })).toHaveTextContent("GitHub");
   });
 
+  it("keeps an API key account's region for a key without |region", async () => {
+    const imports = logRequests("/auth/credentials");
+    const account = { ...accountBy("APIKey"), region: "eu-central-1" };
+    const { user } = renderWithProviders(<Harness account={account} />);
+    expect(await screen.findByRole("heading", { name: "Kiro API key" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Region" })).toHaveValue("eu-central-1");
+
+    await user.type(screen.getByRole("textbox", { name: "Kiro API keys" }), "ksk_fresh");
+    await user.click(screen.getByRole("button", { name: "Sign in again" }));
+    await waitFor(() => expect(imports.count).toBe(1));
+    expect(imports.bodies[0]).toMatchObject({
+      kiroApiKey: "ksk_fresh",
+      region: "eu-central-1",
+      reloginAccountId: account.id,
+    });
+  });
+
   it("takes exactly one credential", async () => {
     const imports = logRequests("/auth/credentials");
     const { user } = renderWithProviders(
