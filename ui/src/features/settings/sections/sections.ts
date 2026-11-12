@@ -5,6 +5,7 @@ import {
   CloudServerIcon,
   Coins01Icon,
   FilterHorizontalIcon,
+  FirstAidKitIcon,
   GlobalIcon,
   LockPasswordIcon,
   RepeatIcon,
@@ -28,6 +29,7 @@ export const SETTINGS_SECTIONS = [
   { id: "settings-routing", titleKey: "routing", icon: Route02Icon, group: "requests" },
   { id: "settings-auto-continue", titleKey: "autoContinue", icon: RepeatIcon, group: "requests" },
   { id: "settings-tool-history", titleKey: "toolHistory", icon: Wrench01Icon, group: "requests" },
+  { id: "settings-self-heal", titleKey: "selfHeal", icon: FirstAidKitIcon, group: "requests" },
   { id: "settings-thinking", titleKey: "thinkingSettings", icon: AiBrain01Icon, group: "models" },
   {
     id: "settings-model-mappings",
@@ -73,6 +75,7 @@ export const SECTION_ID = {
   routing: "settings-routing",
   autoContinue: "settings-auto-continue",
   toolHistory: "settings-tool-history",
+  selfHeal: "settings-self-heal",
   thinking: "settings-thinking",
   modelMappings: "settings-model-mappings",
   endpoint: "settings-endpoint",

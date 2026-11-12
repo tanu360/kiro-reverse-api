@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import type { JSX } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { AccountHealNotices } from "@/features/settings/account-heal-notices";
 import { isAuthenticated, useSession } from "@/lib/auth/session";
 import { AdminEventsProvider } from "@/lib/events/admin-events";
 
@@ -24,6 +25,7 @@ function AppLayout(): JSX.Element | null {
   if (!session) return null;
   return (
     <AdminEventsProvider>
+      <AccountHealNotices />
       <AppShell>
         <Outlet />
       </AppShell>

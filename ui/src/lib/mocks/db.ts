@@ -1,3 +1,4 @@
+import type { AccountHealth } from "@/lib/api/account-health";
 import type {
   Account,
   AccountFull,
@@ -60,6 +61,8 @@ export interface MockDb {
   endpoint: EndpointConfig;
   proxy: ProxyConfig;
   promptFilter: PromptFilterConfig;
+  /** GET /account-health: self-heal settings and state. */
+  accountHealth: AccountHealth;
   startedAt: number;
   /** '2.1.0' */
   version: string;
@@ -142,7 +145,13 @@ const REMOTE_CHANGELOG = [
 /** The common fields every scenario shares. */
 function baseDb(): Pick<
   MockDb,
-  "adminPassword" | "firstRunPending" | "failedLogins" | "version" | "remoteVersion" | "pending"
+  | "adminPassword"
+  | "firstRunPending"
+  | "failedLogins"
+  | "version"
+  | "remoteVersion"
+  | "pending"
+  | "accountHealth"
 > {
   return {
     adminPassword: mockAdminPassword(),
@@ -152,6 +161,12 @@ function baseDb(): Pick<
     // Same as the running version: no update notice in tests, screenshots or axe runs.
     remoteVersion: { version: "2.1.0", changelog: "" },
     pending: { iam: {}, microsoft: {}, builderId: {} },
+    accountHealth: {
+      enabled: true,
+      minIntervalSec: 300,
+      maxRounds: 5,
+      state: { lastHealAt: 0, rounds: 0, halted: false, haltedAt: 0, lastHealed: 0 },
+    },
   };
 }
 

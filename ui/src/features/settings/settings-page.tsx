@@ -39,6 +39,7 @@ import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
 import { RoutingCard } from "./sections/routing-card";
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "./sections/sections";
+import { SelfHealCard } from "./sections/self-heal-card";
 import { StreamIntegrityCard } from "./sections/stream-integrity-card";
 import { ThinkingCard } from "./sections/thinking-card";
 import { ToolHistoryCard } from "./sections/tool-history-card";
@@ -377,6 +378,7 @@ function SettingsContent(): JSX.Element {
           <RoutingCard />
           <AutoContinueCard />
           <ToolHistoryCard />
+          <SelfHealCard />
           <ThinkingCard />
           <ModelMappingsCard />
           <EndpointCard />
