@@ -220,7 +220,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 | ------------- | -------------------- |
 | Go            | 1.25 +               |
 | Node.js       | 22 + com pnpm (só para compilar a UI de administração a partir do código-fonte) |
-| SO            | Linux / macOS        |
+| SO            | Linux / macOS / Windows |
 | Contêiner     | Docker 24+ opcional  |
 | Armazenamento | Volume local em disco |
 

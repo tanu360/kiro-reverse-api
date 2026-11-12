@@ -220,7 +220,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 | ------------ | -------------------- |
 | Go           | 1.25 +               |
 | Node.js      | 22 + kèm pnpm (chỉ cần khi build giao diện quản trị từ mã nguồn) |
-| Hệ điều hành | Linux / macOS        |
+| Hệ điều hành | Linux / macOS / Windows |
 | Container    | Docker 24+, không bắt buộc |
 | Lưu trữ      | Volume cục bộ trên ổ đĩa |
 

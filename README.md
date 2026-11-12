@@ -220,7 +220,7 @@ If this project helps you, a Star would mean a lot.
 | --------- | -------------------- |
 | Go        | 1.25 +               |
 | Node.js   | 22 + with pnpm (only to build the admin UI from source) |
-| OS        | Linux / macOS        |
+| OS        | Linux / macOS / Windows |
 | Container | Docker 24+ optional  |
 | Storage   | Local volume on disk |
 
