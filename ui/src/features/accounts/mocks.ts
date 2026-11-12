@@ -1,4 +1,5 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
+import type { AccountActivityResponse } from "@/lib/api/account-activity";
 import type {
   Account,
   AccountActionResult,
@@ -179,12 +180,43 @@ function liveModels() {
   ];
 }
 
+/**
+ * GET /observe/account-activity over the request log: final requests since local midnight and
+ * in the last 60 s per account. The mock has no pool, so "at limit" is the live RPM reaching it.
+ */
+function accountActivity(): AccountActivityResponse {
+  const now = mockNowUnix();
+  const midnight = new Date(now * 1000);
+  midnight.setHours(0, 0, 0, 0);
+  const dayStart = Math.floor(midnight.getTime() / 1000);
+  const limit = mockDb.settings.accountRpmLimit ?? 0;
+  const accounts: AccountActivityResponse["accounts"] = {};
+  for (const account of mockDb.accounts) {
+    accounts[account.id] = { today: 0, rpm: 0, atLimit: false };
+  }
+  for (const record of mockDb.requests) {
+    const row = accounts[record.accountId];
+    if (!row || record.ts > now) continue;
+    if (record.ts >= dayStart) row.today += 1;
+    if (record.ts > now - 60) row.rpm += 1;
+  }
+  for (const row of Object.values(accounts)) row.atLimit = limit > 0 && row.rpm >= limit;
+  return { nowUnix: now, dayStartUnix: dayStart, rpmLimit: limit, accounts };
+}
+
 export const handlers: HttpHandler[] = [
   http.get(apiUrl("/accounts"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
     return HttpResponse.json(mockDb.accounts);
+  }),
+
+  http.get(apiUrl("/observe/account-activity"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json(accountActivity());
   }),
 
   http.post(apiUrl("/accounts/batch"), async ({ request }) => {

@@ -9,6 +9,7 @@ import type { Account, HeatmapCell } from "@/lib/api/types";
 import { formatCompact, formatNumber, formatPercent, formatRelativeTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { LiveActivityStrip } from "../account-activity";
 import { UsageMeter } from "../account-cells";
 import { formatCreditAmount, formatResetDate, resetDateSec } from "../account-model";
 
@@ -21,9 +22,9 @@ const ActivityChart = lazy(() => import("./activity-chart"));
 
 /**
  * The sheet's opening card: the credits meter (plan, or trial for a trial-only account) with the
- * reset date, the last 24 hours of requests, then the four lifetime numbers. Four across from a
- * 28rem card, two by two below it (a phone sheet). The section keeps the "Statistics" name for
- * screen readers; the numbers carry their own labels.
+ * reset date, the last 24 hours of requests, today's and the last minute's requests, then the
+ * four lifetime numbers. Four across from a 28rem card, two by two below it (a phone sheet). The
+ * section keeps the "Statistics" name for screen readers; the numbers carry their own labels.
  */
 export function StatisticsSection({ account }: { account: Account }): JSX.Element {
   const { t, lang } = useT("accounts");
@@ -72,6 +73,7 @@ export function StatisticsSection({ account }: { account: Account }): JSX.Elemen
         accountId={account.id}
         className={cn(hasUsage && "border-border-subtle border-t")}
       />
+      <LiveActivityStrip accountId={account.id} className="border-border-subtle border-t" />
       <StatStrip className="border-border-subtle border-t" items={stats} />
     </Card>
   );
