@@ -96,7 +96,7 @@ export function renderWithProviders(
 }
 
 /**
- * Renders the real route tree at '/admin' + path in memory history and waits until the
+ * Renders the real route tree at `path` in memory history and waits until the
  * router settles (guards and redirects included).
  */
 export async function renderApp(
@@ -106,9 +106,8 @@ export async function renderApp(
   const { queryClient, lang } = prepare(options);
   const router = createRouter({
     routeTree,
-    basepath: "/admin",
     context: { queryClient },
-    history: createMemoryHistory({ initialEntries: [`/admin${path}`] }),
+    history: createMemoryHistory({ initialEntries: [path] }),
   });
   const user = userEvent.setup();
   const result = render(

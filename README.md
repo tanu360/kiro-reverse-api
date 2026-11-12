@@ -258,7 +258,7 @@ go build -o kiro-proxy .
 ./kiro-proxy
 ```
 
-The admin UI needs Node.js 22+ and pnpm to build. `go build` embeds whatever is in `ui/dist`: without the UI build, `/admin` shows a "UI not built" page while the API keeps working. The Docker image builds both.
+The admin UI needs Node.js 22+ and pnpm to build. `go build` embeds whatever is in `ui/dist`: without the UI build, `/` shows a "UI not built" page while the API keeps working. The Docker image builds both.
 
 ### 🎨 Admin UI development
 
@@ -297,7 +297,7 @@ Admin password authentication allows five failed attempts per client per minute,
 
 ## 🕹 Usage
 
-Open `http://localhost:8080/admin`, log in, add accounts, then call the API:
+Open `http://localhost:8080`, log in, add accounts, then call the API:
 
 ```bash
 # Anthropic — Claude
@@ -333,7 +333,7 @@ curl http://localhost:8080/v1/responses \
 | `GET`    | `/v1/codex/models`              | Model list in the Codex CLI format            |
 | `GET`    | `/v1/stats`                     | Aggregate proxy usage statistics              |
 | `GET`    | `/health`                       | Health check                                  |
-| `GET`    | `/admin`                        | Web admin panel (embedded SPA; deep links under `/admin/*` fall back to the app) |
+| `GET`    | `/`                             | Web admin panel (embedded SPA; page links such as `/accounts` open the app, old `/admin/*` links redirect, and a client that does not ask for HTML gets the health check) |
 
 ---
 

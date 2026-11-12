@@ -415,14 +415,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write([]byte(`{"status":"ok"}`))
 
-	case path == "/admin" || path == "/admin/":
-		defaultAdminUI().ServeHTTP(w, r)
 	case strings.HasPrefix(path, "/admin/api/"):
 		h.handleAdminAPI(w, r)
-	case strings.HasPrefix(path, "/admin/"):
-		defaultAdminUI().ServeHTTP(w, r)
+	case path == "/admin" || strings.HasPrefix(path, "/admin/"):
+		redirectLegacyAdminPath(w, r)
 
-	case path == "/health" || path == "/":
+	//! A browser opening the root gets the admin UI; API clients and monitors that probe "/"
+	//! keep getting the health JSON they always did.
+	case path == "/health" || (path == "/" && !wantsHTML(r)):
 		h.handleHealth(w, r)
 
 	case path == "/v1/stats":
@@ -434,8 +434,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		h.handleStats(w, r)
 
-	default:
+	case strings.HasPrefix(path, "/v1/"):
 		http.Error(w, "Not Found", 404)
+
+	default:
+		// The admin UI at the root: its files, and index.html for the pages a browser opens.
+		defaultAdminUI().ServeHTTP(w, r)
 	}
 }
 

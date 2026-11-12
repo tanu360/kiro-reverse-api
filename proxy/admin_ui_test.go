@@ -29,6 +29,18 @@ func serveAdminUI(h http.Handler, method, target string) *httptest.ResponseRecor
 	return rec
 }
 
+// browserAccept is what a browser sends when it opens a page.
+const browserAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+
+// servePage requests target the way a browser opening it does.
+func servePage(h http.Handler, method, target string) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(method, target, nil)
+	req.Header.Set("Accept", browserAccept)
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
 func assertIndexResponse(t *testing.T, rec *httptest.ResponseRecorder, target string) {
 	t.Helper()
 	if rec.Code != http.StatusOK {
@@ -45,6 +57,17 @@ func assertIndexResponse(t *testing.T, rec *httptest.ResponseRecorder, target st
 	}
 }
 
+// assertPlainNotFound checks the proxy's plain 404, the answer an API client always got.
+func assertPlainNotFound(t *testing.T, rec *httptest.ResponseRecorder, target string) {
+	t.Helper()
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("%s: status %d, want 404", target, rec.Code)
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != "Not Found" {
+		t.Fatalf("%s: body %q, want the plain Not Found", target, got)
+	}
+}
+
 // withAdminUI swaps the embedded admin UI for a fixture so tests that go through
 // Handler.ServeHTTP do not depend on whether ui/dist was built locally.
 func withAdminUI(t *testing.T, ui http.Handler) {
@@ -54,32 +77,42 @@ func withAdminUI(t *testing.T, ui http.Handler) {
 	t.Cleanup(func() { defaultAdminUI = previous })
 }
 
+func newRoutedHandlerForTest(t *testing.T) http.Handler {
+	t.Helper()
+	t.Setenv("ADMIN_PASSWORD", "")
+	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+		t.Fatal(err)
+	}
+	withAdminUI(t, newAdminUIHandler(testAdminDist(), true))
+	return newHandlerWithoutBackgroundForTest(t)
+}
+
 func TestAdminUIServesIndex(t *testing.T) {
 	h := newAdminUIHandler(testAdminDist(), true)
-	for _, target := range []string{"/admin", "/admin/"} {
-		assertIndexResponse(t, serveAdminUI(h, http.MethodGet, target), target)
-	}
+	assertIndexResponse(t, servePage(h, http.MethodGet, "/"), "/")
 
-	rec := serveAdminUI(h, http.MethodHead, "/admin/")
+	rec := servePage(h, http.MethodHead, "/")
 	if rec.Code != http.StatusOK {
-		t.Fatalf("HEAD /admin/: status %d, want 200", rec.Code)
+		t.Fatalf("HEAD /: status %d, want 200", rec.Code)
 	}
 	if rec.Body.Len() != 0 {
-		t.Fatalf("HEAD /admin/: wrote a %d-byte body", rec.Body.Len())
+		t.Fatalf("HEAD /: wrote a %d-byte body", rec.Body.Len())
 	}
 }
 
 func TestAdminUIDeepLinkFallback(t *testing.T) {
 	h := newAdminUIHandler(testAdminDist(), true)
-	for _, target := range []string{"/admin/accounts", "/admin/requests?page=2", "/admin/accounts/abc/detail"} {
-		assertIndexResponse(t, serveAdminUI(h, http.MethodGet, target), target)
+	for _, target := range []string{"/accounts", "/requests?page=2", "/accounts/abc/detail", "/api"} {
+		assertIndexResponse(t, servePage(h, http.MethodGet, target), target)
+		// Only a page load falls back to the app; an API client gets the plain 404.
+		assertPlainNotFound(t, serveAdminUI(h, http.MethodGet, target), target+" (no Accept)")
 	}
 }
 
 func TestAdminUIAssetCacheHeaders(t *testing.T) {
 	h := newAdminUIHandler(testAdminDist(), true)
 
-	rec := serveAdminUI(h, http.MethodGet, "/admin/assets/index-abc123.js")
+	rec := serveAdminUI(h, http.MethodGet, "/assets/index-abc123.js")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("asset: status %d, want 200", rec.Code)
 	}
@@ -93,8 +126,8 @@ func TestAdminUIAssetCacheHeaders(t *testing.T) {
 		t.Fatalf("asset: Content-Type %q, want a JavaScript type", got)
 	}
 
-	for _, target := range []string{"/admin/assets/missing.js", "/admin/assets/", "/admin/assets/nested/missing.css"} {
-		rec := serveAdminUI(h, http.MethodGet, target)
+	for _, target := range []string{"/assets/missing.js", "/assets/", "/assets/nested/missing.css"} {
+		rec := servePage(h, http.MethodGet, target)
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("%s: status %d, want 404", target, rec.Code)
 		}
@@ -107,28 +140,10 @@ func TestAdminUIAssetCacheHeaders(t *testing.T) {
 	}
 }
 
-func TestAdminUISPARouteWithoutSlash(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
-		t.Fatal(err)
-	}
-	withAdminUI(t, newAdminUIHandler(testAdminDist(), true))
-	h := newHandlerWithoutBackgroundForTest(t)
-
-	assertIndexResponse(t, serveAdminUI(h, http.MethodGet, "/admin/api"), "/admin/api")
-
-	rec := serveAdminUI(h, http.MethodGet, "/admin/api/status")
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("/admin/api/status: status %d, want 401 from the admin API", rec.Code)
-	}
-	if strings.Contains(rec.Body.String(), testIndexHTML) {
-		t.Fatal("/admin/api/status was served by the admin UI")
-	}
-}
-
 func TestAdminUIRootFile(t *testing.T) {
 	h := newAdminUIHandler(testAdminDist(), true)
 
-	rec := serveAdminUI(h, http.MethodGet, "/admin/favicon.ico")
+	rec := serveAdminUI(h, http.MethodGet, "/favicon.ico")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("favicon: status %d, want 200", rec.Code)
 	}
@@ -140,19 +155,19 @@ func TestAdminUIRootFile(t *testing.T) {
 	}
 
 	// The index file itself is served in place, never redirected to the directory.
-	assertIndexResponse(t, serveAdminUI(h, http.MethodGet, "/admin/index.html"), "/admin/index.html")
+	assertIndexResponse(t, serveAdminUI(h, http.MethodGet, "/index.html"), "/index.html")
 }
 
 func TestAdminUIRejectsTraversal(t *testing.T) {
 	h := newAdminUIHandler(testAdminDist(), true)
 	for _, target := range []string{
-		"/admin/../go.mod",
-		"/admin/%2e%2e/x",
-		"/admin/%2e%2e/go.mod",
-		"/admin/assets/../../go.mod",
-		"/admin/./../handler.go",
+		"/../go.mod",
+		"/%2e%2e/x",
+		"/%2e%2e/go.mod",
+		"/assets/../../go.mod",
+		"/./../handler.go",
 	} {
-		rec := serveAdminUI(h, http.MethodGet, target)
+		rec := servePage(h, http.MethodGet, target)
 		body := rec.Body.String()
 		switch rec.Code {
 		case http.StatusOK:
@@ -169,23 +184,17 @@ func TestAdminUIRejectsTraversal(t *testing.T) {
 	}
 }
 
-func TestAdminUIMethodNotAllowed(t *testing.T) {
+func TestAdminUIOtherMethodsAreNotFound(t *testing.T) {
 	h := newAdminUIHandler(testAdminDist(), true)
 	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
-		rec := serveAdminUI(h, method, "/admin/accounts")
-		if rec.Code != http.StatusMethodNotAllowed {
-			t.Fatalf("%s /admin/accounts: status %d, want 405", method, rec.Code)
-		}
-		if got := rec.Header().Get("Allow"); got != "GET, HEAD" {
-			t.Fatalf("%s /admin/accounts: Allow %q, want \"GET, HEAD\"", method, got)
-		}
+		assertPlainNotFound(t, servePage(h, method, "/accounts"), method+" /accounts")
 	}
 }
 
 func TestAdminUINotBuilt(t *testing.T) {
 	h := newAdminUIHandler(fstest.MapFS{".keep": {Data: []byte{}}}, false)
-	for _, target := range []string{"/admin", "/admin/", "/admin/accounts", "/admin/assets/index-abc123.js"} {
-		rec := serveAdminUI(h, http.MethodGet, target)
+	for _, target := range []string{"/", "/accounts", "/assets/index-abc123.js"} {
+		rec := servePage(h, http.MethodGet, target)
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("%s: status %d, want 503", target, rec.Code)
 		}
@@ -203,6 +212,90 @@ func TestAdminUINotBuilt(t *testing.T) {
 			t.Fatalf("%s: Cache-Control %q, want no-store", target, got)
 		}
 	}
+	assertPlainNotFound(t, serveAdminUI(h, http.MethodGet, "/accounts"), "/accounts (no Accept)")
+}
+
+func TestRootServesUIToBrowsersAndHealthToClients(t *testing.T) {
+	h := newRoutedHandlerForTest(t)
+
+	assertIndexResponse(t, servePage(h, http.MethodGet, "/"), "/ (browser)")
+
+	for _, target := range []string{"/", "/health"} {
+		rec := serveAdminUI(h, http.MethodGet, target)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: status %d, want 200", target, rec.Code)
+		}
+		var health map[string]any
+		if err := json.NewDecoder(rec.Body).Decode(&health); err != nil {
+			t.Fatalf("%s: body is not the health JSON: %v", target, err)
+		}
+		if health["status"] != "ok" {
+			t.Fatalf("%s: health %v, want status ok", target, health)
+		}
+	}
+	// /health stays JSON for a browser too.
+	if rec := servePage(h, http.MethodGet, "/health"); strings.Contains(rec.Body.String(), testIndexHTML) {
+		t.Fatal("/health served the admin UI to a browser")
+	}
+}
+
+func TestRootRoutesKeepTheProxyAPI(t *testing.T) {
+	h := newRoutedHandlerForTest(t)
+
+	// The API page is a UI route; the admin API under it is not.
+	assertIndexResponse(t, servePage(h, http.MethodGet, "/api"), "/api")
+	rec := servePage(h, http.MethodGet, "/admin/api/status")
+	if rec.Code != http.StatusUnauthorized || strings.Contains(rec.Body.String(), testIndexHTML) {
+		t.Fatalf("/admin/api/status: status %d, want 401 from the admin API", rec.Code)
+	}
+
+	// Unknown proxy paths stay a plain 404, even for a browser.
+	assertPlainNotFound(t, servePage(h, http.MethodGet, "/v1/unknown"), "/v1/unknown")
+	assertPlainNotFound(t, serveAdminUI(h, http.MethodPost, "/unknown"), "POST /unknown")
+
+	// Proxy routes are matched before the UI, for a browser too.
+	for _, target := range []string{"/v1/models", "/models"} {
+		rec = servePage(h, http.MethodGet, target)
+		if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "application/json") {
+			t.Fatalf("%s: Content-Type %q, want the proxy API's JSON", target, got)
+		}
+		if strings.Contains(rec.Body.String(), testIndexHTML) {
+			t.Fatalf("%s: served the admin UI", target)
+		}
+	}
+}
+
+func TestLegacyAdminPagesRedirectToRoot(t *testing.T) {
+	h := newRoutedHandlerForTest(t)
+	for target, want := range map[string]string{
+		"/admin":                        "/",
+		"/admin/":                       "/",
+		"/admin/accounts":               "/accounts",
+		"/admin/accounts?status=failed": "/accounts?status=failed",
+		"/admin/api":                    "/api",
+		"/admin/assets/index-abc123.js": "/assets/index-abc123.js",
+		"/admin//evil.example/":         "/evil.example/",
+		"/admin///evil.example?next=/x": "/evil.example?next=/x",
+	} {
+		rec := servePage(h, http.MethodGet, target)
+		if rec.Code != http.StatusMovedPermanently {
+			t.Fatalf("%s: status %d, want 301", target, rec.Code)
+		}
+		if got := rec.Header().Get("Location"); got != want {
+			t.Fatalf("%s: Location %q, want %q", target, got, want)
+		}
+	}
+
+	// A backslash after /admin/ must not turn into a protocol-relative redirect either.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.URL.Path = "/admin/\\evil.example"
+	h.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Location"); got != "/evil.example" {
+		t.Fatalf("/admin/\\evil.example: Location %q, want /evil.example", got)
+	}
+
+	assertPlainNotFound(t, serveAdminUI(h, http.MethodPost, "/admin/accounts"), "POST /admin/accounts")
 }
 
 func TestAdminAPIUnaffected(t *testing.T) {

@@ -14,7 +14,7 @@ export function AppIcon({ size, className }: { size: number; className?: string 
       alt=""
       className={className}
       height={size}
-      src={resolvedTheme === "dark" ? "/admin/icon.webp" : "/admin/icon-light.webp"}
+      src={resolvedTheme === "dark" ? "/icon.webp" : "/icon-light.webp"}
       width={size}
     />
   );

@@ -159,6 +159,6 @@ describe("route guards", () => {
   it("renders the not-found page for an unknown path", async () => {
     authed.mockReturnValue(true);
     const { findByRole } = await renderApp("/nope");
-    expect(await findByRole("link")).toHaveAttribute("href", "/admin/");
+    expect(await findByRole("link")).toHaveAttribute("href", "/");
   });
 });

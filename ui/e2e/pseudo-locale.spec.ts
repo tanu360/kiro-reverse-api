@@ -185,7 +185,7 @@ async function mockDbStrings(page: Page): Promise<string[]> {
       }
     };
     try {
-      const path = "/admin/src/lib/mocks/db.ts";
+      const path = "/src/lib/mocks/db.ts";
       visit((await import(/* @vite-ignore */ path)).mockDb);
     } catch {
       // Not mock mode: only the responses count as data.
@@ -212,11 +212,11 @@ async function expectAllTranslated(page: Page, serverStrings: Set<string>, label
 }
 
 async function signIn(page: Page): Promise<void> {
-  await page.goto("/admin/");
-  await page.waitForURL(/\/admin\/(setup|login)/);
+  await page.goto("/");
+  await page.waitForURL(/\/(setup|login)/);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL(/\/admin\/?$/);
+  await page.waitForURL(/^https?:\/\/[^/]+\/?$/);
   await expect(page.getByRole("button", { name: /Search/ })).toBeVisible();
 }
 
@@ -240,8 +240,8 @@ test.describe("pseudo locale", () => {
 
   test("every route renders only translated text", async ({ page }) => {
     const serverStrings = collectServerStrings(page);
-    await page.goto("/admin/");
-    await page.waitForURL(/\/admin\/setup/);
+    await page.goto("/");
+    await page.waitForURL(/\/setup/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expectAllTranslated(page, serverStrings, "setup");
 
@@ -255,16 +255,16 @@ test.describe("pseudo locale", () => {
       "backups",
       "no-such-page",
     ]) {
-      await page.goto(`/admin/${route}`);
+      await page.goto(`/${route}`);
       await expect(page.locator("main#main")).toBeVisible();
       await expectAllTranslated(page, serverStrings, `/${route}`);
     }
 
     // Sign out through the Admin menu, then check the login page.
-    await page.goto("/admin/");
+    await page.goto("/");
     await page.getByRole("button", { name: /Admin/ }).first().click();
     await page.getByRole("menuitem", { name: /Sign out/ }).click();
-    await page.waitForURL(/\/admin\/login/);
+    await page.waitForURL(/\/login/);
     await expectAllTranslated(page, serverStrings, "login");
   });
 
@@ -285,7 +285,7 @@ test.describe("pseudo locale", () => {
     await page.keyboard.press("Escape");
 
     // Accounts: add-account dialog, row menu, account detail sheet, confirm dialog.
-    await page.goto("/admin/accounts");
+    await page.goto("/accounts");
     await page
       .getByRole("button", { name: /Add account/ })
       .first()
@@ -320,7 +320,7 @@ test.describe("pseudo locale", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
 
     // Requests: request detail sheet.
-    await page.goto("/admin/requests");
+    await page.goto("/requests");
     await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
     // Enter on a focused row opens it (a click may land on a cell's own control).
     await page.locator('main#main tbody tr[tabindex="0"]').first().press("Enter");

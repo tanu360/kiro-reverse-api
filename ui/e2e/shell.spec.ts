@@ -1,15 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
 
 // Mock mode (pnpm dev:mock). First-run is pending on every fresh load, so the first visit
-// lands on /admin/setup, whose sign-in form accepts the mock admin password.
+// lands on /setup, whose sign-in form accepts the mock admin password.
 const PASSWORD = "12345678";
 
 async function signIn(page: Page): Promise<void> {
-  await page.goto("/admin/");
-  await page.waitForURL(/\/admin\/(setup|login)/);
+  await page.goto("/");
+  await page.waitForURL(/\/(setup|login)/);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL(/\/admin\/?$/);
+  await page.waitForURL(/^https?:\/\/[^/]+\/?$/);
   // The URL changes before the lazy shell mounts; wait for it so keyboard shortcuts are bound.
   await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
 }
@@ -22,7 +22,7 @@ test.describe("app shell", () => {
   });
 
   test("lands on Overview", async ({ page }) => {
-    await expect(page).toHaveURL(/\/admin\/?$/);
+    await expect(page).toHaveURL(/^https?:\/\/[^/]+\/?$/);
     await expect(page.locator('[data-slot="page-title"]')).toHaveText("Overview");
     await expect(page.locator("main#main h1")).toHaveText("Overview");
   });
@@ -32,9 +32,9 @@ test.describe("app shell", () => {
       .getByRole("navigation", { name: "Main navigation" })
       .getByRole("link", { name: "Accounts", exact: true })
       .click();
-    await expect(page).toHaveURL(/\/admin\/accounts$/);
+    await expect(page).toHaveURL(/\/accounts$/);
     await page.reload();
-    await expect(page).toHaveURL(/\/admin\/accounts$/);
+    await expect(page).toHaveURL(/\/accounts$/);
     await expect(page.locator("main#main h1")).toHaveText("Accounts");
   });
 
@@ -44,7 +44,7 @@ test.describe("app shell", () => {
     await expect(input).toBeVisible();
     await input.fill("Backups");
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/admin\/backups$/);
+    await expect(page).toHaveURL(/\/backups$/);
     await expect(input).toBeHidden();
   });
 
@@ -145,10 +145,10 @@ test.describe("app shell", () => {
   });
 
   test("an unknown search value does not break the page", async ({ page }) => {
-    await page.goto("/admin/?range=7d");
+    await page.goto("/?range=7d");
     await expect(page.locator("main#main h1")).toHaveText("Overview");
     await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
-    await page.goto("/admin/requests?page=-3&pageSize=7&sort=bogus&status=x");
+    await page.goto("/requests?page=-3&pageSize=7&sort=bogus&status=x");
     await expect(page.locator("main#main h1")).toHaveText("Requests");
   });
 
@@ -167,7 +167,7 @@ test.describe("app shell", () => {
     await expect(hint).toBeVisible();
     await page.getByRole("button", { name: "Admin menu" }).first().click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
-    await expect(page).toHaveURL(/\/admin\/(login|setup)/);
+    await expect(page).toHaveURL(/\/(login|setup)/);
     await expect(hint).toBeHidden();
   });
 

@@ -24,7 +24,36 @@ function keepDistPlaceholder(): Plugin {
   };
 }
 
-// Mock mode registers MSW's service worker under the /admin/ scope. Serve the worker straight
+// Old /admin/... page URLs (bookmarks from before the UI moved to the root) land on the same page
+// at the root, as the Go server does (redirectLegacyAdminPath in proxy/admin_ui.go). The admin API
+// keeps /admin/api/. A 302, not the server's 301, so a browser never caches a dev redirect.
+function redirectLegacyAdminPages(): Plugin {
+  return {
+    name: "kiro:redirect-legacy-admin-pages",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? "";
+        const queryAt = url.indexOf("?");
+        const pathname = queryAt === -1 ? url : url.slice(0, queryAt);
+        const legacy =
+          pathname === "/admin" ||
+          (pathname.startsWith("/admin/") && !pathname.startsWith("/admin/api/"));
+        if (!legacy || (req.method !== "GET" && req.method !== "HEAD")) {
+          next();
+          return;
+        }
+        // Leading slashes and backslashes go, so the target never points at another host.
+        const rest = pathname.slice("/admin".length).replace(/^[/\\]+/, "");
+        res.statusCode = 302;
+        res.setHeader("Location", `/${rest}${queryAt === -1 ? "" : url.slice(queryAt)}`);
+        res.end();
+      });
+    },
+  };
+}
+
+// Mock mode registers MSW's service worker at the root scope. Serve the worker straight
 // from node_modules in dev so it is never copied into public/ or shipped in dist/.
 function serveMockWorker(): Plugin {
   const workerPath = path.resolve(rootDir, "node_modules/msw/lib/mockServiceWorker.js");
@@ -48,7 +77,7 @@ function serveMockWorker(): Plugin {
           );
           return;
         }
-        if (req.method !== "GET" || pathname !== "/admin/mockServiceWorker.js") {
+        if (req.method !== "GET" || pathname !== "/mockServiceWorker.js") {
           next();
           return;
         }
@@ -56,7 +85,7 @@ function serveMockWorker(): Plugin {
           const body = await readFile(workerPath);
           res.statusCode = 200;
           res.setHeader("Content-Type", "text/javascript");
-          res.setHeader("Service-Worker-Allowed", "/admin/");
+          res.setHeader("Service-Worker-Allowed", "/");
           res.setHeader("Cache-Control", "no-store");
           res.end(body);
         } catch (error) {
@@ -72,7 +101,7 @@ export default defineConfig(({ mode }) => {
   return {
     // Simultaneous mock/live servers must not overwrite each other's optimized dependencies.
     cacheDir: path.resolve(rootDir, `node_modules/.vite-${isMock ? "mock" : "live"}`),
-    base: "/admin/",
+    base: "/",
     plugins: [
       tanstackRouter({
         target: "react",
@@ -83,6 +112,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       keepDistPlaceholder(),
+      redirectLegacyAdminPages(),
       ...(isMock ? [serveMockWorker()] : []),
     ],
     resolve: {
@@ -104,7 +134,7 @@ export default defineConfig(({ mode }) => {
       proxy: isMock
         ? undefined
         : {
-            // Regex key: a plain '/admin/api' string would prefix-match the SPA page /admin/api.
+            // Regex key: only the admin API under /admin/api/, never a page path.
             // Timeouts are off so the SSE stream at /admin/api/events is never cut or buffered.
             "^/admin/api/": { target: goTarget, proxyTimeout: 0, timeout: 0 },
             "/v1": { target: goTarget },

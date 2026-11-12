@@ -258,7 +258,7 @@ go build -o kiro-proxy .
 ./kiro-proxy
 ```
 
-Giao diện quản trị cần Node.js 22+ và pnpm để build. `go build` nhúng mọi thứ có trong `ui/dist`: nếu chưa build giao diện, `/admin` hiển thị trang "UI not built" trong khi API vẫn hoạt động. Docker image build cả hai.
+Giao diện quản trị cần Node.js 22+ và pnpm để build. `go build` nhúng mọi thứ có trong `ui/dist`: nếu chưa build giao diện, `/` hiển thị trang "UI not built" trong khi API vẫn hoạt động. Docker image build cả hai.
 
 ### 🎨 Phát triển giao diện quản trị
 
@@ -297,7 +297,7 @@ Xác thực bằng mật khẩu quản trị cho phép năm lần thử sai cho 
 
 ## 🕹 Cách dùng
 
-Mở `http://localhost:8080/admin`, đăng nhập, thêm tài khoản, rồi gọi API:
+Mở `http://localhost:8080`, đăng nhập, thêm tài khoản, rồi gọi API:
 
 ```bash
 # Anthropic — Claude
@@ -333,7 +333,7 @@ curl http://localhost:8080/v1/responses \
 | `GET`    | `/v1/codex/models`              | Danh sách model theo định dạng Codex CLI      |
 | `GET`    | `/v1/stats`                     | Thống kê tổng hợp mức sử dụng proxy           |
 | `GET`    | `/health`                       | Kiểm tra tình trạng hoạt động                 |
-| `GET`    | `/admin`                        | Trang quản trị web (SPA nhúng; deep link dưới `/admin/*` được chuyển về ứng dụng) |
+| `GET`    | `/`                             | Trang quản trị web (SPA nhúng; link trang như `/accounts` mở ứng dụng, link cũ `/admin/*` được chuyển hướng, client không yêu cầu HTML nhận health check) |
 
 ---
 

@@ -63,10 +63,10 @@ describe("OverviewPage", () => {
     await renderApp("/");
     const row = await screen.findByRole("region", { name: "Key figures" });
     const links: [string, string][] = [
-      ["Review accounts needing attention", "/admin/accounts?status=attention"],
-      ["View accounts", "/admin/accounts"],
-      ["View requests", "/admin/requests"],
-      ["View failed requests", "/admin/requests?status=failed"],
+      ["Review accounts needing attention", "/accounts?status=attention"],
+      ["View accounts", "/accounts"],
+      ["View requests", "/requests"],
+      ["View failed requests", "/requests?status=failed"],
     ];
     for (const [name, href] of links) {
       expect(within(row).getByRole("link", { name })).toHaveAttribute("href", href);
@@ -348,7 +348,7 @@ describe("OverviewPage", () => {
     });
     expect(
       within(card).getByRole("link", { name: "View all accounts that need attention" }),
-    ).toHaveAttribute("href", "/admin/accounts?status=attention");
+    ).toHaveAttribute("href", "/accounts?status=attention");
   });
 
   it("refreshes the token from a needs-attention row", async () => {
@@ -404,7 +404,7 @@ describe("OverviewPage", () => {
     ).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "View all accounts" })).toHaveAttribute(
       "href",
-      "/admin/accounts?sort=requests&order=desc",
+      "/accounts?sort=requests&order=desc",
     );
   });
 

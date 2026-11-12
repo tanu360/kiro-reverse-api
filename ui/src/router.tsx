@@ -4,7 +4,6 @@ import { routeTree } from "./routeTree.gen";
 
 export const router = createRouter({
   routeTree,
-  basepath: "/admin",
   context: { queryClient },
   defaultPreload: "intent",
   scrollRestoration: true,

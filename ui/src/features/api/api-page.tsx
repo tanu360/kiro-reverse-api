@@ -6,7 +6,7 @@ import { ApiKeysCard } from "./api-keys-card";
 import { ClientSnippetsCard } from "./client-snippets";
 import { EndpointsCard } from "./endpoints-card";
 
-/** /admin/api: API access, API keys, endpoint URLs and client setup snippets. */
+/** /api: API access, API keys, endpoint URLs and client setup snippets. */
 export function ApiPage(): JSX.Element {
   const { t } = useT("api");
   return (

@@ -108,10 +108,13 @@ export function claimMockPassword(password = mockDb.adminPassword): void {
  * The first-run password as config/admin_password.go makes it: 8 crypto-random digits,
  * zero-padded ("%08d"). It is drawn once and kept in localStorage, so it stays the same across
  * reloads, as the real one does until it is claimed; setting that key pins a known one (e2e).
- * Unit tests keep the fixed 12345678.
+ * VITE_MOCK_PASSWORD (in ui/.env.mock.local, never committed) pins one for a whole dev machine,
+ * over whatever the browser kept. Unit tests keep the fixed 12345678.
  */
 function mockAdminPassword(): string {
   if (import.meta.env.MODE === "test") return "12345678";
+  const pinned = import.meta.env.VITE_MOCK_PASSWORD;
+  if (pinned) return pinned;
   try {
     const stored = localStorage.getItem(MOCK_PASSWORD_KEY);
     if (stored) return stored;

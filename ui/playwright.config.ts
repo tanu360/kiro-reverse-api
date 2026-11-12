@@ -14,7 +14,7 @@ export default defineConfig({
   forbidOnly: CI,
   reporter: CI ? [["github"], ["list"]] : "list",
   use: {
-    baseURL: `${origin}/admin/`,
+    baseURL: `${origin}/`,
     // The browser mock draws a random 8-digit first-run password, as the server does
     // (src/lib/mocks/db.ts); the specs pin the known one through the key it reads. They also pin
     // the small dataset (src/lib/mocks/scenario.ts): the dev server defaults to the full one.
@@ -42,7 +42,10 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: `pnpm dev:mock --host 127.0.0.1 --port ${PORT} --strictPort`,
-    url: `${origin}/admin/`,
+    url: `${origin}/`,
     reuseExistingServer: false,
+    // An empty value beats a VITE_MOCK_PASSWORD pinned in a local .env.mock.local, so the specs'
+    // password above is the one the mock uses.
+    env: { VITE_MOCK_PASSWORD: "" },
   },
 });

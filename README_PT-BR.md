@@ -258,7 +258,7 @@ go build -o kiro-proxy .
 ./kiro-proxy
 ```
 
-A UI de administração precisa de Node.js 22+ e pnpm para compilar. O `go build` embute o que estiver em `ui/dist`: sem a compilação da UI, `/admin` mostra uma página "UI not built" enquanto a API continua funcionando. A imagem Docker compila as duas.
+A UI de administração precisa de Node.js 22+ e pnpm para compilar. O `go build` embute o que estiver em `ui/dist`: sem a compilação da UI, `/` mostra uma página "UI not built" enquanto a API continua funcionando. A imagem Docker compila as duas.
 
 ### 🎨 Desenvolvimento da UI de administração
 
@@ -297,7 +297,7 @@ A autenticação por senha de administrador permite cinco tentativas com falha p
 
 ## 🕹 Uso
 
-Abra `http://localhost:8080/admin`, entre, adicione contas e depois chame a API:
+Abra `http://localhost:8080`, entre, adicione contas e depois chame a API:
 
 ```bash
 # Anthropic — Claude
@@ -333,7 +333,7 @@ curl http://localhost:8080/v1/responses \
 | `GET`    | `/v1/codex/models`              | Lista de modelos no formato do Codex CLI      |
 | `GET`    | `/v1/stats`                     | Estatísticas agregadas de uso do proxy        |
 | `GET`    | `/health`                       | Verificação de saúde                          |
-| `GET`    | `/admin`                        | Painel de administração web (SPA embutido; links diretos em `/admin/*` caem no app) |
+| `GET`    | `/`                             | Painel de administração web (SPA embutido; links de página como `/accounts` abrem o app, links antigos `/admin/*` redirecionam e um cliente que não pede HTML recebe o health check) |
 
 ---
 

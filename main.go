@@ -44,7 +44,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%d", config.GetHost(), config.GetPort())
 	logger.Infof("Kiro Proxy starting on http://%s (log level: %s)", addr, logger.LevelName(logger.GetLevel()))
-	logger.Infof("Admin panel: http://%s/admin", addr)
+	logger.Infof("Admin panel: http://%s/", addr)
 	logger.Infof("Claude API: http://%s/v1/messages", addr)
 	logger.Infof("OpenAI API: http://%s/v1/chat/completions", addr)
 	if config.GetHost() == config.DefaultHost {

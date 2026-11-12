@@ -258,7 +258,7 @@ go build -o kiro-proxy .
 ./kiro-proxy
 ```
 
-构建管理面板需要 Node.js 22+ 与 pnpm。`go build` 会内嵌 `ui/dist` 中的内容：未构建 UI 时，`/admin` 会显示 "UI not built" 页面，API 仍可正常使用。Docker 镜像会同时构建两者。
+构建管理面板需要 Node.js 22+ 与 pnpm。`go build` 会内嵌 `ui/dist` 中的内容：未构建 UI 时，`/` 会显示 "UI not built" 页面，API 仍可正常使用。Docker 镜像会同时构建两者。
 
 ### 🎨 管理面板开发
 
@@ -297,7 +297,7 @@ go build -o kiro-proxy .
 
 ## 🕹 使用方法
 
-打开 `http://localhost:8080/admin`，登录后添加账号即可调用 API：
+打开 `http://localhost:8080`，登录后添加账号即可调用 API：
 
 ```bash
 # Anthropic — Claude
@@ -333,7 +333,7 @@ curl http://localhost:8080/v1/responses \
 | `GET`    | `/v1/codex/models`              | Codex CLI 格式的模型列表                      |
 | `GET`    | `/v1/stats`                     | 代理使用聚合统计                              |
 | `GET`    | `/health`                       | 健康检查                                      |
-| `GET`    | `/admin`                        | Web 管理面板（内嵌 SPA；`/admin/*` 下的深层链接回退到该应用） |
+| `GET`    | `/`                             | Web 管理面板（内嵌 SPA；`/accounts` 等页面链接直接打开应用，旧的 `/admin/*` 链接会重定向，不请求 HTML 的客户端得到健康检查） |
 
 ---
 

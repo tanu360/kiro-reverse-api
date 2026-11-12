@@ -18,17 +18,19 @@ until curl -fs -o /dev/null "$base/health"; do
   sleep 1
 done
 
-# The "UI not built" page answers 503, so -f fails on it.
-curl -fsS -o "$tmp/index.html" "$base/admin/"
+# The app is served at the root, but only to a client that asks for HTML, as a browser does: a
+# plain probe of / gets the health JSON. The "UI not built" page answers 503, so -f fails on it.
+html="Accept: text/html"
+curl -fsS -H "$html" -o "$tmp/index.html" "$base/"
 grep -q 'id="root"' "$tmp/index.html" || {
-  echo "/admin/ is not the admin UI document" >&2
+  echo "/ is not the admin UI document" >&2
   exit 1
 }
 
 # Every script and stylesheet the document references is served.
-assets="$(grep -o '/admin/assets/[^"]*' "$tmp/index.html" | sort -u)"
+assets="$(grep -o '"/assets/[^"]*' "$tmp/index.html" | tr -d '"' | sort -u)"
 if [ -z "$assets" ]; then
-  echo "/admin/ references no /admin/assets/ files" >&2
+  echo "/ references no /assets/ files" >&2
   exit 1
 fi
 for asset in $assets; do
@@ -36,7 +38,14 @@ for asset in $assets; do
 done
 
 # A deep link falls back to the SPA document.
-curl -fsS -o "$tmp/deep.html" "$base/admin/accounts"
+curl -fsS -H "$html" -o "$tmp/deep.html" "$base/accounts"
 grep -q 'id="root"' "$tmp/deep.html"
+
+# An old /admin/ page link moves to the same page at the root.
+location="$(curl -fsS -o /dev/null -w '%{redirect_url}' -H "$html" "$base/admin/accounts")"
+[ "$location" = "$base/accounts" ] || {
+  echo "/admin/accounts redirects to '$location', not $base/accounts" >&2
+  exit 1
+}
 
 echo "admin UI ok: $(echo "$assets" | wc -l | tr -d ' ') assets served from $base"

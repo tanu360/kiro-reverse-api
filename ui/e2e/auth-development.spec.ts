@@ -6,7 +6,7 @@ test("mock sign-in survives reloads and new tabs, and re-login returns to Accoun
   context,
 }) => {
   await page.route("https://raw.githubusercontent.com/**", (route) => route.abort());
-  await page.goto("/admin/accounts?plan=pro");
+  await page.goto("/accounts?plan=pro");
   await expect(page).toHaveURL(/\/setup\?redirect=/);
   await expect(page.getByRole("checkbox", { name: "Stay signed in" })).toBeChecked();
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -24,7 +24,7 @@ test("mock sign-in survives reloads and new tabs, and re-login returns to Accoun
   await expect(page).toHaveURL(/\/accounts\?plan=pro$/);
 
   const other = await context.newPage();
-  await other.goto("/admin/accounts");
+  await other.goto("/accounts");
   await expect(other.getByRole("table", { name: "Accounts" })).toBeVisible();
   await other.close();
 

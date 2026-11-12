@@ -21,12 +21,12 @@ async function openAccounts(page: Page, width: number): Promise<void> {
   await page.emulateMedia({ reducedMotion: "reduce" });
   // The remote version check is the app's only external call; keep it off the network.
   await page.route("https://raw.githubusercontent.com/**", (route) => route.abort());
-  await page.goto("/admin/");
-  await page.waitForURL(/\/admin\/(setup|login)/);
+  await page.goto("/");
+  await page.waitForURL(/\/(setup|login)/);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL(/\/admin\/?$/);
-  await page.goto("/admin/accounts");
+  await page.waitForURL(/^https?:\/\/[^/]+\/?$/);
+  await page.goto("/accounts");
   await expect(page.locator("main#main h1")).toHaveText("Accounts");
   await page.evaluate(() => document.fonts.ready);
 }

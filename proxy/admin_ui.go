@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	adminUIPrefix      = "/admin/"
 	adminUIAssetPrefix = "assets/"
 	adminUIIndexFile   = "index.html"
 
@@ -26,9 +25,10 @@ var defaultAdminUI = sync.OnceValue(func() http.Handler {
 	return newAdminUIHandler(d, ok)
 })
 
-// adminUIHandler serves the admin single-page app under /admin. Hashed files under
-// /admin/assets/ are cached for a year; every other route falls back to index.html so
-// the client router can resolve deep links. /admin/api/* is routed before this handler.
+// adminUIHandler serves the admin single-page app at the site root. Hashed files under
+// /assets/ are cached for a year; any other page a browser asks for falls back to index.html
+// so the client router can resolve deep links. The proxy API, /admin/api/* and /health are
+// routed before this handler, which only sees what nothing else matched.
 type adminUIHandler struct {
 	dist  fs.FS
 	index []byte
@@ -45,17 +45,26 @@ func newAdminUIHandler(dist fs.FS, built bool) http.Handler {
 	return &adminUIHandler{dist: dist, index: index}
 }
 
+// apiNotFound is the proxy's plain 404 for a path nothing serves, the body it always had.
+func apiNotFound(w http.ResponseWriter) {
+	http.Error(w, "Not Found", http.StatusNotFound)
+}
+
+// wantsHTML reports whether the request is a browser page load. Only those fall back to the
+// app: an API client that hits an unknown path keeps getting a plain 404, not a web page.
+func wantsHTML(r *http.Request) bool {
+	return strings.Contains(r.Header.Get("Accept"), "text/html")
+}
+
 func (h *adminUIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	//! The app shares the root with the proxy API: a POST to a path nothing serves is the
+	//! API's plain 404, as before the UI moved here, never a 405 from the app.
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		apiNotFound(w)
 		return
 	}
 
-	rel := strings.TrimPrefix(r.URL.Path, adminUIPrefix)
-	if r.URL.Path == "/admin" {
-		rel = ""
-	}
+	rel := strings.TrimPrefix(r.URL.Path, "/")
 	name := path.Clean(rel)
 	if rel == "" {
 		name = "."
@@ -75,6 +84,10 @@ func (h *adminUIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if name != "." && h.serveFile(w, r, name, cacheNoCache) {
+		return
+	}
+	if !wantsHTML(r) {
+		apiNotFound(w)
 		return
 	}
 	h.serveIndex(w, r)
@@ -105,7 +118,7 @@ func (h *adminUIHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, adminUIIndexFile, time.Time{}, bytes.NewReader(h.index))
 }
 
-// adminUINotBuiltHandler answers every admin UI route when the binary was built without ui/dist.
+// adminUINotBuiltHandler answers browser page loads when the binary was built without ui/dist.
 type adminUINotBuiltHandler struct{}
 
 const adminUINotBuiltPage = `<!doctype html>
@@ -129,9 +142,30 @@ code{background:#f6f8fa;padding:.1rem .3rem;border-radius:4px}
 </html>
 `
 
-func (adminUINotBuiltHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
+func (adminUINotBuiltHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if (r.Method != http.MethodGet && r.Method != http.MethodHead) || !wantsHTML(r) {
+		apiNotFound(w)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusServiceUnavailable)
 	w.Write([]byte(adminUINotBuiltPage))
+}
+
+// redirectLegacyAdminPath moves a page URL from the old /admin/ base (a bookmark, an installed
+// app's start URL) to the same page at the root, query kept. /admin/api/* is the admin API and
+// never reaches this.
+func redirectLegacyAdminPath(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		apiNotFound(w)
+		return
+	}
+	//! Leading slashes and backslashes are dropped, so /admin//evil.example or /admin/\evil.example
+	//! cannot become a protocol-relative redirect to another host.
+	target := "/" + strings.TrimLeft(strings.TrimPrefix(r.URL.Path, "/admin"), "/\\")
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusMovedPermanently)
 }

@@ -9,11 +9,11 @@ import { expect, type Page, test } from "@playwright/test";
 const PASSWORD = "12345678";
 
 async function signIn(page: Page): Promise<void> {
-  await page.goto("/admin/");
-  await page.waitForURL(/\/admin\/(setup|login)/);
+  await page.goto("/");
+  await page.waitForURL(/\/(setup|login)/);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL(/\/admin\/?$/);
+  await page.waitForURL(/^https?:\/\/[^/]+\/?$/);
   await expect(page.locator("main#main")).toBeVisible();
 }
 
@@ -37,13 +37,13 @@ for (const lang of ["vi", "pt-BR"]) {
     test("the boot script sets <html lang> before the app loads", async ({ page }) => {
       // Without the app bundle, only the inline script in index.html can set the language.
       await page.route("**/src/main.tsx", (route) => route.abort());
-      await page.goto("/admin/");
+      await page.goto("/");
       await expect(page.locator("html")).toHaveAttribute("lang", lang);
     });
 
     test("the accounts table fits 1440 px without sideways scroll", async ({ page }) => {
       await signIn(page);
-      await page.goto("/admin/accounts");
+      await page.goto("/accounts");
       const container = page.locator('[data-slot="table-container"]');
       // Loaded rows, not the aria-hidden skeleton rows, which never overflow.
       await expect(container.locator("tbody tr:not([aria-hidden])").first()).toBeVisible();

@@ -21,7 +21,7 @@ export async function startMockWorker(): Promise<void> {
   );
   const worker = setupWorker(...allHandlers);
   await worker.start({
-    serviceWorker: { url: "/admin/mockServiceWorker.js", options: { scope: "/admin/" } },
+    serviceWorker: { url: "/mockServiceWorker.js", options: { scope: "/" } },
     // MSW 3 renamed onUnhandledRequest to onUnhandledFrame.
     onUnhandledFrame: "bypass",
     quiet: true,

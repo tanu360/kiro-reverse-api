@@ -43,7 +43,7 @@ let idSeed = 0;
 /** Open toasts that close on a path (ToastOptions.hideOnPath), by id. */
 const pathToasts = new Map<string, { path: string }>();
 
-/** True when `pathname` (with or without the /admin base) is `path` or a page under it. */
+/** True when `pathname` is `path` or a page under it. */
 function isOnPath(pathname: string, path: string): boolean {
   const current = pathname.replace(/\/+$/, "");
   const target = path.replace(/\/+$/, "");
