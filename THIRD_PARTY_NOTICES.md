@@ -201,3 +201,74 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Devicon
+
+- Source: https://github.com/devicons/devicon (via Iconify `devicon`)
+- Copyright (c) 2015 konpa
+- License: MIT
+
+The C# mark in `ui/src/components/shared/language-logos.tsx` is taken from its `csharp` icon. The mark names the language a client snippet is written in; the brand belongs to its owner.
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2015 konpa
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## vscode-icons
+
+- Source: https://github.com/vscode-icons/vscode-icons (via Iconify `vscode-icons`)
+- Copyright The vscode-icons Contributors
+- License: MIT
+
+The Go gopher in `ui/src/components/shared/language-logos.tsx` is taken from its `file_type_go_gopher` icon. The mark names the language a client snippet is written in; the brand belongs to its owner.
+
+```text
+The MIT License (MIT)
+
+Copyright The vscode-icons Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## SVG Logos and Simple Icons
+
+- Sources: https://github.com/gilbarbara/logos and https://github.com/simple-icons/simple-icons (via Iconify `logos` and `simple-icons`)
+- License: CC0 1.0 (public domain dedication; no notice required, listed for provenance)
+
+The Python, Node.js, Java, PHP, Ruby and curl marks in `ui/src/components/shared/language-logos.tsx` come from these sets. The marks name the languages and tools a client snippet uses; the brands belong to their owners.

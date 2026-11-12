@@ -213,7 +213,7 @@ describe("Client setup snippets", () => {
   it("names a code block that scrolls sideways as a region around its scroller", async () => {
     overflow(900, 300);
     const { user } = await renderPage();
-    const block = screen.getByRole("region", { name: "Anthropic Messages API code" });
+    const block = screen.getByRole("region", { name: "Curl request code" });
     expect(block.tagName).toBe("SECTION");
     expect(block.querySelector("pre")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Codex" }));
@@ -223,9 +223,7 @@ describe("Client setup snippets", () => {
   it("adds no region to a code block that fits", async () => {
     overflow(300, 300);
     await renderPage();
-    expect(
-      screen.queryByRole("region", { name: "Anthropic Messages API code" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Curl request code" })).not.toBeInTheDocument();
     for (const pre of document.querySelectorAll("pre")) {
       expect(pre).not.toHaveAttribute("tabindex");
     }

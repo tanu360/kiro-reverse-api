@@ -1,7 +1,33 @@
-import type { HighlighterCore, ThemedToken, ThemeRegistration } from "shiki/core";
+import type { HighlighterCore, LanguageInput, ThemedToken, ThemeRegistration } from "shiki/core";
 
 /** The languages a CodeBlock can highlight (the API page's client snippets). */
-export type CodeLanguage = "bash" | "toml" | "python" | "typescript" | "json";
+export type CodeLanguage =
+  | "bash"
+  | "toml"
+  | "python"
+  | "typescript"
+  | "javascript"
+  | "json"
+  | "go"
+  | "java"
+  | "php"
+  | "ruby"
+  | "csharp";
+
+/* Each grammar is its own chunk, fetched the first time a block needs it (PHP's pulls in HTML). */
+const GRAMMARS: Record<CodeLanguage, LanguageInput> = {
+  bash: () => import("shiki/langs/bash.mjs"),
+  toml: () => import("shiki/langs/toml.mjs"),
+  python: () => import("shiki/langs/python.mjs"),
+  typescript: () => import("shiki/langs/typescript.mjs"),
+  javascript: () => import("shiki/langs/javascript.mjs"),
+  json: () => import("shiki/langs/json.mjs"),
+  go: () => import("shiki/langs/go.mjs"),
+  java: () => import("shiki/langs/java.mjs"),
+  php: () => import("shiki/langs/php.mjs"),
+  ruby: () => import("shiki/langs/ruby.mjs"),
+  csharp: () => import("shiki/langs/csharp.mjs"),
+};
 
 const THEME = "kiro";
 
@@ -87,8 +113,8 @@ const KIRO_THEME: ThemeRegistration = {
 let highlighterPromise: Promise<HighlighterCore> | null = null;
 
 /**
- * One Shiki highlighter for the app, built on first use and loaded in its own chunk: the core,
- * the JavaScript regex engine (no WebAssembly) and only the grammars above.
+ * One Shiki highlighter for the app, built on first use and loaded in its own chunk: the core and
+ * the JavaScript regex engine (no WebAssembly). Grammars are added as blocks ask for them.
  */
 function getHighlighter(): Promise<HighlighterCore> {
   highlighterPromise ??= (async () => {
@@ -98,13 +124,7 @@ function getHighlighter(): Promise<HighlighterCore> {
     ]);
     return createHighlighterCore({
       themes: [KIRO_THEME],
-      langs: [
-        import("shiki/langs/bash.mjs"),
-        import("shiki/langs/toml.mjs"),
-        import("shiki/langs/python.mjs"),
-        import("shiki/langs/typescript.mjs"),
-        import("shiki/langs/json.mjs"),
-      ],
+      langs: [],
       engine: createJavaScriptRegexEngine(),
     });
   })();
@@ -113,6 +133,19 @@ function getHighlighter(): Promise<HighlighterCore> {
     highlighterPromise = null;
   });
   return highlighterPromise;
+}
+
+const grammarLoads = new Map<CodeLanguage, Promise<void>>();
+
+/** Loads a grammar into the highlighter once; a failed load is retried on the next block. */
+function loadGrammar(highlighter: HighlighterCore, grammar: CodeLanguage): Promise<void> {
+  let load = grammarLoads.get(grammar);
+  if (!load) {
+    load = highlighter.loadLanguage(GRAMMARS[grammar]);
+    load.catch(() => grammarLoads.delete(grammar));
+    grammarLoads.set(grammar, load);
+  }
+  return load;
 }
 
 type Highlight = (code: string, lang: CodeLanguage) => ThemedToken[][];
@@ -181,6 +214,9 @@ function embedJson(code: string, lines: ThemedToken[][], highlight: Highlight): 
 /** The code as lines of coloured tokens; each token's `color` is a CSS variable reference. */
 export async function highlightCode(code: string, lang: CodeLanguage): Promise<ThemedToken[][]> {
   const highlighter = await getHighlighter();
+  // bash embeds JSON bodies, so it needs the JSON grammar too.
+  const grammars: CodeLanguage[] = lang === "bash" ? ["bash", "json"] : [lang];
+  await Promise.all(grammars.map((grammar) => loadGrammar(highlighter, grammar)));
   const highlight: Highlight = (text, language) =>
     highlighter.codeToTokens(text, { lang: language, theme: THEME }).tokens;
   const lines = highlight(code, lang);

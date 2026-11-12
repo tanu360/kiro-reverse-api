@@ -194,7 +194,7 @@
 - 实时更新的概览仪表盘：账号、请求、成功与失败的 KPI 卡片及每小时趋势，带迷你走势图的每分钟实时指标，流量趋势，模型分布环形图，以及按账号堆叠的流量柱状图。统计卡片区分 Kiro 账号的 Credits 用量与本代理产生的请求用量。
 - 账号页支持带计数的状态标签页、筛选（套餐、认证、区域、启用）、排序、批量操作、详情视图、连接测试与导出。
 - 请求日志支持带计数的状态标签页、搜索（也会匹配完整的 API Key）、排序、含错误分类的详情视图、脱敏 API Key，以及基于 SQLite 的历史记录。
-- 接口页管理客户端 API Key（可自定义 Key 值、启用/禁用、按 Key 设置 Token 与 Credits 限额、重置用量），并提供 curl、Claude Code、Codex 与 OpenAI SDK 的语法高亮接入示例。
+- 接口页管理客户端 API Key（可自定义 Key 值、启用/禁用、按 Key 设置 Token 与 Credits 限额、重置用量），并提供语法高亮的接入示例生成器：为 Anthropic Messages、OpenAI Chat Completions 与 OpenAI Responses 接口生成 curl、Python、Node.js、Go、Java、PHP、Ruby 与 C# 请求代码（官方 SDK 或纯 HTTP，可选流式）及示例响应，另含 Claude Code 与 Codex 配置。
 - 设置页涵盖用量、账号路由、自动续写、工具历史、Thinking、模型映射、System Prompt 过滤、流完整性、Kiro 端点、出站代理、管理员密码与重置统计；备份页支持定时备份、上传与一键恢复。
 - 命令菜单（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>）可快速打开页面和执行操作；隐私模式可隐藏邮箱地址；支持对照 GitHub Releases 检查更新。
 - 修改管理员密码会结束其他所有已登录的会话。

@@ -1,4 +1,5 @@
 import {
+  CalculatorIcon,
   ChartColumnIcon,
   CodeIcon,
   Globe02Icon,
@@ -39,6 +40,14 @@ const ENDPOINTS: readonly Endpoint[] = [
     copyKey: "endpoints.copyClaude",
     method: "POST",
     path: "/v1/messages",
+  },
+  {
+    id: "count-tokens",
+    icon: CalculatorIcon,
+    titleKey: "endpoints.countTokens",
+    copyKey: "endpoints.copyCountTokens",
+    method: "POST",
+    path: "/v1/messages/count_tokens",
   },
   {
     id: "openai",

@@ -31,6 +31,7 @@ const SKIPPED = [
   /\/flag-icon\.tsx$/,
   /\/model-logos?\.tsx$/,
   /\/brand-logos\.tsx$/,
+  /\/language-logos\.tsx$/,
 ];
 
 // Places that own a sticky layer by design: DataTable's pinned columns, the site header, the

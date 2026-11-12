@@ -1,6 +1,7 @@
 import {
   Fragment,
   type JSX,
+  type ReactNode,
   type RefObject,
   useEffect,
   useLayoutEffect,
@@ -12,23 +13,26 @@ import { CopyButton } from "@/components/shared/copy-button";
 import { type CodeLanguage, highlightCode } from "@/lib/highlight";
 import { cn, keyByText } from "@/lib/utils";
 
-function isWiderThanBox(element: HTMLElement): boolean {
-  return element.scrollWidth > element.clientWidth;
+function overflowsBox(element: HTMLElement): boolean {
+  return element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight;
 }
 
-/** True while the element's content is wider than its box; rechecked on resize and new content. */
-function useScrollsSideways(ref: RefObject<HTMLElement | null>): boolean {
+/**
+ * True while the element's content overflows its box (wider, or taller under `capHeight`);
+ * rechecked on resize and new content.
+ */
+function useScrolls(ref: RefObject<HTMLElement | null>): boolean {
   const [scrolls, setScrolls] = useState(false);
   // After every render, since new content (other code, its highlighted lines) changes the scroll
   // width. An unchanged result does not render again.
   useLayoutEffect(() => {
     const element = ref.current;
-    if (element) setScrolls(isWiderThanBox(element));
+    if (element) setScrolls(overflowsBox(element));
   });
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => setScrolls(isWiderThanBox(element)));
+    const observer = new ResizeObserver(() => setScrolls(overflowsBox(element)));
     observer.observe(element);
     return () => observer.disconnect();
   }, [ref]);
@@ -88,6 +92,8 @@ export function CodeBlock({
   wrap = false,
   language,
   bare = false,
+  actions,
+  capHeight = false,
   className,
 }: {
   code: string;
@@ -102,15 +108,20 @@ export function CodeBlock({
   language?: CodeLanguage;
   /** No title strip and no frame: the caller shows the title and the copy button. */
   bare?: boolean;
+  /** Controls in the title strip, before the copy button (the request builder's client switch). */
+  actions?: ReactNode;
+  /** Caps the code at 288 px (13 lines); longer code scrolls inside the block instead of growing the page. */
+  capHeight?: boolean;
   /** Layout only. */
   className?: string;
 }): JSX.Element {
   const preRef = useRef<HTMLPreElement>(null);
-  const scrolls = useScrollsSideways(preRef);
+  const scrolls = useScrolls(preRef);
   const lines = useHighlightedLines(code, language);
   const preClassName = cn(
     "scrollbar-x max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed outline-none focus-outline-inset",
     wrap && "whitespace-pre-wrap wrap-anywhere",
+    capHeight && "max-h-72 overflow-y-auto",
   );
   const content = (
     <code>
@@ -149,21 +160,25 @@ export function CodeBlock({
       {bare ? (
         <figcaption className="sr-only">{title}</figcaption>
       ) : (
-        <div className="flex min-h-9 items-center justify-between gap-2 border-border-subtle border-b bg-surface-2 py-0.5 ps-3 pe-1">
+        <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border-border-subtle border-b bg-surface-2 py-0.5 ps-3 pe-1">
           <figcaption className="min-w-0 truncate font-medium text-meta text-muted-foreground">
             {title}
           </figcaption>
-          <CopyButton
-            copiedMessage={copiedMessage}
-            label={copyLabel}
-            size="icon-sm"
-            value={code}
-            variant="quiet"
-          />
+          {/* Actions wrap under the title on a strip too narrow for both. */}
+          <div className="ms-auto flex min-w-0 items-center gap-2">
+            {actions}
+            <CopyButton
+              copiedMessage={copiedMessage}
+              label={copyLabel}
+              size="icon-sm"
+              value={code}
+              variant="quiet"
+            />
+          </div>
         </div>
       )}
       {/*
-        While the code scrolls sideways, the section is named, which makes it a region landmark
+        While the code scrolls (sideways, or down under capHeight), the section is named, which makes it a region landmark
         around the scroller (browsers make a scrolling box a tab stop themselves, so arrow keys
         scroll it); otherwise the unnamed section is plain markup. It stays mounted either way,
         so the measured <pre> is never replaced.

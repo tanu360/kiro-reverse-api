@@ -27,4 +27,16 @@ describe("highlightCode", () => {
     expect(color("1024")).toBe("var(--code-token-constant)");
     expect(color("claude-sonnet-5")).toBe("var(--code-token-string)");
   });
+
+  it("loads a grammar on first use and keeps every character", async () => {
+    const go =
+      'package main\n\nfunc main() {\n\treq.Header.Set("x-api-key", os.Getenv("KIRO_API_KEY"))\n}';
+    const lines = await highlightCode(go, "go");
+    expect(lines.map((line) => line.map((token) => token.content).join(""))).toEqual(
+      go.split("\n"),
+    );
+    expect(lines[0].find((token) => token.content === "package")?.color).toBe(
+      "var(--code-token-keyword)",
+    );
+  });
 });

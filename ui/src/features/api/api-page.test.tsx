@@ -247,7 +247,7 @@ describe("ApiPage", () => {
     expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
   });
 
-  it("shows the six endpoint URLs on window.location.origin", async () => {
+  it("shows the seven endpoint URLs on window.location.origin", async () => {
     await renderPage();
     const list = screen.getByRole("list", { name: "Endpoints" });
     const urls = within(list)
@@ -256,6 +256,7 @@ describe("ApiPage", () => {
     const origin = window.location.origin;
     expect(urls).toEqual([
       `${origin}/v1/messages`,
+      `${origin}/v1/messages/count_tokens`,
       `${origin}/v1/chat/completions`,
       `${origin}/v1/responses`,
       `${origin}/v1/models`,
@@ -263,6 +264,40 @@ describe("ApiPage", () => {
       `${origin}/v1/stats`,
     ]);
     expect(screen.getByRole("button", { name: "Copy Claude API endpoint" })).toBeInTheDocument();
+  });
+
+  it("builds the request for the picked API and language, SDK or plain HTTP", async () => {
+    const { user } = await renderPage();
+    const origin = window.location.origin;
+    const request = () =>
+      screen.getByRole("tabpanel", { name: "API request" }).querySelector("pre");
+    expect(request()).toHaveTextContent(`curl "${origin}/v1/messages"`);
+    // Curl has no SDK, so no switch.
+    expect(screen.queryByRole("switch", { name: /SDK/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /Responses/ }));
+    await user.click(screen.getByRole("radio", { name: "Python" }));
+    const sdk = screen.getByRole("switch", { name: "OpenAI SDK" });
+    expect(sdk).toBeChecked();
+    expect(request()).toHaveTextContent(`base_url="${origin}/v1"`);
+    expect(request()).toHaveTextContent("client.responses.create(");
+
+    await user.click(sdk);
+    expect(sdk).not.toBeChecked();
+    expect(request()).toHaveTextContent(`"${origin}/v1/responses"`);
+    expect(request()).toHaveTextContent("requests.post(");
+
+    await user.click(screen.getByRole("radio", { name: /Messages/ }));
+    expect(screen.getByRole("switch", { name: "Anthropic SDK" })).not.toBeChecked();
+  });
+
+  it("keeps the picks for the next visit", async () => {
+    const first = await renderPage();
+    await first.user.click(screen.getByRole("radio", { name: "Go" }));
+    first.unmount();
+    await renderPage();
+    expect(screen.getByRole("radio", { name: "Go" })).toBeChecked();
+    expect(screen.getByText("main.go")).toBeInTheDocument();
   });
 
   it("renders client snippets for this origin with the placeholder env var", async () => {
