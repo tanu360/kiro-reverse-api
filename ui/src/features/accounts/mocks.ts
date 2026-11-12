@@ -1,5 +1,6 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
 import type { AccountActivityResponse } from "@/lib/api/account-activity";
+import type { DuplicateGroup } from "@/lib/api/duplicates";
 import type {
   Account,
   AccountActionResult,
@@ -224,6 +225,54 @@ function accountActivity(): AccountActivityResponse {
   return { nowUnix: now, dayStartUnix: dayStart, rpmLimit: limit, accounts };
 }
 
+/**
+ * The mock's duplicate groups: one Kiro user is the same provider, sign-in method and email
+ * (the Go rule set also matches refresh tokens, user ids and API keys, which mockDb lacks). The
+ * seeded accounts have none, so the list is empty until a test adds a copy.
+ */
+function duplicateGroups(): DuplicateGroup[] {
+  const byUser = new Map<string, Account[]>();
+  for (const account of mockDb.accounts) {
+    const email = account.email.trim().toLowerCase();
+    if (!email || isApiKey(account)) continue;
+    const key = [account.provider.toLowerCase(), account.authMethod.toLowerCase(), email].join("|");
+    byUser.set(key, [...(byUser.get(key) ?? []), account]);
+  }
+  return [...byUser.values()]
+    .filter((accounts) => accounts.length > 1)
+    .map((accounts) => {
+      const healthy = (account: Account) =>
+        account.enabled && !account.silent && !isBanned(account) && account.hasToken;
+      const keeper = [...accounts].sort(
+        (a, b) =>
+          Number(healthy(b)) - Number(healthy(a)) ||
+          b.lastRefresh - a.lastRefresh ||
+          b.expiresAt - a.expiresAt,
+      )[0];
+      return {
+        reasons: ["email"],
+        suggestedKeepId: keeper?.id ?? "",
+        accounts: accounts.map((account) => ({
+          id: account.id,
+          email: account.email,
+          nickname: account.nickname,
+          authMethod: account.authMethod,
+          provider: account.provider,
+          region: account.region,
+          enabled: account.enabled,
+          healthy: healthy(account),
+          banStatus: account.banStatus,
+          silent: account.silent,
+          lastRefresh: account.lastRefresh,
+          expiresAt: account.expiresAt,
+          lastUsed: account.lastUsed,
+          requestCount: account.requestCount,
+          errorCount: account.errorCount,
+        })),
+      };
+    });
+}
+
 export const handlers: HttpHandler[] = [
   http.get(apiUrl("/accounts"), async ({ request }) => {
     const denied = requireAuth(request);
@@ -327,6 +376,61 @@ export const handlers: HttpHandler[] = [
     accountsChanged();
     const { ok, failed } = countOk(results);
     return HttpResponse.json({ success: true, deleted: ok, failed, results });
+  }),
+
+  // Registered before /accounts/:id/... so "duplicates" is never read as an account id.
+  http.get(apiUrl("/accounts/duplicates"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const groups = duplicateGroups();
+    return HttpResponse.json({
+      duplicateCount: groups.reduce((sum, group) => sum + group.accounts.length - 1, 0),
+      groups,
+    });
+  }),
+
+  http.post(apiUrl("/accounts/duplicates/merge"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    const body = await readJson(request);
+    if (!body) return jsonError(400, "Invalid JSON", { code: "invalid_json" });
+    const keepId = typeof body.keepId === "string" ? body.keepId : "";
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string" && id !== keepId)
+      : [];
+    const removed = [...new Set(ids)];
+    if (!keepId || removed.length === 0) {
+      return jsonError(400, "ids must name at least one account besides keepId", {
+        code: "no_account_ids",
+      });
+    }
+    await mockDelay();
+    const group = duplicateGroups().find((candidate) =>
+      candidate.accounts.some((account) => account.id === keepId),
+    );
+    const members = new Set(group?.accounts.map((account) => account.id));
+    if (!group || removed.some((id) => !members.has(id))) {
+      return jsonError(
+        409,
+        "These accounts are no longer duplicates of each other. Review the duplicates again.",
+        { code: "duplicates_changed" },
+      );
+    }
+    const kept = findAccount(keepId);
+    for (const id of removed) {
+      const donor = findAccount(id);
+      if (kept && donor) {
+        kept.requestCount += donor.requestCount;
+        kept.errorCount += donor.errorCount;
+        kept.totalTokens += donor.totalTokens;
+        kept.totalCredits += donor.totalCredits;
+        kept.lastUsed = Math.max(kept.lastUsed, donor.lastUsed);
+      }
+    }
+    mockDb.accounts = mockDb.accounts.filter((account) => !removed.includes(account.id));
+    accountsChanged(keepId);
+    return HttpResponse.json({ success: true, keptId: keepId, removed, requestsMoved: 0 });
   }),
 
   // Registered before /accounts/:id/... so "models" is never read as an account id.

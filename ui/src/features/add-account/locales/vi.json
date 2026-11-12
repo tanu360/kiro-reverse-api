@@ -17,6 +17,8 @@
   "failed": "Không thể thêm tài khoản: {error}",
   "allFailed": "Không thể thêm tài khoản nào: {error}",
   "importSuccess_other": "Đã thêm {count} tài khoản.",
+  "importUpdated_other": "Đã cập nhật {count} tài khoản hiện có.",
+  "updatedExisting": "Đã cập nhật tài khoản hiện có {name}.",
   "importPartial_other": "Đã thêm {count} tài khoản, {failed} thất bại.",
   "moreFailures_other": "Còn {count} lỗi khác.",
   "stepAdded": "Đã thêm tài khoản",

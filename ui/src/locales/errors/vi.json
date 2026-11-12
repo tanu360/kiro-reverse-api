@@ -9,6 +9,7 @@
   "serverError.accountNotFound": "Không tìm thấy tài khoản.",
   "serverError.apiKeyNotFound": "Không tìm thấy API key.",
   "serverError.noAccountIds": "Chưa chọn tài khoản nào.",
+  "serverError.duplicatesChanged": "Các tài khoản này không còn trùng lặp với nhau. Hãy xem lại các tài khoản trùng lặp.",
   "serverError.startUrlRequired": "Nhập start URL.",
   "serverError.bearerTokenRequired": "Nhập SSO token.",
   "serverError.refreshTokenRequired": "Nhập refresh token.",

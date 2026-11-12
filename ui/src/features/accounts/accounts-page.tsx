@@ -39,6 +39,7 @@ import { AccountsTable } from "./accounts-table";
 import { AccountsToolbar } from "./accounts-toolbar";
 import { BatchBar } from "./batch-bar";
 import { BatchTagDialog } from "./batch-tag-dialog";
+import { DuplicatesNotice } from "./duplicates-notice";
 import { ExportDialog } from "./export-dialog";
 import { TestAccountDialog } from "./test-account-dialog";
 
@@ -339,6 +340,7 @@ export function AccountsPage(): JSX.Element {
       />
 
       <div className="flex min-w-0 flex-col gap-4">
+        {noAccounts ? null : <DuplicatesNotice />}
         {/* The accounts container lets the toolbar give the search its own row on narrow cards. */}
         <DataTableCard className="@container/accounts" toolbar={toolbar}>
           {loadFailed ? (

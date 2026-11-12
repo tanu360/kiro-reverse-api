@@ -14,6 +14,7 @@ import { FlowNote, FlowSteps, RegionField, SubmitButton, UrlBox } from "../field
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
 import { useFocusAfter } from "../focus";
 import { parseRegion } from "../lib/region";
+import { savedTitle } from "../result-toast";
 
 const DEFAULT_INTERVAL_S = 5;
 /** Network failures in a row before polling gives up. */
@@ -58,7 +59,7 @@ export function BuilderIdFlow(): JSX.Element {
         if (!sessions.isCurrent(generation) || sessions.builderIdSession !== sessionId) return;
         if (res.completed) {
           sessions.stopBuilderId();
-          toast.success(tr("success", { name: show(res.account.email, res.account.id) }));
+          toast.success(savedTitle(tr, res.account, show(res.account.email, res.account.id)));
           finish([res.account]);
           return;
         }

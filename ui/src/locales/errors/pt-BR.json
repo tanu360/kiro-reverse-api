@@ -9,6 +9,7 @@
   "serverError.accountNotFound": "Conta não encontrada.",
   "serverError.apiKeyNotFound": "Chave de API não encontrada.",
   "serverError.noAccountIds": "Nenhuma conta selecionada.",
+  "serverError.duplicatesChanged": "Essas contas não são mais duplicatas entre si. Revise as duplicatas novamente.",
   "serverError.startUrlRequired": "Informe uma URL inicial.",
   "serverError.bearerTokenRequired": "Informe um token SSO.",
   "serverError.refreshTokenRequired": "Informe um refresh token.",

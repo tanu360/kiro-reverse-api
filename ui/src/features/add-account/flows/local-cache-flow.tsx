@@ -28,6 +28,7 @@ import {
   type LocalProvider,
   localCacheErrorField,
 } from "../lib/local-cache";
+import { savedTitle } from "../result-toast";
 
 /**
  * A JSON textarea with an Upload button in its bottom bar that reads a .json file into it.
@@ -130,7 +131,7 @@ export function LocalCacheFlow(): JSX.Element {
     try {
       const res = await importCredentials(built.payload);
       if (!sessions.isCurrent(generation)) return;
-      toast.success(t("success", { name: display(res.account.email, res.account.id) }));
+      toast.success(savedTitle(t, res.account, display(res.account.email, res.account.id)));
       finishAdd([res.account]);
     } catch (error) {
       if (sessions.isCurrent(generation)) {

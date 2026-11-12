@@ -49,7 +49,7 @@ export function SsoTokenFlow(): JSX.Element {
       if (!sessions.isCurrent(generation)) return;
       // Each token's error is the AWS sign-in code's Chinese message, sent without a code.
       const failures = res.errors.map((message) => serverMessageText(message, t));
-      showBatchResult(t, res.accounts.length, failures);
+      showBatchResult(t, res.accounts, failures);
       finishAdd(res.accounts);
     } catch (error) {
       if (sessions.isCurrent(generation)) {

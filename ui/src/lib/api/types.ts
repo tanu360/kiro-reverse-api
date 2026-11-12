@@ -41,6 +41,7 @@ export type ServerErrorCode =
   | "account_not_found"
   | "api_key_not_found"
   | "no_account_ids"
+  | "duplicates_changed"
   | "not_overage_capable"
   | "overage_failed"
   | "models_refresh_failed"
@@ -208,6 +209,8 @@ export interface RemoteVersionJson {
 export interface AddedAccountRef {
   id: string;
   email: string;
+  /** True when the login matched a stored account and updated it instead of adding one. */
+  updated?: boolean;
 }
 export interface AddAccountResponse {
   success: true;

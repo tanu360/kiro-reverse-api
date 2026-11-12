@@ -61,7 +61,12 @@ type ChangeEventType =
  * settings events refresh it too, at once, without waiting for the server's next observe_tick.
  */
 const CHANGE_INVALIDATIONS: Record<ChangeEventType, ReadonlyArray<readonly unknown[]>> = {
-  accounts_changed: [queryKeys.accounts.list(), queryKeys.status, queryKeys.observe.overview()],
+  accounts_changed: [
+    queryKeys.accounts.list(),
+    queryKeys.accounts.duplicates(),
+    queryKeys.status,
+    queryKeys.observe.overview(),
+  ],
   api_keys_changed: [queryKeys.apiKeys.all],
   settings_changed: [queryKeys.settings.all, queryKeys.observe.overview()],
   stats_reset: [
