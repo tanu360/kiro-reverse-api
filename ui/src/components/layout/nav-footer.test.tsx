@@ -15,6 +15,11 @@ vi.mock("@/lib/api/system", () => ({
       queryFn: () => Promise.resolve({ version: "v2.1.0" }),
       staleTime: Number.POSITIVE_INFINITY,
     }),
+  statusQuery: () =>
+    queryOptions({
+      queryKey: ["status"],
+      queryFn: () => Promise.resolve({}),
+    }),
   fetchRemoteVersion: vi.fn(),
   compareVersions: (a: string, b: string) =>
     a.replace(/^v/, "").localeCompare(b.replace(/^v/, ""), undefined, { numeric: true }),
@@ -58,7 +63,7 @@ describe("NavFooter update card", () => {
     await passSilentCheck();
     expect(screen.queryByText("New version")).toBeNull();
     expect(screen.queryByRole("button", { name: /Update available/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "Admin menu" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Admin menu/ })).toBeInTheDocument();
   });
 
   it("names the release with its first changelog line and opens the update dialog", async () => {

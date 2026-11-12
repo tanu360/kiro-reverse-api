@@ -4,13 +4,14 @@ import {
   EllipsisVerticalIcon,
   LogOutIcon,
   RefreshCwIcon,
+  ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
-import type { IconSvgElement } from "@hugeicons/react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type JSX, useCallback, useState } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
-import { GithubLogo, KiroMark } from "@/components/shared/brand-logos";
+import { GithubLogo } from "@/components/shared/brand-logos";
 import {
   Menu,
   MenuGroup,
@@ -22,10 +23,11 @@ import {
 } from "@/components/ui/menu";
 import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
-import { versionQuery } from "@/lib/api/system";
+import { statusQuery, versionQuery } from "@/lib/api/system";
 import { signOut } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { useUpdateCheck } from "./update-check";
 import { stripV } from "./update-dialog";
 
@@ -124,6 +126,11 @@ function SidebarUserMenu(): JSX.Element {
   // The bare number (2.1.0), no leading v.
   const version = data?.version ? stripV(data.version) : null;
   const { checking } = useUpdateCheck();
+  // The live dot: /status answers every 10 s while the tab is visible (the Overview's query, so
+  // one poll serves both). Green while it answers, red once a poll fails, none before the first.
+  const status = useQuery(statusQuery());
+  const live = status.isError ? false : status.isSuccess ? true : null;
+  const liveLabel = live === null ? null : t(live ? "shell.proxy.online" : "shell.proxy.offline");
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -135,20 +142,31 @@ function SidebarUserMenu(): JSX.Element {
         <MenuTrigger
           render={
             <SidebarMenuButton
-              aria-label={t("shell.userMenu")}
+              aria-label={
+                liveLabel ? t("shell.userMenuStatus", { status: liveLabel }) : t("shell.userMenu")
+              }
               className="data-popup-open:bg-sidebar-row-active data-popup-open:text-sidebar-foreground"
               size="lg"
-              tooltip={version ? `${t("shell.admin")} · ${version}` : t("shell.admin")}
+              tooltip={[t("shell.admin"), version, liveLabel].filter(Boolean).join(" · ")}
             />
           }
         >
           {/*
-           * The Kiro ghost, bare (no chip, no border) in the sidebar's text colour, so it follows
-           * the theme. Its 32 px box is as tall as the two lines beside it; in the icon rail the
-           * box is the whole button.
+           * A server with a live dot: the proxy's state at a glance, and unlike the Kiro ghost in
+           * the header, not a second copy of the logo. Its 32 px box is as tall as the two lines
+           * beside it; in the icon rail the box is the whole button.
            */}
-          <span className="flex size-8 shrink-0 items-center justify-center text-sidebar-foreground">
-            <KiroMark className="size-5" />
+          <span className="relative flex size-8 shrink-0 items-center justify-center text-sidebar-foreground">
+            <HugeiconsIcon aria-hidden="true" className="size-5" icon={ServerStack01Icon} />
+            {live === null ? null : (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute end-1 bottom-1 size-2.5 rounded-full ring-2 ring-sidebar",
+                  live ? "bg-success" : "bg-destructive",
+                )}
+              />
+            )}
           </span>
           <span className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium text-sidebar-foreground">{t("shell.admin")}</span>
