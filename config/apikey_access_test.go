@@ -283,3 +283,32 @@ func TestDeleteApiKeyDropsPendingCalls(t *testing.T) {
 		t.Fatal("a deleted key keeps its pending calls")
 	}
 }
+
+// An install that keeps its accounts in the credentials store (as after
+// restoring a credentials backup) has an empty cfg.Accounts; binding a key must
+// check ids against the credentials store then.
+func TestApiKeyAccountIDsUseCredentialsStore(t *testing.T) {
+	if err := Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if err := ReplaceCredentials(true, []Account{{ID: "cred-1", Email: "a@example.com", Enabled: true}}); err != nil {
+		t.Fatalf("ReplaceCredentials: %v", err)
+	}
+	created, err := AddApiKey(ApiKeyEntry{Key: "sk-cred-bound", Enabled: true, AccountIDs: []string{"cred-1"}})
+	if err != nil {
+		t.Fatalf("bind to a credentials-store account: %v", err)
+	}
+	if !reflect.DeepEqual(created.AccountIDs, []string{"cred-1"}) {
+		t.Fatalf("AccountIDs = %v, want [cred-1]", created.AccountIDs)
+	}
+	patch := *GetApiKeyEntry(created.ID)
+	patch.AccountIDs = []string{"cred-1", "missing"}
+	if err := UpdateApiKey(created.ID, patch); !errors.Is(err, ErrApiKeyUnknownAccount) {
+		t.Fatalf("update with an unknown id: err = %v, want ErrApiKeyUnknownAccount", err)
+	}
+	patch.AccountIDs = []string{"cred-1"}
+	patch.Name = "renamed"
+	if err := UpdateApiKey(created.ID, patch); err != nil {
+		t.Fatalf("update on a credentials-store install: %v", err)
+	}
+}

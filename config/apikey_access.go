@@ -27,17 +27,42 @@ const regenerateApiKeyAttempts = 5
 // counts. Guarded by cfgLock.
 var apiKeyPendingCalls = map[string]int64{}
 
+// credentialAccountIDs is the set of account ids in the credentials store, or
+// nil when that store is not the active one and cfg.Accounts holds the
+// accounts (the same choice GetAccounts makes). Callers read it before they
+// take cfgLock, so credLock is never taken under cfgLock here.
+func credentialAccountIDs() map[string]bool {
+	credLock.RLock()
+	defer credLock.RUnlock()
+	if !credLoaded {
+		return nil
+	}
+	ids := make(map[string]bool, len(credentials))
+	for i := range credentials {
+		ids[credentials[i].ID] = true
+	}
+	return ids
+}
+
 // normalizeApiKeyAccountIDsLocked trims, drops blanks and duplicates, and checks
-// that every id is a stored account. An id already on the key (previous) stays
-// valid after its account is deleted, so a stale id never blocks an unrelated
-// edit. An empty result is nil: every account. Caller holds cfgLock.
-func normalizeApiKeyAccountIDsLocked(ids, previous []string) ([]string, error) {
+// that every id is a stored account: one in credIDs when the credentials store
+// is active (credIDs from credentialAccountIDs), else one in cfg.Accounts. An
+// id already on the key (previous) stays valid after its account is deleted,
+// so a stale id never blocks an unrelated edit. An empty result is nil: every
+// account. Caller holds cfgLock.
+func normalizeApiKeyAccountIDsLocked(ids, previous []string, credIDs map[string]bool) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	known := make(map[string]bool, len(cfg.Accounts)+len(previous))
-	for i := range cfg.Accounts {
-		known[cfg.Accounts[i].ID] = true
+	known := make(map[string]bool, len(cfg.Accounts)+len(credIDs)+len(previous))
+	if credIDs != nil {
+		for id := range credIDs {
+			known[id] = true
+		}
+	} else {
+		for i := range cfg.Accounts {
+			known[cfg.Accounts[i].ID] = true
+		}
 	}
 	for _, id := range previous {
 		known[id] = true
