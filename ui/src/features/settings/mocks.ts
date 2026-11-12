@@ -36,6 +36,7 @@ const MAX_AUTO_CONTINUE = 10;
 const MAX_LOG_RETENTION_DAYS = 3650;
 const IMAGE_RESIZE_DIMENSION = { min: 256, max: 4096 };
 const IMAGE_RESIZE_KB = { min: 50, max: 4096 };
+const MAX_ACCOUNT_RPM_LIMIT = 1000;
 const MIN_PASSWORD_RUNES = 8;
 const MAX_MAPPINGS = 200;
 const MAX_MODEL_ID_BYTES = 256;
@@ -125,6 +126,9 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
   const maxKB = optional(body, "imageResizeMaxKB", isInteger);
   if (maxKB === null) return null;
   if (maxKB !== undefined) patch.imageResizeMaxKB = maxKB;
+  const rpmLimit = optional(body, "accountRpmLimit", isInteger);
+  if (rpmLimit === null) return null;
+  if (rpmLimit !== undefined) patch.accountRpmLimit = rpmLimit;
   const password = optional(body, "password", isString);
   if (password === null) return null;
   if (password !== undefined) patch.password = password;
@@ -365,6 +369,14 @@ export const handlers: HttpHandler[] = [
     }
     const resizeError = imageResizeRangeError(patch);
     if (resizeError) return resizeError;
+    if (
+      patch.accountRpmLimit !== undefined &&
+      (patch.accountRpmLimit < 0 || patch.accountRpmLimit > MAX_ACCOUNT_RPM_LIMIT)
+    ) {
+      return jsonError(400, "accountRpmLimit must be between 0 and 1000", {
+        code: "account_rpm_limit_range",
+      });
+    }
     if (patch.password && [...patch.password].length < MIN_PASSWORD_RUNES) {
       return jsonError(400, "Password must be at least 8 characters");
     }

@@ -1383,6 +1383,7 @@ export function defaultSettings(): Settings {
     lenientStreamIntegrity: false,
     sessionAffinity: true,
     routingMode: "weighted",
+    accountRpmLimit: 0,
     autoContinue: false,
     autoContinueMax: 3,
     structuredToolHistory: true,

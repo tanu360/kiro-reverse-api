@@ -163,6 +163,8 @@ type Config struct {
 
 	RoutingMode string `json:"routingMode,omitempty"`
 
+	AccountRPMLimit int `json:"accountRpmLimit,omitempty"`
+
 	StructuredToolHistory *bool `json:"structuredToolHistory,omitempty"`
 
 	ImageResize             *bool `json:"imageResize,omitempty"`

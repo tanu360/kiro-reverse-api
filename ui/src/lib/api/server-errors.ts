@@ -38,6 +38,7 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   priority_range: "errors:serverError.priorityRange",
   image_resize_dimension_range: "errors:serverError.imageResizeDimensionRange",
   image_resize_size_range: "errors:serverError.imageResizeSizeRange",
+  account_rpm_limit_range: "errors:serverError.accountRpmLimitRange",
   password_too_short: "errors:serverError.passwordTooShort",
   invalid_endpoint: "errors:serverError.invalidEndpoint",
   invalid_api_domain: "errors:serverError.invalidApiDomain",

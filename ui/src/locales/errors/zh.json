@@ -25,6 +25,7 @@
   "serverError.priorityRange": "优先级必须是 0 到 999 之间的整数。",
   "serverError.imageResizeDimensionRange": "最大宽度或高度必须在 256 到 4096 像素之间。",
   "serverError.imageResizeSizeRange": "最大文件大小必须在 50 到 4096 KB 之间。",
+  "serverError.accountRpmLimitRange": "每个账号的每分钟请求数必须在 0 到 1000 之间（0 表示不限制）。",
   "serverError.notOverageCapable": "该账号不支持超额用量。",
   "serverError.apiKeyAccountNoProfile": "Kiro API Key 账号没有 Kiro Profile，其区域在导入时设定。",
   "serverError.profileNotAvailable": "所选 Kiro Profile 对该账号不可用。",

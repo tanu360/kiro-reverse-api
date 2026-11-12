@@ -2016,6 +2016,7 @@ export function seedFullDataset(now: number): FullDataset {
       lenientStreamIntegrity: true,
       sessionAffinity: false,
       routingMode: "priority",
+      accountRpmLimit: 60,
       autoContinue: true,
       autoContinueMax: 10,
       structuredToolHistory: false,

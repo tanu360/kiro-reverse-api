@@ -30,6 +30,7 @@ export const queryKeys = {
         : (["observe", "heatmap", windowMin] as const);
     },
     modelMix: () => ["observe", "model-mix"] as const,
+    accountActivity: () => ["observe", "account-activity"] as const,
   },
   requests: {
     all: ["requests"] as const,

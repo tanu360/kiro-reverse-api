@@ -358,12 +358,13 @@ func (h *Handler) handleClaudeDirectWebSearch(w http.ResponseWriter, r *http.Req
 			recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
 			return
 		}
-		status := http.StatusBadGateway
+		status, errType, message := http.StatusBadGateway, "api_error", err.Error()
 		if errors.Is(err, errNoWebSearchAccounts) {
-			status = http.StatusServiceUnavailable
+			//! No account was tried: 404, 429 (RPM limit) or 503, the same answer as a chat request.
+			status, errType, message = h.noAccountError(model, "api_error")
 		}
-		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, status, err.Error())
-		h.sendClaudeError(w, status, "api_error", "Web search failed: "+err.Error())
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, status, message)
+		h.sendClaudeError(w, status, errType, "Web search failed: "+message)
 		return
 	}
 

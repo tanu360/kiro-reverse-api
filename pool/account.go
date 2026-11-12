@@ -20,6 +20,8 @@ type AccountPool struct {
 	modelLists    map[string]map[string]bool
 	// enabledIDs lists every enabled account, including over-limit ones Reload keeps out of rotation.
 	enabledIDs []string
+	// rpm holds recent starts per account for the optional RPM limit (rpm_limit.go).
+	rpm rpmStarts
 }
 
 var (
@@ -165,6 +167,7 @@ func (p *AccountPool) GetPreferredForModelExcluding(preferredID, model string, e
 				continue
 			}
 			if p.canServeLocked(acc, model, excluded, now, allowOverUsage) {
+				p.noteRPMStartLocked(acc.ID)
 				accCopy := *acc
 				return &accCopy
 			}
@@ -215,12 +218,18 @@ func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]
 		accCopy := *acc
 		p.currentIndex = (idx + 1) % uint64(n)
 		p.lastSelected = accCopy.ID
+		p.noteRPMStartLocked(accCopy.ID)
 		return &accCopy
 	}
 	return nil
 }
 
 func (p *AccountPool) canServeLocked(acc *config.Account, model string, excluded map[string]bool, now time.Time, allowOverUsage bool) bool {
+	return p.eligibleLocked(acc, model, excluded, now, allowOverUsage) && !p.rpmLimitedLocked(acc.ID)
+}
+
+// eligibleLocked is canServeLocked without the per-account RPM limit.
+func (p *AccountPool) eligibleLocked(acc *config.Account, model string, excluded map[string]bool, now time.Time, allowOverUsage bool) bool {
 	if excluded != nil && excluded[acc.ID] {
 		return false
 	}

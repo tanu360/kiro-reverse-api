@@ -65,6 +65,7 @@ export type ServerErrorCode =
   | "priority_range"
   | "image_resize_dimension_range"
   | "image_resize_size_range"
+  | "account_rpm_limit_range"
   | "password_too_short"
   | "invalid_endpoint"
   | "invalid_api_domain"
@@ -982,6 +983,8 @@ export interface Settings {
   sessionAffinity: boolean;
   /** default weighted */
   routingMode: RoutingMode;
+  /** requests one account may start per minute; 0 (default) = no limit */
+  accountRpmLimit: number;
   autoContinue: boolean;
   /** 1..10, default 3 */
   autoContinueMax: number;
@@ -1004,6 +1007,8 @@ export interface SettingsPatch {
   lenientStreamIntegrity?: boolean;
   sessionAffinity?: boolean;
   routingMode?: RoutingMode;
+  /** integer 0..1000; 0 turns the limit off */
+  accountRpmLimit?: number;
   autoContinue?: boolean;
   /** integer 1..10 */
   autoContinueMax?: number;

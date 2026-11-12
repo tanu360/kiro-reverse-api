@@ -11,6 +11,7 @@ import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { ACCOUNT_SORTS, type AccountSort } from "@/routes/-search";
+import { AccountActivityLine } from "./account-activity";
 import {
   AccountFlags,
   AccountIdentity,
@@ -107,7 +108,14 @@ export function AccountsTable({
         header: t("columns.status"),
         sortable: true,
         ...width("w-36"),
-        cell: (account) => <StatusPill account={account} />,
+        // The small pill over the live line: the same two-line height as the Account cell. The
+        // line does not size the column (inline-size containment); a long one truncates.
+        cell: (account) => (
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <StatusPill account={account} size="sm" />
+            <AccountActivityLine accountId={account.id} className="w-full contain-inline-size" />
+          </div>
+        ),
       },
       {
         id: "usage",
@@ -184,7 +192,9 @@ export function AccountsTable({
         <AccountCard account={account} ctx={ctx} onDetails={onDetails} onTest={onTest} />
       )}
       // The phone loading rows take the account card's shape and height.
-      renderCardSkeleton={() => <ListCardSkeleton action leading meter stats={3} variant="row" />}
+      renderCardSkeleton={() => (
+        <ListCardSkeleton action leading lines={1} meter stats={3} variant="row" />
+      )}
       rowLabel={(account) => t("openDetails", { email: accountName(account).text })}
       selection={{
         selected,
@@ -199,7 +209,7 @@ export function AccountsTable({
 /**
  * One account as a row of the card list: the checkbox and name with the switch and menu at the
  * end; the status pill leading the nickname, plan and sign-in line; usage across the full width;
- * three quiet stats. A tap anywhere else opens the details.
+ * the live requests line; three quiet stats. A tap anywhere else opens the details.
  */
 function AccountCard({
   account,
@@ -245,6 +255,7 @@ function AccountCard({
       variant="row"
     >
       <UsageMeter account={account} />
+      <AccountActivityLine accountId={account.id} className="h-5" />
       <dl className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-3 text-meta">
         <Stat
           label={t("columns.requests")}
