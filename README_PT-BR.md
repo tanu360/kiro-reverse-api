@@ -75,6 +75,14 @@ Se este projeto ajuda você, uma Star significaria muito.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/accounts-add-dark.webp">
+    <img alt="Adicionar conta" src="screenshots/pt-BR/accounts-add-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Adicionar conta</b> — todos os métodos de login e importação num só diálogo, cada um com seus passos</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/accounts-detail-dark.webp">
     <img alt="Detalhes da conta" src="screenshots/pt-BR/accounts-detail-light.webp" width="100%">
   </picture>

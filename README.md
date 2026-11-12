@@ -75,6 +75,14 @@ If this project helps you, a Star would mean a lot.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/accounts-add-dark.webp">
+    <img alt="Add account" src="screenshots/en/accounts-add-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Add account</b> — every sign-in and import method in one dialog, each with its steps</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/accounts-detail-dark.webp">
     <img alt="Account details" src="screenshots/en/accounts-detail-light.webp" width="100%">
   </picture>

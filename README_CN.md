@@ -75,6 +75,14 @@
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/accounts-add-dark.webp">
+    <img alt="添加账号" src="screenshots/zh/accounts-add-light.webp" width="100%">
+  </picture>
+  <br><sub><b>添加账号</b> — 一个对话框列出全部登录与导入方式，每种都有步骤说明</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/accounts-detail-dark.webp">
     <img alt="账号详情" src="screenshots/zh/accounts-detail-light.webp" width="100%">
   </picture>

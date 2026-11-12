@@ -75,6 +75,14 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 
 <p align="center">
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/accounts-add-dark.webp">
+    <img alt="Thêm tài khoản" src="screenshots/vi/accounts-add-light.webp" width="100%">
+  </picture>
+  <br><sub><b>Thêm tài khoản</b> — mọi cách đăng nhập và nhập trong một hộp thoại, mỗi cách kèm các bước</sub>
+</p>
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/vi/accounts-detail-dark.webp">
     <img alt="Chi tiết tài khoản" src="screenshots/vi/accounts-detail-light.webp" width="100%">
   </picture>
