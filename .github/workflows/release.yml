@@ -1,0 +1,168 @@
+name: Release
+
+# A v* tag builds the binaries and publishes them on that tag's GitHub Release. Run the workflow by
+# hand (Actions > Release > Run workflow) for a dry run: it builds, smoke-tests and keeps the
+# archives as a workflow artifact, and publishes nothing.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second run for the same tag waits for the first instead of cancelling a half-done upload.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# bash -eo pipefail: a failing command anywhere in a pipe fails the step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The binary reports config.Version, compiled from source as in the Docker image. Refuse a
+      # tag that names another version, and keep version.json equal to config.Version.
+      - name: Check version
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(jq -r .version version.json)"
+          if [ "$EVENT" = push ]; then
+            base="${TAG#v}"
+            base="${base%%-*}"
+            if [ "$base" != "$version" ]; then
+              echo "::error::Tag $TAG does not match version.json version $version"
+              exit 1
+            fi
+          fi
+          go test ./config/ -run '^TestVersionMatchesUpdateManifest$'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # The pnpm version comes from the packageManager field; there is no root package.json.
+          package_json_file: ui/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      # Build the UI once; every binary embeds the same ui/dist.
+      - name: Build UI
+        working-directory: ui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Build binaries
+        run: .github/scripts/build-release.sh "$RUNNER_TEMP/release"
+
+      # Run the linux/amd64 binary straight from its archive and check that it serves the admin UI
+      # and reports the release version. The server log is printed only on failure.
+      - name: Smoke test linux/amd64 binary
+        run: |
+          smoke="$RUNNER_TEMP/smoke"
+          mkdir -p "$smoke"
+          tar -xzf "$RUNNER_TEMP/release/kiro-proxy_linux_amd64.tar.gz" -C "$smoke"
+          DATA_DIR="$smoke/state" "$smoke/kiro-proxy_linux_amd64/kiro-proxy" >"$smoke/server.log" 2>&1 &
+          pid=$!
+          stop() {
+            status=$?
+            kill "$pid" 2>/dev/null || true
+            [ "$status" -eq 0 ] || cat "$smoke/server.log"
+          }
+          trap stop EXIT
+          .github/scripts/admin-ui-smoke.sh http://127.0.0.1:8080
+          want="$(jq -r .version version.json)"
+          got="$(curl -fsS http://127.0.0.1:8080/health | jq -r .version)"
+          if [ "$got" != "$want" ]; then
+            echo "::error::The binary reports version $got, version.json says $want"
+            exit 1
+          fi
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiro-proxy-binaries
+          path: ${{ runner.temp }}/release
+          retention-days: 7
+          if-no-files-found: error
+          # The archives are compressed already.
+          compression-level: 0
+
+  # Only this job holds a write token, and it runs no project code: the build above, with its
+  # package installs, gets read access only.
+  publish:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: kiro-proxy-binaries
+          path: ${{ runner.temp }}/release
+
+      # A first run creates the release with the changelog from version.json. A re-run replaces
+      # the assets and leaves the notes alone, in case they were edited on GitHub since.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          assets=("$RUNNER_TEMP"/release/kiro-proxy_* "$RUNNER_TEMP/release/SHA256SUMS.txt")
+          if [ "${#assets[@]}" -ne 7 ]; then
+            echo "::error::Expected 6 archives and SHA256SUMS.txt, found ${#assets[@]} files"
+            exit 1
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            exit 0
+          fi
+
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            jq -r '.changelog | split("\n") | map(select(length > 0) | "- " + .) | .[]' version.json
+            echo
+            echo "Check a download against the checksums with \`sha256sum -c SHA256SUMS.txt --ignore-missing\` (macOS: \`shasum -a 256 -c SHA256SUMS.txt --ignore-missing\`)."
+            echo
+            echo "Docker image: \`ghcr.io/${GH_REPO,,}:${TAG#v}\`"
+          } >"$notes"
+
+          flags=()
+          case "$TAG" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$TAG" "${assets[@]}" --verify-tag --title "Kiro Proxy $TAG" \
+            --notes-file "$notes" "${flags[@]}"
