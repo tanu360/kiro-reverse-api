@@ -5,7 +5,9 @@
 // - Codex: [model_providers.<id>] with name, base_url, env_key and wire_api = "responses", picked
 //   by model_provider in ~/.codex/config.toml (https://developers.openai.com/codex/config-advanced).
 
-export const SNIPPET_MODEL = "claude-sonnet-5";
+// "auto" lets Kiro pick the model per task. Every account serves it, free tier included, and
+// /v1/models always lists it, so the snippets run as pasted whatever the accounts hold.
+export const SNIPPET_MODEL = "auto";
 export const SNIPPET_KEY_ENV = "KIRO_API_KEY";
 
 interface ClientSnippets {

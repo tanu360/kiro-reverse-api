@@ -21,7 +21,7 @@ describe("buildClientSnippets", () => {
 
   it("uses the placeholder env var and the default model", () => {
     expect(SNIPPET_KEY_ENV).toBe("KIRO_API_KEY");
-    expect(SNIPPET_MODEL).toBe("claude-sonnet-5");
+    expect(SNIPPET_MODEL).toBe("auto");
   });
 
   it("puts the origin in every snippet exactly once", () => {
@@ -34,7 +34,7 @@ describe("buildClientSnippets", () => {
     expect(snippets.curl.anthropic).toContain('-H "anthropic-version: 2023-06-01"');
     expect(snippets.curl.anthropic).toContain('-H "content-type: application/json"');
     expect(snippets.curl.anthropic).toContain('"max_tokens": 1024');
-    expect(snippets.curl.anthropic).toContain('"model": "claude-sonnet-5"');
+    expect(snippets.curl.anthropic).toContain('"model": "auto"');
     expect(snippets.curl.openai).toContain(`"${ORIGIN}/v1/chat/completions"`);
     expect(snippets.curl.openai).toContain('-H "Authorization: Bearer $KIRO_API_KEY"');
   });
@@ -61,7 +61,7 @@ describe("buildClientSnippets", () => {
   it("Codex defines a responses provider on /v1 that reads KIRO_API_KEY", () => {
     expect(snippets.codex).toBe(
       [
-        'model = "claude-sonnet-5"',
+        'model = "auto"',
         'model_provider = "kiro"',
         "",
         "[model_providers.kiro]",
