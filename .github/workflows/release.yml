@@ -32,10 +32,27 @@ jobs:
         with:
           persist-credentials: false
 
+      # go.mod says `go 1.25.0`, and go-version-file would install exactly that patch. Build with
+      # the newest patch of the go.mod minor instead, as the Docker image's golang:1.25 tag does,
+      # so the published binaries get the latest stdlib security fixes.
+      - name: Pick Go version
+        id: go
+        run: |
+          minor="$(awk '$1 == "go" { split($2, v, "."); print v[1] "." v[2]; exit }' go.mod)"
+          if ! [[ "$minor" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Cannot read the go directive from go.mod"
+            exit 1
+          fi
+          echo "version=$minor.x" >> "$GITHUB_OUTPUT"
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go.outputs.version }}
+          check-latest: true
+
+      - name: Show Go version
+        run: go version
 
       # The binary reports config.Version, compiled from source as in the Docker image. Refuse a
       # tag that names another version, and keep version.json equal to config.Version.
