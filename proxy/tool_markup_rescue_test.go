@@ -55,16 +55,17 @@ func TestToolMarkupFilterPassesPlainTextWithoutDelay(t *testing.T) {
 
 func TestToolMarkupFilterHoldsOnlyPendingTagPrefix(t *testing.T) {
 	f := newToolMarkupFilter(markupTestTools())
-	if got := f.Push("Hello <"); got != "Hello " {
+	//! The space before a possible tag waits with it: it only leads into markup if the tag is one.
+	if got := f.Push("Hello <"); got != "Hello" {
 		t.Fatalf("Push = %q, want text before the possible tag", got)
 	}
-	if got := f.Push("b>bold</b>"); got != "<b>bold</b>" {
+	if got := f.Push("b>bold</b>"); got != " <b>bold</b>" {
 		t.Fatalf("Push = %q, want the released non-markup tag", got)
 	}
-	if got := f.Push("see <invo"); got != "see " {
+	if got := f.Push("see <invo"); got != "see" {
 		t.Fatalf("Push = %q, want the invoke prefix held", got)
 	}
-	if got := f.Flush(); got != "<invo" {
+	if got := f.Flush(); got != " <invo" {
 		t.Fatalf("Flush = %q, want the held prefix released", got)
 	}
 }
@@ -462,10 +463,10 @@ func TestToolMarkupFilterAbandonReleasesHeldMarkupAsText(t *testing.T) {
 	f := newToolMarkupFilter(markupTestTools())
 	inv := `<invoke name="Bash"><parameter name="command">ls</parameter></invoke>`
 	got := f.Push("a <function_calls>"+inv+" ") + f.Push("<invo")
-	if got != "a " {
+	if got != "a" {
 		t.Fatalf("Push = %q", got)
 	}
-	if rest := f.Abandon(); rest != "<function_calls>"+inv+" <invo" {
+	if rest := f.Abandon(); rest != " <function_calls>"+inv+" <invo" {
 		t.Fatalf("Abandon = %q, want everything held returned as text", rest)
 	}
 	if rest := f.Abandon(); rest != "" {
@@ -513,5 +514,66 @@ func TestParseEventStreamKeepsRetryOpenWhenOnlyHeldTextWasPending(t *testing.T) 
 	}, nil)), callback)
 	if err == nil || emitted {
 		t.Fatalf("emitted=%t err=%v, nothing reached the client so the attempt stays retryable", emitted, err)
+	}
+}
+
+func TestToolMarkupFilterRescuesDSMLMarkup(t *testing.T) {
+	text := "Reading it.\n\n<｜DSML｜function_calls>\n<｜DSML｜invoke name=\"Multi\">\n" +
+		"<｜DSML｜parameter name=\"label\" string=\"true\">42</｜DSML｜parameter>\n" +
+		"<｜DSML｜parameter name=\"ids\" string=\"false\">[1,2]</｜DSML｜parameter>\n" +
+		"</｜DSML｜invoke>\n</｜DSML｜function_calls>"
+	for _, chunks := range [][]string{{text}, byteChunks(text)} {
+		got, tools := runMarkupFilter(t, chunks)
+		if got != "Reading it.\n\n" {
+			t.Fatalf("text = %q, want the markup gone", got)
+		}
+		want := []KiroToolUse{{Name: "Multi", Input: map[string]interface{}{"label": "42", "ids": []interface{}{1.0, 2.0}}}}
+		if len(tools) != 1 || !reflect.DeepEqual(tools[0].Input, want[0].Input) || tools[0].Name != "Multi" {
+			t.Fatalf("tools = %#v", tools)
+		}
+	}
+}
+
+func TestToolMarkupFilterDropsDSMLOpenerCutShortByARealCall(t *testing.T) {
+	// deepseek-3.2 on Kiro, live: the text ends with the opener, then Kiro sends the real call.
+	f := newToolMarkupFilter(markupTestTools())
+	got := f.Push("I'll read numbers.txt and add them up.\n\n<｜DSML") + f.Push("｜function_calls")
+	if got != "I'll read numbers.txt and add them up." {
+		t.Fatalf("Push = %q", got)
+	}
+	got += f.beforeToolUse()
+	f.markSeen(KiroToolUse{Name: "Read", Input: map[string]interface{}{"path": "numbers.txt"}})
+	got += f.Flush()
+	if got != "I'll read numbers.txt and add them up." {
+		t.Fatalf("text = %q, want no DSML fragment and no trailing blank line", got)
+	}
+}
+
+func TestParseEventStreamDropsDSMLOpenerBeforeToolUse(t *testing.T) {
+	var text string
+	var tools []KiroToolUse
+	callback := &KiroStreamCallback{
+		OnText:      func(s string, _ bool) { text += s },
+		OnToolUse:   func(tu KiroToolUse) { tools = append(tools, tu) },
+		markupTools: markupTestTools(),
+	}
+	err := parseFrames(t, callback,
+		awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "I'll read the numbers.txt file.\n\n<｜DSML"}),
+		awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "｜function_calls"}),
+		awsEventStreamFrame(t, "toolUseEvent", map[string]interface{}{"toolUseId": "tooluse_1", "name": "Read", "input": `{"path":"numbers.txt"}`, "stop": true}),
+		meteringFrame(t),
+	)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if text != "I'll read the numbers.txt file." || len(tools) != 1 {
+		t.Fatalf("text = %q tools = %d", text, len(tools))
+	}
+}
+
+func TestToolMarkupFilterKeepsADSMLOpenerWithoutACall(t *testing.T) {
+	got, tools := runMarkupFilter(t, []string{"Use the tag <｜DSML", "｜function_calls in your prompt."})
+	if got != "Use the tag <｜DSML｜function_calls in your prompt." || len(tools) != 0 {
+		t.Fatalf("text = %q tools = %d: text that only looks like an opener stays", got, len(tools))
 	}
 }

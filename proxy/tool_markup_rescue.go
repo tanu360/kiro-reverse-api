@@ -43,10 +43,16 @@ func newToolMarkupTags(ns string) toolMarkupTags {
 	}
 }
 
-// toolMarkupDialects covers leaks with and without the namespace prefix Claude's native format puts on every tag.
+// dsmlNamespace prefixes every tag of DeepSeek's DSML tool-call markup (<｜DSML｜invoke ...>).
+// deepseek-3.2 starts writing it as answer text right before Kiro sends the real tool call.
+const dsmlNamespace = "｜DSML｜"
+
+// toolMarkupDialects covers leaks with and without the namespace prefix Claude's native format
+// puts on every tag, and DeepSeek's DSML.
 var toolMarkupDialects = []toolMarkupTags{
 	newToolMarkupTags(""),
 	newToolMarkupTags("antml" + ":"),
+	newToolMarkupTags(dsmlNamespace),
 }
 
 type markupParse int
@@ -138,6 +144,9 @@ type toolMarkupFilter struct {
 	ticks      int
 	fenced     bool
 	inlineCode bool
+	// space is whitespace held back from the end of the emitted text. It goes out with the next
+	// text, and is dropped with a markup opener that a real tool call cut short.
+	space string
 }
 
 func newToolMarkupFilter(tools map[string]map[string]string) *toolMarkupFilter {
@@ -170,9 +179,9 @@ func (f *toolMarkupFilter) Abandon() string {
 	if f == nil {
 		return ""
 	}
-	held := f.runRaw.String() + f.buf
+	held := f.space + f.runRaw.String() + f.buf
 	f.runRaw.Reset()
-	f.buf, f.run, f.calls, f.wrapped, f.rescued = "", nil, nil, false, nil
+	f.buf, f.run, f.calls, f.wrapped, f.rescued, f.space = "", nil, nil, false, nil, ""
 	return held
 }
 
@@ -240,7 +249,7 @@ func (f *toolMarkupFilter) drain(final bool) string {
 			f.buf = ""
 			break
 		}
-		f.write(&out, f.buf[:idx])
+		f.writeHoldingSpace(&out, f.buf[:idx])
 		f.buf = f.buf[idx:]
 		if !f.stepTag(final, &out) {
 			break
@@ -250,7 +259,64 @@ func (f *toolMarkupFilter) drain(final bool) string {
 		f.calls = nil
 		f.commitTrailingWhitespace()
 	}
+	if final && f.space != "" {
+		out.WriteString(f.space)
+		f.space = ""
+	}
 	return out.String()
+}
+
+// writeHoldingSpace emits the text before a '<' but keeps its trailing whitespace back, so
+// whitespace that only leads into tool-call markup never reaches the client.
+func (f *toolMarkupFilter) writeHoldingSpace(out *strings.Builder, s string) {
+	trimmed := strings.TrimRight(s, " \t\r\n")
+	f.write(out, trimmed)
+	f.space += s[len(trimmed):]
+}
+
+// beforeToolUse runs when Kiro sends a real tool call. A held markup opener with nothing after
+// it is the model starting the same call as text (deepseek-3.2 writes "<｜DSML｜function_calls"
+// first), so it is dropped with the whitespace before it. Otherwise held whitespace is returned,
+// so it reaches the client before the call.
+func (f *toolMarkupFilter) beforeToolUse() string {
+	if f == nil || f.calls != nil || len(f.run) > 0 {
+		return ""
+	}
+	if f.danglingOpener() {
+		logger.Debugf("[KiroAPI] Dropped %q: tool markup cut short by a real tool call", strings.TrimSpace(f.buf))
+		f.buf, f.space = "", ""
+		return ""
+	}
+	if f.buf != "" {
+		return ""
+	}
+	space := f.space
+	f.space = ""
+	return space
+}
+
+// dropDanglingOpener drops a held markup opener at the end of a turn that made real tool calls.
+func (f *toolMarkupFilter) dropDanglingOpener() {
+	if f == nil || f.calls != nil || len(f.run) > 0 || !f.danglingOpener() {
+		return
+	}
+	logger.Debugf("[KiroAPI] Dropped %q: tool markup left unfinished before a real tool call", strings.TrimSpace(f.buf))
+	f.buf, f.space = "", ""
+}
+
+// danglingOpener reports whether the held text is only the start of a function_calls or invoke tag.
+func (f *toolMarkupFilter) danglingOpener() bool {
+	stub := strings.TrimRight(f.buf, " \t\r\n")
+	if len(stub) < 2 || stub[0] != '<' {
+		return false
+	}
+	for i := range toolMarkupDialects {
+		tags := &toolMarkupDialects[i]
+		if strings.HasPrefix(tags.callsOpen, stub) || strings.HasPrefix(tags.invokeOpen, stub) {
+			return true
+		}
+	}
+	return false
 }
 
 // stepAfterRun decides what follows a finished run of invokes: whitespace is held,
@@ -312,6 +378,13 @@ func (f *toolMarkupFilter) emitBytes(out *strings.Builder, n int) {
 
 // write emits text and tracks whether it leaves a Markdown code span or fence open.
 func (f *toolMarkupFilter) write(out *strings.Builder, s string) {
+	if s == "" {
+		return
+	}
+	if f.space != "" {
+		out.WriteString(f.space)
+		f.space = ""
+	}
 	out.WriteString(s)
 	for i := 0; i < len(s); i++ {
 		if s[i] == '`' {
@@ -480,7 +553,7 @@ func (f *toolMarkupFilter) parseInvoke(s string, tags *toolMarkupTags) (int, mar
 			f.run = append(f.run, KiroToolUse{Name: name, Input: input})
 			return pos + len(tags.invokeClose), markupComplete
 		case strings.HasPrefix(rest, tags.paramOpen):
-			key, valueStart, status := markupName(rest, len(tags.paramOpen))
+			key, valueStart, isString, status := markupParamName(rest, len(tags.paramOpen))
 			if status != markupComplete {
 				return 0, status
 			}
@@ -488,7 +561,15 @@ func (f *toolMarkupFilter) parseInvoke(s string, tags *toolMarkupTags) (int, mar
 			if end < 0 {
 				return 0, markupNeedMore
 			}
-			input[key] = coerceMarkupParam(rest[valueStart:valueStart+end], paramTypes[key])
+			schemaType := paramTypes[key]
+			if isString != nil {
+				//! DSML says per parameter whether its value is a plain string or JSON.
+				schemaType = "json"
+				if *isString {
+					schemaType = "string"
+				}
+			}
+			input[key] = coerceMarkupParam(rest[valueStart:valueStart+end], schemaType)
 			pos += valueStart + end + len(tags.paramClose)
 		case isPartialTag(rest, tags.invokeClose) || isPartialTag(rest, tags.paramOpen):
 			return 0, markupNeedMore
@@ -514,6 +595,44 @@ func markupName(s string, start int) (string, int, markupParse) {
 		return "", 0, markupInvalid
 	}
 	return name, start + end + 2, markupComplete
+}
+
+// markupParamName reads a parameter's quoted name and any attributes after it, up to the tag's
+// closing '>'. DSML adds string="true" or string="false"; isString is nil without it.
+func markupParamName(s string, start int) (string, int, *bool, markupParse) {
+	rest := s[start:]
+	quote := strings.IndexByte(rest, '"')
+	if quote < 0 {
+		if len(rest) > maxMarkupNameLen || strings.ContainsAny(rest, "<>\n") {
+			return "", 0, nil, markupInvalid
+		}
+		return "", 0, nil, markupNeedMore
+	}
+	name := rest[:quote]
+	if name == "" || len(name) > maxMarkupNameLen || strings.ContainsAny(name, "<>\n") {
+		return "", 0, nil, markupInvalid
+	}
+	attrs := rest[quote+1:]
+	end := strings.IndexByte(attrs, '>')
+	if end < 0 {
+		if len(attrs) > maxMarkupNameLen || strings.ContainsAny(attrs, "<\n") {
+			return "", 0, nil, markupInvalid
+		}
+		return "", 0, nil, markupNeedMore
+	}
+	var isString *bool
+	switch strings.TrimSpace(attrs[:end]) {
+	case "":
+	case `string="true"`:
+		yes := true
+		isString = &yes
+	case `string="false"`:
+		no := false
+		isString = &no
+	default:
+		return "", 0, nil, markupInvalid
+	}
+	return name, start + quote + 1 + end + 1, isString, markupComplete
 }
 
 func coerceMarkupParam(raw, schemaType string) interface{} {

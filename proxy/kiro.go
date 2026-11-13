@@ -616,8 +616,10 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 
 	tracked := *callback
 	originalOnToolUse := tracked.OnToolUse
+	var emitAssistantText func(content string)
 	tracked.OnToolUse = func(toolUse KiroToolUse) {
 		turn.toolCount++
+		emitAssistantText(markup.beforeToolUse())
 		markup.markSeen(toolUse)
 		if originalOnToolUse != nil {
 			emitted = true
@@ -625,7 +627,7 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		}
 	}
 	callback = &tracked
-	emitAssistantText := func(content string) {
+	emitAssistantText = func(content string) {
 		if content == "" {
 			return
 		}
@@ -738,6 +740,9 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 	//! Tools that never received a stop frame are flushed in arrival order.
 	if err := pending.flushAll(callback); err != nil {
 		return emitted, err
+	}
+	if turn.toolCount > 0 {
+		markup.dropDanglingOpener()
 	}
 	emitAssistantText(markup.Flush())
 	markup.emitRescued(callback)
