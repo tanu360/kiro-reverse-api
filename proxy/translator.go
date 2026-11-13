@@ -2158,6 +2158,24 @@ func KiroToOpenAIResponse(content string, toolUses []KiroToolUse, inputTokens, o
 }
 
 func extractThinkingFromContent(content string) (string, string) {
+	answer, reasoning := splitInlineThinking(content)
+	return strings.TrimSpace(answer), reasoning
+}
+
+// answerFromContent is extractThinkingFromContent for a non-stream answer that ended with
+// stopReason. The stream only drops the whitespace before the first visible text, so an answer
+// cut at a stop sequence or at max_tokens keeps the exact text before the cut, as the stream
+// sent it (and as the Messages API returns it). Other answers keep the old trim at both ends.
+func answerFromContent(content, stopReason string) (string, string) {
+	answer, reasoning := splitInlineThinking(content)
+	if stopReason == "stop_sequence" || stopReason == "max_tokens" {
+		return strings.TrimLeft(answer, " \t\r\n"), reasoning
+	}
+	return strings.TrimSpace(answer), reasoning
+}
+
+// splitInlineThinking takes the <thinking> blocks out of an answer.
+func splitInlineThinking(content string) (string, string) {
 	var reasoning string
 	result := content
 
@@ -2178,7 +2196,7 @@ func extractThinkingFromContent(content string) (string, string) {
 		result = result[:start] + result[end+11:]
 	}
 
-	return strings.TrimSpace(result), reasoning
+	return result, reasoning
 }
 
 func KiroToOpenAIResponseWithReasoning(content, reasoningContent string, toolUses []KiroToolUse, inputTokens, outputTokens int, model, thinkingFormat string) map[string]interface{} {

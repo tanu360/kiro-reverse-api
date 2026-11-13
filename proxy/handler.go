@@ -1735,7 +1735,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			}
 
 			thinkingFormat := thinkingOpts.Format
-			finalContent, extractedReasoning := extractThinkingFromContent(content)
+			finalContent, extractedReasoning := answerFromContent(content, upstreamStopReason)
 			rawThinkingContent := thinkingContent
 			if thinking && rawThinkingContent == "" && extractedReasoning != "" {
 				rawThinkingContent = extractedReasoning
@@ -2453,7 +2453,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				break
 			}
 
-			finalContent, extractedReasoning := extractThinkingFromContent(content)
+			finalContent, extractedReasoning := answerFromContent(content, upstreamStopReason)
 			if thinking && reasoningContent == "" && extractedReasoning != "" {
 				reasoningContent = extractedReasoning
 			} else if !thinking {

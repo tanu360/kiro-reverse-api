@@ -205,7 +205,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				break
 			}
 
-			finalContent, extractedReasoning := extractThinkingFromContent(content)
+			finalContent, extractedReasoning := answerFromContent(content, upstreamStopReason)
 			if thinking && reasoningContent == "" && extractedReasoning != "" {
 				reasoningContent = extractedReasoning
 			} else if !thinking {
