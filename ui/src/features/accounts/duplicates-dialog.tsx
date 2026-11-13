@@ -1,4 +1,11 @@
-import { CircleCheckIcon, InformationCircleIcon } from "@hugeicons/core-free-icons";
+import {
+  CircleCheckIcon,
+  Coins01Icon,
+  GitMergeIcon,
+  InformationCircleIcon,
+  UserCheck01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
 import { ChoiceCard } from "@/components/shared/choice-card";
@@ -11,15 +18,62 @@ import { Switch } from "@/components/ui/switch";
 import { type DuplicateAccount, type DuplicateGroup, mergeDuplicates } from "@/lib/api/duplicates";
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatRelativeTime } from "@/lib/format";
-import { useT } from "@/lib/i18n";
+import { intlLocale, type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { authLabel, isApiKeyAccount } from "./account-model";
+import { authLabel, isApiKeyAccount, isBanned, isHeld } from "./account-model";
 
 /** A group's identity across refetches: its account ids, in order. */
 function groupKey(group: DuplicateGroup): string {
   return group.accounts.map((account) => account.id).join(",");
+}
+
+/**
+ * Why the server does not count a copy as healthy (config.IsHealthyAccount), as the status the
+ * Accounts list shows for it: banned or suspended by Kiro, switched off, or holding no token or
+ * key. Null for a healthy copy. Such a copy is never suggested over a healthy one.
+ */
+export function unusableStatus(
+  account: DuplicateAccount,
+): "banned" | "suspended" | "disabled" | "noToken" | null {
+  if (account.healthy) return null;
+  if (isBanned(account)) return account.banStatus === "SUSPENDED" ? "suspended" : "banned";
+  if (!account.enabled || account.silent || isHeld(account)) return "disabled";
+  return "noToken";
+}
+
+/** "Matched by: same refresh token and same user ID", the list joined the language's way. */
+function matchLine(group: DuplicateGroup, t: TFunction, lang: Lang): string {
+  const reasons = new Intl.ListFormat(intlLocale(lang), { type: "conjunction" }).format(
+    group.reasons.map((reason) => t(`duplicates.reason.${reason}`)),
+  );
+  return t("duplicates.matchedBy", { reasons });
+}
+
+/** What the duplicates are, why they matter, what to do and what Merge does, as three points. */
+const POINTS = [
+  { icon: Coins01Icon, key: "duplicates.pointCredits" },
+  { icon: UserCheck01Icon, key: "duplicates.pointChoose" },
+  { icon: GitMergeIcon, key: "duplicates.pointMerge" },
+] as const;
+
+function MergePoints(): JSX.Element {
+  const { t } = useT("accounts");
+  return (
+    <ul className="flex flex-col gap-2 text-sm leading-normal">
+      {POINTS.map((point) => (
+        <li className="flex gap-2.5" key={point.key}>
+          <HugeiconsIcon
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            icon={point.icon}
+          />
+          <span className="min-w-0 text-pretty">{t(point.key)}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function DuplicateChoice({
@@ -32,6 +86,7 @@ function DuplicateChoice({
   const { t, lang } = useT("accounts");
   const displayEmail = useDisplayEmail();
   const mono = isApiKeyAccount(account) || !account.email;
+  const unusable = unusableStatus(account);
   const meta = [account.nickname, authLabel(account, t), account.region]
     .filter(Boolean)
     .join(" · ");
@@ -57,11 +112,11 @@ function DuplicateChoice({
               {t("duplicates.suggested")}
             </Badge>
           ) : null}
-          {account.healthy ? null : (
+          {unusable ? (
             <Badge icon={InformationCircleIcon} size="sm" tone="warning">
-              {t("duplicates.needsAttention")}
+              {t(`health.${unusable}`)}
             </Badge>
-          )}
+          ) : null}
         </span>
       }
     >
@@ -85,7 +140,7 @@ export function DuplicatesDialog({
   onOpenChange: (open: boolean) => void;
   groups: DuplicateGroup[];
 }): JSX.Element {
-  const { t } = useT("accounts");
+  const { t, lang } = useT("accounts");
   const { t: tc } = useT();
   const queryClient = useQueryClient();
   const [choices, setChoices] = useState<Record<string, string>>({});
@@ -150,29 +205,33 @@ export function DuplicatesDialog({
       title={t("duplicates.title")}
     >
       <div className="flex flex-col gap-6">
+        <MergePoints />
         {groups.map((group, index) => {
           const key = groupKey(group);
-          const label = t("duplicates.groupLabel", { index: index + 1 });
+          const label = t("duplicates.groupLabel", {
+            index: index + 1,
+            count: group.accounts.length,
+          });
           const on = !skipped[key];
           return (
             <section aria-label={label} className="flex min-w-0 flex-col gap-2" key={key}>
-              <div className="flex min-w-0 items-center justify-between gap-4">
-                <div className="flex min-w-0 flex-col gap-0.5">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
                   <h3 className="font-medium text-sm">{label}</h3>
-                  <p className="text-muted-foreground text-xs">
-                    {group.reasons.map((reason) => t(`duplicates.reason.${reason}`)).join(" · ")}
-                  </p>
+                  <Label className="shrink-0" variant="option">
+                    <Switch
+                      checked={on}
+                      disabled={merging}
+                      onCheckedChange={(checked) =>
+                        setSkipped((current) => ({ ...current, [key]: !checked }))
+                      }
+                    />
+                    {t("duplicates.include")}
+                  </Label>
                 </div>
-                <Label className="shrink-0" variant="option">
-                  <Switch
-                    checked={on}
-                    disabled={merging}
-                    onCheckedChange={(checked) =>
-                      setSkipped((current) => ({ ...current, [key]: !checked }))
-                    }
-                  />
-                  {t("duplicates.include")}
-                </Label>
+                <p className="text-pretty text-muted-foreground text-xs">
+                  {matchLine(group, t, lang)}
+                </p>
               </div>
               <RadioGroup
                 aria-label={t("duplicates.keepLabel", { index: index + 1 })}

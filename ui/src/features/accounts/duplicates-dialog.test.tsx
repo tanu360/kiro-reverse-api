@@ -6,6 +6,7 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderApp } from "@/test/render";
+import { unusableStatus } from "./duplicates-dialog";
 
 // The whole app renders per test, so a busy run needs more than the 5 s default.
 vi.setConfig({ testTimeout: 15_000 });
@@ -63,8 +64,23 @@ describe("Duplicate accounts", () => {
     expect(await screen.findByText("1 duplicate account")).toBeInTheDocument();
 
     const dialog = await openReview(user);
-    expect(within(dialog).getByText("Group 1")).toBeInTheDocument();
-    expect(within(dialog).getByText("Same email and sign-in method")).toBeInTheDocument();
+    // What the duplicates are, why they matter, what to pick and what Merge does.
+    expect(within(dialog).getByText("Some Kiro users were added more than once.")).toBeVisible();
+    expect(
+      within(dialog).getByText("Copies of one user share one set of credits, so they add nothing."),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("For each user, choose the account to keep."),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/A backup is saved first, so you can undo the merge in Backups/),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("region", { name: "User 1 · added 2 times" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Matched by: same email with the same sign-in method"),
+    ).toBeInTheDocument();
     const radios = within(dialog).getAllByRole("radio");
     expect(radios).toHaveLength(2);
     // The original was refreshed last, so it is the suggestion and starts checked.
@@ -72,7 +88,7 @@ describe("Duplicate accounts", () => {
     expect(radios[1]).not.toBeChecked();
     const cards = within(dialog).getAllByText(DANA_MASKED);
     expect(cards).toHaveLength(2);
-    expect(within(dialog).getAllByText("Suggested")).toHaveLength(1);
+    expect(within(dialog).getAllByText("Suggested to keep")).toHaveLength(1);
     expect(within(dialog).getByText(/Imported copy/)).toBeInTheDocument();
     expect(within(dialog).getByText(/5 requests/)).toBeInTheDocument();
   });
@@ -93,7 +109,9 @@ describe("Duplicate accounts", () => {
     await user.click(within(dialog).getByRole("button", { name: "Merge" }));
 
     expect(
-      await screen.findByText("Merged the duplicates and deleted 1 account."),
+      await screen.findByText(
+        "Merged the duplicates and deleted 1 extra copy. A backup was saved first.",
+      ),
     ).toBeInTheDocument();
     expect(bodies).toEqual([{ keepId: COPY_ID, ids: [dana.id, COPY_ID] }]);
     await waitFor(() =>
@@ -120,10 +138,10 @@ describe("Duplicate accounts", () => {
     await user.click(within(notice).getByRole("button", { name: "Review" }));
     const dialog = await screen.findByRole("dialog", { name: "Duplicate accounts" });
 
-    const switches = within(dialog).getAllByRole("switch", { name: "Merge this group" });
+    const switches = within(dialog).getAllByRole("switch", { name: "Include in merge" });
     expect(switches).toHaveLength(2);
     for (const toggle of switches) expect(toggle).toBeChecked();
-    const otherGroup = within(dialog).getByRole("region", { name: "Group 2" });
+    const otherGroup = within(dialog).getByRole("region", { name: "User 2 · added 2 times" });
 
     // A group switched off is left out: its keeper choice is disabled and it is not merged.
     await user.click(switches[1] as HTMLElement);
@@ -136,11 +154,55 @@ describe("Duplicate accounts", () => {
     await user.click(within(dialog).getByRole("button", { name: "Merge" }));
 
     expect(
-      await screen.findByText("Merged the duplicates and deleted 1 account."),
+      await screen.findByText(
+        "Merged the duplicates and deleted 1 extra copy. A backup was saved first.",
+      ),
     ).toBeInTheDocument();
     expect(bodies).toEqual([{ keepId: dana.id, ids: [dana.id, COPY_ID] }]);
     expect(mockDb.accounts.some((account) => account.id === "other-copy")).toBe(true);
     expect(await screen.findByText("1 duplicate account")).toBeInTheDocument();
+  });
+
+  it("names why a copy cannot serve requests instead of a vague warning", async () => {
+    const dana = addDanaCopy();
+    const copy = mockDb.accounts.find((account) => account.id === COPY_ID) as Account;
+    copy.enabled = false;
+    copy.lastRefresh = dana.lastRefresh + 60;
+    const { user } = await renderAccounts();
+    const dialog = await openReview(user);
+    const cards = within(dialog).getAllByRole("radio");
+    // The newer copy is switched off, so the working original stays the suggestion.
+    expect(cards[0]).toBeChecked();
+    expect(within(dialog).getByText("Disabled")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Needs attention")).not.toBeInTheDocument();
+  });
+
+  it("maps every unhealthy copy to the status the accounts list shows", () => {
+    const base = {
+      id: "a",
+      email: "",
+      nickname: "",
+      authMethod: "social",
+      provider: "Google",
+      region: "us-east-1",
+      enabled: true,
+      healthy: false,
+      banStatus: "",
+      silent: false,
+      lastRefresh: 0,
+      expiresAt: 0,
+      lastUsed: 0,
+      requestCount: 0,
+      errorCount: 0,
+    };
+    expect(unusableStatus({ ...base, healthy: true })).toBeNull();
+    expect(unusableStatus({ ...base, banStatus: "BANNED" })).toBe("banned");
+    expect(unusableStatus({ ...base, banStatus: "SUSPENDED" })).toBe("suspended");
+    expect(unusableStatus({ ...base, banStatus: "DISABLED" })).toBe("disabled");
+    expect(unusableStatus({ ...base, enabled: false })).toBe("disabled");
+    expect(unusableStatus({ ...base, silent: true })).toBe("disabled");
+    // Enabled, not held and still unhealthy: the server found no token or key.
+    expect(unusableStatus(base)).toBe("noToken");
   });
 
   it("shows the changed-group error", async () => {
