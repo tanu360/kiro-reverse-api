@@ -45,9 +45,19 @@ describe("AccountActivityLine", () => {
     expect(screen.getByText(/42 today/)).toBeInTheDocument();
     expect(
       screen.getByText(
-        /^At the limit of 20 requests per minute: new requests go to other accounts/,
+        /^At the limit of 20 requests per minute\. Every try sent to this account counts, including failed tries/,
       ),
     ).toBeInTheDocument();
+  });
+
+  it("uses the singular for one request in the line's sentence", async () => {
+    serve(activity({ a: { today: 1, rpm: 1, atLimit: true } }, 1));
+    renderWithProviders(<AccountActivityLine accountId="a" />);
+    expect(
+      await screen.findByText(
+        /^At the limit of 1 request per minute\..* 1 request finished in the last minute, 1 since midnight/,
+      ),
+    ).toHaveClass("sr-only");
   });
 
   it("holds the line with a dash while the first poll loads, and reads idle for an unlisted account", async () => {
@@ -96,7 +106,23 @@ describe("LiveActivityStrip", () => {
     expect(screen.getByText("Requests today")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getByText("Requests per minute")).toBeInTheDocument();
-    expect(screen.getByText("At limit")).toHaveAttribute("data-slot", "badge");
+    // The pill is the hint's tooltip trigger.
+    expect(screen.getByText("At limit")).toHaveAttribute("data-slot", "tooltip-trigger");
+  });
+
+  it("explains in the pill why a minute with no finished request can be at the limit", async () => {
+    serve(activity({ a: { today: 4, rpm: 0, atLimit: true } }, 1));
+    renderWithProviders(
+      <Card className="@container">
+        <LiveActivityStrip accountId="a" />
+      </Card>,
+    );
+    expect(await screen.findByText("0 / 1")).toBeInTheDocument();
+    const hint = screen.getByText(
+      /^At the limit of 1 request per minute\. Every try sent to this account counts, including failed tries that moved on to another account\./,
+    );
+    expect(hint).toHaveClass("sr-only");
+    expect(screen.getByText("At limit")).toContainElement(hint);
   });
 
   it("shows the bare count when no limit is set", async () => {

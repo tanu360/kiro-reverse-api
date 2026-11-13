@@ -7,14 +7,23 @@ import { EMPTY, formatNumber } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
+/** Why the pool skips the account: the limit, and that every try counts against it. */
+function atLimitHint(activity: AccountActivityView, t: TFunction, lang: Lang): string {
+  return t("live.atLimitHint", {
+    count: activity.rpmLimit,
+    limit: formatNumber(activity.rpmLimit, lang),
+  });
+}
+
 /** The full sentence behind the short line: the tooltip and what a screen reader reads. */
 function activitySentence(activity: AccountActivityView, t: TFunction, lang: Lang): string {
   const numbers = t("live.description", {
+    count: activity.rpm,
     rpm: formatNumber(activity.rpm, lang),
     today: formatNumber(activity.today, lang),
   });
   if (!activity.atLimit) return numbers;
-  return `${t("live.atLimitHint", { limit: formatNumber(activity.rpmLimit, lang) })} ${numbers}`;
+  return `${atLimitHint(activity, t, lang)} ${numbers}`;
 }
 
 /**
@@ -95,12 +104,18 @@ export function LiveActivityStrip({
             limit: formatNumber(activity.rpmLimit, lang),
           })
         : formatNumber(activity.rpm, lang);
+    //! The limit counts every try, the number beside it only finished requests: the hint says why "0 / 1" can be at the limit.
+    const hint = atLimitHint(activity, t, lang);
     rpm = activity.atLimit ? (
       <span className="inline-flex items-center gap-2">
         {value}
-        <Badge size="sm" tone="warning">
-          {t("live.atLimit")}
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger render={<Badge size="sm" tone="warning" />}>
+            {t("live.atLimit")}
+            <span className="sr-only">{hint}</span>
+          </TooltipTrigger>
+          <TooltipPopup>{hint}</TooltipPopup>
+        </Tooltip>
       </span>
     ) : (
       value
