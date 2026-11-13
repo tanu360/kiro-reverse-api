@@ -288,7 +288,7 @@ function classify(status: number, message: string): RequestErrorType {
   const lower = message.toLowerCase();
   const has = (...markers: string[]) => markers.some((m) => lower.includes(m));
   if (status === 499) return "client_closed";
-  if (status === 429 && has("limit exceeded")) return "api_key_limit";
+  if (status === 429 && has("limit exceeded", "api key call limit")) return "api_key_limit";
   if (has("402") && has("overage")) return "overage";
   if (
     /(^|[^A-Za-z0-9])429([^A-Za-z0-9]|$)/.test(message) ||
@@ -311,12 +311,23 @@ function classify(status: number, message: string): RequestErrorType {
     return "stream";
   }
   if (has("no available accounts")) return "no_accounts";
-  if (status === 400 || status === 405) return "invalid_request";
+  if (status === 400 || status === 404 || status === 405) return "invalid_request";
   if (status === 429) return "rate_limit";
   if (has("timeout", "deadline exceeded")) return "timeout";
   if (status >= 500 || status === 0) return "upstream";
   return "unknown";
 }
+
+describe("request error classifier", () => {
+  it("files a call limit as an API key limit and an unknown model as an invalid request", () => {
+    expect(classify(429, "API key call limit reached: 2 of 2 successful calls used")).toBe(
+      "api_key_limit",
+    );
+    expect(classify(404, 'model "gpt-6.1-sol" is not available on any account')).toBe(
+      "invalid_request",
+    );
+  });
+});
 
 describe("full dataset (the browser default, polished for screenshots)", () => {
   const now = mockNowUnix();
