@@ -226,7 +226,7 @@
   "detail.proxyHint": "Leave empty to use the global proxy.",
   "detail.proxyHintPool": "Leave empty to use the proxy pool.",
   "detail.proxyPasswordKept": "The saved password shows as ********. Leave it unchanged to keep it.",
-  "detail.proxyFormatError": "Start the URL with socks5://, socks5h://, http:// or https://.",
+  "detail.proxyFormatError": "Enter a URL such as socks5://host:1080. It starts with socks5://, socks5h://, http:// or https://, then a host and a port from 1 to 65535.",
   "detail.tokenExpiry": "Token expiry",
   "detail.trialCredits": "Trial credits",
   "detail.trialStatus": "Trial status",

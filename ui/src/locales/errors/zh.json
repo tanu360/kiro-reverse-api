@@ -33,6 +33,7 @@
   "serverError.apiKeyAccountNoProfile": "Kiro API Key 账号没有 Kiro Profile，其区域在导入时设定。",
   "serverError.profileNotAvailable": "所选 Kiro Profile 对该账号不可用。",
   "serverError.profileArnInvalid": "Kiro Profile ARN 无效。",
+  "serverError.proxyUrlInvalid": "代理地址需要主机和 1 到 65535 之间的端口，且不能包含空格、路径或第二个端口。",
   "serverError.proxyUrlScheme": "代理地址必须以 http://、https://、socks5:// 或 socks5h:// 开头。",
   "serverError.proxyPasswordMasked": "代理地址中包含隐藏后的密码，但没有已保存的密码。请输入真实密码。",
   "serverError.invalidEndpoint": "请选择端点：auto、kiro、codewhisperer 或 amazonq。",

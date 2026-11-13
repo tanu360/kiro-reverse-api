@@ -33,6 +33,7 @@
   "serverError.apiKeyAccountNoProfile": "Tài khoản dùng Kiro API key không có Kiro profile. Khu vực của các tài khoản này được đặt khi nhập.",
   "serverError.profileNotAvailable": "Kiro profile đã chọn không khả dụng cho tài khoản này.",
   "serverError.profileArnInvalid": "ARN của Kiro profile không hợp lệ.",
+  "serverError.proxyUrlInvalid": "URL proxy cần máy chủ và cổng từ 1 đến 65535, không có khoảng trắng, đường dẫn hay cổng thứ hai.",
   "serverError.proxyUrlScheme": "URL proxy phải bắt đầu bằng http://, https://, socks5:// hoặc socks5h://.",
   "serverError.proxyPasswordMasked": "URL proxy chứa mật khẩu đã ẩn, nhưng chưa có mật khẩu nào được lưu. Hãy nhập mật khẩu thật.",
   "serverError.invalidEndpoint": "Chọn một endpoint: auto, kiro, codewhisperer hoặc amazonq.",

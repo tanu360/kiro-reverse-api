@@ -343,6 +343,19 @@ describe("isValidMachineId / isValidProxyUrl", () => {
     expect(isValidProxyUrl("ftp://proxy")).toBe(false);
     expect(isValidProxyUrl("127.0.0.1:1080")).toBe(false);
   });
+
+  it("needs a host and a port in range, as the server does", () => {
+    expect(isValidProxyUrl("http://proxy.example.com")).toBe(true);
+    expect(isValidProxyUrl("socks5://user:********@[::1]:1080")).toBe(true);
+    expect(isValidProxyUrl("http://u:p%40ss@10.0.0.1:3128/")).toBe(true);
+    expect(isValidProxyUrl("http://")).toBe(false);
+    expect(isValidProxyUrl("http://127.0.0.1:99999")).toBe(false);
+    expect(isValidProxyUrl("http://exa mple.com:80")).toBe(false);
+    expect(isValidProxyUrl("http://1.2.3.4:8080:9")).toBe(false);
+    expect(isValidProxyUrl("http://[1.2.3.4:8080]:9")).toBe(false);
+    expect(isValidProxyUrl("socks5://127.0.0.1")).toBe(false);
+    expect(isValidProxyUrl("http://host:8080/path")).toBe(false);
+  });
 });
 
 describe("buildCopyJson", () => {

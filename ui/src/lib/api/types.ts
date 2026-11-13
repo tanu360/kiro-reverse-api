@@ -80,6 +80,7 @@ export type ServerErrorCode =
   | "invalid_endpoint"
   | "invalid_api_domain"
   | "proxy_url_scheme"
+  | "proxy_url_invalid"
   | "proxy_password_masked"
   | "api_key_empty"
   | "api_key_exists"

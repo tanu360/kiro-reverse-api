@@ -227,7 +227,7 @@
   "detail.proxyHint": "Deixe vazio para usar o proxy global.",
   "detail.proxyHintPool": "Deixe vazio para usar o pool de proxies.",
   "detail.proxyPasswordKept": "A senha salva aparece como ********. Deixe-a sem alterações para mantê-la.",
-  "detail.proxyFormatError": "Comece a URL com socks5://, socks5h://, http:// ou https://.",
+  "detail.proxyFormatError": "Digite uma URL como socks5://host:1080. Ela começa com socks5://, socks5h://, http:// ou https://, seguida do host e de uma porta de 1 a 65535.",
   "detail.tokenExpiry": "Validade do token",
   "detail.trialCredits": "Créditos de avaliação",
   "detail.trialStatus": "Status da avaliação",

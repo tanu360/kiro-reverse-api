@@ -33,6 +33,7 @@
   "serverError.apiKeyAccountNoProfile": "Contas com chave de API do Kiro não têm perfil do Kiro. A região é definida na importação.",
   "serverError.profileNotAvailable": "O perfil do Kiro selecionado não está disponível para esta conta.",
   "serverError.profileArnInvalid": "O ARN do perfil do Kiro não é válido.",
+  "serverError.proxyUrlInvalid": "A URL do proxy precisa de um host e de uma porta de 1 a 65535, sem espaços, caminho ou segunda porta.",
   "serverError.proxyUrlScheme": "A URL do proxy deve começar com http://, https://, socks5:// ou socks5h://.",
   "serverError.proxyPasswordMasked": "A URL do proxy contém a senha mascarada, mas nenhuma senha está salva. Informe a senha real.",
   "serverError.invalidEndpoint": "Escolha um endpoint: auto, kiro, codewhisperer ou amazonq.",

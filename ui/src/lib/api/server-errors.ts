@@ -46,6 +46,7 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   invalid_endpoint: "errors:serverError.invalidEndpoint",
   invalid_api_domain: "errors:serverError.invalidApiDomain",
   proxy_url_scheme: "errors:serverError.proxyUrlScheme",
+  proxy_url_invalid: "errors:serverError.proxyUrlInvalid",
   proxy_password_masked: "errors:serverError.proxyPasswordMasked",
   api_key_empty: "errors:serverError.apiKeyEmpty",
   api_key_exists: "errors:serverError.apiKeyExists",

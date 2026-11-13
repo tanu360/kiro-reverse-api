@@ -209,7 +209,7 @@
   "detail.proxyHint": "Để trống để dùng proxy chung.",
   "detail.proxyHintPool": "Để trống để dùng nhóm proxy.",
   "detail.proxyPasswordKept": "Mật khẩu đã lưu hiển thị là ********. Để nguyên nếu muốn giữ mật khẩu.",
-  "detail.proxyFormatError": "URL phải bắt đầu bằng socks5://, socks5h://, http:// hoặc https://.",
+  "detail.proxyFormatError": "Nhập URL như socks5://host:1080. URL bắt đầu bằng socks5://, socks5h://, http:// hoặc https://, rồi đến máy chủ và cổng từ 1 đến 65535.",
   "detail.tokenExpiry": "Hạn token",
   "detail.trialCredits": "Credit dùng thử",
   "detail.trialStatus": "Trạng thái dùng thử",
