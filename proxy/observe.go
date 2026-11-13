@@ -331,7 +331,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 	if s == nil {
 		return
 	}
-	errorType := classifyRequestError(success, status, message)
+	errorType, message := proxyFailureRecord(trace, success, classifyRequestError(success, status, message), message)
 	attempts := trace.finishAttempts(success, status, message)
 	if len(message) > 500 {
 		message = message[:500]

@@ -181,6 +181,7 @@ function check(proxy: StoredProxy): void {
       checkedAt: now,
       failedAt: now,
       lastError: "connection refused or reset: proxyconnect tcp: connect: connection refused",
+      errorCode: "connect",
     };
     return;
   }

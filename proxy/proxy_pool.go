@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"kiro-proxy/proxypool"
 )
@@ -49,6 +50,26 @@ func dropPoolClients() {
 		value.(*http.Client).CloseIdleConnections()
 		return true
 	})
+}
+
+// accountClient is the client for an account's Kiro traffic on its route. Only a
+// pool route gets a pool proxy's client: an own or the global proxy whose URL is
+// also in the pool keeps its plain client, so its failures are its own, not the
+// pool's (which would retry them on the same account and log them as the pool's).
+func accountClient(account *config.Account, stream bool) *http.Client {
+	route := proxypool.Default().Resolve(account)
+	if route.Unavailable {
+		return noHealthyClient
+	}
+	if route.ProxyID != "" {
+		if c, ok := poolClientFor(route.URL, stream); ok {
+			return c
+		}
+	}
+	if stream {
+		return outboundStreamClient(route.URL)
+	}
+	return outboundRestClient(route.URL)
 }
 
 // poolClientFor returns the client for a pool route: the fail-fast client for

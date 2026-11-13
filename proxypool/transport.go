@@ -10,9 +10,9 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptrace"
-	"net/url"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"kiro-proxy/textfmt"
@@ -29,6 +29,8 @@ const (
 	KindTunnel    = "tunnel"
 	KindSOCKS     = "socks"
 	KindNoHealthy = "no_healthy"
+	// KindAuthRequired is a proxy that asked for a sign-in it was not given.
+	KindAuthRequired = "auth_required"
 )
 
 // ErrNoHealthyProxy is the cause of a request the pool had no proxy for.
@@ -63,6 +65,8 @@ func kindText(kind string) string {
 		return "TLS handshake failed"
 	case KindAuth:
 		return "proxy rejected the sign-in"
+	case KindAuthRequired:
+		return "proxy requires a sign-in"
 	case KindTunnel:
 		return "proxy refused the tunnel"
 	case KindSOCKS:
@@ -104,10 +108,15 @@ func classify(err error) string {
 	var verifyErr *tls.CertificateVerificationError
 	var unknownAuthority x509.UnknownAuthorityError
 	var hostnameErr x509.HostnameError
+	var refused *connectRefusedError
 	switch {
+	case errors.As(err, &refused):
+		return refused.kind()
+	//! Go offers a SOCKS proxy a username and password only when the URL has them.
+	case strings.Contains(msg, "no acceptable authentication methods"):
+		return KindAuthRequired
 	case strings.Contains(msg, "proxy authentication required"),
-		strings.Contains(msg, "username/password authentication failed"),
-		strings.Contains(msg, "no acceptable authentication methods"):
+		strings.Contains(msg, "username/password authentication failed"):
 		return KindAuth
 	case errors.As(err, &dnsErr):
 		return KindDNS
@@ -116,6 +125,9 @@ func classify(err error) string {
 	case errors.As(err, &recordErr), errors.As(err, &verifyErr), errors.As(err, &unknownAuthority),
 		errors.As(err, &hostnameErr), strings.Contains(msg, "tls:"), strings.Contains(msg, "x509:"):
 		return KindTLS
+	//! A SOCKS proxy whose port is closed never got to the handshake.
+	case errors.Is(err, syscall.ECONNREFUSED), errors.Is(err, syscall.ECONNRESET):
+		return KindConnect
 	case strings.Contains(msg, "socks"):
 		return KindSOCKS
 	case isConnectStatus(err.Error()):
@@ -131,24 +143,11 @@ func classify(err error) string {
 // error repeats the request URL and the proxy's host:port, which a client must
 // not see. ok is false for any other error, a direct dial included.
 func DescribeProxyFailure(err error) (text string, ok bool) {
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) && urlErr.Err != nil {
-		err = urlErr.Err
-	}
-	var expired *connectTimeoutError
-	if errors.As(err, &expired) {
-		return kindText(KindTimeout), true
-	}
-	var outbound *outboundProxyError
-	if errors.As(err, &outbound) {
-		return kindText(classify(outbound.cause)), true
-	}
-	var opErr *net.OpError
-	atProxy := errors.As(err, &opErr) && (opErr.Op == "proxyconnect" || strings.HasPrefix(opErr.Op, "socks"))
-	if !atProxy && !isConnectStatus(err.Error()) {
+	failure, ok := describeOutbound(err)
+	if !ok {
 		return "", false
 	}
-	return kindText(classify(err)), true
+	return failure.Text(), true
 }
 
 // isConnectStatus matches the bare reason phrase Go returns for a CONNECT the
@@ -225,7 +224,7 @@ func (t *instrumentedTransport) RoundTrip(req *http.Request) (*http.Response, er
 	//! A plain-HTTP request through an HTTP proxy gets the 407 as a response, not a CONNECT error.
 	if resp.StatusCode == http.StatusProxyAuthRequired {
 		resp.Body.Close()
-		perr := &ProxyError{ProxyID: t.id, Kind: KindAuth, cause: errors.New(resp.Status)}
+		perr := &ProxyError{ProxyID: t.id, Kind: answerKind(resp.StatusCode, hasSignIn(t.url)), cause: errors.New(resp.Status)}
 		Default().reportFailure(t.id, t.url, perr)
 		return nil, perr
 	}

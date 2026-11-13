@@ -30,9 +30,12 @@ describe("errorTypeTone", () => {
     expect(errorTypeTone(type)).toBe("muted");
   });
 
-  it.each(["stream", "timeout", "rate_limit", "upstream", "unknown"])("%s is a warning", (type) => {
-    expect(errorTypeTone(type)).toBe("warning");
-  });
+  it.each(["proxy", "stream", "timeout", "rate_limit", "upstream", "unknown"])(
+    "%s is a warning",
+    (type) => {
+      expect(errorTypeTone(type)).toBe("warning");
+    },
+  );
 
   it.each([
     "overage",

@@ -869,6 +869,7 @@ export type RequestErrorType =
   | "quota"
   | "suspended"
   | "profile"
+  | "proxy"
   | "auth"
   | "stream"
   | "no_accounts"
@@ -887,6 +888,18 @@ export type RequestSort =
   | "credits"
   | "duration";
 
+/**
+ * How a try failed at an outbound proxy before it reached Kiro (errorType "proxy"). `code` is the
+ * server's failure kind: connect, timeout, dns, tls, auth, auth_required, tunnel, socks or
+ * no_healthy. `status` is the proxy's answer to CONNECT when it refused one. `source` is absent
+ * on rows logged before it.
+ */
+export interface RequestAttemptProxy {
+  source?: "account" | "global" | "pool";
+  code: string;
+  status?: number;
+}
+
 /** One upstream try of a request, oldest first in RequestRecord.attempts. */
 export interface RequestAttempt {
   accountId: string;
@@ -902,6 +915,8 @@ export interface RequestAttempt {
   errorType?: RequestErrorType;
   /** <= 200 bytes */
   message?: string;
+  /** a failure at an outbound proxy; the UI words it from this, not from message */
+  proxy?: RequestAttemptProxy;
   /** failed, and the next attempt ran on another account */
   failover?: boolean;
   /** failed after the upstream stream had sent output */

@@ -193,7 +193,7 @@ func performKiroWebSearch(ctx context.Context, account *config.Account, query st
 		}
 	}
 
-	resp, err := GetRestClientForProxy(ResolveAccountProxyURL(account)).Do(req)
+	resp, err := accountClient(account, false).Do(req)
 	if err != nil {
 		return nil, err
 	}

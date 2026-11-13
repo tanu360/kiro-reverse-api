@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"kiro-proxy/config"
+	"kiro-proxy/logger"
+	"kiro-proxy/proxypool"
 
 	"github.com/google/uuid"
 )
@@ -320,6 +322,7 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 		}
 		//! MCP errors never touch account health: its 403 would otherwise ban an account that chats fine.
 		lastErr = err
+		logger.Warnf("[WebSearch] %s: search failed: %s", accountEmailForLog(account), proxypool.LogText(err))
 		recordAttemptError(ctx, account, model, 0, err)
 	}
 	if lastErr == nil {

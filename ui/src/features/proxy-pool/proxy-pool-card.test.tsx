@@ -142,7 +142,50 @@ describe("ProxyPoolCard", () => {
     expect(await screen.findByText("Every proxy was checked.")).toBeInTheDocument();
     expect(await screen.findByText("Healthy")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
-    expect(screen.getByText(/^Last error: connection refused/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Last error: The proxy refused the connection.", { exact: false }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/proxyconnect/)).not.toBeInTheDocument();
+  });
+
+  it("words a failed test from its code and keeps the server's text behind Details", async () => {
+    const dead = { ...frankfurt, id: "px_2", label: "Dead", url: "http://127.0.0.1:9" };
+    seedProxyPoolMock({ proxies: [dead] });
+    const { user } = await renderCard();
+    await user.click(await screen.findByRole("button", { name: "Test" }));
+
+    // The toast and its live-region copy.
+    expect(
+      await screen.findAllByText("Dead is not reachable. The proxy refused the connection."),
+    ).not.toHaveLength(0);
+    expect(
+      await screen.findByText(/^Last error: The proxy refused the connection\./),
+    ).toBeVisible();
+    // Details opens on a click or tap as well as on hover, and keyboard focus reaches it.
+    const details = screen.getByRole("button", { name: "Details" });
+    await user.click(details);
+    expect(await screen.findByText(/proxyconnect tcp: connect: connection refused/)).toBeVisible();
+    expect(details.tabIndex).toBe(0);
+  });
+
+  it.each([
+    [{ errorCode: "tunnel", errorStatus: 502 }, "The proxy answered with HTTP 502."],
+    [{ errorCode: "auth", errorStatus: 407 }, "The proxy rejected the username or password."],
+    [
+      { errorCode: "auth_required", errorStatus: 407 },
+      "The proxy asks for a username and password.",
+    ],
+    [{ errorCode: "timeout" }, "Connection timed out."],
+    [{ errorCode: "dns" }, "Could not resolve the proxy host."],
+    [{ errorCode: "something_new" }, "The connection through the proxy failed."],
+    [{}, "The connection through the proxy failed."],
+  ])("words the last error %o", async (code, sentence) => {
+    const health = { status: "failed" as const, lastError: "raw text: boom", ...code };
+    seedProxyPoolMock({ proxies: [{ ...frankfurt, health }] });
+    await renderCard();
+    expect(
+      await screen.findByText(`Last error: ${sentence}`, { exact: false }),
+    ).toBeInTheDocument();
   });
 
   it("turns the pool on as the switch flips", async () => {
