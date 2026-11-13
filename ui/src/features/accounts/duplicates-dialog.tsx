@@ -1,8 +1,8 @@
 import {
+  ArchiveIcon,
   CircleCheckIcon,
   Coins01Icon,
   GitMergeIcon,
-  InformationCircleIcon,
   UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -17,11 +17,12 @@ import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { type DuplicateAccount, type DuplicateGroup, mergeDuplicates } from "@/lib/api/duplicates";
 import { queryKeys } from "@/lib/api/query-keys";
-import { formatRelativeTime } from "@/lib/format";
-import { intlLocale, type Lang, type TFunction, useT } from "@/lib/i18n";
+import { formatList, formatRelativeTime } from "@/lib/format";
+import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { STATUS_PILL } from "./account-cells";
 import { authLabel, isApiKeyAccount, isBanned, isHeld } from "./account-model";
 
 /** A group's identity across refetches: its account ids, in order. */
@@ -45,17 +46,22 @@ export function unusableStatus(
 
 /** "Matched by: same refresh token and same user ID", the list joined the language's way. */
 function matchLine(group: DuplicateGroup, t: TFunction, lang: Lang): string {
-  const reasons = new Intl.ListFormat(intlLocale(lang), { type: "conjunction" }).format(
+  const reasons = formatList(
     group.reasons.map((reason) => t(`duplicates.reason.${reason}`)),
+    lang,
   );
   return t("duplicates.matchedBy", { reasons });
 }
 
-/** What the duplicates are, why they matter, what to do and what Merge does, as three points. */
+/**
+ * Why the copies matter, what to choose (and what a user left out keeps), what Merge does, and
+ * what restoring the backup it saves first brings back, as four points.
+ */
 const POINTS = [
   { icon: Coins01Icon, key: "duplicates.pointCredits" },
   { icon: UserCheck01Icon, key: "duplicates.pointChoose" },
   { icon: GitMergeIcon, key: "duplicates.pointMerge" },
+  { icon: ArchiveIcon, key: "duplicates.pointBackup" },
 ] as const;
 
 function MergePoints(): JSX.Element {
@@ -112,8 +118,14 @@ function DuplicateChoice({
               {t("duplicates.suggested")}
             </Badge>
           ) : null}
+          {/* The Accounts list's own pill for that status: its word, colour and icon. */}
           {unusable ? (
-            <Badge icon={InformationCircleIcon} size="sm" tone="warning">
+            <Badge
+              data-status={unusable}
+              icon={STATUS_PILL[unusable].icon}
+              size="sm"
+              tone={STATUS_PILL[unusable].tone}
+            >
               {t(`health.${unusable}`)}
             </Badge>
           ) : null}
@@ -147,6 +159,8 @@ export function DuplicatesDialog({
   const [skipped, setSkipped] = useState<Record<string, boolean>>({});
   const [merging, setMerging] = useState(false);
   const included = groups.filter((group) => !skipped[groupKey(group)]);
+  // Every group switched on merges at once, each down to the one account it keeps.
+  const removing = included.reduce((sum, group) => sum + group.accounts.length - 1, 0);
 
   // The operator's pick while it is still in the group, else the server's suggestion.
   const keeperOf = (group: DuplicateGroup): string => {
@@ -196,7 +210,7 @@ export function DuplicatesDialog({
             {tc("actions.cancel")}
           </Button>
           <Button disabled={included.length === 0} loading={merging} onClick={() => void onMerge()}>
-            {t("duplicates.merge")}
+            {removing > 0 ? t("duplicates.mergeCount", { count: removing }) : t("duplicates.merge")}
           </Button>
         </>
       }

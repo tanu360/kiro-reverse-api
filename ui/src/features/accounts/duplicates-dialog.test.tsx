@@ -36,8 +36,11 @@ async function renderAccounts() {
   return view;
 }
 
-async function openReview(user: Awaited<ReturnType<typeof renderAccounts>>["user"]) {
-  const title = await screen.findByText("1 duplicate account");
+async function openReview(
+  user: Awaited<ReturnType<typeof renderAccounts>>["user"],
+  noticeTitle = "1 duplicate account",
+) {
+  const title = await screen.findByText(noticeTitle);
   const notice = title.closest<HTMLElement>('[data-slot="alert"]') as HTMLElement;
   await user.click(within(notice).getByRole("button", { name: "Review" }));
   return screen.findByRole("dialog", { name: "Duplicate accounts" });
@@ -64,17 +67,33 @@ describe("Duplicate accounts", () => {
     expect(await screen.findByText("1 duplicate account")).toBeInTheDocument();
 
     const dialog = await openReview(user);
-    // What the duplicates are, why they matter, what to pick and what Merge does.
+    // What the duplicates are, why they matter, what to pick, what Merge does and what the
+    // backup it saves first can bring back.
     expect(within(dialog).getByText("Some Kiro users were added more than once.")).toBeVisible();
     expect(
-      within(dialog).getByText("Copies of one user share one set of credits, so they add nothing."),
+      within(dialog).getByText(
+        "Copies of one user share one set of credits, so the extra copies add no credits.",
+      ),
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText("For each user, choose the account to keep."),
+      within(dialog).getByText(
+        "For each user, choose the account to keep. Users you leave out of the merge stay as they are.",
+      ),
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText(/A backup is saved first, so you can undo the merge in Backups/),
+      within(dialog).getByText(
+        "Merge deletes the other copies and moves their requests and stats to the account you keep.",
+      ),
     ).toBeInTheDocument();
+    // A restore rolls back everything, not only the merge, so the text promises no undo.
+    expect(
+      within(dialog).getByText(
+        "A backup is saved first. Restoring it in Backups returns all accounts and settings to how they were before the merge, so later changes, such as refreshed tokens, are lost.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText(/undo/i)).not.toBeInTheDocument();
+    // The button says how many copies it deletes.
+    expect(within(dialog).getByRole("button", { name: "Merge 1 copy" })).toBeEnabled();
     expect(
       within(dialog).getByRole("region", { name: "User 1 · added 2 times" }),
     ).toBeInTheDocument();
@@ -106,7 +125,7 @@ describe("Duplicate accounts", () => {
     const dialog = await openReview(user);
 
     await user.click(within(dialog).getAllByRole("radio")[1] as HTMLElement);
-    await user.click(within(dialog).getByRole("button", { name: "Merge" }));
+    await user.click(within(dialog).getByRole("button", { name: "Merge 1 copy" }));
 
     expect(
       await screen.findByText(
@@ -142,16 +161,19 @@ describe("Duplicate accounts", () => {
     expect(switches).toHaveLength(2);
     for (const toggle of switches) expect(toggle).toBeChecked();
     const otherGroup = within(dialog).getByRole("region", { name: "User 2 · added 2 times" });
+    // One press merges every group switched on, and the button counts what it deletes.
+    expect(within(dialog).getByRole("button", { name: "Merge 2 copies" })).toBeEnabled();
 
     // A group switched off is left out: its keeper choice is disabled and it is not merged.
     await user.click(switches[1] as HTMLElement);
     for (const radio of within(otherGroup).getAllByRole("radio")) {
       expect(radio).toHaveAttribute("aria-disabled", "true");
     }
+    expect(within(dialog).getByRole("button", { name: "Merge 1 copy" })).toBeEnabled();
     await user.click(switches[0] as HTMLElement);
     expect(within(dialog).getByRole("button", { name: "Merge" })).toBeDisabled();
     await user.click(switches[0] as HTMLElement);
-    await user.click(within(dialog).getByRole("button", { name: "Merge" }));
+    await user.click(within(dialog).getByRole("button", { name: "Merge 1 copy" }));
 
     expect(
       await screen.findByText(
@@ -175,6 +197,33 @@ describe("Duplicate accounts", () => {
     expect(cards[0]).toBeChecked();
     expect(within(dialog).getByText("Disabled")).toBeInTheDocument();
     expect(within(dialog).queryByText("Needs attention")).not.toBeInTheDocument();
+  });
+
+  it("shows a copy's status with the accounts list's own pill", async () => {
+    const dana = addDanaCopy();
+    const copy = mockDb.accounts.find((account) => account.id === COPY_ID) as Account;
+    copy.enabled = false;
+    mockDb.accounts.push({ ...dana, id: "dana-banned", banStatus: "BANNED", banReason: "" });
+    const { user } = await renderAccounts();
+    const table = screen.getByRole("table", { name: "Accounts" });
+    const dialog = await openReview(user, "2 duplicate accounts");
+
+    // Same word, colour and icon as the list: red for a ban, grey for a switched-off copy.
+    for (const status of ["disabled", "banned"]) {
+      const listPill = table.querySelector<HTMLElement>(`[data-status="${status}"]`);
+      const dialogPill = dialog.querySelector<HTMLElement>(`[data-status="${status}"]`);
+      expect(listPill).not.toBeNull();
+      expect(dialogPill).not.toBeNull();
+      expect(dialogPill?.className).toBe(listPill?.className);
+      expect(dialogPill?.textContent).toBe(listPill?.textContent);
+      expect(dialogPill?.querySelector("svg")?.innerHTML).toBe(
+        listPill?.querySelector("svg")?.innerHTML,
+      );
+    }
+    expect(dialog.querySelector('[data-status="banned"]')?.className).toContain("--pill-error-bg");
+    expect(dialog.querySelector('[data-status="disabled"]')?.className).toContain(
+      "--pill-neutral-bg",
+    );
   });
 
   it("maps every unhealthy copy to the status the accounts list shows", () => {
@@ -217,7 +266,7 @@ describe("Duplicate accounts", () => {
     );
     const { user } = await renderAccounts();
     const dialog = await openReview(user);
-    await user.click(within(dialog).getByRole("button", { name: "Merge" }));
+    await user.click(within(dialog).getByRole("button", { name: "Merge 1 copy" }));
 
     const matches = await screen.findAllByText(
       "These accounts are no longer duplicates. Review the duplicates again.",
