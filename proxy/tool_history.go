@@ -4,6 +4,7 @@ import (
 	"errors"
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -230,7 +231,7 @@ func callWithToolHistoryFallback(payload *KiroPayload, call func() error) error 
 		return retryErr
 	}
 	markStructuredToolHistoryRejected()
-	logger.Warnf("[ToolHistory] Narrated retry was accepted; narrating tool history for the next %s", structuredToolHistoryRejectionTTL)
+	logger.Warnf("[ToolHistory] Narrated retry was accepted; narrating tool history for the next %s", textfmt.Duration(structuredToolHistoryRejectionTTL))
 	return retryErr
 }
 

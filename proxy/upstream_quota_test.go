@@ -25,6 +25,7 @@ func TestUpstreamQuotaPreservesStatusHintAndCooldown(t *testing.T) {
 				http.Error(w, "rate limited", http.StatusTooManyRequests)
 			})
 			t.Cleanup(func() { h.pool.RecordSuccess("only") })
+			logs := captureLogs(t)
 			body := `{"model":"claude-sonnet-4.5","max_tokens":100,"messages":[{"role":"user","content":"hi"}]}`
 			if path == "/v1/responses" {
 				body = `{"model":"claude-sonnet-4.5","input":"hi"}`
@@ -44,6 +45,9 @@ func TestUpstreamQuotaPreservesStatusHintAndCooldown(t *testing.T) {
 			}
 			if h.pool.GetNext() != nil {
 				t.Fatal("quota cooldown bypassed on next request")
+			}
+			if want := "(429, retry-after 2m), trying next"; !strings.Contains(logs.String(), want) {
+				t.Fatalf("missing %q in logs:\n%s", want, logs)
 			}
 		})
 	}

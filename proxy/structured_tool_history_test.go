@@ -426,6 +426,7 @@ func TestKiroBadRequestRetriesWithFlattenedToolHistory(t *testing.T) {
 	setStructuredToolHistoryForTest(t, true)
 	seen, cleanup := newToolHistoryUpstream(t, http.StatusBadRequest)
 	defer cleanup()
+	logs := captureLogs(t)
 
 	payload := structuredToolHistoryPayload()
 	if !payloadHasStructuredToolHistory(payload) {
@@ -451,6 +452,9 @@ func TestKiroBadRequestRetriesWithFlattenedToolHistory(t *testing.T) {
 	}
 	if payloadHasStructuredToolHistory(structuredToolHistoryPayload()) {
 		t.Fatal("later requests must flatten directly after a confirmed rejection")
+	}
+	if want := "narrating tool history for the next 1h\n"; !strings.Contains(logs.String(), want) {
+		t.Fatalf("missing %q in logs:\n%s", want, logs)
 	}
 }
 

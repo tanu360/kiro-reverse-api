@@ -41,6 +41,19 @@ func TestKiroStreamClientHasNoTotalTimeout(t *testing.T) {
 	}
 }
 
+// The idle error can reach the request log, so it names the wait as the UI
+// does: "3m", not Go's "3m0s".
+func TestIdleStreamErrorWritesTheWaitInPlainUnits(t *testing.T) {
+	for idle, want := range map[time.Duration]string{
+		3 * time.Minute:  "upstream stream idle timeout: no data for 3m",
+		90 * time.Second: "upstream stream idle timeout: no data for 1m 30s",
+	} {
+		if got := (&idleTimeoutBody{idle: idle}).idleError().Error(); got != want {
+			t.Errorf("idle %v: %q, want %q", idle, got, want)
+		}
+	}
+}
+
 func setStreamIdleTimeout(t *testing.T, d time.Duration) {
 	t.Helper()
 	old := kiroStreamIdleTimeout

@@ -13,6 +13,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
+	"kiro-proxy/textfmt"
 	"math"
 	"net/http"
 	"strings"
@@ -310,7 +311,7 @@ func (h *Handler) refreshAllAccounts(every time.Duration) {
 	})
 	h.pool.Reload()
 	logger.Infof("[BackgroundRefresh] Sweep finished: %d accounts in %s (%d workers)",
-		len(accounts), time.Since(start).Round(time.Millisecond), max(1, min(backgroundRefreshWorkers, len(accounts))))
+		len(accounts), textfmt.Duration(time.Since(start)), max(1, min(backgroundRefreshWorkers, len(accounts))))
 	kickAlerts()
 }
 

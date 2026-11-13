@@ -11,6 +11,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"kiro-proxy/proxypool"
+	"kiro-proxy/textfmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -489,7 +490,7 @@ endpointLoop:
 					if throttled {
 						kind = "throttled"
 					}
-					logger.Warnf("[KiroAPI] Endpoint %s %s (429, retry-after %s), trying next...", ep.Name, kind, delay)
+					logger.Warnf("[KiroAPI] Endpoint %s %s (429, retry-after %s), trying next...", ep.Name, kind, textfmt.Duration(delay))
 				}
 
 				if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 402 {

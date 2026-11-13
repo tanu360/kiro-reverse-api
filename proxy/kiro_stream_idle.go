@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"kiro-proxy/textfmt"
 )
 
 var (
@@ -55,7 +57,7 @@ func (b *idleTimeoutBody) Read(p []byte) (int, error) {
 }
 
 func (b *idleTimeoutBody) idleError() error {
-	return fmt.Errorf("%w: no data for %s", errKiroStreamIdle, b.idle)
+	return fmt.Errorf("%w: no data for %s", errKiroStreamIdle, textfmt.Duration(b.idle))
 }
 
 func (b *idleTimeoutBody) Close() error {
