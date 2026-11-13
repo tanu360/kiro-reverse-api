@@ -368,10 +368,7 @@ func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payloa
 		return err
 	}
 
-	//! Full payload logging stays debug-only because it can include user prompts and tokens.
-	if payloadJSON, err := json.Marshal(payload); err == nil {
-		logger.Debugf("[KiroAPI] Request payload: %s", string(payloadJSON))
-	}
+	logKiroPayloadDebug(payload)
 
 	if callback != nil && callback.OnToolUse != nil && len(payload.ToolNameMap) > 0 {
 		originalOnToolUse := callback.OnToolUse
