@@ -96,7 +96,7 @@ func (h *Handler) authenticateForClaudeWithRequestLog(w http.ResponseWriter, r *
 		}
 		if recordRequest {
 			provided := extractProvidedKey(r)
-			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, "", 0, 0, 0, false, ae.status, ae.message)
+			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, rejectedRequestModel(r), 0, 0, 0, false, ae.status, ae.message)
 		}
 		if ae.status == http.StatusTooManyRequests {
 			//! Every 429 here is the key's own limit, already reached.
@@ -125,7 +125,7 @@ func (h *Handler) authenticateForOpenAIWithRequestLog(w http.ResponseWriter, r *
 		}
 		if recordRequest {
 			provided := extractProvidedKey(r)
-			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, "", 0, 0, 0, false, ae.status, ae.message)
+			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, rejectedRequestModel(r), 0, 0, 0, false, ae.status, ae.message)
 		}
 		if ae.status == http.StatusTooManyRequests {
 			//! Every 429 here is the key's own limit, already reached.
