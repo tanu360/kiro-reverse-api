@@ -40,6 +40,7 @@
   "kindScheduled": "Theo lịch",
   "kindAuto": "Trước khi lưu",
   "kindPreRestore": "Điểm hoàn tác",
+  "kindPreMerge": "Trước khi gộp",
   "noteBeforeUpload": "Trước khi khôi phục từ tệp {name}",
   "noteBeforeRestore": "Trước khi khôi phục bản sao lưu {id}",
   "noteScheduled": "Theo lịch ({cadence})",

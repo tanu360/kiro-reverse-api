@@ -41,6 +41,7 @@
   "kindScheduled": "Agendado",
   "kindAuto": "Antes de salvar",
   "kindPreRestore": "Ponto de reversão",
+  "kindPreMerge": "Antes de mesclar",
   "noteBeforeUpload": "Antes de restaurar do arquivo {name}",
   "noteBeforeRestore": "Antes de restaurar o backup {id}",
   "noteScheduled": "Agendado ({cadence})",

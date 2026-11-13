@@ -17,6 +17,8 @@ const RESTORE_PREFIX = "auto before restore ";
 const SCHEDULED_NOTE = /^auto-(hourly|daily|weekly)$/;
 /** The note of the backup a duplicate merge saves first (proxy/account_dedup.go). */
 const MERGE_NOTE = "before merging duplicate accounts";
+/** The kind the UI gives that backup. */
+const MERGE_KIND = "pre-merge";
 
 type BackupTone = "primary" | "neutral" | "warning";
 
@@ -90,7 +92,18 @@ const KIND_KEYS: Record<string, string> = {
   scheduled: "kindScheduled",
   auto: "kindAuto",
   "pre-restore": "kindPreRestore",
+  [MERGE_KIND]: "kindPreMerge",
 };
+
+/**
+ * The kind a row shows. The server files the backup a duplicate merge saves first as "auto" with
+ * a fixed note, so that backup (old or new, from any server version) shows its own kind,
+ * "Before merge", instead of "Before save". Every other row keeps the server's kind.
+ */
+export function backupKind(entry: Pick<BackupEntry, "kind" | "note">): string {
+  if (entry.kind === "auto" && (entry.note ?? "").trim() === MERGE_NOTE) return MERGE_KIND;
+  return entry.kind;
+}
 
 /** Known kinds are translated; any other kind is shown as the server sent it. */
 export function kindLabel(kind: string, t: TFunction): string {

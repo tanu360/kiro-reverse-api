@@ -92,9 +92,9 @@ Se este projeto ajuda você, uma Star significaria muito.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/accounts-tester-dark.webp">
-    <img alt="Teste de modelos" src="screenshots/pt-BR/accounts-tester-light.webp" width="100%">
+    <img alt="Testar conta" src="screenshots/pt-BR/accounts-tester-light.webp" width="100%">
   </picture>
-  <br><sub><b>Teste de modelos</b> — teste um modelo ou todos os modelos em cache de uma vez; toque numa linha para ver a resposta e as etapas</sub>
+  <br><sub><b>Testar conta</b> — teste um modelo ou todos os modelos em cache de uma vez; toque numa linha para ver a resposta e as etapas</sub>
 </p>
 
 <p align="center">

@@ -57,6 +57,7 @@
   "selfHeal.more": "Contas suspensas pelo Kiro, contas que você desabilitou e contas aguardando a renovação dos créditos nunca são alteradas. Uma conta que falha de novo após uma recuperação é bloqueada de novo.",
   "selfHeal.interval": "Tempo mínimo entre recuperações",
   "selfHeal.intervalHint": "Em segundos, de {min} a {max}.",
+  "selfHeal.intervalDuration": "{duration} entre recuperações.",
   "selfHeal.intervalInvalid": "Informe um número inteiro de segundos de {min} a {max}.",
   "selfHeal.rounds": "Máximo de recuperações sem requisição bem-sucedida",
   "selfHeal.roundsHint": "De 0 a {max}. 0 significa sem limite. Depois desse número de recuperações, o proxy para de recuperar até uma requisição dar certo ou você retomar a autorrecuperação.",

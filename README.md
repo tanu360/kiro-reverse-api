@@ -92,9 +92,9 @@ If this project helps you, a Star would mean a lot.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/en/accounts-tester-dark.webp">
-    <img alt="Model tester" src="screenshots/en/accounts-tester-light.webp" width="100%">
+    <img alt="Test account" src="screenshots/en/accounts-tester-light.webp" width="100%">
   </picture>
-  <br><sub><b>Model tester</b> — test one model or every cached model at once; tap a row for its response and steps</sub>
+  <br><sub><b>Test account</b> — test one model or every cached model at once; tap a row for its response and steps</sub>
 </p>
 
 <p align="center">

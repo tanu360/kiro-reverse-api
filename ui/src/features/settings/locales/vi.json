@@ -55,6 +55,7 @@
   "selfHeal.more": "Tài khoản bị Kiro tạm ngưng, tài khoản bạn đã tắt và tài khoản đang chờ credit được đặt lại không bao giờ bị động đến. Tài khoản lỗi lại sau khi được phục hồi sẽ bị chặn lại.",
   "selfHeal.interval": "Khoảng cách tối thiểu giữa hai lần phục hồi",
   "selfHeal.intervalHint": "Tính bằng giây, từ {min} đến {max}.",
+  "selfHeal.intervalDuration": "{duration} giữa hai lần phục hồi.",
   "selfHeal.intervalInvalid": "Nhập số giây nguyên từ {min} đến {max}.",
   "selfHeal.rounds": "Số lần phục hồi tối đa khi chưa có yêu cầu thành công",
   "selfHeal.roundsHint": "Từ 0 đến {max}. 0 là không giới hạn. Sau từng này lần phục hồi, proxy ngừng phục hồi cho đến khi có yêu cầu thành công hoặc bạn cho tiếp tục.",

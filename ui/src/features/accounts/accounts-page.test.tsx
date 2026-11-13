@@ -479,6 +479,25 @@ describe("AccountsPage tags", () => {
     expect(router.state.location.search).not.toHaveProperty("tag");
   });
 
+  it("puts a card's tags on a line of their own, under the status and plan line", async () => {
+    tagFixtures();
+    const { list } = await renderCards();
+    const card = within(list)
+      .getAllByRole("listitem")
+      .find((item) => within(item).queryByText(DANA_MASKED));
+    if (!card) throw new Error("dana card missing");
+    const meta = card.querySelector('[data-slot="list-card-meta"]') as HTMLElement;
+    const tags = card.querySelector('[data-slot="account-tags"]') as HTMLElement;
+    // The meta line keeps its text for the nickname, plan and sign-in method.
+    expect(meta).not.toContainElement(tags);
+    expect(meta.compareDocumentPosition(tags) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Room for all three tags on their own line.
+    for (const tag of ["Team-A", "backup", "ci"]) {
+      expect(within(tags).getByText(tag)).toBeInTheDocument();
+    }
+    expect(within(tags).queryByText(/^\+/)).not.toBeInTheDocument();
+  });
+
   it("filters by a tag named All without mistaking it for the All row", async () => {
     const { dana } = tagFixtures();
     dana.tags = ["All"];

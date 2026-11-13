@@ -46,6 +46,28 @@ function finite(value: number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const HAN = /\p{Script=Han}/u;
+const LATIN_OR_DIGIT = /[\p{Script=Latin}\d]/u;
+
+/**
+ * "a, b and c", joined the language's way (Intl.ListFormat). Where a Chinese joining word such
+ * as 和 meets Latin text, a space goes between them ("刷新 Token 和用户 ID"), as the zh texts
+ * write it everywhere else ("无 Token").
+ */
+export function formatList(items: readonly string[], lang?: Lang): string {
+  const parts = new Intl.ListFormat(locale(lang), { type: "conjunction" }).formatToParts(items);
+  return parts
+    .map((part, index) => {
+      if (part.type !== "literal") return part.value;
+      const before = parts[index - 1]?.value.at(-1) ?? "";
+      const after = parts[index + 1]?.value.at(0) ?? "";
+      const lead = LATIN_OR_DIGIT.test(before) && HAN.test(part.value.at(0) ?? "") ? " " : "";
+      const trail = LATIN_OR_DIGIT.test(after) && HAN.test(part.value.at(-1) ?? "") ? " " : "";
+      return lead + part.value + trail;
+    })
+    .join("");
+}
+
 /** Grouped integer (truncated toward zero). */
 export function formatNumber(value: number, lang?: Lang): string {
   return numberFormat(lang, { maximumFractionDigits: 0 }).format(Math.trunc(finite(value)));
@@ -188,22 +210,30 @@ const DURATION_UNITS: ReadonlyArray<[string, number]> = [
  * "45s", "1m 30s", "1h", "1h 15m", "2d 3h" in English; the units follow the UI language. The
  * seconds are rounded first, and the units past the two shown are dropped. The long display
  * reads "1 hour 15 minutes", for a duration inside a sentence such as "Every 5 minutes".
+ * `units` counts the units from the largest one on; 4 shows every unit, for a value that must
+ * read exactly: 3661 is "1h 1m 1s" and 3601 is "1h 1s".
  */
 export function formatDuration(
   seconds: number,
   lang?: Lang,
   display: UnitDisplay = "narrow",
+  units = 2,
 ): string {
   let rest = Math.max(0, Math.round(finite(seconds)));
   const parts: [number, string][] = [];
+  let left = units;
   for (const [unit, size] of DURATION_UNITS) {
     const value = Math.floor(rest / size);
     rest -= value * size;
     if (parts.length === 0) {
-      if (value > 0 || size === 1) parts.push([value, unit]);
+      if (value > 0 || size === 1) {
+        parts.push([value, unit]);
+        left -= 1;
+      }
     } else {
+      if (left <= 0) break;
+      left -= 1;
       if (value > 0) parts.push([value, unit]);
-      break;
     }
   }
   return joinUnits(parts, lang, display);

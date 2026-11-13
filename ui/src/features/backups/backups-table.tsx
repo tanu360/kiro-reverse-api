@@ -4,6 +4,7 @@ import {
   Delete02Icon,
   Download01Icon,
   EllipsisVerticalIcon,
+  GitMergeIcon,
   HandIcon,
   HistoryIcon,
   SaveIcon,
@@ -23,7 +24,7 @@ import type { BackupEntry } from "@/lib/api/types";
 import { EMPTY, formatBytes, formatDateTime } from "@/lib/format";
 import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { accountsCell, kindLabel, kindTone, noteText } from "./backup-model";
+import { accountsCell, backupKind, kindLabel, kindTone, noteText } from "./backup-model";
 
 export type BackupAction = "download" | "restore" | "delete";
 
@@ -65,6 +66,7 @@ const KIND_ICONS: Record<string, IconSvgElement> = {
   scheduled: CalendarClockIcon,
   auto: SaveIcon,
   "pre-restore": HistoryIcon,
+  "pre-merge": GitMergeIcon,
 };
 
 function KindBadge({ kind, t }: { kind: string; t: TFunction }): JSX.Element {
@@ -256,7 +258,7 @@ function BackupCard({
         // One line: a long count wraps in its own column, so every card's badge sits bottom-left,
         // on the baseline of the count's last line.
         <div className="flex items-baseline-last justify-between gap-3">
-          <KindBadge kind={entry.kind} t={t} />
+          <KindBadge kind={backupKind(entry)} t={t} />
           <span className="min-w-0 text-end text-meta text-muted-foreground">
             {fillNodes(t("common:text.labelValue"), {
               label: t("accountsInBackup"),
@@ -300,7 +302,11 @@ export function BackupsTable({
   const columns = useMemo<DataTableColumn<BackupEntry>[]>(
     () => [
       { id: "time", header: t("time"), cell: (entry) => <TimeCell entry={entry} /> },
-      { id: "kind", header: t("kind"), cell: (entry) => <KindBadge kind={entry.kind} t={t} /> },
+      {
+        id: "kind",
+        header: t("kind"),
+        cell: (entry) => <KindBadge kind={backupKind(entry)} t={t} />,
+      },
       {
         id: "note",
         header: t("note"),

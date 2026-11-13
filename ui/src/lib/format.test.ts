@@ -7,6 +7,7 @@ import {
   formatDuration,
   formatDurationMs,
   formatFraction,
+  formatList,
   formatNumber,
   formatPercent,
   formatRelativeTime,
@@ -57,6 +58,31 @@ describe("formatDurationMs", () => {
   });
 });
 
+describe("formatList", () => {
+  it("joins the items the language's way", () => {
+    expect(formatList(["same refresh token"], "en")).toBe("same refresh token");
+    expect(formatList(["a", "b", "c"], "en")).toBe("a, b, and c");
+    expect(formatList(["mesmo refresh token", "mesmo ID de usuário"], "pt-BR")).toBe(
+      "mesmo refresh token e mesmo ID de usuário",
+    );
+  });
+
+  it("puts a space between a Chinese joining word and Latin text", () => {
+    expect(formatList(["相同的刷新 Token", "相同的用户 ID"], "zh")).toBe(
+      "相同的刷新 Token 和相同的用户 ID",
+    );
+    expect(formatList(["相同的用户 ID", "相同的 API Key"], "zh")).toBe(
+      "相同的用户 ID 和相同的 API Key",
+    );
+    expect(formatList(["相同的刷新 Token", "相同的用户 ID", "相同的邮箱及登录方式"], "zh")).toBe(
+      "相同的刷新 Token、相同的用户 ID 和相同的邮箱及登录方式",
+    );
+    expect(formatList(["相同的邮箱及登录方式", "API Key"], "zh")).toBe(
+      "相同的邮箱及登录方式和 API Key",
+    );
+  });
+});
+
 describe("formatDuration", () => {
   it("shows the largest unit and the next one, a space between them", () => {
     expect(formatDuration(0, "en")).toBe("0s");
@@ -84,6 +110,16 @@ describe("formatDuration", () => {
     expect(formatDuration(0.4, "en")).toBe("0s");
     expect(formatDuration(-5, "en")).toBe("0s");
     expect(formatDuration(Number.NaN, "en")).toBe("0s");
+  });
+
+  it("shows more units when asked, still without the zero ones", () => {
+    expect(formatDuration(3661, "en", "narrow", 4)).toBe("1h 1m 1s");
+    expect(formatDuration(3601, "en", "narrow", 4)).toBe("1h 1s");
+    expect(formatDuration(4500, "en", "narrow", 4)).toBe("1h 15m");
+    expect(formatDuration(86_400, "en", "narrow", 4)).toBe("1d");
+    expect(formatDuration(90_061, "en", "narrow", 4)).toBe("1d 1h 1m 1s");
+    expect(formatDuration(90_061, "en", "narrow", 3)).toBe("1d 1h 1m");
+    expect(formatDuration(45, "en", "narrow", 4)).toBe("45s");
   });
 
   it("follows the UI language", () => {

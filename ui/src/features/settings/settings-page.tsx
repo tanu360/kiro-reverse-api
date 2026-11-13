@@ -126,34 +126,89 @@ function goToSection(id: SectionId): void {
   target.focus({ preventScroll: true });
 }
 
-/** Scroll-spy: the card in view, updated once per frame while the page scrolls. */
+/** The section a deep link names (/settings#settings-alerts), or null. */
+function hashSection(): SectionId | null {
+  const id = window.location.hash.slice(1);
+  return SETTINGS_SECTIONS.find((section) => section.id === id)?.id ?? null;
+}
+
+/** Keys that scroll the page while focus is not in a text field. */
+const SCROLL_KEYS = new Set([" ", "PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown"]);
+
+/** How long after a wheel, touch or scroll key a page scroll counts as the reader's. */
+const USER_SCROLL_MS = 800;
+
+function isTextField(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+  );
+}
+
+/**
+ * Scroll-spy: the card in view, updated once per frame while the page scrolls. A nav click or a
+ * deep link keeps its section marked until the reader scrolls the page (a scroll that follows a
+ * wheel, touch or scroll key; the page shows no vertical scrollbar, index.css) or tabs into
+ * another card. Near the page end the card it went to sits at the top while the page cannot
+ * scroll further, where the spy alone marks the last card. A key that only works a control
+ * (Space on a switch) does not scroll, so the section stays marked.
+ */
 function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] {
-  const [active, setActive] = useState<SectionId>(SETTINGS_SECTIONS[0].id);
-  // A nav click wins over the scroll event its own jump fires.
-  const pinnedUntil = useRef(0);
+  const [linked] = useState(hashSection);
+  const [active, setActive] = useState<SectionId>(linked ?? SETTINGS_SECTIONS[0].id);
+  const pinned = useRef<SectionId | null>(linked);
+  const userUntil = useRef(0);
 
   useEffect(() => {
     let frame = 0;
     const update = () => {
       frame = 0;
-      if (Date.now() < pinnedUntil.current) return;
-      setActive(sectionInView(offset));
+      setActive(pinned.current ?? sectionInView(offset));
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update);
     };
+    const onScroll = () => {
+      if (pinned.current && performance.now() < userUntil.current) pinned.current = null;
+      schedule();
+    };
+    const userInput = () => {
+      userUntil.current = performance.now() + USER_SCROLL_MS;
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (SCROLL_KEYS.has(event.key) && !isTextField(event.target)) userInput();
+    };
+    // Tabbing on into another card moves the reader there, so the spy follows again.
+    const onFocus = (event: FocusEvent) => {
+      const target = event.target;
+      if (!pinned.current || !(target instanceof Element) || target.closest("nav")) return;
+      if (document.getElementById(pinned.current)?.contains(target)) return;
+      pinned.current = null;
+      schedule();
+    };
     update();
-    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", schedule);
+    window.addEventListener("wheel", userInput, { passive: true });
+    window.addEventListener("touchmove", userInput, { passive: true });
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("focusin", onFocus);
     return () => {
       if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", schedule);
+      window.removeEventListener("wheel", userInput);
+      window.removeEventListener("touchmove", userInput);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("focusin", onFocus);
     };
   }, [offset]);
 
+  // A tap on a chip can follow a touch that moved the chip row: the jump it starts is not the
+  // reader's scroll.
   const pin = useCallback((id: SectionId) => {
-    pinnedUntil.current = Date.now() + 400;
+    pinned.current = id;
+    userUntil.current = 0;
     setActive(id);
   }, []);
   return [active, pin];
@@ -227,15 +282,26 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   const [active, pin] = useActiveSection(wide ? SPY_OFFSET : SPY_OFFSET + CHIP_ROW_HEIGHT);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // In the chip row, scroll the active chip into view without scrolling the page.
+  // In the chip row, scroll the active chip into view without scrolling the page: when the
+  // section changes, and when the chips change width (their On/Off pills load after a deep link
+  // has landed and pushed the active chip back out of view).
   useLayoutEffect(() => {
-    const list = listRef.current?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]');
-    const chip = listRef.current?.querySelector<HTMLElement>(`a[href="#${active}"]`);
-    if (!list || !chip || list.scrollWidth <= list.clientWidth) return;
-    const listBox = list.getBoundingClientRect();
-    const chipBox = chip.getBoundingClientRect();
-    if (chipBox.left < listBox.left) list.scrollLeft -= listBox.left - chipBox.left + 32;
-    else if (chipBox.right > listBox.right) list.scrollLeft += chipBox.right - listBox.right + 32;
+    const row = listRef.current;
+    const list = row?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]');
+    if (!row || !list) return;
+    const reveal = () => {
+      const chip = row.querySelector<HTMLElement>(`a[href="#${active}"]`);
+      if (!chip || list.scrollWidth <= list.clientWidth) return;
+      const listBox = list.getBoundingClientRect();
+      const chipBox = chip.getBoundingClientRect();
+      if (chipBox.left < listBox.left) list.scrollLeft -= listBox.left - chipBox.left + 32;
+      else if (chipBox.right > listBox.right) list.scrollLeft += chipBox.right - listBox.right + 32;
+    };
+    reveal();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(reveal);
+    observer.observe(row);
+    return () => observer.disconnect();
   }, [active]);
 
   const onClick = (event: MouseEvent<HTMLAnchorElement>, id: SectionId) => {

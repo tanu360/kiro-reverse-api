@@ -41,6 +41,7 @@
   "kindScheduled": "Scheduled",
   "kindAuto": "Before save",
   "kindPreRestore": "Rollback point",
+  "kindPreMerge": "Before merge",
   "noteBeforeUpload": "Before restoring from file {name}",
   "noteBeforeRestore": "Before restoring backup {id}",
   "noteScheduled": "Scheduled ({cadence})",

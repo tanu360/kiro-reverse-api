@@ -40,6 +40,7 @@
   "kindScheduled": "定时",
   "kindAuto": "保存前",
   "kindPreRestore": "回滚点",
+  "kindPreMerge": "合并前",
   "noteBeforeUpload": "从文件 {name} 恢复之前",
   "noteBeforeRestore": "恢复备份 {id} 之前",
   "noteScheduled": "定时（{cadence}）",

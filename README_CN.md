@@ -92,9 +92,9 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/zh/accounts-tester-dark.webp">
-    <img alt="模型测试" src="screenshots/zh/accounts-tester-light.webp" width="100%">
+    <img alt="测试账号" src="screenshots/zh/accounts-tester-light.webp" width="100%">
   </picture>
-  <br><sub><b>模型测试</b> — 一次测试一个或全部已缓存的模型；点击一行查看响应与步骤</sub>
+  <br><sub><b>测试账号</b> — 一次测试一个或全部已缓存的模型；点击一行查看响应与步骤</sub>
 </p>
 
 <p align="center">

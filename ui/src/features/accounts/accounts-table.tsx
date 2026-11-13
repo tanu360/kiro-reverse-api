@@ -212,11 +212,14 @@ export function AccountsTable({
   );
 }
 
+/** Tags a phone card shows on their own line; more fold into a "+N" pill. */
+const CARD_TAGS = 3;
+
 /**
  * One account as a row of the card list: the checkbox and name with the switch and menu at the
- * end; the status pill leading the nickname, plan and sign-in line, then the first tag; usage
- * across the full width; the live requests line; three quiet stats. A tap anywhere else opens the
- * details.
+ * end; the status pill leading the nickname, plan and sign-in line; the tags on a line of their
+ * own, so the line keeps its text and each tag its room; usage across the full width; the live
+ * requests line; three quiet stats. A tap anywhere else opens the details.
  */
 function AccountCard({
   account,
@@ -252,7 +255,6 @@ function AccountCard({
         <span className="flex min-w-0 items-center gap-2">
           <StatusPill account={account} size="sm" />
           <span className="truncate">{accountMeta(account, t, !authIconNamesMethod(account))}</span>
-          <TagBadges max={1} tags={account.tags} />
           <AccountFlags account={account} showPriority />
         </span>
       }
@@ -262,6 +264,7 @@ function AccountCard({
       title={<span className={name.mono ? "font-mono text-meta" : undefined}>{name.text}</span>}
       variant="row"
     >
+      <TagBadges max={CARD_TAGS} tags={account.tags} />
       <UsageMeter account={account} />
       <AccountActivityLine accountId={account.id} className="h-5" />
       <dl className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-3 text-meta">
