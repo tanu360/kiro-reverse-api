@@ -249,8 +249,11 @@ func TestRootRoutesKeepTheProxyAPI(t *testing.T) {
 		t.Fatalf("/admin/api/status: status %d, want 401 from the admin API", rec.Code)
 	}
 
-	// Unknown proxy paths stay a plain 404, even for a browser.
-	assertPlainNotFound(t, servePage(h, http.MethodGet, "/v1/unknown"), "/v1/unknown")
+	// Unknown proxy paths are a JSON 404 that SDKs can read, even for a browser; never the UI.
+	rec = servePage(h, http.MethodGet, "/v1/unknown")
+	if rec.Code != http.StatusNotFound || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") || strings.Contains(rec.Body.String(), testIndexHTML) {
+		t.Fatalf("/v1/unknown: status %d %q %s, want a JSON 404", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
+	}
 	assertPlainNotFound(t, serveAdminUI(h, http.MethodPost, "/unknown"), "POST /unknown")
 
 	// Proxy routes are matched before the UI, for a browser too.

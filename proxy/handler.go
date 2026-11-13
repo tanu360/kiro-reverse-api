@@ -422,6 +422,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.handleModels(w, ar)
+	case strings.HasPrefix(path, "/v1/models/") || strings.HasPrefix(path, "/models/"):
+		ar := h.authenticateForModels(w, r)
+		if ar == nil {
+			return
+		}
+		h.handleModel(w, ar, strings.TrimPrefix(strings.TrimPrefix(path, "/v1/models/"), "/models/"))
 	case path == "/v1/codex/models" || path == "/codex/models" || path == "/v1/codex-models":
 		ar := h.authenticateForOpenAI(w, r)
 		if ar == nil {
@@ -453,7 +459,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleStats(w, r)
 
 	case strings.HasPrefix(path, "/v1/"):
-		http.Error(w, "Not Found", 404)
+		sendClientNotFound(w, r)
 
 	default:
 		// The admin UI at the root: its files, and index.html for the pages a browser opens.
@@ -536,8 +542,8 @@ func (h *Handler) handleStats(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(h.statusPayload(false))
 }
 
-func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
-
+// listedModels is what /v1/models lists for the request's API key.
+func (h *Handler) listedModels(r *http.Request) []map[string]interface{} {
 	h.modelsCacheMu.RLock()
 	cached := h.cachedModels
 	h.modelsCacheMu.RUnlock()
@@ -560,12 +566,11 @@ func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 	//! mapping points them anywhere, so they only failed. A model mapping still adds them.
 	models = append(models, buildModelInfo("auto", "kiro-proxy", true))
 	models = appendConfiguredModelAliases(models, thinkingSuffix)
+	return models
+}
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"object": "list",
-		"data":   models,
-	})
+func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
+	writeModelsList(w, r, h.listedModels(r))
 }
 
 func buildAnthropicModelsResponse(cached []ModelInfo, thinkingSuffix string) []map[string]interface{} {
@@ -623,9 +628,14 @@ func buildModelInfo(id, ownedBy string, supportsImage bool) map[string]interface
 	}
 
 	return map[string]interface{}{
-		"id":               id,
-		"object":           "model",
-		"owned_by":         ownedBy,
+		"id":       id,
+		"object":   "model",
+		"owned_by": ownedBy,
+		// type, display_name and created_at are the Anthropic shape, created the OpenAI one.
+		"type":             "model",
+		"display_name":     modelDisplayName(id),
+		"created_at":       modelsCreatedAt.Format(time.RFC3339),
+		"created":          modelsCreatedAt.Unix(),
 		"supports_image":   supportsImage,
 		"input_modalities": modalities,
 		"modalities":       modalitiesMap,
@@ -2450,10 +2460,13 @@ func (h *Handler) sendOpenAIError(w http.ResponseWriter, status int, errType, me
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
+	code, param := openAIErrorCode(status, message)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"error": map[string]interface{}{
 			"type":    errType,
 			"message": message,
+			"code":    code,
+			"param":   param,
 		},
 	})
 }
