@@ -41,14 +41,19 @@ func (c *outputCut) record(unsentTokens int) {
 type promptOverhead struct {
 	estimated int // the local estimate of the prompt
 	overhead  int // Kiro's count of the prompt minus the estimate
-	fromCut   bool
-	seq       uint64
+	// output is the estimated answer the count was taken with. Kiro's count covers prompt and
+	// answer, and the answer's estimate runs high on prose (4289 for 3360 live), so a long
+	// answer leaves the prompt's count low.
+	output  int
+	fromCut bool
+	seq     uint64
 }
 
 // savedPromptOverhead is one entry of the saved table; the list order keeps the age order.
 type savedPromptOverhead struct {
 	Estimated int  `json:"estimated"`
 	Overhead  int  `json:"overhead"`
+	Output    int  `json:"output,omitempty"`
 	FromCut   bool `json:"fromCut,omitempty"`
 }
 
@@ -91,7 +96,7 @@ func loadPromptOverheads() *promptOverheads {
 	sort.Strings(models)
 	for _, model := range models {
 		for _, e := range saved[model] {
-			p.record(model, e.Estimated, e.Estimated+e.Overhead, e.FromCut)
+			p.record(model, e.Estimated, e.Estimated+e.Overhead, e.Output, e.FromCut)
 		}
 	}
 	return p
@@ -110,7 +115,7 @@ func (p *promptOverheads) persist() {
 		ordered := append([]promptOverhead(nil), list...)
 		sort.Slice(ordered, func(i, j int) bool { return ordered[i].seq < ordered[j].seq })
 		for _, e := range ordered {
-			saved[model] = append(saved[model], savedPromptOverhead{Estimated: e.estimated, Overhead: e.overhead, FromCut: e.fromCut})
+			saved[model] = append(saved[model], savedPromptOverhead{Estimated: e.estimated, Overhead: e.overhead, Output: e.output, FromCut: e.fromCut})
 		}
 	}
 	p.mu.Unlock()
@@ -126,7 +131,7 @@ func (p *promptOverheads) persist() {
 // record notes Kiro's count of a prompt and reports whether the table changed. A whole answer's
 // count replaces an earlier one for a prompt of the same estimate; a cut answer's count is only
 // kept when there is none.
-func (p *promptOverheads) record(model string, estimated, counted int, fromCut bool) bool {
+func (p *promptOverheads) record(model string, estimated, counted, output int, fromCut bool) bool {
 	if p == nil || estimated <= 0 || counted <= 0 {
 		return false
 	}
@@ -134,14 +139,14 @@ func (p *promptOverheads) record(model string, estimated, counted int, fromCut b
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.seq++
-	entry := promptOverhead{estimated: estimated, overhead: counted - estimated, fromCut: fromCut, seq: p.seq}
+	entry := promptOverhead{estimated: estimated, overhead: counted - estimated, output: max(output, 0), fromCut: fromCut, seq: p.seq}
 	list, known := p.byModel[key]
 	for i := range list {
 		if list[i].estimated == estimated {
 			if fromCut && !list[i].fromCut {
 				return false
 			}
-			changed := list[i].overhead != entry.overhead || list[i].fromCut != fromCut
+			changed := list[i].overhead != entry.overhead || list[i].output != entry.output || list[i].fromCut != fromCut
 			list[i] = entry
 			return changed
 		}
@@ -178,33 +183,44 @@ func (p *promptOverheads) countedWhole(model string, estimated int) bool {
 	return false
 }
 
-// overhead is what Kiro added to the counted prompt nearest in estimated size: of this model,
-// else of any model. It is 0 when Kiro has counted no prompt yet.
+// overhead is what Kiro added to the counted prompt that best matches this estimate: of this
+// model, else of any model. It is 0 when Kiro has counted no prompt yet.
 func (p *promptOverheads) overhead(model string, estimated int) int {
 	if p == nil {
 		return 0
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if best, ok := nearestOverhead(p.byModel[strings.ToLower(model)], estimated); ok {
+	if best, ok := nearestOverhead(p.byModel[strings.ToLower(model)], estimated, true); ok {
 		return best.overhead
 	}
 	var all []promptOverhead
 	for _, list := range p.byModel {
 		all = append(all, list...)
 	}
-	best, _ := nearestOverhead(all, estimated)
+	//! Another model's prompt of the same size is not the same prompt, so no size wins outright.
+	best, _ := nearestOverhead(all, estimated, false)
 	return best.overhead
 }
 
-// nearestOverhead picks the entry closest in estimated size; the newest wins a tie.
-func nearestOverhead(list []promptOverhead, estimated int) (promptOverhead, bool) {
+// overheadMissPerOutput weighs an entry's answer against its distance in prompt size. Live
+// (2026-11-13) Kiro's count grew 0.965 tokens per estimated prompt token, so a size step of d
+// misses by about 0.035d, while an answer of n estimated tokens misses by up to 0.25n.
+const overheadMissPerOutput = 7
+
+// nearestOverhead picks the entry for a prompt of exactly this estimate when exact is set, else
+// the one whose count should miss least: near in size and taken with a short answer. The newest
+// wins a tie.
+func nearestOverhead(list []promptOverhead, estimated int, exact bool) (promptOverhead, bool) {
 	var best promptOverhead
-	found := false
+	bestMiss, found := 0, false
 	for _, e := range list {
-		d, bestD := absInt(e.estimated-estimated), absInt(best.estimated-estimated)
-		if !found || d < bestD || (d == bestD && e.seq > best.seq) {
-			best, found = e, true
+		miss := absInt(e.estimated-estimated) + overheadMissPerOutput*e.output
+		if exact && e.estimated == estimated {
+			miss = -1
+		}
+		if !found || miss < bestMiss || (miss == bestMiss && e.seq > best.seq) {
+			best, bestMiss, found = e, miss, true
 		}
 	}
 	return best, found
@@ -226,14 +242,15 @@ func (p *promptOverheads) finalizeUsage(model string, cut outputCut, inputTokens
 		outputTokens = estimatedOutputTokens
 	}
 	if inputTokens > 0 {
-		if p.record(model, estimatedInputTokens, inputTokens, false) {
+		//! Kiro's own input count does not include the answer, so no answer makes it miss.
+		if p.record(model, estimatedInputTokens, inputTokens, 0, false) {
 			p.persist()
 		}
 		return inputTokens, outputTokens
 	}
 	if contextTokens > 0 && !(cut.cut && p.countedWhole(model, estimatedInputTokens)) {
 		inputTokens = inputFromContextTokens(contextTokens, outputTokens+cut.unsent, estimatedInputTokens)
-		if p.record(model, estimatedInputTokens, inputTokens, cut.cut) {
+		if p.record(model, estimatedInputTokens, inputTokens, outputTokens+cut.unsent, cut.cut) {
 			p.persist()
 		}
 		return inputTokens, outputTokens

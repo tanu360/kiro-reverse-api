@@ -191,19 +191,22 @@ func TestPromptOverheadsSurviveARestart(t *testing.T) {
 
 func TestPromptOverheadsPickTheNearestCountedPrompt(t *testing.T) {
 	p := newPromptOverheads()
-	p.record("claude-haiku-4.5", 4, 4104, false)
-	p.record("claude-haiku-4.5", 3738, 7706, false)
-	p.record("deepseek-3.2", 22, 3793, false)
+	p.record("claude-haiku-4.5", 4, 4104, 1, false)
+	p.record("claude-haiku-4.5", 3738, 7706, 1, false)
+	p.record("deepseek-3.2", 22, 3793, 32, false)
+	// A long answer leaves Kiro's prompt count low (live: 3215 against about 4140).
+	p.record("claude-haiku-4.5", 37, 3215, 4289, false)
 	cases := []struct {
 		model     string
 		estimated int
 		want      int
 	}{
-		{"claude-haiku-4.5", 30, 4130},   // nearest is the 4-token prompt
+		{"claude-haiku-4.5", 30, 4130},   // the 4-token prompt, not the long answer's 37
+		{"claude-haiku-4.5", 37, 3215},   // the same prompt size reads as its whole answer did
 		{"claude-haiku-4.5", 3000, 6968}, // nearest is the 3738-token prompt
 		{"CLAUDE-HAIKU-4.5", 4, 4104},    // model IDs ignore case
 		{"deepseek-3.2", 22, 3793},
-		{"claude-sonnet-4.5", 22, 3793}, // no count for this model: the nearest of any model
+		{"claude-sonnet-4.5", 22, 4122}, // no count for this model: the best of any model
 	}
 	for _, c := range cases {
 		if got := c.estimated + p.overhead(c.model, c.estimated); got != c.want {
@@ -211,7 +214,7 @@ func TestPromptOverheadsPickTheNearestCountedPrompt(t *testing.T) {
 		}
 	}
 	// A cut answer's count does not replace a whole answer's for the same prompt size.
-	if p.record("claude-haiku-4.5", 4, 4200, true) {
+	if p.record("claude-haiku-4.5", 4, 4200, 1, true) {
 		t.Error("a cut count replaced a whole count")
 	}
 	if got := 4 + p.overhead("claude-haiku-4.5", 4); got != 4104 {
@@ -219,7 +222,7 @@ func TestPromptOverheadsPickTheNearestCountedPrompt(t *testing.T) {
 	}
 	// The oldest entry gives way once a model holds promptOverheadsPerModel sizes.
 	for i := 0; i < promptOverheadsPerModel; i++ {
-		p.record("claude-haiku-4.5", 10000+i, 14000+i, false)
+		p.record("claude-haiku-4.5", 10000+i, 14000+i, 1, false)
 	}
 	if p.countedWhole("claude-haiku-4.5", 4) {
 		t.Error("the oldest entry was kept past the limit")
