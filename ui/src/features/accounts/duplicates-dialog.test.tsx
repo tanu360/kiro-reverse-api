@@ -13,6 +13,7 @@ vi.setConfig({ testTimeout: 15_000 });
 const DANA = "dana.whitfield@northwind-labs.com";
 const DANA_MASKED = "da***@no***.com";
 const COPY_ID = "dana-copy";
+const OTHER = "m.oyelaran@outlook.com";
 
 /** Stores Dana a second time: same user, an older refresh, so the original is the suggestion. */
 function addDanaCopy(): Account {
@@ -100,6 +101,46 @@ describe("Duplicate accounts", () => {
     );
     await waitFor(() => expect(screen.queryByText("1 duplicate account")).not.toBeInTheDocument());
     expect(mockDb.accounts.some((account) => account.id === dana.id)).toBe(false);
+  });
+
+  it("merges only the groups left switched on", async () => {
+    const dana = addDanaCopy();
+    const other = mockDb.accounts.find((account) => account.email === OTHER) as Account;
+    mockDb.accounts.push({ ...other, id: "other-copy", lastRefresh: other.lastRefresh - 3600 });
+    const bodies: unknown[] = [];
+    mockServer.use(
+      http.post(apiUrl("/accounts/duplicates/merge"), async ({ request }) => {
+        bodies.push(await request.clone().json());
+        return undefined;
+      }),
+    );
+    const { user } = await renderAccounts();
+    const title = await screen.findByText("2 duplicate accounts");
+    const notice = title.closest<HTMLElement>('[data-slot="alert"]') as HTMLElement;
+    await user.click(within(notice).getByRole("button", { name: "Review" }));
+    const dialog = await screen.findByRole("dialog", { name: "Duplicate accounts" });
+
+    const switches = within(dialog).getAllByRole("switch", { name: "Merge this group" });
+    expect(switches).toHaveLength(2);
+    for (const toggle of switches) expect(toggle).toBeChecked();
+    const otherGroup = within(dialog).getByRole("region", { name: "Group 2" });
+
+    // A group switched off is left out: its keeper choice is disabled and it is not merged.
+    await user.click(switches[1] as HTMLElement);
+    for (const radio of within(otherGroup).getAllByRole("radio")) {
+      expect(radio).toHaveAttribute("aria-disabled", "true");
+    }
+    await user.click(switches[0] as HTMLElement);
+    expect(within(dialog).getByRole("button", { name: "Merge" })).toBeDisabled();
+    await user.click(switches[0] as HTMLElement);
+    await user.click(within(dialog).getByRole("button", { name: "Merge" }));
+
+    expect(
+      await screen.findByText("Duplicates merged. 1 account was removed."),
+    ).toBeInTheDocument();
+    expect(bodies).toEqual([{ keepId: dana.id, ids: [dana.id, COPY_ID] }]);
+    expect(mockDb.accounts.some((account) => account.id === "other-copy")).toBe(true);
+    expect(await screen.findByText("1 duplicate account")).toBeInTheDocument();
   });
 
   it("shows the changed-group error", async () => {

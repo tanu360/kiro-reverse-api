@@ -241,6 +241,7 @@
   "duplicates.title": "重复账号",
   "duplicates.description": "每一组都是被保存了多次的同一个 Kiro 用户。请选择要保留的账号。其他账号会被移除，它们的请求记录和计数会转到保留的账号上。合并前会先创建备份。",
   "duplicates.groupLabel": "第 {index} 组",
+  "duplicates.include": "合并此组",
   "duplicates.keepLabel": "第 {index} 组中要保留的账号",
   "duplicates.reason.refresh_token": "相同的刷新 Token",
   "duplicates.reason.api_key": "相同的 API Key",

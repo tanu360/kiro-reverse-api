@@ -257,6 +257,7 @@
   "duplicates.title": "Duplicate accounts",
   "duplicates.description": "Each group is one Kiro user stored more than once. Choose the account to keep. The others are removed, and their requests and counters move to it. A backup is made first.",
   "duplicates.groupLabel": "Group {index}",
+  "duplicates.include": "Merge this group",
   "duplicates.keepLabel": "Account to keep in group {index}",
   "duplicates.reason.refresh_token": "Same refresh token",
   "duplicates.reason.api_key": "Same API key",

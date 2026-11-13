@@ -258,6 +258,7 @@
   "duplicates.title": "Contas duplicadas",
   "duplicates.description": "Cada grupo é um usuário do Kiro salvo mais de uma vez. Escolha a conta que fica. As outras são removidas, e suas requisições e contadores passam para ela. Um backup é feito antes.",
   "duplicates.groupLabel": "Grupo {index}",
+  "duplicates.include": "Mesclar este grupo",
   "duplicates.keepLabel": "Conta a manter no grupo {index}",
   "duplicates.reason.refresh_token": "Mesmo refresh token",
   "duplicates.reason.api_key": "Mesma chave de API",
