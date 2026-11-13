@@ -172,8 +172,10 @@
   "snippets.sdk": "SDK {name}",
   "snippets.request": "Yêu cầu {language}",
   "snippets.shell": "Shell",
-  "snippets.claudeCodeHint": "Chạy trong shell, rồi khởi động Claude Code trong cùng shell đó.",
-  "snippets.codexHint": "Thêm vào {file}. Codex đọc key từ {env}.",
+  "snippets.claudeCodeHint": "Chạy trong shell, rồi khởi động Claude Code trong cùng shell đó. Các dòng model chọn những model mà tài khoản miễn phí hỗ trợ.",
+  "snippets.codexModels": "danh sách model cho Codex",
+  "snippets.codexModelsHint": "Trước tiên, lưu danh sách model vào {file}. Codex cần nó để dùng công cụ {tool}. Hãy chạy lại khi tài khoản thay đổi.",
+  "snippets.codexHint": "Sau đó thêm vào {file}. Codex đọc key từ {env}.",
   "snippets.copy": "Sao chép đoạn mã {name}",
   "snippets.codeRegion": "Mã {name}"
 }

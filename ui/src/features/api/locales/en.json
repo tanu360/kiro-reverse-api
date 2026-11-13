@@ -177,8 +177,10 @@
   "snippets.sdk": "{name} SDK",
   "snippets.request": "{language} request",
   "snippets.shell": "Shell",
-  "snippets.claudeCodeHint": "Run in a shell, then start Claude Code in the same shell.",
-  "snippets.codexHint": "Add to {file}. Codex reads the key from {env}.",
+  "snippets.claudeCodeHint": "Run in a shell, then start Claude Code in the same shell. The model lines pick models that free accounts serve.",
+  "snippets.codexModels": "Codex model list",
+  "snippets.codexModelsHint": "First save the model list to {file}. Codex needs it for its {tool} tool. Run it again when your accounts change.",
+  "snippets.codexHint": "Then add to {file}. Codex reads the key from {env}.",
   "snippets.copy": "Copy {name} snippet",
   "snippets.codeRegion": "{name} code"
 }

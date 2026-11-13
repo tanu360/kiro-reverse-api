@@ -29,6 +29,7 @@ import { CodeText } from "./code-text";
 import {
   buildRequestSnippet,
   buildToolSnippets,
+  CODEX_CATALOG_FILE,
   SNIPPET_APIS,
   SNIPPET_KEY_ENV,
   SNIPPET_LANGUAGE_INFO,
@@ -306,6 +307,20 @@ export function ClientSnippetsCard(): JSX.Element {
             />
           </StackedPanel>
           <StackedPanel className="flex min-w-0 flex-col gap-4" value="codex">
+            {/* First the model list: Codex never fetches it, and needs it for apply_patch. */}
+            <Hint>
+              <CodeText
+                code={{ file: CODEX_CATALOG_FILE, tool: "apply_patch" }}
+                text={t("snippets.codexModelsHint")}
+              />
+            </Hint>
+            <Snippet
+              code={tools.codexModels}
+              language="bash"
+              copyLabel={t("snippets.copy", { name: t("snippets.codexModels") })}
+              name={t("snippets.codexModels")}
+              title={t("snippets.shell")}
+            />
             <Hint>
               <CodeText
                 code={{ file: CODEX_CONFIG_FILE, env: SNIPPET_KEY_ENV }}

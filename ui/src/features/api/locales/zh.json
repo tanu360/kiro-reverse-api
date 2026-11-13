@@ -172,8 +172,10 @@
   "snippets.sdk": "{name} SDK",
   "snippets.request": "{language} 请求",
   "snippets.shell": "Shell",
-  "snippets.claudeCodeHint": "在 shell 中运行，然后在同一个 shell 中启动 Claude Code。",
-  "snippets.codexHint": "添加到 {file}。Codex 从 {env} 读取 API Key。",
+  "snippets.claudeCodeHint": "在 shell 中运行，然后在同一个 shell 中启动 Claude Code。其中的模型变量选用免费账号可用的模型。",
+  "snippets.codexModels": "Codex 模型列表",
+  "snippets.codexModelsHint": "先把模型列表保存到 {file}。Codex 需要它才能使用 {tool} 工具。账号变动后请重新运行。",
+  "snippets.codexHint": "然后添加到 {file}。Codex 从 {env} 读取 API Key。",
   "snippets.copy": "复制 {name} 示例",
   "snippets.codeRegion": "{name} 代码"
 }
