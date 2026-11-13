@@ -250,6 +250,11 @@ func NewHandler() *Handler {
 
 	go h.backgroundObserveTick()
 
+	//! Before the request log is read: rows from older versions still hold raw client keys.
+	if err := scrubStoredRequestKeys(); err != nil {
+		logger.Warnf("[Observe] Failed to mask older client keys: %v", err)
+	}
+
 	//! The model mix sums the whole request log, so it warms in the background
 	//! and the listener does not wait on a full-table scan.
 	if warmup, err := getObserveStore().loadWindowFromDB(); err != nil {

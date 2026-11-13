@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"kiro-proxy/config"
 	"kiro-proxy/db"
@@ -99,5 +100,50 @@ func TestMaskApiKeyHidesShortKeys(t *testing.T) {
 	}
 	if short := config.MaskApiKey("sk-bogus"); config.MaskApiKey(short) != short {
 		t.Fatalf("masking a short key twice changes it: %q", short)
+	}
+}
+
+// Rows logged before keys were masked: a configured key refused for being disabled (no key
+// id then), a served one, a wrong key, a short one, and an already masked row.
+func TestScrubStoredRequestKeysMasksOlderRows(t *testing.T) {
+	setupApiKeyUsageTest(t)
+	disabled := addUsageKey(t, "off", "sk-disabled-0123456789abcdef", false)
+	served := addUsageKey(t, "on", "sk-served-0123456789abcdef", true)
+	insertUsageRows(t,
+		usageRow{ts: 100, key: disabled.Key},
+		usageRow{ts: 101, keyID: served.ID, key: served.Key, success: true},
+		usageRow{ts: 102, key: "sk-someone-elses-real-secret-0000"},
+		usageRow{ts: 103, key: "sk-bogus"},
+		usageRow{ts: 104, keyID: served.ID, key: config.MaskApiKey(served.Key), success: true},
+		usageRow{ts: 105},
+	)
+
+	for run := 0; run < 2; run++ {
+		if err := scrubStoredRequestKeys(); err != nil {
+			t.Fatalf("run %d: %v", run, err)
+		}
+		want := []string{
+			config.MaskApiKey(disabled.Key), config.MaskApiKey(served.Key),
+			config.MaskApiKey("sk-someone-elses-real-secret-0000"), "****",
+			config.MaskApiKey(served.Key), "",
+		}
+		if got := storedRequestKeys(t); strings.Join(got, "|") != strings.Join(want, "|") {
+			t.Fatalf("run %d: stored keys %q, want %q", run, got, want)
+		}
+	}
+	d, err := db.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var keyID string
+	if err := d.QueryRow(`SELECT api_key_id FROM requests WHERE ts = 100`).Scan(&keyID); err != nil || keyID != disabled.ID {
+		t.Fatalf("disabled key's row has key id %q (%v), want %q", keyID, err, disabled.ID)
+	}
+	resp := mustUsage(t, time.Unix(200, 0), "24h", 0)
+	if e := usageEntry(t, resp, usageKindKey, disabled.ID); e.Totals.Requests != 1 {
+		t.Fatalf("disabled key usage %+v", e)
+	}
+	if e := usageEntry(t, resp, usageKindInvalid, usageKindInvalid); e.Totals.Requests != 2 {
+		t.Fatalf("invalid key usage %+v", e)
 	}
 }

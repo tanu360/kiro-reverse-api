@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	"kiro-proxy/config"
+	"kiro-proxy/db"
+	"kiro-proxy/logger"
 )
 
 // storedRequestAPIKey is the client key a request row keeps: masked, never the raw value.
@@ -71,4 +73,38 @@ func (ks requestKeySearch) sql() (string, []interface{}) {
 		return "", nil
 	}
 	return " OR " + strings.Join(parts, " OR "), args
+}
+
+// scrubStoredRequestKeys masks the client keys that older versions logged in full. It first
+// gives a row that names a configured key by its raw value (a request refused for a disabled
+// or used-up key, logged before the key id was kept) that key's id, so usage by key still
+// counts it under that key. A row already masked is left alone, so a second run changes
+// nothing. It runs once at start, before the request log is read.
+func scrubStoredRequestKeys() error {
+	d, err := db.Get()
+	if err != nil {
+		return err
+	}
+	for _, key := range config.ListApiKeys() {
+		if key.ID == "" || key.Key == "" {
+			continue
+		}
+		if _, err := d.Exec(`UPDATE requests SET api_key_id = ? WHERE api_key_id = '' AND api_key = ?`, key.ID, key.Key); err != nil {
+			return err
+		}
+	}
+	//! Same rule as config.MaskApiKey: 10 characters or fewer become ****, longer ones keep
+	//! their first 6 and last 4. Keys are ASCII, so SQLite's character counts match Go's bytes.
+	res, err := d.Exec(`UPDATE requests SET api_key = CASE
+ WHEN length(api_key) <= 10 THEN '****'
+ ELSE substr(api_key, 1, 6) || '****' || substr(api_key, -4)
+END
+WHERE api_key <> '' AND api_key <> '****' AND NOT (length(api_key) = 14 AND substr(api_key, 7, 4) = '****')`)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n > 0 {
+		logger.Infof("[Observe] Masked the client key on %d older request log rows", n)
+	}
+	return nil
 }
