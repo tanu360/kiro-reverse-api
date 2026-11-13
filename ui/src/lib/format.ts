@@ -119,7 +119,7 @@ function formatUnit(
   unit: string,
   lang: Lang | undefined,
   digits = 0,
-  display: "short" | "narrow" = "short",
+  display: "short" | "narrow" | "long" = "short",
 ): string {
   return numberFormat(lang, {
     style: "unit",
@@ -158,23 +158,55 @@ export function formatDurationMs(
   const value = Number(ms ?? 0);
   if (!Number.isFinite(value) || (!value && !hasEndpoint)) return EMPTY;
   if (value < 1000) return formatUnit(Math.round(value), "millisecond", lang, 0, "narrow");
-  // Rounded to the shown precision first, so 59 960 ms is "1m 0s" and not "60.0 s".
+  // Rounded to the shown precision first, so 59 960 ms is "1m" and not "60.0 s".
   const seconds = value / 1000;
   const digits = seconds < 10 ? 2 : 1;
   const shown = Math.round(seconds * 10 ** digits) / 10 ** digits;
   if (shown < 60) return formatUnit(shown, "second", lang, shown < 10 ? 2 : 1, "narrow");
-  const totalSec = Math.round(seconds);
-  return joinUnits(
-    [
-      [Math.floor(totalSec / 60), "minute"],
-      [totalSec % 60, "second"],
-    ],
-    lang,
-  );
+  return formatDuration(seconds, lang);
 }
 
-function joinUnits(parts: [number, string][], lang: Lang | undefined): string {
-  return parts.map(([value, unit]) => formatUnit(value, unit, lang, 0, "narrow")).join(" ");
+type UnitDisplay = "narrow" | "long";
+
+function joinUnits(
+  parts: [number, string][],
+  lang: Lang | undefined,
+  display: UnitDisplay = "narrow",
+): string {
+  return parts.map(([value, unit]) => formatUnit(value, unit, lang, 0, display)).join(" ");
+}
+
+const DURATION_UNITS: ReadonlyArray<[string, number]> = [
+  ["day", 86_400],
+  ["hour", 3600],
+  ["minute", 60],
+  ["second", 1],
+];
+
+/**
+ * A span of time in its largest unit and the next one, with a zero second unit left out: "0s",
+ * "45s", "1m 30s", "1h", "1h 15m", "2d 3h" in English; the units follow the UI language. The
+ * seconds are rounded first, and the units past the two shown are dropped. The long display
+ * reads "1 hour 15 minutes", for a duration inside a sentence such as "Every 5 minutes".
+ */
+export function formatDuration(
+  seconds: number,
+  lang?: Lang,
+  display: UnitDisplay = "narrow",
+): string {
+  let rest = Math.max(0, Math.round(finite(seconds)));
+  const parts: [number, string][] = [];
+  for (const [unit, size] of DURATION_UNITS) {
+    const value = Math.floor(rest / size);
+    rest -= value * size;
+    if (parts.length === 0) {
+      if (value > 0 || size === 1) parts.push([value, unit]);
+    } else {
+      if (value > 0) parts.push([value, unit]);
+      break;
+    }
+  }
+  return joinUnits(parts, lang, display);
 }
 
 /** "3d 4h", "4h 12m" or "12m" in English; the units follow the UI language. */

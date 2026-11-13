@@ -30,10 +30,10 @@ describe("AccountActivityLine", () => {
       }),
     );
     renderWithProviders(<AccountActivityLine accountId="a" />);
-    expect(await screen.findByText("3 rpm · 1,234 today")).toBeInTheDocument();
+    expect(await screen.findByText("3/min · 1,234 today")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "3 requests finished in the last minute, 1,234 since midnight (server time).",
+        "3 requests finished in the last minute and 1,234 since midnight (server time).",
       ),
     ).toHaveClass("sr-only");
   });
@@ -45,7 +45,7 @@ describe("AccountActivityLine", () => {
     expect(screen.getByText(/42 today/)).toBeInTheDocument();
     expect(
       screen.getByText(
-        /^At the limit of 20 requests per minute\. Every try sent to this account counts, including failed tries/,
+        /^This account is at its limit of 20 requests per minute\. Every attempt sent to it counts, including failed ones/,
       ),
     ).toBeInTheDocument();
   });
@@ -55,7 +55,7 @@ describe("AccountActivityLine", () => {
     renderWithProviders(<AccountActivityLine accountId="a" />);
     expect(
       await screen.findByText(
-        /^At the limit of 1 request per minute\..* 1 request finished in the last minute, 1 since midnight/,
+        /^This account is at its limit of 1 request per minute\..* 1 request finished in the last minute and 1 since midnight/,
       ),
     ).toHaveClass("sr-only");
   });
@@ -64,7 +64,7 @@ describe("AccountActivityLine", () => {
     serve(activity({}));
     const view = renderWithProviders(<AccountActivityLine accountId="new" />);
     expect(view.container).toHaveTextContent(EMPTY);
-    expect(await screen.findByText("0 rpm · 0 today")).toBeInTheDocument();
+    expect(await screen.findByText("0/min · 0 today")).toBeInTheDocument();
   });
 
   it("shows nothing when the poll fails", async () => {
@@ -90,7 +90,7 @@ describe("AccountActivityLine", () => {
     const rpm = times.filter((ts) => ts > now - 60).length;
 
     renderWithProviders(<AccountActivityLine accountId={account.id} />);
-    expect(await screen.findByText(`${rpm} rpm · ${today} today`)).toBeInTheDocument();
+    expect(await screen.findByText(`${rpm}/min · ${today} today`)).toBeInTheDocument();
   });
 });
 
@@ -119,7 +119,7 @@ describe("LiveActivityStrip", () => {
     );
     expect(await screen.findByText("0 / 1")).toBeInTheDocument();
     const hint = screen.getByText(
-      /^At the limit of 1 request per minute\. Every try sent to this account counts, including failed tries that moved on to another account\./,
+      /^This account is at its limit of 1 request per minute\. Every attempt sent to it counts, including failed ones that moved on to another account\./,
     );
     expect(hint).toHaveClass("sr-only");
     expect(screen.getByText("At limit")).toContainElement(hint);

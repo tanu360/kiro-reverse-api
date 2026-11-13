@@ -198,7 +198,9 @@ describe("ApiPage", () => {
 
     let confirm = await openConfirm();
     expect(within(confirm).getByText("Regenerate team-a?")).toBeInTheDocument();
-    expect(within(confirm).getByText(/The current key stops working at once/)).toBeInTheDocument();
+    expect(
+      within(confirm).getByText(/The current key stops working right away/),
+    ).toBeInTheDocument();
     await user.click(within(confirm).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(sent("POST", path)).toHaveLength(0);
@@ -277,7 +279,7 @@ describe("ApiPage", () => {
 
     // Unknown until the list loads: the picks must not look like deleted accounts.
     expect(await within(dialog).findByText("Could not load accounts")).toBeInTheDocument();
-    expect(within(dialog).queryByText("Removed account")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Deleted account")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/ selected$/)).not.toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -308,7 +310,7 @@ describe("ApiPage", () => {
     await user.click(badge);
     expect(
       await screen.findByText(
-        "The key used all its successful calls, so clients get 429. Raise the call limit or reset usage.",
+        "The key reached its call limit, so clients get a 429 error. Raise the call limit or reset usage.",
       ),
     ).toBeInTheDocument();
     expect(within(teamRow).getByText("Enabled")).toBeInTheDocument();

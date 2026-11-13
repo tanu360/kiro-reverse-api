@@ -7,6 +7,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"kiro-proxy/textfmt"
 )
 
 // The scheduler tests run in a synctest bubble: time.Sleep and the scheduler's
@@ -360,7 +362,7 @@ func TestRefreshSchedulerLogsIntervalChanges(t *testing.T) {
 		"[BackgroundRefresh] Sweep every 30m",
 		"[BackgroundRefresh] Interval set to 5m",
 		"[BackgroundRefresh] Off: usage and tokens refresh only on demand",
-		"[BackgroundRefresh] Interval set to 1h30m",
+		"[BackgroundRefresh] Interval set to 1h 30m",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in logs:\n%s", want, out)
@@ -470,7 +472,7 @@ func TestHousekeepingListsModelsWhileUsageSweepIsOff(t *testing.T) {
 
 func TestHousekeepingListsModelsEveryThirtyMinutesWhateverTheInterval(t *testing.T) {
 	for _, interval := range []time.Duration{5 * time.Minute, 30 * time.Minute, 24 * time.Hour} {
-		t.Run(shortInterval(interval), func(t *testing.T) {
+		t.Run(textfmt.Duration(interval), func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				r := startHousekeepingRig(t, interval, 0)
 				defer r.close()

@@ -1,10 +1,10 @@
 package proxy
 
 import (
-	"fmt"
 	"time"
 
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 )
 
 // refreshScheduler runs the background housekeeping sweep on an interval the
@@ -95,21 +95,8 @@ func (s *refreshScheduler) announce(previous, every time.Duration) {
 	case every <= 0:
 		logger.Infof("[BackgroundRefresh] Off: usage and tokens refresh only on demand")
 	case previous < 0:
-		logger.Infof("[BackgroundRefresh] Sweep every %s", shortInterval(every))
+		logger.Infof("[BackgroundRefresh] Sweep every %s", textfmt.Duration(every))
 	default:
-		logger.Infof("[BackgroundRefresh] Interval set to %s", shortInterval(every))
+		logger.Infof("[BackgroundRefresh] Interval set to %s", textfmt.Duration(every))
 	}
-}
-
-// shortInterval writes a whole number of minutes as "30m", "1h" or "1h30m".
-func shortInterval(d time.Duration) string {
-	hours := int(d / time.Hour)
-	minutes := int((d % time.Hour) / time.Minute)
-	switch {
-	case hours == 0:
-		return fmt.Sprintf("%dm", minutes)
-	case minutes == 0:
-		return fmt.Sprintf("%dh", hours)
-	}
-	return fmt.Sprintf("%dh%dm", hours, minutes)
 }

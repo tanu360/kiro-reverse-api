@@ -93,7 +93,7 @@ describe("Duplicate accounts", () => {
     await user.click(within(dialog).getByRole("button", { name: "Merge" }));
 
     expect(
-      await screen.findByText("Duplicates merged. 1 account was removed."),
+      await screen.findByText("Merged the duplicates and deleted 1 account."),
     ).toBeInTheDocument();
     expect(bodies).toEqual([{ keepId: COPY_ID, ids: [dana.id, COPY_ID] }]);
     await waitFor(() =>
@@ -136,7 +136,7 @@ describe("Duplicate accounts", () => {
     await user.click(within(dialog).getByRole("button", { name: "Merge" }));
 
     expect(
-      await screen.findByText("Duplicates merged. 1 account was removed."),
+      await screen.findByText("Merged the duplicates and deleted 1 account."),
     ).toBeInTheDocument();
     expect(bodies).toEqual([{ keepId: dana.id, ids: [dana.id, COPY_ID] }]);
     expect(mockDb.accounts.some((account) => account.id === "other-copy")).toBe(true);
@@ -158,7 +158,7 @@ describe("Duplicate accounts", () => {
     await user.click(within(dialog).getByRole("button", { name: "Merge" }));
 
     const matches = await screen.findAllByText(
-      "These accounts are no longer duplicates of each other. Review the duplicates again.",
+      "These accounts are no longer duplicates. Review the duplicates again.",
     );
     // One error toast (the toast region also announces it to screen readers).
     expect(matches.filter((node) => node.getAttribute("data-slot") === "toast-title")).toHaveLength(

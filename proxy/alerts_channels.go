@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"kiro-proxy/config"
+	"kiro-proxy/textfmt"
 )
 
 // Send policy. Variables so tests can shorten them.
@@ -190,7 +191,7 @@ func doAlertAttempt(ctx context.Context, client *http.Client, ch config.AlertCha
 	resp, err := client.Do(req)
 	if err != nil {
 		if attemptCtx.Err() != nil && ctx.Err() == nil {
-			return alertAttempt{err: fmt.Errorf("timed out after %s", alertAttemptTimeout)}
+			return alertAttempt{err: fmt.Errorf("timed out after %s", textfmt.Duration(alertAttemptTimeout))}
 		}
 		return alertAttempt{err: err}
 	}

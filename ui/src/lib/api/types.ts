@@ -233,7 +233,7 @@ export interface AddAccountResponse {
   relogin?: boolean;
   /** Re-login only: false when no user id or email could be compared. */
   identityVerified?: boolean;
-  /** Re-login only: true after a confirmed "Replace identity". */
+  /** Re-login only: true after a confirmed "Switch user". */
   identityReplaced?: boolean;
 }
 /** 409 relogin_identity_mismatch; the emails are "" when unknown. */

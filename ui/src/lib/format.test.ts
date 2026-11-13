@@ -4,6 +4,7 @@ import {
   formatCompact,
   formatCredits,
   formatCreditsExact,
+  formatDuration,
   formatDurationMs,
   formatFraction,
   formatNumber,
@@ -38,13 +39,67 @@ describe("formatDurationMs", () => {
     expect(formatDurationMs(1840, true)).toBe("1.84s");
     expect(formatDurationMs(12_500, true)).toBe("12.5s");
     expect(formatDurationMs(125_000, true)).toBe("2m 5s");
-    // Rounded before the unit is picked: never "60.0 s".
-    expect(formatDurationMs(59_960, true)).toBe("1m 0s");
+    // Rounded before the unit is picked: never "60.0 s", and a zero second unit is left out.
+    expect(formatDurationMs(59_960, true)).toBe("1m");
+    expect(formatDurationMs(60_000, true)).toBe("1m");
+    expect(formatDurationMs(90_000, true)).toBe("1m 30s");
+  });
+
+  it("goes on to hours instead of counting minutes past 60", () => {
+    expect(formatDurationMs(3_600_000, true)).toBe("1h");
+    expect(formatDurationMs(3_660_000, true)).toBe("1h 1m");
+    expect(formatDurationMs(4_500_000, true)).toBe("1h 15m");
   });
 
   it("shows — for legacy rows and 0 ms for real instant requests", () => {
     expect(formatDurationMs(undefined, false)).toBe("—");
     expect(formatDurationMs(0, true)).toBe("0ms");
+  });
+});
+
+describe("formatDuration", () => {
+  it("shows the largest unit and the next one, a space between them", () => {
+    expect(formatDuration(0, "en")).toBe("0s");
+    expect(formatDuration(45, "en")).toBe("45s");
+    expect(formatDuration(59, "en")).toBe("59s");
+    expect(formatDuration(90, "en")).toBe("1m 30s");
+    expect(formatDuration(15 * 60, "en")).toBe("15m");
+    expect(formatDuration(4500, "en")).toBe("1h 15m");
+    expect(formatDuration(2 * 86_400 + 3 * 3600, "en")).toBe("2d 3h");
+  });
+
+  it("leaves out a zero second unit and the units past the two shown", () => {
+    expect(formatDuration(60, "en")).toBe("1m");
+    expect(formatDuration(3600, "en")).toBe("1h");
+    expect(formatDuration(3630, "en")).toBe("1h");
+    expect(formatDuration(3660, "en")).toBe("1h 1m");
+    expect(formatDuration(3661, "en")).toBe("1h 1m");
+    expect(formatDuration(86_400, "en")).toBe("1d");
+    expect(formatDuration(86_400 + 59 * 60, "en")).toBe("1d");
+    expect(formatDuration(2 * 86_400 + 3 * 3600 + 59 * 60, "en")).toBe("2d 3h");
+  });
+
+  it("rounds to the second and never goes below zero", () => {
+    expect(formatDuration(59.6, "en")).toBe("1m");
+    expect(formatDuration(0.4, "en")).toBe("0s");
+    expect(formatDuration(-5, "en")).toBe("0s");
+    expect(formatDuration(Number.NaN, "en")).toBe("0s");
+  });
+
+  it("follows the UI language", () => {
+    expect(formatDuration(4500, "zh")).toBe("1小时 15分钟");
+    expect(formatDuration(4500, "vi")).toBe("1 giờ 15 phút");
+    expect(formatDuration(4500, "pt-BR")).toBe("1 h 15 min");
+    expect(formatDuration(2 * 86_400 + 3 * 3600, "pt-BR")).toBe("2 dias 3 h");
+  });
+
+  it("spells the units out in the long display", () => {
+    expect(formatDuration(60, "en", "long")).toBe("1 minute");
+    expect(formatDuration(5 * 60, "en", "long")).toBe("5 minutes");
+    expect(formatDuration(3600, "en", "long")).toBe("1 hour");
+    expect(formatDuration(90 * 60, "en", "long")).toBe("1 hour 30 minutes");
+    expect(formatDuration(86_400, "en", "long")).toBe("1 day");
+    expect(formatDuration(5 * 60, "pt-BR", "long")).toBe("5 minutos");
   });
 });
 

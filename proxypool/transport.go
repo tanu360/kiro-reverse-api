@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"kiro-proxy/textfmt"
 )
 
 // Kinds of proxy failure. Only failures before a connection to the upstream
@@ -171,7 +173,7 @@ var connectTimeout = 15 * time.Second
 type connectTimeoutError struct{ budget time.Duration }
 
 func (e *connectTimeoutError) Error() string {
-	return fmt.Sprintf("proxy connect timeout: no connection within %s", e.budget)
+	return fmt.Sprintf("no connection through the proxy within %s", textfmt.Duration(e.budget))
 }
 
 func (e *connectTimeoutError) Timeout() bool   { return true }

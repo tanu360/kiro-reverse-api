@@ -52,7 +52,7 @@ describe("SelfHealCard", () => {
       within(card).getByRole("switch", { name: "Bring back accounts the proxy blocked" }),
     ).toHaveAttribute("aria-checked", "true");
     expect(within(card).getByLabelText("Minimum time between heals")).toHaveValue("300");
-    expect(within(card).getByLabelText("Heals in a row without a successful request")).toHaveValue(
+    expect(within(card).getByLabelText("Maximum heals without a successful request")).toHaveValue(
       "5",
     );
     expect(
@@ -64,7 +64,7 @@ describe("SelfHealCard", () => {
   it("marks an out-of-range interval and round cap and sends nothing", async () => {
     const { card, user } = await renderCard();
     const interval = within(card).getByLabelText("Minimum time between heals");
-    const rounds = within(card).getByLabelText("Heals in a row without a successful request");
+    const rounds = within(card).getByLabelText("Maximum heals without a successful request");
 
     await user.clear(interval);
     await user.type(interval, "29");
@@ -86,7 +86,7 @@ describe("SelfHealCard", () => {
     await user.click(
       within(card).getByRole("switch", { name: "Bring back accounts the proxy blocked" }),
     );
-    const rounds = within(card).getByLabelText("Heals in a row without a successful request");
+    const rounds = within(card).getByLabelText("Maximum heals without a successful request");
     await user.clear(rounds);
     await user.type(rounds, "0");
     await user.click(within(card).getByRole("button", { name: "Save" }));
@@ -114,10 +114,10 @@ describe("SelfHealCard", () => {
 
     expect(
       within(card).getByText(
-        "Self-heal stopped: the limit was reached with no successful request. Check the accounts, then resume.",
+        "Self-heal stopped after reaching its limit without a successful request. Check the accounts, then resume.",
       ),
     ).toBeInTheDocument();
-    expect(within(card).getByText(/2 accounts came back\./)).toBeInTheDocument();
+    expect(card).toHaveTextContent("2 accounts came back 2 minutes ago.");
     expect(
       within(card).getByText(/5 of 5 heals used since the last successful request\./),
     ).toBeInTheDocument();

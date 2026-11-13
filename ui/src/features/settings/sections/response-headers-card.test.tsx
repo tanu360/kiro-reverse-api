@@ -121,7 +121,7 @@ describe("ResponseHeadersCard", () => {
     await user.type(name, "Bad Name");
     expect(
       within(dialog).getByText(
-        "A header name uses letters, digits and symbols such as - _ . ~, with no spaces or colons.",
+        "A header name can only use letters, digits and symbols such as - _ . ~, with no spaces or colons.",
       ),
     ).toBeInTheDocument();
     await user.clear(name);

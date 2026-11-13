@@ -43,9 +43,7 @@ describe("PriorityRow", () => {
     const { sheet, input } = await openPriorityEditor(account);
     expect(input).toHaveValue("12");
     expect(
-      within(sheet).getByText(
-        /In the priority routing mode, lower numbers take new requests first/,
-      ),
+      within(sheet).getByText(/In priority routing, a lower number gets new requests first/),
     ).toBeInTheDocument();
   });
 

@@ -519,7 +519,7 @@ export const handlers: HttpHandler[] = [
     });
   }),
 
-  // Re-login that signed in as another user: "Replace identity" or discard
+  // Re-login that signed in as another user: "Switch user" or discard
   http.post(apiUrl("/accounts/:id/relogin/confirm"), async ({ request, params }) => {
     const denied = requireAuth(request);
     if (denied) return denied;

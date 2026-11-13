@@ -7,6 +7,7 @@ import (
 
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 )
 
 //! A substring mapping rule such as "gpt-5" also matches models Kiro serves itself
@@ -142,7 +143,7 @@ func runModelsListing(stop <-chan struct{}, startDelay, every time.Duration, ret
 			} else if next < len(retries) {
 				delay = retries[next]
 				next++
-				logger.Infof("[ModelsCache] Listing models again in %s", delay)
+				logger.Infof("[ModelsCache] Listing models again in %s", textfmt.Duration(delay))
 			}
 			timer.Reset(delay)
 		case <-stop:

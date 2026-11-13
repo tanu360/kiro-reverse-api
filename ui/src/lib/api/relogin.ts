@@ -10,7 +10,7 @@ import type {
 const reloginPath = (id: string, action: "confirm" | "discard") =>
   `/accounts/${encodeURIComponent(id)}/relogin/${action}`;
 
-/** Applies a stashed login whose user differs from the account's ("Replace identity"). */
+/** Applies a stashed login whose user differs from the account's ("Switch user"). */
 export function confirmRelogin(id: string, pendingId: string): Promise<AddAccountResponse> {
   return apiRequest(reloginPath(id, "confirm"), { method: "POST", body: { pendingId } });
 }
