@@ -32,6 +32,7 @@
   "serverError.profileNotAvailable": "O perfil do Kiro selecionado não está disponível para esta conta.",
   "serverError.profileArnInvalid": "O ARN do perfil do Kiro não é válido.",
   "serverError.proxyUrlScheme": "A URL do proxy deve começar com http://, https://, socks5:// ou socks5h://.",
+  "serverError.proxyPasswordMasked": "A URL do proxy ainda contém a senha mascarada, mas nenhuma senha está salva. Digite a senha real.",
   "serverError.invalidEndpoint": "Escolha um endpoint: auto, kiro, codewhisperer ou amazonq.",
   "serverError.invalidApiDomain": "Escolha um domínio de API: amazonaws ou kiro.",
   "serverError.apiKeyExists": "Esta chave de API já existe.",

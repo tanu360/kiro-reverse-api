@@ -1,11 +1,14 @@
 package proxy
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"kiro-proxy/logger"
 	"kiro-proxy/proxypool"
 )
 
@@ -88,6 +91,42 @@ func poolClientFor(proxyURL string, stream bool) (*http.Client, bool) {
 // same account cannot help until a proxy recovers.
 func isNoHealthyProxyError(err error) bool {
 	return proxypool.IsNoHealthy(err)
+}
+
+// noHealthyWarnEvery spaces the warning about requests failing for want of a pool proxy.
+const noHealthyWarnEvery = time.Minute
+
+var lastNoHealthyWarn atomic.Int64
+
+// noHealthyProxyFailure is the error of an attempt the pool had no proxy for,
+// without the upstream URL the transport error repeats. Each account of each
+// request hits it, so it warns at most once per noHealthyWarnEvery.
+func noHealthyProxyFailure() error {
+	now := time.Now().UnixNano()
+	last := lastNoHealthyWarn.Load()
+	if now-last >= int64(noHealthyWarnEvery) && lastNoHealthyWarn.CompareAndSwap(last, now) {
+		logger.Warnf("[ProxyPool] Requests are failing: no pool proxy is healthy and direct fallback is off")
+	}
+	return proxypool.NoHealthyError()
+}
+
+// upstreamErrorText is the error text a client gets. A pool proxy failure reads
+// as its fixed wording, without the upstream URL the transport error repeats.
+func upstreamErrorText(err error) string {
+	var perr *proxypool.ProxyError
+	if errors.As(err, &perr) {
+		return perr.Error()
+	}
+	return err.Error()
+}
+
+// poolAwareStatus is fallback, or 503 for a request that failed at its pool
+// proxy or found none, as upstreamFailureStatus answers on the chat paths.
+func poolAwareStatus(err error, fallback int) int {
+	if proxypool.IsProxyError(err) {
+		return http.StatusServiceUnavailable
+	}
+	return fallback
 }
 
 // startProxyPool loads the saved pool state and starts the periodic health check.

@@ -464,6 +464,7 @@ func (m *Manager) reportFailure(id, dialURL string, cause error) {
 	wasFailed := h.Status == StatusFailed
 	h.Status = StatusFailed
 	h.FailedAt = m.now().UnixMilli()
+	h.LatencyMs = 0
 	h.LastError = errorText(cause, p)
 	moved := m.moveAccountsLocked(pool, id)
 	m.persistLocked()
@@ -515,6 +516,8 @@ func (m *Manager) reportSuccess(id, dialURL string) {
 	}
 	h = m.healthLocked(id)
 	h.Status = StatusOK
+	h.FailedAt = 0
+	h.LastError = ""
 	m.persistLocked()
 	m.mu.Unlock()
 	m.fire(false)
@@ -589,6 +592,8 @@ func (m *Manager) recordCheck(gen uint64, p config.PoolProxy, latency time.Durat
 	moved := 0
 	if err == nil {
 		h.Status = StatusOK
+		h.FailedAt = 0
+		h.LastError = ""
 		h.LatencyMs = latency.Milliseconds()
 		if h.LatencyMs == 0 && latency > 0 {
 			h.LatencyMs = 1

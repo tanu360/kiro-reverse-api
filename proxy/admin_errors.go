@@ -48,6 +48,7 @@ const (
 	codeInvalidEndpoint         = "invalid_endpoint"
 	codeInvalidAPIDomain        = "invalid_api_domain"
 	codeProxyURLScheme          = "proxy_url_scheme"
+	codeProxyPasswordMasked     = "proxy_password_masked"
 	codeAPIKeyEmpty             = "api_key_empty"
 	codeAPIKeyExists            = "api_key_exists"
 	codeAPIKeyCollision         = "api_key_collision"

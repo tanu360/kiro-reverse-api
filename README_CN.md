@@ -260,7 +260,7 @@ cd kiro-proxy_linux_amd64
 ./kiro-proxy
 ```
 
-Windows 用户请下载 `kiro-proxy_windows_amd64.zip`（或 `_arm64`），解压后在终端中运行 `kiro-proxy.exe`。数据库默认创建在当前目录，可通过 `DATA_DIR` 存放到其他位置。Release 中的 `SHA256SUMS.txt` 列出了每个压缩包的校验值，可用 `sha256sum -c SHA256SUMS.txt --ignore-missing` 校验下载的文件（macOS：`shasum -a 256 -c SHA256SUMS.txt --ignore-missing`）。二进制文件未签名：如果 macOS 阻止运行，请执行 `xattr -d com.apple.quarantine kiro-proxy`；Windows SmartScreen 可能在首次运行前要求确认。
+Windows 用户请下载 `kiro-proxy_windows_amd64.zip`（或 `_arm64`），解压后在终端中运行 `kiro-proxy.exe`。数据库默认创建在当前目录，可通过 `DATA_DIR` 存放到其他位置。服务监听 `127.0.0.1:8080`：8080 端口被占用时设置 `PORT`，需要接受其他机器连接时设置 `LISTEN_HOST=0.0.0.0`。Release 中的 `SHA256SUMS.txt` 列出了每个压缩包的校验值，可用 `sha256sum -c SHA256SUMS.txt --ignore-missing` 校验下载的文件（macOS：`shasum -a 256 -c SHA256SUMS.txt --ignore-missing`）。二进制文件未签名：如果 macOS 阻止运行，请执行 `xattr -d com.apple.quarantine kiro-proxy`；Windows SmartScreen 可能在首次运行前要求确认。
 
 ### 🛠 源码编译
 
@@ -301,6 +301,7 @@ go build -o kiro-proxy .
 | `DATA_DIR`        | `kiro.db` 所在目录                  | `.`                |
 | `ADMIN_PASSWORD` | 管理面板密码（覆盖配置文件）        | —                  |
 | `LISTEN_HOST`    | 监听地址。默认只接受本机连接；设为 `0.0.0.0` 可接受其他机器连接。Docker 镜像已设为 `0.0.0.0` | `127.0.0.1` |
+| `PORT`           | 监听端口（覆盖配置文件）            | `8080`             |
 | `KIRO_TOOL_MARKUP_RESCUE` | 设为 `off` 时，不再把 Kiro 混入回复文本的工具调用标记还原为工具调用 | 开启 |
 | `LOG_LEVEL`      | 日志级别：`debug`、`info`、`warn` 或 `error`（覆盖配置文件） | `info` |
 
@@ -416,6 +417,7 @@ OpenAI `reasoning_effort` 与 Claude `output_config.effort` 同样可用：`low`
 | `DATA_DIR`        | `kiro.db` 所在目录                    | `.`                |
 | `ADMIN_PASSWORD` | 管理面板密码（覆盖配置文件）          | —                  |
 | `LISTEN_HOST`    | 监听地址。默认只接受本机连接；设为 `0.0.0.0` 可接受其他机器连接。Docker 镜像已设为 `0.0.0.0` | `127.0.0.1` |
+| `PORT`           | 监听端口（覆盖配置文件）            | `8080`             |
 | `KIRO_TOOL_MARKUP_RESCUE` | 设为 `off` 时，不再把 Kiro 混入回复文本的工具调用标记还原为工具调用 | 开启 |
 | `LOG_LEVEL`      | 日志级别：`debug`、`info`、`warn` 或 `error`（覆盖配置文件） | `info` |
 

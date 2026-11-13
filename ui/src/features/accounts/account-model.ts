@@ -522,6 +522,14 @@ export function proxyDisplayUrl(url: string): string {
   return url.trim().replace(/^([a-z][a-z0-9+.-]*:\/\/)([^:@/]*):[^@/]*@/i, "$1$2@");
 }
 
+/** What the server shows in place of a saved proxy password; sent back, it keeps the password. */
+export const MASKED_PROXY_PASSWORD = "********";
+
+/** Whether a proxy URL from the server holds a saved password (shown masked). */
+export function hasMaskedProxyPassword(url: string): boolean {
+  return url.includes(`:${MASKED_PROXY_PASSWORD}@`);
+}
+
 /** Empty (global proxy) or a socks5, socks5h, http or https URL. */
 export function isValidProxyUrl(value: string): boolean {
   const trimmed = value.trim();

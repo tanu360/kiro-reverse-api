@@ -48,6 +48,7 @@ import { settingsQuery } from "@/lib/api/settings";
 import type { ApiKey } from "@/lib/api/types";
 import { formatCredits, formatNumber, formatRelativeTime } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
+import { useMaskText } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { limitReachedReason, wouldLockOutClients } from "./api-key-form";
@@ -72,8 +73,9 @@ interface DialogState {
   session: number;
 }
 
-function keyName(apiKey: ApiKey, t: TFunction): string {
-  return apiKey.name || t("keys.unnamed");
+/** The key's name, with any e-mail in it masked in privacy mode, as Usage by key shows it. */
+function keyName(apiKey: ApiKey, t: TFunction, mask: (text?: string) => string): string {
+  return apiKey.name ? mask(apiKey.name) : t("keys.unnamed");
 }
 
 /** The full secret is fetched on demand for each copy and never cached. */
@@ -88,6 +90,7 @@ function isShown(element: HTMLElement): boolean {
 
 export function ApiKeysCard(): JSX.Element {
   const { t, lang } = useT("api");
+  const mask = useMaskText();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const keys = useQuery(apiKeysQuery());
@@ -236,7 +239,7 @@ export function ApiKeysCard(): JSX.Element {
   const onToggle = async (apiKey: ApiKey) => {
     if (apiKey.enabled && wouldLockOutClients(list, apiKey.id, requireApiKey)) {
       const ok = await confirm({
-        title: t("keys.confirmDisableTitle", { name: keyName(apiKey, t) }),
+        title: t("keys.confirmDisableTitle", { name: keyName(apiKey, t, mask) }),
         description: t("keys.lockoutWarning"),
         confirmLabel: t("common:actions.disable"),
         variant: "danger",
@@ -249,7 +252,7 @@ export function ApiKeysCard(): JSX.Element {
   // The old value stops working at once, so it always asks.
   const onRegenerate = async (apiKey: ApiKey) => {
     const ok = await confirm({
-      title: t("keys.confirmRegenerateTitle", { name: keyName(apiKey, t) }),
+      title: t("keys.confirmRegenerateTitle", { name: keyName(apiKey, t, mask) }),
       description: t("keys.confirmRegenerateBody"),
       confirmLabel: t("keys.regenerate"),
       variant: "danger",
@@ -262,7 +265,7 @@ export function ApiKeysCard(): JSX.Element {
   const onDelete = async (apiKey: ApiKey) => {
     const lockout = wouldLockOutClients(list, apiKey.id, requireApiKey);
     const ok = await confirm({
-      title: t("keys.confirmDeleteTitle", { name: keyName(apiKey, t) }),
+      title: t("keys.confirmDeleteTitle", { name: keyName(apiKey, t, mask) }),
       description: lockout
         ? t("common:text.joinSentences", {
             first: t("keys.confirmDeleteBody"),
@@ -310,7 +313,7 @@ export function ApiKeysCard(): JSX.Element {
       className: "w-full max-w-0",
       cell: (apiKey) => (
         <TruncatedText className={cn("font-medium", !apiKey.name && "text-muted-foreground")}>
-          {keyName(apiKey, t)}
+          {keyName(apiKey, t, mask)}
         </TruncatedText>
       ),
     },
@@ -367,7 +370,7 @@ export function ApiKeysCard(): JSX.Element {
       title={
         // The same cut as the Name column: a clipped name keeps its full text in a tooltip.
         <TruncatedText className={cn(!apiKey.name && "text-muted-foreground")}>
-          {keyName(apiKey, t)}
+          {keyName(apiKey, t, mask)}
         </TruncatedText>
       }
     >
@@ -501,6 +504,7 @@ export function ApiKeysCard(): JSX.Element {
 /** `fill` spreads it across a table cell (copy button at the end); inline in a card footer. */
 function MaskedKey({ apiKey, fill = false }: { apiKey: ApiKey; fill?: boolean }): JSX.Element {
   const { t } = useT("api");
+  const mask = useMaskText();
   return (
     <span
       className={cn(
@@ -510,7 +514,7 @@ function MaskedKey({ apiKey, fill = false }: { apiKey: ApiKey; fill?: boolean })
     >
       <TruncatedText className="font-mono text-meta">{apiKey.keyMasked}</TruncatedText>
       <CopyButton
-        label={t("keys.copyKey", { name: keyName(apiKey, t) })}
+        label={t("keys.copyKey", { name: keyName(apiKey, t, mask) })}
         size="icon"
         value={() => fetchSecret(apiKey.id)}
         variant="quiet"
@@ -692,6 +696,7 @@ function KeyActions({
   triggerRef: (element: HTMLButtonElement | null) => (() => void) | undefined;
 }): JSX.Element {
   const { t } = useT("api");
+  const mask = useMaskText();
   // The trigger stays enabled while the row is busy: disabling it would drop keyboard focus
   // to <body> right after a menu action. The actions themselves wait instead.
   return (
@@ -700,7 +705,7 @@ function KeyActions({
         render={
           <Button
             aria-busy={busy || undefined}
-            aria-label={t("keys.rowActions", { name: keyName(apiKey, t) })}
+            aria-label={t("keys.rowActions", { name: keyName(apiKey, t, mask) })}
             ref={triggerRef}
             size="icon"
             variant="quiet"

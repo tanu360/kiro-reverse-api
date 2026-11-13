@@ -37,6 +37,7 @@
   "editor.label": "Nhãn",
   "editor.labelPlaceholder": "VPS Frankfurt",
   "editor.labelTooLong": "Tối đa {max} ký tự.",
+  "editor.hostHasPort": "Hãy nhập cổng vào ô Cổng, không ghi sau host.",
   "editor.passwordKeep": "Để trống để giữ mật khẩu đã lưu.",
   "editor.passwordClear": "Xóa mật khẩu đã lưu",
   "editor.added": "Đã thêm proxy và đang kiểm tra.",

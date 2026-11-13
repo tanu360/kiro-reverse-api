@@ -116,7 +116,7 @@ export function ProxyEditor({
   const kind = kindOf(model.proxy);
   const kindHint = KINDS.find((item) => item.value === kind)?.hint ?? "settings:proxySocks5Hint";
   const tipId = `${id}-address-tip`;
-  const hostInvalid = showErrors && errors.host;
+  const hostInvalid = showErrors && (errors.host || errors.hostPort);
   const portInvalid = showErrors && errors.port;
   const labelInvalid = showErrors && errors.label;
 
@@ -192,7 +192,9 @@ export function ProxyEditor({
                 value={model.proxy.host}
               />
               {hostInvalid ? (
-                <FieldError match>{t("settings:proxyHostRequired")}</FieldError>
+                <FieldError match>
+                  {errors.host ? t("settings:proxyHostRequired") : t("editor.hostHasPort")}
+                </FieldError>
               ) : null}
             </Field>
             <Field className="min-w-0 items-stretch" invalid={portInvalid}>

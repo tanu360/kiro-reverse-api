@@ -43,6 +43,9 @@ func main() {
 	handler := proxy.NewHandler()
 
 	addr := fmt.Sprintf("%s:%d", config.GetHost(), config.GetPort())
+	if raw, ignored := config.IgnoredPortEnv(); ignored {
+		logger.Warnf("PORT=%q is not a port from 1 to 65535 and is ignored", raw)
+	}
 	logger.Infof("Kiro Proxy starting on http://%s (log level: %s)", addr, logger.LevelName(logger.GetLevel()))
 	logger.Infof("Admin panel: http://%s/", addr)
 	logger.Infof("Claude API: http://%s/v1/messages", addr)

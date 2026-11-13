@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { proxyPoolQuery } from "@/lib/api/proxy-pool";
 import { queryKeys } from "@/lib/api/query-keys";
 import { proxyQuery, updateProxyConfig } from "@/lib/api/settings";
 import type { ProxyConfig } from "@/lib/api/types";
@@ -102,6 +103,9 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
   const confirm = useConfirm();
   const server = useMemo(() => parseProxyUrl(config.proxyURL ?? ""), [config.proxyURL]);
   const direct = server.type === "none";
+  // With the pool on, Kiro traffic of accounts without their own proxy goes through the pool,
+  // not this route: say so, or "Direct" reads as this server's IP talking to Kiro.
+  const poolOn = useQuery(proxyPoolQuery()).data?.mode === "on";
   // `session` remounts the form on each open, so it starts from the saved proxy.
   const [editor, setEditor] = useState({ open: false, session: 0 });
   const closeEditor = () => setEditor((prev) => ({ ...prev, open: false }));
@@ -139,7 +143,7 @@ function OutboundProxyPanel({ config }: { config: ProxyConfig }): JSX.Element {
   return (
     <SettingsGroup
       badge={status}
-      description={t("proxyHint")}
+      description={poolOn ? t("proxyHintPoolOn") : t("proxyHint")}
       id={SECTION_ID.outboundProxy}
       title={t("proxySettings")}
     >

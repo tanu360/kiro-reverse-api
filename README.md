@@ -260,7 +260,7 @@ cd kiro-proxy_linux_amd64
 ./kiro-proxy
 ```
 
-On Windows, download `kiro-proxy_windows_amd64.zip` (or `_arm64`), extract it and run `kiro-proxy.exe` from a terminal. The database is created in the current folder; set `DATA_DIR` to keep it somewhere else. `SHA256SUMS.txt` on the release lists every archive's checksum: check a download with `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). The binaries are not signed: if macOS refuses to open `kiro-proxy`, run `xattr -d com.apple.quarantine kiro-proxy`, and Windows SmartScreen may ask before the first run.
+On Windows, download `kiro-proxy_windows_amd64.zip` (or `_arm64`), extract it and run `kiro-proxy.exe` from a terminal. The database is created in the current folder; set `DATA_DIR` to keep it somewhere else. The server listens on `127.0.0.1:8080`: set `PORT` when 8080 is taken, and `LISTEN_HOST=0.0.0.0` to accept other machines. `SHA256SUMS.txt` on the release lists every archive's checksum: check a download with `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). The binaries are not signed: if macOS refuses to open `kiro-proxy`, run `xattr -d com.apple.quarantine kiro-proxy`, and Windows SmartScreen may ask before the first run.
 
 ### 🛠 Build from source
 
@@ -301,6 +301,7 @@ Admin password authentication allows five failed attempts per client per minute,
 | `DATA_DIR`        | Directory for `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)   | —                  |
 | `LISTEN_HOST`    | Address to listen on. The default accepts this machine only; set `0.0.0.0` to accept other machines. The Docker image sets `0.0.0.0` | `127.0.0.1` |
+| `PORT`           | Port to listen on (overrides config)      | `8080`             |
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 | `LOG_LEVEL`      | Log level: `debug`, `info`, `warn`, or `error` (overrides config) | `info` |
 
@@ -416,6 +417,7 @@ For users in restricted network regions, configure an outbound proxy in the admi
 | `DATA_DIR`        | Directory for `kiro.db`                  | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)  | —                  |
 | `LISTEN_HOST`    | Address to listen on. The default accepts this machine only; set `0.0.0.0` to accept other machines. The Docker image sets `0.0.0.0` | `127.0.0.1` |
+| `PORT`           | Port to listen on (overrides config)      | `8080`             |
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 | `LOG_LEVEL`      | Log level: `debug`, `info`, `warn`, or `error` (overrides config) | `info` |
 

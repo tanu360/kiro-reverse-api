@@ -32,6 +32,7 @@
   "serverError.profileNotAvailable": "Kiro profile đã chọn không khả dụng cho tài khoản này.",
   "serverError.profileArnInvalid": "ARN của Kiro profile không hợp lệ.",
   "serverError.proxyUrlScheme": "URL proxy phải bắt đầu bằng http://, https://, socks5:// hoặc socks5h://.",
+  "serverError.proxyPasswordMasked": "URL proxy vẫn chứa mật khẩu đã ẩn, nhưng chưa có mật khẩu nào được lưu. Hãy nhập mật khẩu thật.",
   "serverError.invalidEndpoint": "Chọn một endpoint: auto, kiro, codewhisperer hoặc amazonq.",
   "serverError.invalidApiDomain": "Chọn một tên miền API: amazonaws hoặc kiro.",
   "serverError.apiKeyExists": "API key này đã tồn tại.",

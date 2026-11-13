@@ -72,6 +72,8 @@ export function editorModel(proxy?: PoolProxy): EditorModel {
 
 export interface EditorErrors {
   host: boolean;
+  /** The host holds a port (host:port typed in one field); IPv6 hosts have more colons. */
+  hostPort: boolean;
   port: boolean;
   label: boolean;
 }
@@ -82,15 +84,17 @@ function validPort(port: string): boolean {
 }
 
 export function editorErrors(model: EditorModel): EditorErrors {
+  const host = model.proxy.host.trim();
   return {
-    host: model.proxy.host.trim() === "",
+    host: host === "",
+    hostPort: host.split(":").length === 2,
     port: !validPort(model.proxy.port.trim()),
     label: [...model.label.trim()].length > MAX_LABEL,
   };
 }
 
 export function hasErrors(errors: EditorErrors): boolean {
-  return errors.host || errors.port || errors.label;
+  return errors.host || errors.hostPort || errors.port || errors.label;
 }
 
 /**

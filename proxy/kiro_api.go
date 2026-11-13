@@ -578,7 +578,13 @@ func refreshAccountInfo(account *config.Account, markFailure bool) (*config.Acco
 	if err != nil {
 
 		errMsg := err.Error()
-		if isSuspensionErrorMessage(errMsg) {
+		var transportErr *neturl.Error
+		if errors.As(err, &transportErr) {
+			//! No HTTP answer came back (dead proxy, pool with no healthy proxy, DNS), so nothing
+			//! proves the token bad; the error text also repeats the URL, whose profile ARN digits
+			//! can hold "401" or "403".
+			logger.Warnf("[RefreshAccountInfo] %s could not reach Kiro; not disabling it: %v", account.Email, err)
+		} else if isSuspensionErrorMessage(errMsg) {
 
 			logger.Warnf("[RefreshAccountInfo] Account %s is temporarily suspended: %v", account.Email, err)
 

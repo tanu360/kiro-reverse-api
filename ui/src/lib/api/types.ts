@@ -76,6 +76,7 @@ export type ServerErrorCode =
   | "invalid_endpoint"
   | "invalid_api_domain"
   | "proxy_url_scheme"
+  | "proxy_password_masked"
   | "api_key_empty"
   | "api_key_exists"
   | "api_key_collision"

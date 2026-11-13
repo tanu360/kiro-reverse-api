@@ -260,7 +260,7 @@ cd kiro-proxy_linux_amd64
 ./kiro-proxy
 ```
 
-No Windows, baixe `kiro-proxy_windows_amd64.zip` (ou `_arm64`), extraia e execute `kiro-proxy.exe` em um terminal. O banco de dados é criado na pasta atual; defina `DATA_DIR` para guardá-lo em outro lugar. O `SHA256SUMS.txt` da release lista o checksum de cada arquivo: confira um download com `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Os binários não são assinados: se o macOS bloquear a execução, rode `xattr -d com.apple.quarantine kiro-proxy`; o SmartScreen do Windows pode pedir confirmação na primeira execução.
+No Windows, baixe `kiro-proxy_windows_amd64.zip` (ou `_arm64`), extraia e execute `kiro-proxy.exe` em um terminal. O banco de dados é criado na pasta atual; defina `DATA_DIR` para guardá-lo em outro lugar. O servidor escuta em `127.0.0.1:8080`: defina `PORT` se a porta 8080 estiver ocupada e `LISTEN_HOST=0.0.0.0` para aceitar outras máquinas. O `SHA256SUMS.txt` da release lista o checksum de cada arquivo: confira um download com `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Os binários não são assinados: se o macOS bloquear a execução, rode `xattr -d com.apple.quarantine kiro-proxy`; o SmartScreen do Windows pode pedir confirmação na primeira execução.
 
 ### 🛠 Compilar a partir do código-fonte
 
@@ -301,6 +301,7 @@ A autenticação por senha de administrador permite cinco tentativas com falha p
 | `DATA_DIR`        | Diretório do `kiro.db`                    | `.`                |
 | `ADMIN_PASSWORD` | Senha do painel de administração (substitui a configuração) | —  |
 | `LISTEN_HOST`    | Endereço de escuta. O padrão aceita só esta máquina; defina `0.0.0.0` para aceitar outras máquinas. A imagem Docker define `0.0.0.0` | `127.0.0.1` |
+| `PORT`           | Porta de escuta (substitui a configuração) | `8080`            |
 | `KIRO_TOOL_MARKUP_RESCUE` | Defina `off` para deixar de converter de volta em chamadas de ferramenta a marcação de chamada de ferramenta que o Kiro vaza no texto da resposta | on |
 | `LOG_LEVEL`      | Nível de log: `debug`, `info`, `warn` ou `error` (substitui a configuração) | `info` |
 
@@ -416,6 +417,7 @@ Para quem está em regiões com rede restrita, configure um proxy de saída no p
 | `DATA_DIR`        | Diretório do `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Senha do painel de administração (substitui a configuração) | — |
 | `LISTEN_HOST`    | Endereço de escuta. O padrão aceita só esta máquina; defina `0.0.0.0` para aceitar outras máquinas. A imagem Docker define `0.0.0.0` | `127.0.0.1` |
+| `PORT`           | Porta de escuta (substitui a configuração) | `8080`            |
 | `KIRO_TOOL_MARKUP_RESCUE` | Defina `off` para deixar de converter de volta em chamadas de ferramenta a marcação de chamada de ferramenta que o Kiro vaza no texto da resposta | on |
 | `LOG_LEVEL`      | Nível de log: `debug`, `info`, `warn` ou `error` (substitui a configuração) | `info` |
 

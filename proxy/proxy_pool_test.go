@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"strings"
 	"testing"
 	"time"
@@ -141,6 +142,7 @@ func TestProxyPoolAPIValidation(t *testing.T) {
 		{http.MethodPut, "/admin/api/proxy-pool/settings", `{"mode":"sometimes"}`, http.StatusBadRequest, codeProxyPoolInvalid},
 		{http.MethodPost, "/admin/api/proxy-pool/proxies", `{"url":"ftp://10.0.0.1:21"}`, http.StatusBadRequest, codeProxyPoolInvalid},
 		{http.MethodPost, "/admin/api/proxy-pool/proxies", `{"url":"http://10.0.0.1"}`, http.StatusBadRequest, codeProxyPoolInvalid},
+		{http.MethodPost, "/admin/api/proxy-pool/proxies", `{"url":"127.0.0.1:19403"}`, http.StatusBadRequest, codeProxyPoolInvalid},
 		{http.MethodPost, "/admin/api/proxy-pool/proxies", `{"url":`, http.StatusBadRequest, codeInvalidJSON},
 		{http.MethodPut, "/admin/api/proxy-pool/proxies/px_missing", `{"label":"x"}`, http.StatusNotFound, codeProxyPoolNotFound},
 		{http.MethodDelete, "/admin/api/proxy-pool/proxies/px_missing", ``, http.StatusNotFound, codeProxyPoolNotFound},
@@ -308,5 +310,106 @@ func TestPoolClientRebuiltAfterEdit(t *testing.T) {
 	// An account's own proxy that is not in the pool keeps the plain client cache.
 	if c, ok := poolClientFor("http://own.example:8080", true); ok || c != nil {
 		t.Fatal("a non-pool URL went through the pool clients")
+	}
+}
+
+// A usage refresh that cannot reach Kiro through the pool must not ban the
+// account, even though the error repeats a URL whose profile ARN holds "403".
+func TestUsageRefreshProxyFailureDoesNotBan(t *testing.T) {
+	h := newPoolTestAdmin(t)
+	dead := config.PoolProxy{ID: "px_dead", URL: "http://" + poolClosedPort(t)}
+	if err := config.SetProxyPool([]config.PoolProxy{dead}); err != nil {
+		t.Fatal(err)
+	}
+	setPoolMode(t, config.ProxyPoolModeOn, false)
+	acc := config.Account{ID: "acc-arn", Email: "arn@example.com", Enabled: true, AuthMethod: "idc",
+		AccessToken: "token", RefreshToken: "refresh",
+		ProfileArn: "arn:aws:codewhisperer:us-east-1:540312340301:profile/ABCDEF"}
+	if err := config.AddAccount(acc); err != nil {
+		t.Fatal(err)
+	}
+	h.pool.Reload()
+
+	check := func(stage string) {
+		t.Helper()
+		_, err := RefreshAccountInfo(&acc)
+		if err == nil || !strings.Contains(err.Error(), "403") {
+			t.Fatalf("%s: refresh error %v, want a transport error whose URL holds 403", stage, err)
+		}
+		for _, a := range config.GetAccounts() {
+			if a.ID == acc.ID && (!a.Enabled || a.BanStatus != "") {
+				t.Fatalf("%s: a proxy failure banned the account: enabled=%v ban=%q", stage, a.Enabled, a.BanStatus)
+			}
+		}
+	}
+	check("dead proxy")
+	// The dead proxy is now failed, so the pool has none left: the fail-fast client answers.
+	if got := ResolveAccountProxyURL(&acc); got != proxypool.UnavailableURL {
+		t.Fatalf("route %q, want UnavailableURL", got)
+	}
+	check("no healthy proxy")
+}
+
+// With no pool proxy up, a chat attempt stops at the first endpoint and the client sees the
+// pool's own wording, not the upstream URL the transport error repeats.
+func TestNoHealthyProxyChatFailsOnceWithoutURL(t *testing.T) {
+	h := newPoolTestAdmin(t)
+	dead := config.PoolProxy{ID: "px_dead", URL: "http://" + poolClosedPort(t), Username: "u", Password: "pool-secret"}
+	if err := config.SetProxyPool([]config.PoolProxy{dead}); err != nil {
+		t.Fatal(err)
+	}
+	setPoolMode(t, config.ProxyPoolModeOn, false)
+	acc := addPoolTestAccount(t, h, "acc-chat")
+	acc.ProfileArn = "arn:aws:codewhisperer:us-east-1:540312340301:profile/ABCDEF"
+	proxypool.Default().ReportFailure(dead.ID, errors.New("connect: connection refused"))
+
+	var payload KiroPayload
+	payload.ConversationState.CurrentMessage.UserInputMessage.Content = "hi"
+	start := time.Now()
+	err := callKiroAPIContextOnce(t.Context(), acc, &payload, &KiroStreamCallback{})
+	if !proxypool.IsNoHealthy(err) || time.Since(start) > time.Second {
+		t.Fatalf("chat: %v after %s, want the no-healthy error at once", err, time.Since(start))
+	}
+	// A REST call (usage, MCP search) gets the transport's url.Error, which repeats the URL.
+	transport := &neturl.Error{Op: "Post", URL: "https://q.us-east-1.amazonaws.com/generateAssistantResponse", Err: proxypool.NoHealthyError()}
+	text := upstreamErrorText(fmt.Errorf("wrapped: %w", transport))
+	for _, leak := range []string{"https://", "amazonaws", "pool-secret", "kiro.dev"} {
+		if strings.Contains(err.Error(), leak) || strings.Contains(text, leak) {
+			t.Fatalf("client text %q / %q holds %q", err.Error(), text, leak)
+		}
+	}
+	if text != proxypool.ErrNoHealthyProxy.Error() {
+		t.Fatalf("client text %q", text)
+	}
+}
+
+func TestNoHealthyProxyWebSearchIs503(t *testing.T) {
+	h := newStreamTestHandler(t, func(http.ResponseWriter, *http.Request) {
+		t.Error("a request reached Kiro without a healthy pool proxy")
+	})
+	t.Cleanup(proxypool.SetCheckTargetForTest("http://kiro.test/", nil))
+	proxypool.Default().ResetForTest()
+	t.Cleanup(proxypool.Default().ResetForTest)
+	t.Cleanup(dropPoolClients)
+	dead := config.PoolProxy{ID: "px_dead", URL: "http://" + poolClosedPort(t)}
+	if err := config.SetProxyPool([]config.PoolProxy{dead}); err != nil {
+		t.Fatal(err)
+	}
+	setPoolMode(t, config.ProxyPoolModeOn, false)
+	proxypool.Default().ReportFailure(dead.ID, errors.New("connect: connection refused"))
+
+	//! The plain chat path answers 503 here; the web search paths answered 500 (loop) and 502 (direct).
+	for name, body := range map[string]string{
+		"loop": `{"model":"claude-sonnet-4.5","max_tokens":64,
+			"tools":[{"type":"web_search_20250305","name":"web_search"}],
+			"messages":[{"role":"user","content":"What is the latest Go?"}]}`,
+		"direct": `{"model":"claude-sonnet-4.5","max_tokens":64,
+			"tools":[{"type":"web_search_20250305","name":"web_search"}],
+			"messages":[{"role":"user","content":"Perform a web search for the query: go"}]}`,
+	} {
+		rec := postClaudeMessages(t, h, body)
+		if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), proxypool.ErrNoHealthyProxy.Error()) {
+			t.Errorf("%s: %d %s, want 503 with the no-healthy message", name, rec.Code, rec.Body.String())
+		}
 	}
 }

@@ -140,6 +140,7 @@ func TestParseInputRejectsBadSchemeHostPort(t *testing.T) {
 		"http://host:8080/path",
 		"http://host:8080?x=1",
 		"socks4://host:1080",
+		"socks5://[127.0.0.1:19403]:1080",
 	} {
 		_, err := buildProxy(ProxyInput{URL: strPtr(raw)}, nil)
 		var inputErr *InputError
@@ -716,5 +717,63 @@ func TestStateLoadIsRetriedAfterAFailedRead(t *testing.T) {
 	}
 	if h := m.Health("px_a"); h.Status != StatusFailed {
 		t.Fatalf("saved health was not read: %+v", h)
+	}
+}
+
+// A proxy written as host:port gets an error that names the missing scheme.
+func TestParseInputNamesMissingScheme(t *testing.T) {
+	for _, raw := range []string{"127.0.0.1:19403", "proxy.example.com:8080", "user:pw@10.0.0.1:1080"} {
+		_, err := buildProxy(ProxyInput{URL: strPtr(raw)}, nil)
+		var inputErr *InputError
+		if !errors.As(err, &inputErr) || !strings.Contains(inputErr.Reason, "no scheme") {
+			t.Errorf("%q: got %v, want a missing-scheme error", raw, err)
+		}
+		if err != nil && strings.Contains(err.Error(), "pw@") {
+			t.Errorf("%q: the error repeats the sign-in: %v", raw, err)
+		}
+	}
+}
+
+// Health keeps no field from the state before: a failure drops the old latency, and a recovery
+// drops the old error and failure time.
+func TestHealthDropsStaleFields(t *testing.T) {
+	live := poolProxy("px_live", fakeProxy(t, http.StatusOK))
+	m := setupPool(t, live)
+	if h, _ := m.CheckOne(context.Background(), live.ID); h.Status != StatusOK || h.LatencyMs == 0 {
+		t.Fatalf("first check %+v", h)
+	}
+	m.ReportFailure(live.ID, errors.New("connect: connection refused"))
+	if h := m.Health(live.ID); h.Status != StatusFailed || h.LatencyMs != 0 || h.LastError == "" || h.FailedAt == 0 {
+		t.Fatalf("after a failure %+v, want failed with no latency", h)
+	}
+	h, _ := m.CheckOne(context.Background(), live.ID)
+	if h.Status != StatusOK || h.LastError != "" || h.FailedAt != 0 {
+		t.Fatalf("after a good check %+v, want ok with no old error", h)
+	}
+	m.ReportFailure(live.ID, errors.New("connect: connection refused"))
+	m.ReportSuccess(live.ID)
+	if h := m.Health(live.ID); h.Status != StatusOK || h.LastError != "" || h.FailedAt != 0 {
+		t.Fatalf("after a good connection %+v, want ok with no old error", h)
+	}
+}
+
+func TestParseProxyURLNamesBracketedHostPort(t *testing.T) {
+	//! url.Parse refuses these first, which used to hide the reason behind "not a valid proxy URL".
+	for _, raw := range []string{
+		"socks5://[127.0.0.1:19409]:1080",
+		"socks5://[127.0.0.1:19409]",
+		"http://user:p@ss@[proxy.example:3128]:8080",
+		"https://[proxy.example:443]:443/",
+	} {
+		_, err := buildProxy(ProxyInput{URL: strPtr(raw)}, nil)
+		var inputErr *InputError
+		if !errors.As(err, &inputErr) || !strings.Contains(inputErr.Reason, "the host holds a port") {
+			t.Errorf("%q: got %v, want the host-holds-a-port reason", raw, err)
+		}
+	}
+	for _, raw := range []string{"socks5://[::1]:1080", "socks5://u:p@[fe80::1%25en0]:1080", "http://[2001:db8::1]:3128"} {
+		if _, err := buildProxy(ProxyInput{URL: strPtr(raw)}, nil); err != nil {
+			t.Errorf("%q: %v, want an IPv6 proxy accepted", raw, err)
+		}
 	}
 }
