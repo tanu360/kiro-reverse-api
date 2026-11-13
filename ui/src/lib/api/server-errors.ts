@@ -40,6 +40,8 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   image_resize_dimension_range: "errors:serverError.imageResizeDimensionRange",
   image_resize_size_range: "errors:serverError.imageResizeSizeRange",
   account_rpm_limit_range: "errors:serverError.accountRpmLimitRange",
+  usage_refresh_interval_range: "errors:serverError.usageRefreshIntervalRange",
+  tag_required: "errors:serverError.tagRequired",
   password_too_short: "errors:serverError.passwordTooShort",
   invalid_endpoint: "errors:serverError.invalidEndpoint",
   invalid_api_domain: "errors:serverError.invalidApiDomain",
@@ -88,6 +90,7 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   relogin_identity_mismatch: "errors:serverError.reloginIdentityMismatch",
   relogin_pending_not_found: "errors:serverError.reloginPendingNotFound",
   relogin_single_credential: "errors:serverError.reloginSingleCredential",
+  relogin_other_account: "errors:serverError.reloginOtherAccount",
 };
 
 /** The `code` of an ApiError's JSON body, or null. */

@@ -194,7 +194,7 @@ export function AddAccountDialog({
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <DialogPanel className="in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-6">
               <MethodSelect busy={busy} method={method} onSelect={selectMethod} />
-              <MethodHead method={method} />
+              <MethodHead method={method} relogin={Boolean(relogin)} />
               <FlowProvider value={context}>
                 <Flow key={flowKey} />
               </FlowProvider>

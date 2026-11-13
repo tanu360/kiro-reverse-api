@@ -177,9 +177,16 @@ export function MethodSelect({
 
 /**
  * The open method's heading at the top of the pane: its mark in a chip, its name (Builder ID
- * with the Recommended badge) and what it adds, over a hairline.
+ * with the Recommended badge) and what it adds (or, in re-login mode, that it signs the account
+ * in again), over a hairline.
  */
-export function MethodHead({ method }: { method: AddAccountMethod }): JSX.Element {
+export function MethodHead({
+  method,
+  relogin = false,
+}: {
+  method: AddAccountMethod;
+  relogin?: boolean;
+}): JSX.Element {
   const { t } = useT("add-account");
   return (
     <div className="mb-5 flex items-start gap-3.5 border-border-subtle border-b pb-5">
@@ -196,7 +203,9 @@ export function MethodHead({ method }: { method: AddAccountMethod }): JSX.Elemen
           ) : null}
         </div>
         <p className="text-pretty text-muted-foreground text-sm">
-          {t(`methods.${method}.description`)}
+          {relogin
+            ? t("relogin.methodDescription", { method: t(`methods.${method}.title`) })
+            : t(`methods.${method}.description`)}
         </p>
       </div>
     </div>

@@ -28,6 +28,8 @@ export interface SuccessResponse {
  * - callback_url_wrong_address: `expected` is the callback URL the step needs.
  * - relogin_identity_mismatch (409): the new sign-in is another user; the body is a
  *   ReloginMismatchBody, and the login waits for POST /accounts/{id}/relogin/confirm or /discard.
+ * - relogin_other_account (409): the new sign-in is another stored account's user; the body is a
+ *   ReloginOtherAccountBody. Nothing waits: `saved` says whether that account took the new tokens.
  * - model_*: also `index`; `model` (duplicate, self, chain) or `max` (too many, ID too long).
  */
 export type ServerErrorCode =
@@ -113,7 +115,10 @@ export type ServerErrorCode =
   | "microsoft_profile_unresolved"
   | "relogin_identity_mismatch"
   | "relogin_pending_not_found"
-  | "relogin_single_credential";
+  | "relogin_single_credential"
+  | "relogin_other_account"
+  | "usage_refresh_interval_range"
+  | "tag_required";
 
 // ---------------------------------------------------------------------------
 // Session and first run
@@ -241,6 +246,17 @@ export interface ReloginMismatchBody {
   incomingEmail: string;
   /** seconds the stashed login waits for confirm or discard */
   expiresIn: number;
+}
+/** 409 relogin_other_account; otherEmail is "" when unknown. */
+export interface ReloginOtherAccountBody {
+  success: false;
+  error: string;
+  code: "relogin_other_account";
+  accountId: string;
+  otherAccountId: string;
+  otherEmail: string;
+  /** true when the other account took the new sign-in's tokens */
+  saved: boolean;
 }
 /** POST /accounts/{id}/relogin/confirm and /discard */
 export interface ReloginPendingRequest {

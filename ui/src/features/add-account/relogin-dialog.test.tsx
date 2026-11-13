@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
-import { http } from "msw";
+import { HttpResponse, http } from "msw";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account } from "@/lib/api/types";
@@ -109,7 +109,11 @@ describe("AddAccountDialog in re-login mode", () => {
     expect(await screen.findByRole("heading", { name: "Kiro API key" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Region" })).toHaveValue("eu-central-1");
 
-    await user.type(screen.getByRole("textbox", { name: "Kiro API keys" }), "ksk_fresh");
+    // One key, so the field says so: no "Kiro API keys" or "One per line".
+    expect(screen.queryByRole("textbox", { name: "Kiro API keys" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/One per line/)).not.toBeInTheDocument();
+    expect(screen.getByText("Sign this account in again with Kiro API key.")).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "Kiro API key" }), "ksk_fresh");
     await user.click(screen.getByRole("button", { name: "Sign in again" }));
     await waitFor(() => expect(imports.count).toBe(1));
     expect(imports.bodies[0]).toMatchObject({
@@ -194,6 +198,37 @@ describe("AddAccountDialog in re-login mode", () => {
       "someone.else@northwind-labs.dev",
     );
     await expectToast("someone.else@northwind-labs.dev is signed in again.");
+  });
+
+  it("names the stored account a sign-in belongs to, masked, and asks nothing", async () => {
+    mockServer.use(
+      http.post(apiUrl("/auth/credentials"), () =>
+        HttpResponse.json(
+          {
+            success: false,
+            error: "the new sign-in belongs to another account in the pool",
+            code: "relogin_other_account",
+            accountId: "x",
+            otherAccountId: "other-id",
+            otherEmail: "teammate@northwind-labs.dev",
+            saved: true,
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    const account = accountBy("Enterprise");
+    const { user } = renderWithProviders(
+      <Harness account={account} initialMethod="credentials" />,
+      { privacy: true },
+    );
+    await submitCredentials(user, OTHER_USER);
+
+    await expectToast(/^This sign-in is te\S+@\S+, another account in the pool\./);
+    expect(screen.queryByText(/teammate@northwind-labs\.dev/)).not.toBeInTheDocument();
+    await expectToast(/now uses the new sign-in\.$/);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(mockDb.accounts.find((item) => item.id === account.id)?.email).toBe(account.email);
   });
 
   it("discards the waiting login when the admin declines", async () => {

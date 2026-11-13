@@ -45,6 +45,11 @@
     "reason": "Kiro API key format example (key prefix and region id), typed as data."
   },
   {
+    "file": "src/features/add-account/flows/api-key-flow.tsx",
+    "text": "ksk_…",
+    "reason": "Kiro API key format example (the key prefix) for the one key a re-login takes."
+  },
+  {
     "file": "src/features/add-account/flows/credentials-flow.tsx",
     "text": "[{\"refreshToken\":\"xxx\",\"provider\":\"BuilderID\"}]",
     "reason": "JSON example of the credentials payload; wire field names are code."
