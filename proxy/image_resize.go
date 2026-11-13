@@ -234,7 +234,8 @@ func decodedBytesPerPixel(model color.Model, format string, raw []byte) int64 {
 
 // downscaleImage decodes raw (png, jpeg, gif first frame or webp), fits it within
 // lim.maxDim and re-encodes it: PNG when it has real transparency and fits
-// lim.maxBytes, otherwise JPEG on white. ok is false when raw cannot be decoded or
+// lim.maxBytes, the smaller of PNG and JPEG for an opaque PNG or GIF, otherwise
+// JPEG on white. ok is false when raw cannot be decoded or
 // the result would be no better than raw. The caller holds resizeBudget for it.
 func downscaleImage(raw []byte, lim imageResizeLimits) (out []byte, format string, w, h int, ok bool) {
 	resizeDecodes.Add(1)
@@ -275,10 +276,18 @@ func downscaleImage(raw []byte, lim imageResizeLimits) (out []byte, format strin
 	}
 
 	fits := false
-	if !opaque {
+	switch {
+	case !opaque:
 		fits = consider(encodePNG(scaled), "png", scaled)
 		if !fits {
 			scaled = flattenOnWhite(scaled)
+		}
+	case srcFormat == "png" || srcFormat == "gif":
+		//! A screenshot or diagram with flat areas is often far smaller as PNG: a 146 KB PNG
+		//! became a 395 KB JPEG. Both are tried and the smaller one is kept.
+		if consider(encodePNG(scaled), "png", scaled) {
+			consider(encodeJPEG(scaled, resizeJPEGQualities[0]), "jpeg", scaled)
+			fits = true
 		}
 	}
 	for _, q := range resizeJPEGQualities {

@@ -8,6 +8,7 @@ import (
 	"hash/crc32"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
@@ -567,8 +568,13 @@ func TestImageResizeCapsFullDecodesPerPayload(t *testing.T) {
 
 	resizePayloadImages(payload)
 
+	//! A smooth strip may come out as PNG or JPEG, whichever is smaller; resized means narrower.
+	resized := func(img KiroImage) bool {
+		out, _ := decodeKiroImage(t, img)
+		return out.Bounds().Dx() < 2000
+	}
 	for i, img := range cur.Images[:resizeMaxDecodesPerPayload] {
-		if img.Format != "jpeg" {
+		if !resized(img) {
 			t.Fatalf("image %d not resized", i)
 		}
 	}
@@ -580,7 +586,7 @@ func TestImageResizeCapsFullDecodesPerPayload(t *testing.T) {
 	next := &KiroPayload{}
 	next.ConversationState.CurrentMessage.UserInputMessage.Images = []KiroImage{last}
 	resizePayloadImages(next)
-	if next.ConversationState.CurrentMessage.UserInputMessage.Images[0].Format != "jpeg" {
+	if !resized(next.ConversationState.CurrentMessage.UserInputMessage.Images[0]) {
 		t.Fatal("the image skipped for the cap was not resized by the next request")
 	}
 
@@ -592,7 +598,7 @@ func TestImageResizeCapsFullDecodesPerPayload(t *testing.T) {
 	}
 	resizePayloadImages(many)
 	for i, img := range many.ConversationState.CurrentMessage.UserInputMessage.Images {
-		if img.Format != "jpeg" {
+		if !resized(img) {
 			t.Fatalf("repeated image %d not resized from the cache", i)
 		}
 	}
@@ -871,5 +877,27 @@ func TestImageResizeSettingsRoundTrip(t *testing.T) {
 	}
 	if config.GetImageResize() || config.GetImageResizeMaxDimension() != 1024 || config.GetImageResizeMaxKB() != 300 {
 		t.Fatal("a rejected patch changed a setting")
+	}
+}
+
+// A screenshot-like PNG with large flat areas stays PNG when that is smaller than JPEG.
+// Live: a 4000x3000 PNG of 146 KB became a 395 KB JPEG.
+func TestImageResizeFlatPNGStaysTheSmallerPNG(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 4000, 3000))
+	draw.Draw(src, src.Bounds(), image.NewUniform(color.RGBA{240, 240, 245, 255}), image.Point{}, draw.Src)
+	for y := 0; y < 3000; y += 150 {
+		draw.Draw(src, image.Rect(200, y, 3800, y+60), image.NewUniform(color.RGBA{30, 60, 200, 255}), image.Point{}, draw.Src)
+	}
+	raw := encodeTestPNG(t, src)
+	img := testKiroImage("png", raw)
+	if !resizeKiroImage(&img, testResizeLimits) {
+		t.Fatal("a 4000x3000 PNG over the size limit was not resized")
+	}
+	out, n := decodeKiroImage(t, img)
+	if b := out.Bounds(); max(b.Dx(), b.Dy()) > testResizeLimits.maxDim {
+		t.Fatalf("output %dx%d is over the limit", b.Dx(), b.Dy())
+	}
+	if img.Format != "png" || n > len(raw) {
+		t.Fatalf("output %s %d KB from a %d KB PNG; want the smaller PNG", img.Format, n>>10, len(raw)>>10)
 	}
 }
