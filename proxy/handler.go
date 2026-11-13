@@ -408,7 +408,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	case path == "/v1/models" || path == "/models":
-		ar := h.authenticateForOpenAI(w, r)
+		ar := h.authenticateForModels(w, r)
 		if ar == nil {
 			return
 		}
