@@ -219,6 +219,7 @@
   "detail.proxyURL": "Account proxy",
   "detail.proxyURLPlaceholder": "socks5://host:port",
   "detail.proxyHint": "Leave empty to use the global proxy.",
+  "detail.proxyHintPool": "Leave empty to use the proxy pool.",
   "detail.proxyPasswordKept": "The saved password shows as ********. Leave it as it is to keep the password.",
   "detail.proxyFormatError": "Start the URL with socks5://, socks5h://, http:// or https://.",
   "detail.tokenExpiry": "Token expiry",

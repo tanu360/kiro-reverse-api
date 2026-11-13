@@ -204,6 +204,7 @@
   "detail.proxyURL": "账号代理",
   "detail.proxyURLPlaceholder": "socks5://host:port",
   "detail.proxyHint": "留空则使用全局代理。",
+  "detail.proxyHintPool": "留空则使用代理池。",
   "detail.proxyPasswordKept": "已保存的密码显示为 ********。保持不变即可保留该密码。",
   "detail.proxyFormatError": "URL 须以 socks5://、socks5h://、http:// 或 https:// 开头。",
   "detail.tokenExpiry": "Token 到期",

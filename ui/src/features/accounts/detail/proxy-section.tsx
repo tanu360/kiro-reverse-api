@@ -25,6 +25,8 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(account.proxyURL);
   const [error, setError] = useState<string | null>(null);
+  // While the pool carries Kiro traffic, an empty field means the pool, not the global proxy.
+  const pooled = routesThroughPool(useQuery(proxyPoolQuery()).data);
 
   const onSubmit = () => {
     const proxyURL = value.trim();
@@ -66,7 +68,9 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
           variant="code"
         />
         {error ? <FieldError match>{error}</FieldError> : null}
-        <FieldDescription>{t("detail.proxyHint")}</FieldDescription>
+        <FieldDescription>
+          {t(pooled ? "detail.proxyHintPool" : "detail.proxyHint")}
+        </FieldDescription>
         {hasMaskedProxyPassword(account.proxyURL) ? (
           <FieldDescription>{t("detail.proxyPasswordKept")}</FieldDescription>
         ) : null}

@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
+import { resetProxyPoolMock, seedProxyPoolMock } from "@/features/proxy-pool/mocks";
 import type { Account } from "@/lib/api/types";
 import { mockDb } from "@/lib/mocks/db";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
@@ -179,6 +180,32 @@ describe("AccountDetailSheet", () => {
     const facts = section(sheet, "Account");
     expect(await within(facts).findByText("Direct")).toBeInTheDocument();
     expect(within(facts).getByText("Global")).toBeInTheDocument();
+  });
+
+  it("says an empty account proxy means the pool while the pool is on", async () => {
+    onTestFinished(resetProxyPoolMock);
+    const first = await openSheet(dana());
+    let row = await openEditor(first.sheet, first.user, "Account proxy");
+    expect(within(row).getByText("Leave empty to use the global proxy.")).toBeInTheDocument();
+    first.unmount();
+    seedProxyPoolMock({
+      mode: "on",
+      proxies: [
+        {
+          id: "px_a",
+          label: "Tokyo",
+          url: "socks5://10.1.0.1:1080",
+          username: "",
+          password: "",
+          createdAt: 0,
+          health: { status: "ok", latencyMs: 90 },
+        },
+      ],
+    });
+    const { sheet, user } = await openSheet(dana());
+    row = await openEditor(sheet, user, "Account proxy");
+    expect(await within(row).findByText("Leave empty to use the proxy pool.")).toBeInTheDocument();
+    expect(within(row).queryByText("Leave empty to use the global proxy.")).toBeNull();
   });
 
   it("reverts the overage switch when AWS fails", async () => {
