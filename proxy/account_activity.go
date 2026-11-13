@@ -80,6 +80,36 @@ func (t *accountRateTracker) snapshot(nowUnix int64) map[string]int {
 	return out
 }
 
+// move adds the live RPM of removed accounts to the kept one, for a duplicate
+// merge. A slot holds one second at a time, so the newer second wins.
+func (t *accountRateTracker) move(keepID string, removed []string) {
+	if keepID == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for _, id := range removed {
+		src := t.rings[id]
+		if src == nil || id == keepID {
+			continue
+		}
+		delete(t.rings, id)
+		dst := t.rings[keepID]
+		if dst == nil {
+			t.rings[keepID] = src
+			continue
+		}
+		for i := range src {
+			switch s, d := &src[i], &dst[i]; {
+			case s.sec > d.sec:
+				*d = *s
+			case s.sec == d.sec && s.sec != 0:
+				d.n += s.n
+			}
+		}
+	}
+}
+
 func (t *accountRateTracker) reset() {
 	t.mu.Lock()
 	t.rings = nil

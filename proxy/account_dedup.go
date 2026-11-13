@@ -196,6 +196,9 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 		//! The accounts are merged already; old rows keep the removed id and still count in totals.
 		logger.Warnf("[Accounts] Merged duplicates into %s, but could not move their request history: %v", kept.ID, err)
 	}
+	//! The live "today" and RPM numbers follow the moved rows; a restart would rebuild them from those rows.
+	getObserveStore().moveAccountRings(kept.ID, removeIDs)
+	accountRates.move(kept.ID, removeIDs)
 	logger.Infof("[Accounts] Merged %d duplicate account(s) into %s", len(removeIDs), kept.ID)
 	//! The merge moves keys bound to a removed copy onto the kept account; open key lists refetch.
 	publishEvent(eventAPIKeysChanged, kept.ID)
@@ -264,4 +267,68 @@ func moveAccountHistory(keepID string, removed []string) (int64, error) {
 		return 0, err
 	}
 	return moved, nil
+}
+
+// moveAccountRings folds the live numbers of removed accounts into the kept
+// one: the minute rings ("today", the heatmap) and the recent request and
+// error lists. A restart rebuilds them from the moved rows; without this the
+// kept account would miss the copies' requests until then.
+func (s *observeStore) moveAccountRings(keepID string, removed []string) {
+	if s == nil || keepID == "" {
+		return
+	}
+	s.mu.Lock()
+	changed := false
+	for _, id := range removed {
+		if id == "" || id == keepID {
+			continue
+		}
+		if src := s.accountRings[id]; src != nil {
+			delete(s.accountRings, id)
+			delete(s.accountTouched, id)
+			dst := s.getOrCreateAccountRing(keepID)
+			for i := range src {
+				foldMinuteBucket(&dst[i], &src[i])
+			}
+			changed = true
+		}
+		for i := range s.recentRequests {
+			if s.recentRequests[i].AccountID == id {
+				s.recentRequests[i].AccountID = keepID
+				changed = true
+			}
+		}
+		for i := range s.recentErrors {
+			if s.recentErrors[i].AccountID == id {
+				s.recentErrors[i].AccountID = keepID
+				changed = true
+			}
+		}
+	}
+	s.mu.Unlock()
+	if changed {
+		s.seq.Add(1)
+	}
+}
+
+// foldMinuteBucket adds src to dst when both hold the same minute. A slot
+// holds one minute at a time, so the newer minute wins otherwise, as it would
+// when that slot is next written.
+func foldMinuteBucket(dst, src *minuteBucket) {
+	switch {
+	case src.WindowMin == 0 || src.WindowMin < dst.WindowMin:
+		return
+	case src.WindowMin > dst.WindowMin:
+		*dst = *src
+		return
+	}
+	dst.Reqs += src.Reqs
+	dst.Successes += src.Successes
+	dst.Failures += src.Failures
+	dst.Retries += src.Retries
+	dst.InTokens += src.InTokens
+	dst.OutTokens += src.OutTokens
+	dst.CacheReadTokens += src.CacheReadTokens
+	dst.CacheWriteTokens += src.CacheWriteTokens
+	dst.Credits += src.Credits
 }
