@@ -145,7 +145,7 @@ func TestMessagesWithoutMaxTokensCheckTheThinkingBudgetAgainstTheModelMaximum(t 
 	if got := check(16000, false); got != "" {
 		t.Fatalf("budget 16000 under a 32000 maximum: got %q", got)
 	}
-	if got := check(32000, false); got != "thinking.budget_tokens must be less than max_tokens" {
+	if got := check(32000, false); got != "thinking.budget_tokens must be less than max_tokens (not set, so the model's maximum of 32000)" {
 		t.Fatalf("budget 32000 at the 32000 maximum: got %q", got)
 	}
 	if got := check(32000, true); got != "" {

@@ -96,6 +96,10 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 		return msg
 	}
 	if msg := validateClaudeThinkingBudget(req.Thinking, req.MaxTokens, req.interleavedThinking); msg != "" {
+		if msg == budgetUnderMaxTokens && req.maxTokensDefaulted {
+			//! The client sent no max_tokens; naming it alone left them looking for a value they never set.
+			return fmt.Sprintf("%s (not set, so the model's maximum of %d)", budgetUnderMaxTokens, req.MaxTokens)
+		}
 		return msg
 	}
 
@@ -129,6 +133,8 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 	return ""
 }
 
+const budgetUnderMaxTokens = "thinking.budget_tokens must be less than max_tokens"
+
 func validateClaudeThinkingConfig(thinking *ClaudeThinkingConfig, maxTokens int) string {
 	return validateClaudeThinkingBudget(thinking, maxTokens, false)
 }
@@ -153,7 +159,7 @@ func validateClaudeThinkingBudget(thinking *ClaudeThinkingConfig, maxTokens int,
 			return "thinking.budget_tokens must be at least 1024"
 		}
 		if maxTokens > 0 && thinking.BudgetTokens >= maxTokens && !interleaved {
-			return "thinking.budget_tokens must be less than max_tokens"
+			return budgetUnderMaxTokens
 		}
 	case "adaptive":
 		if thinking.BudgetTokens != 0 {
