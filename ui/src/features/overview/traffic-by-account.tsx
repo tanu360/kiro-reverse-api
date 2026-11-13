@@ -150,10 +150,12 @@ export function TrafficByAccount(): JSX.Element {
             icon={UserMultipleIcon}
           />
         ),
+        // With every busy account listed, the rest never reached an account (a wrong key, an
+        // unknown model, no account free); "Other accounts" read as if accounts were missing.
         label:
           otherCount > 0
             ? t("heatmap.otherCount", { count: otherCount, n: formatNumber(otherCount, lang) })
-            : t("heatmap.other"),
+            : t("heatmap.noAccount"),
         other: true,
         totals: view.other,
       },

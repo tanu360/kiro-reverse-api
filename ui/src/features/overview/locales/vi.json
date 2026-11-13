@@ -72,7 +72,7 @@
   "heatmap.description": "60 phút qua",
   "heatmap.descriptionTop": "Top {shown} trên {total} · 60 phút qua",
   "heatmap.empty": "Không có hoạt động tài khoản trong giờ qua",
-  "heatmap.other": "Tài khoản khác",
+  "heatmap.noAccount": "Không có tài khoản",
   "heatmap.otherCount_other": "{n} tài khoản khác",
   "heatmap.failed_other": "{n} thất bại",
   "heatmap.legendLabel": "Tài khoản trong 60 phút qua",

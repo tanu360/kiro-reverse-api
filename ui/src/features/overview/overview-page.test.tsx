@@ -251,13 +251,13 @@ describe("OverviewPage", () => {
     const list = await within(heatmap).findByRole("list", {
       name: "Accounts in the last 60 min",
     });
-    // No busy accounts: the whole hour is "Other accounts", with its failures beside it.
-    const other = () => within(list).getByText("Other accounts").closest("li")?.textContent;
-    expect(other()).toBe("Other accounts1072 failed");
+    // No busy accounts: the whole hour never reached an account, with its failures beside it.
+    const other = () => within(list).getByText("No account").closest("li")?.textContent;
+    expect(other()).toBe("No account1072 failed");
 
     newest = 31;
     await queryClient.refetchQueries({ queryKey: heatmapQuery(60, { top: 5 }).queryKey });
-    await waitFor(() => expect(other()).toBe("Other accounts1312 failed"));
+    await waitFor(() => expect(other()).toBe("No account1312 failed"));
   });
 
   it("shows an empty state in the heatmap without traffic", async () => {

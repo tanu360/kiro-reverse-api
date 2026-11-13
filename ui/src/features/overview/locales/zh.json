@@ -72,7 +72,7 @@
   "heatmap.description": "最近 60 分钟",
   "heatmap.descriptionTop": "前 {shown} 名，共 {total} 个 · 最近 60 分钟",
   "heatmap.empty": "最近一小时没有账号活动",
-  "heatmap.other": "其他账号",
+  "heatmap.noAccount": "未分配账号",
   "heatmap.otherCount_other": "其他 {n} 个账号",
   "heatmap.failed_other": "{n} 次失败",
   "heatmap.legendLabel": "最近 60 分钟的账号",

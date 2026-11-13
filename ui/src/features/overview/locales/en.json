@@ -74,7 +74,7 @@
   "heatmap.description": "Last 60 min",
   "heatmap.descriptionTop": "Top {shown} of {total} · last 60 min",
   "heatmap.empty": "No account activity in the last hour",
-  "heatmap.other": "Other accounts",
+  "heatmap.noAccount": "No account",
   "heatmap.otherCount_one": "{n} other account",
   "heatmap.otherCount_other": "{n} other accounts",
   "heatmap.failed_one": "{n} failed",
