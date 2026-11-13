@@ -14,7 +14,7 @@
   "openDetails": "Open details for {email}",
   "lockedSwitch.banned": "Banned by Kiro. The account cannot be turned on.",
   "lockedSwitch.suspended": "Suspended by Kiro. Refresh the token to check it again.",
-  "filter.search": "Search by email, nickname, notes or tags",
+  "filter.search": "Search email, nickname, notes, tags",
   "filter.status": "Account status",
   "filter.all": "All",
   "filter.quoted": "“{value}”",

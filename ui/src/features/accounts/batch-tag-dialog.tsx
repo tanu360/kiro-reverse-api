@@ -64,6 +64,7 @@ export function BatchTagDialog({
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<BatchTagAction | null>(null);
   const inUse = useMemo(() => tagsInUse(accounts), [accounts]);
+  const shown = picked !== null && draft === picked ? mask(picked) : draft;
 
   const nameOf = (id: string) => {
     const account = accounts.find((item) => item.id === id);
@@ -168,12 +169,13 @@ export function BatchTagDialog({
             autoComplete="off"
             onChange={(event) => {
               setPicked(null);
-              setDraft(event.target.value);
+              // An edit of a masked pick opens the tag itself: the masked text is never a tag.
+              setDraft(shown === draft ? event.target.value : draft);
               if (error) setError(null);
             }}
             ref={inputRef}
             spellCheck={false}
-            value={picked !== null && draft === picked ? mask(picked) : draft}
+            value={shown}
           />
           {error ? <FieldError match>{error}</FieldError> : null}
         </Field>

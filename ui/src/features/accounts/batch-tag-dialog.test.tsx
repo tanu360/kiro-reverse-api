@@ -82,6 +82,20 @@ describe("BatchTagDialog", () => {
     expect(bodies[0]).toEqual({ ids: [first.id], action: "removeTag", tag: "ops@example.com" });
   });
 
+  it("opens the tag itself, not its masked text, when a masked pick is edited", async () => {
+    const [first] = mockDb.accounts;
+    first.tags = ["ops@example.com"];
+    const { user } = renderDialog([first.id]);
+    const dialog = await screen.findByRole("dialog", { name: "Tag 1 account" });
+    const picks = within(dialog).getByRole("group", { name: "Tags in use" });
+    await user.click(within(picks).getByRole("button", { name: /^op\S+@\S+\.com$/ }));
+    const input = within(dialog).getByRole("textbox", { name: "Tag" });
+    await user.type(input, "{Backspace}");
+    expect(input).toHaveValue("ops@example.com");
+    await user.type(input, "{Backspace}");
+    expect(input).toHaveValue("ops@example.co");
+  });
+
   it("names an account that already has the most tags in the result toast", async () => {
     const [full, other] = mockDb.accounts;
     full.tags = Array.from({ length: 10 }, (_, i) => `t${i}`);

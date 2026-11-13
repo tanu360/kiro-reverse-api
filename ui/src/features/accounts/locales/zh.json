@@ -14,7 +14,7 @@
   "openDetails": "打开 {email} 的详情",
   "lockedSwitch.banned": "已被 Kiro 封禁，无法启用。",
   "lockedSwitch.suspended": "已被 Kiro 暂停。刷新 Token 可重新检查。",
-  "filter.search": "按邮箱、昵称、备注或标签搜索",
+  "filter.search": "搜索邮箱、昵称、备注、标签",
   "filter.status": "账号状态",
   "filter.all": "全部",
   "filter.quoted": "“{value}”",
