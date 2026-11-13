@@ -86,10 +86,16 @@ function FilterSelect({
   const { t, lang } = useT("accounts");
   const mask = useMaskText();
   const show = (text: string) => (masked ? mask(text) : text);
-  const current =
+  const allLabel = t("filter.all");
+  const picked =
     value === undefined
-      ? t("filter.all")
+      ? allLabel
       : show(options.find((option) => option.value === value)?.label ?? value);
+  // A value that reads like All (a tag named "All") is quoted, so it never looks unfiltered.
+  const current =
+    value !== undefined && picked.trim().toLowerCase() === allLabel.toLowerCase()
+      ? t("filter.quoted", { value: picked })
+      : picked;
   // Each row shows its count; a pick closes the menu, as in a select.
   return (
     <Menu>

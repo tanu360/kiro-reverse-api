@@ -59,6 +59,8 @@ export function BatchTagDialog({
   const displayEmail = useDisplayEmail();
   const mask = useMaskText();
   const [draft, setDraft] = useState("");
+  // The quick pick in the field: shown masked under privacy (as the chips are) while untouched.
+  const [picked, setPicked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<BatchTagAction | null>(null);
   const inUse = useMemo(() => tagsInUse(accounts), [accounts]);
@@ -114,6 +116,7 @@ export function BatchTagDialog({
         description: describeFailures(results, nameOf, t) || undefined,
       });
       setDraft("");
+      setPicked(null);
       onDone();
     } catch (failure) {
       toast.update(toastId, { type: "error", title: errorMessage(failure, t) });
@@ -164,12 +167,13 @@ export function BatchTagDialog({
           <Input
             autoComplete="off"
             onChange={(event) => {
+              setPicked(null);
               setDraft(event.target.value);
               if (error) setError(null);
             }}
             ref={inputRef}
             spellCheck={false}
-            value={draft}
+            value={picked !== null && draft === picked ? mask(picked) : draft}
           />
           {error ? <FieldError match>{error}</FieldError> : null}
         </Field>
@@ -186,6 +190,7 @@ export function BatchTagDialog({
                     <button
                       onClick={() => {
                         setDraft(tag);
+                        setPicked(tag);
                         setError(null);
                         inputRef.current?.focus();
                       }}

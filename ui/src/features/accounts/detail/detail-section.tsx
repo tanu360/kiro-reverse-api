@@ -37,6 +37,7 @@ export function EditableFieldRow({
   title,
   value,
   mono = false,
+  multiline = false,
   wide = false,
   open,
   onEdit,
@@ -50,6 +51,8 @@ export function EditableFieldRow({
   value: ReactNode;
   /** An ID or a URL: set in mono. */
   mono?: boolean;
+  /** Free text: the read view keeps line breaks (InlineEditRow `multiline`). */
+  multiline?: boolean;
   /** The edit view gives its controls the whole row (InlineEditRow `wide`). */
   wide?: boolean;
   /** The edit view is showing. */
@@ -67,6 +70,7 @@ export function EditableFieldRow({
       editing={open}
       label={title}
       mono={mono}
+      multiline={multiline}
       onCancel={() => onOpenChange(false)}
       onEdit={onEdit}
       onSubmit={onSubmit}

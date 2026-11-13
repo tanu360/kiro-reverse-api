@@ -66,6 +66,22 @@ describe("BatchTagDialog", () => {
     expect(within(dialog).getByRole("textbox", { name: "Tag" })).toHaveValue("team-a");
   });
 
+  it("keeps a picked email tag masked in the field under privacy, and sends it whole", async () => {
+    const bodies = captureBatch();
+    const [first] = mockDb.accounts;
+    first.tags = ["ops@example.com"];
+    const { user } = renderDialog([first.id]);
+    const dialog = await screen.findByRole("dialog", { name: "Tag 1 account" });
+    const picks = within(dialog).getByRole("group", { name: "Tags in use" });
+    await user.click(within(picks).getByRole("button", { name: /^op\S+@\S+\.com$/ }));
+    const input = within(dialog).getByRole("textbox", { name: "Tag" });
+    expect(input).not.toHaveValue("ops@example.com");
+    expect((input as HTMLInputElement).value).toMatch(/^op\S+@\S+\.com$/);
+    await user.click(within(dialog).getByRole("button", { name: "Remove tag" }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ ids: [first.id], action: "removeTag", tag: "ops@example.com" });
+  });
+
   it("names an account that already has the most tags in the result toast", async () => {
     const [full, other] = mockDb.accounts;
     full.tags = Array.from({ length: 10 }, (_, i) => `t${i}`);

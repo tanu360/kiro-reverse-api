@@ -32,6 +32,7 @@ export function NotesRow({ account }: { account: Account }): JSX.Element {
       onSubmit={() => save.mutate({ notes: draft.trim() }, { onSuccess: () => setOpen(false) })}
       open={open}
       saving={save.isPending}
+      multiline
       title={t("metadata.notes")}
       value={mask(account.notes)}
       wide

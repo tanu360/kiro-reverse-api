@@ -147,6 +147,8 @@ export interface InlineEditRowProps {
   placeholder?: string;
   /** An ID or a URL: mono, at the body size of the values around it. */
   mono?: boolean;
+  /** Free text (notes): the read view keeps its line breaks and shows up to six lines. */
+  multiline?: boolean;
   /**
    * The edit view gives the controls the whole row: the label above them at every width, and
    * Save and Cancel under them on phones. For a value longer than the space beside the label
@@ -177,6 +179,7 @@ export function InlineEditRow({
   value,
   placeholder,
   mono = false,
+  multiline = false,
   wide = false,
   editing,
   onEdit,
@@ -265,17 +268,19 @@ export function InlineEditRow({
     <div
       className={cn(
         ROW_GRID,
-        "group/row relative min-h-9 items-center gap-y-0.5 transition-colors hover:bg-accent has-focus-visible:bg-accent max-sm:py-2 sm:pointer-coarse:min-h-10",
+        "group/row relative min-h-9 gap-y-0.5 transition-colors hover:bg-accent has-focus-visible:bg-accent max-sm:py-2 sm:pointer-coarse:min-h-10",
+        multiline ? "items-start sm:py-2" : "items-center",
       )}
       data-slot="inline-edit-row"
     >
       <dt className={ROW_LABEL} id={labelId}>
         {label}
       </dt>
-      <dd className="flex min-w-0 items-center gap-2">
+      <dd className={cn("flex min-w-0 gap-2", multiline ? "items-start" : "items-center")}>
         <span
           className={cn(
-            "min-w-0 flex-1 truncate tabular-nums",
+            "min-w-0 flex-1 tabular-nums",
+            multiline ? "line-clamp-6 whitespace-pre-line break-words" : "truncate",
             empty ? "text-muted-foreground" : mono && "font-mono",
           )}
         >

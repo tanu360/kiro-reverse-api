@@ -96,7 +96,7 @@ describe("AccountsPage", () => {
   it("filters by nickname as the user types", async () => {
     const { table, user } = await renderAccounts();
     await user.type(
-      screen.getByRole("searchbox", { name: "Search by email or nickname" }),
+      screen.getByRole("searchbox", { name: "Search by email, nickname, notes or tags" }),
       "overfl",
     );
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
@@ -198,7 +198,7 @@ describe("AccountsPage", () => {
     expect(await screen.findByText(`${ids.length} selected`)).toBeInTheDocument();
 
     await user.type(
-      screen.getByRole("searchbox", { name: "Search by email or nickname" }),
+      screen.getByRole("searchbox", { name: "Search by email, nickname, notes or tags" }),
       "overfl",
     );
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
@@ -261,7 +261,7 @@ describe("AccountsPage", () => {
     mockServer.use(http.get(apiUrl("/accounts"), () => new Promise<Response>(() => {})));
     await renderApp("/accounts?status=banned&plan=power");
     expect(
-      await screen.findByRole("searchbox", { name: "Search by email or nickname" }),
+      await screen.findByRole("searchbox", { name: "Search by email, nickname, notes or tags" }),
     ).toBeInTheDocument();
     // The tabs hold their place, disabled and without counts, so the table does not shift.
     const tabs = screen.getByRole("tablist", { name: "Account status" });
@@ -491,6 +491,8 @@ describe("AccountsPage tags", () => {
     await user.click(rows[1]);
     await waitFor(() => expect(router.state.location.search).toMatchObject({ tag: "all" }));
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
+    // The picked tag is quoted, so the trigger never reads like the unfiltered state.
+    expect(screen.getByRole("button", { name: "Tag: “All”" })).toBeInTheDocument();
   });
 
   it("masks an email inside a tag in the Tag select under privacy", async () => {
@@ -510,7 +512,7 @@ describe("AccountsPage tags", () => {
     tagFixtures();
     const { table, user } = await renderAccounts();
     await user.type(
-      screen.getByRole("searchbox", { name: "Search by email or nickname" }),
+      screen.getByRole("searchbox", { name: "Search by email, nickname, notes or tags" }),
       "audit",
     );
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
