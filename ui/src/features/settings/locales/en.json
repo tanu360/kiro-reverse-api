@@ -57,6 +57,7 @@
   "selfHeal.more": "Accounts suspended by Kiro, accounts you turned off and accounts waiting for their credits to reset are never touched. An account that fails again after a heal is blocked again.",
   "selfHeal.interval": "Minimum time between heals",
   "selfHeal.intervalHint": "In seconds, from {min} to {max}.",
+  "selfHeal.intervalDuration": "{duration} between heals.",
   "selfHeal.intervalInvalid": "Enter a whole number of seconds from {min} to {max}.",
   "selfHeal.rounds": "Maximum heals without a successful request",
   "selfHeal.roundsHint": "From 0 to {max}. 0 means no limit. After this many heals, the proxy stops healing until a request succeeds or you resume it.",

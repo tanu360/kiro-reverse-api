@@ -3,7 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useId, useState } from "react";
 import { RelativeTime } from "@/components/shared/relative-time";
-import { SettingsRow, SwitchField } from "@/components/shared/settings-rows";
+import { ROW_DESCRIPTION, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError } from "@/components/ui/field";
@@ -25,6 +25,7 @@ import {
   type SelfHealState,
   updateAccountHealth,
 } from "@/lib/api/account-health";
+import { formatDuration } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { useDraft } from "../lib/dirty";
@@ -98,7 +99,7 @@ function inRange(value: number | null, min: number, max: number): value is numbe
 }
 
 function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
-  const { t } = useT("settings");
+  const { t, lang } = useT("settings");
   const queryClient = useQueryClient();
   const intervalId = useId();
   const roundsId = useId();
@@ -119,6 +120,12 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
       },
     },
   );
+
+  // The seconds typed so far as a duration ("5m", "1h 15m"); nothing while they are not valid.
+  const interval = draft.value.minIntervalSec;
+  const intervalText = inRange(interval, SELF_HEAL_INTERVAL_MIN, SELF_HEAL_INTERVAL_MAX)
+    ? formatDuration(interval, lang)
+    : null;
 
   const onSubmit = () => {
     const { enabled, minIntervalSec, maxRounds } = draft.value;
@@ -178,6 +185,11 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
           htmlFor={intervalId}
           title={t("selfHeal.interval")}
         >
+          {intervalText && !intervalInvalid ? (
+            <p className={ROW_DESCRIPTION}>
+              {t("selfHeal.intervalDuration", { duration: intervalText })}
+            </p>
+          ) : null}
           {intervalInvalid ? (
             <FieldError match>
               {t("selfHeal.intervalInvalid", {

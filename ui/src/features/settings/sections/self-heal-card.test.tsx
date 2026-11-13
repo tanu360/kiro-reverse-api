@@ -61,6 +61,26 @@ describe("SelfHealCard", () => {
     expect(within(card).queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
   });
 
+  it("shows the interval as a duration while typing, and nothing for an invalid value", async () => {
+    const { card, user } = await renderCard();
+    expect(within(card).getByText("5m between heals.")).toBeInTheDocument();
+    const interval = within(card).getByLabelText("Minimum time between heals");
+
+    await user.clear(interval);
+    await user.type(interval, "4500");
+    expect(within(card).getByText("1h 15m between heals.")).toBeInTheDocument();
+
+    // Below the minimum, or empty: no duration line.
+    await user.clear(interval);
+    await user.type(interval, "29");
+    expect(within(card).queryByText(/between heals\./)).not.toBeInTheDocument();
+    await user.clear(interval);
+    expect(within(card).queryByText(/between heals\./)).not.toBeInTheDocument();
+
+    await user.type(interval, "86400");
+    expect(within(card).getByText("1d between heals.")).toBeInTheDocument();
+  });
+
   it("marks an out-of-range interval and round cap and sends nothing", async () => {
     const { card, user } = await renderCard();
     const interval = within(card).getByLabelText("Minimum time between heals");
