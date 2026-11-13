@@ -133,6 +133,14 @@ func DescribeProxyFailure(err error) (text string, ok bool) {
 	if errors.As(err, &urlErr) && urlErr.Err != nil {
 		err = urlErr.Err
 	}
+	var expired *connectTimeoutError
+	if errors.As(err, &expired) {
+		return kindText(KindTimeout), true
+	}
+	var outbound *outboundProxyError
+	if errors.As(err, &outbound) {
+		return kindText(classify(outbound.cause)), true
+	}
 	var opErr *net.OpError
 	atProxy := errors.As(err, &opErr) && (opErr.Op == "proxyconnect" || strings.HasPrefix(opErr.Op, "socks"))
 	if !atProxy && !isConnectStatus(err.Error()) {
@@ -163,7 +171,7 @@ var connectTimeout = 15 * time.Second
 type connectTimeoutError struct{ budget time.Duration }
 
 func (e *connectTimeoutError) Error() string {
-	return fmt.Sprintf("no connection through the proxy within %s", e.budget)
+	return fmt.Sprintf("proxy connect timeout: no connection within %s", e.budget)
 }
 
 func (e *connectTimeoutError) Timeout() bool   { return true }
@@ -195,8 +203,49 @@ type instrumentedTransport struct {
 }
 
 func (t *instrumentedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	parent := req.Context()
-	ctx, cancel := context.WithCancelCause(parent)
+	resp, conn, err := roundTripWithin(t.base, req)
+	if err != nil {
+		if conn.ready || (!conn.expired && req.Context().Err() != nil) {
+			return nil, err
+		}
+		var perr *ProxyError
+		if conn.expired {
+			perr = &ProxyError{ProxyID: t.id, Kind: KindTimeout, cause: conn.cause}
+			//! Go keeps dialing after the request gave up (the dial outlives the request);
+			//! this cancels that dial, which a stalled SOCKS handshake would otherwise hold forever.
+			t.CloseIdleConnections()
+		} else {
+			perr = newProxyError(t.id, err)
+		}
+		Default().reportFailure(t.id, t.url, perr)
+		return nil, perr
+	}
+	//! A plain-HTTP request through an HTTP proxy gets the 407 as a response, not a CONNECT error.
+	if resp.StatusCode == http.StatusProxyAuthRequired {
+		resp.Body.Close()
+		perr := &ProxyError{ProxyID: t.id, Kind: KindAuth, cause: errors.New(resp.Status)}
+		Default().reportFailure(t.id, t.url, perr)
+		return nil, perr
+	}
+	if conn.fresh {
+		Default().reportSuccess(t.id, t.url)
+	}
+	return resp, nil
+}
+
+// connectOutcome is how a request's way to its connection went: ready when it got one, fresh
+// when that one was new, expired when connectTimeout ran out first (cause then says so).
+type connectOutcome struct {
+	ready   bool
+	fresh   bool
+	expired bool
+	cause   error
+}
+
+// roundTripWithin runs req on base and cancels it when no connection exists within
+// connectTimeout. A response's body releases the request's context once it is closed.
+func roundTripWithin(base http.RoundTripper, req *http.Request) (*http.Response, connectOutcome, error) {
+	ctx, cancel := context.WithCancelCause(req.Context())
 	var state atomic.Int32
 	var fresh atomic.Bool
 	budget := connectTimeout
@@ -215,38 +264,18 @@ func (t *instrumentedTransport) RoundTrip(req *http.Request) (*http.Response, er
 			}
 		},
 	}
-	resp, err := t.base.RoundTrip(req.WithContext(httptrace.WithClientTrace(ctx, trace)))
+	resp, err := base.RoundTrip(req.WithContext(httptrace.WithClientTrace(ctx, trace)))
 	timer.Stop()
 	if err != nil {
 		cause := context.Cause(ctx)
 		cancel(nil)
 		var expired *connectTimeoutError
-		timedOut := errors.As(cause, &expired)
-		if state.Load() == connReady || (!timedOut && parent.Err() != nil) {
-			return nil, err
-		}
-		var perr *ProxyError
-		if timedOut {
-			perr = &ProxyError{ProxyID: t.id, Kind: KindTimeout, cause: cause}
-			//! Go keeps dialing after the request gave up (the dial outlives the request);
-			//! this cancels that dial, which a stalled SOCKS handshake would otherwise hold forever.
-			t.CloseIdleConnections()
-		} else {
-			perr = newProxyError(t.id, err)
-		}
-		Default().reportFailure(t.id, t.url, perr)
-		return nil, perr
-	}
-	//! A plain-HTTP request through an HTTP proxy gets the 407 as a response, not a CONNECT error.
-	if resp.StatusCode == http.StatusProxyAuthRequired {
-		resp.Body.Close()
-		cancel(nil)
-		perr := &ProxyError{ProxyID: t.id, Kind: KindAuth, cause: errors.New(resp.Status)}
-		Default().reportFailure(t.id, t.url, perr)
-		return nil, perr
-	}
-	if fresh.Load() {
-		Default().reportSuccess(t.id, t.url)
+		return nil, connectOutcome{
+			ready:   state.Load() == connReady,
+			fresh:   fresh.Load(),
+			expired: errors.As(cause, &expired),
+			cause:   cause,
+		}, err
 	}
 	//! The body reads on ctx: it is released when the body is closed, not here.
 	if resp.Body == nil {
@@ -254,8 +283,55 @@ func (t *instrumentedTransport) RoundTrip(req *http.Request) (*http.Response, er
 	} else {
 		resp.Body = &releaseBody{ReadCloser: resp.Body, release: func() { cancel(nil) }}
 	}
-	return resp, nil
+	return resp, connectOutcome{ready: true, fresh: fresh.Load()}, nil
 }
+
+// BoundConnect gives a transport that dials through an outbound proxy outside the pool (an
+// account's own or the global proxy) the pool's connectTimeout: Go gives a CONNECT a full
+// minute and a SOCKS handshake no deadline, so a proxy that accepts and then stalls held every
+// try that long. As for a pool proxy, a failure before the connection exists is the proxy's:
+// DescribeProxyFailure names it, a CONNECT the proxy dropped (Go's bare "unexpected EOF")
+// included. Its text stays Go's, for the server and request logs. Nothing is reported to the pool.
+func BoundConnect(base http.RoundTripper) http.RoundTripper {
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return &boundedTransport{base: base}
+}
+
+type boundedTransport struct {
+	base http.RoundTripper
+}
+
+func (t *boundedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, conn, err := roundTripWithin(t.base, req)
+	if err == nil || conn.ready || (!conn.expired && req.Context().Err() != nil) {
+		return resp, err
+	}
+	if conn.expired {
+		//! As in instrumentedTransport: the dial outlives the request unless this cancels it.
+		t.CloseIdleConnections()
+		return nil, conn.cause
+	}
+	return nil, &outboundProxyError{cause: err}
+}
+
+// outboundProxyError is a request through an own or the global proxy that failed before its
+// connection existed. It reads as its cause.
+type outboundProxyError struct{ cause error }
+
+func (e *outboundProxyError) Error() string { return e.cause.Error() }
+func (e *outboundProxyError) Unwrap() error { return e.cause }
+
+// CloseIdleConnections lets http.Client.CloseIdleConnections reach the wrapped transport.
+func (t *boundedTransport) CloseIdleConnections() {
+	if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
+}
+
+// Unwrap is the wrapped transport.
+func (t *boundedTransport) Unwrap() http.RoundTripper { return t.base }
 
 // releaseBody runs release once the response body is closed.
 type releaseBody struct {

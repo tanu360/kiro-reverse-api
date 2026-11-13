@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"kiro-proxy/config"
@@ -259,4 +260,80 @@ func TestHandleAccountFailureNeverBansOnTransportError(t *testing.T) {
 	if got := config.GetAccounts()[0]; got.Enabled || got.BanStatus == "" {
 		t.Fatalf("a Kiro 403 no longer bans: enabled=%v ban=%q", got.Enabled, got.BanStatus)
 	}
+}
+
+// countingDeadProxy accepts each connection and closes it at once, as a broken proxy does,
+// and counts the connections.
+func countingDeadProxy(t *testing.T) (string, *atomic.Int32) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	var accepted atomic.Int32
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			accepted.Add(1)
+			conn.Close()
+		}
+	}()
+	return "http://" + ln.Addr().String(), &accepted
+}
+
+// An account's own proxy that fails is dialed once per request: each endpoint and each retry
+// of that account dials the same proxy. The request moves to the next account at once, the
+// failed pick gives its RPM start back, and the attempt names the first endpoint.
+func TestOwnProxyFailureMovesToTheNextAccountAtOnce(t *testing.T) {
+	h := newStreamTestHandler(t, func(http.ResponseWriter, *http.Request) {})
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeKiroTextResponse(t, w, "OK")
+	}))
+	t.Cleanup(upstream.Close)
+	old := kiroEndpoints
+	kiroEndpoints = []kiroEndpoint{
+		{URL: upstream.URL + "/generateAssistantResponse", Origin: "AI_EDITOR", Name: "first"},
+		{URL: upstream.URL + "/generateAssistantResponse", Origin: "AI_EDITOR", Name: "second"},
+	}
+	t.Cleanup(func() { kiroEndpoints = old })
+	if err := config.UpdateEndpointFallback(true); err != nil {
+		t.Fatal(err)
+	}
+	kiroHttpStore.Store(upstream.Client())
+	if err := config.AddAccount(config.Account{ID: "next", Enabled: true, AccessToken: "token-next", ProfileArn: "arn:aws:codewhisperer:profile/next"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateRoutingMode(config.RoutingModePriority); err != nil {
+		t.Fatal(err)
+	}
+	proxyURL, accepted := countingDeadProxy(t)
+	t.Cleanup(func() { proxyClientCache.Delete(proxyURL) })
+	acc := setTestAccountProxy(t, h, proxyURL)
+	if acc.ID != "only" {
+		t.Fatalf("setup: own proxy on %s", acc.ID)
+	}
+	clearRPMStarts(h.pool)
+	t.Cleanup(func() { clearRPMStarts(h.pool) })
+	if err := config.UpdateAccountRPMLimit(1); err != nil {
+		t.Fatal(err)
+	}
+	// The pool is shared: an earlier test's cooldown on this id must not skip the account.
+	h.pool.ClearCooldown(acc.ID)
+	h.pool.ClearCooldown("next")
+
+	rec := postClientAPI(h, "/v1/messages", transportPlainBody)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "OK") {
+		t.Fatalf("status %d %s, want the next account's answer", rec.Code, rec.Body.String())
+	}
+	if n := accepted.Load(); n != 1 {
+		t.Fatalf("the dead proxy was dialed %d times, want once", n)
+	}
+	if at := h.pool.AtRPMLimit(); at[acc.ID] || !at["next"] {
+		t.Fatalf("AtRPMLimit = %v: the dead proxy's pick kept its start, or the answer did not count", at)
+	}
+	assertAccountNotBanned(t, acc.ID)
 }

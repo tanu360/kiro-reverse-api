@@ -38,7 +38,7 @@ func newRequestRetryPlan() requestRetryPlan {
 }
 
 func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalAttempts int) bool {
-	if isUpstreamClientError(err) || isNoHealthyProxyError(err) {
+	if isUpstreamClientError(err) || isNoHealthyProxyError(err) || isOutboundProxyFailure(err) {
 		return false
 	}
 	if err == nil || accountAttempt+1 >= rp.maxPerAccount || totalAttempts >= rp.maxPerRequest || isContextCanceledError(err) {
@@ -48,13 +48,19 @@ func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalA
 }
 
 func (rp requestRetryPlan) shouldBackoffBeforeNextAccount(err error, totalAttempts int) bool {
-	if isUpstreamClientError(err) || isNoHealthyProxyError(err) {
+	if isUpstreamClientError(err) || isNoHealthyProxyError(err) || isOutboundProxyFailure(err) {
 		return false
 	}
 	if err == nil || totalAttempts >= rp.maxPerRequest || isContextCanceledError(err) {
 		return false
 	}
 	return isStreamIntegrityError(err) || !isTerminalAccountErrorMessage(err.Error())
+}
+
+// isOutboundProxyFailure is a try that failed at the account's own or the global proxy.
+func isOutboundProxyFailure(err error) bool {
+	_, ok := outboundProxyFailure(err)
+	return ok
 }
 
 func isContextCanceledError(err error) bool {

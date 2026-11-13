@@ -131,7 +131,7 @@ func settleRPMPickFailure(ctx context.Context, account *config.Account, err erro
 		return
 	}
 	//! The same error reading canRetrySameAccount uses: only an attempt it ends gives the start back.
-	if pick.reached || !(isNoHealthyProxyError(err) || isTerminalAccountErrorMessage(err.Error())) {
+	if pick.reached || !(isNoHealthyProxyError(err) || isOutboundProxyFailure(err) || isTerminalAccountErrorMessage(err.Error())) {
 		return
 	}
 	pick.done = true

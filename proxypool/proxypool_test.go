@@ -777,3 +777,97 @@ func TestParseProxyURLNamesBracketedHostPort(t *testing.T) {
 		}
 	}
 }
+
+func TestBoundConnectEndsAStalledOutboundProxy(t *testing.T) {
+	prev := connectTimeout
+	connectTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { connectTimeout = prev })
+	for _, scheme := range []string{"http", "socks5"} {
+		t.Run(scheme, func(t *testing.T) {
+			addr, closed := stallingProxy(t)
+			proxyURL, _ := url.Parse(scheme + "://" + addr)
+			client := &http.Client{Transport: BoundConnect(&http.Transport{Proxy: http.ProxyURL(proxyURL)})}
+
+			start := time.Now()
+			_, err := client.Get("https://kiro.test/generate")
+			if text, ok := DescribeProxyFailure(err); !ok || text != kindText(KindTimeout) {
+				t.Fatalf("stalled proxy: %v, want a proxy timeout", err)
+			}
+			if IsProxyError(err) {
+				t.Fatalf("an own proxy's failure must not read as a pool proxy's: %v", err)
+			}
+			var netErr net.Error
+			if !errors.As(err, &netErr) || !netErr.Timeout() {
+				t.Fatalf("stalled proxy: %v, want a timeout", err)
+			}
+			if took := time.Since(start); took > 5*time.Second {
+				t.Fatalf("the stalled request took %s", took)
+			}
+			select {
+			case <-closed:
+			case <-time.After(5 * time.Second):
+				t.Fatal("the stalled dial was left running")
+			}
+		})
+	}
+}
+
+func TestBoundConnectKeepsAWorkingProxy(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		_, _ = io.WriteString(w, "ok")
+	}))
+	t.Cleanup(upstream.Close)
+	prev := connectTimeout
+	connectTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { connectTimeout = prev })
+
+	// The budget covers the way to the connection only: a slow answer is not cut.
+	resp, err := (&http.Client{Transport: BoundConnect(&http.Transport{})}).Get(upstream.URL)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if string(body) != "ok" {
+		t.Fatalf("body %q", body)
+	}
+}
+
+func TestBoundConnectNamesADroppedConnect(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			conn.Close()
+		}
+	}()
+	proxyURL, _ := url.Parse("http://" + ln.Addr().String())
+	client := &http.Client{Transport: BoundConnect(&http.Transport{Proxy: http.ProxyURL(proxyURL)})}
+
+	// Go returns a bare "unexpected EOF" for a CONNECT the proxy hung up on.
+	_, err = client.Get("https://kiro.test/generate")
+	if text, ok := DescribeProxyFailure(err); !ok || text != kindText(KindConnect) {
+		t.Fatalf("dropped CONNECT: %v, want a proxy failure", err)
+	}
+	if IsProxyError(err) || !strings.Contains(err.Error(), "EOF") {
+		t.Fatalf("the error must keep Go's text and stay out of the pool: %v", err)
+	}
+
+	// A caller that gave up is not the proxy's failure.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://kiro.test/generate", nil)
+	if _, err := client.Do(req); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled request: %v", err)
+	} else if _, ok := DescribeProxyFailure(err); ok {
+		t.Fatalf("a canceled request read as a proxy failure: %v", err)
+	}
+}

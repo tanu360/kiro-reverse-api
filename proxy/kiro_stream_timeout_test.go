@@ -27,7 +27,11 @@ func TestKiroStreamClientHasNoTotalTimeout(t *testing.T) {
 		if client.Timeout != 0 {
 			t.Fatalf("%s stream client has a total timeout %v", name, client.Timeout)
 		}
-		transport, ok := client.Transport.(*http.Transport)
+		base := client.Transport
+		if bounded, isBounded := base.(interface{ Unwrap() http.RoundTripper }); isBounded {
+			base = bounded.Unwrap()
+		}
+		transport, ok := base.(*http.Transport)
 		if !ok || transport.ResponseHeaderTimeout <= 0 {
 			t.Fatalf("%s stream client needs a response header timeout, got %#v", name, client.Transport)
 		}

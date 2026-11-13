@@ -53,3 +53,14 @@ func neverReachedKiro(err error) bool {
 	var opErr *net.OpError
 	return errors.As(err, &opErr) && opErr.Op == "dial"
 }
+
+// outboundProxyFailure names a try that failed at the account's own or the global proxy: its
+// dial, CONNECT, SOCKS handshake or connect deadline. Every endpoint and every retry of the
+// account dial that proxy again, so the request moves on to another account at once. A pool
+// proxy failure is not one: the pool has moved the account to another proxy.
+func outboundProxyFailure(err error) (string, bool) {
+	if err == nil || proxypool.IsProxyError(err) {
+		return "", false
+	}
+	return proxypool.DescribeProxyFailure(err)
+}

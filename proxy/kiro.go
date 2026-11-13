@@ -92,7 +92,7 @@ func GetClientForProxy(proxyURL string) *http.Client {
 	if cached, ok := proxyClientCache.Load(proxyURL); ok {
 		return cached.(*http.Client)
 	}
-	client := newKiroStreamClient(proxyURL)
+	client := boundOutboundProxy(newKiroStreamClient(proxyURL), proxyURL)
 	proxyClientCache.Store(proxyURL, client)
 	return client
 }
@@ -108,10 +108,10 @@ func GetRestClientForProxy(proxyURL string) *http.Client {
 	if cached, ok := proxyClientCache.Load(cacheKey); ok {
 		return cached.(*http.Client)
 	}
-	client := &http.Client{
+	client := boundOutboundProxy(&http.Client{
 		Timeout:   30 * time.Second,
 		Transport: buildKiroTransport(proxyURL),
-	}
+	}, proxyURL)
 	proxyClientCache.Store(cacheKey, client)
 	return client
 }
@@ -124,6 +124,9 @@ func ResolveAccountProxyURL(account *config.Account) string {
 
 func buildKiroTransport(proxyURL string) *http.Transport {
 	t := &http.Transport{
+		//! Go's DefaultTransport bounds: a zero Transport has no dial or TLS handshake deadline.
+		DialContext:         (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		TLSHandshakeTimeout: 10 * time.Second,
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 20,
 		IdleConnTimeout:     90 * time.Second,
@@ -144,13 +147,23 @@ func buildKiroTransport(proxyURL string) *http.Transport {
 }
 
 func InitKiroHttpClient(proxyURL string) {
-	kiroHttpStore.Store(newKiroStreamClient(proxyURL))
+	kiroHttpStore.Store(boundOutboundProxy(newKiroStreamClient(proxyURL), proxyURL))
 
 	restClient := &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: buildKiroTransport(proxyURL),
 	}
-	kiroRestHttpStore.Store(restClient)
+	kiroRestHttpStore.Store(boundOutboundProxy(restClient, proxyURL))
+}
+
+// boundOutboundProxy gives a client that dials through an account's own or the global proxy
+// the pool's deadline for the way to a connection. Without it a proxy that accepts and never
+// answers the CONNECT held each try for Go's full minute before the request could fail over.
+func boundOutboundProxy(client *http.Client, proxyURL string) *http.Client {
+	if proxyURL != "" {
+		client.Transport = proxypool.BoundConnect(client.Transport)
+	}
+	return client
 }
 
 type KiroPayload struct {
@@ -442,6 +455,11 @@ endpointLoop:
 				//! Every endpoint takes the same route, so with no pool proxy up the others fail too.
 				if isNoHealthyProxyError(err) {
 					return noHealthyProxyFailure()
+				}
+				//! Same for an own or global proxy that failed: the next endpoint dials it again.
+				if text, ok := outboundProxyFailure(err); ok {
+					logger.Warnf("[KiroAPI] %s: outbound proxy failed (%s): %v", accountEmailForLog(account), text, err)
+					return err
 				}
 				logger.Warnf("[KiroAPI] Endpoint %s failed: %v", ep.Name, err)
 				if !isRetryableStreamError(err) {
