@@ -6,15 +6,10 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { maskEmail, maskEmailsInText } from "@/lib/privacy";
-import { toastError } from "@/lib/toast";
+import { toast } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 import { inMemoryRequestsHandler } from "./mocks";
 import { formatRowDate } from "./request-model";
-
-vi.mock("@/lib/toast", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/toast")>();
-  return { ...actual, toastError: vi.fn() };
-});
 
 const RECENT_REQUESTS = apiUrl("/observe/recent-requests");
 
@@ -59,7 +54,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.mocked(toastError).mockClear();
+  vi.restoreAllMocks();
 });
 
 describe("RequestsPage", () => {
@@ -543,11 +538,14 @@ describe("RequestsPage", () => {
         fail ? HttpResponse.json({ error: "database is locked" }, { status: 500 }) : undefined,
       ),
     );
+    const errorToast = vi.spyOn(toast, "error");
     const { user } = await renderApp("/requests");
     await waitForRows();
     fail = true;
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(errorToast).toHaveBeenCalledTimes(1));
+    // The list's own news: never copied into an open detail sheet (modal-notice.tsx).
+    expect(errorToast.mock.calls[0]?.[1]).toEqual({ background: true });
     expect(bodyRows()).toHaveLength(25);
   });
 });

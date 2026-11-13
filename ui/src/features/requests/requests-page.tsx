@@ -12,9 +12,10 @@ import { PageHeader, RefreshButton } from "@/components/shared/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { recentRequestsQuery, requestCountsQuery } from "@/lib/api/requests";
+import { errorMessage } from "@/lib/api/server-errors";
 import type { RequestRecord } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { toastError } from "@/lib/toast";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { RequestSort, RequestsSearch } from "@/routes/-search";
 import { RequestDetailSheet } from "./request-detail-sheet";
@@ -76,14 +77,15 @@ export function RequestsPage(): JSX.Element {
     }
   }, [urlSearch.search, updateSearch]);
 
-  // A failed refetch keeps the rows on screen and reports the failure in a toast.
+  // A failed refetch keeps the rows on screen and reports the failure in a toast; it is the
+  // page's own news, never copied into an open detail sheet.
   const { data, error, errorUpdatedAt, isError } = query;
   const hasData = data !== undefined;
   const toastedAt = useRef(0);
   useEffect(() => {
     if (!isError || !hasData || errorUpdatedAt === toastedAt.current) return;
     toastedAt.current = errorUpdatedAt;
-    toastError(error, t);
+    toast.error(errorMessage(error, t), { background: true });
   }, [isError, hasData, error, errorUpdatedAt, t]);
 
   const rows = data?.requests ?? [];

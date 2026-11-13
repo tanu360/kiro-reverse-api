@@ -36,6 +36,7 @@ export function AccountHealNotices(): null {
         toast.warning(t("selfHeal.toastHalted"), {
           id: HALTED_TOAST_ID,
           duration: 0,
+          background: true,
           action: {
             label: t("selfHeal.open"),
             onClick: () => void navigate({ to: "/settings", hash: SECTION_ID.selfHeal }),

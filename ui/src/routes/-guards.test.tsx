@@ -144,7 +144,10 @@ describe("route guards", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
     expect(router.state.location.search).toEqual({ redirect: "/accounts" });
     expect(toast.warning).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(toast.warning).mock.calls[0]?.[1]).toEqual({ id: "session-expired" });
+    expect(vi.mocked(toast.warning).mock.calls[0]?.[1]).toEqual({
+      id: "session-expired",
+      background: true,
+    });
   });
 
   it("does not move on a password change", async () => {

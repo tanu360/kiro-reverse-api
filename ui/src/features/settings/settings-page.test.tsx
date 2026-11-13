@@ -452,6 +452,56 @@ describe("SettingsPage", () => {
       expect(await writes()).toEqual([]);
     });
 
+    it("refuses a host with a port or a space in the field, as the server would", async () => {
+      const { user } = await renderPage();
+      const dialog = await openEditor(user);
+      const host = within(dialog).getByLabelText("Host");
+      const port = within(dialog).getByLabelText("Port");
+
+      await user.clear(host);
+      await user.type(host, "1.2.3.4:8080");
+      await user.clear(port);
+      await user.type(port, "9");
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(
+        within(dialog).getByText("Put the port in the Port field, not after the host."),
+      ).toBeInTheDocument();
+
+      await user.clear(host);
+      await user.type(host, "exa mple.com");
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(
+        within(dialog).getByText("Enter a host name or IP address with no spaces or slashes."),
+      ).toBeInTheDocument();
+      expect(await writes()).toEqual([]);
+    });
+
+    it("shows the server's refusal in the dialog, not only in a toast under it", async () => {
+      mockServer.use(
+        http.post(apiUrl("/proxy"), () =>
+          HttpResponse.json(
+            { error: "invalid proxy: url needs a port", code: "proxy_url_invalid" },
+            { status: 400 },
+          ),
+        ),
+      );
+      const { user } = await renderPage();
+      const dialog = await openEditor(user);
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+      const notice = await within(dialog).findByRole("alert");
+      expect(notice).toHaveTextContent(
+        "Could not save settings: The proxy URL needs a host and a port from 1 to 65535",
+      );
+      // Over the dialog's buttons, and gone once the form changes.
+      expect(
+        notice.compareDocumentPosition(within(dialog).getByRole("button", { name: "Save" })) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      await user.type(within(dialog).getByLabelText("Host"), "x");
+      expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+    });
+
     it("sends the encoded URL from the editor and shows the new route", async () => {
       const { user } = await renderPage();
       const card = section(SECTION_ID.outboundProxy);

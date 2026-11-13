@@ -111,3 +111,91 @@ export function buildProxyUrl(model: ProxyModel): string {
   const host = rawHost.includes(":") && !rawHost.startsWith("[") ? `[${rawHost}]` : rawHost;
   return `${scheme}://${auth}${host}:${model.port.trim()}`;
 }
+
+// ---------------------------------------------------------------------------
+// Validation: the server's rules (proxypool.ValidateOutboundURL, parseProxyURL), shared by the
+// outbound proxy dialog, the proxy pool editor and an account's own proxy field.
+// ---------------------------------------------------------------------------
+
+/** What is wrong with a typed proxy host: none given, a port after it, or not a host at all. */
+export type ProxyHostProblem = "missing" | "port" | "invalid";
+
+/**
+ * An IPv6 address, with an optional %zone, by the URL parser's own rules (as Go's ParseIP):
+ * "::1" is one, "1.2.3.4:8080:9" is a host with two ports.
+ */
+function isIPv6(host: string): boolean {
+  const address = host.split("%", 1)[0];
+  if (!/^[0-9a-f:.]+$/i.test(address) || !address.includes(":")) return false;
+  try {
+    new URL(`http://[${address}]/`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks a host as typed into a proxy form (an IPv6 address without brackets), as the server's
+ * URL parser does: it is required, has no space, slash, ?, #, @, % or bracket, and holds no
+ * port ("1.2.3.4:8080" with the port typed after it). An IPv6 address keeps its colons and zone.
+ */
+export function proxyHostProblem(host: string): ProxyHostProblem | null {
+  const value = host.trim();
+  if (value === "") return "missing";
+  if (isIPv6(value)) return null;
+  if (/[\s/?#@%[\]]/.test(value)) return "invalid";
+  return value.includes(":") ? "port" : null;
+}
+
+/** Digits only, from 1 to 65535. */
+export function isValidProxyPort(port: string): boolean {
+  const value = Number(port);
+  return /^\d+$/.test(port) && value >= 1 && value <= 65535;
+}
+
+const PROXY_URL_PATTERN = /^(socks5|socks5h|http|https):\/\/([^/?#]*)\/?$/i;
+
+/**
+ * Empty (no proxy of its own) or a socks5, socks5h, http or https URL with a host (checked as
+ * proxyHostProblem does) and a port from 1 to 65535; http and https may leave the port out.
+ * "http://", port 99999, a space, a path or a host with a second port are refused, as the
+ * server refuses them.
+ */
+export function isValidProxyUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === "") return true;
+  if (/\s/.test(trimmed)) return false;
+  const match = PROXY_URL_PATTERN.exec(trimmed);
+  if (!match) return false;
+  const scheme = match[1].toLowerCase();
+  const authority = match[2];
+  const hostPort = authority.slice(authority.lastIndexOf("@") + 1);
+  let host: string;
+  let port = "";
+  if (hostPort.startsWith("[")) {
+    const close = hostPort.indexOf("]");
+    if (close < 0) return false;
+    host = hostPort.slice(1, close);
+    // Brackets hold an IPv6 address; a bracketed "1.2.3.4:8080" is a host with a port.
+    if (!isIPv6(host)) return false;
+    const rest = hostPort.slice(close + 1);
+    if (rest !== "" && !rest.startsWith(":")) return false;
+    port = rest.slice(1);
+  } else {
+    const parts = hostPort.split(":");
+    if (parts.length > 2) return false;
+    host = parts[0];
+    port = parts[1] ?? "";
+  }
+  if (proxyHostProblem(host) !== null) return false;
+  if (port === "") return !scheme.startsWith("socks5");
+  return isValidProxyPort(port);
+}
+
+/** The message under the Host field for each ProxyHostProblem. */
+export const PROXY_HOST_PROBLEM_KEYS: Readonly<Record<ProxyHostProblem, string>> = {
+  missing: "settings:proxyHostRequired",
+  port: "settings:proxyHostHasPort",
+  invalid: "settings:proxyHostInvalid",
+};

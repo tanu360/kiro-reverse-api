@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildProxyUrl, parseProxyUrl } from "./proxy-url";
+import {
+  buildProxyUrl,
+  isValidProxyPort,
+  isValidProxyUrl,
+  parseProxyUrl,
+  proxyHostProblem,
+} from "./proxy-url";
 
 describe("parseProxyUrl", () => {
   it("keeps socks5h and decodes the credentials", () => {
@@ -90,5 +96,56 @@ describe("buildProxyUrl", () => {
 
   it("does not bracket an already bracketed IPv6 host twice", () => {
     expect(buildProxyUrl({ ...base, host: "[fe80::1]" })).toBe("socks5://[fe80::1]:1080");
+  });
+});
+
+describe("proxyHostProblem", () => {
+  it("needs a host", () => {
+    expect(proxyHostProblem("")).toBe("missing");
+    expect(proxyHostProblem("   ")).toBe("missing");
+  });
+
+  it("refuses a port typed after the host, as the server does", () => {
+    expect(proxyHostProblem("1.2.3.4:8080")).toBe("port");
+    expect(proxyHostProblem("proxy.local:1080")).toBe("port");
+    expect(proxyHostProblem("1.2.3.4:8080:9")).toBe("port");
+  });
+
+  it("refuses a space, a slash, a query, an @, a % or brackets", () => {
+    expect(proxyHostProblem("exa mple.com")).toBe("invalid");
+    expect(proxyHostProblem("exa%mple.com")).toBe("invalid");
+    expect(proxyHostProblem("user@proxy.local")).toBe("invalid");
+    expect(proxyHostProblem("proxy.local/path")).toBe("invalid");
+    expect(proxyHostProblem("proxy.local?x")).toBe("invalid");
+    expect(proxyHostProblem("[::1]")).toBe("invalid");
+  });
+
+  it("keeps the colons of an IPv6 address", () => {
+    expect(proxyHostProblem("::1")).toBeNull();
+    expect(proxyHostProblem("fe80::1%eth0")).toBeNull();
+    expect(proxyHostProblem("2001:db8::8a2e:370:7334")).toBeNull();
+    expect(proxyHostProblem(" proxy.example.com ")).toBeNull();
+  });
+
+  it("agrees with the URL check on what the dialog builds", () => {
+    for (const host of ["1.2.3.4:8080", "exa mple.com", "proxy.local/path", ""]) {
+      const url = buildProxyUrl({ ...parseProxyUrl("socks5://h:1"), host, port: "9" });
+      expect(isValidProxyUrl(url), host).toBe(false);
+    }
+    for (const host of ["proxy.example.com", "10.0.0.1", "::1"]) {
+      const url = buildProxyUrl({ ...parseProxyUrl("socks5://h:1"), host, port: "9" });
+      expect(isValidProxyUrl(url), host).toBe(true);
+    }
+  });
+});
+
+describe("isValidProxyPort", () => {
+  it("takes 1 to 65535, digits only", () => {
+    expect(isValidProxyPort("1")).toBe(true);
+    expect(isValidProxyPort("65535")).toBe(true);
+    expect(isValidProxyPort("0")).toBe(false);
+    expect(isValidProxyPort("65536")).toBe(false);
+    expect(isValidProxyPort("")).toBe(false);
+    expect(isValidProxyPort("80a")).toBe(false);
   });
 });

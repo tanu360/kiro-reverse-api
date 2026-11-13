@@ -43,7 +43,15 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { proxyQuery, updateProxyConfig } from "@/lib/api/settings";
 import type { ProxyConfig } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import { buildProxyUrl, type ProxyModel, parseProxyUrl, schemeForType } from "../lib/proxy-url";
+import {
+  buildProxyUrl,
+  isValidProxyPort,
+  PROXY_HOST_PROBLEM_KEYS,
+  type ProxyModel,
+  parseProxyUrl,
+  proxyHostProblem,
+  schemeForType,
+} from "../lib/proxy-url";
 import { SECTION_ID } from "./sections";
 import { fillNodes, SectionQuery, SettingsGroup, useSectionSave } from "./settings-section";
 
@@ -70,11 +78,6 @@ function withKind(model: ProxyModel, kind: ProxyKind): ProxyModel {
 }
 
 const PASTE_EXAMPLE = "socks5://user:pass@host:1080";
-
-function validPort(port: string): boolean {
-  const value = Number(port);
-  return /^\d+$/.test(port) && value >= 1 && value <= 65535;
-}
 
 /** `host:port`, an IPv6 host in brackets. */
 function address(model: ProxyModel): string {
@@ -241,8 +244,11 @@ function ProxyEditor({
 
   const kind = kindOf(model);
   const kindHint = KINDS.find((item) => item.value === kind)?.hint ?? "proxySocks5Hint";
-  const hostInvalid = addressError && !model.host.trim();
-  const portInvalid = addressError && !validPort(model.port.trim());
+  // The server's checks (proxy-url.ts): a host without a port or a space, a port in range.
+  const hostProblem = proxyHostProblem(model.host);
+  const portValid = isValidProxyPort(model.port.trim());
+  const hostInvalid = addressError && hostProblem !== null;
+  const portInvalid = addressError && !portValid;
   const tipId = `${id}-address-tip`;
 
   return (
@@ -253,7 +259,7 @@ function ProxyEditor({
         onSubmit={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (!model.host.trim() || !validPort(model.port.trim())) {
+          if (hostProblem !== null || !portValid) {
             setAddressError(true);
             return;
           }
@@ -299,7 +305,9 @@ function ProxyEditor({
                 spellCheck={false}
                 value={model.host}
               />
-              {hostInvalid ? <FieldError match>{t("proxyHostRequired")}</FieldError> : null}
+              {hostInvalid && hostProblem ? (
+                <FieldError match>{t(PROXY_HOST_PROBLEM_KEYS[hostProblem])}</FieldError>
+              ) : null}
             </Field>
             <Field className="min-w-0 items-stretch" invalid={portInvalid}>
               <FieldLabel>{t("proxyPort")}</FieldLabel>

@@ -1,4 +1,11 @@
-import { buildProxyUrl, type ProxyModel, parseProxyUrl } from "@/features/settings/lib/proxy-url";
+import {
+  buildProxyUrl,
+  isValidProxyPort,
+  type ProxyHostProblem,
+  type ProxyModel,
+  parseProxyUrl,
+  proxyHostProblem,
+} from "@/features/settings/lib/proxy-url";
 import type {
   PoolProxy,
   PoolProxyInput,
@@ -71,30 +78,25 @@ export function editorModel(proxy?: PoolProxy): EditorModel {
 }
 
 export interface EditorErrors {
-  host: boolean;
-  /** The host holds a port (host:port typed in one field); IPv6 hosts have more colons. */
-  hostPort: boolean;
+  /**
+   * What the server would refuse in the host (proxyHostProblem): none given, a port typed after
+   * it (an IPv6 host keeps its colons), or a space or slash.
+   */
+  host: ProxyHostProblem | null;
   port: boolean;
   label: boolean;
 }
 
-function validPort(port: string): boolean {
-  const value = Number(port);
-  return /^\d+$/.test(port) && value >= 1 && value <= 65535;
-}
-
 export function editorErrors(model: EditorModel): EditorErrors {
-  const host = model.proxy.host.trim();
   return {
-    host: host === "",
-    hostPort: host.split(":").length === 2,
-    port: !validPort(model.proxy.port.trim()),
+    host: proxyHostProblem(model.proxy.host),
+    port: !isValidProxyPort(model.proxy.port.trim()),
     label: [...model.label.trim()].length > MAX_LABEL,
   };
 }
 
 export function hasErrors(errors: EditorErrors): boolean {
-  return errors.host || errors.hostPort || errors.port || errors.label;
+  return errors.host !== null || errors.port || errors.label;
 }
 
 /**

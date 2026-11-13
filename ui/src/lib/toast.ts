@@ -1,3 +1,4 @@
+import { type ModalNoticeSlot, openModalSlot, showInOpenModal } from "@/components/ui/modal-notice";
 import { toastManager as manager } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { TFunction } from "@/lib/i18n";
@@ -14,6 +15,11 @@ interface ToastOptions {
    * syncToastPath).
    */
   hideOnPath?: string;
+  /**
+   * Raised by work in the background (a poll, a refetch, the server's events, the session
+   * timer), not by something done in an open dialog or sheet: it is never copied into one.
+   */
+  background?: boolean;
 }
 
 type ToastType = "success" | "error" | "warning" | "info" | "loading";
@@ -39,6 +45,12 @@ function toastType(type: ToastType): "error" | "warning" | "loading" | undefined
 }
 
 let idSeed = 0;
+
+/**
+ * The modal open when each loading toast started, by id: its error, when it settles, belongs in
+ * that modal if it is still the open one (see update).
+ */
+const loadingOrigins = new Map<string, ModalNoticeSlot | undefined>();
 
 /** Open toasts that close on a path (ToastOptions.hideOnPath), by id. */
 const pathToasts = new Map<string, { path: string }>();
@@ -83,6 +95,13 @@ function show(type: ToastType, title: string, options: ToastOptions = {}): strin
       if (pathToasts.get(id) === entry) pathToasts.delete(id);
     };
   }
+  // Under an open modal the toast cannot be read (components/ui/modal-notice.tsx): an error or
+  // warning also shows in the modal itself.
+  if ((type === "error" || type === "warning") && !options.background) {
+    showInOpenModal({ type, title, description: options.description });
+  }
+  if (type === "loading") loadingOrigins.set(id, openModalSlot());
+  else loadingOrigins.delete(id);
   manager.add({
     id,
     type: toastType(type),
@@ -109,6 +128,12 @@ function update(
   id: string,
   next: { type: SettledType; title: string; description?: string; duration?: number },
 ): void {
+  const origin = loadingOrigins.get(id);
+  loadingOrigins.delete(id);
+  // A failure shows in the modal it started in, while that modal is still the open one.
+  if ((next.type === "error" || next.type === "warning") && origin && origin === openModalSlot()) {
+    origin.show({ type: next.type, title: next.title, description: next.description });
+  }
   // `type` is always set, even to undefined, so a settled loading toast drops its spinner.
   manager.update(id, {
     type: toastType(next.type),
@@ -139,6 +164,7 @@ export const toast: {
   loading: (title, options) => show("loading", title, options),
   update,
   dismiss(id) {
+    if (id) loadingOrigins.delete(id);
     manager.close(id);
   },
 };

@@ -50,7 +50,10 @@ function useSessionRedirects(): void {
     () =>
       subscribeSession((_session, reason) => {
         if (reason === "expired") {
-          toast.warning(tRef.current("errors:sessionExpired"), { id: "session-expired" });
+          toast.warning(tRef.current("errors:sessionExpired"), {
+            id: "session-expired",
+            background: true,
+          });
           const location = router.state.location;
           void router.navigate({
             to: "/login",
