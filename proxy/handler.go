@@ -1112,9 +1112,16 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			var thinkingSource thinkingStreamSource
 			var thinkingStarted bool
 			var eventThinkingOpen bool
+			var sawVisibleText bool
 
 			sendText := func(text string, thinkingState int) {
 				if thinkingState == 0 {
+					//! Kiro leaves "\n\n" after the closing thinking tag. The non-stream answer
+					//! trims it, so the streamed one drops what comes before its first visible text.
+					if !sawVisibleText {
+						text = strings.TrimLeft(text, " \t\r\n")
+						sawVisibleText = text != ""
+					}
 					if text == "" {
 						return
 					}
@@ -1889,11 +1896,17 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			var thinkingSource thinkingStreamSource
 			var thinkingStarted bool
 			var eventThinkingOpen bool
+			var sawVisibleText bool
 			responseStarted := false
 
 			sendChunk := func(content string, thinkingState int) {
 				if content == "" && thinkingState == 2 {
 					return
+				}
+				//! As in the Claude stream: no "\n\n" left by a thinking block before the answer.
+				if thinkingState == 0 && !sawVisibleText {
+					content = strings.TrimLeft(content, " \t\r\n")
+					sawVisibleText = content != ""
 				}
 
 				var chunk map[string]interface{}
