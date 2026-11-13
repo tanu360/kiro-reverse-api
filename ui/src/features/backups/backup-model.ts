@@ -17,7 +17,7 @@ const RESTORE_PREFIX = "auto before restore ";
 const SCHEDULED_NOTE = /^auto-(hourly|daily|weekly)$/;
 /** The note of the backup a duplicate merge saves first (proxy/account_dedup.go). */
 const MERGE_NOTE = "before merging duplicate accounts";
-/** The kind the UI gives that backup. */
+/** That backup's kind. Older versions saved it as "auto" with the note above. */
 const MERGE_KIND = "pre-merge";
 
 type BackupTone = "primary" | "neutral" | "warning";
@@ -96,9 +96,9 @@ const KIND_KEYS: Record<string, string> = {
 };
 
 /**
- * The kind a row shows. The server files the backup a duplicate merge saves first as "auto" with
- * a fixed note, so that backup (old or new, from any server version) shows its own kind,
- * "Before merge", instead of "Before save". Every other row keeps the server's kind.
+ * The kind a row shows. The server files the backup a duplicate merge saves first as
+ * "pre-merge"; older versions filed it as "auto" with a fixed note, so such a row also shows
+ * "Before merge" instead of "Before save". Every other row keeps the server's kind.
  */
 export function backupKind(entry: Pick<BackupEntry, "kind" | "note">): string {
   if (entry.kind === "auto" && (entry.note ?? "").trim() === MERGE_NOTE) return MERGE_KIND;
@@ -148,7 +148,7 @@ export function noteText(
       return t("noteBeforeRestore", { id: mask(note.slice(RESTORE_PREFIX.length)) });
     }
   }
-  if (entry.kind === "auto" && note === MERGE_NOTE) return t("noteBeforeMerge");
+  if (backupKind(entry) === MERGE_KIND && note === MERGE_NOTE) return t("noteBeforeMerge");
   if (entry.kind === "scheduled") {
     const match = SCHEDULED_NOTE.exec(note);
     if (match) return t("noteScheduled", { cadence: cadenceLabel(match[1] as BackupCadence, t) });

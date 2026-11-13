@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -312,12 +313,43 @@ func TestApiMergeDuplicateAccountsMovesHistoryAndSumsCounters(t *testing.T) {
 	}
 	found := false
 	for _, b := range backups {
-		if b.Kind == "auto" && b.Note == "before merging duplicate accounts" && b.AccountCnt == 3 {
+		if b.Kind == "pre-merge" && b.Note == "before merging duplicate accounts" && b.AccountCnt == 3 {
 			found = true
 		}
 	}
 	if !found {
 		t.Fatalf("no pre-merge backup with the 3 accounts: %+v", backups)
+	}
+
+	// The restore point outlives the automatic backups that only the newest 20 of are kept.
+	for i := 0; i < 25; i++ {
+		if _, err := config.CreateBackup("auto", ""); err != nil {
+			t.Fatalf("auto backup %d: %v", i, err)
+		}
+	}
+	backups, err = config.ListBackups(true)
+	if err != nil {
+		t.Fatalf("list backups: %v", err)
+	}
+	autos, merges := 0, 0
+	for _, b := range backups {
+		switch b.Kind {
+		case "auto":
+			autos++
+		case "pre-merge":
+			merges++
+		}
+	}
+	if autos != 20 || merges != 1 {
+		t.Fatalf("after 25 auto backups: %d auto, %d pre-merge; want 20 and 1", autos, merges)
+	}
+	// It is listed without autoInclude too, like a rollback point.
+	listed, err := config.ListBackups(false)
+	if err != nil {
+		t.Fatalf("list backups: %v", err)
+	}
+	if !slices.ContainsFunc(listed, func(b config.BackupEntry) bool { return b.Kind == "pre-merge" }) {
+		t.Fatalf("pre-merge backup missing from the default list: %+v", listed)
 	}
 }
 

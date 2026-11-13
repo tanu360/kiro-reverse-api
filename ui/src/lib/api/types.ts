@@ -1213,7 +1213,13 @@ export type PromptFilterUpdate = Partial<PromptFilterConfig>;
 // Backups
 // ---------------------------------------------------------------------------
 
-export type BackupKind = "manual" | "scheduled" | "auto" | "pre-restore" | (string & {});
+export type BackupKind =
+  | "manual"
+  | "scheduled"
+  | "auto"
+  | "pre-restore"
+  | "pre-merge"
+  | (string & {});
 export interface BackupEntry {
   id: string;
   /** unix seconds */

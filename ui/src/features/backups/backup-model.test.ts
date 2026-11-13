@@ -57,6 +57,10 @@ describe("noteText", () => {
     const merge = entry({ kind: "auto", note: "before merging duplicate accounts" });
     expect(noteText(merge, t)).toBe("Before merging duplicate accounts");
     expect(noteText(merge, tFor("zh"))).toBe("合并重复账号之前");
+    // The server now saves it with its own kind; the note reads the same.
+    const current = entry({ kind: "pre-merge", note: "before merging duplicate accounts" });
+    expect(noteText(current, t)).toBe("Before merging duplicate accounts");
+    expect(noteText(current, tFor("vi"))).not.toBe("before merging duplicate accounts");
   });
 
   it("labels the server note of a scheduled backup", () => {
@@ -98,6 +102,10 @@ describe("kindLabel and kindTone", () => {
   it("gives the backup a duplicate merge saves first its own kind, old rows too", () => {
     const merge = entry({ kind: "auto", note: "before merging duplicate accounts" });
     expect(backupKind(merge)).toBe("pre-merge");
+    // The server now saves it with that kind.
+    const current = entry({ kind: "pre-merge", note: "before merging duplicate accounts" });
+    expect(backupKind(current)).toBe("pre-merge");
+    expect(kindLabel(backupKind(current), t)).toBe("Before merge");
     expect(kindLabel(backupKind(merge), t)).toBe("Before merge");
     expect(kindLabel(backupKind(merge), tFor("zh"))).toBe("合并前");
     expect(kindTone(backupKind(merge))).toBe("neutral");

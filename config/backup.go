@@ -15,6 +15,10 @@ import (
 	"kiro-proxy/db"
 )
 
+// BackupKindPreMerge is the kind of the backup a duplicate-account merge saves first. Like a
+// "pre-restore" backup it is never pruned by count.
+const BackupKindPreMerge = "pre-merge"
+
 const (
 	maxAutoKeep       = 20
 	defaultManualKeep = 100

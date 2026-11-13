@@ -159,8 +159,10 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 	}
 
 	//! A merge deletes accounts and their secrets, so it never runs without a restore point.
-	//! The Backups page translates this note by its exact text (MERGE_NOTE in backup-model.ts).
-	if _, err := config.CreateBackup("auto", "before merging duplicate accounts"); err != nil {
+	//! Its own kind keeps it out of the pruning of the newest-20 "auto" backups, like a
+	//! "pre-restore" one. Older versions wrote kind "auto" with this note; the Backups page
+	//! labels both "Before merge" (backupKind in backup-model.ts).
+	if _, err := config.CreateBackup(config.BackupKindPreMerge, "before merging duplicate accounts"); err != nil {
 		writeAdminErr(w, http.StatusInternalServerError, fmt.Errorf("could not back up before the merge: %w", err), "")
 		return
 	}
