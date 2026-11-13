@@ -95,7 +95,8 @@ func (h *Handler) authenticateForClaudeWithRequestLog(w http.ResponseWriter, r *
 			ae = newAuthError(http.StatusUnauthorized, "authentication_error", err.Error())
 		}
 		if recordRequest {
-			recordFinalRequestWithAPIKey(r.Context(), "", extractProvidedKey(r), nil, "", 0, 0, 0, false, ae.status, ae.message)
+			provided := extractProvidedKey(r)
+			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, "", 0, 0, 0, false, ae.status, ae.message)
 		}
 		h.sendClaudeError(w, ae.status, ae.code, ae.message)
 		return nil
@@ -119,7 +120,8 @@ func (h *Handler) authenticateForOpenAIWithRequestLog(w http.ResponseWriter, r *
 			ae = newAuthError(http.StatusUnauthorized, "authentication_error", err.Error())
 		}
 		if recordRequest {
-			recordFinalRequestWithAPIKey(r.Context(), "", extractProvidedKey(r), nil, "", 0, 0, 0, false, ae.status, ae.message)
+			provided := extractProvidedKey(r)
+			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, "", 0, 0, 0, false, ae.status, ae.message)
 		}
 		h.sendOpenAIError(w, ae.status, ae.code, ae.message)
 		return nil

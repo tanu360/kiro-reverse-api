@@ -121,6 +121,19 @@ const (
 	usageSlotUnknown = -3
 )
 
+// rejectedKeyID is the ID of the configured key a refused request sent (one
+// that is disabled or over a limit), so the request stays with that key when
+// it is regenerated later. A value that names no key gives "".
+func rejectedKeyID(provided string) string {
+	if provided == "" {
+		return ""
+	}
+	if entry := config.FindApiKeyByValue(provided); entry != nil {
+		return entry.ID
+	}
+	return ""
+}
+
 // queryApiKeyUsage buckets the request log of [from, to) by key. Buckets start at the viewer's
 // local hour or midnight (tzOffsetMin), the last one is the current, partial bucket, and every
 // series is dense: one value per bucket, zero where nothing happened. Raw key values are only
@@ -175,7 +188,6 @@ CASE
  WHEN api_key = '' THEN `+strconv.Itoa(usageSlotNoKey)+slotCases.String()+`
  ELSE `+strconv.Itoa(usageSlotUnknown)+`
 END AS slot,
-MAX(CASE WHEN api_key_id <> '' THEN api_key ELSE '' END),
 COUNT(*),
 COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0),
 COALESCE(SUM(in_tokens), 0),
@@ -206,13 +218,12 @@ GROUP BY b, api_key_id, slot`, args...)
 
 	for rows.Next() {
 		var (
-			bucket   int64
-			keyID    string
-			slot     int
-			storedAs string
-			t        apiKeyUsageTotals
+			bucket int64
+			keyID  string
+			slot   int
+			t      apiKeyUsageTotals
 		)
-		if err := rows.Scan(&bucket, &keyID, &slot, &storedAs, &t.Requests, &t.Succeeded, &t.InTokens, &t.OutTokens, &t.Credits); err != nil {
+		if err := rows.Scan(&bucket, &keyID, &slot, &t.Requests, &t.Succeeded, &t.InTokens, &t.OutTokens, &t.Credits); err != nil {
 			return resp, err
 		}
 		idx := bucket - first
@@ -229,9 +240,6 @@ GROUP BY b, api_key_id, slot`, args...)
 				e = entryFor(keys[i].ID, usageKindKey)
 			} else {
 				e = entryFor(keyID, usageKindDeleted)
-				if e.KeyMasked == "" && storedAs != "" {
-					e.KeyMasked = config.MaskApiKey(storedAs)
-				}
 			}
 		case slot >= 0 && slot < len(keys):
 			e = entryFor(keys[slot].ID, usageKindKey)
@@ -249,10 +257,17 @@ GROUP BY b, api_key_id, slot`, args...)
 	}
 
 	for _, e := range entries {
-		if e.Kind == usageKindKey {
+		switch e.Kind {
+		case usageKindKey:
 			key := keys[byID[e.ID]]
 			e.Name = key.Name
 			e.KeyMasked = config.MaskApiKey(key.Key)
+		case usageKindDeleted:
+			//! The value it last sent: a key regenerated before it was deleted sent several.
+			var last string
+			if err := d.QueryRow(`SELECT api_key FROM requests WHERE api_key_id = ? AND api_key <> '' AND ts >= ? AND ts < ? ORDER BY ts DESC, id DESC LIMIT 1`, e.ID, from, to).Scan(&last); err == nil {
+				e.KeyMasked = config.MaskApiKey(last)
+			}
 		}
 		resp.Keys = append(resp.Keys, *e)
 	}

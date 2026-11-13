@@ -186,6 +186,7 @@ export function ApiKeyUsageSheet({
                 secondary={series.secondary}
                 status={loading ? "loading" : "ready"}
                 tzOffset={data?.tzOffset ?? 0}
+                wholeNumbers={metric !== "credits"}
               />
             </Suspense>
           </div>

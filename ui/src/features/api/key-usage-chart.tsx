@@ -2,7 +2,7 @@ import { type JSX, useId, useMemo } from "react";
 import { Bar } from "@/components/charts/bar";
 import { BarChart } from "@/components/charts/bar-chart";
 import { BarXAxis } from "@/components/charts/bar-x-axis";
-import { useChartStable } from "@/components/charts/chart-context";
+import { useChartStable, useSettledYScale } from "@/components/charts/chart-context";
 import { ChartTooltip, TooltipContent, type TooltipRow } from "@/components/charts/tooltip";
 import { YAxis } from "@/components/charts/y-axis";
 import { TRACK_COLOR } from "@/features/overview/colors";
@@ -68,6 +68,15 @@ function BarColumnTrack(): JSX.Element | null {
 }
 BarColumnTrack.displayName = "BarColumnTrack";
 
+/** Count labels in whole numbers: two requests read 0, 1, 2, not 0, 0.5 … 2. */
+function WholeNumberYAxis(): JSX.Element {
+  const scale = useSettledYScale();
+  const ticks = scale.ticks(4).filter((tick) => Number.isInteger(tick));
+  return <YAxis numTicks={4} side="right" tickValues={ticks} />;
+}
+// Named as the axis it wraps, so the chart keeps it out of the bars' reveal clip like YAxis.
+WholeNumberYAxis.displayName = "YAxis";
+
 /**
  * Lazy-loaded bar chart for one key's usage: a bar per hour or day, `primary` hatched under
  * `secondary` (succeeded under failed, input under output), over a faint full-height track. The
@@ -85,6 +94,7 @@ export default function KeyUsageChart({
   reducedMotion,
   status = "ready",
   empty = false,
+  wholeNumbers = false,
 }: {
   bars: UsageBar[];
   bucket: "hour" | "day";
@@ -98,6 +108,8 @@ export default function KeyUsageChart({
   reducedMotion: boolean;
   status?: "loading" | "ready";
   empty?: boolean;
+  /** Counts (requests, tokens): the axis skips fractional labels. */
+  wholeNumbers?: boolean;
 }): JSX.Element {
   const phone = useIsMobile();
   const id = useId().replace(/:/g, "");
@@ -130,7 +142,7 @@ export default function KeyUsageChart({
       <HatchPattern color={primary.color} id={ids.primary} />
       {secondary ? <HatchPattern color={secondary.color} id={ids.secondary} /> : null}
       {empty ? null : <BarColumnTrack />}
-      {empty ? null : <YAxis numTicks={4} side="right" />}
+      {empty ? null : wholeNumbers ? <WholeNumberYAxis /> : <YAxis numTicks={4} side="right" />}
       <Bar
         animate={!reducedMotion}
         dataKey="primary"
