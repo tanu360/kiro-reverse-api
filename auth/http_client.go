@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"kiro-proxy/proxypool"
 )
 
 var httpClientStore atomic.Pointer[http.Client]
@@ -51,6 +53,7 @@ func buildAuthTransport(proxyURL string) *http.Transport {
 	} else {
 		t.Proxy = http.ProxyFromEnvironment
 	}
+	proxypool.KeepConnectAnswer(t)
 	return t
 }
 

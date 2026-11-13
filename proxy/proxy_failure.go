@@ -75,12 +75,15 @@ func loggedProxyFailure(message string) (string, *attemptProxyFailure, bool) {
 	case strings.Contains(lower, "outbound proxy failed: "):
 		_, text, _ := strings.Cut(lower, "outbound proxy failed: ")
 		return message, &attemptProxyFailure{Code: kindOfText(text)}, true
-	case strings.Contains(lower, "no connection through the proxy within"):
+	//! "proxy connect timeout" is the wording of dev builds before the fixed one.
+	case strings.Contains(lower, "no connection through the proxy within"), strings.Contains(lower, "proxy connect timeout"):
 		return outboundProxyWording(&attemptProxyFailure{Code: proxypool.KindTimeout})
 	case strings.Contains(lower, "socks connect "):
 		code := proxypool.KindSOCKS
 		switch {
-		case strings.Contains(lower, "authentication failed"), strings.Contains(lower, "no acceptable authentication"):
+		case strings.Contains(lower, "no acceptable authentication"):
+			code = proxypool.KindAuthRequired
+		case strings.Contains(lower, "authentication failed"):
 			code = proxypool.KindAuth
 		case strings.Contains(lower, "no such host"):
 			code = proxypool.KindDNS
@@ -129,10 +132,15 @@ func kindOfText(text string) string {
 
 // tidyLoggedProxyFailures gives a row read back from the log the fixed wording for
 // a proxy failure logged before attempts carried one, in its message and in its
-// failed attempts, so no Kiro URL or proxy address shows. Error types stay as logged.
+// failed attempts, so no Kiro URL or proxy address shows. Each also reads as the
+// "proxy" error a new row gets ("upstream", "auth" or "timeout" before); the
+// database keeps what was logged.
 func tidyLoggedProxyFailures(rec *requestRecord) {
 	if !rec.Success {
 		if clean, _, ok := loggedProxyFailure(rec.Message); ok {
+			if classifyRequestError(false, rec.Status, rec.Message) == errorTypeProxy {
+				rec.ErrorType = errorTypeProxy
+			}
 			rec.Message = clean
 		}
 	}
@@ -142,6 +150,9 @@ func tidyLoggedProxyFailures(rec *requestRecord) {
 			continue
 		}
 		if clean, failure, ok := loggedProxyFailure(a.Message); ok {
+			if classifyRequestError(false, a.Status, a.Message) == errorTypeProxy {
+				a.ErrorType = errorTypeProxy
+			}
 			a.Message = clean
 			a.Proxy = failure
 		}

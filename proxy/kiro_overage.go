@@ -56,7 +56,7 @@ func FetchOverageStatus(account *config.Account) (*OverageSnapshot, error) {
 	}
 	setKiroHeaders(req, account)
 
-	resp, err := GetRestClientForProxy(ResolveAccountProxyURL(account)).Do(req)
+	resp, err := accountClient(account, false).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func SetOverageStatus(account *config.Account, enabled bool) (*OverageSnapshot, 
 	setKiroHeaders(req, account)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := GetRestClientForProxy(ResolveAccountProxyURL(account)).Do(req)
+	resp, err := accountClient(account, false).Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -87,6 +87,11 @@ func GetClientForProxy(proxyURL string) *http.Client {
 	if c, ok := poolClientFor(proxyURL, true); ok {
 		return c
 	}
+	return outboundStreamClient(proxyURL)
+}
+
+// outboundStreamClient is the stream client through an account's own or the global proxy, or direct ("").
+func outboundStreamClient(proxyURL string) *http.Client {
 	if proxyURL == "" {
 		return kiroHttpStore.Load()
 	}
@@ -102,6 +107,11 @@ func GetRestClientForProxy(proxyURL string) *http.Client {
 	if c, ok := poolClientFor(proxyURL, false); ok {
 		return c
 	}
+	return outboundRestClient(proxyURL)
+}
+
+// outboundRestClient is outboundStreamClient's REST client.
+func outboundRestClient(proxyURL string) *http.Client {
 	if proxyURL == "" {
 		return kiroRestHttpStore.Load()
 	}
@@ -144,6 +154,7 @@ func buildKiroTransport(proxyURL string) *http.Transport {
 	} else {
 		t.Proxy = http.ProxyFromEnvironment
 	}
+	proxypool.KeepConnectAnswer(t)
 	return t
 }
 
@@ -447,7 +458,7 @@ endpointLoop:
 			req.Header.Set("Amz-Sdk-Request", fmt.Sprintf("attempt=%d; max=%d", streamAttempt, maxStreamAttemptsPerEndpoint))
 			req.Header.Set("Amz-Sdk-Invocation-Id", invocationID)
 
-			resp, err := GetClientForProxy(ResolveAccountProxyURL(account)).Do(req)
+			resp, err := accountClient(account, true).Do(req)
 			if err != nil {
 				lastErr = err
 				if ctxErr := ctx.Err(); ctxErr != nil {
@@ -462,7 +473,7 @@ endpointLoop:
 					logger.Warnf("[KiroAPI] %s: outbound proxy failed (%s): %v", accountEmailForLog(account), text, err)
 					return err
 				}
-				logger.Warnf("[KiroAPI] Endpoint %s failed: %v", ep.Name, err)
+				logger.Warnf("[KiroAPI] Endpoint %s failed: %s", ep.Name, proxypool.LogText(err))
 				if !isRetryableStreamError(err) {
 					return err
 				}

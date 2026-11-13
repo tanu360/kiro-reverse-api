@@ -49,7 +49,7 @@ func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
 
 	setKiroHeaders(req, account)
 
-	resp, err := GetRestClientForProxy(ResolveAccountProxyURL(account)).Do(req)
+	resp, err := accountClient(account, false).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func GetUserInfo(account *config.Account) (*UserInfoResponse, error) {
 	setKiroHeaders(req, account)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := GetRestClientForProxy(ResolveAccountProxyURL(account)).Do(req)
+	resp, err := accountClient(account, false).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 	baseURL := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&maxResults=50", kiroModelAPIBase)
 	baseURL = regionalizeURL(baseURL, account)
 	baseURL = withProfileArnQuery(baseURL, account)
-	client := GetRestClientForProxy(ResolveAccountProxyURL(account))
+	client := accountClient(account, false)
 
 	var models []ModelInfo
 	nextToken := ""
@@ -425,7 +425,7 @@ func listAvailableProfiles(ctx context.Context, account *config.Account, region 
 // paging at the first one, which is all request-time resolution needs.
 func listKiroProfiles(ctx context.Context, account *config.Account, region string, firstOnly bool) ([]KiroProfile, error) {
 	endpoint := regionalizeURLForRegion(fmt.Sprintf("%s/ListAvailableProfiles", kiroRestAPIBase), region)
-	client := GetRestClientForProxy(ResolveAccountProxyURL(account))
+	client := accountClient(account, false)
 
 	var profiles []KiroProfile
 	seen := make(map[string]bool)

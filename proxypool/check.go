@@ -62,6 +62,7 @@ func checkProxy(ctx context.Context, fullURL string) (time.Duration, error) {
 		TLSClientConfig:       tlsConfig,
 		DisableKeepAlives:     true,
 	}
+	KeepConnectAnswer(transport)
 	defer transport.CloseIdleConnections()
 
 	ctx, cancel := context.WithTimeout(ctx, checkTotalTimeout)
@@ -81,7 +82,7 @@ func checkProxy(ctx context.Context, fullURL string) (time.Duration, error) {
 	latency := time.Since(start)
 	resp.Body.Close()
 	if resp.StatusCode == http.StatusProxyAuthRequired {
-		return 0, &ProxyError{Kind: KindAuth, cause: errors.New(resp.Status)}
+		return 0, &ProxyError{Kind: answerKind(resp.StatusCode, proxyURL.User != nil), cause: errors.New(resp.Status)}
 	}
 	return latency, nil
 }

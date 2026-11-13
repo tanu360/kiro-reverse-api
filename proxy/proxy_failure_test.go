@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bufio"
 	"errors"
 	"io"
 	"net"
@@ -100,6 +101,28 @@ func TestProxyFailuresLogAsProxyErrors(t *testing.T) {
 		t.Cleanup(srv.Close)
 		return srv.URL
 	}
+	answering := func(statusLine string) string {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { ln.Close() })
+		go func() {
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				go func(conn net.Conn) {
+					defer conn.Close()
+					if _, err := http.ReadRequest(bufio.NewReader(conn)); err == nil {
+						_, _ = io.WriteString(conn, "HTTP/1.1 "+statusLine+"\r\nContent-Length: 0\r\n\r\n")
+					}
+				}(conn)
+			}
+		}()
+		return "http://" + ln.Addr().String()
+	}
 	closed := "http://" + poolClosedPort(t)
 	cases := []struct {
 		name     string
@@ -110,7 +133,9 @@ func TestProxyFailuresLogAsProxyErrors(t *testing.T) {
 	}{
 		{"own refused", closed, "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindConnect}, "outbound proxy failed: connection refused or reset"},
 		{"own CONNECT 403", refusing(http.StatusForbidden), "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindTunnel, Status: 403}, "outbound proxy failed: proxy refused the tunnel"},
-		{"own CONNECT 407", refusing(http.StatusProxyAuthRequired), "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindAuth, Status: 407}, "outbound proxy failed: proxy rejected the sign-in"},
+		{"own CONNECT 407 without a login", refusing(http.StatusProxyAuthRequired), "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindAuthRequired, Status: 407}, "outbound proxy failed: proxy requires a sign-in"},
+		{"own CONNECT 407 with a login", strings.Replace(refusing(http.StatusProxyAuthRequired), "http://", "http://user:wrong@", 1), "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindAuth, Status: 407}, "outbound proxy failed: proxy rejected the sign-in"},
+		{"own CONNECT 403 own phrase", answering("403 Access violation"), "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindTunnel, Status: 403}, "outbound proxy failed: proxy refused the tunnel"},
 		{"own SOCKS login", "socks5://user:wrong@" + socksRejectingLogin(t), "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindAuth}, "outbound proxy failed: proxy rejected the sign-in"},
 		{"own SOCKS refused", "socks5://" + poolClosedPort(t), "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindConnect}, "outbound proxy failed: connection refused or reset"},
 		{"own host unknown", "http://proxy.invalid:3128", "", attemptProxyFailure{Source: proxySourceAccount, Code: proxypool.KindDNS}, "outbound proxy failed: proxy host lookup failed"},
@@ -150,6 +175,65 @@ func TestProxyFailuresLogAsProxyErrors(t *testing.T) {
 			assertNoGoText(t, "row message", row.Message, "kiro.invalid", "127.0.0.1", "wrong")
 			assertNoGoText(t, "attempt message", a.Message, "kiro.invalid", "127.0.0.1", "wrong")
 			assertAccountNotBanned(t, acc.ID)
+		})
+	}
+}
+
+// An own or the global proxy whose URL is also in the pool stays an own or the
+// global proxy: with the pool off, its failure is not the pool's, so the request
+// fails over at once instead of retrying the account, and the pool proxy's health
+// is left alone.
+func TestProxyListedInPoolKeepsItsSource(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		own    bool
+		source string
+	}{
+		{"global", false, proxySourceGlobal},
+		{"own", true, proxySourceAccount},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newStreamTestHandler(t, func(http.ResponseWriter, *http.Request) { t.Error("a request reached Kiro past a failed proxy") })
+			clearOnlyCooldown(t, h)
+			kiroEndpoints = []kiroEndpoint{{URL: "https://kiro.invalid/generateAssistantResponse", Origin: "AI_EDITOR", Name: "test"}}
+			t.Cleanup(proxypool.SetCheckTargetForTest("http://kiro.test/", nil))
+			proxypool.Default().ResetForTest()
+			t.Cleanup(proxypool.Default().ResetForTest)
+			t.Cleanup(dropPoolClients)
+			listed := "http://" + poolClosedPort(t)
+			if err := config.SetProxyPool([]config.PoolProxy{{ID: "px_listed", URL: listed}}); err != nil {
+				t.Fatal(err)
+			}
+			setPoolMode(t, config.ProxyPoolModeOff, false)
+			global := ""
+			if !c.own {
+				global = listed
+			}
+			if err := config.UpdateProxySettings(global); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				_ = config.UpdateProxySettings("")
+				proxyClientCache.Delete(listed)
+			})
+			own := ""
+			if c.own {
+				own = listed
+			}
+			setTestAccountProxy(t, h, own)
+
+			postClientAPI(h, "/v1/messages", transportPlainBody)
+			row := lastRecordedRequest(t)
+			if row.ErrorType != errorTypeProxy || row.Message != "outbound proxy failed: connection refused or reset" {
+				t.Fatalf("row = %q %q, want the %s proxy's wording", row.ErrorType, row.Message, c.source)
+			}
+			want := attemptProxyFailure{Source: c.source, Code: proxypool.KindConnect}
+			if len(row.Attempts) != 1 || row.Attempts[0].Proxy == nil || *row.Attempts[0].Proxy != want {
+				t.Fatalf("attempts = %#v, want one %+v", row.Attempts, want)
+			}
+			if h := proxypool.Default().Health("px_listed"); h.Status == proxypool.StatusFailed {
+				t.Fatalf("the pool proxy was marked failed: %+v", h)
+			}
 		})
 	}
 }
@@ -242,8 +326,8 @@ func TestClassifyProxyFailureMessages(t *testing.T) {
 }
 
 // Rows logged before attempts named their proxy failure read back with the
-// client's wording, and their failed attempts gain the failure for the UI.
-// Error types stay as logged.
+// client's wording and the "proxy" type, and their failed attempts gain the
+// failure for the UI.
 func TestTidyLoggedProxyFailures(t *testing.T) {
 	const url = `Post "https://q.us-east-1.amazonaws.com/generateAssistantResponse": `
 	cases := []struct {
@@ -261,6 +345,8 @@ func TestTidyLoggedProxyFailures(t *testing.T) {
 		{url + "Proxy Authentication Required", "outbound proxy failed: proxy rejected the sign-in", attemptProxyFailure{Code: proxypool.KindAuth, Status: 407}},
 		{url + "Bad Gateway", "outbound proxy failed: proxy refused the tunnel", attemptProxyFailure{Code: proxypool.KindTunnel, Status: 502}},
 		{url + "no connection through the proxy within 15s", "outbound proxy failed: connection timed out", attemptProxyFailure{Code: proxypool.KindTimeout}},
+		{url + "proxy connect timeout: no connection within 15s", "outbound proxy failed: connection timed out", attemptProxyFailure{Code: proxypool.KindTimeout}},
+		{url + "socks connect tcp 127.0.0.1:1080->q.us-east-1.amazonaws.com:443: no acceptable authentication methods", "outbound proxy failed: proxy requires a sign-in", attemptProxyFailure{Code: proxypool.KindAuthRequired}},
 		{"outbound pool proxy failed: TLS handshake failed", "outbound pool proxy failed: TLS handshake failed", attemptProxyFailure{Source: proxySourcePool, Code: proxypool.KindTLS}},
 		{"no healthy outbound proxy in the pool", "no healthy outbound proxy in the pool", attemptProxyFailure{Source: proxySourcePool, Code: proxypool.KindNoHealthy}},
 	}
@@ -275,14 +361,14 @@ func TestTidyLoggedProxyFailures(t *testing.T) {
 			},
 		}
 		tidyLoggedProxyFailures(&rec)
-		if rec.Message != c.clean || rec.ErrorType != "upstream" {
-			t.Errorf("%q: row = %q %q, want %q with its logged type", c.message, rec.ErrorType, rec.Message, c.clean)
+		if rec.Message != c.clean || rec.ErrorType != errorTypeProxy {
+			t.Errorf("%q: row = %q %q, want proxy %q", c.message, rec.ErrorType, rec.Message, c.clean)
 		}
 		a := rec.Attempts[0]
-		if a.Message != c.clean || a.ErrorType != "upstream" || a.Proxy == nil || *a.Proxy != c.want {
+		if a.Message != c.clean || a.ErrorType != errorTypeProxy || a.Proxy == nil || *a.Proxy != c.want {
 			t.Errorf("%q: attempt = %+v proxy %+v, want %+v", c.message, a, a.Proxy, c.want)
 		}
-		if other := rec.Attempts[1]; other.Proxy != nil || other.Message != "HTTP 500 from test: boom" {
+		if other := rec.Attempts[1]; other.Proxy != nil || other.ErrorType != "upstream" || other.Message != "HTTP 500 from test: boom" {
 			t.Errorf("%q: a Kiro failure changed: %+v", c.message, other)
 		}
 	}
@@ -316,7 +402,7 @@ func TestLoggedProxyFailureTidiedOnRead(t *testing.T) {
 		t.Fatalf("rows = %d", len(page.Requests))
 	}
 	got := page.Requests[0]
-	if got.Message != "outbound proxy failed: connection refused or reset" || got.ErrorType != "upstream" {
+	if got.Message != "outbound proxy failed: connection refused or reset" || got.ErrorType != errorTypeProxy {
 		t.Fatalf("row = %q %q", got.ErrorType, got.Message)
 	}
 	if len(got.Attempts) != 1 || got.Attempts[0].Proxy == nil || got.Attempts[0].Proxy.Code != proxypool.KindConnect {

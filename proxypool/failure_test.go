@@ -1,7 +1,9 @@
 package proxypool
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -68,6 +70,33 @@ func socksRejectingLogin(t *testing.T) string {
 	return ln.Addr().String()
 }
 
+// connectAnsweringProxy answers every CONNECT with statusLine as it is, such as a
+// reason phrase of the proxy's own ("403 Access violation").
+func connectAnsweringProxy(t *testing.T, statusLine string) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(conn net.Conn) {
+				defer conn.Close()
+				if _, err := http.ReadRequest(bufio.NewReader(conn)); err != nil {
+					return
+				}
+				_, _ = io.WriteString(conn, "HTTP/1.1 "+statusLine+"\r\nContent-Length: 0\r\n\r\n")
+			}(conn)
+		}
+	}()
+	return "http://" + ln.Addr().String()
+}
+
 // A failed check stores the failure's kind and the proxy's answer to CONNECT
 // beside the redacted text, for the admin UI's own wording; a good check clears them.
 func TestCheckStoresFailureCode(t *testing.T) {
@@ -82,7 +111,10 @@ func TestCheckStoresFailureCode(t *testing.T) {
 		{"socks refused", "socks5://" + strings.TrimPrefix(closed, "http://"), KindConnect, 0},
 		{"connect 403", connectRefusingProxy(t, http.StatusForbidden), KindTunnel, http.StatusForbidden},
 		{"connect 502", connectRefusingProxy(t, http.StatusBadGateway), KindTunnel, http.StatusBadGateway},
-		{"connect 407", connectRefusingProxy(t, http.StatusProxyAuthRequired), KindAuth, http.StatusProxyAuthRequired},
+		{"connect 407 without a login", connectRefusingProxy(t, http.StatusProxyAuthRequired), KindAuthRequired, http.StatusProxyAuthRequired},
+		{"connect 407 with a login", strings.Replace(connectRefusingProxy(t, http.StatusProxyAuthRequired), "http://", "http://user:wrong-secret@", 1), KindAuth, http.StatusProxyAuthRequired},
+		{"connect 403 own phrase", connectAnsweringProxy(t, "403 Access violation"), KindTunnel, http.StatusForbidden},
+		{"connect 502 own phrase", connectAnsweringProxy(t, "502 Proxy Error"), KindTunnel, http.StatusBadGateway},
 		{"socks login", "socks5://user:wrong-secret@" + socksRejectingLogin(t), KindAuth, 0},
 		{"unknown host", "http://proxy.invalid:3128", KindDNS, 0},
 	}
@@ -143,6 +175,27 @@ func TestSavedLastErrorGainsCode(t *testing.T) {
 		if h := m.Health(id); h.ErrorCode != want.Kind || h.ErrorStatus != want.Status || h.LastError == "" {
 			t.Errorf("%s: %+v, want %+v", id, h, want)
 		}
+	}
+}
+
+// The server log gets a pool proxy failure's cause without the proxy's password;
+// any other error reads as it is.
+func TestLogTextAddsRedactedCause(t *testing.T) {
+	p := poolProxy("px_log", "http://user:hunter2-secret@10.0.0.1:3128")
+	setupPool(t, p)
+	err := &ProxyError{ProxyID: p.ID, Kind: KindTunnel, cause: errors.New("Access violation from user:hunter2-secret@10.0.0.1")}
+	got := LogText(err)
+	if !strings.Contains(got, "outbound pool proxy failed: proxy refused the tunnel (") || !strings.Contains(got, "Access violation") {
+		t.Fatalf("LogText = %q, want the wording and the cause", got)
+	}
+	if strings.Contains(got, "hunter2-secret") {
+		t.Fatalf("LogText leaks the password: %q", got)
+	}
+	if got := LogText(NoHealthyError()); got != ErrNoHealthyProxy.Error() {
+		t.Fatalf("LogText(no healthy) = %q", got)
+	}
+	if got := LogText(errors.New("HTTP 500 from test: boom")); got != "HTTP 500 from test: boom" {
+		t.Fatalf("LogText(other) = %q", got)
 	}
 }
 
