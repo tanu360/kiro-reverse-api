@@ -161,6 +161,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 			var credits float64
 			var upstreamCache cacheTokenCounts
 			var realInputTokens int
+			var cut outputCut
 			var upstreamStopReason string
 
 			callback := &KiroStreamCallback{
@@ -177,6 +178,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnOutputCut: cut.record,
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
@@ -212,7 +214,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				reasoningContent = ""
 			}
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
-			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
@@ -311,6 +313,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			var credits float64
 			var upstreamCache cacheTokenCounts
 			var realInputTokens int
+			var cut outputCut
 			var upstreamStopReason string
 			responseID := "resp_" + uuid.NewString()
 			createdAt := time.Now().Unix()
@@ -586,6 +589,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnOutputCut: cut.record,
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
@@ -640,7 +644,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				reasoningContent = ""
 			}
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
-			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)

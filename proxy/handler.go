@@ -43,6 +43,8 @@ type Handler struct {
 	// lastModelsSweep holds each account's outcome from the latest models sweep; guarded by modelsCacheMu.
 	lastModelsSweep []accountResult
 	promptCache     *promptCacheTracker
+	// promptOverheads remembers what Kiro adds to each prompt; see prompt_overhead.go.
+	promptOverheads *promptOverheads
 	affinity        *sessionAffinity
 	adminSessions   *adminSessionStore
 	usageRefresh    *refreshScheduler
@@ -263,14 +265,15 @@ func NewHandler() *Handler {
 	applyProxyConfig(config.GetProxyURL())
 
 	h := &Handler{
-		pool:           pool.GetPool(),
-		startTime:      time.Now().Unix(),
-		stopRefresh:    make(chan struct{}),
-		stopStatsSaver: make(chan struct{}),
-		promptCache:    newPromptCacheTracker(defaultPromptCacheTTL),
-		affinity:       newSessionAffinity(),
-		adminSessions:  newAdminSessionStore(),
-		usageRefresh:   newRefreshScheduler(config.GetUsageRefreshInterval),
+		pool:            pool.GetPool(),
+		startTime:       time.Now().Unix(),
+		stopRefresh:     make(chan struct{}),
+		stopStatsSaver:  make(chan struct{}),
+		promptCache:     newPromptCacheTracker(defaultPromptCacheTTL),
+		promptOverheads: newPromptOverheads(),
+		affinity:        newSessionAffinity(),
+		adminSessions:   newAdminSessionStore(),
+		usageRefresh:    newRefreshScheduler(config.GetUsageRefreshInterval),
 	}
 
 	restoreNativeModels()
@@ -1107,6 +1110,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			var credits float64
 			var upstreamCache cacheTokenCounts
 			var realInputTokens int
+			var cut outputCut
 			var toolUses []KiroToolUse
 			var nextContentIndex int
 			var rawContentBuilder strings.Builder
@@ -1432,6 +1436,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnOutputCut: cut.record,
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
@@ -1508,7 +1513,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				thinkingOutput = ""
 			}
 			estimatedOutputTokens := estimateClaudeOutputTokens(outputContent, thinkingOutput, toolUses)
-			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
@@ -1562,22 +1567,6 @@ func (h *Handler) recordSuccessForApiKey(apiKeyReservation *apiKeyUsageReservati
 	if err := apiKeyReservation.finalize(int64(inputTokens+outputTokens), credits); err != nil {
 		logger.Warnf("[ApiKey] failed to finalize usage for key %s: %v", apiKeyReservation.id, err)
 	}
-}
-
-// finalizeUsageTokens fills in usage Kiro did not report. contextTokens comes from
-// contextUsagePercentage, which Kiro measures after the turn: the prompt plus this answer.
-func finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, contextTokens, estimatedOutputTokens int) (int, int) {
-	if outputTokens <= 0 {
-		outputTokens = estimatedOutputTokens
-	}
-	if inputTokens <= 0 {
-		if contextTokens > 0 {
-			inputTokens = inputFromContextTokens(contextTokens, outputTokens, estimatedInputTokens)
-		} else {
-			inputTokens = estimatedInputTokens
-		}
-	}
-	return inputTokens, outputTokens
 }
 
 // inputFromContextTokens removes the answer from Kiro's context count. Live (2026-11-02,
@@ -1675,6 +1664,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			var credits float64
 			var upstreamCache cacheTokenCounts
 			var realInputTokens int
+			var cut outputCut
 			var upstreamStopReason string
 			var thinkingSignature string
 			var redactedThinking []string
@@ -1701,6 +1691,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnOutputCut: cut.record,
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
@@ -1745,7 +1736,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			}
 
 			estimatedOutputTokens := estimateClaudeOutputTokens(finalContent, rawThinkingContent, toolUses)
-			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
@@ -1959,6 +1950,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			var credits float64
 			var upstreamCache cacheTokenCounts
 			var realInputTokens int
+			var cut outputCut
 			var upstreamStopReason string
 			var rawContentBuilder strings.Builder
 			var rawReasoningBuilder strings.Builder
@@ -2249,6 +2241,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnOutputCut: cut.record,
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
@@ -2309,7 +2302,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				estimatedOutputTokens += estimateApproxTokens(tc.Function.Name)
 				estimatedOutputTokens += estimateApproxTokens(tc.Function.Arguments)
 			}
-			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
@@ -2409,6 +2402,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			var credits float64
 			var upstreamCache cacheTokenCounts
 			var realInputTokens int
+			var cut outputCut
 			var upstreamStopReason string
 
 			callback := &KiroStreamCallback{
@@ -2425,6 +2419,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				OnContextUsage: func(pct float64) {
 					realInputTokens = int(pct * float64(getContextWindowSize(model)) / 100.0)
 				},
+				OnOutputCut: cut.record,
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
@@ -2461,7 +2456,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			}
 
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
-			inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)

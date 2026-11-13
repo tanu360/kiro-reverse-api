@@ -715,20 +715,23 @@ func TestRecordSuccessForApiKeyAttributesUsage(t *testing.T) {
 	}
 }
 
+// noOverheads remembers nothing, so these tests see only one turn's counts.
+var noOverheads *promptOverheads
+
 func TestFinalizeUsageTokensPrefersProviderUsage(t *testing.T) {
-	in, out := finalizeUsageTokens(120, 34, 999, 5000, 88)
+	in, out := noOverheads.finalizeUsage("", outputCut{}, 120, 34, 999, 5000, 88)
 	if in != 120 || out != 34 {
 		t.Fatalf("expected provider usage to win, got input=%d output=%d", in, out)
 	}
 }
 
 func TestFinalizeUsageTokensFallsBackWhenProviderUsageMissing(t *testing.T) {
-	in, out := finalizeUsageTokens(0, 0, 999, 5000, 88)
+	in, out := noOverheads.finalizeUsage("", outputCut{}, 0, 0, 999, 5000, 88)
 	if in != 4912 || out != 88 {
 		t.Fatalf("expected context minus output as input and estimated output fallback, got input=%d output=%d", in, out)
 	}
 
-	in, out = finalizeUsageTokens(0, 0, 999, 0, 88)
+	in, out = noOverheads.finalizeUsage("", outputCut{}, 0, 0, 999, 0, 88)
 	if in != 999 || out != 88 {
 		t.Fatalf("expected estimated input fallback, got input=%d output=%d", in, out)
 	}
@@ -1121,14 +1124,14 @@ func TestFinalizeUsageTokensRemovesTheAnswerFromKiroContext(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			in, out := finalizeUsageTokens(0, 0, tc.estimatedIn, tc.context, tc.estimatedOut)
+			in, out := noOverheads.finalizeUsage("", outputCut{}, 0, 0, tc.estimatedIn, tc.context, tc.estimatedOut)
 			if in != tc.wantIn || out != tc.estimatedOut {
 				t.Fatalf("input=%d output=%d, want input=%d output=%d", in, out, tc.wantIn, tc.estimatedOut)
 			}
 		})
 	}
 	//! Output Kiro reports itself is subtracted the same way.
-	if in, out := finalizeUsageTokens(0, 600, 40, 4710, 900); in != 4110 || out != 600 {
+	if in, out := noOverheads.finalizeUsage("", outputCut{}, 0, 600, 40, 4710, 900); in != 4110 || out != 600 {
 		t.Fatalf("input=%d output=%d, want the reported output removed from the context", in, out)
 	}
 }

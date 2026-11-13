@@ -51,6 +51,8 @@ type outputLimiter struct {
 	cancel     context.CancelCauseFunc
 
 	usedUnits int
+	// seenUnits counts all the output Kiro wrote, sent or not: Kiro's context count includes it.
+	seenUnits int
 	// pending is answer text held back while it could still be the start of a stop sequence.
 	pending       string
 	inThinkingTag bool
@@ -133,6 +135,9 @@ func (l *outputLimiter) run(ctx context.Context, call func(context.Context, *Kir
 func (l *outputLimiter) callback() *KiroStreamCallback {
 	cb := *l.downstream
 	cb.OnText = func(text string, isThinking bool) {
+		for _, r := range text {
+			l.seenUnits += runeTokenUnits(r)
+		}
 		if l.stopped || text == "" {
 			return
 		}
@@ -149,6 +154,8 @@ func (l *outputLimiter) callback() *KiroStreamCallback {
 	}
 	if l.downstream.OnToolUse != nil {
 		cb.OnToolUse = func(toolUse KiroToolUse) {
+			units := (estimateApproxTokens(toolUse.Name) + estimateJSONTokens(toolUse.Input)) * tokenUnitScale
+			l.seenUnits += units
 			if l.stopped {
 				return
 			}
@@ -161,7 +168,7 @@ func (l *outputLimiter) callback() *KiroStreamCallback {
 				l.stop("max_tokens", "")
 				return
 			}
-			l.usedUnits += (estimateApproxTokens(toolUse.Name) + estimateJSONTokens(toolUse.Input)) * tokenUnitScale
+			l.usedUnits += units
 			l.forwarded = true
 			l.downstream.OnToolUse(toolUse)
 			if l.maxUnits > 0 && l.usedUnits >= l.maxUnits {
@@ -188,6 +195,7 @@ func (l *outputLimiter) callback() *KiroStreamCallback {
 			}
 		}
 	}
+	cb.OnOutputCut = nil
 	cb.OnStopReason = func(reason string) { l.upstreamStop = reason }
 	cb.OnCredits = func(credits float64) { l.credits += credits }
 	cb.OnContextUsage = func(percentage float64) { l.contextUsage = append(l.contextUsage, percentage) }
@@ -311,6 +319,11 @@ func (l *outputLimiter) usedTokens() int {
 	return (l.usedUnits + tokenUnitScale - 1) / tokenUnitScale
 }
 
+// unsentTokens is the output Kiro wrote past the cut, as far as it arrived before the cancel.
+func (l *outputLimiter) unsentTokens() int {
+	return max((l.seenUnits+tokenUnitScale-1)/tokenUnitScale-l.usedTokens(), 0)
+}
+
 // finish hands the turn's end to the handler: the limit's stop reason, and the output counted
 // here when the stream was cut, since Kiro's own count never arrived or covers text not sent.
 func (l *outputLimiter) finish() {
@@ -326,6 +339,9 @@ func (l *outputLimiter) finish() {
 	}
 	if l.stopped && l.stopReason == "stop_sequence" && d.OnStopSequence != nil {
 		d.OnStopSequence(l.sequence)
+	}
+	if l.stopped && d.OnOutputCut != nil {
+		d.OnOutputCut(l.unsentTokens())
 	}
 	if d.OnCredits != nil && l.credits > 0 {
 		d.OnCredits(l.credits)

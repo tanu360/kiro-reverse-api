@@ -280,6 +280,9 @@ type KiroStreamCallback struct {
 	OnStopReason   func(reason string)
 	// OnStopSequence names the stop sequence that ended the answer, after OnStopReason("stop_sequence").
 	OnStopSequence func(sequence string)
+	// OnOutputCut says the output limiter cut the answer, with the output Kiro wrote past the
+	// cut (estimated tokens). The client never got it, but OnContextUsage counts it.
+	OnOutputCut func(unsentTokens int)
 	//! Called only when Kiro itself reports cache counts; both are already part of OnComplete's input total.
 	OnCacheUsage func(cacheReadTokens, cacheWriteTokens int)
 	// OnThinkingSignature receives a reasoning block's signature; it belongs to the thinking block open now or next.

@@ -636,7 +636,8 @@ func (h *Handler) callClaudeRound(ctx context.Context, account *config.Account, 
 	if !thinking {
 		reasoning = ""
 	}
-	inputTokens, outputTokens = finalizeUsageTokens(inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimateClaudeOutputTokens(text, reasoning, toolUses))
+	//! Rounds call Kiro without the output limiter, so no answer here is cut.
+	inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), outputCut{}, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimateClaudeOutputTokens(text, reasoning, toolUses))
 	return &claudeWebSearchRound{
 		text:         text,
 		thinking:     reasoning,
