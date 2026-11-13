@@ -205,7 +205,8 @@ func TestClaudeAuthFailureRecordsOneFailedRequest(t *testing.T) {
 		t.Fatalf("expected one auth-failed request row, got %#v", stats)
 	}
 	page := getObserveStore().RequestPage(requestQuery{Page: 1, PageSize: 10, Status: "failed"})
-	if page.Total != 1 || len(page.Requests) != 1 || page.Requests[0].APIKeyMasked != "sk-missing" {
+	// A key of 10 characters or fewer is masked whole.
+	if page.Total != 1 || len(page.Requests) != 1 || page.Requests[0].APIKeyMasked != "****" {
 		t.Fatalf("unexpected failed auth request page: total=%d rows=%#v", page.Total, page.Requests)
 	}
 }

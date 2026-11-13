@@ -147,8 +147,8 @@ func validateClaudeThinkingConfig(thinking *ClaudeThinkingConfig, maxTokens int)
 	}
 
 	display := strings.ToLower(strings.TrimSpace(thinking.Display))
-	if display != "" && display != "summarized" && display != "omitted" {
-		return "thinking.display must be one of: summarized, omitted"
+	if display != "" && display != "summarized" && display != "omitted" && display != "updates" {
+		return "thinking.display must be one of: summarized, omitted, updates"
 	}
 	if kind == "disabled" && display != "" {
 		return "thinking.display is not supported when thinking.type is disabled"
@@ -173,7 +173,9 @@ func resolveClaudeThinkingResponseOptions(thinking *ClaudeThinkingConfig, defaul
 
 	display := strings.ToLower(strings.TrimSpace(thinking.Display))
 	switch display {
-	case "summarized":
+	//! "updates" asks for progress notes between tool calls. Kiro has none; its thinking
+	//! text is the closest thing, and it is what Claude Code got after dropping the field.
+	case "summarized", "updates":
 		opts.Format = "thinking"
 	case "omitted":
 		opts.Format = "thinking"
@@ -247,6 +249,11 @@ func NewHandler() *Handler {
 	go h.backgroundRefresh()
 
 	go h.backgroundObserveTick()
+
+	//! Before the request log is read: rows from older versions still hold raw client keys.
+	if err := scrubStoredRequestKeys(); err != nil {
+		logger.Warnf("[Observe] Failed to mask older client keys: %v", err)
+	}
 
 	//! The model mix sums the whole request log, so it warms in the background
 	//! and the listener does not wait on a full-table scan.
@@ -406,7 +413,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	case path == "/v1/models" || path == "/models":
-		ar := h.authenticateForOpenAI(w, r)
+		ar := h.authenticateForModels(w, r)
 		if ar == nil {
 			return
 		}
@@ -922,7 +929,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	}
 	noteResponseModel(r.Context(), req.Model)
 	if msg := validateClaudeRequestShape(&req); msg != "" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
 	}
@@ -937,6 +944,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
+		markNoRetryForKeyLimit(w, err)
 		h.sendClaudeError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
 	}
@@ -1109,9 +1117,16 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			var thinkingSource thinkingStreamSource
 			var thinkingStarted bool
 			var eventThinkingOpen bool
+			var sawVisibleText bool
 
 			sendText := func(text string, thinkingState int) {
 				if thinkingState == 0 {
+					//! Kiro leaves "\n\n" after the closing thinking tag. The non-stream answer
+					//! trims it, so the streamed one drops what comes before its first visible text.
+					if !sawVisibleText {
+						text = strings.TrimLeft(text, " \t\r\n")
+						sawVisibleText = text != ""
+					}
 					if text == "" {
 						return
 					}
@@ -1751,6 +1766,9 @@ func (h *Handler) noAccountError(ctx context.Context, model, serverErrType strin
 }
 
 func (h *Handler) sendClaudeError(w http.ResponseWriter, status int, errType, message string) {
+	if noRetryStatus(status) {
+		markNoRetry(w)
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1787,7 +1805,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 	noteResponseModel(r.Context(), req.Model)
 	if msg := validateOpenAIRequestShape(&req); msg != "" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
 		return
 	}
@@ -1800,6 +1818,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
 	if err != nil {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusTooManyRequests, err.Error())
+		markNoRetryForKeyLimit(w, err)
 		h.sendOpenAIError(w, http.StatusTooManyRequests, "rate_limit_error", err.Error())
 		return
 	}
@@ -1891,7 +1910,6 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				if content == "" && thinkingState == 2 {
 					return
 				}
-
 				var chunk map[string]interface{}
 
 				if thinkingState > 0 {
@@ -2412,6 +2430,9 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *Handler) sendOpenAIError(w http.ResponseWriter, status int, errType, message string) {
+	if noRetryStatus(status) {
+		markNoRetry(w)
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -3778,6 +3799,7 @@ func (h *Handler) apiGetStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
+	logLevel, logLevelFromEnv := currentLogLevel()
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"requireApiKey":          config.IsApiKeyRequired(),
 		"port":                   config.GetPort(),
@@ -3796,6 +3818,9 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"imageResize":             config.GetImageResize(),
 		"imageResizeMaxDimension": config.GetImageResizeMaxDimension(),
 		"imageResizeMaxKB":        config.GetImageResizeMaxKB(),
+
+		"logLevel":        logLevel,
+		"logLevelFromEnv": logLevelFromEnv,
 	})
 }
 
@@ -3891,9 +3916,16 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		ImageResize             *bool `json:"imageResize,omitempty"`
 		ImageResizeMaxDimension *int  `json:"imageResizeMaxDimension,omitempty"`
 		ImageResizeMaxKB        *int  `json:"imageResizeMaxKB,omitempty"`
+
+		LogLevel *string `json:"logLevel,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
+		return
+	}
+	logLevel, ok := parseLogLevelPatch(req.LogLevel)
+	if !ok {
+		writeAdminError(w, http.StatusBadRequest, codeLogLevelInvalid, "logLevel must be one of: debug, info, warn, error")
 		return
 	}
 
@@ -4004,6 +4036,12 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := applyImageResizePatch(req.ImageResize, req.ImageResizeMaxDimension, req.ImageResizeMaxKB); err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	if err := applyLogLevel(logLevel); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return

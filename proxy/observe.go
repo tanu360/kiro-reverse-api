@@ -340,7 +340,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 		TS:           observeNow().Unix(),
 		AccountID:    accountID,
 		APIKeyID:     apiKeyID,
-		APIKey:       apiKey,
+		APIKey:       storedRequestAPIKey(apiKey),
 		APIKeyMasked: requestAPIKeyMasked(apiKeyID, apiKey),
 		Email:        email,
 		Model:        model,
@@ -812,6 +812,7 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 	all := s.RecentRequests(observeRecentReqs)
 	filtered := make([]requestRecord, 0, len(all))
 	search := strings.ToLower(q.Search)
+	keySearch := newRequestKeySearch(q.Search)
 	for _, rec := range all {
 		if q.Status == "success" && !rec.Success {
 			continue
@@ -821,7 +822,7 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 		}
 		if search != "" {
 			haystack := strings.ToLower(rec.Email + " " + rec.AccountID + " " + rec.APIKeyID + " " + rec.APIKey + " " + rec.APIKeyMasked + " " + rec.Model + " " + rec.Message + " " + rec.Endpoint + " " + rec.ErrorType + " " + rec.RequestID)
-			if !strings.Contains(haystack, search) {
+			if !strings.Contains(haystack, search) && !keySearch.matches(rec) {
 				continue
 			}
 		}

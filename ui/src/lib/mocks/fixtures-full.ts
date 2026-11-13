@@ -2029,6 +2029,8 @@ export function seedFullDataset(now: number): FullDataset {
       imageResize: false,
       imageResizeMaxDimension: 2048,
       imageResizeMaxKB: 800,
+      logLevel: "info",
+      logLevelFromEnv: false,
     },
     thinking: {
       suffix: "-reasoning-extended",

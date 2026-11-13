@@ -1408,6 +1408,8 @@ export function defaultSettings(): Settings {
     imageResize: true,
     imageResizeMaxDimension: 1568,
     imageResizeMaxKB: 400,
+    logLevel: "info",
+    logLevelFromEnv: false,
   };
 }
 

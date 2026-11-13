@@ -432,7 +432,8 @@ func MaskApiKey(key string) string {
 		return ""
 	}
 	if len(key) <= 10 {
-		return key
+		//! Too short to show any part of it.
+		return "****"
 	}
 	return key[:6] + "****" + key[len(key)-4:]
 }

@@ -432,6 +432,13 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 	s.RecordRequest("a-id", "same@example.com", "sort-model", 1, 1, 0.01, true, 200, "")
 	keyA := "sk-client-" + strings.Repeat("a", 50) + "middle-a" + strings.Repeat("z", 50)
 	keyB := "sk-client-" + strings.Repeat("b", 50) + "middle-b" + strings.Repeat("y", 50)
+	// Rows keep only the masked key; a search by any part of a key's value finds its rows
+	// through the configured key's id.
+	for id, key := range map[string]string{"key-a": keyA, "key-b": keyB} {
+		if _, err := config.AddApiKey(config.ApiKeyEntry{ID: id, Key: key, Enabled: true}); err != nil {
+			t.Fatalf("add key %s: %v", id, err)
+		}
+	}
 	s.RecordRequestWithAPIKey("api-acc-a", "key-a", keyA, "api@example.com", "api-model", 1, 1, 0.01, true, 200, "")
 	s.RecordRequestWithAPIKey("api-acc-b", "key-b", keyB, "api@example.com", "api-model", 1, 1, 0.01, true, 200, "")
 
@@ -457,7 +464,8 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 	}
 
 	apiKeyPage := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "sk-client", Sort: "api_key", Order: "asc"})
-	if apiKeyPage.Total != 2 || apiKeyPage.Requests[0].APIKeyID != "key-a" || apiKeyPage.Requests[0].APIKeyMasked == "" {
+	// Sorted by the masked value the log shows: "sk-cli****yyyy" (key-b) before "sk-cli****zzzz".
+	if apiKeyPage.Total != 2 || apiKeyPage.Requests[0].APIKeyID != "key-b" || apiKeyPage.Requests[0].APIKeyMasked == "" {
 		t.Fatalf("expected API key search/sort with masked value, got total=%d rows=%#v", apiKeyPage.Total, apiKeyPage.Requests)
 	}
 	hiddenPartPage := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "middle-a", Sort: "api_key", Order: "asc"})

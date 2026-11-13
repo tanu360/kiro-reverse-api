@@ -21,6 +21,7 @@ export interface SuccessResponse {
  * - backup_* (400): an upload or stored backup the restore cannot read (`detail`: why).
  * - invalid_cadence / invalid_keep (400): POST /backups/schedule out of range.
  * - log_retention_range (400): POST /log-retention days outside 0..3650.
+ * - log_level_invalid (400): POST /settings logLevel is not debug, info, warn or error.
  * - self_heal_interval_range / self_heal_rounds_range (400): POST /account-health out of range.
  * - token_refresh_failed, models_refresh_failed, overage_failed, profile_verify_failed,
  *   kiro_sign_in_failed, microsoft_denied, microsoft_token_failed, microsoft_credential_invalid,
@@ -67,6 +68,7 @@ export type ServerErrorCode =
   | "api_key_account_no_profile"
   | "auto_continue_max_range"
   | "log_retention_range"
+  | "log_level_invalid"
   | "routing_mode_invalid"
   | "priority_range"
   | "image_resize_dimension_range"
@@ -1054,6 +1056,9 @@ export interface ApiKeyRegenerateResponse {
  */
 export type RoutingMode = "weighted" | "priority";
 
+/** How much the server writes to its own log; `info` is the default. */
+export type LogLevel = "debug" | "info" | "warn" | "error";
+
 export interface Settings {
   requireApiKey: boolean;
   /** read-only */
@@ -1081,6 +1086,10 @@ export interface Settings {
   imageResizeMaxDimension: number;
   /** decoded file size in KB, 50..4096, default 400 */
   imageResizeMaxKB: number;
+  /** the level in effect now; applies at once and is kept for the next start */
+  logLevel: LogLevel;
+  /** read-only: LOG_LEVEL is set, so it picks the level again at each start */
+  logLevelFromEnv: boolean;
 }
 export interface SettingsPatch {
   requireApiKey?: boolean;
@@ -1103,6 +1112,7 @@ export interface SettingsPatch {
   imageResizeMaxDimension?: number;
   /** integer 50..4096 */
   imageResizeMaxKB?: number;
+  logLevel?: LogLevel;
 }
 
 export type ThinkingFormat = "reasoning_content" | "thinking" | "think";

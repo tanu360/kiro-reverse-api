@@ -140,8 +140,10 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	}
 	if q.Search != "" {
 		like := "%" + escapeSQLLike(q.Search) + "%"
-		where = append(where, "(email LIKE ? ESCAPE '\\' OR account_id LIKE ? ESCAPE '\\' OR api_key_id LIKE ? ESCAPE '\\' OR api_key LIKE ? ESCAPE '\\' OR model LIKE ? ESCAPE '\\' OR message LIKE ? ESCAPE '\\' OR endpoint LIKE ? ESCAPE '\\' OR error_type LIKE ? ESCAPE '\\' OR request_id LIKE ? ESCAPE '\\')")
+		keyClause, keyArgs := newRequestKeySearch(q.Search).sql()
+		where = append(where, "(email LIKE ? ESCAPE '\\' OR account_id LIKE ? ESCAPE '\\' OR api_key_id LIKE ? ESCAPE '\\' OR api_key LIKE ? ESCAPE '\\' OR model LIKE ? ESCAPE '\\' OR message LIKE ? ESCAPE '\\' OR endpoint LIKE ? ESCAPE '\\' OR error_type LIKE ? ESCAPE '\\' OR request_id LIKE ? ESCAPE '\\'"+keyClause+")")
 		args = append(args, like, like, like, like, like, like, like, like, like)
+		args = append(args, keyArgs...)
 	}
 	whereSQL := ""
 	if len(where) > 0 {

@@ -98,6 +98,10 @@ func (h *Handler) authenticateForClaudeWithRequestLog(w http.ResponseWriter, r *
 			provided := extractProvidedKey(r)
 			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, "", 0, 0, 0, false, ae.status, ae.message)
 		}
+		if ae.status == http.StatusTooManyRequests {
+			//! Every 429 here is the key's own limit, already reached.
+			markNoRetry(w)
+		}
 		h.sendClaudeError(w, ae.status, ae.code, ae.message)
 		return nil
 	}
@@ -122,6 +126,10 @@ func (h *Handler) authenticateForOpenAIWithRequestLog(w http.ResponseWriter, r *
 		if recordRequest {
 			provided := extractProvidedKey(r)
 			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, "", 0, 0, 0, false, ae.status, ae.message)
+		}
+		if ae.status == http.StatusTooManyRequests {
+			//! Every 429 here is the key's own limit, already reached.
+			markNoRetry(w)
 		}
 		h.sendOpenAIError(w, ae.status, ae.code, ae.message)
 		return nil
