@@ -86,3 +86,45 @@ export function hasTag(account: Pick<Account, "tags">, tag: string): boolean {
   const key = tagKey(tag);
   return (account.tags ?? []).some((existing) => tagKey(existing) === key);
 }
+
+/** A text field's selection, as `selectionStart` and `selectionEnd` read it. */
+export interface FieldSelection {
+  start: number;
+  end: number;
+}
+
+/**
+ * The real text after an edit of the masked copy a field shows (a quick-pick tag under privacy).
+ * `selection` is the field's selection just before the edit, or null when it was not seen.
+ * Replacing the whole masked text (select all, then type, paste or delete) gives just the new
+ * text. An edit next to characters the mask keeps as they are, such as the head "op" or the tail
+ * ".com" of "op***@ex***.com", lands at the same place in the real text. An edit among the masked
+ * characters has no real place to go, so it gives the real text unchanged.
+ */
+export function editMaskedText(
+  real: string,
+  masked: string,
+  next: string,
+  selection: FieldSelection | null,
+): string {
+  let same = 0;
+  while (same < masked.length && same < next.length && masked[same] === next[same]) same += 1;
+  // The edit replaced masked[start, cut) with next[start, next.length - kept).
+  const start = Math.min(same, selection?.start ?? same, selection?.end ?? same);
+  const selectionEnd = Math.max(start, selection?.start ?? start, selection?.end ?? start);
+  const maxKept = Math.max(0, Math.min(masked.length - selectionEnd, next.length - start));
+  let kept = 0;
+  while (kept < maxKept && masked[masked.length - 1 - kept] === next[next.length - 1 - kept]) {
+    kept += 1;
+  }
+  const cut = masked.length - kept;
+  const typed = next.slice(start, next.length - kept);
+  if (start === 0 && cut === masked.length) return typed;
+  const after = masked.slice(start);
+  if (real.endsWith(after)) {
+    return real.slice(0, real.length - after.length) + typed + masked.slice(cut);
+  }
+  const before = masked.slice(0, cut);
+  if (real.startsWith(before)) return masked.slice(0, start) + typed + real.slice(cut);
+  return real;
+}

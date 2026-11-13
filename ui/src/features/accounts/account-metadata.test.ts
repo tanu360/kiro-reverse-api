@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  editMaskedText,
   hasTag,
   MAX_TAG_LENGTH,
   MAX_TAGS,
@@ -56,5 +57,42 @@ describe("hasTag", () => {
     expect(hasTag({ tags: ["Team-A"] }, "team-a")).toBe(true);
     expect(hasTag({ tags: ["Team-A"] }, "team")).toBe(false);
     expect(hasTag({ tags: [] }, "x")).toBe(false);
+  });
+});
+
+describe("editMaskedText", () => {
+  const real = "ops@example.com";
+  const masked = "op***@ex***.com";
+  const caret = (at: number) => ({ start: at, end: at });
+
+  it("gives the new text when the whole masked text is replaced", () => {
+    const all = { start: 0, end: masked.length };
+    expect(editMaskedText(real, masked, "z", all)).toBe("z");
+    // A replacement that starts like the masked text is still a replacement.
+    expect(editMaskedText(real, masked, "o", all)).toBe("o");
+    expect(editMaskedText(real, masked, "", all)).toBe("");
+    expect(editMaskedText(real, masked, "ci-team", all)).toBe("ci-team");
+  });
+
+  it("lands an edit next to the kept head or tail at the same place in the real text", () => {
+    expect(editMaskedText(real, masked, `${masked}x`, caret(masked.length))).toBe(`${real}x`);
+    expect(editMaskedText(real, masked, masked.slice(0, -1), caret(masked.length))).toBe(
+      "ops@example.co",
+    );
+    expect(editMaskedText(real, masked, "op***@ex***.org", { start: 12, end: 15 })).toBe(
+      "ops@example.org",
+    );
+    expect(editMaskedText(real, masked, `x${masked}`, caret(0))).toBe(`x${real}`);
+    expect(editMaskedText(real, masked, "opx***@ex***.com", caret(2))).toBe("opxs@example.com");
+    expect(editMaskedText(real, masked, "o***@ex***.com", caret(2))).toBe("os@example.com");
+  });
+
+  it("gives the real text unchanged for an edit among the masked characters", () => {
+    expect(editMaskedText(real, masked, "op*x**@ex***.com", caret(3))).toBe(real);
+  });
+
+  it("reads the edit from the text alone when the selection was not seen", () => {
+    expect(editMaskedText(real, masked, `${masked}x`, null)).toBe(`${real}x`);
+    expect(editMaskedText(real, masked, "zz", null)).toBe("zz");
   });
 });

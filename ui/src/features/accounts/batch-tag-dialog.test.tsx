@@ -82,18 +82,42 @@ describe("BatchTagDialog", () => {
     expect(bodies[0]).toEqual({ ids: [first.id], action: "removeTag", tag: "ops@example.com" });
   });
 
-  it("opens the tag itself, not its masked text, when a masked pick is edited", async () => {
+  async function pickMaskedTag() {
     const [first] = mockDb.accounts;
     first.tags = ["ops@example.com"];
-    const { user } = renderDialog([first.id]);
+    const view = renderDialog([first.id]);
     const dialog = await screen.findByRole("dialog", { name: "Tag 1 account" });
     const picks = within(dialog).getByRole("group", { name: "Tags in use" });
-    await user.click(within(picks).getByRole("button", { name: /^op\S+@\S+\.com$/ }));
-    const input = within(dialog).getByRole("textbox", { name: "Tag" });
-    await user.type(input, "{Backspace}");
-    expect(input).toHaveValue("ops@example.com");
+    await view.user.click(within(picks).getByRole("button", { name: /^op\S+@\S+\.com$/ }));
+    const input = within(dialog).getByRole("textbox", { name: "Tag" }) as HTMLInputElement;
+    expect(input.value).toBe("op***@ex***.com");
+    return { ...view, dialog, input };
+  }
+
+  it("edits the tag itself, not its masked text, when the end of a masked pick is edited", async () => {
+    const { user, input } = await pickMaskedTag();
     await user.type(input, "{Backspace}");
     expect(input).toHaveValue("ops@example.co");
+    await user.type(input, "m");
+    expect(input).toHaveValue("ops@example.com");
+  });
+
+  it("types over a masked pick that is selected whole, without losing a key", async () => {
+    const { user, input } = await pickMaskedTag();
+    await user.keyboard("{Control>}a{/Control}zz");
+    expect(input).toHaveValue("zz");
+    expect(document.body.innerHTML).not.toContain("ops@example.com");
+  });
+
+  it("pastes over a masked pick that is selected whole", async () => {
+    const bodies = captureBatch();
+    const { user, dialog, input } = await pickMaskedTag();
+    await user.keyboard("{Control>}a{/Control}");
+    await user.paste("ci");
+    expect(input).toHaveValue("ci");
+    await user.click(within(dialog).getByRole("button", { name: "Add tag" }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ action: "addTag", tag: "ci" });
   });
 
   it("names an account that already has the most tags in the result toast", async () => {

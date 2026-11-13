@@ -1,4 +1,4 @@
-import { type FormEvent, type JSX, useId, useMemo, useRef, useState } from "react";
+import { type FormEvent, type JSX, useCallback, useId, useMemo, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,14 @@ import type {
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { MAX_TAG_LENGTH, MAX_TAGS, parseTagInput, tagKey } from "./account-metadata";
+import {
+  editMaskedText,
+  type FieldSelection,
+  MAX_TAG_LENGTH,
+  MAX_TAGS,
+  parseTagInput,
+  tagKey,
+} from "./account-metadata";
 import { describeFailures } from "./account-model";
 import { useInvalidateAccounts } from "./use-account-actions";
 
@@ -55,6 +62,23 @@ export function BatchTagDialog({
   const { t } = useT("accounts");
   const formId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // The field's selection just before an edit: it tells a replaced masked pick from an edit of it.
+  const selectionBeforeEdit = useRef<FieldSelection | null>(null);
+  const fieldRef = useCallback((node: HTMLInputElement | null) => {
+    inputRef.current = node;
+    if (!node) return;
+    const note = () => {
+      selectionBeforeEdit.current = {
+        start: node.selectionStart ?? node.value.length,
+        end: node.selectionEnd ?? node.value.length,
+      };
+    };
+    node.addEventListener("beforeinput", note);
+    return () => {
+      node.removeEventListener("beforeinput", note);
+      inputRef.current = null;
+    };
+  }, []);
   const invalidate = useInvalidateAccounts();
   const displayEmail = useDisplayEmail();
   const mask = useMaskText();
@@ -168,12 +192,18 @@ export function BatchTagDialog({
           <Input
             autoComplete="off"
             onChange={(event) => {
+              const next = event.target.value;
+              // An edit of a masked pick lands on the tag itself: the masked text is never a tag.
+              setDraft(
+                shown === draft
+                  ? next
+                  : editMaskedText(draft, shown, next, selectionBeforeEdit.current),
+              );
+              selectionBeforeEdit.current = null;
               setPicked(null);
-              // An edit of a masked pick opens the tag itself: the masked text is never a tag.
-              setDraft(shown === draft ? event.target.value : draft);
               if (error) setError(null);
             }}
-            ref={inputRef}
+            ref={fieldRef}
             spellCheck={false}
             value={shown}
           />

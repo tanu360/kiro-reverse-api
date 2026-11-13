@@ -484,11 +484,12 @@ describe("AccountsPage tags", () => {
     dana.tags = ["All"];
     const { table, user, router } = await renderAccounts();
     await user.click(screen.getByRole("button", { name: "Tag: All" }));
-    const rows = await screen.findAllByRole("menuitemradio", { name: /^All/ });
-    // The All row and the tag: only the All row is checked while no tag is picked.
-    expect(rows).toHaveLength(2);
-    expect(rows.filter((row) => row.getAttribute("aria-checked") === "true")).toHaveLength(1);
-    await user.click(rows[1]);
+    const allRow = await screen.findByRole("menuitemradio", { name: /^All/ });
+    // The tag reads quoted in the menu, so the menu never shows two All rows.
+    const tagRow = screen.getByRole("menuitemradio", { name: /^“All”/ });
+    expect(allRow).toHaveAttribute("aria-checked", "true");
+    expect(tagRow).toHaveAttribute("aria-checked", "false");
+    await user.click(tagRow);
     await waitFor(() => expect(router.state.location.search).toMatchObject({ tag: "all" }));
     await waitFor(() => expect(bodyRows(table)).toHaveLength(1));
     // The picked tag is quoted, so the trigger never reads like the unfiltered state.
