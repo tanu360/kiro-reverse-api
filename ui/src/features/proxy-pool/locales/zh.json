@@ -13,7 +13,7 @@
   "card.intervalTitle": "健康检查",
   "card.intervalHint": "代理池开启时，按此频率通过每个代理连接 Kiro 主机。",
   "card.intervalOff": "关闭",
-  "card.intervalEvery": "每 {minutes} 分钟",
+  "card.intervalEvery": "每 {interval}",
   "card.empty": "还没有代理。添加代理后，账号可分散到多个出站 IP 地址。",
   "card.checkedAt": "检查于 {time}",
   "card.notChecked": "尚未检查",

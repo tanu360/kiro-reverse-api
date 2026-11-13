@@ -13,7 +13,7 @@
   "card.intervalTitle": "Verificação de saúde",
   "card.intervalHint": "Com o pool ligado, conecta ao host do Kiro por cada proxy nesta frequência.",
   "card.intervalOff": "Desligada",
-  "card.intervalEvery": "A cada {minutes} min",
+  "card.intervalEvery": "A cada {interval}",
   "card.empty": "Ainda não há proxies. Adicione um para distribuir as contas entre vários IPs de saída.",
   "card.checkedAt": "Verificado {time}",
   "card.notChecked": "Ainda não verificado",

@@ -13,7 +13,7 @@
   "card.intervalTitle": "Health check",
   "card.intervalHint": "While the pool is on, connect to the Kiro host through each proxy on this schedule.",
   "card.intervalOff": "Off",
-  "card.intervalEvery": "Every {minutes} min",
+  "card.intervalEvery": "Every {interval}",
   "card.empty": "No proxies yet. Add one to spread accounts over several outbound IP addresses.",
   "card.checkedAt": "Checked {time}",
   "card.notChecked": "Not checked yet",

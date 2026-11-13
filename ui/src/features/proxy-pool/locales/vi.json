@@ -13,7 +13,7 @@
   "card.intervalTitle": "Kiểm tra định kỳ",
   "card.intervalHint": "Khi nhóm đang bật, kết nối tới máy chủ Kiro qua từng proxy theo lịch này.",
   "card.intervalOff": "Tắt",
-  "card.intervalEvery": "Mỗi {minutes} phút",
+  "card.intervalEvery": "Mỗi {interval}",
   "card.empty": "Chưa có proxy nào. Thêm proxy để chia tài khoản ra nhiều địa chỉ IP đi ra.",
   "card.checkedAt": "Kiểm tra {time}",
   "card.notChecked": "Chưa kiểm tra",

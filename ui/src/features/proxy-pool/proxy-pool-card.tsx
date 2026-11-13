@@ -36,7 +36,7 @@ import {
   updateProxyPoolSettings,
 } from "@/lib/api/proxy-pool";
 import { queryKeys } from "@/lib/api/query-keys";
-import { formatDurationMs } from "@/lib/format";
+import { formatDuration, formatDurationMs } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
@@ -67,10 +67,14 @@ function IntervalSelect({
   onChange: (minutes: number) => void;
   disabled?: boolean;
 }): JSX.Element {
-  const { t } = useT("proxy-pool");
+  const { t, lang } = useT("proxy-pool");
+  // {interval} reads "5 minutes", "1 hour" or "1 day".
   const items = intervalOptions(value).map((minutes) => ({
     value: String(minutes),
-    label: minutes === 0 ? t("card.intervalOff") : t("card.intervalEvery", { minutes }),
+    label:
+      minutes === 0
+        ? t("card.intervalOff")
+        : t("card.intervalEvery", { interval: formatDuration(minutes * 60, lang, "long") }),
   }));
   return (
     <Select
@@ -250,7 +254,6 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
             value={interval}
           />
         }
-        controlWidth="number"
         description={t("card.intervalHint")}
         title={t("card.intervalTitle")}
       />
