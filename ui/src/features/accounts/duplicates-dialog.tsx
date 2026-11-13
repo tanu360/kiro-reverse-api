@@ -120,7 +120,11 @@ export function DuplicatesDialog({
         }
       }
     } finally {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+      // The kept account's requests today and live RPM now include the removed copies'.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.observe.accountActivity() }),
+      ]);
       setMerging(false);
     }
     if (removed > 0) toast.success(t("duplicates.mergeSuccess", { count: removed }));
