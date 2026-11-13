@@ -14,6 +14,7 @@ import {
   formatAuthMethod,
   formatCreditAmount,
   formatResetDate,
+  hasMaskedProxyPassword,
   isBanned,
   isHeld,
   isValidMachineId,
@@ -312,6 +313,14 @@ describe("proxyDisplayUrl", () => {
   it("leaves a URL without credentials as it is", () => {
     expect(proxyDisplayUrl("socks5h://host:1080")).toBe("socks5h://host:1080");
     expect(proxyDisplayUrl("http://user@proxy:3128")).toBe("http://user@proxy:3128");
+  });
+});
+
+describe("hasMaskedProxyPassword", () => {
+  it("spots the mask the server sends for a saved password", () => {
+    expect(hasMaskedProxyPassword("socks5://user:********@127.0.0.1:1080")).toBe(true);
+    expect(hasMaskedProxyPassword("socks5://user@127.0.0.1:1080")).toBe(false);
+    expect(hasMaskedProxyPassword("")).toBe(false);
   });
 });
 

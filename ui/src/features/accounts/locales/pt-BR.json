@@ -220,6 +220,7 @@
   "detail.proxyURL": "Proxy da conta",
   "detail.proxyURLPlaceholder": "socks5://host:port",
   "detail.proxyHint": "Deixe vazio para usar o proxy global.",
+  "detail.proxyPasswordKept": "A senha salva aparece como ********. Deixe como está para manter a senha.",
   "detail.proxyFormatError": "Comece a URL com socks5://, socks5h://, http:// ou https://.",
   "detail.tokenExpiry": "Validade do token",
   "detail.trialCredits": "Créditos de avaliação",

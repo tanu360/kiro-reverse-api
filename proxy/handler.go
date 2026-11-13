@@ -2694,7 +2694,7 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 			"overageRate":       a.OverageRate,
 			"currentOverages":   a.CurrentOverages,
 			"overageCheckedAt":  a.OverageCheckedAt,
-			"proxyURL":          a.ProxyURL,
+			"proxyURL":          maskProxyURL(a.ProxyURL),
 			"subscriptionType":  a.SubscriptionType,
 			"subscriptionTitle": a.SubscriptionTitle,
 			"daysRemaining":     a.DaysRemaining,
@@ -2801,6 +2801,12 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 		writeAdminError(w, http.StatusNotFound, codeAccountNotFound, "Account not found")
 		return
 	}
+	//! Checked before any field is written, so a bad proxy URL leaves the account untouched.
+	proxyURL, hasProxyURL, proxyErr := accountProxyURLUpdate(updates, existing.ProxyURL)
+	if proxyErr != nil {
+		writeProxyURLError(w, proxyErr)
+		return
+	}
 	metadata, err := parseMetadataPatch(updates)
 	if err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, err.Error())
@@ -2839,8 +2845,8 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	if hasPriority {
 		existing.Priority = priority
 	}
-	if v, ok := updates["proxyURL"].(string); ok {
-		existing.ProxyURL = v
+	if hasProxyURL {
+		existing.ProxyURL = proxyURL
 	}
 	if v, ok := updates["silent"].(bool); ok {
 		existing.Silent = v
@@ -4350,7 +4356,7 @@ func applyProxyConfig(proxyURL string) {
 
 func (h *Handler) apiGetProxy(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
-		"proxyURL": config.GetProxyURL(),
+		"proxyURL": maskProxyURL(config.GetProxyURL()),
 	})
 }
 
@@ -4372,6 +4378,13 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	//! GET answers with the password masked; the mask sent back keeps the saved one.
+	restored, err := restoreProxyPassword(req.ProxyURL, config.GetProxyURL())
+	if err != nil {
+		writeProxyURLError(w, err)
+		return
+	}
+	req.ProxyURL = restored
 
 	if err := config.UpdateProxySettings(req.ProxyURL); err != nil {
 		w.WriteHeader(500)

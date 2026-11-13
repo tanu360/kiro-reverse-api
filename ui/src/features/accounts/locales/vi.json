@@ -204,6 +204,7 @@
   "detail.proxyURL": "Proxy tài khoản",
   "detail.proxyURLPlaceholder": "socks5://host:port",
   "detail.proxyHint": "Để trống để dùng proxy chung.",
+  "detail.proxyPasswordKept": "Mật khẩu đã lưu hiển thị là ********. Giữ nguyên để giữ mật khẩu này.",
   "detail.proxyFormatError": "URL phải bắt đầu bằng socks5://, socks5h://, http:// hoặc https://.",
   "detail.tokenExpiry": "Hạn token",
   "detail.trialCredits": "Credit dùng thử",
