@@ -68,6 +68,53 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
   });
 
+  it("shows a cut section name whole when the keyboard reaches its link, not only on hover", async () => {
+    // From xl the nav is the sidebar's rows, where a name can be cut beside its pill.
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes("min-width: 1280px"),
+          media: query,
+          onchange: null,
+          addListener: () => {},
+          removeListener: () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    // jsdom has no layout: "Stream integrity" reads as cut, every other name as whole.
+    const cut = (element: Element) =>
+      element.classList.contains("truncate") && element.textContent === "Stream integrity";
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return cut(this) ? 200 : 0;
+    });
+    try {
+      const { user } = await renderPage();
+      const nav = screen.getByRole("navigation", { name: "Settings sections" });
+      const link = within(nav).getByRole("link", { name: /^Stream integrity/ });
+      let tabs = 0;
+      while (document.activeElement !== link && tabs < 60) {
+        await user.tab();
+        tabs += 1;
+      }
+      expect(link).toHaveFocus();
+      await waitFor(() =>
+        expect(document.querySelector("[data-slot=tooltip-popup]")).toHaveTextContent(
+          "Stream integrity",
+        ),
+      );
+
+      // A name that fits gets no tooltip.
+      await user.tab();
+      await waitFor(() => expect(document.querySelector("[data-slot=tooltip-popup]")).toBeNull());
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it("saves the Usage switch as it is flipped, with no Save of its own", async () => {
     const { user } = await renderPage();
     const usage = section(SECTION_ID.usage);

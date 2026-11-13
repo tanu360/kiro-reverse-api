@@ -16,7 +16,6 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusDot } from "@/components/shared/status-dot";
-import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProxyPoolCard } from "@/features/proxy-pool/proxy-pool-card";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { proxyPoolQuery } from "@/lib/api/proxy-pool";
@@ -236,6 +236,60 @@ interface NavEntry {
   danger: boolean;
 }
 
+/**
+ * One wide-nav row: the app sidebar's row as a link to its section. A name cut beside its pill
+ * (pt-BR "Integridade do stream") shows whole in a tooltip while it is cut, on hover and when
+ * the keyboard focuses the link (the link is the tooltip's trigger, not the name inside it).
+ */
+function WideNavLink({
+  entry,
+  onClick,
+}: {
+  entry: NavEntry;
+  onClick: (event: MouseEvent<HTMLAnchorElement>, id: SectionId) => void;
+}): JSX.Element {
+  const label = useRef<HTMLSpanElement | null>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <Tooltip
+      onOpenChange={(next) => {
+        const element = label.current;
+        setOpen(next && element !== null && element.scrollWidth > element.clientWidth);
+      }}
+      open={open}
+    >
+      <SidebarMenuButton
+        isActive={entry.current}
+        render={
+          <TooltipTrigger
+            render={
+              <a
+                aria-current={entry.current ? "true" : undefined}
+                href={`#${entry.id}`}
+                onClick={(event) => onClick(event, entry.id)}
+              />
+            }
+          />
+        }
+        variant={entry.danger ? "destructive" : "default"}
+      >
+        <HugeiconsIcon aria-hidden="true" icon={entry.icon} />
+        <span className="block min-w-0 flex-1 truncate" ref={label}>
+          {entry.label}
+        </span>
+        {entry.dirty ? <DirtyMark /> : null}
+        {/* In the row's own flex line, so the label truncates before a pill of any width. */}
+        {entry.on === undefined ? null : (
+          <span className="flex shrink-0">
+            <StateBadge on={entry.on} />
+          </span>
+        )}
+      </SidebarMenuButton>
+      <TooltipPopup>{entry.label}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
 /** The section's saved On/Off, visual only: the link keeps the section name. */
 function StateBadge({ on }: { on: boolean }): JSX.Element {
   const { t } = useT("settings");
@@ -341,28 +395,7 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
             <SidebarMenu aria-labelledby={labelId}>
               {entries.map((entry) => (
                 <SidebarMenuItem key={entry.id}>
-                  <SidebarMenuButton
-                    isActive={entry.current}
-                    render={
-                      <a
-                        aria-current={entry.current ? "true" : undefined}
-                        href={`#${entry.id}`}
-                        onClick={(event) => onClick(event, entry.id)}
-                      />
-                    }
-                    variant={entry.danger ? "destructive" : "default"}
-                  >
-                    <HugeiconsIcon aria-hidden="true" icon={entry.icon} />
-                    {/* A label cut beside a pill (pt-BR "Integridade do stream") shows whole on hover. */}
-                    <TruncatedText className="flex-1">{entry.label}</TruncatedText>
-                    {entry.dirty ? <DirtyMark /> : null}
-                    {/* In the row's own flex line, so the label truncates before a pill of any width. */}
-                    {entry.on === undefined ? null : (
-                      <span className="flex shrink-0">
-                        <StateBadge on={entry.on} />
-                      </span>
-                    )}
-                  </SidebarMenuButton>
+                  <WideNavLink entry={entry} onClick={onClick} />
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
