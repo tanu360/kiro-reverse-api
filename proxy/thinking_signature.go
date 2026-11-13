@@ -1,5 +1,7 @@
 package proxy
 
+import "encoding/json"
+
 //! Kiro's reasoningContentEvent is flat: {"text"?, "signature"?, "redactedContent"?}, the same
 //! shape as Bedrock's ReasoningContentBlockDelta. The signature usually comes as its own event
 //! after the block's last text. Only /v1/messages has a place for either field: a thinking
@@ -77,4 +79,41 @@ func applyClaudeThinkingExtras(blocks []ClaudeContentBlock, signature string, re
 		result = append(result, ClaudeContentBlock{Type: "redacted_thinking", Data: data})
 	}
 	return append(result, blocks[insertAt:]...)
+}
+
+// MarshalJSON writes the fields the Messages API always sends for a block type even when they
+// are empty: an omitted "thinking" or "signature" reads as None in the SDKs, and client code
+// that takes the length of block.thinking breaks on it.
+func (b ClaudeContentBlock) MarshalJSON() ([]byte, error) {
+	type plain ClaudeContentBlock
+	switch b.Type {
+	case "thinking":
+		return json.Marshal(struct {
+			Type      string `json:"type"`
+			Thinking  string `json:"thinking"`
+			Signature string `json:"signature"`
+		}{b.Type, b.Thinking, b.Signature})
+	case "text":
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		}{b.Type, b.Text})
+	case "redacted_thinking":
+		return json.Marshal(struct {
+			Type string `json:"type"`
+			Data string `json:"data"`
+		}{b.Type, b.Data})
+	case "tool_use":
+		input := b.Input
+		if input == nil {
+			input = map[string]interface{}{}
+		}
+		return json.Marshal(struct {
+			Type  string      `json:"type"`
+			ID    string      `json:"id"`
+			Name  string      `json:"name"`
+			Input interface{} `json:"input"`
+		}{b.Type, b.ID, b.Name, input})
+	}
+	return json.Marshal(plain(b))
 }

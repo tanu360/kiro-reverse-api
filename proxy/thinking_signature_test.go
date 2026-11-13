@@ -333,8 +333,9 @@ func TestClaudeStreamNoKiroSignatureUnchanged(t *testing.T) {
 	}
 	msg := decodeClaudeMessage(t, postThinkingClaude(t, h, false, "", nil))
 	block := responseSSEMap(t, responseSSESlice(t, msg["content"])[0])
-	if _, has := block["signature"]; has || block["type"] != "thinking" {
-		t.Fatalf("thinking block = %v, want no signature field", block)
+	//! The API always sends both strings; without a Kiro signature the field is empty, not missing.
+	if sig, has := block["signature"]; !has || sig != "" || block["type"] != "thinking" || block["thinking"] != "plan it" {
+		t.Fatalf("thinking block = %v, want an empty signature string", block)
 	}
 }
 
