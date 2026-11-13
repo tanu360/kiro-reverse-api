@@ -2,6 +2,7 @@ import { type HttpHandler, HttpResponse, http } from "msw";
 import type { ResponseHeaderRule } from "@/lib/api/response-headers";
 import type {
   ApiDomain,
+  LogLevel,
   ModelMappingRule,
   PreferredEndpoint,
   PromptFilterRule,
@@ -49,6 +50,7 @@ const API_REGIONS = ["us-east-1", "eu-central-1"];
 const AWS_REGION = /^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$/;
 
 const ROUTING_MODES: readonly string[] = ["weighted", "priority"] satisfies RoutingMode[];
+const LOG_LEVELS: readonly string[] = ["debug", "info", "warn", "error"] satisfies LogLevel[];
 
 type Json = Record<string, unknown>;
 
@@ -118,6 +120,10 @@ function readSettingsPatch(body: Json): SettingsPatch | null {
   const password = optional(body, "password", isString);
   if (password === null) return null;
   if (password !== undefined) patch.password = password;
+  // Any string decodes; the handler then rejects an unknown level with log_level_invalid.
+  const logLevel = optional(body, "logLevel", isString);
+  if (logLevel === null) return null;
+  if (logLevel !== undefined) patch.logLevel = logLevel as LogLevel;
   return patch;
 }
 
@@ -336,6 +342,11 @@ export const handlers: HttpHandler[] = [
     const body = await readObject(request);
     const patch = body ? readSettingsPatch(body) : null;
     if (!patch) return invalidJson();
+    if (patch.logLevel !== undefined && !LOG_LEVELS.includes(patch.logLevel)) {
+      return jsonError(400, "logLevel must be one of: debug, info, warn, error", {
+        code: "log_level_invalid",
+      });
+    }
     if (
       patch.autoContinueMax !== undefined &&
       (patch.autoContinueMax < 1 || patch.autoContinueMax > MAX_AUTO_CONTINUE)

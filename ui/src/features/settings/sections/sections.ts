@@ -4,6 +4,7 @@ import {
   ArrowDataTransferHorizontalIcon,
   CloudServerIcon,
   Coins01Icon,
+  ComputerTerminal01Icon,
   Database01Icon,
   FilterHorizontalIcon,
   FirstAidKitIcon,
@@ -67,6 +68,12 @@ export const SETTINGS_SECTIONS = [
   },
   { id: "settings-alerts", titleKey: "alerts:title", icon: Notification01Icon, group: "server" },
   {
+    id: "settings-server-log",
+    titleKey: "serverLog.title",
+    icon: ComputerTerminal01Icon,
+    group: "server",
+  },
+  {
     id: "settings-prompt-filter",
     titleKey: "promptFilter",
     icon: FilterHorizontalIcon,
@@ -113,6 +120,7 @@ export const SECTION_ID = {
   proxyPool: "settings-proxy-pool",
   responseHeaders: "settings-response-headers",
   alerts: "settings-alerts",
+  serverLog: "settings-server-log",
   promptFilter: "settings-prompt-filter",
   logRetention: "settings-log-retention",
   dangerZone: "settings-danger-zone",

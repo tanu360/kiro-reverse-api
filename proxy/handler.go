@@ -3770,6 +3770,7 @@ func (h *Handler) apiGetStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
+	logLevel, logLevelFromEnv := currentLogLevel()
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"requireApiKey":          config.IsApiKeyRequired(),
 		"port":                   config.GetPort(),
@@ -3788,6 +3789,9 @@ func (h *Handler) apiGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"imageResize":             config.GetImageResize(),
 		"imageResizeMaxDimension": config.GetImageResizeMaxDimension(),
 		"imageResizeMaxKB":        config.GetImageResizeMaxKB(),
+
+		"logLevel":        logLevel,
+		"logLevelFromEnv": logLevelFromEnv,
 	})
 }
 
@@ -3883,9 +3887,16 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		ImageResize             *bool `json:"imageResize,omitempty"`
 		ImageResizeMaxDimension *int  `json:"imageResizeMaxDimension,omitempty"`
 		ImageResizeMaxKB        *int  `json:"imageResizeMaxKB,omitempty"`
+
+		LogLevel *string `json:"logLevel,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
+		return
+	}
+	logLevel, ok := parseLogLevelPatch(req.LogLevel)
+	if !ok {
+		writeAdminError(w, http.StatusBadRequest, codeLogLevelInvalid, "logLevel must be one of: debug, info, warn, error")
 		return
 	}
 
@@ -3996,6 +4007,12 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := applyImageResizePatch(req.ImageResize, req.ImageResizeMaxDimension, req.ImageResizeMaxKB); err != nil {
+		w.WriteHeader(500)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	if err := applyLogLevel(logLevel); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
