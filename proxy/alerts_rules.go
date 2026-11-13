@@ -250,6 +250,14 @@ func accountLabel(acc config.Account) string {
 	}
 }
 
+// accountCount writes "1 account" or "3 accounts".
+func accountCount(n int) string {
+	if n == 1 {
+		return "1 account"
+	}
+	return strconv.Itoa(n) + " accounts"
+}
+
 func formatCredits(v float64) string {
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
@@ -263,7 +271,7 @@ func accountUsageMessage(acc config.Account, threshold int, now int64) alertMess
 	label := accountLabel(acc)
 	text := fmt.Sprintf("%s has used %.1f%% of its credits (%s of %s).", label, pct, formatCredits(acc.UsageCurrent), formatCredits(acc.UsageLimit))
 	if acc.NextResetDate != "" {
-		text += " Resets " + acc.NextResetDate + "."
+		text += " Credits reset on " + acc.NextResetDate + "."
 	}
 	return alertMessage{
 		Event:    alertEventAccountUsage,
@@ -293,7 +301,7 @@ func poolUsageMessage(used, limit float64, n, threshold int, now int64) alertMes
 		Event:    alertEventPoolUsage,
 		Severity: severity,
 		Title:    fmt.Sprintf("Pool usage passed %d%%", threshold),
-		Text:     fmt.Sprintf("The pool has used %.1f%% of its credits (%s of %s over %d accounts).", pct, formatCredits(used), formatCredits(limit), n),
+		Text:     fmt.Sprintf("The pool has used %.1f%% of its credits (%s of %s, across %s).", pct, formatCredits(used), formatCredits(limit), accountCount(n)),
 		Data: map[string]any{
 			"threshold": threshold,
 			"percent":   roundPercent(pct),
@@ -308,9 +316,9 @@ func poolUsageMessage(used, limit float64, n, threshold int, now int64) alertMes
 func bannedMessage(acc config.Account, now int64) alertMessage {
 	label := accountLabel(acc)
 	reason := strings.TrimSpace(acc.BanReason)
-	text := label + " was banned and taken out of the pool."
+	text := label + " was banned and no longer serves requests."
 	if reason != "" {
-		text = label + " was banned and taken out of the pool: " + reason
+		text += " Reason: " + reason
 	}
 	return alertMessage{
 		Event:    alertEventAccountBanned,
@@ -328,11 +336,16 @@ func bannedMessage(acc config.Account, now int64) alertMessage {
 }
 
 func allUnavailableMessage(pooled int, since, now int64) alertMessage {
+	at := time.Unix(since, 0).UTC().Format("2006-01-02 15:04 UTC")
+	text := fmt.Sprintf("None of the %d accounts in the pool has been able to serve requests since %s. Each one is banned, suspended, cooling down or out of credits.", pooled, at)
+	if pooled == 1 {
+		text = "The only account in the pool has not been able to serve requests since " + at + ". It is banned, suspended, cooling down or out of credits."
+	}
 	return alertMessage{
 		Event:    alertEventAllUnavailable,
 		Severity: "critical",
 		Title:    "No account available",
-		Text:     fmt.Sprintf("None of the %d accounts in the pool can serve requests (banned, suspended, cooling down or out of credits) since %s.", pooled, time.Unix(since, 0).UTC().Format(time.RFC3339)),
+		Text:     text,
 		Data: map[string]any{
 			"accounts": pooled,
 			"since":    since,
@@ -346,7 +359,7 @@ func testAlertMessage(now int64) alertMessage {
 		Event:    alertEventTest,
 		Severity: "info",
 		Title:    "Test alert",
-		Text:     "This channel is set up: alerts from Kiro Proxy will arrive here.",
+		Text:     "This channel works. Alerts from Kiro Proxy will arrive here.",
 		TS:       now,
 	}
 }
