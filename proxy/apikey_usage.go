@@ -167,8 +167,9 @@ func queryApiKeyUsage(now time.Time, rng usageRange, tzOffsetMin int, keys []con
 		return resp, err
 	}
 
-	// A rejected request is logged with an empty key ID and the raw key it sent. When that raw
-	// value is a configured key (disabled or over its limit), the CASE names the key's slot.
+	// Versions before 3.3.0 logged a rejected request with an empty key ID and the raw key it
+	// sent. The start-up migration (db.MaskRequestKeys) gives such a row its key's ID and masks
+	// the value; the CASE still names the key's slot for a row it could not reach.
 	var slotCases strings.Builder
 	args := []interface{}{off, size}
 	for i, key := range keys {
