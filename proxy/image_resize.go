@@ -97,6 +97,12 @@ func resizeKiroImage(img *KiroImage, lim imageResizeLimits) bool {
 	return resizeImage(img, lim, newResizeAllowance())
 }
 
+// logUndecodableImage notes an inbound image dropped because its base64 does not decode. The
+// model then answers as if no image was sent, so this line is the only trace of it.
+func logUndecodableImage(size int) {
+	logger.Warnf("[Image] Dropped an image whose base64 does not decode (%d characters)", size)
+}
+
 // resizeAllowance is what one payload may spend on full decodes: a number of them, and
 // one deadline for every wait on the memory budget together.
 type resizeAllowance struct {
