@@ -537,3 +537,42 @@ func TestUpstreamHTTPStatus(t *testing.T) {
 		}
 	}
 }
+
+// A 400 that every Kiro endpoint gives is tried on each of them (D6); the attempt list shows
+// each endpoint, not only the last one.
+func TestAttemptChainListsEveryEndpointTried(t *testing.T) {
+	var hits []string
+	h := newAttemptChainHandler(t, 1, func(w http.ResponseWriter, r *http.Request) {
+		hits = append(hits, r.URL.Path)
+		http.Error(w, `{"message":"Improperly formed request.","reason":"IMAGE_FORMAT_UNSUPPORTED"}`, http.StatusBadRequest)
+	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits = append(hits, r.URL.Path)
+		http.Error(w, `{"message":"Improperly formed request.","reason":"IMAGE_FORMAT_UNSUPPORTED"}`, http.StatusBadRequest)
+	}))
+	t.Cleanup(server.Close)
+	kiroEndpoints = []kiroEndpoint{
+		{URL: server.URL + "/one", Origin: "AI_EDITOR", Name: "Kiro IDE"},
+		{URL: server.URL + "/two", Origin: "AI_EDITOR", Name: "CodeWhisperer"},
+		{URL: server.URL + "/three", Origin: "AI_EDITOR", Name: "AmazonQ"},
+	}
+	if err := config.UpdateEndpointFallback(true); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := withRequestTrace(httptest.NewRequest(http.MethodPost, "/v1/messages", nil), requestEndpointClaude)
+	h.handleClaudeNonStream(rec, req, testKiroPayload(), "claude-sonnet-4.5", false, claudeThinkingResponseOptions{}, 1, nil, nil)
+	if rec.Code != http.StatusBadRequest || len(hits) != 3 {
+		t.Fatalf("status %d after %d upstream calls, want 400 after 3", rec.Code, len(hits))
+	}
+	attempts := lastRecordedAttempts(t)
+	if len(attempts) != 3 {
+		t.Fatalf("attempts = %#v, want one per endpoint", attempts)
+	}
+	for i, want := range []string{"Kiro IDE", "CodeWhisperer", "AmazonQ"} {
+		a := attempts[i]
+		if a.Endpoint != want || a.Success || a.Status != http.StatusBadRequest || a.Failover || a.AccountID != attempts[0].AccountID {
+			t.Fatalf("attempt %d = %#v, want a failed try on %s", i, a, want)
+		}
+	}
+}

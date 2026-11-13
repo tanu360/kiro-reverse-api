@@ -418,7 +418,11 @@ func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payloa
 	var clientErr *upstreamClientError
 endpointLoop:
 	for epIndex, ep := range endpoints {
-		noteAttemptEndpoint(ctx, ep.Name)
+		if epIndex > 0 && lastErr != nil {
+			traceEndpointFallback(ctx, account, ep.Name, lastErr)
+		} else {
+			noteAttemptEndpoint(ctx, ep.Name)
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}

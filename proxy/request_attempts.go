@@ -201,6 +201,25 @@ func traceAttemptGiveUp(ctx context.Context) {
 	}
 }
 
+// traceEndpointFallback runs when a Kiro endpoint failed and the same account tries the next
+// one. The open attempt closes as failed with err and a new one opens on endpoint, so the
+// request's attempt list shows every endpoint tried, not only the last.
+func traceEndpointFallback(ctx context.Context, account *config.Account, endpoint string, err error) {
+	_, c := attemptChainFromContext(ctx)
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	tried := err != nil && c.open && !c.done && len(c.items) > 0 && c.items[len(c.items)-1].Endpoint != ""
+	c.mu.Unlock()
+	if !tried {
+		noteAttemptEndpoint(ctx, endpoint)
+		return
+	}
+	traceAttemptFailed(ctx, account, 0, err)
+	traceAttemptStart(ctx, account, endpoint)
+}
+
 // noteAttemptEndpoint records the Kiro endpoint the open attempt is calling.
 func noteAttemptEndpoint(ctx context.Context, name string) {
 	_, c := attemptChainFromContext(ctx)
