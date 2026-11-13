@@ -6,15 +6,10 @@ import { mockDb } from "@/lib/mocks/db";
 import { apiUrl, jsonError } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { maskEmail, maskEmailsInText } from "@/lib/privacy";
-import { toastError } from "@/lib/toast";
+import { toast } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 import { inMemoryRequestsHandler } from "./mocks";
 import { formatRowDate } from "./request-model";
-
-vi.mock("@/lib/toast", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/toast")>();
-  return { ...actual, toastError: vi.fn() };
-});
 
 const RECENT_REQUESTS = apiUrl("/observe/recent-requests");
 
@@ -59,7 +54,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.mocked(toastError).mockClear();
+  vi.restoreAllMocks();
 });
 
 describe("RequestsPage", () => {
@@ -80,7 +75,7 @@ describe("RequestsPage", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
   });
 
-  it("debounces the search by 250 ms, resets the page and keeps the search in the URL", async () => {
+  it("debounces the search by 250 ms, resets the page and keeps the search out of the URL", async () => {
     const seen = recordRequests();
     const { router } = await renderApp("/requests?page=2");
     await waitForRows();
@@ -93,15 +88,16 @@ describe("RequestsPage", () => {
     act(() => {
       vi.advanceTimersByTime(249);
     });
-    expect(router.state.location.search).not.toHaveProperty("search");
+    expect(last(seen).has("search")).toBe(false);
     act(() => {
       vi.advanceTimersByTime(1);
     });
     vi.useRealTimers();
 
-    await waitFor(() => expect(router.state.location.search).toEqual({ search: "sonnet" }));
     await waitFor(() => expect(last(seen).get("search")).toBe("sonnet"));
     expect(last(seen).get("page")).toBe("1");
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(router.state.location.href).toBe("/requests");
     expect(seen.every((params) => params.get("search") !== "  sonnet ")).toBe(true);
   });
 
@@ -120,13 +116,53 @@ describe("RequestsPage", () => {
     expect(screen.getByRole("searchbox", { name: "Search requests" })).toHaveValue(key);
   });
 
-  it("moves a key out of a pasted link and searches for it", async () => {
+  it("never puts a custom key typed slowly into the URL or the history, at any length", async () => {
     const seen = recordRequests();
-    const { router } = await renderApp(
-      "/requests?search=sk-pasted-key-0123456789abcd&status=failed",
-    );
-    await waitFor(() => expect(last(seen).get("search")).toBe("sk-pasted-key-0123456789abcd"));
+    const { router } = await renderApp("/requests?status=failed");
+    await waitForRows();
+    const box = screen.getByRole("searchbox", { name: "Search requests" });
+    const hrefs = new Set<string>();
+    const stop = router.subscribe("onResolved", () => {
+      hrefs.add(router.state.location.href);
+    });
+    const historyBefore = window.history.length;
+
+    // A custom key with no sk- prefix, 24 characters, one every 600 ms: each prefix outlives
+    // the 250 ms debounce and is searched on its own.
+    const key = "teamalphasecretvalue2026";
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    for (let length = 1; length <= key.length; length += 1) {
+      fireEvent.change(box, { target: { value: key.slice(0, length) } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+      hrefs.add(router.state.location.href);
+      hrefs.add(window.location.href);
+    }
+    vi.useRealTimers();
+    stop();
+
+    await waitFor(() => expect(last(seen).get("search")).toBe(key));
+    expect(seen.some((params) => params.get("search") === "team")).toBe(true);
+    for (const href of hrefs) {
+      expect(decodeURIComponent(href)).not.toContain("tea");
+      expect(href).not.toContain("search");
+    }
+    expect(router.state.location.search).toEqual({ status: "failed" });
+    expect(window.history.length).toBe(historyBefore);
+  });
+
+  it("takes the search from a pasted link once, then cleans it off the URL", async () => {
+    const seen = recordRequests();
+    const { router } = await renderApp("/requests?search=teamalphasecret&status=failed");
+    await waitFor(() => expect(last(seen).get("search")).toBe("teamalphasecret"));
+    // The first request already searches: the unfiltered list never loads in between.
+    expect(seen.every((params) => params.get("search") === "teamalphasecret")).toBe(true);
     await waitFor(() => expect(router.state.location.search).toEqual({ status: "failed" }));
+    expect(router.state.location.href).not.toContain("teamalpha");
+    expect(screen.getByRole("searchbox", { name: "Search requests" })).toHaveValue(
+      "teamalphasecret",
+    );
   });
 
   it("counts each status in its tab, as Accounts does", async () => {
@@ -543,11 +579,14 @@ describe("RequestsPage", () => {
         fail ? HttpResponse.json({ error: "database is locked" }, { status: 500 }) : undefined,
       ),
     );
+    const errorToast = vi.spyOn(toast, "error");
     const { user } = await renderApp("/requests");
     await waitForRows();
     fail = true;
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(errorToast).toHaveBeenCalledTimes(1));
+    // The list's own news: never copied into an open detail sheet (modal-notice.tsx).
+    expect(errorToast.mock.calls[0]?.[1]).toEqual({ background: true });
     expect(bodyRows()).toHaveLength(25);
   });
 });

@@ -4,7 +4,7 @@
   "search": "Tìm yêu cầu",
   "searchPlaceholder": "Tìm tài khoản, API key, model hoặc lỗi",
   "searchPlaceholderShort": "Tìm kiếm",
-  "searchHint": "Tìm kiếm cũng khớp với API key đầy đủ, nên kết quả khớp có thể không hiện trong cột API key đã che. Key đầy đủ không bao giờ được ghi vào địa chỉ trang. Nhập loại lỗi như trong bảng, ví dụ “Lỗi proxy”, để chỉ liệt kê các yêu cầu thất bại thuộc loại đó.",
+  "searchHint": "Tìm kiếm cũng khớp với API key đầy đủ, nên kết quả khớp có thể không hiện trong cột API key đã che. Nội dung tìm kiếm không bao giờ được ghi vào địa chỉ trang. Nhập loại lỗi như trong bảng, ví dụ “Lỗi proxy”, để chỉ liệt kê các yêu cầu thất bại thuộc loại đó.",
   "searchHintLabel": "Về tìm kiếm",
   "clearSearch": "Xóa tìm kiếm",
   "statusFilter": "Trạng thái",

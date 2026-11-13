@@ -4,12 +4,13 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { Card } from "@/components/ui/card";
 import type { AccountActivityResponse } from "@/lib/api/account-activity";
+import type { Account } from "@/lib/api/types";
 import { EMPTY } from "@/lib/format";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
-import { AccountActivityLine, LiveActivityStrip } from "./account-activity";
+import { AccountActivityLine, LiveActivityStrip, LiveStatusPill } from "./account-activity";
 
 function serve(body: AccountActivityResponse): void {
   mockServer.use(http.get(apiUrl("/observe/account-activity"), () => HttpResponse.json(body)));
@@ -176,12 +177,75 @@ describe("account hold hints", () => {
       // biome-ignore lint/a11y/noStaticElementInteractions: stands in for a table row's click
       // biome-ignore lint/a11y/useKeyWithClickEvents: stands in for a table row's click
       <div onClick={() => opened++}>
+        <LiveStatusPill account={activeAccount("a")} size="sm" />
         <AccountActivityLine accountId="a" />
       </div>,
     );
-    await user.click(await screen.findByRole("button", { name: "Cooling down" }));
+    await user.click(await screen.findByRole("button", { name: /^Cooling down/ }));
     expect(await screen.findByRole("dialog")).toHaveTextContent(/1m 30s/);
     expect(opened).toBe(0);
     expect(screen.getByText(/3 today/)).toBeInTheDocument();
+  });
+});
+
+function activeAccount(id: string, patch: Partial<Account> = {}): Account {
+  const base = mockDb.accounts.find((account) => account.enabled && account.hasToken);
+  if (!base) throw new Error("fixture missing");
+  return {
+    ...base,
+    id,
+    banStatus: "",
+    banReason: "",
+    expiresAt: 4_000_000_000,
+    usageCurrent: 0,
+    usageLimit: 50,
+    ...patch,
+  };
+}
+
+describe("a cooling account", () => {
+  const cooling = activity({
+    a: { today: 43, rpm: 0, atLimit: false, cooldownUntil: 1_800_000_045 },
+  });
+
+  it("reads Cooling down in its pill, not Active, with the time left in the hint", async () => {
+    serve(cooling);
+    renderWithProviders(<LiveStatusPill account={activeAccount("a")} size="sm" />);
+    const pill = await screen.findByRole("button", { name: /^Cooling down/ });
+    expect(pill).toHaveTextContent(/back in rotation in 45s/);
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+  });
+
+  it("puts the time left in the line under the pill, not a second Cooling down", async () => {
+    serve(cooling);
+    renderWithProviders(<AccountActivityLine accountId="a" />);
+    expect(await screen.findByText("45s left")).toBeInTheDocument();
+    expect(screen.getByText("43 today")).toBeInTheDocument();
+    expect(screen.queryByText("Cooling down")).not.toBeInTheDocument();
+  });
+
+  it("reads Active again once the cooldown is over", async () => {
+    serve(activity({ a: { today: 43, rpm: 1, atLimit: false, cooldownUntil: 1_799_999_990 } }));
+    renderWithProviders(
+      <>
+        <LiveStatusPill account={activeAccount("a")} size="sm" />
+        <AccountActivityLine accountId="a" />
+      </>,
+    );
+    expect(await screen.findByText("1/min · 43 today")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+  });
+
+  it("keeps a stronger status than Active, such as Disabled", async () => {
+    serve(cooling);
+    renderWithProviders(
+      <>
+        <LiveStatusPill account={activeAccount("a", { enabled: false })} size="sm" />
+        <AccountActivityLine accountId="a" />
+      </>,
+    );
+    expect(await screen.findByText("45s left")).toBeInTheDocument();
+    expect(screen.getByText("Disabled")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Cooling down/ })).not.toBeInTheDocument();
   });
 });

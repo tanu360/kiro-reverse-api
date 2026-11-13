@@ -506,7 +506,6 @@ export function formatTokenExpiry(expiry: TokenExpiry, t: TFunction): string {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HEX32_PATTERN = /^[0-9a-f]{32}$/i;
-const PROXY_PATTERN = /^(socks5|socks5h|http|https):\/\/([^/?#]*)\/?$/i;
 
 /** Empty (clears the value), a UUID or 32 hex characters, any case. */
 export function isValidMachineId(value: string): boolean {
@@ -530,42 +529,8 @@ export function hasMaskedProxyPassword(url: string): boolean {
   return url.includes(`:${MASKED_PROXY_PASSWORD}@`);
 }
 
-/**
- * Empty (global proxy) or a socks5, socks5h, http or https URL with a host, and a port from 1 to
- * 65535 (http and https may leave it out). The same rules as the server's ValidateOutboundURL:
- * "http://", port 99999, a space or a host with a second port are refused.
- */
-export function isValidProxyUrl(value: string): boolean {
-  const trimmed = value.trim();
-  if (trimmed === "") return true;
-  const match = PROXY_PATTERN.exec(trimmed);
-  if (!match || /\s/.test(trimmed)) return false;
-  const scheme = (match[1] ?? "").toLowerCase();
-  const authority = match[2] ?? "";
-  const hostPort = authority.slice(authority.lastIndexOf("@") + 1);
-  let host = hostPort;
-  let port = "";
-  if (hostPort.startsWith("[")) {
-    const close = hostPort.indexOf("]");
-    if (close < 0) return false;
-    host = hostPort.slice(1, close);
-    // Brackets hold an IPv6 address, never a typed host:port.
-    // An IPv6 address has at least two colons; "1.2.3.4:8080" in brackets is a host:port.
-    if (!/^[0-9a-f:.]+(%.+)?$/i.test(host) || host.split(":").length < 3) return false;
-    const rest = hostPort.slice(close + 1);
-    if (rest !== "" && !rest.startsWith(":")) return false;
-    port = rest.slice(1);
-  } else {
-    const parts = hostPort.split(":");
-    if (parts.length > 2) return false;
-    host = parts[0] ?? "";
-    port = parts[1] ?? "";
-  }
-  if (host === "") return false;
-  if (port === "") return !scheme.startsWith("socks5");
-  const n = Number(port);
-  return /^\d+$/.test(port) && n >= 1 && n <= 65535;
-}
+/** The account's own proxy URL: empty (the pool or the global proxy) or one the server accepts. */
+export { isValidProxyUrl } from "@/features/settings/lib/proxy-url";
 
 // ---------------------------------------------------------------------------
 // Credentials JSON (contains secrets: never log)

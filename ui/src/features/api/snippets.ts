@@ -1,9 +1,13 @@
 // Client setup snippets. They only ever name the KIRO_API_KEY env var: never a real key.
 // Checked against the current docs:
 // - Claude Code: ANTHROPIC_BASE_URL overrides the API endpoint; ANTHROPIC_AUTH_TOKEN is sent as
-//   "Authorization: Bearer <value>" (https://code.claude.com/docs/en/env-vars).
+//   "Authorization: Bearer <value>"; ANTHROPIC_MODEL is the main model, and
+//   ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL are what the opus, sonnet and haiku aliases (and
+//   the background tasks, on haiku) send (https://code.claude.com/docs/en/env-vars).
 // - Codex: [model_providers.<id>] with name, base_url, env_key and wire_api = "responses", picked
 //   by model_provider in ~/.codex/config.toml (https://developers.openai.com/codex/config-advanced).
+//   model_catalog_json is a path ("~" expands) to a model list in the /v1/codex/models format;
+//   Codex never fetches that list itself, and without it has no apply_patch tool.
 // - SDKs: the Anthropic clients take the bare origin (they add /v1/messages themselves); the
 //   OpenAI clients take the origin with /v1.
 
@@ -563,21 +567,49 @@ export function buildRequestSnippet(
   }
 }
 
+/**
+ * The models Claude Code is set to. Its own defaults (claude-*-5-5 in Claude Code 2.1) are not
+ * served on free accounts, which answer them with a 404; these two are served on every account,
+ * free tier included. They are environment variables, not a mapping rule on the server, so they
+ * change only the client that copies them: a client that names its model keeps it, and Opus stays
+ * Opus for every other client of an account that serves it.
+ */
+export const CLAUDE_CODE_MODELS = {
+  main: "claude-sonnet-4.5",
+  opus: "claude-sonnet-4.5",
+  sonnet: "claude-sonnet-4.5",
+  haiku: "claude-haiku-4.5",
+} as const;
+
+/** Where the Codex setup saves the /v1/codex/models list ("~" expands in Codex's config). */
+export const CODEX_CATALOG_FILE = "~/.codex/kiro-models.json";
+
 /** The Claude Code and Codex setups for a proxy reachable at `origin` (e.g. location.origin). */
 export function buildToolSnippets(
   origin: string,
   model: string = SNIPPET_MODEL,
-): { claudeCode: string; codex: string } {
+): { claudeCode: string; codexModels: string; codex: string } {
   const env = SNIPPET_KEY_ENV;
   return {
     claudeCode: lines(
       `export ANTHROPIC_BASE_URL="${origin}"`,
       `export ANTHROPIC_AUTH_TOKEN="$${env}"`,
+      `export ANTHROPIC_MODEL="${CLAUDE_CODE_MODELS.main}"`,
+      `export ANTHROPIC_DEFAULT_OPUS_MODEL="${CLAUDE_CODE_MODELS.opus}"`,
+      `export ANTHROPIC_DEFAULT_SONNET_MODEL="${CLAUDE_CODE_MODELS.sonnet}"`,
+      `export ANTHROPIC_DEFAULT_HAIKU_MODEL="${CLAUDE_CODE_MODELS.haiku}"`,
       "claude",
+    ),
+    // -f: an error (a wrong key) writes no file; --create-dirs: a first Codex run has no ~/.codex.
+    codexModels: lines(
+      `curl -fsS --create-dirs -o ${CODEX_CATALOG_FILE} \\`,
+      `  -H "Authorization: Bearer $${env}" \\`,
+      `  "${origin}/v1/codex/models"`,
     ),
     codex: lines(
       `model = "${model}"`,
       'model_provider = "kiro"',
+      `model_catalog_json = "${CODEX_CATALOG_FILE}"`,
       "",
       "[model_providers.kiro]",
       'name = "Kiro Proxy"',

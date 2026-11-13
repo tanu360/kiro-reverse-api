@@ -31,7 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { type ProxyModel, parseProxyUrl, schemeForType } from "@/features/settings/lib/proxy-url";
+import {
+  PROXY_HOST_PROBLEM_KEYS,
+  type ProxyModel,
+  parseProxyUrl,
+  schemeForType,
+} from "@/features/settings/lib/proxy-url";
 import { addPoolProxy, type PoolProxy, updatePoolProxy } from "@/lib/api/proxy-pool";
 import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
@@ -116,7 +121,7 @@ export function ProxyEditor({
   const kind = kindOf(model.proxy);
   const kindHint = KINDS.find((item) => item.value === kind)?.hint ?? "settings:proxySocks5Hint";
   const tipId = `${id}-address-tip`;
-  const hostInvalid = showErrors && (errors.host || errors.hostPort);
+  const hostInvalid = showErrors && errors.host !== null;
   const portInvalid = showErrors && errors.port;
   const labelInvalid = showErrors && errors.label;
 
@@ -191,10 +196,8 @@ export function ProxyEditor({
                 spellCheck={false}
                 value={model.proxy.host}
               />
-              {hostInvalid ? (
-                <FieldError match>
-                  {errors.host ? t("settings:proxyHostRequired") : t("editor.hostHasPort")}
-                </FieldError>
+              {hostInvalid && errors.host ? (
+                <FieldError match>{t(PROXY_HOST_PROBLEM_KEYS[errors.host])}</FieldError>
               ) : null}
             </Field>
             <Field className="min-w-0 items-stretch" invalid={portInvalid}>

@@ -4,7 +4,7 @@
   "search": "Search requests",
   "searchPlaceholder": "Search account, API key, model or error",
   "searchPlaceholderShort": "Search",
-  "searchHint": "Search also matches the full API key, so a match may not show in the masked API key column. A full key never goes into the page address. Type an error type as the table shows it, such as Proxy error, to list only those failed requests.",
+  "searchHint": "Search also matches the full API key, so a match may not show in the masked API key column. The search text never goes into the page address. Type an error type as the table shows it, such as Proxy error, to list only those failed requests.",
   "searchHintLabel": "About search",
   "clearSearch": "Clear search",
   "statusFilter": "Status",

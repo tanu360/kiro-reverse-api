@@ -4,7 +4,7 @@
   "search": "Buscar requisições",
   "searchPlaceholder": "Buscar conta, chave de API, modelo ou erro",
   "searchPlaceholderShort": "Buscar",
-  "searchHint": "A busca também compara a chave de API completa, então um resultado pode não aparecer na coluna de chave de API mascarada. A chave completa nunca vai para o endereço da página. Digite um tipo de erro como aparece na tabela, por exemplo “Erro de proxy”, para listar só as requisições com falha desse tipo.",
+  "searchHint": "A busca também compara a chave de API completa, então um resultado pode não aparecer na coluna de chave de API mascarada. O texto da busca nunca vai para o endereço da página. Digite um tipo de erro como aparece na tabela, por exemplo “Erro de proxy”, para listar só as requisições com falha desse tipo.",
   "searchHintLabel": "Sobre a busca",
   "clearSearch": "Limpar busca",
   "statusFilter": "Status",

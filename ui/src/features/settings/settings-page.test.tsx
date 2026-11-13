@@ -68,6 +68,53 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
   });
 
+  it("shows a cut section name whole when the keyboard reaches its link, not only on hover", async () => {
+    // From xl the nav is the sidebar's rows, where a name can be cut beside its pill.
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes("min-width: 1280px"),
+          media: query,
+          onchange: null,
+          addListener: () => {},
+          removeListener: () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    // jsdom has no layout: "Stream integrity" reads as cut, every other name as whole.
+    const cut = (element: Element) =>
+      element.classList.contains("truncate") && element.textContent === "Stream integrity";
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return cut(this) ? 200 : 0;
+    });
+    try {
+      const { user } = await renderPage();
+      const nav = screen.getByRole("navigation", { name: "Settings sections" });
+      const link = within(nav).getByRole("link", { name: /^Stream integrity/ });
+      let tabs = 0;
+      while (document.activeElement !== link && tabs < 60) {
+        await user.tab();
+        tabs += 1;
+      }
+      expect(link).toHaveFocus();
+      await waitFor(() =>
+        expect(document.querySelector("[data-slot=tooltip-popup]")).toHaveTextContent(
+          "Stream integrity",
+        ),
+      );
+
+      // A name that fits gets no tooltip.
+      await user.tab();
+      await waitFor(() => expect(document.querySelector("[data-slot=tooltip-popup]")).toBeNull());
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it("saves the Usage switch as it is flipped, with no Save of its own", async () => {
     const { user } = await renderPage();
     const usage = section(SECTION_ID.usage);
@@ -450,6 +497,56 @@ describe("SettingsPage", () => {
 
       expect(within(dialog).getByText("Enter a proxy host.")).toBeInTheDocument();
       expect(await writes()).toEqual([]);
+    });
+
+    it("refuses a host with a port or a space in the field, as the server would", async () => {
+      const { user } = await renderPage();
+      const dialog = await openEditor(user);
+      const host = within(dialog).getByLabelText("Host");
+      const port = within(dialog).getByLabelText("Port");
+
+      await user.clear(host);
+      await user.type(host, "1.2.3.4:8080");
+      await user.clear(port);
+      await user.type(port, "9");
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(
+        within(dialog).getByText("Put the port in the Port field, not after the host."),
+      ).toBeInTheDocument();
+
+      await user.clear(host);
+      await user.type(host, "exa mple.com");
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(
+        within(dialog).getByText("Enter a host name or IP address with no spaces or slashes."),
+      ).toBeInTheDocument();
+      expect(await writes()).toEqual([]);
+    });
+
+    it("shows the server's refusal in the dialog, not only in a toast under it", async () => {
+      mockServer.use(
+        http.post(apiUrl("/proxy"), () =>
+          HttpResponse.json(
+            { error: "invalid proxy: url needs a port", code: "proxy_url_invalid" },
+            { status: 400 },
+          ),
+        ),
+      );
+      const { user } = await renderPage();
+      const dialog = await openEditor(user);
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+      const notice = await within(dialog).findByRole("alert");
+      expect(notice).toHaveTextContent(
+        "Could not save settings: The proxy URL needs a host and a port from 1 to 65535",
+      );
+      // Over the dialog's buttons, and gone once the form changes.
+      expect(
+        notice.compareDocumentPosition(within(dialog).getByRole("button", { name: "Save" })) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      await user.type(within(dialog).getByLabelText("Host"), "x");
+      expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("sends the encoded URL from the editor and shows the new route", async () => {

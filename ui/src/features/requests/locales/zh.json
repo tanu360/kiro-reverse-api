@@ -4,7 +4,7 @@
   "search": "搜索请求",
   "searchPlaceholder": "搜索账号、API Key、模型或错误",
   "searchPlaceholderShort": "搜索",
-  "searchHint": "搜索也会匹配完整的 API Key，因此匹配结果可能不会显示在已遮盖的 API Key 列中。完整的 API Key 不会写入页面地址。输入表格中显示的错误类型（例如“代理错误”），即可只列出该类型的失败请求。",
+  "searchHint": "搜索也会匹配完整的 API Key，因此匹配结果可能不会显示在已遮盖的 API Key 列中。搜索内容不会写入页面地址。输入表格中显示的错误类型（例如“代理错误”），即可只列出该类型的失败请求。",
   "searchHintLabel": "关于搜索",
   "clearSearch": "清除搜索",
   "statusFilter": "状态",

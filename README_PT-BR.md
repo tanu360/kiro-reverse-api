@@ -350,6 +350,8 @@ curl http://localhost:8080/v1/responses \
 
 Contas gratuitas respondem aos modelos padrão `claude-*-5-5` do Claude Code com um 404, então defina `ANTHROPIC_MODEL` e as variáveis `ANTHROPIC_DEFAULT_*_MODEL` com um modelo que suas contas atendem, como `claude-sonnet-4.5`.
 
+Para o Codex, salve `/v1/codex/models` em um arquivo e defina `model_catalog_json` com o caminho dele no `~/.codex/config.toml`; sem isso, o Codex fica sem a ferramenta `apply_patch`.
+
 ### 📌 Endpoints em resumo
 
 | Método   | Caminho                         | O que faz                                     |

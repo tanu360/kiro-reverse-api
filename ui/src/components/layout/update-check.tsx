@@ -88,6 +88,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
           toast.warning(tRef.current("shell.update.availableToast", { latest: version }), {
             id: AVAILABLE_TOAST_ID,
             duration: AVAILABLE_TOAST_MS,
+            background: true,
             action: { label: tRef.current("shell.update.view"), onClick: openDialog },
           });
         })

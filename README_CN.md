@@ -350,6 +350,8 @@ curl http://localhost:8080/v1/responses \
 
 免费账号会对 Claude Code 默认的 `claude-*-5-5` 模型返回 404，因此请把 `ANTHROPIC_MODEL` 和 `ANTHROPIC_DEFAULT_*_MODEL` 变量设为你的账号可用的模型，例如 `claude-sonnet-4.5`。
 
+使用 Codex 时，请把 `/v1/codex/models` 保存为文件，并在 `~/.codex/config.toml` 中把 `model_catalog_json` 设为该文件的路径；否则 Codex 没有 `apply_patch` 工具。
+
 ### 📌 端点速查
 
 | 方法     | 路径                            | 说明                                          |

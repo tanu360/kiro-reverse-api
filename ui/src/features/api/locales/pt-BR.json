@@ -177,8 +177,10 @@
   "snippets.sdk": "SDK da {name}",
   "snippets.request": "Requisição em {language}",
   "snippets.shell": "Shell",
-  "snippets.claudeCodeHint": "Execute em um shell e depois inicie o Claude Code no mesmo shell.",
-  "snippets.codexHint": "Adicione ao arquivo {file}. O Codex lê a chave de {env}.",
+  "snippets.claudeCodeHint": "Rode em um shell e depois inicie o Claude Code no mesmo shell. As linhas de modelo escolhem modelos que as contas gratuitas atendem.",
+  "snippets.codexModels": "lista de modelos do Codex",
+  "snippets.codexModelsHint": "Primeiro, salve a lista de modelos em {file}. O Codex precisa dela para a ferramenta {tool}. Rode de novo quando suas contas mudarem.",
+  "snippets.codexHint": "Depois, adicione a {file}. O Codex lê a chave de {env}.",
   "snippets.copy": "Copiar código de {name}",
   "snippets.codeRegion": "Código {name}"
 }

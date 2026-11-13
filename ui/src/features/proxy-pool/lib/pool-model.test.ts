@@ -95,12 +95,12 @@ describe("editor", () => {
 
   it("flags a missing host, a bad port and a long label", () => {
     const model = editorModel();
-    expect(editorErrors(model)).toEqual({ host: true, hostPort: false, port: true, label: false });
+    expect(editorErrors(model)).toEqual({ host: "missing", port: true, label: false });
     model.proxy = { ...model.proxy, host: "h", port: "70000" };
     expect(editorErrors(model).port).toBe(true);
     model.proxy = { ...model.proxy, port: "8080" };
     model.label = "x".repeat(65);
-    expect(editorErrors(model)).toEqual({ host: false, hostPort: false, port: false, label: true });
+    expect(editorErrors(model)).toEqual({ host: null, port: false, label: true });
     model.label = "x".repeat(64);
     expect(hasErrors(editorErrors(model))).toBe(false);
   });
@@ -108,12 +108,23 @@ describe("editor", () => {
   it("flags a port typed after the host, not an IPv6 host", () => {
     const model = editorModel();
     model.proxy = { ...model.proxy, host: "127.0.0.1:19403", port: "1080" };
-    expect(editorErrors(model).hostPort).toBe(true);
+    expect(editorErrors(model).host).toBe("port");
     expect(hasErrors(editorErrors(model))).toBe(true);
+    // Two ports typed after the host are a port too, as the server reads them.
+    model.proxy = { ...model.proxy, host: "1.2.3.4:8080:9" };
+    expect(editorErrors(model).host).toBe("port");
     model.proxy = { ...model.proxy, host: "::1" };
-    expect(editorErrors(model).hostPort).toBe(false);
+    expect(editorErrors(model).host).toBeNull();
     model.proxy = { ...model.proxy, host: "proxy.example.com" };
     expect(hasErrors(editorErrors(model))).toBe(false);
+  });
+
+  it("flags a host with a space or a slash, which the server refuses", () => {
+    const model = editorModel();
+    model.proxy = { ...model.proxy, host: "exa mple.com", port: "1080" };
+    expect(editorErrors(model).host).toBe("invalid");
+    model.proxy = { ...model.proxy, host: "proxy.example.com/path" };
+    expect(hasErrors(editorErrors(model))).toBe(true);
   });
 
   it("sends the address without sign-in and the credentials as their own fields", () => {

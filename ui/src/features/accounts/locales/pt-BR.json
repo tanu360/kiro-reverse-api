@@ -69,6 +69,7 @@
   "live.description_other": "{rpm} requisições concluídas no último minuto e {today} desde a meia-noite (horário do servidor).",
   "live.atLimitHint_one": "Esta conta está no limite de {limit} requisição por minuto. Toda tentativa enviada a ela é contabilizada, inclusive as que falharam e passaram para outra conta. Novas requisições vão para outras contas até a contagem dela ficar abaixo do limite.",
   "live.atLimitHint_other": "Esta conta está no limite de {limit} requisições por minuto. Toda tentativa enviada a ela é contabilizada, inclusive as que falharam e passaram para outra conta. Novas requisições vão para outras contas até a contagem dela ficar abaixo do limite.",
+  "live.cooldownLeft": "faltam {time}",
   "live.coolingDown": "Em espera",
   "live.coolingDownHint": "O pool ignora esta conta por um tempo após erros. Ela volta ao rodízio em {time}.",
   "live.today": "Requisições hoje",

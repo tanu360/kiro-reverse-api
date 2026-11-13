@@ -8,6 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type React from "react";
 import { Button } from "@/components/ui/button";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
+import { ModalNoticeHost, ModalNoticeOutlet } from "@/components/ui/modal-notice";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -136,7 +137,7 @@ export function DialogPopup({
           }}
           {...props}
         >
-          {children}
+          <ModalNoticeHost>{children}</ModalNoticeHost>
           {showCloseButton && (
             <DialogPrimitive.Close
               aria-label={t("actions.close")}
@@ -196,11 +197,17 @@ export function DialogFooter({
     "data-slot": "dialog-footer",
   };
 
-  return useRender({
-    defaultTagName: "div",
-    props: mergeProps<"div">(defaultProps, props),
-    render,
-  });
+  return (
+    <>
+      {/* An error or warning raised while the dialog is open (modal-notice.tsx). */}
+      <ModalNoticeOutlet />
+      {useRender({
+        defaultTagName: "div",
+        props: mergeProps<"div">(defaultProps, props),
+        render,
+      })}
+    </>
+  );
 }
 
 export function DialogTitle({

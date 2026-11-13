@@ -191,6 +191,8 @@
   "proxyAuth": "Authentication",
   "proxyUsername": "Username",
   "proxyPassword": "Password",
+  "proxyHostHasPort": "Put the port in the Port field, not after the host.",
+  "proxyHostInvalid": "Enter a host name or IP address with no spaces or slashes.",
   "proxyHostRequired": "Enter a proxy host.",
   "proxyPortInvalid": "Enter a port from 1 to 65535.",
   "proxyNoneHint": "Connect from this server's own network and IP address.",

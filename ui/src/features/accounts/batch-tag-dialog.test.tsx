@@ -127,8 +127,12 @@ describe("BatchTagDialog", () => {
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByRole("textbox", { name: "Tag" }), "new");
     await user.click(within(dialog).getByRole("button", { name: "Add tag" }));
-    expect(await screen.findByText("Tagged 1 account.")).toBeInTheDocument();
-    expect(await screen.findByText(/Already has 10 tags/)).toBeInTheDocument();
+    expect(
+      await screen.findByText("Tagged 1 account.", { selector: "[data-slot=toast-title]" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Already has 10 tags/, { selector: "[data-slot=toast-description]" }),
+    ).toBeInTheDocument();
   });
 
   it("asks for one tag and sends nothing for an empty or comma-separated value", async () => {

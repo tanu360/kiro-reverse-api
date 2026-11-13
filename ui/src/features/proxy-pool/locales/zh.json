@@ -48,7 +48,6 @@
   "editor.label": "名称",
   "editor.labelPlaceholder": "法兰克福 VPS",
   "editor.labelTooLong": "最多 {max} 个字符。",
-  "editor.hostHasPort": "请把端口填在“端口”栏，不要写在地址后面。",
   "editor.passwordKeep": "留空则保留已保存的密码。",
   "editor.passwordClear": "移除已保存的密码",
   "editor.added": "代理已添加，正在检查。",

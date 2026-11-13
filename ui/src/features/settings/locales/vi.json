@@ -185,6 +185,8 @@
   "proxyAuth": "Xác thực",
   "proxyUsername": "Tên người dùng",
   "proxyPassword": "Mật khẩu",
+  "proxyHostHasPort": "Hãy nhập cổng vào ô Cổng, không ghi sau host.",
+  "proxyHostInvalid": "Nhập tên host hoặc địa chỉ IP, không có dấu cách hay dấu gạch chéo.",
   "proxyHostRequired": "Nhập host proxy.",
   "proxyPortInvalid": "Nhập cổng từ 1 đến 65535.",
   "proxyNoneHint": "Kết nối bằng mạng và địa chỉ IP của chính máy chủ này.",

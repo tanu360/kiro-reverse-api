@@ -39,7 +39,10 @@ describe("ExportDialog", () => {
     expect(within(dialog).getByText("0 selected")).toBeInTheDocument();
     expect(within(dialog).getByRole("checkbox", { name: "Select all" })).not.toBeChecked();
     await user.click(within(dialog).getByRole("button", { name: "Copy JSON" }));
-    expect(await screen.findByText("Select at least one account.")).toBeInTheDocument();
+    // In the dialog itself: the toast sits under its backdrop (modal-notice.tsx).
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Select at least one account.",
+    );
     expect(copyText).not.toHaveBeenCalled();
   });
 
@@ -101,7 +104,9 @@ describe("ExportDialog", () => {
     const { dialog, user } = await openExport();
     await user.click(within(dialog).getByRole("checkbox", { name: "Select all" }));
     await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
-    expect(await screen.findByText("Select at least one account.")).toBeInTheDocument();
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Select at least one account.",
+    );
     expect(within(dialog).getByRole("radio", { name: "Accounts" })).toBeChecked();
     expect(within(dialog).getByRole("list", { name: "Accounts to export" })).toBeInTheDocument();
   });

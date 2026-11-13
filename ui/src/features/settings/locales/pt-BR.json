@@ -191,6 +191,8 @@
   "proxyAuth": "Autenticação",
   "proxyUsername": "Usuário",
   "proxyPassword": "Senha",
+  "proxyHostHasPort": "Coloque a porta no campo Porta, não depois do host.",
+  "proxyHostInvalid": "Informe um nome de host ou endereço IP, sem espaços nem barras.",
   "proxyHostRequired": "Informe o host do proxy.",
   "proxyPortInvalid": "Informe uma porta de 1 a 65535.",
   "proxyNoneHint": "Conecta pela rede e pelo IP deste servidor.",

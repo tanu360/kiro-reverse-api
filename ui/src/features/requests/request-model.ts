@@ -139,17 +139,6 @@ export function defaultSortDesc(columnId: string): boolean {
   return columnId === "time";
 }
 
-/**
- * Search text that may be a client API key: one word with a key prefix, or 20 characters or
- * more with no spaces. It stays out of the page URL, so a pasted key never lands in the
- * address bar or the browser history. Masked keys (with *) are not secrets.
- */
-export function isSecretSearch(text: string): boolean {
-  const value = text.trim();
-  if (value === "" || /[\s*]/.test(value)) return false;
-  return /^(sk|ksk|key)[-_]/i.test(value) || value.length >= 20;
-}
-
 export function hasFilters(search: RequestsSearch): boolean {
   return Boolean(search.search?.trim() || search.status);
 }

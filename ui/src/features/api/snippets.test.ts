@@ -127,6 +127,7 @@ describe("buildRequestSnippet", () => {
     for (const code of [
       ...COMBINATIONS.map((options) => buildRequestSnippet(ORIGIN, options)),
       tools.claudeCode,
+      tools.codexModels,
       tools.codex,
     ]) {
       for (const secret of secrets) expect(code).not.toContain(secret);
@@ -153,21 +154,37 @@ describe("compact snippets", () => {
 describe("buildToolSnippets", () => {
   const tools = buildToolSnippets(ORIGIN);
 
-  it("Claude Code points ANTHROPIC_BASE_URL at the origin without /v1", () => {
+  it("Claude Code points ANTHROPIC_BASE_URL at the origin without /v1 and picks free models", () => {
+    // Claude Code's own defaults (claude-*-5-5) get a 404 on free accounts.
     expect(tools.claudeCode).toBe(
       [
         `export ANTHROPIC_BASE_URL="${ORIGIN}"`,
         'export ANTHROPIC_AUTH_TOKEN="$KIRO_API_KEY"',
+        'export ANTHROPIC_MODEL="claude-sonnet-4.5"',
+        'export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-sonnet-4.5"',
+        'export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4.5"',
+        'export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4.5"',
         "claude",
       ].join("\n"),
     );
   });
 
-  it("Codex defines a responses provider on /v1 that reads KIRO_API_KEY", () => {
+  it("Codex saves the model list it never fetches itself, with the key", () => {
+    expect(tools.codexModels).toBe(
+      [
+        "curl -fsS --create-dirs -o ~/.codex/kiro-models.json \\",
+        '  -H "Authorization: Bearer $KIRO_API_KEY" \\',
+        `  "${ORIGIN}/v1/codex/models"`,
+      ].join("\n"),
+    );
+  });
+
+  it("Codex defines a responses provider on /v1 that reads KIRO_API_KEY and the model list", () => {
     expect(tools.codex).toBe(
       [
         'model = "auto"',
         'model_provider = "kiro"',
+        'model_catalog_json = "~/.codex/kiro-models.json"',
         "",
         "[model_providers.kiro]",
         'name = "Kiro Proxy"',
