@@ -60,11 +60,11 @@ func (h *Handler) retryEmptyModelsCache(delays []time.Duration) {
 	//! The native set is filled only by a sweep. When the boot sweep fails for every account
 	//! (token refresh or network down at start), substring rules would hijack native models
 	//! until the 30-minute timer. Retrying sooner shortens that window to about a minute.
-	for _, delay := range delays {
+	//! Logged after the wait, not before: at boot the first wait spans the boot listing itself.
+	for i, delay := range delays {
 		if h.modelsCacheFilled() {
 			return
 		}
-		logger.Infof("[ModelsCache] No models cached yet, retrying in %s", delay)
 		timer := time.NewTimer(delay)
 		select {
 		case <-timer.C:
@@ -73,6 +73,7 @@ func (h *Handler) retryEmptyModelsCache(delays []time.Duration) {
 			return
 		}
 		if !h.modelsCacheFilled() {
+			logger.Infof("[ModelsCache] No models cached yet, listing again (retry %d of %d)", i+1, len(delays))
 			h.refreshModelsCache()
 		}
 	}
