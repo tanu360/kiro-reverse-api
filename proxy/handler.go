@@ -1003,6 +1003,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	kiroPayload := ClaudeToKiro(&req, thinking)
 	kiroPayload.StopSequences = req.StopSequences
 	h.applyReasoningEffort(kiroPayload, req.Model, claudeOutputEffort(&req))
+	applyClaudeThinkingBudget(kiroPayload, req.Thinking)
 	attachStructuredOutput(kiroPayload, claudeStructuredOutputSpec(&req), req.Stream)
 	thinkingResponseOpts.Format = structuredOutputThinkingFormat(kiroPayload.StructuredOutput, thinkingResponseOpts.Format, "thinking")
 

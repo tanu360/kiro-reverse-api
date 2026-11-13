@@ -57,7 +57,11 @@ func (h *Handler) applyReasoningEffort(payload *KiroPayload, model, rawEffort st
 		payload.AdditionalModelRequestFields = map[string]interface{}{
 			"output_config": map[string]interface{}{"effort": native},
 		}
+		return
 	}
+	//! No FREE model lists an effort schema, so the level only switched thinking on: low and
+	//! xhigh thought the same. The thinking prompt's length now follows the level instead.
+	setThinkingLength(payload, effortThinkingLength[effort])
 }
 
 func (h *Handler) effortLevelsForModel(model string) []string {
