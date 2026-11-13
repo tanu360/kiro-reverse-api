@@ -98,9 +98,11 @@ func resizeKiroImage(img *KiroImage, lim imageResizeLimits) bool {
 }
 
 // logUndecodableImage notes an inbound image dropped because its base64 does not decode. The
-// model then answers as if no image was sent, so this line is the only trace of it.
+// model then answers as if no image was sent, so this line is the only trace of it. It is a
+// debug line: validation, token counting and translation each parse the content, so one bad
+// image logs it several times.
 func logUndecodableImage(size int) {
-	logger.Warnf("[Image] Dropped an image whose base64 does not decode (%d characters)", size)
+	logger.Debugf("[Image] Dropped an image whose base64 does not decode (%d characters)", size)
 }
 
 // resizeAllowance is what one payload may spend on full decodes: a number of them, and
