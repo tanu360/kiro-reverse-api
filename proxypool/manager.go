@@ -44,6 +44,10 @@ type Health struct {
 	FailedAt  int64  `json:"failedAt,omitempty"`
 	LatencyMs int64  `json:"latencyMs,omitempty"`
 	LastError string `json:"lastError,omitempty"`
+	// ErrorCode is the last failure's Kind, for the admin UI's own wording; ErrorStatus is
+	// the proxy's answer to CONNECT when it refused one.
+	ErrorCode   string `json:"errorCode,omitempty"`
+	ErrorStatus int    `json:"errorStatus,omitempty"`
 }
 
 // Route is where an account's traffic goes. URL is "" for direct.
@@ -207,6 +211,12 @@ func (m *Manager) ensureLoadedLocked() bool {
 	//! What changed in memory while the read kept failing is newer than the saved state.
 	for id, h := range state.Health {
 		if _, seen := m.health[id]; h != nil && !seen {
+			if h.LastError != "" && h.ErrorCode == "" {
+				//! Saved before ErrorCode existed: the text starts with the kind's wording.
+				if failure, ok := FailureOfText(h.LastError); ok {
+					h.ErrorCode, h.ErrorStatus = failure.Kind, failure.Status
+				}
+			}
 			m.health[id] = h
 		}
 	}
@@ -465,7 +475,7 @@ func (m *Manager) reportFailure(id, dialURL string, cause error) {
 	h.Status = StatusFailed
 	h.FailedAt = m.now().UnixMilli()
 	h.LatencyMs = 0
-	h.LastError = errorText(cause, p)
+	h.noteFailure(cause, p)
 	moved := m.moveAccountsLocked(pool, id)
 	m.persistLocked()
 	m.mu.Unlock()
@@ -517,10 +527,23 @@ func (m *Manager) reportSuccess(id, dialURL string) {
 	h = m.healthLocked(id)
 	h.Status = StatusOK
 	h.FailedAt = 0
-	h.LastError = ""
+	h.clearFailure()
 	m.persistLocked()
 	m.mu.Unlock()
 	m.fire(false)
+}
+
+// noteFailure stores err as the last failure: its redacted text and its kind.
+func (h *Health) noteFailure(err error, p config.PoolProxy) {
+	h.LastError = errorText(err, p)
+	h.ErrorCode, h.ErrorStatus = "", 0
+	if failure, ok := Describe(err); ok {
+		h.ErrorCode, h.ErrorStatus = failure.Kind, failure.Status
+	}
+}
+
+func (h *Health) clearFailure() {
+	h.LastError, h.ErrorCode, h.ErrorStatus = "", "", 0
 }
 
 // errorText is the stored last error: the failure kind, then the cause with every secret removed.
@@ -593,7 +616,7 @@ func (m *Manager) recordCheck(gen uint64, p config.PoolProxy, latency time.Durat
 	if err == nil {
 		h.Status = StatusOK
 		h.FailedAt = 0
-		h.LastError = ""
+		h.clearFailure()
 		h.LatencyMs = latency.Milliseconds()
 		if h.LatencyMs == 0 && latency > 0 {
 			h.LatencyMs = 1
@@ -602,7 +625,7 @@ func (m *Manager) recordCheck(gen uint64, p config.PoolProxy, latency time.Durat
 		h.Status = StatusFailed
 		h.FailedAt = now
 		h.LatencyMs = 0
-		h.LastError = errorText(err, p)
+		h.noteFailure(err, p)
 		moved = m.moveAccountsLocked(pool, p.ID)
 	}
 	m.persistLocked()

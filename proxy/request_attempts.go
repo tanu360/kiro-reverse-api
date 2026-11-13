@@ -38,6 +38,9 @@ type requestAttempt struct {
 	Status     int    `json:"status,omitempty"`
 	ErrorType  string `json:"errorType,omitempty"`
 	Message    string `json:"message,omitempty"`
+	// Proxy names a failure at the outbound proxy (ErrorType "proxy"); Message then
+	// holds the fixed wording clients get, and Go's text stays in the server log.
+	Proxy *attemptProxyFailure `json:"proxy,omitempty"`
 	// Failover marks a failed attempt that the next one moved to another account.
 	Failover bool `json:"failover,omitempty"`
 	// MidStream marks a failed attempt whose upstream stream had already sent output.
@@ -61,6 +64,14 @@ type attemptChain struct {
 	output  bool
 	skipped int
 	done    bool
+	// lastProxyFail is the latest attempt that failed at its proxy, with Go's text for
+	// that failure: the request's final record carries the same text when it ends on it.
+	lastProxyFail *failedAtProxy
+}
+
+type failedAtProxy struct {
+	raw     string
+	message string
 }
 
 func attemptChainFromContext(ctx context.Context) (*requestTrace, *attemptChain) {
@@ -125,7 +136,34 @@ func traceAttemptFailed(ctx context.Context, account *config.Account, status int
 	if status == 0 {
 		status = upstreamHTTPStatus(err)
 	}
-	c.closeLocked(now, false, status, err.Error())
+	failure, atProxy := proxyFailureOf(account, err)
+	if !atProxy {
+		c.closeLocked(now, false, status, err.Error())
+		return
+	}
+	//! Go's text repeats Kiro's URL and the proxy's address; the request log keeps the client's wording.
+	message := upstreamErrorText(err)
+	c.closeLocked(now, false, status, message)
+	last := &c.items[len(c.items)-1]
+	last.ErrorType = errorTypeProxy
+	last.Proxy = failure
+	c.lastProxyFail = &failedAtProxy{raw: err.Error(), message: message}
+}
+
+// proxyFailureMessage is the request log's wording for a request that ended on a
+// try that failed at its proxy: message is the final error's text, which is that
+// try's error text when the request ended on it.
+func (t *requestTrace) proxyFailureMessage(message string) (string, bool) {
+	if t == nil {
+		return "", false
+	}
+	c := &t.attempts
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.lastProxyFail == nil || c.lastProxyFail.raw != message {
+		return "", false
+	}
+	return c.lastProxyFail.message, true
 }
 
 // traceAttemptOK closes the open attempt as a success. Call it where an

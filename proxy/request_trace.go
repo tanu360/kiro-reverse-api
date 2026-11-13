@@ -89,6 +89,9 @@ func classifyRequestError(success bool, status int, message string) string {
 		return "suspended"
 	case isProfileUnavailableErrorMessage(message):
 		return "profile"
+	//! Before auth: a proxy's own "authentication failed" or "Forbidden" says nothing about the token.
+	case isProxyFailureMessage(message):
+		return errorTypeProxy
 	case isAuthErrorMessage(message), status == http.StatusUnauthorized:
 		return "auth"
 	case strings.Contains(lower, "upstream stream ended"),

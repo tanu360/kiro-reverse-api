@@ -191,6 +191,7 @@ FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? O
 		rec.Success = success == 1
 		rec.APIKeyMasked = requestAPIKeyMasked(rec.APIKeyID, rec.APIKey)
 		rec.Attempts = decodeAttempts(attemptsJSON)
+		tidyLoggedProxyFailures(&rec)
 		requests = append(requests, rec)
 	}
 	if err := rows.Err(); err != nil {
@@ -230,6 +231,7 @@ FROM requests ORDER BY ts DESC, id DESC LIMIT ?`, limit)
 		rec.Success = success == 1
 		rec.APIKeyMasked = requestAPIKeyMasked(rec.APIKeyID, rec.APIKey)
 		rec.Attempts = decodeAttempts(attemptsJSON)
+		tidyLoggedProxyFailures(&rec)
 		out = append(out, rec)
 	}
 	return out, rows.Err()
