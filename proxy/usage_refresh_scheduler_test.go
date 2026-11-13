@@ -385,20 +385,28 @@ type housekeepingRig struct {
 	sweeps   []time.Duration
 	inFlight int
 	overlap  bool
+	// listFails holds whether each listing, in order, asks for a retry; later ones do not.
+	listFails []bool
 
 	stop chan struct{}
 	done chan struct{}
 }
 
-func startHousekeepingRig(t *testing.T, interval, takes time.Duration) *housekeepingRig {
+func startHousekeepingRig(t *testing.T, interval, takes time.Duration, listFails ...bool) *housekeepingRig {
 	t.Helper()
-	r := &housekeepingRig{t: t, start: time.Now(), takes: takes, stop: make(chan struct{}), done: make(chan struct{})}
+	r := &housekeepingRig{t: t, start: time.Now(), takes: takes, listFails: listFails, stop: make(chan struct{}), done: make(chan struct{})}
 	r.interval.Store(int64(interval))
 	r.usage = newRefreshScheduler(func() time.Duration { return time.Duration(r.interval.Load()) })
 	go func() {
 		defer close(r.done)
 		runHousekeepingJobs(r.stop, r.usage,
-			func() { r.job(&r.listings) },
+			func() bool {
+				r.job(&r.listings)
+				r.mu.Lock()
+				defer r.mu.Unlock()
+				n := len(r.listings) - 1
+				return n < len(r.listFails) && r.listFails[n]
+			},
 			func(time.Duration) { r.job(&r.sweeps) })
 	}()
 	synctest.Wait()
@@ -536,6 +544,60 @@ func TestHousekeepingJobWaitingForItsTurnGivesUpOnStop(t *testing.T) {
 		r.close()
 		if l, s := r.counts(); l+s != 1 {
 			t.Fatalf("%d listings, %d sweeps after stop; the waiting job must not start", l, s)
+		}
+	})
+}
+
+func TestHousekeepingRetriesAFailedModelsListingSooner(t *testing.T) {
+	boot := 10 * time.Second
+	for _, tc := range []struct {
+		name  string
+		fails []bool
+		want  []time.Duration
+	}{
+		{"recovers on the 2nd retry", []bool{true, true, false},
+			[]time.Duration{boot, boot + time.Minute, boot + 3*time.Minute, boot + 3*time.Minute + modelsListEvery}},
+		{"keeps failing: 4 retries, then the regular cadence", []bool{true, true, true, true, true, true, true},
+			[]time.Duration{boot, boot + time.Minute, boot + 3*time.Minute, boot + 7*time.Minute, boot + 15*time.Minute,
+				boot + 15*time.Minute + modelsListEvery, boot + 15*time.Minute + 2*modelsListEvery}},
+		{"a later failure gets the retries again", []bool{false, true, false},
+			[]time.Duration{boot, boot + modelsListEvery, boot + modelsListEvery + time.Minute, boot + 2*modelsListEvery + time.Minute}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				r := startHousekeepingRig(t, 5*time.Minute, 0, tc.fails...)
+				defer r.close()
+
+				r.at(tc.want[len(tc.want)-1] + time.Second)
+				r.mu.Lock()
+				defer r.mu.Unlock()
+				if len(r.listings) != len(tc.want) {
+					t.Fatalf("listings at %v, want %v", r.listings, tc.want)
+				}
+				for i := range tc.want {
+					if r.listings[i] != tc.want[i] {
+						t.Fatalf("listings at %v, want %v", r.listings, tc.want)
+					}
+				}
+			})
+		})
+	}
+}
+
+func TestHousekeepingModelsRetryWaitsForTheUsageSweep(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Every job lasts 90 s, longer than the first retry delay, and every listing fails.
+		r := startHousekeepingRig(t, 5*time.Minute, 90*time.Second, true, true, true, true)
+		defer r.close()
+
+		r.at(10*time.Second + time.Hour)
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.overlap {
+			t.Fatal("a models retry ran at the same time as the usage sweep")
+		}
+		if len(r.listings) < 5 {
+			t.Fatalf("%d listings, want the boot listing and its 4 retries", len(r.listings))
 		}
 	})
 }

@@ -100,7 +100,7 @@ func checkStructuredAnswer(answer string, spec *structuredOutputSpec) structured
 		var complete bool
 		check.errs, complete = validateJSONSchemaWithin(value, spec.Schema, spec.Strict, &steps)
 		if !complete {
-			logger.Warnf("[StructuredOutput] JSON schema too costly to check in %d steps; the rest of the answer is unchecked", maxSchemaSteps)
+			logger.Warnf("[StructuredOutput] JSON schema too costly to check fully (%d steps, %d $ref hops in a row); the rest of the answer is unchecked", maxSchemaSteps, maxSchemaRefHops)
 		}
 	}
 	check.valid = len(check.errs) == 0
@@ -146,6 +146,12 @@ func (a *structuredAttempt) callback() *KiroStreamCallback {
 		}
 		//! Inline <thinking> blocks are reasoning, not part of the JSON answer.
 		a.splitter.Push(text, a.recordAnswer, a.recordThinking)
+	}
+	if !a.forwardThinking {
+		//! A retry's reasoning is dropped, so its signature and redacted blocks go too: they
+		//! would sign the first attempt's thinking text with the retry's signature.
+		cb.OnThinkingSignature = nil
+		cb.OnRedactedThinking = nil
 	}
 	cb.OnToolUse = func(toolUse KiroToolUse) { a.toolUses = append(a.toolUses, toolUse) }
 	cb.onFollowupPayload = func(payload *KiroPayload) { a.followup = payload }

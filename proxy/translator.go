@@ -2003,6 +2003,7 @@ func parseBase64Image(data, format string) *KiroImage {
 		if _, errRaw := base64.RawStdEncoding.DecodeString(data); errRaw != nil {
 			if _, errURL := base64.URLEncoding.DecodeString(data); errURL != nil {
 				if _, errRawURL := base64.RawURLEncoding.DecodeString(data); errRawURL != nil {
+					logUndecodableImage(len(data))
 					return nil
 				}
 			}

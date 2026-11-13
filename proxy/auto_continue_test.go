@@ -16,13 +16,16 @@ import (
 
 type scriptedHop struct {
 	thinking []string
-	text     []string
-	tools    []KiroToolUse
-	stop     string
-	in, out  int
-	credits  float64
-	cache    [2]int
-	err      error
+	// signature and redacted follow the thinking, as Kiro's reasoning events would.
+	signature string
+	redacted  []string
+	text      []string
+	tools     []KiroToolUse
+	stop      string
+	in, out   int
+	credits   float64
+	cache     [2]int
+	err       error
 	// followup is reported as the payload a hosted-search round sent.
 	followup *KiroPayload
 }
@@ -37,6 +40,14 @@ func (s *scriptedKiro) call(_ context.Context, _ *config.Account, payload *KiroP
 	s.payloads = append(s.payloads, payload)
 	for _, text := range hop.thinking {
 		cb.OnText(text, true)
+	}
+	if hop.signature != "" && cb.OnThinkingSignature != nil {
+		cb.OnThinkingSignature(hop.signature)
+	}
+	for _, data := range hop.redacted {
+		if cb.OnRedactedThinking != nil {
+			cb.OnRedactedThinking(data)
+		}
 	}
 	for _, text := range hop.text {
 		cb.OnText(text, false)

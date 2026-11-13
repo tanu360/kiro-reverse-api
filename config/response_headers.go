@@ -211,8 +211,9 @@ func responseHeaderValueCode(value string) string {
 	return ""
 }
 
-// unknownResponseHeaderVariable returns the first {lower_snake} placeholder that is not a known
-// variable, else "". Other braces are literal text.
+// unknownResponseHeaderVariable returns the first {name} placeholder that is not a known
+// variable, else "". Other braces are literal text. A name in another case, such as
+// {Request_Id}, is refused too: it would be sent as written.
 func unknownResponseHeaderVariable(value string) string {
 	for rest := value; ; {
 		open := strings.IndexByte(rest, '{')
@@ -232,11 +233,12 @@ func unknownResponseHeaderVariable(value string) string {
 }
 
 func isPlaceholderName(name string) bool {
-	if name == "" || name[0] < 'a' || name[0] > 'z' {
+	isLetter := func(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
+	if name == "" || !isLetter(name[0]) {
 		return false
 	}
 	for i := 1; i < len(name); i++ {
-		if c := name[i]; (c < 'a' || c > 'z') && c != '_' && (c < '0' || c > '9') {
+		if c := name[i]; !isLetter(c) && c != '_' && (c < '0' || c > '9') {
 			return false
 		}
 	}

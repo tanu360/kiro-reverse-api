@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -334,8 +335,12 @@ func TestValidateJSONSchemaBoundedWork(t *testing.T) {
 		want     []string
 		complete bool
 	}{
+		//! The cycle ends at maxSchemaRefHops, so the check reports itself incomplete.
 		{"self-referencing anyOf", `{"anyOf":[{"$ref":"#"},{"$ref":"#"}],"type":"string"}`, one,
-			[]string{"$: does not match any allowed schema (anyOf)", "$: expected string, got integer"}, true},
+			[]string{"$: does not match any allowed schema (anyOf)", "$: expected string, got integer"}, false},
+		{"anyOf chain past the $ref hop cap", refChainSchema(maxSchemaRefHops + 8), one, nil, false},
+		{"anyOf chain within the $ref hop cap", refChainSchema(maxSchemaRefHops / 2), one,
+			[]string{"$: does not match any allowed schema (anyOf)"}, true},
 		{"self-referencing allOf", `{"allOf":[{"$ref":"#"},{"$ref":"#"}]}`, one, nil, false},
 		{"recursive union tree", treeUnionSchema, treeUnionValue(40, "b"), nil, true},
 		{"recursive union tree, bad leaf", treeUnionSchema, treeUnionValue(40, "c"),
@@ -366,6 +371,17 @@ func TestValidateJSONSchemaBoundedWork(t *testing.T) {
 	if errs, complete := validateJSONSchemaWithin(one, mustSchema(`{"type":"string"}`), false, &spent); errs != nil || complete {
 		t.Fatalf("errs=%q complete=%t, want an unchecked value with no budget", errs, complete)
 	}
+}
+
+// refChainSchema is a chain of n anyOf unions, each a $ref to the next, ending in a string.
+func refChainSchema(n int) string {
+	defs := make([]string, 0, n+1)
+	for i := 0; i < n; i++ {
+		next := fmt.Sprintf(`{"$ref":"#/$defs/d%d"}`, i+1)
+		defs = append(defs, fmt.Sprintf(`"d%d":{"anyOf":[%s,%s]}`, i, next, next))
+	}
+	defs = append(defs, fmt.Sprintf(`"d%d":{"type":"string"}`, n))
+	return `{"$ref":"#/$defs/d0","$defs":{` + strings.Join(defs, ",") + `}}`
 }
 
 // treeUnionSchema is a discriminated union whose children recurse into the root schema.

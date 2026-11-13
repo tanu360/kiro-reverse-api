@@ -215,7 +215,7 @@
   "responseHeaders.empty": "还没有自定义响应头。例如，{example} 可让 NewAPI 或 OneAPI 的日志与本代理的请求日志对应起来。",
   "responseHeaders.limit": "最多可添加 {max} 个响应头。",
   "responseHeaders.onCount": "已启用 {on}/{total} 个响应头",
-  "responseHeaders.editorDescription": "随 /v1/messages、/v1/chat/completions、/v1/responses、/v1/models 和 count_tokens 的每个响应发送。",
+  "responseHeaders.editorDescription": "随 /v1/messages, /v1/chat/completions, /v1/responses, /v1/models 和 count_tokens 的每个响应发送。",
   "responseHeaders.name": "响应头名称",
   "responseHeaders.nameHint": "使用字母、数字和 - 或 _ 等符号，不能有空格。代理自行管理的响应头（如 Content-Type、Connection 或 CORS 响应头）不能设置。",
   "responseHeaders.value": "值",

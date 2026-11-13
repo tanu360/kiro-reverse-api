@@ -59,6 +59,9 @@ func TestUpdateResponseHeadersRejectsInvalidEntries(t *testing.T) {
 		{"invalid utf8", []ResponseHeaderRule{{Name: "X-A", Value: "a\xffb"}}, 0, "response_header_value_invalid"},
 		{"long value", []ResponseHeaderRule{{Name: "X-A", Value: strings.Repeat("v", maxResponseHeaderValueLen+1)}}, 0, "response_header_value_too_long"},
 		{"unknown variable", []ResponseHeaderRule{ok, {Name: "X-A", Value: "id={reqid}"}}, 1, "response_header_unknown_variable"},
+		//! Variables are lower case; {Request_Id} would be sent as written.
+		{"variable in another case", []ResponseHeaderRule{{Name: "X-A", Value: "{Request_Id}"}}, 0, "response_header_unknown_variable"},
+		{"variable in upper case", []ResponseHeaderRule{{Name: "X-A", Value: "{MODEL}"}}, 0, "response_header_unknown_variable"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -98,7 +101,7 @@ func TestUpdateResponseHeadersTrimsAndPersists(t *testing.T) {
 
 	rules := []ResponseHeaderRule{
 		{Name: " X-Request-Id\t", Value: "  {request_id} ", Enabled: true},
-		{Name: "X-Kiro-Trace", Value: "{model}/{account_id}/{key_id}/{client_ip} {Literal} {0} {", Enabled: false},
+		{Name: "X-Kiro-Trace", Value: "{model}/{account_id}/{key_id}/{client_ip} {0} {a-b} {", Enabled: false},
 		{Name: "x~custom!#$%&'*+-.^_`|", Value: "ok", Enabled: true},
 	}
 	if err := UpdateResponseHeaders(rules); err != nil {

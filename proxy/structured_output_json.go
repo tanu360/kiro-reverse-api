@@ -146,6 +146,9 @@ type schemaRun struct {
 	// steps is the work left; once it runs out the rest of the value goes unchecked.
 	steps     *int
 	exhausted bool
+	// refCapped is set when maxSchemaRefHops cut a check short: what lay past the cap was
+	// taken as matching.
+	refCapped bool
 	// memo holds anyOf/oneOf branch results, so a recursive union visits each node once.
 	memo map[schemaMemoKey]bool
 }
@@ -182,8 +185,9 @@ func validateJSONSchema(value interface{}, schema map[string]interface{}, strict
 }
 
 // validateJSONSchemaWithin is validateJSONSchema drawing on a step budget the caller may share
-// across values. complete is false when the budget ran out: the problems found up to then are
-// real, and the part of the value left unchecked counts as matching.
+// across values. complete is false when the budget ran out or a $ref chain went past
+// maxSchemaRefHops: the problems found up to then are real, and the part of the value left
+// unchecked counts as matching.
 func validateJSONSchemaWithin(value interface{}, schema map[string]interface{}, strict bool, steps *int) (errs []string, complete bool) {
 	if schema == nil {
 		return nil, true
@@ -191,7 +195,7 @@ func validateJSONSchemaWithin(value interface{}, schema map[string]interface{}, 
 	run := &schemaRun{root: schema, strict: strict, steps: steps}
 	v := &schemaValidator{run: run}
 	v.check(value, schema, "$", 0)
-	return v.errs, !run.exhausted
+	return v.errs, !run.exhausted && !run.refCapped
 }
 
 func (v *schemaValidator) stopped() bool {
@@ -264,7 +268,14 @@ func memoKeyFor(schema map[string]interface{}, value interface{}, refHops int) (
 }
 
 func (v *schemaValidator) check(value interface{}, schema map[string]interface{}, path string, refHops int) {
-	if v.stopped() || refHops > maxSchemaRefHops || !v.spend(1) {
+	if v.stopped() {
+		return
+	}
+	if refHops > maxSchemaRefHops {
+		v.run.refCapped = true
+		return
+	}
+	if !v.spend(1) {
 		return
 	}
 	if ref, ok := schema["$ref"].(string); ok {

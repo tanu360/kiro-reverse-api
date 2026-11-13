@@ -13,6 +13,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -241,6 +242,7 @@ func NewHandler() *Handler {
 		usageRefresh:   newRefreshScheduler(config.GetUsageRefreshInterval),
 	}
 
+	restoreNativeModels()
 	go h.backgroundRefresh()
 
 	go h.backgroundObserveTick()
@@ -266,9 +268,6 @@ func NewHandler() *Handler {
 }
 
 func (h *Handler) backgroundRefresh() {
-	//! The boot listing runs 10 s in; the retry loop waits a minute first, so it
-	//! only acts when that listing came back empty.
-	go h.retryEmptyModelsCache(modelsCacheRetryDelays)
 	h.runHousekeeping(h.stopRefresh)
 }
 
@@ -694,6 +693,7 @@ func (h *Handler) sweepModelsCache() {
 		h.modelsCacheTime = time.Now().Unix()
 		h.modelsCacheMu.Unlock()
 		logger.Infof("[ModelsCache] Cached %d models", len(aggregated))
+		rememberNativeModels(aggregated)
 	}
 }
 
@@ -865,7 +865,13 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
-	if msg := validateClaudeThinkingConfig(req.Thinking, req.MaxTokens); msg != "" {
+	//! count_tokens has no max_tokens field and the SDKs send none, so the budget is checked
+	//! against max_tokens only when the client sent one.
+	maxTokens := req.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = math.MaxInt
+	}
+	if msg := validateClaudeThinkingConfig(req.Thinking, maxTokens); msg != "" {
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
 	}
@@ -875,7 +881,8 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 	req.Model = actualModel
 	effectiveReq := cloneClaudeRequestForThinking(&req, thinking)
 
-	estimatedTokens := estimateClaudeRequestInputTokens(effectiveReq)
+	estimatedTokens := estimateClaudeRequestInputTokens(effectiveReq) +
+		structuredOutputPromptTokens(claudeStructuredOutputSpec(&req), estimateClaudeValueTokens(req.System) > 0)
 	if estimatedTokens < 1 {
 		estimatedTokens = 1
 	}
@@ -944,6 +951,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	kiroPayload := ClaudeToKiro(&req, thinking)
 	h.applyReasoningEffort(kiroPayload, req.Model, claudeOutputEffort(&req))
 	attachStructuredOutput(kiroPayload, claudeStructuredOutputSpec(&req), req.Stream)
+	thinkingResponseOpts.Format = structuredOutputThinkingFormat(kiroPayload.StructuredOutput, thinkingResponseOpts.Format, "thinking")
 
 	if req.Stream {
 		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile, apiKeyReservation)
@@ -1820,7 +1828,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 	defer keepalive.Close()
 	w, flusher = keepalive, keepalive
 
-	thinkingFormat := config.GetThinkingConfig().OpenAIFormat
+	thinkingFormat := structuredOutputThinkingFormat(payload.StructuredOutput, config.GetThinkingConfig().OpenAIFormat, "reasoning_content")
 
 	chatID := "chatcmpl-" + uuid.New().String()
 	excluded := make(map[string]bool)
@@ -2345,7 +2353,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			h.rememberAccount(payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
-			thinkingFormat := config.GetThinkingConfig().OpenAIFormat
+			thinkingFormat := structuredOutputThinkingFormat(payload.StructuredOutput, config.GetThinkingConfig().OpenAIFormat, "reasoning_content")
 			resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
 			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, cacheDetails)
 			if choices, ok := resp["choices"].([]map[string]interface{}); ok && len(choices) > 0 {

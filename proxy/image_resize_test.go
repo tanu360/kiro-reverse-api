@@ -640,6 +640,38 @@ func TestImageResizeLeavesImageWhenBudgetStaysFull(t *testing.T) {
 	}
 }
 
+func TestImageResizeBudgetWaitIsPerPayload(t *testing.T) {
+	useDefaultImageResizeForTest(t)
+	imageResizeCache.reset()
+	t.Cleanup(imageResizeCache.reset)
+	wait := resizeBudgetWait
+	resizeBudgetWait = 150 * time.Millisecond
+	t.Cleanup(func() { resizeBudgetWait = wait })
+
+	if !resizeBudget.acquire(resizeMemoryBudget, 0) {
+		t.Fatal("the resize budget is not free")
+	}
+	defer resizeBudget.release(resizeMemoryBudget)
+	payload := &KiroPayload{}
+	cur := &payload.ConversationState.CurrentMessage.UserInputMessage
+	for i := 0; i < 3; i++ {
+		cur.Images = append(cur.Images, testKiroImage("png", encodeTestPNG(t, resizeTestPhoto(2000+i, 200, 7, 0))))
+	}
+	before := append([]KiroImage(nil), cur.Images...)
+
+	start := time.Now()
+	resizePayloadImages(payload)
+	//! Three images each waiting the full 150 ms would take 450 ms.
+	if took := time.Since(start); took > 300*time.Millisecond {
+		t.Fatalf("resizePayloadImages took %s with the budget full, want about one wait (%s)", took, resizeBudgetWait)
+	}
+	for i := range cur.Images {
+		if cur.Images[i] != before[i] {
+			t.Fatalf("image %d changed without the memory budget", i)
+		}
+	}
+}
+
 func TestImageResizeDisabledLeavesImages(t *testing.T) {
 	setImageResizeForTest(t, false, config.DefaultImageResizeMaxDimension)
 	payload := &KiroPayload{}
