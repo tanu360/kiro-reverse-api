@@ -17,6 +17,18 @@ import (
 // rotation where it stopped. The pick counts as a start for the RPM limit, as
 // a weighted pick does.
 func (p *AccountPool) firstByPriorityLocked(model string, excluded map[string]bool) *config.Account {
+	best := p.bestByPriorityLocked(model, excluded)
+	if best == nil {
+		return nil
+	}
+	accCopy := *best
+	p.noteRPMStartLocked(accCopy.ID)
+	return &accCopy
+}
+
+// bestByPriorityLocked is the account firstByPriorityLocked picks, without
+// counting the pick for the RPM limit. It points into p.accounts.
+func (p *AccountPool) bestByPriorityLocked(model string, excluded map[string]bool) *config.Account {
 	allowOverUsage := config.GetAllowOverUsage()
 	now := time.Now()
 	seen := make(map[string]bool, len(p.accounts))
@@ -36,10 +48,18 @@ func (p *AccountPool) firstByPriorityLocked(model string, excluded map[string]bo
 		}
 		best = acc
 	}
-	if best == nil {
-		return nil
+	return best
+}
+
+// outrankedLocked reports whether priority routing takes a conversation off
+// bound, its session affinity account: in priority mode, an account with a
+// lower Priority number can serve model right now. An account of the same
+// priority never outranks bound, so the conversation keeps its prompt cache.
+// Always false in weighted mode.
+func (p *AccountPool) outrankedLocked(bound *config.Account, model string, excluded map[string]bool) bool {
+	if config.GetRoutingMode() != config.RoutingModePriority {
+		return false
 	}
-	accCopy := *best
-	p.noteRPMStartLocked(accCopy.ID)
-	return &accCopy
+	best := p.bestByPriorityLocked(model, excluded)
+	return best != nil && best.Priority < bound.Priority
 }

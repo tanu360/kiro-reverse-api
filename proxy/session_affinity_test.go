@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"kiro-proxy/config"
 	"kiro-proxy/pool"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -170,5 +173,79 @@ func TestSessionAffinityDefaultsOn(t *testing.T) {
 	}
 	if !config.GetSessionAffinity() {
 		t.Fatal("session affinity must be on for a fresh install")
+	}
+}
+
+// priorityAffinityHandler is affinityTestHandler in priority routing mode with
+// prio-top at priority 0 and prio-low at priority 3.
+func priorityAffinityHandler(t *testing.T) *Handler {
+	t.Helper()
+	if err := config.Init(tempDBPath(t)); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	for _, acc := range []config.Account{
+		{ID: "prio-low", Email: "prio-low@example.com", Enabled: true, Priority: 3},
+		{ID: "prio-top", Email: "prio-top@example.com", Enabled: true, Priority: 0},
+	} {
+		if err := config.AddAccount(acc); err != nil {
+			t.Fatalf("AddAccount: %v", err)
+		}
+	}
+	if err := config.UpdateRoutingMode(config.RoutingModePriority); err != nil {
+		t.Fatalf("UpdateRoutingMode: %v", err)
+	}
+	t.Cleanup(func() { _ = config.UpdateRoutingMode(config.RoutingModeWeighted) })
+	p := pool.GetPool()
+	p.Reload()
+	return &Handler{pool: p, affinity: newSessionAffinity()}
+}
+
+// In priority mode a conversation bound to a lower-priority account goes back
+// to the top account once it is free, logs the move, and is bound there after
+// the turn succeeds.
+func TestPickAccountPriorityModeMovesConversationToHigherPriority(t *testing.T) {
+	h := priorityAffinityHandler(t)
+	logs := captureLogs(t)
+	conv := payloadFor("conversation-prio")
+	h.affinity.Bind(affinityKey(conv), "prio-low")
+
+	acc := h.pickAccount(context.Background(), conv, "", nil)
+	if acc == nil || acc.ID != "prio-top" {
+		t.Fatalf("bound turn went to %v, want prio-top", acc)
+	}
+	want := "[SessionAffinity] Conversation moved from bound account prio-low@example.com (priority 3) to higher-priority account prio-top@example.com (priority 0)"
+	if !strings.Contains(logs.String(), want) {
+		t.Fatalf("missing %q in logs:\n%s", want, logs)
+	}
+	if strings.Contains(logs.String(), "unavailable") {
+		t.Fatalf("a move by priority was logged as an unavailable account:\n%s", logs)
+	}
+	h.rememberAccount(conv, acc)
+	if got := h.affinity.Lookup(affinityKey(conv)); got != "prio-top" {
+		t.Fatalf("binding after the move = %q, want prio-top", got)
+	}
+}
+
+// The move only happens toward an account this request may use: a key bound to
+// the lower account keeps the conversation there, and weighted mode never moves it.
+func TestPickAccountPriorityModeKeepsConversationWhenTopNotUsable(t *testing.T) {
+	h := priorityAffinityHandler(t)
+	conv := payloadFor("conversation-prio")
+	h.affinity.Bind(affinityKey(conv), "prio-low")
+
+	key := config.ApiKeyEntry{ID: "k-low", Key: "sk-low", AccountIDs: []string{"prio-low"}}
+	ctx := withApiKeyContext(httptest.NewRequest(http.MethodPost, "/v1/messages", nil), &key).Context()
+	if acc := h.pickAccount(ctx, conv, "", nil); acc == nil || acc.ID != "prio-low" {
+		t.Fatalf("key limited to prio-low: got %v, want prio-low", acc)
+	}
+	if acc := h.pickAccount(context.Background(), conv, "", map[string]bool{"prio-top": true}); acc == nil || acc.ID != "prio-low" {
+		t.Fatalf("prio-top excluded: got %v, want prio-low", acc)
+	}
+
+	if err := config.UpdateRoutingMode(config.RoutingModeWeighted); err != nil {
+		t.Fatal(err)
+	}
+	if acc := h.pickAccount(context.Background(), conv, "", nil); acc == nil || acc.ID != "prio-low" {
+		t.Fatalf("weighted mode: got %v, want prio-low", acc)
 	}
 }

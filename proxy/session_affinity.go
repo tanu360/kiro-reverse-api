@@ -95,8 +95,12 @@ func affinityKey(payload *KiroPayload) string {
 
 // pickAccount chooses the account for one attempt. With affinity on, a
 // follow-up turn returns to the account that served the conversation last, as
-// long as that account can still serve; otherwise round-robin decides. A
-// client key bound to some accounts (ctx) only ever gets one of those.
+// long as that account can still serve; otherwise the routing mode decides.
+// In priority mode the priority wins: when an account with a better priority
+// than the bound one can serve, the turn goes there, and the success binds
+// the conversation to it. An account of the same priority never takes the
+// conversation, so it keeps its prompt cache. A client key bound to some
+// accounts (ctx) only ever gets one of those.
 func (h *Handler) pickAccount(ctx context.Context, payload *KiroPayload, model string, excluded map[string]bool) *config.Account {
 	preferred := ""
 	if config.GetSessionAffinity() {
@@ -112,9 +116,20 @@ func (h *Handler) pickAccount(ctx context.Context, payload *KiroPayload, model s
 	noteRPMPick(ctx, account, since)
 	//! A move off the bound account costs the conversation its prompt cache; log it so a cache-miss spike can be traced.
 	if preferred != "" && account != nil && account.ID != preferred {
-		logger.Debugf("[SessionAffinity] Bound account %s unavailable, conversation moved to %s", preferred, account.Email)
+		logAffinityMove(h.pool.GetByID(preferred), preferred, account)
 	}
 	return account
+}
+
+// logAffinityMove says why a turn left its bound account. In priority mode a
+// pick that ranks above the bound account means a better account was free, so
+// the turn moved by priority whether or not the bound account could serve.
+func logAffinityMove(bound *config.Account, boundID string, picked *config.Account) {
+	if bound != nil && config.GetRoutingMode() == config.RoutingModePriority && picked.Priority < bound.Priority {
+		logger.Debugf("[SessionAffinity] Conversation moved from bound account %s (priority %d) to higher-priority account %s (priority %d)", bound.Email, bound.Priority, picked.Email, picked.Priority)
+		return
+	}
+	logger.Debugf("[SessionAffinity] Bound account %s unavailable, conversation moved to %s", boundID, picked.Email)
 }
 
 // rememberAccount binds the conversation to the account that just served it.

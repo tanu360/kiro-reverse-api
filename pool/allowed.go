@@ -30,7 +30,8 @@ func AllowedSet(ids []string) map[string]bool {
 
 // GetPreferredForModelAllowed is GetPreferredForModelExcluding limited to the
 // accounts in allowed; nil allowed means every account. A preferred account
-// outside the list is ignored.
+// outside the list is ignored, and in priority mode only an account in the
+// list can outrank the preferred one.
 func (p *AccountPool) GetPreferredForModelAllowed(preferredID, model string, excluded, allowed map[string]bool) *config.Account {
 	if allowed == nil {
 		return p.GetPreferredForModelExcluding(preferredID, model, excluded)

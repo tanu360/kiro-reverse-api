@@ -153,9 +153,11 @@ func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string
 }
 
 // GetPreferredForModelExcluding returns preferredID when that account can serve
-// model right now, and the round-robin pick otherwise. A preferred hit leaves
-// the rotation cursor alone, so sticky conversations do not skew where new
-// conversations land.
+// model right now, and the routing mode's pick otherwise. In priority mode an
+// account with a better priority that can serve wins over preferredID as well;
+// one with the same priority does not. A preferred hit leaves the rotation
+// cursor alone, so sticky conversations do not skew where new conversations
+// land.
 func (p *AccountPool) GetPreferredForModelExcluding(preferredID, model string, excluded map[string]bool) *config.Account {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -168,7 +170,7 @@ func (p *AccountPool) GetPreferredForModelExcluding(preferredID, model string, e
 			if acc.ID != preferredID {
 				continue
 			}
-			if p.canServeLocked(acc, model, excluded, now, allowOverUsage) {
+			if p.canServeLocked(acc, model, excluded, now, allowOverUsage) && !p.outrankedLocked(acc, model, excluded) {
 				p.noteRPMStartLocked(acc.ID)
 				accCopy := *acc
 				return &accCopy
