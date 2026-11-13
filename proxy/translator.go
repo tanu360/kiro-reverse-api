@@ -303,6 +303,9 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 
 	payload := &KiroPayload{}
 	payload.ToolNameMap = toolNameMap
+	if len(kiroTools) > 0 && (choice == "any" || choice == "tool") {
+		payload.ForcedToolChoice = choice
+	}
 	payload.ConversationState.ChatTriggerType = "MANUAL"
 	payload.ConversationState.AgentTaskType = "vibe"
 	payload.ConversationState.AgentContinuationId = uuid.New().String()
@@ -1270,6 +1273,9 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 
 	payload := &KiroPayload{}
 	payload.ToolNameMap = toolNameMap
+	if len(kiroTools) > 0 && (choice == "any" || choice == "tool") {
+		payload.ForcedToolChoice = choice
+	}
 	payload.ConversationState.ChatTriggerType = "MANUAL"
 	payload.ConversationState.ConversationID = buildConversationID(modelID, systemPrompt, firstOpenAIConversationAnchor(nonSystemMessages))
 	payload.ConversationState.CurrentMessage.UserInputMessage = KiroUserInputMessage{

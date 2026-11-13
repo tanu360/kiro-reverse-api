@@ -31,6 +31,9 @@ func callKiroAutoContinue(ctx context.Context, account *config.Account, payload 
 			return callKiroAutoContinue(ctx, account, payload, cb, call)
 		})
 	}
+	if payload != nil && payload.ForcedToolChoice != "" && callback != nil && callback.OnToolUse != nil {
+		return callKiroForcedTool(ctx, account, payload, callback, call)
+	}
 	if payload != nil && payload.StructuredOutput != nil && callback != nil {
 		return callKiroStructured(ctx, account, payload, callback, call)
 	}
