@@ -35,6 +35,7 @@ func TestValidationFailureLogsMappedModel(t *testing.T) {
 	for _, tc := range []struct{ path, body string }{
 		{"/v1/messages", `{"model":"claude-sonnet-5-5","max_tokens":64,"messages":[]}`},
 		{"/v1/chat/completions", `{"model":"claude-sonnet-5-5","messages":[]}`},
+		{"/v1/responses", `{"model":"claude-sonnet-5-5","input":[]}`},
 	} {
 		rec := serveWithKey(h, http.MethodPost, tc.path, "", tc.body)
 		if rec.Code != http.StatusBadRequest {

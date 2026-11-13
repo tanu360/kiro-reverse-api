@@ -46,12 +46,12 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	if req.PreviousResponseID != "" {
 		state, err := loadResponseState(req.PreviousResponseID)
 		if errors.Is(err, sql.ErrNoRows) {
-			recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, "previous_response_id not found")
+			recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusBadRequest, "previous_response_id not found")
 			h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", "previous_response_id not found")
 			return
 		}
 		if err != nil {
-			recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusInternalServerError, err.Error())
+			recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusInternalServerError, err.Error())
 			h.sendOpenAIError(w, http.StatusInternalServerError, "server_error", err.Error())
 			return
 		}
@@ -60,7 +60,7 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 
 	prepared, msg := prepareResponsesRequest(&req, previousMessages)
 	if msg != "" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", msg)
 		return
 	}
