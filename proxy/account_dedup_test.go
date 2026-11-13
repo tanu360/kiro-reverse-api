@@ -353,3 +353,77 @@ func TestApiMergeDuplicateAccountsRejectsChangedGroup(t *testing.T) {
 		t.Fatalf("a refused merge took a backup: %+v", backups)
 	}
 }
+
+// The Accounts page's "today" and live RPM of the kept account include the
+// removed copy's requests right after the merge, not only after a restart.
+func TestApiMergeDuplicateAccountsMovesLiveActivity(t *testing.T) {
+	h := newDedupHandler(t,
+		config.Account{ID: "keep", Email: "dev@example.com", AuthMethod: "social", Provider: "Google", RefreshToken: "rt-k", Enabled: true},
+		config.Account{ID: "dup", Email: "dev@example.com", AuthMethod: "social", Provider: "Google", RefreshToken: "rt-d", Enabled: true},
+		config.Account{ID: "other", Email: "other@example.com", AuthMethod: "social", Provider: "Google", RefreshToken: "rt-o", Enabled: true},
+	)
+	s := getObserveStore()
+	s.Reset()
+	t.Cleanup(s.Reset)
+	now := time.Now()
+	pinObserveClock(t, now)
+	record := func(id string, at time.Time) {
+		s.mu.Lock()
+		s.countRequestLocked(at.Unix(), id, "claude-haiku-4.5", true, 1, 1, 0, cacheTokenCounts{})
+		s.recentRequests[s.recentReqIdx%len(s.recentRequests)] = requestRecord{TS: at.Unix(), AccountID: id}
+		s.recentReqIdx++
+		s.mu.Unlock()
+		accountRates.record(id, at.Unix())
+	}
+	record("keep", now)
+	record("dup", now)
+	record("dup", now.Add(-90*time.Second))
+	record("other", now)
+
+	if rec := postMerge(h, `{"keepId":"keep","ids":["keep","dup"]}`); rec.Code != http.StatusOK {
+		t.Fatalf("merge status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	got := buildAccountActivity(s, h.pool, config.GetAccounts(), now)
+	if _, ok := got.Accounts["dup"]; ok {
+		t.Fatalf("removed copy still listed: %+v", got.Accounts)
+	}
+	keep := got.Accounts["keep"]
+	// Today counts only the minutes since local midnight; just after it, the older request is yesterday's.
+	wantToday := 3
+	if localDayStart(now).After(now.Add(-90 * time.Second)) {
+		wantToday = 2
+	}
+	if keep.Today != wantToday || keep.RPM != 2 {
+		t.Fatalf("kept account after merge = %+v, want today %d and rpm 2 (its own request and the copy's)", keep, wantToday)
+	}
+	if other := got.Accounts["other"]; other.Today != 1 || other.RPM != 1 {
+		t.Fatalf("an unrelated account changed: %+v", other)
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, r := range s.recentRequests {
+		if r.AccountID == "dup" {
+			t.Fatal("a recent request still names the removed copy")
+		}
+	}
+}
+
+func TestFoldMinuteBucketKeepsTheNewerMinute(t *testing.T) {
+	dst := minuteBucket{WindowMin: 10, Reqs: 1, Successes: 1, Credits: 0.5}
+	foldMinuteBucket(&dst, &minuteBucket{WindowMin: 10, Reqs: 2, Failures: 2, Credits: 0.25})
+	if dst.Reqs != 3 || dst.Successes != 1 || dst.Failures != 2 || dst.Credits != 0.75 {
+		t.Fatalf("same minute = %+v, want summed", dst)
+	}
+	foldMinuteBucket(&dst, &minuteBucket{WindowMin: 9, Reqs: 5})
+	if dst.WindowMin != 10 || dst.Reqs != 3 {
+		t.Fatalf("an older minute changed the slot: %+v", dst)
+	}
+	foldMinuteBucket(&dst, &minuteBucket{WindowMin: 11, Reqs: 4})
+	if dst.WindowMin != 11 || dst.Reqs != 4 {
+		t.Fatalf("a newer minute did not replace the slot: %+v", dst)
+	}
+	foldMinuteBucket(&dst, &minuteBucket{})
+	if dst.WindowMin != 11 || dst.Reqs != 4 {
+		t.Fatalf("an empty slot changed the kept one: %+v", dst)
+	}
+}

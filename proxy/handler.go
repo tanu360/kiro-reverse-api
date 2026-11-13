@@ -1455,7 +1455,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 	}
 
 	if lastErr == nil {
-		status, errType, message := h.noAccountError(model, "api_error")
+		status, errType, message := h.noAccountError(r.Context(), model, "api_error")
 		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
 		h.sendClaudeError(w, status, errType, message)
 		return
@@ -1706,7 +1706,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if lastErr == nil {
-		status, errType, message := h.noAccountError(model, "api_error")
+		status, errType, message := h.noAccountError(r.Context(), model, "api_error")
 		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
 		h.sendClaudeError(w, status, errType, message)
 		return
@@ -1719,16 +1719,21 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 // noAccountError describes a request that no account took. A model that no
 // enabled account lists is the client's mistake and gets 404; an empty or busy
 // pool is ours and keeps 503 with the API's own server error type. Accounts
-// held back only by the per-account RPM limit give 429 rate_limit_error.
-func (h *Handler) noAccountError(model, serverErrType string) (int, string, string) {
-	if !h.pool.OffersModel(model) {
+// held back only by the per-account RPM limit give 429 rate_limit_error. Only
+// the accounts the request's API key may use count.
+func (h *Handler) noAccountError(ctx context.Context, model, serverErrType string) (int, string, string) {
+	allowed := allowedAccountsFromContext(ctx)
+	if !h.pool.AllowedKnowsModel(allowed, model) {
 		errType := "invalid_request_error"
 		if serverErrType == "api_error" {
 			errType = "not_found_error"
 		}
+		if allowed != nil {
+			return http.StatusNotFound, errType, fmt.Sprintf("model %q is not available on any account this API key can use", model)
+		}
 		return http.StatusNotFound, errType, fmt.Sprintf("model %q is not available on any account", model)
 	}
-	if h.pool.BlockedByRPMLimit(model) {
+	if h.pool.BlockedByRPMLimitAllowed(model, allowed) {
 		return http.StatusTooManyRequests, "rate_limit_error", fmt.Sprintf("All accounts reached the limit of %d requests per minute", config.GetAccountRPMLimit())
 	}
 	return http.StatusServiceUnavailable, serverErrType, "No available accounts"
@@ -2226,7 +2231,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 	}
 
 	if lastErr == nil {
-		status, errType, message := h.noAccountError(model, "server_error")
+		status, errType, message := h.noAccountError(r.Context(), model, "server_error")
 		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
 		h.sendOpenAIError(w, status, errType, message)
 		return
@@ -2354,7 +2359,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if lastErr == nil {
-		status, errType, message := h.noAccountError(model, "server_error")
+		status, errType, message := h.noAccountError(r.Context(), model, "server_error")
 		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, nil, model, 0, 0, 0, false, status, message)
 		h.sendOpenAIError(w, status, errType, message)
 		return

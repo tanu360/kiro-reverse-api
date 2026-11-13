@@ -217,9 +217,11 @@ func TestBoundApiKeyRequestsReachOnlyBoundAccounts(t *testing.T) {
 func TestBoundApiKeyFailsWhenBoundAccountsUnavailable(t *testing.T) {
 	served := &servedBy{}
 	h := newKeyAccessHandler(t, recordingUpstream(t, served), "free-a", "off-b", "free-c")
-	// Bound to a disabled account, and to one that does not list the model.
+	// Bound to a disabled account, and to one that lists the model but cools down.
+	// (A model none of the key's accounts lists is a 404: TestBoundKeyModelOnlyOnOtherAccountsGets404.)
 	key := addTestKey(t, config.ApiKeyEntry{Key: "sk-bound-off", AccountIDs: []string{"off-b", "free-c"}, CallLimit: 1})
-	h.pool.SetModelList("free-c", []string{"claude-haiku-4.5"})
+	h.pool.SetModelList("free-c", []string{"claude-sonnet-4.5", "claude-haiku-4.5"})
+	h.pool.RecordThrottleError("free-c", 5*time.Minute)
 	requireKeys(t)
 
 	for i := 0; i < 2; i++ {

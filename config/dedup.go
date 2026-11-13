@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"strings"
+
+	"kiro-proxy/logger"
 )
 
 // Why two stored accounts are one Kiro user, in the order the rules are tried.
@@ -80,13 +82,18 @@ func duplicateReason(a, b *Account) string {
 	if IsAPIKeyAccount(a) || IsAPIKeyAccount(b) {
 		return ""
 	}
-	if folded(a.Provider) != folded(b.Provider) {
+	//! An empty provider is unknown, not different: IAM SSO and SSO-token logins store none, Builder ID device login stores "BuilderId".
+	if bothSetAndDiffer(folded(a.Provider), folded(b.Provider)) {
 		return ""
 	}
 	if sameValue(a.UserId, b.UserId) {
 		return DuplicateReasonUserID
 	}
 	if folded(a.AuthMethod) != folded(b.AuthMethod) || !sameFolded(a.Email, b.Email) {
+		return ""
+	}
+	//! By email an empty provider is unknown for IdC logins only. A social login's provider is part of who it is: one email can be a Google and a Github user.
+	if folded(a.AuthMethod) != "idc" && folded(a.Provider) != folded(b.Provider) {
 		return ""
 	}
 	//! One email can name different users: two Entra tenants, two IdC organizations. A pinned ARN is an operator choice, not an identity.
@@ -387,7 +394,8 @@ func applyIncoming(dst *Account, src Account) {
 
 // MergeAccounts keeps keepID and deletes removeIDs in one save. The kept
 // account takes the freshest token of a removed account with its own sign-in
-// method, any identity field it lacks, and the given counters. It returns
+// method, any identity field it lacks, and the given counters. Client API keys
+// bound to a removed account are bound to the kept one instead. It returns
 // ErrAccountNotFound when any ID is no longer stored, and changes nothing then.
 func MergeAccounts(keepID string, removeIDs []string, counters AccountCounters) (kept Account, err error) {
 	defer func() {
@@ -400,17 +408,13 @@ func MergeAccounts(keepID string, removeIDs []string, counters AccountCounters) 
 	}()
 
 	if CredentialsLoaded() {
-		credLock.Lock()
-		defer credLock.Unlock()
-		next, kept, err := mergeInto(credentials, keepID, removeIDs, counters)
+		kept, err := mergeCredentials(keepID, removeIDs, counters)
 		if err != nil {
 			return Account{}, err
 		}
-		previous := credentials
-		credentials = next
-		if err := saveCredentialsLocked(); err != nil {
-			credentials = previous
-			return Account{}, err
+		//! The accounts are merged already; a key left on a removed id only stops matching.
+		if err := RepointApiKeyAccounts(keepID, removeIDs); err != nil {
+			logger.Warnf("[Accounts] Merged duplicates into %s, but could not move the API keys bound to them: %v", keepID, err)
 		}
 		return kept, nil
 	}
@@ -423,8 +427,27 @@ func MergeAccounts(keepID string, removeIDs []string, counters AccountCounters) 
 	}
 	previous := cfg.Accounts
 	cfg.Accounts = next
+	previousKeys := repointApiKeyAccountsLocked(keepID, removeIDs)
 	if err := Save(); err != nil {
 		cfg.Accounts = previous
+		restoreApiKeyAccountsLocked(previousKeys)
+		return Account{}, err
+	}
+	return kept, nil
+}
+
+// mergeCredentials is MergeAccounts for the credentials store.
+func mergeCredentials(keepID string, removeIDs []string, counters AccountCounters) (Account, error) {
+	credLock.Lock()
+	defer credLock.Unlock()
+	next, kept, err := mergeInto(credentials, keepID, removeIDs, counters)
+	if err != nil {
+		return Account{}, err
+	}
+	previous := credentials
+	credentials = next
+	if err := saveCredentialsLocked(); err != nil {
+		credentials = previous
 		return Account{}, err
 	}
 	return kept, nil

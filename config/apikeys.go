@@ -49,6 +49,7 @@ func GetApiKeyEntry(id string) *ApiKeyEntry {
 }
 
 func AddApiKey(entry ApiKeyEntry) (ApiKeyEntry, error) {
+	credIDs := credentialAccountIDs()
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	if cfg == nil {
@@ -65,7 +66,7 @@ func AddApiKey(entry ApiKeyEntry) (ApiKeyEntry, error) {
 	if err := validateApiKeyCallLimit(entry.CallLimit); err != nil {
 		return ApiKeyEntry{}, err
 	}
-	accountIDs, err := normalizeApiKeyAccountIDsLocked(entry.AccountIDs, nil)
+	accountIDs, err := normalizeApiKeyAccountIDsLocked(entry.AccountIDs, nil, credIDs)
 	if err != nil {
 		return ApiKeyEntry{}, err
 	}
@@ -101,6 +102,7 @@ func UpdateApiKeyGuarded(id string, patch ApiKeyEntry) error {
 }
 
 func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
+	credIDs := credentialAccountIDs()
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
 	if cfg == nil {
@@ -125,7 +127,7 @@ func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 	if err := validateApiKeyCallLimit(patch.CallLimit); err != nil {
 		return err
 	}
-	accountIDs, err := normalizeApiKeyAccountIDsLocked(patch.AccountIDs, cfg.ApiKeys[idx].AccountIDs)
+	accountIDs, err := normalizeApiKeyAccountIDsLocked(patch.AccountIDs, cfg.ApiKeys[idx].AccountIDs, credIDs)
 	if err != nil {
 		return err
 	}

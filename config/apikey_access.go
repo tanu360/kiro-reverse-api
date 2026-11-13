@@ -27,17 +27,42 @@ const regenerateApiKeyAttempts = 5
 // counts. Guarded by cfgLock.
 var apiKeyPendingCalls = map[string]int64{}
 
+// credentialAccountIDs is the set of account ids in the credentials store, or
+// nil when that store is not the active one and cfg.Accounts holds the
+// accounts (the same choice GetAccounts makes). Callers read it before they
+// take cfgLock, so credLock is never taken under cfgLock here.
+func credentialAccountIDs() map[string]bool {
+	credLock.RLock()
+	defer credLock.RUnlock()
+	if !credLoaded {
+		return nil
+	}
+	ids := make(map[string]bool, len(credentials))
+	for i := range credentials {
+		ids[credentials[i].ID] = true
+	}
+	return ids
+}
+
 // normalizeApiKeyAccountIDsLocked trims, drops blanks and duplicates, and checks
-// that every id is a stored account. An id already on the key (previous) stays
-// valid after its account is deleted, so a stale id never blocks an unrelated
-// edit. An empty result is nil: every account. Caller holds cfgLock.
-func normalizeApiKeyAccountIDsLocked(ids, previous []string) ([]string, error) {
+// that every id is a stored account: one in credIDs when the credentials store
+// is active (credIDs from credentialAccountIDs), else one in cfg.Accounts. An
+// id already on the key (previous) stays valid after its account is deleted,
+// so a stale id never blocks an unrelated edit. An empty result is nil: every
+// account. Caller holds cfgLock.
+func normalizeApiKeyAccountIDsLocked(ids, previous []string, credIDs map[string]bool) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	known := make(map[string]bool, len(cfg.Accounts)+len(previous))
-	for i := range cfg.Accounts {
-		known[cfg.Accounts[i].ID] = true
+	known := make(map[string]bool, len(cfg.Accounts)+len(credIDs)+len(previous))
+	if credIDs != nil {
+		for id := range credIDs {
+			known[id] = true
+		}
+	} else {
+		for i := range cfg.Accounts {
+			known[cfg.Accounts[i].ID] = true
+		}
 	}
 	for _, id := range previous {
 		known[id] = true
@@ -59,6 +84,78 @@ func normalizeApiKeyAccountIDsLocked(ids, previous []string) ([]string, error) {
 		return nil, nil
 	}
 	return out, nil
+}
+
+// repointApiKeyAccountsLocked moves every key bound to a removed account onto
+// keepID, keeping the list order and dropping the duplicate when the key
+// already lists keepID. It returns the changed keys' previous lists by index,
+// for a rollback, or nil when no key changed. Caller holds cfgLock for writing.
+func repointApiKeyAccountsLocked(keepID string, removeIDs []string) map[int][]string {
+	remove := make(map[string]bool, len(removeIDs))
+	for _, id := range removeIDs {
+		if id != "" && id != keepID {
+			remove[id] = true
+		}
+	}
+	var previous map[int][]string
+	for i := range cfg.ApiKeys {
+		ids := cfg.ApiKeys[i].AccountIDs
+		hit := false
+		for _, id := range ids {
+			if remove[id] {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			continue
+		}
+		seen := make(map[string]bool, len(ids))
+		next := make([]string, 0, len(ids))
+		for _, id := range ids {
+			if remove[id] {
+				id = keepID
+			}
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			next = append(next, id)
+		}
+		if previous == nil {
+			previous = make(map[int][]string)
+		}
+		previous[i] = ids
+		cfg.ApiKeys[i].AccountIDs = next
+	}
+	return previous
+}
+
+// restoreApiKeyAccountsLocked undoes repointApiKeyAccountsLocked after a failed
+// save. Caller holds cfgLock for writing.
+func restoreApiKeyAccountsLocked(previous map[int][]string) {
+	for i, ids := range previous {
+		cfg.ApiKeys[i].AccountIDs = ids
+	}
+}
+
+// RepointApiKeyAccounts is repointApiKeyAccountsLocked with its own lock and
+// save, for a merge done in the credentials store.
+func RepointApiKeyAccounts(keepID string, removeIDs []string) error {
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	if cfg == nil {
+		return errors.New("config not initialized")
+	}
+	previous := repointApiKeyAccountsLocked(keepID, removeIDs)
+	if previous == nil {
+		return nil
+	}
+	if err := Save(); err != nil {
+		restoreApiKeyAccountsLocked(previous)
+		return err
+	}
+	return nil
 }
 
 func validateApiKeyCallLimit(limit int64) error {

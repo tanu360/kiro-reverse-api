@@ -446,3 +446,125 @@ func TestMergeAccountsTakesFreshestSameMethodToken(t *testing.T) {
 		}
 	})
 }
+
+func TestMergeAccountsMovesBoundApiKeysToTheKeeper(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		for _, id := range []string{"keep", "copy", "other"} {
+			if err := AddAccount(Account{ID: id, Email: id + "@example.com", RefreshToken: "rt-" + id, AuthMethod: "social", Provider: "Google", Enabled: true}); err != nil {
+				t.Fatalf("seed %s: %v", id, err)
+			}
+		}
+		onCopy, err := AddApiKey(ApiKeyEntry{Key: "sk-on-copy", Enabled: true, AccountIDs: []string{"copy", "other"}})
+		if err != nil {
+			t.Fatalf("add key: %v", err)
+		}
+		onBoth, err := AddApiKey(ApiKeyEntry{Key: "sk-on-both", Enabled: true, AccountIDs: []string{"keep", "copy"}})
+		if err != nil {
+			t.Fatalf("add key: %v", err)
+		}
+		unbound, err := AddApiKey(ApiKeyEntry{Key: "sk-unbound", Enabled: true})
+		if err != nil {
+			t.Fatalf("add key: %v", err)
+		}
+		if _, err := MergeAccounts("keep", []string{"copy"}, AccountCounters{}); err != nil {
+			t.Fatalf("merge: %v", err)
+		}
+		if got := GetApiKeyEntry(onCopy.ID).AccountIDs; !reflect.DeepEqual(got, []string{"keep", "other"}) {
+			t.Fatalf("key bound to the removed copy = %v, want [keep other]", got)
+		}
+		if got := GetApiKeyEntry(onBoth.ID).AccountIDs; !reflect.DeepEqual(got, []string{"keep"}) {
+			t.Fatalf("key bound to both = %v, want [keep]", got)
+		}
+		if got := GetApiKeyEntry(unbound.ID).AccountIDs; len(got) != 0 {
+			t.Fatalf("unbound key = %v, want every account", got)
+		}
+	})
+}
+
+// IAM SSO and SSO-token logins store no provider; Builder ID device login
+// stores "BuilderId". An empty provider is unknown, so one Kiro user found
+// through both paths is still one account. Two set, different providers stay
+// apart.
+func TestDuplicateGroupsTreatEmptyProviderAsUnknown(t *testing.T) {
+	groups := FindDuplicateGroups([]Account{
+		{ID: "a", Provider: "BuilderId", AuthMethod: "idc", UserId: "u-1", Email: "u@example.com"},
+		{ID: "b", Provider: "", AuthMethod: "idc", UserId: "u-1", Email: "u@example.com"},
+		{ID: "c", Provider: "BuilderId", AuthMethod: "idc", Email: "v@example.com"},
+		{ID: "d", Provider: "", AuthMethod: "idc", Email: "v@example.com"},
+		{ID: "e", Provider: "Google", AuthMethod: "social", UserId: "u-9", Email: "w@example.com"},
+		{ID: "f", Provider: "Github", AuthMethod: "social", UserId: "u-9", Email: "w@example.com"},
+	})
+	if got, want := groupIDs(groups), [][]string{{"a", "b"}, {"c", "d"}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("groups = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(groups[0].Reasons, []string{DuplicateReasonUserID}) || !reflect.DeepEqual(groups[1].Reasons, []string{DuplicateReasonEmail}) {
+		t.Fatalf("reasons = %v / %v", groups[0].Reasons, groups[1].Reasons)
+	}
+}
+
+func TestUpsertAccountMatchesAcrossEmptyProvider(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		if err := AddAccount(Account{ID: "a1", Email: "u@example.com", UserId: "user-1", AuthMethod: "idc", Provider: "BuilderId", RefreshToken: "rt-old", ClientID: "c1", Enabled: true}); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		stored, updated, err := UpsertAccount(Account{ID: "a2", Email: "u@example.com", UserId: "user-1", AuthMethod: "idc", RefreshToken: "rt-new", ClientID: "c2", Enabled: true})
+		if err != nil {
+			t.Fatalf("upsert: %v", err)
+		}
+		if !updated || stored.ID != "a1" || stored.Provider != "BuilderId" || stored.RefreshToken != "rt-new" {
+			t.Fatalf("upsert with no provider = %+v updated=%v, want a1 updated", stored, updated)
+		}
+		if n := len(GetAccounts()); n != 1 {
+			t.Fatalf("stored %d accounts, want 1", n)
+		}
+		// A credentials import without a provider, after the token rotated.
+		stored, updated, err = UpsertAccount(Account{ID: "a3", Email: "u@example.com", UserId: "user-1", AuthMethod: "idc", RefreshToken: "rt-rotated", Enabled: true})
+		if err != nil || !updated || stored.ID != "a1" {
+			t.Fatalf("second upsert = %+v updated=%v err=%v, want a1 updated", stored, updated, err)
+		}
+	})
+}
+
+// By email, an empty provider is unknown for IdC logins only. A social login
+// with no provider (a credentials import without one, whose userId could not be
+// read) is not matched by email to a stored social login of some provider: one
+// email can be a Google and a Github user. By userId it still matches.
+func TestDuplicateGroupsSocialEmailNeedsTheSameProvider(t *testing.T) {
+	groups := FindDuplicateGroups([]Account{
+		{ID: "gh", Provider: "Github", AuthMethod: "social", UserId: "u-gh", Email: "dev@example.com"},
+		{ID: "np", Provider: "", AuthMethod: "social", Email: "dev@example.com"},
+		{ID: "go", Provider: "Google", AuthMethod: "social", UserId: "u-go", Email: "ops@example.com"},
+		{ID: "go2", Provider: "", AuthMethod: "social", UserId: "u-go", Email: "ops@example.com"},
+		{ID: "x1", Provider: "", AuthMethod: "social", Email: "x@example.com"},
+		{ID: "x2", Provider: "", AuthMethod: "social", Email: "x@example.com"},
+	})
+	if got, want := groupIDs(groups), [][]string{{"go", "go2"}, {"x1", "x2"}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("groups = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(groups[0].Reasons, []string{DuplicateReasonUserID}) || !reflect.DeepEqual(groups[1].Reasons, []string{DuplicateReasonEmail}) {
+		t.Fatalf("reasons = %v / %v", groups[0].Reasons, groups[1].Reasons)
+	}
+}
+
+func TestUpsertAccountSocialWithoutProviderDoesNotTakeOverByEmail(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		if err := AddAccount(Account{ID: "gh", Email: "dev@example.com", UserId: "u-gh", AuthMethod: "social", Provider: "Github", RefreshToken: "rt-gh", Enabled: true}); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		stored, updated, err := UpsertAccount(Account{ID: "new", Email: "dev@example.com", AuthMethod: "social", RefreshToken: "rt-other", Enabled: true})
+		if err != nil {
+			t.Fatalf("upsert: %v", err)
+		}
+		if updated || stored.ID != "new" {
+			t.Fatalf("upsert = %+v updated=%v, want a new account", stored, updated)
+		}
+		for _, a := range GetAccounts() {
+			if a.ID == "gh" && a.RefreshToken != "rt-gh" {
+				t.Fatal("the Github account's token was overwritten")
+			}
+		}
+		if n := len(GetAccounts()); n != 2 {
+			t.Fatalf("stored %d accounts, want 2", n)
+		}
+	})
+}

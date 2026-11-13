@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -342,7 +343,7 @@ func TestNoAccountErrorAllAtRPMLimitIs429(t *testing.T) {
 		t.Fatalf("error = %+v, want rate_limit_error naming the limit", payload.Error)
 	}
 
-	status, errType, _ := h.noAccountError("claude-sonnet-4.5", "server_error")
+	status, errType, _ := h.noAccountError(context.Background(), "claude-sonnet-4.5", "server_error")
 	if status != http.StatusTooManyRequests || errType != "rate_limit_error" {
 		t.Fatalf("noAccountError for the OpenAI APIs = %d %s, want 429 rate_limit_error", status, errType)
 	}
@@ -351,7 +352,7 @@ func TestNoAccountErrorAllAtRPMLimitIs429(t *testing.T) {
 	clearRPMStarts(h.pool)
 	h.pool.RecordQuotaError("responses-account", time.Hour)
 	t.Cleanup(func() { h.pool.RecordSuccess("responses-account") })
-	if status, _, _ := h.noAccountError("claude-sonnet-4.5", "server_error"); status != http.StatusServiceUnavailable {
+	if status, _, _ := h.noAccountError(context.Background(), "claude-sonnet-4.5", "server_error"); status != http.StatusServiceUnavailable {
 		t.Fatalf("noAccountError with the limit off and the account cooling down = %d, want 503", status)
 	}
 }
