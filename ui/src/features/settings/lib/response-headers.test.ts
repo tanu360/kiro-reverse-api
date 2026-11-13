@@ -84,13 +84,18 @@ describe("headerValueProblem", () => {
     expect(headerValueProblem("中".repeat(171))?.code).toBe("response_header_value_too_long");
   });
 
-  it("refuses an unknown {lower_snake} placeholder and leaves other braces alone", () => {
+  it("refuses an unknown {name} placeholder and leaves other braces alone", () => {
     expect(headerValueProblem("{reqid}")).toEqual({
       code: "response_header_unknown_variable",
       params: { variable: "reqid" },
     });
     expect(unknownVariable("{request_id}-{modle}")).toBe("modle");
-    expect(unknownVariable("{} {Model} {1x} {a-b} {open")).toBeNull();
+    expect(unknownVariable("{} {1x} {a-b} {open")).toBeNull();
+  });
+
+  it("refuses a variable typed in another case", () => {
+    expect(unknownVariable("{Request_Id}")).toBe("Request_Id");
+    expect(unknownVariable("{request_id} {MODEL}")).toBe("MODEL");
   });
 });
 

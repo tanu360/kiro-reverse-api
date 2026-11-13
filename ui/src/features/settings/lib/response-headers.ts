@@ -89,7 +89,10 @@ export function headerNameProblem(raw: string): ResponseHeaderProblem | null {
   return null;
 }
 
-/** The first {lower_snake} placeholder that is not a variable; other braces are literal text. */
+/**
+ * The first {name} placeholder that is not a variable; other braces are literal text. A name
+ * in another case, such as {Request_Id}, counts: the proxy would send it as written.
+ */
 export function unknownVariable(value: string): string | null {
   let rest = value;
   for (;;) {
@@ -100,7 +103,7 @@ export function unknownVariable(value: string): string | null {
     if (end < 0) return null;
     const name = rest.slice(0, end);
     if (
-      /^[a-z][a-z0-9_]*$/.test(name) &&
+      /^[A-Za-z][A-Za-z0-9_]*$/.test(name) &&
       !(RESPONSE_HEADER_VARIABLES as readonly string[]).includes(name)
     ) {
       return name;
