@@ -114,6 +114,9 @@ type ClaudeRequest struct {
 	StopSequences []string `json:"stop_sequences,omitempty"`
 	// OutputFormat is the structured-outputs beta alias of output_config.format.
 	OutputFormat json.RawMessage `json:"output_format,omitempty"`
+
+	// interleavedThinking is set when the client sent the interleaved-thinking beta for a model that has it.
+	interleavedThinking bool
 }
 
 type ClaudeThinkingConfig struct {

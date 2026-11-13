@@ -83,7 +83,13 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 	if len(req.Messages) == 0 {
 		return "messages must not be empty"
 	}
-	if msg := validateClaudeThinkingConfig(req.Thinking, req.MaxTokens); msg != "" {
+	if req.MaxTokens <= 0 {
+		return "max_tokens is required and must be at least 1"
+	}
+	if msg := validateClaudeMessageRoles(req.Messages); msg != "" {
+		return msg
+	}
+	if msg := validateClaudeThinkingBudget(req.Thinking, req.MaxTokens, req.interleavedThinking); msg != "" {
 		return msg
 	}
 
@@ -115,6 +121,12 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 }
 
 func validateClaudeThinkingConfig(thinking *ClaudeThinkingConfig, maxTokens int) string {
+	return validateClaudeThinkingBudget(thinking, maxTokens, false)
+}
+
+// validateClaudeThinkingBudget checks the thinking config. With interleaved thinking the
+// budget covers every thinking block of the turn, so it may exceed max_tokens, as in the API.
+func validateClaudeThinkingBudget(thinking *ClaudeThinkingConfig, maxTokens int, interleaved bool) string {
 	if thinking == nil {
 		return ""
 	}
@@ -131,7 +143,7 @@ func validateClaudeThinkingConfig(thinking *ClaudeThinkingConfig, maxTokens int)
 		if thinking.BudgetTokens < 1024 {
 			return "thinking.budget_tokens must be at least 1024"
 		}
-		if maxTokens > 0 && thinking.BudgetTokens >= maxTokens {
+		if maxTokens > 0 && thinking.BudgetTokens >= maxTokens && !interleaved {
 			return "thinking.budget_tokens must be less than max_tokens"
 		}
 	case "adaptive":
@@ -197,6 +209,10 @@ func validateOpenAIRequestShape(req *OpenAIRequest) string {
 	}
 	if len(req.Messages) == 0 {
 		return "messages must not be empty"
+	}
+
+	if msg := validateOpenAIMessageRoles(req.Messages); msg != "" {
+		return msg
 	}
 
 	hasNonSystem := false
@@ -884,7 +900,7 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 
 	var req ClaudeRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		h.sendClaudeError(w, 400, "invalid_request_error", "Invalid JSON")
+		h.sendClaudeError(w, 400, "invalid_request_error", clientJSONError(err))
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
@@ -894,7 +910,12 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 	if maxTokens == 0 {
 		maxTokens = math.MaxInt
 	}
-	if msg := validateClaudeThinkingConfig(req.Thinking, maxTokens); msg != "" {
+	if msg := validateClaudeCountTokensShape(&req); msg != "" {
+		h.sendClaudeError(w, 400, "invalid_request_error", msg)
+		return
+	}
+	req.interleavedThinking = claudeInterleavedThinking(r, req.Model)
+	if msg := validateClaudeThinkingBudget(req.Thinking, maxTokens, req.interleavedThinking); msg != "" {
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
 	}
@@ -902,6 +923,12 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := resolveClaudeThinkingMode(req.Model, req.Thinking, thinkingCfg.Suffix)
 	req.Model = actualModel
+	//! The API counts only for a model it serves; a count for one no account has would mislead.
+	if h.pool != nil && !h.pool.AllowedKnowsModel(allowedAccountsFromContext(r.Context()), req.Model) {
+		_, errType, message := h.noAccountError(r.Context(), req.Model, "api_error")
+		h.sendClaudeError(w, http.StatusNotFound, errType, message)
+		return
+	}
 	effectiveReq := cloneClaudeRequestForThinking(&req, thinking)
 
 	estimatedTokens := estimateClaudeRequestInputTokens(effectiveReq) +
@@ -937,11 +964,12 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 
 	var req ClaudeRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON: "+err.Error())
-		h.sendClaudeError(w, 400, "invalid_request_error", "Invalid JSON: "+err.Error())
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, clientJSONError(err))
+		h.sendClaudeError(w, 400, "invalid_request_error", clientJSONError(err))
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
+	req.interleavedThinking = claudeInterleavedThinking(r, req.Model)
 	if msg := validateClaudeRequestShape(&req); msg != "" {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
@@ -1822,8 +1850,8 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 
 	var req OpenAIRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, "Invalid JSON")
-		h.sendOpenAIError(w, 400, "invalid_request_error", "Invalid JSON")
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, clientJSONError(err))
+		h.sendOpenAIError(w, 400, "invalid_request_error", clientJSONError(err))
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
