@@ -3,6 +3,7 @@ package proxy
 import (
 	"encoding/json"
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 	"os"
 	"strings"
 
@@ -209,7 +210,7 @@ func (f *toolMarkupFilter) emitRescued(callback *KiroStreamCallback) {
 		}
 	}
 	f.rescued = nil
-	logger.Infof("[KiroAPI] Rescued %d tool call(s) from leaked markup, %d duplicate(s) dropped", rescued, duplicates)
+	logger.Infof("[KiroAPI] Rescued %s from leaked markup, dropped %s", textfmt.Count(rescued, "tool call", "tool calls"), textfmt.Count(duplicates, "duplicate", "duplicates"))
 }
 
 func toolUseSignature(toolUse KiroToolUse) string {

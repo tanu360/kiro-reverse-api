@@ -4,6 +4,7 @@ import (
 	"context"
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 	"strings"
 )
 
@@ -33,13 +34,13 @@ func callKiroStructured(ctx context.Context, account *config.Account, payload *K
 	firstCheck := checkStructuredAnswer(first.answer.String(), spec)
 	if firstCheck.valid || !first.canRetry(&inner) || ctx.Err() != nil {
 		if !firstCheck.valid {
-			logger.Infof("[StructuredOutput] Answer did not match the requested JSON (%d problems); no retry possible", len(firstCheck.errs))
+			logger.Infof("[StructuredOutput] Answer did not match the requested JSON (%s); no retry possible", textfmt.Count(len(firstCheck.errs), "problem", "problems"))
 		}
 		finishStructured(callback, maxTokens, first, firstCheck.best(first.answer.String()), first)
 		return nil
 	}
 
-	logger.Infof("[StructuredOutput] Answer did not match the requested JSON (%d problems), retrying once", len(firstCheck.errs))
+	logger.Infof("[StructuredOutput] Answer did not match the requested JSON (%s), retrying once", textfmt.Count(len(firstCheck.errs), "problem", "problems"))
 	base := &inner
 	if first.followup != nil {
 		//! Search results live only in the follow-up payload; retrying from the request would drop them.

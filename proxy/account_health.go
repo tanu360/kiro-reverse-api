@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"kiro-proxy/textfmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -133,7 +134,7 @@ func (s *selfHealer) try(p *pool.AccountPool) bool {
 		s.state.HaltedAt = now.Unix()
 		s.armed.Store(true)
 		s.persistLocked()
-		logger.Errorf("[SelfHeal] Stopped after %d rounds without a successful request; check the accounts, then resume self-heal in Settings", s.state.Rounds)
+		logger.Errorf("[SelfHeal] Stopped after %s without a successful request; check the accounts, then resume self-heal in Settings", textfmt.Count(s.state.Rounds, "round", "rounds"))
 		publishEvent(eventAccountHeal, "halted:"+strconv.Itoa(s.state.Rounds))
 		return false
 	}
@@ -163,8 +164,9 @@ func (s *selfHealer) try(p *pool.AccountPool) bool {
 	s.armed.Store(true)
 	s.seq.Add(1)
 	s.persistLocked()
-	logger.Warnf("[SelfHeal] Round %d/%s: no account could serve; restored %d accounts (%d auth bans, %d cooldowns)",
-		s.state.Rounds, roundsLabel(maxRounds), len(healed), len(restored), len(uncooled))
+	logger.Warnf("[SelfHeal] Round %d/%s: no account could serve; restored %s (%s, %s)",
+		s.state.Rounds, roundsLabel(maxRounds), textfmt.Count(len(healed), "account", "accounts"),
+		textfmt.Count(len(restored), "auth ban", "auth bans"), textfmt.Count(len(uncooled), "cooldown", "cooldowns"))
 	publishEvent(eventAccountHeal, "healed:"+strconv.Itoa(len(healed)))
 	return true
 }

@@ -121,7 +121,7 @@ func (h *Handler) listModelsForHousekeeping() (retry bool) {
 		}
 	}
 	if failed > 0 {
-		logger.Infof("[ModelsCache] %d of %d accounts could not list their models", failed, len(h.lastModelsSweep))
+		logger.Infof("[ModelsCache] %d of %s could not list their models", failed, textfmt.Count(len(h.lastModelsSweep), "account", "accounts"))
 	}
 	return failed > 0
 }

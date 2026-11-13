@@ -3,6 +3,7 @@ package pool
 import (
 	"fmt"
 	"kiro-proxy/config"
+	"kiro-proxy/textfmt"
 	"time"
 )
 
@@ -44,7 +45,7 @@ func (re *RetryExecutor) ExecuteWithRetry(
 
 		acc := re.pool.GetNextForModelExcluding(model, excludeIDs)
 		if acc == nil {
-			return nil, fmt.Errorf("no available accounts after %d attempts (excluded: %d)", totalAttempts, len(excludeIDs))
+			return nil, fmt.Errorf("no available accounts after %s (excluded: %d)", textfmt.Count(totalAttempts, "attempt", "attempts"), len(excludeIDs))
 		}
 
 		accountAttempts := 0
@@ -102,5 +103,5 @@ func (re *RetryExecutor) ExecuteWithRetry(
 		TotalAttempts: totalAttempts,
 		Success:       false,
 		Error:         lastErr,
-	}, fmt.Errorf("all retries exhausted (%d attempts, %d accounts): %w", totalAttempts, len(excludeIDs)+1, lastErr)
+	}, fmt.Errorf("all retries exhausted (%s, %s): %w", textfmt.Count(totalAttempts, "attempt", "attempts"), textfmt.Count(len(excludeIDs)+1, "account", "accounts"), lastErr)
 }

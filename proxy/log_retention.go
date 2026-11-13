@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"kiro-proxy/textfmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -90,10 +91,10 @@ func runLogRetention(now time.Time, stop <-chan struct{}) {
 	logRetention.lastPrunedErrors = errs
 	logRetention.mu.Unlock()
 	if err != nil {
-		logger.Warnf("[Retention] Prune failed after %d requests, %d errors: %v", reqs, errs, err)
+		logger.Warnf("[Retention] Prune failed after %s, %s: %v", textfmt.Count(int(reqs), "request", "requests"), textfmt.Count(int(errs), "error", "errors"), err)
 	}
 	if reqs > 0 || errs > 0 {
-		logger.Infof("[Retention] Pruned %d requests, %d errors older than %d days", reqs, errs, days)
+		logger.Infof("[Retention] Pruned %s, %s older than %s", textfmt.Count(int(reqs), "request", "requests"), textfmt.Count(int(errs), "error", "errors"), textfmt.Count(days, "day", "days"))
 	}
 	// The settings card shows the last run.
 	publishEvent(eventSettingsChanged, "")

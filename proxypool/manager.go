@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"kiro-proxy/textfmt"
 	"sync"
 	"time"
 
@@ -485,7 +486,7 @@ func (m *Manager) reportFailure(id, dialURL string, cause error) {
 		if errors.As(cause, &perr) {
 			kind = perr.Kind
 		}
-		logger.Warnf("[ProxyPool] Proxy %s failed (%s); moved %d account(s) to other proxies", Name(p), kind, moved)
+		logger.Warnf("[ProxyPool] Proxy %s failed (%s); moved %s to other proxies", Name(p), kind, textfmt.Count(moved, "account", "accounts"))
 		m.fire(false)
 	}
 }

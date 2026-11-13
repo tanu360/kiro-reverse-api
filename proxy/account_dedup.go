@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"kiro-proxy/textfmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -202,7 +203,7 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 	//! The live "today" and RPM numbers follow the moved rows; a restart would rebuild them from those rows.
 	getObserveStore().moveAccountRings(kept.ID, removeIDs)
 	accountRates.move(kept.ID, removeIDs)
-	logger.Infof("[Accounts] Merged %d duplicate account(s) into %s", len(removeIDs), kept.ID)
+	logger.Infof("[Accounts] Merged %s into %s", textfmt.Count(len(removeIDs), "duplicate account", "duplicate accounts"), kept.ID)
 	//! The merge moves keys bound to a removed copy onto the kept account; open key lists refetch.
 	publishEvent(eventAPIKeysChanged, kept.ID)
 

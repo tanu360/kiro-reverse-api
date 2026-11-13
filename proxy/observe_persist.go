@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"database/sql"
+	"kiro-proxy/textfmt"
 	"strings"
 
 	"kiro-proxy/db"
@@ -474,7 +475,7 @@ func (s *observeStore) loadWindowFromDB() (*modelWarmup, error) {
 	s.mu.Unlock()
 	s.seq.Add(1)
 
-	logger.Infof("[Observe] Warmed %d requests, %d errors, %d minute rows from db", len(reqs), len(errs), len(minutes))
+	logger.Infof("[Observe] Warmed %s, %s, %s from db", textfmt.Count(len(reqs), "request", "requests"), textfmt.Count(len(errs), "error", "errors"), textfmt.Count(len(minutes), "minute row", "minute rows"))
 	return &modelWarmup{store: s, maxRequestID: maxRequestID, maxErrorID: maxErrorID, generation: generation}, nil
 }
 
@@ -508,7 +509,7 @@ func (w *modelWarmup) run() error {
 	s.mu.Unlock()
 	s.seq.Add(1)
 
-	logger.Infof("[Observe] Warmed %d models from db", len(models))
+	logger.Infof("[Observe] Warmed %s from db", textfmt.Count(len(models), "model", "models"))
 	return nil
 }
 

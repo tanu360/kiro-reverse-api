@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"kiro-proxy/textfmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -341,7 +342,7 @@ func (h *Handler) runWebSearches(ctx context.Context, model string, toolUses []K
 		case outcome.query == "":
 			outcome.errorCode, outcome.errorText = "invalid_input", "query is required"
 		case *used >= maxUses:
-			outcome.errorCode, outcome.errorText = "max_uses_exceeded", fmt.Sprintf("the web_search limit of %d uses is reached; answer with the results you have", maxUses)
+			outcome.errorCode, outcome.errorText = "max_uses_exceeded", fmt.Sprintf("the web_search limit of %s is reached; answer with the results you have", textfmt.Count(maxUses, "use", "uses"))
 		default:
 			*used++
 			results, _, err := h.searchWebWithFailover(ctx, model, outcome.query)

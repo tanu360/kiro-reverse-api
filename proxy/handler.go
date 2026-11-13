@@ -317,8 +317,9 @@ func (h *Handler) refreshAllAccounts(every time.Duration) {
 		logger.Infof("[BackgroundRefresh] Refreshed %s: %s %.1f/%.1f", account.Email, info.SubscriptionType, info.UsageCurrent, info.UsageLimit)
 	})
 	h.pool.Reload()
-	logger.Infof("[BackgroundRefresh] Sweep finished: %d accounts in %s (%d workers)",
-		len(accounts), textfmt.Duration(time.Since(start)), max(1, min(backgroundRefreshWorkers, len(accounts))))
+	logger.Infof("[BackgroundRefresh] Sweep finished: %s in %s (%s)",
+		textfmt.Count(len(accounts), "account", "accounts"), textfmt.Duration(time.Since(start)),
+		textfmt.Count(max(1, min(backgroundRefreshWorkers, len(accounts))), "worker", "workers"))
 	kickAlerts()
 }
 
@@ -701,7 +702,7 @@ func (h *Handler) sweepModelsCache() {
 		publishNativeModels(h.cachedModels)
 		h.modelsCacheTime = time.Now().Unix()
 		h.modelsCacheMu.Unlock()
-		logger.Infof("[ModelsCache] Cached %d models", len(aggregated))
+		logger.Infof("[ModelsCache] Cached %s", textfmt.Count(len(aggregated), "model", "models"))
 		rememberNativeModels(aggregated)
 	}
 }
@@ -726,7 +727,7 @@ func (h *Handler) fetchAndCacheAccountModels(account *config.Account) error {
 	h.modelsCacheTime = time.Now().Unix()
 	h.modelsCacheMu.Unlock()
 
-	logger.Infof("[ModelsCache] Refreshed %d models for account %s", len(models), account.Email)
+	logger.Infof("[ModelsCache] Refreshed %s for account %s", textfmt.Count(len(models), "model", "models"), account.Email)
 	return nil
 }
 
