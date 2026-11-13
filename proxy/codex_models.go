@@ -76,7 +76,9 @@ type codexModelMessages struct {
 }
 
 func (h *Handler) handleCodexModels(w http.ResponseWriter, r *http.Request) {
-	models := buildCodexModelsResponse(h.filterModelInfosForAPIKey(r.Context(), h.cachedModelsSnapshot(false)))
+	//! Like /v1/models: before the first listing the cache is empty, and the built-in
+	//! fallback names models a free account does not serve.
+	models := buildCodexModelsResponse(h.filterModelInfosForAPIKey(r.Context(), h.cachedModelsSnapshot(true)))
 	if len(models) == 0 {
 		models = buildCodexModelsResponse(h.filterModelInfosForAPIKey(r.Context(), fallbackCodexModelInfos()))
 	}
