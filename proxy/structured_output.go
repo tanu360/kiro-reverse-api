@@ -247,6 +247,31 @@ func structuredOutputInstruction(spec *structuredOutputSpec) string {
 	return b.String()
 }
 
+// structuredOutputThinkingFormat is the thinking format a response uses. The text formats
+// (think and thinking tags on Chat; think tags and plain reasoning_content on Messages)
+// write the reasoning into the content, ahead of the JSON the client parses. A request
+// with a spec gets separate instead: reasoning_content on Chat, thinking blocks on Messages.
+func structuredOutputThinkingFormat(spec *structuredOutputSpec, format, separate string) string {
+	if spec == nil {
+		return format
+	}
+	return separate
+}
+
+// structuredOutputPromptTokens estimates what attachStructuredOutput adds to the prompt: the
+// instruction, the current-turn reminder and, when there is no system prompt to join, the
+// priming acknowledgement.
+func structuredOutputPromptTokens(spec *structuredOutputSpec, hasSystem bool) int {
+	if spec == nil {
+		return 0
+	}
+	total := estimateApproxTokens(structuredOutputInstruction(spec)) + estimateApproxTokens(structuredOutputReminder(spec))
+	if !hasSystem {
+		total += estimateApproxTokens(structuredPrimingAck)
+	}
+	return total
+}
+
 func structuredOutputReminder(spec *structuredOutputSpec) string {
 	if spec.Schema != nil {
 		return "Format your final answer as only the JSON value that matches the JSON schema in the instructions: no code fences, no other text."

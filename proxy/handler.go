@@ -879,7 +879,8 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 	req.Model = actualModel
 	effectiveReq := cloneClaudeRequestForThinking(&req, thinking)
 
-	estimatedTokens := estimateClaudeRequestInputTokens(effectiveReq)
+	estimatedTokens := estimateClaudeRequestInputTokens(effectiveReq) +
+		structuredOutputPromptTokens(claudeStructuredOutputSpec(&req), estimateClaudeValueTokens(req.System) > 0)
 	if estimatedTokens < 1 {
 		estimatedTokens = 1
 	}
@@ -948,6 +949,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	kiroPayload := ClaudeToKiro(&req, thinking)
 	h.applyReasoningEffort(kiroPayload, req.Model, claudeOutputEffort(&req))
 	attachStructuredOutput(kiroPayload, claudeStructuredOutputSpec(&req), req.Stream)
+	thinkingResponseOpts.Format = structuredOutputThinkingFormat(kiroPayload.StructuredOutput, thinkingResponseOpts.Format, "thinking")
 
 	if req.Stream {
 		h.handleClaudeStream(w, r, kiroPayload, req.Model, thinking, thinkingResponseOpts, estimatedInputTokens, cacheProfile, apiKeyReservation)
@@ -1819,7 +1821,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 	defer keepalive.Close()
 	w, flusher = keepalive, keepalive
 
-	thinkingFormat := config.GetThinkingConfig().OpenAIFormat
+	thinkingFormat := structuredOutputThinkingFormat(payload.StructuredOutput, config.GetThinkingConfig().OpenAIFormat, "reasoning_content")
 
 	chatID := "chatcmpl-" + uuid.New().String()
 	excluded := make(map[string]bool)
@@ -2344,7 +2346,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			h.rememberAccount(payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
-			thinkingFormat := config.GetThinkingConfig().OpenAIFormat
+			thinkingFormat := structuredOutputThinkingFormat(payload.StructuredOutput, config.GetThinkingConfig().OpenAIFormat, "reasoning_content")
 			resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
 			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, cacheDetails)
 			if choices, ok := resp["choices"].([]map[string]interface{}); ok && len(choices) > 0 {
