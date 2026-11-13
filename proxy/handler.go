@@ -1761,7 +1761,9 @@ func (h *Handler) noAccountError(ctx context.Context, model, serverErrType strin
 		return http.StatusNotFound, errType, fmt.Sprintf("model %q is not available on any account", model)
 	}
 	if h.pool.BlockedByRPMLimitAllowed(model, allowed) {
-		return http.StatusTooManyRequests, "rate_limit_error", fmt.Sprintf("All accounts reached the limit of %d requests per minute", config.GetAccountRPMLimit())
+		//! The window is known, so clients can wait for it instead of retrying at once.
+		noteRetryAfter(ctx, h.pool.RPMRetryAfter(model, allowed))
+		return http.StatusTooManyRequests, "rate_limit_error", fmt.Sprintf("All accounts reached the limit of %s per minute", textfmt.Count(config.GetAccountRPMLimit(), "request", "requests"))
 	}
 	return http.StatusServiceUnavailable, serverErrType, "No available accounts"
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -339,8 +340,12 @@ func TestNoAccountErrorAllAtRPMLimitIs429(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode %s: %v", rec.Body.String(), err)
 	}
-	if payload.Error.Type != "rate_limit_error" || !strings.Contains(payload.Error.Message, "1 requests per minute") {
+	if payload.Error.Type != "rate_limit_error" || payload.Error.Message != "All accounts reached the limit of 1 request per minute" {
 		t.Fatalf("error = %+v, want rate_limit_error naming the limit", payload.Error)
+	}
+	//! The window is known: the client is told when the oldest start leaves it.
+	if secs, err := strconv.Atoi(rec.Header().Get("Retry-After")); err != nil || secs < 1 || secs > 60 {
+		t.Fatalf("Retry-After = %q, want 1 to 60 seconds", rec.Header().Get("Retry-After"))
 	}
 
 	status, errType, _ := h.noAccountError(context.Background(), "claude-sonnet-4.5", "server_error")
@@ -389,7 +394,7 @@ func TestDirectWebSearchAllAtRPMLimitIs429(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode %s: %v", rec.Body.String(), err)
 	}
-	if payload.Error.Type != "rate_limit_error" || !strings.Contains(payload.Error.Message, "1 requests per minute") {
+	if payload.Error.Type != "rate_limit_error" || !strings.Contains(payload.Error.Message, "1 request per minute") {
 		t.Fatalf("error = %+v, want rate_limit_error naming the limit", payload.Error)
 	}
 }

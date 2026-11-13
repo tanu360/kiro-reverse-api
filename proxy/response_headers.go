@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"kiro-proxy/config"
@@ -43,6 +45,8 @@ type responseHeaderVars struct {
 	model     string
 	accountID string
 	keyID     string
+	// retryAfter is the Retry-After value of a 429 the proxy itself gives, in seconds.
+	retryAfter string
 }
 
 type responseHeaderValues struct {
@@ -192,12 +196,19 @@ func (w *headerInjectingWriter) commit() {
 }
 
 func (w *headerInjectingWriter) inject() {
+	header := w.ResponseWriter.Header()
+	w.vars.mu.Lock()
+	retryAfter := w.vars.retryAfter
+	w.vars.mu.Unlock()
+	if retryAfter != "" && header.Get("Retry-After") == "" {
+		header.Set("Retry-After", retryAfter)
+		exposeResponseHeaders(header, []string{"Retry-After"})
+	}
 	rules := config.ActiveResponseHeaders()
 	if len(rules) == 0 {
 		return
 	}
 	values := w.vars.snapshot()
-	header := w.ResponseWriter.Header()
 	added := make([]string, 0, len(rules))
 	for _, rule := range rules {
 		//! A header the proxy set for this response (Retry-After, SSE Cache-Control, CORS) wins.
@@ -297,4 +308,17 @@ func sanitizeResponseHeaderValue(value string, max int, keepTab bool) string {
 		cut--
 	}
 	return clean[:cut]
+}
+
+// noteRetryAfter gives the client response a Retry-After header, rounded up to whole seconds.
+func noteRetryAfter(ctx context.Context, wait time.Duration) {
+	if wait <= 0 {
+		return
+	}
+	if vars := responseHeaderVarsFrom(ctx); vars != nil {
+		seconds := int((wait + time.Second - 1) / time.Second)
+		vars.mu.Lock()
+		vars.retryAfter = strconv.Itoa(seconds)
+		vars.mu.Unlock()
+	}
 }

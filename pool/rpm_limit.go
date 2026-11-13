@@ -170,3 +170,39 @@ func (p *AccountPool) BlockedByRPMLimitAllowed(model string, allowed map[string]
 	}
 	return false
 }
+
+// RPMRetryAfter is how long until an account that the per-account RPM limit holds back can
+// take a request for model again: the soonest moment its oldest start leaves the window.
+// Only the accounts in allowed count (nil is every account). It is zero when no account
+// is held back by the limit alone.
+func (p *AccountPool) RPMRetryAfter(model string, allowed map[string]bool) time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if config.GetAccountRPMLimit() <= 0 {
+		p.rpm.m = nil
+		return 0
+	}
+	allowOverUsage := config.GetAllowOverUsage()
+	now := rpmNow()
+	var soonest time.Duration
+	seen := make(map[string]bool, len(p.accounts))
+	for i := range p.accounts {
+		acc := &p.accounts[i]
+		if seen[acc.ID] || (allowed != nil && !allowed[acc.ID]) {
+			continue
+		}
+		seen[acc.ID] = true
+		if !p.eligibleLocked(acc, model, nil, time.Now(), allowOverUsage) || !p.rpmLimitedLocked(acc.ID) {
+			continue
+		}
+		starts := p.rpm.m[acc.ID]
+		if len(starts) == 0 {
+			continue
+		}
+		wait := time.Unix(0, starts[0]).Add(rpmWindow).Sub(now)
+		if wait > 0 && (soonest == 0 || wait < soonest) {
+			soonest = wait
+		}
+	}
+	return soonest
+}

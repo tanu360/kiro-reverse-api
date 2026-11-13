@@ -336,3 +336,21 @@ func TestReleaseRPMStartGivesBackTheOldestStartSinceTheCall(t *testing.T) {
 		t.Fatal("pick at t0+61 s admitted: the release gave back R2's start instead of R1's")
 	}
 }
+
+func TestRPMRetryAfterIsWhenTheOldestStartLeaves(t *testing.T) {
+	now := setRPMLimitForTest(t, 1)
+	p := newTestPool(config.Account{ID: "a"})
+	if wait := p.RPMRetryAfter("", nil); wait != 0 {
+		t.Fatalf("no start yet: wait %v", wait)
+	}
+	if acc := p.GetNext(); acc == nil {
+		t.Fatal("first pick")
+	}
+	*now = now.Add(20 * time.Second)
+	if wait := p.RPMRetryAfter("", nil); wait != 40*time.Second {
+		t.Fatalf("wait = %v, want 40s", wait)
+	}
+	if wait := p.RPMRetryAfter("", map[string]bool{"other": true}); wait != 0 {
+		t.Fatalf("an account the key cannot use does not count: wait %v", wait)
+	}
+}
