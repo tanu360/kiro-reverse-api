@@ -274,6 +274,9 @@ func NewHandler() *Handler {
 	if err := scrubStoredRequestKeys(); err != nil {
 		logger.Warnf("[Observe] Failed to mask older client keys: %v", err)
 	}
+	if err := reclassifyStoredProxyFailures(); err != nil {
+		logger.Warnf("[Observe] Failed to file older proxy failures: %v", err)
+	}
 
 	//! The model mix sums the whole request log, so it warms in the background
 	//! and the listener does not wait on a full-table scan.

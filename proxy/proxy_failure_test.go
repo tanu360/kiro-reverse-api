@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"kiro-proxy/config"
+	"kiro-proxy/db"
 	"kiro-proxy/proxypool"
 )
 
@@ -407,5 +408,49 @@ func TestLoggedProxyFailureTidiedOnRead(t *testing.T) {
 	}
 	if len(got.Attempts) != 1 || got.Attempts[0].Proxy == nil || got.Attempts[0].Proxy.Code != proxypool.KindConnect {
 		t.Fatalf("attempts = %#v", got.Attempts)
+	}
+}
+
+// Rows logged as "upstream" or "auth" before the proxy type existed are filed under it on
+// start, so the request log's exact "Proxy error" filter finds them too.
+func TestReclassifyStoredProxyFailures(t *testing.T) {
+	setupApiKeyUsageTest(t)
+	d, err := db.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	insert := func(ts int64, success int, status int, errorType, message string) {
+		if _, err := d.Exec(`INSERT INTO requests (ts, success, status, error_type, message) VALUES (?, ?, ?, ?, ?)`, ts, success, status, errorType, message); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert(1, 0, 503, "upstream", `Post "https://q.us-east-1.amazonaws.com/generateAssistantResponse": proxyconnect tcp: dial tcp 127.0.0.1:9: connect: connection refused`)
+	insert(2, 0, 400, "auth", `Post "https://q.us-east-1.amazonaws.com/generateAssistantResponse": Forbidden`)
+	insert(3, 0, 500, "upstream", "upstream connection failed: the proxy stalled")
+	insert(4, 1, 200, "", "")
+	for run := 0; run < 2; run++ {
+		if err := reclassifyStoredProxyFailures(); err != nil {
+			t.Fatalf("run %d: %v", run, err)
+		}
+	}
+	rows, err := d.Query(`SELECT error_type FROM requests ORDER BY ts`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var got []string
+	for rows.Next() {
+		var errorType string
+		if err := rows.Scan(&errorType); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, errorType)
+	}
+	if strings.Join(got, ",") != "proxy,proxy,upstream," {
+		t.Fatalf("error types = %q", got)
+	}
+	page := getObserveStore().RequestPage(requestQuery{Page: 1, PageSize: 10, ErrorType: "proxy"})
+	if page.Total != 2 {
+		t.Fatalf("proxy filter found %d rows, want 2", page.Total)
 	}
 }

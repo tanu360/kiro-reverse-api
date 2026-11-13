@@ -139,6 +139,10 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	case "failed":
 		where = append(where, "success = 0")
 	}
+	if q.ErrorType != "" {
+		where = append(where, "success = 0 AND error_type = ?")
+		args = append(args, q.ErrorType)
+	}
 	if q.Search != "" {
 		like := "%" + escapeSQLLike(q.Search) + "%"
 		keyClause, keyArgs := newRequestKeySearch(q.Search).sql()

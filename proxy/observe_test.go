@@ -453,6 +453,31 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 		t.Fatalf("unexpected persisted error request: %#v", page.Requests[0])
 	}
 
+	//! The error type filter is exact, and only failed rows have a type.
+	failedType := page.Requests[0].ErrorType
+	if failedType == "" {
+		t.Fatalf("the failed row has no error type")
+	}
+	for _, persisted := range []bool{true, false} {
+		var typePage requestPage
+		if persisted {
+			typePage = s.RequestPage(requestQuery{Page: 1, PageSize: 10, ErrorType: strings.ToUpper(failedType)})
+		} else {
+			typePage = s.memoryRequestPage(normalizeRequestQuery(requestQuery{Page: 1, PageSize: 10, ErrorType: failedType}))
+		}
+		if typePage.Total != 1 || typePage.Requests[0].ErrorType != failedType {
+			t.Fatalf("persisted=%t: error type filter gave total=%d rows=%#v", persisted, typePage.Total, typePage.Requests)
+		}
+		if persisted {
+			typePage = s.RequestPage(requestQuery{Page: 1, PageSize: 10, ErrorType: "proxy"})
+		} else {
+			typePage = s.memoryRequestPage(normalizeRequestQuery(requestQuery{Page: 1, PageSize: 10, ErrorType: "proxy"}))
+		}
+		if typePage.Total != 0 {
+			t.Fatalf("persisted=%t: a type no row has matched %d rows", persisted, typePage.Total)
+		}
+	}
+
 	literalPage := s.RequestPage(requestQuery{Page: 1, PageSize: 10, Search: "literal%", Sort: "time", Order: "desc"})
 	if literalPage.Total != 1 || literalPage.Requests[0].Model != "literal%model" {
 		t.Fatalf("expected LIKE wildcard to be escaped, got total=%d rows=%#v", literalPage.Total, literalPage.Requests)

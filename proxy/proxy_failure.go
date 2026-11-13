@@ -6,7 +6,10 @@ import (
 	"strings"
 
 	"kiro-proxy/config"
+	"kiro-proxy/db"
+	"kiro-proxy/logger"
 	"kiro-proxy/proxypool"
+	"kiro-proxy/textfmt"
 )
 
 // errorTypeProxy is the request log error type of a request or a try that failed
@@ -176,4 +179,48 @@ func proxyFailureRecord(trace *requestTrace, success bool, errorType, message st
 		}
 	}
 	return errorType, message
+}
+
+// reclassifyStoredProxyFailures files older request rows that failed at an outbound proxy
+// under the proxy error type, as tidyLoggedProxyFailures shows them. The request log's
+// error type filter matches the stored column, so without this a search for "Proxy error"
+// missed the rows logged before the type existed. The message is left as stored. A second
+// run changes nothing.
+func reclassifyStoredProxyFailures() error {
+	d, err := db.Get()
+	if err != nil {
+		return err
+	}
+	//! Only messages that can be a proxy failure: the fixed wordings name the proxy, and Go's
+	//! own text ("Post \"https://...\": Forbidden") starts with the request it was making.
+	rows, err := d.Query(`SELECT id, status, message FROM requests WHERE success = 0 AND error_type != ? AND (message LIKE '%prox%' OR message LIKE 'Post "%')`, errorTypeProxy)
+	if err != nil {
+		return err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		var status int
+		var message string
+		if err := rows.Scan(&id, &status, &message); err != nil {
+			rows.Close()
+			return err
+		}
+		if _, _, ok := loggedProxyFailure(message); ok && classifyRequestError(false, status, message) == errorTypeProxy {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, err := d.Exec(`UPDATE requests SET error_type = ? WHERE id = ?`, errorTypeProxy, id); err != nil {
+			return err
+		}
+	}
+	if len(ids) > 0 {
+		logger.Infof("[Observe] Filed %s that failed at a proxy under Proxy error", textfmt.Count(len(ids), "older request", "older requests"))
+	}
+	return nil
 }

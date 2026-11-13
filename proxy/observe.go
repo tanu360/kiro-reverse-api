@@ -104,6 +104,9 @@ type requestQuery struct {
 	Status   string
 	Sort     string
 	Order    string
+	// ErrorType keeps only the rows of one error type (the UI sends it for a search that
+	// names a type the way the table labels it).
+	ErrorType string
 }
 
 type requestPage struct {
@@ -797,6 +800,7 @@ func normalizeRequestQuery(q requestQuery) requestQuery {
 	if q.Order != "asc" {
 		q.Order = "desc"
 	}
+	q.ErrorType = strings.TrimSpace(strings.ToLower(q.ErrorType))
 	return q
 }
 
@@ -820,6 +824,9 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 			continue
 		}
 		if q.Status == "failed" && rec.Success {
+			continue
+		}
+		if q.ErrorType != "" && (rec.Success || rec.ErrorType != q.ErrorType) {
 			continue
 		}
 		if search != "" {
