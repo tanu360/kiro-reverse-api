@@ -3561,6 +3561,12 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 		writeAdminError(w, http.StatusBadRequest, codeRefreshTokenRequired, "refreshToken or kiroApiKey is required")
 		return
 	}
+	if req.ReloginAccountID != "" {
+		if owner := reloginTokenOwner(req.ReloginAccountID, req.RefreshToken); owner != nil {
+			writeReloginOtherAccount(w, req.ReloginAccountID, *owner, false)
+			return
+		}
+	}
 
 	region, err := config.NormalizeAWSRegion(req.Region)
 	if err != nil {

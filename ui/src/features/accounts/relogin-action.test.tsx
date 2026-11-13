@@ -1,5 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { TopAccounts } from "@/features/overview/top-accounts";
 import { mockDb } from "@/lib/mocks/db";
 import { renderApp, renderWithProviders } from "@/test/render";
 import { AccountDetailSheet } from "./account-detail-sheet";
@@ -60,6 +61,14 @@ describe("Sign in again", () => {
     );
     const sheet = await screen.findByRole("dialog");
     await user.click(within(sheet).getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Sign in again" }));
+    expect(await screen.findByRole("dialog", { name: "Sign in again" })).toBeInTheDocument();
+  });
+
+  it("opens from the Overview accounts card's row menu", async () => {
+    const { user } = renderWithProviders(<TopAccounts />);
+    const menus = await screen.findAllByRole("button", { name: "More actions" });
+    await user.click(menus[0]);
     await user.click(await screen.findByRole("menuitem", { name: "Sign in again" }));
     expect(await screen.findByRole("dialog", { name: "Sign in again" })).toBeInTheDocument();
   });

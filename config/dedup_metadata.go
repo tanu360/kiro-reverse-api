@@ -4,6 +4,11 @@ import "strings"
 
 // Notes and tags are the operator's, so neither a repeat login nor a duplicate merge loses them.
 
+// hasAccountMetadata reports whether an account carries notes or tags.
+func hasAccountMetadata(account Account) bool {
+	return strings.TrimSpace(account.Notes) != "" || len(account.Tags) > 0
+}
+
 // absorbIncomingMetadata adds a repeat login's or import's tags after the stored ones and fills
 // empty notes. Stored notes win, so importing one file twice never doubles them.
 func absorbIncomingMetadata(dst *Account, src Account) {

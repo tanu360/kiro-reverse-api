@@ -158,8 +158,8 @@ func TestBatchAddRemoveTag(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.apiBatchAccounts(rec, httptest.NewRequest(http.MethodPost, "/admin/api/accounts/batch",
 		strings.NewReader(`{"ids":["a"],"action":"addTag","tag":"  \n "}`)))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("an empty tag must be rejected, got %d %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"code":"tag_required"`) {
+		t.Fatalf("an empty tag must be rejected with a code, got %d %s", rec.Code, rec.Body.String())
 	}
 }
 

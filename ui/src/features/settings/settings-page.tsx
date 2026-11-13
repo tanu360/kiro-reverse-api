@@ -367,9 +367,37 @@ function useLeaveGuard(): void {
   });
 }
 
+/**
+ * A deep link (/settings#settings-alerts) on a fresh load lands while the cards above its card
+ * still load and grow, so it ends up far above it. Until the reader scrolls, presses a key or a
+ * few seconds pass, every growth of the column brings the card back to the top.
+ */
+function useHashLanding(): void {
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    const column = document.getElementById(id)?.parentElement;
+    if (!SETTINGS_SECTIONS.some((section) => section.id === id) || !column) return;
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      document.getElementById(id)?.scrollIntoView({ block: "start" });
+    });
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    const stop = () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+      for (const type of events) window.removeEventListener(type, stop);
+    };
+    const timer = window.setTimeout(stop, 5000);
+    for (const type of events) window.addEventListener(type, stop, { passive: true });
+    observer.observe(column);
+    return stop;
+  }, []);
+}
+
 function SettingsContent(): JSX.Element {
   const { t } = useT("settings");
   useLeaveGuard();
+  useHashLanding();
   // The nav becomes a column only from xl: at lg the app sidebar is already open, and a third
   // column would leave the cards too narrow for their rows.
   const wide = useMediaQuery("xl");

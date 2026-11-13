@@ -102,17 +102,18 @@ export function ApiKeyFlow(): JSX.Element {
         error={errors.keys}
         hint={
           <>
-            {t("apikey.keysHint")} <Code>ksk_…|eu-central-1</Code>
+            {relogin.target ? t("relogin.keyHint") : t("apikey.keysHint")}{" "}
+            <Code>ksk_…|eu-central-1</Code>
           </>
         }
-        label={t("apikey.keysLabel")}
+        label={relogin.target ? t("relogin.keyLabel") : t("apikey.keysLabel")}
       >
         <Textarea
           autoComplete="off"
           disabled={pending}
           onChange={(event) => setKeys(event.target.value)}
           ref={keysRef}
-          placeholder={"ksk_…\nksk_…|eu-central-1"}
+          placeholder={relogin.target ? "ksk_…" : "ksk_…\nksk_…|eu-central-1"}
           spellCheck={false}
           value={keys}
           variant="mono"

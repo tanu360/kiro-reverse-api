@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
-import { confirmRelogin, discardRelogin, reloginMismatch } from "@/lib/api/relogin";
+import {
+  confirmRelogin,
+  discardRelogin,
+  reloginMismatch,
+  reloginOtherAccount,
+} from "@/lib/api/relogin";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { Account, AddedAccountRef } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
@@ -26,7 +31,8 @@ export interface ReloginFlow {
   /**
    * Handles a re-login that signed in as another user (409 relogin_identity_mismatch): asks to
    * replace the identity, then applies the waiting login (and finishes the dialog) or discards
-   * it. True when it handled the error, so the flow shows nothing else.
+   * it. A sign-in that is another stored account (409 relogin_other_account) only says so. True
+   * when it handled the error, so the flow shows nothing else.
    */
   resolveMismatch: (error: unknown) => Promise<boolean>;
 }
@@ -56,6 +62,16 @@ export function useReloginFlow(): ReloginFlow {
   const resolveMismatch = useCallback(
     async (error: unknown) => {
       if (!relogin) return false;
+      const other = reloginOtherAccount(error);
+      if (other) {
+        const name = other.otherEmail
+          ? display(other.otherEmail, other.otherAccountId)
+          : t("relogin.unknownUser");
+        toast.error(t("relogin.otherAccount", { name }), {
+          description: other.saved ? t("relogin.otherAccountSaved", { name }) : undefined,
+        });
+        return true;
+      }
       const mismatch = reloginMismatch(error);
       if (!mismatch) return false;
       // Busy keeps the dialog open under the confirm: no outside press or Escape closes it.

@@ -160,7 +160,7 @@ export function BuilderIdFlow(): JSX.Element {
             },
             {
               state: "todo",
-              title: t("stepAdded"),
+              title: relogin.target ? t("relogin.stepDone") : t("stepAdded"),
               children: (
                 <p
                   aria-live="polite"
@@ -196,7 +196,7 @@ export function BuilderIdFlow(): JSX.Element {
             children: <FlowNote>{t("builderid.startNote")}</FlowNote>,
           },
           { state: "todo", title: t("builderid.stepApprove") },
-          { state: "todo", title: t("stepAdded") },
+          { state: "todo", title: relogin.target ? t("relogin.stepDone") : t("stepAdded") },
         ]}
       />
       <RegionField

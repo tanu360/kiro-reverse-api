@@ -44,6 +44,19 @@ func (e *reloginMismatchError) Error() string {
 	return "the new sign-in belongs to a different user than this account"
 }
 
+// reloginOtherAccountError is a login that is another stored account's user. It is never
+// stashed: confirming it would leave two accounts on one login, and a pasted refresh token was
+// rotated by the refresh, so the old one the other account holds may be spent. saved is true
+// when the login's fresh tokens went to that account instead.
+type reloginOtherAccountError struct {
+	other config.Account
+	saved bool
+}
+
+func (e *reloginOtherAccountError) Error() string {
+	return "the new sign-in belongs to another account in the pool"
+}
+
 // reloginBindings maps a browser or device-code sign-in session to the account it logs in
 // again. The binding is made when the flow starts, so poll and complete stay unchanged and an
 // unknown account is refused before any AWS call.
@@ -232,6 +245,60 @@ func reloginDuplicate(incoming config.Account, others []config.Account) error {
 	return nil
 }
 
+// reloginOwner is the stored account, among others, whose user the incoming login is: the same
+// Kiro user by the duplicate rules, or the same user id within one id namespace (an import may
+// not name the provider the stored account has). A Kiro API key keeps its own duplicate check.
+func reloginOwner(incoming config.Account, others []config.Account) *config.Account {
+	if config.IsAPIKeyAccount(&incoming) {
+		return nil
+	}
+	user := strings.TrimSpace(incoming.UserId)
+	for i := range others {
+		other := &others[i]
+		if config.IsAPIKeyAccount(other) {
+			continue
+		}
+		if config.SameKiroUser(other, &incoming) {
+			return other
+		}
+		if user != "" && strings.TrimSpace(other.UserId) == user &&
+			config.IsExternalIdpAccount(other) == config.IsExternalIdpAccount(&incoming) {
+			return other
+		}
+	}
+	return nil
+}
+
+// reloginTokenOwner is the stored account other than targetID that holds refreshToken. A pasted
+// token is checked before it is refreshed: the refresh rotates it, and the account that owns it
+// would keep the spent one.
+func reloginTokenOwner(targetID, refreshToken string) *config.Account {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return nil
+	}
+	for _, account := range config.GetAccounts() {
+		if account.ID != targetID && strings.TrimSpace(account.RefreshToken) == refreshToken {
+			return &account
+		}
+	}
+	return nil
+}
+
+// writeReloginOtherAccount is the 409 for a login that is another stored account's user.
+func writeReloginOtherAccount(w http.ResponseWriter, targetID string, other config.Account, saved bool) {
+	w.WriteHeader(http.StatusConflict)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        false,
+		"error":          (&reloginOtherAccountError{}).Error(),
+		"code":           codeReloginOtherAccount,
+		"accountId":      targetID,
+		"otherAccountId": other.ID,
+		"otherEmail":     identityEmail(other.Email),
+		"saved":          saved,
+	})
+}
+
 // loginFamily names the kind of sign-in an account uses. Imports and browser sign-ins spell
 // the same kind differently (an IAM login has no provider, an Enterprise import says so).
 func loginFamily(account config.Account) string {
@@ -321,9 +388,10 @@ func mergeRelogin(current, incoming config.Account, identityReplaced bool) confi
 		merged.ProfileArnPinned = false
 	}
 
-	//! Only an automatic hold (a ban, a suspension, a pool disable) is lifted. A manual disable
-	//! sets no ban status and stays, like Silent. Kiro re-bans after the async check if needed.
-	if current.BanStatus != "" && current.BanStatus != "ACTIVE" {
+	//! Only an automatic hold (a ban or a suspension, BANNED) is lifted. A manual disable stays,
+	//! like Silent: a plain one sets no ban status, and switching off an auth-banned account
+	//! leaves DISABLED (keepOffForAdmin). Kiro re-bans after the async check if needed.
+	if current.BanStatus == "BANNED" {
 		merged.Enabled = true
 		merged.BanStatus = "ACTIVE"
 		merged.BanReason = ""
@@ -360,10 +428,42 @@ type reloginOutcome struct {
 	identityReplaced bool
 }
 
-// saveRelogin replaces targetID's login with incoming. It holds the account's refresh lock, so a
-// background refresh of the old login cannot write its tokens over the new ones afterwards. A
-// different user is refused with *reloginMismatchError unless replaceIdentity is set.
+// saveRelogin replaces targetID's login with incoming. A different user is refused with
+// *reloginMismatchError unless replaceIdentity is set. A login that is another stored account's
+// user is always refused with *reloginOtherAccountError, and its tokens go to that account.
 func (h *Handler) saveRelogin(ctx context.Context, targetID string, incoming config.Account, replaceIdentity bool) (reloginOutcome, error) {
+	outcome, err := h.replaceRelogin(ctx, targetID, incoming, replaceIdentity)
+	var other *reloginOtherAccountError
+	if errors.As(err, &other) {
+		//! After the target's refresh lock is released: holding two account locks could deadlock.
+		other.saved = h.absorbReloginIntoOwner(ctx, other.other.ID, incoming)
+	}
+	return outcome, err
+}
+
+// absorbReloginIntoOwner saves a login into the stored account that is its user, the way adding
+// that login again would, and reports whether it did.
+func (h *Handler) absorbReloginIntoOwner(ctx context.Context, ownerID string, incoming config.Account) bool {
+	unlock, err := lockAccountRefresh(ctx, ownerID)
+	if err != nil {
+		return false
+	}
+	defer unlock()
+	saved, err := config.AbsorbLogin(ownerID, incoming)
+	if err != nil {
+		logger.Warnf("[Relogin] Could not save the sign-in into account %s: %v", ownerID, err)
+		return false
+	}
+	if h.pool != nil {
+		h.pool.Reload()
+	}
+	logger.Infof("[Relogin] The sign-in is account %s (%s); saved its new tokens there", saved.Email, saved.ID)
+	return true
+}
+
+// replaceRelogin is saveRelogin's write. It holds the account's refresh lock, so a background
+// refresh of the old login cannot write its tokens over the new ones afterwards.
+func (h *Handler) replaceRelogin(ctx context.Context, targetID string, incoming config.Account, replaceIdentity bool) (reloginOutcome, error) {
 	unlock, err := lockAccountRefresh(ctx, targetID)
 	if err != nil {
 		return reloginOutcome{}, err
@@ -376,6 +476,11 @@ func (h *Handler) saveRelogin(ctx context.Context, targetID string, incoming con
 	saved, err := config.ReplaceAccountLogin(targetID, func(current config.Account, others []config.Account) (config.Account, error) {
 		found = true
 		match, verified := reloginIdentity(current, incoming)
+		if !match || !verified {
+			if owner := reloginOwner(incoming, others); owner != nil {
+				return config.Account{}, &reloginOtherAccountError{other: *owner}
+			}
+		}
 		if !match && !replaceIdentity {
 			return config.Account{}, &reloginMismatchError{current: current, incoming: incoming}
 		}
@@ -467,8 +572,12 @@ func (h *Handler) writeReloginFlowsLocked(w http.ResponseWriter, r *http.Request
 
 func writeReloginResult(w http.ResponseWriter, targetID string, incoming config.Account, outcome reloginOutcome, err error, extra map[string]interface{}) bool {
 	var mismatch *reloginMismatchError
+	var other *reloginOtherAccountError
 	switch {
 	case err == nil:
+	case errors.As(err, &other):
+		writeReloginOtherAccount(w, targetID, other.other, other.saved)
+		return true
 	case errors.As(err, &mismatch):
 		pendingID := reloginPending.stash(targetID, incoming)
 		w.WriteHeader(http.StatusConflict)

@@ -134,15 +134,30 @@ func evalPoolUsage(pct float64, thresholds []int, cooldown time.Duration, st ale
 	return send, next
 }
 
-// evalBanned decides one account's ban alert: once per ban (BanTime). A ban
-// older than alertStaleBan when first seen is recorded without a message.
+// evalBanned decides one account's ban alert: once per ban. A ban older than
+// alertStaleBan when first seen is recorded without a message.
+//
+// A ban is its reason plus the requests the account had served by then, not
+// its BanTime: self-heal and a re-login lift an auth ban (BanTime 0), and the
+// next failure stamps a new BanTime. Banned again for the same reason without
+// a request served in between is the same outage, so it does not alert again.
 func evalBanned(acc config.Account, st alertState, now int64) (send bool, next alertState) {
 	if acc.BanStatus != "BANNED" {
 		return false, st
 	}
-	period := strconv.FormatInt(acc.BanTime, 10)
+	reason := strings.TrimSpace(acc.BanReason)
+	served := banServed(acc)
+	period := banPeriod(acc.BanTime, served, reason)
 	if st.Period == period {
 		return false, st
+	}
+	prevTime, prevServed, prevReason, ok := parseBanPeriod(st.Period)
+	if ok && (prevTime == acc.BanTime || (prevReason == reason && prevServed == served)) {
+		//! Keeps SentAt and moves the period on, so a request served while banned (a stream
+		//! that started before the ban) does not count as one served after it.
+		next = st
+		next.Period = period
+		return false, next
 	}
 	next = alertState{Period: period, Level: 1}
 	if acc.BanTime <= 0 || now-acc.BanTime > int64(alertStaleBan.Seconds()) {
@@ -150,6 +165,33 @@ func evalBanned(acc config.Account, st alertState, now int64) (send bool, next a
 	}
 	next.SentAt = now
 	return true, next
+}
+
+// banServed is how many requests the account has finished without an error.
+func banServed(acc config.Account) int {
+	return max(acc.RequestCount-acc.ErrorCount, 0)
+}
+
+// banPeriod is a ban's alert_state period: "banTime|served|reason".
+func banPeriod(banTime int64, served int, reason string) string {
+	return strconv.FormatInt(banTime, 10) + "|" + strconv.Itoa(served) + "|" + reason
+}
+
+// parseBanPeriod reads banPeriod. A period from before the served count is the
+// ban time alone; it matches only its own ban.
+func parseBanPeriod(period string) (banTime int64, served int, reason string, ok bool) {
+	parts := strings.SplitN(period, "|", 3)
+	banTime, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, 0, "", false
+	}
+	if len(parts) != 3 {
+		return banTime, -1, "\x00", true
+	}
+	if served, err = strconv.Atoi(parts[1]); err != nil {
+		return 0, 0, "", false
+	}
+	return banTime, served, parts[2], true
 }
 
 // alertPoolSize counts the accounts the admin has not switched off: the enabled

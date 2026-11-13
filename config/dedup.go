@@ -248,7 +248,9 @@ func betterKeeper(a, b *Account) bool {
 // Kiro user, that account takes the new credentials and keeps its ID and
 // operator settings (updated is true); otherwise the account is added. A Kiro
 // API key that is already stored is refused with ErrDuplicateKiroAPIKey: the
-// key never changes, so there is nothing to update.
+// key never changes, so there is nothing to update. The exception is the same
+// key and region with notes or tags, as an export imported back carries them:
+// they join the stored account's, with a missing nickname (updated is true).
 func UpsertAccount(account Account) (stored Account, updated bool, err error) {
 	normalizeAccountMetadata(&account)
 	if IsAPIKeyAccount(&account) {
@@ -310,10 +312,19 @@ func upsertInto(list []Account, incoming Account) ([]Account, Account, bool, err
 	target := -1
 	var best Account
 	for i := range list {
-		if duplicateReason(&list[i], &incoming) == "" {
+		reason := duplicateReason(&list[i], &incoming)
+		if reason == "" {
 			continue
 		}
 		if IsAPIKeyAccount(&incoming) || IsAPIKeyAccount(&list[i]) {
+			if reason == DuplicateReasonAPIKey && hasAccountMetadata(incoming) &&
+				strings.EqualFold(strings.TrimSpace(list[i].Region), strings.TrimSpace(incoming.Region)) {
+				//! An export imported back carries the key with notes or tags: nothing to replace, but they join.
+				next := append([]Account(nil), list...)
+				absorbIncomingMetadata(&next[i], incoming)
+				fillIfEmpty(&next[i].Nickname, incoming.Nickname)
+				return next, next[i], true, nil
+			}
 			return nil, Account{}, false, ErrDuplicateKiroAPIKey
 		}
 		//! With copies already stored, the login lands on the copy a merge would keep, ranked as it will be once updated.

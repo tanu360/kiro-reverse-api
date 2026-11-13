@@ -85,10 +85,18 @@ function FilterSelect({
 }): JSX.Element {
   const { t, lang } = useT("accounts");
   const mask = useMaskText();
-  const show = (text: string) => (masked ? mask(text) : text);
+  const allLabel = t("filter.all");
+  // A value that reads like All (a tag named "All") is quoted, in the menu and on the trigger,
+  // so it never looks like the unfiltered All row.
+  const show = (text: string) => {
+    const label = masked ? mask(text) : text;
+    return label.trim().toLowerCase() === allLabel.toLowerCase()
+      ? t("filter.quoted", { value: label })
+      : label;
+  };
   const current =
     value === undefined
-      ? t("filter.all")
+      ? allLabel
       : show(options.find((option) => option.value === value)?.label ?? value);
   // Each row shows its count; a pick closes the menu, as in a select.
   return (

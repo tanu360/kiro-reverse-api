@@ -154,7 +154,7 @@ export function IamFlow(): JSX.Element {
                   </>
                 ),
               },
-              { state: "todo", title: t("stepAdded") },
+              { state: "todo", title: relogin.target ? t("relogin.stepDone") : t("stepAdded") },
             ]}
           />
         </>

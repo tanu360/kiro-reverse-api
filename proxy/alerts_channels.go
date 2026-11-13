@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -54,17 +55,28 @@ var (
 )
 
 // alertHTTPClient is the client alerts go out on. It follows the outbound
-// proxy setting (Telegram and Discord are blocked in some regions) and is
-// rebuilt when that setting changes. It does not follow redirects: a webhook
-// that answers with one is misconfigured, and following it would resend the
-// alert to an address nobody entered.
+// proxy setting (Telegram and Discord are blocked in some regions), except for
+// a receiver on this host or the local network, and is rebuilt when that
+// setting changes. It does not follow redirects: a webhook that answers with
+// one is misconfigured, and following it would resend the alert to an address
+// nobody entered.
 func alertHTTPClient() *http.Client {
 	proxyURL := config.GetProxyURL()
 	alertClientMu.Lock()
 	defer alertClientMu.Unlock()
 	if alertClient == nil || alertClientProxy != proxyURL {
+		transport := buildKiroTransport(proxyURL)
+		if outbound := transport.Proxy; proxyURL != "" && outbound != nil {
+			//! A remote proxy cannot reach a self-hosted receiver (n8n, Home Assistant) on loopback or the LAN.
+			transport.Proxy = func(req *http.Request) (*url.URL, error) {
+				if alertDirectHost(req.URL.Hostname()) {
+					return nil, nil
+				}
+				return outbound(req)
+			}
+		}
 		alertClient = &http.Client{
-			Transport: buildKiroTransport(proxyURL),
+			Transport: transport,
 			CheckRedirect: func(*http.Request, []*http.Request) error {
 				return http.ErrUseLastResponse
 			},
@@ -72,6 +84,28 @@ func alertHTTPClient() *http.Client {
 		alertClientProxy = proxyURL
 	}
 	return alertClient
+}
+
+// alertDirectHost reports whether host is on this machine or the local network:
+// localhost, a single-label or .local/.lan/.internal/.home.arpa name, or a
+// loopback, private, link-local or unspecified address.
+func alertDirectHost(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	if host == "" {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
+	}
+	if host == "localhost" || !strings.Contains(host, ".") {
+		return true
+	}
+	for _, suffix := range []string{".localhost", ".local", ".lan", ".internal", ".home.arpa"} {
+		if strings.HasSuffix(host, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // alertText is the message as one plain-text block for the chat channels.

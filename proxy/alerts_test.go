@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -250,10 +251,61 @@ func TestBannedAlertOncePerBan(t *testing.T) {
 	if msgs, _ := mustEvaluate(t, a, cfg, []config.Account{acc, manual}, 0, 0, now+90); len(msgs) != 0 {
 		t.Fatalf("manual disable alerted: %+v", msgs)
 	}
-	// Unbanned, then banned again later: a new ban, a new message.
+	// Unbanned, served a request, then banned again later: a new ban, a new message.
 	acc.BanTime = now + 600
+	acc.RequestCount = 1
 	if msgs, _ := mustEvaluate(t, a, cfg, []config.Account{acc}, 0, 0, now+620); len(msgs) != 1 {
 		t.Fatalf("second ban = %+v", msgs)
+	}
+}
+
+func TestBannedAlertNotRepeatedWhenAHealedAccountFailsAgain(t *testing.T) {
+	initAlertsTest(t)
+	a := newAlerter()
+	cfg := usageOnly(testAlertsConfig(), alertEventAccountBanned)
+	const now = int64(1_800_000_000)
+	acc := config.Account{ID: "a1", Email: "a1@example.test", BanStatus: "BANNED", BanReason: banReasonAuthFailed,
+		BanTime: now - 60, RequestCount: 5, ErrorCount: 1}
+	if msgs, _ := mustEvaluate(t, a, cfg, []config.Account{acc}, 0, 0, now); len(msgs) != 1 {
+		t.Fatalf("first ban = %+v", msgs)
+	}
+	// Five self-heal rounds: re-enabled (BanTime 0), the next request fails and bans it again.
+	for round := int64(1); round <= 5; round++ {
+		at := now + round*300
+		healed := acc
+		healed.Enabled, healed.BanStatus, healed.BanReason, healed.BanTime = true, "ACTIVE", "", 0
+		if msgs, _ := mustEvaluate(t, a, cfg, []config.Account{healed}, 1, 1, at); len(msgs) != 0 {
+			t.Fatalf("round %d heal alerted: %+v", round, msgs)
+		}
+		acc.BanTime = at + 5
+		acc.RequestCount++
+		acc.ErrorCount++
+		if msgs, _ := mustEvaluate(t, a, cfg, []config.Account{acc}, 0, 0, at+10); len(msgs) != 0 {
+			t.Fatalf("round %d re-ban alerted again: %+v", round, msgs)
+		}
+	}
+	// A restart reads the same state.
+	if msgs, _ := mustEvaluate(t, newAlerter(), cfg, []config.Account{acc}, 0, 0, now+2000); len(msgs) != 0 {
+		t.Fatalf("restart resent: %+v", msgs)
+	}
+	// Another reason is news.
+	acc.BanReason = "AWS temporarily suspended"
+	acc.BanTime = now + 2100
+	if msgs, _ := mustEvaluate(t, a, cfg, []config.Account{acc}, 0, 0, now+2110); len(msgs) != 1 {
+		t.Fatalf("a new reason = %+v", msgs)
+	}
+}
+
+func TestBannedAlertReadsAStateRowFromBeforeTheServedCount(t *testing.T) {
+	const now = int64(1_800_000_000)
+	acc := config.Account{ID: "a1", BanStatus: "BANNED", BanReason: "x", BanTime: now - 60}
+	legacy := alertState{Period: strconv.FormatInt(acc.BanTime, 10), Level: 1, SentAt: now - 50}
+	if send, next := evalBanned(acc, legacy, now); send || next.SentAt != legacy.SentAt || next.Period != banPeriod(acc.BanTime, 0, "x") {
+		t.Fatalf("the same ban resent or lost its send time: send=%v next=%+v", send, next)
+	}
+	acc.BanTime = now - 30
+	if send, _ := evalBanned(acc, legacy, now); !send {
+		t.Fatal("a later ban after an old-format row did not alert")
 	}
 }
 

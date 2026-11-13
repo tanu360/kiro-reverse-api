@@ -1,6 +1,11 @@
 import { apiRequest } from "./client";
 import { isApiError } from "./errors";
-import type { AddAccountResponse, ReloginMismatchBody, SuccessResponse } from "./types";
+import type {
+  AddAccountResponse,
+  ReloginMismatchBody,
+  ReloginOtherAccountBody,
+  SuccessResponse,
+} from "./types";
 
 const reloginPath = (id: string, action: "confirm" | "discard") =>
   `/accounts/${encodeURIComponent(id)}/relogin/${action}`;
@@ -38,5 +43,21 @@ export function reloginMismatch(error: unknown): ReloginMismatchBody | null {
     currentEmail: typeof body.currentEmail === "string" ? body.currentEmail : "",
     incomingEmail: typeof body.incomingEmail === "string" ? body.incomingEmail : "",
     expiresIn: typeof body.expiresIn === "number" ? body.expiresIn : 0,
+  };
+}
+
+/** The 409 body of a re-login that signed in as another stored account, or null otherwise. */
+export function reloginOtherAccount(error: unknown): ReloginOtherAccountBody | null {
+  if (!isApiError(error) || error.status !== 409) return null;
+  const body = error.body as Partial<ReloginOtherAccountBody> | null;
+  if (body?.code !== "relogin_other_account") return null;
+  return {
+    success: false,
+    error: typeof body.error === "string" ? body.error : "",
+    code: "relogin_other_account",
+    accountId: typeof body.accountId === "string" ? body.accountId : "",
+    otherAccountId: typeof body.otherAccountId === "string" ? body.otherAccountId : "",
+    otherEmail: typeof body.otherEmail === "string" ? body.otherEmail : "",
+    saved: body.saved === true,
   };
 }

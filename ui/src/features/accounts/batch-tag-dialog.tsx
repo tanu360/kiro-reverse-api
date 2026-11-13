@@ -1,4 +1,4 @@
-import { type FormEvent, type JSX, useId, useMemo, useRef, useState } from "react";
+import { type FormEvent, type JSX, useCallback, useId, useMemo, useRef, useState } from "react";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,14 @@ import type {
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
-import { MAX_TAG_LENGTH, MAX_TAGS, parseTagInput, tagKey } from "./account-metadata";
+import {
+  editMaskedText,
+  type FieldSelection,
+  MAX_TAG_LENGTH,
+  MAX_TAGS,
+  parseTagInput,
+  tagKey,
+} from "./account-metadata";
 import { describeFailures } from "./account-model";
 import { useInvalidateAccounts } from "./use-account-actions";
 
@@ -55,13 +62,33 @@ export function BatchTagDialog({
   const { t } = useT("accounts");
   const formId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // The field's selection just before an edit: it tells a replaced masked pick from an edit of it.
+  const selectionBeforeEdit = useRef<FieldSelection | null>(null);
+  const fieldRef = useCallback((node: HTMLInputElement | null) => {
+    inputRef.current = node;
+    if (!node) return;
+    const note = () => {
+      selectionBeforeEdit.current = {
+        start: node.selectionStart ?? node.value.length,
+        end: node.selectionEnd ?? node.value.length,
+      };
+    };
+    node.addEventListener("beforeinput", note);
+    return () => {
+      node.removeEventListener("beforeinput", note);
+      inputRef.current = null;
+    };
+  }, []);
   const invalidate = useInvalidateAccounts();
   const displayEmail = useDisplayEmail();
   const mask = useMaskText();
   const [draft, setDraft] = useState("");
+  // The quick pick in the field: shown masked under privacy (as the chips are) while untouched.
+  const [picked, setPicked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<BatchTagAction | null>(null);
   const inUse = useMemo(() => tagsInUse(accounts), [accounts]);
+  const shown = picked !== null && draft === picked ? mask(picked) : draft;
 
   const nameOf = (id: string) => {
     const account = accounts.find((item) => item.id === id);
@@ -114,6 +141,7 @@ export function BatchTagDialog({
         description: describeFailures(results, nameOf, t) || undefined,
       });
       setDraft("");
+      setPicked(null);
       onDone();
     } catch (failure) {
       toast.update(toastId, { type: "error", title: errorMessage(failure, t) });
@@ -164,12 +192,20 @@ export function BatchTagDialog({
           <Input
             autoComplete="off"
             onChange={(event) => {
-              setDraft(event.target.value);
+              const next = event.target.value;
+              // An edit of a masked pick lands on the tag itself: the masked text is never a tag.
+              setDraft(
+                shown === draft
+                  ? next
+                  : editMaskedText(draft, shown, next, selectionBeforeEdit.current),
+              );
+              selectionBeforeEdit.current = null;
+              setPicked(null);
               if (error) setError(null);
             }}
-            ref={inputRef}
+            ref={fieldRef}
             spellCheck={false}
-            value={draft}
+            value={shown}
           />
           {error ? <FieldError match>{error}</FieldError> : null}
         </Field>
@@ -186,6 +222,7 @@ export function BatchTagDialog({
                     <button
                       onClick={() => {
                         setDraft(tag);
+                        setPicked(tag);
                         setError(null);
                         inputRef.current?.focus();
                       }}

@@ -19,6 +19,7 @@ import {
 } from "@/features/accounts/account-cells";
 import { AccountDetailSheet } from "@/features/accounts/account-detail-sheet";
 import { AccountRowActions } from "@/features/accounts/account-row-actions";
+import { ReloginHost } from "@/features/accounts/relogin-host";
 import { TestAccountDialog } from "@/features/accounts/test-account-dialog";
 import { accountsQuery } from "@/lib/api/accounts";
 import type { Account } from "@/lib/api/types";
@@ -310,7 +311,7 @@ export function TopAccounts(): JSX.Element {
   }
 
   return (
-    <>
+    <ReloginHost>
       <SectionCard
         description={t("topAccounts.description")}
         descriptionVariant="inline"
@@ -351,6 +352,6 @@ export function TopAccounts(): JSX.Element {
           open={test.open}
         />
       ) : null}
-    </>
+    </ReloginHost>
   );
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -266,11 +267,18 @@ func (a *alerter) deliver(ctx context.Context, client *http.Client, ch config.Al
 	}
 	//! Only the channel's type and name: its URL and token are secrets, and so may be the error.
 	if result.OK {
-		logger.Infof("[Alerts] Sent %s alert to %s channel %q (%d attempts)", msg.Event, ch.Type, ch.Name, result.Attempts)
+		logger.Infof("[Alerts] Sent %s alert to %s channel %q (%s)", msg.Event, ch.Type, ch.Name, attemptsLabel(result.Attempts))
 	} else {
-		logger.Warnf("[Alerts] %s alert to %s channel %q failed after %d attempts (status %d)", msg.Event, ch.Type, ch.Name, result.Attempts, result.Status)
+		logger.Warnf("[Alerts] %s alert to %s channel %q failed after %s (status %d)", msg.Event, ch.Type, ch.Name, attemptsLabel(result.Attempts), result.Status)
 	}
 	return result
+}
+
+func attemptsLabel(n int) string {
+	if n == 1 {
+		return "1 attempt"
+	}
+	return strconv.Itoa(n) + " attempts"
 }
 
 // evaluateAlerts runs the rules over the live accounts and queues what they
