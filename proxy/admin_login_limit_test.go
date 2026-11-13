@@ -10,7 +10,7 @@ import (
 )
 
 func TestAdminPasswordLimitsCoverBothRoutes(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	config.SetPassword("00001122")
@@ -51,7 +51,7 @@ func TestAdminPasswordLimitsCoverBothRoutes(t *testing.T) {
 	}
 }
 func TestAdminLimiterSlowsDistributedGuessesWithoutLockout(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	config.SetPassword("12345678")
@@ -96,7 +96,7 @@ func TestAdminLimiterGroupsIPv6ByPrefix(t *testing.T) {
 }
 
 func TestSuccessfulPasswordChecksDoNotConsumeFailureBudget(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	config.SetPassword("12345678")

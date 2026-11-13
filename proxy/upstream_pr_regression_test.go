@@ -133,7 +133,7 @@ func TestStopReasonVariantsAndToolInputIsolation(t *testing.T) {
 
 func TestFreshInstallRejectsKnownAdminPassword(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "")
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	h := &Handler{}
@@ -153,7 +153,7 @@ func TestFreshInstallRejectsKnownAdminPassword(t *testing.T) {
 }
 
 func TestConfiguredAliasesAdvertisedWithExactPrecedence(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateModelMappings([]config.ModelMappingRule{{Key: "alias", Value: "claude-haiku-4.5"}, {Key: "alias-pro", Value: "claude-opus-4.8"}, {Key: "alias-pro-thinking", Value: "claude-sonnet-4.5"}}); err != nil {

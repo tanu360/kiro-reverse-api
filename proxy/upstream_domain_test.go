@@ -22,7 +22,7 @@ const (
 // their defaults afterwards, since later tests in the package may run without config.Init.
 func initUpstreamTest(t *testing.T) {
 	t.Helper()
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	t.Cleanup(func() {

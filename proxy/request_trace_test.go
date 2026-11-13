@@ -69,7 +69,7 @@ func TestRequestEndpointForPath(t *testing.T) {
 
 func setupTraceTestStore(t *testing.T) *observeStore {
 	t.Helper()
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	resetObservePersistenceForTest(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)

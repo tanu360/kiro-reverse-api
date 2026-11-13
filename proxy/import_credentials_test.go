@@ -21,7 +21,7 @@ func installCleanAuthClient(t *testing.T) func() {
 }
 
 func TestApiImportCredentialsRejectsWhenRefreshFails(t *testing.T) {
-	cfgFile := t.TempDir() + "/config.json"
+	cfgFile := tempDataDir(t) + "/config.json"
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestApiImportCredentialsRejectsWhenRefreshFails(t *testing.T) {
 }
 
 func TestApiImportCredentialsUsesUpstreamExpiresAt(t *testing.T) {
-	cfgFile := t.TempDir() + "/config.json"
+	cfgFile := tempDataDir(t) + "/config.json"
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
@@ -150,7 +150,7 @@ func waitForModelRefresh(t *testing.T, calls <-chan string, wantAuth string) {
 }
 
 func TestApiImportCredentialsAPIKeySuccess(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	modelCalls := stubImportNetwork(t)
@@ -185,7 +185,7 @@ func TestApiImportCredentialsAPIKeySuccess(t *testing.T) {
 }
 
 func TestApiImportCredentialsBareAPIKeyInAccessToken(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	modelCalls := stubImportNetwork(t)
@@ -204,7 +204,7 @@ func TestApiImportCredentialsBareAPIKeyInAccessToken(t *testing.T) {
 }
 
 func TestApiImportCredentialsAPIKeyDuplicateRejected(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	modelCalls := stubImportNetwork(t)
@@ -226,7 +226,7 @@ func TestApiImportCredentialsAPIKeyDuplicateRejected(t *testing.T) {
 }
 
 func TestApiImportCredentialsAPIKeyRejectsInvalidRegion(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	stubImportNetwork(t)

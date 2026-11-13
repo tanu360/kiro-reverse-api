@@ -1,11 +1,51 @@
 package pool
 
 import (
+	"sync"
 	"time"
 
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
 )
+
+// backgroundSavesRunning counts the cooldown saves started by
+// saveCooldownsInBackground that have not finished yet.
+var (
+	backgroundSavesMu      sync.Mutex
+	backgroundSavesIdle    = sync.NewCond(&backgroundSavesMu)
+	backgroundSavesRunning int
+)
+
+// saveCooldownsInBackground saves the cooldowns without making the request
+// that set them wait for the database.
+func (p *AccountPool) saveCooldownsInBackground() {
+	backgroundSavesMu.Lock()
+	backgroundSavesRunning++
+	backgroundSavesMu.Unlock()
+	go func() {
+		defer func() {
+			backgroundSavesMu.Lock()
+			backgroundSavesRunning--
+			if backgroundSavesRunning == 0 {
+				backgroundSavesIdle.Broadcast()
+			}
+			backgroundSavesMu.Unlock()
+		}()
+		_ = p.SaveCooldowns()
+	}()
+}
+
+// WaitForBackgroundSaves returns once every cooldown save started in the
+// background has finished. Tests call it before their data folder is removed:
+// a save still running would write a journal file into the folder while it is
+// being deleted.
+func WaitForBackgroundSaves() {
+	backgroundSavesMu.Lock()
+	defer backgroundSavesMu.Unlock()
+	for backgroundSavesRunning > 0 {
+		backgroundSavesIdle.Wait()
+	}
+}
 
 func (p *AccountPool) SaveCooldowns() error {
 	if p == nil {

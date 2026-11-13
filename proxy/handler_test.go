@@ -29,7 +29,7 @@ func TestThinkingSourceReasoningFirst(t *testing.T) {
 
 func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) {
 	resetObservePersistenceForTest(t)
-	cfgFile := t.TempDir() + "/kiro.db"
+	cfgFile := tempDBPath(t)
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestClaudeNonStreamRetriesNextAccountAfterPreResponseFailure(t *testing.T) 
 
 func TestClaudeNonStreamNoAccountsRecordsOneFailedRequest(t *testing.T) {
 	resetObservePersistenceForTest(t)
-	cfgFile := t.TempDir() + "/kiro.db"
+	cfgFile := tempDBPath(t)
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestClaudeNonStreamNoAccountsRecordsOneFailedRequest(t *testing.T) {
 
 func TestClaudeAuthFailureRecordsOneFailedRequest(t *testing.T) {
 	resetObservePersistenceForTest(t)
-	cfgFile := t.TempDir() + "/kiro.db"
+	cfgFile := tempDBPath(t)
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestAccountCreditTotalsSumsServerUsage(t *testing.T) {
 
 func TestStatusPayloadUsesRequestDBAndAccountCredits(t *testing.T) {
 	resetObservePersistenceForTest(t)
-	cfgFile := t.TempDir() + "/kiro.db"
+	cfgFile := tempDBPath(t)
 	if err := config.Init(cfgFile); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestStatusPayloadUsesRequestDBAndAccountCredits(t *testing.T) {
 }
 
 func TestUpdateSettingsReloadsPoolAfterAllowOverUsageChange(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.AddAccount(config.Account{
@@ -313,7 +313,7 @@ func TestUpdateSettingsReloadsPoolAfterAllowOverUsageChange(t *testing.T) {
 }
 
 func TestAdminModelMappingsSaveAndApply(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")
@@ -352,7 +352,7 @@ func TestAdminModelMappingsSaveAndApply(t *testing.T) {
 }
 
 func TestAdminAPIDoesNotAcceptPasswordCookie(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")
@@ -376,7 +376,7 @@ func TestAdminAPIDoesNotAcceptPasswordCookie(t *testing.T) {
 }
 
 func TestBatchDeleteAccounts(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	for _, account := range []config.Account{
@@ -486,7 +486,7 @@ func TestValidateOpenAIRequestShapeAllowsToolResultFinalTurn(t *testing.T) {
 }
 
 func TestAuthenticateMultiApiKeyAndLimits(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	require := true
@@ -523,7 +523,7 @@ func TestAuthenticateMultiApiKeyAndLimits(t *testing.T) {
 }
 
 func TestApiKeyListMasksAndDetailReturnsCopyableKey(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	entry, err := config.AddApiKey(config.ApiKeyEntry{Name: "client", Key: "sk-copyable", Enabled: true})
@@ -568,7 +568,7 @@ func TestApiKeyListMasksAndDetailReturnsCopyableKey(t *testing.T) {
 }
 
 func TestModelsEndpointRequiresManagedApiKey(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	require := true
@@ -599,7 +599,7 @@ func TestModelsEndpointRequiresManagedApiKey(t *testing.T) {
 }
 
 func TestCodexModelsEndpointReturnsManifest(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	t.Cleanup(func() {
@@ -657,7 +657,7 @@ func TestCodexModelsEndpointReturnsManifest(t *testing.T) {
 }
 
 func TestUnknownManagedApiKeyDoesNotAuthenticate(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	require := true
@@ -676,7 +676,7 @@ func TestUnknownManagedApiKeyDoesNotAuthenticate(t *testing.T) {
 }
 
 func TestApiKeyReservationRejectsProjectedTokenOverrun(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	entry, err := config.AddApiKey(config.ApiKeyEntry{Name: "limited", Key: "sk-limited", Enabled: true, TokenLimit: 10})
@@ -694,7 +694,7 @@ func TestApiKeyReservationRejectsProjectedTokenOverrun(t *testing.T) {
 }
 
 func TestRecordSuccessForApiKeyAttributesUsage(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	entry, err := config.AddApiKey(config.ApiKeyEntry{Name: "usage", Key: "sk-usage", Enabled: true})
@@ -1067,7 +1067,7 @@ func TestBuildCodexModelsResponseUsesKiroModelMetadata(t *testing.T) {
 }
 
 func TestAdminPasswordChangeRequiresEightCharacters(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")
@@ -1122,7 +1122,7 @@ func TestFinalizeUsageTokensRemovesTheAnswerFromKiroContext(t *testing.T) {
 }
 
 func TestAccountsListKeepsStatsForAccountsOutOfRotation(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.AddAccount(config.Account{
@@ -1157,7 +1157,7 @@ func TestAccountsListKeepsStatsForAccountsOutOfRotation(t *testing.T) {
 
 func TestFinalRequestCountsErrorsOnTheAccount(t *testing.T) {
 	resetObservePersistenceForTest(t)
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.AddAccount(config.Account{ID: "acc", Enabled: true}); err != nil {
@@ -1179,7 +1179,7 @@ func TestFinalRequestCountsErrorsOnTheAccount(t *testing.T) {
 }
 
 func TestAccountWritesPublishAccountsChanged(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	id, ch := getBroadcaster().Subscribe()
@@ -1202,7 +1202,7 @@ func TestAccountWritesPublishAccountsChanged(t *testing.T) {
 }
 
 func TestAccountFieldWritesAndCooldownsPublishAccountsChanged(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.AddAccount(config.Account{ID: "acc", Enabled: true}); err != nil {

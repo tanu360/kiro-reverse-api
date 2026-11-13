@@ -55,7 +55,7 @@ func TestAPIKeyAccountSurvivesExportImportRoundTrip(t *testing.T) {
 		"full account":       fullBody,
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+			if err := config.Init(tempDBPath(t)); err != nil {
 				t.Fatalf("config.Init: %v", err)
 			}
 			config.SetPassword("admin-password")

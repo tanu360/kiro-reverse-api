@@ -26,7 +26,7 @@ func assertLockout(t *testing.T, rec *httptest.ResponseRecorder) {
 }
 
 func TestApiKeyLockoutGuard(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	h := &Handler{}
@@ -79,7 +79,7 @@ func TestApiKeyLockoutGuard(t *testing.T) {
 }
 
 func TestApiKeyChangesPublishEvent(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	id, ch := getBroadcaster().Subscribe()

@@ -5,7 +5,6 @@ import (
 	"kiro-proxy/config"
 	"math"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -30,7 +29,7 @@ func TestResolveProfileArnReturnsCachedValueWithoutRequest(t *testing.T) {
 }
 
 func TestResolveProfileArnFetchesAndCachesProfile(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "kiro.db")
+	configPath := tempDBPath(t)
 	if err := config.Init(configPath); err != nil {
 		t.Fatalf("init config: %v", err)
 	}

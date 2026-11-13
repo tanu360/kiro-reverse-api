@@ -35,7 +35,7 @@ func signIn(h *Handler, password string) int {
 
 func TestFirstRunPasswordShownUntilFirstSignIn(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "")
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	h := newHandlerWithoutBackgroundForTest(t)
@@ -79,7 +79,7 @@ func TestFirstRunPasswordShownUntilFirstSignIn(t *testing.T) {
 
 func TestFirstRunPasswordNeverShownForChosenPassword(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "operator-chosen")
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	if got := firstRunPassword(t, newHandlerWithoutBackgroundForTest(t)); got != "" {
@@ -89,7 +89,7 @@ func TestFirstRunPasswordNeverShownForChosenPassword(t *testing.T) {
 
 func TestFirstRunPasswordHiddenAfterEnvOverride(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "")
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	//! main applies ADMIN_PASSWORD after Load; the page must not then show that value.

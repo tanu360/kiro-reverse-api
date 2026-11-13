@@ -10,7 +10,7 @@ import (
 )
 
 func TestObserveLoadFromDBRebuildsCounters(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	resetObservePersistenceForTest(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)
@@ -95,7 +95,7 @@ func TestObserveLoadFromDBRebuildsCounters(t *testing.T) {
 }
 
 func TestObserveModelWarmupAddsToLiveCounts(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	resetObservePersistenceForTest(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)

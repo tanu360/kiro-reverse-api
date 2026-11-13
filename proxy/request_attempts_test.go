@@ -59,7 +59,7 @@ var attemptChainRun atomic.Int32
 // Kiro endpoint named "test" and no waits.
 func newAttemptChainHandler(t *testing.T, maxPerAccount int, upstream http.HandlerFunc) *Handler {
 	t.Helper()
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	resetObservePersistenceForTest(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)

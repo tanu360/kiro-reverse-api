@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,7 +15,7 @@ import (
 func setupApiKeyUsageTest(t *testing.T) {
 	t.Helper()
 	resetObservePersistenceForTest(t)
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 }

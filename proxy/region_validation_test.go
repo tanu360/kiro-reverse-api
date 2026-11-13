@@ -16,7 +16,7 @@ const unsafeTestRegion = "@evil.example/x#"
 
 func newRegionTestAdmin(t *testing.T) *Handler {
 	t.Helper()
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")

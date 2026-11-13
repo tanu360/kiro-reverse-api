@@ -30,7 +30,7 @@ func postSettings(h *Handler, body string) *httptest.ResponseRecorder {
 }
 
 func TestUsageRefreshSettingsRoundTrip(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	h := &Handler{usageRefresh: newRefreshScheduler(config.GetUsageRefreshInterval)}
@@ -67,7 +67,7 @@ func TestUsageRefreshSettingsRoundTrip(t *testing.T) {
 }
 
 func TestUsageRefreshSettingsRejectsOutOfRange(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	h := &Handler{}

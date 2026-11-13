@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"kiro-proxy/config"
 	"kiro-proxy/pool"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -87,7 +86,7 @@ func TestSessionAffinityEvictsExpiredFirst(t *testing.T) {
 
 func affinityTestHandler(t *testing.T, ids ...string) *Handler {
 	t.Helper()
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	for _, id := range ids {
@@ -166,7 +165,7 @@ func TestPickAccountFailsOverAndRebinds(t *testing.T) {
 }
 
 func TestSessionAffinityDefaultsOn(t *testing.T) {
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if !config.GetSessionAffinity() {

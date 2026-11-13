@@ -15,7 +15,7 @@ import (
 // weighted afterwards, so a later test's pool rotates again.
 func initRoutingAdminConfig(t *testing.T) {
 	t.Helper()
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	t.Cleanup(func() { _ = config.UpdateRoutingMode(config.RoutingModeWeighted) })

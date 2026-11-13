@@ -21,7 +21,7 @@ const day = int64(86400)
 // it made itself), and a job state with no run and no kick.
 func setupLogRetentionTest(t *testing.T) {
 	t.Helper()
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	resetObservePersistenceForTest(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)

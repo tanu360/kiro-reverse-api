@@ -237,7 +237,7 @@ func TestExportImportRoundTripKeepsNotesAndTags(t *testing.T) {
 	body["tags"] = account.Tags
 	payload, _ := json.Marshal(body)
 
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")

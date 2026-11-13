@@ -13,7 +13,7 @@ import (
 )
 
 func TestListKiroProfilesFollowsNextTokenPagination(t *testing.T) {
-	if err := config.Init(filepath.Join(t.TempDir(), "config.json")); err != nil {
+	if err := config.Init(filepath.Join(tempDataDir(t), "config.json")); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	var pages []string

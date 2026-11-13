@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 
 	"kiro-proxy/config"
@@ -11,7 +10,7 @@ import (
 
 func TestWebSearchLoopChargesEachRoundToItsAccount(t *testing.T) {
 	s := newObserveStoreForTest(t)
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	for _, id := range []string{"a", "b"} {

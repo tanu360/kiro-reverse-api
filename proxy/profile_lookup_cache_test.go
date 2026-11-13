@@ -5,7 +5,6 @@ import (
 	"kiro-proxy/config"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -69,7 +68,7 @@ func TestResolveProfileArnRefreshFallbackRunsOncePerSuppressionWindow(t *testing
 		t.Run(tc.name, func(t *testing.T) {
 			clearProfileArnResolutionCooldowns()
 			t.Cleanup(clearProfileArnResolutionCooldowns)
-			if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+			if err := config.Init(tempDBPath(t)); err != nil {
 				t.Fatalf("init config: %v", err)
 			}
 			stored := config.Account{

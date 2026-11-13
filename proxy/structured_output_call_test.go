@@ -15,7 +15,7 @@ import (
 
 func initStructuredConfigForTest(t *testing.T) {
 	t.Helper()
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 }

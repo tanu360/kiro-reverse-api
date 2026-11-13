@@ -47,7 +47,7 @@ func TestVersionGateIsNotAuthenticationFailure(t *testing.T) {
 }
 
 func TestVersionGateFailureDoesNotDisableAccount(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestVersionGateFailureDoesNotDisableAccount(t *testing.T) {
 }
 
 func TestProfileUnavailableFailureDoesNotDisableAccount(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)
 	}

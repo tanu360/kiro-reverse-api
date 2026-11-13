@@ -449,7 +449,7 @@ func TestResponseHeadersApplyLive(t *testing.T) {
 }
 
 func TestHeaderInjectingWriterCommitPoints(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	setTestResponseHeaders(t, config.ResponseHeaderRule{Name: "X-Account", Value: "{account_id}", Enabled: true})

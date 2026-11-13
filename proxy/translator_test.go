@@ -3,7 +3,6 @@ package proxy
 import (
 	"encoding/json"
 	"kiro-proxy/config"
-	"path/filepath"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -540,7 +539,7 @@ func TestParseModelAndThinkingNormalizesClaudeDashVersions(t *testing.T) {
 }
 
 func TestParseModelAndThinkingUsesConfiguredMappings(t *testing.T) {
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	t.Cleanup(func() {

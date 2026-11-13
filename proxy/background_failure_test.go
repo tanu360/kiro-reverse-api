@@ -9,7 +9,7 @@ import (
 // A background model listing must never be able to ban an account. Real traffic
 // decides account health, because only it sees what a client actually got.
 func TestBackgroundFailureIgnoresTransientErrors(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.AddAccount(config.Account{ID: "acct", Email: "a@example.com", Enabled: true}); err != nil {
@@ -39,7 +39,7 @@ func TestBackgroundFailureIgnoresTransientErrors(t *testing.T) {
 
 // A dead refresh token does prove the account cannot serve, so that one still counts.
 func TestBackgroundFailureStillHandlesTerminalErrors(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.AddAccount(config.Account{ID: "acct", Email: "a@example.com", Enabled: true}); err != nil {

@@ -8,7 +8,6 @@ import (
 	"kiro-proxy/config"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -17,7 +16,7 @@ import (
 
 func setStructuredToolHistoryForTest(t *testing.T, enabled bool) {
 	t.Helper()
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.UpdateStructuredToolHistory(enabled); err != nil {
@@ -86,7 +85,7 @@ func assertToolHistoryPaired(t *testing.T, payload *KiroPayload) {
 }
 
 func TestStructuredToolHistoryDefaultsOn(t *testing.T) {
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if !config.GetStructuredToolHistory() {

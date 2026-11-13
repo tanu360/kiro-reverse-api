@@ -35,7 +35,7 @@ func runBatch(t *testing.T, h *Handler, body string) batchResponse {
 }
 
 func TestBatchEnableCountsMatchedAccountsOnly(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	for _, id := range []string{"a", "b"} {
@@ -67,7 +67,7 @@ func TestBatchEnableCountsMatchedAccountsOnly(t *testing.T) {
 }
 
 func TestBatchRefreshAndRefreshModelsReportUnknownIDs(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	p := accountpool.GetPool()

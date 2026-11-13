@@ -37,7 +37,7 @@ func pinObserveClock(t *testing.T, at time.Time) {
 func newObserveStoreForTest(t *testing.T) *observeStore {
 	t.Helper()
 	resetObservePersistenceForTest(t)
-	if err := db.ResetForTest(t.TempDir()); err != nil {
+	if err := db.ResetForTest(tempDataDir(t)); err != nil {
 		t.Fatalf("reset db: %v", err)
 	}
 	return getObserveStore()
@@ -331,7 +331,7 @@ func TestObserveTickPublishesOnlyOnChange(t *testing.T) {
 	s := newObserveStoreForTest(t)
 	//! A frozen clock keeps a minute rollover from publishing mid-test.
 	pinObserveClock(t, time.Now())
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	id, ch := getBroadcaster().Subscribe()
@@ -412,7 +412,7 @@ func TestObserveStore_ModelMixSortedByCredits(t *testing.T) {
 }
 
 func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	resetObservePersistenceForTest(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)
@@ -474,7 +474,7 @@ func TestObserveStore_RequestPagePersistsAndFilters(t *testing.T) {
 }
 
 func TestQueryPersistedRequestStats(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	resetObservePersistenceForTest(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)

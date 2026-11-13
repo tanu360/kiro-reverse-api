@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -21,7 +20,7 @@ const (
 
 func newAccountProfileTestHandler(t *testing.T) *Handler {
 	t.Helper()
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	config.SetPassword("admin-password")
@@ -134,7 +133,7 @@ func TestAccountProfileRejectsAPIKeyAndMissingAccounts(t *testing.T) {
 }
 
 func TestRefreshKeepsPinnedProfileArn(t *testing.T) {
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	account := config.Account{ID: "pinned", Enabled: true, AuthMethod: "idc", AccessToken: "old", RefreshToken: "old-refresh", ClientID: "client", ClientSecret: "secret", ExpiresAt: 1}

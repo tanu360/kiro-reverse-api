@@ -27,7 +27,7 @@ func seedNativeModels(t *testing.T, ids ...string) {
 // initDefaultMappingsConfig starts a fresh config, so the default model mappings apply.
 func initDefaultMappingsConfig(t *testing.T) {
 	t.Helper()
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)
 	}

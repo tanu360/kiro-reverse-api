@@ -186,7 +186,7 @@ func clearRPMStarts(p *accountpool.AccountPool) {
 
 func TestAPIAccountActivity_Shape(t *testing.T) {
 	newActivityStoreForTest(t)
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword("admin-password")
@@ -251,7 +251,7 @@ func TestAPIAccountActivity_Shape(t *testing.T) {
 }
 
 func TestSettingsAccountRPMLimitRangeAndLive(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.AddAccount(config.Account{ID: "lim-a", Enabled: true, AccessToken: "token"}); err != nil {

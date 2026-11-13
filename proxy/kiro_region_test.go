@@ -6,7 +6,6 @@ import (
 	"io"
 	"kiro-proxy/config"
 	"net/http"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -130,7 +129,7 @@ func TestKiroProfileRegionCandidates(t *testing.T) {
 }
 
 func TestResolveProfileArnFallsBackToSecondRegion(t *testing.T) {
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	var hosts []string
@@ -187,7 +186,7 @@ func TestListAvailableProfilesFollowsNextToken(t *testing.T) {
 func TestBuilderIDUsesFixedProfileArnWithoutLookup(t *testing.T) {
 	clearProfileArnResolutionCooldowns()
 	t.Cleanup(clearProfileArnResolutionCooldowns)
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("init config: %v", err)
 	}
 	stored := config.Account{
@@ -248,7 +247,7 @@ func TestRefreshAccountInfoDoesNotBanWhenProfileLookupFails(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			clearProfileArnResolutionCooldowns()
 			t.Cleanup(clearProfileArnResolutionCooldowns)
-			if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+			if err := config.Init(tempDBPath(t)); err != nil {
 				t.Fatalf("init config: %v", err)
 			}
 			account := config.Account{ID: "acct-" + strings.ReplaceAll(name, " ", "-"), Email: "user@example.com", AccessToken: "token", Provider: "Enterprise", Enabled: true}

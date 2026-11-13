@@ -237,7 +237,7 @@ func newStreamTestHandler(t *testing.T, upstream http.HandlerFunc) *Handler {
 	//! newStreamTestHandler points the proxy at upstream with one account and no endpoint fallback.
 	t.Helper()
 	resetObservePersistenceForTest(t)
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.AddAccount(config.Account{

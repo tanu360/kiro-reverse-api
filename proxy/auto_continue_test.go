@@ -327,7 +327,7 @@ func TestAutoContinueKeepsDeclaredToolsAndMovesToolResultsToHistory(t *testing.T
 }
 
 func TestCallKiroAutoContinueIsOffByDefault(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	script := &scriptedKiro{hops: []scriptedHop{
@@ -457,7 +457,7 @@ func TestOpenAIAutoContinuesCappedAnswer(t *testing.T) {
 }
 
 func TestAutoContinueSettingsRoundTrip(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	h := &Handler{}

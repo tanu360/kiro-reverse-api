@@ -28,7 +28,7 @@ func postSchedule(h *Handler, body string) *httptest.ResponseRecorder {
 }
 
 func TestBackupScheduleValidatesAndReturnsNextRun(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	h := &Handler{}
@@ -85,7 +85,7 @@ func TestNextScheduledBackup(t *testing.T) {
 }
 
 func TestScheduledBackupRunsWhenLastRunIsInTheFuture(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if err := config.UpdateBackupSchedule(config.BackupSchedule{Enabled: true, Cadence: "daily", Keep: 5}); err != nil {
@@ -117,7 +117,7 @@ func TestScheduledBackupRunsWhenLastRunIsInTheFuture(t *testing.T) {
 }
 
 func TestBackupScheduleLoweringKeepPrunes(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	h := &Handler{}
@@ -163,7 +163,7 @@ func countScheduledBackups(t *testing.T) int {
 }
 
 func TestBackupScheduleOffNeverPrunesAndLegacyKeepSurvives(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	h := &Handler{}
@@ -223,7 +223,7 @@ func TestUntilBackupTickLandsOnTheWallClock(t *testing.T) {
 }
 
 func TestBackupErrorsUse404And400(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	h := &Handler{adminSessions: newAdminSessionStore()}
@@ -256,7 +256,7 @@ func TestBackupErrorsUse404And400(t *testing.T) {
 }
 
 func TestBackupDeletePublishesEvent(t *testing.T) {
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	entry, err := config.CreateBackup("manual", "")

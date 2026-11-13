@@ -89,7 +89,7 @@ func TestObserveStoreTracksCacheTokensSeparately(t *testing.T) {
 
 func TestRequestRecordsPersistCacheTokens(t *testing.T) {
 	resetObservePersistenceForTest(t)
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatal(err)
 	}

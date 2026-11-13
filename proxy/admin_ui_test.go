@@ -80,7 +80,7 @@ func withAdminUI(t *testing.T, ui http.Handler) {
 func newRoutedHandlerForTest(t *testing.T) http.Handler {
 	t.Helper()
 	t.Setenv("ADMIN_PASSWORD", "")
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	withAdminUI(t, newAdminUIHandler(testAdminDist(), true))
@@ -300,7 +300,7 @@ func TestLegacyAdminPagesRedirectToRoot(t *testing.T) {
 
 func TestAdminAPIUnaffected(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "")
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	withAdminUI(t, newAdminUIHandler(testAdminDist(), true))

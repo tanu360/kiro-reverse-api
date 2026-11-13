@@ -123,7 +123,7 @@ func TestAdminRefreshSuspensionReloadsPool(t *testing.T) {
 }
 func TestRestorePreservesEnvironmentPassword(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "env-password")
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateSettingsPatch(nil, "backup-password"); err != nil {

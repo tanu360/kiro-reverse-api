@@ -14,7 +14,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -32,7 +31,7 @@ var testResizeLimits = imageResizeLimits{
 // puts the defaults back afterwards, so later tests see resizing on.
 func setImageResizeForTest(t *testing.T, enabled bool, maxDim int) {
 	t.Helper()
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	if !enabled {
@@ -820,7 +819,7 @@ func TestEstimateImageTokensUsesResizeMaxDimension(t *testing.T) {
 }
 
 func TestImageResizeSettingsRoundTrip(t *testing.T) {
-	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	t.Cleanup(func() {

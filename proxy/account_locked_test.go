@@ -37,7 +37,7 @@ func TestSuspensionClassifierMatchesLockedAccount(t *testing.T) {
 
 func setupHealTest(t *testing.T, accounts ...config.Account) *accountpool.AccountPool {
 	t.Helper()
-	dir := t.TempDir()
+	dir := tempDataDir(t)
 	if err := db.ResetForTest(dir); err != nil {
 		t.Fatalf("reset db: %v", err)
 	}

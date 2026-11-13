@@ -323,9 +323,7 @@ func (p *AccountPool) RecordThrottleError(id string, retryAfter time.Duration) i
 	}
 	p.mu.Unlock()
 
-	go func() {
-		_ = p.SaveCooldowns()
-	}()
+	p.saveCooldownsInBackground()
 	if grew {
 		notifyCooldownChanged(id)
 	}
@@ -364,9 +362,7 @@ func (p *AccountPool) recordError(id string, isQuotaError bool, retryAfter time.
 	}
 	p.mu.Unlock()
 
-	go func() {
-		_ = p.SaveCooldowns()
-	}()
+	p.saveCooldownsInBackground()
 	if changed {
 		notifyCooldownChanged(id)
 	}

@@ -43,7 +43,7 @@ func (s *servedBy) list() []string {
 func newKeyAccessHandler(t *testing.T, upstream http.HandlerFunc, accountIDs ...string) *Handler {
 	t.Helper()
 	resetObservePersistenceForTest(t)
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	for _, id := range accountIDs {

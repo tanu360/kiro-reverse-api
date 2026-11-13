@@ -179,7 +179,7 @@ func TestSecureCompare(t *testing.T) {
 
 func newAdminAuthTestHandler(t *testing.T, password string) *Handler {
 	t.Helper()
-	if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	config.SetPassword(password)

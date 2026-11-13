@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"testing"
@@ -19,7 +18,7 @@ import (
 
 func initAlertsTest(t *testing.T) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "kiro.db")
+	path := tempDBPath(t)
 	if err := config.Init(path); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}

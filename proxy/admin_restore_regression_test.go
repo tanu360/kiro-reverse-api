@@ -36,7 +36,7 @@ func TestBackupRestoreRevokesSessionsAndKeepsPasswordPrivate(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Setenv("ADMIN_PASSWORD", "")
-			if err := config.Init(t.TempDir() + "/kiro.db"); err != nil {
+			if err := config.Init(tempDBPath(t)); err != nil {
 				t.Fatal(err)
 			}
 			original := config.GetPassword()
