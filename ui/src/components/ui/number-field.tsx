@@ -5,6 +5,7 @@ import { MinusIcon, PlusIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as React from "react";
 import { useUiT } from "@/components/ui/messages";
+import { intlLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const NumberFieldContext: React.Context<{
@@ -23,6 +24,8 @@ export function NumberField({
 }): React.ReactElement {
   const generatedId = React.useId();
   const fieldId = id ?? generatedId;
+  // Group and parse the number the UI language's way ("4.500" in pt-BR), not the browser's.
+  const { lang } = useUiT();
 
   return (
     <NumberFieldContext.Provider value={{ fieldId }}>
@@ -31,6 +34,7 @@ export function NumberField({
         data-size={size}
         data-slot="number-field"
         id={fieldId}
+        locale={intlLocale(lang)}
         {...props}
       />
     </NumberFieldContext.Provider>

@@ -25,7 +25,7 @@ import {
   type SelfHealState,
   updateAccountHealth,
 } from "@/lib/api/account-health";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { useDraft } from "../lib/dirty";
@@ -121,11 +121,17 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
     },
   );
 
-  // The seconds typed so far as a duration ("5m", "1h 15m"); nothing while they are not valid.
+  // The seconds typed so far as a duration ("5m", "1h 15m"), every unit shown so it reads what
+  // was typed (3661 is "1h 1m 1s"); nothing while they are not valid.
   const interval = draft.value.minIntervalSec;
   const intervalText = inRange(interval, SELF_HEAL_INTERVAL_MIN, SELF_HEAL_INTERVAL_MAX)
-    ? formatDuration(interval, lang)
+    ? formatDuration(interval, lang, "narrow", 4)
     : null;
+  // The range grouped the way the field shows its number ("86,400", "86.400").
+  const intervalRange = {
+    min: formatNumber(SELF_HEAL_INTERVAL_MIN, lang),
+    max: formatNumber(SELF_HEAL_INTERVAL_MAX, lang),
+  };
 
   const onSubmit = () => {
     const { enabled, minIntervalSec, maxRounds } = draft.value;
@@ -178,10 +184,7 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
             />
           }
           controlWidth="number"
-          description={t("selfHeal.intervalHint", {
-            min: SELF_HEAL_INTERVAL_MIN,
-            max: SELF_HEAL_INTERVAL_MAX,
-          })}
+          description={t("selfHeal.intervalHint", intervalRange)}
           htmlFor={intervalId}
           title={t("selfHeal.interval")}
         >
@@ -191,12 +194,7 @@ function SelfHealForm({ health }: { health: AccountHealth }): JSX.Element {
             </p>
           ) : null}
           {intervalInvalid ? (
-            <FieldError match>
-              {t("selfHeal.intervalInvalid", {
-                min: SELF_HEAL_INTERVAL_MIN,
-                max: SELF_HEAL_INTERVAL_MAX,
-              })}
-            </FieldError>
+            <FieldError match>{t("selfHeal.intervalInvalid", intervalRange)}</FieldError>
           ) : null}
         </SettingsRow>
       </Field>
