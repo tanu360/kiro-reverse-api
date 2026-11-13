@@ -90,6 +90,9 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 	if msg := validateClaudeMessageRoles(req.Messages); msg != "" {
 		return msg
 	}
+	if msg := validateClaudeMessageContent(req.Messages); msg != "" {
+		return msg
+	}
 	if msg := validateClaudeThinkingBudget(req.Thinking, req.MaxTokens, req.interleavedThinking); msg != "" {
 		return msg
 	}
@@ -199,13 +202,18 @@ func resolveClaudeThinkingResponseOptions(thinking *ClaudeThinkingConfig, defaul
 }
 
 func validateOpenAIRequestShape(req *OpenAIRequest) string {
+	return validateOpenAIRequestShapeAs(req, chatRequestChecks)
+}
+
+// validateOpenAIRequestShapeAs runs the Chat checks, worded for the API the request came in on.
+func validateOpenAIRequestShapeAs(req *OpenAIRequest, checks openAIRequestChecks) string {
 	if msg := validateOpenAIToolChoice(req); msg != "" {
 		return msg
 	}
 	if msg := validateChatResponseFormat(req); msg != "" {
 		return msg
 	}
-	if msg := validateOpenAIOutputOptions(req); msg != "" {
+	if msg := validateOpenAIOutputOptions(req, checks.maxTokens); msg != "" {
 		return msg
 	}
 	if len(req.Messages) == 0 {
@@ -239,13 +247,13 @@ func validateOpenAIRequestShape(req *OpenAIRequest) string {
 	}
 
 	if !hasNonSystem {
-		return "at least one non-system message is required"
+		return checks.noNonSystem
 	}
 	if lastRole == "assistant" {
-		return "assistant-prefill final message is not supported; last message must be user or tool"
+		return checks.prefill
 	}
 	if !hasUserContext {
-		return "at least one non-empty user message is required"
+		return checks.noUserText
 	}
 	return ""
 }

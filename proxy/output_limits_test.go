@@ -324,7 +324,7 @@ func TestOpenAIOutputOptionsRefuseWhatKiroCannotDo(t *testing.T) {
 		{req: OpenAIRequest{Stop: []byte(`{"x":1}`)}, fail: true},
 	}
 	for i, c := range cases {
-		if got := validateOpenAIOutputOptions(&c.req); (got != "") != c.fail {
+		if got := validateOpenAIOutputOptions(&c.req, "max_tokens"); (got != "") != c.fail {
 			t.Fatalf("case %d: %q", i, got)
 		}
 	}

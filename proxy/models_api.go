@@ -136,7 +136,7 @@ func openAIErrorCode(status int, message string) (code, param interface{}) {
 		return "rate_limit_exceeded", nil
 	case status == http.StatusBadRequest:
 		//! A validation message starts with the field it is about.
-		for _, field := range []string{"top_logprobs", "logprobs", "n", "stop", "max_tokens", "messages", "tool_choice", "response_format", "input"} {
+		for _, field := range []string{"top_logprobs", "logprobs", "n", "stop", "max_tokens", "max_completion_tokens", "max_output_tokens", "messages", "tool_choice", "response_format", "input"} {
 			if strings.HasPrefix(message, field+" ") || strings.HasPrefix(message, field+"[") || strings.HasPrefix(message, field+":") {
 				return nil, field
 			}

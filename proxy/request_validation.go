@@ -25,7 +25,19 @@ func validateClaudeMessageRoles(messages []ClaudeMessage) string {
 	return ""
 }
 
-// validateOpenAIMessageRoles names a message whose role Chat Completions does not have.
+// validateClaudeMessageContent names a message whose content is neither a string nor an array
+// of content blocks. Without it, content: 5 read as "at least one non-empty user message".
+func validateClaudeMessageContent(messages []ClaudeMessage) string {
+	for i, message := range messages {
+		if !isTextOrList(message.Content) {
+			return fmt.Sprintf("messages.%d.content must be a string or an array of content blocks, not %s", i, jsonValueKind(message.Content))
+		}
+	}
+	return ""
+}
+
+// validateOpenAIMessageRoles names a message whose role Chat Completions does not have, or
+// whose content is neither a string nor an array of content parts.
 func validateOpenAIMessageRoles(messages []OpenAIMessage) string {
 	for i, message := range messages {
 		switch strings.TrimSpace(message.Role) {
@@ -33,17 +45,78 @@ func validateOpenAIMessageRoles(messages []OpenAIMessage) string {
 		default:
 			return fmt.Sprintf("messages[%d].role must be one of system, developer, user, assistant or tool, got %q", i, message.Role)
 		}
+		if !isTextOrList(message.Content) {
+			return fmt.Sprintf("messages[%d].content must be a string or an array of content parts, not %s", i, jsonValueKind(message.Content))
+		}
 	}
 	return ""
 }
 
+// isTextOrList reports whether a decoded content value is a string, a list or absent. An
+// absent (null) content stays allowed: an assistant turn that only calls tools has none.
+func isTextOrList(content interface{}) bool {
+	if content == nil {
+		return true
+	}
+	if _, ok := content.(string); ok {
+		return true
+	}
+	kind := reflect.TypeOf(content).Kind()
+	return kind == reflect.Slice || kind == reflect.Array
+}
+
+// jsonValueKind names the JSON type of a decoded value, for a validation message.
+func jsonValueKind(value interface{}) string {
+	switch value.(type) {
+	case nil:
+		return "null"
+	case string:
+		return "a string"
+	case bool:
+		return "a boolean"
+	case float64, float32, int, int64, json.Number:
+		return "a number"
+	case []interface{}:
+		return "an array"
+	case map[string]interface{}:
+		return "an object"
+	}
+	return "another type"
+}
+
 // validateClaudeCountTokensShape is the part of the Messages checks that count_tokens shares:
-// it needs messages with known roles, but no max_tokens and no final user turn.
+// it needs messages with known roles and content types, but no max_tokens and no final user turn.
 func validateClaudeCountTokensShape(req *ClaudeRequest) string {
 	if len(req.Messages) == 0 {
 		return "messages must not be empty"
 	}
-	return validateClaudeMessageRoles(req.Messages)
+	if msg := validateClaudeMessageRoles(req.Messages); msg != "" {
+		return msg
+	}
+	return validateClaudeMessageContent(req.Messages)
+}
+
+// openAIRequestChecks words the checks Chat Completions and the Responses API share, each in
+// its own field names: a Responses request is checked after its input becomes chat messages.
+type openAIRequestChecks struct {
+	maxTokens   string
+	noNonSystem string
+	prefill     string
+	noUserText  string
+}
+
+var chatRequestChecks = openAIRequestChecks{
+	maxTokens:   "max_tokens",
+	noNonSystem: "at least one non-system message is required",
+	prefill:     "assistant-prefill final message is not supported; last message must be user or tool",
+	noUserText:  "at least one non-empty user message is required",
+}
+
+var responsesRequestChecks = openAIRequestChecks{
+	maxTokens:   "max_output_tokens",
+	noNonSystem: "input needs at least one item that is not a system or developer message",
+	prefill:     "input must not end with an assistant message: prefill is not supported",
+	noUserText:  "input needs at least one user message with content",
 }
 
 const interleavedThinkingBeta = "interleaved-thinking-2025-05-14"
