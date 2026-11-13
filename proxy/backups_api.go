@@ -97,6 +97,7 @@ func (h *Handler) apiBackupsRestore(w http.ResponseWriter, _ *http.Request, id s
 	}
 	h.adminSessions.RevokeAll()
 	h.pool.Reload()
+	applyRestoredLogLevel()
 	publishEvent(eventBackupRestored, id)
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
@@ -146,6 +147,7 @@ func (h *Handler) apiBackupsRestoreUpload(w http.ResponseWriter, r *http.Request
 	}
 	h.adminSessions.RevokeAll()
 	h.pool.Reload()
+	applyRestoredLogLevel()
 	publishEvent(eventBackupRestored, "upload")
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }

@@ -76,3 +76,37 @@ func TestSettingsLogLevelAppliesLiveAndPersists(t *testing.T) {
 		t.Fatalf("with LOG_LEVEL set: level=%q fromEnv=%v", level, fromEnv)
 	}
 }
+
+// A restore brings back the backup's saved level. It applies at once, as at a start, so
+// Settings shows the level the server now logs at.
+func TestRestoreAppliesTheBackupsLogLevel(t *testing.T) {
+	keepLogLevel(t)
+	t.Setenv("LOG_LEVEL", "")
+	h := newRegionTestAdmin(t)
+	if rec := serveRegionTestAdmin(h, http.MethodPost, "/admin/api/settings", `{"logLevel":"debug"}`); rec.Code != http.StatusOK {
+		t.Fatalf("POST debug: %d %s", rec.Code, rec.Body.String())
+	}
+	backup, err := config.CreateBackup("manual", "with debug")
+	if err != nil {
+		t.Fatalf("backup: %v", err)
+	}
+	if rec := serveRegionTestAdmin(h, http.MethodPost, "/admin/api/settings", `{"logLevel":"info"}`); rec.Code != http.StatusOK || logger.GetLevel() != logger.LevelInfo {
+		t.Fatalf("POST info: %d level=%v", rec.Code, logger.GetLevel())
+	}
+
+	if rec := serveRegionTestAdmin(h, http.MethodPost, "/admin/api/backups/"+backup.ID+"/restore", ""); rec.Code != http.StatusOK {
+		t.Fatalf("restore: %d %s", rec.Code, rec.Body.String())
+	}
+	if level, _ := settingsLogLevel(t, h); level != "debug" || config.GetLogLevel() != "debug" {
+		t.Fatalf("after restore: GET level=%q saved=%q", level, config.GetLogLevel())
+	}
+
+	// LOG_LEVEL still picks the level, as it does at a start.
+	t.Setenv("LOG_LEVEL", "error")
+	if rec := serveRegionTestAdmin(h, http.MethodPost, "/admin/api/backups/"+backup.ID+"/restore", ""); rec.Code != http.StatusOK {
+		t.Fatalf("restore with LOG_LEVEL: %d %s", rec.Code, rec.Body.String())
+	}
+	if logger.GetLevel() != logger.LevelError {
+		t.Fatalf("with LOG_LEVEL=error after restore: level=%v", logger.GetLevel())
+	}
+}

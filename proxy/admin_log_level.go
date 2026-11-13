@@ -50,3 +50,14 @@ func applyLogLevel(name string) error {
 	logger.SetLevel(next)
 	return nil
 }
+
+// applyRestoredLogLevel switches the logger to the level a restored backup saved, as a start
+// would (LOG_LEVEL still wins). Without it Settings showed the old level until the next start,
+// which then switched to the restored one, debug included.
+func applyRestoredLogLevel() {
+	before := logger.GetLevel()
+	logger.Init(config.GetLogLevel())
+	if after := logger.GetLevel(); after != before {
+		logger.Infof("[Settings] Log level is now %s, from the restored backup", logger.LevelName(after))
+	}
+}
