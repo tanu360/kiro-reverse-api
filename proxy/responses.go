@@ -318,6 +318,9 @@ func validateResponsesMessageItem(obj map[string]interface{}, field string) erro
 	case bool, float64, json.Number:
 		return fmt.Errorf("%s.content must be a string or an array of content parts, not %s", field, jsonValueKind(content))
 	}
+	if j, part := firstNonObjectPart(obj["content"]); j >= 0 {
+		return fmt.Errorf("%s.content[%d] must be an object, not %s", field, j, jsonValueKind(part))
+	}
 	return nil
 }
 

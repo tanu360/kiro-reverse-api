@@ -32,6 +32,9 @@ func validateClaudeMessageContent(messages []ClaudeMessage) string {
 		if !isTextOrList(message.Content) {
 			return fmt.Sprintf("messages.%d.content must be a string or an array of content blocks, not %s", i, jsonValueKind(message.Content))
 		}
+		if j, part := firstNonObjectPart(message.Content); j >= 0 {
+			return fmt.Sprintf("messages.%d.content.%d must be an object, not %s", i, j, jsonValueKind(part))
+		}
 	}
 	return ""
 }
@@ -48,6 +51,9 @@ func validateOpenAIMessageRoles(messages []OpenAIMessage) string {
 		if !isTextOrList(message.Content) {
 			return fmt.Sprintf("messages[%d].content must be a string or an array of content parts, not %s", i, jsonValueKind(message.Content))
 		}
+		if j, part := firstNonObjectPart(message.Content); j >= 0 {
+			return fmt.Sprintf("messages[%d].content[%d] must be an object, not %s", i, j, jsonValueKind(part))
+		}
 	}
 	return ""
 }
@@ -63,6 +69,22 @@ func isTextOrList(content interface{}) bool {
 	}
 	kind := reflect.TypeOf(content).Kind()
 	return kind == reflect.Slice || kind == reflect.Array
+}
+
+// firstNonObjectPart finds the first element of a content array that is not an object (a bare
+// string or number), with its index; -1 when there is none or the content is not an array.
+// Such an element was dropped without a word, and alone it read as an empty user message.
+func firstNonObjectPart(content interface{}) (int, interface{}) {
+	parts, ok := content.([]interface{})
+	if !ok {
+		return -1, nil
+	}
+	for i, part := range parts {
+		if _, isObject := part.(map[string]interface{}); !isObject {
+			return i, part
+		}
+	}
+	return -1, nil
 }
 
 // jsonValueKind names the JSON type of a decoded value, for a validation message.
