@@ -43,6 +43,7 @@ const (
 	codeReloginIdentityMismatch = "relogin_identity_mismatch"
 	codeReloginPendingNotFound  = "relogin_pending_not_found"
 	codeReloginSingleCredential = "relogin_single_credential"
+	codeReloginOtherAccount     = "relogin_other_account"
 	codeAutoContinueMaxRange    = "auto_continue_max_range"
 	codePasswordTooShort        = "password_too_short"
 	codeInvalidEndpoint         = "invalid_endpoint"

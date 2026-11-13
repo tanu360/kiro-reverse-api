@@ -50,3 +50,18 @@ func replaceAccountLoginLocked(accounts []Account, id string, fn func(Account, [
 	}
 	return next, nil
 }
+
+// SameKiroUser reports whether two accounts are one Kiro user by the duplicate rules: the same
+// refresh token, Kiro API key, user id or email.
+func SameKiroUser(a, b *Account) bool {
+	return duplicateReason(a, b) != ""
+}
+
+// AbsorbLogin moves a fresh login onto the stored account id the way a repeat add does: the
+// login's tokens replace the stored ones, and the operator's settings, notes and tags stay.
+func AbsorbLogin(id string, incoming Account) (Account, error) {
+	return ReplaceAccountLogin(id, func(current Account, _ []Account) (Account, error) {
+		applyIncoming(&current, incoming)
+		return current, nil
+	})
+}
