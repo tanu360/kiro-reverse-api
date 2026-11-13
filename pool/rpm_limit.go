@@ -54,11 +54,18 @@ func (p *AccountPool) noteRPMStartLocked(id string) {
 	p.rpm.m[id] = starts
 }
 
-// ReleaseRPMStart gives back one start the account took at or after since. A
-// client request that makes several upstream calls (the web search loop)
-// calls it before it picks again, so it counts as one request, not one per
-// call. A start older than since is never given back: it may be another
-// request's, and the caller's own start has already left the window.
+// ReleaseRPMStart gives back the start the account took for a call that began
+// at since. A client request that makes several upstream calls (the web search
+// loop) calls it before it picks again, so it counts as one request, not one
+// per call.
+//
+// The pool does not know which start is the caller's, so it gives back the
+// oldest start at or after since. The caller picked right after since, so that
+// is its own start, or another request's taken just before it, which leaves the
+// window no later than the caller's would: the account never admits more than
+// the limit. A start older than since is never given back. Once since has left
+// the window the caller's start may have left with it, and every start still
+// there is another request's, so nothing is given back.
 func (p *AccountPool) ReleaseRPMStart(id string, since time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -66,16 +73,23 @@ func (p *AccountPool) ReleaseRPMStart(id string, since time.Time) {
 		p.rpm.m = nil
 		return
 	}
-	starts := p.rpm.trimLocked(id, rpmNow())
-	n := len(starts)
-	if n == 0 || starts[n-1] < since.UnixNano() {
+	now := rpmNow()
+	if !since.After(now.Add(-rpmWindow)) {
 		return
 	}
-	if n == 1 {
-		delete(p.rpm.m, id)
+	starts := p.rpm.trimLocked(id, now)
+	from := since.UnixNano()
+	for i, start := range starts {
+		if start < from {
+			continue
+		}
+		if len(starts) == 1 {
+			delete(p.rpm.m, id)
+			return
+		}
+		p.rpm.m[id] = append(starts[:i:i], starts[i+1:]...)
 		return
 	}
-	p.rpm.m[id] = starts[:n-1]
 }
 
 // trimLocked drops the account's starts at or before now minus the window and

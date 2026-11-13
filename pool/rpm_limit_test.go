@@ -288,3 +288,51 @@ func TestReleaseRPMStartGivesBackOnlyARecentStart(t *testing.T) {
 		t.Fatal("an older start was given back")
 	}
 }
+
+// A call that ran longer than the window lost its own start to the window. The
+// release must not take another request's start in its place.
+func TestReleaseRPMStartAfterTheWindowGivesNothingBack(t *testing.T) {
+	now := setRPMLimitForTest(t, 2)
+	p := newTestPool(config.Account{ID: "a"})
+	t0 := *now
+	if p.GetNext() == nil { // R1's call starts at t0 and streams for 70 s
+		t.Fatal("R1 pick = none")
+	}
+	*now = t0.Add(30 * time.Second)
+	if p.GetNext() == nil { // R2 starts at t0+30 s
+		t.Fatal("R2 pick = none")
+	}
+	*now = t0.Add(70 * time.Second)
+	p.ReleaseRPMStart("a", t0) // R1's next call: its t0 start already left the window
+	if p.GetNext() == nil {
+		t.Fatal("R1's next pick = none, want the slot R1's own start freed")
+	}
+	if acc := p.GetNext(); acc != nil {
+		t.Fatal("a third request was admitted while R2 and R1's new call fill a limit of 2")
+	}
+}
+
+// The release gives back the caller's own (oldest) start, not a newer one of
+// another request, so the account's budget does not free up early.
+func TestReleaseRPMStartGivesBackTheOldestStartSinceTheCall(t *testing.T) {
+	now := setRPMLimitForTest(t, 2)
+	p := newTestPool(config.Account{ID: "a"})
+	t0 := *now
+	if p.GetNext() == nil { // R1 at t0
+		t.Fatal("R1 pick = none")
+	}
+	*now = t0.Add(10 * time.Second)
+	if p.GetNext() == nil { // R2 at t0+10 s
+		t.Fatal("R2 pick = none")
+	}
+	*now = t0.Add(20 * time.Second)
+	p.ReleaseRPMStart("a", t0) // R1's call ends: its t0 start goes back
+	if p.GetNext() == nil {    // R1's next call at t0+20 s
+		t.Fatal("R1's next pick = none")
+	}
+	// At t0+61 s a start from t0 would have left the window, R2's from t0+10 s has not.
+	*now = t0.Add(61 * time.Second)
+	if acc := p.GetNext(); acc != nil {
+		t.Fatal("pick at t0+61 s admitted: the release gave back R2's start instead of R1's")
+	}
+}
