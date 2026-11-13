@@ -14,6 +14,9 @@ import (
 // accountStatusTagLimit marks a batch addTag row whose account already has the most tags.
 const accountStatusTagLimit = "tag_limit"
 
+// codeTagRequired: a batch addTag or removeTag without a tag.
+const codeTagRequired = "tag_required"
+
 var errInvalidMetadata = errors.New("notes must be a string and tags an array of strings")
 
 // metadataPatch is the notes and tags part of PUT /accounts/{id}. A key left out of the
@@ -79,8 +82,7 @@ func (p metadataPatch) apply(id string) error {
 func (h *Handler) batchTags(w http.ResponseWriter, ids []string, add bool, rawTag string) {
 	tag := config.NormalizeAccountTag(rawTag)
 	if tag == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "tag is required"})
+		writeAdminError(w, http.StatusBadRequest, codeTagRequired, "tag is required")
 		return
 	}
 	matched, slots, results := matchAccounts(ids)
