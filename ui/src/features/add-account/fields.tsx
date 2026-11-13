@@ -1,8 +1,9 @@
-import { ArrowUpRight01Icon, ExternalLinkIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowUpRight01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, type Ref, useEffect, useId, useRef } from "react";
 import { AwsLogo, GithubLogo, GoogleLogo, MicrosoftLogo } from "@/components/shared/brand-logos";
 import { CopyButton } from "@/components/shared/copy-button";
+import { OpenLinkButton } from "@/components/shared/open-link-button";
 import { ROW_DESCRIPTION } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
@@ -12,20 +13,11 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * A sign-in link as one quiet line instead of a field (no box around it): the label, then the URL in mono cut to a
- * single line (Open and Copy carry the full address), with Open as a secondary
- * button and a copy icon at its end. A long OAuth URL no longer fills the step.
+ * A sign-in link as one quiet line instead of a field (no box around it): the label, then the
+ * URL in mono cut to a single line (Open and Copy carry the full address), with an open and a
+ * copy icon at its end, as in a CopyField's addon. A long OAuth URL no longer fills the step.
  */
-export function UrlBox({
-  label,
-  url,
-  showOpen = true,
-}: {
-  label: string;
-  url: string;
-  /** False when the step's main button already opens the link (Builder ID's footer). */
-  showOpen?: boolean;
-}): JSX.Element {
+export function UrlBox({ label, url }: { label: string; url: string }): JSX.Element {
   const { t } = useT("add-account");
   return (
     <div className="flex w-full min-w-0 flex-col gap-2">
@@ -34,13 +26,10 @@ export function UrlBox({
         <span className="min-w-0 flex-1 truncate font-mono text-meta text-muted-foreground">
           {url}
         </span>
-        {showOpen ? (
-          <ExternalLink className="ms-1" href={url}>
-            <HugeiconsIcon aria-hidden="true" icon={ExternalLinkIcon} />
-            {t("open")}
-          </ExternalLink>
-        ) : null}
-        <CopyButton label={t("copyLink")} size="icon-sm" value={url} variant="quiet" />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <OpenLinkButton href={url} label={t("openLink")} size="icon-sm" variant="quiet" />
+          <CopyButton label={t("copyLink")} size="icon-sm" value={url} variant="quiet" />
+        </div>
       </div>
     </div>
   );

@@ -177,6 +177,14 @@ describe("Builder ID", () => {
     expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
     expect(screen.getByText("Waiting for authorization…")).toBeInTheDocument();
     expect(polls.count).toBe(0);
+    // The Verification URL row has its open icon before the copy icon; the footer keeps its
+    // labelled Open AWS page button.
+    const verifyUrl = "https://view.awsapps.com/start/#/device?user_code=ABCD-EFGH";
+    const open = screen.getByRole("link", { name: "Open link" });
+    expect(open).toHaveAttribute("href", verifyUrl);
+    expect(open).toHaveAttribute("target", "_blank");
+    expect(open.nextElementSibling).toBe(screen.getByRole("button", { name: "Copy link" }));
+    expect(screen.getByRole("link", { name: "Open AWS page" })).toHaveAttribute("href", verifyUrl);
 
     await untilPolls(polls, 3);
     await expectClosed();
