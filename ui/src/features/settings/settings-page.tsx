@@ -16,6 +16,7 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusDot } from "@/components/shared/status-dot";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -352,7 +353,8 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
                     variant={entry.danger ? "destructive" : "default"}
                   >
                     <HugeiconsIcon aria-hidden="true" icon={entry.icon} />
-                    <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                    {/* A label cut beside a pill (pt-BR "Integridade do stream") shows whole on hover. */}
+                    <TruncatedText className="flex-1">{entry.label}</TruncatedText>
                     {entry.dirty ? <DirtyMark /> : null}
                     {/* In the row's own flex line, so the label truncates before a pill of any width. */}
                     {entry.on === undefined ? null : (
