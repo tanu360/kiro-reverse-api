@@ -894,6 +894,18 @@ func TestReloginIdentityRules(t *testing.T) {
 		{"key labels never decide", config.Account{Email: "api-key-aaaa"}, config.Account{Email: "api-key-bbbb"}, true, false},
 		{"entra and kiro ids are not compared", config.Account{UserId: "kiro-u", Email: "a@x"},
 			config.Account{UserId: "oid", AuthMethod: auth.MicrosoftSSOAuthMethod, Email: "a@x"}, true, true},
+		{"same email, other user id", config.Account{UserId: "u", Email: "a@x"},
+			config.Account{UserId: "v", Email: "A@x"}, false, true},
+		{"same email, other social provider", config.Account{AuthMethod: "social", Provider: "Google", Email: "a@x"},
+			config.Account{AuthMethod: "social", Provider: "Github", Email: "a@x"}, false, true},
+		{"same email, social provider not named", config.Account{AuthMethod: "social", Provider: "Google", Email: "a@x"},
+			config.Account{AuthMethod: "social", Email: "a@x"}, true, true},
+		{"entra id replaced by kiro's, same tenant",
+			config.Account{UserId: "kiro-u", AuthMethod: auth.MicrosoftSSOAuthMethod, Email: "a@x", IssuerURL: "https://login.example/t1/v2.0"},
+			config.Account{UserId: "oid", AuthMethod: auth.MicrosoftSSOAuthMethod, Email: "a@x", IssuerURL: "https://login.example/t1/v2.0/"}, true, true},
+		{"entra user of another tenant",
+			config.Account{UserId: "oid-1", AuthMethod: auth.MicrosoftSSOAuthMethod, Email: "a@x", IssuerURL: "https://login.example/t1/v2.0"},
+			config.Account{UserId: "oid-2", AuthMethod: auth.MicrosoftSSOAuthMethod, Email: "a@x", IssuerURL: "https://login.example/t2/v2.0"}, false, true},
 	}
 	for _, tc := range cases {
 		match, verified := reloginIdentity(tc.current, tc.in)

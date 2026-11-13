@@ -159,3 +159,45 @@ func TestReloginKeepsAnAdminSwitchOffOfAnAuthBan(t *testing.T) {
 		t.Fatalf("tokens not replaced: %+v", got)
 	}
 }
+
+func TestReloginSameEmailOtherUserIsNotTheTarget(t *testing.T) {
+	h, fake, _ := newReloginHandler(t)
+	addReloginTarget(t, baseReloginAccount("acc-1"))
+	// One email, two Kiro users (two IdC organizations, or a Google and a Github login).
+	twin := otherReloginAccount("acc-2")
+	twin.Email = "dev@example.com"
+	addReloginTarget(t, twin)
+	if groups := config.FindDuplicateGroups(config.GetAccounts()); len(groups) != 0 {
+		t.Fatalf("setup: %v", groups)
+	}
+	fake.access, fake.refresh = "at-y-new", "rt-y-new"
+	fake.users["at-y-new"] = [2]string{"dev@example.com", "user-2"}
+
+	rec, body := callRelogin(t, h.apiImportCredentials, idcCredentials("acc-1"))
+	if rec.Code != http.StatusConflict || body["code"] != codeReloginOtherAccount || body["otherAccountId"] != "acc-2" || body["saved"] != true {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if got := storedRelogin(t, "acc-1"); got.UserId != "user-1" || got.AccessToken != "at-old" {
+		t.Fatalf("the target took the other user's login: %+v", got)
+	}
+	if got := storedRelogin(t, "acc-2"); got.AccessToken != "at-y-new" || got.RefreshToken != "rt-y-new" {
+		t.Fatalf("the login did not reach its account: %+v", got)
+	}
+	if groups := config.FindDuplicateGroups(config.GetAccounts()); len(groups) != 0 {
+		t.Fatalf("re-login left two accounts on one user: %v", groups)
+	}
+
+	// With no stored account for that user, the switch waits for the identity confirm.
+	if err := config.DeleteAccount("acc-2"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	fake.access, fake.refresh = "at-z", "rt-z"
+	fake.users["at-z"] = [2]string{"dev@example.com", "user-2"}
+	rec, body = callRelogin(t, h.apiImportCredentials, idcCredentials("acc-1"))
+	if rec.Code != http.StatusConflict || body["code"] != codeReloginIdentityMismatch {
+		t.Fatalf("no owner: status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if got := storedRelogin(t, "acc-1"); got.UserId != "user-1" || got.AccessToken != "at-old" {
+		t.Fatalf("the target switched user without a confirm: %+v", got)
+	}
+}

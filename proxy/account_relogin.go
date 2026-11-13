@@ -213,8 +213,8 @@ func identityEmail(email string) string {
 // user lookup is best effort and a transient failure must not block a re-login.
 func reloginIdentity(current, incoming config.Account) (match, verified bool) {
 	curUser, inUser := strings.TrimSpace(current.UserId), strings.TrimSpace(incoming.UserId)
-	usersComparable := curUser != "" && inUser != "" &&
-		config.IsExternalIdpAccount(&current) == config.IsExternalIdpAccount(&incoming)
+	external := config.IsExternalIdpAccount(&current)
+	usersComparable := curUser != "" && inUser != "" && external == config.IsExternalIdpAccount(&incoming)
 	curEmail, inEmail := identityEmail(current.Email), identityEmail(incoming.Email)
 	emailsComparable := curEmail != "" && inEmail != ""
 	if !usersComparable && !emailsComparable {
@@ -223,10 +223,32 @@ func reloginIdentity(current, incoming config.Account) (match, verified bool) {
 	if usersComparable && curUser == inUser {
 		return true, true
 	}
-	if emailsComparable && strings.EqualFold(curEmail, inEmail) {
+	//! Two Kiro user ids that differ are two users whatever the emails say, as in the duplicate
+	//! rules: one email can be a Google and a Github user, or a user in two IdC organizations.
+	//! An Entra id does not decide: the usage refresh can replace the token-derived id with Kiro's.
+	if usersComparable && !external {
+		return false, true
+	}
+	if emailsComparable && strings.EqualFold(curEmail, inEmail) && !otherUserOfEmail(current, incoming) {
 		return true, true
 	}
 	return false, true
+}
+
+// otherUserOfEmail reports two logins with one email that the duplicate rules keep apart: two
+// social providers (a Google and a Github user) or two Entra tenants.
+func otherUserOfEmail(current, incoming config.Account) bool {
+	differ := func(a, b string) bool {
+		a, b = strings.TrimSpace(a), strings.TrimSpace(b)
+		return a != "" && b != "" && !strings.EqualFold(a, b)
+	}
+	social := strings.EqualFold(strings.TrimSpace(current.AuthMethod), "social") &&
+		strings.EqualFold(strings.TrimSpace(incoming.AuthMethod), "social")
+	if social && differ(current.Provider, incoming.Provider) {
+		return true
+	}
+	return config.IsExternalIdpAccount(&current) && config.IsExternalIdpAccount(&incoming) &&
+		differ(strings.TrimRight(current.IssuerURL, "/"), strings.TrimRight(incoming.IssuerURL, "/"))
 }
 
 // reloginDuplicate applies the add path's uniqueness rules to every account but the target: an
