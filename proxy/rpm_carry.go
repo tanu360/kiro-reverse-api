@@ -2,8 +2,10 @@ package proxy
 
 import (
 	"context"
+	"sync"
 	"time"
 
+	"kiro-proxy/config"
 	accountpool "kiro-proxy/pool"
 )
 
@@ -61,4 +63,77 @@ func (c *rpmCarry) done(id string, since time.Time) {
 		return
 	}
 	c.id, c.since = id, since
+}
+
+// A try that never reached Kiro still took the start its pick recorded, and
+// failover picks every account in turn. With no healthy pool proxy, one failed
+// request then leaves each account at its limit, and the next request reads 429
+// instead of the outage until a minute has passed, even once a proxy is back.
+// rpmPicks remembers when the request picked each account, so the pick's start
+// goes back when its last try failed before any connection to Kiro existed.
+
+type rpmPicksKey struct{}
+
+type rpmPicks struct {
+	pool  *accountpool.AccountPool
+	mu    sync.Mutex
+	picks map[string]*rpmPick
+}
+
+// rpmPick is one pick of an account by the request. reached marks a try that
+// connected to Kiro, which keeps the start; done marks a start given back.
+type rpmPick struct {
+	since   time.Time
+	reached bool
+	done    bool
+}
+
+// withRPMPicks gives a client request its pick ledger.
+func withRPMPicks(ctx context.Context, p *accountpool.AccountPool) context.Context {
+	if p == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, rpmPicksKey{}, &rpmPicks{pool: p})
+}
+
+// noteRPMPick records that the request picked the account; since is a time
+// taken just before the pick, so the pick's start is at or after it.
+func noteRPMPick(ctx context.Context, account *config.Account, since time.Time) {
+	l, _ := ctx.Value(rpmPicksKey{}).(*rpmPicks)
+	if l == nil || account == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.picks == nil {
+		l.picks = make(map[string]*rpmPick)
+	}
+	l.picks[account.ID] = &rpmPick{since: since}
+}
+
+// settleRPMPickFailure gives the start of the account's latest pick back when
+// err failed before any connection to Kiro, no earlier try of that pick
+// connected, and the retry plan will not try the account again for this pick.
+// A retried error keeps the start: the retry may still reach Kiro.
+func settleRPMPickFailure(ctx context.Context, account *config.Account, err error) {
+	l, _ := ctx.Value(rpmPicksKey{}).(*rpmPicks)
+	if l == nil || account == nil || err == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	pick := l.picks[account.ID]
+	if pick == nil || pick.done {
+		return
+	}
+	if !neverReachedKiro(err) {
+		pick.reached = true
+		return
+	}
+	//! The same error reading canRetrySameAccount uses: only an attempt it ends gives the start back.
+	if pick.reached || !(isNoHealthyProxyError(err) || isTerminalAccountErrorMessage(err.Error())) {
+		return
+	}
+	pick.done = true
+	l.pool.ReleaseRPMStart(account.ID, pick.since)
 }

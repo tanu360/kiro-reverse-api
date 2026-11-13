@@ -623,7 +623,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 						"id":     responseID,
 						"object": "response",
 						"status": "failed",
-						"error":  map[string]string{"message": err.Error()},
+						"error":  map[string]string{"message": upstreamErrorText(err)},
 					},
 				})
 				recordFinalRequestForApiKey(ctx, apiKeyReservation, account, model, 0, 0, 0, false, http.StatusInternalServerError, err.Error())

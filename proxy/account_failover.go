@@ -200,7 +200,7 @@ func (h *Handler) disableAccountOverage(account *config.Account) {
 // anything transient must stay out of the pool; otherwise a model listing that
 // hiccups pulls an account real traffic would still succeed on.
 func (h *Handler) handleBackgroundAccountFailure(account *config.Account, err error) {
-	if err == nil || !isTerminalAccountErrorMessage(err.Error()) {
+	if err == nil || isUpstreamTransportError(err) || !isTerminalAccountErrorMessage(err.Error()) {
 		return
 	}
 	//! Bans reach admin pages through the config hook and cooldowns through the pool's.
@@ -214,6 +214,13 @@ func (h *Handler) handleAccountFailure(account *config.Account, err error) {
 	}
 	//! A pool proxy that failed to connect moved the account already; the account itself is fine.
 	if proxypool.IsProxyError(err) {
+		return
+	}
+	//! No HTTP answer came back, so nothing proves the token bad: an own or global proxy's CONNECT
+	//! "Forbidden" or SOCKS "authentication failed" is the proxy's word, and the error text also
+	//! repeats the URL, whose profile ARN digits can read as a 401 or a 429. Cool the account only.
+	if isUpstreamTransportError(err) {
+		h.pool.RecordError(account.ID, false)
 		return
 	}
 

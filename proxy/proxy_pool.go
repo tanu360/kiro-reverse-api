@@ -111,22 +111,18 @@ func noHealthyProxyFailure() error {
 }
 
 // upstreamErrorText is the error text a client gets. A pool proxy failure reads
-// as its fixed wording, without the upstream URL the transport error repeats.
+// as its fixed wording, and any other failure with no HTTP answer as
+// upstreamTransportText, without the upstream URL or proxy address the
+// transport error repeats.
 func upstreamErrorText(err error) string {
 	var perr *proxypool.ProxyError
 	if errors.As(err, &perr) {
 		return perr.Error()
 	}
-	return err.Error()
-}
-
-// poolAwareStatus is fallback, or 503 for a request that failed at its pool
-// proxy or found none, as upstreamFailureStatus answers on the chat paths.
-func poolAwareStatus(err error, fallback int) int {
-	if proxypool.IsProxyError(err) {
-		return http.StatusServiceUnavailable
+	if isUpstreamTransportError(err) {
+		return upstreamTransportText(err)
 	}
-	return fallback
+	return err.Error()
 }
 
 // startProxyPool loads the saved pool state and starts the periodic health check.

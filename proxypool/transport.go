@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptrace"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -120,6 +121,24 @@ func classify(err error) string {
 	default:
 		return KindConnect
 	}
+}
+
+// DescribeProxyFailure names a request that failed at an outbound proxy outside
+// the pool (an account's own or the global proxy) in ProxyError's fixed
+// wording: an HTTP proxy's dial, TLS or CONNECT, or a SOCKS handshake. Go's
+// error repeats the request URL and the proxy's host:port, which a client must
+// not see. ok is false for any other error, a direct dial included.
+func DescribeProxyFailure(err error) (text string, ok bool) {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr.Err != nil {
+		err = urlErr.Err
+	}
+	var opErr *net.OpError
+	atProxy := errors.As(err, &opErr) && (opErr.Op == "proxyconnect" || strings.HasPrefix(opErr.Op, "socks"))
+	if !atProxy && !isConnectStatus(err.Error()) {
+		return "", false
+	}
+	return kindText(classify(err)), true
 }
 
 // isConnectStatus matches the bare reason phrase Go returns for a CONNECT the

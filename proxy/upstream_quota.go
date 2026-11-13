@@ -88,6 +88,12 @@ func retryAfterDuration(value string, now time.Time) time.Duration {
 }
 
 func upstreamFailureStatus(err error) int {
+	return upstreamFailureStatusOr(err, http.StatusInternalServerError)
+}
+
+// upstreamFailureStatusOr is upstreamFailureStatus with fallback for an error
+// that is none of the typed upstream failures.
+func upstreamFailureStatusOr(err error, fallback int) int {
 	var client *upstreamClientError
 	if errors.As(err, &client) {
 		return client.status
@@ -97,10 +103,11 @@ func upstreamFailureStatus(err error) int {
 		return http.StatusTooManyRequests
 	}
 	//! The outbound route is down, not the server: a client may retry once a proxy recovers.
-	if proxypool.IsProxyError(err) {
+	//! An account's own or the global proxy, or Kiro unreachable, answers as a pool proxy does.
+	if proxypool.IsProxyError(err) || isUpstreamTransportError(err) {
 		return http.StatusServiceUnavailable
 	}
-	return http.StatusInternalServerError
+	return fallback
 }
 
 func setUpstreamRetryAfter(w http.ResponseWriter, err error) {
@@ -114,14 +121,18 @@ func setUpstreamRetryAfter(w http.ResponseWriter, err error) {
 
 func (h *Handler) sendClaudeUpstreamError(w http.ResponseWriter, err error) {
 	setUpstreamRetryAfter(w, err)
-	kind := "api_error"
+	h.sendClaudeError(w, upstreamFailureStatus(err), claudeUpstreamErrorType(err), upstreamErrorText(err))
+}
+
+// claudeUpstreamErrorType is the Anthropic error type for an upstream failure.
+func claudeUpstreamErrorType(err error) string {
+	if upstreamFailureStatus(err) == http.StatusTooManyRequests {
+		return "rate_limit_error"
+	}
 	if isUpstreamClientError(err) {
-		kind = "invalid_request_error"
+		return "invalid_request_error"
 	}
-	if upstreamFailureStatus(err) == 429 {
-		kind = "rate_limit_error"
-	}
-	h.sendClaudeError(w, upstreamFailureStatus(err), kind, upstreamErrorText(err))
+	return "api_error"
 }
 
 func (h *Handler) sendOpenAIUpstreamError(w http.ResponseWriter, err error) {

@@ -291,10 +291,12 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 	var lastErr error
 	var lastAccount *config.Account
 	for attempt := 0; attempt < newRequestRetryPlan().maxPerRequest; attempt++ {
+		picked := time.Now()
 		account := h.pool.GetNextForModelAllowed(model, excluded, allowedAccountsFromContext(ctx))
 		if account == nil {
 			break
 		}
+		noteRPMPick(ctx, account, picked)
 		excluded[account.ID] = true
 		lastAccount = account
 		traceAttemptStart(ctx, account, attemptEndpointWebSearch)
@@ -341,7 +343,7 @@ func (h *Handler) runWebSearches(ctx context.Context, model string, toolUses []K
 			*used++
 			results, _, err := h.searchWebWithFailover(ctx, model, outcome.query)
 			if err != nil {
-				outcome.errorCode, outcome.errorText = "unavailable", err.Error()
+				outcome.errorCode, outcome.errorText = "unavailable", upstreamErrorText(err)
 			}
 			outcome.results = results
 		}
@@ -361,13 +363,18 @@ func (h *Handler) handleClaudeDirectWebSearch(w http.ResponseWriter, r *http.Req
 			recordClientDisconnect(r.Context(), apiKeyReservation, account, model)
 			return
 		}
-		status, errType, message := poolAwareStatus(err, http.StatusBadGateway), "api_error", upstreamErrorText(err)
 		if errors.Is(err, errNoWebSearchAccounts) {
 			//! No account was tried: 404, 429 (RPM limit) or 503, the same answer as a chat request.
-			status, errType, message = h.noAccountError(r.Context(), model, "api_error")
+			status, errType, message := h.noAccountError(r.Context(), model, "api_error")
+			recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, status, message)
+			h.sendClaudeError(w, status, errType, "Web search failed: "+message)
+			return
 		}
-		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, status, message)
-		h.sendClaudeError(w, status, errType, "Web search failed: "+message)
+		//! An MCP failure is untyped and stays 502; a typed one answers as on /v1/messages.
+		status := upstreamFailureStatusOr(err, http.StatusBadGateway)
+		recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, status, err.Error())
+		setUpstreamRetryAfter(w, err)
+		h.sendClaudeError(w, status, claudeUpstreamErrorType(err), "Web search failed: "+upstreamErrorText(err))
 		return
 	}
 
@@ -415,13 +422,16 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 				finish(false, clientClosedRequestStatus, clientDisconnectedMessage)
 				return
 			}
-			status, errType, message := poolAwareStatus(err, http.StatusInternalServerError), "api_error", upstreamErrorText(err)
 			if errors.Is(err, errNoClaudeAccounts) {
 				//! Same answer as the plain Claude path, so clients see one message for an empty pool or unknown model.
-				status, errType, message = h.noAccountError(ctx, req.Model, "api_error")
+				status, errType, message := h.noAccountError(ctx, req.Model, "api_error")
+				finish(false, status, message)
+				h.sendClaudeError(w, status, errType, message)
+				return
 			}
-			finish(false, status, message)
-			h.sendClaudeError(w, status, errType, message)
+			//! The same status, type and Retry-After as the plain path: a 400 must not read as retryable.
+			finish(false, upstreamFailureStatus(err), err.Error())
+			h.sendClaudeUpstreamError(w, err)
 			return
 		}
 		carry.done(account.ID, since)

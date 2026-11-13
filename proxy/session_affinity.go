@@ -103,11 +103,13 @@ func (h *Handler) pickAccount(ctx context.Context, payload *KiroPayload, model s
 		preferred = h.affinity.Lookup(affinityKey(payload))
 	}
 	allowed := allowedAccountsFromContext(ctx)
+	since := time.Now()
 	account := h.pool.GetPreferredForModelAllowed(preferred, model, excluded, allowed)
 	//! Only a fresh request heals: one that already excluded accounts would retry an account that just failed it.
 	if account == nil && len(excluded) == 0 && h.trySelfHeal() {
 		account = h.pool.GetPreferredForModelAllowed(preferred, model, excluded, allowed)
 	}
+	noteRPMPick(ctx, account, since)
 	//! A move off the bound account costs the conversation its prompt cache; log it so a cache-miss spike can be traced.
 	if preferred != "" && account != nil && account.ID != preferred {
 		logger.Debugf("[SessionAffinity] Bound account %s unavailable, conversation moved to %s", preferred, account.Email)

@@ -347,6 +347,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if endpoint := requestEndpointForPath(path); endpoint != "" {
 		r = withRequestTrace(r, endpoint)
+		r = r.WithContext(withRPMPicks(r.Context(), h.pool))
 	}
 
 	controller := http.NewResponseController(w)
@@ -1413,7 +1414,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, 500, err.Error())
 				h.sendSSE(w, flusher, "error", map[string]interface{}{
 					"type":  "error",
-					"error": map[string]string{"type": "api_error", "message": err.Error()},
+					"error": map[string]string{"type": "api_error", "message": upstreamErrorText(err)},
 				})
 				return
 			}
@@ -1536,6 +1537,7 @@ func recordAttemptError(ctx context.Context, account *config.Account, model stri
 		return
 	}
 	traceAttemptFailed(ctx, account, status, err)
+	settleRPMPickFailure(ctx, account, err)
 	getObserveStore().RecordFailure(account.ID, model)
 	getObserveStore().RecordError(account.ID, account.Email, model, status, err.Error())
 }
@@ -2180,7 +2182,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				}
 				recordFinalRequestForApiKey(r.Context(), apiKeyReservation, account, model, 0, 0, 0, false, 500, err.Error())
 				errData, _ := json.Marshal(map[string]interface{}{
-					"error": map[string]string{"message": err.Error(), "type": "server_error"},
+					"error": map[string]string{"message": upstreamErrorText(err), "type": "server_error"},
 				})
 				fmt.Fprintf(w, "data: %s\n\n", string(errData))
 				flusher.Flush()
