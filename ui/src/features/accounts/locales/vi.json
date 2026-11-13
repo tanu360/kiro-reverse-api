@@ -67,6 +67,8 @@
   "live.atLimit": "Đạt giới hạn",
   "live.description_other": "{rpm} yêu cầu hoàn tất trong phút vừa qua và {today} yêu cầu từ nửa đêm (giờ máy chủ).",
   "live.atLimitHint_other": "Tài khoản này đã đạt giới hạn {limit} yêu cầu mỗi phút. Mọi lần thử gửi đến tài khoản đều được tính, kể cả các lần thử thất bại đã chuyển sang tài khoản khác. Yêu cầu mới sẽ đi tới các tài khoản khác cho đến khi số yêu cầu của tài khoản này xuống dưới giới hạn.",
+  "live.coolingDown": "Đang chờ",
+  "live.coolingDownHint": "Sau khi lỗi, nhóm tài khoản tạm bỏ qua tài khoản này. Tài khoản quay lại vòng xoay sau {time}.",
   "live.today": "Yêu cầu hôm nay",
   "live.rpm": "Yêu cầu mỗi phút",
   "live.rpmOfLimit": "{rpm} / {limit}",

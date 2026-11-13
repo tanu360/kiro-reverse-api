@@ -11,6 +11,8 @@ export interface AccountActivity {
   rpm: number;
   /** The account started `rpmLimit` requests in the last minute; the pool skips it for now. */
   atLimit: boolean;
+  /** unix s: while set and ahead, the pool skips the account after errors or a 429. */
+  cooldownUntil?: number;
 }
 
 /** GET /admin/api/observe/account-activity: every configured account, zeros when idle. */
@@ -27,6 +29,8 @@ export interface AccountActivityResponse {
 /** One account's numbers with the limit they are measured against. */
 export interface AccountActivityView extends AccountActivity {
   rpmLimit: number;
+  /** Seconds of cooldown left at the poll, by the server's clock; 0 when none. */
+  cooldownSeconds: number;
 }
 
 /** The live RPM moves every second, so the numbers poll on their own. */
@@ -61,10 +65,14 @@ export function accountActivityQuery() {
  */
 export function useAccountActivity(accountId: string) {
   const select = useCallback(
-    (data: AccountActivityResponse): AccountActivityView => ({
-      ...(data.accounts?.[accountId] ?? IDLE),
-      rpmLimit: data.rpmLimit ?? 0,
-    }),
+    (data: AccountActivityResponse): AccountActivityView => {
+      const activity = data.accounts?.[accountId] ?? IDLE;
+      return {
+        ...activity,
+        rpmLimit: data.rpmLimit ?? 0,
+        cooldownSeconds: Math.max(0, (activity.cooldownUntil ?? 0) - (data.nowUnix ?? 0)),
+      };
+    },
     [accountId],
   );
   return useQuery({ ...accountActivityQuery(), select });

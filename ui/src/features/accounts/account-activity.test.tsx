@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { Card } from "@/components/ui/card";
@@ -106,8 +107,8 @@ describe("LiveActivityStrip", () => {
     expect(screen.getByText("Requests today")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getByText("Requests per minute")).toBeInTheDocument();
-    // The pill is the hint's tooltip trigger.
-    expect(screen.getByText("At limit")).toHaveAttribute("data-slot", "tooltip-trigger");
+    // The pill is a button: its hint opens on tap and from the keyboard, not only on hover.
+    expect(screen.getByRole("button", { name: /^At limit/ })).toBeInTheDocument();
   });
 
   it("explains in the pill why a minute with no finished request can be at the limit", async () => {
@@ -122,7 +123,7 @@ describe("LiveActivityStrip", () => {
       /^This account is at its limit of 1 request per minute\. Every attempt sent to it counts, including failed ones that moved on to another account\./,
     );
     expect(hint).toHaveClass("sr-only");
-    expect(screen.getByText("At limit")).toContainElement(hint);
+    expect(screen.getByRole("button", { name: /^At limit/ })).toContainElement(hint);
   });
 
   it("shows the bare count when no limit is set", async () => {
@@ -135,5 +136,52 @@ describe("LiveActivityStrip", () => {
     expect(await screen.findByText("2")).toBeInTheDocument();
     expect(screen.queryByText("At limit")).not.toBeInTheDocument();
     expect(screen.queryByText(/\//)).not.toBeInTheDocument();
+  });
+
+  it("says Cooling down with the time left while the pool skips the account after errors", async () => {
+    serve(activity({ a: { today: 7, rpm: 0, atLimit: false, cooldownUntil: 1_800_000_045 } }, 0));
+    renderWithProviders(
+      <Card className="@container">
+        <LiveActivityStrip accountId="a" />
+      </Card>,
+    );
+    const pill = await screen.findByRole("button", { name: /^Cooling down/ });
+    expect(pill).toHaveTextContent(/back in rotation in 45s/);
+  });
+});
+
+describe("account hold hints", () => {
+  it("opens the At limit hint with a tap and from the keyboard", async () => {
+    const user = userEvent.setup();
+    serve(activity({ a: { today: 1, rpm: 1, atLimit: true } }, 1));
+    renderWithProviders(<AccountActivityLine accountId="a" />);
+    const trigger = await screen.findByRole("button", { name: "At limit" });
+    await user.tab();
+    expect(trigger).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog")).toHaveTextContent(
+      /^This account is at its limit of 1 request per minute\./,
+    );
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(trigger);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("keeps a tap on the hint from reaching the row under it", async () => {
+    const user = userEvent.setup();
+    let opened = 0;
+    serve(activity({ a: { today: 3, rpm: 0, atLimit: false, cooldownUntil: 1_800_000_090 } }));
+    renderWithProviders(
+      // biome-ignore lint/a11y/noStaticElementInteractions: stands in for a table row's click
+      // biome-ignore lint/a11y/useKeyWithClickEvents: stands in for a table row's click
+      <div onClick={() => opened++}>
+        <AccountActivityLine accountId="a" />
+      </div>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Cooling down" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent(/1m 30s/);
+    expect(opened).toBe(0);
+    expect(screen.getByText(/3 today/)).toBeInTheDocument();
   });
 });

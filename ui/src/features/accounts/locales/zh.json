@@ -67,6 +67,8 @@
   "live.atLimit": "已达上限",
   "live.description_other": "最近一分钟完成 {rpm} 次请求，今日（服务器时间零点起）共 {today} 次。",
   "live.atLimitHint_other": "此账号已达到每分钟 {limit} 次请求的上限。发往此账号的每次尝试都会计入，包括失败后转到其他账号的尝试。在它的请求数降到上限以下之前，新请求会转到其他账号。",
+  "live.coolingDown": "冷却中",
+  "live.coolingDownHint": "该账号出错后，账号池会暂时跳过它，将在 {time} 后恢复轮换。",
   "live.today": "今日请求数",
   "live.rpm": "每分钟请求数",
   "live.rpmOfLimit": "{rpm} / {limit}",

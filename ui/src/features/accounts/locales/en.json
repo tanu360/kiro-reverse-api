@@ -69,6 +69,8 @@
   "live.description_other": "{rpm} requests finished in the last minute and {today} since midnight (server time).",
   "live.atLimitHint_one": "This account is at its limit of {limit} request per minute. Every attempt sent to it counts, including failed ones that moved on to another account. New requests go to other accounts until its count drops below the limit.",
   "live.atLimitHint_other": "This account is at its limit of {limit} requests per minute. Every attempt sent to it counts, including failed ones that moved on to another account. New requests go to other accounts until its count drops below the limit.",
+  "live.coolingDown": "Cooling down",
+  "live.coolingDownHint": "The pool skips this account for a short time after errors. It is back in rotation in {time}.",
   "live.today": "Requests today",
   "live.rpm": "Requests per minute",
   "live.rpmOfLimit": "{rpm} / {limit}",
