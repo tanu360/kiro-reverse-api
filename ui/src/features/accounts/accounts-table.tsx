@@ -101,7 +101,12 @@ export function AccountsTable({
         // size it (inline-size containment), so a long address truncates (with a tooltip)
         // instead of widening the column, and loading rows measure the same as data rows.
         cell: (account) => (
-          <AccountIdentity account={account} className="w-full contain-inline-size" showTags />
+          <AccountIdentity
+            account={account}
+            className="w-full contain-inline-size"
+            showPriority
+            showTags
+          />
         ),
       },
       {
@@ -248,7 +253,7 @@ function AccountCard({
           <StatusPill account={account} size="sm" />
           <span className="truncate">{accountMeta(account, t, !authIconNamesMethod(account))}</span>
           <TagBadges max={1} tags={account.tags} />
-          <AccountFlags account={account} />
+          <AccountFlags account={account} showPriority />
         </span>
       }
       onOpen={() => onDetails(account)}

@@ -165,12 +165,36 @@ function PriorityFlag({ priority, label }: { priority: number; label: string }):
 }
 
 /**
- * Weight (or, in the priority routing mode, the priority instead), an active trial and overage,
- * as quiet marks after the email. Nothing when plain.
+ * Weight (or, with `showPriority` in the priority routing mode, the priority instead), an active
+ * trial and overage, as quiet marks after the email. Nothing when plain. Only the Accounts page
+ * passes `showPriority`, so other lists (the Overview) neither change nor fetch the routing mode.
  */
-export function AccountFlags({ account }: { account: Account }): JSX.Element | null {
+export function AccountFlags({
+  account,
+  showPriority = false,
+}: {
+  account: Account;
+  showPriority?: boolean;
+}): JSX.Element | null {
+  return showPriority ? (
+    <RoutedAccountFlags account={account} />
+  ) : (
+    <FlagList account={account} priorityMode={false} />
+  );
+}
+
+function RoutedAccountFlags({ account }: { account: Account }): JSX.Element | null {
+  return <FlagList account={account} priorityMode={useRoutingMode() === "priority"} />;
+}
+
+function FlagList({
+  account,
+  priorityMode,
+}: {
+  account: Account;
+  priorityMode: boolean;
+}): JSX.Element | null {
   const { t } = useT("accounts");
-  const priorityMode = useRoutingMode() === "priority";
   const flags: ReactNode[] = [];
   if (priorityMode) {
     flags.push(
@@ -318,10 +342,13 @@ export function AuthAvatar({
 export function AccountIdentity({
   account,
   showTags = false,
+  showPriority = false,
   className,
 }: {
   account: Account;
   showTags?: boolean;
+  /** The priority mark in the priority routing mode (AccountFlags); the Accounts page only. */
+  showPriority?: boolean;
   className?: string;
 }): JSX.Element {
   const { t } = useT("accounts");
@@ -331,7 +358,7 @@ export function AccountIdentity({
       <div className="flex min-w-0 items-center gap-2">
         <AccountName account={account} />
         <AuthIcon account={account} />
-        <AccountFlags account={account} />
+        <AccountFlags account={account} showPriority={showPriority} />
       </div>
       {showTags ? (
         <div className="flex min-w-0 items-center gap-2">
