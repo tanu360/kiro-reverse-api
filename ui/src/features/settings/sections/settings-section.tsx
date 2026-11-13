@@ -163,6 +163,17 @@ export function SettingsGroup({
 }
 
 /**
+ * Focuses the form's first field marked invalid, unless focus is in one, and scrolls it to the
+ * middle of the view: at the top edge it would hide under the sticky header.
+ */
+export function focusFirstInvalidField(form: HTMLFormElement): void {
+  const field = form.querySelector<HTMLElement>('[aria-invalid="true"]');
+  if (!field || field.contains(document.activeElement)) return;
+  field.focus({ preventScroll: true });
+  field.scrollIntoView?.({ block: "center" });
+}
+
+/**
  * A settings section in its own form: Enter in a field submits it, and Save is the submit
  * button. `hint` is at most two sentences; `learnMore` holds the rest behind a popover. The
  * children are rows (SettingsRow, SwitchField), each under a hairline; the footer holds Save.
@@ -194,7 +205,10 @@ export function SettingsSection({
         noValidate
         onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
+          const form = event.currentTarget;
           onSubmit?.();
+          // Save on a card whose refused field is scrolled away showed nothing: take the user to it.
+          window.setTimeout(() => focusFirstInvalidField(form), 0);
         }}
       >
         <SettingsGroup

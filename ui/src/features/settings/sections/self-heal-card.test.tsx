@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { mockServer } from "@/lib/mocks/node";
@@ -121,6 +121,8 @@ describe("SelfHealCard", () => {
     expect(interval).toHaveAttribute("aria-invalid", "true");
     expect(rounds).toHaveAttribute("aria-invalid", "true");
     expect(await writes()).toEqual([]);
+    // Save took the user to the first refused field, which may sit out of view.
+    await waitFor(() => expect(interval).toHaveFocus());
   });
 
   it("saves the switch and both numbers in one patch; 0 rounds means no limit", async () => {
