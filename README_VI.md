@@ -350,6 +350,8 @@ curl http://localhost:8080/v1/responses \
 
 Tài khoản miễn phí trả về lỗi 404 cho các model mặc định `claude-*-5-5` của Claude Code, vì vậy hãy đặt `ANTHROPIC_MODEL` và các biến `ANTHROPIC_DEFAULT_*_MODEL` thành một model mà tài khoản của bạn hỗ trợ, ví dụ `claude-sonnet-4.5`.
 
+Với Codex, hãy lưu `/v1/codex/models` thành một tệp và đặt `model_catalog_json` trong `~/.codex/config.toml` thành đường dẫn của tệp đó; nếu không, Codex sẽ không có công cụ `apply_patch`.
+
 ### 📌 Danh sách endpoint
 
 | Phương thức | Đường dẫn                       | Tác dụng                                      |

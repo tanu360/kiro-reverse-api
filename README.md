@@ -350,6 +350,8 @@ curl http://localhost:8080/v1/responses \
 
 Free accounts answer Claude Code's default `claude-*-5-5` models with a 404, so set `ANTHROPIC_MODEL` and the `ANTHROPIC_DEFAULT_*_MODEL` variables to a model your accounts serve, such as `claude-sonnet-4.5`.
 
+For Codex, save `/v1/codex/models` to a file and set `model_catalog_json` to its path in `~/.codex/config.toml`; without it Codex has no `apply_patch` tool.
+
 ### 📌 Endpoints at a glance
 
 | Method   | Path                            | What it does                                  |
