@@ -134,7 +134,7 @@ function hashSection(): SectionId | null {
 /** Keys that scroll the page while focus is not in a text field. */
 const SCROLL_KEYS = new Set([" ", "PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown"]);
 
-/** How long after a wheel, touch, key or scrollbar press a page scroll counts as the reader's. */
+/** How long after a wheel, touch or scroll key a page scroll counts as the reader's. */
 const USER_SCROLL_MS = 800;
 
 function isTextField(target: EventTarget | null): boolean {
@@ -147,10 +147,10 @@ function isTextField(target: EventTarget | null): boolean {
 /**
  * Scroll-spy: the card in view, updated once per frame while the page scrolls. A nav click or a
  * deep link keeps its section marked until the reader scrolls the page (a scroll that follows a
- * wheel, touch, scroll key or scrollbar press) or tabs into another card. Near the page end the
- * card it went to sits at the top while the page cannot scroll further, where the spy alone
- * marks the last card. A key that only works a control (Space on a switch) does not scroll, so
- * the section stays marked.
+ * wheel, touch or scroll key; the page shows no vertical scrollbar, index.css) or tabs into
+ * another card. Near the page end the card it went to sits at the top while the page cannot
+ * scroll further, where the spy alone marks the last card. A key that only works a control
+ * (Space on a switch) does not scroll, so the section stays marked.
  */
 function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] {
   const [linked] = useState(hashSection);
@@ -177,10 +177,6 @@ function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] 
     const onKey = (event: KeyboardEvent) => {
       if (SCROLL_KEYS.has(event.key) && !isTextField(event.target)) userInput();
     };
-    // A press on the page's own scrollbar lands on the root element.
-    const onPointer = (event: PointerEvent) => {
-      if (event.target === document.documentElement) userInput();
-    };
     // Tabbing on into another card moves the reader there, so the spy follows again.
     const onFocus = (event: FocusEvent) => {
       const target = event.target;
@@ -195,7 +191,6 @@ function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] 
     window.addEventListener("wheel", userInput, { passive: true });
     window.addEventListener("touchmove", userInput, { passive: true });
     window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onPointer);
     window.addEventListener("focusin", onFocus);
     return () => {
       if (frame) cancelAnimationFrame(frame);
@@ -204,7 +199,6 @@ function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] 
       window.removeEventListener("wheel", userInput);
       window.removeEventListener("touchmove", userInput);
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("focusin", onFocus);
     };
   }, [offset]);
