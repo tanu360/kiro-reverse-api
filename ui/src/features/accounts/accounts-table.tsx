@@ -252,9 +252,12 @@ function AccountCard({
       }
       meta={
         // The status leads the meta line, so the header row leaves the name its width.
+        // A long nickname wraps to a second line instead of cutting the plan and sign-in.
         <span className="flex min-w-0 items-center gap-2">
           <StatusPill account={account} size="sm" />
-          <span className="truncate">{accountMeta(account, t, !authIconNamesMethod(account))}</span>
+          <span className="line-clamp-2 min-w-0 wrap-anywhere">
+            {accountMeta(account, t, !authIconNamesMethod(account))}
+          </span>
           <AccountFlags account={account} showPriority />
         </span>
       }
@@ -264,7 +267,8 @@ function AccountCard({
       title={<span className={name.mono ? "font-mono text-meta" : undefined}>{name.text}</span>}
       variant="row"
     >
-      <TagBadges max={CARD_TAGS} tags={account.tags} />
+      {/* The tags wrap on the card's own line, so a long tag keeps its text. */}
+      <TagBadges max={CARD_TAGS} tags={account.tags} wrap />
       <UsageMeter account={account} />
       <AccountActivityLine accountId={account.id} className="h-5" />
       <dl className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-3 text-meta">
