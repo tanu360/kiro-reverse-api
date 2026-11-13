@@ -34,7 +34,7 @@ const SORT_LABEL_KEYS: Record<RequestSort, string> = {
 };
 
 interface RequestsToolbarProps {
-  /** The search held in the URL. */
+  /** The search in effect (the page holds it, never the URL). */
   search: string;
   status: StatusValue;
   /** Called with the trimmed text 250 ms after the viewer stops typing. */
@@ -84,7 +84,7 @@ export function RequestsToolbar({
   const latest = useRef({ search, onSearchChange });
   latest.current = { search, onSearchChange };
 
-  // The URL wins when it changes from elsewhere (Clear filters, back button).
+  // The page's search wins when it changes from elsewhere (Clear filters, a ?search= link).
   useEffect(() => {
     setText((current) => (current.trim() === search ? current : search));
   }, [search]);

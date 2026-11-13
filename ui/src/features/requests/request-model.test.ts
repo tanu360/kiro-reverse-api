@@ -5,7 +5,6 @@ import {
   errorTypeForSearch,
   errorTypeTone,
   formatRowDate,
-  isSecretSearch,
   normalizeApiKeyMask,
   rowKey,
   toQueryParams,
@@ -162,22 +161,6 @@ describe("formatRowDate", () => {
   it("keeps the year for older rows", () => {
     expect(formatRowDate(lastYear, "en", now)).toBe("Nov 3, 2025");
     expect(formatRowDate(lastYear, "zh", now)).toBe("2025年11月3日");
-  });
-});
-
-describe("isSecretSearch", () => {
-  it("treats key-like text as a secret and everything else as plain search", () => {
-    for (const secret of [
-      "sk-bogus1",
-      "sk-clb-0123456789abcdef",
-      "KSK_abcdef",
-      "abcdefghijklmnopqrstuvwxyz",
-    ]) {
-      expect(isSecretSearch(secret)).toBe(true);
-    }
-    for (const plain of ["sonnet", "proxy", "sk-clb****e4yo", "claude haiku 4.5", "", "  "]) {
-      expect(isSecretSearch(plain)).toBe(false);
-    }
   });
 });
 

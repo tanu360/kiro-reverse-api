@@ -27,7 +27,6 @@ import {
   DEFAULT_SORT,
   defaultSortDesc,
   hasFilters,
-  isSecretSearch,
   PAGE_SIZES,
   type PageSize,
   rowKey,
@@ -45,12 +44,13 @@ export function RequestsPage(): JSX.Element {
   const { t, lang } = useT("requests");
   const urlSearch = useSearch({ from: "/_app/requests" });
   const navigate = useNavigate({ from: "/requests" });
-  // A key-like search lives only here, never in the URL (isSecretSearch).
-  const [secretSearch, keepSecretSearch] = useState("");
-  // A search in the URL wins; a key-like one only ever lives in this state.
+  // The search text lives in the page, never in the URL: a client key typed or pasted into the
+  // box (it also matches the full key) must not reach the address bar or the browser history,
+  // at any length or with any prefix. The status, sort and paging stay in the URL.
+  const [searchText, setSearchText] = useState(() => urlSearch.search?.trim() ?? "");
   const search = useMemo<RequestsSearch>(
-    () => (urlSearch.search || !secretSearch ? urlSearch : { ...urlSearch, search: secretSearch }),
-    [urlSearch, secretSearch],
+    () => ({ ...urlSearch, search: searchText || undefined }),
+    [urlSearch, searchText],
   );
   const params = useMemo(() => toQueryParams(search, lang), [search, lang]);
   const query = useQuery(recentRequestsQuery(params));
@@ -69,12 +69,12 @@ export function RequestsPage(): JSX.Element {
     [navigate],
   );
 
-  // A key pasted into a link (?search=sk-...) moves off the URL at once.
+  // A ?search= link (a bookmark from an older version, a shared link) fills the box once and
+  // leaves the URL at once, replacing its history entry.
   useEffect(() => {
-    if (urlSearch.search && isSecretSearch(urlSearch.search)) {
-      keepSecretSearch(urlSearch.search.trim());
-      updateSearch({ search: undefined }, { replace: true });
-    }
+    if (urlSearch.search === undefined) return;
+    setSearchText(urlSearch.search.trim());
+    updateSearch({ search: undefined }, { replace: true });
   }, [urlSearch.search, updateSearch]);
 
   // A failed refetch keeps the rows on screen and reports the failure in a toast; it is the
@@ -123,8 +123,8 @@ export function RequestsPage(): JSX.Element {
     updateSearch({ sort: next, order: desc ? "desc" : "asc", page: undefined });
 
   const clearFilters = () => {
-    keepSecretSearch("");
-    updateSearch({ search: undefined, status: undefined, page: undefined });
+    setSearchText("");
+    updateSearch({ status: undefined, page: undefined });
   };
 
   let emptyState: JSX.Element;
@@ -210,12 +210,11 @@ export function RequestsPage(): JSX.Element {
                     }
                   }}
                   onSearchChange={(text) => {
-                    const secret = isSecretSearch(text);
-                    keepSecretSearch(secret ? text.trim() : "");
-                    updateSearch(
-                      { search: secret ? undefined : text || undefined, page: undefined },
-                      { replace: true },
-                    );
+                    setSearchText(text.trim());
+                    // A new search starts on page 1.
+                    if (urlSearch.page !== undefined) {
+                      updateSearch({ page: undefined }, { replace: true });
+                    }
                   }}
                   onSortChange={setSort}
                   onStatusChange={(status) => updateSearch({ status, page: undefined })}
