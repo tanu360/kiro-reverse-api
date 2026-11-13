@@ -503,8 +503,10 @@ endpointLoop:
 				if resp.StatusCode == http.StatusTooManyRequests {
 					delay := retryAfterDuration(resp.Header.Get("Retry-After"), time.Now())
 					throttled := !isUsageQuotaExhaustedMessage(string(errBody))
-					quotaErr = quotaErr.merge(&upstreamQuotaError{message: lastErr.Error(), retryFor: delay, throttled: throttled})
-					lastErr = quotaErr
+					endpointErr := &upstreamQuotaError{message: lastErr.Error(), retryFor: delay, throttled: throttled}
+					quotaErr = quotaErr.merge(endpointErr)
+					//! lastErr stays this endpoint's own 429: its attempt and log line name it, not the merged verdict.
+					lastErr = endpointErr
 					kind := "quota exhausted"
 					if throttled {
 						kind = "throttled"
@@ -552,17 +554,23 @@ endpointLoop:
 		}
 	}
 
-	if quotaErr != nil {
-		return quotaErr
+	var final error
+	switch {
+	case quotaErr != nil:
+		final = quotaErr
+	case clientErr != nil:
+		//! Any endpoint calling the request invalid means another account would reject it too.
+		final = clientErr
+	case lastErr != nil:
+		final = lastErr
+	default:
+		return fmt.Errorf("all endpoints failed")
 	}
-	//! Any endpoint calling the request invalid means another account would reject it too.
-	if clientErr != nil {
-		return clientErr
+	if lastErr != nil && final != lastErr {
+		//! The caller closes the last endpoint's attempt with final; that attempt keeps its own error.
+		noteAttemptEndpointError(ctx, lastErr, final)
 	}
-	if lastErr != nil {
-		return lastErr
-	}
-	return fmt.Errorf("all endpoints failed")
+	return final
 }
 
 func isRetryableStreamError(err error) bool {
