@@ -924,7 +924,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	}
 	noteResponseModel(r.Context(), req.Model)
 	if msg := validateClaudeRequestShape(&req); msg != "" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
 	}
@@ -1800,7 +1800,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 	noteResponseModel(r.Context(), req.Model)
 	if msg := validateOpenAIRequestShape(&req); msg != "" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusBadRequest, msg)
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, 400, "invalid_request_error", msg)
 		return
 	}

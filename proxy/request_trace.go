@@ -79,7 +79,8 @@ func classifyRequestError(success bool, status int, message string) string {
 	switch {
 	case status == 499:
 		return "client_closed"
-	case status == http.StatusTooManyRequests && strings.Contains(lower, "limit exceeded"):
+	case status == http.StatusTooManyRequests && strings.Contains(lower, "limit exceeded"),
+		status == http.StatusTooManyRequests && strings.Contains(lower, "api key call limit"):
 		return "api_key_limit"
 	case isOverageErrorMessage(message):
 		return "overage"
@@ -97,7 +98,8 @@ func classifyRequestError(success bool, status int, message string) string {
 		return "stream"
 	case strings.Contains(lower, "no available accounts"):
 		return "no_accounts"
-	case status == http.StatusBadRequest, status == http.StatusMethodNotAllowed:
+	case status == http.StatusBadRequest, status == http.StatusMethodNotAllowed,
+		status == http.StatusNotFound && strings.Contains(lower, "is not available on any account"):
 		return "invalid_request"
 	case status == http.StatusTooManyRequests:
 		return "rate_limit"
