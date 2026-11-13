@@ -1042,16 +1042,27 @@ func TestBuildCodexModelsResponseUsesKiroModelMetadata(t *testing.T) {
 	if models[0].Slug != "claude-opus-4.8" || models[0].DisplayName != "Claude Opus 4.8" {
 		t.Fatalf("unexpected base model identity: %#v", models[0])
 	}
-	if strings.ContainsAny(models[0].ModelMessages.InstructionsTemplate, "{}") || !strings.Contains(models[0].ModelMessages.InstructionsTemplate, "claude-opus-4.8") {
-		t.Fatalf("expected direct model name in instructions template, got %q", models[0].ModelMessages.InstructionsTemplate)
-	}
+	//! Codex keeps its own system prompt: the catalog repeats it, and sends no
+	//! instructions_template, which Codex would use in its place.
 	for _, model := range models {
-		if strings.ContainsAny(model.ModelMessages.InstructionsTemplate, "{}") {
-			t.Fatalf("expected direct model instructions for %s: %q", model.Slug, model.ModelMessages.InstructionsTemplate)
+		if model.BaseInstructions != codexBaseInstructions || model.ModelMessages != nil {
+			t.Fatalf("expected Codex's own instructions and no model_messages for %s, got %q / %#v", model.Slug, model.BaseInstructions[:min(80, len(model.BaseInstructions))], model.ModelMessages)
 		}
-		if len(model.ModelMessages.InstructionsVariables) != 0 {
-			t.Fatalf("expected no instruction variables for %s, got %#v", model.Slug, model.ModelMessages.InstructionsVariables)
-		}
+	}
+	if !strings.HasPrefix(codexBaseInstructions, "You are a coding agent running in the Codex CLI") ||
+		!strings.Contains(codexBaseInstructions, "apply_patch") || strings.Contains(codexBaseInstructions, "shim") {
+		t.Fatalf("unexpected Codex instructions: %q", codexBaseInstructions[:min(200, len(codexBaseInstructions))])
+	}
+	raw, err := json.Marshal(models[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := fields["model_messages"]; ok {
+		t.Fatalf("catalog entry still sends model_messages: %s", fields["model_messages"])
 	}
 	if models[0].ContextWindow != 1000000 || models[0].TruncationPolicy.Limit != 320000 {
 		t.Fatalf("expected Kiro token limits to drive Codex limits, got %#v", models[0])

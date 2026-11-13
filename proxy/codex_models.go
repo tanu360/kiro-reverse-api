@@ -1,11 +1,21 @@
 package proxy
 
 import (
+	_ "embed"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 )
+
+// codexBaseInstructions is the Codex CLI's own system prompt, as Codex 0.168 sends it for
+// a model it has no metadata for (openai/codex, Copyright 2025 OpenAI, Apache-2.0;
+// see THIRD_PARTY_NOTICES.md). A model_catalog_json entry must carry instructions:
+// Codex refuses a catalog with none, and sends no system prompt at all for an empty
+// one. So the catalog repeats Codex's prompt rather than a short one of its own, and
+// Codex runs as it does without a catalog, plus the apply_patch tool.
+//
+//go:embed codex_base_instructions.md
+var codexBaseInstructions string
 
 type codexModelsResponse struct {
 	Models []codexModelEntry `json:"models"`
@@ -44,7 +54,7 @@ type codexModelEntry struct {
 	PreferWebsockets            bool                  `json:"prefer_websockets"`
 	AvailableInPlans            []string              `json:"available_in_plans"`
 	BaseInstructions            string                `json:"base_instructions"`
-	ModelMessages               codexModelMessages    `json:"model_messages"`
+	ModelMessages               *codexModelMessages   `json:"model_messages,omitempty"`
 	SupportsComputerUse         bool                  `json:"supports_computer_use"`
 	SupportsMCP                 bool                  `json:"supports_mcp"`
 	VisionBridgeEnabled         bool                  `json:"vision_bridge_enabled"`
@@ -181,11 +191,8 @@ func buildCodexModelEntry(id, displayName, description string, contextWindow int
 		Priority:                    priority,
 		PreferWebsockets:            false,
 		AvailableInPlans:            []string{"free", "plus", "pro", "team", "business", "enterprise"},
-		BaseInstructions:            "You are a coding agent running in Codex through a local BYOK shim.",
-		ModelMessages: codexModelMessages{
-			InstructionsTemplate:  fmt.Sprintf("You are Codex running on %s through a local all-model shim. Be a helpful, direct coding collaborator.", id),
-			InstructionsVariables: map[string]string{},
-		},
+		//! No model_messages: its instructions_template would replace base_instructions.
+		BaseInstructions:    codexBaseInstructions,
 		SupportsComputerUse: true,
 		SupportsMCP:         true,
 		VisionBridgeEnabled: false,
