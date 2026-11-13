@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -382,7 +383,12 @@ func GetPassword() string {
 	return cfg.Password
 }
 
+// GetPort is the port to listen on: PORT when it holds 1-65535 (a downloaded
+// binary has no other way to move off a busy 8080), else the stored port, else 8080.
 func GetPort() int {
+	if port, err := strconv.Atoi(strings.TrimSpace(os.Getenv("PORT"))); err == nil && port >= 1 && port <= 65535 {
+		return port
+	}
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	if cfg.Port == 0 {

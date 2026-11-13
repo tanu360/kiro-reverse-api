@@ -260,7 +260,7 @@ cd kiro-proxy_linux_amd64
 ./kiro-proxy
 ```
 
-Trên Windows, tải `kiro-proxy_windows_amd64.zip` (hoặc `_arm64`), giải nén rồi chạy `kiro-proxy.exe` trong terminal. Cơ sở dữ liệu được tạo trong thư mục hiện tại; đặt `DATA_DIR` để lưu ở nơi khác. File `SHA256SUMS.txt` trong bản phát hành liệt kê checksum của từng file nén: kiểm tra file đã tải bằng `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Các binary chưa được ký: nếu macOS chặn, hãy chạy `xattr -d com.apple.quarantine kiro-proxy`; Windows SmartScreen có thể hỏi xác nhận ở lần chạy đầu tiên.
+Trên Windows, tải `kiro-proxy_windows_amd64.zip` (hoặc `_arm64`), giải nén rồi chạy `kiro-proxy.exe` trong terminal. Cơ sở dữ liệu được tạo trong thư mục hiện tại; đặt `DATA_DIR` để lưu ở nơi khác. Server lắng nghe tại `127.0.0.1:8080`: đặt `PORT` khi cổng 8080 đã bị dùng, và `LISTEN_HOST=0.0.0.0` để nhận kết nối từ máy khác. File `SHA256SUMS.txt` trong bản phát hành liệt kê checksum của từng file nén: kiểm tra file đã tải bằng `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Các binary chưa được ký: nếu macOS chặn, hãy chạy `xattr -d com.apple.quarantine kiro-proxy`; Windows SmartScreen có thể hỏi xác nhận ở lần chạy đầu tiên.
 
 ### 🛠 Build từ mã nguồn
 
@@ -301,6 +301,7 @@ Xác thực bằng mật khẩu quản trị cho phép năm lần thử sai cho 
 | `DATA_DIR`        | Thư mục chứa `kiro.db`                    | `.`                |
 | `ADMIN_PASSWORD` | Mật khẩu trang quản trị (ghi đè cấu hình) | —                  |
 | `LISTEN_HOST`    | Địa chỉ lắng nghe. Mặc định chỉ nhận kết nối từ máy này; đặt `0.0.0.0` để nhận kết nối từ máy khác. Docker image đặt sẵn `0.0.0.0` | `127.0.0.1` |
+| `PORT`           | Cổng lắng nghe (ghi đè cấu hình)          | `8080`             |
 | `KIRO_TOOL_MARKUP_RESCUE` | Đặt `off` để ngừng chuyển markup lệnh gọi tool mà Kiro để lọt vào văn bản câu trả lời trở lại thành lệnh gọi tool | on |
 | `LOG_LEVEL`      | Mức log: `debug`, `info`, `warn` hoặc `error` (ghi đè cấu hình) | `info` |
 
@@ -416,6 +417,7 @@ Nếu bạn ở khu vực có mạng bị hạn chế, hãy cấu hình proxy ou
 | `DATA_DIR`        | Thư mục chứa `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Mật khẩu trang quản trị (ghi đè cấu hình) | —                 |
 | `LISTEN_HOST`    | Địa chỉ lắng nghe. Mặc định chỉ nhận kết nối từ máy này; đặt `0.0.0.0` để nhận kết nối từ máy khác. Docker image đặt sẵn `0.0.0.0` | `127.0.0.1` |
+| `PORT`           | Cổng lắng nghe (ghi đè cấu hình)          | `8080`             |
 | `KIRO_TOOL_MARKUP_RESCUE` | Đặt `off` để ngừng chuyển markup lệnh gọi tool mà Kiro để lọt vào văn bản câu trả lời trở lại thành lệnh gọi tool | on |
 | `LOG_LEVEL`      | Mức log: `debug`, `info`, `warn` hoặc `error` (ghi đè cấu hình) | `info` |
 
