@@ -31,8 +31,10 @@ func (e *upstreamQuotaError) Error() string { return e.message }
 
 func (e *upstreamQuotaError) merge(next *upstreamQuotaError) *upstreamQuotaError {
 	//! Quota is account-wide: one endpoint reporting exhaustion outweighs another's throttle.
+	//! A copy, so the merged verdict never rewrites the endpoint error it started from.
 	if e == nil {
-		return next
+		merged := *next
+		return &merged
 	}
 	if next.retryFor > e.retryFor || (e.throttled && !next.throttled) {
 		e.message = next.message

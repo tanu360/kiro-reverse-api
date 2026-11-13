@@ -6,6 +6,7 @@ import (
 
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 )
 
 // backgroundSavesRunning counts the cooldown saves started by
@@ -128,7 +129,7 @@ func (p *AccountPool) loadCooldowns() error {
 		return err
 	}
 	if loaded > 0 {
-		logger.Infof("[Pool] Loaded %d active cooldowns from db", loaded)
+		logger.Infof("[Pool] Loaded %s from the database", textfmt.Count(loaded, "active cooldown", "active cooldowns"))
 	}
 	return nil
 }

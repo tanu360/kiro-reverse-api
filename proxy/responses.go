@@ -108,7 +108,7 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		ToolChoice:      req.ToolChoice,
 		ReasoningEffort: reqReasoningEffort(req),
 	}
-	if msg := validateOpenAIRequestShape(&openaiReq); msg != "" {
+	if msg := validateOpenAIRequestShapeAs(&openaiReq, responsesRequestChecks); msg != "" {
 		return nil, msg
 	}
 
@@ -284,8 +284,8 @@ func responsesInputToMessages(raw json.RawMessage) ([]OpenAIMessage, error) {
 	var arr []interface{}
 	if err := json.Unmarshal(raw, &arr); err == nil {
 		var messages []OpenAIMessage
-		for _, item := range arr {
-			itemMessages, err := responseInputItemToMessages(item)
+		for i, item := range arr {
+			itemMessages, err := responseInputItemToMessages(item, fmt.Sprintf("input[%d]", i))
 			if err != nil {
 				return nil, err
 			}
@@ -296,10 +296,29 @@ func responsesInputToMessages(raw json.RawMessage) ([]OpenAIMessage, error) {
 
 	var obj map[string]interface{}
 	if err := json.Unmarshal(raw, &obj); err == nil {
-		return responseInputItemToMessages(obj)
+		return responseInputItemToMessages(obj, "input")
 	}
 
-	return nil, fmt.Errorf("input must be a string or array")
+	var value interface{}
+	_ = json.Unmarshal(raw, &value)
+	return nil, fmt.Errorf("input must be a string or an array, not %s", jsonValueKind(value))
+}
+
+// validateResponsesMessageItem checks a message input item's role and content type. field
+// names the item as the client wrote it (input[2]); its chat message index differs.
+func validateResponsesMessageItem(obj map[string]interface{}, field string) error {
+	rawRole, _ := obj["role"].(string)
+	switch strings.ToLower(strings.TrimSpace(rawRole)) {
+	//! "tool" is not a Responses role, but it was always passed through as a chat tool turn.
+	case "", "user", "assistant", "system", "developer", "tool":
+	default:
+		return fmt.Errorf("%s.role must be one of user, assistant, system or developer, got %q", field, rawRole)
+	}
+	switch content := obj["content"].(type) {
+	case bool, float64, json.Number:
+		return fmt.Errorf("%s.content must be a string or an array of content parts, not %s", field, jsonValueKind(content))
+	}
+	return nil
 }
 
 func appendResponseMessages(messages []OpenAIMessage, next ...OpenAIMessage) []OpenAIMessage {
@@ -319,10 +338,12 @@ func appendResponseMessages(messages []OpenAIMessage, next ...OpenAIMessage) []O
 	return messages
 }
 
-func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
+// responseInputItemToMessages turns one input item into chat messages. field names the item
+// in error messages: input[i], or input when the whole input is one object.
+func responseInputItemToMessages(item interface{}, field string) ([]OpenAIMessage, error) {
 	obj, ok := item.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("input item must be an object")
+		return nil, fmt.Errorf("%s must be an object, not %s", field, jsonValueKind(item))
 	}
 
 	itemType, _ := obj["type"].(string)
@@ -344,10 +365,13 @@ func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
 			}
 		}
 		if len(parts) == 0 {
-			return nil, fmt.Errorf("agent_message requires text content")
+			return nil, fmt.Errorf("%s.content must hold text for an agent_message", field)
 		}
 		return []OpenAIMessage{{Role: "user", Content: strings.Join(parts, "\n")}}, nil
 	case "", "message":
+		if err := validateResponsesMessageItem(obj, field); err != nil {
+			return nil, err
+		}
 		if role == "" {
 			role = "user"
 		}
@@ -386,7 +410,7 @@ func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
 		if itemType == "custom_tool_call" {
 			input, ok := obj["input"].(string)
 			if !ok {
-				return nil, fmt.Errorf("custom_tool_call input must be a string")
+				return nil, fmt.Errorf("%s.input must be a string", field)
 			}
 			b, _ := json.Marshal(map[string]string{"input": input})
 			arguments = string(b)
@@ -404,12 +428,15 @@ func responseInputItemToMessages(item interface{}) ([]OpenAIMessage, error) {
 		return []OpenAIMessage{{Role: "assistant", Content: nil, ToolCalls: []ToolCall{tc}}}, nil
 	default:
 		if role != "" {
+			if err := validateResponsesMessageItem(obj, field); err != nil {
+				return nil, err
+			}
 			return []OpenAIMessage{{Role: role, Content: responsesContentToOpenAIContent(obj["content"])}}, nil
 		}
 		if strings.TrimSpace(itemType) != "" {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("unsupported Responses input item type: %s", itemType)
+		return nil, fmt.Errorf("%s.type %q is not a Responses input item type", field, itemType)
 	}
 }
 

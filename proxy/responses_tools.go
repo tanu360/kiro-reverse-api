@@ -30,22 +30,28 @@ func extractInputResponsesTools(raw json.RawMessage) ([]OpenAIResponsesTool, err
 		}
 		items = []json.RawMessage{raw}
 	}
+	isList := strings.HasPrefix(strings.TrimSpace(string(raw)), "[")
 	var tools []OpenAIResponsesTool
-	for _, item := range items {
+	for i, item := range items {
 		var header struct {
 			Type string `json:"type"`
 		}
 		if json.Unmarshal(item, &header) != nil || (header.Type != "additional_tools" && header.Type != "tool_search_output") {
 			continue
 		}
+		field := "input"
+		if isList {
+			field = fmt.Sprintf("input[%d]", i)
+		}
 		var block struct {
 			Tools []OpenAIResponsesTool `json:"tools"`
 		}
 		if err := json.Unmarshal(item, &block); err != nil {
-			return nil, fmt.Errorf("invalid %s: %w", header.Type, err)
+			//! Go's decoder text names internal types; say which item and field is wrong instead.
+			return nil, fmt.Errorf("%s (%s): %s", field, header.Type, strings.TrimPrefix(clientJSONError(err), "Invalid JSON: "))
 		}
 		if block.Tools == nil && header.Type == "additional_tools" {
-			return nil, fmt.Errorf("additional_tools requires a tools array")
+			return nil, fmt.Errorf("%s.tools must be an array for additional_tools", field)
 		}
 		tools = append(tools, block.Tools...)
 	}

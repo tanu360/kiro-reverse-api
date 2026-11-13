@@ -38,8 +38,9 @@ func openAIStopSequences(raw json.RawMessage) ([]string, string) {
 }
 
 // validateOpenAIOutputOptions refuses options the proxy cannot honour instead of ignoring them:
-// Kiro returns one answer and no token probabilities.
-func validateOpenAIOutputOptions(req *OpenAIRequest) string {
+// Kiro returns one answer and no token probabilities. maxTokensField is the API's name for
+// MaxTokens: max_tokens on Chat, max_output_tokens on Responses.
+func validateOpenAIOutputOptions(req *OpenAIRequest, maxTokensField string) string {
 	if _, msg := openAIStopSequences(req.Stop); msg != "" {
 		return msg
 	}
@@ -52,8 +53,11 @@ func validateOpenAIOutputOptions(req *OpenAIRequest) string {
 	if req.TopLogprobs != nil && *req.TopLogprobs > 0 {
 		return "top_logprobs is not supported by this server"
 	}
-	if req.MaxTokens < 0 || req.MaxCompletionTokens < 0 {
-		return "max_tokens must be a positive number"
+	if req.MaxCompletionTokens < 0 {
+		return "max_completion_tokens must be a positive number"
+	}
+	if req.MaxTokens < 0 {
+		return maxTokensField + " must be a positive number"
 	}
 	return ""
 }

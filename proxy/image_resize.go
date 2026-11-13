@@ -20,6 +20,7 @@ import (
 
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 )
 
 //! Kiro answers 400 to very large image fields, such as the full-screen screenshots
@@ -102,7 +103,7 @@ func resizeKiroImage(img *KiroImage, lim imageResizeLimits) bool {
 // debug line: validation, token counting and translation each parse the content, so one bad
 // image logs it several times.
 func logUndecodableImage(size int) {
-	logger.Debugf("[Image] Dropped an image whose base64 does not decode (%d characters)", size)
+	logger.Debugf("[Image] Dropped an image whose base64 does not decode (%s)", textfmt.Count(size, "character", "characters"))
 }
 
 // resizeAllowance is what one payload may spend on full decodes: a number of them, and

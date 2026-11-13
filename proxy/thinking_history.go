@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 	"strconv"
 	"strings"
 )
@@ -146,7 +147,8 @@ func extractClaudeAssistantHistory(content interface{}, keepThinking bool) (stri
 	}
 	thinkingBlocks, redactedBlocks := countClaudeThinkingBlocks(blocks)
 	if redactedBlocks > 0 {
-		logger.Debugf("[ThinkingHistory] Dropping %d redacted_thinking block(s): Kiro cannot replay encrypted reasoning", redactedBlocks)
+		logger.Debugf("[ThinkingHistory] Dropping %s: Kiro cannot replay encrypted reasoning",
+			textfmt.Count(redactedBlocks, "redacted_thinking block", "redacted_thinking blocks"))
 	}
 	if thinkingBlocks == 0 || !keepThinking {
 		return extractClaudeAssistantContent(content)

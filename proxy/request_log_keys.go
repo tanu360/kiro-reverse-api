@@ -8,6 +8,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/db"
 	"kiro-proxy/logger"
+	"kiro-proxy/textfmt"
 )
 
 // storedRequestAPIKey is the client key a request row keeps: masked, never the raw value.
@@ -122,7 +123,7 @@ func scrubStoredRequestKeys() error {
 		return err
 	}
 	if n > 0 {
-		logger.Infof("[Observe] Masked the client key on %d older request log rows", n)
+		logger.Infof("[Observe] Masked the client key on %s", textfmt.Count(int(n), "older request log row", "older request log rows"))
 	}
 	return nil
 }

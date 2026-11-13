@@ -90,6 +90,9 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 	if msg := validateClaudeMessageRoles(req.Messages); msg != "" {
 		return msg
 	}
+	if msg := validateClaudeMessageContent(req.Messages); msg != "" {
+		return msg
+	}
 	if msg := validateClaudeThinkingBudget(req.Thinking, req.MaxTokens, req.interleavedThinking); msg != "" {
 		return msg
 	}
@@ -199,13 +202,18 @@ func resolveClaudeThinkingResponseOptions(thinking *ClaudeThinkingConfig, defaul
 }
 
 func validateOpenAIRequestShape(req *OpenAIRequest) string {
+	return validateOpenAIRequestShapeAs(req, chatRequestChecks)
+}
+
+// validateOpenAIRequestShapeAs runs the Chat checks, worded for the API the request came in on.
+func validateOpenAIRequestShapeAs(req *OpenAIRequest, checks openAIRequestChecks) string {
 	if msg := validateOpenAIToolChoice(req); msg != "" {
 		return msg
 	}
 	if msg := validateChatResponseFormat(req); msg != "" {
 		return msg
 	}
-	if msg := validateOpenAIOutputOptions(req); msg != "" {
+	if msg := validateOpenAIOutputOptions(req, checks.maxTokens); msg != "" {
 		return msg
 	}
 	if len(req.Messages) == 0 {
@@ -239,13 +247,13 @@ func validateOpenAIRequestShape(req *OpenAIRequest) string {
 	}
 
 	if !hasNonSystem {
-		return "at least one non-system message is required"
+		return checks.noNonSystem
 	}
 	if lastRole == "assistant" {
-		return "assistant-prefill final message is not supported; last message must be user or tool"
+		return checks.prefill
 	}
 	if !hasUserContext {
-		return "at least one non-empty user message is required"
+		return checks.noUserText
 	}
 	return ""
 }
@@ -429,12 +437,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		id := strings.TrimPrefix(strings.TrimPrefix(path, "/v1/responses/"), "/responses/")
 		switch r.Method {
-		case http.MethodGet:
+		case http.MethodGet, http.MethodHead:
 			h.apiGetOpenAIResponse(w, ar, id)
 		case http.MethodDelete:
 			h.apiDeleteOpenAIResponse(w, ar, id)
 		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			sendMethodNotAllowed(w, ar, errorShapeOpenAI, http.MethodGet, http.MethodDelete)
 		}
 	case path == "/v1/models" || path == "/models":
 		ar := h.authenticateForModels(w, r)
@@ -590,6 +598,9 @@ func (h *Handler) listedModels(r *http.Request) []map[string]interface{} {
 }
 
 func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
+	if refuseMethod(w, r, errorShapeByHeader, http.MethodGet) {
+		return
+	}
 	writeModelsList(w, r, h.listedModels(r))
 }
 
@@ -891,8 +902,7 @@ func mergeStringLists(base []string, extra []string) []string {
 }
 
 func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	if refuseMethod(w, r, errorShapeAnthropic, http.MethodPost) {
 		return
 	}
 
@@ -952,9 +962,7 @@ func (h *Handler) handleClaudeMessages(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
-	if r.Method != "POST" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	if refuseMethod(w, r, errorShapeAnthropic, http.MethodPost) {
 		return
 	}
 
@@ -1727,7 +1735,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			}
 
 			thinkingFormat := thinkingOpts.Format
-			finalContent, extractedReasoning := extractThinkingFromContent(content)
+			finalContent, extractedReasoning := answerFromContent(content, upstreamStopReason)
 			rawThinkingContent := thinkingContent
 			if thinking && rawThinkingContent == "" && extractedReasoning != "" {
 				rawThinkingContent = extractedReasoning
@@ -1841,9 +1849,7 @@ func (h *Handler) sendClaudeError(w http.ResponseWriter, status int, errType, me
 func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
-	if r.Method != "POST" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	if refuseMethod(w, r, errorShapeOpenAI, http.MethodPost) {
 		return
 	}
 
@@ -2447,7 +2453,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				break
 			}
 
-			finalContent, extractedReasoning := extractThinkingFromContent(content)
+			finalContent, extractedReasoning := answerFromContent(content, upstreamStopReason)
 			if thinking && reasoningContent == "" && extractedReasoning != "" {
 				reasoningContent = extractedReasoning
 			} else if !thinking {

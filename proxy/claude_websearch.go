@@ -629,7 +629,7 @@ func (h *Handler) callClaudeRound(ctx context.Context, account *config.Account, 
 	if err := CallKiroAPIContext(ctx, account, payload, callback); err != nil {
 		return nil, err
 	}
-	text, extracted := extractThinkingFromContent(text)
+	text, extracted := answerFromContent(text, stopReason)
 	if reasoning == "" {
 		reasoning = extracted
 	}

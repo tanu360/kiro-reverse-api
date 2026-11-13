@@ -64,7 +64,7 @@ func restoreNativeModels() {
 		return
 	}
 	if nativeModelIDs.CompareAndSwap(nil, &set) {
-		logger.Infof("[ModelsCache] Restored %d native models from the last listing", len(set))
+		logger.Infof("[ModelsCache] Restored %s from the last listing", textfmt.Count(len(set), "native model", "native models"))
 	}
 }
 

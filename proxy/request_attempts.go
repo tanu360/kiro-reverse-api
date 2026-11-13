@@ -67,6 +67,15 @@ type attemptChain struct {
 	// lastProxyFail is the latest attempt that failed at its proxy, with Go's text for
 	// that failure: the request's final record carries the same text when it ends on it.
 	lastProxyFail *failedAtProxy
+	// endpointErr is the open attempt's own endpoint error when the call returned another
+	// endpoint's error (a merged 429, an earlier 400): closing with that one uses this instead.
+	endpointErr *endpointOwnError
+}
+
+type endpointOwnError struct {
+	// final is the text of the error the call returned.
+	final string
+	err   error
 }
 
 type failedAtProxy struct {
@@ -99,6 +108,7 @@ func traceAttemptStart(ctx context.Context, account *config.Account, endpoint st
 	if c.open {
 		c.closeLocked(now, true, 0, "")
 	}
+	c.endpointErr = nil
 	accountID, email := accountIdentity(account)
 	next := requestAttempt{
 		AccountID: accountID,
@@ -132,6 +142,9 @@ func traceAttemptFailed(ctx context.Context, account *config.Account, status int
 		c.open = true
 		c.openAt = now
 		c.output = false
+	}
+	if own := c.endpointErr; own != nil && err.Error() == own.final {
+		err, status = own.err, 0
 	}
 	if status == 0 {
 		status = upstreamHTTPStatus(err)
@@ -230,6 +243,22 @@ func noteAttemptEndpoint(ctx context.Context, name string) {
 	defer c.mu.Unlock()
 	if c.open && !c.done && len(c.items) > 0 {
 		c.items[len(c.items)-1].Endpoint = name
+		c.endpointErr = nil
+	}
+}
+
+// noteAttemptEndpointError records own as the open attempt's error when the Kiro call
+// returns final, another endpoint's error (a 429 merged across endpoints, for example).
+// The caller closes the attempt with final; the attempt then shows own instead.
+func noteAttemptEndpointError(ctx context.Context, own, final error) {
+	_, c := attemptChainFromContext(ctx)
+	if c == nil || own == nil || final == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.open && !c.done {
+		c.endpointErr = &endpointOwnError{final: final.Error(), err: own}
 	}
 }
 
@@ -263,6 +292,9 @@ func (t *requestTrace) finishAttempts(success bool, status int, message string) 
 	defer c.mu.Unlock()
 	if !c.done {
 		if c.open {
+			if own := c.endpointErr; own != nil && !success && message == own.final {
+				status, message = upstreamHTTPStatus(own.err), upstreamErrorText(own.err)
+			}
 			c.closeLocked(time.Now(), success, status, message)
 		}
 		if c.skipped > 0 && len(c.items) > 0 {
@@ -298,6 +330,7 @@ func (c *attemptChain) appendLocked(next requestAttempt) {
 
 func (c *attemptChain) closeLocked(now time.Time, success bool, status int, message string) {
 	c.open = false
+	c.endpointErr = nil
 	if len(c.items) == 0 {
 		return
 	}

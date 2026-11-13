@@ -20,9 +20,7 @@ import (
 func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
-	if r.Method != http.MethodPost {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	if refuseMethod(w, r, errorShapeOpenAI, http.MethodPost) {
 		return
 	}
 
@@ -207,7 +205,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				break
 			}
 
-			finalContent, extractedReasoning := extractThinkingFromContent(content)
+			finalContent, extractedReasoning := answerFromContent(content, upstreamStopReason)
 			if thinking && reasoningContent == "" && extractedReasoning != "" {
 				reasoningContent = extractedReasoning
 			} else if !thinking {
