@@ -1025,6 +1025,8 @@ type OpenAIRequest struct {
 	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
 	// ResponseFormat requests JSON output; see structured_output.go.
 	ResponseFormat json.RawMessage `json:"response_format,omitempty"`
+	// StreamOptions asks for the separate usage chunk; see openai_stream_options.go.
+	StreamOptions *OpenAIStreamOptions `json:"stream_options,omitempty"`
 }
 
 type OpenAIMessage struct {
@@ -2190,7 +2192,7 @@ func KiroToOpenAIResponseWithReasoning(content, reasoningContent string, toolUse
 				message["content"] = "<think>" + reasoningContent + "</think>" + content
 			default:
 				message["content"] = content
-				message["reasoning_content"] = reasoningContent
+				message["reasoning_content"] = strings.TrimLeft(reasoningContent, " \t\r\n")
 			}
 		} else {
 			message["content"] = content

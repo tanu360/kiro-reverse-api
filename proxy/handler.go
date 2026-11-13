@@ -1809,6 +1809,7 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	attachStructuredOutput(kiroPayload, chatStructuredOutputSpec(&req), req.Stream)
 
 	if req.Stream {
+		r = withChatStreamUsage(r, req.StreamOptions)
 		h.handleOpenAIStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)
 	} else {
 		h.handleOpenAINonStream(w, r, kiroPayload, req.Model, thinking, estimatedInputTokens, apiKeyReservation)
@@ -1882,6 +1883,8 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			var thinkingSource thinkingStreamSource
 			var thinkingStarted bool
 			var eventThinkingOpen bool
+			//! Leading whitespace the model leaves after a thinking block is dropped, as the non-stream reply does.
+			var sawContent, sawReasoning bool
 			responseStarted := false
 
 			sendChunk := func(content string, thinkingState int) {
@@ -1945,9 +1948,13 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 							}},
 						}
 					default:
+						if !sawReasoning {
+							content = strings.TrimLeft(content, " \t\r\n")
+						}
 						if content == "" {
 							return
 						}
+						sawReasoning = true
 						chunk = map[string]interface{}{
 							"id":      chatID,
 							"object":  "chat.completion.chunk",
@@ -1961,9 +1968,13 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 						}
 					}
 				} else {
+					if !sawContent {
+						content = strings.TrimLeft(content, " \t\r\n")
+					}
 					if content == "" {
 						return
 					}
+					sawContent = true
 					chunk = map[string]interface{}{
 						"id":      chatID,
 						"object":  "chat.completion.chunk",
@@ -1975,6 +1986,9 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 							"finish_reason": nil,
 						}},
 					}
+				}
+				if !responseStarted {
+					withAssistantRole(chunk)
 				}
 				data, _ := json.Marshal(chunk)
 				fmt.Fprintf(w, "data: %s\n\n", string(data))
@@ -2133,6 +2147,9 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 						}},
 					}
 					toolCallIndex++
+					if !responseStarted {
+						withAssistantRole(chunk)
+					}
 					data, _ := json.Marshal(chunk)
 					fmt.Fprintf(w, "data: %s\n\n", string(data))
 					flusher.Flush()
@@ -2220,20 +2237,34 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 
 			finishReason := mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolCalls))
 
+			usage := buildOpenAIUsage(inputTokens, outputTokens, cacheDetails)
+			created := time.Now().Unix()
 			chunk := map[string]interface{}{
 				"id":      chatID,
 				"object":  "chat.completion.chunk",
-				"created": time.Now().Unix(),
+				"created": created,
 				"model":   model,
 				"choices": []map[string]interface{}{{
 					"index":         0,
 					"delta":         map[string]interface{}{},
 					"finish_reason": finishReason,
 				}},
-				"usage": buildOpenAIUsage(inputTokens, outputTokens, cacheDetails),
+				"usage": usage,
+			}
+			//! With stream_options.include_usage the usage moves to its own chunk with empty choices, as OpenAI sends it.
+			separateUsage := chatStreamWantsUsageChunk(r.Context())
+			if separateUsage {
+				delete(chunk, "usage")
+			}
+			if !responseStarted {
+				withAssistantRole(chunk)
 			}
 			data, _ := json.Marshal(chunk)
 			fmt.Fprintf(w, "data: %s\n\n", string(data))
+			if separateUsage {
+				data, _ = json.Marshal(chatUsageChunk(chatID, model, created, usage))
+				fmt.Fprintf(w, "data: %s\n\n", string(data))
+			}
 			fmt.Fprintf(w, "data: [DONE]\n\n")
 			flusher.Flush()
 			return
