@@ -10,6 +10,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { InfoHint } from "@/components/shared/info-hint";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SettingsEmptyRow, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { SECTION_ID } from "@/features/settings/sections/sections";
 import { SectionQuery, SettingsGroup } from "@/features/settings/sections/settings-section";
 import {
@@ -375,14 +375,11 @@ function ProxyRow({
       }
     >
       {proxy.health.status === "failed" && lastError ? (
-        // A short sentence in the viewer's language; the server's own text in the tooltip.
+        // A short sentence in the viewer's language; the server's own text behind Details,
+        // which opens on hover, click, tap and keyboard alike.
         <p className="wrap-anywhere text-destructive-foreground text-xs">
-          <Tooltip>
-            <TooltipTrigger render={<span />}>
-              {t("card.lastError", { error: proxyFailureSentence(errorCode, errorStatus, t) })}
-            </TooltipTrigger>
-            <TooltipPopup>{mask(lastError)}</TooltipPopup>
-          </Tooltip>
+          {t("card.lastError", { error: proxyFailureSentence(errorCode, errorStatus, t) })}{" "}
+          <InfoHint hint={mask(lastError)}>{t("card.lastErrorDetails")}</InfoHint>
         </p>
       ) : null}
     </SettingsRow>

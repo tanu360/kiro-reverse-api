@@ -8,8 +8,8 @@ export type PoolProxyStatus = "unknown" | "ok" | "failed";
 
 /**
  * Times are Unix milliseconds; lastError is redacted English from the server. errorCode names the
- * last failure (connect, timeout, dns, tls, auth, tunnel, socks) and errorStatus is the proxy's
- * answer to CONNECT when it refused one; both are absent from servers before them.
+ * last failure (connect, timeout, dns, tls, auth, auth_required, tunnel, socks) and errorStatus is
+ * the proxy's answer to CONNECT when it refused one; both are absent from servers before them.
  */
 export interface PoolProxyHealth {
   status: PoolProxyStatus;

@@ -170,11 +170,18 @@ describe("AttemptsCard", () => {
             accountId: "acc-4",
             message: "no healthy outbound proxy in the pool",
             proxy: { source: "pool", code: "no_healthy" },
+            failover: true,
+          },
+          {
+            ...failed,
+            accountId: "acc-5",
+            message: "outbound proxy failed: proxy requires a sign-in",
+            proxy: { source: "account", code: "auth_required", status: 407 },
           },
         ]}
       />,
     );
-    const [own, global, old, none] = attemptItems();
+    const [own, global, old, none, noLogin] = attemptItems();
     expect(own).toHaveTextContent("Proxy error");
     expect(own).toHaveTextContent(
       "Could not connect through the account's proxy. The proxy refused the connection.",
@@ -186,6 +193,9 @@ describe("AttemptsCard", () => {
     );
     expect(old).toHaveTextContent("Could not connect through the proxy. Connection timed out.");
     expect(none).toHaveTextContent("No pool proxy was healthy.");
+    expect(noLogin).toHaveTextContent(
+      "Could not connect through the account's proxy. The proxy asks for a username and password.",
+    );
   });
 
   it("draws nothing for a row without attempts", () => {

@@ -7,6 +7,7 @@ const FAILURE_KEYS: Record<string, string> = {
   dns: "proxy-pool:failure.dns",
   tls: "proxy-pool:failure.tls",
   auth: "proxy-pool:failure.auth",
+  auth_required: "proxy-pool:failure.authRequired",
   tunnel: "proxy-pool:failure.tunnel",
   socks: "proxy-pool:failure.socks",
 };

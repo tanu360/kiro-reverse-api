@@ -888,8 +888,9 @@ export type RequestSort =
 
 /**
  * How a try failed at an outbound proxy before it reached Kiro (errorType "proxy"). `code` is the
- * server's failure kind: connect, timeout, dns, tls, auth, tunnel, socks or no_healthy. `status` is
- * the proxy's answer to CONNECT when it refused one. `source` is absent on rows logged before it.
+ * server's failure kind: connect, timeout, dns, tls, auth, auth_required, tunnel, socks or
+ * no_healthy. `status` is the proxy's answer to CONNECT when it refused one. `source` is absent
+ * on rows logged before it.
  */
 export interface RequestAttemptProxy {
   source?: "account" | "global" | "pool";
