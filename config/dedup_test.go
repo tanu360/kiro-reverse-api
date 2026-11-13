@@ -568,3 +568,41 @@ func TestUpsertAccountSocialWithoutProviderDoesNotTakeOverByEmail(t *testing.T) 
 		}
 	})
 }
+
+// A copy that reaches Kiro only through its own proxy must not lose that route
+// when it is merged into a keeper without one; a keeper's own proxy wins.
+func TestMergeAccountsKeepsADonorProxyTheKeeperLacks(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		for _, a := range []Account{
+			{ID: "keep", AuthMethod: "social", Email: "dev@example.com", RefreshToken: "rt-a", ExpiresAt: 300},
+			{ID: "proxied", AuthMethod: "social", Email: "dev@example.com", RefreshToken: "rt-b", ExpiresAt: 100, ProxyURL: "socks5://u:p@sg-proxy:1080"},
+		} {
+			if err := AddAccount(a); err != nil {
+				t.Fatalf("seed %s: %v", a.ID, err)
+			}
+		}
+		kept, err := MergeAccounts("keep", []string{"proxied"}, AccountCounters{})
+		if err != nil {
+			t.Fatalf("merge: %v", err)
+		}
+		if kept.ProxyURL != "socks5://u:p@sg-proxy:1080" || GetAccounts()[0].ProxyURL != kept.ProxyURL {
+			t.Fatalf("keeper proxy = %q, want the donor's", kept.ProxyURL)
+		}
+
+		for _, a := range []Account{
+			{ID: "keep2", AuthMethod: "social", Email: "two@example.com", RefreshToken: "rt-c", ExpiresAt: 300, ProxyURL: "http://own:8080"},
+			{ID: "other2", AuthMethod: "social", Email: "two@example.com", RefreshToken: "rt-d", ExpiresAt: 100, ProxyURL: "http://donor:8080"},
+		} {
+			if err := AddAccount(a); err != nil {
+				t.Fatalf("seed %s: %v", a.ID, err)
+			}
+		}
+		kept, err = MergeAccounts("keep2", []string{"other2"}, AccountCounters{})
+		if err != nil {
+			t.Fatalf("merge: %v", err)
+		}
+		if kept.ProxyURL != "http://own:8080" {
+			t.Fatalf("keeper proxy = %q, want its own", kept.ProxyURL)
+		}
+	})
+}

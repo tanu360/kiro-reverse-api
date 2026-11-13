@@ -394,9 +394,10 @@ func applyIncoming(dst *Account, src Account) {
 
 // MergeAccounts keeps keepID and deletes removeIDs in one save. The kept
 // account takes the freshest token of a removed account with its own sign-in
-// method, any identity field it lacks, and the given counters. Client API keys
-// bound to a removed account are bound to the kept one instead. It returns
-// ErrAccountNotFound when any ID is no longer stored, and changes nothing then.
+// method, any identity field or own proxy it lacks, and the given counters.
+// Client API keys bound to a removed account are bound to the kept one instead.
+// It returns ErrAccountNotFound when any ID is no longer stored, and changes
+// nothing then.
 func MergeAccounts(keepID string, removeIDs []string, counters AccountCounters) (kept Account, err error) {
 	defer func() {
 		if err == nil {
@@ -534,6 +535,8 @@ func absorbDonors(keeper *Account, donors []Account) {
 		fillIfEmpty(&keeper.UserId, donor.UserId)
 		fillIfEmpty(&keeper.Nickname, donor.Nickname)
 		fillIfEmpty(&keeper.Provider, donor.Provider)
+		//! A copy may be reachable only through its own proxy; the merge must not move it to the pool or direct.
+		fillIfEmpty(&keeper.ProxyURL, donor.ProxyURL)
 		if !keeper.ProfileArnPinned {
 			fillIfEmpty(&keeper.ProfileArn, donor.ProfileArn)
 		}
