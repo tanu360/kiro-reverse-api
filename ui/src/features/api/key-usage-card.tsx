@@ -92,8 +92,9 @@ export function KeyUsageCard(): JSX.Element {
         text = (
           <>
             <span className="min-w-0 truncate text-muted-foreground">{shown.title}</span>
+            {/* The masked key tells two deleted keys apart, so the group name gives way first. */}
             {shown.keyMasked ? (
-              <span className="min-w-0 truncate font-mono text-meta text-muted-foreground">
+              <span className="shrink-0 font-mono text-meta text-muted-foreground">
                 {shown.keyMasked}
               </span>
             ) : null}
@@ -259,7 +260,7 @@ export function KeyUsageCard(): JSX.Element {
             const passed = Math.max(0, amount - failed);
             return (
               <li
-                className="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-md px-2 py-1.5 text-sm [grid-template-areas:'name_value''bar_value'] has-[button:hover]:bg-(--row-hover) @lg:min-h-10 @lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_5rem] @lg:[grid-template-areas:'name_bar_value']"
+                className="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-md px-2 py-1.5 text-sm [grid-template-areas:'name_value''bar_value'] has-[button:hover]:bg-(--row-hover) @lg:min-h-10 @lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_5rem] @lg:[grid-template-areas:'name_bar_value']"
                 key={row.key}
               >
                 <div className="flex min-w-0 items-center gap-2.5 [grid-area:name]">

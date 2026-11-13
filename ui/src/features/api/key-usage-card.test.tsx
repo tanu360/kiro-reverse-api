@@ -152,7 +152,10 @@ describe("KeyUsageCard", () => {
       // An unnamed key goes by its masked value.
       "View usage of sk-unn****5678",
     ]);
-    expect(within(region).getByText("sk-del****1234")).toBeInTheDocument();
+    // Two deleted keys differ only in their masked values: the name is cut, never the key.
+    const deletedKey = within(region).getByText("sk-del****1234");
+    expect(deletedKey).toHaveClass("shrink-0");
+    expect(deletedKey).not.toHaveClass("truncate");
     expect(within(region).getByText("3 failed")).toBeInTheDocument();
     expect(within(region).queryByText(/Turn on Require an API key/)).toBeNull();
   });
