@@ -439,6 +439,10 @@ endpointLoop:
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return ctxErr
 				}
+				//! Every endpoint takes the same route, so with no pool proxy up the others fail too.
+				if isNoHealthyProxyError(err) {
+					return noHealthyProxyFailure()
+				}
 				logger.Warnf("[KiroAPI] Endpoint %s failed: %v", ep.Name, err)
 				if !isRetryableStreamError(err) {
 					return err

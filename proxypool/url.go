@@ -51,6 +51,10 @@ func parseProxyURL(raw string) (base, user, pass string, hasUser bool, err error
 	if raw == "" {
 		return "", "", "", false, invalid("url is required")
 	}
+	if !strings.Contains(raw, "://") {
+		//! url.Parse reads host:port as a scheme or fails on it, and either way says only "not valid".
+		return "", "", "", false, invalid("url has no scheme: start it with http://, https://, socks5:// or socks5h://, as in socks5://host:port")
+	}
 	u, parseErr := url.Parse(raw)
 	if parseErr != nil || u.Opaque != "" {
 		return "", "", "", false, invalid("url is not a valid proxy URL")
@@ -64,6 +68,10 @@ func parseProxyURL(raw string) (base, user, pass string, hasUser bool, err error
 	host := u.Hostname()
 	if host == "" {
 		return "", "", "", false, invalid("url needs a host")
+	}
+	if addr, _, _ := strings.Cut(host, "%"); strings.Contains(host, ":") && net.ParseIP(addr) == nil {
+		//! A host:port typed as the host arrives bracketed, as if it were IPv6.
+		return "", "", "", false, invalid("the host holds a port: write the url as scheme://host:port")
 	}
 	port := u.Port()
 	if port == "" {

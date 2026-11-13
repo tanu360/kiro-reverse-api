@@ -121,7 +121,7 @@ func (h *Handler) sendClaudeUpstreamError(w http.ResponseWriter, err error) {
 	if upstreamFailureStatus(err) == 429 {
 		kind = "rate_limit_error"
 	}
-	h.sendClaudeError(w, upstreamFailureStatus(err), kind, err.Error())
+	h.sendClaudeError(w, upstreamFailureStatus(err), kind, upstreamErrorText(err))
 }
 
 func (h *Handler) sendOpenAIUpstreamError(w http.ResponseWriter, err error) {
@@ -133,5 +133,5 @@ func (h *Handler) sendOpenAIUpstreamError(w http.ResponseWriter, err error) {
 	if upstreamFailureStatus(err) == 429 {
 		kind = "rate_limit_error"
 	}
-	h.sendOpenAIError(w, upstreamFailureStatus(err), kind, err.Error())
+	h.sendOpenAIError(w, upstreamFailureStatus(err), kind, upstreamErrorText(err))
 }
