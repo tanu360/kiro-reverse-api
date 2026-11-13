@@ -71,10 +71,24 @@ func TestRequestLogNeverStoresRawClientKeys(t *testing.T) {
 
 	// Search still finds a valid key's rows by any part of its value, and a wrong key's row
 	// by its whole value.
-	for search, want := range map[string]int{"log-0123": 1, "sk-wrong-key-for-test-0000": 1, "for-test": 0} {
+	//! A wrong key of 10 characters or fewer masks to "****"; its fingerprint still finds it.
+	for search, want := range map[string]int{"log-0123": 1, "sk-wrong-key-for-test-0000": 1, "for-test": 0, "sk-bogus": 1, "sk-bogu": 0} {
 		if page := getObserveStore().RequestPage(requestQuery{Page: 1, PageSize: 10, Search: search}); page.Total != want {
 			t.Fatalf("search %q found %d rows, want %d", search, page.Total, want)
 		}
+		found := 0
+		keySearch := newRequestKeySearch(search)
+		for _, rec := range getObserveStore().RecentRequests(10) {
+			if keySearch.matches(rec) || strings.Contains(strings.ToLower(rec.APIKeyMasked), strings.ToLower(search)) {
+				found++
+			}
+		}
+		if search == "sk-bogus" && found != 1 {
+			t.Fatalf("in-memory search %q found %d rows, want 1", search, found)
+		}
+	}
+	if hashes := storedRequestKeyHashes(t); hashes[0] != "" || hashes[1] == "" || hashes[2] == "" || hashes[1] == hashes[2] {
+		t.Fatalf("fingerprints %q: only the unknown keys get one, each its own", hashes)
 	}
 
 	// The valid key's row is still counted under its key, the wrong ones as invalid.
@@ -149,4 +163,26 @@ func TestScrubStoredRequestKeysMasksOlderRows(t *testing.T) {
 	if e := usageEntry(t, resp, usageKindInvalid, usageKindInvalid); e.Totals.Requests != 3 {
 		t.Fatalf("invalid key usage %+v", e)
 	}
+}
+
+func storedRequestKeyHashes(t *testing.T) []string {
+	t.Helper()
+	d, err := db.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := d.Query(`SELECT api_key_hash FROM requests ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var hashes []string
+	for rows.Next() {
+		var hash string
+		if err := rows.Scan(&hash); err != nil {
+			t.Fatal(err)
+		}
+		hashes = append(hashes, hash)
+	}
+	return hashes
 }

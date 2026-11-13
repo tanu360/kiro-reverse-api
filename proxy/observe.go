@@ -75,6 +75,7 @@ type requestRecord struct {
 	AccountID    string  `json:"accountId"`
 	APIKeyID     string  `json:"apiKeyId,omitempty"`
 	APIKey       string  `json:"-"`
+	APIKeyHash   string  `json:"-"`
 	APIKeyMasked string  `json:"apiKeyMasked,omitempty"`
 	Email        string  `json:"email,omitempty"`
 	Model        string  `json:"model"`
@@ -341,6 +342,7 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 		AccountID:    accountID,
 		APIKeyID:     apiKeyID,
 		APIKey:       storedRequestAPIKey(apiKey),
+		APIKeyHash:   unknownRequestKeyHash(apiKeyID, apiKey),
 		APIKeyMasked: requestAPIKeyMasked(apiKeyID, apiKey),
 		Email:        email,
 		Model:        model,

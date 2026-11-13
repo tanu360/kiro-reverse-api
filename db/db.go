@@ -236,6 +236,9 @@ var requestColumnMigrations = []struct{ name, definition string }{
 	{"cache_write_tokens", "INTEGER NOT NULL DEFAULT 0"},
 	{"attempts_json", "TEXT NOT NULL DEFAULT ''"},
 	{"request_id", "TEXT NOT NULL DEFAULT ''"},
+	// api_key_hash fingerprints a key the proxy did not know, so a search for its full value
+	// finds the row even when its mask ("****" for 10 characters or fewer) hides all of it.
+	{"api_key_hash", "TEXT NOT NULL DEFAULT ''"},
 }
 
 // cooldownColumnMigrations lists cooldowns columns added after the first

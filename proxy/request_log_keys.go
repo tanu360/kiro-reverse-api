@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 
 	"kiro-proxy/config"
@@ -21,6 +23,24 @@ func storedRequestAPIKey(apiKey string) string {
 type requestKeySearch struct {
 	ids    []string
 	masked string
+	// hash is the search text's fingerprint: it finds rows of a key the proxy did not know.
+	hash string
+}
+
+// unknownRequestKeyHash fingerprints a key that matched no configured key, for the search.
+// Rows of a configured key are found by its id, so their key gets no fingerprint.
+func unknownRequestKeyHash(apiKeyID, apiKey string) string {
+	if apiKeyID != "" || apiKey == "" {
+		return ""
+	}
+	return requestKeyHash(apiKey)
+}
+
+// requestKeyHash is a salted SHA-256 prefix: equal for equal keys, and too short and salted
+// to look a key up by.
+func requestKeyHash(apiKey string) string {
+	sum := sha256.Sum256([]byte("kiro-proxy request log key\x00" + apiKey))
+	return hex.EncodeToString(sum[:8])
 }
 
 func newRequestKeySearch(search string) requestKeySearch {
@@ -39,12 +59,18 @@ func newRequestKeySearch(search string) requestKeySearch {
 	if len(search) > 10 && !strings.ContainsAny(search, " \t") {
 		ks.masked = config.MaskApiKey(search)
 	}
+	if !strings.ContainsAny(search, " \t") {
+		ks.hash = requestKeyHash(search)
+	}
 	return ks
 }
 
 // matches reports whether an in-memory row belongs to a key the search names.
 func (ks requestKeySearch) matches(rec requestRecord) bool {
 	if ks.masked != "" && rec.APIKey == ks.masked {
+		return true
+	}
+	if ks.hash != "" && rec.APIKeyHash == ks.hash {
 		return true
 	}
 	for _, id := range ks.ids {
@@ -68,6 +94,10 @@ func (ks requestKeySearch) sql() (string, []interface{}) {
 	if ks.masked != "" {
 		parts = append(parts, "api_key = ?")
 		args = append(args, ks.masked)
+	}
+	if ks.hash != "" {
+		parts = append(parts, "api_key_hash = ?")
+		args = append(args, ks.hash)
 	}
 	if len(parts) == 0 {
 		return "", nil
