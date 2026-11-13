@@ -335,6 +335,9 @@ type jsonFenceStripper struct {
 	buf   string
 	// midLine is set once part of the current body line was sent; a fence only starts a line.
 	midLine bool
+	// space is trailing whitespace held back: it goes out before more text, and is dropped
+	// at the closing fence and at the end, so the JSON carries no stray newline.
+	space string
 }
 
 // maxFenceLineLen bounds how long a first line is held while it could still be a fence.
@@ -345,14 +348,30 @@ func (s *jsonFenceStripper) Push(text string) string {
 		return ""
 	}
 	if s.state == fencePass {
-		return text
+		var out strings.Builder
+		s.write(&out, text)
+		return out.String()
 	}
 	s.buf += text
 	return s.drain(false)
 }
 
 func (s *jsonFenceStripper) Flush() string {
-	return s.drain(true)
+	out := s.drain(true)
+	s.space = ""
+	return out
+}
+
+// write sends text on, holding its trailing whitespace until more text follows.
+func (s *jsonFenceStripper) write(out *strings.Builder, text string) {
+	trimmed := strings.TrimRight(text, " \t\r\n")
+	if trimmed == "" {
+		s.space += text
+		return
+	}
+	out.WriteString(s.space)
+	out.WriteString(trimmed)
+	s.space = text[len(trimmed):]
 }
 
 func (s *jsonFenceStripper) drain(final bool) string {
@@ -360,14 +379,14 @@ func (s *jsonFenceStripper) drain(final bool) string {
 	for {
 		switch s.state {
 		case fencePass:
-			out.WriteString(s.buf)
+			s.write(&out, s.buf)
 			s.buf = ""
 			return out.String()
 
 		case fenceThinking:
 			if idx := strings.Index(s.buf, thinkingCloseTag); idx >= 0 {
 				end := idx + len(thinkingCloseTag)
-				out.WriteString(s.buf[:end])
+				s.write(&out, s.buf[:end])
 				s.buf = s.buf[end:]
 				s.state = fenceStart
 				continue
@@ -376,7 +395,7 @@ func (s *jsonFenceStripper) drain(final bool) string {
 			if !final {
 				keep = partialTagSuffixLen(s.buf, thinkingCloseTag)
 			}
-			out.WriteString(s.buf[:len(s.buf)-keep])
+			s.write(&out, s.buf[:len(s.buf)-keep])
 			s.buf = s.buf[len(s.buf)-keep:]
 			return out.String()
 
@@ -385,13 +404,13 @@ func (s *jsonFenceStripper) drain(final bool) string {
 			switch {
 			case lead == "":
 				if final {
-					out.WriteString(s.buf)
+					s.write(&out, s.buf)
 					s.buf = ""
 				}
 				return out.String()
 			case strings.HasPrefix(lead, thinkingOpenTag):
 				end := strings.Index(s.buf, thinkingOpenTag) + len(thinkingOpenTag)
-				out.WriteString(s.buf[:end])
+				s.write(&out, s.buf[:end])
 				s.buf = s.buf[end:]
 				s.state = fenceThinking
 				continue
@@ -432,7 +451,7 @@ func (s *jsonFenceStripper) drain(final bool) string {
 					s.state = fencePass
 					break
 				}
-				out.WriteString(s.buf[:newline+1])
+				s.write(&out, s.buf[:newline+1])
 				s.buf = s.buf[newline+1:]
 				s.midLine = false
 			}
@@ -441,7 +460,7 @@ func (s *jsonFenceStripper) drain(final bool) string {
 			}
 			if final {
 				if s.midLine || strings.TrimSpace(s.buf) != "```" {
-					out.WriteString(s.buf)
+					s.write(&out, s.buf)
 				}
 				s.buf = ""
 				return out.String()
@@ -451,7 +470,7 @@ func (s *jsonFenceStripper) drain(final bool) string {
 				return out.String()
 			}
 			if s.buf != "" {
-				out.WriteString(s.buf)
+				s.write(&out, s.buf)
 				s.midLine = true
 			}
 			s.buf = ""

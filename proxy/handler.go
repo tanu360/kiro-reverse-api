@@ -2270,7 +2270,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 
 			finishReason := mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolCalls))
 
-			usage := buildOpenAIUsage(inputTokens, outputTokens, cacheDetails)
+			usage := buildOpenAIUsage(inputTokens, outputTokens, cacheDetails, reasoningTokenCount(reasoningOutput, outputTokens))
 			created := time.Now().Unix()
 			chunk := map[string]interface{}{
 				"id":      chatID,
@@ -2422,7 +2422,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 
 			thinkingFormat := structuredOutputThinkingFormat(payload.StructuredOutput, config.GetThinkingConfig().OpenAIFormat, "reasoning_content")
 			resp := KiroToOpenAIResponseWithReasoning(finalContent, reasoningContent, toolUses, inputTokens, outputTokens, model, thinkingFormat)
-			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, cacheDetails)
+			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, cacheDetails, reasoningTokenCount(reasoningContent, outputTokens))
 			if choices, ok := resp["choices"].([]map[string]interface{}); ok && len(choices) > 0 {
 				choices[0]["finish_reason"] = mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
 			}

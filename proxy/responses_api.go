@@ -225,7 +225,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			response, storedMessages := buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
-			addResponsesCacheUsage(response, cacheDetails)
+			addResponsesCacheUsage(response, cacheDetails, reasoningTokenCount(reasoningContent, outputTokens))
 			if len(toolUses) == 0 {
 				upstreamStopReason = inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload))
 			}
@@ -673,7 +673,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				nextOutputIndex++
 			}
 			response, storedMessages := buildResponsesCompletedObjectWithOutput(responseID, createdAt, prepared, outputItems, finalContent, toolUses, inputTokens, outputTokens)
-			addResponsesCacheUsage(response, cacheDetails)
+			addResponsesCacheUsage(response, cacheDetails, reasoningTokenCount(reasoningContent, outputTokens))
 			if len(toolUses) == 0 {
 				upstreamStopReason = inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload))
 			}
@@ -808,6 +808,8 @@ func buildResponsesReasoningOutputItem(reasoning string) map[string]interface{} 
 func buildResponsesReasoningOutputItemWithID(id, reasoning string) map[string]interface{} {
 	summary := []interface{}{}
 	content := []interface{}{}
+	//! Kiro's reasoning often opens with a blank line; the stream drops it, so this does too.
+	reasoning = strings.TrimSpace(reasoning)
 	if reasoning != "" {
 		summary = append(summary, map[string]interface{}{"type": "summary_text", "text": reasoning})
 		content = append(content, map[string]interface{}{"type": "reasoning_text", "text": reasoning})

@@ -2118,6 +2118,9 @@ func KiroToOpenAIResponse(content string, toolUses []KiroToolUse, inputTokens, o
 
 	if len(toolUses) > 0 {
 		msg.Content = nil
+		if strings.TrimSpace(content) != "" {
+			msg.Content = content
+		}
 		msg.ToolCalls = make([]ToolCall, len(toolUses))
 		for i, tu := range toolUses {
 			args, _ := json.Marshal(tu.Input)
@@ -2182,8 +2185,26 @@ func KiroToOpenAIResponseWithReasoning(content, reasoningContent string, toolUse
 		"role": "assistant",
 	}
 
+	if reasoningContent != "" {
+		switch thinkingFormat {
+		case "thinking":
+			message["content"] = "<thinking>" + reasoningContent + "</thinking>" + content
+		case "think":
+			message["content"] = "<think>" + reasoningContent + "</think>" + content
+		default:
+			message["content"] = content
+			message["reasoning_content"] = strings.TrimLeft(reasoningContent, " \t\r\n")
+		}
+	} else {
+		message["content"] = content
+	}
+
 	if len(toolUses) > 0 {
-		message["content"] = nil
+		//! The text before a tool call is part of the answer, as the stream sends it; only an
+		//! empty one is null, as OpenAI sends it.
+		if text, _ := message["content"].(string); strings.TrimSpace(text) == "" {
+			message["content"] = nil
+		}
 		toolCalls := make([]map[string]interface{}, len(toolUses))
 		for i, tu := range toolUses {
 			args, _ := json.Marshal(tu.Input)
@@ -2198,21 +2219,6 @@ func KiroToOpenAIResponseWithReasoning(content, reasoningContent string, toolUse
 		}
 		message["tool_calls"] = toolCalls
 		finishReason = "tool_calls"
-	} else {
-
-		if reasoningContent != "" {
-			switch thinkingFormat {
-			case "thinking":
-				message["content"] = "<thinking>" + reasoningContent + "</thinking>" + content
-			case "think":
-				message["content"] = "<think>" + reasoningContent + "</think>" + content
-			default:
-				message["content"] = content
-				message["reasoning_content"] = strings.TrimLeft(reasoningContent, " \t\r\n")
-			}
-		} else {
-			message["content"] = content
-		}
 	}
 
 	return map[string]interface{}{

@@ -405,17 +405,21 @@ func TestJSONFenceStripperStream(t *testing.T) {
 		want   string
 	}{
 		{"no fence", []string{`{"a":`, `1}`}, `{"a":1}`},
-		{"fence in one chunk", []string{"```json\n{\"a\":1}\n```"}, "{\"a\":1}\n"},
-		{"fence split across chunks", []string{"`", "``js", "on\n{\"a\"", ":1}\n``", "`\n"}, "{\"a\":1}\n"},
-		{"bare fence and leading blank", []string{"\n\n```\n", "[1,2]\n```"}, "[1,2]\n"},
-		{"upper-case language", []string{"```JSON\n{}\n```"}, "{}\n"},
+		//! The JSON ends where the value ends: a trailing newline (before the closing fence or
+		//! at the end of the stream) is not part of it, as in the non-stream answer.
+		{"fence in one chunk", []string{"```json\n{\"a\":1}\n```"}, "{\"a\":1}"},
+		{"fence split across chunks", []string{"`", "``js", "on\n{\"a\"", ":1}\n``", "`\n"}, "{\"a\":1}"},
+		{"bare fence and leading blank", []string{"\n\n```\n", "[1,2]\n```"}, "[1,2]"},
+		{"upper-case language", []string{"```JSON\n{}\n```"}, "{}"},
 		{"python fence passes through", []string{"```python\nprint(1)\n```"}, "```python\nprint(1)\n```"},
 		{"prose passes through", []string{"Sure", ": ```json\n{}\n```"}, "Sure: ```json\n{}\n```"},
-		{"backticks inside strings", []string{"```json\n{\"code\":\"", "```", "\"}\n```"}, "{\"code\":\"```\"}\n"},
+		{"backticks inside strings", []string{"```json\n{\"code\":\"", "```", "\"}\n```"}, "{\"code\":\"```\"}"},
 		{"text after closing fence", []string{"```json\n{}\n```\nDone."}, "{}\nDone."},
-		{"closing fence without newline at end", []string{"```json\n{}\n", "```"}, "{}\n"},
-		{"thinking before fence", []string{"<thin", "king>plan ``` x</thi", "nking>\n```json\n{}\n```"}, "<thinking>plan ``` x</thinking>{}\n"},
-		{"only whitespace", []string{"  \n"}, "  \n"},
+		{"closing fence without newline at end", []string{"```json\n{}\n", "```"}, "{}"},
+		{"thinking before fence", []string{"<thin", "king>plan ``` x</thi", "nking>\n```json\n{}\n```"}, "<thinking>plan ``` x</thinking>{}"},
+		{"only whitespace", []string{"  \n"}, ""},
+		{"no fence, trailing newline", []string{`{"planets": [1]}`, "\n"}, `{"planets": [1]}`},
+		{"no fence, inner newlines kept", []string{"{\n  \"a\": 1", "\n}\n"}, "{\n  \"a\": 1\n}"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var stripper jsonFenceStripper

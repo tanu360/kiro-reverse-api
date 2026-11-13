@@ -1,5 +1,7 @@
 package proxy
 
+import "strings"
+
 // OpenAITokenDetails contains the cache components OpenAI-compatible clients
 // understand. CachedTokens and CacheWriteTokens are subsets of the top-level
 // input/prompt token count.
@@ -30,30 +32,45 @@ func resolveOpenAICacheUsage(tracker *promptCacheTracker, accountID string, payl
 	}
 }
 
-func addResponsesCacheUsage(response map[string]interface{}, details *OpenAITokenDetails) {
-	if details == nil {
-		return
-	}
+// addResponsesCacheUsage fills the Responses usage details. Both are always present, as the
+// OpenAI API sends them: a client reading reasoning_tokens (Codex's reasoning_output_tokens)
+// got nothing, and stream and non-stream answers had different shapes.
+func addResponsesCacheUsage(response map[string]interface{}, details *OpenAITokenDetails, reasoningTokens int) {
 	values, ok := response["usage"].(map[string]int)
 	if !ok {
 		return
 	}
-	usage := make(map[string]interface{}, len(values)+1)
+	usage := make(map[string]interface{}, len(values)+2)
 	for key, value := range values {
 		usage[key] = value
 	}
-	usage["input_tokens_details"] = details
+	usage["input_tokens_details"] = cacheDetailsOrZero(details)
+	usage["output_tokens_details"] = map[string]int{"reasoning_tokens": reasoningTokens}
 	response["usage"] = usage
 }
 
-func buildOpenAIUsage(inputTokens, outputTokens int, details *OpenAITokenDetails) map[string]interface{} {
-	usage := map[string]interface{}{
-		"prompt_tokens":     inputTokens,
-		"completion_tokens": outputTokens,
-		"total_tokens":      inputTokens + outputTokens,
+func buildOpenAIUsage(inputTokens, outputTokens int, details *OpenAITokenDetails, reasoningTokens int) map[string]interface{} {
+	return map[string]interface{}{
+		"prompt_tokens":             inputTokens,
+		"completion_tokens":         outputTokens,
+		"total_tokens":              inputTokens + outputTokens,
+		"prompt_tokens_details":     cacheDetailsOrZero(details),
+		"completion_tokens_details": map[string]int{"reasoning_tokens": reasoningTokens},
 	}
-	if details != nil {
-		usage["prompt_tokens_details"] = details
+}
+
+func cacheDetailsOrZero(details *OpenAITokenDetails) *OpenAITokenDetails {
+	if details == nil {
+		return &OpenAITokenDetails{}
 	}
-	return usage
+	return details
+}
+
+// reasoningTokenCount is the part of the output that was reasoning. Kiro counts output as one
+// number, so the reasoning text is estimated and capped by that number.
+func reasoningTokenCount(reasoning string, outputTokens int) int {
+	if strings.TrimSpace(reasoning) == "" {
+		return 0
+	}
+	return min(estimateApproxTokens(reasoning), max(outputTokens, 0))
 }
