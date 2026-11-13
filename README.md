@@ -35,7 +35,7 @@
 
 **Kiro Proxy** is a small Go service that turns one or more authorized **Kiro** accounts into a local API endpoint that speaks the **OpenAI** and **Anthropic** wire formats:
 
-1. Pools multiple Kiro accounts and load-balances requests with round-robin, weights, and session affinity.
+1. Pools multiple Kiro accounts and load-balances requests with round-robin, weights or priorities, and session affinity.
 2. Translates Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, and OpenAI `/v1/responses` calls to and from Kiro upstream, including tools, thinking, reasoning effort, and web search.
 3. Refreshes access tokens automatically and streams Server-Sent Events end-to-end, with keepalives and failover.
 4. Ships with a React admin panel, embedded in the binary, for account management, live observability, and request audit, in English, 简体中文, Tiếng Việt, and Português (Brasil).
@@ -166,6 +166,8 @@ If this project helps you, a Star would mean a lot.
 - SSE streaming for every endpoint, with mid-stream account failover on transient upstream errors and a keepalive every 15 seconds while the upstream is silent (long reasoning, held tool arguments).
 - Anthropic's `web_search` server tool runs through Kiro's own web search, with results returned as search result blocks.
 - Reasoning effort: OpenAI `reasoning_effort` and Claude `output_config.effort` (`low` to `xhigh`) turn on thinking and reach models that support effort levels; `minimal` turns it off.
+- Structured output: OpenAI `response_format` (`json_object`, `json_schema`), Claude `output_config.format` and Responses `text.format` return bare JSON, checked against the schema (see [Structured Output](#-structured-output)).
+- Thinking signatures: on `/v1/messages`, a thinking block carries the `signature` Kiro sends (`signature_delta` when streaming), and `redacted_thinking` blocks pass through.
 - Tool-call rescue: tool calls that Kiro leaks into the answer as markup are turned back into real tool calls (switch off with `KIRO_TOOL_MARKUP_RESCUE=off`).
 - Request body decompression (gzip/deflate) for clients that pre-compress payloads.
 
@@ -174,15 +176,23 @@ If this project helps you, a Star would mean a lot.
 - **Auto-continue** (opt-in): when an answer stops at Kiro's ~8192-token output cap without a tool call, the proxy asks Kiro to continue and appends the rest, up to 10 times.
 - **Structured tool history**: earlier tool calls and results reach the model as real tool calls, so long agent sessions keep calling tools; a rejected request is retried once as plain text.
 - **Prompt filter**: replaces Claude Code's built-in system prompt with a compact one, strips environment noise (env vars, git status, recent commits), and applies your own line or regex rules in order.
-- **Model mappings**: ordered, drag-to-reorder rules that send any client model name to a Kiro model ID; the first match wins.
+- **Model mappings**: ordered, drag-to-reorder rules that send any client model name to a Kiro model ID; the first match wins. A model Kiro lists itself only follows a rule with its full name, so a substring rule such as `gpt-5` never redirects a native model.
 - **Stream integrity**: rejects replies that end without a stop reason or metering event, with an opt-in lenient mode for IdC and Enterprise accounts that send neither.
 - **Endpoint choice**: pick a Kiro endpoint or let the proxy choose by availability, with optional fallback to the others.
+- **Image resizing** (on by default): an image wider or taller than 1568 px, or larger than 400 KB, is scaled down and re-encoded before it goes to Kiro. Both limits are settings.
+- **Response headers**: up to 20 custom headers on every API response, streams and errors included. Values can use `{request_id}`, `{model}`, `{account_id}`, `{key_id}` and `{client_ip}`; `{request_id}` is the Trace ID in the request log.
 
 ### 👥 Account pool
 
-- Multiple Kiro accounts with round-robin selection per model and a per-account weight (an account with weight N takes about N times as many new requests).
-- Session affinity: follow-up turns return to the account that answered the previous turn and already holds the prompt cache; new conversations still rotate.
+- Multiple Kiro accounts with two routing modes. **Weighted** (default): round-robin per model with a per-account weight (an account with weight N takes about N times as many new requests). **Priority**: each new request goes to the account with the lowest priority number (0–999) that can serve it; the next one takes over while it cools down, runs out of credits, is disabled, or lacks the model.
+- Session affinity: follow-up turns return to the account that answered the previous turn and already holds the prompt cache; new conversations still follow the routing mode. Turn it off to route every request by the routing mode, for example for strict priority.
+- Optional limit of 1 to 1000 requests per minute per account: an account at the limit is skipped, and when every account is at it, clients get HTTP 429. The Accounts page shows each account's live requests per minute and requests today.
+- **Self-heal** (on by default): when no account can serve, the proxy lifts the auth bans and error cooldowns it set by itself and tries again, at most once every 5 minutes and 5 times in a row without a successful request (both adjustable). Kiro suspensions (a 403 "locked your account" counts as one), accounts you turned off and quota cooldowns are never lifted.
 - Automatic OAuth token refresh ahead of expiry, safe under concurrent requests; account cooldowns survive restarts.
+- Background refresh of usage and soon-to-expire tokens every 30 minutes by default. Pick 5 minutes to 24 hours, or Off to refresh only on demand; tokens still renew when a request needs one.
+- Signing in or importing a stored account again updates it instead of adding a copy. Copies left from earlier versions (same refresh token, Kiro API key, user ID, or email and sign-in method) show in a notice on the Accounts page; **Review** merges each group into one account after a backup, keeping its requests and summed counters.
+- **Sign in again** in every account menu replaces an account's login in place and keeps its ID, settings, notes, tags and statistics. When the new sign-in is a different user, the proxy asks before it replaces the identity.
+- Notes (up to 2000 characters) and up to 10 tags (24 characters each) per account. Search matches them, tags work in the Tag filter and in batch actions, and export and import keep both.
 - Auth methods: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), SSO token, Kiro IDE local cache, credentials JSON, Kiro web cookie, and headless Kiro API keys (`ksk_…`).
 - Per account: its own outbound proxy, device (machine) ID, pinned Kiro profile, model list refresh, connection test, and the real Kiro overage switch.
 - Optional overage: accounts keep serving after their credits run out.
@@ -192,10 +202,11 @@ If this project helps you, a Star would mean a lot.
 
 - React single-page app embedded in the binary; no separate web server to run.
 - Overview dashboard that updates live: KPI cards for accounts, requests, successes and failures with hourly trends, per-minute live tiles with sparklines, traffic over time, a model-mix donut, and traffic by account as stacked bars. Its cards keep Kiro account credit usage apart from proxy request usage.
-- Accounts with status tabs and counts, filters (plan, auth, region, enabled), sorting, batch actions, a detail view, connection tests, and export.
-- Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, masked API keys, and SQLite-backed history.
-- API page with client API key management (optional custom key values, enable/disable, per-key token and credit limits, usage reset) and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
-- Settings for usage, routing, auto-continue, tool history, thinking, model mappings, prompt filter, stream integrity, endpoint, outbound proxy, admin password, and statistics reset; Backups with a schedule, upload, and one-click restore.
+- Accounts with status tabs and counts, filters (plan, auth, region, enabled, tag), search over email, nickname, notes and tags, sorting, batch actions, a detail view, connection tests, live requests per minute and today, a duplicates review, and export.
+- Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history.
+- API page with client API key management (optional custom key values, enable/disable, per-key token, credit and call limits, account binding, regenerate, usage reset), a **Usage by key** chart, and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
+- Settings for usage and background refresh, routing (mode, session affinity, per-account limit), auto-continue, tool history, image resizing, self-heal, thinking, model mappings, prompt filter, stream integrity, endpoint, upstream domain and region, outbound proxy, proxy pool, response headers, alerts, admin password, log retention, and statistics reset; Backups with a schedule, upload, and one-click restore.
+- Alerts to a webhook, Telegram, Discord or Slack when credits run low, an account is banned, or no account can serve requests (see [Alerts](#-alerts)).
 - Command menu (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) for pages and actions, privacy mode that masks email addresses, and an update check that reads `version.json` from the repo's `main` branch.
 - Changing the admin password ends every other signed-in session.
 - Light, dark, and system theme; four UI languages: English, 简体中文, Tiếng Việt, and Português (Brasil).
@@ -203,13 +214,16 @@ If this project helps you, a Star would mean a lot.
 
 ### 🌐 Networking
 
-- Outbound proxy support — SOCKS5, HTTP, or HTTPS, switched live without restart, with a per-account override.
+- Outbound proxy support — SOCKS5, HTTP, or HTTPS, switched live without restart, with a per-account override. Saved proxy passwords show as `********`.
+- Proxy pool: accounts without a proxy of their own each get one from a pool, with health checks and a move to a healthy proxy when one fails to connect (see [Proxy pool](#-proxy-pool)).
+- Upstream domain and region (**Settings → Upstream domain & region**): send chat and web search to `runtime.{region}.kiro.dev` instead of `q.{region}.amazonaws.com` (usage and model lists stay on AWS), and override, for every account, the API region (`us-east-1` or `eu-central-1`) or the region Builder ID and IAM Identity Center tokens are refreshed in. A region that does not match an account makes its requests fail, but never bans the account.
 - Configurable thinking-mode suffix and Anthropic `thinking` config passthrough.
 
 ### 🧩 Storage
 
 - Single-file SQLite (`modernc.org/sqlite`) database at `kiro.db`, using DELETE journal mode.
-- Final request rows are the source of truth for dashboard request, token, credit, success, and failed totals.
+- Final request rows, plus a rollup of the rows that log retention removed, are the source of truth for dashboard request, token, credit, success, and failed totals.
+- Log retention: request and error log rows older than 90 days (1 to 3650, or keep forever) are deleted in small batches, two minutes after start and then daily.
 - 30-day retention on stored responses, asynchronous writes off the request hot path.
 
 ---
@@ -301,7 +315,7 @@ Admin password authentication allows five failed attempts per client per minute,
 | `DATA_DIR`        | Directory for `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)   | —                  |
 | `LISTEN_HOST`    | Address to listen on. The default accepts this machine only; set `0.0.0.0` to accept other machines. The Docker image sets `0.0.0.0` | `127.0.0.1` |
-| `PORT`           | Port to listen on (overrides config)      | `8080`             |
+| `PORT`           | Port to listen on, 1–65535 (overrides config). An invalid value is ignored with a warning at startup. In Docker, change the host side of the port mapping instead | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 | `LOG_LEVEL`      | Log level: `debug`, `info`, `warn`, or `error` (overrides config) | `info` |
 
@@ -359,7 +373,11 @@ Require API keys from the **API** page (**API access → Require an API key**). 
 - Leave **Custom key (optional)** blank to auto-generate a secure `sk-...` key, or enter your own key value.
 - Lists and request logs show masked keys such as `sk-clb****e4yo`; the full key remains stored for authentication and copying from key detail.
 - Token and credit quota checks use exact raw values. Rounded or compact UI labels are display-only.
-- A token or credit limit of `0` means unlimited for that dimension.
+- A token, credit or call limit of `0` means unlimited for that dimension.
+- **Call limit** counts successful calls only; failed requests, `/v1/models` and `count_tokens` do not count. A key that used all its calls gets HTTP 429 until you raise the limit or reset usage.
+- **Accounts → Only selected accounts** binds a key to some accounts. Its requests use only those accounts, never another one (HTTP 503 when none of them is available), and its model list shows only the models they serve.
+- **Regenerate key** gives a key a new value, and the old value stops working at once. The name, limits, accounts and usage stay.
+- **Usage by key** charts each key's requests, tokens and credits over 24 hours, 7 days or 30 days, split into succeeded and failed, with separate rows for requests without a key, invalid keys and deleted keys.
 
 ---
 
@@ -371,6 +389,7 @@ The Overview page and the Accounts page intentionally answer different questions
 - **Requests card**: app/proxy history from SQLite `requests` rows: `COUNT(*)`, `SUM(total_tokens)`, and `SUM(credits)`.
 - **Succeeded / Failed cards**: final proxy request outcomes from the same `requests` table.
 - **Account cards**: current visible account counters saved on the account record (`requestCount`, `totalTokens`, `totalCredits`).
+- **Log retention**: before old rows are deleted, their totals go into a rollup, so the Overview cards and `/v1/stats` keep counting them. The Requests page and Usage by key show only the rows kept.
 
 If an old/deleted account still has rows in `requests`, the Overview's **Proxy credits** can be higher than the visible account credit sum. Use **Settings → Danger zone → Reset statistics** or a one-time DB cleanup if you want historical request rows cleared.
 
@@ -391,7 +410,23 @@ Claude-compatible requests that include a top-level `thinking` config also enabl
 
 OpenAI `reasoning_effort` and Claude `output_config.effort` work too: `low`, `medium`, `high`, or `xhigh` turns thinking on and is passed to models that support effort levels, and `minimal` turns it off.
 
+On `/v1/messages` with the default thinking-block output, a thinking block carries the `signature` Kiro sends (`signature_delta` when streaming), and `redacted_thinking` blocks pass through. Kiro does not always send either. With thinking on, thinking blocks a client sends back are replayed to Kiro as text, following Anthropic's rules on which turns keep them; their signatures and redacted blocks are dropped.
+
 Output format is configured in **Settings → Thinking** in the admin panel.
+
+---
+
+## 🧾 Structured Output
+
+Kiro has no JSON mode, so the proxy asks the model for JSON, strips code fences, checks the answer against the schema, and retries once on the same account when it does not match.
+
+| API              | Field                                                          |
+| ---------------- | -------------------------------------------------------------- |
+| Chat Completions | `response_format`: `json_object` or `json_schema`              |
+| Messages         | `output_config.format` (or `output_format`): `json_schema`     |
+| Responses        | `text.format`: `json_object` or `json_schema`                  |
+
+On Chat and Messages, reasoning stays out of the answer: it arrives as `reasoning_content` or thinking blocks. A schema can be up to 32 KiB, and an unsupported format type returns HTTP 400. `count_tokens` includes the added JSON instruction.
 
 ---
 
@@ -406,7 +441,26 @@ For users in restricted network regions, configure an outbound proxy in the admi
 | HTTPS    | `https://proxy.example.com:443` |
 
 > [!TIP]
-> The setting takes effect immediately, no restart required. An account can also use its own proxy (account detail → **Account proxy**); leave it empty to use the global one.
+> The setting takes effect immediately, no restart required. An account can also use its own proxy (account detail → **Account proxy**); leave it empty to use the global one. Saved passwords show as `********`; saving the masked value keeps the password.
+
+### 🔁 Proxy pool
+
+**Settings → Proxy pool** spreads accounts that have no proxy of their own over a list of up to 100 proxies (`http`, `https`, `socks5` or `socks5h`). Each account keeps the proxy it gets, and new accounts go to the healthy proxy with the fewest accounts. A proxy that fails to connect hands its accounts to a healthy one at once; a proxy failure never bans an account or cools it down. Health checks run every 10 minutes by default, and token refreshes take the same route as the account's requests.
+
+The order is: the account's own proxy, the pool, the global proxy, then direct. When no pool proxy is healthy, requests get HTTP 503 `no healthy outbound proxy in the pool`, unless **Fall back to direct** is on: then they use the global proxy, or go direct when none is set.
+
+---
+
+## 🔔 Alerts
+
+**Settings → Alerts** sends a message to a webhook, Telegram, Discord or Slack channel (up to 20) when:
+
+- an account's credit usage passes a threshold (default 80, 90 and 100 %): once per threshold, and again after its credits reset;
+- the credit usage of all enabled, unbanned accounts passes a threshold, at most once per cooldown (default 60 minutes);
+- an account is banned: Kiro suspends it or its sign-in stops working;
+- no enabled account has been able to serve requests for a minute.
+
+Nothing is checked until a channel is on, and **Send test** tries a channel once. A webhook gets a JSON POST with `event`, `severity`, `title`, `text`, `data` and `ts`, plus an `X-Kiro-Proxy-Event` header. With a signing secret, `X-Kiro-Proxy-Signature: sha256=<hex>` carries the HMAC-SHA256 of the body. Saved URLs, tokens and secrets are never shown again.
 
 ---
 
@@ -417,7 +471,7 @@ For users in restricted network regions, configure an outbound proxy in the admi
 | `DATA_DIR`        | Directory for `kiro.db`                  | `.`                |
 | `ADMIN_PASSWORD` | Admin panel password (overrides config)  | —                  |
 | `LISTEN_HOST`    | Address to listen on. The default accepts this machine only; set `0.0.0.0` to accept other machines. The Docker image sets `0.0.0.0` | `127.0.0.1` |
-| `PORT`           | Port to listen on (overrides config)      | `8080`             |
+| `PORT`           | Port to listen on, 1–65535 (overrides config). An invalid value is ignored with a warning at startup. In Docker, change the host side of the port mapping instead | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 | `LOG_LEVEL`      | Log level: `debug`, `info`, `warn`, or `error` (overrides config) | `info` |
 

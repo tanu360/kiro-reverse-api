@@ -35,7 +35,7 @@
 
 **Kiro Proxy** é um pequeno serviço em Go que transforma uma ou mais contas **Kiro** autorizadas em um endpoint de API local que fala os formatos de comunicação da **OpenAI** e da **Anthropic**:
 
-1. Agrupa várias contas Kiro e distribui as requisições com round-robin, pesos e afinidade de sessão.
+1. Agrupa várias contas Kiro e distribui as requisições com round-robin, pesos ou prioridades e afinidade de sessão.
 2. Traduz chamadas Anthropic `/v1/messages`, OpenAI `/v1/chat/completions` e OpenAI `/v1/responses` de e para o upstream do Kiro, incluindo ferramentas, raciocínio, nível de esforço do raciocínio e busca na web.
 3. Atualiza os tokens de acesso automaticamente e transmite Server-Sent Events de ponta a ponta, com keepalives e failover.
 4. Inclui um painel de administração em React, embutido no binário, para gerenciar contas, acompanhar tudo ao vivo e auditar requisições, em English, 简体中文, Tiếng Việt e Português (Brasil).
@@ -166,6 +166,8 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Streaming SSE em todos os endpoints, com failover de conta no meio do stream em erros transitórios do upstream e um keepalive a cada 15 segundos enquanto o upstream fica em silêncio (raciocínio longo, argumentos de ferramenta retidos).
 - A ferramenta de servidor `web_search` da Anthropic roda pela própria busca na web do Kiro, com os resultados devolvidos como blocos de resultado de busca.
 - Nível de esforço: `reasoning_effort` da OpenAI e `output_config.effort` do Claude (de `low` a `xhigh`) ativam o raciocínio e chegam aos modelos que aceitam níveis de esforço; `minimal` o desativa.
+- Saída estruturada: `response_format` da OpenAI (`json_object`, `json_schema`), `output_config.format` do Claude e `text.format` da Responses devolvem JSON puro, conferido contra o schema (veja [Saída estruturada](#-saída-estruturada)).
+- Assinaturas de raciocínio: em `/v1/messages`, um bloco de raciocínio traz a `signature` que o Kiro envia (`signature_delta` no streaming), e blocos `redacted_thinking` passam direto.
 - Resgate de chamadas de ferramenta: chamadas de ferramenta que o Kiro vaza na resposta como marcação voltam a ser chamadas de ferramenta reais (desative com `KIRO_TOOL_MARKUP_RESCUE=off`).
 - Descompressão do corpo da requisição (gzip/deflate) para clientes que comprimem o payload antes de enviar.
 
@@ -174,15 +176,23 @@ Se este projeto ajuda você, uma Star significaria muito.
 - **Autocontinuar** (opcional): quando uma resposta para no limite de saída de ~8192 tokens do Kiro sem chamada de ferramenta, o proxy pede ao Kiro para continuar e anexa o restante, até 10 vezes.
 - **Histórico estruturado de ferramentas**: chamadas de ferramenta e resultados anteriores chegam ao modelo como chamadas reais, então sessões longas de agente continuam chamando ferramentas; uma requisição rejeitada é tentada novamente uma vez como texto simples.
 - **Filtro de system prompt**: substitui o system prompt integrado do Claude Code por um compacto, remove ruído do ambiente (variáveis de ambiente, status do git, commits recentes) e aplica suas próprias regras de linha ou de regex, em ordem.
-- **Mapeamento de modelos**: regras ordenadas, reordenáveis arrastando, que enviam qualquer nome de modelo do cliente para um ID de modelo do Kiro; vence a primeira correspondência.
+- **Mapeamento de modelos**: regras ordenadas, reordenáveis arrastando, que enviam qualquer nome de modelo do cliente para um ID de modelo do Kiro; vence a primeira correspondência. Um modelo que o próprio Kiro lista só segue uma regra com o nome completo dele, então uma regra de substring como `gpt-5` nunca redireciona um modelo nativo.
 - **Integridade do stream**: rejeita respostas que terminam sem motivo de parada ou evento de medição, com um modo tolerante opcional para contas IdC e Enterprise que não enviam nenhum dos dois.
 - **Escolha de endpoint**: escolha um endpoint do Kiro ou deixe o proxy escolher pela disponibilidade, com alternativa opcional para os demais.
+- **Redimensionamento de imagens** (ligado por padrão): uma imagem com largura ou altura acima de 1568 px, ou com mais de 400 KB, é reduzida e recodificada antes de ir para o Kiro. Os dois limites são configuráveis.
+- **Cabeçalhos de resposta**: até 20 cabeçalhos personalizados em toda resposta da API, incluindo streams e erros. Os valores podem usar `{request_id}`, `{model}`, `{account_id}`, `{key_id}` e `{client_ip}`; `{request_id}` é o ID de rastreio no log de requisições.
 
 ### 👥 Pool de contas
 
-- Várias contas Kiro com seleção round-robin por modelo e peso por conta (uma conta com peso N recebe cerca de N vezes mais requisições novas).
-- Afinidade de sessão: os turnos seguintes voltam para a conta que respondeu ao turno anterior e já tem o cache do prompt; conversas novas continuam alternando entre as contas.
+- Várias contas Kiro com dois modos de roteamento. **Ponderado** (padrão): round-robin por modelo com peso por conta (uma conta com peso N recebe cerca de N vezes mais requisições novas). **Prioridade**: cada requisição nova vai para a conta com o menor número de prioridade (0–999) que pode atendê-la; a próxima assume enquanto ela está em espera, sem créditos, desativada ou sem o modelo.
+- Afinidade de sessão: os turnos seguintes voltam para a conta que respondeu ao turno anterior e já tem o cache do prompt; conversas novas seguem o modo de roteamento. Desligue-a para rotear cada requisição pelo modo de roteamento, como pede a prioridade estrita.
+- Limite opcional de 1 a 1000 requisições por minuto por conta: uma conta no limite é pulada e, quando todas estão no limite, os clientes recebem HTTP 429. A página Contas mostra ao vivo as requisições por minuto e as de hoje de cada conta.
+- **Autorrecuperação** (ligada por padrão): quando nenhuma conta pode atender, o proxy retira os bloqueios de autenticação e os períodos de espera por erro que ele mesmo aplicou e tenta de novo, no máximo uma vez a cada 5 minutos e 5 vezes seguidas sem uma requisição bem-sucedida (ambos ajustáveis). Suspensões do Kiro (um 403 "locked your account" conta como uma), contas que você desligou e períodos de espera por cota nunca são retirados.
 - Atualização automática do token OAuth antes de expirar, segura com requisições simultâneas; os períodos de espera das contas continuam valendo após reinicializações.
+- Atualização em segundo plano do uso e dos tokens prestes a expirar a cada 30 minutos por padrão. Escolha de 5 minutos a 24 horas, ou Desabilitada para atualizar só sob demanda; os tokens continuam sendo renovados quando uma requisição precisa.
+- Entrar de novo ou importar uma conta já salva atualiza essa conta em vez de criar uma cópia. Cópias deixadas por versões anteriores (mesmo refresh token, chave de API do Kiro, ID de usuário, ou mesmo e-mail e método de login) aparecem em um aviso na página Contas; **Revisar** mescla cada grupo em uma conta depois de um backup, mantendo as requisições e somando os contadores.
+- **Entrar novamente**, no menu de cada conta, troca o login da conta no lugar e mantém o ID, as configurações, as notas, as tags e as estatísticas. Quando o novo login é de outro usuário, o proxy pede confirmação antes de trocar a identidade.
+- Notas (até 2000 caracteres) e até 10 tags (de 24 caracteres cada) por conta. A busca encontra as duas, as tags funcionam no filtro Tag e nas ações em lote, e a exportação e a importação mantêm ambas.
 - Métodos de autenticação: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), token SSO, cache local do Kiro IDE, JSON de credenciais, cookie web do Kiro e chaves de API headless do Kiro (`ksk_…`).
 - Por conta: proxy de saída próprio, ID de dispositivo (máquina), perfil do Kiro fixado, atualização da lista de modelos, teste de conexão e a chave real de excedente do Kiro.
 - Excedente opcional: as contas continuam atendendo depois que os créditos acabam.
@@ -192,10 +202,11 @@ Se este projeto ajuda você, uma Star significaria muito.
 
 - Aplicativo React de página única embutido no binário; não há servidor web separado para rodar.
 - Painel Visão geral atualizado ao vivo: cartões de KPI de contas, requisições, sucessos e falhas com tendências por hora, indicadores ao vivo por minuto com sparklines, tráfego ao longo do tempo, um gráfico de rosca com a distribuição por modelo e o tráfego por conta em barras empilhadas. Os cartões separam o uso de créditos das contas Kiro do uso de requisições do proxy.
-- Contas com abas de status e contagens, filtros (plano, autenticação, região, ligada), ordenação, ações em lote, visão de detalhes, testes de conexão e exportação.
-- Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, chaves de API mascaradas e histórico guardado em SQLite.
-- Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens e créditos por chave, redefinição de uso) e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
-- Configurações de uso, roteamento, autocontinuar, histórico de ferramentas, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, proxy de saída, senha de administrador e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
+- Contas com abas de status e contagens, filtros (plano, autenticação, região, ligada, tag), busca por e-mail, apelido, notas e tags, ordenação, ações em lote, visão de detalhes, testes de conexão, requisições por minuto e de hoje ao vivo, revisão de duplicadas e exportação.
+- Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite.
+- Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens, créditos e chamadas por chave, vínculo com contas, gerar nova chave, redefinição de uso), um gráfico **Uso por chave** e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
+- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), autocontinuar, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, senha de administrador, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
+- Alertas para webhook, Telegram, Discord ou Slack quando os créditos estão acabando, uma conta é banida ou nenhuma conta consegue atender requisições (veja [Alertas](#-alertas)).
 - Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações pelo `version.json` da branch `main` do repositório.
 - Alterar a senha de administrador encerra todas as outras sessões conectadas.
 - Tema claro, escuro e do sistema; quatro idiomas na interface: English, 简体中文, Tiếng Việt e Português (Brasil).
@@ -203,13 +214,16 @@ Se este projeto ajuda você, uma Star significaria muito.
 
 ### 🌐 Rede
 
-- Suporte a proxy de saída — SOCKS5, HTTP ou HTTPS, trocado ao vivo sem reiniciar, com substituição por conta.
+- Suporte a proxy de saída — SOCKS5, HTTP ou HTTPS, trocado ao vivo sem reiniciar, com substituição por conta. Senhas de proxy salvas aparecem como `********`.
+- Pool de proxies: cada conta sem proxy próprio recebe um proxy do pool, com verificações de saúde e troca para um proxy saudável quando um deles não conecta (veja [Pool de proxies](#-pool-de-proxies)).
+- Domínio e região upstream (**Configurações → Domínio e região upstream**): envie o chat e a busca na web para `runtime.{region}.kiro.dev` em vez de `q.{region}.amazonaws.com` (uso e listas de modelos continuam na AWS) e substitua, para todas as contas, a região da API (`us-east-1` ou `eu-central-1`) ou a região em que os tokens do Builder ID e do IAM Identity Center são renovados. Uma região que não combina com a conta faz as requisições dela falharem, mas nunca bane a conta.
 - Sufixo do modo de raciocínio configurável e repasse da configuração `thinking` da Anthropic.
 
 ### 🧩 Armazenamento
 
 - Banco de dados SQLite em arquivo único (`modernc.org/sqlite`) em `kiro.db`, no modo de journal DELETE.
-- As linhas finais de requisição são a fonte da verdade para os totais de requisições, tokens, créditos, sucessos e falhas do painel.
+- As linhas finais de requisição, mais um resumo das linhas que a retenção de logs removeu, são a fonte da verdade para os totais de requisições, tokens, créditos, sucessos e falhas do painel.
+- Retenção de logs: linhas do log de requisições e de erros com mais de 90 dias (de 1 a 3650, ou guardar para sempre) são excluídas em pequenos lotes, dois minutos depois da inicialização e depois uma vez por dia.
 - Retenção de 30 dias para respostas armazenadas, com gravações assíncronas fora do caminho crítico da requisição.
 
 ---
@@ -301,7 +315,7 @@ A autenticação por senha de administrador permite cinco tentativas com falha p
 | `DATA_DIR`        | Diretório do `kiro.db`                    | `.`                |
 | `ADMIN_PASSWORD` | Senha do painel de administração (substitui a configuração) | —  |
 | `LISTEN_HOST`    | Endereço de escuta. O padrão aceita só esta máquina; defina `0.0.0.0` para aceitar outras máquinas. A imagem Docker define `0.0.0.0` | `127.0.0.1` |
-| `PORT`           | Porta de escuta (substitui a configuração) | `8080`            |
+| `PORT`           | Porta de escuta, de 1 a 65535 (substitui a configuração). Um valor inválido é ignorado, com um aviso na inicialização. No Docker, troque o lado do host no mapeamento de portas | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Defina `off` para deixar de converter de volta em chamadas de ferramenta a marcação de chamada de ferramenta que o Kiro vaza no texto da resposta | on |
 | `LOG_LEVEL`      | Nível de log: `debug`, `info`, `warn` ou `error` (substitui a configuração) | `info` |
 
@@ -359,7 +373,11 @@ Exija chaves de API na página **API** (**Acesso à API → Exigir chave de API*
 - Deixe **Chave personalizada (opcional)** em branco para gerar automaticamente uma chave `sk-...` segura, ou informe seu próprio valor de chave.
 - Listas e logs de requisições mostram chaves mascaradas como `sk-clb****e4yo`; a chave completa continua armazenada para autenticação e para ser copiada nos detalhes da chave.
 - As verificações de cota de tokens e créditos usam os valores brutos exatos. Rótulos arredondados ou compactos na interface servem só para exibição.
-- Um limite de tokens ou créditos igual a `0` significa ilimitado nessa dimensão.
+- Um limite de tokens, créditos ou chamadas igual a `0` significa ilimitado nessa dimensão.
+- O **Limite de chamadas** conta só as chamadas bem-sucedidas; requisições com falha, `/v1/models` e `count_tokens` não contam. Uma chave que usou todas as chamadas recebe HTTP 429 até você aumentar o limite ou redefinir o uso.
+- **Contas → Só as contas selecionadas** vincula uma chave a algumas contas. As requisições dela usam só essas contas, nunca outra (HTTP 503 quando nenhuma delas está disponível), e a lista de modelos dela mostra só os modelos que essas contas atendem.
+- **Gerar nova chave** dá um novo valor à chave, e o valor antigo para de funcionar na hora. Nome, limites, contas e uso continuam iguais.
+- **Uso por chave** mostra em gráfico as requisições, os tokens e os créditos de cada chave nas últimas 24 horas, 7 dias ou 30 dias, separados entre sucesso e falha, com linhas próprias para requisições sem chave, chaves inválidas e chaves excluídas.
 
 ---
 
@@ -371,6 +389,7 @@ A página Visão geral e a página Contas respondem, de propósito, a perguntas 
 - **Cartão Requisições**: histórico do app/proxy a partir das linhas `requests` do SQLite: `COUNT(*)`, `SUM(total_tokens)` e `SUM(credits)`.
 - **Cartões Sucesso / Falha**: resultados finais das requisições do proxy, da mesma tabela `requests`.
 - **Cartões de conta**: contadores atuais das contas visíveis, salvos no registro da conta (`requestCount`, `totalTokens`, `totalCredits`).
+- **Retenção de logs**: antes de excluir linhas antigas, os totais delas vão para um resumo, então os cartões da Visão geral e o `/v1/stats` continuam contando essas linhas. A página Requisições e o Uso por chave mostram só as linhas mantidas.
 
 Se uma conta antiga/excluída ainda tiver linhas em `requests`, os **Créditos do proxy** da Visão geral podem ficar acima da soma dos créditos das contas visíveis. Use **Configurações → Zona de perigo → Redefinir estatísticas** ou uma limpeza única no banco de dados se quiser apagar as linhas históricas de requisições.
 
@@ -391,7 +410,23 @@ Requisições compatíveis com o Claude que incluem uma configuração `thinking
 
 O `reasoning_effort` da OpenAI e o `output_config.effort` do Claude também funcionam: `low`, `medium`, `high` ou `xhigh` ativa o raciocínio e é repassado aos modelos que aceitam níveis de esforço, e `minimal` o desativa.
 
+Em `/v1/messages`, com a saída padrão em blocos de raciocínio, um bloco de raciocínio traz a `signature` que o Kiro envia (`signature_delta` no streaming), e blocos `redacted_thinking` passam direto. O Kiro nem sempre envia um ou outro. Com o raciocínio ligado, blocos de raciocínio que o cliente devolve são reenviados ao Kiro como texto, seguindo as regras da Anthropic sobre quais turnos os mantêm; as assinaturas e os blocos `redacted_thinking` deles são descartados.
+
 O formato de saída é configurado em **Configurações → Raciocínio** no painel de administração.
+
+---
+
+## 🧾 Saída estruturada
+
+O Kiro não tem modo JSON, então o proxy pede JSON ao modelo, remove cercas de código, confere a resposta contra o schema e tenta de novo uma vez, na mesma conta, quando ela não bate.
+
+| API              | Campo                                                          |
+| ---------------- | -------------------------------------------------------------- |
+| Chat Completions | `response_format`: `json_object` ou `json_schema`              |
+| Messages         | `output_config.format` (ou `output_format`): `json_schema`     |
+| Responses        | `text.format`: `json_object` ou `json_schema`                  |
+
+No Chat e no Messages, o raciocínio fica fora da resposta: ele chega como `reasoning_content` ou como blocos de raciocínio. Um schema pode ter até 32 KiB, e um tipo de formato sem suporte retorna HTTP 400. O `count_tokens` inclui a instrução de JSON adicionada.
 
 ---
 
@@ -406,7 +441,26 @@ Para quem está em regiões com rede restrita, configure um proxy de saída no p
 | HTTPS    | `https://proxy.example.com:443` |
 
 > [!TIP]
-> A configuração vale na hora, sem reiniciar. Uma conta também pode usar o próprio proxy (detalhes da conta → **Proxy da conta**); deixe vazio para usar o proxy global.
+> A configuração vale na hora, sem reiniciar. Uma conta também pode usar o próprio proxy (detalhes da conta → **Proxy da conta**); deixe vazio para usar o proxy global. Senhas salvas aparecem como `********`; salvar o valor mascarado mantém a senha.
+
+### 🔁 Pool de proxies
+
+**Configurações → Pool de proxies** distribui as contas sem proxy próprio por uma lista de até 100 proxies (`http`, `https`, `socks5` ou `socks5h`). Cada conta fica com o proxy que recebe, e contas novas vão para o proxy saudável com menos contas. Um proxy que não conecta passa as contas dele para um proxy saudável na hora; uma falha de proxy nunca bane uma conta nem a coloca em espera. As verificações de saúde rodam a cada 10 minutos por padrão, e a renovação de tokens segue a mesma rota das requisições da conta.
+
+A ordem é: o proxy próprio da conta, o pool, o proxy global e, por último, a conexão direta. Quando nenhum proxy do pool está saudável, as requisições recebem HTTP 503 `no healthy outbound proxy in the pool`, a menos que **Recorrer à conexão direta** esteja ligado: aí elas usam o proxy global ou, se não houver um, vão direto.
+
+---
+
+## 🔔 Alertas
+
+**Configurações → Alertas** envia uma mensagem para um canal de webhook, Telegram, Discord ou Slack (até 20) quando:
+
+- o uso de créditos de uma conta passa de um limite (padrão 80, 90 e 100 %): uma vez por limite, e de novo depois que os créditos da conta são renovados;
+- o uso de créditos de todas as contas ligadas e não banidas passa de um limite, no máximo uma vez por intervalo entre alertas (padrão 60 minutos);
+- uma conta é banida: o Kiro a suspende ou o login dela para de funcionar;
+- nenhuma conta ligada consegue atender requisições por um minuto.
+
+Nada é verificado enquanto nenhum canal está ligado, e **Enviar teste** tenta um canal uma vez. Um webhook recebe um POST JSON com `event`, `severity`, `title`, `text`, `data` e `ts`, além do cabeçalho `X-Kiro-Proxy-Event`. Com um segredo de assinatura, `X-Kiro-Proxy-Signature: sha256=<hex>` leva o HMAC-SHA256 do corpo. URLs, tokens e segredos salvos nunca são mostrados de novo.
 
 ---
 
@@ -417,7 +471,7 @@ Para quem está em regiões com rede restrita, configure um proxy de saída no p
 | `DATA_DIR`        | Diretório do `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Senha do painel de administração (substitui a configuração) | — |
 | `LISTEN_HOST`    | Endereço de escuta. O padrão aceita só esta máquina; defina `0.0.0.0` para aceitar outras máquinas. A imagem Docker define `0.0.0.0` | `127.0.0.1` |
-| `PORT`           | Porta de escuta (substitui a configuração) | `8080`            |
+| `PORT`           | Porta de escuta, de 1 a 65535 (substitui a configuração). Um valor inválido é ignorado, com um aviso na inicialização. No Docker, troque o lado do host no mapeamento de portas | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Defina `off` para deixar de converter de volta em chamadas de ferramenta a marcação de chamada de ferramenta que o Kiro vaza no texto da resposta | on |
 | `LOG_LEVEL`      | Nível de log: `debug`, `info`, `warn` ou `error` (substitui a configuração) | `info` |
 
