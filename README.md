@@ -205,7 +205,7 @@ If this project helps you, a Star would mean a lot.
 - Accounts with status tabs and counts, filters (plan, auth, region, enabled, tag), search over email, nickname, notes and tags, sorting, batch actions, a detail view, connection tests, live requests per minute and today, a duplicates review, and export.
 - Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history.
 - API page with client API key management (optional custom key values, enable/disable, per-key token, credit and call limits, account binding, regenerate, usage reset), a **Usage by key** chart, and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
-- Settings for usage and background refresh, routing (mode, session affinity, per-account limit), auto-continue, tool history, image resizing, self-heal, thinking, model mappings, prompt filter, stream integrity, endpoint, upstream domain and region, outbound proxy, proxy pool, response headers, alerts, admin password, log retention, and statistics reset; Backups with a schedule, upload, and one-click restore.
+- Settings for usage and background refresh, routing (mode, session affinity, per-account limit), auto-continue, tool history, image resizing, self-heal, thinking, model mappings, prompt filter, stream integrity, endpoint, upstream domain and region, outbound proxy, proxy pool, response headers, alerts, server log, admin password, log retention, and statistics reset; Backups with a schedule, upload, and one-click restore.
 - Alerts to a webhook, Telegram, Discord or Slack when credits run low, an account is banned, or no account can serve requests (see [Alerts](#-alerts)).
 - Command menu (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) for pages and actions, privacy mode that masks email addresses, and an update check that reads `version.json` from the repo's `main` branch.
 - Changing the admin password ends every other signed-in session.
@@ -339,14 +339,16 @@ curl http://localhost:8080/v1/messages \
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer any" \
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello!"}]}'
+  -d '{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"Hello!"}]}'
 
 # OpenAI — Responses
 curl http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer any" \
-  -d '{"model":"gpt-4o","input":"Hello!"}'
+  -d '{"model":"claude-sonnet-4.5","input":"Hello!"}'
 ```
+
+Free accounts answer Claude Code's default `claude-*-5-5` models with a 404, so set `ANTHROPIC_MODEL` and the `ANTHROPIC_DEFAULT_*_MODEL` variables to a model your accounts serve, such as `claude-sonnet-4.5`.
 
 ### 📌 Endpoints at a glance
 

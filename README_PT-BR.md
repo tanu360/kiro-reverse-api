@@ -205,7 +205,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Contas com abas de status e contagens, filtros (plano, autenticação, região, ligada, tag), busca por e-mail, apelido, notas e tags, ordenação, ações em lote, visão de detalhes, testes de conexão, requisições por minuto e de hoje ao vivo, revisão de duplicadas e exportação.
 - Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite.
 - Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens, créditos e chamadas por chave, vínculo com contas, gerar nova chave, redefinição de uso), um gráfico **Uso por chave** e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
-- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), continuação automática, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, senha de administrador, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
+- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), continuação automática, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, log do servidor, senha de administrador, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
 - Alertas para webhook, Telegram, Discord ou Slack quando os créditos estão acabando, uma conta é banida ou nenhuma conta consegue atender requisições (veja [Alertas](#-alertas)).
 - Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações pelo `version.json` da branch `main` do repositório.
 - Alterar a senha de administrador encerra todas as outras sessões conectadas.
@@ -339,14 +339,16 @@ curl http://localhost:8080/v1/messages \
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer any" \
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello!"}]}'
+  -d '{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"Hello!"}]}'
 
 # OpenAI — Responses
 curl http://localhost:8080/v1/responses \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer any" \
-  -d '{"model":"gpt-4o","input":"Hello!"}'
+  -d '{"model":"claude-sonnet-4.5","input":"Hello!"}'
 ```
+
+Contas gratuitas respondem aos modelos padrão `claude-*-5-5` do Claude Code com um 404, então defina `ANTHROPIC_MODEL` e as variáveis `ANTHROPIC_DEFAULT_*_MODEL` com um modelo que suas contas atendem, como `claude-sonnet-4.5`.
 
 ### 📌 Endpoints em resumo
 
