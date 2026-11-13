@@ -382,3 +382,34 @@ func TestNoHealthyProxyChatFailsOnceWithoutURL(t *testing.T) {
 		t.Fatalf("client text %q", text)
 	}
 }
+
+func TestNoHealthyProxyWebSearchIs503(t *testing.T) {
+	h := newStreamTestHandler(t, func(http.ResponseWriter, *http.Request) {
+		t.Error("a request reached Kiro without a healthy pool proxy")
+	})
+	t.Cleanup(proxypool.SetCheckTargetForTest("http://kiro.test/", nil))
+	proxypool.Default().ResetForTest()
+	t.Cleanup(proxypool.Default().ResetForTest)
+	t.Cleanup(dropPoolClients)
+	dead := config.PoolProxy{ID: "px_dead", URL: "http://" + poolClosedPort(t)}
+	if err := config.SetProxyPool([]config.PoolProxy{dead}); err != nil {
+		t.Fatal(err)
+	}
+	setPoolMode(t, config.ProxyPoolModeOn, false)
+	proxypool.Default().ReportFailure(dead.ID, errors.New("connect: connection refused"))
+
+	//! The plain chat path answers 503 here; the web search paths answered 500 (loop) and 502 (direct).
+	for name, body := range map[string]string{
+		"loop": `{"model":"claude-sonnet-4.5","max_tokens":64,
+			"tools":[{"type":"web_search_20250305","name":"web_search"}],
+			"messages":[{"role":"user","content":"What is the latest Go?"}]}`,
+		"direct": `{"model":"claude-sonnet-4.5","max_tokens":64,
+			"tools":[{"type":"web_search_20250305","name":"web_search"}],
+			"messages":[{"role":"user","content":"Perform a web search for the query: go"}]}`,
+	} {
+		rec := postClaudeMessages(t, h, body)
+		if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), proxypool.ErrNoHealthyProxy.Error()) {
+			t.Errorf("%s: %d %s, want 503 with the no-healthy message", name, rec.Code, rec.Body.String())
+		}
+	}
+}

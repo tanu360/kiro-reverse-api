@@ -756,3 +756,24 @@ func TestHealthDropsStaleFields(t *testing.T) {
 		t.Fatalf("after a good connection %+v, want ok with no old error", h)
 	}
 }
+
+func TestParseProxyURLNamesBracketedHostPort(t *testing.T) {
+	//! url.Parse refuses these first, which used to hide the reason behind "not a valid proxy URL".
+	for _, raw := range []string{
+		"socks5://[127.0.0.1:19409]:1080",
+		"socks5://[127.0.0.1:19409]",
+		"http://user:p@ss@[proxy.example:3128]:8080",
+		"https://[proxy.example:443]:443/",
+	} {
+		_, err := buildProxy(ProxyInput{URL: strPtr(raw)}, nil)
+		var inputErr *InputError
+		if !errors.As(err, &inputErr) || !strings.Contains(inputErr.Reason, "the host holds a port") {
+			t.Errorf("%q: got %v, want the host-holds-a-port reason", raw, err)
+		}
+	}
+	for _, raw := range []string{"socks5://[::1]:1080", "socks5://u:p@[fe80::1%25en0]:1080", "http://[2001:db8::1]:3128"} {
+		if _, err := buildProxy(ProxyInput{URL: strPtr(raw)}, nil); err != nil {
+			t.Errorf("%q: %v, want an IPv6 proxy accepted", raw, err)
+		}
+	}
+}

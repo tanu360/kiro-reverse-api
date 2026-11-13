@@ -120,6 +120,15 @@ func upstreamErrorText(err error) string {
 	return err.Error()
 }
 
+// poolAwareStatus is fallback, or 503 for a request that failed at its pool
+// proxy or found none, as upstreamFailureStatus answers on the chat paths.
+func poolAwareStatus(err error, fallback int) int {
+	if proxypool.IsProxyError(err) {
+		return http.StatusServiceUnavailable
+	}
+	return fallback
+}
+
 // startProxyPool loads the saved pool state and starts the periodic health check.
 func startProxyPool() {
 	proxypool.Default().Load()
