@@ -86,7 +86,7 @@ describe("AddAccountDialog in re-login mode", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Sign in again" });
     expect(
-      within(dialog).getByText(`Signing ${account.email} in again.`, { exact: false }),
+      within(dialog).getByText(`Sign in again as ${account.email}.`, { exact: false }),
     ).toBeInTheDocument();
     const rail = within(dialog).getByRole("navigation", { name: "Method" });
     expect(within(rail).getByRole("button", { name: "AWS Builder ID" })).toHaveAttribute(
@@ -112,7 +112,7 @@ describe("AddAccountDialog in re-login mode", () => {
     // One key, so the field says so: no "Kiro API keys" or "One per line".
     expect(screen.queryByRole("textbox", { name: "Kiro API keys" })).not.toBeInTheDocument();
     expect(screen.queryByText(/One per line/)).not.toBeInTheDocument();
-    expect(screen.getByText("Sign this account in again with Kiro API key.")).toBeInTheDocument();
+    expect(screen.getByText("Sign in again with Kiro API key.")).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Kiro API key" }), "ksk_fresh");
     await user.click(screen.getByRole("button", { name: "Sign in again" }));
     await waitFor(() => expect(imports.count).toBe(1));
@@ -185,11 +185,11 @@ describe("AddAccountDialog in re-login mode", () => {
     await submitCredentials(user, OTHER_USER);
 
     const ask = await screen.findByRole("alertdialog", {
-      name: "Replace the account's identity?",
+      name: "Switch this account to another user?",
     });
     expect(within(ask).getByText(/someone\.else@northwind-labs\.dev/)).toBeInTheDocument();
     expect(within(ask).getByText(new RegExp(account.email.replace(/\./g, "\\.")))).toBeTruthy();
-    await user.click(within(ask).getByRole("button", { name: "Replace identity" }));
+    await user.click(within(ask).getByRole("button", { name: "Switch user" }));
 
     await expectClosed();
     expect(confirms.count).toBe(1);
@@ -224,7 +224,7 @@ describe("AddAccountDialog in re-login mode", () => {
     );
     await submitCredentials(user, OTHER_USER);
 
-    await expectToast(/^This sign-in is te\S+@\S+, another account in the pool\./);
+    await expectToast(/^This sign-in belongs to te\S+@\S+, another account in the pool\./);
     expect(screen.queryByText(/teammate@northwind-labs\.dev/)).not.toBeInTheDocument();
     await expectToast(/now uses the new sign-in\.$/);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
@@ -239,13 +239,13 @@ describe("AddAccountDialog in re-login mode", () => {
     await submitCredentials(user, OTHER_USER);
 
     const ask = await screen.findByRole("alertdialog", {
-      name: "Replace the account's identity?",
+      name: "Switch this account to another user?",
     });
     await user.click(within(ask).getByRole("button", { name: "Cancel" }));
 
     await waitFor(() => expect(discards.count).toBe(1));
     expect(confirms.count).toBe(0);
-    await expectToast("The account stays as it was. The new sign-in was discarded.");
+    await expectToast("Nothing changed. The new sign-in was discarded.");
     expect(mockDb.accounts.find((item) => item.id === account.id)?.email).toBe(account.email);
     // The re-login dialog stays open for another try.
     expect(screen.getByRole("dialog", { name: "Sign in again" })).toBeInTheDocument();

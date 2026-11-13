@@ -78,7 +78,9 @@ describe("AccountHealNotices", () => {
     emit("halted:5");
 
     expect(
-      await screen.findByText("Self-heal stopped: accounts keep failing after a heal. Check them."),
+      await screen.findByText(
+        "Self-heal stopped because accounts keep failing after each heal. Check the accounts.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open settings" })).toBeInTheDocument();
     expect(warning).toHaveBeenCalledWith(

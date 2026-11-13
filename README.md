@@ -447,7 +447,7 @@ For users in restricted network regions, configure an outbound proxy in the admi
 
 **Settings → Proxy pool** spreads accounts that have no proxy of their own over a list of up to 100 proxies (`http`, `https`, `socks5` or `socks5h`). Each account keeps the proxy it gets, and new accounts go to the healthy proxy with the fewest accounts. A proxy that fails to connect hands its accounts to a healthy one at once; a proxy failure never bans an account or cools it down. Health checks run every 10 minutes by default, and token refreshes take the same route as the account's requests.
 
-The order is: the account's own proxy, the pool, the global proxy, then direct. When no pool proxy is healthy, requests get HTTP 503 `no healthy outbound proxy in the pool`, unless **Fall back to direct** is on: then they use the global proxy, or go direct when none is set.
+The order is: the account's own proxy, the pool, the global proxy, then direct. When no pool proxy is healthy, requests get HTTP 503 `no healthy outbound proxy in the pool`, unless **Fall back when no proxy is healthy** is on: then they use the global proxy, or go direct when none is set.
 
 ---
 

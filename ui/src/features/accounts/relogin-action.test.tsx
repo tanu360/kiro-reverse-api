@@ -86,7 +86,9 @@ describe("Sign in again", () => {
       within(dialog).getByRole("heading", { name: "IAM Identity Center (Enterprise SSO)" }),
     ).toBeVisible();
     expect(
-      within(dialog).getByText(new RegExp(`Signing ${DANA_MASKED.replace(/[.*]/g, "\\$&")}`)),
+      within(dialog).getByText(
+        new RegExp(`Sign in again as ${DANA_MASKED.replace(/[.*]/g, "\\$&")}`),
+      ),
     ).toBeInTheDocument();
     expect(within(dialog).queryByText(DANA)).not.toBeInTheDocument();
   });

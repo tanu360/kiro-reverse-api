@@ -57,8 +57,8 @@ describe("LogRetentionCard", () => {
     expect(days).not.toBeDisabled();
     expect(save).toHaveAttribute("aria-disabled", "true");
     expect(card).toHaveTextContent("Between 1 and 3650.");
-    expect(card).toHaveTextContent("Last cleanup 3 hours ago · 449 entries removed · Oldest entry");
-    expect(card).toHaveTextContent("18,240 removed requests still counted in totals");
+    expect(card).toHaveTextContent("Last cleanup 3 hours ago · 449 entries deleted · Oldest entry");
+    expect(card).toHaveTextContent("18,240 deleted requests still counted in totals");
   });
 
   it("says when no cleanup ran yet", async () => {
@@ -66,7 +66,7 @@ describe("LogRetentionCard", () => {
     mockDb.logRetention.archivedRequests = 1;
     const { card } = await renderCard();
     expect(card).toHaveTextContent("No cleanup since the server started · Oldest entry");
-    expect(card).toHaveTextContent("1 removed request still counted in totals");
+    expect(card).toHaveTextContent("1 deleted request still counted in totals");
     expect(card).not.toHaveTextContent("Last cleanup");
   });
 

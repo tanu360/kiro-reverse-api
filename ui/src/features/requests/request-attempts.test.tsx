@@ -66,10 +66,10 @@ describe("AttemptsCard", () => {
     expect(first).toHaveTextContent("Upstream error 500");
     expect(first).toHaveTextContent(ms(812));
     expect(first).toHaveTextContent("Retried on the same account");
-    expect(first).not.toHaveTextContent("Failed over");
+    expect(first).not.toHaveTextContent("Moved to another account");
 
     expect(second).toHaveTextContent(`at +${ms(920)}`);
-    expect(second).toHaveTextContent("Failed over to another account");
+    expect(second).toHaveTextContent("Moved to another account");
     expect(second).not.toHaveTextContent("Retried");
 
     expect(third).toHaveTextContent("second.account@example.com");
@@ -88,11 +88,11 @@ describe("AttemptsCard", () => {
 
     // 2 kept plus 5 left out.
     expect(within(screen.getByRole("region", { name: "Attempts" })).getByText("7")).toBeVisible();
-    expect(screen.getByText("5 earlier attempts not kept")).toBeInTheDocument();
+    expect(screen.getByText("5 earlier attempts not recorded")).toBeInTheDocument();
     const list = screen.getByRole("list");
     const rows = within(list).getAllByRole("listitem");
     expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveTextContent("5 earlier attempts not kept");
+    expect(rows[1]).toHaveTextContent("5 earlier attempts not recorded");
   });
 
   it("flags output that had already started", () => {
@@ -105,7 +105,7 @@ describe("AttemptsCard", () => {
     );
     const [only] = attemptItems();
     expect(only).toHaveTextContent("Stream interrupted");
-    expect(only).toHaveTextContent("Broke after output started");
+    expect(only).toHaveTextContent("Failed after the reply started");
     expect(only).not.toHaveTextContent("Retried");
   });
 
@@ -121,7 +121,7 @@ describe("AttemptsCard", () => {
     );
     const [first, second] = attemptItems();
     expect(first).not.toHaveTextContent("Retried");
-    expect(first).not.toHaveTextContent("Failed over");
+    expect(first).not.toHaveTextContent("Moved to another account");
     expect(second).toHaveTextContent("Web search");
   });
 

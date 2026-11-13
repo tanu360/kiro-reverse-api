@@ -75,7 +75,7 @@ async function card(): Promise<HTMLElement> {
   return screen.findByRole("region", { name: "Usage by key" });
 }
 
-/** The row names in list order (the open buttons carry "View usage of …"). */
+/** The row names in list order (the open buttons carry "View usage for …"). */
 async function rowNames(region: HTMLElement): Promise<string[]> {
   const list = await within(region).findByRole("list", { name: "API keys by usage" });
   return within(list)
@@ -105,18 +105,18 @@ describe("KeyUsageCard", () => {
     const region = await card();
 
     expect(await rowNames(region)).toEqual([
-      "View usage of alpha",
-      "View usage of gamma",
-      "View usage of beta",
+      "View usage for alpha",
+      "View usage for gamma",
+      "View usage for beta",
     ]);
     expect(within(region).getByText("24 requests")).toBeInTheDocument();
     expect(within(region).getByText("2 failed")).toBeInTheDocument();
 
     await user.click(within(region).getByRole("radio", { name: "Credits" }));
     expect(await rowNames(region)).toEqual([
-      "View usage of beta",
-      "View usage of gamma",
-      "View usage of alpha",
+      "View usage for beta",
+      "View usage for gamma",
+      "View usage for alpha",
     ]);
     expect(within(region).getByText("4.75 credits")).toBeInTheDocument();
     expect(within(region).getByText("3.25")).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe("KeyUsageCard", () => {
     renderWithProviders(<KeyUsageCard />);
     const names = await rowNames(await card());
     expect(names).toHaveLength(6);
-    expect(names[4]).toBe("View usage of key-e");
+    expect(names[4]).toBe("View usage for key-e");
     expect(names[5]).toContain("2 other keys");
   });
 
@@ -146,11 +146,11 @@ describe("KeyUsageCard", () => {
     renderWithProviders(<KeyUsageCard />);
     const region = await card();
     expect(await rowNames(region)).toEqual([
-      "View usage of No API key",
-      "View usage of Invalid keys",
-      "View usage of Deleted key",
+      "View usage for No API key",
+      "View usage for Invalid keys",
+      "View usage for Deleted key",
       // An unnamed key goes by its masked value.
-      "View usage of sk-unn****5678",
+      "View usage for sk-unn****5678",
     ]);
     // Two deleted keys differ only in their masked values: the name is cut, never the key.
     const deletedKey = within(region).getByText("sk-del****1234");
@@ -173,7 +173,7 @@ describe("KeyUsageCard", () => {
     renderWithProviders(<KeyUsageCard />);
     const region = await card();
     expect(
-      await within(region).findByText(/Require an API key is on, so the proxy rejects/),
+      await within(region).findByText(/were rejected because Require an API key is on/),
     ).toBeInTheDocument();
     expect(within(region).queryByText(/Turn on Require an API key/)).toBeNull();
   });
@@ -182,14 +182,14 @@ describe("KeyUsageCard", () => {
     served = usage([entry("a", "key", { requests: 1 }, { name: "ci bob@example.com" })]);
     renderWithProviders(<KeyUsageCard />, { privacy: true });
     const region = await card();
-    expect(await rowNames(region)).toEqual(["View usage of ci bo***@ex***.com"]);
+    expect(await rowNames(region)).toEqual(["View usage for ci bo***@ex***.com"]);
     expect(region.textContent).not.toContain("bob@example.com");
   });
 
   it("shows email key names in full with privacy off", async () => {
     served = usage([entry("a", "key", { requests: 1 }, { name: "ci bob@example.com" })]);
     renderWithProviders(<KeyUsageCard />, { privacy: false });
-    expect(await rowNames(await card())).toEqual(["View usage of ci bob@example.com"]);
+    expect(await rowNames(await card())).toEqual(["View usage for ci bob@example.com"]);
   });
 
   it("refetches with range=7d", async () => {
@@ -225,7 +225,7 @@ describe("KeyUsageCard", () => {
     ]);
     const { user } = renderWithProviders(<KeyUsageCard />);
     const region = await card();
-    await user.click(await within(region).findByRole("button", { name: "View usage of alpha" }));
+    await user.click(await within(region).findByRole("button", { name: "View usage for alpha" }));
     const sheet = await screen.findByRole("dialog", { name: "alpha" });
     expect(within(sheet).getByText("sk-alp****0001")).toBeInTheDocument();
     expect(ranges).toEqual(["24h"]);

@@ -70,7 +70,7 @@ describe("RequestDetailSheet attempts", () => {
     const dialog = await screen.findByRole("dialog");
     const card = within(dialog).getByRole("region", { name: "Attempts" });
     expect(within(card).getAllByRole("listitem")).toHaveLength(2);
-    expect(card).toHaveTextContent("Failed over to another account");
+    expect(card).toHaveTextContent("Moved to another account");
   });
 
   it("leaves the card out for a row logged before the chain existed", async () => {

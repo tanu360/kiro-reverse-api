@@ -156,7 +156,7 @@ describe("AlertsCard", () => {
     await user.click(screen.getByRole("button", { name: "Edit Receiver" }));
     dialog = await screen.findByRole("dialog", { name: "Edit channel" });
     const secret = within(dialog).getByLabelText("Signing secret");
-    expect(secret).toHaveAttribute("placeholder", "Saved. Leave blank to keep it.");
+    expect(secret).toHaveAttribute("placeholder", "Saved. Leave empty to keep it.");
     recorded = [];
     await user.click(within(dialog).getByRole("checkbox", { name: "Remove the saved secret" }));
     expect(secret).toBeDisabled();

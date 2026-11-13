@@ -39,7 +39,7 @@ describe("BatchTagDialog", () => {
     const [first, second] = mockDb.accounts;
     const ids = [first.id, second.id];
     const { user, onDone } = renderDialog(ids);
-    const dialog = await screen.findByRole("dialog", { name: "Tag 2 accounts" });
+    const dialog = await screen.findByRole("dialog", { name: "Edit tags for 2 accounts" });
     const input = within(dialog).getByRole("textbox", { name: "Tag" });
     await waitFor(() => expect(input).toHaveFocus());
 
@@ -60,7 +60,7 @@ describe("BatchTagDialog", () => {
     const [first] = mockDb.accounts;
     first.tags = ["team-a"];
     const { user } = renderDialog([first.id]);
-    const dialog = await screen.findByRole("dialog", { name: "Tag 1 account" });
+    const dialog = await screen.findByRole("dialog", { name: "Edit tags for 1 account" });
     const picks = within(dialog).getByRole("group", { name: "Tags in use" });
     await user.click(within(picks).getByRole("button", { name: "team-a" }));
     expect(within(dialog).getByRole("textbox", { name: "Tag" })).toHaveValue("team-a");
@@ -71,7 +71,7 @@ describe("BatchTagDialog", () => {
     const [first] = mockDb.accounts;
     first.tags = ["ops@example.com"];
     const { user } = renderDialog([first.id]);
-    const dialog = await screen.findByRole("dialog", { name: "Tag 1 account" });
+    const dialog = await screen.findByRole("dialog", { name: "Edit tags for 1 account" });
     const picks = within(dialog).getByRole("group", { name: "Tags in use" });
     await user.click(within(picks).getByRole("button", { name: /^op\S+@\S+\.com$/ }));
     const input = within(dialog).getByRole("textbox", { name: "Tag" });
@@ -86,7 +86,7 @@ describe("BatchTagDialog", () => {
     const [first] = mockDb.accounts;
     first.tags = ["ops@example.com"];
     const view = renderDialog([first.id]);
-    const dialog = await screen.findByRole("dialog", { name: "Tag 1 account" });
+    const dialog = await screen.findByRole("dialog", { name: "Edit tags for 1 account" });
     const picks = within(dialog).getByRole("group", { name: "Tags in use" });
     await view.user.click(within(picks).getByRole("button", { name: /^op\S+@\S+\.com$/ }));
     const input = within(dialog).getByRole("textbox", { name: "Tag" }) as HTMLInputElement;
