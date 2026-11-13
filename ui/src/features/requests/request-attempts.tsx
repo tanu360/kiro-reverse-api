@@ -8,6 +8,7 @@ import { EMPTY, formatDurationMs, formatNumber } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { ErrorTypeLabel } from "./error-type-badge";
+import { attemptProxyText } from "./proxy-failure";
 
 /** The endpoint an MCP web search attempt reports; it never reaches a Kiro chat endpoint. */
 const WEB_SEARCH = "web_search";
@@ -17,8 +18,9 @@ const WEB_SEARCH = "web_search";
  * dot on a hairline rail, then the account and the attempt's duration, then the Kiro endpoint,
  * when it started and its result. A failure adds its error text (emails masked under privacy
  * mode) and what came next: another account (failover), the same account again, or nothing
- * because output had already started. Rows logged before the chain existed have none, and the
- * card is not drawn.
+ * because output had already started. A failure at an outbound proxy is worded from its code,
+ * in the viewer's language, never with Go's text. Rows logged before the chain existed have none,
+ * and the card is not drawn.
  */
 export function AttemptsCard({ attempts }: { attempts?: RequestAttempt[] }): JSX.Element | null {
   const { t, lang } = useT("requests");
@@ -63,7 +65,11 @@ function AttemptItem({
 }): JSX.Element {
   const { t, lang } = useT("requests");
   const maskText = useMaskText();
-  const message = attempt.success ? "" : maskText(attempt.message);
+  const message = attempt.success
+    ? ""
+    : attempt.proxy
+      ? attemptProxyText(attempt.proxy, t)
+      : maskText(attempt.message);
   const notes = attemptNotes(attempt, next, t);
   return (
     <li className="group flex gap-3" data-success={attempt.success} data-testid="request-attempt">

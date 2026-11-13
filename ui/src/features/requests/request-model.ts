@@ -23,6 +23,7 @@ const ERROR_TYPES: readonly RequestErrorType[] = [
   "quota",
   "suspended",
   "profile",
+  "proxy",
   "auth",
   "stream",
   "no_accounts",
@@ -43,6 +44,7 @@ const MUTED_TYPES: ReadonlySet<string> = new Set([
   "api_key_limit",
 ]);
 const WARNING_TYPES: ReadonlySet<string> = new Set([
+  "proxy",
   "stream",
   "timeout",
   "rate_limit",

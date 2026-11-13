@@ -661,6 +661,7 @@ const FAILURES: Record<RequestErrorType, { status: number; message: string }> = 
   quota: { status: 429, message: "monthly credits exhausted for {email}" },
   suspended: { status: 403, message: "TEMPORARILY_SUSPENDED: account {email} is suspended" },
   profile: { status: 400, message: "Kiro profile could not be resolved for this account" },
+  proxy: { status: 503, message: "outbound proxy failed: connection refused or reset" },
   auth: { status: 401, message: "upstream rejected the access token for {email} (401)" },
   stream: { status: 502, message: "stream ended before message_stop" },
   no_accounts: { status: 503, message: "no available accounts" },

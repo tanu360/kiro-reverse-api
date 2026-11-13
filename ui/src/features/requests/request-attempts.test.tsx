@@ -138,6 +138,56 @@ describe("AttemptsCard", () => {
     );
   });
 
+  it("words a failure at a proxy from its code, never with Go's text", () => {
+    const raw =
+      'Post "https://q.us-east-1.amazonaws.com/generateAssistantResponse": proxyconnect tcp: dial tcp 127.0.0.1:9: connect: connection refused';
+    const failed = { ...FAILOVER_CHAIN[0], status: undefined, errorType: "proxy" as const };
+    renderWithProviders(
+      <AttemptsCard
+        attempts={[
+          {
+            ...failed,
+            message: raw,
+            proxy: { source: "account", code: "connect" },
+            failover: true,
+          },
+          {
+            ...failed,
+            accountId: "acc-2",
+            message: "outbound proxy failed: proxy refused the tunnel",
+            proxy: { source: "global", code: "tunnel", status: 403 },
+            failover: true,
+          },
+          {
+            ...failed,
+            accountId: "acc-3",
+            message: "outbound proxy failed: connection timed out",
+            proxy: { code: "timeout" },
+            failover: true,
+          },
+          {
+            ...failed,
+            accountId: "acc-4",
+            message: "no healthy outbound proxy in the pool",
+            proxy: { source: "pool", code: "no_healthy" },
+          },
+        ]}
+      />,
+    );
+    const [own, global, old, none] = attemptItems();
+    expect(own).toHaveTextContent("Proxy error");
+    expect(own).toHaveTextContent(
+      "Could not connect through the account's proxy. The proxy refused the connection.",
+    );
+    expect(own).not.toHaveTextContent("proxyconnect");
+    expect(own).not.toHaveTextContent("amazonaws");
+    expect(global).toHaveTextContent(
+      "Could not connect through the global proxy. The proxy answered with HTTP 403.",
+    );
+    expect(old).toHaveTextContent("Could not connect through the proxy. Connection timed out.");
+    expect(none).toHaveTextContent("No pool proxy was healthy.");
+  });
+
   it("draws nothing for a row without attempts", () => {
     const { container } = renderWithProviders(<AttemptsCard attempts={undefined} />);
     expect(container.querySelector("[data-slot='section-card']")).toBeNull();

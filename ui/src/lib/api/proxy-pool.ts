@@ -6,13 +6,19 @@ import type { SuccessResponse } from "./types";
 /** `unknown` until the first check or connection. */
 export type PoolProxyStatus = "unknown" | "ok" | "failed";
 
-/** Times are Unix milliseconds; lastError is redacted English from the server. */
+/**
+ * Times are Unix milliseconds; lastError is redacted English from the server. errorCode names the
+ * last failure (connect, timeout, dns, tls, auth, tunnel, socks) and errorStatus is the proxy's
+ * answer to CONNECT when it refused one; both are absent from servers before them.
+ */
 export interface PoolProxyHealth {
   status: PoolProxyStatus;
   checkedAt?: number;
   failedAt?: number;
   latencyMs?: number;
   lastError?: string;
+  errorCode?: string;
+  errorStatus?: number;
 }
 
 /** A pool proxy as the server shows it: the password is never sent, only whether one is set. */

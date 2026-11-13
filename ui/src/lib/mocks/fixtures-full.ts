@@ -1207,6 +1207,14 @@ const FAILURES: Record<RequestErrorType, readonly FailureTemplate[]> = {
   profile: [
     { status: 403, message: "no available Kiro profile for {email} in {region}", routed: true },
   ],
+  proxy: [
+    {
+      status: 503,
+      message: "outbound proxy failed: connection refused or reset",
+      routed: true,
+    },
+    { status: 503, message: "no healthy outbound proxy in the pool", routed: true },
+  ],
   auth: [
     { status: 401, message: "HTTP 401: access token expired for {email}", routed: true },
     {

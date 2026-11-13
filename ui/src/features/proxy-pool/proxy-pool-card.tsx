@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { SECTION_ID } from "@/features/settings/sections/sections";
 import { SectionQuery, SettingsGroup } from "@/features/settings/sections/settings-section";
 import {
@@ -40,6 +41,7 @@ import { formatDuration, formatDurationMs } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
+import { proxyFailureSentence } from "./lib/pool-failure";
 import { intervalOptions, poolErrorMessage, proxyName, statusLook } from "./lib/pool-model";
 import { ProxyEditor } from "./proxy-pool-editor";
 
@@ -157,7 +159,10 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       if (checked.health.status === "ok") {
         toast.success(t("card.testOk", { name }));
       } else {
-        toast.error(t("card.testFailed", { name, error: mask(checked.health.lastError) }));
+        const { errorCode, errorStatus } = checked.health;
+        toast.error(
+          t("card.testFailed", { name, error: proxyFailureSentence(errorCode, errorStatus, t) }),
+        );
       }
     } catch (error) {
       toast.error(poolErrorMessage(error, t));
@@ -309,7 +314,7 @@ function ProxyRow({
   const { t, lang } = useT("proxy-pool");
   const mask = useMaskText();
   const look = statusLook(proxy.health.status);
-  const { checkedAt, latencyMs, lastError } = proxy.health;
+  const { checkedAt, latencyMs, lastError, errorCode, errorStatus } = proxy.health;
   return (
     <SettingsRow
       control={
@@ -370,8 +375,14 @@ function ProxyRow({
       }
     >
       {proxy.health.status === "failed" && lastError ? (
+        // A short sentence in the viewer's language; the server's own text in the tooltip.
         <p className="wrap-anywhere text-destructive-foreground text-xs">
-          {t("card.lastError", { error: mask(lastError) })}
+          <Tooltip>
+            <TooltipTrigger render={<span />}>
+              {t("card.lastError", { error: proxyFailureSentence(errorCode, errorStatus, t) })}
+            </TooltipTrigger>
+            <TooltipPopup>{mask(lastError)}</TooltipPopup>
+          </Tooltip>
         </p>
       ) : null}
     </SettingsRow>
