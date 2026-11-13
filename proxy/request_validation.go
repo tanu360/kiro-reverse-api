@@ -37,6 +37,21 @@ func validateOpenAIMessageRoles(messages []OpenAIMessage) string {
 	return ""
 }
 
+// defaultClaudeMaxTokens fills a missing max_tokens with the model's maximum output instead of
+// refusing the request, which the Messages API would do. JSON cannot tell an absent max_tokens
+// from 0, so 0 is filled too. It runs before the thinking budget check, which then compares
+// against the filled value. A negative max_tokens is the client's mistake.
+func defaultClaudeMaxTokens(req *ClaudeRequest) string {
+	if req.MaxTokens < 0 {
+		return "max_tokens must be at least 1"
+	}
+	if req.MaxTokens == 0 {
+		req.MaxTokens = modelMaxOutputTokens(req.Model)
+		req.maxTokensDefaulted = true
+	}
+	return ""
+}
+
 // validateClaudeCountTokensShape is the part of the Messages checks that count_tokens shares:
 // it needs messages with known roles, but no max_tokens and no final user turn.
 func validateClaudeCountTokensShape(req *ClaudeRequest) string {

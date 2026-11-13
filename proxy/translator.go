@@ -117,6 +117,9 @@ type ClaudeRequest struct {
 
 	// interleavedThinking is set when the client sent the interleaved-thinking beta for a model that has it.
 	interleavedThinking bool
+	// maxTokensDefaulted is set when the client sent no max_tokens and MaxTokens holds the model's
+	// maximum output; see defaultClaudeMaxTokens.
+	maxTokensDefaulted bool
 }
 
 type ClaudeThinkingConfig struct {
@@ -336,9 +339,16 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 		payload.ConversationState.History = history
 	}
 
-	if req.MaxTokens > 0 || req.Temperature > 0 || req.TopP > 0 {
+	//! A max_tokens the proxy filled in is not the client's limit. Kiro stops at the model's
+	//! maximum by itself, and the output limiter counts with an estimate that could cut the
+	//! reply short of it, so the payload carries no limit, as before max_tokens was checked.
+	maxTokens := req.MaxTokens
+	if req.maxTokensDefaulted {
+		maxTokens = 0
+	}
+	if maxTokens > 0 || req.Temperature > 0 || req.TopP > 0 {
 		payload.InferenceConfig = &InferenceConfig{
-			MaxTokens:   req.MaxTokens,
+			MaxTokens:   maxTokens,
 			Temperature: req.Temperature,
 			TopP:        req.TopP,
 		}
