@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"kiro-proxy/textfmt"
 )
 
 // Client API key access: the account allowlist, the successful-call limit and
@@ -168,10 +170,11 @@ func validateApiKeyCallLimit(limit int64) error {
 // callLimitError is the 429 text for a key out of calls. In-progress calls are
 // named only when they, not finished ones, fill the limit.
 func callLimitError(limit, used, pending int64) error {
+	calls := textfmt.Count(int(limit), "successful call", "successful calls")
 	if pending > 0 && used < limit {
-		return fmt.Errorf("%w: %d of %d successful calls used, %d more in progress", ErrApiKeyCallLimitExceeded, used, limit, pending)
+		return fmt.Errorf("%w: %d of %s used, %d more in progress", ErrApiKeyCallLimitExceeded, used, calls, pending)
 	}
-	return fmt.Errorf("%w: %d of %d successful calls used", ErrApiKeyCallLimitExceeded, used, limit)
+	return fmt.Errorf("%w: %d of %s used", ErrApiKeyCallLimitExceeded, used, calls)
 }
 
 // ApiKeyCallLimitError reports a key that has used up its call limit, or nil.

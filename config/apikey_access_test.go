@@ -312,3 +312,16 @@ func TestApiKeyAccountIDsUseCredentialsStore(t *testing.T) {
 		t.Fatalf("update on a credentials-store install: %v", err)
 	}
 }
+
+// A call limit of 1 reads "1 of 1 successful call used", not "calls".
+func TestCallLimitErrorCountsInPlainEnglish(t *testing.T) {
+	if got, want := callLimitError(1, 1, 0).Error(), "API key call limit reached: 1 of 1 successful call used"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got, want := callLimitError(1, 0, 1).Error(), "API key call limit reached: 0 of 1 successful call used, 1 more in progress"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got, want := callLimitError(3, 3, 0).Error(), "API key call limit reached: 3 of 3 successful calls used"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
