@@ -201,32 +201,138 @@ func TestPriorityModeReturnsNilWhenNoneAvailable(t *testing.T) {
 	}
 }
 
-// Session affinity wins over priority: a running conversation stays on its
-// account while that account can serve, and only falls to the top account once
-// it cannot.
-func TestPriorityModeAffinityKeepsBoundAccount(t *testing.T) {
+// Priority wins over session affinity: a running conversation leaves its
+// account as soon as an account with a better (lower) priority can serve, and
+// falls to the next account in priority order when its own cannot.
+func TestPriorityModeBoundConversationReturnsToHigherPriority(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	p := newTestPool(
 		config.Account{ID: "a", Priority: 2},
 		config.Account{ID: "b", Priority: 0},
 		config.Account{ID: "c", Priority: 1},
 	)
+	// The conversation landed on a while b and c were cooling down.
+	p.cooldowns["b"] = time.Now().Add(time.Minute)
+	p.cooldowns["c"] = time.Now().Add(time.Minute)
+	if acc := p.GetPreferredForModelExcluding("a", "", nil); acc == nil || acc.ID != "a" {
+		t.Fatalf("bound pick with b and c cooling = %v, want a", acc)
+	}
+
+	// c is free again: the conversation moves up to c, b still cooling.
+	p.RecordSuccess("c")
+	if acc := p.GetPreferredForModelExcluding("a", "", nil); acc == nil || acc.ID != "c" {
+		t.Fatalf("bound pick with c free again = %v, want c", acc)
+	}
+
+	// b is free again: a conversation bound to a or to c moves to b.
+	p.RecordSuccess("b")
+	for _, bound := range []string{"a", "c"} {
+		if acc := p.GetPreferredForModelExcluding(bound, "", nil); acc == nil || acc.ID != "b" {
+			t.Fatalf("pick bound to %s with b free again = %v, want b", bound, acc)
+		}
+	}
+	// The top account keeps its own conversations, and a new conversation goes there too.
+	for _, bound := range []string{"b", ""} {
+		if acc := p.GetPreferredForModelExcluding(bound, "", nil); acc == nil || acc.ID != "b" {
+			t.Fatalf("pick bound to %q = %v, want b", bound, acc)
+		}
+	}
+
+	// The bound account cannot serve: the best one left takes over.
+	p.cooldowns["a"] = time.Now().Add(time.Minute)
+	if acc := p.GetPreferredForModelExcluding("a", "", map[string]bool{"b": true}); acc == nil || acc.ID != "c" {
+		t.Fatalf("pick with a cooling and b excluded = %v, want c", acc)
+	}
+}
+
+// An account of the same priority never pulls a conversation away: the bound
+// account already holds its prompt cache.
+func TestPriorityModeBoundConversationStaysOnEqualPriority(t *testing.T) {
+	useRoutingMode(t, config.RoutingModePriority)
+	p := newTestPool(
+		config.Account{ID: "a", Priority: 1},
+		config.Account{ID: "b", Priority: 1},
+		config.Account{ID: "c", Priority: 3},
+	)
+	for i := 0; i < 3; i++ {
+		if acc := p.GetPreferredForModelExcluding("b", "", nil); acc == nil || acc.ID != "b" {
+			t.Fatalf("bound pick %d = %v, want b (a has the same priority and comes first in the list)", i, acc)
+		}
+	}
+	// Every account at the default 0.
+	p = newTestPool(config.Account{ID: "x"}, config.Account{ID: "y"})
+	if acc := p.GetPreferredForModelExcluding("y", "", nil); acc == nil || acc.ID != "y" {
+		t.Fatalf("bound pick with equal default priorities = %v, want y", acc)
+	}
+}
+
+// A higher-priority account that cannot take this request leaves the
+// conversation where it is.
+func TestPriorityModeBoundConversationStaysWhenHigherCannotServe(t *testing.T) {
+	newPool := func() *AccountPool {
+		return newTestPool(
+			config.Account{ID: "top", Priority: 0},
+			config.Account{ID: "bound", Priority: 5},
+		)
+	}
+	wantBound := func(t *testing.T, acc *config.Account, why string) {
+		t.Helper()
+		if acc == nil || acc.ID != "bound" {
+			t.Fatalf("%s: pick = %v, want bound", why, acc)
+		}
+	}
+
+	t.Run("cooling down", func(t *testing.T) {
+		useRoutingMode(t, config.RoutingModePriority)
+		p := newPool()
+		p.cooldowns["top"] = time.Now().Add(time.Minute)
+		wantBound(t, p.GetPreferredForModelExcluding("bound", "", nil), "top cooling down")
+	})
+	t.Run("excluded", func(t *testing.T) {
+		useRoutingMode(t, config.RoutingModePriority)
+		p := newPool()
+		wantBound(t, p.GetPreferredForModelExcluding("bound", "", map[string]bool{"top": true}), "top excluded")
+	})
+	t.Run("not allowed for the key", func(t *testing.T) {
+		useRoutingMode(t, config.RoutingModePriority)
+		p := newPool()
+		wantBound(t, p.GetPreferredForModelAllowed("bound", "", nil, map[string]bool{"bound": true}), "top outside the key's accounts")
+		// The same key with top in its list does move.
+		if acc := p.GetPreferredForModelAllowed("bound", "", nil, map[string]bool{"bound": true, "top": true}); acc == nil || acc.ID != "top" {
+			t.Fatalf("key allowed both: pick = %v, want top", acc)
+		}
+	})
+	t.Run("model not served", func(t *testing.T) {
+		useRoutingMode(t, config.RoutingModePriority)
+		p := newPool()
+		p.SetModelList("top", []string{"claude-haiku-4.5"})
+		wantBound(t, p.GetPreferredForModelExcluding("bound", "claude-opus-4.6", nil), "top lacks the model")
+	})
+	t.Run("at its RPM limit", func(t *testing.T) {
+		setRPMLimitForTest(t, 1)
+		if err := config.UpdateRoutingMode(config.RoutingModePriority); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = config.UpdateRoutingMode(config.RoutingModeWeighted) })
+		p := newPool()
+		if acc := p.GetNext(); acc == nil || acc.ID != "top" {
+			t.Fatalf("setup pick = %v, want top", acc)
+		}
+		wantBound(t, p.GetPreferredForModelExcluding("bound", "", nil), "top at its RPM limit")
+	})
+}
+
+// Weighted mode keeps every conversation on its account, whatever the priorities.
+func TestWeightedModeBoundConversationIgnoresPriority(t *testing.T) {
+	useRoutingMode(t, config.RoutingModeWeighted)
+	p := newTestPool(
+		config.Account{ID: "a", Priority: 2},
+		config.Account{ID: "b", Priority: 0},
+	)
 	for i := 0; i < 3; i++ {
 		if acc := p.GetPreferredForModelExcluding("a", "", nil); acc == nil || acc.ID != "a" {
 			t.Fatalf("bound pick %d = %v, want a", i, acc)
 		}
-	}
-	// A new conversation (no binding) still goes to the top account.
-	if acc := p.GetPreferredForModelExcluding("", "", nil); acc == nil || acc.ID != "b" {
-		t.Fatalf("unbound pick = %v, want b", acc)
-	}
-
-	p.cooldowns["a"] = time.Now().Add(time.Minute)
-	if acc := p.GetPreferredForModelExcluding("a", "", nil); acc == nil || acc.ID != "b" {
-		t.Fatalf("pick with the bound account cooling down = %v, want b", acc)
-	}
-	if acc := p.GetPreferredForModelExcluding("a", "", map[string]bool{"b": true}); acc == nil || acc.ID != "c" {
-		t.Fatalf("pick with a cooling and b excluded = %v, want c", acc)
 	}
 }
 

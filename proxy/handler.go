@@ -84,8 +84,8 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 	if len(req.Messages) == 0 {
 		return "messages must not be empty"
 	}
-	if req.MaxTokens <= 0 {
-		return "max_tokens is required and must be at least 1"
+	if msg := defaultClaudeMaxTokens(req); msg != "" {
+		return msg
 	}
 	if msg := validateClaudeMessageRoles(req.Messages); msg != "" {
 		return msg

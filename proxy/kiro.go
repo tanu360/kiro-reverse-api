@@ -901,6 +901,32 @@ func recordUpstreamContextWindows(models []ModelInfo) {
 	}
 }
 
+// upstreamMaxOutputTokens maps lowercase Kiro model IDs to the maxOutputTokens
+// ListAvailableModels reported for them.
+var upstreamMaxOutputTokens sync.Map
+
+// defaultMaxOutputTokens is a model's output maximum when Kiro has not
+// reported one: 64K, what the current Claude Sonnet, Haiku and Opus allow.
+const defaultMaxOutputTokens = 64000
+
+func recordUpstreamMaxOutputTokens(models []ModelInfo) {
+	for _, m := range models {
+		if m.TokenLimits != nil && m.TokenLimits.MaxOutputTokens > 0 {
+			upstreamMaxOutputTokens.Store(strings.ToLower(m.ModelId), m.TokenLimits.MaxOutputTokens)
+		}
+	}
+}
+
+// modelMaxOutputTokens is the most output the client's model name can write:
+// the maxOutputTokens Kiro reported for the model it maps to, else
+// defaultMaxOutputTokens.
+func modelMaxOutputTokens(model string) int {
+	if n, ok := upstreamMaxOutputTokens.Load(strings.ToLower(MapModel(model))); ok {
+		return n.(int)
+	}
+	return defaultMaxOutputTokens
+}
+
 func getContextWindowSize(model string) int {
 	//! contextUsagePercentage is measured against the window upstream reports, so that
 	//! number wins over any name-based guess. Live: auto reports 1M, deepseek-3.2 164K.

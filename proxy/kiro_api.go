@@ -123,6 +123,7 @@ func ListAvailableModels(account *config.Account) ([]ModelInfo, error) {
 	}
 	//! Recorded here, not in the callers, so no listing path can skip it.
 	recordUpstreamContextWindows(models)
+	recordUpstreamMaxOutputTokens(models)
 	return models, nil
 }
 
