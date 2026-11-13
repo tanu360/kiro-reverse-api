@@ -3,6 +3,7 @@ import { StatusDot } from "@/components/shared/status-dot";
 import { Badge } from "@/components/ui/badge";
 import type { ProxyPoolView } from "@/lib/api/proxy-pool";
 import { useT } from "@/lib/i18n";
+import { useMaskText } from "@/lib/privacy";
 import { assignedProxy, proxyName, statusLook } from "./lib/pool-model";
 
 const DOT_TONE = { success: "success", destructive: "destructive", neutral: "muted" } as const;
@@ -19,6 +20,7 @@ export function PoolProxyValue({
   view: ProxyPoolView;
 }): JSX.Element {
   const { t } = useT("proxy-pool");
+  const mask = useMaskText();
   const proxy = assignedProxy(view, accountId);
   const look = proxy ? statusLook(proxy.health.status) : undefined;
   return (
@@ -30,7 +32,7 @@ export function PoolProxyValue({
             className={proxy.label ? "min-w-0 truncate" : "min-w-0 truncate font-mono"}
             translate={proxy.label ? undefined : "no"}
           >
-            {proxyName(proxy)}
+            {mask(proxyName(proxy))}
           </span>
         </>
       ) : (

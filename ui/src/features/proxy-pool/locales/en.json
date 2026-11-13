@@ -38,6 +38,7 @@
   "editor.label": "Label",
   "editor.labelPlaceholder": "Frankfurt VPS",
   "editor.labelTooLong": "Use at most {max} characters.",
+  "editor.hostHasPort": "Put the port in the Port field, not after the host.",
   "editor.passwordKeep": "Leave empty to keep the saved password.",
   "editor.passwordClear": "Remove the saved password",
   "editor.added": "The proxy was added and is being checked.",

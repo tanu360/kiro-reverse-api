@@ -38,6 +38,7 @@ import {
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatDurationMs } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
+import { useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { intervalOptions, poolErrorMessage, proxyName, statusLook } from "./lib/pool-model";
 import { ProxyEditor } from "./proxy-pool-editor";
@@ -100,6 +101,8 @@ function IntervalSelect({
  */
 function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const { t } = useT("proxy-pool");
+  // Proxy logins are often e-mail addresses: privacy mode masks them wherever a name shows.
+  const mask = useMaskText();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [pending, setPending] = useState<ProxyPoolSettingsPatch | null>(null);
@@ -146,11 +149,11 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
     setTesting((prev) => new Set(prev).add(proxy.id));
     try {
       const { proxy: checked } = await checkPoolProxy(proxy.id);
-      const name = proxyName(checked);
+      const name = mask(proxyName(checked));
       if (checked.health.status === "ok") {
         toast.success(t("card.testOk", { name }));
       } else {
-        toast.error(t("card.testFailed", { name, error: checked.health.lastError ?? "" }));
+        toast.error(t("card.testFailed", { name, error: mask(checked.health.lastError) }));
       }
     } catch (error) {
       toast.error(poolErrorMessage(error, t));
@@ -165,7 +168,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   };
 
   const remove = async (proxy: PoolProxy) => {
-    const name = proxyName(proxy);
+    const name = mask(proxyName(proxy));
     const last = view.mode === "on" && view.proxies.length === 1;
     const confirmed = await confirm({
       title: t("card.removeTitle"),
@@ -301,6 +304,7 @@ function ProxyRow({
   onRemove: () => void;
 }): JSX.Element {
   const { t, lang } = useT("proxy-pool");
+  const mask = useMaskText();
   const look = statusLook(proxy.health.status);
   const { checkedAt, latencyMs, lastError } = proxy.health;
   return (
@@ -330,7 +334,9 @@ function ProxyRow({
               {proxy.url}
             </span>
           ) : null}
-          {proxy.username ? <span>{t("card.signsInAs", { user: proxy.username })}</span> : null}
+          {proxy.username ? (
+            <span>{t("card.signsInAs", { user: mask(proxy.username) })}</span>
+          ) : null}
           <span>
             {checkedAt
               ? fillNodes(t("card.checkedAt"), {
@@ -351,7 +357,7 @@ function ProxyRow({
       }
       title={
         proxy.label ? (
-          proxy.label
+          mask(proxy.label)
         ) : (
           // A long host wraps at its dots and colon first, mid-label only when it must.
           <span className="wrap-anywhere font-mono text-meta" translate="no">
@@ -362,7 +368,7 @@ function ProxyRow({
     >
       {proxy.health.status === "failed" && lastError ? (
         <p className="wrap-anywhere text-destructive-foreground text-xs">
-          {t("card.lastError", { error: lastError })}
+          {t("card.lastError", { error: mask(lastError) })}
         </p>
       ) : null}
     </SettingsRow>

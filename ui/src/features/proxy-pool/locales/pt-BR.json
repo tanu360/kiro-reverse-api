@@ -38,6 +38,7 @@
   "editor.label": "Rótulo",
   "editor.labelPlaceholder": "VPS Frankfurt",
   "editor.labelTooLong": "Use no máximo {max} caracteres.",
+  "editor.hostHasPort": "Coloque a porta no campo Porta, não depois do host.",
   "editor.passwordKeep": "Deixe vazio para manter a senha salva.",
   "editor.passwordClear": "Remover a senha salva",
   "editor.added": "O proxy foi adicionado e está sendo verificado.",
