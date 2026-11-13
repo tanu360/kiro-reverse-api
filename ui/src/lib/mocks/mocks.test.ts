@@ -300,6 +300,8 @@ function classify(status: number, message: string): RequestErrorType {
     return "suspended";
   }
   if (has("no available kiro profile")) return "profile";
+  // Before auth: a proxy's own "authentication failed" or "Forbidden" says nothing about the token.
+  if (isProxyFailure(message)) return "proxy";
   if (
     has("http 401", "http 403", "unauthorized", "forbidden", "authentication failed") ||
     has("token invalid", "token expired", "invalid_grant") ||
@@ -318,6 +320,40 @@ function classify(status: number, message: string): RequestErrorType {
   return "unknown";
 }
 
+/** proxy/proxy_failure.go isProxyFailureMessage: the fixed wording, or Go's raw proxy text. */
+function isProxyFailure(message: string): boolean {
+  const lower = message.toLowerCase();
+  const markers = [
+    "no healthy outbound proxy",
+    "outbound pool proxy failed: ",
+    "outbound proxy failed: ",
+    "no connection through the proxy within",
+    "proxy connect timeout",
+    "socks connect ",
+    "proxyconnect ",
+  ];
+  if (markers.some((m) => lower.includes(m))) return true;
+  // A CONNECT the proxy refused leaves Go's bare reason phrase after the URL.
+  const cause = /^[A-Z][A-Za-z]* "[^"]*": (.+)$/.exec(message)?.[1]?.trim();
+  if (!cause) return false;
+  return (
+    /^[1-5]\d\d \S/.test(cause) ||
+    [
+      "bad request",
+      "unauthorized",
+      "forbidden",
+      "not found",
+      "method not allowed",
+      "proxy authentication required",
+      "too many requests",
+      "internal server error",
+      "bad gateway",
+      "service unavailable",
+      "gateway timeout",
+    ].includes(cause.toLowerCase())
+  );
+}
+
 describe("request error classifier", () => {
   it("files a call limit as an API key limit and an unknown model as an invalid request", () => {
     expect(classify(429, "API key call limit reached: 2 of 2 successful calls used")).toBe(
@@ -326,6 +362,26 @@ describe("request error classifier", () => {
     expect(classify(404, 'model "gpt-6.1-sol" is not available on any account')).toBe(
       "invalid_request",
     );
+  });
+
+  it("files proxy failures as proxy errors, before auth", () => {
+    expect(classify(503, "outbound proxy failed: connection refused or reset")).toBe("proxy");
+    expect(classify(503, "no healthy outbound proxy in the pool")).toBe("proxy");
+    expect(classify(503, "outbound pool proxy failed: proxy rejected the sign-in")).toBe("proxy");
+    expect(
+      classify(
+        500,
+        'Post "https://q.us-east-1.amazonaws.com/generateAssistantResponse": Forbidden',
+      ),
+    ).toBe("proxy");
+    expect(
+      classify(
+        503,
+        'Post "https://q.us-east-1.amazonaws.com/generateAssistantResponse": socks connect tcp 127.0.0.1:1080->q.us-east-1.amazonaws.com:443: username/password authentication failed',
+      ),
+    ).toBe("proxy");
+    expect(classify(500, 'Post "https://kiro.invalid": EOF')).toBe("upstream");
+    expect(classify(500, "HTTP 403: forbidden")).toBe("auth");
   });
 });
 
