@@ -121,6 +121,9 @@ func validateClaudeRequestShape(req *ClaudeRequest) string {
 		return "assistant-prefill final message is not supported; last message must be user"
 	}
 	if !hasUserContext {
+		if msg := unreadableClaudeBlock(req.Messages); msg != "" {
+			return msg
+		}
 		return "at least one non-empty user message is required"
 	}
 	return ""
@@ -204,7 +207,13 @@ func resolveClaudeThinkingResponseOptions(thinking *ClaudeThinkingConfig, defaul
 }
 
 func validateOpenAIRequestShape(req *OpenAIRequest) string {
-	return validateOpenAIRequestShapeAs(req, chatRequestChecks)
+	msg := validateOpenAIRequestShapeAs(req, chatRequestChecks)
+	if msg == chatRequestChecks.noUserText {
+		if unreadable := unreadableChatPart(req.Messages); unreadable != "" {
+			return unreadable
+		}
+	}
+	return msg
 }
 
 // validateOpenAIRequestShapeAs runs the Chat checks, worded for the API the request came in on.

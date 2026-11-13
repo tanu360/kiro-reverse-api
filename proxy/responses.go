@@ -87,6 +87,9 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		return nil, err.Error()
 	}
 	if len(currentMessages) == 0 {
+		if unreadable := unreadableResponsesInput(req.Input); unreadable != "" {
+			return nil, unreadable
+		}
 		return nil, "input is required"
 	}
 
@@ -109,6 +112,11 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		ReasoningEffort: reqReasoningEffort(req),
 	}
 	if msg := validateOpenAIRequestShapeAs(&openaiReq, responsesRequestChecks); msg != "" {
+		if msg == responsesRequestChecks.noNonSystem || msg == responsesRequestChecks.noUserText {
+			if unreadable := unreadableResponsesInput(req.Input); unreadable != "" {
+				return nil, unreadable
+			}
+		}
 		return nil, msg
 	}
 
