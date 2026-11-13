@@ -1818,6 +1818,8 @@ func (h *Handler) noAccountError(ctx context.Context, model, serverErrType strin
 		noteRetryAfter(ctx, h.pool.RPMRetryAfter(model, allowed))
 		return http.StatusTooManyRequests, "rate_limit_error", fmt.Sprintf("All accounts reached the limit of %s per minute", textfmt.Count(config.GetAccountRPMLimit(), "request", "requests"))
 	}
+	//! Every account is cooling down or out of rotation; a known cooldown end tells clients when to retry.
+	noteRetryAfter(ctx, h.pool.CooldownRetryAfter(model, allowed))
 	return http.StatusServiceUnavailable, serverErrType, "No available accounts"
 }
 

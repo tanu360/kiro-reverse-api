@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,10 @@ func TestBoundKeyCoolingDownGets503NotOtherAccountsRPMLimit(t *testing.T) {
 		rec := serveWithKey(h, http.MethodPost, tc.path, bound.Key, tc.body)
 		if rec.Code != http.StatusServiceUnavailable || strings.Contains(rec.Body.String(), "per minute") {
 			t.Fatalf("%s: bound key whose only account cools down = %d %s, want 503 No available accounts", tc.path, rec.Code, rec.Body.String())
+		}
+		//! The cooldown end is known: the 503 says when free-b is back.
+		if secs, err := strconv.Atoi(rec.Header().Get("Retry-After")); err != nil || secs < 290 || secs > 300 {
+			t.Fatalf("%s: Retry-After = %q, want about 300", tc.path, rec.Header().Get("Retry-After"))
 		}
 	}
 	// The unbound key may use free-a, which only the limit holds back: 429.
