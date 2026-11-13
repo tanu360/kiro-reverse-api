@@ -4,6 +4,7 @@ import { formatBytes } from "@/lib/format";
 import { type Lang, type TParams, translate } from "@/lib/i18n";
 import {
   accountsCell,
+  backupKind,
   clampKeep,
   isNotABackupMessage,
   keepMax,
@@ -92,6 +93,20 @@ describe("kindLabel and kindTone", () => {
     expect(kindLabel("scheduled", t)).toBe("Scheduled");
     expect(kindLabel("auto", t)).toBe("Before save");
     expect(kindLabel("pre-restore", t)).toBe("Rollback point");
+  });
+
+  it("gives the backup a duplicate merge saves first its own kind, old rows too", () => {
+    const merge = entry({ kind: "auto", note: "before merging duplicate accounts" });
+    expect(backupKind(merge)).toBe("pre-merge");
+    expect(kindLabel(backupKind(merge), t)).toBe("Before merge");
+    expect(kindLabel(backupKind(merge), tFor("zh"))).toBe("合并前");
+    expect(kindTone(backupKind(merge))).toBe("neutral");
+    // Any other automatic backup, and a manual one with that note, keep the server's kind.
+    expect(backupKind(entry({ kind: "auto", note: "" }))).toBe("auto");
+    expect(backupKind(entry({ kind: "auto" }))).toBe("auto");
+    expect(backupKind(entry({ kind: "manual", note: "before merging duplicate accounts" }))).toBe(
+      "manual",
+    );
   });
 
   it("shows an unknown kind raw, and an em dash when empty", () => {
