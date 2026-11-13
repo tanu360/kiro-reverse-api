@@ -5,14 +5,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	"kiro-proxy/config"
 	"kiro-proxy/logger"
 )
 
 //! A substring mapping rule such as "gpt-5" also matches models Kiro serves itself
 //! (gpt-5.6-sol on Pro accounts) and sent them to a different model. A name Kiro
 //! lists now passes through before the substring rules run; only an exact rule
-//! redirects it. The set mirrors the /v1/models cache, so it is empty until the
-//! first sweep, and the old substring behaviour applies until then.
+//! redirects it. The set mirrors the /v1/models cache. At start it holds the IDs the
+//! last successful sweep saved, so a restart (about 10 s before the first sweep, or
+//! longer when every account fails it) does not bring the substring behaviour back.
+//! On a first start with no saved IDs, the old behaviour applies until the first sweep.
 
 // nativeModelIDs maps each lower-cased model ID in the /v1/models cache to its listed spelling.
 var nativeModelIDs atomic.Pointer[map[string]string]
@@ -23,18 +26,63 @@ func publishNativeModels(models []ModelInfo) {
 		nativeModelIDs.Store(nil)
 		return
 	}
-	ids := make(map[string]string, len(models))
+	ids := make([]string, 0, len(models))
 	for _, m := range models {
-		id := strings.TrimSpace(m.ModelId)
+		ids = append(ids, m.ModelId)
+	}
+	set := nativeModelSet(ids)
+	nativeModelIDs.Store(&set)
+}
+
+// nativeModelSet keys each non-blank ID by its trimmed lower-cased form; the first spelling wins.
+func nativeModelSet(ids []string) map[string]string {
+	set := make(map[string]string, len(ids))
+	for _, raw := range ids {
+		id := strings.TrimSpace(raw)
 		if id == "" {
 			continue
 		}
 		key := strings.ToLower(id)
-		if _, exists := ids[key]; !exists {
-			ids[key] = id
+		if _, exists := set[key]; !exists {
+			set[key] = id
 		}
 	}
-	nativeModelIDs.Store(&ids)
+	return set
+}
+
+// restoreNativeModels publishes the IDs the last successful sweep saved, unless a sweep
+// already published a set. NewHandler calls it before any request is served.
+func restoreNativeModels() {
+	ids, err := config.LoadNativeModelIDs()
+	if err != nil {
+		logger.Warnf("[ModelsCache] Could not load the saved model list: %v", err)
+		return
+	}
+	set := nativeModelSet(ids)
+	if len(set) == 0 {
+		return
+	}
+	if nativeModelIDs.CompareAndSwap(nil, &set) {
+		logger.Infof("[ModelsCache] Restored %d native models from the last listing", len(set))
+	}
+}
+
+// rememberNativeModels saves the model IDs a sweep cached, for restoreNativeModels. Sweeps
+// are rare (the 30-minute timer, its retries, an admin refresh), so the one-row write
+// needs no change check.
+func rememberNativeModels(models []ModelInfo) {
+	ids := make([]string, 0, len(models))
+	for _, m := range models {
+		if id := strings.TrimSpace(m.ModelId); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	if err := config.SaveNativeModelIDs(ids); err != nil {
+		logger.Warnf("[ModelsCache] Could not save the model list: %v", err)
+	}
 }
 
 // nativeModelID reports the listed spelling of model when Kiro lists it (trimmed, case-insensitive).

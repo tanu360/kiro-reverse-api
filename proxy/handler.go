@@ -242,6 +242,7 @@ func NewHandler() *Handler {
 		usageRefresh:   newRefreshScheduler(config.GetUsageRefreshInterval),
 	}
 
+	restoreNativeModels()
 	go h.backgroundRefresh()
 
 	go h.backgroundObserveTick()
@@ -692,6 +693,7 @@ func (h *Handler) sweepModelsCache() {
 		h.modelsCacheTime = time.Now().Unix()
 		h.modelsCacheMu.Unlock()
 		logger.Infof("[ModelsCache] Cached %d models", len(aggregated))
+		rememberNativeModels(aggregated)
 	}
 }
 

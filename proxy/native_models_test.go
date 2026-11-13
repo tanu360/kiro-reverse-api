@@ -324,3 +324,75 @@ func TestListModelsForHousekeepingRetriesWhileAnAccountFails(t *testing.T) {
 		t.Fatalf("MapModel(gpt-5.6-sol) after the retry = %q, want gpt-5.6-sol", got)
 	}
 }
+
+func TestNativeModelsRestoredFromLastSweep(t *testing.T) {
+	publishNativeModels(nil)
+	h := newResponsesTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
+		t.Errorf("inference endpoint called while listing models")
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	t.Cleanup(func() { publishNativeModels(nil) })
+	t.Cleanup(func() { h.pool.SetModelList("responses-account", nil) })
+	t.Cleanup(func() { _ = config.UpdateModelMappings(config.DefaultModelMappings()) })
+	if err := config.UpdateModelMappings([]config.ModelMappingRule{{Key: "haiku", Value: "claude-opus-5"}}); err != nil {
+		t.Fatalf("set mappings: %v", err)
+	}
+	var listingDown atomic.Bool
+	stubRestTransport(t, func(r *http.Request) (*http.Response, error) {
+		if !strings.Contains(r.URL.Path, "ListAvailableModels") {
+			return jsonResponse(http.StatusNotFound, `{}`), nil
+		}
+		if listingDown.Load() {
+			return jsonResponse(http.StatusInternalServerError, `{}`), nil
+		}
+		return jsonResponse(http.StatusOK, `{"models":[{"modelId":"claude-haiku-4.5"},{"modelId":"claude-sonnet-4.5"}]}`), nil
+	})
+
+	h.sweepModelsCache()
+	if ids, err := config.LoadNativeModelIDs(); err != nil || len(ids) != 2 || ids[0] != "claude-haiku-4.5" {
+		t.Fatalf("saved ids = (%v, %v), want the sweep's two models", ids, err)
+	}
+
+	//! A restart: the in-memory set is gone and every account fails the first listing.
+	publishNativeModels(nil)
+	if got := MapModel("claude-haiku-4.5"); got != "claude-opus-5" {
+		t.Fatalf("precondition: with no native set MapModel = %q, want the substring target", got)
+	}
+	restoreNativeModels()
+	listingDown.Store(true)
+	h.sweepModelsCache()
+	if got := MapModel("claude-haiku-4.5"); got != "claude-haiku-4.5" {
+		t.Fatalf("MapModel(claude-haiku-4.5) after restore = %q, want it native", got)
+	}
+	if got := MapModel("my-haiku-proxy"); got != "claude-opus-5" {
+		t.Fatalf("MapModel(my-haiku-proxy) = %q, want the substring rule for an unlisted name", got)
+	}
+	if ids, err := config.LoadNativeModelIDs(); err != nil || len(ids) != 2 {
+		t.Fatalf("a failed sweep changed the saved ids: (%v, %v)", ids, err)
+	}
+}
+
+func TestRestoreNativeModelsKeepsAPublishedSet(t *testing.T) {
+	initDefaultMappingsConfig(t)
+	t.Cleanup(func() { publishNativeModels(nil) })
+	if err := config.SaveNativeModelIDs([]string{"stale-model"}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	publishNativeModels([]ModelInfo{{ModelId: "fresh-model"}})
+	restoreNativeModels()
+	if _, ok := nativeModelID("stale-model"); ok {
+		t.Fatal("restore replaced a set a sweep had already published")
+	}
+	if _, ok := nativeModelID("fresh-model"); !ok {
+		t.Fatal("restore dropped the published set")
+	}
+
+	publishNativeModels(nil)
+	if err := config.SaveNativeModelIDs([]string{" ", ""}); err != nil {
+		t.Fatalf("save blanks: %v", err)
+	}
+	restoreNativeModels()
+	if nativeModelIDs.Load() != nil {
+		t.Fatal("blank saved ids must leave the set unset")
+	}
+}
