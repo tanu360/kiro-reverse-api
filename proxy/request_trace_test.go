@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -24,6 +25,7 @@ func TestClassifyRequestError(t *testing.T) {
 		{"client closed", false, 499, "client disconnected", "client_closed"},
 		{"api key token limit", false, 429, "token limit exceeded", "api_key_limit"},
 		{"api key credit limit", false, 429, "credit limit exceeded", "api_key_limit"},
+		{"api key call limit", false, 429, fmt.Errorf("%w: 2 of 2 successful calls used", config.ErrApiKeyCallLimitExceeded).Error(), "api_key_limit"},
 		{"overage", false, 500, "HTTP 402: overage is not enabled", "overage"},
 		{"quota", false, 500, "HTTP 429: monthly quota reached", "quota"},
 		{"suspended before auth", false, 500, "HTTP 403: TEMPORARILY_SUSPENDED", "suspended"},
@@ -36,10 +38,11 @@ func TestClassifyRequestError(t *testing.T) {
 		{"no accounts", false, 503, "No available accounts", "no_accounts"},
 		{"invalid json", false, 400, "Invalid JSON", "invalid_request"},
 		{"method", false, 405, "Method Not Allowed", "invalid_request"},
+		{"unknown model", false, 404, `model "gpt-6.1-sol" is not available on any account`, "invalid_request"},
 		{"plain 429", false, 429, "Too many requests", "rate_limit"},
 		{"timeout", false, 500, "context deadline exceeded", "timeout"},
 		{"upstream", false, 500, "HTTP 500: internal error", "upstream"},
-		{"unknown", false, 404, "not found", "unknown"},
+		{"unknown", false, 409, "conflict", "unknown"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
