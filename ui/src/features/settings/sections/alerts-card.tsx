@@ -67,6 +67,7 @@ import {
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
 import { type TFunction, useT } from "@/lib/i18n";
+import { useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { useDraft } from "../lib/dirty";
 import {
@@ -157,8 +158,13 @@ function isChannelField(field: string | undefined): field is ChannelField {
   );
 }
 
-function channelLabel(channel: { name: string; type: AlertChannelType }, t: TFunction): string {
-  return channel.name.trim() || t(`type.${channel.type}`);
+/** The channel's name (emails in it masked under privacy), or its type when it has none. */
+function channelLabel(
+  channel: { name: string; type: AlertChannelType },
+  t: TFunction,
+  mask: (text?: string) => string,
+): string {
+  return mask(channel.name.trim()) || t(`type.${channel.type}`);
 }
 
 export function AlertsCard(): JSX.Element {
@@ -192,6 +198,7 @@ function rulesPatch(form: RulesForm) {
  */
 function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
   const { t } = useT("alerts");
+  const mask = useMaskText();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const accountId = useId();
@@ -274,7 +281,7 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
   };
 
   const onRemove = async (channel: AlertChannel) => {
-    const name = channelLabel(channel, t);
+    const name = channelLabel(channel, t, mask);
     const confirmed = await confirm({
       title: t("removeChannelTitle", { name }),
       description: t("removeChannelBody"),
@@ -300,16 +307,16 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
             }
           : old,
       );
-      const name = channelLabel(channel, t);
+      const name = channelLabel(channel, t, mask);
       if (result.ok) toast.success(t("testOk", { name }));
       else {
-        const reason = result.error || t("attempts", { count: result.attempts });
+        const reason = mask(result.error) || t("attempts", { count: result.attempts });
         toast.error(t("testFailed", { name, reason }));
       }
     },
     onError: (error, channel) => {
       toast.error(
-        t("testFailed", { name: channelLabel(channel, t), reason: errorMessage(error, t) }),
+        t("testFailed", { name: channelLabel(channel, t, mask), reason: errorMessage(error, t) }),
       );
     },
   });
@@ -547,7 +554,8 @@ function ChannelRow({
   onRemove: () => void;
 }): JSX.Element {
   const { t } = useT("alerts");
-  const name = channelLabel(channel, t);
+  const mask = useMaskText();
+  const name = channelLabel(channel, t, mask);
   const target = [
     channel.targetHint,
     channel.type === "telegram" && channel.chatId ? t("chatIdValue", { id: channel.chatId }) : "",
@@ -620,6 +628,7 @@ function ChannelRow({
 /** "Delivered · Test · 5 minutes ago · 1 attempt", and the scrubbed error under a failure. */
 function LastResult({ result }: { result: AlertDelivery | null }): JSX.Element {
   const { t } = useT("alerts");
+  const mask = useMaskText();
   if (!result) return <p className={ROW_DESCRIPTION}>{t("lastNever")}</p>;
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -637,7 +646,7 @@ function LastResult({ result }: { result: AlertDelivery | null }): JSX.Element {
       </p>
       {!result.ok && result.error ? (
         <p className="text-pretty text-destructive-foreground text-xs leading-normal wrap-anywhere">
-          {result.error}
+          {mask(result.error)}
         </p>
       ) : null}
     </div>

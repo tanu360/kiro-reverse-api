@@ -44,6 +44,7 @@
   "noteBeforeUpload": "Antes de restaurar do arquivo {name}",
   "noteBeforeRestore": "Antes de restaurar o backup {id}",
   "noteScheduled": "Agendado ({cadence})",
+  "noteBeforeMerge": "Antes de mesclar contas duplicadas",
   "restoredAccountCount_one": "{n} conta restaurada",
   "restoredAccountCount_other": "{n} contas restauradas",
   "preRestoreSavedHint_one": "O ponto de reversão salvou {n} conta antes da restauração.",

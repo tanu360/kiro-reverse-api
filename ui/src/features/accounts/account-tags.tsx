@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
  * An account's tags as small neutral pills (emails in them masked under privacy). The first
  * `max` show; the rest fold into a "+N" pill whose tooltip, and screen reader text, lists them.
  * A long tag is cut with an ellipsis. `wrap` lets the pills wrap where the row has room to grow
- * (the detail sheet); a list row keeps them on one line, clipped at the row's edge.
+ * (the detail sheet); a list row keeps them on one line, where a tag pill narrows to its ellipsis
+ * and the "+N" pill keeps its full width, so no pill is cut at the row's edge.
  */
 export function TagBadges({
   tags,
@@ -36,8 +37,8 @@ export function TagBadges({
       data-slot="account-tags"
     >
       {shown.map((tag) => (
-        <Badge key={tag} size="sm" tone="neutral">
-          <span className="max-w-24 truncate">{mask(tag)}</span>
+        <Badge className={wrap ? undefined : "min-w-0 shrink"} key={tag} size="sm" tone="neutral">
+          <span className="min-w-0 max-w-24 truncate">{mask(tag)}</span>
         </Badge>
       ))}
       {rest.length > 0 ? (

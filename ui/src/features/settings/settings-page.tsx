@@ -5,6 +5,7 @@ import { useBlocker } from "@tanstack/react-router";
 import {
   type JSX,
   type MouseEvent,
+  type RefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -370,12 +371,14 @@ function useLeaveGuard(): void {
 /**
  * A deep link (/settings#settings-alerts) on a fresh load lands while the cards above its card
  * still load and grow, so it ends up far above it. Until the reader scrolls, presses a key or a
- * few seconds pass, every growth of the column brings the card back to the top.
+ * few seconds pass, every growth of the column brings the card back to the top. The column that
+ * holds every card is watched, not the card's parent: a card wrapped in its own form (the admin
+ * password) has a parent that never grows while the cards above it load.
  */
-function useHashLanding(): void {
+function useHashLanding(columnRef: RefObject<HTMLDivElement | null>): void {
   useEffect(() => {
     const id = window.location.hash.slice(1);
-    const column = document.getElementById(id)?.parentElement;
+    const column = columnRef.current;
     if (!SETTINGS_SECTIONS.some((section) => section.id === id) || !column) return;
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
@@ -391,13 +394,14 @@ function useHashLanding(): void {
     for (const type of events) window.addEventListener(type, stop, { passive: true });
     observer.observe(column);
     return stop;
-  }, []);
+  }, [columnRef]);
 }
 
 function SettingsContent(): JSX.Element {
   const { t } = useT("settings");
   useLeaveGuard();
-  useHashLanding();
+  const columnRef = useRef<HTMLDivElement>(null);
+  useHashLanding(columnRef);
   // The nav becomes a column only from xl: at lg the app sidebar is already open, and a third
   // column would leave the cards too narrow for their rows.
   const wide = useMediaQuery("xl");
@@ -408,7 +412,10 @@ function SettingsContent(): JSX.Element {
         <SectionNav wide={wide} />
         {/* Capped, so on a wide screen a row's control stays near its label; a little wider
             from 2xl, so the column does not leave an empty band on the right only. */}
-        <div className="flex min-w-0 max-w-5xl flex-col gap-4 md:gap-6 2xl:max-w-6xl">
+        <div
+          className="flex min-w-0 max-w-5xl flex-col gap-4 md:gap-6 2xl:max-w-6xl"
+          ref={columnRef}
+        >
           <GeneralSettingsError />
           <UsageCard />
           <StreamIntegrityCard />

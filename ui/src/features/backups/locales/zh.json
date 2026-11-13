@@ -43,6 +43,7 @@
   "noteBeforeUpload": "从文件 {name} 恢复之前",
   "noteBeforeRestore": "恢复备份 {id} 之前",
   "noteScheduled": "定时（{cadence}）",
+  "noteBeforeMerge": "合并重复账号之前",
   "restoredAccountCount": "已恢复 {n} 个",
   "preRestoreSavedHint_other": "回滚点在恢复前保存了 {n} 个账号。",
   "download": "下载",

@@ -91,6 +91,35 @@ describe("AlertsCard", () => {
     expect(screen.getByText("1 channel on")).toBeInTheDocument();
   });
 
+  it("masks emails in a channel's name and error under privacy", async () => {
+    const named: AlertsConfig = {
+      ...SAVED,
+      channels: [
+        {
+          ...SAVED.channels[0],
+          name: "Pager ops@example.com",
+          lastResult: {
+            ts: Math.floor(Date.now() / 1000) - 60,
+            ok: false,
+            status: 403,
+            attempts: 1,
+            event: "test",
+            error: "rejected for ops@example.com",
+          },
+        },
+      ],
+    };
+    mockServer.use(http.get(apiUrl("/alerts"), () => HttpResponse.json(named)));
+    const { container } = renderWithProviders(<AlertsCard />, { privacy: true });
+
+    const row = (await screen.findByText("Pager op***@ex***.com")).closest("li") as HTMLElement;
+    expect(within(row).getByText("rejected for op***@ex***.com")).toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: "Send test to Pager op***@ex***.com" }),
+    ).toBeInTheDocument();
+    expect(container.innerHTML).not.toContain("ops@example.com");
+  });
+
   it("adds a channel from the dialog and lists it with a masked target", async () => {
     const { user } = await renderCard();
     expect(

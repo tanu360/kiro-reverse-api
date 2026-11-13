@@ -15,6 +15,8 @@ export const CADENCES: readonly BackupCadence[] = ["hourly", "daily", "weekly"];
 const UPLOAD_PREFIX = "upload ";
 const RESTORE_PREFIX = "auto before restore ";
 const SCHEDULED_NOTE = /^auto-(hourly|daily|weekly)$/;
+/** The note of the backup a duplicate merge saves first (proxy/account_dedup.go). */
+const MERGE_NOTE = "before merging duplicate accounts";
 
 type BackupTone = "primary" | "neutral" | "warning";
 
@@ -133,6 +135,7 @@ export function noteText(
       return t("noteBeforeRestore", { id: mask(note.slice(RESTORE_PREFIX.length)) });
     }
   }
+  if (entry.kind === "auto" && note === MERGE_NOTE) return t("noteBeforeMerge");
   if (entry.kind === "scheduled") {
     const match = SCHEDULED_NOTE.exec(note);
     if (match) return t("noteScheduled", { cadence: cadenceLabel(match[1] as BackupCadence, t) });

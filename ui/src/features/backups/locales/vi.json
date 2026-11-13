@@ -43,6 +43,7 @@
   "noteBeforeUpload": "Trước khi khôi phục từ tệp {name}",
   "noteBeforeRestore": "Trước khi khôi phục bản sao lưu {id}",
   "noteScheduled": "Theo lịch ({cadence})",
+  "noteBeforeMerge": "Trước khi gộp các tài khoản trùng lặp",
   "restoredAccountCount": "Đã khôi phục {n}",
   "preRestoreSavedHint_other": "Điểm hoàn tác đã lưu {n} tài khoản trước khi khôi phục.",
   "download": "Tải xuống",

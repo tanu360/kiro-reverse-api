@@ -287,3 +287,34 @@ describe("leaving with unsaved edits", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });
+
+describe("settings deep link", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("follows the column that holds every card, also for a card inside its own form", async () => {
+    const observed: Element[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe(target: Element): void {
+          observed.push(target);
+        }
+        unobserve(): void {}
+        disconnect(): void {}
+      },
+    );
+    window.history.replaceState(null, "", `/settings#${SECTION_ID.adminPassword}`);
+    try {
+      await renderPage();
+      const card = section(SECTION_ID.adminPassword);
+      const column = observed.find((target) => target.contains(card));
+      expect(column).toBeDefined();
+      // The column, not the card's form: the cards above the admin password grow inside it.
+      expect(column?.contains(section(SETTINGS_SECTIONS[0].id))).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

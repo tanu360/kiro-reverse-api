@@ -52,6 +52,12 @@ describe("noteText", () => {
     );
   });
 
+  it("describes the backup a duplicate merge saves first", () => {
+    const merge = entry({ kind: "auto", note: "before merging duplicate accounts" });
+    expect(noteText(merge, t)).toBe("Before merging duplicate accounts");
+    expect(noteText(merge, tFor("zh"))).toBe("合并重复账号之前");
+  });
+
   it("labels the server note of a scheduled backup", () => {
     expect(noteText(entry({ kind: "scheduled", note: "auto-daily" }), t)).toBe("Scheduled (Daily)");
     expect(noteText(entry({ kind: "scheduled", note: "auto-weekly" }), tFor("zh"))).toBe(
