@@ -116,6 +116,7 @@ func TestScrubStoredRequestKeysMasksOlderRows(t *testing.T) {
 		usageRow{ts: 103, key: "sk-bogus"},
 		usageRow{ts: 104, keyID: served.ID, key: config.MaskApiKey(served.Key), success: true},
 		usageRow{ts: 105},
+		usageRow{ts: 106, key: "ключ-чужой-секрет-0000"},
 	)
 
 	for run := 0; run < 2; run++ {
@@ -126,6 +127,8 @@ func TestScrubStoredRequestKeysMasksOlderRows(t *testing.T) {
 			config.MaskApiKey(disabled.Key), config.MaskApiKey(served.Key),
 			config.MaskApiKey("sk-someone-elses-real-secret-0000"), "****",
 			config.MaskApiKey(served.Key), "",
+			//! The SQL mask counts bytes, as config.MaskApiKey does.
+			config.MaskApiKey("ключ-чужой-секрет-0000"),
 		}
 		if got := storedRequestKeys(t); strings.Join(got, "|") != strings.Join(want, "|") {
 			t.Fatalf("run %d: stored keys %q, want %q", run, got, want)
@@ -143,7 +146,7 @@ func TestScrubStoredRequestKeysMasksOlderRows(t *testing.T) {
 	if e := usageEntry(t, resp, usageKindKey, disabled.ID); e.Totals.Requests != 1 {
 		t.Fatalf("disabled key usage %+v", e)
 	}
-	if e := usageEntry(t, resp, usageKindInvalid, usageKindInvalid); e.Totals.Requests != 2 {
+	if e := usageEntry(t, resp, usageKindInvalid, usageKindInvalid); e.Totals.Requests != 3 {
 		t.Fatalf("invalid key usage %+v", e)
 	}
 }
