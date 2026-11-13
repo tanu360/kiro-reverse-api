@@ -110,6 +110,8 @@ type ClaudeRequest struct {
 	OutputConfig *ClaudeOutputConfig   `json:"output_config,omitempty"`
 	Tools        []ClaudeTool          `json:"tools,omitempty"`
 	ToolChoice   interface{}           `json:"tool_choice,omitempty"`
+	// StopSequences end the answer where one starts; see output_limits.go.
+	StopSequences []string `json:"stop_sequences,omitempty"`
 	// OutputFormat is the structured-outputs beta alias of output_config.format.
 	OutputFormat json.RawMessage `json:"output_format,omitempty"`
 }
@@ -1014,15 +1016,23 @@ func KiroToClaudeResponse(content, thinkingContent string, includeEmptyThinkingB
 }
 
 type OpenAIRequest struct {
-	Model           string          `json:"model"`
-	Messages        []OpenAIMessage `json:"messages"`
-	MaxTokens       int             `json:"max_tokens,omitempty"`
-	Temperature     float64         `json:"temperature,omitempty"`
-	TopP            float64         `json:"top_p,omitempty"`
-	Stream          bool            `json:"stream,omitempty"`
-	Tools           []OpenAITool    `json:"tools,omitempty"`
-	ToolChoice      interface{}     `json:"tool_choice,omitempty"`
-	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
+	Model       string          `json:"model"`
+	Messages    []OpenAIMessage `json:"messages"`
+	MaxTokens   int             `json:"max_tokens,omitempty"`
+	Temperature float64         `json:"temperature,omitempty"`
+	TopP        float64         `json:"top_p,omitempty"`
+	Stream      bool            `json:"stream,omitempty"`
+	// MaxCompletionTokens is the newer name of max_tokens and wins when both are set.
+	MaxCompletionTokens int `json:"max_completion_tokens,omitempty"`
+	// Stop is a string or a list of strings; see output_limits.go.
+	Stop json.RawMessage `json:"stop,omitempty"`
+	// N and Logprobs are only accepted at the values the proxy can honour; see openai_options.go.
+	N               *int         `json:"n,omitempty"`
+	Logprobs        *bool        `json:"logprobs,omitempty"`
+	TopLogprobs     *int         `json:"top_logprobs,omitempty"`
+	Tools           []OpenAITool `json:"tools,omitempty"`
+	ToolChoice      interface{}  `json:"tool_choice,omitempty"`
+	ReasoningEffort string       `json:"reasoning_effort,omitempty"`
 	// ResponseFormat requests JSON output; see structured_output.go.
 	ResponseFormat json.RawMessage `json:"response_format,omitempty"`
 	// StreamOptions asks for the separate usage chunk; see openai_stream_options.go.

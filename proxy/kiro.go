@@ -198,6 +198,11 @@ type KiroPayload struct {
 	ToolNameMap map[string]string `json:"-"`
 	// StructuredOutput routes the request through callKiroStructured (JSON output requests).
 	StructuredOutput *structuredOutputSpec `json:"-"`
+	// StopSequences end the answer where one starts; Kiro has none, see output_limits.go.
+	StopSequences []string `json:"-"`
+	// ForcedToolChoice is "any" or "tool" when the client's tool_choice requires a tool call;
+	// see tool_choice_call.go.
+	ForcedToolChoice string `json:"-"`
 }
 
 type KiroUserInputMessage struct {
@@ -273,6 +278,8 @@ type KiroStreamCallback struct {
 	OnCredits      func(credits float64)
 	OnContextUsage func(percentage float64)
 	OnStopReason   func(reason string)
+	// OnStopSequence names the stop sequence that ended the answer, after OnStopReason("stop_sequence").
+	OnStopSequence func(sequence string)
 	//! Called only when Kiro itself reports cache counts; both are already part of OnComplete's input total.
 	OnCacheUsage func(cacheReadTokens, cacheWriteTokens int)
 	// OnThinkingSignature receives a reasoning block's signature; it belongs to the thinking block open now or next.

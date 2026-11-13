@@ -26,6 +26,11 @@ type kiroCallFunc func(ctx context.Context, account *config.Account, payload *Ki
 
 // callKiroAutoContinue runs call and, when the setting is on, continues answers cut off at the output cap.
 func callKiroAutoContinue(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback, call kiroCallFunc) error {
+	if limiter := newOutputLimiter(ctx, payload, callback); limiter != nil {
+		return limiter.run(ctx, func(ctx context.Context, cb *KiroStreamCallback) error {
+			return callKiroAutoContinue(ctx, account, payload, cb, call)
+		})
+	}
 	if payload != nil && payload.StructuredOutput != nil && callback != nil {
 		return callKiroStructured(ctx, account, payload, callback, call)
 	}

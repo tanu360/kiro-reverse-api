@@ -192,6 +192,9 @@ func validateOpenAIRequestShape(req *OpenAIRequest) string {
 	if msg := validateChatResponseFormat(req); msg != "" {
 		return msg
 	}
+	if msg := validateOpenAIOutputOptions(req); msg != "" {
+		return msg
+	}
 	if len(req.Messages) == 0 {
 		return "messages must not be empty"
 	}
@@ -960,6 +963,7 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	}
 
 	kiroPayload := ClaudeToKiro(&req, thinking)
+	kiroPayload.StopSequences = req.StopSequences
 	h.applyReasoningEffort(kiroPayload, req.Model, claudeOutputEffort(&req))
 	attachStructuredOutput(kiroPayload, claudeStructuredOutputSpec(&req), req.Stream)
 	thinkingResponseOpts.Format = structuredOutputThinkingFormat(kiroPayload.StructuredOutput, thinkingResponseOpts.Format, "thinking")
@@ -1057,6 +1061,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			var rawContentBuilder strings.Builder
 			var rawThinkingBuilder strings.Builder
 			var upstreamStopReason string
+			var stopSequence *string
 			activeBlockIndex := -1
 			activeBlockType := ""
 			// pendingThinkingSignature waits for the thinking block it signs to close.
@@ -1379,6 +1384,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
+				OnStopSequence: func(sequence string) { stopSequence = &sequence },
 				OnCacheUsage: func(read, write int) {
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
@@ -1467,7 +1473,8 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			h.sendSSE(w, flusher, "message_delta", map[string]interface{}{
 				"type": "message_delta",
 				"delta": map[string]interface{}{
-					"stop_reason": stopReason,
+					"stop_reason":   stopReason,
+					"stop_sequence": claudeStopSequence(stopReason, stopSequence),
 				},
 				"usage": buildClaudeUsageMap(inputTokens, outputTokens, cacheUsage, cacheProfile != nil),
 			})
@@ -1620,6 +1627,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			var upstreamStopReason string
 			var thinkingSignature string
 			var redactedThinking []string
+			var stopSequence *string
 
 			callback := &KiroStreamCallback{
 				OnText: func(text string, isThinking bool) {
@@ -1645,6 +1653,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				OnStopReason: func(reason string) {
 					upstreamStopReason = reason
 				},
+				OnStopSequence: func(sequence string) { stopSequence = &sequence },
 				OnCacheUsage: func(read, write int) {
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
@@ -1716,6 +1725,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			resp := KiroToClaudeResponse(finalContent, responseThinkingContent, includeEmptyThinkingBlock, toolUses, inputTokens, outputTokens, model)
 			resp.Content = applyClaudeThinkingExtras(resp.Content, thinkingSignature, redactedThinking)
 			resp.StopReason = mapClaudeStopReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
+			resp.StopSequence = claudeStopSequence(resp.StopReason, stopSequence)
 			resp.Usage.InputTokens = billedClaudeInputTokens(inputTokens, cacheUsage)
 			resp.Usage.CacheCreationInputTokens = cacheUsage.CacheCreationInputTokens
 			resp.Usage.CacheReadInputTokens = cacheUsage.CacheReadInputTokens
@@ -1826,7 +1836,9 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.MaxTokens = openAIMaxOutputTokens(&req)
 	kiroPayload := OpenAIToKiro(&req, thinking)
+	kiroPayload.StopSequences, _ = openAIStopSequences(req.Stop)
 	h.applyReasoningEffort(kiroPayload, req.Model, req.ReasoningEffort)
 	attachStructuredOutput(kiroPayload, chatStructuredOutputSpec(&req), req.Stream)
 
