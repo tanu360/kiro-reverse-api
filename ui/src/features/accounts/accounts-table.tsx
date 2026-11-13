@@ -11,7 +11,7 @@ import type { Account } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { ACCOUNT_SORTS, type AccountSort } from "@/routes/-search";
-import { AccountActivityLine } from "./account-activity";
+import { AccountActivityLine, LiveStatusPill } from "./account-activity";
 import {
   AccountFlags,
   AccountIdentity,
@@ -20,7 +20,6 @@ import {
   authIconNamesMethod,
   hasAuthIcon,
   LastUsedText,
-  StatusPill,
   TokenExpiryText,
   UsageMeter,
   useAccountName,
@@ -118,7 +117,7 @@ export function AccountsTable({
         // line does not size the column (inline-size containment); a long one truncates.
         cell: (account) => (
           <div className="flex min-w-0 flex-col items-start gap-1">
-            <StatusPill account={account} size="sm" />
+            <LiveStatusPill account={account} size="sm" />
             <AccountActivityLine accountId={account.id} className="w-full contain-inline-size" />
           </div>
         ),
@@ -254,7 +253,7 @@ function AccountCard({
         // The status leads the meta line, so the header row leaves the name its width.
         // A long nickname wraps to a second line instead of cutting the plan and sign-in.
         <span className="flex min-w-0 items-center gap-2">
-          <StatusPill account={account} size="sm" />
+          <LiveStatusPill account={account} size="sm" />
           <span className="line-clamp-2 min-w-0 wrap-anywhere">
             {accountMeta(account, t, !authIconNamesMethod(account))}
           </span>

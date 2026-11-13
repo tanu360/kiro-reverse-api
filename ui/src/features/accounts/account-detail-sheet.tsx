@@ -10,7 +10,8 @@ import {
 import { accountsQuery } from "@/lib/api/accounts";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
-import { AuthAvatar, accountMeta, StatusPill } from "./account-cells";
+import { LiveStatusPill } from "./account-activity";
+import { AuthAvatar, accountMeta } from "./account-cells";
 import { isApiKeyAccount, isHeld, supportsKiroProfiles } from "./account-model";
 import { AccountSheetActions } from "./account-row-actions";
 import { AccountSection } from "./detail/account-section";
@@ -81,7 +82,7 @@ export function AccountDetailSheet({
                   </ResponsiveSheetTitle>
                   {/* The list's status pill leads the meta line, as on the phone cards. */}
                   <div className="flex min-w-0 items-center gap-2">
-                    <StatusPill account={account} plain size="sm" />
+                    <LiveStatusPill account={account} plain size="sm" />
                     {meta ? (
                       <ResponsiveSheetDescription className="min-w-0 truncate">
                         {meta}
