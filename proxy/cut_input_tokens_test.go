@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"kiro-proxy/config"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -170,5 +171,61 @@ func TestCutAnswerWithKiroCountRemovesTheUnsentOutput(t *testing.T) {
 		if in != whole || logged != in || held != whole {
 			t.Errorf("%s %s: cut %d (logged %d), whole %d, held cut %d; want all equal", req.api, req.limit, in, logged, whole, held)
 		}
+	}
+}
+
+// The table is saved, so the first cut answer after a restart still reports Kiro's count.
+func TestPromptOverheadsSurviveARestart(t *testing.T) {
+	if err := config.Init(tempDBPath(t)); err != nil {
+		t.Fatalf("config.Init: %v", err)
+	}
+	before := loadPromptOverheads()
+	if in, _ := before.finalizeUsage("claude-haiku-4.5", outputCut{}, 0, 32, 22, 4183, 32); in != 4151 {
+		t.Fatalf("whole answer: input %d, want 4151", in)
+	}
+	after := loadPromptOverheads()
+	if in, _ := after.finalizeUsage("claude-haiku-4.5", outputCut{cut: true}, 0, 8, 22, 0, 8); in != 4151 {
+		t.Fatalf("cut answer after a restart: input %d, want 4151", in)
+	}
+}
+
+func TestPromptOverheadsPickTheNearestCountedPrompt(t *testing.T) {
+	p := newPromptOverheads()
+	p.record("claude-haiku-4.5", 4, 4104, false)
+	p.record("claude-haiku-4.5", 3738, 7706, false)
+	p.record("deepseek-3.2", 22, 3793, false)
+	cases := []struct {
+		model     string
+		estimated int
+		want      int
+	}{
+		{"claude-haiku-4.5", 30, 4130},   // nearest is the 4-token prompt
+		{"claude-haiku-4.5", 3000, 6968}, // nearest is the 3738-token prompt
+		{"CLAUDE-HAIKU-4.5", 4, 4104},    // model IDs ignore case
+		{"deepseek-3.2", 22, 3793},
+		{"claude-sonnet-4.5", 22, 3793}, // no count for this model: the nearest of any model
+	}
+	for _, c := range cases {
+		if got := c.estimated + p.overhead(c.model, c.estimated); got != c.want {
+			t.Errorf("%s %d: got %d, want %d", c.model, c.estimated, got, c.want)
+		}
+	}
+	// A cut answer's count does not replace a whole answer's for the same prompt size.
+	if p.record("claude-haiku-4.5", 4, 4200, true) {
+		t.Error("a cut count replaced a whole count")
+	}
+	if got := 4 + p.overhead("claude-haiku-4.5", 4); got != 4104 {
+		t.Errorf("after a cut count: got %d, want 4104", got)
+	}
+	// The oldest entry gives way once a model holds promptOverheadsPerModel sizes.
+	for i := 0; i < promptOverheadsPerModel; i++ {
+		p.record("claude-haiku-4.5", 10000+i, 14000+i, false)
+	}
+	if p.countedWhole("claude-haiku-4.5", 4) {
+		t.Error("the oldest entry was kept past the limit")
+	}
+	var empty *promptOverheads
+	if in, _ := empty.finalizeUsage("m", outputCut{cut: true}, 0, 8, 22, 0, 8); in != 22 {
+		t.Errorf("no table: input %d, want the estimate 22", in)
 	}
 }

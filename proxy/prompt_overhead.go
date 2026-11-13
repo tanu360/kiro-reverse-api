@@ -1,6 +1,10 @@
 package proxy
 
 import (
+	"encoding/json"
+	"kiro-proxy/config"
+	"kiro-proxy/logger"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -13,6 +17,7 @@ import (
 //! now reports what Kiro counted for the prompt: the count it brought, with the output past the
 //! cut removed as well, or else the estimate plus what Kiro added to the nearest prompt it
 //! counted. A prompt Kiro already counted keeps that count, so it reads the same cut or not.
+//! The table is saved in the database, so a cut answer right after a restart reads the same.
 
 const (
 	// promptOverheadsPerModel bounds the prompt sizes remembered for one model.
@@ -40,23 +45,90 @@ type promptOverhead struct {
 	seq       uint64
 }
 
+// savedPromptOverhead is one entry of the saved table; the list order keeps the age order.
+type savedPromptOverhead struct {
+	Estimated int  `json:"estimated"`
+	Overhead  int  `json:"overhead"`
+	FromCut   bool `json:"fromCut,omitempty"`
+}
+
 // promptOverheads remembers, per Kiro model, how far Kiro's prompt count ran past the local
 // estimate. A nil *promptOverheads remembers nothing.
 type promptOverheads struct {
 	mu      sync.Mutex
 	seq     uint64
 	byModel map[string][]promptOverhead
+	// save stores the table after a change; nil keeps it in memory only.
+	save   func([]byte) error
+	saveMu sync.Mutex
 }
 
 func newPromptOverheads() *promptOverheads {
 	return &promptOverheads{byModel: map[string][]promptOverhead{}}
 }
 
-// record notes Kiro's count of a prompt. A whole answer's count replaces an earlier one for a
-// prompt of the same estimate; a cut answer's count is only kept when there is none.
-func (p *promptOverheads) record(model string, estimated, counted int, fromCut bool) {
-	if p == nil || estimated <= 0 || counted <= 0 {
+// loadPromptOverheads returns the table saved in the database, which it keeps saving to.
+func loadPromptOverheads() *promptOverheads {
+	p := newPromptOverheads()
+	p.save = config.SavePromptOverheads
+	data, err := config.LoadPromptOverheads()
+	if err != nil {
+		logger.Warnf("[Usage] Could not load the saved prompt overheads: %v", err)
+		return p
+	}
+	if data == nil {
+		return p
+	}
+	var saved map[string][]savedPromptOverhead
+	if err := json.Unmarshal(data, &saved); err != nil {
+		logger.Warnf("[Usage] Could not read the saved prompt overheads: %v", err)
+		return p
+	}
+	models := make([]string, 0, len(saved))
+	for model := range saved {
+		models = append(models, model)
+	}
+	sort.Strings(models)
+	for _, model := range models {
+		for _, e := range saved[model] {
+			p.record(model, e.Estimated, e.Estimated+e.Overhead, e.FromCut)
+		}
+	}
+	return p
+}
+
+// persist saves the table; saves run one at a time, each with the table as it is then.
+func (p *promptOverheads) persist() {
+	if p == nil || p.save == nil {
 		return
+	}
+	p.saveMu.Lock()
+	defer p.saveMu.Unlock()
+	p.mu.Lock()
+	saved := make(map[string][]savedPromptOverhead, len(p.byModel))
+	for model, list := range p.byModel {
+		ordered := append([]promptOverhead(nil), list...)
+		sort.Slice(ordered, func(i, j int) bool { return ordered[i].seq < ordered[j].seq })
+		for _, e := range ordered {
+			saved[model] = append(saved[model], savedPromptOverhead{Estimated: e.estimated, Overhead: e.overhead, FromCut: e.fromCut})
+		}
+	}
+	p.mu.Unlock()
+	data, err := json.Marshal(saved)
+	if err == nil {
+		err = p.save(data)
+	}
+	if err != nil {
+		logger.Warnf("[Usage] Could not save the prompt overheads: %v", err)
+	}
+}
+
+// record notes Kiro's count of a prompt and reports whether the table changed. A whole answer's
+// count replaces an earlier one for a prompt of the same estimate; a cut answer's count is only
+// kept when there is none.
+func (p *promptOverheads) record(model string, estimated, counted int, fromCut bool) bool {
+	if p == nil || estimated <= 0 || counted <= 0 {
+		return false
 	}
 	key := strings.ToLower(model)
 	p.mu.Lock()
@@ -66,18 +138,20 @@ func (p *promptOverheads) record(model string, estimated, counted int, fromCut b
 	list, known := p.byModel[key]
 	for i := range list {
 		if list[i].estimated == estimated {
-			if !fromCut || list[i].fromCut {
-				list[i] = entry
+			if fromCut && !list[i].fromCut {
+				return false
 			}
-			return
+			changed := list[i].overhead != entry.overhead || list[i].fromCut != fromCut
+			list[i] = entry
+			return changed
 		}
 	}
 	if !known && len(p.byModel) >= promptOverheadModels {
-		return
+		return false
 	}
 	if len(list) < promptOverheadsPerModel {
 		p.byModel[key] = append(list, entry)
-		return
+		return true
 	}
 	oldest := 0
 	for i := range list {
@@ -86,6 +160,7 @@ func (p *promptOverheads) record(model string, estimated, counted int, fromCut b
 		}
 	}
 	list[oldest] = entry
+	return true
 }
 
 // countedWhole reports whether a whole answer brought Kiro's count of a prompt of this estimate.
@@ -151,12 +226,16 @@ func (p *promptOverheads) finalizeUsage(model string, cut outputCut, inputTokens
 		outputTokens = estimatedOutputTokens
 	}
 	if inputTokens > 0 {
-		p.record(model, estimatedInputTokens, inputTokens, false)
+		if p.record(model, estimatedInputTokens, inputTokens, false) {
+			p.persist()
+		}
 		return inputTokens, outputTokens
 	}
 	if contextTokens > 0 && !(cut.cut && p.countedWhole(model, estimatedInputTokens)) {
 		inputTokens = inputFromContextTokens(contextTokens, outputTokens+cut.unsent, estimatedInputTokens)
-		p.record(model, estimatedInputTokens, inputTokens, cut.cut)
+		if p.record(model, estimatedInputTokens, inputTokens, cut.cut) {
+			p.persist()
+		}
 		return inputTokens, outputTokens
 	}
 	return estimatedInputTokens + p.overhead(model, estimatedInputTokens), outputTokens

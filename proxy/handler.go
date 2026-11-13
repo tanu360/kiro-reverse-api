@@ -279,7 +279,7 @@ func NewHandler() *Handler {
 		stopRefresh:     make(chan struct{}),
 		stopStatsSaver:  make(chan struct{}),
 		promptCache:     newPromptCacheTracker(defaultPromptCacheTTL),
-		promptOverheads: newPromptOverheads(),
+		promptOverheads: loadPromptOverheads(),
 		affinity:        newSessionAffinity(),
 		adminSessions:   newAdminSessionStore(),
 		usageRefresh:    newRefreshScheduler(config.GetUsageRefreshInterval),
