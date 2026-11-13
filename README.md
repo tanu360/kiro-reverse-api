@@ -175,8 +175,8 @@ If this project helps you, a Star would mean a lot.
 
 - **Auto-continue** (opt-in): when an answer stops at Kiro's ~8192-token output cap without a tool call, the proxy asks Kiro to continue and appends the rest, up to 10 times.
 - **Structured tool history**: earlier tool calls and results reach the model as real tool calls, so long agent sessions keep calling tools; a rejected request is retried once as plain text.
-- **Prompt filter**: replaces Claude Code's built-in system prompt with a compact one, strips environment noise (env vars, git status, recent commits), and applies your own line or regex rules in order.
-- **Model mappings**: ordered, drag-to-reorder rules that send any client model name to a Kiro model ID; the first match wins. A model Kiro lists itself only follows a rule with its full name, so a substring rule such as `gpt-5` never redirects a native model.
+- **System prompt filter**: replaces Claude Code's built-in system prompt with a compact one, strips environment noise (env vars, git status, recent commits), and applies your own line or regex rules in order.
+- **Model mapping**: ordered, drag-to-reorder rules that send any client model name to a Kiro model ID; the first match wins. A model Kiro lists itself only follows a rule with its full name, so a substring rule such as `gpt-5` never redirects a native model.
 - **Stream integrity**: rejects replies that end without a stop reason or metering event, with an opt-in lenient mode for IdC and Enterprise accounts that send neither.
 - **Endpoint choice**: pick a Kiro endpoint or let the proxy choose by availability, with optional fallback to the others.
 - **Image resizing** (on by default): an image wider or taller than 1568 px, or larger than 400 KB, is scaled down and re-encoded before it goes to Kiro. Both limits are settings.
@@ -185,7 +185,7 @@ If this project helps you, a Star would mean a lot.
 ### 👥 Account pool
 
 - Multiple Kiro accounts with two routing modes. **Weighted** (default): round-robin per model with a per-account weight (an account with weight N takes about N times as many new requests). **Priority**: each new request goes to the account with the lowest priority number (0–999) that can serve it; the next one takes over while it cools down, runs out of credits, is disabled, or lacks the model.
-- Session affinity: follow-up turns return to the account that answered the previous turn and already holds the prompt cache; new conversations still follow the routing mode. Turn it off to route every request by the routing mode, for example for strict priority.
+- Session affinity (**Keep conversations on one account**): follow-up turns return to the account that answered the previous turn and already holds the prompt cache; new conversations still follow the routing mode. Turn it off to route every request by the routing mode, for example for strict priority.
 - Optional limit of 1 to 1000 requests per minute per account: an account at the limit is skipped, and when every account is at it, clients get HTTP 429. A try that never reached Kiro (a proxy or connection failure) does not count toward it. The Accounts page shows each account's live requests per minute and requests today.
 - **Self-heal** (on by default): when no account can serve, the proxy lifts the auth bans and error cooldowns it set by itself and tries again, at most once every 5 minutes and 5 times in a row without a successful request (both adjustable). Kiro suspensions (a 403 "locked your account" counts as one), accounts you turned off and quota cooldowns are never lifted.
 - Automatic OAuth token refresh ahead of expiry, safe under concurrent requests; account cooldowns survive restarts.
@@ -193,7 +193,7 @@ If this project helps you, a Star would mean a lot.
 - Signing in or importing a stored account again updates it instead of adding a copy. A stored Kiro API key added again is refused with HTTP 409 (already added), unless it comes with notes or tags and the same region, as an export imported back into the same backend does: then its tags join the stored account's and empty notes and nickname are filled. Copies left from earlier versions (same refresh token, Kiro API key, user ID, or email and sign-in method) show in a notice on the Accounts page; **Review** merges each group into one account after a backup, keeping its requests, summed counters, notes and tags, and a copy's own proxy when the kept account has none.
 - **Sign in again** in every account menu replaces an account's login in place and keeps its ID, settings, notes, tags and statistics. It lifts a ban, but an account you switched off stays off. When the new sign-in is a different user, the proxy asks before it replaces the identity. A sign-in that belongs to another account in the pool is refused with HTTP 409 (`relogin_other_account`) and no confirmation: this account stays as it was, and the panel names the other account and says whether it took the new tokens.
 - Notes (up to 2000 characters) and up to 10 tags (24 characters each) per account. Search matches them, tags work in the Tag filter and in batch actions, and export and import keep both.
-- Auth methods: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), SSO token, Kiro IDE local cache, credentials JSON, Kiro web cookie, and headless Kiro API keys (`ksk_…`).
+- Auth methods: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), SSO token, Kiro IDE local cache, credentials JSON, Kiro web cookie, and headless Kiro API keys (`ksk_…`). In **Add account**, each sign-in link has an open icon and a copy icon.
 - Per account: its own outbound proxy, device (machine) ID, pinned Kiro profile, model list refresh, connection test, and the real Kiro overage switch.
 - Optional overage: accounts keep serving after their credits run out.
 - Per-account import / export and bulk operations.
@@ -201,7 +201,7 @@ If this project helps you, a Star would mean a lot.
 ### 🛡 Admin panel
 
 - React single-page app embedded in the binary; no separate web server to run.
-- Overview dashboard that updates live: KPI cards for accounts, requests, successes and failures with hourly trends, per-minute live tiles with sparklines, traffic over time, a model-mix donut, and traffic by account as stacked bars. Its cards keep Kiro account credit usage apart from proxy request usage.
+- Overview dashboard that updates live: four KPI cards (accounts, plan credits, and requests and failures in the last hour), traffic over time as stacked bars, a list of accounts that need attention, traffic by account, a model-mix donut, and the most active accounts. The **Plan credits** card splits Kiro credit use into the part used through the proxy and the part used outside it.
 - Accounts with status tabs and counts, filters (plan, auth, region, enabled, tag), search over email, nickname, notes and tags, sorting, batch actions, a detail view, connection tests, live requests per minute and today, a duplicates review, and export.
 - Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history.
 - API page with client API key management (optional custom key values, enable/disable, per-key token, credit and call limits, account binding, regenerate, usage reset), a **Usage by key** chart, and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
@@ -385,13 +385,13 @@ Require API keys from the **API** page (**API access → Require an API key**). 
 
 The Overview page and the Accounts page intentionally answer different questions:
 
-- **Accounts card**: current configured Kiro accounts, using Kiro server quota fields (`usage_current / usage_limit`).
-- **Requests card**: app/proxy history from SQLite `requests` rows: `COUNT(*)`, `SUM(total_tokens)`, and `SUM(credits)`.
-- **Succeeded / Failed cards**: final proxy request outcomes from the same `requests` table.
-- **Account cards**: current visible account counters saved on the account record (`requestCount`, `totalTokens`, `totalCredits`).
-- **Log retention**: before old rows are deleted, their totals go into a rollup, so the Overview cards and `/v1/stats` keep counting them. The Requests page and Usage by key show only the rows kept.
+- **Accounts** card: the configured Kiro accounts right now, by health (available, attention, banned, disabled).
+- **Plan credits** card: this month's Kiro server quota fields, summed over all accounts (`usage_current / usage_limit`). Its bar splits the used credits into **Proxy** (credits of requests sent through this proxy) and **Outside** (the rest), next to what is **Left**.
+- **Requests** and **Failed** cards: finished proxy requests in the last hour, compared with the hour before.
+- **Accounts** page: the counters saved on each account record (`requestCount`, `totalTokens`, `totalCredits`).
+- **Log retention**: before old rows are deleted, their totals go into a rollup, so the **Plan credits** card, the model mix and `/v1/stats` keep counting them. The Requests page and Usage by key show only the rows kept.
 
-If an old/deleted account still has rows in `requests`, the Overview's **Proxy credits** can be higher than the visible account credit sum. Use **Settings → Danger zone → Reset statistics** or a one-time DB cleanup if you want historical request rows cleared.
+If an old or deleted account still has rows in `requests`, its credits still count toward **Proxy**. **Proxy** can then be too high and **Outside** too low. Use **Settings → Danger zone → Reset statistics** or a one-time DB cleanup if you want historical request rows cleared.
 
 Token labels may display compactly (`54.5M`, `476.5K`), but backend math and quota checks use raw numbers.
 

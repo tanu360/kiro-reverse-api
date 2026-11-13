@@ -193,7 +193,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - Đăng nhập lại hoặc nhập lại một tài khoản đã lưu sẽ cập nhật tài khoản đó thay vì tạo bản sao. Thêm lại một Kiro API key đã lưu sẽ bị từ chối với HTTP 409 (đã được thêm), trừ khi nó đi kèm ghi chú hoặc thẻ và cùng khu vực, như khi nhập lại bản xuất vào chính backend đó: khi ấy thẻ của nó được gộp vào thẻ của tài khoản đã lưu, còn ghi chú và biệt danh đang trống được điền vào. Các bản sao còn sót từ phiên bản cũ (cùng refresh token, Kiro API key, user ID, hoặc cùng email và phương thức đăng nhập) hiện thành thông báo trên trang Tài khoản; **Xem lại** gộp mỗi nhóm thành một tài khoản sau khi sao lưu, giữ lại các yêu cầu, cộng dồn bộ đếm, gộp ghi chú và thẻ, và giữ proxy riêng của một bản sao khi tài khoản được giữ lại chưa có proxy riêng.
 - **Đăng nhập lại** trong menu của mỗi tài khoản thay thông tin đăng nhập ngay tại chỗ và giữ nguyên ID, cài đặt, ghi chú, thẻ và thống kê. Thao tác này gỡ lệnh cấm, nhưng tài khoản bạn đã tắt vẫn tắt. Khi lần đăng nhập mới là một người dùng khác, proxy hỏi xác nhận trước khi thay danh tính. Lần đăng nhập thuộc về một tài khoản khác trong pool bị từ chối với HTTP 409 (`relogin_other_account`) mà không hỏi xác nhận: tài khoản này giữ nguyên, và trang quản trị cho biết đó là tài khoản nào và tài khoản đó đã nhận token mới hay chưa.
 - Ghi chú (tối đa 2000 ký tự) và tối đa 10 thẻ (mỗi thẻ 24 ký tự) cho mỗi tài khoản. Tìm kiếm khớp cả ghi chú lẫn thẻ, thẻ dùng được trong bộ lọc Thẻ và thao tác hàng loạt, và cả xuất lẫn nhập đều giữ cả hai.
-- Phương thức xác thực: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), SSO token, cache cục bộ của Kiro IDE, JSON thông tin xác thực, cookie web Kiro và Kiro API key cho môi trường không giao diện (`ksk_…`).
+- Phương thức xác thực: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), SSO token, cache cục bộ của Kiro IDE, JSON thông tin xác thực, cookie web Kiro và Kiro API key cho môi trường không giao diện (`ksk_…`). Trong **Thêm tài khoản**, mỗi liên kết đăng nhập có một biểu tượng mở và một biểu tượng sao chép.
 - Cho từng tài khoản: proxy outbound riêng, ID thiết bị (machine ID), Kiro profile được ghim, làm mới danh sách model, kiểm tra kết nối và công tắc vượt mức thật của Kiro.
 - Vượt mức (tùy chọn): tài khoản tiếp tục phục vụ yêu cầu sau khi hết credit.
 - Nhập / xuất theo từng tài khoản và thao tác hàng loạt.
@@ -201,11 +201,11 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 ### 🛡 Trang quản trị
 
 - Ứng dụng React một trang nhúng trong binary; không cần chạy web server riêng.
-- Bảng điều khiển Tổng quan cập nhật trực tiếp: thẻ KPI cho tài khoản, yêu cầu, thành công và thất bại kèm xu hướng theo giờ, ô số liệu trực tiếp theo phút có sparkline, lưu lượng theo thời gian, biểu đồ donut phân bổ model và lưu lượng theo tài khoản dạng cột chồng. Các thẻ tách riêng mức dùng credit của tài khoản Kiro với mức dùng của yêu cầu qua proxy.
+- Bảng điều khiển Tổng quan cập nhật trực tiếp: bốn thẻ KPI (tài khoản, credit gói, cùng số yêu cầu và số yêu cầu thất bại trong giờ qua), lưu lượng theo thời gian dạng cột chồng, danh sách tài khoản cần chú ý, lưu lượng theo tài khoản, biểu đồ donut phân bổ model và các tài khoản hoạt động nhiều nhất. Thẻ **Credit gói** chia mức dùng credit Kiro thành phần dùng qua proxy và phần dùng ngoài proxy.
 - Tài khoản với tab trạng thái kèm số lượng, bộ lọc (gói, xác thực, khu vực, bật, thẻ), tìm kiếm theo email, biệt danh, ghi chú và thẻ, sắp xếp, thao tác hàng loạt, chế độ xem chi tiết, kiểm tra kết nối, số yêu cầu mỗi phút và hôm nay theo thời gian thực, xem lại tài khoản trùng lặp và xuất.
 - Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, Mã truy vết và dòng thời gian của từng lần thử upstream (tài khoản, endpoint, thời lượng, kết quả, failover), API key được che và lịch sử lưu trong SQLite.
 - Trang API quản lý API key của client (giá trị key tùy chỉnh không bắt buộc, bật/tắt, giới hạn token, credit và lượt gọi cho từng key, gắn key với tài khoản, tạo lại key, đặt lại mức sử dụng), biểu đồ **Mức sử dụng theo key** và trình tạo mã thiết lập client có tô sáng cú pháp: mã gọi các API Anthropic Messages, OpenAI Chat Completions và OpenAI Responses bằng curl, Python, Node.js, Go, Java, PHP, Ruby và C# (SDK chính thức hoặc HTTP thuần, có hoặc không stream) kèm phản hồi mẫu, cùng cấu hình Claude Code và Codex.
-- Cài đặt cho mức sử dụng và làm mới trong nền, định tuyến (chế độ, giữ hội thoại, giới hạn mỗi tài khoản), tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, tự phục hồi, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, tên miền và khu vực upstream, proxy outbound, nhóm proxy, header phản hồi, cảnh báo, mật khẩu quản trị, lưu giữ nhật ký và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
+- Cài đặt cho mức sử dụng và làm mới trong nền, định tuyến (chế độ, giữ hội thoại, giới hạn mỗi tài khoản), tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, tự phục hồi, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, tên miền và khu vực Kiro, proxy outbound, nhóm proxy, header phản hồi, cảnh báo, mật khẩu quản trị, lưu giữ nhật ký và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
 - Cảnh báo qua webhook, Telegram, Discord hoặc Slack khi sắp hết credit, khi tài khoản bị cấm hoặc khi không còn tài khoản nào phục vụ được yêu cầu (xem [Cảnh báo](#-cảnh-báo)).
 - Menu lệnh (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) để mở trang và chạy thao tác, chế độ riêng tư ẩn địa chỉ email, và kiểm tra cập nhật qua `version.json` trên nhánh `main` của repo.
 - Đổi mật khẩu quản trị sẽ kết thúc mọi phiên đăng nhập khác.
@@ -216,7 +216,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 
 - Hỗ trợ proxy outbound — SOCKS5, HTTP hoặc HTTPS, chuyển đổi trực tiếp không cần khởi động lại, có thể ghi đè riêng cho từng tài khoản. Mật khẩu proxy đã lưu hiển thị dạng `********`.
 - Nhóm proxy: mỗi tài khoản không có proxy riêng được gán một proxy trong nhóm, có kiểm tra định kỳ và tự chuyển sang proxy hoạt động tốt khi một proxy không kết nối được (xem [Nhóm proxy](#-nhóm-proxy)).
-- Tên miền và khu vực upstream (**Cài đặt → Tên miền và khu vực upstream**): gửi chat và tìm kiếm web tới `runtime.{region}.kiro.dev` thay vì `q.{region}.amazonaws.com` (mức sử dụng và danh sách model vẫn đi qua AWS), và ghi đè cho mọi tài khoản khu vực API (`us-east-1` hoặc `eu-central-1`) hoặc khu vực dùng để làm mới token Builder ID và IAM Identity Center. Khu vực không khớp với tài khoản khiến yêu cầu của tài khoản đó thất bại, nhưng không bao giờ làm tài khoản bị cấm.
+- Tên miền và khu vực Kiro (**Cài đặt → Tên miền và khu vực Kiro**): gửi chat và tìm kiếm web tới `runtime.{region}.kiro.dev` thay vì `q.{region}.amazonaws.com` (mức sử dụng và danh sách model vẫn đi qua AWS), và ghi đè cho mọi tài khoản khu vực API (`us-east-1` hoặc `eu-central-1`) hoặc khu vực dùng để làm mới token Builder ID và IAM Identity Center. Khu vực không khớp với tài khoản khiến yêu cầu của tài khoản đó thất bại, nhưng không bao giờ làm tài khoản bị cấm.
 - Hậu tố chế độ thinking có thể tùy chỉnh và chuyển tiếp nguyên cấu hình `thinking` của Anthropic.
 
 ### 🧩 Lưu trữ
@@ -385,13 +385,13 @@ Bắt buộc API key từ trang **API** (**Truy cập API → Bắt buộc API k
 
 Trang Tổng quan và trang Tài khoản cố ý trả lời những câu hỏi khác nhau:
 
-- **Thẻ Tài khoản**: các tài khoản Kiro đang được cấu hình, dùng các trường hạn mức từ máy chủ Kiro (`usage_current / usage_limit`).
-- **Thẻ Yêu cầu**: lịch sử của ứng dụng/proxy từ các dòng `requests` trong SQLite: `COUNT(*)`, `SUM(total_tokens)` và `SUM(credits)`.
-- **Thẻ Thành công / Thất bại**: kết quả cuối cùng của yêu cầu qua proxy, lấy từ cùng bảng `requests`.
-- **Thẻ của từng tài khoản**: bộ đếm hiện tại của các tài khoản đang hiển thị, lưu trên bản ghi tài khoản (`requestCount`, `totalTokens`, `totalCredits`).
-- **Lưu giữ nhật ký**: trước khi xóa các dòng cũ, tổng số của chúng được gộp vào một bản tổng hợp, nên các thẻ trên trang Tổng quan và `/v1/stats` vẫn tính chúng. Trang Yêu cầu và Mức sử dụng theo key chỉ hiển thị các dòng được giữ lại.
+- **Thẻ Tài khoản**: các tài khoản Kiro đang được cấu hình ở thời điểm hiện tại, chia theo tình trạng (khả dụng, cần chú ý, bị cấm, đã tắt).
+- **Thẻ Credit gói**: các trường hạn mức từ máy chủ Kiro trong tháng này, cộng cho mọi tài khoản (`usage_current / usage_limit`). Thanh của thẻ chia credit đã dùng thành **Proxy** (credit của các yêu cầu đi qua proxy này) và **Ngoài proxy** (phần còn lại), bên cạnh phần **Còn lại**.
+- **Thẻ Yêu cầu** và **Thẻ Thất bại**: các yêu cầu qua proxy đã kết thúc trong giờ qua, so với giờ trước đó.
+- **Trang Tài khoản**: bộ đếm lưu trên bản ghi của từng tài khoản (`requestCount`, `totalTokens`, `totalCredits`).
+- **Lưu giữ nhật ký**: trước khi xóa các dòng cũ, tổng số của chúng được gộp vào một bản tổng hợp, nên thẻ **Credit gói**, biểu đồ phân bổ model và `/v1/stats` vẫn tính chúng. Trang Yêu cầu và Mức sử dụng theo key chỉ hiển thị các dòng được giữ lại.
 
-Nếu một tài khoản cũ hoặc đã xóa vẫn còn dòng trong `requests`, **Credit qua proxy** trên trang Tổng quan có thể cao hơn tổng credit của các tài khoản đang hiển thị. Dùng **Cài đặt → Vùng nguy hiểm → Đặt lại thống kê** hoặc dọn DB một lần nếu bạn muốn xóa các dòng yêu cầu cũ.
+Nếu một tài khoản cũ hoặc đã xóa vẫn còn dòng trong `requests`, credit của nó vẫn được tính vào **Proxy**. Khi đó **Proxy** có thể cao hơn thực tế, còn **Ngoài proxy** thấp hơn thực tế. Dùng **Cài đặt → Vùng nguy hiểm → Đặt lại thống kê** hoặc dọn DB một lần nếu bạn muốn xóa các dòng yêu cầu cũ.
 
 Nhãn token có thể hiển thị dạng rút gọn (`54.5M`, `476.5K`), nhưng phép tính ở backend và việc kiểm tra hạn mức dùng số thô.
 
@@ -449,7 +449,7 @@ Proxy riêng của tài khoản và proxy chung có 15 giây để kết nối. 
 
 **Cài đặt → Nhóm proxy** phân bổ các tài khoản không có proxy riêng vào danh sách tối đa 100 proxy (`http`, `https`, `socks5` hoặc `socks5h`). Mỗi tài khoản giữ nguyên proxy được gán, còn tài khoản mới được gán vào proxy hoạt động tốt đang có ít tài khoản nhất. Proxy nào không kết nối được sẽ chuyển ngay tài khoản của nó sang một proxy hoạt động tốt; lỗi proxy không bao giờ làm tài khoản bị cấm hay rơi vào thời gian chờ. Mặc định kiểm tra định kỳ mỗi 10 phút, và việc làm mới token đi cùng đường với yêu cầu của tài khoản.
 
-Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi kết nối trực tiếp. Khi không có proxy nào trong nhóm hoạt động tốt, yêu cầu nhận HTTP 503 `no healthy outbound proxy in the pool`, trừ khi bật **Dự phòng kết nối trực tiếp**: khi đó yêu cầu đi qua proxy chung, hoặc đi trực tiếp nếu chưa đặt proxy chung.
+Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi kết nối trực tiếp. Khi không có proxy nào trong nhóm hoạt động tốt, yêu cầu nhận HTTP 503 `no healthy outbound proxy in the pool`, trừ khi bật **Dự phòng khi không có proxy nào hoạt động tốt**: khi đó yêu cầu đi qua proxy chung, hoặc đi trực tiếp nếu chưa đặt proxy chung.
 
 ---
 

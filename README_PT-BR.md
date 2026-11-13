@@ -134,7 +134,7 @@ Se este projeto ajuda você, uma Star significaria muito.
     <source media="(prefers-color-scheme: dark)" srcset="screenshots/pt-BR/settings-1-dark.webp">
     <img alt="Configurações" src="screenshots/pt-BR/settings-1-light.webp" width="100%">
   </picture>
-  <br><sub><b>Configurações</b> — uso, integridade do stream, roteamento, autocontinuar</sub>
+  <br><sub><b>Configurações</b> — uso, integridade do stream, roteamento, continuação automática</sub>
 </p>
 
 <p align="center">
@@ -173,7 +173,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 
 ### 🧰 Tratamento de requisições
 
-- **Autocontinuar** (opcional): quando uma resposta para no limite de saída de ~8192 tokens do Kiro sem chamada de ferramenta, o proxy pede ao Kiro para continuar e anexa o restante, até 10 vezes.
+- **Continuação automática** (opcional): quando uma resposta para no limite de saída de ~8192 tokens do Kiro sem chamada de ferramenta, o proxy pede ao Kiro para continuar e anexa o restante, até 10 vezes.
 - **Histórico estruturado de ferramentas**: chamadas de ferramenta e resultados anteriores chegam ao modelo como chamadas reais, então sessões longas de agente continuam chamando ferramentas; uma requisição rejeitada é tentada novamente uma vez como texto simples.
 - **Filtro de system prompt**: substitui o system prompt integrado do Claude Code por um compacto, remove ruído do ambiente (variáveis de ambiente, status do git, commits recentes) e aplica suas próprias regras de linha ou de regex, em ordem.
 - **Mapeamento de modelos**: regras ordenadas, reordenáveis arrastando, que enviam qualquer nome de modelo do cliente para um ID de modelo do Kiro; vence a primeira correspondência. Um modelo que o próprio Kiro lista só segue uma regra com o nome completo dele, então uma regra de substring como `gpt-5` nunca redireciona um modelo nativo.
@@ -185,7 +185,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 ### 👥 Pool de contas
 
 - Várias contas Kiro com dois modos de roteamento. **Ponderado** (padrão): round-robin por modelo com peso por conta (uma conta com peso N recebe cerca de N vezes mais requisições novas). **Prioridade**: cada requisição nova vai para a conta com o menor número de prioridade (0–999) que pode atendê-la; a próxima assume enquanto ela está em espera, sem créditos, desativada ou sem o modelo.
-- Afinidade de sessão: os turnos seguintes voltam para a conta que respondeu ao turno anterior e já tem o cache do prompt; conversas novas seguem o modo de roteamento. Desligue-a para rotear cada requisição pelo modo de roteamento, como pede a prioridade estrita.
+- Afinidade de sessão (**Manter conversas em uma conta**): os turnos seguintes voltam para a conta que respondeu ao turno anterior e já tem o cache do prompt; conversas novas seguem o modo de roteamento. Desligue-a para rotear cada requisição pelo modo de roteamento, como pede a prioridade estrita.
 - Limite opcional de 1 a 1000 requisições por minuto por conta: uma conta no limite é pulada e, quando todas estão no limite, os clientes recebem HTTP 429. Uma tentativa que nunca chegou ao Kiro (uma falha de proxy ou de conexão) não conta para o limite. A página Contas mostra ao vivo as requisições por minuto e as de hoje de cada conta.
 - **Autorrecuperação** (ligada por padrão): quando nenhuma conta pode atender, o proxy retira os bloqueios de autenticação e os períodos de espera por erro que ele mesmo aplicou e tenta de novo, no máximo uma vez a cada 5 minutos e 5 vezes seguidas sem uma requisição bem-sucedida (ambos ajustáveis). Suspensões do Kiro (um 403 "locked your account" conta como uma), contas que você desligou e períodos de espera por cota nunca são retirados.
 - Atualização automática do token OAuth antes de expirar, segura com requisições simultâneas; os períodos de espera das contas continuam valendo após reinicializações.
@@ -193,7 +193,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Entrar de novo ou importar uma conta já salva atualiza essa conta em vez de criar uma cópia. Uma chave de API do Kiro já salva, adicionada de novo, é recusada com HTTP 409 (já adicionada), a menos que venha com notas ou tags e na mesma região, como uma exportação importada de volta no mesmo backend: aí as tags dela se juntam às da conta salva, e notas e apelido vazios são preenchidos. Cópias deixadas por versões anteriores (mesmo refresh token, chave de API do Kiro, ID de usuário, ou mesmo e-mail e método de login) aparecem em um aviso na página Contas; **Revisar** mescla cada grupo em uma conta depois de um backup, mantendo as requisições, somando os contadores, juntando notas e tags e mantendo o proxy próprio de uma cópia quando a conta mantida não tem um.
 - **Entrar novamente**, no menu de cada conta, troca o login da conta no lugar e mantém o ID, as configurações, as notas, as tags e as estatísticas. Ele retira um banimento, mas uma conta que você desligou continua desligada. Quando o novo login é de outro usuário, o proxy pede confirmação antes de trocar a identidade. Um login que pertence a outra conta do pool é recusado com HTTP 409 (`relogin_other_account`), sem confirmação: esta conta fica como estava, e o painel mostra qual é a outra conta e se ela passou a usar os novos tokens.
 - Notas (até 2000 caracteres) e até 10 tags (de 24 caracteres cada) por conta. A busca encontra as duas, as tags funcionam no filtro Tag e nas ações em lote, e a exportação e a importação mantêm ambas.
-- Métodos de autenticação: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), token SSO, cache local do Kiro IDE, JSON de credenciais, cookie web do Kiro e chaves de API headless do Kiro (`ksk_…`).
+- Métodos de autenticação: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), token SSO, cache local do Kiro IDE, JSON de credenciais, cookie web do Kiro e chaves de API headless do Kiro (`ksk_…`). Em **Adicionar conta**, cada link de login tem um ícone para abrir e outro para copiar.
 - Por conta: proxy de saída próprio, ID de dispositivo (máquina), perfil do Kiro fixado, atualização da lista de modelos, teste de conexão e a chave real de excedente do Kiro.
 - Excedente opcional: as contas continuam atendendo depois que os créditos acabam.
 - Importação / exportação por conta e operações em lote.
@@ -201,11 +201,11 @@ Se este projeto ajuda você, uma Star significaria muito.
 ### 🛡 Painel de administração
 
 - Aplicativo React de página única embutido no binário; não há servidor web separado para rodar.
-- Painel Visão geral atualizado ao vivo: cartões de KPI de contas, requisições, sucessos e falhas com tendências por hora, indicadores ao vivo por minuto com sparklines, tráfego ao longo do tempo, um gráfico de rosca com a distribuição por modelo e o tráfego por conta em barras empilhadas. Os cartões separam o uso de créditos das contas Kiro do uso de requisições do proxy.
+- Painel Visão geral atualizado ao vivo: quatro cartões de KPI (contas, créditos do plano, e requisições e falhas na última hora), o tráfego ao longo do tempo em barras empilhadas, uma lista das contas que precisam de atenção, o tráfego por conta, um gráfico de rosca com a distribuição por modelo e as contas mais ativas. O cartão **Créditos do plano** separa o uso de créditos do Kiro em uso pelo proxy e uso fora dele.
 - Contas com abas de status e contagens, filtros (plano, autenticação, região, ligada, tag), busca por e-mail, apelido, notas e tags, ordenação, ações em lote, visão de detalhes, testes de conexão, requisições por minuto e de hoje ao vivo, revisão de duplicadas e exportação.
 - Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite.
 - Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens, créditos e chamadas por chave, vínculo com contas, gerar nova chave, redefinição de uso), um gráfico **Uso por chave** e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
-- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), autocontinuar, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, senha de administrador, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
+- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), continuação automática, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, senha de administrador, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
 - Alertas para webhook, Telegram, Discord ou Slack quando os créditos estão acabando, uma conta é banida ou nenhuma conta consegue atender requisições (veja [Alertas](#-alertas)).
 - Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações pelo `version.json` da branch `main` do repositório.
 - Alterar a senha de administrador encerra todas as outras sessões conectadas.
@@ -385,13 +385,13 @@ Exija chaves de API na página **API** (**Acesso à API → Exigir chave de API*
 
 A página Visão geral e a página Contas respondem, de propósito, a perguntas diferentes:
 
-- **Cartão Contas**: contas Kiro configuradas no momento, com os campos de cota do servidor do Kiro (`usage_current / usage_limit`).
-- **Cartão Requisições**: histórico do app/proxy a partir das linhas `requests` do SQLite: `COUNT(*)`, `SUM(total_tokens)` e `SUM(credits)`.
-- **Cartões Sucesso / Falha**: resultados finais das requisições do proxy, da mesma tabela `requests`.
-- **Cartões de conta**: contadores atuais das contas visíveis, salvos no registro da conta (`requestCount`, `totalTokens`, `totalCredits`).
-- **Retenção de logs**: antes de excluir linhas antigas, os totais delas vão para um resumo, então os cartões da Visão geral e o `/v1/stats` continuam contando essas linhas. A página Requisições e o Uso por chave mostram só as linhas mantidas.
+- **Cartão Contas**: as contas Kiro configuradas agora, agrupadas por situação (disponíveis, atenção, banidas, desabilitadas).
+- **Cartão Créditos do plano**: os campos de cota do servidor do Kiro neste mês, somados entre todas as contas (`usage_current / usage_limit`). A barra divide os créditos usados em **Proxy** (créditos das requisições feitas por este proxy) e **Fora** (o restante), e mostra o que ainda resta (**Restam**).
+- **Cartões Requisições e Falhas**: requisições do proxy concluídas na última hora, comparadas com a hora anterior.
+- **Página Contas**: os contadores salvos no registro de cada conta (`requestCount`, `totalTokens`, `totalCredits`).
+- **Retenção de logs**: antes de excluir linhas antigas, os totais delas vão para um resumo, então o cartão **Créditos do plano**, a distribuição por modelo e o `/v1/stats` continuam contando essas linhas. A página Requisições e o Uso por chave mostram só as linhas mantidas.
 
-Se uma conta antiga/excluída ainda tiver linhas em `requests`, os **Créditos do proxy** da Visão geral podem ficar acima da soma dos créditos das contas visíveis. Use **Configurações → Zona de perigo → Redefinir estatísticas** ou uma limpeza única no banco de dados se quiser apagar as linhas históricas de requisições.
+Se uma conta antiga ou excluída ainda tiver linhas em `requests`, os créditos dela continuam contando em **Proxy**. Assim, **Proxy** pode ficar alto demais, e **Fora**, baixo demais. Use **Configurações → Zona de perigo → Redefinir estatísticas** ou uma limpeza única no banco de dados se quiser apagar as linhas históricas de requisições.
 
 Os rótulos de tokens podem aparecer de forma compacta (`54.5M`, `476.5K`), mas os cálculos do backend e as verificações de cota usam os números brutos.
 
@@ -449,7 +449,7 @@ O proxy próprio de uma conta e o proxy global têm 15 segundos para conectar. Q
 
 **Configurações → Pool de proxies** distribui as contas sem proxy próprio por uma lista de até 100 proxies (`http`, `https`, `socks5` ou `socks5h`). Cada conta fica com o proxy que recebe, e contas novas vão para o proxy saudável com menos contas. Um proxy que não conecta passa as contas dele para um proxy saudável na hora; uma falha de proxy nunca bane uma conta nem a coloca em espera. As verificações de saúde rodam a cada 10 minutos por padrão, e a renovação de tokens segue a mesma rota das requisições da conta.
 
-A ordem é: o proxy próprio da conta, o pool, o proxy global e, por último, a conexão direta. Quando nenhum proxy do pool está saudável, as requisições recebem HTTP 503 `no healthy outbound proxy in the pool`, a menos que **Recorrer à conexão direta** esteja ligado: aí elas usam o proxy global ou, se não houver um, vão direto.
+A ordem é: o proxy próprio da conta, o pool, o proxy global e, por último, a conexão direta. Quando nenhum proxy do pool está saudável, as requisições recebem HTTP 503 `no healthy outbound proxy in the pool`, a menos que **Usar alternativa se nenhum proxy estiver saudável** esteja ligado: aí elas usam o proxy global ou, se não houver um, vão direto.
 
 ---
 
