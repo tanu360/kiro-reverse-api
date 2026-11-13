@@ -35,7 +35,7 @@
 
 **Kiro Proxy** là một dịch vụ Go nhỏ, biến một hoặc nhiều tài khoản **Kiro** đã được cấp quyền thành một endpoint API cục bộ dùng định dạng giao tiếp của **OpenAI** và **Anthropic**:
 
-1. Gộp nhiều tài khoản Kiro và cân bằng tải yêu cầu bằng round-robin, trọng số và cơ chế giữ hội thoại trên cùng một tài khoản.
+1. Gộp nhiều tài khoản Kiro và cân bằng tải yêu cầu bằng round-robin, trọng số hoặc mức ưu tiên, cùng cơ chế giữ hội thoại trên cùng một tài khoản.
 2. Chuyển đổi hai chiều giữa các lệnh gọi Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, OpenAI `/v1/responses` và upstream Kiro, bao gồm tool, thinking, mức suy luận (reasoning effort) và tìm kiếm web.
 3. Tự động làm mới access token và stream Server-Sent Events xuyên suốt từ đầu đến cuối, kèm keepalive và failover.
 4. Đi kèm trang quản trị React nhúng sẵn trong binary để quản lý tài khoản, theo dõi trực tiếp và kiểm tra yêu cầu, với giao diện English, 简体中文, Tiếng Việt và Português (Brasil).
@@ -166,6 +166,8 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - Streaming SSE cho mọi endpoint, có failover sang tài khoản khác ngay giữa stream khi upstream gặp lỗi tạm thời, và gửi keepalive mỗi 15 giây khi upstream im lặng (suy luận dài, tham số tool đang bị giữ lại).
 - Server tool `web_search` của Anthropic chạy qua tính năng tìm kiếm web của chính Kiro, kết quả trả về dưới dạng các khối search result.
 - Mức suy luận: `reasoning_effort` của OpenAI và `output_config.effort` của Claude (`low` đến `xhigh`) bật thinking và được chuyển tới các model hỗ trợ mức effort; `minimal` tắt thinking.
+- Đầu ra có cấu trúc: `response_format` của OpenAI (`json_object`, `json_schema`), `output_config.format` của Claude và `text.format` của Responses trả về JSON thuần, được kiểm tra theo schema (xem [Đầu ra có cấu trúc](#-đầu-ra-có-cấu-trúc)).
+- Chữ ký thinking: trên `/v1/messages`, khối thinking mang `signature` do Kiro gửi (`signature_delta` khi stream), và các khối `redacted_thinking` được chuyển tiếp nguyên vẹn.
 - Khôi phục lệnh gọi tool: lệnh gọi tool mà Kiro để lọt vào câu trả lời dưới dạng markup được chuyển lại thành lệnh gọi tool thật (tắt bằng `KIRO_TOOL_MARKUP_RESCUE=off`).
 - Giải nén body yêu cầu (gzip/deflate) cho các client nén payload trước khi gửi.
 
@@ -174,15 +176,23 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - **Tự động viết tiếp** (mặc định tắt): khi câu trả lời dừng ở giới hạn đầu ra khoảng 8192 token của Kiro mà không có lệnh gọi tool, proxy yêu cầu Kiro viết tiếp và nối phần còn lại, tối đa 10 lần.
 - **Lịch sử tool có cấu trúc**: lệnh gọi tool và kết quả trước đó đến model dưới dạng lệnh gọi tool thật, nên các phiên agent dài vẫn tiếp tục gọi tool; yêu cầu bị từ chối sẽ được thử lại một lần ở dạng văn bản thuần.
 - **Bộ lọc system prompt**: thay system prompt tích hợp của Claude Code bằng một prompt gọn hơn, loại bỏ nhiễu môi trường (biến môi trường, git status, commit gần đây) và áp dụng các quy tắc lọc dòng hoặc regex của riêng bạn theo thứ tự.
-- **Ánh xạ model**: các quy tắc có thứ tự, kéo để sắp xếp, chuyển bất kỳ tên model nào của client sang một ID model Kiro; quy tắc khớp đầu tiên được dùng.
+- **Ánh xạ model**: các quy tắc có thứ tự, kéo để sắp xếp, chuyển bất kỳ tên model nào của client sang một ID model Kiro; quy tắc khớp đầu tiên được dùng. Model mà chính Kiro liệt kê chỉ đi theo quy tắc ghi đúng tên đầy đủ của nó, nên quy tắc khớp chuỗi con như `gpt-5` không bao giờ chuyển hướng một model gốc.
 - **Toàn vẹn stream**: từ chối phản hồi kết thúc mà không có stop reason hoặc sự kiện metering, kèm chế độ nới lỏng (phải tự bật) cho tài khoản IdC và Enterprise không gửi cả hai.
 - **Chọn endpoint**: chọn một endpoint Kiro hoặc để proxy tự chọn theo tình trạng khả dụng, có thể chuyển sang các endpoint khác khi lỗi.
+- **Thu nhỏ hình ảnh** (mặc định bật): ảnh có chiều rộng hoặc chiều cao vượt 1568 px, hoặc nặng hơn 400 KB, được thu nhỏ và mã hóa lại trước khi gửi tới Kiro. Cả hai giới hạn đều chỉnh được trong cài đặt.
+- **Header phản hồi**: tối đa 20 header tùy chỉnh trên mọi phản hồi API, kể cả stream và lỗi. Giá trị có thể dùng `{request_id}`, `{model}`, `{account_id}`, `{key_id}` và `{client_ip}`; `{request_id}` chính là Mã truy vết trong nhật ký yêu cầu.
 
 ### 👥 Nhóm tài khoản
 
-- Nhiều tài khoản Kiro, chọn theo round-robin cho từng model và có trọng số cho từng tài khoản (tài khoản có trọng số N nhận số yêu cầu mới gấp khoảng N lần).
-- Giữ hội thoại trên một tài khoản: các lượt tiếp theo quay về tài khoản đã trả lời lượt trước, nơi đã có sẵn prompt cache; hội thoại mới vẫn luân phiên giữa các tài khoản.
+- Nhiều tài khoản Kiro với hai chế độ định tuyến. **Theo trọng số** (mặc định): round-robin cho từng model và có trọng số cho từng tài khoản (tài khoản có trọng số N nhận số yêu cầu mới gấp khoảng N lần). **Theo ưu tiên**: mỗi yêu cầu mới đến tài khoản có số ưu tiên nhỏ nhất (0–999) phục vụ được nó; tài khoản kế tiếp sẽ thay thế khi tài khoản đó đang trong thời gian chờ, hết credit, bị tắt hoặc không có model.
+- Giữ hội thoại trên một tài khoản: các lượt tiếp theo quay về tài khoản đã trả lời lượt trước, nơi đã có sẵn prompt cache; hội thoại mới đi theo chế độ định tuyến. Tắt tính năng này để mọi yêu cầu đều được định tuyến lại theo chế độ định tuyến, chẳng hạn khi cần ưu tiên tuyệt đối.
+- Giới hạn tùy chọn từ 1 đến 1000 yêu cầu mỗi phút cho mỗi tài khoản: tài khoản chạm giới hạn sẽ bị bỏ qua, và khi mọi tài khoản đều chạm giới hạn, client nhận HTTP 429. Trang Tài khoản hiển thị trực tiếp số yêu cầu mỗi phút và số yêu cầu hôm nay của từng tài khoản.
+- **Tự phục hồi** (mặc định bật): khi không còn tài khoản nào phục vụ được, proxy gỡ các lệnh cấm xác thực và thời gian chờ do lỗi mà chính nó đặt ra rồi thử lại, tối đa một lần mỗi 5 phút và 5 lần liên tiếp mà không có yêu cầu thành công (cả hai đều chỉnh được). Tài khoản bị Kiro đình chỉ (lỗi 403 "locked your account" cũng được tính là đình chỉ), tài khoản bạn đã tắt và thời gian chờ do hết hạn mức không bao giờ được gỡ.
 - Tự động làm mới OAuth token trước khi hết hạn, an toàn khi có yêu cầu đồng thời; thời gian chờ của tài khoản được giữ lại qua các lần khởi động lại.
+- Làm mới mức sử dụng và token sắp hết hạn trong nền, mặc định mỗi 30 phút. Chọn từ 5 phút đến 24 giờ, hoặc Tắt để chỉ làm mới khi cần; token vẫn được gia hạn khi một yêu cầu cần đến.
+- Đăng nhập lại hoặc nhập lại một tài khoản đã lưu sẽ cập nhật tài khoản đó thay vì tạo bản sao. Các bản sao còn sót từ phiên bản cũ (cùng refresh token, Kiro API key, user ID, hoặc cùng email và phương thức đăng nhập) hiện thành thông báo trên trang Tài khoản; **Xem lại** gộp mỗi nhóm thành một tài khoản sau khi sao lưu, giữ lại các yêu cầu và cộng dồn bộ đếm.
+- **Đăng nhập lại** trong menu của mỗi tài khoản thay thông tin đăng nhập ngay tại chỗ và giữ nguyên ID, cài đặt, ghi chú, thẻ và thống kê. Khi lần đăng nhập mới là một người dùng khác, proxy hỏi xác nhận trước khi thay danh tính.
+- Ghi chú (tối đa 2000 ký tự) và tối đa 10 thẻ (mỗi thẻ 24 ký tự) cho mỗi tài khoản. Tìm kiếm khớp cả ghi chú lẫn thẻ, thẻ dùng được trong bộ lọc Thẻ và thao tác hàng loạt, và cả xuất lẫn nhập đều giữ cả hai.
 - Phương thức xác thực: AWS Builder ID, IAM Identity Center (Enterprise SSO), Microsoft SSO (Entra ID), SSO token, cache cục bộ của Kiro IDE, JSON thông tin xác thực, cookie web Kiro và Kiro API key cho môi trường không giao diện (`ksk_…`).
 - Cho từng tài khoản: proxy outbound riêng, ID thiết bị (machine ID), Kiro profile được ghim, làm mới danh sách model, kiểm tra kết nối và công tắc vượt mức thật của Kiro.
 - Vượt mức (tùy chọn): tài khoản tiếp tục phục vụ yêu cầu sau khi hết credit.
@@ -192,10 +202,11 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 
 - Ứng dụng React một trang nhúng trong binary; không cần chạy web server riêng.
 - Bảng điều khiển Tổng quan cập nhật trực tiếp: thẻ KPI cho tài khoản, yêu cầu, thành công và thất bại kèm xu hướng theo giờ, ô số liệu trực tiếp theo phút có sparkline, lưu lượng theo thời gian, biểu đồ donut phân bổ model và lưu lượng theo tài khoản dạng cột chồng. Các thẻ tách riêng mức dùng credit của tài khoản Kiro với mức dùng của yêu cầu qua proxy.
-- Tài khoản với tab trạng thái kèm số lượng, bộ lọc (gói, xác thực, khu vực, bật), sắp xếp, thao tác hàng loạt, chế độ xem chi tiết, kiểm tra kết nối và xuất.
-- Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, API key được che và lịch sử lưu trong SQLite.
-- Trang API quản lý API key của client (giá trị key tùy chỉnh không bắt buộc, bật/tắt, giới hạn token và credit cho từng key, đặt lại mức sử dụng) và trình tạo mã thiết lập client có tô sáng cú pháp: mã gọi các API Anthropic Messages, OpenAI Chat Completions và OpenAI Responses bằng curl, Python, Node.js, Go, Java, PHP, Ruby và C# (SDK chính thức hoặc HTTP thuần, có hoặc không stream) kèm phản hồi mẫu, cùng cấu hình Claude Code và Codex.
-- Cài đặt cho mức sử dụng, định tuyến, tự động viết tiếp, lịch sử tool, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, proxy outbound, mật khẩu quản trị và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
+- Tài khoản với tab trạng thái kèm số lượng, bộ lọc (gói, xác thực, khu vực, bật, thẻ), tìm kiếm theo email, biệt danh, ghi chú và thẻ, sắp xếp, thao tác hàng loạt, chế độ xem chi tiết, kiểm tra kết nối, số yêu cầu mỗi phút và hôm nay theo thời gian thực, xem lại tài khoản trùng lặp và xuất.
+- Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, Mã truy vết và dòng thời gian của từng lần thử upstream (tài khoản, endpoint, thời lượng, kết quả, failover), API key được che và lịch sử lưu trong SQLite.
+- Trang API quản lý API key của client (giá trị key tùy chỉnh không bắt buộc, bật/tắt, giới hạn token, credit và lượt gọi cho từng key, gắn key với tài khoản, tạo lại key, đặt lại mức sử dụng), biểu đồ **Mức sử dụng theo key** và trình tạo mã thiết lập client có tô sáng cú pháp: mã gọi các API Anthropic Messages, OpenAI Chat Completions và OpenAI Responses bằng curl, Python, Node.js, Go, Java, PHP, Ruby và C# (SDK chính thức hoặc HTTP thuần, có hoặc không stream) kèm phản hồi mẫu, cùng cấu hình Claude Code và Codex.
+- Cài đặt cho mức sử dụng và làm mới trong nền, định tuyến (chế độ, giữ hội thoại, giới hạn mỗi tài khoản), tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, tự phục hồi, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, tên miền và khu vực upstream, proxy outbound, nhóm proxy, header phản hồi, cảnh báo, mật khẩu quản trị, lưu giữ nhật ký và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
+- Cảnh báo qua webhook, Telegram, Discord hoặc Slack khi sắp hết credit, khi tài khoản bị cấm hoặc khi không còn tài khoản nào phục vụ được yêu cầu (xem [Cảnh báo](#-cảnh-báo)).
 - Menu lệnh (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) để mở trang và chạy thao tác, chế độ riêng tư ẩn địa chỉ email, và kiểm tra cập nhật qua `version.json` trên nhánh `main` của repo.
 - Đổi mật khẩu quản trị sẽ kết thúc mọi phiên đăng nhập khác.
 - Giao diện sáng, tối và theo hệ thống; bốn ngôn ngữ giao diện: English, 简体中文, Tiếng Việt và Português (Brasil).
@@ -203,13 +214,16 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 
 ### 🌐 Mạng
 
-- Hỗ trợ proxy outbound — SOCKS5, HTTP hoặc HTTPS, chuyển đổi trực tiếp không cần khởi động lại, có thể ghi đè riêng cho từng tài khoản.
+- Hỗ trợ proxy outbound — SOCKS5, HTTP hoặc HTTPS, chuyển đổi trực tiếp không cần khởi động lại, có thể ghi đè riêng cho từng tài khoản. Mật khẩu proxy đã lưu hiển thị dạng `********`.
+- Nhóm proxy: mỗi tài khoản không có proxy riêng được gán một proxy trong nhóm, có kiểm tra định kỳ và tự chuyển sang proxy hoạt động tốt khi một proxy không kết nối được (xem [Nhóm proxy](#-nhóm-proxy)).
+- Tên miền và khu vực upstream (**Cài đặt → Tên miền và khu vực upstream**): gửi chat và tìm kiếm web tới `runtime.{region}.kiro.dev` thay vì `q.{region}.amazonaws.com` (mức sử dụng và danh sách model vẫn đi qua AWS), và ghi đè cho mọi tài khoản khu vực API (`us-east-1` hoặc `eu-central-1`) hoặc khu vực dùng để làm mới token Builder ID và IAM Identity Center. Khu vực không khớp với tài khoản khiến yêu cầu của tài khoản đó thất bại, nhưng không bao giờ làm tài khoản bị cấm.
 - Hậu tố chế độ thinking có thể tùy chỉnh và chuyển tiếp nguyên cấu hình `thinking` của Anthropic.
 
 ### 🧩 Lưu trữ
 
 - Cơ sở dữ liệu SQLite một tệp (`modernc.org/sqlite`) tại `kiro.db`, dùng chế độ journal DELETE.
-- Các dòng yêu cầu cuối cùng là nguồn dữ liệu chuẩn cho tổng số yêu cầu, token, credit, thành công và thất bại trên bảng điều khiển.
+- Các dòng yêu cầu cuối cùng, cùng bản tổng hợp của các dòng mà tính năng lưu giữ nhật ký đã xóa, là nguồn dữ liệu chuẩn cho tổng số yêu cầu, token, credit, thành công và thất bại trên bảng điều khiển.
+- Lưu giữ nhật ký: các dòng nhật ký yêu cầu và lỗi cũ hơn 90 ngày (từ 1 đến 3650, hoặc giữ vĩnh viễn) bị xóa theo từng lô nhỏ, hai phút sau khi khởi động rồi mỗi ngày một lần.
 - Response đã lưu được giữ 30 ngày; việc ghi chạy bất đồng bộ, nằm ngoài đường xử lý chính của yêu cầu.
 
 ---
@@ -301,7 +315,7 @@ Xác thực bằng mật khẩu quản trị cho phép năm lần thử sai cho 
 | `DATA_DIR`        | Thư mục chứa `kiro.db`                    | `.`                |
 | `ADMIN_PASSWORD` | Mật khẩu trang quản trị (ghi đè cấu hình) | —                  |
 | `LISTEN_HOST`    | Địa chỉ lắng nghe. Mặc định chỉ nhận kết nối từ máy này; đặt `0.0.0.0` để nhận kết nối từ máy khác. Docker image đặt sẵn `0.0.0.0` | `127.0.0.1` |
-| `PORT`           | Cổng lắng nghe (ghi đè cấu hình)          | `8080`             |
+| `PORT`           | Cổng lắng nghe, từ 1 đến 65535 (ghi đè cấu hình). Giá trị không hợp lệ bị bỏ qua, kèm cảnh báo khi khởi động. Với Docker, hãy đổi phía host trong ánh xạ cổng | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Đặt `off` để ngừng chuyển markup lệnh gọi tool mà Kiro để lọt vào văn bản câu trả lời trở lại thành lệnh gọi tool | on |
 | `LOG_LEVEL`      | Mức log: `debug`, `info`, `warn` hoặc `error` (ghi đè cấu hình) | `info` |
 
@@ -359,7 +373,11 @@ Bắt buộc API key từ trang **API** (**Truy cập API → Bắt buộc API k
 - Để trống **Key tùy chỉnh (không bắt buộc)** để tự tạo một key `sk-...` an toàn, hoặc nhập giá trị key của riêng bạn.
 - Danh sách và nhật ký yêu cầu hiển thị key đã che, ví dụ `sk-clb****e4yo`; key đầy đủ vẫn được lưu để xác thực và để sao chép từ chi tiết key.
 - Việc kiểm tra hạn mức token và credit dùng giá trị thô chính xác. Nhãn làm tròn hoặc rút gọn trên giao diện chỉ dùng để hiển thị.
-- Giới hạn token hoặc credit bằng `0` nghĩa là không giới hạn cho loại đó.
+- Giới hạn token, credit hoặc lượt gọi bằng `0` nghĩa là không giới hạn cho loại đó.
+- **Giới hạn lượt gọi** chỉ đếm các lượt gọi thành công; yêu cầu thất bại, `/v1/models` và `count_tokens` không được tính. Key đã dùng hết lượt gọi nhận HTTP 429 cho đến khi bạn nâng giới hạn hoặc đặt lại mức sử dụng.
+- **Tài khoản → Chỉ các tài khoản đã chọn** gắn một key với một số tài khoản. Yêu cầu của key đó chỉ dùng các tài khoản này, không bao giờ dùng tài khoản khác (HTTP 503 khi không tài khoản nào trong số đó khả dụng), và danh sách model của key chỉ hiện các model mà chúng phục vụ.
+- **Tạo lại key** cấp cho key một giá trị mới, và giá trị cũ ngừng hoạt động ngay lập tức. Tên, giới hạn, tài khoản và mức sử dụng được giữ nguyên.
+- **Mức sử dụng theo key** vẽ biểu đồ số yêu cầu, token và credit của từng key trong 24 giờ, 7 ngày hoặc 30 ngày, tách riêng thành công và thất bại, với các dòng riêng cho yêu cầu không có key, key không hợp lệ và key đã xóa.
 
 ---
 
@@ -371,6 +389,7 @@ Trang Tổng quan và trang Tài khoản cố ý trả lời những câu hỏi 
 - **Thẻ Yêu cầu**: lịch sử của ứng dụng/proxy từ các dòng `requests` trong SQLite: `COUNT(*)`, `SUM(total_tokens)` và `SUM(credits)`.
 - **Thẻ Thành công / Thất bại**: kết quả cuối cùng của yêu cầu qua proxy, lấy từ cùng bảng `requests`.
 - **Thẻ của từng tài khoản**: bộ đếm hiện tại của các tài khoản đang hiển thị, lưu trên bản ghi tài khoản (`requestCount`, `totalTokens`, `totalCredits`).
+- **Lưu giữ nhật ký**: trước khi xóa các dòng cũ, tổng số của chúng được gộp vào một bản tổng hợp, nên các thẻ trên trang Tổng quan và `/v1/stats` vẫn tính chúng. Trang Yêu cầu và Mức sử dụng theo key chỉ hiển thị các dòng được giữ lại.
 
 Nếu một tài khoản cũ hoặc đã xóa vẫn còn dòng trong `requests`, **Credit qua proxy** trên trang Tổng quan có thể cao hơn tổng credit của các tài khoản đang hiển thị. Dùng **Cài đặt → Vùng nguy hiểm → Đặt lại thống kê** hoặc dọn DB một lần nếu bạn muốn xóa các dòng yêu cầu cũ.
 
@@ -391,7 +410,23 @@ Các yêu cầu tương thích Claude có cấu hình `thinking` ở cấp cao n
 
 `reasoning_effort` của OpenAI và `output_config.effort` của Claude cũng dùng được: `low`, `medium`, `high` hoặc `xhigh` bật thinking và được chuyển tới các model hỗ trợ mức effort, còn `minimal` tắt thinking.
 
+Trên `/v1/messages`, với định dạng đầu ra mặc định là khối thinking, khối thinking mang `signature` do Kiro gửi (`signature_delta` khi stream), và các khối `redacted_thinking` được chuyển tiếp nguyên vẹn. Không phải lúc nào Kiro cũng gửi hai thứ này. Khi bật thinking, các khối thinking mà client gửi lại được phát lại cho Kiro dưới dạng văn bản, theo quy tắc của Anthropic về những lượt được giữ thinking; chữ ký và các khối `redacted_thinking` của chúng bị bỏ đi.
+
 Định dạng đầu ra được cấu hình tại **Cài đặt → Thinking** trong trang quản trị.
+
+---
+
+## 🧾 Đầu ra có cấu trúc
+
+Kiro không có chế độ JSON, nên proxy yêu cầu model trả về JSON, bỏ code fence, kiểm tra câu trả lời theo schema và thử lại một lần trên cùng tài khoản khi không khớp.
+
+| API              | Trường                                                         |
+| ---------------- | -------------------------------------------------------------- |
+| Chat Completions | `response_format`: `json_object` hoặc `json_schema`            |
+| Messages         | `output_config.format` (hoặc `output_format`): `json_schema`   |
+| Responses        | `text.format`: `json_object` hoặc `json_schema`                |
+
+Trên Chat và Messages, phần suy luận không lẫn vào câu trả lời mà được trả về dưới dạng `reasoning_content` hoặc khối thinking. Schema có thể lớn tối đa 32 KiB, và loại định dạng không được hỗ trợ trả về HTTP 400. `count_tokens` có tính cả chỉ dẫn JSON được thêm vào.
 
 ---
 
@@ -406,7 +441,26 @@ Nếu bạn ở khu vực có mạng bị hạn chế, hãy cấu hình proxy ou
 | HTTPS    | `https://proxy.example.com:443` |
 
 > [!TIP]
-> Cài đặt có hiệu lực ngay, không cần khởi động lại. Mỗi tài khoản cũng có thể dùng proxy riêng (chi tiết tài khoản → **Proxy tài khoản**); để trống để dùng proxy chung.
+> Cài đặt có hiệu lực ngay, không cần khởi động lại. Mỗi tài khoản cũng có thể dùng proxy riêng (chi tiết tài khoản → **Proxy tài khoản**); để trống để dùng proxy chung. Mật khẩu đã lưu hiển thị dạng `********`; lưu lại nguyên giá trị đã che vẫn giữ mật khẩu cũ.
+
+### 🔁 Nhóm proxy
+
+**Cài đặt → Nhóm proxy** phân bổ các tài khoản không có proxy riêng vào danh sách tối đa 100 proxy (`http`, `https`, `socks5` hoặc `socks5h`). Mỗi tài khoản giữ nguyên proxy được gán, còn tài khoản mới được gán vào proxy hoạt động tốt đang có ít tài khoản nhất. Proxy nào không kết nối được sẽ chuyển ngay tài khoản của nó sang một proxy hoạt động tốt; lỗi proxy không bao giờ làm tài khoản bị cấm hay rơi vào thời gian chờ. Mặc định kiểm tra định kỳ mỗi 10 phút, và việc làm mới token đi cùng đường với yêu cầu của tài khoản.
+
+Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi kết nối trực tiếp. Khi không có proxy nào trong nhóm hoạt động tốt, yêu cầu nhận HTTP 503 `no healthy outbound proxy in the pool`, trừ khi bật **Dự phòng kết nối trực tiếp**: khi đó yêu cầu đi qua proxy chung, hoặc đi trực tiếp nếu chưa đặt proxy chung.
+
+---
+
+## 🔔 Cảnh báo
+
+**Cài đặt → Cảnh báo** gửi tin nhắn tới kênh webhook, Telegram, Discord hoặc Slack (tối đa 20 kênh) khi:
+
+- mức dùng credit của một tài khoản vượt một ngưỡng (mặc định 80, 90 và 100 %): mỗi ngưỡng gửi một lần, và gửi lại sau khi credit của tài khoản được đặt lại;
+- tổng mức dùng credit của mọi tài khoản đang bật và không bị cấm vượt một ngưỡng, tối đa một lần trong mỗi khoảng thời gian chờ (mặc định 60 phút);
+- một tài khoản bị cấm: Kiro đình chỉ tài khoản đó hoặc thông tin đăng nhập của nó ngừng hoạt động;
+- không tài khoản đang bật nào phục vụ được yêu cầu trong suốt một phút.
+
+Không có gì được kiểm tra khi chưa bật kênh nào, và **Gửi thử** gửi thử tới một kênh một lần. Webhook nhận một POST JSON gồm `event`, `severity`, `title`, `text`, `data` và `ts`, kèm header `X-Kiro-Proxy-Event`. Khi đặt khóa ký, `X-Kiro-Proxy-Signature: sha256=<hex>` mang HMAC-SHA256 của body. URL, token và khóa bí mật đã lưu không bao giờ được hiển thị lại.
 
 ---
 
@@ -417,7 +471,7 @@ Nếu bạn ở khu vực có mạng bị hạn chế, hãy cấu hình proxy ou
 | `DATA_DIR`        | Thư mục chứa `kiro.db`                   | `.`                |
 | `ADMIN_PASSWORD` | Mật khẩu trang quản trị (ghi đè cấu hình) | —                 |
 | `LISTEN_HOST`    | Địa chỉ lắng nghe. Mặc định chỉ nhận kết nối từ máy này; đặt `0.0.0.0` để nhận kết nối từ máy khác. Docker image đặt sẵn `0.0.0.0` | `127.0.0.1` |
-| `PORT`           | Cổng lắng nghe (ghi đè cấu hình)          | `8080`             |
+| `PORT`           | Cổng lắng nghe, từ 1 đến 65535 (ghi đè cấu hình). Giá trị không hợp lệ bị bỏ qua, kèm cảnh báo khi khởi động. Với Docker, hãy đổi phía host trong ánh xạ cổng | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Đặt `off` để ngừng chuyển markup lệnh gọi tool mà Kiro để lọt vào văn bản câu trả lời trở lại thành lệnh gọi tool | on |
 | `LOG_LEVEL`      | Mức log: `debug`, `info`, `warn` hoặc `error` (ghi đè cấu hình) | `info` |
 
