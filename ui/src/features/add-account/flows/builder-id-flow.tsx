@@ -150,11 +150,7 @@ export function BuilderIdFlow(): JSX.Element {
               children: (
                 <>
                   <FlowNote>{t("builderid.verifyCode")}</FlowNote>
-                  <UrlBox
-                    label={t("builderid.verifyUrl")}
-                    showOpen={false}
-                    url={code.verificationUri}
-                  />
+                  <UrlBox label={t("builderid.verifyUrl")} url={code.verificationUri} />
                 </>
               ),
             },

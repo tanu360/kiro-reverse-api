@@ -21,4 +21,23 @@ describe("CopyField", () => {
     expect(box).toHaveClass("break-all");
     expect(box).not.toHaveClass("wrap-anywhere");
   });
+
+  it("puts the open link before the copy button, opening the address in a new tab", () => {
+    const url = "https://proxy.example.com/v1";
+    renderWithProviders(
+      <CopyField label="Endpoint" openHref={url} openLabel="Open endpoint" value={url} />,
+    );
+    expect(screen.getByRole("textbox", { name: "Endpoint" })).toHaveValue(url);
+    const open = screen.getByRole("link", { name: "Open endpoint" });
+    expect(open).toHaveAttribute("href", url);
+    expect(open).toHaveAttribute("target", "_blank");
+    expect(open).toHaveAttribute("rel", "noopener noreferrer");
+    const copy = screen.getByRole("button", { name: "Copy" });
+    expect(open.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("has no open link without an address", () => {
+    renderWithProviders(<CopyField label="Key" value="sk-123" />);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
 });

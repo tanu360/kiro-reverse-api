@@ -4,7 +4,7 @@
   "recommended": "推荐",
   "cancel": "取消",
   "add": "添加",
-  "open": "打开",
+  "openLink": "打开链接",
   "copyLink": "复制链接",
   "region": "区域",
   "regionInvalid": "请输入类似 us-east-1 的区域。",

@@ -4,7 +4,7 @@
   "recommended": "Recommended",
   "cancel": "Cancel",
   "add": "Add",
-  "open": "Open",
+  "openLink": "Open link",
   "copyLink": "Copy link",
   "region": "Region",
   "regionInvalid": "Enter a region like us-east-1.",

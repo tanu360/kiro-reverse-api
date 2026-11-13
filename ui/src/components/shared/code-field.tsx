@@ -1,15 +1,12 @@
-import { ExternalLinkIcon } from "@hugeicons/core-free-icons";
 import { Fragment, type JSX, type ReactNode } from "react";
-import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { CopyButton } from "@/components/shared/copy-button";
-import { Button } from "@/components/ui/button";
+import { OpenLinkButton } from "@/components/shared/open-link-button";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 import { cn, keyByText } from "@/lib/utils";
 
@@ -74,7 +71,7 @@ export function CopyField({
   multiline?: boolean;
   /** Adds an open button that opens this address in a new tab. */
   openHref?: string;
-  /** The open button's name, required with `openHref`. */
+  /** The open button's name, required with `openHref` (without it no open button shows). */
   openLabel?: string;
   id?: string;
   /** On the group: layout only. */
@@ -108,22 +105,8 @@ export function CopyField({
         />
       )}
       <InputGroupAddon align="inline-end" className="gap-0.5">
-        {openHref ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  aria-label={openLabel}
-                  render={<a href={openHref} rel="noopener noreferrer" target="_blank" />}
-                  size="icon-sm"
-                  variant="quiet"
-                />
-              }
-            >
-              <AnimatedIcon icon={ExternalLinkIcon} aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipPopup>{openLabel}</TooltipPopup>
-          </Tooltip>
+        {openHref && openLabel ? (
+          <OpenLinkButton href={openHref} label={openLabel} size="icon-sm" variant="quiet" />
         ) : null}
         <CopyButton
           copiedMessage={copiedMessage}
