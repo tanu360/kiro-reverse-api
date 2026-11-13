@@ -26,6 +26,7 @@ import {
   DEFAULT_SORT,
   defaultSortDesc,
   hasFilters,
+  isSecretSearch,
   PAGE_SIZES,
   type PageSize,
   rowKey,
@@ -40,10 +41,17 @@ interface Selection {
 }
 
 export function RequestsPage(): JSX.Element {
-  const { t } = useT("requests");
-  const search = useSearch({ from: "/_app/requests" });
+  const { t, lang } = useT("requests");
+  const urlSearch = useSearch({ from: "/_app/requests" });
   const navigate = useNavigate({ from: "/requests" });
-  const params = useMemo(() => toQueryParams(search), [search]);
+  // A key-like search lives only here, never in the URL (isSecretSearch).
+  const [secretSearch, keepSecretSearch] = useState("");
+  // A search in the URL wins; a key-like one only ever lives in this state.
+  const search = useMemo<RequestsSearch>(
+    () => (urlSearch.search || !secretSearch ? urlSearch : { ...urlSearch, search: secretSearch }),
+    [urlSearch, secretSearch],
+  );
+  const params = useMemo(() => toQueryParams(search, lang), [search, lang]);
   const query = useQuery(recentRequestsQuery(params));
   const countsQuery = useQuery(requestCountsQuery());
   const columns = useRequestColumns();
@@ -59,6 +67,14 @@ export function RequestsPage(): JSX.Element {
     },
     [navigate],
   );
+
+  // A key pasted into a link (?search=sk-...) moves off the URL at once.
+  useEffect(() => {
+    if (urlSearch.search && isSecretSearch(urlSearch.search)) {
+      keepSecretSearch(urlSearch.search.trim());
+      updateSearch({ search: undefined }, { replace: true });
+    }
+  }, [urlSearch.search, updateSearch]);
 
   // A failed refetch keeps the rows on screen and reports the failure in a toast.
   const { data, error, errorUpdatedAt, isError } = query;
@@ -104,8 +120,10 @@ export function RequestsPage(): JSX.Element {
   const setSort = (next: RequestSort, desc: boolean) =>
     updateSearch({ sort: next, order: desc ? "desc" : "asc", page: undefined });
 
-  const clearFilters = () =>
+  const clearFilters = () => {
+    keepSecretSearch("");
     updateSearch({ search: undefined, status: undefined, page: undefined });
+  };
 
   let emptyState: JSX.Element;
   if (outOfRange) {
@@ -189,9 +207,14 @@ export function RequestsPage(): JSX.Element {
                       updateSearch({ pageSize: next as PageSize, page: undefined });
                     }
                   }}
-                  onSearchChange={(text) =>
-                    updateSearch({ search: text || undefined, page: undefined }, { replace: true })
-                  }
+                  onSearchChange={(text) => {
+                    const secret = isSecretSearch(text);
+                    keepSecretSearch(secret ? text.trim() : "");
+                    updateSearch(
+                      { search: secret ? undefined : text || undefined, page: undefined },
+                      { replace: true },
+                    );
+                  }}
                   onSortChange={setSort}
                   onStatusChange={(status) => updateSearch({ status, page: undefined })}
                   pageSize={pageSize}

@@ -13,6 +13,7 @@ export async function getRecentRequests(
       pageSize: params.pageSize,
       search: params.search?.trim(),
       status: params.status,
+      errorType: params.errorType,
       sort: params.sort,
       order: params.order,
     },

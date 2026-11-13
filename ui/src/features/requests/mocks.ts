@@ -20,6 +20,7 @@ interface NormalizedQuery {
   pageSize: number;
   search: string;
   status: "" | "success" | "failed";
+  errorType: string;
   sort: RequestSort;
   order: "asc" | "desc";
 }
@@ -47,6 +48,7 @@ function normalizeQuery(url: URL): NormalizedQuery {
     pageSize,
     search: (q.get("search") ?? "").trim(),
     status: status === "success" || status === "failed" ? status : "",
+    errorType: (q.get("errorType") ?? "").trim().toLowerCase(),
     sort: (SORTS as readonly string[]).includes(sort) ? (sort as RequestSort) : "time",
     order: order === "asc" ? "asc" : "desc",
   };
@@ -69,6 +71,7 @@ function rawKey(record: RequestRecord): string {
 function matches(record: RequestRecord, query: NormalizedQuery): boolean {
   if (query.status === "success" && !record.success) return false;
   if (query.status === "failed" && record.success) return false;
+  if (query.errorType && (record.success || record.errorType !== query.errorType)) return false;
   if (!query.search) return true;
   const needle = query.search.toLowerCase();
   return [

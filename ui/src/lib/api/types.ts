@@ -966,6 +966,8 @@ export interface RecentRequestsParams {
   pageSize?: number;
   search?: string;
   status?: "success" | "failed" | "";
+  /** Only failed rows of this error type (a search that names a type by its label). */
+  errorType?: string;
   /** default 'time' */
   sort?: RequestSort;
   /** default 'desc' */

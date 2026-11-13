@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { RequestRecord } from "@/lib/api/types";
 import {
   cleanSearch,
+  errorTypeForSearch,
   errorTypeTone,
   formatRowDate,
+  isSecretSearch,
   normalizeApiKeyMask,
   rowKey,
   toQueryParams,
@@ -160,5 +162,39 @@ describe("formatRowDate", () => {
   it("keeps the year for older rows", () => {
     expect(formatRowDate(lastYear, "en", now)).toBe("Nov 3, 2025");
     expect(formatRowDate(lastYear, "zh", now)).toBe("2025年11月3日");
+  });
+});
+
+describe("isSecretSearch", () => {
+  it("treats key-like text as a secret and everything else as plain search", () => {
+    for (const secret of [
+      "sk-bogus1",
+      "sk-clb-0123456789abcdef",
+      "KSK_abcdef",
+      "abcdefghijklmnopqrstuvwxyz",
+    ]) {
+      expect(isSecretSearch(secret)).toBe(true);
+    }
+    for (const plain of ["sonnet", "proxy", "sk-clb****e4yo", "claude haiku 4.5", "", "  "]) {
+      expect(isSecretSearch(plain)).toBe(false);
+    }
+  });
+});
+
+describe("errorTypeForSearch", () => {
+  it("reads an error type label in the page language or English, and leaves the rest alone", () => {
+    expect(errorTypeForSearch("Proxy error", "en")).toBe("proxy");
+    expect(errorTypeForSearch("  proxy ERROR ", "en")).toBe("proxy");
+    expect(errorTypeForSearch("代理错误", "zh")).toBe("proxy");
+    expect(errorTypeForSearch("Proxy error", "zh")).toBe("proxy");
+    expect(errorTypeForSearch("API key limit", "pt-BR")).toBe("api_key_limit");
+    expect(errorTypeForSearch("proxy", "en")).toBeUndefined();
+    expect(errorTypeForSearch("sonnet", "en")).toBeUndefined();
+  });
+
+  it("sends the type, not the text, when the search names one", () => {
+    expect(toQueryParams({ search: "Proxy error" }, "en")).toMatchObject({ errorType: "proxy" });
+    expect(toQueryParams({ search: "Proxy error" }, "en")).not.toHaveProperty("search");
+    expect(toQueryParams({ search: "Proxy error" })).toMatchObject({ search: "Proxy error" });
   });
 });

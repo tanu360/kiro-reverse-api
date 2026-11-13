@@ -6,7 +6,7 @@ import type {
   RequestRecord,
 } from "@/lib/api/types";
 import { dateTimeFormat, unixToDate } from "@/lib/format";
-import type { Lang } from "@/lib/i18n";
+import { type Lang, translate } from "@/lib/i18n";
 import type { RequestSort, RequestsSearch } from "@/routes/-search";
 
 export const DEFAULT_PAGE = 1;
@@ -83,7 +83,7 @@ export function rowKey(record: RequestRecord, index: number): string {
 }
 
 /** URL search to API params: defaults applied, empty search and status left out. */
-export function toQueryParams(search: RequestsSearch): RecentRequestsParams {
+export function toQueryParams(search: RequestsSearch, lang?: Lang): RecentRequestsParams {
   const params: RecentRequestsParams = {
     page: search.page ?? DEFAULT_PAGE,
     pageSize: search.pageSize ?? DEFAULT_PAGE_SIZE,
@@ -91,9 +91,28 @@ export function toQueryParams(search: RequestsSearch): RecentRequestsParams {
     order: search.order ?? DEFAULT_ORDER,
   };
   const text = search.search?.trim();
-  if (text) params.search = text;
+  const errorType = text && lang ? errorTypeForSearch(text, lang) : undefined;
+  if (errorType) params.errorType = errorType;
+  else if (text) params.search = text;
   if (search.status) params.status = search.status;
   return params;
+}
+
+/**
+ * The error type a search names by the label the table shows ("Proxy error"), in the page's
+ * language or in English. The server matches that type exactly; the raw name ("proxy") stays a
+ * plain search, which also finds it in messages.
+ */
+export function errorTypeForSearch(text: string, lang: Lang): RequestErrorType | undefined {
+  const value = text.trim().toLocaleLowerCase();
+  if (!value) return undefined;
+  for (const type of ERROR_TYPES) {
+    const key = `errorType.${type}`;
+    for (const label of [translate(lang, "requests", key), translate("en", "requests", key)]) {
+      if (label && label !== key && label.toLocaleLowerCase() === value) return type;
+    }
+  }
+  return undefined;
 }
 
 /** Drops default values so the URL only carries what the viewer changed. */
@@ -118,6 +137,17 @@ export function cleanSearch(search: RequestsSearch): RequestsSearch {
 /** A newly sorted column starts descending for time and ascending for everything else. */
 export function defaultSortDesc(columnId: string): boolean {
   return columnId === "time";
+}
+
+/**
+ * Search text that may be a client API key: one word with a key prefix, or 20 characters or
+ * more with no spaces. It stays out of the page URL, so a pasted key never lands in the
+ * address bar or the browser history. Masked keys (with *) are not secrets.
+ */
+export function isSecretSearch(text: string): boolean {
+  const value = text.trim();
+  if (value === "" || /[\s*]/.test(value)) return false;
+  return /^(sk|ksk|key)[-_]/i.test(value) || value.length >= 20;
 }
 
 export function hasFilters(search: RequestsSearch): boolean {

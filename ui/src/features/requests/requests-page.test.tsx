@@ -105,6 +105,30 @@ describe("RequestsPage", () => {
     expect(seen.every((params) => params.get("search") !== "  sonnet ")).toBe(true);
   });
 
+  it("keeps a key-like search out of the URL but still sends it to the server", async () => {
+    const seen = recordRequests();
+    const { router } = await renderApp("/requests");
+    await waitForRows();
+
+    const key = "sk-live-0123456789abcdefghijklmn";
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search requests" }), {
+      target: { value: key },
+    });
+    await waitFor(() => expect(last(seen).get("search")).toBe(key));
+    expect(router.state.location.search).not.toHaveProperty("search");
+    expect(router.state.location.href).not.toContain("0123456789");
+    expect(screen.getByRole("searchbox", { name: "Search requests" })).toHaveValue(key);
+  });
+
+  it("moves a key out of a pasted link and searches for it", async () => {
+    const seen = recordRequests();
+    const { router } = await renderApp(
+      "/requests?search=sk-pasted-key-0123456789abcd&status=failed",
+    );
+    await waitFor(() => expect(last(seen).get("search")).toBe("sk-pasted-key-0123456789abcd"));
+    await waitFor(() => expect(router.state.location.search).toEqual({ status: "failed" }));
+  });
+
   it("counts each status in its tab, as Accounts does", async () => {
     await renderApp("/requests");
     await waitForRows();
