@@ -524,3 +524,47 @@ func TestUpsertAccountMatchesAcrossEmptyProvider(t *testing.T) {
 		}
 	})
 }
+
+// By email, an empty provider is unknown for IdC logins only. A social login
+// with no provider (a credentials import without one, whose userId could not be
+// read) is not matched by email to a stored social login of some provider: one
+// email can be a Google and a Github user. By userId it still matches.
+func TestDuplicateGroupsSocialEmailNeedsTheSameProvider(t *testing.T) {
+	groups := FindDuplicateGroups([]Account{
+		{ID: "gh", Provider: "Github", AuthMethod: "social", UserId: "u-gh", Email: "dev@example.com"},
+		{ID: "np", Provider: "", AuthMethod: "social", Email: "dev@example.com"},
+		{ID: "go", Provider: "Google", AuthMethod: "social", UserId: "u-go", Email: "ops@example.com"},
+		{ID: "go2", Provider: "", AuthMethod: "social", UserId: "u-go", Email: "ops@example.com"},
+		{ID: "x1", Provider: "", AuthMethod: "social", Email: "x@example.com"},
+		{ID: "x2", Provider: "", AuthMethod: "social", Email: "x@example.com"},
+	})
+	if got, want := groupIDs(groups), [][]string{{"go", "go2"}, {"x1", "x2"}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("groups = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(groups[0].Reasons, []string{DuplicateReasonUserID}) || !reflect.DeepEqual(groups[1].Reasons, []string{DuplicateReasonEmail}) {
+		t.Fatalf("reasons = %v / %v", groups[0].Reasons, groups[1].Reasons)
+	}
+}
+
+func TestUpsertAccountSocialWithoutProviderDoesNotTakeOverByEmail(t *testing.T) {
+	forEachStore(t, func(t *testing.T) {
+		if err := AddAccount(Account{ID: "gh", Email: "dev@example.com", UserId: "u-gh", AuthMethod: "social", Provider: "Github", RefreshToken: "rt-gh", Enabled: true}); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		stored, updated, err := UpsertAccount(Account{ID: "new", Email: "dev@example.com", AuthMethod: "social", RefreshToken: "rt-other", Enabled: true})
+		if err != nil {
+			t.Fatalf("upsert: %v", err)
+		}
+		if updated || stored.ID != "new" {
+			t.Fatalf("upsert = %+v updated=%v, want a new account", stored, updated)
+		}
+		for _, a := range GetAccounts() {
+			if a.ID == "gh" && a.RefreshToken != "rt-gh" {
+				t.Fatal("the Github account's token was overwritten")
+			}
+		}
+		if n := len(GetAccounts()); n != 2 {
+			t.Fatalf("stored %d accounts, want 2", n)
+		}
+	})
+}

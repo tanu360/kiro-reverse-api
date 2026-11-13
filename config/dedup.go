@@ -92,6 +92,10 @@ func duplicateReason(a, b *Account) string {
 	if folded(a.AuthMethod) != folded(b.AuthMethod) || !sameFolded(a.Email, b.Email) {
 		return ""
 	}
+	//! By email an empty provider is unknown for IdC logins only. A social login's provider is part of who it is: one email can be a Google and a Github user.
+	if folded(a.AuthMethod) != "idc" && folded(a.Provider) != folded(b.Provider) {
+		return ""
+	}
 	//! One email can name different users: two Entra tenants, two IdC organizations. A pinned ARN is an operator choice, not an identity.
 	if !a.ProfileArnPinned && !b.ProfileArnPinned && bothSetAndDiffer(a.ProfileArn, b.ProfileArn) {
 		return ""
