@@ -147,8 +147,8 @@ func validateClaudeThinkingConfig(thinking *ClaudeThinkingConfig, maxTokens int)
 	}
 
 	display := strings.ToLower(strings.TrimSpace(thinking.Display))
-	if display != "" && display != "summarized" && display != "omitted" {
-		return "thinking.display must be one of: summarized, omitted"
+	if display != "" && display != "summarized" && display != "omitted" && display != "updates" {
+		return "thinking.display must be one of: summarized, omitted, updates"
 	}
 	if kind == "disabled" && display != "" {
 		return "thinking.display is not supported when thinking.type is disabled"
@@ -173,7 +173,9 @@ func resolveClaudeThinkingResponseOptions(thinking *ClaudeThinkingConfig, defaul
 
 	display := strings.ToLower(strings.TrimSpace(thinking.Display))
 	switch display {
-	case "summarized":
+	//! "updates" asks for progress notes between tool calls. Kiro has none; its thinking
+	//! text is the closest thing, and it is what Claude Code got after dropping the field.
+	case "summarized", "updates":
 		opts.Format = "thinking"
 	case "omitted":
 		opts.Format = "thinking"
