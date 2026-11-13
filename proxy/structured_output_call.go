@@ -100,7 +100,7 @@ func checkStructuredAnswer(answer string, spec *structuredOutputSpec) structured
 		var complete bool
 		check.errs, complete = validateJSONSchemaWithin(value, spec.Schema, spec.Strict, &steps)
 		if !complete {
-			logger.Warnf("[StructuredOutput] JSON schema too costly to check in %d steps; the rest of the answer is unchecked", maxSchemaSteps)
+			logger.Warnf("[StructuredOutput] JSON schema too costly to check fully (%d steps, %d $ref hops in a row); the rest of the answer is unchecked", maxSchemaSteps, maxSchemaRefHops)
 		}
 	}
 	check.valid = len(check.errs) == 0
