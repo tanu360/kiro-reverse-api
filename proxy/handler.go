@@ -429,12 +429,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		id := strings.TrimPrefix(strings.TrimPrefix(path, "/v1/responses/"), "/responses/")
 		switch r.Method {
-		case http.MethodGet:
+		case http.MethodGet, http.MethodHead:
 			h.apiGetOpenAIResponse(w, ar, id)
 		case http.MethodDelete:
 			h.apiDeleteOpenAIResponse(w, ar, id)
 		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			sendMethodNotAllowed(w, ar, errorShapeOpenAI, http.MethodGet, http.MethodDelete)
 		}
 	case path == "/v1/models" || path == "/models":
 		ar := h.authenticateForModels(w, r)
@@ -590,6 +590,9 @@ func (h *Handler) listedModels(r *http.Request) []map[string]interface{} {
 }
 
 func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
+	if refuseMethod(w, r, errorShapeByHeader, http.MethodGet) {
+		return
+	}
 	writeModelsList(w, r, h.listedModels(r))
 }
 
@@ -891,8 +894,7 @@ func mergeStringLists(base []string, extra []string) []string {
 }
 
 func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	if refuseMethod(w, r, errorShapeAnthropic, http.MethodPost) {
 		return
 	}
 
@@ -952,9 +954,7 @@ func (h *Handler) handleClaudeMessages(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
-	if r.Method != "POST" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	if refuseMethod(w, r, errorShapeAnthropic, http.MethodPost) {
 		return
 	}
 
@@ -1841,9 +1841,7 @@ func (h *Handler) sendClaudeError(w http.ResponseWriter, status int, errType, me
 func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
-	if r.Method != "POST" {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	if refuseMethod(w, r, errorShapeOpenAI, http.MethodPost) {
 		return
 	}
 

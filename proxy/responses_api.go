@@ -20,9 +20,7 @@ import (
 func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := apiKeyIDFromContext(r.Context())
 	apiKeyValue := apiKeyValueFromContext(r.Context())
-	if r.Method != http.MethodPost {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusMethodNotAllowed, "Method Not Allowed")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	if refuseMethod(w, r, errorShapeOpenAI, http.MethodPost) {
 		return
 	}
 

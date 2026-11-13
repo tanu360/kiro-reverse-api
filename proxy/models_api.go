@@ -91,8 +91,7 @@ func modelIndex(models []map[string]interface{}, id string) int {
 
 // handleModel answers GET /v1/models/{id} from the same list /v1/models gives the key.
 func (h *Handler) handleModel(w http.ResponseWriter, r *http.Request, id string) {
-	if r.Method != http.MethodGet {
-		sendModelsError(w, r, http.StatusMethodNotAllowed, "invalid_request_error", "Method Not Allowed")
+	if refuseMethod(w, r, errorShapeByHeader, http.MethodGet) {
 		return
 	}
 	models := h.listedModels(r)
