@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+
+	"kiro-proxy/proxypool"
 )
 
 // maskedProxyPassword stands in for a stored proxy password in admin API answers.
@@ -91,6 +93,9 @@ func accountProxyURLUpdate(updates map[string]interface{}, stored string) (value
 	if err != nil {
 		return "", false, err
 	}
+	if err := proxypool.ValidateOutboundURL(value); err != nil {
+		return "", false, err
+	}
 	return value, true, nil
 }
 
@@ -99,6 +104,11 @@ func accountProxyURLUpdate(updates map[string]interface{}, stored string) (value
 func writeProxyURLError(w http.ResponseWriter, err error) {
 	if errors.Is(err, errMaskedProxyPassword) {
 		writeAdminError(w, http.StatusBadRequest, codeProxyPasswordMasked, err.Error())
+		return
+	}
+	var inputErr *proxypool.InputError
+	if errors.As(err, &inputErr) {
+		writeAdminError(w, http.StatusBadRequest, codeProxyURLInvalid, "proxyURL: "+inputErr.Reason)
 		return
 	}
 	writeAdminError(w, http.StatusBadRequest, codeProxyURLScheme, err.Error())

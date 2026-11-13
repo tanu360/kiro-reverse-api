@@ -73,6 +73,10 @@ func parseProxyURL(raw string) (base, user, pass string, hasUser bool, err error
 	if host == "" {
 		return "", "", "", false, invalid("url needs a host")
 	}
+	if hostHoldsPort(host) {
+		//! url.Parse reads host:port:port as the host "host:port", stored as [host:port]:port.
+		return "", "", "", false, invalid("the host holds a port: write the url as scheme://host:port")
+	}
 	port := u.Port()
 	if port == "" {
 		return "", "", "", false, invalid("url needs a port")
@@ -90,6 +94,61 @@ func parseProxyURL(raw string) (base, user, pass string, hasUser bool, err error
 		hasUser = true
 	}
 	return base, user, pass, hasUser, nil
+}
+
+// hostHoldsPort reports a parsed host with a colon that is not an IPv6 address.
+func hostHoldsPort(host string) bool {
+	if !strings.Contains(host, ":") {
+		return false
+	}
+	addr, _, _ := strings.Cut(host, "%")
+	return net.ParseIP(addr) == nil
+}
+
+// ValidateOutboundURL checks an account's own or the global proxy URL before it is saved: one
+// of the four schemes, a host, and a port from 1 to 65535 when one is given (http and https
+// fall back to 80 and 443, SOCKS needs one). Before, only the scheme was checked, so
+// "http://" dialed local port 80 and "http://127.0.0.1:99999" failed on every request.
+func ValidateOutboundURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	if strings.ContainsAny(raw, " \t\r\n") {
+		return invalid("url must not contain spaces")
+	}
+	if bracketedHostPort(raw) {
+		return invalid("the host holds a port: write the url as scheme://host:port")
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Opaque != "" {
+		return invalid("url is not a valid proxy URL")
+	}
+	scheme := strings.ToLower(u.Scheme)
+	switch scheme {
+	case "http", "https", "socks5", "socks5h":
+	default:
+		return invalid("url must start with http://, https://, socks5:// or socks5h://")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return invalid("url needs a host")
+	}
+	if hostHoldsPort(host) {
+		return invalid("the host holds a port: write the url as scheme://host:port")
+	}
+	port := u.Port()
+	if port == "" {
+		if strings.HasPrefix(scheme, "socks5") {
+			return invalid("url needs a port")
+		}
+	} else if n, convErr := strconv.Atoi(port); convErr != nil || n < 1 || n > 65535 {
+		return invalid("port must be from 1 to 65535")
+	}
+	if (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
+		return invalid("url must not have a path or query")
+	}
+	return nil
 }
 
 // bracketedHostPort reports a host:port typed as the host. A form that brackets

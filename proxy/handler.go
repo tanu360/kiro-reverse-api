@@ -13,6 +13,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
+	"kiro-proxy/proxypool"
 	"kiro-proxy/textfmt"
 	"math"
 	"net/http"
@@ -4533,6 +4534,10 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.ProxyURL = restored
+	if err := proxypool.ValidateOutboundURL(req.ProxyURL); err != nil {
+		writeProxyURLError(w, err)
+		return
+	}
 
 	if err := config.UpdateProxySettings(req.ProxyURL); err != nil {
 		w.WriteHeader(500)

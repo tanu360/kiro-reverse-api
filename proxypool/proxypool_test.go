@@ -141,6 +141,8 @@ func TestParseInputRejectsBadSchemeHostPort(t *testing.T) {
 		"http://host:8080?x=1",
 		"socks4://host:1080",
 		"socks5://[127.0.0.1:19403]:1080",
+		// Live: accepted and stored as http://[1.2.3.4:8080]:9, which never works.
+		"http://1.2.3.4:8080:9",
 	} {
 		_, err := buildProxy(ProxyInput{URL: strPtr(raw)}, nil)
 		var inputErr *InputError
@@ -869,5 +871,37 @@ func TestBoundConnectNamesADroppedConnect(t *testing.T) {
 		t.Fatalf("canceled request: %v", err)
 	} else if _, ok := DescribeProxyFailure(err); ok {
 		t.Fatalf("a canceled request read as a proxy failure: %v", err)
+	}
+}
+
+func TestValidateOutboundURL(t *testing.T) {
+	for _, raw := range []string{
+		"",
+		"http://127.0.0.1:3128",
+		"http://proxy.example.com",
+		"https://user:p%40ss@proxy.example.com:8443",
+		"socks5://127.0.0.1:1080",
+		"socks5h://user:pass@[::1]:1080",
+		"http://127.0.0.1:3128/",
+	} {
+		if err := ValidateOutboundURL(raw); err != nil {
+			t.Errorf("%q refused: %v", raw, err)
+		}
+	}
+	for raw, want := range map[string]string{
+		"http://":                 "url needs a host",
+		"http://127.0.0.1:99999":  "port must be from 1 to 65535",
+		"http://exa mple.com:80":  "url must not contain spaces",
+		"socks5://127.0.0.1":      "url needs a port",
+		"http://1.2.3.4:8080:9":   "the host holds a port",
+		"http://[1.2.3.4:8080]:9": "the host holds a port",
+		"ftp://host:21":           "url must start with",
+		"http://host:8080/path":   "url must not have a path or query",
+	} {
+		err := ValidateOutboundURL(raw)
+		var inputErr *InputError
+		if !errors.As(err, &inputErr) || !strings.HasPrefix(inputErr.Reason, want) {
+			t.Errorf("%q: got %v, want %q", raw, err, want)
+		}
 	}
 }

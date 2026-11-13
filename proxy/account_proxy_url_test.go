@@ -147,3 +147,24 @@ func TestGlobalProxyURLMaskedAndKept(t *testing.T) {
 		t.Fatalf("saving the masked URL stored %q", stored)
 	}
 }
+
+// Account and global proxy URLs are checked like pool URLs: a host, and a port in range.
+func TestProxyURLsNeedAHostAndAValidPort(t *testing.T) {
+	h := newRegionTestAdmin(t)
+	t.Cleanup(func() { applyProxyConfig("") })
+	for _, bad := range []string{"http://", "http://127.0.0.1:99999", "http://exa mple.com:80", "http://1.2.3.4:8080:9"} {
+		rec := serveRegionTestAdmin(h, http.MethodPost, "/admin/api/proxy", `{"proxyURL":"`+bad+`"}`)
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"proxy_url_invalid"`) {
+			t.Fatalf("global %q: %d %s", bad, rec.Code, rec.Body.String())
+		}
+		if _, _, err := accountProxyURLUpdate(map[string]interface{}{"proxyURL": bad}, ""); err == nil {
+			t.Fatalf("account %q accepted", bad)
+		}
+	}
+	if config.GetProxyURL() != "" {
+		t.Fatalf("a refused URL was saved: %q", config.GetProxyURL())
+	}
+	if _, ok, err := accountProxyURLUpdate(map[string]interface{}{"proxyURL": "socks5://127.0.0.1:1080"}, ""); !ok || err != nil {
+		t.Fatalf("a good URL was refused: %v", err)
+	}
+}
