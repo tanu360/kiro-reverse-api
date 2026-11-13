@@ -668,3 +668,27 @@ func TestAutoContinueContinuationDropsReasoningExtras(t *testing.T) {
 		t.Fatalf("signatures=%q redacted=%q, want only the first hop's", signatures, redacted)
 	}
 }
+
+func TestCountTokensThinkingWithoutMaxTokens(t *testing.T) {
+	h := newResponsesTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
+		t.Errorf("count_tokens called upstream")
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	for _, tc := range []struct {
+		name, body string
+		want       int
+	}{
+		//! The Anthropic SDKs' count_tokens has no max_tokens, so a thinking request sends none.
+		{"no max_tokens, as the SDKs send it", `{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":1024}}`, http.StatusOK},
+		{"budget not under the max_tokens sent", `{"model":"claude-sonnet-4.5","max_tokens":1024,"messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":1024}}`, http.StatusBadRequest},
+		{"budget under the minimum", `{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":512}}`, http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/messages/count_tokens", strings.NewReader(tc.body)))
+			if rec.Code != tc.want {
+				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tc.want, rec.Body.String())
+			}
+		})
+	}
+}

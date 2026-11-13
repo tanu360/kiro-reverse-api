@@ -13,6 +13,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -862,7 +863,13 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
-	if msg := validateClaudeThinkingConfig(req.Thinking, req.MaxTokens); msg != "" {
+	//! count_tokens has no max_tokens field and the SDKs send none, so the budget is checked
+	//! against max_tokens only when the client sent one.
+	maxTokens := req.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = math.MaxInt
+	}
+	if msg := validateClaudeThinkingConfig(req.Thinking, maxTokens); msg != "" {
 		h.sendClaudeError(w, 400, "invalid_request_error", msg)
 		return
 	}
