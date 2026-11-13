@@ -398,3 +398,24 @@ func TestDirectWebSearchAllAtRPMLimitIs429(t *testing.T) {
 		t.Fatalf("error = %+v, want rate_limit_error naming the limit", payload.Error)
 	}
 }
+
+// A cooling account shows when it comes back; the Accounts page said Active while it was skipped.
+func TestAccountActivityShowsCooldownEnd(t *testing.T) {
+	h := newResponsesTestHandler(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeKiroTextResponse(t, w, "hello")
+	})
+	s := newActivityStoreForTest(t)
+	now := time.Now()
+	h.pool.RecordQuotaError("responses-account", time.Minute)
+	t.Cleanup(func() { h.pool.RecordSuccess("responses-account") })
+	got := buildAccountActivity(s, h.pool, config.GetAccounts(), now)
+	until := got.Accounts["responses-account"].CooldownUntil
+	if until <= now.Unix() || until > now.Add(2*time.Minute).Unix() {
+		t.Fatalf("cooldownUntil = %d, want about a minute after %d", until, now.Unix())
+	}
+	h.pool.RecordSuccess("responses-account")
+	h.pool.ClearCooldown("responses-account")
+	if got := buildAccountActivity(s, h.pool, config.GetAccounts(), now); got.Accounts["responses-account"].CooldownUntil != 0 {
+		t.Fatalf("no cooldown must leave the field out, got %d", got.Accounts["responses-account"].CooldownUntil)
+	}
+}

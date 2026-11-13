@@ -178,6 +178,9 @@ type accountActivity struct {
 	RPM int `json:"rpm"`
 	// AtLimit: the account started RPMLimit requests in the last minute and is skipped.
 	AtLimit bool `json:"atLimit"`
+	// CooldownUntil (unix s) is set while the pool skips the account after errors or a 429;
+	// the Accounts page showed such an account as plain Active while its bound key got 503.
+	CooldownUntil int64 `json:"cooldownUntil,omitempty"`
 }
 
 type accountActivityResponse struct {
@@ -207,7 +210,13 @@ func buildAccountActivity(store *observeStore, p *accountpool.AccountPool, accou
 		Accounts:     make(map[string]accountActivity, len(accounts)),
 	}
 	for _, a := range accounts {
-		out.Accounts[a.ID] = accountActivity{Today: today[a.ID], RPM: rates[a.ID], AtLimit: atLimit[a.ID]}
+		activity := accountActivity{Today: today[a.ID], RPM: rates[a.ID], AtLimit: atLimit[a.ID]}
+		if p != nil {
+			if until := p.CooldownUntil(a.ID); until.After(now) {
+				activity.CooldownUntil = until.Unix()
+			}
+		}
+		out.Accounts[a.ID] = activity
 	}
 	return out
 }
