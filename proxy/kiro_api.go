@@ -588,14 +588,8 @@ func refreshAccountInfo(account *config.Account, markFailure bool) (*config.Acco
 
 			logger.Warnf("[RefreshAccountInfo] Account %s is temporarily suspended: %v", account.Email, err)
 
-			updatedAccount := *account
-			updatedAccount.Enabled = false
-			updatedAccount.BanStatus = "BANNED"
-			updatedAccount.BanReason = "AWS temporarily suspended - unusual user activity detected"
-			updatedAccount.BanTime = time.Now().Unix()
-
 			if markFailure {
-				if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
+				if _, updateErr := banAccount(account.ID, "BANNED", banReasonSuspended); updateErr != nil {
 					logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
 				}
 			}
@@ -609,14 +603,8 @@ func refreshAccountInfo(account *config.Account, markFailure bool) (*config.Acco
 
 			logger.Warnf("[RefreshAccountInfo] Authentication error for %s: %v", account.Email, err)
 
-			updatedAccount := *account
-			updatedAccount.Enabled = false
-			updatedAccount.BanStatus = "BANNED"
-			updatedAccount.BanReason = "Authentication failed - token invalid or expired"
-			updatedAccount.BanTime = time.Now().Unix()
-
 			if markFailure {
-				if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
+				if _, updateErr := banAccount(account.ID, "BANNED", banReasonAuthFailed); updateErr != nil {
 					logger.Errorf("[RefreshAccountInfo] Failed to update account ban status: %v", updateErr)
 				}
 			}
@@ -628,12 +616,7 @@ func refreshAccountInfo(account *config.Account, markFailure bool) (*config.Acco
 	if account.BanStatus != "" && account.BanStatus != "ACTIVE" {
 		logger.Infof("[RefreshAccountInfo] Account %s is now active, clearing ban status", account.Email)
 
-		updatedAccount := *account
-		updatedAccount.BanStatus = "ACTIVE"
-		updatedAccount.BanReason = ""
-		updatedAccount.BanTime = 0
-
-		if updateErr := config.UpdateAccount(account.ID, updatedAccount); updateErr != nil {
+		if _, updateErr := clearAccountBan(account.ID); updateErr != nil {
 			logger.Errorf("[RefreshAccountInfo] Failed to clear account ban status: %v", updateErr)
 		}
 	}

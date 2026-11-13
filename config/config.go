@@ -517,6 +517,46 @@ func UpdateAccount(id string, account Account) (err error) {
 	return fmt.Errorf("account not found: %s", id)
 }
 
+// MutateAccount runs mutate on the stored account under the store's write lock and saves it
+// when mutate reports a change. A caller that holds an older copy of the account (a refresh, a
+// ban on the request path) changes only the fields it owns this way: every field mutate leaves
+// alone keeps its stored value, so an admin edit made after the copy was taken stays.
+func MutateAccount(id string, mutate func(*Account) bool) (changed bool, err error) {
+	defer func() {
+		if err == nil && changed {
+			notifyAccountsChanged(id)
+		}
+	}()
+	if CredentialsLoaded() {
+		credLock.Lock()
+		defer credLock.Unlock()
+		return mutateAccountLocked(credentials, id, mutate, saveCredentialsLocked)
+	}
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	return mutateAccountLocked(cfg.Accounts, id, mutate, Save)
+}
+
+func mutateAccountLocked(accounts []Account, id string, mutate func(*Account) bool, save func() error) (bool, error) {
+	for i := range accounts {
+		if accounts[i].ID != id {
+			continue
+		}
+		previous := accounts[i]
+		if !mutate(&accounts[i]) {
+			accounts[i] = previous
+			return false, nil
+		}
+		accounts[i].ID = id
+		if err := save(); err != nil {
+			accounts[i] = previous
+			return false, err
+		}
+		return true, nil
+	}
+	return false, fmt.Errorf("account not found: %s", id)
+}
+
 // AuthMethodExternalIdp marks a Microsoft Enterprise SSO account.
 const AuthMethodExternalIdp = "external_idp"
 

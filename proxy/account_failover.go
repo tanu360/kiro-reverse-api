@@ -153,22 +153,12 @@ func (h *Handler) disableAccount(account *config.Account, banStatus, banReason s
 		return
 	}
 
-	if banReason == banReasonAuthFailed {
-		banStatus = authBanStatusFor(account.ID)
-	}
-
-	updatedAccount := *account
-	if !updatedAccount.Enabled && updatedAccount.BanStatus == banStatus && updatedAccount.BanReason == banReason {
+	changed, err := banAccount(account.ID, banStatus, banReason)
+	if err != nil {
+		logger.Warnf("[AccountFailover] Failed to disable %s: %v", account.Email, err)
 		return
 	}
-
-	updatedAccount.Enabled = false
-	updatedAccount.BanStatus = banStatus
-	updatedAccount.BanReason = banReason
-	updatedAccount.BanTime = time.Now().Unix()
-
-	if err := config.UpdateAccount(account.ID, updatedAccount); err != nil {
-		logger.Warnf("[AccountFailover] Failed to disable %s: %v", account.Email, err)
+	if !changed {
 		return
 	}
 

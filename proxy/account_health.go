@@ -242,20 +242,41 @@ func keepOffForAdmin(acc *config.Account) {
 	}
 }
 
-// authBanStatusFor is the status an auth ban on the account gets. An account an
-// admin already switched off (disabled, with no proxy ban) keeps the admin's
-// DISABLED: a BANNED auth ban written over it would let self-heal switch it
-// back on. The stored account decides, since the caller's copy can predate
-// the admin's change.
-func authBanStatusFor(id string) string {
-	for _, acc := range config.GetAccounts() {
-		if acc.ID != id {
-			continue
+// banAccount switches the stored account off with a ban and reports whether it
+// wrote. It changes only the switch and the ban fields of the stored row: the
+// caller's copy can predate an admin's change (switch, priority, weight, proxy,
+// nickname), and writing that copy back would undo it. An auth ban on an account
+// an admin already switched off (disabled, with no proxy ban) keeps the admin's
+// DISABLED: a BANNED auth ban written over it would let self-heal switch it back on.
+func banAccount(id, banStatus, banReason string) (bool, error) {
+	return config.MutateAccount(id, func(acc *config.Account) bool {
+		status := banStatus
+		if banReason == banReasonAuthFailed && !acc.Enabled &&
+			(acc.BanStatus == "" || acc.BanStatus == "ACTIVE" || acc.BanStatus == "DISABLED") {
+			status = "DISABLED"
 		}
-		if !acc.Enabled && (acc.BanStatus == "" || acc.BanStatus == "ACTIVE" || acc.BanStatus == "DISABLED") {
-			return "DISABLED"
+		if !acc.Enabled && acc.BanStatus == status && acc.BanReason == banReason {
+			return false
 		}
-		break
-	}
-	return "BANNED"
+		acc.Enabled = false
+		acc.BanStatus = status
+		acc.BanReason = banReason
+		acc.BanTime = time.Now().Unix()
+		return true
+	})
+}
+
+// clearAccountBan marks the stored account active again after Kiro answered for
+// it, and reports whether it wrote. Like banAccount it changes only the ban
+// fields, so the switch stays as the admin left it.
+func clearAccountBan(id string) (bool, error) {
+	return config.MutateAccount(id, func(acc *config.Account) bool {
+		if acc.BanStatus == "" || acc.BanStatus == "ACTIVE" {
+			return false
+		}
+		acc.BanStatus = "ACTIVE"
+		acc.BanReason = ""
+		acc.BanTime = 0
+		return true
+	})
 }
