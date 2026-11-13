@@ -383,10 +383,26 @@ func GetPassword() string {
 	return cfg.Password
 }
 
+// envPort reads PORT: the port when it holds 1-65535, else 0, and the raw value.
+func envPort() (int, string) {
+	raw := strings.TrimSpace(os.Getenv("PORT"))
+	if port, err := strconv.Atoi(raw); err == nil && port >= 1 && port <= 65535 {
+		return port, raw
+	}
+	return 0, raw
+}
+
+// IgnoredPortEnv is a PORT that GetPort passes over: set, but not a port from 1 to 65535.
+// Startup warns about it, or a typo would bind the stored port without a hint.
+func IgnoredPortEnv() (string, bool) {
+	port, raw := envPort()
+	return raw, port == 0 && raw != ""
+}
+
 // GetPort is the port to listen on: PORT when it holds 1-65535 (a downloaded
 // binary has no other way to move off a busy 8080), else the stored port, else 8080.
 func GetPort() int {
-	if port, err := strconv.Atoi(strings.TrimSpace(os.Getenv("PORT"))); err == nil && port >= 1 && port <= 65535 {
+	if port, _ := envPort(); port != 0 {
 		return port
 	}
 	cfgLock.RLock()
