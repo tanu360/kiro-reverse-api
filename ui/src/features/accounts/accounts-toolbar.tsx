@@ -275,18 +275,14 @@ export function AccountsToolbar({
         </InputGroup>
 
         {loading ? (
-          // The filter row's height: a control's (its scroll bar takes no room of its own).
+          // The filter row's height: a control's.
           <Skeleton className="h-9 w-40 pointer-coarse:h-10" />
         ) : (
           <>
             {hasControls ? (
               // One sideways-scrolling row below a 32rem card; from there up the controls wrap.
               // The 4 px bleed (-m-1 with p-1 inside) keeps the buttons' focus outline unclipped.
-              <ScrollArea
-                className="-m-1 h-auto w-auto min-w-0"
-                scrollFade
-                scrollbarGutter="overlap"
-              >
+              <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade>
                 <div className="flex w-max items-center gap-2 p-1 @lg/accounts:w-auto @lg/accounts:flex-wrap">
                   {showSort ? (
                     <SortSelect

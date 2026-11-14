@@ -77,7 +77,7 @@ export function TabsList({
   }
   return (
     <div
-      className="scroll-fade-x scrollbar-none min-w-0 max-w-full overflow-x-auto overscroll-x-contain"
+      className="scroll-fade-x min-w-0 max-w-full overflow-x-auto overscroll-x-contain"
       data-slot="tabs-list-scroller"
     >
       {list}

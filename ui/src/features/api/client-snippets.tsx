@@ -243,7 +243,7 @@ function RequestBuilder({ origin }: { origin: string }): JSX.Element {
 
       {/* One line: a card too narrow for all eight scrolls them sideways. The 4 px bleed (-m-1
           with p-1 inside) keeps the chips' focus outline unclipped. */}
-      <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade scrollbar={false}>
+      <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade>
         <RadioGroupPrimitive
           aria-label={t("snippets.language")}
           className="flex w-max gap-1.5 p-1"

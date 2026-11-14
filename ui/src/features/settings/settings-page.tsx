@@ -156,7 +156,7 @@ function isTextField(target: EventTarget | null): boolean {
 /**
  * Scroll-spy: the card in view, updated once per frame while the page scrolls. A nav click or a
  * deep link keeps its section marked until the reader scrolls the page (a scroll that follows a
- * wheel, touch or scroll key; the page shows no vertical scrollbar, index.css) or tabs into
+ * wheel, touch or scroll key; no scrollbar shows anywhere, index.css) or tabs into
  * another card. Near the page end the card it went to sits at the top while the page cannot
  * scroll further, where the spy alone marks the last card. A key that only works a control
  * (Space on a switch) does not scroll, so the section stays marked.
@@ -440,7 +440,7 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
       aria-label={t("sections")}
       className="sticky top-12 z-30 -mx-4 bg-background pt-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-linear-to-b after:from-background md:-mx-6"
     >
-      <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade scrollbarGutter>
+      <ScrollArea className="h-auto" clampContentMinWidth={false} scrollFade>
         {/* The top 4px of padding sits inside the scroller, so a chip's focus ring is not clipped. */}
         <div className="flex w-max gap-2 px-4 pt-1 md:px-6" ref={listRef}>
           {groups.map(({ group, labelId, entries }) => (

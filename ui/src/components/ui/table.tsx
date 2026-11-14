@@ -68,7 +68,7 @@ export function Table({
         {...props}
       />
     ),
-    className: "scrollbar-x relative w-full overflow-x-auto",
+    className: "relative w-full overflow-x-auto",
     "data-slot": "table-container",
     "data-variant": variant,
   };

@@ -17,12 +17,6 @@
   --sidebar-content-inset: 0.5rem;
   --sidebar-control-gap: 0.5rem;
   --sidebar-row-content-inset: 0.625rem;
-  /*
-   * The one scrollbar thumb (see the scrollbar rules below): the foreground at 22 %, 32 % on
-   * hover, so it reads on every surface in both themes.
-   */
-  --app-scrollbar-thumb: color-mix(in oklab, var(--foreground) 22%, transparent);
-  --app-scrollbar-thumb-hover: color-mix(in oklab, var(--foreground) 32%, transparent);
   /* Frosted dialogs (t3code dialog-glass). */
   --glass-blur: 12px;
   --glass-opacity: 80%;
@@ -608,69 +602,19 @@
 }
 
 /*
- * Scrollbars, after claude-guest-pass (which hides the page's): a vertical scrollbar never shows,
- * on the page or in any panel, list or field, though everything still scrolls by wheel, touch and
- * keys. A horizontal one stays: a 6 px round thumb in --app-scrollbar-thumb (a step darker on
- * hover) on a clear track, the same bar as ScrollArea's. Chromium and Safari take this from
- * ::-webkit-scrollbar, where width sizes the vertical bar and height the horizontal one. Never set
- * scrollbar-width or scrollbar-color in those browsers: either one switches these rules off for
- * that element. Firefox has no per-axis control, so there every scrollbar hides, except on a
- * `scrollbar-x` scroller (sideways only, no vertical overflow), which keeps a thin one.
+ * Scrollbars: none, anywhere. Every page, panel, list, table, code block and field still scrolls
+ * by wheel, touch, trackpad and keys, and the scroll fades (ScrollArea scrollFade, the menu and
+ * select lists) show where more content sits. One rule for every browser: Firefox reads
+ * scrollbar-width, Chromium and Safari the ::-webkit-scrollbar pseudo-element.
  */
 @layer base {
-  ::-webkit-scrollbar {
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
     width: 0;
-    height: 10px;
-    background: transparent;
-  }
-  ::-webkit-scrollbar-track,
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-button {
-    display: none;
-  }
-  ::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: 9999px;
-    background: var(--app-scrollbar-thumb) padding-box;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--app-scrollbar-thumb-hover);
-  }
-
-  @supports not selector(::-webkit-scrollbar) {
-    * {
-      scrollbar-width: none;
-    }
-  }
-}
-
-@utility scrollbar-x {
-  @supports not selector(::-webkit-scrollbar) {
-    scrollbar-width: thin;
-    scrollbar-color: var(--app-scrollbar-thumb) transparent;
-  }
-}
-
-/* Opt in to a vertical scrollbar: the same 6 px round thumb as the horizontal one. */
-@utility scrollbar-y {
-  &::-webkit-scrollbar {
-    width: 10px;
-  }
-
-  @supports not selector(::-webkit-scrollbar) {
-    scrollbar-width: thin;
-    scrollbar-color: var(--app-scrollbar-thumb) transparent;
-  }
-}
-
-/* No scrollbar on either axis (a tab strip that scrolls sideways under its own fades). */
-@utility scrollbar-none {
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
+    height: 0;
   }
 }
 
