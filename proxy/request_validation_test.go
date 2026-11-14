@@ -19,12 +19,14 @@ func TestClientJSONErrorHidesGoTypes(t *testing.T) {
 		`[]`:                             "Invalid JSON: the body must be an object, not an array",
 		`{"model":`:                      "Invalid JSON: the body ends too early",
 		`{"model": x}`:                   "Invalid JSON at byte",
-		`{"model":"x","messages":[{"role":true}]}`: "Invalid JSON: messages.0.role must be a string, not a boolean",
+		`{"model":"x","messages":[{"role":true}]}`:                            "Invalid JSON: messages.0.role must be a string, not a boolean",
+		`{"model":"x","messages":[{"role":"user","content":"a"},{"role":7}]}`: "Invalid JSON: messages.1.role must be a string, not a number",
+		`{"model":"x","stop_sequences":["a",2]}`:                              "Invalid JSON: stop_sequences.1 must be a string, not a number",
 	}
 	for body, want := range cases {
 		var req ClaudeRequest
 		err := json.Unmarshal([]byte(body), &req)
-		got := clientJSONError(err)
+		got := clientJSONError(err, []byte(body))
 		if !strings.HasPrefix(got, want) || strings.Contains(got, "Go ") || strings.Contains(got, "proxy.") {
 			t.Fatalf("%s: got %q, want %q", body, got, want)
 		}

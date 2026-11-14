@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -190,12 +191,13 @@ func anthropicBetaEnabled(r *http.Request, beta string) bool {
 
 // clientJSONError describes a request body that did not decode, in the API's terms. Go's own
 // text named internal types ("Go struct field ClaudeRequest.messages of type []proxy.ClaudeMessage").
-func clientJSONError(err error) string {
+// body is the JSON that failed, so the field path can name array positions on every Go release.
+func clientJSONError(err error, body []byte) string {
 	var typeErr *json.UnmarshalTypeError
 	var syntaxErr *json.SyntaxError
 	switch {
 	case errors.As(err, &typeErr):
-		field := typeErr.Field
+		field := jsonErrorPath(body, typeErr.Field, typeErr.Value)
 		if field == "" {
 			return fmt.Sprintf("Invalid JSON: the body must be an object, not %s", jsonValueName(typeErr.Value))
 		}
@@ -206,6 +208,98 @@ func clientJSONError(err error) string {
 		return fmt.Sprintf("Invalid JSON at byte %d: %s", syntaxErr.Offset, syntaxErr.Error())
 	}
 	return "Invalid JSON"
+}
+
+// jsonErrorPath adds array positions to a type error's field path: Go 1.25 reports
+// "messages.role" where newer releases report "messages.0.role". The first value in document
+// order whose JSON kind matches the error is the one the decoder stopped at.
+func jsonErrorPath(body []byte, field, value string) string {
+	if field == "" || len(body) == 0 {
+		return field
+	}
+	kind, _, _ := strings.Cut(value, " ")
+	var root any
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if dec.Decode(&root) != nil {
+		return field
+	}
+	if path, ok := findJSONErrorPath(root, strings.Split(field, "."), kind); ok {
+		return strings.Join(path, ".")
+	}
+	return field
+}
+
+func findJSONErrorPath(node any, parts []string, kind string) ([]string, bool) {
+	if len(parts) == 0 {
+		if jsonNodeKind(node) == kind {
+			return nil, true
+		}
+		if items, ok := node.([]any); ok {
+			// A wrong element type: Go 1.25 names only the array.
+			for i, item := range items {
+				if rest, ok := findJSONErrorPath(item, nil, kind); ok {
+					return append([]string{strconv.Itoa(i)}, rest...), true
+				}
+			}
+		}
+		return nil, false
+	}
+	switch n := node.(type) {
+	case []any:
+		if i, err := strconv.Atoi(parts[0]); err == nil {
+			// Newer Go already names the position.
+			if i < 0 || i >= len(n) {
+				return nil, false
+			}
+			rest, ok := findJSONErrorPath(n[i], parts[1:], kind)
+			if !ok {
+				return nil, false
+			}
+			return append([]string{parts[0]}, rest...), true
+		}
+		for i, item := range n {
+			if rest, ok := findJSONErrorPath(item, parts, kind); ok {
+				return append([]string{strconv.Itoa(i)}, rest...), true
+			}
+		}
+	case map[string]any:
+		child, ok := n[parts[0]]
+		if !ok {
+			// encoding/json matches keys without regard to case.
+			for key, v := range n {
+				if strings.EqualFold(key, parts[0]) {
+					child, ok = v, true
+					break
+				}
+			}
+		}
+		if !ok {
+			return nil, false
+		}
+		rest, found := findJSONErrorPath(child, parts[1:], kind)
+		if !found {
+			return nil, false
+		}
+		return append([]string{parts[0]}, rest...), true
+	}
+	return nil, false
+}
+
+func jsonNodeKind(node any) string {
+	switch node.(type) {
+	case map[string]any:
+		return "object"
+	case []any:
+		return "array"
+	case string:
+		return "string"
+	case json.Number:
+		return "number"
+	case bool:
+		return "bool"
+	}
+	return ""
 }
 
 func jsonKindName(t reflect.Type) string {

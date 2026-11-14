@@ -48,7 +48,7 @@ func extractInputResponsesTools(raw json.RawMessage) ([]OpenAIResponsesTool, err
 		}
 		if err := json.Unmarshal(item, &block); err != nil {
 			//! Go's decoder text names internal types; say which item and field is wrong instead.
-			return nil, fmt.Errorf("%s (%s): %s", field, header.Type, strings.TrimPrefix(clientJSONError(err), "Invalid JSON: "))
+			return nil, fmt.Errorf("%s (%s): %s", field, header.Type, strings.TrimPrefix(clientJSONError(err, item), "Invalid JSON: "))
 		}
 		if block.Tools == nil && header.Type == "additional_tools" {
 			return nil, fmt.Errorf("%s.tools must be an array for additional_tools", field)

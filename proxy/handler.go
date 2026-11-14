@@ -932,7 +932,7 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 
 	var req ClaudeRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		h.sendClaudeError(w, 400, "invalid_request_error", clientJSONError(err))
+		h.sendClaudeError(w, 400, "invalid_request_error", clientJSONError(err, body))
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
@@ -994,8 +994,8 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 
 	var req ClaudeRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, clientJSONError(err))
-		h.sendClaudeError(w, 400, "invalid_request_error", clientJSONError(err))
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, clientJSONError(err, body))
+		h.sendClaudeError(w, 400, "invalid_request_error", clientJSONError(err, body))
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
@@ -1869,8 +1869,8 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 
 	var req OpenAIRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, clientJSONError(err))
-		h.sendOpenAIError(w, 400, "invalid_request_error", clientJSONError(err))
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, clientJSONError(err, body))
+		h.sendOpenAIError(w, 400, "invalid_request_error", clientJSONError(err, body))
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)

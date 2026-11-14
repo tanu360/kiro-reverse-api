@@ -134,10 +134,11 @@ var bigNoisyPNG = sync.OnceValue(func() []byte {
 	return buf.Bytes()
 })
 
-// wideStripPNG is over the dimension limit but cheap to encode and resize.
+// wideStripPNG is over the dimension limit but cheap to encode and resize. Its noise makes the
+// JPEG re-encode smaller than a PNG one on every Go release; a smooth gradient flips with the encoder.
 func wideStripPNG(t *testing.T) []byte {
 	t.Helper()
-	return encodeTestPNG(t, resizeTestPhoto(2000, 200, 7, 0))
+	return encodeTestPNG(t, resizeTestPhoto(2000, 200, 7, 24))
 }
 
 func TestImageResizeBigPNGBecomesJPEGWithinLimits(t *testing.T) {

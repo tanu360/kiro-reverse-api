@@ -34,8 +34,8 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 
 	var req OpenAIResponsesRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, clientJSONError(err))
-		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", clientJSONError(err))
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, "", 0, 0, 0, false, http.StatusBadRequest, clientJSONError(err, body))
+		h.sendOpenAIError(w, http.StatusBadRequest, "invalid_request_error", clientJSONError(err, body))
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
