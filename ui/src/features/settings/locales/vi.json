@@ -348,6 +348,7 @@
   "twoFactor.secretCopied": "Đã sao chép khóa",
   "twoFactor.accountName": "Trong ứng dụng, mục này hiện là {issuer} (admin).",
   "twoFactor.confirmCode": "Mã trong ứng dụng",
+  "twoFactor.codePlaceholder": "123456",
   "twoFactor.enabling": "Đang bật…",
   "twoFactor.enabled": "Đã bật đăng nhập hai bước. Các phiên đăng nhập khác đã bị kết thúc.",
   "twoFactor.codesTitle": "Lưu mã khôi phục",

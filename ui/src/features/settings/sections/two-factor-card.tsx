@@ -1,4 +1,3 @@
-import { Input as InputPrimitive } from "@base-ui/react/input";
 import {
   Alert02Icon,
   InformationCircleIcon,
@@ -9,7 +8,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type JSX, useEffect, useId, useMemo, useState } from "react";
+import { type FormEvent, type JSX, useId, useMemo, useState } from "react";
 import { Code } from "@/components/shared/code";
 import { CopyButton } from "@/components/shared/copy-button";
 import { PasswordInput } from "@/components/shared/password-input";
@@ -28,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage, serverErrorCode } from "@/lib/api/server-errors";
@@ -44,9 +44,8 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 import { SECTION_ID } from "./sections";
-import { SectionQuery, SettingsGroup } from "./settings-section";
+import { Hint, SectionQuery, SettingsGroup } from "./settings-section";
 import { parseQrSvg, StyledQr } from "./styled-qr";
 
 /** Settings card for admin two-factor sign-in with an authenticator app. */
@@ -80,6 +79,10 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
     if (next) queryClient.setQueryData(queryKeys.settings.twoFactor(), next);
     void queryClient.invalidateQueries({ queryKey: queryKeys.settings.twoFactor() });
   };
+  // How to get back in without the app or the codes: behind the sign-in row's Learn more.
+  const lockout = fillNodes(t("twoFactor.lockoutNote"), {
+    env: <Code>ADMIN_RESET_2FA=1</Code>,
+  });
 
   return (
     <SettingsGroup
@@ -102,11 +105,13 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
             }
             controlWidth="auto"
             description={
-              status.enabledAt
-                ? t("twoFactor.onSince", {
-                    time: formatDateTime(Math.floor(status.enabledAt / 1000), lang),
-                  })
-                : t("twoFactor.onHint")
+              <Hint more={lockout}>
+                {status.enabledAt
+                  ? t("twoFactor.onSince", {
+                      time: formatDateTime(Math.floor(status.enabledAt / 1000), lang),
+                    })
+                  : t("twoFactor.onHint")}
+              </Hint>
             }
             title={t("twoFactor.signIn")}
           />
@@ -143,7 +148,7 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
             </Button>
           }
           controlWidth="auto"
-          description={t("twoFactor.offHint")}
+          description={<Hint more={lockout}>{t("twoFactor.offHint")}</Hint>}
           title={t("twoFactor.signIn")}
         >
           {status.resetByEnv ? (
@@ -154,9 +159,6 @@ function TwoFactorPanel({ status }: { status: TwoFactorStatus }): JSX.Element {
           ) : null}
         </SettingsRow>
       )}
-      <p className="px-4 pb-4 text-muted-foreground text-xs sm:px-6">
-        {fillNodes(t("twoFactor.lockoutNote"), { env: <Code>ADMIN_RESET_2FA=1</Code> })}
-      </p>
 
       <Dialog
         onOpenChange={(next) => {
@@ -196,10 +198,8 @@ function codeError(error: unknown, t: (key: string) => string): string {
 const CODE_LENGTH = 6;
 
 /**
- * The six-digit field the dialogs share: six boxes over one real input, so typing, a phone's
- * code autofill and a paste all land in one field with one label. It keeps digits only, at most
- * six: a letter never shows, and a code pasted as "123 456" lands as "123456". A wrong code
- * shakes the boxes once (not under reduced motion).
+ * The six-digit field the dialogs share, a plain input. It keeps digits only, at most six: a
+ * letter never shows, and a code pasted as "123 456" lands as "123456".
  */
 function CodeInput({
   id,
@@ -214,64 +214,21 @@ function CodeInput({
   error: string | null;
   label: string;
 }): JSX.Element {
-  const [focused, setFocused] = useState(false);
-  // Bumped by each new error, so the boxes remount and shake again; the input keeps its focus.
-  const [shake, setShake] = useState(0);
-  useEffect(() => {
-    if (error) setShake((count) => count + 1);
-  }, [error]);
-  const active = Math.min(value.length, CODE_LENGTH - 1);
+  const { t } = useT("settings");
   return (
     <Field className="min-w-0 items-stretch" invalid={error !== null}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <div className="relative">
-        <InputPrimitive
-          autoComplete="one-time-code"
-          autoFocus
-          className="absolute inset-0 z-10 size-full cursor-text bg-transparent text-transparent caret-transparent outline-none selection:bg-transparent"
-          id={id}
-          inputMode="numeric"
-          maxLength={9}
-          onBlur={() => setFocused(false)}
-          onChange={(event) =>
-            onChange(event.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))
-          }
-          onFocus={() => setFocused(true)}
-          spellCheck={false}
-          value={value}
-        />
-        <div
-          aria-hidden="true"
-          className={cn("grid grid-cols-6 gap-2", shake > 0 && error && "animate-otp-shake")}
-          key={shake}
-        >
-          {Array.from({ length: CODE_LENGTH }, (_, index) => {
-            const digit = value[index];
-            const current = focused && index === active && value.length < CODE_LENGTH;
-            return (
-              <div
-                className={cn(
-                  "flex h-10 items-center justify-center rounded-lg border bg-field font-mono text-foreground text-lg tabular-nums transition-[border-color,box-shadow] duration-150",
-                  error
-                    ? "border-destructive/64"
-                    : current || (focused && value.length === CODE_LENGTH && index === active)
-                      ? "border-field-border-focus ring-2 ring-primary/24"
-                      : "border-field-border",
-                )}
-                // biome-ignore lint/suspicious/noArrayIndexKey: the boxes are fixed positions.
-                key={index}
-              >
-                {digit ??
-                  (current ? (
-                    <span className="h-5 w-px bg-foreground motion-safe:animate-pulse" />
-                  ) : (
-                    <span className="size-1 rounded-full bg-muted-foreground/40" />
-                  ))}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <Input
+        autoComplete="one-time-code"
+        autoFocus
+        id={id}
+        inputMode="numeric"
+        maxLength={9}
+        onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))}
+        placeholder={t("twoFactor.codePlaceholder")}
+        spellCheck={false}
+        value={value}
+      />
       {error ? <FieldError match>{error}</FieldError> : null}
     </Field>
   );
@@ -431,8 +388,8 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
 }
 
 /**
- * The QR code, drawn in the app's style (StyledQr): dark modules on a white tile in a soft purple
- * frame, in both themes, since a scanner reads dark-on-light. The key to type stays behind "Can't
+ * The QR code, drawn in the app's style (StyledQr): dark modules on a white tile in both themes,
+ * since a scanner reads dark-on-light. The key to type stays behind "Can't
  * scan?" until asked for. A QR the styling cannot read is shown as the server drew it.
  */
 function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
@@ -453,9 +410,7 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
   }
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="size-52 rounded-2xl bg-linear-to-br from-primary/30 via-primary/10 to-primary/5 p-1.5 shadow-sm">
-        {qr}
-      </div>
+      <div className="size-52">{qr}</div>
       {setup && !showKey ? (
         <p className="text-muted-foreground text-xs">
           <Button
@@ -469,10 +424,10 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
         </p>
       ) : null}
       {setup && showKey ? (
-        <div className="flex w-full min-w-0 flex-col gap-2">
-          <div className="flex items-center gap-1 rounded-lg border border-border-subtle bg-surface-2 py-1 ps-3 pe-1">
+        <div className="flex w-full min-w-0 flex-col items-center gap-1">
+          <div className="flex max-w-full items-center justify-center gap-1">
             {/* The key as the app takes it: one word, the body font, so nothing is retyped wrong. */}
-            <span className="min-w-0 flex-1 py-1 text-sm break-all" translate="no">
+            <span className="min-w-0 text-center text-sm break-all" translate="no">
               {setup.secret}
             </span>
             <CopyButton

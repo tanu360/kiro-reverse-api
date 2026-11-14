@@ -755,28 +755,6 @@
  * the row, and while the row is highlighted it slides left by --marquee-distance to show the rest,
  * pausing at each end, then back. Reduced motion wraps the label instead of moving it.
  */
-/* A wrong two-factor code: the code boxes shake once. Reduced motion keeps them still. */
-@keyframes otp-shake {
-  0%,
-  100% {
-    translate: 0;
-  }
-  20%,
-  60% {
-    translate: -4px 0;
-  }
-  40%,
-  80% {
-    translate: 4px 0;
-  }
-}
-@utility animate-otp-shake {
-  animation: otp-shake 300ms ease-in-out;
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-}
-
 @keyframes marquee-text {
   0%,
   15% {

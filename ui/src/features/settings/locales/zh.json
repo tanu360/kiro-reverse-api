@@ -348,6 +348,7 @@
   "twoFactor.secretCopied": "密钥已复制",
   "twoFactor.accountName": "在应用中显示为 {issuer} (admin)。",
   "twoFactor.confirmCode": "应用中的验证码",
+  "twoFactor.codePlaceholder": "123456",
   "twoFactor.enabling": "正在开启…",
   "twoFactor.enabled": "两步验证已开启。其他已登录的会话已结束。",
   "twoFactor.codesTitle": "保存你的恢复码",

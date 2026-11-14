@@ -357,6 +357,7 @@
   "twoFactor.secretCopied": "Secret copied",
   "twoFactor.accountName": "It shows up in the app as {issuer} (admin).",
   "twoFactor.confirmCode": "Code from the app",
+  "twoFactor.codePlaceholder": "123456",
   "twoFactor.enabling": "Turning on…",
   "twoFactor.enabled": "Two-factor sign-in is on. Other signed-in sessions were ended.",
   "twoFactor.codesTitle": "Save your recovery codes",

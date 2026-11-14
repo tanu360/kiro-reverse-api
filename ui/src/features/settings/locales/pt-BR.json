@@ -357,6 +357,7 @@
   "twoFactor.secretCopied": "Chave copiada",
   "twoFactor.accountName": "No app, aparece como {issuer} (admin).",
   "twoFactor.confirmCode": "Código do app",
+  "twoFactor.codePlaceholder": "123456",
   "twoFactor.enabling": "Ligando…",
   "twoFactor.enabled": "O login em duas etapas está ligado. As outras sessões foram encerradas.",
   "twoFactor.codesTitle": "Guarde seus códigos de recuperação",
