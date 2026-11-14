@@ -43,7 +43,14 @@ trap 'rm -rf "$stage"' EXIT
 for target in "${targets[@]}"; do
   os="${target%/*}"
   arch="${target#*/}"
-  name="kiro-proxy_${os}_${arch}"
+  # Plain platform names in place of GOOS/GOARCH: "darwin_amd64" told people little.
+  case "$target" in
+    darwin/arm64) platform=macos-apple-silicon ;;
+    darwin/amd64) platform=macos-intel ;;
+    */amd64) platform="$os-x64" ;;
+    *) platform="$os-$arch" ;;
+  esac
+  name="kiro-proxy-$platform"
   bin=kiro-proxy
   [ "$os" = windows ] && bin=kiro-proxy.exe
 
@@ -68,8 +75,8 @@ for target in "${targets[@]}"; do
   fi
 done
 
-(cd "$out" && sha256sum kiro-proxy_* >SHA256SUMS.txt)
+(cd "$out" && sha256sum kiro-proxy-* >SHA256SUMS.txt)
 
 echo
 echo "release assets in $out:"
-(cd "$out" && ls -l kiro-proxy_* SHA256SUMS.txt)
+(cd "$out" && ls -l kiro-proxy-* SHA256SUMS.txt)

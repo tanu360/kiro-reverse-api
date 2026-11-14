@@ -129,7 +129,7 @@
   "shell.update.binaryStep": "先停止代理。在包含 {folder} 的目录中运行以下命令，下载 {platform} 版本并覆盖旧版本：",
   "shell.update.binaryStepWindows": "先停止代理。在 PowerShell 中进入包含 {folder} 的目录，运行以下命令，下载 {platform} 版本并覆盖旧版本：",
   "shell.update.binaryAfter": "然后用相同的 {env} 重新启动。未设置 {env} 时，数据库位于启动时所在的目录。",
-  "shell.update.binaryOther": "其他平台请使用发布页上对应的压缩包，例如 darwin_arm64 或 windows_amd64。",
+  "shell.update.binaryOther": "其他平台请使用发布页上对应的压缩包，例如 macos-apple-silicon 或 windows-x64。",
   "shell.notFound.title": "页面不存在",
   "shell.notFound.description": "此地址没有对应的页面。",
   "shell.notFound.action": "前往概览",

@@ -147,14 +147,14 @@ jobs:
       - name: Build binaries
         run: .github/scripts/build-release.sh "$RUNNER_TEMP/release"
 
-      # Run the linux/amd64 binary straight from its archive and check that it serves the admin UI
+      # Run the linux-x64 binary straight from its archive and check that it serves the admin UI
       # and reports the release version. The server log is printed only on failure.
-      - name: Smoke test linux/amd64 binary
+      - name: Smoke test linux-x64 binary
         run: |
           smoke="$RUNNER_TEMP/smoke"
           mkdir -p "$smoke"
-          tar -xzf "$RUNNER_TEMP/release/kiro-proxy_linux_amd64.tar.gz" -C "$smoke"
-          DATA_DIR="$smoke/state" "$smoke/kiro-proxy_linux_amd64/kiro-proxy" >"$smoke/server.log" 2>&1 &
+          tar -xzf "$RUNNER_TEMP/release/kiro-proxy-linux-x64.tar.gz" -C "$smoke"
+          DATA_DIR="$smoke/state" "$smoke/kiro-proxy-linux-x64/kiro-proxy" >"$smoke/server.log" 2>&1 &
           pid=$!
           stop() {
             status=$?
@@ -217,7 +217,7 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
         run: |
           shopt -s nullglob
-          assets=("$RUNNER_TEMP"/release/kiro-proxy_* "$RUNNER_TEMP/release/SHA256SUMS.txt")
+          assets=("$RUNNER_TEMP"/release/kiro-proxy-* "$RUNNER_TEMP/release/SHA256SUMS.txt")
           if [ "${#assets[@]}" -ne 7 ]; then
             echo "::error::Expected 6 archives and SHA256SUMS.txt, found ${#assets[@]} files"
             exit 1

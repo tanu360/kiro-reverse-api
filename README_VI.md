@@ -168,17 +168,17 @@ docker run -d \
 
 ### 📦 Tải binary dựng sẵn
 
-Mỗi [bản phát hành](https://github.com/tanu360/kiro-reverse-api/releases) đều kèm binary chạy ngay cho Linux, macOS và Windows trên amd64 và arm64, đã tích hợp sẵn giao diện quản trị. Không cần Go, Node.js hay Docker.
+Mỗi [bản phát hành](https://github.com/tanu360/kiro-reverse-api/releases) đều kèm binary chạy ngay cho Linux, macOS và Windows trên x64 và arm64, đã tích hợp sẵn giao diện quản trị. Không cần Go, Node.js hay Docker.
 
 ```bash
-# Đổi linux_amd64 theo nền tảng của bạn: linux_arm64, darwin_amd64 hoặc darwin_arm64
-curl -LO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy_linux_amd64.tar.gz
-tar -xzf kiro-proxy_linux_amd64.tar.gz
-cd kiro-proxy_linux_amd64
+# Đổi linux-x64 theo nền tảng của bạn: linux-arm64, macos-apple-silicon hoặc macos-intel
+curl -LO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy-linux-x64.tar.gz
+tar -xzf kiro-proxy-linux-x64.tar.gz
+cd kiro-proxy-linux-x64
 ./kiro-proxy
 ```
 
-Trên Windows, tải `kiro-proxy_windows_amd64.zip` (hoặc `_arm64`), giải nén rồi chạy `kiro-proxy.exe` trong terminal. Cơ sở dữ liệu được tạo trong thư mục hiện tại; đặt `DATA_DIR` để lưu ở nơi khác. Server lắng nghe tại `127.0.0.1:8080`: đặt `PORT` khi cổng 8080 đã bị dùng, và `LISTEN_HOST=0.0.0.0` để nhận kết nối từ máy khác. File `SHA256SUMS.txt` trong bản phát hành liệt kê checksum của từng file nén: kiểm tra file đã tải bằng `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Các binary chưa được ký: nếu macOS chặn, hãy chạy `xattr -d com.apple.quarantine kiro-proxy`; Windows SmartScreen có thể hỏi xác nhận ở lần chạy đầu tiên.
+Trên Windows, tải `kiro-proxy-windows-x64.zip` (hoặc `kiro-proxy-windows-arm64.zip`), giải nén rồi chạy `kiro-proxy.exe` trong terminal. Cơ sở dữ liệu được tạo trong thư mục hiện tại; đặt `DATA_DIR` để lưu ở nơi khác. Server lắng nghe tại `127.0.0.1:8080`: đặt `PORT` khi cổng 8080 đã bị dùng, và `LISTEN_HOST=0.0.0.0` để nhận kết nối từ máy khác. File `SHA256SUMS.txt` trong bản phát hành liệt kê checksum của từng file nén: kiểm tra file đã tải bằng `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). Các binary chưa được ký: nếu macOS chặn, hãy chạy `xattr -d com.apple.quarantine kiro-proxy`; Windows SmartScreen có thể hỏi xác nhận ở lần chạy đầu tiên.
 
 ### 🛠 Build từ mã nguồn
 

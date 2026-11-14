@@ -208,7 +208,7 @@ export interface StatusResponse extends StatsResponse {
 
 export interface VersionResponse {
   version: string;
-  /** The server's runtime.GOOS and GOARCH: the release archive kiro-proxy_<os>_<arch>. */
+  /** The server's runtime.GOOS and GOARCH, which pick its release archive (kiro-proxy-linux-x64, ...). */
   os?: string;
   arch?: string;
   /** The server runs in a container (Docker or Podman). */

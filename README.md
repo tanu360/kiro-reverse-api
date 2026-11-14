@@ -168,17 +168,17 @@ docker run -d \
 
 ### 📦 Download a binary
 
-Every [release](https://github.com/tanu360/kiro-reverse-api/releases) ships a ready-to-run binary for Linux, macOS and Windows on amd64 and arm64, with the admin UI built in. You need no Go, Node.js or Docker.
+Every [release](https://github.com/tanu360/kiro-reverse-api/releases) ships a ready-to-run binary for Linux, macOS and Windows on x64 and arm64, with the admin UI built in. You need no Go, Node.js or Docker.
 
 ```bash
-# Swap linux_amd64 for your platform: linux_arm64, darwin_amd64 or darwin_arm64
-curl -LO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy_linux_amd64.tar.gz
-tar -xzf kiro-proxy_linux_amd64.tar.gz
-cd kiro-proxy_linux_amd64
+# Swap linux-x64 for your platform: linux-arm64, macos-apple-silicon or macos-intel
+curl -LO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy-linux-x64.tar.gz
+tar -xzf kiro-proxy-linux-x64.tar.gz
+cd kiro-proxy-linux-x64
 ./kiro-proxy
 ```
 
-On Windows, download `kiro-proxy_windows_amd64.zip` (or `_arm64`), extract it and run `kiro-proxy.exe` from a terminal. The database is created in the current folder; set `DATA_DIR` to keep it somewhere else. The server listens on `127.0.0.1:8080`: set `PORT` when 8080 is taken, and `LISTEN_HOST=0.0.0.0` to accept other machines. `SHA256SUMS.txt` on the release lists every archive's checksum: check a download with `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). The binaries are not signed: if macOS refuses to open `kiro-proxy`, run `xattr -d com.apple.quarantine kiro-proxy`, and Windows SmartScreen may ask before the first run.
+On Windows, download `kiro-proxy-windows-x64.zip` (or `kiro-proxy-windows-arm64.zip`), extract it and run `kiro-proxy.exe` from a terminal. The database is created in the current folder; set `DATA_DIR` to keep it somewhere else. The server listens on `127.0.0.1:8080`: set `PORT` when 8080 is taken, and `LISTEN_HOST=0.0.0.0` to accept other machines. `SHA256SUMS.txt` on the release lists every archive's checksum: check a download with `sha256sum -c SHA256SUMS.txt --ignore-missing` (macOS: `shasum -a 256 -c SHA256SUMS.txt --ignore-missing`). The binaries are not signed: if macOS refuses to open `kiro-proxy`, run `xattr -d com.apple.quarantine kiro-proxy`, and Windows SmartScreen may ask before the first run.
 
 ### 🛠 Build from source
 

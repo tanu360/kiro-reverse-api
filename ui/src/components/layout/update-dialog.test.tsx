@@ -105,32 +105,40 @@ describe("release archive", () => {
   it("names the archive for the server's platform, as build-release.sh does", () => {
     const arm = releaseArchive({ os: "linux", arch: "arm64" });
     expect(arm).toMatchObject({
-      file: "kiro-proxy_linux_arm64.tar.gz",
-      folder: "kiro-proxy_linux_arm64",
+      file: "kiro-proxy-linux-arm64.tar.gz",
+      folder: "kiro-proxy-linux-arm64",
       windows: false,
       platform: "Linux (arm64)",
       known: true,
     });
     expect(binaryCommand(arm)).toBe(
-      "curl -fLO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy_linux_arm64.tar.gz && tar -xzf kiro-proxy_linux_arm64.tar.gz",
+      "curl -fLO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy-linux-arm64.tar.gz && tar -xzf kiro-proxy-linux-arm64.tar.gz",
     );
-    expect(releaseArchive({ os: "darwin", arch: "arm64" }).file).toBe(
-      "kiro-proxy_darwin_arm64.tar.gz",
+    expect(releaseArchive({ os: "darwin", arch: "arm64" })).toMatchObject({
+      file: "kiro-proxy-macos-apple-silicon.tar.gz",
+      platform: "macOS (Apple silicon)",
+    });
+    expect(releaseArchive({ os: "darwin", arch: "amd64" }).file).toBe(
+      "kiro-proxy-macos-intel.tar.gz",
     );
+    expect(releaseArchive({ os: "linux", arch: "amd64" })).toMatchObject({
+      file: "kiro-proxy-linux-x64.tar.gz",
+      platform: "Linux (x64)",
+    });
   });
 
   it("gives Windows the zip and a PowerShell command", () => {
     const win = releaseArchive({ os: "windows", arch: "amd64" });
-    expect(win).toMatchObject({ file: "kiro-proxy_windows_amd64.zip", windows: true });
+    expect(win).toMatchObject({ file: "kiro-proxy-windows-x64.zip", windows: true });
     expect(binaryCommand(win)).toBe(
-      "curl.exe -fLO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy_windows_amd64.zip; Expand-Archive -Force kiro-proxy_windows_amd64.zip .",
+      "curl.exe -fLO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy-windows-x64.zip; Expand-Archive -Force kiro-proxy-windows-x64.zip .",
     );
   });
 
-  it("falls back to linux_amd64 for a platform with no archive, or none reported", () => {
+  it("falls back to linux-x64 for a platform with no archive, or none reported", () => {
     for (const server of [{ os: "freebsd", arch: "amd64" }, { os: "linux", arch: "386" }, {}]) {
       expect(releaseArchive(server)).toMatchObject({
-        file: "kiro-proxy_linux_amd64.tar.gz",
+        file: "kiro-proxy-linux-x64.tar.gz",
         known: false,
       });
     }
@@ -221,12 +229,14 @@ describe("UpdateDialog", () => {
       server: { version: "2.1.0", os: "darwin", arch: "arm64", docker: false },
     });
     expect(await screen.findByRole("radio", { name: "Binary" })).toBeChecked();
-    expect(screen.getByText(/download the macOS \(arm64\) build/)).toBeInTheDocument();
+    expect(screen.getByText(/download the macOS \(Apple silicon\) build/)).toBeInTheDocument();
     const box = screen.getByRole("textbox", { name: /^Stop the proxy/ });
     expect(box).toHaveTextContent(
-      "curl -fLO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy_darwin_arm64.tar.gz && tar -xzf kiro-proxy_darwin_arm64.tar.gz",
+      "curl -fLO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy-macos-apple-silicon.tar.gz && tar -xzf kiro-proxy-macos-apple-silicon.tar.gz",
     );
-    expect(screen.getByText("kiro-proxy_darwin_arm64", { selector: "code" })).toBeInTheDocument();
+    expect(
+      screen.getByText("kiro-proxy-macos-apple-silicon", { selector: "code" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("DATA_DIR", { selector: "code" })).toHaveLength(2);
 
     copyTextMock.mockResolvedValue(true);
@@ -249,7 +259,7 @@ describe("UpdateDialog", () => {
 
     await user.click(screen.getByRole("radio", { name: "Binary" }));
     expect(screen.getByRole("textbox", { name: /^Stop the proxy/ })).toHaveTextContent(
-      "kiro-proxy_linux_amd64.tar.gz",
+      "kiro-proxy-linux-x64.tar.gz",
     );
   });
 
@@ -259,11 +269,11 @@ describe("UpdateDialog", () => {
       server: { version: "2.1.0", os: "windows", arch: "arm64", docker: false },
     });
     expect(await screen.findByRole("textbox", { name: /In PowerShell/ })).toHaveTextContent(
-      "Expand-Archive -Force kiro-proxy_windows_arm64.zip .",
+      "Expand-Archive -Force kiro-proxy-windows-arm64.zip .",
     );
   });
 
-  it("points at the linux_amd64 archive and says how to pick another when the platform is unknown", async () => {
+  it("points at the linux-x64 archive and says how to pick another when the platform is unknown", async () => {
     renderDialog({ changelog: "", server: { version: "2.1.0", os: "freebsd", arch: "amd64" } });
     await screen.findByRole("radio", { name: "Binary", checked: true });
     expect(screen.getByText(/For another platform, use its archive/)).toBeInTheDocument();

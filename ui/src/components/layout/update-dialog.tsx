@@ -20,8 +20,8 @@ import { GITHUB_URL } from "./user-menu";
 /*
  * How a running proxy is updated. The Compose file builds from the clone, the image on ghcr.io is
  * rebuilt from main on every push (docker.yml), and a v* tag publishes release archives
- * (release.yml, .github/scripts/build-release.sh): kiro-proxy_<os>_<arch>.tar.gz, .zip on Windows,
- * each holding one kiro-proxy_<os>_<arch> folder. /releases/latest/download/<file> follows the
+ * (release.yml, .github/scripts/build-release.sh): kiro-proxy-<platform>.tar.gz, .zip on Windows,
+ * each holding one kiro-proxy-<platform> folder. /releases/latest/download/<file> follows the
  * newest release, so the command needs no version in it.
  */
 const COMPOSE_COMMAND = "git pull && docker compose up -d --build";
@@ -35,9 +35,16 @@ const UPDATE_METHODS = [
   { id: "binary", label: "shell.update.methodBinary" },
 ] as const satisfies readonly { id: UpdateMethod; label: string }[];
 
-/** The platforms build-release.sh packages, with the name the steps show for each. */
-const RELEASE_OS: Record<string, string> = { linux: "Linux", darwin: "macOS", windows: "Windows" };
-const RELEASE_ARCH = new Set(["amd64", "arm64"]);
+/** The platforms build-release.sh packages, by GOOS/GOARCH: the archive's platform part and the name the steps show. */
+const RELEASE_TARGETS: Record<string, { name: string; label: string }> = {
+  "linux/amd64": { name: "linux-x64", label: "Linux (x64)" },
+  "linux/arm64": { name: "linux-arm64", label: "Linux (arm64)" },
+  "darwin/amd64": { name: "macos-intel", label: "macOS (Intel)" },
+  "darwin/arm64": { name: "macos-apple-silicon", label: "macOS (Apple silicon)" },
+  "windows/amd64": { name: "windows-x64", label: "Windows (x64)" },
+  "windows/arm64": { name: "windows-arm64", label: "Windows (arm64)" },
+};
+const FALLBACK_TARGET = "linux/amd64";
 
 /** "v2.1.0" and "2.1.0" both display as "2.1.0", the one format the shell shows. */
 export function stripV(version: string): string {
@@ -116,25 +123,25 @@ export interface ReleaseArchive {
   /** The one folder the archive holds (and the old install sits in). */
   folder: string;
   windows: boolean;
-  /** "Linux (arm64)", the platform the archive is built for. */
+  /** "macOS (Apple silicon)", the platform the archive is built for. */
   platform: string;
-  /** False when the server did not say or no archive is built for it: then linux_amd64. */
+  /** False when the server did not say or no archive is built for it: then linux-x64. */
   known: boolean;
 }
 
-/** The release archive for the server's platform, or the linux_amd64 one when there is none. */
+/** The release archive for the server's platform, or the linux-x64 one when there is none. */
 export function releaseArchive(server?: Pick<VersionResponse, "os" | "arch">): ReleaseArchive {
-  const os = server?.os ?? "";
-  const arch = server?.arch ?? "";
-  const known = Object.hasOwn(RELEASE_OS, os) && RELEASE_ARCH.has(arch);
-  const target = known ? { os, arch } : { os: "linux", arch: "amd64" };
-  const folder = `kiro-proxy_${target.os}_${target.arch}`;
-  const windows = target.os === "windows";
+  const reported = `${server?.os ?? ""}/${server?.arch ?? ""}`;
+  const known = Object.hasOwn(RELEASE_TARGETS, reported);
+  const key = known ? reported : FALLBACK_TARGET;
+  const target = RELEASE_TARGETS[key];
+  const folder = `kiro-proxy-${target.name}`;
+  const windows = key.startsWith("windows/");
   return {
     file: `${folder}.${windows ? "zip" : "tar.gz"}`,
     folder,
     windows,
-    platform: `${RELEASE_OS[target.os]} (${target.arch})`,
+    platform: target.label,
     known,
   };
 }

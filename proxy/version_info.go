@@ -12,7 +12,7 @@ import (
 
 // versionInfo is GET /admin/api/version: the running version, and what the update dialog needs
 // to show the right way to update this server. os and arch name the release archive
-// (kiro-proxy_<os>_<arch>), and docker says the server runs in a container, where the Docker
+// (kiro-proxy-linux-x64, kiro-proxy-macos-apple-silicon, ...), and docker says the server runs in a container, where the Docker
 // steps apply instead of a binary download.
 type versionInfo struct {
 	Version string `json:"version"`

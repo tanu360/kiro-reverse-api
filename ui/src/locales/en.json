@@ -129,7 +129,7 @@
   "shell.update.binaryStep": "Stop the proxy. In the folder that holds {folder}, run this to download the {platform} build and unpack it over the old one:",
   "shell.update.binaryStepWindows": "Stop the proxy. In PowerShell, in the folder that holds {folder}, run this to download the {platform} build and unpack it over the old one:",
   "shell.update.binaryAfter": "Then start it again with the same {env}. Without {env}, the database is in the folder you start it from.",
-  "shell.update.binaryOther": "For another platform, use its archive from the release page, such as darwin_arm64 or windows_amd64.",
+  "shell.update.binaryOther": "For another platform, use its archive from the release page, such as macos-apple-silicon or windows-x64.",
   "shell.notFound.title": "Page not found",
   "shell.notFound.description": "This address does not match any page.",
   "shell.notFound.action": "Go to Overview",
