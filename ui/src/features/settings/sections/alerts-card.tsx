@@ -249,7 +249,9 @@ function SummaryTimeSelect({
       <SelectTrigger id={id}>
         <SelectValue />
       </SelectTrigger>
-      <SelectPopup>
+      {/* 48 half hours: a list under the field, capped at 22rem and scrolling, instead of one
+          laid over the field that grows to the window's height to line the chosen time up. */}
+      <SelectPopup alignItemWithTrigger={false}>
         {items.map((item) => (
           <SelectItem key={item.value} value={item.value}>
             {item.label}
