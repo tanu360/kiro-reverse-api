@@ -1,7 +1,8 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
+import type { Conversation, ConversationTotals } from "@/lib/api/requests";
 import type { RecentRequestsResponse, RequestRecord, RequestSort } from "@/lib/api/types";
-import { mockDb } from "@/lib/mocks/db";
-import { apiUrl, mockDelay, requireAuth } from "@/lib/mocks/http";
+import { mockDb, mockNowUnix } from "@/lib/mocks/db";
+import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
 
 const SORTS: readonly RequestSort[] = [
   "time",
@@ -21,6 +22,7 @@ interface NormalizedQuery {
   search: string;
   status: "" | "success" | "failed";
   errorType: string;
+  conversation: string;
   sort: RequestSort;
   order: "asc" | "desc";
 }
@@ -49,6 +51,7 @@ function normalizeQuery(url: URL): NormalizedQuery {
     search: (q.get("search") ?? "").trim(),
     status: status === "success" || status === "failed" ? status : "",
     errorType: (q.get("errorType") ?? "").trim().toLowerCase(),
+    conversation: (q.get("conversation") ?? "").trim(),
     sort: (SORTS as readonly string[]).includes(sort) ? (sort as RequestSort) : "time",
     order: order === "asc" ? "asc" : "desc",
   };
@@ -72,6 +75,7 @@ function matches(record: RequestRecord, query: NormalizedQuery): boolean {
   if (query.status === "success" && !record.success) return false;
   if (query.status === "failed" && record.success) return false;
   if (query.errorType && (record.success || record.errorType !== query.errorType)) return false;
+  if (query.conversation && record.conversationId !== query.conversation) return false;
   if (!query.search) return true;
   const needle = query.search.toLowerCase();
   return [
@@ -185,4 +189,195 @@ export const handlers: HttpHandler[] = [
       true,
     );
   }),
+
+  http.get(apiUrl("/observe/conversations/:id"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const id = String(params.id);
+    const turns = mockDb.requests
+      .filter((record) => record.conversationId === id)
+      .sort((a, b) => a.ts - b.ts || (a.id ?? 0) - (b.id ?? 0));
+    if (turns.length === 0) {
+      return jsonError(404, "no request of this conversation is logged", {
+        code: "conversation_not_found",
+      });
+    }
+    const body: Conversation = {
+      id,
+      turns: turns.slice(0, 500),
+      totals: summarize(turns.slice(0, 500)),
+      truncated: turns.length > 500,
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(apiUrl("/observe/requests/:id/body"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const record = mockDb.requests.find((item) => item.id === Number(params.id));
+    if (!record?.hasBody) {
+      return jsonError(404, "this request's body was not kept", { code: "request_body_missing" });
+    }
+    const text = JSON.stringify(mockBody(record));
+    return HttpResponse.json({
+      endpoint: record.endpoint ?? "claude",
+      size: text.length,
+      model: record.model,
+      stream: true,
+      body: text,
+    });
+  }),
+
+  // proxy/request_replay.go: the kept body runs again without streaming and is logged anew.
+  http.post(apiUrl("/observe/requests/:id/replay"), async ({ request, params }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const original = mockDb.requests.find((item) => item.id === Number(params.id));
+    if (!original) return jsonError(404, "request not found", { code: "request_not_found" });
+    if (!original.hasBody) {
+      return jsonError(404, "this request's body was not kept", { code: "request_body_missing" });
+    }
+    const input: unknown = await request.json().catch(() => null);
+    const { accountId, model } = (input ?? {}) as { accountId?: unknown; model?: unknown };
+    const account = mockDb.accounts.find((item) => item.id === (accountId || original.accountId));
+    if (!account) {
+      return jsonError(400, "choose an account that exists", { code: "replay_account_invalid" });
+    }
+    const chosenModel = typeof model === "string" && model.trim() ? model.trim() : original.model;
+    const nextId = Math.max(0, ...mockDb.requests.map((item) => item.id ?? 0)) + 1;
+    const replay: RequestRecord = {
+      id: nextId,
+      ts: mockNowUnix(),
+      accountId: account.id,
+      email: account.email,
+      model: chosenModel,
+      inTokens: original.inTokens,
+      outTokens: 96,
+      totalTokens: original.inTokens + 96,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      credits: 0.0124,
+      success: true,
+      status: 200,
+      endpoint: original.endpoint,
+      durationMs: 2140,
+      requestId: `req_${nextId.toString(16).padStart(24, "0")}`,
+      conversationId: chosenModel === original.model ? original.conversationId : undefined,
+      replayOf: original.id,
+      hasBody: true,
+      attempts: [
+        {
+          accountId: account.id,
+          email: account.email,
+          endpoint: "kiro",
+          startMs: 4,
+          durationMs: 2132,
+          success: true,
+        },
+      ],
+    };
+    mockDb.requests.unshift(replay);
+    return HttpResponse.json({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      durationMs: replay.durationMs,
+      accountId: account.id,
+      model: chosenModel,
+      response: mockAnswer(replay),
+      request: replay,
+    });
+  }),
 ];
+
+/** proxy/request_replay.go summarizeConversation. */
+function summarize(turns: RequestRecord[]): ConversationTotals {
+  const totals: ConversationTotals = {
+    requests: 0,
+    successes: 0,
+    failures: 0,
+    failovers: 0,
+    replays: 0,
+    inTokens: 0,
+    outTokens: 0,
+    cacheReadTokens: 0,
+    credits: 0,
+    durationMs: 0,
+    firstTs: turns[0]?.ts ?? 0,
+    lastTs: turns.at(-1)?.ts ?? 0,
+    accounts: [],
+    models: [],
+    accountMoves: 0,
+  };
+  let last = "";
+  for (const turn of turns) {
+    totals.requests++;
+    if (turn.success) totals.successes++;
+    else totals.failures++;
+    if (turn.replayOf) totals.replays++;
+    totals.failovers += turn.attempts?.filter((attempt) => attempt.failover).length ?? 0;
+    totals.inTokens += turn.inTokens;
+    totals.outTokens += turn.outTokens;
+    totals.cacheReadTokens += turn.cacheReadTokens;
+    totals.credits += turn.credits;
+    totals.durationMs += turn.durationMs ?? 0;
+    const account = turn.email || turn.accountId;
+    if (account) {
+      if (!totals.accounts.includes(account)) totals.accounts.push(account);
+      if (last && last !== account) totals.accountMoves++;
+      last = account;
+    }
+    if (turn.model && !totals.models.includes(turn.model)) totals.models.push(turn.model);
+  }
+  return totals;
+}
+
+/** A plausible client body for a logged request, in its API's shape. */
+function mockBody(record: RequestRecord): Record<string, unknown> {
+  const messages = [
+    {
+      role: "user",
+      content: "Refactor the retry loop in proxy/kiro.go so each endpoint gets one try.",
+    },
+  ];
+  if (record.endpoint === "responses") {
+    return { model: record.model, stream: true, input: messages[0].content };
+  }
+  if (record.endpoint === "openai") {
+    return { model: record.model, stream: true, messages };
+  }
+  return { model: record.model, max_tokens: 4096, stream: true, messages };
+}
+
+/** What a non-streamed answer of the record's API looks like. */
+function mockAnswer(record: RequestRecord): Record<string, unknown> {
+  const text = "The loop now tries each endpoint once and moves on after the first failure.";
+  if (record.endpoint === "openai") {
+    return {
+      id: `chatcmpl-${record.id}`,
+      object: "chat.completion",
+      model: record.model,
+      choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }],
+      usage: { prompt_tokens: record.inTokens, completion_tokens: record.outTokens },
+    };
+  }
+  if (record.endpoint === "responses") {
+    return {
+      id: `resp_${record.id}`,
+      object: "response",
+      model: record.model,
+      output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text }] }],
+    };
+  }
+  return {
+    id: `msg_${record.id}`,
+    type: "message",
+    role: "assistant",
+    model: record.model,
+    content: [{ type: "text", text }],
+    stop_reason: "end_turn",
+    usage: { input_tokens: record.inTokens, output_tokens: record.outTokens },
+  };
+}

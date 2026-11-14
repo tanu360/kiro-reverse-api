@@ -33,12 +33,20 @@ describe("validators return every key they own", () => {
       pageSize: undefined,
     });
     expect(
-      validateRequestsSearch({ page: -3, pageSize: 7, sort: "bogus", status: "x", order: "up" }),
+      validateRequestsSearch({
+        page: -3,
+        pageSize: 7,
+        sort: "bogus",
+        status: "x",
+        order: "up",
+        conversation: "../../etc/passwd",
+      }),
     ).toStrictEqual({
       page: undefined,
       pageSize: undefined,
       search: undefined,
       status: undefined,
+      conversation: undefined,
       sort: undefined,
       order: undefined,
     });

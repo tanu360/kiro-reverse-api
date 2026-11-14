@@ -1,4 +1,4 @@
-import { InboxIcon, InfoIcon, SearchXIcon } from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, InboxIcon, InfoIcon, SearchXIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
@@ -9,7 +9,7 @@ import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader, RefreshButton } from "@/components/shared/page-header";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { recentRequestsQuery, requestCountsQuery } from "@/lib/api/requests";
 import { errorMessage } from "@/lib/api/server-errors";
@@ -18,6 +18,7 @@ import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { RequestSort, RequestsSearch } from "@/routes/-search";
+import { shortConversationId } from "./conversation-sheet";
 import { RequestDetailSheet } from "./request-detail-sheet";
 import {
   cleanSearch,
@@ -124,7 +125,7 @@ export function RequestsPage(): JSX.Element {
 
   const clearFilters = () => {
     setSearchText("");
-    updateSearch({ status: undefined, page: undefined });
+    updateSearch({ status: undefined, conversation: undefined, page: undefined });
   };
 
   let emptyState: JSX.Element;
@@ -177,6 +178,24 @@ export function RequestsPage(): JSX.Element {
         <AlertDescription>{t("memoryNote")}</AlertDescription>
       </Alert>
     ) : null;
+  // One conversation's turns: a notice says so, with the way back to every request.
+  const conversationNote = search.conversation ? (
+    <Alert role="status" size="sm" variant="info">
+      <HugeiconsIcon icon={BubbleChatIcon} aria-hidden="true" />
+      <AlertDescription>
+        {t("conversation.filtered", { id: shortConversationId(search.conversation) })}
+      </AlertDescription>
+      <AlertAction>
+        <Button
+          onClick={() => updateSearch({ conversation: undefined, page: undefined })}
+          size="xs"
+          variant="secondary"
+        >
+          {t("conversation.showAll")}
+        </Button>
+      </AlertAction>
+    </Alert>
+  ) : null;
   // Nothing to page through when the list fits the smallest page, is out of range or failed.
   const showPager = hasData && total > PAGE_SIZES[0] && !outOfRange && !fatalError;
   const refresh = () => {
@@ -224,10 +243,14 @@ export function RequestsPage(): JSX.Element {
                   sort={sort.id as RequestSort}
                   status={search.status}
                 />
+                {conversationNote}
                 {memoryNote}
               </>
             ) : (
-              memoryNote
+              <>
+                {conversationNote}
+                {memoryNote}
+              </>
             )
           }
         >
@@ -285,6 +308,10 @@ export function RequestsPage(): JSX.Element {
         }
         onOpenChange={setSheetOpen}
         onPrevious={selectedIndex > 0 ? () => stepTo(selectedIndex - 1) : undefined}
+        onShowConversation={(conversation) => {
+          setSheetOpen(false);
+          updateSearch({ conversation, page: undefined });
+        }}
         open={sheetOpen}
         position={selectedIndex + 1}
         record={selectedRecord}

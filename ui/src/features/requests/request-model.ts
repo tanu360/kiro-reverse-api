@@ -95,6 +95,7 @@ export function toQueryParams(search: RequestsSearch, lang?: Lang): RecentReques
   if (errorType) params.errorType = errorType;
   else if (text) params.search = text;
   if (search.status) params.status = search.status;
+  if (search.conversation) params.conversation = search.conversation;
   return params;
 }
 
@@ -125,6 +126,7 @@ export function cleanSearch(search: RequestsSearch): RequestsSearch {
   const text = search.search?.trim();
   if (text) out.search = text;
   if (search.status) out.status = search.status;
+  if (search.conversation) out.conversation = search.conversation;
   const sort = search.sort ?? DEFAULT_SORT;
   const order = search.order ?? DEFAULT_ORDER;
   if (sort !== DEFAULT_SORT || order !== DEFAULT_ORDER) {
@@ -140,7 +142,7 @@ export function defaultSortDesc(columnId: string): boolean {
 }
 
 export function hasFilters(search: RequestsSearch): boolean {
-  return Boolean(search.search?.trim() || search.status);
+  return Boolean(search.search?.trim() || search.status || search.conversation);
 }
 
 function dateFormat(lang: Lang, withYear: boolean): Intl.DateTimeFormat {

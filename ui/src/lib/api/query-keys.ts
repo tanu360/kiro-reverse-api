@@ -38,6 +38,8 @@ export const queryKeys = {
     all: ["requests"] as const,
     list: (p: RecentRequestsParams) => ["requests", "list", p] as const,
     counts: () => ["requests", "counts"] as const,
+    conversation: (id: string) => ["requests", "conversation", id] as const,
+    body: (id: number) => ["requests", "body", id] as const,
   },
   apiKeys: {
     all: ["api-keys"] as const,
@@ -55,6 +57,8 @@ export const queryKeys = {
     proxyPool: () => ["settings", "proxy-pool"] as const,
     promptFilter: () => ["settings", "prompt-filter"] as const,
     responseHeaders: () => ["settings", "response-headers"] as const,
+    twoFactor: () => ["settings", "two-factor"] as const,
+    metrics: () => ["settings", "metrics"] as const,
   },
   backups: {
     all: ["backups"] as const,

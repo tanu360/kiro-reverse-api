@@ -93,6 +93,20 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   relogin_pending_not_found: "errors:serverError.reloginPendingNotFound",
   relogin_single_credential: "errors:serverError.reloginSingleCredential",
   relogin_other_account: "errors:serverError.reloginOtherAccount",
+  totp_required: "errors:serverError.totpRequired",
+  totp_invalid: "errors:serverError.totpInvalid",
+  totp_reused: "errors:serverError.totpReused",
+  totp_challenge_expired: "errors:serverError.totpChallengeExpired",
+  totp_setup_expired: "errors:serverError.totpSetupExpired",
+  totp_already_enabled: "errors:serverError.totpAlreadyEnabled",
+  totp_not_enabled: "errors:serverError.totpNotEnabled",
+  totp_reset_by_env: "errors:serverError.totpResetByEnv",
+  totp_proof_required: "errors:serverError.totpProofRequired",
+  admin_password_wrong: "errors:serverError.adminPasswordWrong",
+  request_not_found: "errors:serverError.requestNotFound",
+  request_body_missing: "errors:serverError.requestBodyMissing",
+  replay_account_invalid: "errors:serverError.replayAccountInvalid",
+  conversation_not_found: "errors:serverError.conversationNotFound",
 };
 
 /** The `code` of an ApiError's JSON body, or null. */
@@ -161,6 +175,7 @@ export const SERVER_ERROR_KEYS: readonly (readonly [message: string, key: string
     "Too many admin password attempts; try again later",
     "errors:serverError.tooManyPasswordAttempts",
   ],
+  ["Too many two-factor attempts; try again later", "errors:serverError.tooManyCodeAttempts"],
   ["Password must be at least 8 characters", "errors:serverError.passwordTooShort"],
   ["autoContinueMax must be between 1 and 10", "errors:serverError.autoContinueMaxRange"],
   ["Account is not overage capable", "errors:serverError.notOverageCapable"],

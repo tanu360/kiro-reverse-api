@@ -88,5 +88,20 @@
   "serverError.modelMappingSelf": "{model} 不能映射到自身。",
   "serverError.modelMappingDuplicate": "{model} 被映射了多次。",
   "serverError.modelMappingChain": "{model} 也是另一条映射的来源。映射只应用一次，请直接映射到最终模型。",
-  "serverError.detail": "（详情：{detail}）"
+  "serverError.detail": "（详情：{detail}）",
+  "serverError.totpRequired": "已开启两步验证，请用密码和验证码登录。",
+  "serverError.totpInvalid": "验证码不正确。请确认手机时间准确后重试。",
+  "serverError.totpReused": "此验证码已用过，请等待下一个。",
+  "serverError.totpChallengeExpired": "登录已超时，请重新输入密码。",
+  "serverError.totpSetupExpired": "二维码已过期，请重新开始设置。",
+  "serverError.totpAlreadyEnabled": "两步验证已开启。",
+  "serverError.totpNotEnabled": "两步验证已关闭。",
+  "serverError.totpResetByEnv": "服务器设置了 ADMIN_RESET_2FA，下次启动会再次关闭两步验证。请先移除它。",
+  "serverError.totpProofRequired": "请输入当前验证码或管理员密码。",
+  "serverError.tooManyCodeAttempts": "错误的验证码太多，请稍后再试。",
+  "serverError.requestNotFound": "日志中已没有这个请求。",
+  "serverError.requestBodyMissing": "这个请求的内容没有保存，无法重放。",
+  "serverError.replayAccountInvalid": "请选择一个仍然存在的账号。",
+  "serverError.conversationNotFound": "日志中没有这个对话的请求。",
+  "serverError.adminPasswordWrong": "密码不正确。"
 }

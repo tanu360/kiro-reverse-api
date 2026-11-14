@@ -25,5 +25,22 @@
   "clickToCopy": "点击复制",
   "passwordCopied": "密码已复制到剪贴板",
   "changePasswordToast": "请在设置中修改生成的密码。",
-  "openSettings": "打开设置"
+  "openSettings": "打开设置",
+  "codePrompt": "输入身份验证器应用中的 6 位验证码。",
+  "recoveryPrompt": "输入你保存的一个恢复码。每个恢复码只能用一次。",
+  "codeLabel": "应用中的验证码",
+  "recoveryLabel": "恢复码",
+  "codePlaceholder": "123456",
+  "recoveryPlaceholder": "abcde-12345",
+  "codeRequired": "请输入验证码。",
+  "recoveryRequired": "请输入恢复码。",
+  "verify": "验证",
+  "verifying": "正在验证…",
+  "useRecovery": "使用恢复码",
+  "useCode": "使用应用中的验证码",
+  "backToPassword": "返回",
+  "codeWrong": "验证码不正确。请确认手机时间准确。",
+  "recoveryWrong": "恢复码不正确，或已经用过。",
+  "codeReused": "此验证码已用过，请等待下一个。",
+  "challengeExpired": "登录已超时，请重新输入密码。"
 }

@@ -41,6 +41,7 @@ import { DangerZoneCard } from "./sections/danger-zone-card";
 import { EndpointCard } from "./sections/endpoint-card";
 import { ImageResizeCard } from "./sections/image-resize-card";
 import { LogRetentionCard } from "./sections/log-retention-card";
+import { MetricsCard } from "./sections/metrics-card";
 import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
@@ -52,6 +53,7 @@ import { ServerLogCard } from "./sections/server-log-card";
 import { StreamIntegrityCard } from "./sections/stream-integrity-card";
 import { ThinkingCard } from "./sections/thinking-card";
 import { ToolHistoryCard } from "./sections/tool-history-card";
+import { TwoFactorCard } from "./sections/two-factor-card";
 import { UpstreamCard } from "./sections/upstream-card";
 import { UsageCard } from "./sections/usage-card";
 
@@ -531,11 +533,13 @@ function SettingsContent(): JSX.Element {
           <EndpointCard />
           <UpstreamCard />
           <AdminPasswordCard />
+          <TwoFactorCard />
           <OutboundProxyCard />
           <ProxyPoolCard />
           <ResponseHeadersCard />
           <AlertsCard />
           <ServerLogCard />
+          <MetricsCard />
           <PromptFilterCard />
           <LogRetentionCard />
           <DangerZoneCard />

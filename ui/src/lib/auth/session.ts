@@ -1,6 +1,13 @@
 import { useSyncExternalStore } from "react";
 import { ApiError } from "@/lib/api/errors";
-import { createSession, deleteSession } from "@/lib/api/session";
+import {
+  completeSession,
+  createSession,
+  deleteSession,
+  isChallenge,
+  type SecondFactor,
+} from "@/lib/api/session";
+import type { SessionCreateResponse } from "@/lib/api/types";
 import { readStorage, writeStorage } from "@/lib/storage";
 
 export interface Session {
@@ -121,18 +128,44 @@ export function useSession(): Session | null {
   return useSyncExternalStore(subscribeStore, getSession, () => null);
 }
 
-async function startSession(
-  password: string,
+/** A sign-in either got its token, or waits for a two-factor code against `challenge`. */
+export type SignInResult =
+  | { kind: "signed-in" }
+  | { kind: "two-factor"; challenge: string; expiresAt: number };
+
+function storeToken(
+  res: SessionCreateResponse | undefined,
   remember: boolean,
   reason: SessionChangeReason,
-): Promise<void> {
-  const res = await createSession(password);
+): void {
   if (!res?.token) throw new ApiError({ status: 401, serverMessage: "Unauthorized", body: res });
   setSession({ token: res.token, expiresAt: Number(res.expiresAt) || 0, remember }, reason);
 }
 
-export function signIn(password: string, remember: boolean): Promise<void> {
+async function startSession(
+  password: string,
+  remember: boolean,
+  reason: SessionChangeReason,
+): Promise<SignInResult> {
+  const res = await createSession(password);
+  if (isChallenge(res)) {
+    return { kind: "two-factor", challenge: res.challenge, expiresAt: Number(res.expiresAt) || 0 };
+  }
+  storeToken(res, remember, reason);
+  return { kind: "signed-in" };
+}
+
+export function signIn(password: string, remember: boolean): Promise<SignInResult> {
   return startSession(password, remember, "signin");
+}
+
+/** The code step of a sign-in with two-factor on: stores the token like signIn. */
+export async function completeSignIn(
+  challenge: string,
+  factor: SecondFactor,
+  remember: boolean,
+): Promise<void> {
+  storeToken(await completeSession(challenge, factor), remember, "signin");
 }
 
 /** Revokes the token server-side when possible; the local session ends either way. */
@@ -151,7 +184,9 @@ export async function signOut(): Promise<void> {
  */
 export async function reauthenticate(password: string): Promise<void> {
   try {
-    await startSession(password, getRememberPreference(), "password-changed");
+    const result = await startSession(password, getRememberPreference(), "password-changed");
+    // With two-factor sign-in on, the server kept this session through the change instead.
+    if (result.kind === "two-factor") notify(getSession(), "password-changed");
   } catch (error) {
     clearSession("expired");
     throw error;

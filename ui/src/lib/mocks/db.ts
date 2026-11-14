@@ -19,6 +19,7 @@ import type {
   UpstreamConfig,
 } from "@/lib/api/types";
 import {
+  annotateConversations,
   buildModelMix,
   defaultEndpoint,
   defaultModelMappings,
@@ -48,8 +49,12 @@ export interface MockDb {
   adminPassword: string;
   /** true until the first successful sign-in */
   firstRunPending: boolean;
-  /** 5 failures -> 429 with Retry-After: 60 */
+  /** 5 failures -> 429 with Retry-After: 60; wrong two-factor codes count too */
   failedLogins: number;
+  /** Admin two-factor sign-in, as config/admin_totp.go keeps it (codes stored plain here). */
+  twoFactor: MockTwoFactor;
+  /** GET /metrics settings: the Prometheus endpoint's switch and bearer token. */
+  metrics: { enabled: boolean; token: string };
   accounts: Account[];
   secrets: Record<string, AccountFull>;
   apiKeys: Array<ApiKey & { key: string }>;
@@ -81,6 +86,36 @@ export interface MockDb {
     iam: Record<string, unknown>;
     microsoft: Record<string, unknown>;
     builderId: Record<string, { polls: number }>;
+  };
+}
+
+export interface MockTwoFactor {
+  enabled: boolean;
+  /** ms epoch */
+  enabledAt: number;
+  secret: string;
+  /** Unused recovery codes. */
+  recovery: string[];
+  /** The last time step a code was accepted for: a code works once. */
+  lastStep: number;
+  /** A setup shown but not confirmed yet expires at this ms epoch; 0 for none. */
+  pendingUntil: number;
+  /** Sign-ins past the password, waiting for a code: challenge -> expiry and wrong tries. */
+  challenges: Record<string, { expiresAt: number; failures: number }>;
+  /** ADMIN_RESET_2FA is set on the mock server. */
+  resetByEnv: boolean;
+}
+
+export function freshTwoFactor(): MockTwoFactor {
+  return {
+    enabled: false,
+    enabledAt: 0,
+    secret: "",
+    recovery: [],
+    lastStep: 0,
+    pendingUntil: 0,
+    challenges: {},
+    resetByEnv: false,
   };
 }
 
@@ -157,6 +192,8 @@ function baseDb(): Pick<
   | "adminPassword"
   | "firstRunPending"
   | "failedLogins"
+  | "twoFactor"
+  | "metrics"
   | "version"
   | "remoteVersion"
   | "pending"
@@ -167,6 +204,8 @@ function baseDb(): Pick<
     adminPassword: mockAdminPassword(),
     firstRunPending: mockFirstRunPending(),
     failedLogins: 0,
+    twoFactor: freshTwoFactor(),
+    metrics: { enabled: false, token: "" },
     version: "2.1.0",
     // Same as the running version: no update notice in tests, screenshots or axe runs.
     remoteVersion: { version: "2.1.0", changelog: "" },
@@ -199,12 +238,15 @@ function seedLogRetention(now: number, ran: boolean): LogRetention {
 /** Large and varied: every union value, extremes and 30 days of traffic (fixtures-full.ts). */
 function seedFullDb(now: number): MockDb {
   const data = seedFullDataset(now);
+  annotateConversations(data.requests, now);
   return {
     ...baseDb(),
     ...data,
     upstream: defaultUpstream(),
     modelMix: buildModelMix(data.requests, data.errors),
     logRetention: seedLogRetention(now, true),
+    // A Prometheus server already scrapes the full dataset's proxy.
+    metrics: { enabled: true, token: "kpm_6f1d0c9a2b7e4f5a8c3d1e0b9a7f6e5d4c3b2a1f0e9d8c7b" },
     // An update is out, so the update notice shows.
     remoteVersion: { version: "2.2.0", changelog: REMOTE_CHANGELOG },
   };
@@ -240,6 +282,7 @@ function seedDb(scenario: MockScenario): MockDb {
   if (scenario === "empty") return seedEmptyDb(now);
   const accounts = seedAccounts();
   const requests = seedRequests(now, SEED_REQUEST_COUNT);
+  annotateConversations(requests, now);
   const errors = seedErrors(requests);
   return {
     ...baseDb(),

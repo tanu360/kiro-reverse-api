@@ -581,6 +581,29 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json(OK);
   }),
 
+  http.get(apiUrl("/metrics"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json({ ...mockDb.metrics, path: "/metrics" });
+  }),
+
+  // proxy/metrics.go apiMetricsSettings: turning on without a token makes one.
+  http.post(apiUrl("/metrics"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body: unknown = await request.json().catch(() => null);
+    if (typeof body !== "object" || body === null) return invalidJson();
+    const { enabled, regenerate } = body as { enabled?: unknown; regenerate?: unknown };
+    if (typeof enabled === "boolean") mockDb.metrics.enabled = enabled;
+    if (regenerate === true || (mockDb.metrics.enabled && !mockDb.metrics.token)) {
+      const bytes = crypto.getRandomValues(new Uint8Array(24));
+      mockDb.metrics.token = `kpm_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+    }
+    return HttpResponse.json({ ...mockDb.metrics, path: "/metrics" });
+  }),
+
   http.get(apiUrl("/proxy"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;

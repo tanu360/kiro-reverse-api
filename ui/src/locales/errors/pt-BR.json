@@ -88,5 +88,20 @@
   "serverError.modelMappingSelf": "{model} não pode ser mapeado para si mesmo.",
   "serverError.modelMappingDuplicate": "{model} está mapeado mais de uma vez.",
   "serverError.modelMappingChain": "{model} também é a origem de outro mapeamento. Os mapeamentos são aplicados uma única vez, então mapeie direto para o modelo final.",
-  "serverError.detail": "(Detalhes: {detail})"
+  "serverError.detail": "(Detalhes: {detail})",
+  "serverError.totpRequired": "O login em duas etapas está ligado. Entre com a senha e um código.",
+  "serverError.totpInvalid": "Esse código não está certo. Confira se o relógio do celular está correto e tente de novo.",
+  "serverError.totpReused": "Este código já foi usado. Espere o próximo.",
+  "serverError.totpChallengeExpired": "O login expirou. Digite a senha de novo.",
+  "serverError.totpSetupExpired": "O QR code expirou. Comece a configuração de novo.",
+  "serverError.totpAlreadyEnabled": "O login em duas etapas já está ligado.",
+  "serverError.totpNotEnabled": "O login em duas etapas está desligado.",
+  "serverError.totpResetByEnv": "ADMIN_RESET_2FA está definido no servidor, então a próxima inicialização desligaria o login em duas etapas de novo. Remova-o antes.",
+  "serverError.totpProofRequired": "Digite um código atual ou a senha de administrador.",
+  "serverError.tooManyCodeAttempts": "Muitos códigos errados. Tente de novo mais tarde.",
+  "serverError.requestNotFound": "Esta requisição não está mais no log.",
+  "serverError.requestBodyMissing": "O corpo desta requisição não foi guardado, então ela não pode ser repetida.",
+  "serverError.replayAccountInvalid": "Escolha uma conta que ainda exista.",
+  "serverError.conversationNotFound": "Nenhuma requisição desta conversa está no log.",
+  "serverError.adminPasswordWrong": "Senha incorreta."
 }
