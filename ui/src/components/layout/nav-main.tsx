@@ -1,6 +1,6 @@
 import { PlusIcon } from "@hugeicons/core-free-icons";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { type JSX, useState } from "react";
+import { type JSX, type MouseEvent, useState } from "react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Collapsible, CollapsiblePanel } from "@/components/ui/collapsible";
 import {
@@ -90,10 +90,15 @@ export function NavMain(): JSX.Element {
                 const onPage = active?.id === item.id;
                 const view = onPage ? activeNavView(item, status, pathname) : undefined;
                 const open = !collapsed.has(item.id);
-                const onRowClick = () => {
-                  // Already on the plain page: the click folds or unfolds its tree, and the
-                  // mobile sheet stays open to show it. The rail has no tree to fold.
-                  if (item.views && onPage && !view && !rail) {
+                // Sub-pages (Settings) leave no plain page: /settings is its first sub-page.
+                const subPages = item.views?.some((sub) => !("status" in sub)) ?? false;
+                const onRowClick = (event: MouseEvent) => {
+                  // Already on the plain page, or on any of the sub-pages: the click folds or
+                  // unfolds its tree, and the mobile sheet stays open to show it. On a sub-page
+                  // it stays there instead of going to the first one. The rail has no tree to
+                  // fold.
+                  if (item.views && onPage && (!view || subPages) && !rail) {
+                    if (subPages) event.preventDefault();
                     setOpen(item.id, !open);
                     return;
                   }
