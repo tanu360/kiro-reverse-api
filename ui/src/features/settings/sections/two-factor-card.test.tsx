@@ -13,6 +13,9 @@ describe("TwoFactorCard", () => {
     expect(
       await within(dialog).findByRole("img", { name: "QR code for your authenticator app" }),
     ).toBeInTheDocument();
+    // The key to type waits behind "Can't scan?".
+    expect(within(dialog).queryByText("MZXW6YTBOI4DGNJQGEZTSMBVGM2DONZY")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Can't scan? Use the setup key" }));
     expect(within(dialog).getByText("MZXW6YTBOI4DGNJQGEZTSMBVGM2DONZY")).toBeInTheDocument();
 
     const field = within(dialog).getByLabelText("Code from the app");
