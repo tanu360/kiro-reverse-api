@@ -1,10 +1,12 @@
 name: Release
 
-# A v* tag builds the binaries and publishes them on that tag's GitHub Release. Run the workflow by
-# hand (Actions > Release > Run workflow) for a dry run: it builds, smoke-tests and keeps the
-# archives as a workflow artifact, and publishes nothing.
+# A push to main whose version.json names a version with no v<version> tag yet builds the binaries,
+# creates that tag and its GitHub Release, and starts the Docker build for the tag. A v* tag pushed
+# by hand publishes the same way. Run the workflow by hand (Actions > Release > Run workflow) for a
+# dry run: it builds, smoke-tests and keeps the archives as a workflow artifact, and publishes nothing.
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
@@ -22,7 +24,53 @@ defaults:
     shell: bash
 
 jobs:
+  # Decides the tag and whether to publish. A main push whose version is already tagged stops here.
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      publish: ${{ steps.plan.outputs.publish }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Pick tag
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version="$(jq -r .version version.json)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::version.json version '$version' is not a semantic version"
+            exit 1
+          fi
+          tag="v$version"
+          publish=false
+          if [ "$EVENT" = push ] && [ "$REF_TYPE" = tag ]; then
+            tag="$REF_NAME"
+            publish=true
+          elif [ "$EVENT" = push ]; then
+            if gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; then
+              echo "$tag is already tagged; nothing to release."
+            else
+              echo "$tag has no tag yet; releasing it."
+              publish=true
+            fi
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: plan
+    if: needs.plan.outputs.publish == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -59,7 +107,7 @@ jobs:
       - name: Check version
         env:
           EVENT: ${{ github.event_name }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.plan.outputs.tag }}
         run: |
           version="$(jq -r .version version.json)"
           if [ "$EVENT" = push ]; then
@@ -91,6 +139,10 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm build
+
+      # A main push can release before CI on the same commit finishes, so the Go tests run here too.
+      - name: Test Go
+        run: go test ./...
 
       - name: Build binaries
         run: .github/scripts/build-release.sh "$RUNNER_TEMP/release"
@@ -131,12 +183,17 @@ jobs:
   # Only this job holds a write token, and it runs no project code: the build above, with its
   # package installs, gets read access only.
   publish:
-    needs: build
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [plan, build]
+    if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # A main push and a hand-pushed tag for one version publish one after the other.
+    concurrency:
+      group: release-publish-${{ needs.plan.outputs.tag }}
+      cancel-in-progress: false
     permissions:
       contents: write
+      actions: write
 
     steps:
       - name: Checkout
@@ -156,7 +213,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           shopt -s nullglob
           assets=("$RUNNER_TEMP"/release/kiro-proxy_* "$RUNNER_TEMP/release/SHA256SUMS.txt")
@@ -181,5 +239,17 @@ jobs:
 
           flags=()
           case "$TAG" in *-*) flags+=(--prerelease) ;; esac
-          gh release create "$TAG" "${assets[@]}" --verify-tag --title "Kiro Proxy $TAG" \
+          if [ "$REF_TYPE" = tag ]; then
+            flags+=(--verify-tag)
+          else
+            # The release creates the tag on the commit that was built.
+            flags+=(--target "$GITHUB_SHA")
+          fi
+          gh release create "$TAG" "${assets[@]}" --title "Kiro Proxy $TAG" \
             --notes-file "$notes" "${flags[@]}"
+
+          # A tag made with GITHUB_TOKEN starts no workflow, so start the Docker build for it here;
+          # its semver rules read the tag ref and push the <version> and <major>.<minor> images.
+          if [ "$REF_TYPE" != tag ]; then
+            gh workflow run docker.yml --ref "$TAG"
+          fi
