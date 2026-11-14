@@ -18,6 +18,7 @@ import { setSession } from "@/lib/auth/session";
 import { I18nProvider, type Lang } from "@/lib/i18n";
 import { PrivacyProvider } from "@/lib/privacy";
 import { routeTree } from "@/routeTree.gen";
+import { trackRouter } from "./routers";
 
 interface RenderOptions {
   lang?: Lang;
@@ -109,6 +110,7 @@ export async function renderApp(
     context: { queryClient },
     history: createMemoryHistory({ initialEntries: [path] }),
   });
+  trackRouter(router);
   const user = userEvent.setup();
   const result = render(
     <Providers lang={lang} privacy={options.privacy} queryClient={queryClient}>

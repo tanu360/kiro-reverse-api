@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, vi } from "vitest";
 import { resetMockDb } from "@/lib/mocks/db";
 import { mockServer } from "@/lib/mocks/node";
 import { queryClient } from "@/lib/query-client";
+import { settleRouters } from "./routers";
 
 // The events provider uses the real EventSource only when no test passes createEventSource.
 // Without one it stays 'closed' and requests no ticket. A test can stub its own.
@@ -68,7 +69,9 @@ beforeAll(() => {
   mockServer.listen({ onUnhandledFrame: "error" });
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // A navigation the test started finishes before the page goes (routers.ts).
+  await settleRouters();
   cleanup();
   mockServer.resetHandlers();
   resetMockDb();
