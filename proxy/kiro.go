@@ -173,7 +173,7 @@ func InitKiroHttpClient(proxyURL string) {
 // answers the CONNECT held each try for Go's full minute before the request could fail over.
 func boundOutboundProxy(client *http.Client, proxyURL string) *http.Client {
 	if proxyURL != "" {
-		client.Transport = proxypool.BoundConnect(client.Transport)
+		client.Transport = proxypool.BoundConnectReporting(client.Transport, proxyURL)
 	}
 	return client
 }

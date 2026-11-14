@@ -292,29 +292,49 @@ func roundTripWithin(base http.RoundTripper, req *http.Request) (*http.Response,
 // minute and a SOCKS handshake no deadline, so a proxy that accepts and then stalls held every
 // try that long. As for a pool proxy, a failure before the connection exists is the proxy's:
 // DescribeProxyFailure names it, a CONNECT the proxy dropped (Go's bare "unexpected EOF")
-// included. Its text stays Go's, for the server and request logs. Nothing is reported to the pool.
+// included. Its text stays Go's, for the server and request logs. The outcome counts toward
+// the proxy's detected entry (see BoundConnectReporting); nothing routes around it.
 func BoundConnect(base http.RoundTripper) http.RoundTripper {
+	return BoundConnectReporting(base, "")
+}
+
+// BoundConnectReporting is BoundConnect for a transport that dials through dialURL: a new
+// connection and a failure before one exists are recorded on the proxy's detected entry.
+func BoundConnectReporting(base http.RoundTripper, dialURL string) http.RoundTripper {
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	return &boundedTransport{base: base}
+	return &boundedTransport{base: base, url: dialURL}
 }
 
 type boundedTransport struct {
 	base http.RoundTripper
+	url  string
 }
 
 func (t *boundedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, conn, err := roundTripWithin(t.base, req)
-	if err == nil || conn.ready || (!conn.expired && req.Context().Err() != nil) {
+	if err == nil {
+		if conn.fresh && t.url != "" {
+			Default().reportOutbound(t.url, nil)
+		}
+		return resp, nil
+	}
+	if conn.ready || (!conn.expired && req.Context().Err() != nil) {
 		return resp, err
 	}
+	var failure error
 	if conn.expired {
 		//! As in instrumentedTransport: the dial outlives the request unless this cancels it.
 		t.CloseIdleConnections()
-		return nil, conn.cause
+		failure = conn.cause
+	} else {
+		failure = &outboundProxyError{cause: err}
 	}
-	return nil, &outboundProxyError{cause: err}
+	if t.url != "" {
+		Default().reportOutbound(t.url, failure)
+	}
+	return nil, failure
 }
 
 // outboundProxyError is a request through an own or the global proxy that failed before its

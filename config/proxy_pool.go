@@ -14,6 +14,9 @@ type PoolProxy struct {
 	Username  string `json:"username,omitempty"`
 	Password  string `json:"password,omitempty"`
 	CreatedAt int64  `json:"createdAt,omitempty"`
+	// Disabled is the admin's off switch: the pool never routes through the proxy
+	// and never checks it, and no health check switches it back on.
+	Disabled bool `json:"disabled,omitempty"`
 }
 
 const (

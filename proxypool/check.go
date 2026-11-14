@@ -39,6 +39,13 @@ func SetCheckTargetForTest(target string, tlsConfig *tls.Config) func() {
 	}
 }
 
+// SetMaxFailuresForTest makes n failures in a row disable a pool proxy and returns the restore.
+func SetMaxFailuresForTest(n int) func() {
+	prev := failureThreshold
+	failureThreshold = n
+	return func() { failureThreshold = prev }
+}
+
 func checkDestination() (string, *tls.Config) {
 	checkMu.RLock()
 	defer checkMu.RUnlock()

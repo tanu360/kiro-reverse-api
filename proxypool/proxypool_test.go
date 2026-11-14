@@ -89,6 +89,14 @@ func poolProxy(id, rawURL string) config.PoolProxy {
 
 func strPtr(s string) *string { return &s }
 
+// oneStrike makes a single failed check or connection disable a proxy, for the
+// tests about what a failure records or how routing reacts to a failed proxy.
+func oneStrike(t *testing.T) {
+	t.Helper()
+	failureThreshold = 1
+	t.Cleanup(func() { failureThreshold = MaxFailures })
+}
+
 func TestParseInputSplitsCredentials(t *testing.T) {
 	p, err := buildProxy(ProxyInput{URL: strPtr(" socks5://alice:p%40ss%3Aword@Proxy.Example.com:1080 "), Label: strPtr("  Tokyo  ")}, nil)
 	if err != nil {
@@ -201,6 +209,7 @@ func TestResolveModeOffSkipsPool(t *testing.T) {
 }
 
 func TestResolveRoundRobinSticky(t *testing.T) {
+	oneStrike(t)
 	m := setupPool(t, poolProxy("px_a", "http://10.0.0.1:3128"), poolProxy("px_b", "http://10.0.0.2:3128"))
 	accounts := []*config.Account{addAccount(t, "a1", ""), addAccount(t, "a2", ""), addAccount(t, "a3", "")}
 	want := []string{"px_a", "px_b", "px_a"}
@@ -240,6 +249,7 @@ func failAll(m *Manager, ids ...string) {
 }
 
 func TestResolveNoHealthyUnavailable(t *testing.T) {
+	oneStrike(t)
 	m := setupPool(t, poolProxy("px_a", "http://10.0.0.1:3128"), poolProxy("px_b", "http://10.0.0.2:3128"))
 	m.mu.Lock()
 	m.lastKick = time.Now() // no background check-all from this test
@@ -259,6 +269,7 @@ func TestResolveNoHealthyUnavailable(t *testing.T) {
 }
 
 func TestResolveNoHealthyFallbackGlobalThenDirect(t *testing.T) {
+	oneStrike(t)
 	m := setupPool(t, poolProxy("px_a", "http://10.0.0.1:3128"))
 	m.mu.Lock()
 	m.lastKick = time.Now() // no background check-all from this test
@@ -286,6 +297,7 @@ func clientThrough(id, proxyURL string) *http.Client {
 }
 
 func TestInstrumentDialFailureRotatesAccount(t *testing.T) {
+	oneStrike(t)
 	dead := poolProxy("px_dead", closedPortURL(t))
 	live := poolProxy("px_live", fakeProxy(t, http.StatusOK))
 	m := setupPool(t, dead, live)
@@ -352,6 +364,7 @@ func connectProxy(t *testing.T, status int) string {
 }
 
 func TestInstrument407IsAuthFailure(t *testing.T) {
+	oneStrike(t)
 	p := poolProxy("px_auth", connectProxy(t, http.StatusProxyAuthRequired))
 	p.Username, p.Password = "bob", "wrong-secret"
 	m := setupPool(t, p)
@@ -438,6 +451,7 @@ func TestCheckProxyHealthyRecordsLatency(t *testing.T) {
 }
 
 func TestCheckProxyClosedPortFails(t *testing.T) {
+	oneStrike(t)
 	p := poolProxy("px_dead", closedPortURL(t))
 	p.Username, p.Password = "carol", "hunter2-secret"
 	m := setupPool(t, p, poolProxy("px_other", "http://10.0.0.9:3128"))
@@ -489,6 +503,7 @@ func TestRedactNeverLeaksPassword(t *testing.T) {
 }
 
 func TestStatePersistsAcrossReload(t *testing.T) {
+	oneStrike(t)
 	m := setupPool(t, poolProxy("px_a", "http://10.0.0.1:3128"), poolProxy("px_b", "http://10.0.0.2:3128"))
 	acc := addAccount(t, "a1", "")
 	addAccount(t, "gone", "")
@@ -513,6 +528,7 @@ func TestStatePersistsAcrossReload(t *testing.T) {
 }
 
 func TestResolveFallbackStartsARecoveryCheck(t *testing.T) {
+	oneStrike(t)
 	p := poolProxy("px_a", fakeProxy(t, http.StatusOK))
 	m := setupPool(t, p)
 	setPoolSettings(t, config.ProxyPoolModeOn, true)
@@ -579,6 +595,7 @@ func stallingProxy(t *testing.T) (string, <-chan struct{}) {
 }
 
 func TestInstrumentStalledSOCKSHandshakeTimesOut(t *testing.T) {
+	oneStrike(t)
 	addr, closed := stallingProxy(t)
 	stalled := poolProxy("px_stalled", "socks5://"+addr)
 	live := poolProxy("px_live", fakeProxy(t, http.StatusOK))
@@ -616,6 +633,7 @@ func TestInstrumentStalledSOCKSHandshakeTimesOut(t *testing.T) {
 }
 
 func TestReportsAboutAnEditedProxyAreDropped(t *testing.T) {
+	oneStrike(t)
 	old := poolProxy("px_a", closedPortURL(t))
 	other := poolProxy("px_b", fakeProxy(t, http.StatusOK))
 	m := setupPool(t, old, other)
@@ -676,6 +694,7 @@ func TestResetForTestEndsBackgroundChecks(t *testing.T) {
 }
 
 func TestStateLoadIsRetriedAfterAFailedRead(t *testing.T) {
+	oneStrike(t)
 	m := setupPool(t, poolProxy("px_a", "http://10.0.0.1:3128"), poolProxy("px_b", "http://10.0.0.2:3128"))
 	a1 := addAccount(t, "a1", "")
 	a2 := addAccount(t, "a2", "")
@@ -739,6 +758,7 @@ func TestParseInputNamesMissingScheme(t *testing.T) {
 // Health keeps no field from the state before: a failure drops the old latency, and a recovery
 // drops the old error and failure time.
 func TestHealthDropsStaleFields(t *testing.T) {
+	oneStrike(t)
 	live := poolProxy("px_live", fakeProxy(t, http.StatusOK))
 	m := setupPool(t, live)
 	if h, _ := m.CheckOne(context.Background(), live.ID); h.Status != StatusOK || h.LatencyMs == 0 {

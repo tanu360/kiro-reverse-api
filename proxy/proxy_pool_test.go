@@ -209,7 +209,8 @@ func TestPoolRotationOnDialFailureEndToEnd(t *testing.T) {
 	if first != proxypool.FullURL(dead) {
 		t.Fatalf("first route %q, want the dead proxy", first)
 	}
-	_, err := GetRestClientForProxy(first).Get("http://kiro.test/generateAssistantResponse")
+	//! The account's own client: a failed connection moves this account to another proxy at once.
+	_, err := accountClient(acc, false).Get("http://kiro.test/generateAssistantResponse")
 	if !proxypool.IsProxyError(err) {
 		t.Fatalf("dead proxy: %v, want a ProxyError", err)
 	}
@@ -259,7 +260,7 @@ func TestNoHealthyProxyClientFailsFast(t *testing.T) {
 	}
 	setPoolMode(t, config.ProxyPoolModeOn, false)
 	acc := addPoolTestAccount(t, h, "acc-none")
-	proxypool.Default().ReportFailure(dead.ID, errors.New("connect: connection refused"))
+	disablePoolProxy(dead.ID)
 
 	route := ResolveAccountProxyURL(acc)
 	if route != proxypool.UnavailableURL {
@@ -316,6 +317,7 @@ func TestPoolClientRebuiltAfterEdit(t *testing.T) {
 // A usage refresh that cannot reach Kiro through the pool must not ban the
 // account, even though the error repeats a URL whose profile ARN holds "403".
 func TestUsageRefreshProxyFailureDoesNotBan(t *testing.T) {
+	t.Cleanup(proxypool.SetMaxFailuresForTest(1))
 	h := newPoolTestAdmin(t)
 	dead := config.PoolProxy{ID: "px_dead", URL: "http://" + poolClosedPort(t)}
 	if err := config.SetProxyPool([]config.PoolProxy{dead}); err != nil {
@@ -361,7 +363,7 @@ func TestNoHealthyProxyChatFailsOnceWithoutURL(t *testing.T) {
 	setPoolMode(t, config.ProxyPoolModeOn, false)
 	acc := addPoolTestAccount(t, h, "acc-chat")
 	acc.ProfileArn = "arn:aws:codewhisperer:us-east-1:540312340301:profile/ABCDEF"
-	proxypool.Default().ReportFailure(dead.ID, errors.New("connect: connection refused"))
+	disablePoolProxy(dead.ID)
 
 	var payload KiroPayload
 	payload.ConversationState.CurrentMessage.UserInputMessage.Content = "hi"
@@ -396,7 +398,7 @@ func TestNoHealthyProxyWebSearchIs503(t *testing.T) {
 		t.Fatal(err)
 	}
 	setPoolMode(t, config.ProxyPoolModeOn, false)
-	proxypool.Default().ReportFailure(dead.ID, errors.New("connect: connection refused"))
+	disablePoolProxy(dead.ID)
 
 	//! The plain chat path answers 503 here; the web search paths answered 500 (loop) and 502 (direct).
 	for name, body := range map[string]string{
@@ -411,5 +413,65 @@ func TestNoHealthyProxyWebSearchIs503(t *testing.T) {
 		if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), proxypool.ErrNoHealthyProxy.Error()) {
 			t.Errorf("%s: %d %s, want 503 with the no-healthy message", name, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+// disablePoolProxy fails pool proxy id as many times in a row as it takes to take it out.
+func disablePoolProxy(id string) {
+	for i := 0; i < proxypool.MaxFailures; i++ {
+		proxypool.Default().ReportFailure(id, errors.New("connect: connection refused"))
+	}
+}
+
+func TestProxyPoolAPISwitchAndDetected(t *testing.T) {
+	h := newPoolTestAdmin(t)
+	rec := serveRegionTestAdmin(h, http.MethodPost, "/admin/api/proxy-pool/proxies", fmt.Sprintf(`{"url":"http://%s"}`, poolClosedPort(t)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("add: %d %s", rec.Code, rec.Body.String())
+	}
+	var added struct {
+		Proxy proxypool.ProxyView `json:"proxy"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &added); err != nil || !added.Proxy.Enabled {
+		t.Fatalf("added %+v %v", added, err)
+	}
+	rec = serveRegionTestAdmin(h, http.MethodPut, "/admin/api/proxy-pool/proxies/"+added.Proxy.ID, `{"enabled":false}`)
+	var switched struct {
+		Proxy proxypool.ProxyView `json:"proxy"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &switched); err != nil || switched.Proxy.Enabled || switched.Proxy.State != proxypool.StateOff {
+		t.Fatalf("switch off: %d %s", rec.Code, rec.Body.String())
+	}
+
+	own := config.Account{ID: "own", Email: "own@example.com", Enabled: true, AuthMethod: "social", ProxyURL: "socks5://bob:own-secret@own.example:1080"}
+	open := config.Account{ID: "open", Email: "open@example.com", Enabled: true, AuthMethod: "social", ProxyURL: "http://open.example:8080"}
+	for _, a := range []config.Account{own, open} {
+		if err := config.AddAccount(a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rec = serveRegionTestAdmin(h, http.MethodGet, "/admin/api/proxy-pool", "")
+	if strings.Contains(rec.Body.String(), "own-secret") {
+		t.Fatal("the pool view leaks a detected proxy's password")
+	}
+	var view proxypool.View
+	if err := json.Unmarshal(rec.Body.Bytes(), &view); err != nil || len(view.Detected) != 2 || view.Counts.Off != 1 {
+		t.Fatalf("view %s", rec.Body.String())
+	}
+	for _, d := range view.Detected {
+		rec = serveRegionTestAdmin(h, http.MethodPost, "/admin/api/proxy-pool/detected/"+d.ID+"/adopt", "")
+		switch {
+		case d.Username != "" && (rec.Code != http.StatusBadRequest || adminErrorCode(t, rec.Body.Bytes()) != codeProxyPoolDetectedSignIn):
+			t.Fatalf("adopting a signed-in proxy: %d %s", rec.Code, rec.Body.String())
+		case d.Username == "" && rec.Code != http.StatusCreated:
+			t.Fatalf("adopting an open proxy: %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	if pool := config.GetProxyPool(); len(pool) != 2 || pool[1].URL != "http://open.example:8080" {
+		t.Fatalf("pool after adopt %+v", pool)
+	}
+	rec = serveRegionTestAdmin(h, http.MethodPost, "/admin/api/proxy-pool/detected/dx_missing/check", "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("check unknown detected: %d", rec.Code)
 	}
 }

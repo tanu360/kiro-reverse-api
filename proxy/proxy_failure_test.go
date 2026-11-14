@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"bufio"
-	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -254,7 +253,7 @@ func TestNoHealthyPoolLogsAsProxyError(t *testing.T) {
 		t.Fatal(err)
 	}
 	setPoolMode(t, config.ProxyPoolModeOn, false)
-	proxypool.Default().ReportFailure(dead.ID, errors.New("connect: connection refused"))
+	disablePoolProxy(dead.ID)
 	h.pool.Reload()
 
 	if rec := postClientAPI(h, "/v1/messages", transportPlainBody); rec.Code != http.StatusServiceUnavailable {

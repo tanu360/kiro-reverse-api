@@ -63,7 +63,10 @@ func accountClient(account *config.Account, stream bool) *http.Client {
 	}
 	if route.ProxyID != "" {
 		if c, ok := poolClientFor(route.URL, stream); ok {
-			return c
+			if account == nil || c == noHealthyClient {
+				return c
+			}
+			return detourClient(c, account.ID)
 		}
 	}
 	if stream {
@@ -106,6 +109,36 @@ func poolClientFor(proxyURL string, stream bool) (*http.Client, bool) {
 	client.Transport = proxypool.Instrument(p.ID, proxyURL, client.Transport)
 	actual, _ := poolClients.LoadOrStore(key, client)
 	return actual.(*http.Client), true
+}
+
+// detourClient is a pool proxy's client for one account: a connection that fails at the
+// proxy moves that account to another healthy proxy, so its retry takes another route at
+// once, while the proxy only gains a strike. The copy shares the cached transport.
+func detourClient(c *http.Client, accountID string) *http.Client {
+	wrapped := *c
+	wrapped.Transport = &detourTransport{base: c.Transport, accountID: accountID}
+	return &wrapped
+}
+
+type detourTransport struct {
+	base      http.RoundTripper
+	accountID string
+}
+
+func (t *detourTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.base.RoundTrip(req)
+	var perr *proxypool.ProxyError
+	if err != nil && errors.As(err, &perr) && perr.ProxyID != "" && perr.Kind != proxypool.KindNoHealthy {
+		proxypool.Default().Detour(t.accountID, perr.ProxyID)
+	}
+	return resp, err
+}
+
+// CloseIdleConnections lets http.Client.CloseIdleConnections reach the shared transport.
+func (t *detourTransport) CloseIdleConnections() {
+	if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
 }
 
 // isNoHealthyProxyError is a request the pool had no proxy for: retrying the
