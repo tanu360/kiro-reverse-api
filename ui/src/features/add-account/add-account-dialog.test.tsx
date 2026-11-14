@@ -111,11 +111,11 @@ describe("AddAccountDialog", () => {
       "AWS Builder ID",
       "IAM Identity Center",
       "Microsoft SSO",
-      "Kiro local cache",
+      "Kiro Local Cache",
       "Credentials JSON",
-      "SSO token",
-      "Kiro web cookie",
-      "Kiro API key",
+      "SSO Token",
+      "Kiro Web Cookie",
+      "Kiro API Key",
     ]) {
       expect(within(rail).getByRole("button", { name })).toBeInTheDocument();
     }
@@ -125,9 +125,9 @@ describe("AddAccountDialog", () => {
     );
     expect(screen.getByRole("heading", { name: "AWS Builder ID" })).toBeInTheDocument();
 
-    await user.click(within(rail).getByRole("button", { name: "Kiro API key" }));
-    expect(await screen.findByRole("heading", { name: "Kiro API key" })).toBeInTheDocument();
-    expect(within(rail).getByRole("button", { name: "Kiro API key" })).toHaveAttribute(
+    await user.click(within(rail).getByRole("button", { name: "Kiro API Key" }));
+    expect(await screen.findByRole("heading", { name: "Kiro API Key" })).toBeInTheDocument();
+    expect(within(rail).getByRole("button", { name: "Kiro API Key" })).toHaveAttribute(
       "aria-current",
       "true",
     );
@@ -137,7 +137,7 @@ describe("AddAccountDialog", () => {
 
   it("opens straight into initialMethod", async () => {
     renderWithProviders(<Harness initialMethod="cookie" />);
-    expect(await screen.findByRole("heading", { name: "Kiro web cookie" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Kiro Web Cookie" })).toBeInTheDocument();
   });
 });
 
@@ -441,7 +441,7 @@ describe("IAM Identity Center", () => {
   });
 });
 
-describe("SSO token", () => {
+describe("SSO Token", () => {
   it("keeps the busy Add button focusable, ignores it and blocks Escape while the import runs", async () => {
     mockRefresh();
     const onAdded = vi.fn();
@@ -469,7 +469,7 @@ describe("SSO token", () => {
     expect(imports.count).toBe(1);
 
     await user.keyboard("{Escape}");
-    expect(screen.getByRole("heading", { name: "SSO token" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "SSO Token" })).toBeInTheDocument();
 
     pending.release();
     await expectClosed();
@@ -478,7 +478,7 @@ describe("SSO token", () => {
   });
 });
 
-describe("Kiro API key", () => {
+describe("Kiro API Key", () => {
   it("reports a partial import in one toast", async () => {
     const refreshed = mockRefresh();
     const imports = logRequests("/auth/credentials");

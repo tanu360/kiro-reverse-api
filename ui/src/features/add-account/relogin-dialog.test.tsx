@@ -98,7 +98,7 @@ describe("AddAccountDialog in re-login mode", () => {
 
   it("opens a GitHub account on the web cookie flow with GitHub chosen", async () => {
     renderWithProviders(<Harness account={accountBy("Github")} />);
-    expect(await screen.findByRole("heading", { name: "Kiro web cookie" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Kiro Web Cookie" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Provider" })).toHaveTextContent("GitHub");
   });
 
@@ -106,14 +106,14 @@ describe("AddAccountDialog in re-login mode", () => {
     const imports = logRequests("/auth/credentials");
     const account = { ...accountBy("APIKey"), region: "eu-central-1" };
     const { user } = renderWithProviders(<Harness account={account} />);
-    expect(await screen.findByRole("heading", { name: "Kiro API key" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Kiro API Key" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Region" })).toHaveValue("eu-central-1");
 
     // One key, so the field says so: no "Kiro API keys" or "One per line".
     expect(screen.queryByRole("textbox", { name: "Kiro API keys" })).not.toBeInTheDocument();
     expect(screen.queryByText(/One per line/)).not.toBeInTheDocument();
-    expect(screen.getByText("Sign in again with Kiro API key.")).toBeInTheDocument();
-    await user.type(screen.getByRole("textbox", { name: "Kiro API key" }), "ksk_fresh");
+    expect(screen.getByText("Sign in again with Kiro API Key.")).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "Kiro API Key" }), "ksk_fresh");
     await user.click(screen.getByRole("button", { name: "Sign in again" }));
     await waitFor(() => expect(imports.count).toBe(1));
     expect(imports.bodies[0]).toMatchObject({

@@ -256,9 +256,11 @@ export function AccountsToolbar({
         />
       ) : null}
 
-      {/* Below a 64rem card the search has a row of its own and the filters follow under it. */}
+      {/* Below a 64rem card the search has a row of its own and the filters follow under it.
+          From there the search starts at 10rem and grows to 16rem only with room to spare, so the
+          filters and the page size stay on its row. */}
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <InputGroup className="@5xl/accounts:w-64">
+        <InputGroup className="@5xl/accounts:w-auto @5xl/accounts:max-w-64 @5xl/accounts:grow @5xl/accounts:basis-40">
           <InputGroupAddon>
             <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
           </InputGroupAddon>
