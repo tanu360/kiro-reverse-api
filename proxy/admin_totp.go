@@ -42,7 +42,7 @@ const (
 	// recoveryCodeCount is how many recovery codes enabling two-factor sign-in hands out.
 	recoveryCodeCount = 10
 	totpIssuer        = "Kiro Proxy"
-	totpAccountName   = "admin"
+	totpAccountName   = "Administrator"
 )
 
 type totpChallenge struct {

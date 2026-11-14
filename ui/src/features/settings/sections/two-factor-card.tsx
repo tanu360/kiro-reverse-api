@@ -43,6 +43,7 @@ import {
 } from "@/lib/api/two-factor";
 import { formatDateTime } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
+import { digitsOnly } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
 import { SECTION_ID } from "./sections";
 import { Hint, SectionQuery, SettingsGroup } from "./settings-section";
@@ -224,7 +225,7 @@ function CodeInput({
         id={id}
         inputMode="numeric"
         maxLength={9}
-        onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))}
+        onChange={(event) => onChange(digitsOnly(event.target.value, CODE_LENGTH))}
         placeholder={t("twoFactor.codePlaceholder")}
         spellCheck={false}
         value={value}
@@ -438,7 +439,10 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
             />
           </div>
           <p className="text-center text-muted-foreground text-xs">
-            {t("twoFactor.accountName", { issuer: setup.issuer ?? "Kiro Proxy" })}
+            {t("twoFactor.accountName", {
+              issuer: setup.issuer || "Kiro Proxy",
+              account: setup.account || "Administrator",
+            })}
           </p>
         </div>
       ) : null}

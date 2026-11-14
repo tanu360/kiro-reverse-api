@@ -167,7 +167,7 @@ function twoFactorHandlers(): HttpHandler[] {
         otpauthUrl: MOCK_TOTP_URI,
         qrSvg: MOCK_TOTP_QR_SVG,
         issuer: "Kiro Proxy",
-        account: "admin",
+        account: "Administrator",
         expiresAt: tf.pendingUntil,
       });
     }),

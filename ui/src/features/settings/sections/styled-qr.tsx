@@ -2,8 +2,6 @@ import type { JSX } from "react";
 
 /** The quiet zone drawn round the code, in modules: enough for a phone camera on a white tile. */
 const QUIET = 2;
-/** A data module's dot radius, in modules: round, but large enough to read like a square. */
-const DOT = 0.46;
 /** Finder patterns (the three corner eyes) are 7 modules square. */
 const EYE = 7;
 
@@ -50,20 +48,23 @@ function inEye(x: number, y: number, size: number): boolean {
 }
 
 /**
- * The QR code drawn in the app's style: round dots for the data and rounded corner eyes in Kiro
- * purple, on a white tile with rounded corners. The colours are the --qr-* tokens.
+ * The QR code drawn in the app's style: square data modules, as a scanner samples them, with
+ * rounded corner eyes in Kiro purple, on a white tile with rounded corners. Round dots looked
+ * softer but failed to decode at some sizes; squares with rounded eyes decode at every scale
+ * tried. The colours are the --qr-* tokens.
  */
 export function StyledQr({ modules, label }: { modules: QrModules; label: string }): JSX.Element {
   const { size, dark } = modules;
   const side = size + 2 * QUIET;
-  // Every dot in one path: a circle is two arcs from its left edge.
-  let dots = "";
+  // Every data module in one path, one run per row of dark modules (the eyes are drawn apart).
+  let modulesPath = "";
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       if (!dark[y]?.[x] || inEye(x, y, size)) continue;
-      const cx = x + QUIET + 0.5;
-      const cy = y + QUIET + 0.5;
-      dots += `M${cx - DOT} ${cy}a${DOT} ${DOT} 0 1 0 ${2 * DOT} 0a${DOT} ${DOT} 0 1 0 ${-2 * DOT} 0`;
+      let run = 1;
+      while (x + run < size && dark[y]?.[x + run] && !inEye(x + run, y, size)) run += 1;
+      modulesPath += `M${x + QUIET} ${y + QUIET}h${run}v1h${-run}z`;
+      x += run - 1;
     }
   }
   const eyes = [
@@ -74,7 +75,7 @@ export function StyledQr({ modules, label }: { modules: QrModules; label: string
   return (
     <svg aria-label={label} className="block size-full" role="img" viewBox={`0 0 ${side} ${side}`}>
       <rect fill="var(--qr-tile)" height={side} rx={QUIET * 1.25} width={side} />
-      <path d={dots} fill="var(--qr-module)" />
+      <path d={modulesPath} fill="var(--qr-module)" shapeRendering="crispEdges" />
       {eyes.map(([ex, ey]) => (
         <g fill="var(--qr-eye)" key={`${ex}-${ey}`}>
           <rect
