@@ -62,10 +62,12 @@ import {
   alertsQuery,
   alertsQueryKey,
   testAlertChannel,
+  testDailySummary,
   updateAlerts,
 } from "@/lib/api/alerts";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage } from "@/lib/api/server-errors";
+import { dateTimeFormat, formatRelativeTime } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
@@ -79,6 +81,7 @@ import {
   COOLDOWN_MIN,
   channelDraft,
   formatThresholds,
+  formatUtcMinute,
   invalidRulesFields,
   MAX_CHANNELS,
   NAME_MAX,
@@ -89,6 +92,8 @@ import {
   rulesForm,
   SECRET_MAX,
   serverChannelProblem,
+  summaryTimeDate,
+  summaryTimeOptions,
   toChannelInputs,
   URL_MAX,
   validateChannelDraft,
@@ -106,7 +111,14 @@ import {
 } from "./settings-section";
 
 /** Events a last result can name; anything else shows no event label. */
-const EVENTS = ["account_usage", "pool_usage", "account_banned", "all_unavailable", "test"];
+const EVENTS = [
+  "account_usage",
+  "pool_usage",
+  "account_banned",
+  "all_unavailable",
+  "daily_summary",
+  "test",
+];
 
 /** Example targets for the URL field; addresses, so not translated. */
 const URL_PLACEHOLDER: Record<Exclude<AlertChannelType, "telegram">, string> = {
@@ -189,7 +201,62 @@ function rulesPatch(form: RulesForm) {
     accountThresholds: account.ok ? account.values : [],
     poolThresholds: pool.ok ? pool.values : [],
     poolCooldownMinutes: form.poolCooldownMinutes ?? 0,
+    dailySummary: form.dailySummary,
+    dailySummaryMinute: form.dailySummaryMinute,
   };
+}
+
+/** The viewer's time zone name ("Europe/Ljubljana"); "" when the browser does not say. */
+function viewerTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The summary's send time: each whole hour of the viewer's day, labelled with the local time and
+ * the UTC time the server stores, so the zone is never in doubt.
+ */
+function SummaryTimeSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: number;
+  onChange: (utcMinute: number) => void;
+}): JSX.Element {
+  const { t, lang } = useT("alerts");
+  const clock = dateTimeFormat(lang, { hour: "2-digit", minute: "2-digit" });
+  const items = summaryTimeOptions(value).map((minute) => ({
+    value: minute,
+    label: t("dailySummaryTimeOption", {
+      local: clock.format(summaryTimeDate(minute)),
+      utc: formatUtcMinute(minute),
+    }),
+  }));
+  return (
+    <Select
+      items={items}
+      onValueChange={(next) => {
+        if (typeof next === "number") onChange(next);
+      }}
+      value={value}
+    >
+      <SelectTrigger id={id}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectPopup>
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
+  );
 }
 
 /**
@@ -197,13 +264,14 @@ function rulesPatch(form: RulesForm) {
  * dialog like the outbound proxy; then the rules, saved together with Save.
  */
 function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
-  const { t } = useT("alerts");
+  const { t, lang } = useT("alerts");
   const mask = useMaskText();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const accountId = useId();
   const poolId = useId();
   const cooldownId = useId();
+  const summaryTimeId = useId();
 
   const server = useMemo(() => rulesForm(config), [config]);
   const draft = useDraft<RulesForm>(server);
@@ -321,7 +389,44 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
     },
   });
 
+  const summaryTest = useMutation({
+    mutationFn: testDailySummary,
+    onSuccess: (data) => {
+      const byId = new Map(data.results.map((result) => [result.channelId, result]));
+      queryClient.setQueryData<AlertsConfig>(alertsQueryKey, (old) =>
+        old
+          ? {
+              ...old,
+              channels: old.channels.map((item) => {
+                const result = byId.get(item.id);
+                if (!result) return item;
+                const { channelId: _id, ...lastResult } = result;
+                return { ...item, lastResult };
+              }),
+            }
+          : old,
+      );
+      const failed = data.results.filter((result) => !result.ok).length;
+      if (failed === 0) toast.success(t("dailySummaryTestOk", { count: data.results.length }));
+      else toast.error(t("dailySummaryTestFailed", { failed, count: data.results.length }));
+    },
+    onError: (error) => {
+      toast.error(t("dailySummaryTestError", { reason: errorMessage(error, t) }));
+    },
+  });
+
   const enabledCount = config.channels.filter((channel) => channel.enabled).length;
+  const zone = viewerTimeZone();
+  const summaryUtc = formatUtcMinute(draft.value.dailySummaryMinute);
+  const summaryTimeHint = zone
+    ? t("dailySummaryTimeHint", { zone, utc: summaryUtc })
+    : t("dailySummaryTimeHintNoZone", { utc: summaryUtc });
+  const lastSent =
+    config.dailySummaryLastSent > 0
+      ? t("dailySummaryLastSent", {
+          relative: formatRelativeTime(config.dailySummaryLastSent, lang),
+        })
+      : "";
   const full = config.channels.length >= MAX_CHANNELS;
   const invalidText = (field: RulesField): string | null => {
     if (!invalid.includes(field)) return null;
@@ -481,6 +586,45 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
         description={t("allUnavailableHint")}
         onCheckedChange={(allUnavailable) => edit({ allUnavailable })}
         title={t("allUnavailable")}
+      />
+      <SwitchField
+        checked={draft.value.dailySummary}
+        description={t("dailySummaryHint")}
+        onCheckedChange={(dailySummary) => edit({ dailySummary })}
+        title={t("dailySummary")}
+      />
+      <SettingsRow
+        control={
+          <SummaryTimeSelect
+            id={summaryTimeId}
+            onChange={(dailySummaryMinute) => edit({ dailySummaryMinute })}
+            value={draft.value.dailySummaryMinute}
+          />
+        }
+        description={lastSent ? `${summaryTimeHint} ${lastSent}` : summaryTimeHint}
+        htmlFor={summaryTimeId}
+        title={t("dailySummaryTime")}
+      />
+      <SettingsRow
+        control={
+          <RowAction>
+            <Button
+              disabled={enabledCount === 0}
+              loading={summaryTest.isPending}
+              onClick={() => summaryTest.mutate()}
+              size="sm"
+              variant="secondary"
+            >
+              <HugeiconsIcon icon={SentIcon} aria-hidden="true" />
+              {t("dailySummaryTest")}
+            </Button>
+          </RowAction>
+        }
+        controlWidth="actions"
+        description={
+          enabledCount === 0 ? t("dailySummaryTestNoChannel") : t("dailySummaryTestHint")
+        }
+        title={t("dailySummaryTestTitle")}
       />
 
       <Dialog

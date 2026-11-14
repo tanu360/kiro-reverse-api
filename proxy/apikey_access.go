@@ -54,18 +54,40 @@ func (h *Handler) filterModelMapsForAPIKey(ctx context.Context, models []map[str
 	return out
 }
 
-// filterModelInfosForAPIKey is filterModelMapsForAPIKey for the Codex manifest.
+// filterModelMapsForKeyModels drops the /v1/models entries the request's key
+// may not call (its model allowlist). A key without one gets the list unchanged.
+func filterModelMapsForKeyModels(ctx context.Context, models []map[string]interface{}, thinkingSuffix string) []map[string]interface{} {
+	if v, ok := apiKeyFromContext(ctx); !ok || len(v.allowedModels) == 0 {
+		return models
+	}
+	out := make([]map[string]interface{}, 0, len(models))
+	for _, m := range models {
+		id, _ := m["id"].(string)
+		if apiKeyAllowsListedModel(ctx, id, thinkingSuffix) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// filterModelInfosForAPIKey is filterModelMapsForAPIKey and
+// filterModelMapsForKeyModels for the Codex manifest.
 func (h *Handler) filterModelInfosForAPIKey(ctx context.Context, models []ModelInfo) []ModelInfo {
 	allowed := allowedAccountsFromContext(ctx)
-	if allowed == nil || h.pool == nil {
+	v, _ := apiKeyFromContext(ctx)
+	if (allowed == nil || h.pool == nil) && len(v.allowedModels) == 0 {
 		return models
 	}
 	thinkingSuffix := config.GetThinkingConfig().Suffix
 	out := make([]ModelInfo, 0, len(models))
 	for _, m := range models {
-		if h.apiKeyOffersModel(allowed, m.ModelId, thinkingSuffix) {
-			out = append(out, m)
+		if allowed != nil && h.pool != nil && !h.apiKeyOffersModel(allowed, m.ModelId, thinkingSuffix) {
+			continue
 		}
+		if !apiKeyAllowsListedModel(ctx, m.ModelId, thinkingSuffix) {
+			continue
+		}
+		out = append(out, m)
 	}
 	return out
 }

@@ -9,6 +9,7 @@ export const queryKeys = {
     all: ["accounts"] as const,
     list: () => ["accounts", "list"] as const,
     duplicates: () => ["accounts", "duplicates"] as const,
+    forecast: () => ["accounts", "forecast"] as const,
     profiles: (id: string) => ["accounts", "detail", id, "profiles"] as const,
     models: (id: string) => ["accounts", "detail", id, "models"] as const,
     modelsCached: (id: string) => ["accounts", "detail", id, "models-cached"] as const,

@@ -4,6 +4,8 @@ import type { DuplicateGroup } from "@/lib/api/duplicates";
 import type {
   Account,
   AccountActionResult,
+  AccountForecast,
+  AccountForecastResponse,
   AccountFull,
   AccountInfo,
   BatchAction,
@@ -273,12 +275,76 @@ function duplicateGroups(): DuplicateGroup[] {
     });
 }
 
+const DAY = 86_400;
+const FORECAST_WINDOW_DAYS = 7;
+/** A Kiro credit period, for the mock's spend rate. */
+const PERIOD_DAYS = 30;
+
+/** When the account's credits reset (unix s): the exact moment, else midnight UTC of the date. */
+function resetMoment(account: Account): number {
+  if (account.nextResetAt) return account.nextResetAt;
+  const ms = Date.parse(`${account.nextResetDate}T00:00:00Z`);
+  return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
+}
+
+/**
+ * GET /accounts/forecast with the Go server's states (proxy/account_forecast.go). The mock's
+ * request log is too thin to give a rate, so the rate is the account's average this period:
+ * what it used so far over the days since its last reset (a 30-day period).
+ */
+export function accountForecast(account: Account, now = mockNowUnix()): AccountForecast {
+  const resetAt = resetMoment(account);
+  const daysToReset = resetAt > now ? (resetAt - now) / DAY : 0;
+  const elapsed = Math.max(1, PERIOD_DAYS - daysToReset);
+  const burnPerDay =
+    account.usageLimit > 0 && account.lastUsed > 0 ? account.usageCurrent / elapsed : 0;
+  const base: AccountForecast = {
+    status: "unknown",
+    spent: burnPerDay * FORECAST_WINDOW_DAYS,
+    spanDays: FORECAST_WINDOW_DAYS,
+    burnPerDay,
+    remaining: 0,
+    leftAtReset: 0,
+    ...(resetAt ? { resetAt } : {}),
+  };
+  if (account.usageLimit <= 0) return base;
+  const remaining = Math.max(account.usageLimit - account.usageCurrent, 0);
+  if (remaining <= 0) return { ...base, status: "empty", remaining };
+  if (resetAt <= now) {
+    const { resetAt: _past, ...rest } = base;
+    return { ...rest, remaining };
+  }
+  if (burnPerDay <= 0) return { ...base, status: "idle", remaining, leftAtReset: remaining };
+  const depletesAt = now + Math.floor((remaining / burnPerDay) * DAY);
+  if (depletesAt < resetAt) return { ...base, status: "runs_out", remaining, depletesAt };
+  return {
+    ...base,
+    status: "lasts",
+    remaining,
+    depletesAt,
+    leftAtReset: Math.max(remaining - burnPerDay * daysToReset, 0),
+  };
+}
+
 export const handlers: HttpHandler[] = [
   http.get(apiUrl("/accounts"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;
     await mockDelay();
     return HttpResponse.json(mockDb.accounts);
+  }),
+
+  http.get(apiUrl("/accounts/forecast"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const now = mockNowUnix();
+    const body: AccountForecastResponse = {
+      nowUnix: now,
+      windowDays: FORECAST_WINDOW_DAYS,
+      forecasts: Object.fromEntries(mockDb.accounts.map((a) => [a.id, accountForecast(a, now)])),
+    };
+    return HttpResponse.json(body);
   }),
 
   http.get(apiUrl("/observe/account-activity"), async ({ request }) => {

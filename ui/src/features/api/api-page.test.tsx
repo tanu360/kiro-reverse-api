@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsPatch } from "@/lib/api/types";
@@ -113,6 +113,11 @@ describe("ApiPage", () => {
       creditLimit: 0,
       callLimit: 0,
       accountIds: [],
+      accountTags: [],
+      allowedModels: [],
+      rpmLimit: 0,
+      expiresAt: 0,
+      routingMode: "inherit",
     });
 
     await user.click(within(panel).getByRole("button", { name: "Copy new API key" }));
@@ -240,7 +245,7 @@ describe("ApiPage", () => {
     // "Only selected" with nothing picked would mean every account: the form refuses it.
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     expect(
-      await within(dialog).findByText("Pick at least one account, or choose All accounts."),
+      await within(dialog).findByText("Pick at least one account or tag, or choose All accounts."),
     ).toBeInTheDocument();
     const search = within(dialog).getByRole("searchbox", { name: "Search accounts" });
     expect(search).toHaveFocus();
@@ -262,6 +267,77 @@ describe("ApiPage", () => {
     expect(sent("POST", "/api-keys")[0]?.body).toMatchObject({ accountIds: [dana?.id] });
     expect(mockDb.apiKeys.at(-1)?.accountIds).toEqual([dana?.id]);
     expect(await within(keysTable()).findByText("1 account")).toBeInTheDocument();
+  });
+
+  it("saves a key's tags, models, RPM limit, expiry and routing mode, and shows them", async () => {
+    const [first, second, third] = mockDb.accounts;
+    if (!first || !second || !third) throw new Error("missing seeded data");
+    first.tags = ["team-eu"];
+    second.tags = ["Team-EU", "ops"];
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("button", { name: "Create API key" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "scoped");
+    await user.click(within(dialog).getByRole("radio", { name: "Only selected accounts" }));
+    // The tag picks accounts on its own: both spellings count, and the count says so.
+    await user.click(within(dialog).getByRole("checkbox", { name: /team-eu/ }));
+    expect(
+      within(dialog).getByText(`2 of ${mockDb.accounts.length} accounts in scope`),
+    ).toBeInTheDocument();
+    const rpm = within(dialog).getByRole("textbox", { name: "Requests per minute" });
+    await user.clear(rpm);
+    await user.type(rpm, "30");
+    await user.type(
+      within(dialog).getByRole("textbox", { name: "Allowed models" }),
+      "claude-haiku-4.5, auto",
+    );
+    fireEvent.change(within(dialog).getByLabelText("Expires"), {
+      target: { value: "2031-05-06T07:08" },
+    });
+    await user.click(within(dialog).getByRole("combobox", { name: "Routing mode" }));
+    await user.click(await screen.findByRole("option", { name: "Reset first" }));
+    await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
+
+    await screen.findByTestId("created-key-panel");
+    expect(sent("POST", "/api-keys")[0]?.body).toMatchObject({
+      name: "scoped",
+      accountIds: [],
+      accountTags: ["team-eu"],
+      allowedModels: ["claude-haiku-4.5", "auto"],
+      rpmLimit: 30,
+      expiresAt: Math.floor(new Date(2031, 4, 6, 7, 8).getTime() / 1000),
+      routingMode: "reset_first",
+    });
+    const created = row("scoped");
+    expect(within(created).getByText("team-eu")).toBeInTheDocument();
+    expect(within(created).getByText("2 models")).toBeInTheDocument();
+    expect(within(created).getByText("30/min")).toBeInTheDocument();
+    expect(within(created).getByText("Reset first")).toBeInTheDocument();
+    expect(within(created).getByText("Enabled")).toBeInTheDocument();
+  });
+
+  it("shows Expired for a key past its expiry and warns before saving a past time", async () => {
+    const local = mockDb.apiKeys[3];
+    if (!local) throw new Error("missing seeded key");
+    local.expiresAt = Math.floor(Date.now() / 1000) - 60;
+    const { user } = await renderPage();
+    const expiredRow = row("local-dev");
+    expect(within(expiredRow).getByText("Expired")).toBeInTheDocument();
+    expect(within(expiredRow).queryByText("Enabled")).not.toBeInTheDocument();
+    expect(within(row("team-a")).queryByText("Expired")).not.toBeInTheDocument();
+
+    await user.click(within(keysTable()).getByRole("button", { name: "Actions for local-dev" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText("This time has passed: clients get 401 as soon as you save."),
+    ).toBeInTheDocument();
+    // Clearing the time lets the key work again.
+    fireEvent.change(within(dialog).getByLabelText("Expires"), { target: { value: "" } });
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(sent("PUT", `/api-keys/${local.id}`)).toHaveLength(1));
+    expect(sent("PUT", `/api-keys/${local.id}`)[0]?.body).toMatchObject({ expiresAt: 0 });
+    expect(await within(row("local-dev")).findByText("Enabled")).toBeInTheDocument();
   });
 
   it("keeps a key's accounts while the account list fails to load", async () => {

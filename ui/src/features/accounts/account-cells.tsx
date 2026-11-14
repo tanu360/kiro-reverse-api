@@ -1,5 +1,6 @@
 import {
   AlertCircleIcon,
+  BatteryLowIcon,
   CircleCheckIcon,
   CircleMinusIcon,
   CircleSlashIcon,
@@ -26,6 +27,7 @@ import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import type { AccountStatus } from "@/routes/-search";
+import { forecastHint, useAccountForecast } from "./account-forecast";
 import {
   accountStatus,
   authKey,
@@ -128,10 +130,28 @@ function AccountName({ account }: { account: Account }): JSX.Element {
 }
 
 /** A small muted icon with its meaning as a tooltip and as screen reader text. */
-function Flag({ icon: Icon, label }: { icon: IconSvgElement; label: string }): JSX.Element {
+function Flag({
+  icon: Icon,
+  label,
+  warning = false,
+}: {
+  icon: IconSvgElement;
+  label: string;
+  /** The warning colour, for a flag that asks for attention (credits running out). */
+  warning?: boolean;
+}): JSX.Element {
   return (
     <Tooltip>
-      <TooltipTrigger render={<span className="inline-flex shrink-0 text-muted-foreground" />}>
+      <TooltipTrigger
+        render={
+          <span
+            className={cn(
+              "inline-flex shrink-0",
+              warning ? "text-warning-foreground" : "text-muted-foreground",
+            )}
+          />
+        }
+      >
         <HugeiconsIcon icon={Icon} aria-hidden="true" className="size-3.5" />
         <span className="sr-only">{label}</span>
       </TooltipTrigger>
@@ -184,17 +204,28 @@ export function AccountFlags({
 }
 
 function RoutedAccountFlags({ account }: { account: Account }): JSX.Element | null {
-  return <FlagList account={account} priorityMode={useRoutingMode() === "priority"} />;
+  const mode = useRoutingMode();
+  return (
+    <FlagList
+      account={account}
+      priorityMode={mode === "priority"}
+      showWeight={mode === "weighted"}
+    />
+  );
 }
 
 function FlagList({
   account,
   priorityMode,
+  showWeight = true,
 }: {
   account: Account;
   priorityMode: boolean;
+  /** Off in the reset-first mode, where weight changes nothing. */
+  showWeight?: boolean;
 }): JSX.Element | null {
-  const { t } = useT("accounts");
+  const { t, lang } = useT("accounts");
+  const runsOut = forecastHint(useAccountForecast(account.id), t, lang);
   const flags: ReactNode[] = [];
   if (priorityMode) {
     flags.push(
@@ -204,7 +235,7 @@ function FlagList({
         priority={account.priority}
       />,
     );
-  } else if (account.weight >= 2) {
+  } else if (showWeight && account.weight >= 2) {
     flags.push(
       <Flag icon={WeightIcon} key="weight" label={t("weightShort", { weight: account.weight })} />,
     );
@@ -221,6 +252,9 @@ function FlagList({
   }
   if (overageEnabled(account)) {
     flags.push(<Flag icon={ZapIcon} key="overage" label={t("overageOn")} />);
+  }
+  if (runsOut) {
+    flags.push(<Flag icon={BatteryLowIcon} key="forecast" label={runsOut} warning />);
   }
   if (flags.length === 0) return null;
   return <span className="flex shrink-0 items-center gap-1.5">{flags}</span>;

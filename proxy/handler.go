@@ -612,7 +612,7 @@ func (h *Handler) listedModels(r *http.Request) []map[string]interface{} {
 	//! mapping points them anywhere, so they only failed. A model mapping still adds them.
 	models = append(models, buildModelInfo("auto", "kiro-proxy", true))
 	models = appendConfiguredModelAliases(models, thinkingSuffix)
-	return models
+	return filterModelMapsForKeyModels(r.Context(), models, thinkingSuffix)
 }
 
 func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
@@ -955,6 +955,10 @@ func (h *Handler) handleCountTokens(w http.ResponseWriter, r *http.Request) {
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := resolveClaudeThinkingMode(req.Model, req.Thinking, thinkingCfg.Suffix)
 	req.Model = actualModel
+	if msg := apiKeyModelRefusal(r.Context(), req.Model); msg != "" {
+		h.sendClaudeError(w, http.StatusForbidden, "permission_error", msg)
+		return
+	}
 	//! The API counts only for a model it serves; a count for one no account has would mislead.
 	if h.pool != nil && !h.pool.AllowedKnowsModel(allowedAccountsFromContext(r.Context()), req.Model) {
 		_, errType, message := h.noAccountError(r.Context(), req.Model, "api_error")
@@ -1009,6 +1013,11 @@ func (h *Handler) handleClaudeMessagesInternal(w http.ResponseWriter, r *http.Re
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := resolveClaudeThinkingMode(req.Model, req.Thinking, thinkingCfg.Suffix)
 	req.Model = actualModel
+	if msg := apiKeyModelRefusal(r.Context(), req.Model); msg != "" {
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusForbidden, msg)
+		h.sendClaudeError(w, http.StatusForbidden, "permission_error", msg)
+		return
+	}
 	effectiveReq := cloneClaudeRequestForThinking(&req, thinking)
 	thinkingResponseOpts := resolveClaudeThinkingResponseOptions(req.Thinking, thinkingCfg.ClaudeFormat)
 	estimatedInputTokens := estimateClaudeRequestInputTokens(effectiveReq)
@@ -1534,7 +1543,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
 				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens))
 			h.pool.RecordSuccess(account.ID)
-			h.rememberAccount(payload, account)
+			h.rememberAccount(r.Context(), payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
 
@@ -1757,7 +1766,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
 				resolveCacheTokens(upstreamCache, cacheTokensFromPromptCache(cacheUsage), inputTokens))
 			h.pool.RecordSuccess(account.ID)
-			h.rememberAccount(payload, account)
+			h.rememberAccount(r.Context(), payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 			h.promptCache.Update(account.ID, cacheProfile)
 
@@ -1817,6 +1826,10 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 // the accounts the request's API key may use count.
 func (h *Handler) noAccountError(ctx context.Context, model, serverErrType string) (int, string, string) {
 	allowed := allowedAccountsFromContext(ctx)
+	//! A scope that matches nothing is the key's setup, not a busy pool; say so instead of "No available accounts".
+	if message, empty := apiKeyMatchesNoAccount(ctx); empty {
+		return http.StatusServiceUnavailable, serverErrType, message
+	}
 	if !h.pool.AllowedKnowsModel(allowed, model) {
 		errType := "invalid_request_error"
 		if serverErrType == "api_error" {
@@ -1830,7 +1843,11 @@ func (h *Handler) noAccountError(ctx context.Context, model, serverErrType strin
 	if h.pool.BlockedByRPMLimitAllowed(model, allowed) {
 		//! The window is known, so clients can wait for it instead of retrying at once.
 		noteRetryAfter(ctx, h.pool.RPMRetryAfter(model, allowed))
-		return http.StatusTooManyRequests, "rate_limit_error", fmt.Sprintf("All accounts reached the limit of %s per minute", textfmt.Count(config.GetAccountRPMLimit(), "request", "requests"))
+		perMinute := textfmt.Count(config.GetAccountRPMLimit(), "request", "requests")
+		if allowed != nil {
+			return http.StatusTooManyRequests, "rate_limit_error", fmt.Sprintf("Every account this API key can use reached the limit of %s per minute", perMinute)
+		}
+		return http.StatusTooManyRequests, "rate_limit_error", fmt.Sprintf("All accounts reached the limit of %s per minute", perMinute)
 	}
 	//! Every account is cooling down or out of rotation; a known cooldown end tells clients when to retry.
 	noteRetryAfter(ctx, h.pool.CooldownRetryAfter(model, allowed))
@@ -1883,6 +1900,11 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(req.Model, thinkingCfg.Suffix)
 	req.Model = actualModel
+	if msg := apiKeyModelRefusal(r.Context(), req.Model); msg != "" {
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, req.Model, 0, 0, 0, false, http.StatusForbidden, msg)
+		h.sendOpenAIError(w, http.StatusForbidden, "permission_error", msg)
+		return
+	}
 	thinking = resolveThinkingWithEffort(thinking, req.ReasoningEffort)
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&req)
 	apiKeyReservation, err := reserveApiKeyUsage(apiKeyID, apiKeyValue, tokenBudget(estimatedInputTokens))
@@ -2324,7 +2346,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
 				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
-			h.rememberAccount(payload, account)
+			h.rememberAccount(r.Context(), payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			finishReason := mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolCalls))
@@ -2478,7 +2500,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			recordObservedSuccess(r.Context(), apiKeyReservation, account, model, inputTokens, outputTokens, credits,
 				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
-			h.rememberAccount(payload, account)
+			h.rememberAccount(r.Context(), payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			thinkingFormat := structuredOutputThinkingFormat(payload.StructuredOutput, config.GetThinkingConfig().OpenAIFormat, "reasoning_content")
@@ -2616,6 +2638,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiBatchAccounts(w, r)
 	case path == "/accounts/duplicates" && r.Method == "GET":
 		h.apiListDuplicateAccounts(w, r)
+	case path == "/accounts/forecast" && r.Method == "GET":
+		h.apiAccountForecast(w, r)
 	case path == "/accounts/duplicates/merge" && r.Method == "POST":
 		h.apiMergeDuplicateAccounts(w, r)
 
@@ -2853,6 +2877,7 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, _ *http.Request) {
 			"usageLimit":        a.UsageLimit,
 			"usagePercent":      a.UsagePercent,
 			"nextResetDate":     a.NextResetDate,
+			"nextResetAt":       a.NextResetAt,
 			"lastRefresh":       a.LastRefresh,
 			"trialUsageCurrent": a.TrialUsageCurrent,
 			"trialUsageLimit":   a.TrialUsageLimit,
@@ -4381,6 +4406,7 @@ func (h *Handler) apiGetAccountFull(w http.ResponseWriter, _ *http.Request, id s
 		"usageLimit":        account.UsageLimit,
 		"usagePercent":      account.UsagePercent,
 		"nextResetDate":     account.NextResetDate,
+		"nextResetAt":       account.NextResetAt,
 		"lastRefresh":       account.LastRefresh,
 		"trialUsageCurrent": account.TrialUsageCurrent,
 		"trialUsageLimit":   account.TrialUsageLimit,

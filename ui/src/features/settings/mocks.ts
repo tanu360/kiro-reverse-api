@@ -49,7 +49,11 @@ const API_REGIONS = ["us-east-1", "eu-central-1"];
 /** config.NormalizeAWSRegion */
 const AWS_REGION = /^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$/;
 
-const ROUTING_MODES: readonly string[] = ["weighted", "priority"] satisfies RoutingMode[];
+const ROUTING_MODES: readonly string[] = [
+  "weighted",
+  "priority",
+  "reset_first",
+] satisfies RoutingMode[];
 const LOG_LEVELS: readonly string[] = ["debug", "info", "warn", "error"] satisfies LogLevel[];
 
 type Json = Record<string, unknown>;
@@ -360,7 +364,7 @@ export const handlers: HttpHandler[] = [
       });
     }
     if (patch.routingMode !== undefined && !ROUTING_MODES.includes(patch.routingMode)) {
-      return jsonError(400, 'routingMode must be "weighted" or "priority"', {
+      return jsonError(400, 'routingMode must be "weighted", "priority" or "reset_first"', {
         code: "routing_mode_invalid",
       });
     }

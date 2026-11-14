@@ -6,7 +6,7 @@ import type {
   ApiKeyUsageResponse,
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
-import type { ApiKey, RequestRecord } from "@/lib/api/types";
+import type { ApiKey, ApiKeyRoutingMode, RequestRecord } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { publishMockEvent } from "@/lib/mocks/events";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
@@ -25,6 +25,99 @@ interface KeyBody {
   creditLimit?: unknown;
   accountIds?: unknown;
   callLimit?: unknown;
+  accountTags?: unknown;
+  allowedModels?: unknown;
+  rpmLimit?: unknown;
+  expiresAt?: unknown;
+  routingMode?: unknown;
+}
+
+const KEY_ROUTING_MODES: readonly string[] = [
+  "inherit",
+  "weighted",
+  "priority",
+  "reset_first",
+] satisfies ApiKeyRoutingMode[];
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+/** Trimmed, blanks and case-insensitive repeats dropped (the first spelling wins). */
+function cleanList(values: readonly string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of values) {
+    const item = raw
+      .trim()
+      .replace(/[,，、]/g, " ")
+      .replace(/\s+/g, " ");
+    if (!item || seen.has(item.toLowerCase())) continue;
+    seen.add(item.toLowerCase());
+    out.push(item);
+  }
+  return out;
+}
+
+/** normalizeApiKeyControls (config/apikey_controls.go). */
+function controlsError(body: KeyBody): Response | null {
+  if (typeof body.rpmLimit === "number" && (body.rpmLimit < 0 || body.rpmLimit > 10_000)) {
+    return jsonError(400, "rpm limit must be between 0 and 10000", {
+      code: "api_key_rpm_limit_range",
+      max: 10_000,
+    });
+  }
+  if (typeof body.expiresAt === "number" && body.expiresAt < 0) {
+    return jsonError(400, "expiry must be zero (never) or a unix time", {
+      code: "api_key_expiry_invalid",
+    });
+  }
+  if (
+    typeof body.routingMode === "string" &&
+    body.routingMode !== "" &&
+    !KEY_ROUTING_MODES.includes(body.routingMode)
+  ) {
+    return jsonError(
+      400,
+      'routingMode must be "inherit", "weighted", "priority" or "reset_first"',
+      {
+        code: "api_key_routing_mode_invalid",
+      },
+    );
+  }
+  if (isStringList(body.allowedModels)) {
+    const models = cleanList(body.allowedModels);
+    if (models.length > 50) {
+      return jsonError(400, "an API key may allow at most 50 models", {
+        code: "api_key_too_many_models",
+        max: 50,
+      });
+    }
+    if (models.some((model) => [...model].length > 128)) {
+      return jsonError(400, "a model name may be at most 128 characters", {
+        code: "api_key_model_too_long",
+        max: 128,
+      });
+    }
+  }
+  if (isStringList(body.accountTags) && cleanList(body.accountTags).length > 10) {
+    return jsonError(400, "an API key may select at most 10 account tags", {
+      code: "api_key_too_many_tags",
+      max: 10,
+    });
+  }
+  return null;
+}
+
+/** Applies the controls a create or update body carries; omitted ones stay. */
+function applyControls(stored: StoredKey, body: KeyBody): void {
+  if (isStringList(body.accountTags)) stored.accountTags = cleanList(body.accountTags);
+  if (isStringList(body.allowedModels)) stored.allowedModels = cleanList(body.allowedModels);
+  if (typeof body.rpmLimit === "number") stored.rpmLimit = body.rpmLimit;
+  if (typeof body.expiresAt === "number") stored.expiresAt = body.expiresAt;
+  if (typeof body.routingMode === "string") {
+    stored.routingMode = (body.routingMode || "inherit") as ApiKeyRoutingMode;
+  }
 }
 
 /** MaskApiKey (config/apikeys.go): first 6 + "****" + last 4, or the whole key up to 10 chars. */
@@ -43,15 +136,32 @@ function generateKey(): string {
  * always an array and successfulCalls always a number.
  */
 function view(stored: StoredKey): ApiKey {
-  const { key: _secret, tokenLimit, creditLimit, callLimit, lastUsedAt, name, ...rest } = stored;
+  const {
+    key: _secret,
+    tokenLimit,
+    creditLimit,
+    callLimit,
+    lastUsedAt,
+    name,
+    rpmLimit,
+    expiresAt,
+    expired: _expired,
+    ...rest
+  } = stored;
   return {
     ...rest,
     accountIds: [...(stored.accountIds ?? [])],
+    accountTags: [...(stored.accountTags ?? [])],
+    allowedModels: [...(stored.allowedModels ?? [])],
+    routingMode: stored.routingMode ?? "inherit",
+    expired: Boolean(expiresAt) && (expiresAt ?? 0) <= mockNowUnix(),
     successfulCalls: stored.successfulCalls ?? 0,
     ...(name ? { name } : {}),
     ...(tokenLimit ? { tokenLimit } : {}),
     ...(creditLimit ? { creditLimit } : {}),
     ...(callLimit ? { callLimit } : {}),
+    ...(rpmLimit ? { rpmLimit } : {}),
+    ...(expiresAt ? { expiresAt } : {}),
     ...(lastUsedAt ? { lastUsedAt } : {}),
   };
 }
@@ -74,7 +184,12 @@ function badTypes(body: KeyBody): boolean {
     (creditLimit !== undefined && typeof creditLimit !== "number") ||
     (callLimit !== undefined && !Number.isInteger(callLimit)) ||
     (accountIds !== undefined &&
-      (!Array.isArray(accountIds) || accountIds.some((id) => typeof id !== "string")))
+      (!Array.isArray(accountIds) || accountIds.some((id) => typeof id !== "string"))) ||
+    (body.accountTags !== undefined && !isStringList(body.accountTags)) ||
+    (body.allowedModels !== undefined && !isStringList(body.allowedModels)) ||
+    (body.rpmLimit !== undefined && !Number.isInteger(body.rpmLimit)) ||
+    (body.expiresAt !== undefined && !Number.isInteger(body.expiresAt)) ||
+    (body.routingMode !== undefined && typeof body.routingMode !== "string")
   );
 }
 
@@ -340,7 +455,7 @@ export const handlers: HttpHandler[] = [
     const rawKey = typeof body.key === "string" ? body.key : "";
     const customKey = rawKey.trim();
     if (rawKey !== "" && customKey === "") return jsonError(400, "api key value must not be empty");
-    const limits = limitError(body);
+    const limits = limitError(body) ?? controlsError(body);
     if (limits) return limits;
     const accounts = normalizeAccountIds((body.accountIds as string[] | undefined) ?? []);
     if ("error" in accounts) return accounts.error;
@@ -362,6 +477,7 @@ export const handlers: HttpHandler[] = [
       requestsCount: 0,
       successfulCalls: 0,
     };
+    applyControls(stored, body);
     mockDb.apiKeys.push(stored);
     publishMockEvent("api_keys_changed", stored.id);
     return HttpResponse.json({ success: true, id: stored.id, key, apiKey: view(stored) });
@@ -376,7 +492,7 @@ export const handlers: HttpHandler[] = [
     if (!stored) return jsonError(404, "API key not found");
     const body = await readBody(request);
     if (!body || badTypes(body)) return jsonError(400, "Invalid JSON");
-    const limits = limitError(body);
+    const limits = limitError(body) ?? controlsError(body);
     if (limits) return limits;
     let nextKey = stored.key;
     if (typeof body.key === "string" && body.key !== "") {
@@ -399,6 +515,7 @@ export const handlers: HttpHandler[] = [
     if (typeof body.enabled === "boolean") stored.enabled = body.enabled;
     if (typeof body.tokenLimit === "number") stored.tokenLimit = body.tokenLimit;
     if (typeof body.creditLimit === "number") stored.creditLimit = body.creditLimit;
+    applyControls(stored, body);
     stored.key = nextKey;
     stored.keyMasked = maskKey(nextKey);
     publishMockEvent("api_keys_changed", stored.id);

@@ -716,8 +716,10 @@ func refreshAccountInfo(account *config.Account, markFailure bool) (*config.Acco
 	if usage.NextDateReset != "" {
 		if ts, err := usage.NextDateReset.Int64(); err == nil && ts > 0 {
 			info.NextResetDate = time.Unix(ts, 0).Format("2006-01-02")
+			info.NextResetAt = ts
 		} else if f, err := usage.NextDateReset.Float64(); err == nil && f > 0 {
 			info.NextResetDate = time.Unix(int64(f), 0).Format("2006-01-02")
+			info.NextResetAt = int64(f)
 		}
 	}
 

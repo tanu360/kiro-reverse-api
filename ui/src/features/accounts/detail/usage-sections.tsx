@@ -11,6 +11,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { LiveActivityStrip } from "../account-activity";
 import { UsageMeter } from "../account-cells";
+import { ForecastLine } from "../account-forecast";
 import { formatCreditAmount, formatResetDate, resetDateSec } from "../account-model";
 
 /** 24 one-hour buckets: the account's last day of traffic. */
@@ -67,6 +68,7 @@ export function StatisticsSection({ account }: { account: Account }): JSX.Elemen
               })}
             </p>
           ) : null}
+          {account.usageLimit > 0 ? <ForecastLine accountId={account.id} className="mt-1" /> : null}
         </div>
       ) : null}
       <ActivityStrip

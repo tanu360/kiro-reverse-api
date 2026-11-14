@@ -6,11 +6,24 @@ import {
   buildUpdateRequest,
   EMPTY_API_KEY_FORM,
   formValuesFromKey,
+  fromLocalDateTimeInput,
+  isKeyExpired,
   isLimitReached,
   limitReachedReason,
   parseApiKeyForm,
+  parseModelList,
+  toLocalDateTimeInput,
   wouldLockOutClients,
 } from "./api-key-form";
+
+/** What parse and the request builders give for the controls a plain form leaves alone. */
+const NO_CONTROLS = {
+  accountTags: [],
+  allowedModels: [],
+  rpmLimit: 0,
+  expiresAt: 0,
+  routingMode: "inherit",
+} as const;
 
 function values(overrides: Partial<ApiKeyFormValues> = {}): ApiKeyFormValues {
   return { ...EMPTY_API_KEY_FORM, ...overrides };
@@ -41,6 +54,7 @@ describe("parseApiKeyForm", () => {
         creditLimit: 0,
         callLimit: 0,
         accountIds: [],
+        ...NO_CONTROLS,
       },
     });
   });
@@ -94,6 +108,7 @@ describe("request payloads", () => {
       creditLimit: 0,
       callLimit: 0,
       accountIds: [],
+      ...NO_CONTROLS,
     });
   });
 
@@ -107,6 +122,7 @@ describe("request payloads", () => {
       creditLimit: 0,
       callLimit: 0,
       accountIds: [],
+      ...NO_CONTROLS,
       key: "sk-mine",
     });
   });
@@ -121,6 +137,7 @@ describe("request payloads", () => {
       creditLimit: 2.5,
       callLimit: 0,
       accountIds: [],
+      ...NO_CONTROLS,
     });
   });
 
@@ -141,6 +158,11 @@ describe("formValuesFromKey", () => {
       callLimit: 0,
       accountScope: "all",
       accountIds: [],
+      accountTags: [],
+      allowedModels: "",
+      rpmLimit: 0,
+      expiresAt: "",
+      routingMode: "inherit",
     });
     expect(formValuesFromKey(key())).toEqual(EMPTY_API_KEY_FORM);
     expect(formValuesFromKey(key({ accountIds: [] }))).toEqual(EMPTY_API_KEY_FORM);
@@ -231,5 +253,107 @@ describe("wouldLockOutClients", () => {
     expect(wouldLockOutClients(keys, "a", false)).toBe(false);
     expect(wouldLockOutClients(keys, "b", true)).toBe(false);
     expect(wouldLockOutClients([...keys, key({ id: "c" })], "a", true)).toBe(false);
+  });
+});
+
+describe("key controls", () => {
+  it("parses models comma-separated, once each, and checks their count and length", () => {
+    expect(parseModelList(" claude-haiku-4.5, Claude-Haiku-4.5 ,auto,, ")).toEqual([
+      "claude-haiku-4.5",
+      "auto",
+    ]);
+    const many = Array.from({ length: 51 }, (_, i) => `model-${i}`).join(",");
+    expect(parseApiKeyForm(values({ allowedModels: many }))).toEqual({
+      ok: false,
+      error: "tooManyModels",
+      field: "allowedModels",
+    });
+    expect(parseApiKeyForm(values({ allowedModels: "m".repeat(129) }))).toEqual({
+      ok: false,
+      error: "modelTooLong",
+      field: "allowedModels",
+    });
+  });
+
+  it("takes a whole RPM limit up to 10,000", () => {
+    expect(parseApiKeyForm(values({ rpmLimit: 30 }))).toMatchObject({
+      ok: true,
+      value: { rpmLimit: 30 },
+    });
+    for (const rpmLimit of [-1, 1.5, 10_001]) {
+      expect(parseApiKeyForm(values({ rpmLimit }))).toEqual({
+        ok: false,
+        error: "invalidLimits",
+        field: "rpmLimit",
+      });
+    }
+  });
+
+  it("round-trips the expiry through the local datetime field", () => {
+    const at = Math.floor(new Date(2031, 4, 6, 7, 8).getTime() / 1000);
+    expect(toLocalDateTimeInput(at)).toBe("2031-05-06T07:08");
+    expect(fromLocalDateTimeInput("2031-05-06T07:08")).toBe(at);
+    expect(toLocalDateTimeInput(0)).toBe("");
+    expect(fromLocalDateTimeInput("  ")).toBe(0);
+    expect(fromLocalDateTimeInput("tomorrow")).toBeNull();
+    expect(parseApiKeyForm(values({ expiresAt: "2031-05-06" }))).toEqual({
+      ok: false,
+      error: "invalidExpiry",
+      field: "expiresAt",
+    });
+  });
+
+  it("lets tags alone satisfy only-selected accounts and sends every control", () => {
+    const parsed = parseApiKeyForm(
+      values({
+        accountScope: "selected",
+        accountTags: ["team-eu", "team-eu"],
+        allowedModels: "claude-haiku-4.5",
+        rpmLimit: 12,
+        expiresAt: "2031-05-06T07:08",
+        routingMode: "reset_first",
+      }),
+    );
+    if (!parsed.ok) throw new Error("expected valid form");
+    expect(buildUpdateRequest(parsed.value)).toMatchObject({
+      accountIds: [],
+      accountTags: ["team-eu"],
+      allowedModels: ["claude-haiku-4.5"],
+      rpmLimit: 12,
+      expiresAt: fromLocalDateTimeInput("2031-05-06T07:08"),
+      routingMode: "reset_first",
+    });
+    // Tags kept from before a switch to every account are not sent.
+    const all = parseApiKeyForm(values({ accountScope: "all", accountTags: ["team-eu"] }));
+    expect(all.ok && all.value.accountTags).toEqual([]);
+  });
+
+  it("starts an edit from the stored controls", () => {
+    const at = Math.floor(new Date(2031, 0, 2, 3, 4).getTime() / 1000);
+    expect(
+      formValuesFromKey(
+        key({
+          accountTags: ["eu"],
+          allowedModels: ["a", "b"],
+          rpmLimit: 9,
+          expiresAt: at,
+          routingMode: "priority",
+        }),
+      ),
+    ).toMatchObject({
+      accountScope: "selected",
+      accountTags: ["eu"],
+      allowedModels: "a, b",
+      rpmLimit: 9,
+      expiresAt: "2031-01-02T03:04",
+      routingMode: "priority",
+    });
+  });
+
+  it("reads a key as expired from the flag or a stale time", () => {
+    expect(isKeyExpired(key({ expired: true }))).toBe(true);
+    expect(isKeyExpired(key({ expiresAt: 100 }), 200)).toBe(true);
+    expect(isKeyExpired(key({ expiresAt: 300 }), 200)).toBe(false);
+    expect(isKeyExpired(key())).toBe(false);
   });
 });

@@ -428,6 +428,7 @@ func mergeRelogin(current, incoming config.Account, identityReplaced bool) confi
 		merged.UsageLimit = 0
 		merged.UsagePercent = 0
 		merged.NextResetDate = ""
+		merged.NextResetAt = 0
 		merged.LastRefresh = 0
 		merged.TrialUsageCurrent = 0
 		merged.TrialUsageLimit = 0

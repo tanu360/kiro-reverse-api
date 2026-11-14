@@ -11,12 +11,47 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Label } from "@/components/ui/label";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { accountMeta, useAccountName } from "@/features/accounts/account-cells";
+import { tagKey } from "@/features/accounts/account-metadata";
 import { accountsQuery } from "@/lib/api/accounts";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
-import type { ApiKeyAccountScope } from "./api-key-form";
+import { useMaskText } from "@/lib/privacy";
+import { type ApiKeyAccountScope, MAX_KEY_TAGS } from "./api-key-form";
 
 const SCOPES: readonly ApiKeyAccountScope[] = ["all", "selected"];
+
+/** One tag the picker offers: the first spelling seen, and how many accounts carry it. */
+interface TagOption {
+  tag: string;
+  count: number;
+}
+
+/** Every tag on the accounts, case-insensitively once, most used first, then by name. */
+export function tagOptions(accounts: readonly Account[]): TagOption[] {
+  const byKey = new Map<string, TagOption>();
+  for (const account of accounts) {
+    for (const tag of account.tags ?? []) {
+      const option = byKey.get(tagKey(tag));
+      if (option) option.count++;
+      else byKey.set(tagKey(tag), { tag, count: 1 });
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+/** The accounts a scope reaches: the picked ids plus every account carrying a picked tag. */
+export function scopedAccountIds(
+  accounts: readonly Account[],
+  ids: readonly string[],
+  tags: readonly string[],
+): Set<string> {
+  const out = new Set(ids);
+  const keys = new Set(tags.map(tagKey));
+  for (const account of accounts) {
+    if ((account.tags ?? []).some((tag) => keys.has(tagKey(tag)))) out.add(account.id);
+  }
+  return out;
+}
 
 /**
  * Which accounts a key may use: every account, or the ones picked here. The list searches what
@@ -25,19 +60,28 @@ const SCOPES: readonly ApiKeyAccountScope[] = ["all", "selected"];
  * "Removed account" rows until unchecked: they match nothing, and dropping them silently could
  * empty the list, which would mean every account. Until the list has loaded no pick counts as
  * removed, so a slow or failed load shows its state instead of every pick as removed.
+ *
+ * Tags pick accounts too: every account carrying a picked tag joins the picked ones, now and
+ * whenever an account is tagged later. A picked tag no account carries stays listed with a
+ * warning, as such a key gets no account at all.
  */
 export function AccountPicker({
   scope,
   selected,
+  tags = [],
   onScopeChange,
   onSelectedChange,
+  onTagsChange,
   invalid,
   searchRef,
 }: {
   scope: ApiKeyAccountScope;
   selected: readonly string[];
+  /** Picked account tags. */
+  tags?: readonly string[];
   onScopeChange: (scope: ApiKeyAccountScope) => void;
   onSelectedChange: (ids: string[]) => void;
+  onTagsChange?: (tags: string[]) => void;
   /** "Only selected" with nothing picked. */
   invalid: boolean;
   /** Where focus goes when the picks are invalid. */
@@ -47,6 +91,7 @@ export function AccountPicker({
   const { t: ta } = useT("accounts");
   const { t: tc } = useT();
   const accountName = useAccountName();
+  const mask = useMaskText();
   const accounts = useQuery(accountsQuery());
   const [query, setQuery] = useState("");
   const baseId = useId();
@@ -69,6 +114,21 @@ export function AccountPicker({
 
   const toggle = (id: string) =>
     onSelectedChange(picked.has(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+
+  const options = useMemo(() => tagOptions(list), [list]);
+  const pickedTags = new Set(tags.map(tagKey));
+  const strayTags = loaded
+    ? tags.filter((tag) => !options.some((option) => tagKey(option.tag) === tagKey(tag)))
+    : [];
+  const tagRows: TagOption[] = [...options, ...strayTags.map((tag) => ({ tag, count: 0 }))];
+  const toggleTag = (tag: string) => {
+    if (!onTagsChange) return;
+    const key = tagKey(tag);
+    if (pickedTags.has(key)) onTagsChange(tags.filter((x) => tagKey(x) !== key));
+    else if (tags.length < MAX_KEY_TAGS) onTagsChange([...tags, tag]);
+  };
+  const reached = scopedAccountIds(list, selected, tags);
+  const reachedKnown = [...reached].filter((id) => known.has(id)).length;
 
   const description = (account: Account) =>
     [accountMeta(account, ta), account.enabled ? "" : t("form.accountsDisabled")]
@@ -147,6 +207,40 @@ export function AccountPicker({
       </RadioGroup>
       {scope === "selected" ? (
         <div className="flex min-w-0 flex-col gap-2">
+          {onTagsChange && tagRows.length > 0 ? (
+            <fieldset className="flex min-w-0 flex-col gap-1.5">
+              <legend className="mb-1.5 text-muted-foreground text-xs">
+                {t("form.accountTags")}
+              </legend>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {tagRows.map((option) => {
+                  const id = `${baseId}-tag-${tagKey(option.tag)}`;
+                  const checked = pickedTags.has(tagKey(option.tag));
+                  return (
+                    <Label
+                      className="min-w-0"
+                      htmlFor={id}
+                      key={tagKey(option.tag)}
+                      variant="option"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={!checked && tags.length >= MAX_KEY_TAGS}
+                        id={id}
+                        onCheckedChange={() => toggleTag(option.tag)}
+                      />
+                      <span className="min-w-0 truncate">{mask(option.tag)}</span>
+                      <span className="shrink-0 text-muted-foreground tabular-nums">
+                        {option.count > 0
+                          ? t("form.accountTagCount", { n: option.count })
+                          : t("form.accountTagNone")}
+                      </span>
+                    </Label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
           <InputGroup>
             <InputGroupAddon>
               <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
@@ -176,10 +270,12 @@ export function AccountPicker({
           {rows}
           {loaded ? (
             <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
-              {t("form.accountsSelectedCount", {
-                n: selected.length,
-                total: list.length + removed.length,
-              })}
+              {tags.length > 0
+                ? t("form.accountsReachedCount", { n: reachedKnown, total: list.length })
+                : t("form.accountsSelectedCount", {
+                    n: selected.length,
+                    total: list.length + removed.length,
+                  })}
             </p>
           ) : null}
         </div>

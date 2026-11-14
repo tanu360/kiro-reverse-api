@@ -379,6 +379,32 @@ export function ApiKeyUsageSheet({
                 }
               />
               <PropertyRow
+                label={t("form.allowedModels")}
+                value={
+                  apiKey.allowedModels?.length
+                    ? apiKey.allowedModels.join(", ")
+                    : t("form.allowedModelsPlaceholder")
+                }
+              />
+              <PropertyRow
+                label={t("form.rpmLimit")}
+                value={
+                  apiKey.rpmLimit
+                    ? t("keys.rpmLimit", { n: formatNumber(apiKey.rpmLimit, lang) })
+                    : t("common:unlimited")
+                }
+              />
+              <PropertyRow
+                label={t("form.expiresAt")}
+                value={
+                  apiKey.expiresAt
+                    ? apiKey.expired
+                      ? t("usage.expiredAt", { time: formatDateTime(apiKey.expiresAt, lang) })
+                      : formatDateTime(apiKey.expiresAt, lang)
+                    : t("usage.never")
+                }
+              />
+              <PropertyRow
                 label={t("keys.lastUsed")}
                 value={apiKey.lastUsedAt ? <RelativeTime value={apiKey.lastUsedAt} /> : ""}
               />

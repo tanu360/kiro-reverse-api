@@ -59,6 +59,8 @@ describe("invalidRulesFields", () => {
     accountThresholds: "80, 90, 100",
     poolThresholds: "80, 90, 100",
     poolCooldownMinutes: 60,
+    dailySummary: false,
+    dailySummaryMinute: 540,
   };
 
   it("passes a valid form and names each bad field", () => {

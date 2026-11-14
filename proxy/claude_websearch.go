@@ -295,7 +295,7 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 	var lastAccount *config.Account
 	for attempt := 0; attempt < newRequestRetryPlan().maxPerRequest; attempt++ {
 		picked := time.Now()
-		account := h.pool.GetNextForModelAllowed(model, excluded, allowedAccountsFromContext(ctx))
+		account := h.pool.GetNextForModelScoped(model, excluded, poolScopeFromContext(ctx))
 		if account == nil {
 			break
 		}
@@ -574,7 +574,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 			round, err := h.callClaudeRound(ctx, account, payload, req.Model, thinking, estimatedInputTokens)
 			if err == nil {
 				traceAttemptOK(ctx)
-				h.rememberAccount(payload, account)
+				h.rememberAccount(ctx, payload, account)
 				return round, account, nil
 			}
 			lastErr = err

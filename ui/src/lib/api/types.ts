@@ -89,6 +89,14 @@ export type ServerErrorCode =
   | "credit_limit_negative"
   | "call_limit_negative"
   | "api_key_unknown_account"
+  | "api_key_rpm_limit_range"
+  | "api_key_expiry_invalid"
+  | "api_key_routing_mode_invalid"
+  | "api_key_too_many_models"
+  | "api_key_model_too_long"
+  | "api_key_too_many_tags"
+  | "alert_no_channels"
+  | "alert_summary_time_range"
   | "model_mappings_too_many"
   | "model_mapping_empty"
   | "model_mapping_no_source"
@@ -475,6 +483,8 @@ export interface Account {
   /** FRACTION 0..1 */
   usagePercent: number;
   nextResetDate: string;
+  /** unix s: the exact reset moment when Kiro gave one; 0 or omitted otherwise */
+  nextResetAt?: number;
   /** unix s */
   lastRefresh: number;
   trialUsageCurrent: number;
@@ -1018,7 +1028,56 @@ export interface ApiKey {
   callLimit?: number;
   /** Requests that finished OK; model lists and token counts do not count. */
   successfulCalls?: number;
+  /** Accounts carrying one of these tags join `accountIds` (case-insensitive). Always an array. */
+  accountTags?: string[];
+  /**
+   * Models the key may call, matched against the model a request resolves to (thinking suffix
+   * and model mappings applied), case-insensitive. Empty or omitted = every model.
+   */
+  allowedModels?: string[];
+  /** Requests per minute; omitted/0 = unlimited. */
+  rpmLimit?: number;
+  /** unix s; omitted/0 = never. */
+  expiresAt?: number;
+  /** true once `expiresAt` has passed: clients get 401. */
+  expired?: boolean;
+  /** "inherit" follows the global routing mode. */
+  routingMode?: ApiKeyRoutingMode;
 }
+/**
+ * An account's credit forecast. `unknown`: no limit or reset date known (or a reset date already
+ * past); `empty`: no credits left; `idle`: nothing spent in the window; `lasts`: at the current
+ * rate the credits last until they reset; `runs_out`: they run out before.
+ */
+export type AccountForecastStatus = "unknown" | "empty" | "idle" | "lasts" | "runs_out";
+
+export interface AccountForecast {
+  status: AccountForecastStatus;
+  /** credits spent in the window */
+  spent: number;
+  /** days `spent` averages over: the window, less for an account first used inside it, >= 1 */
+  spanDays: number;
+  burnPerDay: number;
+  /** credits left now, counting spend since the last usage refresh; 0 when the limit is unknown */
+  remaining: number;
+  /** unix s: when the credits reset; omitted when unknown */
+  resetAt?: number;
+  /** unix s: when they run out at `burnPerDay`; omitted when nothing is spent */
+  depletesAt?: number;
+  /** credits expected to be left unused at the reset */
+  leftAtReset: number;
+}
+
+/** GET /accounts/forecast */
+export interface AccountForecastResponse {
+  nowUnix: number;
+  /** 7 */
+  windowDays: number;
+  forecasts: Record<string, AccountForecast>;
+}
+
+/** A key's routing mode: its own, or the global one. */
+export type ApiKeyRoutingMode = "inherit" | RoutingMode;
 export interface ApiKeyListResponse {
   apiKeys: ApiKey[];
 }
@@ -1037,6 +1096,15 @@ export interface ApiKeyCreateRequest {
   accountIds?: string[];
   /** int >= 0 */
   callLimit?: number;
+  /** at most 10 */
+  accountTags?: string[];
+  /** at most 50, each up to 128 characters */
+  allowedModels?: string[];
+  /** int 0..10000 */
+  rpmLimit?: number;
+  /** unix s; 0 = never */
+  expiresAt?: number;
+  routingMode?: ApiKeyRoutingMode;
 }
 export interface ApiKeyCreateResponse {
   success: true;
@@ -1055,6 +1123,14 @@ export interface ApiKeyUpdateRequest {
   /** Replaces the list; [] = every account. Omitted keeps it. */
   accountIds?: string[];
   callLimit?: number;
+  /** Replaces the list; [] clears it. Omitted keeps it. */
+  accountTags?: string[];
+  /** Replaces the list; [] = every model. Omitted keeps it. */
+  allowedModels?: string[];
+  rpmLimit?: number;
+  /** 0 removes the expiry. */
+  expiresAt?: number;
+  routingMode?: ApiKeyRoutingMode;
 }
 export interface ApiKeyUpdateResponse {
   success: true;
@@ -1074,10 +1150,11 @@ export interface ApiKeyRegenerateResponse {
 // ---------------------------------------------------------------------------
 
 /**
- * How the pool picks the account for a new request: `weighted` round-robin (the default) or
- * `priority`, the available account with the lowest Account.priority.
+ * How the pool picks the account for a new request: `weighted` round-robin (the default),
+ * `priority`, the available account with the lowest Account.priority, or `reset_first`, the
+ * available account with credits left whose credits reset soonest (ties: more credits left).
  */
-export type RoutingMode = "weighted" | "priority";
+export type RoutingMode = "weighted" | "priority" | "reset_first";
 
 /** How much the server writes to its own log; `info` is the default. */
 export type LogLevel = "debug" | "info" | "warn" | "error";

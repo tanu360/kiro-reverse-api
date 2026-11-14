@@ -958,6 +958,8 @@ function apiKeysFull(now: number): StoredKey[] {
     {
       name: "Mobile app",
       createdAt: now - 17 * DAY,
+      allowedModels: ["claude-haiku-4.5", "auto"],
+      rpmLimit: 60,
       lastUsedAt: now - 40,
       tokensUsed: 523_118,
       creditsUsed: 18.4,
@@ -977,6 +979,8 @@ function apiKeysFull(now: number): StoredKey[] {
     {
       name: "Gateway — EU",
       createdAt: now - 380 * DAY,
+      accountTags: ["team-eu"],
+      routingMode: "reset_first",
       lastUsedAt: now - 1,
       tokensUsed: 941_200_833,
       creditsUsed: 18_244.27,
@@ -985,6 +989,7 @@ function apiKeysFull(now: number): StoredKey[] {
     {
       name: "Research",
       createdAt: now - 60 * DAY,
+      routingMode: "priority",
       lastUsedAt: now - 3 * MINUTE,
       creditLimit: 500,
       creditsUsed: 499.97,
@@ -1040,6 +1045,7 @@ function apiKeysFull(now: number): StoredKey[] {
     {
       name: "Claude Code — laptop",
       createdAt: now - 14 * DAY,
+      routingMode: "reset_first",
       lastUsedAt: now - 30,
       tokensUsed: 288_114_902,
       creditsUsed: 4_120.66,
@@ -1048,6 +1054,7 @@ function apiKeysFull(now: number): StoredKey[] {
     {
       name: "Codex CLI",
       createdAt: now - 7 * DAY,
+      expiresAt: now + 3 * DAY,
       lastUsedAt: now - 2 * MINUTE,
       tokensUsed: 41_200_117,
       creditsUsed: 702.11,
@@ -1061,7 +1068,8 @@ function apiKeysFull(now: number): StoredKey[] {
       creditsUsed: 2.04,
       requestsCount: 61,
     },
-    { name: "Staging", createdAt: now - 2 * MINUTE },
+    // A tag no account carries: the key gets no account until one is tagged.
+    { name: "Staging", createdAt: now - 2 * MINUTE, accountTags: ["staging"] },
     {
       name: "Load testing",
       createdAt: now - 30 * DAY,
@@ -1074,6 +1082,9 @@ function apiKeysFull(now: number): StoredKey[] {
     {
       name: "Partner: Brightline",
       createdAt: now - 90 * DAY,
+      expiresAt: now - 2 * DAY,
+      allowedModels: ["claude-sonnet-4.5"],
+      rpmLimit: 10,
       lastUsedAt: now - 50 * MINUTE,
       creditLimit: 0.5,
       creditsUsed: 0.4999,
@@ -1083,6 +1094,8 @@ function apiKeysFull(now: number): StoredKey[] {
     {
       name: "n8n workflows",
       createdAt: now - 45 * DAY,
+      accountTags: ["support"],
+      rpmLimit: 30,
       lastUsedAt: now - 15 * MINUTE,
       tokensUsed: 6_004_118,
       creditsUsed: 88.4,
@@ -1108,6 +1121,7 @@ function apiKeysFull(now: number): StoredKey[] {
       name: "Demo",
       key: "demo-key",
       createdAt: now - DAY,
+      expiresAt: now - HOUR,
       lastUsedAt: now - 22 * HOUR,
       requestsCount: 1,
       tokensUsed: 812,

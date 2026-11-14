@@ -118,7 +118,7 @@ func TestPickAccountKeepsConversationOnServingAccount(t *testing.T) {
 	if first == nil {
 		t.Fatal("no account picked")
 	}
-	h.rememberAccount(convA, first)
+	h.rememberAccount(context.Background(), convA, first)
 
 	for turn := 0; turn < 5; turn++ {
 		if acc := h.pickAccount(context.Background(), convA, "", nil); acc == nil || acc.ID != first.ID {
@@ -140,7 +140,7 @@ func TestPickAccountRotatesWhenAffinityDisabled(t *testing.T) {
 	conv := payloadFor("conversation")
 
 	first := h.pickAccount(context.Background(), conv, "", nil)
-	h.rememberAccount(conv, first)
+	h.rememberAccount(context.Background(), conv, first)
 	second := h.pickAccount(context.Background(), conv, "", nil)
 	if first.ID == second.ID {
 		t.Fatalf("affinity off but both turns went to %s", first.ID)
@@ -161,7 +161,7 @@ func TestPickAccountFailsOverAndRebinds(t *testing.T) {
 	if retry == nil || retry.ID != "aff-b" {
 		t.Fatalf("retry went to %v, want aff-b", retry)
 	}
-	h.rememberAccount(conv, retry)
+	h.rememberAccount(context.Background(), conv, retry)
 	if got := h.affinity.Lookup(affinityKey(conv)); got != "aff-b" {
 		t.Fatalf("binding after failover = %q, want aff-b", got)
 	}
@@ -220,7 +220,7 @@ func TestPickAccountPriorityModeMovesConversationToHigherPriority(t *testing.T) 
 	if strings.Contains(logs.String(), "unavailable") {
 		t.Fatalf("a move by priority was logged as an unavailable account:\n%s", logs)
 	}
-	h.rememberAccount(conv, acc)
+	h.rememberAccount(context.Background(), conv, acc)
 	if got := h.affinity.Lookup(affinityKey(conv)); got != "prio-top" {
 		t.Fatalf("binding after the move = %q, want prio-top", got)
 	}

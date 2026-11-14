@@ -100,7 +100,12 @@ func (h *Handler) handleModel(w http.ResponseWriter, r *http.Request, id string)
 		json.NewEncoder(w).Encode(models[i])
 		return
 	}
-	sendModelsError(w, r, http.StatusNotFound, "not_found_error", fmt.Sprintf("model %q is not available on any account", id))
+	message := fmt.Sprintf("model %q is not available on any account", id)
+	if v, ok := apiKeyFromContext(r.Context()); ok && (v.allowed != nil || len(v.allowedModels) > 0) {
+		//! The pool may serve it; this key's accounts or model list do not.
+		message = fmt.Sprintf("model %q is not available to this API key", id)
+	}
+	sendModelsError(w, r, http.StatusNotFound, "not_found_error", message)
 }
 
 // sendModelsError writes an error in the shape the client speaks: Anthropic's when it sent
@@ -126,10 +131,12 @@ func sendClientNotFound(w http.ResponseWriter, r *http.Request) {
 // have an OpenAI code. Others carry null, as the OpenAI API does for errors without one.
 func openAIErrorCode(status int, message string) (code, param interface{}) {
 	switch {
-	case status == http.StatusNotFound && strings.Contains(message, "is not available on any account"):
+	case status == http.StatusNotFound && (strings.Contains(message, "is not available on any account") || strings.Contains(message, "is not available to this API key")):
 		return "model_not_found", "model"
 	case status == http.StatusNotFound && strings.Contains(message, "is not an endpoint"):
 		return "unknown_url", nil
+	case status == http.StatusForbidden && strings.Contains(message, "is not allowed for this API key"):
+		return "model_not_allowed", "model"
 	case status == http.StatusUnauthorized:
 		return "invalid_api_key", nil
 	case status == http.StatusTooManyRequests:

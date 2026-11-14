@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"kiro-proxy/config"
 )
@@ -25,6 +26,16 @@ type apiKeyView struct {
 	AccountIDs      []string `json:"accountIds"`
 	CallLimit       int64    `json:"callLimit,omitempty"`
 	SuccessfulCalls int64    `json:"successfulCalls"`
+	// AccountTags is always an array; its accounts join AccountIDs.
+	AccountTags []string `json:"accountTags"`
+	// AllowedModels is always an array; empty means every model.
+	AllowedModels []string `json:"allowedModels"`
+	RPMLimit      int      `json:"rpmLimit,omitempty"`
+	ExpiresAt     int64    `json:"expiresAt,omitempty"`
+	// Expired is true once ExpiresAt has passed; clients then get 401.
+	Expired bool `json:"expired"`
+	// RoutingMode is "inherit" or the key's own routing mode.
+	RoutingMode string `json:"routingMode"`
 }
 
 // apiKeyLockoutCode marks a 409 for a change that would leave a proxy that
@@ -54,7 +65,26 @@ func toApiKeyView(entry config.ApiKeyEntry) apiKeyView {
 		AccountIDs:      apiKeyViewAccountIDs(entry),
 		CallLimit:       entry.CallLimit,
 		SuccessfulCalls: entry.SuccessfulCalls,
+		AccountTags:     nonNilStrings(entry.AccountTags),
+		AllowedModels:   nonNilStrings(entry.AllowedModels),
+		RPMLimit:        entry.RPMLimit,
+		ExpiresAt:       entry.ExpiresAt,
+		Expired:         config.ApiKeyExpired(entry, time.Now()),
+		RoutingMode:     apiKeyViewRoutingMode(entry.RoutingMode),
 	}
+}
+
+// nonNilStrings is a copy of list that is [] rather than null in JSON.
+func nonNilStrings(list []string) []string {
+	return append([]string{}, list...)
+}
+
+// apiKeyViewRoutingMode shows a stored "" as "inherit".
+func apiKeyViewRoutingMode(mode string) string {
+	if mode == "" {
+		return config.ApiKeyRoutingModeInherit
+	}
+	return mode
 }
 
 func apiKeyViewAccountIDs(entry config.ApiKeyEntry) []string {
@@ -97,6 +127,12 @@ type apiKeyCreateRequest struct {
 
 	AccountIDs []string `json:"accountIds,omitempty"`
 	CallLimit  int64    `json:"callLimit,omitempty"`
+
+	AccountTags   []string `json:"accountTags,omitempty"`
+	AllowedModels []string `json:"allowedModels,omitempty"`
+	RPMLimit      int      `json:"rpmLimit,omitempty"`
+	ExpiresAt     int64    `json:"expiresAt,omitempty"`
+	RoutingMode   string   `json:"routingMode,omitempty"`
 }
 
 func (h *Handler) apiCreateApiKey(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +159,12 @@ func (h *Handler) apiCreateApiKey(w http.ResponseWriter, r *http.Request) {
 		CreditLimit: req.CreditLimit,
 		AccountIDs:  req.AccountIDs,
 		CallLimit:   req.CallLimit,
+
+		AccountTags:   req.AccountTags,
+		AllowedModels: req.AllowedModels,
+		RPMLimit:      req.RPMLimit,
+		ExpiresAt:     req.ExpiresAt,
+		RoutingMode:   req.RoutingMode,
 	})
 	if err != nil {
 		writeAdminErr(w, http.StatusBadRequest, err, "")
@@ -147,6 +189,13 @@ type apiKeyUpdateRequest struct {
 	// AccountIDs replaces the allowlist when present; [] binds the key to every account.
 	AccountIDs *[]string `json:"accountIds,omitempty"`
 	CallLimit  *int64    `json:"callLimit,omitempty"`
+	// AccountTags and AllowedModels replace the list when present; [] clears it.
+	AccountTags   *[]string `json:"accountTags,omitempty"`
+	AllowedModels *[]string `json:"allowedModels,omitempty"`
+	RPMLimit      *int      `json:"rpmLimit,omitempty"`
+	// ExpiresAt 0 removes the expiry.
+	ExpiresAt   *int64  `json:"expiresAt,omitempty"`
+	RoutingMode *string `json:"routingMode,omitempty"`
 }
 
 func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id string) {
@@ -187,6 +236,21 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 	if req.CallLimit != nil {
 		patch.CallLimit = *req.CallLimit
 	}
+	if req.AccountTags != nil {
+		patch.AccountTags = *req.AccountTags
+	}
+	if req.AllowedModels != nil {
+		patch.AllowedModels = *req.AllowedModels
+	}
+	if req.RPMLimit != nil {
+		patch.RPMLimit = *req.RPMLimit
+	}
+	if req.ExpiresAt != nil {
+		patch.ExpiresAt = *req.ExpiresAt
+	}
+	if req.RoutingMode != nil {
+		patch.RoutingMode = *req.RoutingMode
+	}
 	if err := config.UpdateApiKeyGuarded(id, patch); err != nil {
 		if errors.Is(err, config.ErrApiKeyLockout) {
 			writeAPIKeyLockout(w)
@@ -217,6 +281,7 @@ func (h *Handler) apiDeleteApiKey(w http.ResponseWriter, _ *http.Request, id str
 		writeAdminErr(w, http.StatusInternalServerError, err, "")
 		return
 	}
+	apiKeyRPM.forget(id)
 	publishEvent(eventAPIKeysChanged, id)
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
