@@ -316,7 +316,7 @@ func TestOutboundConnectionsReportToDetectedEntry(t *testing.T) {
 		resp.Body.Close()
 		t.Fatal("expected a failure through a closed port")
 	}
-	if d := m.View().Detected[0]; d.Health.Failures != 1 || d.Health.ErrorCode != KindConnect {
+	if d := m.View().Detected[0]; d.Health.Failures != 1 || d.Health.ErrorCode != KindConnect || !strings.HasPrefix(d.Health.LastError, "connection refused or reset: ") {
 		t.Fatalf("detected entry after a failed connection %+v", d)
 	}
 }

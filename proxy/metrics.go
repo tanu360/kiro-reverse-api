@@ -110,9 +110,27 @@ func recordRequestMetrics(rec requestRecord) {
 	h.count++
 }
 
-// recordUpstreamErrorMetric counts one failed upstream attempt by its category.
+// recordUpstreamErrorMetric counts one failed upstream attempt by its category, the
+// request log's error types.
 func recordUpstreamErrorMetric(accountID, email string, status int, message string) {
-	category := classifyRequestError(false, status, message)
+	recordUpstreamErrorCategory(accountID, email, classifyRequestError(false, status, message))
+}
+
+// recordAttemptErrorMetric is recordUpstreamErrorMetric for an attempt's error: one that
+// failed at an outbound proxy counts as a proxy error, as the attempt timeline files it,
+// even when Go's text names no proxy.
+func recordAttemptErrorMetric(account *config.Account, status int, err error) {
+	if account == nil || err == nil {
+		return
+	}
+	if _, atProxy := proxyFailureOf(account, err); atProxy {
+		recordUpstreamErrorCategory(account.ID, account.Email, errorTypeProxy)
+		return
+	}
+	recordUpstreamErrorMetric(account.ID, account.Email, status, err.Error())
+}
+
+func recordUpstreamErrorCategory(accountID, email, category string) {
 	m := metrics
 	m.mu.Lock()
 	m.errors[errorSeries{category, metricsAccount(accountID, email)}]++

@@ -1621,7 +1621,7 @@ func recordAttemptError(ctx context.Context, account *config.Account, model stri
 		return
 	}
 	traceAttemptFailed(ctx, account, status, err)
-	recordUpstreamErrorMetric(account.ID, account.Email, status, err.Error())
+	recordAttemptErrorMetric(account, status, err)
 	settleRPMPickFailure(ctx, account, err)
 	getObserveStore().RecordFailure(account.ID, model)
 	getObserveStore().RecordError(account.ID, account.Email, model, status, err.Error())

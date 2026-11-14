@@ -2,11 +2,16 @@ package proxy
 
 import (
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"kiro-proxy/config"
 )
 
 func scrape(h *Handler, token string) *httptest.ResponseRecorder {
@@ -127,10 +132,14 @@ func TestUpstreamErrorMetricCounts(t *testing.T) {
 	recordUpstreamErrorMetric("a1", "a1@example.com", http.StatusTooManyRequests, "HTTP 429 from kiro: Too many requests")
 	recordUpstreamErrorMetric("a1", "a1@example.com", http.StatusTooManyRequests, "HTTP 429 from kiro: Too many requests")
 	recordUpstreamErrorMetric("a2", "", 0, "context deadline exceeded")
+	//! An own proxy's failure reads as Go's text, which names no proxy; the timeline files it as one.
+	refused := &url.Error{Op: "Post", URL: "https://q.us-east-1.amazonaws.com/x", Err: &net.OpError{Op: "proxyconnect", Net: "tcp", Err: errors.New("connect: connection refused")}}
+	recordAttemptErrorMetric(&config.Account{ID: "a3", ProxyURL: "http://127.0.0.1:9"}, 0, refused)
 	text := h.renderMetrics()
 	for _, want := range []string{
 		`kiro_upstream_errors_total{category="quota",account="a1@example.com"} 2`,
 		`kiro_upstream_errors_total{category="timeout",account="a2"} 1`,
+		`kiro_upstream_errors_total{category="proxy",account="a3"} 1`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("metrics lack %s:\n%s", want, text)

@@ -658,6 +658,10 @@ func errorText(err error, p config.PoolProxy) string {
 		}
 		return Redact(text, p)
 	}
+	//! An own or the global proxy's failure leads with the same fixed wording, so every last error reads alike.
+	if failure, ok := Describe(err); ok {
+		return Redact(kindText(failure.Kind)+": "+err.Error(), p)
+	}
 	return Redact(err.Error(), p)
 }
 
