@@ -138,6 +138,8 @@ export function UsageBreakdownCard({
               centerLabel={t("usage.centerRequests")}
               fractionDigits={0}
               hoveredIndex={hovered}
+              // At most 176 px, against the Overview's 224: a 0.72 hole keeps its ~24 px ring.
+              innerRadius={0.72}
               onHoverChange={setHovered}
               reducedMotion={reducedMotion}
               shareLabel={t("usage.share")}

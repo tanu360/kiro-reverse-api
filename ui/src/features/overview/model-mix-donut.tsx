@@ -30,6 +30,7 @@ export default function ModelMixDonut({
   reducedMotion,
   hoveredIndex,
   onHoverChange,
+  innerRadius = 0.78,
 }: {
   slices: RingSlice[];
   centerLabel: string;
@@ -38,6 +39,11 @@ export default function ModelMixDonut({
   reducedMotion: boolean;
   hoveredIndex: number | null;
   onHoverChange: (index: number | null) => void;
+  /**
+   * The hole as a share of the radius. A smaller donut takes a smaller share, so its ring keeps
+   * the dashboard ring's thickness (about 24 px) instead of thinning with the size.
+   */
+  innerRadius?: number;
 }): JSX.Element {
   const data = useMemo(
     () => slices.map((slice) => ({ label: slice.label, value: slice.value, color: slice.color })),
@@ -54,7 +60,7 @@ export default function ModelMixDonut({
       // The ring is 22 % of the radius at any size (shadcn's donut is 25 %; 30 % read heavy with
       // the rounded, gapped slices), not a fixed 76 px hole that left a hairline ring in the
       // half-width card.
-      innerRadius={0.78}
+      innerRadius={innerRadius}
       onHoverChange={onHoverChange}
       padAngle={0.03}
     >
