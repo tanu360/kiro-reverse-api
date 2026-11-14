@@ -37,6 +37,7 @@ import { metricsQuery } from "@/lib/api/metrics";
 import { proxyPoolQuery } from "@/lib/api/proxy-pool";
 import { responseHeadersQuery } from "@/lib/api/response-headers";
 import { promptFilterQuery, proxyQuery, settingsQuery } from "@/lib/api/settings";
+import { tunnelQuery } from "@/lib/api/tunnel";
 import { twoFactorQuery } from "@/lib/api/two-factor";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,7 @@ import { MetricsCard } from "./sections/metrics-card";
 import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
+import { PublicLinkCard } from "./sections/public-link-card";
 import { ResponseHeadersCard } from "./sections/response-headers-card";
 import { RoutingCard } from "./sections/routing-card";
 import {
@@ -85,6 +87,7 @@ const SECTION_CARDS: Record<SectionId, ComponentType> = {
   "settings-thinking": ThinkingCard,
   "settings-model-mappings": ModelMappingsCard,
   "settings-endpoint": EndpointCard,
+  "settings-public-link": PublicLinkCard,
   "settings-upstream": UpstreamCard,
   "settings-outbound-proxy": OutboundProxyCard,
   "settings-proxy-pool": ProxyPoolCard,
@@ -397,6 +400,7 @@ function SectionNav({
   const promptFilter = useQuery({ ...promptFilterQuery(), enabled: onSecurity }).data;
   const twoFactor = useQuery({ ...twoFactorQuery(), enabled: onSecurity }).data;
   const metrics = useQuery({ ...metricsQuery(), enabled: onServer }).data;
+  const tunnel = useQuery({ ...tunnelQuery(), enabled: onServer }).data;
   // A section that is one switch shows its saved state as a pill in its nav row, so the page
   // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
   // A card of several controls shows On when it does anything: alerts with a channel switched
@@ -412,6 +416,7 @@ function SectionNav({
     "settings-self-heal": health?.enabled,
     "settings-two-factor": twoFactor?.enabled,
     "settings-metrics": metrics?.enabled,
+    "settings-public-link": tunnel?.enabled,
     "settings-alerts": alerts ? alerts.channels.some((channel) => channel.enabled) : undefined,
     "settings-response-headers": headers
       ? headers.headers.some((header) => header.enabled)

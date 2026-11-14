@@ -7,6 +7,7 @@ import (
 	"kiro-proxy/logger"
 	"kiro-proxy/pool"
 	"kiro-proxy/proxy"
+	"kiro-proxy/tunnel"
 	"log"
 	"net/http"
 	"os"
@@ -41,6 +42,14 @@ func main() {
 	pool.GetPool()
 
 	handler := proxy.NewHandler()
+	handler.SetTunnel(tunnel.New(tunnel.Options{
+		DataDir:  dataDir,
+		Version:  config.Version,
+		Handler:  handler,
+		OnChange: proxy.TunnelChanged,
+		Logf:     logger.Infof,
+		Debugf:   logger.Debugf,
+	}))
 
 	addr := fmt.Sprintf("%s:%d", config.GetHost(), config.GetPort())
 	if raw, ignored := config.IgnoredPortEnv(); ignored {

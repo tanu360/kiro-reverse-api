@@ -252,6 +252,9 @@ type Config struct {
 	Backup BackupConfig `json:"backup,omitempty"`
 
 	Alerts AlertsConfig `json:"alerts,omitzero"`
+
+	// Public link through Tailscale Funnel (tunnel.go); off until switched on.
+	Tunnel TunnelSettings `json:"tunnel,omitzero"`
 }
 
 type AccountInfo struct {

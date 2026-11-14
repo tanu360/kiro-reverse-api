@@ -90,3 +90,12 @@ jobs:
 
       - name: Test Go
         run: go test ./...
+
+      # The public-link helper is its own module on a newer Go; GOTOOLCHAIN=auto downloads it.
+      - name: Test tunnel helper
+        working-directory: helper/kiro-tunnel
+        env:
+          GOTOOLCHAIN: auto
+        run: |
+          go vet ./...
+          go test ./...

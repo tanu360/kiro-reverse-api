@@ -1,0 +1,151 @@
+package proxy
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"kiro-proxy/config"
+	"kiro-proxy/tunnel"
+)
+
+func setupTunnelTest(t *testing.T) *Handler {
+	t.Helper()
+	t.Setenv("ADMIN_PASSWORD", "")
+	if err := config.Init(tempDBPath(t)); err != nil {
+		t.Fatal(err)
+	}
+	config.SetPassword("admin-password")
+	return newHandlerWithoutBackgroundForTest(t)
+}
+
+func decodeTunnel(t *testing.T, rec *httptest.ResponseRecorder) tunnelResponse {
+	t.Helper()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	var got tunnelResponse
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+func TestTunnelSettingsStartOffWithTheDefaultName(t *testing.T) {
+	h := setupTunnelTest(t)
+	got := decodeTunnel(t, adminRequest(t, h, http.MethodGet, "/tunnel", ""))
+	if got.Enabled || got.State != tunnel.StateOff || got.Hostname != "kiro-proxy" || got.DefaultHostname != "kiro-proxy" {
+		t.Fatalf("got %+v", got)
+	}
+	if got.TwoFactor || got.APIKeys {
+		t.Errorf("warnings = twoFactor %v apiKeys %v, want both false on a new install", got.TwoFactor, got.APIKeys)
+	}
+}
+
+func TestTunnelSettingsSaveTheSwitchAndName(t *testing.T) {
+	h := setupTunnelTest(t)
+	got := decodeTunnel(t, adminRequest(t, h, http.MethodPost, "/tunnel", `{"enabled":true,"hostname":"my-box"}`))
+	if !got.Enabled || got.Hostname != "my-box" {
+		t.Fatalf("got %+v", got)
+	}
+	if s := config.GetTunnelSettings(); !s.Enabled || s.Hostname != "my-box" {
+		t.Fatalf("saved %+v", s)
+	}
+	// A partial update keeps the other field.
+	got = decodeTunnel(t, adminRequest(t, h, http.MethodPost, "/tunnel", `{"enabled":false}`))
+	if got.Enabled || got.Hostname != "my-box" {
+		t.Fatalf("after switching off: %+v", got)
+	}
+}
+
+func TestTunnelSettingsRefuseABadDeviceName(t *testing.T) {
+	h := setupTunnelTest(t)
+	for _, name := range []string{"", "My-Box", "-box", "box-", "a.b", "has space", "x23456789012345678901234567890123456789012345678901234567890abcd"} {
+		body, _ := json.Marshal(map[string]string{"hostname": name})
+		rec := adminRequest(t, h, http.MethodPost, "/tunnel", string(body))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("hostname %q: status %d, want 400", name, rec.Code)
+			continue
+		}
+		var e struct {
+			Code string `json:"code"`
+		}
+		_ = json.NewDecoder(rec.Body).Decode(&e)
+		if e.Code != codeTunnelHostname {
+			t.Errorf("hostname %q: code %q", name, e.Code)
+		}
+	}
+	if s := config.GetTunnelSettings(); s.Hostname != "kiro-proxy" {
+		t.Errorf("a refused name was saved: %+v", s)
+	}
+}
+
+func TestTunnelAPINeedsAdmin(t *testing.T) {
+	h := setupTunnelTest(t)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin/api/tunnel", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status %d, want 401", rec.Code)
+	}
+}
+
+func TestTunnelLogoutTurnsTheSwitchOff(t *testing.T) {
+	h := setupTunnelTest(t)
+	if err := config.UpdateTunnelSettings(config.TunnelSettings{Enabled: true, Hostname: "box"}); err != nil {
+		t.Fatal(err)
+	}
+	got := decodeTunnel(t, adminRequest(t, h, http.MethodPost, "/tunnel/logout", ""))
+	if got.Enabled || got.SignedIn {
+		t.Fatalf("got %+v", got)
+	}
+	if s := config.GetTunnelSettings(); s.Enabled || s.Hostname != "box" {
+		t.Fatalf("saved %+v", s)
+	}
+}
+
+func TestFirstRunPasswordHiddenOnThePublicLink(t *testing.T) {
+	t.Setenv("ADMIN_PASSWORD", "")
+	if err := config.Init(tempDBPath(t)); err != nil {
+		t.Fatal(err)
+	}
+	h := newHandlerWithoutBackgroundForTest(t)
+	if firstRunPassword(t, h) == "" {
+		t.Fatal("no first-run password locally")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/api/first-run", nil)
+	req = req.WithContext(tunnel.WithTunnel(req.Context()))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Password != "" {
+		t.Fatalf("the public link showed the first-run password %q", body.Password)
+	}
+}
+
+func TestPublicLinkCallsNeedAnAPIKey(t *testing.T) {
+	h := setupTunnelTest(t)
+	off := false
+	if err := config.UpdateSettingsPatch(&off, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	local := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	if _, err := h.authenticate(local); err != nil {
+		t.Fatalf("a local call without a key was refused: %v", err)
+	}
+
+	public := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	public = public.WithContext(tunnel.WithTunnel(public.Context()))
+	_, err := h.authenticate(public)
+	ae, ok := err.(*authError)
+	if !ok || ae.status != http.StatusUnauthorized {
+		t.Fatalf("a public call without a key: err %v, want a 401", err)
+	}
+}

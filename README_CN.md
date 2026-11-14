@@ -110,7 +110,7 @@
 - 账号页支持带计数的状态标签页、筛选（套餐、认证、区域、启用、标签）、按邮箱、昵称、备注与标签搜索、排序、批量操作、详情视图、连接测试、实时的每分钟请求数与今日请求数、重复账号检查与导出。
 - 请求日志支持带计数的状态标签页、搜索（也会匹配完整的 API Key）、排序、含错误分类的详情视图、追踪 ID 与每次上游尝试的时间线（账号、端点、耗时、结果、故障转移）、脱敏 API Key，以及基于 SQLite 的历史记录。 请求详情可打开所属对话（按顺序列出各轮、每轮所用账号、故障转移和合计），并把日志筛选到该对话；「**重放**」可用你选择的账号和模型再次运行一条已记录的请求（参见 [对话与重放](#-对话与重放)）。
 - 接口页管理客户端 API Key（可自定义 Key 值、启用/禁用、按 Key 设置 Token、Credits 与调用次数限额、每分钟请求数、过期时间、允许的模型、按账号或标签绑定账号、按 Key 设置路由模式、重新生成、重置用量），提供「**各 API Key 用量**」图表，以及语法高亮的接入示例生成器：为 Anthropic Messages、OpenAI Chat Completions 与 OpenAI Responses 接口生成 curl、Python、Node.js、Go、Java、PHP、Ruby 与 C# 请求代码（官方 SDK 或纯 HTTP，可选流式）及示例响应，另含 Claude Code 与 Codex 配置。
-- 设置页涵盖用量与后台刷新、账号路由（路由模式、会话亲和、单账号限额）、自动续写、工具历史、图片缩放、自动恢复、Thinking、模型映射、System Prompt 过滤、流完整性、Kiro 端点、上游域名与区域、出站代理、代理池、响应头、告警、服务器日志、管理员密码、两步验证登录、Prometheus 指标、日志保留与重置统计；备份页支持定时备份、上传与一键恢复。
+- 设置页涵盖用量与后台刷新、账号路由（路由模式、会话亲和、单账号限额）、自动续写、工具历史、图片缩放、自动恢复、Thinking、模型映射、System Prompt 过滤、流完整性、Kiro 端点、公开链接、上游域名与区域、出站代理、代理池、响应头、告警、服务器日志、管理员密码、两步验证登录、Prometheus 指标、日志保留与重置统计；备份页支持定时备份、上传与一键恢复。
 - Credits 不足、账号被封禁或没有账号可处理请求时，通过 Webhook、Telegram、Discord 或 Slack 发送告警，并可选每日用量摘要（见[告警](#-告警)）。
 - 命令菜单（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>）可快速打开页面和执行操作；隐私模式可隐藏邮箱地址；支持读取仓库 `main` 分支上的 `version.json` 检查更新。
 - 修改管理员密码会结束其他所有已登录的会话。
@@ -124,6 +124,7 @@
 - 代理池：没有自有代理的账号各自从代理池分到一个代理，支持健康检查、每个代理单独的开关、连续三次失败后转到健康代理，并把全局代理和账号代理作为「检测到的代理」一并检查（参见 [代理池](#-代理池)）。
 - 上游域名与区域（「**设置 → 上游域名与区域**」）：将对话与网络搜索发往 `runtime.{region}.kiro.dev`，而不是 `q.{region}.amazonaws.com`（用量与模型列表仍走 AWS）；还可为所有账号统一覆盖 API 区域（`us-east-1` 或 `eu-central-1`），或 Builder ID 与 IAM Identity Center 令牌的刷新区域。区域与账号不匹配时请求会失败，但账号不会因此被封禁。
 - 思考模式后缀可配置，Anthropic `thinking` 配置直通透传。
+- 公开链接：一个开关即可通过 Tailscale Funnel 把管理面板和 API 放到公网 HTTPS 地址上（例如 `https://kiro-proxy.tail1234.ts.net`），无需端口转发（参见 [公开链接](#-公开链接)）。
 
 ### 🧩 存储
 
@@ -226,6 +227,7 @@ go build -o kiro-proxy .
 | `KIRO_TOOL_MARKUP_RESCUE` | 设为 `off` 时，不再把 Kiro 混入回复文本的工具调用标记还原为工具调用 | 开启 |
 | `LOG_LEVEL`      | 日志级别：`debug`、`info`、`warn` 或 `error`（覆盖配置文件） | `info` |
 | `ADMIN_RESET_2FA` | 设为 `1` 时，启动时关闭管理员两步验证登录，用于应用和恢复码都丢失的情况。用完请移除：设置期间每次启动都会再次关闭 | — |
+| `KIRO_TUNNEL_BIN` | 公开链接辅助程序的路径，设置后直接运行它而不再下载。Docker 镜像已设置 | — |
 
 > [!WARNING]
 > `kiro.db` 包含 OAuth 令牌与管理员凭证。请按敏感信息处理，切勿提交到 git、截图或聊天记录中。数据库目录请挂载为私有卷。
@@ -375,6 +377,25 @@ Kiro 没有 JSON 模式，因此代理会要求模型输出 JSON，去掉代码�
 
 ---
 
+## 🌍 公开链接
+
+「**设置 → 公开链接**」通过 [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel) 把本服务器（管理面板和 API）放到公网 HTTPS 地址上。Windows、macOS、Linux 和 Docker 均可使用，无需端口转发。
+
+1. 打开「**公开 HTTPS 链接**」。代理会从当前版本的 GitHub Release 下载 Tailscale 辅助程序 `kiro-tunnel`（约 8 MB），并用内置在代理中的 SHA-256 校验。Docker 镜像已自带该辅助程序。
+2. 点击「**登录 Tailscale**」，用免费的 Tailscale 账号登录。服务器会以名为 `kiro-proxy` 的设备加入你的 tailnet；可在「**设备名称**」中修改。
+3. 首次使用时点击「**开启 Funnel**」，一步为你的 tailnet 开启 HTTPS 和 Funnel。
+4. 卡片会显示链接，例如 `https://kiro-proxy.tail1234.ts.net`。重启后链接不变。
+
+拿到链接的任何人都能访问登录页和 API，而且 Funnel 域名会出现在公开的证书日志中，所以爬虫一定会找到它。经由该链接时：
+
+- 每个客户端 API 调用都必须带 API Key，即使关闭了「**要求 API Key**」。
+- 首次运行密码永远不会显示：请先设置你自己的管理员密码。
+- 登录锁定按每个访问者自己的地址计算。
+
+分享链接前请先开启两步验证登录。「**退出 Tailscale**」会把设备从你的 tailnet 移除并清除登录状态（保存在 `DATA_DIR` 下的 `tailscale/`）。Tailscale 的日志上传保持关闭。Funnel 自身也有限制：只能用 `*.ts.net` 域名，有 Tailscale 未公布的带宽上限，免费套餐仅限个人使用。
+
+---
+
 ## 🔐 两步验证登录
 
 「**设置 → 两步验证登录**」在输入管理员密码后，还要求输入身份验证器应用（Google Authenticator、1Password、Aegis 等）中的 6 位验证码。
@@ -444,6 +465,7 @@ Kiro 没有 JSON 模式，因此代理会要求模型输出 JSON，去掉代码�
 | `KIRO_TOOL_MARKUP_RESCUE` | 设为 `off` 时，不再把 Kiro 混入回复文本的工具调用标记还原为工具调用 | 开启 |
 | `LOG_LEVEL`      | 日志级别：`debug`、`info`、`warn` 或 `error`（覆盖配置文件） | `info` |
 | `ADMIN_RESET_2FA` | 设为 `1` 时，启动时关闭管理员两步验证登录，用于应用和恢复码都丢失的情况。用完请移除：设置期间每次启动都会再次关闭 | — |
+| `KIRO_TUNNEL_BIN` | 公开链接辅助程序的路径，设置后直接运行它而不再下载。Docker 镜像已设置 | — |
 
 ```diff
 + kiro.db                # local state — config, credentials, SQLite history, backup blobs

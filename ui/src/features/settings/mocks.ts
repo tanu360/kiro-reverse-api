@@ -1,5 +1,6 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
 import type { ResponseHeaderRule } from "@/lib/api/response-headers";
+import { TUNNEL_HOSTNAME, type TunnelStatus } from "@/lib/api/tunnel";
 import type {
   ApiDomain,
   LogLevel,
@@ -331,6 +332,47 @@ function responseHeaderReason(code: string, index: number, name: string, variabl
   }
 }
 
+/** Tailscale's sign-in page in the walked flow: a fake one, opened in a new tab. */
+const MOCK_TAILSCALE_AUTH_URL = "https://login.tailscale.com/a/1a2b3c4d5e6f";
+
+/**
+ * GET /tunnel. A pinned status (tests) shows as is; otherwise the link walks the real flow by
+ * time: download 4 s, connect 1 s, then Tailscale's sign-in for 15 s (the mock "signs in" on its
+ * own), then live. A device already signed in connects for 1.5 s and goes live.
+ */
+function tunnelStatus(): TunnelStatus {
+  const tunnel = mockDb.tunnel;
+  const base = {
+    enabled: tunnel.enabled,
+    hostname: tunnel.hostname,
+    defaultHostname: "kiro-proxy",
+    signedIn: tunnel.signedIn,
+    twoFactor: mockDb.twoFactor.enabled,
+    apiKeys: mockDb.apiKeys.some((key) => key.enabled),
+  };
+  if (tunnel.pinned) return { ...base, state: "off", ...tunnel.pinned };
+  if (!tunnel.enabled) return { ...base, state: "off" };
+  const elapsed = Date.now() - tunnel.since;
+  if (!tunnel.signedIn) {
+    if (elapsed < 4000) {
+      return { ...base, state: "downloading", progress: Math.round(elapsed / 40) };
+    }
+    if (elapsed < 5000) return { ...base, state: "starting" };
+    if (elapsed < 20_000) {
+      return { ...base, state: "needs-login", authURL: MOCK_TAILSCALE_AUTH_URL };
+    }
+    tunnel.signedIn = true;
+  } else if (elapsed < 1500) {
+    return { ...base, state: "starting" };
+  }
+  return {
+    ...base,
+    signedIn: true,
+    state: "running",
+    url: `https://${tunnel.hostname}.tail1234.ts.net`,
+  };
+}
+
 export const handlers: HttpHandler[] = [
   http.get(apiUrl("/settings"), async ({ request }) => {
     const denied = requireAuth(request);
@@ -606,6 +648,50 @@ export const handlers: HttpHandler[] = [
       mockDb.metrics.token = `kpm_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
     }
     return HttpResponse.json({ ...mockDb.metrics, path: "/metrics" });
+  }),
+
+  http.get(apiUrl("/tunnel"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    return HttpResponse.json(tunnelStatus());
+  }),
+
+  // proxy/tunnel_api.go: a new device name restarts a running link.
+  http.post(apiUrl("/tunnel"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const body = await readObject(request);
+    const enabled = body ? optional(body, "enabled", isBool) : null;
+    const hostname = body ? optional(body, "hostname", isString) : null;
+    if (enabled === null || hostname === null) return invalidJson();
+    const tunnel = mockDb.tunnel;
+    if (hostname !== undefined && !TUNNEL_HOSTNAME.test(hostname)) {
+      return jsonError(
+        400,
+        "hostname must be 1 to 63 lowercase letters, digits or hyphens, starting and ending with a letter or digit",
+        { code: "tunnel_hostname" },
+      );
+    }
+    const restart =
+      (enabled === true && !tunnel.enabled) ||
+      (hostname !== undefined && hostname !== tunnel.hostname && tunnel.enabled);
+    if (enabled !== undefined) tunnel.enabled = enabled;
+    if (hostname !== undefined) tunnel.hostname = hostname;
+    if (restart) tunnel.since = Date.now();
+    tunnel.pinned = null;
+    publishMockEvent("settings_changed", "tunnel");
+    return HttpResponse.json(tunnelStatus());
+  }),
+
+  http.post(apiUrl("/tunnel/logout"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    Object.assign(mockDb.tunnel, { enabled: false, signedIn: false, pinned: null });
+    publishMockEvent("settings_changed", "tunnel");
+    return HttpResponse.json(tunnelStatus());
   }),
 
   http.get(apiUrl("/proxy"), async ({ request }) => {

@@ -3,11 +3,17 @@
 # files and README, then writes SHA256SUMS.txt. The release workflow runs this exact script, so a
 # local run proves what CI will publish.
 #
+# Each target also gets the public-link helper, kiro-tunnel-<platform>.gz (helper/kiro-tunnel, its
+# own Go module). The proxy downloads it only when its "Public link" switch goes on, and checks it
+# against the helper's SHA-256, which this script builds into that platform's kiro-proxy. The
+# helper needs a newer Go than the proxy: it builds with GOTOOLCHAIN=$TUNNEL_GOTOOLCHAIN, or the
+# version its go.mod names, which the go command downloads when it is not installed.
+#
 # Usage: build-release.sh <out-dir>
 #
 # Build the admin UI first (cd ui && pnpm build): the binary embeds ui/dist. The script refuses to
 # package a binary without it, unless ALLOW_MISSING_UI=1, which is for local compile checks only.
-# Needs Go, GNU tar, gzip, zip and sha256sum (a Linux host, as on the GitHub runner).
+# Needs Go, GNU tar, gzip, zip, sha256sum and jq (a Linux host, as on the GitHub runner).
 set -euo pipefail
 
 if [ "$#" -ne 1 ] || [ -z "$1" ]; then
@@ -31,6 +37,9 @@ if [ ! -f ui/dist/index.html ] && [ "${ALLOW_MISSING_UI:-}" != 1 ]; then
 fi
 
 docs=(LICENSE THIRD_PARTY_NOTICES.md README.md)
+version="$(jq -r .version version.json)"
+helper_go="go$(awk '$1 == "go" { print $2; exit }' helper/kiro-tunnel/go.mod)"
+helper_toolchain="${TUNNEL_GOTOOLCHAIN:-$helper_go}"
 targets=(linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64)
 
 # Every archive entry gets the release commit's time, so two builds of one commit give the same
@@ -54,12 +63,20 @@ for target in "${targets[@]}"; do
   bin=kiro-proxy
   [ "$os" = windows ] && bin=kiro-proxy.exe
 
+  echo "building kiro-tunnel-$platform"
+  helper="$stage/kiro-tunnel-$platform"
+  (cd helper/kiro-tunnel && GOTOOLCHAIN="$helper_toolchain" GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 \
+    go build -trimpath -ldflags="-s -w -X main.version=$version" -o "$helper" .)
+  helper_sum="$(sha256sum "$helper" | cut -d' ' -f1)"
+  # gzip -n leaves out the name and time, so the asset's checksum depends on the bytes only.
+  gzip -9n <"$helper" >"$out/kiro-tunnel-$platform.gz"
+
   echo "building $name"
   mkdir -p "$stage/$name"
   # Same build as the Docker image (CGO_ENABLED=0, version from config.Version), minus debug
-  # symbols and local paths.
+  # symbols and local paths, plus the checksum of this platform's helper.
   GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 \
-    go build -trimpath -ldflags="-s -w" -o "$stage/$name/$bin" .
+    go build -trimpath -ldflags="-s -w -X kiro-proxy/tunnel.helperSHA256=$helper_sum" -o "$stage/$name/$bin" .
   cp "${docs[@]}" "$stage/$name/"
   chmod 0755 "$stage/$name" "$stage/$name/$bin"
   chmod 0644 "${docs[@]/#/$stage/$name/}"
@@ -75,8 +92,8 @@ for target in "${targets[@]}"; do
   fi
 done
 
-(cd "$out" && sha256sum kiro-proxy-* >SHA256SUMS.txt)
+(cd "$out" && sha256sum kiro-proxy-* kiro-tunnel-* >SHA256SUMS.txt)
 
 echo
 echo "release assets in $out:"
-(cd "$out" && ls -l kiro-proxy-* SHA256SUMS.txt)
+(cd "$out" && ls -l kiro-proxy-* kiro-tunnel-* SHA256SUMS.txt)

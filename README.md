@@ -110,7 +110,7 @@ If this project helps you, a Star would mean a lot.
 - Accounts with status tabs and counts, filters (plan, auth, region, enabled, tag), search over email, nickname, notes and tags, sorting, batch actions, a detail view, connection tests, live requests per minute and today, a duplicates review, and export.
 - Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history. A request's detail opens its conversation (the turns in order, the account each used, failovers and totals) and filters the log to it, and **Replay** runs a logged request again on an account and model you choose (see [Conversations and replay](#-conversations-and-replay)).
 - API page with client API key management (optional custom key values, enable/disable, per-key token, credit and call limits, requests per minute, an expiry time, allowed models, account binding by account or tag, a routing mode per key, regenerate, usage reset), a **Usage by key** chart, and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
-- Settings for usage and background refresh, routing (mode, session affinity, per-account limit), auto-continue, tool history, image resizing, self-heal, thinking, model mappings, prompt filter, stream integrity, endpoint, upstream domain and region, outbound proxy, proxy pool, response headers, alerts, server log, admin password, two-factor sign-in, Prometheus metrics, log retention, and statistics reset; Backups with a schedule, upload, and one-click restore.
+- Settings for usage and background refresh, routing (mode, session affinity, per-account limit), auto-continue, tool history, image resizing, self-heal, thinking, model mappings, prompt filter, stream integrity, endpoint, public link, upstream domain and region, outbound proxy, proxy pool, response headers, alerts, server log, admin password, two-factor sign-in, Prometheus metrics, log retention, and statistics reset; Backups with a schedule, upload, and one-click restore.
 - Alerts to a webhook, Telegram, Discord or Slack when credits run low, an account is banned, or no account can serve requests, and an optional daily usage summary (see [Alerts](#-alerts)).
 - Command menu (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) for pages and actions, privacy mode that masks email addresses, and an update check that reads `version.json` from the repo's `main` branch.
 - Changing the admin password ends every other signed-in session.
@@ -124,6 +124,7 @@ If this project helps you, a Star would mean a lot.
 - Proxy pool: accounts without a proxy of their own each get one from a pool, with health checks, an on/off switch per proxy, a move to a healthy proxy after three failures in a row, and the global and account proxies checked as detected entries (see [Proxy pool](#-proxy-pool)).
 - Upstream domain and region (**Settings → Upstream domain & region**): send chat and web search to `runtime.{region}.kiro.dev` instead of `q.{region}.amazonaws.com` (usage and model lists stay on AWS), and override, for every account, the API region (`us-east-1` or `eu-central-1`) or the region Builder ID and IAM Identity Center tokens are refreshed in. A region that does not match an account makes its requests fail, but never bans the account.
 - Configurable thinking-mode suffix and Anthropic `thinking` config passthrough.
+- Public link: one switch puts the admin panel and the API on a public HTTPS address such as `https://kiro-proxy.tail1234.ts.net` through Tailscale Funnel, with no port forwarding (see [Public link](#-public-link)).
 
 ### 🧩 Storage
 
@@ -226,6 +227,7 @@ Admin password authentication allows five failed attempts per client per minute,
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 | `LOG_LEVEL`      | Log level: `debug`, `info`, `warn`, or `error` (overrides config) | `info` |
 | `ADMIN_RESET_2FA` | Set to `1` to turn admin two-factor sign-in off at start, if you lost the app and the recovery codes. Remove it afterwards: while it is set, each start turns it off again | — |
+| `KIRO_TUNNEL_BIN` | Public-link helper to run instead of downloading it. The Docker image sets it | — |
 
 > [!WARNING]
 > `kiro.db` holds OAuth tokens and admin credentials. Treat it as secret — keep it out of git, screenshots, and chat threads. Mount the database directory as a private volume.
@@ -375,6 +377,25 @@ The order is: the account's own proxy, the pool, the global proxy, then direct. 
 
 ---
 
+## 🌍 Public Link
+
+**Settings → Public link** puts this server, the admin panel and the API, on a public HTTPS address through [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel). It works on Windows, macOS, Linux and Docker, with no port forwarding.
+
+1. Turn on **Public HTTPS link**. The proxy downloads its Tailscale helper, `kiro-tunnel` (about 8 MB), from this version's GitHub release and checks it against a SHA-256 built into the proxy. The Docker image already carries the helper.
+2. Select **Sign in to Tailscale** and sign in with a free Tailscale account. The server joins your tailnet as a device named `kiro-proxy`; **Device name** changes it.
+3. The first time, select **Turn on Funnel**. It turns on HTTPS and Funnel for your tailnet in one step.
+4. The card shows the link, such as `https://kiro-proxy.tail1234.ts.net`. It stays the same after a restart.
+
+Anyone with the link reaches the sign-in page and the API, and Funnel names appear in public certificate logs, so bots will find it. Through the link:
+
+- Every client API call needs an API key, even with **Require an API key** off.
+- The first-run password is never shown: set your own admin password first.
+- The sign-in lockout counts each visitor's own address.
+
+Turn on two-factor sign-in before you share the link. **Sign out of Tailscale** removes the device from your tailnet and forgets the sign-in, which is kept in `tailscale/` under `DATA_DIR`. Tailscale's log upload stays off. Funnel has limits of its own: only `*.ts.net` names, a bandwidth cap that Tailscale does not publish, and a free plan for personal use only.
+
+---
+
 ## 🔐 Two-Factor Sign-In
 
 **Settings → Two-factor sign-in** asks for a six-digit code from an authenticator app (Google Authenticator, 1Password, Aegis and the like) after the admin password.
@@ -444,6 +465,7 @@ Nothing is checked until a channel is on, and **Send test** tries a channel once
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 | `LOG_LEVEL`      | Log level: `debug`, `info`, `warn`, or `error` (overrides config) | `info` |
 | `ADMIN_RESET_2FA` | Set to `1` to turn admin two-factor sign-in off at start, if you lost the app and the recovery codes. Remove it afterwards: while it is set, each start turns it off again | — |
+| `KIRO_TUNNEL_BIN` | Public-link helper to run instead of downloading it. The Docker image sets it | — |
 
 ```diff
 + kiro.db                # local state — config, credentials, SQLite history, backup blobs

@@ -11,6 +11,7 @@ import {
   FirstAidKitIcon,
   GlobalIcon,
   Image01Icon,
+  Link04Icon,
   Location01Icon,
   LockPasswordIcon,
   NetworkIcon,
@@ -88,6 +89,12 @@ export const SETTINGS_SECTIONS = [
     id: "settings-endpoint",
     titleKey: "endpointSettings",
     icon: CloudServerIcon,
+    group: "connection",
+  },
+  {
+    id: "settings-public-link",
+    titleKey: "publicLink.title",
+    icon: Link04Icon,
     group: "connection",
   },
   {
@@ -216,6 +223,7 @@ export const SECTION_ID = {
   thinking: "settings-thinking",
   modelMappings: "settings-model-mappings",
   endpoint: "settings-endpoint",
+  publicLink: "settings-public-link",
   upstream: "settings-upstream",
   adminPassword: "settings-admin-password",
   twoFactor: "settings-two-factor",

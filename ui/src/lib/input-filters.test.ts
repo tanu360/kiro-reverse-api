@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deviceNameChars,
   digitsOnly,
   headerNameChars,
   hexChars,
@@ -17,5 +18,7 @@ describe("input filters", () => {
     expect(hexChars("6F1d-zz9x")).toBe("6F1d-9");
     expect(headerNameChars("X Trace:Id/é")).toBe("XTraceId");
     expect(recoveryCodeChars(" k7xq2 m9fd4.")).toBe("k7xq2m9fd4");
+    expect(deviceNameChars(" Kiro_Proxy.2 ")).toBe("kiroproxy2");
+    expect(deviceNameChars("a".repeat(70))).toHaveLength(63);
   });
 });

@@ -15,6 +15,7 @@ import (
 	"kiro-proxy/pool"
 	"kiro-proxy/proxypool"
 	"kiro-proxy/textfmt"
+	"kiro-proxy/tunnel"
 	"math"
 	"net/http"
 	"strings"
@@ -31,6 +32,8 @@ const tokenRefreshSkewSeconds int64 = 120
 type Handler struct {
 	adminGuesses adminGuessLimiter
 	pool         *pool.AccountPool
+	// tunnel runs the public link; nil until main attaches it (tunnel_api.go).
+	tunnel *tunnel.Manager
 
 	startTime      int64
 	stopRefresh    chan struct{}
@@ -2614,7 +2617,12 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 	if path == "/first-run" && r.Method == "GET" {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		json.NewEncoder(w).Encode(map[string]string{"password": config.FirstRunPassword()})
+		password := config.FirstRunPassword()
+		//! Only this machine sees the first-run password; the public link is the internet.
+		if tunnel.FromTunnel(r) {
+			password = ""
+		}
+		json.NewEncoder(w).Encode(map[string]string{"password": password})
 		return
 	}
 
@@ -2843,6 +2851,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiMetricsSettings(w, r)
 	case path == "/two-factor" || strings.HasPrefix(path, "/two-factor/"):
 		h.handleTwoFactorAPI(w, r, strings.TrimPrefix(path, "/two-factor"))
+	case path == "/tunnel" || strings.HasPrefix(path, "/tunnel/"):
+		h.handleTunnelAPI(w, r, strings.TrimPrefix(path, "/tunnel"))
 	default:
 		w.WriteHeader(404)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Not Found"})

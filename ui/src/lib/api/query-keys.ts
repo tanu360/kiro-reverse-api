@@ -60,6 +60,7 @@ export const queryKeys = {
     responseHeaders: () => ["settings", "response-headers"] as const,
     twoFactor: () => ["settings", "two-factor"] as const,
     metrics: () => ["settings", "metrics"] as const,
+    tunnel: () => ["settings", "tunnel"] as const,
   },
   backups: {
     all: ["backups"] as const,

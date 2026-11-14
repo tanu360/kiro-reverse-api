@@ -110,7 +110,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - Tài khoản với tab trạng thái kèm số lượng, bộ lọc (gói, xác thực, khu vực, bật, thẻ), tìm kiếm theo email, biệt danh, ghi chú và thẻ, sắp xếp, thao tác hàng loạt, chế độ xem chi tiết, kiểm tra kết nối, số yêu cầu mỗi phút và hôm nay theo thời gian thực, xem lại tài khoản trùng lặp và xuất.
 - Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, Mã truy vết và dòng thời gian của từng lần thử upstream (tài khoản, endpoint, thời lượng, kết quả, failover), API key được che và lịch sử lưu trong SQLite. Chi tiết một yêu cầu mở được cuộc hội thoại của nó (các lượt theo thứ tự, tài khoản của từng lượt, các lần chuyển dự phòng và tổng cộng) và lọc nhật ký theo hội thoại đó; **Chạy lại** chạy lại một yêu cầu đã ghi trên tài khoản và model bạn chọn (xem [Hội thoại và chạy lại](#-hội-thoại-và-chạy-lại)).
 - Trang API quản lý API key của client (giá trị key tùy chỉnh không bắt buộc, bật/tắt, giới hạn token, credit và lượt gọi cho từng key, số yêu cầu mỗi phút, thời gian hết hạn, model được phép, gắn key với tài khoản theo từng tài khoản hoặc theo thẻ, chế độ định tuyến riêng cho từng key, tạo lại key, đặt lại mức sử dụng), biểu đồ **Mức sử dụng theo key** và trình tạo mã thiết lập client có tô sáng cú pháp: mã gọi các API Anthropic Messages, OpenAI Chat Completions và OpenAI Responses bằng curl, Python, Node.js, Go, Java, PHP, Ruby và C# (SDK chính thức hoặc HTTP thuần, có hoặc không stream) kèm phản hồi mẫu, cùng cấu hình Claude Code và Codex.
-- Cài đặt cho mức sử dụng và làm mới trong nền, định tuyến (chế độ, giữ hội thoại, giới hạn mỗi tài khoản), tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, tự phục hồi, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, tên miền và khu vực Kiro, proxy outbound, nhóm proxy, header phản hồi, cảnh báo, nhật ký máy chủ, mật khẩu quản trị, đăng nhập hai bước, chỉ số Prometheus, lưu giữ nhật ký và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
+- Cài đặt cho mức sử dụng và làm mới trong nền, định tuyến (chế độ, giữ hội thoại, giới hạn mỗi tài khoản), tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, tự phục hồi, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, liên kết công khai, tên miền và khu vực Kiro, proxy outbound, nhóm proxy, header phản hồi, cảnh báo, nhật ký máy chủ, mật khẩu quản trị, đăng nhập hai bước, chỉ số Prometheus, lưu giữ nhật ký và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
 - Cảnh báo qua webhook, Telegram, Discord hoặc Slack khi sắp hết credit, khi tài khoản bị cấm hoặc khi không còn tài khoản nào phục vụ được yêu cầu, cùng bản tóm tắt sử dụng hằng ngày tùy chọn (xem [Cảnh báo](#-cảnh-báo)).
 - Menu lệnh (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) để mở trang và chạy thao tác, chế độ riêng tư ẩn địa chỉ email, và kiểm tra cập nhật qua `version.json` trên nhánh `main` của repo.
 - Đổi mật khẩu quản trị sẽ kết thúc mọi phiên đăng nhập khác.
@@ -124,6 +124,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - Nhóm proxy: mỗi tài khoản không có proxy riêng được gán một proxy trong nhóm, có kiểm tra tình trạng, công tắc bật/tắt cho từng proxy, chuyển sang proxy hoạt động tốt sau ba lần lỗi liên tiếp, và proxy chung cùng proxy riêng của tài khoản được kiểm tra như các mục phát hiện được (xem [Nhóm proxy](#-nhóm-proxy)).
 - Tên miền và khu vực Kiro (**Cài đặt → Tên miền và khu vực Kiro**): gửi chat và tìm kiếm web tới `runtime.{region}.kiro.dev` thay vì `q.{region}.amazonaws.com` (mức sử dụng và danh sách model vẫn đi qua AWS), và ghi đè cho mọi tài khoản khu vực API (`us-east-1` hoặc `eu-central-1`) hoặc khu vực dùng để làm mới token Builder ID và IAM Identity Center. Khu vực không khớp với tài khoản khiến yêu cầu của tài khoản đó thất bại, nhưng không bao giờ làm tài khoản bị cấm.
 - Hậu tố chế độ thinking có thể tùy chỉnh và chuyển tiếp nguyên cấu hình `thinking` của Anthropic.
+- Liên kết công khai: một công tắc đưa bảng quản trị và API lên một địa chỉ HTTPS công khai như `https://kiro-proxy.tail1234.ts.net` qua Tailscale Funnel, không cần chuyển tiếp cổng (xem [Liên kết công khai](#-liên-kết-công-khai)).
 
 ### 🧩 Lưu trữ
 
@@ -226,6 +227,7 @@ Xác thực bằng mật khẩu quản trị cho phép năm lần thử sai cho 
 | `KIRO_TOOL_MARKUP_RESCUE` | Đặt `off` để ngừng chuyển markup lệnh gọi tool mà Kiro để lọt vào văn bản câu trả lời trở lại thành lệnh gọi tool | on |
 | `LOG_LEVEL`      | Mức log: `debug`, `info`, `warn` hoặc `error` (ghi đè cấu hình) | `info` |
 | `ADMIN_RESET_2FA` | Đặt `1` để tắt đăng nhập hai bước của quản trị khi khởi động, nếu bạn mất cả ứng dụng lẫn mã khôi phục. Gỡ đi sau đó: khi còn đặt, mỗi lần khởi động sẽ tắt lại | — |
+| `KIRO_TUNNEL_BIN` | Chương trình hỗ trợ liên kết công khai để chạy thay vì tải về. Image Docker đã đặt sẵn | — |
 
 > [!WARNING]
 > `kiro.db` chứa OAuth token và thông tin đăng nhập quản trị. Hãy giữ bí mật tệp này — không đưa vào git, ảnh chụp màn hình hay các cuộc trò chuyện. Gắn thư mục cơ sở dữ liệu dưới dạng volume riêng tư.
@@ -375,6 +377,25 @@ Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi
 
 ---
 
+## 🌍 Liên kết công khai
+
+**Cài đặt → Liên kết công khai** đưa máy chủ này, gồm bảng quản trị và API, lên một địa chỉ HTTPS công khai qua [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel). Dùng được trên Windows, macOS, Linux và Docker, không cần chuyển tiếp cổng.
+
+1. Bật **Liên kết HTTPS công khai**. Proxy tải chương trình hỗ trợ Tailscale `kiro-tunnel` (khoảng 8 MB) từ bản phát hành GitHub của phiên bản này và kiểm tra nó bằng một SHA-256 có sẵn trong proxy. Image Docker đã kèm sẵn chương trình này.
+2. Chọn **Đăng nhập Tailscale** và đăng nhập bằng một tài khoản Tailscale miễn phí. Máy chủ tham gia tailnet của bạn dưới dạng thiết bị tên `kiro-proxy`; đổi tên ở **Tên thiết bị**.
+3. Lần đầu, chọn **Bật Funnel**. Bước này bật HTTPS và Funnel cho tailnet của bạn trong một lần.
+4. Thẻ hiển thị liên kết, ví dụ `https://kiro-proxy.tail1234.ts.net`. Liên kết giữ nguyên sau khi khởi động lại.
+
+Bất kỳ ai có liên kết đều vào được trang đăng nhập và API, và tên Funnel xuất hiện trong nhật ký chứng chỉ công khai, nên bot sẽ tìm thấy nó. Qua liên kết:
+
+- Mọi lệnh gọi API của client đều cần API key, kể cả khi **Bắt buộc API key** đang tắt.
+- Mật khẩu lần chạy đầu không bao giờ hiện: hãy đặt mật khẩu quản trị của riêng bạn trước.
+- Khóa đăng nhập tính theo địa chỉ riêng của từng khách truy cập.
+
+Hãy bật đăng nhập hai bước trước khi chia sẻ liên kết. **Đăng xuất Tailscale** gỡ thiết bị khỏi tailnet của bạn và xóa phiên đăng nhập, vốn được lưu trong `tailscale/` dưới `DATA_DIR`. Việc tải nhật ký lên Tailscale luôn tắt. Funnel cũng có giới hạn riêng: chỉ dùng tên `*.ts.net`, có giới hạn băng thông mà Tailscale không công bố, và gói miễn phí chỉ dành cho cá nhân.
+
+---
+
 ## 🔐 Đăng nhập hai bước
 
 **Cài đặt → Đăng nhập hai bước** yêu cầu mã sáu chữ số từ ứng dụng xác thực (Google Authenticator, 1Password, Aegis và các ứng dụng tương tự) sau mật khẩu quản trị.
@@ -444,6 +465,7 @@ Không có gì được kiểm tra khi chưa bật kênh nào, và **Gửi thử
 | `KIRO_TOOL_MARKUP_RESCUE` | Đặt `off` để ngừng chuyển markup lệnh gọi tool mà Kiro để lọt vào văn bản câu trả lời trở lại thành lệnh gọi tool | on |
 | `LOG_LEVEL`      | Mức log: `debug`, `info`, `warn` hoặc `error` (ghi đè cấu hình) | `info` |
 | `ADMIN_RESET_2FA` | Đặt `1` để tắt đăng nhập hai bước của quản trị khi khởi động, nếu bạn mất cả ứng dụng lẫn mã khôi phục. Gỡ đi sau đó: khi còn đặt, mỗi lần khởi động sẽ tắt lại | — |
+| `KIRO_TUNNEL_BIN` | Chương trình hỗ trợ liên kết công khai để chạy thay vì tải về. Image Docker đã đặt sẵn | — |
 
 ```diff
 + kiro.db                # local state — config, credentials, SQLite history, backup blobs

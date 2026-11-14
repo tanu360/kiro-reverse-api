@@ -34,3 +34,14 @@ export function headerNameChars(value: string): string {
 export function recoveryCodeChars(value: string): string {
   return value.replace(/[^0-9A-Za-z-]/g, "");
 }
+
+/**
+ * A device name, one DNS label ("kiro-proxy"): lowercase letters, digits and hyphens, at most 63
+ * of them. Capitals are lowered as they are typed.
+ */
+export function deviceNameChars(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 63);
+}

@@ -104,6 +104,19 @@ jobs:
       - name: Show Go version
         run: go version
 
+      # The public-link helper (helper/kiro-tunnel) is its own module and needs the newer Go that
+      # Tailscale asks for. Build it with the newest patch of its go.mod minor, which the go
+      # command downloads through GOTOOLCHAIN; fall back to the exact go.mod version when go.dev
+      # no longer lists that minor.
+      - name: Pick the helper's Go version
+        run: |
+          exact="$(awk '$1 == "go" { print $2; exit }' helper/kiro-tunnel/go.mod)"
+          minor="$(echo "$exact" | cut -d. -f1,2)"
+          latest="$(curl -fsS 'https://go.dev/dl/?mode=json' |
+            jq -r --arg p "go$minor." '[.[] | select(.stable) | .version | select(startswith($p))][0] // empty' || true)"
+          echo "TUNNEL_GOTOOLCHAIN=${latest:-go$exact}" >> "$GITHUB_ENV"
+          echo "helper toolchain: ${latest:-go$exact}"
+
       # The binary reports config.Version, compiled from source as in the Docker image. Refuse a
       # tag that names another version, and keep version.json equal to config.Version.
       - name: Check version
@@ -144,7 +157,9 @@ jobs:
 
       # A main push can release before CI on the same commit finishes, so the Go tests run here too.
       - name: Test Go
-        run: go test ./...
+        run: |
+          go test ./...
+          (cd helper/kiro-tunnel && GOTOOLCHAIN="$TUNNEL_GOTOOLCHAIN" go test ./...)
 
       - name: Build binaries
         run: .github/scripts/build-release.sh "$RUNNER_TEMP/release"
@@ -171,6 +186,10 @@ jobs:
             echo "::error::The binary reports version $got, version.json says $want"
             exit 1
           fi
+          # The helper starts and speaks the protocol this proxy expects.
+          gunzip -c "$RUNNER_TEMP/release/kiro-tunnel-linux-x64.gz" >"$smoke/kiro-tunnel"
+          chmod 0755 "$smoke/kiro-tunnel"
+          "$smoke/kiro-tunnel" version | tee /dev/stderr | grep -q "kiro-tunnel $want (protocol 1)"
 
       - name: Upload binaries
         uses: actions/upload-artifact@v7
@@ -219,9 +238,9 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
         run: |
           shopt -s nullglob
-          assets=("$RUNNER_TEMP"/release/kiro-proxy-* "$RUNNER_TEMP/release/SHA256SUMS.txt")
-          if [ "${#assets[@]}" -ne 7 ]; then
-            echo "::error::Expected 6 archives and SHA256SUMS.txt, found ${#assets[@]} files"
+          assets=("$RUNNER_TEMP"/release/kiro-proxy-* "$RUNNER_TEMP"/release/kiro-tunnel-* "$RUNNER_TEMP/release/SHA256SUMS.txt")
+          if [ "${#assets[@]}" -ne 13 ]; then
+            echo "::error::Expected 6 archives, 6 helpers and SHA256SUMS.txt, found ${#assets[@]} files"
             exit 1
           fi
 

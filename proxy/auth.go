@@ -8,6 +8,7 @@ import (
 
 	"kiro-proxy/config"
 	"kiro-proxy/pool"
+	"kiro-proxy/tunnel"
 )
 
 type apiKeyContextKey struct{}
@@ -61,7 +62,9 @@ func extractProvidedKey(r *http.Request) string {
 }
 
 func (h *Handler) authenticate(r *http.Request) (*config.ApiKeyEntry, error) {
-	if !config.IsApiKeyRequired() {
+	//! A call through the public link is from the internet: it needs a key even when this
+	//! machine's own clients may call without one.
+	if !config.IsApiKeyRequired() && !tunnel.FromTunnel(r) {
 		return nil, nil
 	}
 

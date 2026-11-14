@@ -253,6 +253,21 @@ func HasApiKeys() bool {
 	return cfg != nil && len(cfg.ApiKeys) > 0
 }
 
+// HasEnabledApiKey reports whether any client key can make a call right now.
+func HasEnabledApiKey() bool {
+	cfgLock.RLock()
+	defer cfgLock.RUnlock()
+	if cfg == nil {
+		return false
+	}
+	for _, key := range cfg.ApiKeys {
+		if key.Enabled {
+			return true
+		}
+	}
+	return false
+}
+
 func RecordApiKeyUsage(id string, tokens int64, credits float64) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()

@@ -110,7 +110,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Contas com abas de status e contagens, filtros (plano, autenticação, região, ligada, tag), busca por e-mail, apelido, notas e tags, ordenação, ações em lote, visão de detalhes, testes de conexão, requisições por minuto e de hoje ao vivo, revisão de duplicadas e exportação.
 - Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite. O detalhe de uma requisição abre a conversa dela (os turnos em ordem, a conta de cada um, as trocas de conta e os totais) e filtra o log por ela, e **Repetir** roda uma requisição registrada de novo numa conta e num modelo que você escolher (veja [Conversas e repetição](#-conversas-e-repetição)).
 - Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens, créditos e chamadas por chave, requisições por minuto, horário de expiração, modelos permitidos, vínculo com contas por conta ou por tag, modo de roteamento por chave, gerar nova chave, redefinição de uso), um gráfico **Uso por chave** e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
-- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), continuação automática, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, log do servidor, senha de administrador, login em duas etapas, métricas do Prometheus, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
+- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), continuação automática, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, link público, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, log do servidor, senha de administrador, login em duas etapas, métricas do Prometheus, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
 - Alertas para webhook, Telegram, Discord ou Slack quando os créditos estão acabando, uma conta é banida ou nenhuma conta consegue atender requisições, e um resumo diário de uso opcional (veja [Alertas](#-alertas)).
 - Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações pelo `version.json` da branch `main` do repositório.
 - Alterar a senha de administrador encerra todas as outras sessões conectadas.
@@ -124,6 +124,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Pool de proxies: cada conta sem proxy próprio recebe um proxy do pool, com verificações de saúde, uma chave liga/desliga por proxy, a troca para um proxy saudável depois de três falhas seguidas, e os proxies global e das contas verificados como entradas detectadas (veja [Pool de proxies](#-pool-de-proxies)).
 - Domínio e região upstream (**Configurações → Domínio e região upstream**): envie o chat e a busca na web para `runtime.{region}.kiro.dev` em vez de `q.{region}.amazonaws.com` (uso e listas de modelos continuam na AWS) e substitua, para todas as contas, a região da API (`us-east-1` ou `eu-central-1`) ou a região em que os tokens do Builder ID e do IAM Identity Center são renovados. Uma região que não combina com a conta faz as requisições dela falharem, mas nunca bane a conta.
 - Sufixo do modo de raciocínio configurável e repasse da configuração `thinking` da Anthropic.
+- Link público: um interruptor coloca o painel de administração e a API em um endereço HTTPS público, como `https://kiro-proxy.tail1234.ts.net`, pelo Tailscale Funnel, sem redirecionamento de portas (veja [Link público](#-link-público)).
 
 ### 🧩 Armazenamento
 
@@ -226,6 +227,7 @@ A autenticação por senha de administrador permite cinco tentativas com falha p
 | `KIRO_TOOL_MARKUP_RESCUE` | Defina `off` para deixar de converter de volta em chamadas de ferramenta a marcação de chamada de ferramenta que o Kiro vaza no texto da resposta | on |
 | `LOG_LEVEL`      | Nível de log: `debug`, `info`, `warn` ou `error` (substitui a configuração) | `info` |
 | `ADMIN_RESET_2FA` | Defina `1` para desligar o login em duas etapas do administrador na inicialização, se você perdeu o app e os códigos de recuperação. Remova depois: enquanto estiver definido, cada inicialização o desliga de novo | — |
+| `KIRO_TUNNEL_BIN` | Auxiliar do link público para executar em vez de baixá-lo. A imagem Docker o define | — |
 
 > [!WARNING]
 > O `kiro.db` guarda tokens OAuth e credenciais de administrador. Trate-o como segredo — mantenha-o fora do git, de capturas de tela e de conversas em chat. Monte o diretório do banco de dados como um volume privado.
@@ -375,6 +377,25 @@ A ordem é: o proxy próprio da conta, o pool, o proxy global e, por último, a 
 
 ---
 
+## 🌍 Link público
+
+**Configurações → Link público** coloca este servidor, o painel de administração e a API, em um endereço HTTPS público pelo [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel). Funciona no Windows, macOS, Linux e Docker, sem redirecionamento de portas.
+
+1. Ligue **Link HTTPS público**. O proxy baixa o auxiliar do Tailscale, `kiro-tunnel` (cerca de 8 MB), do release desta versão no GitHub e o confere com um SHA-256 embutido no proxy. A imagem Docker já traz o auxiliar.
+2. Clique em **Entrar no Tailscale** e entre com uma conta gratuita do Tailscale. O servidor entra na sua tailnet como um dispositivo chamado `kiro-proxy`; **Nome do dispositivo** o altera.
+3. Na primeira vez, clique em **Habilitar Funnel**. Isso liga o HTTPS e o Funnel da sua tailnet em um passo só.
+4. O card mostra o link, como `https://kiro-proxy.tail1234.ts.net`. Ele continua o mesmo depois de reiniciar.
+
+Qualquer pessoa com o link chega à página de login e à API, e os nomes do Funnel aparecem em logs públicos de certificados, então bots vão encontrá-lo. Pelo link:
+
+- Toda chamada de API de cliente precisa de uma chave de API, mesmo com **Exigir chave de API** desligado.
+- A senha da primeira execução nunca aparece: defina sua própria senha de administrador antes.
+- O bloqueio de login conta o endereço de cada visitante.
+
+Ligue o login em duas etapas antes de compartilhar o link. **Sair do Tailscale** remove o dispositivo da sua tailnet e esquece o login, guardado em `tailscale/` dentro de `DATA_DIR`. O envio de logs do Tailscale fica desligado. O Funnel tem limites próprios: só nomes `*.ts.net`, um limite de banda que o Tailscale não publica e um plano gratuito só para uso pessoal.
+
+---
+
 ## 🔐 Login em duas etapas
 
 **Configurações → Login em duas etapas** pede um código de seis dígitos de um app autenticador (Google Authenticator, 1Password, Aegis e similares) depois da senha de administrador.
@@ -444,6 +465,7 @@ Nada é verificado enquanto nenhum canal está ligado, e **Enviar teste** tenta 
 | `KIRO_TOOL_MARKUP_RESCUE` | Defina `off` para deixar de converter de volta em chamadas de ferramenta a marcação de chamada de ferramenta que o Kiro vaza no texto da resposta | on |
 | `LOG_LEVEL`      | Nível de log: `debug`, `info`, `warn` ou `error` (substitui a configuração) | `info` |
 | `ADMIN_RESET_2FA` | Defina `1` para desligar o login em duas etapas do administrador na inicialização, se você perdeu o app e os códigos de recuperação. Remova depois: enquanto estiver definido, cada inicialização o desliga de novo | — |
+| `KIRO_TUNNEL_BIN` | Auxiliar do link público para executar em vez de baixá-lo. A imagem Docker o define | — |
 
 ```diff
 + kiro.db                # local state — config, credentials, SQLite history, backup blobs

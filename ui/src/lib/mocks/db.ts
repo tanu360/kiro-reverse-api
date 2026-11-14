@@ -1,6 +1,7 @@
 import type { AccountHealth } from "@/lib/api/account-health";
 import type { LogRetention } from "@/lib/api/log-retention";
 import type { ResponseHeaderRule } from "@/lib/api/response-headers";
+import type { TunnelStatus } from "@/lib/api/tunnel";
 import type {
   Account,
   AccountFull,
@@ -55,6 +56,8 @@ export interface MockDb {
   twoFactor: MockTwoFactor;
   /** GET /metrics settings: the Prometheus endpoint's switch and bearer token. */
   metrics: { enabled: boolean; token: string };
+  /** GET /tunnel: the public link through Tailscale Funnel. */
+  tunnel: MockTunnel;
   accounts: Account[];
   secrets: Record<string, AccountFull>;
   apiKeys: Array<ApiKey & { key: string }>;
@@ -104,6 +107,24 @@ export interface MockTwoFactor {
   challenges: Record<string, { expiresAt: number; failures: number }>;
   /** ADMIN_RESET_2FA is set on the mock server. */
   resetByEnv: boolean;
+}
+
+/**
+ * The public link as the mock keeps it. The browser mock walks the flow by time from `since`
+ * (download, connect, sign-in, live); a test pins the status it needs in `pinned` instead.
+ */
+export interface MockTunnel {
+  enabled: boolean;
+  hostname: string;
+  signedIn: boolean;
+  /** ms epoch the link was last (re)started. */
+  since: number;
+  /** A status a test shows as is, over the walked flow; any write clears it. */
+  pinned: Partial<TunnelStatus> | null;
+}
+
+export function freshTunnel(): MockTunnel {
+  return { enabled: false, hostname: "kiro-proxy", signedIn: false, since: 0, pinned: null };
 }
 
 export function freshTwoFactor(): MockTwoFactor {
@@ -194,6 +215,7 @@ function baseDb(): Pick<
   | "failedLogins"
   | "twoFactor"
   | "metrics"
+  | "tunnel"
   | "version"
   | "remoteVersion"
   | "pending"
@@ -206,6 +228,7 @@ function baseDb(): Pick<
     failedLogins: 0,
     twoFactor: freshTwoFactor(),
     metrics: { enabled: false, token: "" },
+    tunnel: freshTunnel(),
     version: "2.1.0",
     // Same as the running version: no update notice in tests, screenshots or axe runs.
     remoteVersion: { version: "2.1.0", changelog: "" },
