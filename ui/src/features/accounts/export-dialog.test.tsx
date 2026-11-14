@@ -89,6 +89,41 @@ describe("ExportDialog", () => {
     expect(within(dialog).getByText("1 selected")).toBeInTheDocument();
   });
 
+  it("selects a status group in one click", async () => {
+    const { dialog, user } = await openExport();
+    const picks = within(dialog).getByRole("group", { name: "Select a group" });
+    expect(within(picks).getByRole("button", { name: /^All/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const active = within(picks).getByRole("button", { name: /^Active/ });
+    const activeCount = Number((active.textContent ?? "").replace(/\D/g, ""));
+    await user.click(active);
+    expect(active).toHaveAttribute("aria-pressed", "true");
+    expect(within(picks).getByRole("button", { name: /^All/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    // The selection is exactly the Active group.
+    expect(within(dialog).getByText(`${activeCount} selected`)).toBeInTheDocument();
+    expect(activeCount).toBeLessThan(mockDb.accounts.length);
+  });
+
+  it("masks credentials in the JSON preview until shown, and copies them whole", async () => {
+    const { dialog, user } = await openExport();
+    await user.click(within(dialog).getByRole("radio", { name: "JSON" }));
+    const json = (await within(dialog).findByRole("textbox", {
+      name: "Export JSON",
+    })) as HTMLTextAreaElement;
+    const masked = json.value;
+    expect(masked).toMatch(/"refreshToken": "[^"]{4}…[^"]{4}"/);
+    expect(within(dialog).getByText(/Credentials are hidden in this preview/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("switch", { name: "Show credentials" }));
+    expect(json.value).not.toMatch(/"refreshToken": "[^"]{4}…[^"]{4}"/);
+    expect(json.value.length).toBeGreaterThan(masked.length);
+    expect(within(dialog).getByText("This preview shows live credentials.")).toBeInTheDocument();
+  });
+
   it("swaps the list for the JSON and back", async () => {
     const { dialog, user } = await openExport();
     await user.click(within(dialog).getByRole("radio", { name: "JSON" }));

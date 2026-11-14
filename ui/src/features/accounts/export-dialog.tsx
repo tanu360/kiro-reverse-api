@@ -1,25 +1,64 @@
-import { Copy01Icon, Download01Icon, Search01Icon } from "@hugeicons/core-free-icons";
+import {
+  Copy01Icon,
+  Download01Icon,
+  Search01Icon,
+  SquareLock02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChoiceCard, ChoiceList } from "@/components/shared/choice-card";
 import { LoadingState } from "@/components/shared/loading-state";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { exportAccounts } from "@/lib/api/accounts";
 import type { Account, ExportData } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
 import { saveJson } from "@/lib/download";
 import { useT } from "@/lib/i18n";
+import { useMaskText } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
-import { accountMeta, useAccountName } from "./account-cells";
-import { buildExportCopy, exportFilename, filterAccounts } from "./account-model";
+import { AuthIcon, accountMeta, StatusPill, useAccountName } from "./account-cells";
+import {
+  accountStatus,
+  buildExportCopy,
+  exportFilename,
+  filterAccounts,
+  STATUS_GROUPS,
+  type StatusGroup,
+  statusGroup,
+} from "./account-model";
 
 type ExportView = "list" | "json";
+type QuickGroup = "all" | StatusGroup;
+const QUICK_GROUPS: readonly QuickGroup[] = ["all", ...STATUS_GROUPS];
+
+/** Keys whose string values are sign-in secrets: the preview masks them until revealed. */
+const SECRET_KEY = /(token|secret|password|apikey|api_key|cookie)$/i;
+
+/** A secret as its first and last four characters, so two keys still tell apart. */
+function maskSecret(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 4)}…${value.slice(-4)}` : "••••••••";
+}
+
+/** The export with every secret string masked, for the on-screen preview only. */
+function maskSecrets(value: unknown, key = ""): unknown {
+  if (typeof value === "string") return value && SECRET_KEY.test(key) ? maskSecret(value) : value;
+  if (Array.isArray(value)) return value.map((item) => maskSecrets(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, maskSecrets(v, k)]),
+    );
+  }
+  return value;
+}
 
 /**
  * Exports the chosen accounts (the list filter does not apply). The JSON holds live secrets:
@@ -44,7 +83,9 @@ export function ExportDialog({
   const selectAllId = useId();
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState("");
-  const [json, setJson] = useState<string | null>(null);
+  const [json, setJson] = useState<ExportData | null>(null);
+  const [reveal, setReveal] = useState(false);
+  const maskText = useMaskText();
   const [view, setView] = useState<ExportView>("list");
   const [busy, setBusy] = useState<"show" | "copy" | "download" | null>(null);
   const jsonRef = useRef<HTMLTextAreaElement | null>(null);
@@ -69,9 +110,27 @@ export function ExportDialog({
       setSelected(new Set(initialSelection ?? accounts.map((account) => account.id)));
       setQuery("");
       setJson(null);
+      setReveal(false);
       setView("list");
     }
   }
+
+  // The status of every account, for the quick picks: All, Active, Needs attention, Disabled.
+  const groups = useMemo(() => {
+    const now = Math.floor(Date.now() / 1000);
+    return new Map(
+      accounts.map((account) => [account.id, statusGroup(accountStatus(account, now))]),
+    );
+  }, [accounts]);
+  const groupIds = (group: QuickGroup) =>
+    accounts
+      .filter((account) => group === "all" || groups.get(account.id) === group)
+      .map((account) => account.id);
+  /** The quick pick the selection equals, if any. */
+  const pickedGroup = QUICK_GROUPS.find((group) => {
+    const ids = groupIds(group);
+    return ids.length > 0 && ids.length === selected.size && ids.every((id) => selected.has(id));
+  });
 
   // The search narrows the list by email or nickname; the selection keeps hidden rows.
   const visible = useMemo(
@@ -144,7 +203,7 @@ export function ExportDialog({
     setView("json");
     void withBusy("show", async () => {
       const data = await fetchExport();
-      if (data) setJson(JSON.stringify(data, null, 2));
+      if (data) setJson(data);
       else setView("list");
     });
   };
@@ -172,6 +231,13 @@ export function ExportDialog({
     });
   };
 
+  // The preview masks secrets until revealed, and emails under privacy mode; Copy and Download
+  // always carry the full export.
+  const preview = useMemo(
+    () => (json ? maskText(JSON.stringify(reveal ? json : maskSecrets(json), null, 2)) : ""),
+    [json, reveal, maskText],
+  );
+
   const onDownload = () =>
     withBusy("download", async () => {
       const data = await fetchExport();
@@ -180,7 +246,7 @@ export function ExportDialog({
 
   return (
     <ResponsiveDialog
-      description={t("export.description")}
+      description={t("export.pickDescription")}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)} variant="ghost">
@@ -210,8 +276,12 @@ export function ExportDialog({
       size="xl"
       title={t("export.title")}
     >
+      <Alert className="mb-3" role="note" variant="warning">
+        <HugeiconsIcon icon={SquareLock02Icon} aria-hidden="true" />
+        <AlertDescription>{t("export.description")}</AlertDescription>
+      </Alert>
       {/* One fixed height for both views, so the dialog and its footer stay put on a switch. */}
-      <div className="flex h-96 flex-col gap-3">
+      <div className="flex h-[26rem] flex-col gap-3 max-sm:h-[60dvh]">
         <div className="flex items-center justify-between gap-3">
           <SegmentedControl
             render={
@@ -237,19 +307,28 @@ export function ExportDialog({
         {view === "json" ? (
           jsonShown ? (
             <div className="flex min-h-0 flex-1 flex-col gap-2">
-              <label className="font-medium text-sm/5" htmlFor={jsonId}>
-                {t("export.json")}
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="font-medium text-sm/5" htmlFor={jsonId}>
+                  {t("export.json")}
+                </label>
+                <Label className="cursor-pointer gap-1.5 text-meta">
+                  <Switch checked={reveal} onCheckedChange={setReveal} />
+                  {t("export.revealCredentials")}
+                </Label>
+              </div>
               {/* The field fills the rest of the body; its text scrolls inside it. */}
               <Textarea
                 className="min-h-0 flex-1 *:h-full *:max-h-none"
                 id={jsonId}
                 readOnly
                 ref={jsonRef}
-                value={json ?? ""}
+                value={preview}
                 variant="mono"
                 wrap="off"
               />
+              <p className="text-meta text-muted-foreground">
+                {t(reveal ? "export.previewFull" : "export.previewMasked")}
+              </p>
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -271,6 +350,34 @@ export function ExportDialog({
                 value={query}
               />
             </InputGroup>
+            {/* Quick picks: each sets the selection to one status group, as the Accounts tabs split it. */}
+            <fieldset
+              aria-label={t("export.quickSelect")}
+              className="m-0 flex min-w-0 flex-wrap items-center gap-1.5 border-0 p-0"
+            >
+              {QUICK_GROUPS.map((group) => {
+                const count = groupIds(group).length;
+                return (
+                  <button
+                    aria-pressed={pickedGroup === group}
+                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 font-medium text-xs outline-none transition-colors focus-visible:focus-outline disabled:cursor-default disabled:opacity-50 aria-pressed:bg-foreground aria-pressed:text-background not-aria-pressed:text-muted-foreground not-aria-pressed:shadow-[inset_0_0_0_1px_var(--border)] not-aria-pressed:hover:bg-accent not-aria-pressed:hover:text-foreground pointer-coarse:h-8"
+                    disabled={count === 0}
+                    key={group}
+                    onClick={() => setSelected(new Set(groupIds(group)))}
+                    type="button"
+                  >
+                    {t(
+                      group === "all"
+                        ? "filter.all"
+                        : group === "attention"
+                          ? "filter.attention"
+                          : `health.${group}`,
+                    )}
+                    <span className="tabular-nums opacity-70">{count}</span>
+                  </button>
+                );
+              })}
+            </fieldset>
             {/*
               Inset like the rows below (their 16 px padding and the list's border), so its
               checkbox heads the column of row checkboxes.
@@ -290,31 +397,52 @@ export function ExportDialog({
               {t("export.selectAll")}
             </label>
             {visible.length > 0 ? (
-              // Shrinks to the space left, scrolling inside its card, and to its rows when few.
-              <ChoiceList aria-label={t("export.list")} className="min-h-0" scroll>
-                {visible.map((account) => {
-                  const name = accountName(account);
-                  return (
-                    <ChoiceCard
-                      control={(id) => (
-                        <Checkbox
-                          checked={selected.has(account.id)}
-                          id={id}
-                          onCheckedChange={() => toggle(account.id)}
-                        />
-                      )}
-                      description={accountMeta(account, t)}
-                      key={account.id}
-                      title={
-                        <span className={name.mono ? "font-mono text-meta" : undefined}>
-                          {name.text}
-                        </span>
-                      }
-                      variant="row"
-                    />
-                  );
-                })}
-              </ChoiceList>
+              // Compact rows, so a long pool shows about seven at a time; the list scrolls inside
+              // its border.
+              <ScrollArea
+                className="min-h-0 flex-1 rounded-xl border border-border-subtle"
+                scrollFade
+              >
+                <ul aria-label={t("export.list")} className="divide-y divide-border-subtle">
+                  {visible.map((account) => {
+                    const name = accountName(account);
+                    const id = `export-${account.id}`;
+                    return (
+                      <li key={account.id}>
+                        <label
+                          className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-(--row-hover)"
+                          htmlFor={id}
+                        >
+                          <Checkbox
+                            // Named by the account alone; the meta line and status pill follow.
+                            aria-labelledby={`${id}-name`}
+                            checked={selected.has(account.id)}
+                            id={id}
+                            onCheckedChange={() => toggle(account.id)}
+                          />
+                          <AuthIcon account={account} />
+                          <span className="min-w-0 flex-1">
+                            <span
+                              id={`${id}-name`}
+                              className={
+                                name.mono
+                                  ? "block truncate font-mono text-meta"
+                                  : "block truncate font-medium text-sm/5"
+                              }
+                            >
+                              {name.text}
+                            </span>
+                            <span className="block truncate text-meta text-muted-foreground">
+                              {accountMeta(account, t)}
+                            </span>
+                          </span>
+                          <StatusPill account={account} plain size="sm" />
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </ScrollArea>
             ) : (
               <p className="m-auto text-muted-foreground text-sm">{tc("state.noMatches")}</p>
             )}
