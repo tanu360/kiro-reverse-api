@@ -2,6 +2,7 @@ import { setupWorker } from "msw/browser";
 import { mockDb, resetMockDb } from "./db";
 import { allHandlers } from "./handlers";
 import { resolveMockScenario } from "./scenario";
+import { applyShowcase } from "./showcase";
 import { installWorkerRecovery } from "./worker-recovery";
 
 /**
@@ -13,6 +14,8 @@ export async function startMockWorker(): Promise<void> {
   const scenario = resolveMockScenario();
   const started = performance.now();
   resetMockDb(scenario);
+  // The full dataset also gets the 3.3.0 showcase: pool, headers, a duplicate, the update notes.
+  if (scenario === "full") applyShowcase();
   const ms = Math.round(performance.now() - started);
   console.info(
     `[mock] ${scenario} dataset in ${ms} ms: ${mockDb.accounts.length} accounts, ` +
