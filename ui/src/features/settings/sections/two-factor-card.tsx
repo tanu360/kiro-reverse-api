@@ -1,3 +1,4 @@
+import { Input as InputPrimitive } from "@base-ui/react/input";
 import {
   Alert02Icon,
   InformationCircleIcon,
@@ -8,7 +9,15 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type JSX, type ReactNode, useId, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type JSX,
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 import { Code } from "@/components/shared/code";
 import { CopyButton } from "@/components/shared/copy-button";
 import { PasswordInput } from "@/components/shared/password-input";
@@ -27,7 +36,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage, serverErrorCode } from "@/lib/api/server-errors";
@@ -192,9 +200,14 @@ function codeError(error: unknown, t: (key: string) => string): string {
   return errorMessage(error, t as never);
 }
 
+/** A code from the app has six digits. */
+const CODE_LENGTH = 6;
+
 /**
- * The six-digit field the dialogs share. It keeps digits only, at most six: a letter never shows,
- * and a code pasted as "123 456" lands as "123456".
+ * The six-digit field the dialogs share: six boxes over one real input, so typing, a phone's
+ * code autofill and a paste all land in one field with one label. It keeps digits only, at most
+ * six: a letter never shows, and a code pasted as "123 456" lands as "123456". A wrong code
+ * shakes the boxes once (not under reduced motion).
  */
 function CodeInput({
   id,
@@ -202,39 +215,76 @@ function CodeInput({
   onChange,
   error,
   label,
-  large = false,
+  hideLabel = false,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
   error: string | null;
   label: string;
-  /**
-   * The setup dialog's field: tall, the digits centred and spaced like a code, its label read
-   * by screen readers only (the step title above says it).
-   */
-  large?: boolean;
+  /** The setup dialog's field, whose step title above already says it: screen readers only. */
+  hideLabel?: boolean;
 }): JSX.Element {
-  const { t } = useT("settings");
+  const [focused, setFocused] = useState(false);
+  // Bumped by each new error, so the boxes remount and shake again; the input keeps its focus.
+  const [shake, setShake] = useState(0);
+  useEffect(() => {
+    if (error) setShake((count) => count + 1);
+  }, [error]);
+  const active = Math.min(value.length, CODE_LENGTH - 1);
   return (
     <Field className="min-w-0 items-stretch" invalid={error !== null}>
-      <FieldLabel className={cn(large && "sr-only")} htmlFor={id}>
+      <FieldLabel className={cn(hideLabel && "sr-only")} htmlFor={id}>
         {label}
       </FieldLabel>
-      <Input
-        autoComplete="one-time-code"
-        autoFocus
-        className={cn(large && "[&_input]:text-center [&_input]:text-lg [&_input]:tracking-widest")}
-        id={id}
-        inputMode="numeric"
-        maxLength={9}
-        onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 6))}
-        placeholder={t("twoFactor.codePlaceholder")}
-        size={large ? "lg" : "default"}
-        spellCheck={false}
-        value={value}
-        variant="code"
-      />
+      <div className="relative">
+        <InputPrimitive
+          autoComplete="one-time-code"
+          autoFocus
+          className="absolute inset-0 z-10 size-full cursor-text bg-transparent text-transparent caret-transparent outline-none selection:bg-transparent"
+          id={id}
+          inputMode="numeric"
+          maxLength={9}
+          onBlur={() => setFocused(false)}
+          onChange={(event) =>
+            onChange(event.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))
+          }
+          onFocus={() => setFocused(true)}
+          spellCheck={false}
+          value={value}
+        />
+        <div
+          aria-hidden="true"
+          className={cn("grid grid-cols-6 gap-2", shake > 0 && error && "animate-otp-shake")}
+          key={shake}
+        >
+          {Array.from({ length: CODE_LENGTH }, (_, index) => {
+            const digit = value[index];
+            const current = focused && index === active && value.length < CODE_LENGTH;
+            return (
+              <div
+                className={cn(
+                  "flex h-12 items-center justify-center rounded-lg border bg-field font-mono text-foreground text-xl tabular-nums transition-[border-color,box-shadow] duration-150",
+                  error
+                    ? "border-destructive/64"
+                    : current || (focused && value.length === CODE_LENGTH && index === active)
+                      ? "border-field-border-focus ring-2 ring-primary/24"
+                      : "border-field-border",
+                )}
+                // biome-ignore lint/suspicious/noArrayIndexKey: the boxes are fixed positions.
+                key={index}
+              >
+                {digit ??
+                  (current ? (
+                    <span className="h-5 w-px bg-foreground motion-safe:animate-pulse" />
+                  ) : (
+                    <span className="size-1 rounded-full bg-muted-foreground/40" />
+                  ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
       {error ? <FieldError match>{error}</FieldError> : null}
     </Field>
   );
@@ -354,7 +404,7 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
           </div>
         </DialogHeader>
         <DialogPanel className="flex flex-col gap-6">
-          <SetupStep number={1} title={t("twoFactor.stepScan")}>
+          <SetupStep description={t("twoFactor.apps")} number={1} title={t("twoFactor.stepScan")}>
             {setup.isError ? (
               <Alert role="alert" size="sm" variant="error">
                 <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
@@ -368,8 +418,8 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
             <CodeInput
               error={error}
               id={codeId}
+              hideLabel
               label={t("twoFactor.confirmCode")}
-              large
               onChange={(value) => {
                 setCode(value);
                 setError(null);
@@ -401,36 +451,42 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
 function SetupStep({
   number,
   title,
+  description,
   children,
 }: {
   number: number;
   title: string;
+  description?: string;
   children: ReactNode;
 }): JSX.Element {
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 font-medium text-sm">
-        <span
-          aria-hidden="true"
-          className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs tabular-nums"
-        >
-          {number}
-        </span>
-        {title}
-      </h3>
+      <div className="flex flex-col gap-1">
+        <h3 className="flex items-center gap-2 font-medium text-sm">
+          <span
+            aria-hidden="true"
+            className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs tabular-nums"
+          >
+            {number}
+          </span>
+          {title}
+        </h3>
+        {description ? <p className="ps-7 text-muted-foreground text-xs">{description}</p> : null}
+      </div>
       {children}
     </section>
   );
 }
 
 /**
- * The QR code and the secret to type. The code is drawn in the app's style (StyledQr) on a white
- * tile in a soft purple frame, so it reads dark-on-light for a scanner in both themes; a QR the
+ * The QR code and the key to type. The code is drawn in the app's style (StyledQr) in a soft
+ * purple frame: dark modules on white in the light theme, inverted in the dark one, where "Use a
+ * light code" brings the white one back for a scanner that reads dark-on-light only. A QR the
  * styling cannot read is shown as the server drew it.
  */
 function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
   const { t } = useT("settings");
-  const grouped = setup?.secret.replace(/(.{4})/g, "$1 ").trim() ?? "";
+  const [light, setLight] = useState(false);
   const modules = useMemo(() => (setup ? parseQrSvg(setup.qrSvg) : null), [setup]);
   let qr: JSX.Element;
   if (!setup) qr = <Skeleton className="size-full rounded-xl" />;
@@ -446,18 +502,36 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
   }
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-      <div className="size-48 shrink-0 rounded-2xl bg-linear-to-br from-primary/30 via-primary/10 to-primary/5 p-1.5 shadow-sm">
-        {qr}
+      <div className="flex shrink-0 flex-col items-center gap-2">
+        <div
+          className={cn(
+            "size-52 rounded-2xl bg-linear-to-br from-primary/30 via-primary/10 to-primary/5 p-1.5 shadow-sm",
+            light && "qr-light",
+          )}
+        >
+          {qr}
+        </div>
+        {/* Only the dark theme draws the inverted code, so only it offers the light one. */}
+        {modules ? (
+          <p className="hidden text-muted-foreground text-xs dark:block">
+            <Button
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => setLight((on) => !on)}
+              type="button"
+              variant="link-inline"
+            >
+              {light ? t("twoFactor.qrDark") : t("twoFactor.qrLight")}
+            </Button>
+          </p>
+        ) : null}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2 self-stretch sm:justify-center">
         <p className="text-muted-foreground text-xs">{t("twoFactor.secretHint")}</p>
         <div className="flex items-center gap-1 rounded-lg border border-border-subtle bg-surface-2 py-1 ps-3 pe-1">
-          <code
-            className="min-w-0 flex-1 py-1 font-mono text-sm tracking-wide wrap-anywhere"
-            translate="no"
-          >
-            {grouped || "…"}
-          </code>
+          {/* The key as the app takes it: one word, the body font, so nothing is retyped wrong. */}
+          <span className="min-w-0 flex-1 py-1 text-sm break-all" translate="no">
+            {setup?.secret ?? "…"}
+          </span>
           {setup ? (
             <CopyButton
               copiedMessage={t("twoFactor.secretCopied")}

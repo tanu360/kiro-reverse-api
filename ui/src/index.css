@@ -92,9 +92,9 @@
   --code-token-comment: var(--color-neutral-500);
   --code-token-punctuation: var(--color-neutral-500);
   /*
-   * The two-factor QR code, the same in both themes: a scanner wants dark modules on a light
-   * tile, so the tile stays white on the dark page too. The corner eyes take the deep Kiro
-   * purple of info text (7.4:1 on white), still dark enough to scan.
+   * The two-factor QR code: dark modules on a white tile, the corner eyes in the deep Kiro
+   * purple of info text (7.4:1 on white). The dark theme inverts it (the .dark block); .qr-light
+   * brings this light code back for an app whose scanner reads dark-on-light only.
    */
   --qr-tile: var(--color-white);
   --qr-module: var(--color-zinc-900);
@@ -186,6 +186,10 @@
   --code-token-parameter: var(--color-orange-300);
   --code-token-property: var(--color-pink-300);
   --code-token-punctuation: var(--color-neutral-400);
+  /* Light modules on a near-black tile; iPhone Camera and Google Lens read this inverted code. */
+  --qr-tile: var(--color-zinc-950);
+  --qr-module: var(--color-zinc-100);
+  --qr-eye: var(--color-purple-300);
   --success: var(--color-emerald-500);
   --warning: var(--color-amber-500);
   --sidebar: var(--card);
@@ -755,6 +759,35 @@
  * the row, and while the row is highlighted it slides left by --marquee-distance to show the rest,
  * pausing at each end, then back. Reduced motion wraps the label instead of moving it.
  */
+/* The light QR code in either theme (the 2FA dialog's "Use a light code"). */
+.qr-light {
+  --qr-tile: var(--color-white);
+  --qr-module: var(--color-zinc-900);
+  --qr-eye: #7a0ecd;
+}
+
+/* A wrong two-factor code: the code boxes shake once. Reduced motion keeps them still. */
+@keyframes otp-shake {
+  0%,
+  100% {
+    translate: 0;
+  }
+  20%,
+  60% {
+    translate: -4px 0;
+  }
+  40%,
+  80% {
+    translate: 4px 0;
+  }
+}
+@utility animate-otp-shake {
+  animation: otp-shake 300ms ease-in-out;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 @keyframes marquee-text {
   0%,
   15% {

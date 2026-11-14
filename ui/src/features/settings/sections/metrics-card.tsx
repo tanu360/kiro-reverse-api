@@ -7,6 +7,7 @@ import { CopyField } from "@/components/shared/code-field";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { SettingsRow, SwitchField } from "@/components/shared/settings-rows";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { type MetricsSettings, metricsQuery, updateMetricsSettings } from "@/lib/api/metrics";
 import { queryKeys } from "@/lib/api/query-keys";
 import { useT } from "@/lib/i18n";
@@ -103,25 +104,33 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
           />
           <SettingsRow
             control={
-              <div className="flex min-w-0 flex-col gap-2">
-                <CopyField
-                  copiedMessage={t("metrics.tokenCopied")}
-                  display={maskMetricsToken(settings.token)}
-                  labelledBy={tokenLabel}
-                  multiline
-                  value={settings.token}
-                />
-                <Button
-                  className="self-start"
-                  loading={save.isPending && pending === null}
-                  onClick={() => void regenerate()}
-                  size="sm"
-                  variant="secondary"
-                >
-                  <HugeiconsIcon icon={RefreshIcon} aria-hidden="true" />
-                  {t("metrics.regenerate")}
-                </Button>
-              </div>
+              // New token sits in the field beside Copy, as an icon button with its name as a
+              // tooltip, so the row stays one field high.
+              <CopyField
+                actions={
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          aria-label={t("metrics.regenerate")}
+                          loading={save.isPending && pending === null}
+                          onClick={() => void regenerate()}
+                          size="icon-sm"
+                          variant="quiet"
+                        />
+                      }
+                    >
+                      <HugeiconsIcon icon={RefreshIcon} aria-hidden="true" />
+                    </TooltipTrigger>
+                    <TooltipPopup>{t("metrics.regenerate")}</TooltipPopup>
+                  </Tooltip>
+                }
+                copiedMessage={t("metrics.tokenCopied")}
+                display={maskMetricsToken(settings.token)}
+                labelledBy={tokenLabel}
+                multiline
+                value={settings.token}
+              />
             }
             description={t("metrics.tokenHint")}
             title={<span id={tokenLabel}>{t("metrics.token")}</span>}

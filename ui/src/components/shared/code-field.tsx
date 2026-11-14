@@ -84,6 +84,7 @@ export function CopyField({
   multiline = false,
   openHref,
   openLabel,
+  actions,
   id,
   className,
 }: {
@@ -102,6 +103,8 @@ export function CopyField({
   openHref?: string;
   /** The open button's name, required with `openHref` (without it no open button shows). */
   openLabel?: string;
+  /** More icon buttons in the field, before Copy (the metrics token's New token). */
+  actions?: ReactNode;
   id?: string;
   /** On the group: layout only. */
   className?: string;
@@ -142,6 +145,7 @@ export function CopyField({
         {openHref && openLabel ? (
           <OpenLinkButton href={openHref} label={openLabel} size="icon-sm" variant="quiet" />
         ) : null}
+        {actions}
         <CopyButton
           copiedMessage={copiedMessage}
           label={copyLabel ?? t("actions.copy")}

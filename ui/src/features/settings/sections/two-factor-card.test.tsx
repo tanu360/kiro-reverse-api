@@ -13,7 +13,7 @@ describe("TwoFactorCard", () => {
     expect(
       await within(dialog).findByRole("img", { name: "QR code for your authenticator app" }),
     ).toBeInTheDocument();
-    expect(within(dialog).getByText("MZXW 6YTB OI4D GNJQ GEZT SMBV GM2D ONZY")).toBeInTheDocument();
+    expect(within(dialog).getByText("MZXW6YTBOI4DGNJQGEZTSMBVGM2DONZY")).toBeInTheDocument();
 
     const field = within(dialog).getByLabelText("Code from the app");
     // Digits only, six at most: letters and the space of a pasted "123 456" never show.
