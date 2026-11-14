@@ -300,7 +300,12 @@ export const coreHandlers: HttpHandler[] = [
   http.get(apiUrl("/version"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;
-    return HttpResponse.json({ version: `v${mockDb.version}` });
+    return HttpResponse.json({
+      version: `v${mockDb.version}`,
+      os: "linux",
+      arch: "amd64",
+      docker: true,
+    });
   }),
 
   // The update check answers with the running version (small and empty datasets), so no update
@@ -309,8 +314,8 @@ export const coreHandlers: HttpHandler[] = [
   http.get(REMOTE_VERSION_URL, () =>
     HttpResponse.json({
       ...mockDb.remoteVersion,
-      // Like the real version.json: the repo has no GitHub releases, so it points at the repo.
-      download: "https://github.com/tanu360/kiro-reverse-api",
+      // Like the real version.json: the latest release page (the release list until there is one).
+      download: "https://github.com/tanu360/kiro-reverse-api/releases/latest",
     }),
   ),
 

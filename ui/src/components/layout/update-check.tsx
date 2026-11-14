@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 import { compareVersions, fetchRemoteVersion, versionQuery } from "@/lib/api/system";
-import type { RemoteVersionJson } from "@/lib/api/types";
+import type { RemoteVersionJson, VersionResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { toast } from "@/lib/toast";
@@ -53,6 +53,8 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
   const queryClient = useQueryClient();
   const [latest, setLatest] = useState<RemoteVersionJson | null>(null);
   const [current, setCurrent] = useState("");
+  // The server's platform and container flag, for the dialog's How to update steps.
+  const [server, setServer] = useState<VersionResponse | undefined>();
   const [checking, setChecking] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const busyRef = useRef(false);
@@ -66,11 +68,13 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
 
   /** Resolves the remote release when it is newer than the running version, else null. */
   const lookUp = useCallback(async (): Promise<{ newer: RemoteVersionJson | null }> => {
-    const [{ version }, remote] = await Promise.all([
+    const [running, remote] = await Promise.all([
       queryClient.ensureQueryData(versionQuery()),
       fetchRemoteVersion(),
     ]);
+    const { version } = running;
     setCurrent(stripV(version));
+    setServer(running);
     const newer = compareVersions(remote.version, version) > 0 ? remote : null;
     if (newer) setLatest(newer);
     return { newer };
@@ -145,6 +149,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
         latest={latest}
         onOpenChange={setDialogOpen}
         open={dialogOpen && latest !== null}
+        server={server}
       />
     </UpdateCheckContext.Provider>
   );
