@@ -201,7 +201,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 ### 🛡 Painel de administração
 
 - Aplicativo React de página única embutido no binário; não há servidor web separado para rodar.
-- Painel Visão geral atualizado ao vivo: quatro cartões de KPI (contas, créditos do plano, e requisições e falhas na última hora), o tráfego ao longo do tempo em barras empilhadas, uma lista das contas que precisam de atenção, o tráfego por conta, um gráfico de rosca com a distribuição por modelo e as contas mais ativas. O cartão **Créditos do plano** separa o uso de créditos do Kiro em uso pelo proxy e uso fora dele.
+- Painel Visão geral atualizado ao vivo: quatro cartões de KPI (contas, créditos do plano, e requisições e falhas na última hora), o tráfego da última hora, das últimas 6 ou 24 horas ou de todo o período em barras empilhadas, uma lista das contas que precisam de atenção, o tráfego por conta, um gráfico de rosca com a distribuição por modelo e as contas mais ativas. O cartão **Créditos do plano** separa o uso de créditos do Kiro em uso pelo proxy e uso fora dele.
 - Contas com abas de status e contagens, filtros (plano, autenticação, região, ligada, tag), busca por e-mail, apelido, notas e tags, ordenação, ações em lote, visão de detalhes, testes de conexão, requisições por minuto e de hoje ao vivo, revisão de duplicadas e exportação.
 - Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite.
 - Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens, créditos e chamadas por chave, vínculo com contas, gerar nova chave, redefinição de uso), um gráfico **Uso por chave** e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
@@ -381,7 +381,7 @@ Exija chaves de API na página **API** (**Acesso à API → Exigir chave de API*
 - O **Limite de chamadas** conta só as chamadas bem-sucedidas; requisições com falha, `/v1/models` e `count_tokens` não contam. Uma chave que usou todas as chamadas recebe HTTP 429 até você aumentar o limite ou redefinir o uso.
 - **Contas → Só as contas selecionadas** vincula uma chave a algumas contas. As requisições dela usam só essas contas, nunca outra (HTTP 503 quando nenhuma delas está disponível), e a lista de modelos dela mostra só os modelos que essas contas atendem.
 - **Gerar nova chave** dá um novo valor à chave, e o valor antigo para de funcionar na hora. Nome, limites, contas e uso continuam iguais.
-- **Uso por chave** mostra em gráfico as requisições, os tokens e os créditos de cada chave nas últimas 24 horas, 7 dias ou 30 dias, separados entre sucesso e falha, com linhas próprias para requisições sem chave, chaves inválidas e chaves excluídas.
+- **Uso por chave** mostra em gráfico as requisições, os tokens e os créditos de cada chave nas últimas 24 horas, 7 dias, 30 dias ou em todo o período, separados entre sucesso e falha, com linhas próprias para requisições sem chave, chaves inválidas e chaves excluídas.
 
 ---
 
@@ -393,7 +393,7 @@ A página Visão geral e a página Contas respondem, de propósito, a perguntas 
 - **Cartão Créditos do plano**: os campos de cota do servidor do Kiro neste mês, somados entre todas as contas (`usage_current / usage_limit`). A barra divide os créditos usados em **Proxy** (créditos das requisições feitas por este proxy) e **Fora** (o restante), e mostra o que ainda resta (**Restam**).
 - **Cartões Requisições e Falhas**: requisições do proxy concluídas na última hora, comparadas com a hora anterior.
 - **Página Contas**: os contadores salvos no registro de cada conta (`requestCount`, `totalTokens`, `totalCredits`).
-- **Retenção de logs**: antes de excluir linhas antigas, os totais delas vão para um resumo, então o cartão **Créditos do plano**, a distribuição por modelo e o `/v1/stats` continuam contando essas linhas. A página Requisições e o Uso por chave mostram só as linhas mantidas.
+- **Retenção de logs**: antes de excluir linhas antigas, os totais delas vão para um resumo, então o cartão **Créditos do plano**, a distribuição por modelo e o `/v1/stats` continuam contando essas linhas. Cada dia excluído também guarda seus totais diários, então o Uso por chave e o gráfico de tráfego da Visão geral continuam mostrando esse dia em 7 dias, 30 dias e em todo o período. A página Requisições mostra só as linhas mantidas.
 
 Se uma conta antiga ou excluída ainda tiver linhas em `requests`, os créditos dela continuam contando em **Proxy**. Assim, **Proxy** pode ficar alto demais, e **Fora**, baixo demais. Use **Configurações → Zona de perigo → Redefinir estatísticas** ou uma limpeza única no banco de dados se quiser apagar as linhas históricas de requisições.
 
