@@ -868,6 +868,9 @@ func TestBoundConnectNamesADroppedConnect(t *testing.T) {
 			if err != nil {
 				return
 			}
+			//! Read the CONNECT before hanging up: closing with it unread sends a reset, so
+			//! the client would sometimes see "connection reset by peer" instead of EOF.
+			_, _ = http.ReadRequest(bufio.NewReader(conn))
 			conn.Close()
 		}
 	}()
