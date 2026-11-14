@@ -1,5 +1,5 @@
 import { type JSX, lazy, Suspense } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import type { StatSparklineProps } from "./stat-sparkline";
 
 const load = () => import("./stat-sparkline");
@@ -21,7 +21,7 @@ export function LazySparkline(props: StatSparklineProps): JSX.Element {
   );
 }
 
-/** The trend slot's loading placeholder, filling the slot (28 px inline, 48 px aside). */
+/** The trend slot's loading placeholder: a chart-shaped wave filling the slot (28 px inline, 48 px aside). */
 export function TrendPlaceholder(): JSX.Element {
-  return <Skeleton className="size-full" />;
+  return <ChartSkeleton className="size-full" />;
 }

@@ -111,9 +111,12 @@ describe("ApiKeyUsageSheet", () => {
     await waitFor(() => expect(release).not.toBeNull());
     expect(within(legend(sheet)).getByText("Succeeded")).toBeInTheDocument();
     expect(within(legend(sheet)).queryByText("3")).toBeNull();
+    // The headline numbers are skullet skeletons meanwhile, busy for assistive tech.
+    expect(sheet.querySelectorAll('[aria-busy="true"]').length).toBeGreaterThan(0);
 
     release?.();
     expect(await within(legend(sheet)).findByText("3")).toBeInTheDocument();
+    await waitFor(() => expect(sheet.querySelectorAll('[aria-busy="true"]')).toHaveLength(0));
     expect(within(legend(sheet)).getByText("Failed")).toBeInTheDocument();
     expect(within(legend(sheet)).getByText("2")).toBeInTheDocument();
     expect(within(sheet).getByText("Per hour, last 24 hours")).toBeInTheDocument();

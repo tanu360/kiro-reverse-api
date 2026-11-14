@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import { AppToaster } from "@/components/layout/app-toasts";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
+import { SkeletonThemeProvider } from "@/components/shared/skeleton-theme";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 import { PrivacyProvider } from "@/lib/privacy";
@@ -27,18 +28,20 @@ async function bootstrap(): Promise<void> {
   createRoot(rootElement).render(
     <StrictMode>
       <ThemeProvider>
-        <I18nProvider>
-          <PrivacyProvider>
-            <QueryClientProvider client={queryClient}>
-              <TooltipProvider>
-                <ConfirmProvider>
-                  <RouterProvider router={router} />
-                </ConfirmProvider>
-              </TooltipProvider>
-              <AppToaster />
-            </QueryClientProvider>
-          </PrivacyProvider>
-        </I18nProvider>
+        <SkeletonThemeProvider>
+          <I18nProvider>
+            <PrivacyProvider>
+              <QueryClientProvider client={queryClient}>
+                <TooltipProvider>
+                  <ConfirmProvider>
+                    <RouterProvider router={router} />
+                  </ConfirmProvider>
+                </TooltipProvider>
+                <AppToaster />
+              </QueryClientProvider>
+            </PrivacyProvider>
+          </I18nProvider>
+        </SkeletonThemeProvider>
       </ThemeProvider>
     </StrictMode>,
   );

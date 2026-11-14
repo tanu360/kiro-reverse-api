@@ -1,6 +1,9 @@
 import type { JSX } from "react";
 import { AreaSparkline } from "@/components/charts/sparkline";
 
+/** The idle day's line: the stat tiles' quiet grey (overview/stat-sparkline). */
+const IDLE_COLOR = "color-mix(in oklab, var(--muted-foreground) 45%, transparent)";
+
 export interface ActivityPoint {
   reqs: number;
   failures: number;
@@ -17,11 +20,14 @@ export default function ActivityChart({
   data,
   height,
   onHover,
+  idle = false,
 }: {
   /** Oldest first, one point an hour. */
   data: readonly ActivityPoint[];
   height: number;
   onHover: (index: number | null) => void;
+  /** No request in the day: a quiet grey line on the floor, so it does not read as traffic. */
+  idle?: boolean;
 }): JSX.Element {
   const peak = Math.max(1, ...data.map((point) => point.reqs));
   const domain: [number, number] = [0, peak];
@@ -30,13 +36,13 @@ export default function ActivityChart({
     <div aria-hidden="true" className="relative">
       <AreaSparkline
         animate
-        color="var(--chart-1)"
+        color={idle ? IDLE_COLOR : "var(--chart-1)"}
         crosshair="dashed"
         data={data}
         dataKey="reqs"
         dot
         fill="solid"
-        fillOpacity={0.14}
+        fillOpacity={idle ? 0 : 0.14}
         height={height}
         onHoverChange={(index) => onHover(index)}
         strokeWidth={1.75}

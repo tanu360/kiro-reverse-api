@@ -6,7 +6,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { type JSX, lazy, Suspense, useMemo, useState } from "react";
+import { type JSX, lazy, type ReactNode, Suspense, useMemo, useState } from "react";
+import { Skeleton as SkulletSkeleton } from "skullet/react";
 import { ChartLegendHoverProvider } from "@/components/charts/chart-legend-hover";
 import {
   Legend,
@@ -16,6 +17,7 @@ import {
   LegendMarker,
   LegendValue,
 } from "@/components/charts/legend";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PropertyList, PropertyRow } from "@/components/shared/property-list";
@@ -172,9 +174,15 @@ export function ApiKeyUsageSheet({
       </LegendItem>
     </Legend>
   );
-  const placeholder = <div aria-hidden="true" className={USAGE_PLOT_HEIGHT} />;
+  const placeholder = <ChartSkeleton className={USAGE_PLOT_HEIGHT} />;
 
   const loading = !data;
+  // A headline number, or while the range loads a skullet bar measured from a sample of its size.
+  const stat = (content: ReactNode) => (
+    <SkulletSkeleton label={t("common:state.loading")} loading={loading}>
+      {content}
+    </SkulletSkeleton>
+  );
   const showEmpty = !loading && empty;
   let body: JSX.Element;
   if (!data && query.isError) {
@@ -287,29 +295,33 @@ export function ApiKeyUsageSheet({
             items={[
               {
                 label: t("usage.metric.requests"),
-                value: data ? formatNumber(totals?.requests ?? 0, lang) : "—",
+                value: stat(formatNumber(data ? (totals?.requests ?? 0) : 1234, lang)),
               },
               {
                 label: t("usage.failed"),
                 value:
-                  data && totals && totals.requests > 0 ? (
-                    <span className="inline-flex items-baseline gap-1.5">
-                      {formatNumber(totals.failed, lang)}
-                      <span className="font-normal text-meta text-muted-foreground">
-                        {formatFraction(totals.failed / totals.requests, 1, lang)}
-                      </span>
-                    </span>
-                  ) : (
-                    "—"
-                  ),
+                  !data || (totals && totals.requests > 0)
+                    ? stat(
+                        <span className="inline-flex items-baseline gap-1.5">
+                          {formatNumber(data ? (totals?.failed ?? 0) : 12, lang)}
+                          <span className="font-normal text-meta text-muted-foreground">
+                            {formatFraction(
+                              data && totals ? totals.failed / totals.requests : 0.01,
+                              1,
+                              lang,
+                            )}
+                          </span>
+                        </span>,
+                      )
+                    : "—",
               },
               {
                 label: t("usage.metric.credits"),
-                value: data ? formatCredits(totals?.credits ?? 0, 2, lang) : "—",
+                value: stat(formatCredits(data ? (totals?.credits ?? 0) : 123.45, 2, lang)),
               },
               {
                 label: t("usage.metric.tokens"),
-                value: data ? formatCompact(totals?.tokens ?? 0, lang) : "—",
+                value: stat(formatCompact(data ? (totals?.tokens ?? 0) : 1_200_000, lang)),
               },
             ]}
           />

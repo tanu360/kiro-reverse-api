@@ -3,8 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type JSX, useEffect, useRef, useState } from "react";
-import { Skeleton, SkulletProvider } from "skullet/react";
-import { useTheme } from "@/components/layout/theme-provider";
+import { Skeleton } from "skullet/react";
 import { AnimatedIcon } from "@/components/shared/animated-icon";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -25,17 +24,6 @@ const COPIED_MS = 2000;
 
 /** Stands in for the password while it loads, so the skeleton has its exact width. */
 const SAMPLE_PASSWORD = "00000000";
-
-/**
- * The app's skeleton tokens (index.css --skeleton and --skeleton-highlight, which switch with
- * the theme) and the md radius, so skullet's bar matches every other skeleton.
- */
-const SKELETON_COLORS = { base: "var(--skeleton)", highlight: "var(--skeleton-highlight)" };
-const SKELETON_THEME = {
-  light: SKELETON_COLORS,
-  dark: SKELETON_COLORS,
-  radius: "var(--radius-md)",
-};
 
 /**
  * /setup: shows the generated first-run password from the public GET /first-run, as the old
@@ -109,7 +97,6 @@ function GeneratedPassword({
 }): JSX.Element {
   const { t } = useT("auth");
   const { t: tShared } = useT();
-  const { resolvedTheme } = useTheme();
   const failed = unavailable && !password;
 
   return (
@@ -158,19 +145,13 @@ function GeneratedPassword({
         // While it loads (first visit, or after "Try again"), skullet draws the row from a sample
         // password: a bar where the password will be, the same size as the real row, so nothing
         // moves when it arrives.
-        <SkulletProvider mode={resolvedTheme} theme={SKELETON_THEME}>
-          <Skeleton
-            data={password || null}
-            label={tShared("state.loading")}
-            sample={SAMPLE_PASSWORD}
-          >
-            {(value) => (
-              <div className="flex min-h-10 items-center justify-center pointer-coarse:min-h-11">
-                <CopyablePassword value={value} />
-              </div>
-            )}
-          </Skeleton>
-        </SkulletProvider>
+        <Skeleton data={password || null} label={tShared("state.loading")} sample={SAMPLE_PASSWORD}>
+          {(value) => (
+            <div className="flex min-h-10 items-center justify-center pointer-coarse:min-h-11">
+              <CopyablePassword value={value} />
+            </div>
+          )}
+        </Skeleton>
       )}
     </section>
   );

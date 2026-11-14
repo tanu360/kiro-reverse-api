@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, lazy, Suspense, useId, useState } from "react";
+import { Skeleton as SkulletSkeleton } from "skullet/react";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { CreditAmount } from "@/components/shared/credit-amount";
 import { StatStrip, type StatStripItem } from "@/components/shared/stat-strip";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { heatmapQuery } from "@/lib/api/observe";
 import type { Account, HeatmapCell } from "@/lib/api/types";
 import { formatCompact, formatNumber, formatPercent, formatRelativeTime } from "@/lib/format";
@@ -135,23 +136,29 @@ function ActivityStrip({
         : t("detail.activityNone");
   }
 
-  const placeholder = <Skeleton className="w-full" style={{ height: CHART_HEIGHT }} />;
+  // Shaped like the chart it holds the place of, not a flat block.
+  const placeholder = <ChartSkeleton style={{ height: CHART_HEIGHT }} />;
   return (
     <div className={cn("px-4 py-3.5 sm:px-6", className)}>
       <div className="flex items-baseline justify-between gap-3 text-meta text-muted-foreground">
         <span>{t("detail.activity")}</span>
-        {query.isPending ? (
-          <Skeleton className="h-3 w-32" />
-        ) : (
+        {/* skullet measures the line it will show (the empty day's summary while it loads), so
+            the bar has the text's own width and the row does not move when it lands. */}
+        <SkulletSkeleton label={t("detail.activity")} loading={query.isPending}>
           <span className="truncate tabular-nums">{summary}</span>
-        )}
+        </SkulletSkeleton>
       </div>
       <div className="mt-2">
         {query.isPending ? (
           placeholder
         ) : (
           <Suspense fallback={placeholder}>
-            <ActivityChart data={cells} height={CHART_HEIGHT} onHover={setHovered} />
+            <ActivityChart
+              data={cells}
+              height={CHART_HEIGHT}
+              idle={total === 0}
+              onHover={setHovered}
+            />
           </Suspense>
         )}
       </div>
