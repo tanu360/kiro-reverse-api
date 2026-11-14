@@ -67,10 +67,11 @@ interface SheetState {
 }
 
 /**
- * Usage by key over 24 hours, 7 or 30 days, from the request log: the five busiest keys by
- * requests or credits as hatched bars (failed requests in red at the end), the rest as one
- * lighter row, as the Overview's traffic by account. No API key, invalid keys and deleted keys
- * are rows of their own. A row opens that key's usage chart.
+ * Usage by key over 24 hours, 7 or 30 days or all time, from the request log (All time adds the
+ * totals log retention kept of pruned rows): the five busiest keys by requests or credits as
+ * hatched bars (failed requests in red at the end), the rest as one lighter row, as the
+ * Overview's traffic by account. No API key, invalid keys and deleted keys are rows of their own.
+ * A row opens that key's usage chart.
  */
 export function KeyUsageCard(): JSX.Element {
   const { t, lang } = useT("api");

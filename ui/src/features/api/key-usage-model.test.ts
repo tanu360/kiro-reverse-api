@@ -5,15 +5,7 @@ import type {
   ApiKeyUsageResponse,
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
-import {
-  bucketLabel,
-  bucketTitle,
-  EMPTY_TOTALS,
-  entryRef,
-  findEntry,
-  rankEntries,
-  seriesBars,
-} from "./key-usage-model";
+import { EMPTY_TOTALS, entryRef, findEntry, rankEntries, seriesBars } from "./key-usage-model";
 
 function totals(partial: Partial<ApiKeyUsageTotals>): ApiKeyUsageTotals {
   const merged = { ...EMPTY_TOTALS, ...partial };
@@ -116,22 +108,5 @@ describe("seriesBars", () => {
       { start: 0, primary: 0, secondary: 0 },
       { start: 3600, primary: 0, secondary: 0 },
     ]);
-  });
-});
-
-describe("bucket labels", () => {
-  // Midnight on 10 March 2026 in India (+05:30) is 18:30 UTC on the 9th.
-  const istMidnight = Date.UTC(2026, 2, 9, 18, 30) / 1000;
-
-  it("labels hours and days in the offset the server bucketed with", () => {
-    expect(bucketLabel(istMidnight, "hour", 330, "en")).toMatch(/^12:00\sAM$/u);
-    expect(bucketLabel(istMidnight, "day", 330, "en")).toBe("Mar 10");
-    // The same instant in UTC is still the 9th.
-    expect(bucketLabel(istMidnight, "day", 0, "en")).toBe("Mar 9");
-  });
-
-  it("titles an hour with its span and a day with its weekday", () => {
-    expect(bucketTitle(istMidnight, "hour", 3600, 330, "en")).toMatch(/^12:00\sAM–1:00\sAM$/u);
-    expect(bucketTitle(istMidnight, "day", 86400, 330, "en")).toBe("Tue, Mar 10");
   });
 });

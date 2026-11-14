@@ -8,6 +8,7 @@ import type { ApiKey } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { publishMockEvent } from "@/lib/mocks/events";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
+import { lifetimeGrid } from "@/lib/mocks/lifetime";
 
 // /admin/api/api-keys, as proxy/admin_apikeys.go answers it. The settings endpoints belong to the
 // settings feature.
@@ -158,19 +159,30 @@ function addUsage(totals: ApiKeyUsageTotals, record: (typeof mockDb.requests)[nu
 function buildUsage(
   nowUnix: number,
   range: string,
-  spec: { bucket: "hour" | "day"; seconds: number; count: number },
+  spec: { bucket: "hour" | "day"; seconds: number; count: number } | undefined,
   tzOffset: number,
 ): ApiKeyUsageResponse {
   const off = tzOffset * 60;
-  const current = Math.floor((nowUnix + off) / spec.seconds);
-  const first = current - spec.count + 1;
-  const from = first * spec.seconds - off;
-  const to = (current + 1) * spec.seconds - off;
+  // All time (no spec): the server's grid from the oldest mock record. The mock keeps no
+  // rollups, so nothing is ever "earlier".
+  const oldest = mockDb.requests.reduce<number | undefined>(
+    (min, record) => (min === undefined || record.ts < min ? record.ts : min),
+    undefined,
+  );
+  const grid = spec ? undefined : lifetimeGrid(oldest, nowUnix, tzOffset);
+  const seconds = spec?.seconds ?? 86400;
+  const current = Math.floor((nowUnix + off) / seconds);
+  const first = current - (spec?.count ?? 1) + 1;
+  const from = grid?.from ?? first * seconds - off;
+  const to = grid?.to ?? (current + 1) * seconds - off;
+  const buckets =
+    grid?.buckets ?? Array.from({ length: spec?.count ?? 0 }, (_, i) => from + i * seconds);
   const totals = zeroUsage();
   const entries = new Map<string, ApiKeyUsageEntry>();
   for (const record of mockDb.requests) {
     if (record.ts < from || record.ts >= to) continue;
-    const index = Math.floor((record.ts + off) / spec.seconds) - first;
+    const index = grid ? grid.index(record.ts) : Math.floor((record.ts + off) / seconds) - first;
+    if (index < 0) continue;
     const id = record.apiKeyId ?? "";
     const stored = id ? findKey(id) : undefined;
     const kind = !id ? "none" : stored ? "key" : "deleted";
@@ -184,7 +196,7 @@ function buildUsage(
         ...(stored ? { keyMasked: stored.keyMasked } : {}),
         ...(kind === "deleted" && record.apiKeyMasked ? { keyMasked: record.apiKeyMasked } : {}),
         totals: zeroUsage(),
-        series: Array.from({ length: spec.count }, zeroUsage),
+        series: Array.from({ length: buckets.length }, zeroUsage),
       };
       entries.set(ref, entry);
     }
@@ -200,13 +212,13 @@ function buildUsage(
   );
   return {
     range: range as ApiKeyUsageResponse["range"],
-    bucket: spec.bucket,
-    bucketSeconds: spec.seconds,
+    bucket: grid?.bucket ?? spec?.bucket ?? "day",
+    bucketSeconds: grid?.bucketSeconds ?? seconds,
     tzOffset,
     from,
     to,
     nowUnix,
-    buckets: Array.from({ length: spec.count }, (_, i) => from + i * spec.seconds),
+    buckets,
     totals,
     keys,
   };
@@ -228,8 +240,8 @@ export const handlers: HttpHandler[] = [
     const url = new URL(request.url);
     const range = url.searchParams.get("range") || "24h";
     const spec = USAGE_RANGES[range];
-    if (!spec) {
-      return jsonError(400, "range must be 24h, 7d or 30d", { code: "invalid_usage_range" });
+    if (!spec && range !== "all") {
+      return jsonError(400, "range must be 24h, 7d, 30d or all", { code: "invalid_usage_range" });
     }
     const tzRaw = url.searchParams.get("tzOffset") || "0";
     const tzOffset = Number(tzRaw);

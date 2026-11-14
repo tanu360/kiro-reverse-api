@@ -91,8 +91,9 @@ export interface ApiKeyUsageSheetProps {
 }
 
 /**
- * One key's usage over 24 hours (hourly bars) or 7 or 30 days (daily bars): requests split
- * succeeded and failed, tokens split input and output, or credits. It reads the same query as the
+ * One key's usage over 24 hours (hourly bars), 7 or 30 days (daily bars) or all time (bars of a
+ * day, week, month or year, by the span of the log): requests split succeeded and failed, tokens
+ * split input and output, or credits. It reads the same query as the
  * Usage by key card, so opening it from there sends no request. Mount it with a fresh `key` per
  * opening so the range and measure start over.
  */
@@ -116,6 +117,9 @@ export function ApiKeyUsageSheet({
   const series = metricSeries(metric, t);
   const totals = entry?.totals;
   const empty = (totals?.requests ?? 0) === 0;
+  // All time: requests pruned before daily totals were kept count in the totals, not in a bar.
+  const earlier = entry?.earlier?.requests ?? 0;
+  const bucket = data?.bucket ?? (range === "24h" ? "hour" : "day");
   const bars = useMemo(() => (data ? seriesBars(data, entry, metric) : []), [data, entry, metric]);
   const formatValue = (value: number) =>
     metric === "credits" ? formatCredits(value, 2, lang) : formatNumber(value, lang);
@@ -176,7 +180,7 @@ export function ApiKeyUsageSheet({
             <Suspense fallback={placeholder}>
               <KeyUsageChart
                 bars={bars}
-                bucket={data?.bucket ?? (range === "24h" ? "hour" : "day")}
+                bucket={bucket}
                 bucketSeconds={data?.bucketSeconds ?? (range === "24h" ? 3600 : 86400)}
                 empty={showEmpty}
                 formatValue={formatValue}
@@ -200,6 +204,11 @@ export function ApiKeyUsageSheet({
             </div>
           ) : null}
         </div>
+        {earlier > 0 ? (
+          <p className="text-muted-foreground text-xs">
+            {t("usage.earlierNote", { count: earlier, n: formatNumber(earlier, lang) })}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -267,7 +276,7 @@ export function ApiKeyUsageSheet({
         </div>
         <ChartLegendHoverProvider>
           <SectionCard
-            description={t(`usage.per.${range}`)}
+            description={range === "all" ? t(`usage.per.all.${bucket}`) : t(`usage.per.${range}`)}
             descriptionVariant="inline"
             icon={ChartLineData02Icon}
             title={t(`usage.metric.${metric}`)}

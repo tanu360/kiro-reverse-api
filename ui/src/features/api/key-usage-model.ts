@@ -3,8 +3,6 @@ import type {
   ApiKeyUsageResponse,
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
-import { dateTimeFormat } from "@/lib/format";
-import type { Lang } from "@/lib/i18n";
 
 // Pure helpers for the per-key usage card and sheet: no React, so they test on their own.
 
@@ -140,45 +138,4 @@ export function seriesBars(
     if (metric === "credits") return { start, primary: totals.credits, secondary: 0 };
     return { start, primary: totals.succeeded, secondary: totals.failed };
   });
-}
-
-/**
- * The wall clock at a bucket start in the offset the server bucketed with, read back in UTC. The
- * labels then always match the buckets: no two hours share a label across a DST change.
- */
-function wallClock(start: number, tzOffset: number): Date {
-  return new Date((start + tzOffset * 60) * 1000);
-}
-
-/** The axis label: "14:00" for an hour, "Mar 10" for a day. */
-export function bucketLabel(
-  start: number,
-  bucket: "hour" | "day",
-  tzOffset: number,
-  lang: Lang,
-): string {
-  const options: Intl.DateTimeFormatOptions =
-    bucket === "hour"
-      ? { timeStyle: "short", timeZone: "UTC" }
-      : { month: "short", day: "numeric", timeZone: "UTC" };
-  return dateTimeFormat(lang, options).format(wallClock(start, tzOffset));
-}
-
-/** The tooltip title: "14:00–15:00" for an hour, "Tue, Mar 10" for a day. */
-export function bucketTitle(
-  start: number,
-  bucket: "hour" | "day",
-  bucketSeconds: number,
-  tzOffset: number,
-  lang: Lang,
-): string {
-  if (bucket === "hour") {
-    return `${bucketLabel(start, bucket, tzOffset, lang)}–${bucketLabel(start + bucketSeconds, bucket, tzOffset, lang)}`;
-  }
-  return dateTimeFormat(lang, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(wallClock(start, tzOffset));
 }
