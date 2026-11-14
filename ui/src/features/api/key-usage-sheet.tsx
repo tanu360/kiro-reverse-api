@@ -262,7 +262,7 @@ export function ApiKeyUsageSheet({
       </ResponsiveSheetHeader>
       <ResponsiveSheetPanel className="flex flex-col gap-4">
         <SegmentedControl
-          className="self-start"
+          className="self-end"
           render={
             <RadioGroupPrimitive
               aria-label={t("usage.range")}

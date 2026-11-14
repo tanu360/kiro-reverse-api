@@ -134,11 +134,11 @@ export const buttonVariants = cva(
         // Clear, a clean Save): a soft neutral fill with no border (coss ui / shadcn secondary),
         // a step deeper on hover and while pressed. The fill is the foreground mixed into the
         // surface it sits on, so it reads on cards, dialogs and the page in both themes.
-        // An action inside a tinted notice (Alert's Retry, Dismiss): a hairline and label in the
-        // notice's tone (its --badge-* colours). Light: the card's own fill, a faint tone wash on
-        // hover. Dark: a brighter wash of the tone over the notice instead, since the card's
-        // near-black fill sank into the dark tint like a hole. A grey fill read as dirt.
-        tone: "border-[color-mix(in_srgb,var(--badge-disc,var(--border))_34%,transparent)] bg-card text-(--badge-fg,var(--foreground)) hover:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_9%,var(--card))] data-pressed:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_9%,var(--card))] dark:border-[color-mix(in_srgb,var(--badge-disc,var(--border))_42%,transparent)] dark:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_16%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_26%,transparent)] dark:data-pressed:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_26%,transparent)]",
+        // An action inside a tinted notice (Alert's Retry, Dismiss, Review): a hairline and label
+        // in the notice's tone (its --badge-* colours) over a wash of that tone, a step deeper on
+        // hover and while pressed. The card's own fill read as a white hole in the light tint, and
+        // the dark theme's near-black card sank into it, so both themes use the wash.
+        tone: "border-[color-mix(in_srgb,var(--badge-disc,var(--border))_34%,transparent)] bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_14%,transparent)] text-(--badge-fg,var(--foreground)) hover:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_22%,transparent)] data-pressed:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_22%,transparent)] dark:border-[color-mix(in_srgb,var(--badge-disc,var(--border))_42%,transparent)] dark:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_16%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_26%,transparent)] dark:data-pressed:bg-[color-mix(in_srgb,var(--badge-disc,var(--foreground))_26%,transparent)]",
         secondary:
           "border-transparent bg-[color-mix(in_oklab,var(--foreground)_7%,transparent)] text-foreground hover:bg-[color-mix(in_oklab,var(--foreground)_11%,transparent)] data-pressed:bg-[color-mix(in_oklab,var(--foreground)_13%,transparent)]",
       },
