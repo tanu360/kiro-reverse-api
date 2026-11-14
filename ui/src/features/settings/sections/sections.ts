@@ -24,8 +24,9 @@ import {
 } from "@hugeicons/core-free-icons";
 
 /**
- * The three Settings pages, in tab order: how requests are handled, the server around them, and
- * the admin's own sign-in and data. Each has a `pages.<id>` label in the settings locale.
+ * The three Settings pages, in tab order, about seven cards each: how requests are handled, the
+ * server around them, and what keeps the proxy safe (sign-in, filters, health, alerts, data).
+ * Each has a `pages.<id>` label in the settings locale.
  */
 export const SETTINGS_PAGES = ["requests", "server", "security"] as const;
 export type SettingsPageId = (typeof SETTINGS_PAGES)[number];
@@ -44,6 +45,7 @@ export const SETTINGS_GROUPS = [
   "connection",
   "monitoring",
   "signIn",
+  "safety",
   "data",
 ] as const;
 type SettingsGroup = (typeof SETTINGS_GROUPS)[number];
@@ -55,10 +57,14 @@ export const SETTINGS_GROUP_PAGE = {
   connection: "server",
   monitoring: "server",
   signIn: "security",
+  safety: "security",
   data: "security",
 } as const satisfies Record<SettingsGroup, SettingsPageId>;
 
-/** Card anchors in page order, with the title key and icon the section nav shows. */
+/**
+ * Card anchors in page order, with the title key and icon the section nav shows. `navKey` is a
+ * shorter name for the nav, where a long title would be cut beside its On/Off pill.
+ */
 export const SETTINGS_SECTIONS = [
   { id: "settings-usage", titleKey: "usageSettings", icon: Coins01Icon, group: "requests" },
   {
@@ -71,13 +77,6 @@ export const SETTINGS_SECTIONS = [
   { id: "settings-auto-continue", titleKey: "autoContinue", icon: RepeatIcon, group: "requests" },
   { id: "settings-tool-history", titleKey: "toolHistory", icon: Wrench01Icon, group: "requests" },
   { id: "settings-image-resize", titleKey: "imageResize", icon: Image01Icon, group: "requests" },
-  { id: "settings-self-heal", titleKey: "selfHeal", icon: FirstAidKitIcon, group: "requests" },
-  {
-    id: "settings-prompt-filter",
-    titleKey: "promptFilter",
-    icon: FilterHorizontalIcon,
-    group: "requests",
-  },
   { id: "settings-thinking", titleKey: "thinkingSettings", icon: AiBrain01Icon, group: "models" },
   {
     id: "settings-model-mappings",
@@ -94,6 +93,7 @@ export const SETTINGS_SECTIONS = [
   {
     id: "settings-upstream",
     titleKey: "upstream.title",
+    navKey: "nav.upstream",
     icon: Location01Icon,
     group: "connection",
   },
@@ -112,14 +112,9 @@ export const SETTINGS_SECTIONS = [
   {
     id: "settings-response-headers",
     titleKey: "responseHeaders",
+    navKey: "nav.responseHeaders",
     icon: Tag01Icon,
     group: "connection",
-  },
-  {
-    id: "settings-alerts",
-    titleKey: "alerts:title",
-    icon: Notification01Icon,
-    group: "monitoring",
   },
   {
     id: "settings-server-log",
@@ -127,7 +122,13 @@ export const SETTINGS_SECTIONS = [
     icon: ComputerTerminal01Icon,
     group: "monitoring",
   },
-  { id: "settings-metrics", titleKey: "metrics.title", icon: Analytics01Icon, group: "monitoring" },
+  {
+    id: "settings-metrics",
+    titleKey: "metrics.title",
+    navKey: "nav.metrics",
+    icon: Analytics01Icon,
+    group: "monitoring",
+  },
   {
     id: "settings-admin-password",
     titleKey: "adminPassword",
@@ -137,9 +138,19 @@ export const SETTINGS_SECTIONS = [
   {
     id: "settings-two-factor",
     titleKey: "twoFactor.title",
+    navKey: "nav.twoFactor",
     icon: ShieldKeyIcon,
     group: "signIn",
   },
+  {
+    id: "settings-prompt-filter",
+    titleKey: "promptFilter",
+    navKey: "nav.promptFilter",
+    icon: FilterHorizontalIcon,
+    group: "safety",
+  },
+  { id: "settings-self-heal", titleKey: "selfHeal", icon: FirstAidKitIcon, group: "safety" },
+  { id: "settings-alerts", titleKey: "alerts:title", icon: Notification01Icon, group: "safety" },
   {
     id: "settings-log-retention",
     titleKey: "logRetention",
@@ -157,6 +168,7 @@ export const SETTINGS_SECTIONS = [
 ] as const satisfies readonly {
   id: string;
   titleKey: string;
+  navKey?: string;
   icon: unknown;
   group: SettingsGroup;
   tone?: "danger";
@@ -168,6 +180,12 @@ export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 /** The page a card sits on. */
 export function sectionPage(section: SettingsSection): SettingsPageId {
   return SETTINGS_GROUP_PAGE[section.group];
+}
+
+/** The route of the page a card sits on, for a link to it (with the card's id as the hash). */
+export function sectionPagePath(id: SectionId): (typeof SETTINGS_PAGE_PATH)[SettingsPageId] {
+  const section = SETTINGS_SECTIONS.find((item) => item.id === id);
+  return SETTINGS_PAGE_PATH[section ? sectionPage(section) : "requests"];
 }
 
 const PAGE_SECTIONS: Record<SettingsPageId, readonly SettingsSection[]> = {

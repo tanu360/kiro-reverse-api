@@ -82,8 +82,6 @@ const SECTION_CARDS: Record<SectionId, ComponentType> = {
   "settings-auto-continue": AutoContinueCard,
   "settings-tool-history": ToolHistoryCard,
   "settings-image-resize": ImageResizeCard,
-  "settings-self-heal": SelfHealCard,
-  "settings-prompt-filter": PromptFilterCard,
   "settings-thinking": ThinkingCard,
   "settings-model-mappings": ModelMappingsCard,
   "settings-endpoint": EndpointCard,
@@ -91,11 +89,13 @@ const SECTION_CARDS: Record<SectionId, ComponentType> = {
   "settings-outbound-proxy": OutboundProxyCard,
   "settings-proxy-pool": ProxyPoolCard,
   "settings-response-headers": ResponseHeadersCard,
-  "settings-alerts": AlertsCard,
   "settings-server-log": ServerLogCard,
   "settings-metrics": MetricsCard,
   "settings-admin-password": AdminPasswordCard,
   "settings-two-factor": TwoFactorCard,
+  "settings-prompt-filter": PromptFilterCard,
+  "settings-self-heal": SelfHealCard,
+  "settings-alerts": AlertsCard,
   "settings-log-retention": LogRetentionCard,
   "settings-danger-zone": DangerZoneCard,
 };
@@ -390,11 +390,12 @@ function SectionNav({
   const settings = useQuery({ ...settingsQuery(), enabled: onRequests }).data;
   const proxy = useQuery({ ...proxyQuery(), enabled: onServer }).data;
   const proxyPool = useQuery({ ...proxyPoolQuery(), enabled: onServer }).data;
-  const health = useQuery({ ...accountHealthQuery(), enabled: onRequests }).data;
-  const alerts = useQuery({ ...alertsQuery(), enabled: onServer }).data;
+  const onSecurity = page === "security";
+  const health = useQuery({ ...accountHealthQuery(), enabled: onSecurity }).data;
+  const alerts = useQuery({ ...alertsQuery(), enabled: onSecurity }).data;
   const headers = useQuery({ ...responseHeadersQuery(), enabled: onServer }).data;
-  const promptFilter = useQuery({ ...promptFilterQuery(), enabled: onRequests }).data;
-  const twoFactor = useQuery({ ...twoFactorQuery(), enabled: page === "security" }).data;
+  const promptFilter = useQuery({ ...promptFilterQuery(), enabled: onSecurity }).data;
+  const twoFactor = useQuery({ ...twoFactorQuery(), enabled: onSecurity }).data;
   const metrics = useQuery({ ...metricsQuery(), enabled: onServer }).data;
   // A section that is one switch shows its saved state as a pill in its nav row, so the page
   // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
@@ -468,7 +469,7 @@ function SectionNav({
         .map(
           (section): NavEntry => ({
             id: section.id,
-            label: t(section.titleKey),
+            label: t("navKey" in section ? section.navKey : section.titleKey),
             icon: section.icon,
             current: section.id === active,
             dirty: unsaved?.dirty.has(section.id) ?? false,
@@ -625,7 +626,9 @@ function SettingsContent({ page }: { page: SettingsPageId }): JSX.Element {
     <div className="flex min-w-0 flex-col gap-4 md:gap-6">
       <PageHeader description={t("description")} title={t("title")} />
       <PageTabs page={page} />
-      <div className="flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-[14rem_minmax(0,1fr)] xl:gap-10">
+      {/* The nav column is as wide as the app sidebar's rows (232 px less its 8 px insets), so
+          the two menus read as one: same rows, labels, gaps and width. */}
+      <div className="flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-[13.5rem_minmax(0,1fr)] xl:gap-10">
         <SectionNav page={page} sections={sections} wide={wide} />
         {/* Capped, so on a wide screen a row's control stays near its label; a little wider
             from 2xl, so the column does not leave an empty band on the right only. */}

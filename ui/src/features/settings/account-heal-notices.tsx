@@ -4,7 +4,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { useAdminEvent } from "@/lib/events/admin-events";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { SECTION_ID } from "./sections/sections";
+import { SECTION_ID, sectionPagePath } from "./sections/sections";
 
 /** One halt notice at a time; a recovery or a resume closes it. */
 export const HALTED_TOAST_ID = "self-heal-halted";
@@ -39,7 +39,11 @@ export function AccountHealNotices(): null {
           background: true,
           action: {
             label: t("selfHeal.open"),
-            onClick: () => void navigate({ to: "/settings", hash: SECTION_ID.selfHeal }),
+            onClick: () =>
+              void navigate({
+                to: sectionPagePath(SECTION_ID.selfHeal),
+                hash: SECTION_ID.selfHeal,
+              }),
           },
         });
         break;

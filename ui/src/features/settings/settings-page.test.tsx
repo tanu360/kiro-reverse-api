@@ -57,12 +57,12 @@ async function renderPage(page: SettingsPageId = "requests") {
     await screen.findByRole("switch", { name: "Allow overage" });
     await screen.findByRole("button", { name: "Mapping 1 actions" });
     await screen.findByLabelText("Trigger suffix");
-    await screen.findByRole("button", { name: "Add rule" });
   } else if (page === "server") {
     await screen.findByText("Preferred endpoint");
     await screen.findByText("127.0.0.1:1080");
   } else {
     await screen.findByRole("button", { name: "Change password" });
+    await screen.findByRole("button", { name: "Add rule" });
     await screen.findByRole("button", { name: "Reset statistics" });
   }
   return result;
@@ -600,7 +600,7 @@ describe("SettingsPage", () => {
   });
 
   it("adds a rule in the editor, hints at a bad regex and still saves it", async () => {
-    const { user } = await renderPage();
+    const { user } = await renderPage("security");
     const card = section(SECTION_ID.promptFilter);
     expect(within(card).getAllByRole("listitem")).toHaveLength(2);
 
@@ -651,7 +651,7 @@ describe("SettingsPage", () => {
   });
 
   it("edits and deletes a rule from its menu, and switches every filter at once", async () => {
-    const { user } = await renderPage();
+    const { user } = await renderPage("security");
     const card = section(SECTION_ID.promptFilter);
     const [first] = within(card).getAllByRole("listitem");
 

@@ -34,11 +34,11 @@ async function renderPage(page: SettingsPageId = "requests") {
   if (page === "requests") {
     await screen.findByRole("switch", { name: "Allow overage" });
     await screen.findByRole("button", { name: "Mapping 1 actions" });
-    await screen.findByRole("button", { name: "Add rule" });
   } else if (page === "server") {
     await screen.findByText("127.0.0.1:1080");
   } else {
     await screen.findByRole("button", { name: "Change password" });
+    await screen.findByRole("button", { name: "Add rule" });
     await screen.findByRole("button", { name: "Reset statistics" });
   }
   return result;
@@ -287,9 +287,9 @@ describe("settings focus", () => {
   });
 
   it("gives touch-size targets to section chips and rule inputs", async () => {
-    const { user } = await renderPage();
+    const { user } = await renderPage("security");
     // Below xl (and in tests, which match no media query) the nav is the chip row: 40 px chips.
-    expect(within(nav()).getByRole("link", { name: "Usage" })).toHaveClass("min-h-10");
+    expect(within(nav()).getByRole("link", { name: "Admin password" })).toHaveClass("min-h-10");
 
     const filter = section(SECTION_ID.promptFilter);
     await user.click(within(filter).getByRole("button", { name: "Add rule" }));
@@ -375,11 +375,13 @@ describe("settings deep link", () => {
 
   it("sends a link from before the split to the page its card is on", async () => {
     const { router } = await renderApp(`/settings#${SECTION_ID.alerts}`);
-    expect(router.state.location.pathname).toBe("/settings/server");
+    expect(router.state.location.pathname).toBe("/settings/security");
     expect(router.state.location.hash).toBe(SECTION_ID.alerts);
     // Memory history leaves window.location alone, so the card's mark is the browser's to show;
-    // here the Server page with its Alerts link is enough.
-    expect(await screen.findByRole("tab", { name: "Server", selected: true })).toBeInTheDocument();
+    // here the Security page with its Alerts link is enough.
+    expect(
+      await screen.findByRole("tab", { name: "Security", selected: true }),
+    ).toBeInTheDocument();
     const settingsNav = screen.getByRole("navigation", { name: "Settings sections" });
     expect(within(settingsNav).getByRole("link", { name: /^Alerts/ })).toBeInTheDocument();
   });
@@ -397,9 +399,9 @@ describe("settings deep link", () => {
         disconnect(): void {}
       },
     );
-    window.history.replaceState(null, "", `/settings/server#${SECTION_ID.alerts}`);
+    window.history.replaceState(null, "", `/settings/security#${SECTION_ID.alerts}`);
     try {
-      await renderPage("server");
+      await renderPage("security");
       const link = within(nav()).getByRole("link", { name: "Alerts" });
       expect(link).toHaveAttribute("aria-current", "true");
 
