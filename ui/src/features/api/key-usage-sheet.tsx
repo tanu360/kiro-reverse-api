@@ -51,10 +51,11 @@ import {
 } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { KeyStatus, KeyUsage } from "./api-keys-card";
+import { KeyStatus } from "./api-keys-card";
 import { UsageBreakdownCard } from "./key-usage-breakdown";
 import type { UsageSeries } from "./key-usage-chart";
 import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
+import { KeyLimitsCard } from "./key-usage-limits";
 import {
   EMPTY_TOTALS,
   findEntry,
@@ -413,12 +414,9 @@ export function ApiKeyUsageSheet({
                 value={formatDateTime(apiKey.createdAt, lang)}
               />
             </PropertyList>
-            <div className="px-4 py-4 sm:px-6">
-              <p className="mb-3 font-medium text-sm">{t("keys.usage")}</p>
-              <KeyUsage apiKey={apiKey} />
-            </div>
           </SectionCard>
         ) : null}
+        {apiKey ? <KeyLimitsCard apiKey={apiKey} /> : null}
       </ResponsiveSheetPanel>
     </ResponsiveSheet>
   );
