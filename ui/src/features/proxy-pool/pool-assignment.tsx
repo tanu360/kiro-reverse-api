@@ -4,9 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import type { ProxyPoolView } from "@/lib/api/proxy-pool";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { assignedProxy, proxyName, statusLook } from "./lib/pool-model";
+import { assignedProxy, proxyName, stateLook } from "./lib/pool-model";
 
-const DOT_TONE = { success: "success", destructive: "destructive", neutral: "muted" } as const;
+const DOT_TONE = {
+  success: "success",
+  destructive: "destructive",
+  warning: "warning",
+  neutral: "muted",
+} as const;
 
 /**
  * The pool proxy an account without a proxy of its own is on: its name with a status dot and a
@@ -22,7 +27,7 @@ export function PoolProxyValue({
   const { t } = useT("proxy-pool");
   const mask = useMaskText();
   const proxy = assignedProxy(view, accountId);
-  const look = proxy ? statusLook(proxy.health.status) : undefined;
+  const look = proxy ? stateLook(proxy.state) : undefined;
   return (
     <span className="flex min-w-0 items-center gap-2">
       {proxy && look ? (

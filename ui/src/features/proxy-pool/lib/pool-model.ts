@@ -9,7 +9,9 @@ import {
 import type {
   PoolProxy,
   PoolProxyInput,
+  PoolProxyState,
   PoolProxyStatus,
+  ProxyPoolCounts,
   ProxyPoolView,
 } from "@/lib/api/proxy-pool";
 import { errorMessage, serverErrorCode } from "@/lib/api/server-errors";
@@ -27,13 +29,44 @@ export function intervalOptions(current: number): number[] {
   return [...values].sort((a, b) => a - b);
 }
 
-type Tone = "success" | "destructive" | "neutral";
+type Tone = "success" | "destructive" | "neutral" | "warning";
 
 /** The badge tone and label key of a health status. */
 export function statusLook(status: PoolProxyStatus): { tone: Tone; key: string } {
   if (status === "ok") return { tone: "success", key: "proxy-pool:status.ok" };
   if (status === "failed") return { tone: "destructive", key: "proxy-pool:status.failed" };
   return { tone: "neutral", key: "proxy-pool:status.unknown" };
+}
+
+/** The badge tone and label key of a proxy's state. */
+export function stateLook(state: PoolProxyState): { tone: Tone; key: string } {
+  switch (state) {
+    case "healthy":
+      return { tone: "success", key: "proxy-pool:state.healthy" };
+    case "unhealthy":
+      return { tone: "warning", key: "proxy-pool:state.unhealthy" };
+    case "auto_disabled":
+      return { tone: "destructive", key: "proxy-pool:state.autoDisabled" };
+    case "off":
+      return { tone: "neutral", key: "proxy-pool:state.off" };
+    default:
+      return { tone: "neutral", key: "proxy-pool:state.unknown" };
+  }
+}
+
+/** The count chips over the list, in a fixed order, without the ones at 0 (but healthy). */
+export function countChips(counts: ProxyPoolCounts): { key: string; count: number; tone: Tone }[] {
+  const chips = [
+    { key: "proxy-pool:counts.healthy", count: counts.healthy, tone: "success" as const },
+    { key: "proxy-pool:counts.unhealthy", count: counts.unhealthy, tone: "warning" as const },
+    {
+      key: "proxy-pool:counts.autoDisabled",
+      count: counts.autoDisabled,
+      tone: "destructive" as const,
+    },
+    { key: "proxy-pool:counts.off", count: counts.off, tone: "neutral" as const },
+  ];
+  return chips.filter((chip, index) => index === 0 || chip.count > 0);
 }
 
 /** The label, or the address when the proxy has none. */
@@ -120,6 +153,7 @@ const POOL_ERROR_KEYS: Record<string, string> = {
   proxy_pool_not_found: "proxy-pool:serverError.notFound",
   proxy_pool_empty: "proxy-pool:serverError.empty",
   proxy_pool_full: "proxy-pool:serverError.full",
+  proxy_pool_detected_sign_in: "proxy-pool:serverError.detectedSignIn",
 };
 
 /** A pool error code's own text (with the server's detail), or the app's usual error text. */

@@ -12,7 +12,12 @@ import { type JSX, useState } from "react";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { InfoHint } from "@/components/shared/info-hint";
 import { RelativeTime } from "@/components/shared/relative-time";
-import { SettingsEmptyRow, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
+import {
+  SETTINGS_ROW_X,
+  SettingsEmptyRow,
+  SettingsRow,
+  SwitchField,
+} from "@/components/shared/settings-rows";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,16 +29,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { SECTION_ID } from "@/features/settings/sections/sections";
 import { SectionQuery, SettingsGroup } from "@/features/settings/sections/settings-section";
 import {
+  adoptDetectedProxy,
   checkAllPoolProxies,
+  checkDetectedProxy,
   checkPoolProxy,
+  type DetectedProxy,
   type PoolProxy,
   type ProxyPoolSettingsPatch,
   type ProxyPoolView,
   proxyPoolQuery,
   removePoolProxy,
+  setPoolProxyEnabled,
   updateProxyPoolSettings,
 } from "@/lib/api/proxy-pool";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -42,7 +52,13 @@ import { fillNodes, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { proxyFailureSentence } from "./lib/pool-failure";
-import { intervalOptions, poolErrorMessage, proxyName, statusLook } from "./lib/pool-model";
+import {
+  countChips,
+  intervalOptions,
+  poolErrorMessage,
+  proxyName,
+  stateLook,
+} from "./lib/pool-model";
 import { ProxyEditor } from "./proxy-pool-editor";
 
 /** Settings card for the outbound proxy pool: its switches, the health check and the proxies. */
@@ -156,7 +172,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
     try {
       const { proxy: checked } = await checkPoolProxy(proxy.id);
       const name = mask(proxyName(checked));
-      if (checked.health.status === "ok") {
+      if (checked.health.status === "ok" && !checked.health.failures) {
         toast.success(t("card.testOk", { name }));
       } else {
         const { errorCode, errorStatus } = checked.health;
@@ -174,6 +190,66 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
       });
       refetch();
     }
+  };
+
+  const [switching, setSwitching] = useState<ReadonlySet<string>>(new Set());
+  const toggle = async (proxy: PoolProxy, enabled: boolean) => {
+    setSwitching((prev) => new Set(prev).add(proxy.id));
+    try {
+      await setPoolProxyEnabled(proxy.id, enabled);
+      const name = mask(proxyName(proxy));
+      toast.success(enabled ? t("card.switchedOn", { name }) : t("card.switchedOff", { name }));
+    } catch (error) {
+      toast.error(poolErrorMessage(error, t));
+    } finally {
+      setSwitching((prev) => {
+        const next = new Set(prev);
+        next.delete(proxy.id);
+        return next;
+      });
+      refetch();
+    }
+  };
+
+  const testDetected = async (proxy: DetectedProxy) => {
+    setTesting((prev) => new Set(prev).add(proxy.id));
+    try {
+      const { detected } = await checkDetectedProxy(proxy.id);
+      const name = mask(proxy.url);
+      if (detected.health.status === "ok" && !detected.health.failures) {
+        toast.success(t("card.testOk", { name }));
+      } else {
+        const { errorCode, errorStatus } = detected.health;
+        toast.error(
+          t("card.testFailed", { name, error: proxyFailureSentence(errorCode, errorStatus, t) }),
+        );
+      }
+    } catch (error) {
+      toast.error(poolErrorMessage(error, t));
+    } finally {
+      setTesting((prev) => {
+        const next = new Set(prev);
+        next.delete(proxy.id);
+        return next;
+      });
+      refetch();
+    }
+  };
+
+  const adopt = async (proxy: DetectedProxy) => {
+    const confirmed = await confirm({
+      title: t("detected.adoptTitle"),
+      description: t("detected.adoptBody", { name: mask(proxy.url) }),
+      confirmLabel: t("detected.adopt"),
+    });
+    if (!confirmed) return;
+    try {
+      await adoptDetectedProxy(proxy.id);
+      toast.success(t("detected.adopted", { name: mask(proxy.url) }));
+    } catch (error) {
+      toast.error(poolErrorMessage(error, t));
+    }
+    refetch();
   };
 
   const remove = async (proxy: PoolProxy) => {
@@ -199,6 +275,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   const fallback = pending?.directFallback ?? view.directFallback;
   const interval = pending?.checkIntervalMin ?? view.checkIntervalMin;
   const empty = view.proxies.length === 0;
+  const anyProxy = !empty || view.detected.length > 0;
   const openEditor = (proxy?: PoolProxy) =>
     setEditor((prev) => ({ open: true, session: prev.session + 1, proxy }));
 
@@ -210,7 +287,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
             <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
             {t("card.add")}
           </Button>
-          {empty ? null : (
+          {anyProxy ? (
             <Button
               loading={checkAll.isPending}
               onClick={() => checkAll.mutate()}
@@ -220,7 +297,7 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
               <HugeiconsIcon icon={Pulse01Icon} aria-hidden="true" />
               {t("card.checkAll")}
             </Button>
-          )}
+          ) : null}
         </div>
       }
       badge={
@@ -263,20 +340,48 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
         title={t("card.intervalTitle")}
       />
 
+      {anyProxy ? <CountsRow view={view} /> : null}
+
       {empty ? (
         <SettingsEmptyRow>{t("card.empty")}</SettingsEmptyRow>
       ) : (
         view.proxies.map((proxy) => (
           <ProxyRow
             key={proxy.id}
+            maxFailures={view.maxFailures}
             onEdit={() => openEditor(proxy)}
             onRemove={() => void remove(proxy)}
             onTest={() => void test(proxy)}
+            onToggle={(enabled) => void toggle(proxy, enabled)}
             proxy={proxy}
+            switching={switching.has(proxy.id)}
             testing={testing.has(proxy.id)}
           />
         ))
       )}
+
+      {view.detected.length > 0 ? (
+        <>
+          <SettingsRow
+            description={t("detected.hint")}
+            status={
+              <Badge size="sm" tone="neutral">
+                {view.detected.length}
+              </Badge>
+            }
+            title={t("detected.title")}
+          />
+          {view.detected.map((proxy) => (
+            <DetectedRow
+              key={proxy.id}
+              onAdopt={() => void adopt(proxy)}
+              onTest={() => void testDetected(proxy)}
+              proxy={proxy}
+              testing={testing.has(proxy.id)}
+            />
+          ))}
+        </>
+      ) : null}
 
       <Dialog
         onOpenChange={(open) => {
@@ -297,29 +402,124 @@ function ProxyPoolPanel({ view }: { view: ProxyPoolView }): JSX.Element {
   );
 }
 
-/** One proxy: its name and status, then its address, sign-in, last check, latency and load. */
+/** The proxies in each state: healthy always, the others when there are any. */
+function CountsRow({ view }: { view: ProxyPoolView }): JSX.Element {
+  const { t } = useT("proxy-pool");
+  return (
+    <p
+      className={`${SETTINGS_ROW_X} flex flex-wrap items-center gap-2 py-3`}
+      data-slot="settings-row"
+    >
+      <span className="sr-only">{t("counts.label")}</span>
+      {countChips(view.counts).map((chip) => (
+        <Badge dot key={chip.key} size="sm" tone={chip.tone}>
+          {t(chip.key, { count: chip.count })}
+        </Badge>
+      ))}
+    </p>
+  );
+}
+
+/** The last check's time and latency, the same on pool and detected rows. */
+function CheckFacts({ proxy }: { proxy: PoolProxy | DetectedProxy }): JSX.Element {
+  const { t, lang } = useT("proxy-pool");
+  const { checkedAt, latencyMs } = proxy.health;
+  return (
+    <>
+      <span>
+        {checkedAt
+          ? fillNodes(t("card.checkedAt"), {
+              time: <RelativeTime value={Math.floor(checkedAt / 1000)} />,
+            })
+          : t("card.notChecked")}
+      </span>
+      {proxy.state === "healthy" && latencyMs ? (
+        <span className="tabular-nums">{formatDurationMs(latencyMs, true, lang)}</span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Why a proxy is not plainly healthy: how many failures in a row it has (and that the next ones
+ * take it out), that it was taken out, or that it is switched off; with the last error behind
+ * Details, which opens below so the sentence stays readable on a phone.
+ */
+function StateNote({
+  proxy,
+  maxFailures,
+}: {
+  proxy: PoolProxy | DetectedProxy;
+  maxFailures?: number;
+}): JSX.Element | null {
+  const { t } = useT("proxy-pool");
+  const mask = useMaskText();
+  const { lastError, errorCode, errorStatus, failures = 0 } = proxy.health;
+  if (proxy.state === "off") {
+    return <p className="text-muted-foreground text-xs">{t("card.offNote")}</p>;
+  }
+  if (proxy.state !== "unhealthy" && proxy.state !== "auto_disabled") return null;
+  let lead: string;
+  if (proxy.state === "auto_disabled") lead = t("card.autoDisabledNote", { max: maxFailures ?? 3 });
+  else if (maxFailures !== undefined)
+    lead = t("card.strikesNote", { count: failures, max: maxFailures });
+  else lead = t("detected.failingNote", { count: failures });
+  const tone =
+    proxy.state === "auto_disabled" ? "text-destructive-foreground" : "text-warning-foreground";
+  return (
+    <p className={`wrap-anywhere text-xs ${tone}`}>
+      {lead}
+      {lastError ? (
+        <>
+          {" "}
+          {t("card.lastError", { error: proxyFailureSentence(errorCode, errorStatus, t) })}{" "}
+          <InfoHint hint={mask(lastError)} side="bottom">
+            {t("card.lastErrorDetails")}
+          </InfoHint>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
+/**
+ * One proxy: its name and state, then its address, sign-in, last check, latency and load. The
+ * switch takes it out of the pool without removing it.
+ */
 function ProxyRow({
   proxy,
+  maxFailures,
   testing,
+  switching,
   onTest,
+  onToggle,
   onEdit,
   onRemove,
 }: {
   proxy: PoolProxy;
+  maxFailures: number;
   testing: boolean;
+  switching: boolean;
   onTest: () => void;
+  onToggle: (enabled: boolean) => void;
   onEdit: () => void;
   onRemove: () => void;
 }): JSX.Element {
-  const { t, lang } = useT("proxy-pool");
+  const { t } = useT("proxy-pool");
   const mask = useMaskText();
-  const look = statusLook(proxy.health.status);
-  const { checkedAt, latencyMs, lastError, errorCode, errorStatus } = proxy.health;
+  const look = stateLook(proxy.state);
+  const name = mask(proxyName(proxy));
   return (
     <SettingsRow
       control={
         // A group named by the row; under the text on a narrow row, at its end on a wide one.
         <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
+          <Switch
+            aria-label={t("card.switchLabel", { name })}
+            checked={proxy.enabled}
+            disabled={switching}
+            onCheckedChange={(next) => onToggle(next)}
+          />
           <Button loading={testing} onClick={onTest} size="sm" variant="secondary">
             <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
             {t("actions.test")}
@@ -345,16 +545,7 @@ function ProxyRow({
           {proxy.username ? (
             <span>{t("card.signsInAs", { user: mask(proxy.username) })}</span>
           ) : null}
-          <span>
-            {checkedAt
-              ? fillNodes(t("card.checkedAt"), {
-                  time: <RelativeTime value={Math.floor(checkedAt / 1000)} />,
-                })
-              : t("card.notChecked")}
-          </span>
-          {proxy.health.status === "ok" && latencyMs ? (
-            <span className="tabular-nums">{formatDurationMs(latencyMs, true, lang)}</span>
-          ) : null}
+          <CheckFacts proxy={proxy} />
           <span className="tabular-nums">{t("card.accounts", { count: proxy.accounts })}</span>
         </span>
       }
@@ -374,17 +565,76 @@ function ProxyRow({
         )
       }
     >
-      {proxy.health.status === "failed" && lastError ? (
-        // A short sentence in the viewer's language; the server's own text behind Details,
-        // which opens on hover, click, tap and keyboard alike. Details often wraps under the
-        // sentence on a phone, so its note opens below and leaves the sentence readable.
-        <p className="wrap-anywhere text-destructive-foreground text-xs">
-          {t("card.lastError", { error: proxyFailureSentence(errorCode, errorStatus, t) })}{" "}
-          <InfoHint hint={mask(lastError)} side="bottom">
-            {t("card.lastErrorDetails")}
-          </InfoHint>
-        </p>
-      ) : null}
+      <StateNote maxFailures={maxFailures} proxy={proxy} />
+    </SettingsRow>
+  );
+}
+
+/**
+ * A proxy in use outside the pool: the global proxy or accounts' own. Checked like a pool proxy
+ * and never shared; one without a sign-in can join the pool, one with a sign-in never does.
+ */
+function DetectedRow({
+  proxy,
+  testing,
+  onTest,
+  onAdopt,
+}: {
+  proxy: DetectedProxy;
+  testing: boolean;
+  onTest: () => void;
+  onAdopt: () => void;
+}): JSX.Element {
+  const { t } = useT("proxy-pool");
+  const mask = useMaskText();
+  const look = stateLook(proxy.state);
+  const accounts = proxy.accountIds.length;
+  return (
+    <SettingsRow
+      control={
+        <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
+          <Button loading={testing} onClick={onTest} size="sm" variant="secondary">
+            <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
+            {t("actions.test")}
+          </Button>
+          {proxy.canAdopt ? (
+            <Button onClick={onAdopt} size="sm" variant="secondary">
+              <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
+              {t("detected.adopt")}
+            </Button>
+          ) : null}
+        </fieldset>
+      }
+      controlWidth="actions"
+      description={
+        <span className="flex flex-wrap gap-x-3 gap-y-1">
+          {proxy.global ? <span>{t("detected.global")}</span> : null}
+          {accounts > 0 ? <span>{t("detected.ownOf", { count: accounts })}</span> : null}
+          {proxy.username ? (
+            <span>{t("card.signsInAs", { user: mask(proxy.username) })}</span>
+          ) : null}
+          <CheckFacts proxy={proxy} />
+          {proxy.inPool ? <span>{t("detected.inPool")}</span> : null}
+          {proxy.username || proxy.hasPassword ? <span>{t("detected.notShared")}</span> : null}
+        </span>
+      }
+      status={
+        <span className="flex flex-wrap items-center gap-2">
+          <Badge dot size="sm" tone={look.tone}>
+            {t(look.key)}
+          </Badge>
+          <Badge size="sm" tone="primary">
+            {t("detected.badge")}
+          </Badge>
+        </span>
+      }
+      title={
+        <span className="wrap-anywhere font-mono text-meta" translate="no">
+          {proxy.url}
+        </span>
+      }
+    >
+      <StateNote proxy={proxy} />
     </SettingsRow>
   );
 }
