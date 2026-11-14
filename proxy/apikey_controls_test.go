@@ -187,6 +187,13 @@ func TestApiKeyAllowedModelsRefuseOtherModels(t *testing.T) {
 			t.Fatalf("models lists %q for a haiku-only key", m.ID)
 		}
 	}
+	one := serveWithKey(h, http.MethodGet, "/v1/models/claude-sonnet-4.5", key.Key, "")
+	if one.Code != http.StatusNotFound {
+		t.Fatalf("one model: %d %s", one.Code, one.Body.String())
+	}
+	if _, msg, code := errorBody(t, one); msg != `model "claude-sonnet-4.5" is not available to this API key` || code != "model_not_found" {
+		t.Fatalf("one model error = %q %q", msg, code)
+	}
 }
 
 func TestApiKeyTagScopeRoutesOnlyToTaggedAccounts(t *testing.T) {
@@ -305,5 +312,33 @@ func TestAdminApiKeyControlsRoundTrip(t *testing.T) {
 		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"code":"`+code+`"`) {
 			t.Fatalf("%s: %d %s, want 400 %s", body, rec.Code, rec.Body.String(), code)
 		}
+	}
+}
+
+func TestScopedKeyAtAccountRPMLimitNamesItsScope(t *testing.T) {
+	served := &servedBy{}
+	h := newKeyAccessHandler(t, recordingUpstream(t, served), "lim-a", "lim-b")
+	tagAccount(t, "lim-a", "solo")
+	key := addTestKey(t, config.ApiKeyEntry{Key: "sk-solo-scope", AccountTags: []string{"solo"}})
+	open := addTestKey(t, config.ApiKeyEntry{Key: "sk-solo-open"})
+	requireKeys(t)
+	if err := config.UpdateAccountRPMLimit(1); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = config.UpdateAccountRPMLimit(0) })
+
+	if rec := serveWithKey(h, http.MethodPost, "/v1/messages", key.Key, boundKeyClaudeBody); rec.Code != http.StatusOK {
+		t.Fatalf("first: %d %s", rec.Code, rec.Body.String())
+	}
+	rec := serveWithKey(h, http.MethodPost, "/v1/messages", key.Key, strings.Replace(boundKeyClaudeBody, `"hi"`, `"again"`, 1))
+	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") == "" {
+		t.Fatalf("scoped key at its account's limit: %d %q %s", rec.Code, rec.Header().Get("Retry-After"), rec.Body.String())
+	}
+	if _, msg, _ := errorBody(t, rec); msg != "Every account this API key can use reached the limit of 1 request per minute" {
+		t.Fatalf("message = %q", msg)
+	}
+	// The other account is free, so a key without a scope is served.
+	if rec := serveWithKey(h, http.MethodPost, "/v1/messages", open.Key, strings.Replace(boundKeyClaudeBody, `"hi"`, `"open"`, 1)); rec.Code != http.StatusOK {
+		t.Fatalf("open key: %d %s", rec.Code, rec.Body.String())
 	}
 }

@@ -208,7 +208,7 @@ func (h *Handler) buildDailySummary(from, to time.Time) (dailySummary, error) {
 	for _, r := range keys {
 		label, ok := keyLabels[r.ID]
 		if !ok {
-			label = "deleted key"
+			label = deletedKeyLabel(r.ID, s.From, s.To)
 		}
 		r.Label = label
 		s.Keys = append(s.Keys, r)
@@ -220,6 +220,21 @@ func (h *Handler) buildDailySummary(from, to time.Time) (dailySummary, error) {
 	}
 	s.Attention = summaryAttentionFor(stored, forecasts)
 	return s, nil
+}
+
+// deletedKeyLabel names a key config no longer has by the masked value it last
+// sent in [from, to), so two deleted keys never read the same. "deleted key"
+// alone when the log kept no value.
+func deletedKeyLabel(id string, from, to int64) string {
+	d, err := db.Get()
+	if err != nil {
+		return "deleted key"
+	}
+	var last string
+	if err := d.QueryRow(`SELECT api_key FROM requests WHERE api_key_id = ? AND api_key <> '' AND ts >= ? AND ts < ? ORDER BY ts DESC, id DESC LIMIT 1`, id, from, to).Scan(&last); err != nil || last == "" {
+		return "deleted key"
+	}
+	return "deleted key " + config.MaskApiKey(last)
 }
 
 // groupDigits writes n with thousands separators: 12,345.

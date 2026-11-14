@@ -100,8 +100,12 @@ func seedSummaryTraffic(t *testing.T, now time.Time) {
 		{30 * time.Hour, "sum-b", "key-2", 99, 1, 99999, 9999},
 	}
 	for _, r := range rows {
-		if _, err := d.Exec(`INSERT INTO requests (ts, account_id, api_key_id, credits, success, in_tokens, out_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			now.Add(-r.ago).Unix(), r.account, r.key, r.credits, r.success, r.in, r.outT); err != nil {
+		value := ""
+		if r.key == "key-1" {
+			value = "sk-abc****1111"
+		}
+		if _, err := d.Exec(`INSERT INTO requests (ts, account_id, api_key_id, api_key, credits, success, in_tokens, out_tokens) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			now.Add(-r.ago).Unix(), r.account, r.key, value, r.credits, r.success, r.in, r.outT); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -124,7 +128,8 @@ func TestDailySummaryContents(t *testing.T) {
 	if len(s.Accounts) != 2 || s.Accounts[0].Label != "sum-a@example.com" || s.Accounts[0].Requests != 2 {
 		t.Fatalf("top accounts = %+v", s.Accounts)
 	}
-	if len(s.Keys) != 2 || s.Keys[0].Label != "deleted key" {
+	//! Deleted keys read by the masked value they last sent, so two of them never look alike.
+	if len(s.Keys) != 2 || s.Keys[0].Label != "deleted key sk-abc****1111" || s.Keys[1].Label != "deleted key" {
 		t.Fatalf("top keys = %+v", s.Keys)
 	}
 	if len(s.Attention) != 1 || s.Attention[0].ID != "sum-c" || s.Attention[0].Reason != "banned" {
