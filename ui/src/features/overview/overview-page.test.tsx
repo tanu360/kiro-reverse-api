@@ -290,6 +290,84 @@ describe("OverviewPage", () => {
     expect(await screen.findByText("Requests per 5 min, last 6 hours")).toBeInTheDocument();
   });
 
+  it("offers All time and writes ?range=all", async () => {
+    const tzOffsets: string[] = [];
+    mockServer.use(
+      http.get(apiUrl("/observe/traffic-history"), ({ request }) => {
+        tzOffsets.push(new URL(request.url).searchParams.get("tzOffset") ?? "");
+        return HttpResponse.json({
+          range: "all",
+          bucket: "week",
+          bucketSeconds: 604800,
+          tzOffset: 0,
+          from: 1_699_833_600,
+          to: 1_701_043_200,
+          nowUnix: 1_700_000_000,
+          buckets: [1_699_833_600, 1_700_438_400],
+          series: [
+            { succeeded: 40, failed: 2, retried: 3 },
+            { succeeded: 7, failed: 1, retried: 0 },
+          ],
+          totals: { succeeded: 47, failed: 3, retried: 3 },
+        });
+      }),
+    );
+    const { user, router } = await renderApp("/");
+    const traffic = await screen.findByRole("region", { name: "Traffic" });
+    const ranges = within(traffic).getByRole("radiogroup", { name: "Time range" });
+    expect(
+      within(ranges)
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent),
+    ).toEqual(["1h", "6h", "24h", "All time"]);
+    await user.click(within(ranges).getByRole("radio", { name: "All time" }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ range: "all" });
+    });
+    expect(await within(traffic).findByText("Requests per week, all time")).toBeInTheDocument();
+    expect(
+      await within(traffic).findByText("47 succeeded and 3 failed requests in this range."),
+    ).toBeInTheDocument();
+    expect(tzOffsets).toHaveLength(1);
+    expect(within(traffic).queryByText(/have no date/u)).toBeNull();
+  });
+
+  it("opens on All time from ?range=all and notes traffic without a date", async () => {
+    mockServer.use(
+      http.get(apiUrl("/observe/traffic-history"), () =>
+        HttpResponse.json({
+          range: "all",
+          bucket: "day",
+          bucketSeconds: 86400,
+          tzOffset: 0,
+          from: 1_699_401_600,
+          to: 1_700_006_400,
+          nowUnix: 1_700_000_000,
+          buckets: Array.from({ length: 7 }, (_, i) => 1_699_401_600 + i * 86400),
+          series: Array.from({ length: 7 }, (_, i) => ({ succeeded: i, failed: 0, retried: 0 })),
+          totals: { succeeded: 21 + 26, failed: 0, retried: 2 },
+          earlier: { succeeded: 26, failed: 0, retried: 2 },
+        }),
+      ),
+    );
+    await renderApp("/?range=all");
+    const traffic = await screen.findByRole("region", { name: "Traffic" });
+    expect(within(traffic).getByRole("radio", { name: "All time" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(await within(traffic).findByText("Requests per day, all time")).toBeInTheDocument();
+    expect(
+      await within(traffic).findByText(
+        "26 older requests have no date, so the chart leaves them out. The totals include them.",
+      ),
+    ).toBeInTheDocument();
+    // The legend's totals include them.
+    expect(
+      within(traffic).getByText("47 succeeded and 0 failed requests in this range."),
+    ).toBeInTheDocument();
+  });
+
   it("falls back to the 1 h range for an unknown ?range= instead of crashing", async () => {
     await renderApp("/?range=7d");
     const traffic = await screen.findByRole("region", { name: "Traffic" });

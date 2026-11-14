@@ -1,12 +1,15 @@
 import type { HeatmapCell, ModelMixEntry } from "@/lib/api/types";
 import type { OverviewRange } from "@/routes/-search";
 
+/** The traffic ranges the live per-minute heatmap covers; All time reads the request log. */
+export type HeatmapRange = Exclude<OverviewRange, "all">;
+
 /**
  * Heatmap window and bucket size per traffic-chart range: 30, 72 and 96 points. The 1 h view
  * uses 2-minute buckets because sparse per-minute counts draw as a comb of spikes.
  */
 export const RANGE_WINDOWS: Readonly<
-  Record<OverviewRange, { windowMin: number; bucketMin: number }>
+  Record<HeatmapRange, { windowMin: number; bucketMin: number }>
 > = {
   "1h": { windowMin: 60, bucketMin: 2 },
   "6h": { windowMin: 360, bucketMin: 5 },

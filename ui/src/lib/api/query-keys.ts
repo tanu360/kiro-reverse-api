@@ -31,6 +31,7 @@ export const queryKeys = {
         : (["observe", "heatmap", windowMin] as const);
     },
     modelMix: () => ["observe", "model-mix"] as const,
+    trafficHistory: (tzOffset: number) => ["observe", "traffic-history", tzOffset] as const,
     accountActivity: () => ["observe", "account-activity"] as const,
   },
   requests: {

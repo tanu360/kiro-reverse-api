@@ -1,7 +1,8 @@
 // Search-param schemas for the file routes. The "-" prefix keeps this file out of the route
 // tree. Features import the types from here; this module must not import route files.
 
-export type OverviewRange = "1h" | "6h" | "24h";
+/** The Overview traffic range; `all` is every logged request, by day, week, month or year. */
+export type OverviewRange = "1h" | "6h" | "24h" | "all";
 /** range undefined = '1h' */
 interface OverviewSearch {
   range?: OverviewRange;
@@ -85,7 +86,7 @@ interface LoginSearch {
   redirect?: string;
 }
 
-const OVERVIEW_RANGES: readonly OverviewRange[] = ["1h", "6h", "24h"];
+const OVERVIEW_RANGES: readonly OverviewRange[] = ["1h", "6h", "24h", "all"];
 const PAGE_SIZES: readonly NonNullable<RequestsSearch["pageSize"]>[] = [10, 25, 50, 100];
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {

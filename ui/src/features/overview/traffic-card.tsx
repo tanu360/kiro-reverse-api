@@ -19,7 +19,7 @@ import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
-import { heatmapQuery } from "@/lib/api/observe";
+import { heatmapQuery, trafficHistoryQuery } from "@/lib/api/observe";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ import type { OverviewRange } from "@/routes/-search";
 import {
   bucketGlobal,
   bucketRetries,
+  type HeatmapRange,
   HOUR,
   HOUR_PAIR_WINDOW,
   RANGE_WINDOWS,
@@ -34,12 +35,13 @@ import {
 } from "./aggregate";
 import { FAILED_COLOR, PREVIOUS_COLOR, RETRIED_COLOR, SUCCEEDED_COLOR } from "./colors";
 import { useTotalsFailed } from "./totals";
+import type { TrafficBar } from "./traffic-chart";
 
 const TrafficChart = lazy(() => import("./traffic-chart"));
 
-const RANGES: readonly OverviewRange[] = ["1h", "6h", "24h"];
+const RANGES: readonly OverviewRange[] = ["1h", "6h", "24h", "all"];
 /** Bucket minutes on a phone: 15 bars for 1 h, 18 for 6 h, 24 for 24 h. */
-const PHONE_BUCKET_MIN: Readonly<Record<OverviewRange, number>> = { "1h": 4, "6h": 20, "24h": 60 };
+const PHONE_BUCKET_MIN: Readonly<Record<HeatmapRange, number>> = { "1h": 4, "6h": 20, "24h": 60 };
 /** The plot's height, sized by the card's width (SectionCard is a container), not the viewport. */
 export const PLOT_HEIGHT = "h-64 @2xl:h-72";
 
@@ -72,8 +74,10 @@ function TrafficLegendItem({
 
 /**
  * Port of Studio's performance overview: succeeded, retried and failed requests over 1, 6 or
- * 24 h as hatched stacked bars, with the previous hour dashed over the 1 h view. The range pill
- * sits in the header, top right at every width; the legend with its totals opens the panel.
+ * 24 h as hatched stacked bars, with the previous hour dashed over the 1 h view. All time draws
+ * the request log by day, week, month or year instead, and its legend totals match the lifetime
+ * totals. The range pill sits in the header, top right at every width; the legend with its totals
+ * opens the panel.
  */
 export function TrafficCard(): JSX.Element {
   const { t, lang } = useT("overview");
@@ -85,39 +89,66 @@ export function TrafficCard(): JSX.Element {
   const totalsFailed = useTotalsFailed();
   // Phones draw half as many bars (or fewer), each wider: 30 two-minute bars were slivers there.
   const phone = useIsMobile();
-  const { windowMin } = RANGE_WINDOWS[range];
-  const bucketMin = phone ? PHONE_BUCKET_MIN[range] : RANGE_WINDOWS[range].bucketMin;
+  const allTime = range === "all";
+  // All time keeps the 24 h window for the (disabled) heatmap query, so no hook changes order.
+  const heatRange: HeatmapRange = allTime ? "24h" : range;
+  const { windowMin } = RANGE_WINDOWS[heatRange];
+  const bucketMin = phone ? PHONE_BUCKET_MIN[heatRange] : RANGE_WINDOWS[heatRange].bucketMin;
   const hourView = range === "1h";
   // Only the global row is read (scope=global: no per-account rows on the wire). The 1 h view
   // reads the two-hour heatmap the status cards already load (same key, no extra request), and
   // takes its older hour as the dashed comparison. It follows SSE ticks; the longer ranges poll
-  // every 60 s.
-  const query = useQuery(
-    heatmapQuery(hourView ? HOUR_PAIR_WINDOW : windowMin, { live: hourView, scope: "global" }),
-  );
-  const data = query.data;
+  // every 60 s. All time reads the request log by day or longer and polls every 5 minutes.
+  const heatmap = useQuery({
+    ...heatmapQuery(hourView ? HOUR_PAIR_WINDOW : windowMin, { live: hourView, scope: "global" }),
+    enabled: !allTime,
+  });
+  const history = useQuery({ ...trafficHistoryQuery(), enabled: allTime });
+  const query = allTime ? history : heatmap;
+  const heat = allTime ? undefined : heatmap.data;
+  const past = allTime ? history.data : undefined;
+  const data = allTime ? past : heat;
 
-  const bars = useMemo(() => {
-    if (!data) return [];
+  const bars = useMemo((): TrafficBar[] => {
+    if (past) {
+      return past.buckets.map((start, index) => {
+        const counts = past.series[index];
+        return {
+          date: new Date(start * 1000),
+          succeeded: counts?.succeeded ?? 0,
+          failed: counts?.failed ?? 0,
+          retried: counts?.retried ?? 0,
+        };
+      });
+    }
+    if (!heat) return [];
     const points = hourView
-      ? withPreviousWindow(data.global.cells, data.nowUnix, bucketMin, HOUR)
-      : bucketGlobal(data.global.cells, data.nowUnix, bucketMin, windowMin);
-    const retries = bucketRetries(data.global.cells, bucketMin, hourView ? HOUR : windowMin);
+      ? withPreviousWindow(heat.global.cells, heat.nowUnix, bucketMin, HOUR)
+      : bucketGlobal(heat.global.cells, heat.nowUnix, bucketMin, windowMin);
+    const retries = bucketRetries(heat.global.cells, bucketMin, hourView ? HOUR : windowMin);
     return points.map((point, index) => ({ ...point, retried: retries[index] ?? 0 }));
-  }, [data, hourView, bucketMin, windowMin]);
+  }, [past, heat, hourView, bucketMin, windowMin]);
   const totals = useMemo(
     () =>
-      bars.reduce(
-        (sum, p) => ({
-          succeeded: sum.succeeded + p.succeeded,
-          retried: sum.retried + p.retried,
-          failed: sum.failed + p.failed,
-          previous: sum.previous + (p.previous ?? 0),
-        }),
-        { succeeded: 0, retried: 0, failed: 0, previous: 0 },
-      ),
-    [bars],
+      // All time: the server's totals, which also count the traffic that has no day.
+      past
+        ? { ...past.totals, previous: 0 }
+        : bars.reduce(
+            (sum, p) => ({
+              succeeded: sum.succeeded + p.succeeded,
+              retried: sum.retried + p.retried,
+              failed: sum.failed + p.failed,
+              previous: sum.previous + (p.previous ?? 0),
+            }),
+            { succeeded: 0, retried: 0, failed: 0, previous: 0 },
+          ),
+    [past, bars],
   );
+  const earlier = past?.earlier ? past.earlier.succeeded + past.earlier.failed : 0;
+  // All time's bars and title follow the bucket the server picked for the span of the log.
+  const period = past
+    ? { bucket: past.bucket, bucketSeconds: past.bucketSeconds, tzOffset: past.tzOffset }
+    : undefined;
   // Empty only when nothing at all is drawn: in the 1 h view the previous hour's dashed line
   // alone is still traffic to show, so it keeps the chart instead of "No traffic yet".
   const empty = totals.succeeded + totals.retried + totals.failed + totals.previous === 0;
@@ -161,6 +192,7 @@ export function TrafficCard(): JSX.Element {
     <TrafficChart
       bars={[]}
       bucketMin={bucketMin}
+      period={period}
       labels={labels}
       lang={lang}
       reducedMotion={reducedMotion}
@@ -220,6 +252,7 @@ export function TrafficCard(): JSX.Element {
                 empty={empty}
                 labels={labels}
                 lang={lang}
+                period={period}
                 reducedMotion={reducedMotion}
               />
             </Suspense>
@@ -235,6 +268,11 @@ export function TrafficCard(): JSX.Element {
             </div>
           ) : null}
         </div>
+        {earlier > 0 ? (
+          <p className="text-muted-foreground text-xs">
+            {t("traffic.earlierNote", { count: earlier, n: formatNumber(earlier, lang) })}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -261,7 +299,11 @@ export function TrafficCard(): JSX.Element {
             ))}
           </SegmentedControl>
         }
-        description={t(`traffic.description.${range}`, { n: formatNumber(bucketMin, lang) })}
+        description={
+          allTime
+            ? t(`traffic.description.all.${past?.bucket ?? "day"}`)
+            : t(`traffic.description.${range}`, { n: formatNumber(bucketMin, lang) })
+        }
         descriptionVariant="inline"
         icon={ChartLineData02Icon}
         id="overview-traffic"
