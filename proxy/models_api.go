@@ -130,6 +130,8 @@ func openAIErrorCode(status int, message string) (code, param interface{}) {
 		return "model_not_found", "model"
 	case status == http.StatusNotFound && strings.Contains(message, "is not an endpoint"):
 		return "unknown_url", nil
+	case status == http.StatusForbidden && strings.Contains(message, "is not allowed for this API key"):
+		return "model_not_allowed", "model"
 	case status == http.StatusUnauthorized:
 		return "invalid_api_key", nil
 	case status == http.StatusTooManyRequests:

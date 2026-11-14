@@ -51,15 +51,20 @@ func (p *AccountPool) bestByPriorityLocked(model string, excluded map[string]boo
 	return best
 }
 
-// outrankedLocked reports whether priority routing takes a conversation off
-// bound, its session affinity account: in priority mode, an account with a
-// lower Priority number can serve model right now. An account of the same
+// outrankedLocked reports whether the routing mode takes a conversation off
+// bound, its session affinity account. In priority mode, an account with a
+// lower Priority number can serve model right now; an account of the same
 // priority never outranks bound, so the conversation keeps its prompt cache.
-// Always false in weighted mode.
-func (p *AccountPool) outrankedLocked(bound *config.Account, model string, excluded map[string]bool) bool {
-	if config.GetRoutingMode() != config.RoutingModePriority {
-		return false
+// In reset-first mode, an account that ranks above bound on credits left or on
+// its reset day can serve (resetOutranks). Always false in weighted mode.
+func (p *AccountPool) outrankedLocked(bound *config.Account, model string, excluded map[string]bool, mode string) bool {
+	switch mode {
+	case config.RoutingModePriority:
+		best := p.bestByPriorityLocked(model, excluded)
+		return best != nil && best.Priority < bound.Priority
+	case config.RoutingModeResetFirst:
+		best := p.bestByResetLocked(model, excluded, time.Now())
+		return best != nil && resetOutranks(*best, *bound, time.Now())
 	}
-	best := p.bestByPriorityLocked(model, excluded)
-	return best != nil && best.Priority < bound.Priority
+	return false
 }

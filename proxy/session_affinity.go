@@ -93,40 +93,73 @@ func affinityKey(payload *KiroPayload) string {
 	return payload.ConversationState.ConversationID
 }
 
+// affinityKeyFor is the binding key of payload's conversation for the request
+// in ctx. A client key with its own view of the pool (an account scope or its
+// own routing mode) keeps its own bindings, under its id, so another key
+// sending the same conversation (the same model, system prompt and first
+// message) never moves it off the account its scope picked. Every other
+// request shares the plain conversation key.
+func affinityKeyFor(ctx context.Context, payload *KiroPayload) string {
+	key := affinityKey(payload)
+	if key == "" {
+		return ""
+	}
+	if v, ok := apiKeyFromContext(ctx); ok && (v.allowed != nil || v.mode != "") {
+		return v.id + "\x00" + key
+	}
+	return key
+}
+
 // pickAccount chooses the account for one attempt. With affinity on, a
 // follow-up turn returns to the account that served the conversation last, as
 // long as that account can still serve; otherwise the routing mode decides.
 // In priority mode the priority wins: when an account with a better priority
 // than the bound one can serve, the turn goes there, and the success binds
 // the conversation to it. An account of the same priority never takes the
-// conversation, so it keeps its prompt cache. A client key bound to some
-// accounts (ctx) only ever gets one of those.
+// conversation, so it keeps its prompt cache. Reset-first mode moves a turn
+// only to an account whose credits reset on an earlier day. A client key bound
+// to some accounts (ctx) only ever gets one of those, and a key with its own
+// routing mode picks with that mode.
 func (h *Handler) pickAccount(ctx context.Context, payload *KiroPayload, model string, excluded map[string]bool) *config.Account {
 	preferred := ""
 	if config.GetSessionAffinity() {
-		preferred = h.affinity.Lookup(affinityKey(payload))
+		preferred = h.affinity.Lookup(affinityKeyFor(ctx, payload))
 	}
-	allowed := allowedAccountsFromContext(ctx)
+	scope := poolScopeFromContext(ctx)
 	since := time.Now()
-	account := h.pool.GetPreferredForModelAllowed(preferred, model, excluded, allowed)
+	account := h.pool.GetPreferredForModelScoped(preferred, model, excluded, scope)
 	//! Only a fresh request heals: one that already excluded accounts would retry an account that just failed it.
 	if account == nil && len(excluded) == 0 && h.trySelfHeal() {
-		account = h.pool.GetPreferredForModelAllowed(preferred, model, excluded, allowed)
+		account = h.pool.GetPreferredForModelScoped(preferred, model, excluded, scope)
 	}
 	noteRPMPick(ctx, account, since)
 	//! A move off the bound account costs the conversation its prompt cache; log it so a cache-miss spike can be traced.
 	if preferred != "" && account != nil && account.ID != preferred {
-		logAffinityMove(h.pool.GetByID(preferred), preferred, account)
+		logAffinityMove(h.pool.GetByID(preferred), preferred, account, effectiveRoutingMode(scope.Mode))
 	}
 	return account
 }
 
+// effectiveRoutingMode is the routing mode a pick with a key's mode uses: the
+// key's own, or the global one for "" (inherit).
+func effectiveRoutingMode(keyMode string) string {
+	if config.ValidRoutingMode(keyMode) {
+		return keyMode
+	}
+	return config.GetRoutingMode()
+}
+
 // logAffinityMove says why a turn left its bound account. In priority mode a
 // pick that ranks above the bound account means a better account was free, so
-// the turn moved by priority whether or not the bound account could serve.
-func logAffinityMove(bound *config.Account, boundID string, picked *config.Account) {
-	if bound != nil && config.GetRoutingMode() == config.RoutingModePriority && picked.Priority < bound.Priority {
+// the turn moved by priority whether or not the bound account could serve. In
+// reset-first mode the same holds for an account whose credits reset sooner.
+func logAffinityMove(bound *config.Account, boundID string, picked *config.Account, mode string) {
+	if bound != nil && mode == config.RoutingModePriority && picked.Priority < bound.Priority {
 		logger.Debugf("[SessionAffinity] Conversation moved from bound account %s (priority %d) to higher-priority account %s (priority %d)", bound.Email, bound.Priority, picked.Email, picked.Priority)
+		return
+	}
+	if bound != nil && mode == config.RoutingModeResetFirst && picked.NextResetDate != bound.NextResetDate {
+		logger.Debugf("[SessionAffinity] Conversation moved from bound account %s (credits reset %s) to %s (credits reset %s)", bound.Email, bound.NextResetDate, picked.Email, picked.NextResetDate)
 		return
 	}
 	logger.Debugf("[SessionAffinity] Bound account %s unavailable, conversation moved to %s", boundID, picked.Email)
@@ -135,9 +168,9 @@ func logAffinityMove(bound *config.Account, boundID string, picked *config.Accou
 // rememberAccount binds the conversation to the account that just served it.
 // Binding on success, not on pick, means a failed attempt never pins a
 // conversation to an account that could not answer it.
-func (h *Handler) rememberAccount(payload *KiroPayload, account *config.Account) {
+func (h *Handler) rememberAccount(ctx context.Context, payload *KiroPayload, account *config.Account) {
 	if account == nil || !config.GetSessionAffinity() {
 		return
 	}
-	h.affinity.Bind(affinityKey(payload), account.ID)
+	h.affinity.Bind(affinityKeyFor(ctx, payload), account.ID)
 }

@@ -24,6 +24,8 @@ type AccountPool struct {
 	enabledIDs []string
 	// rpm holds recent starts per account for the optional RPM limit (rpm_limit.go).
 	rpm rpmStarts
+	// spend is each account's credits since its last usage refresh (reset_first.go).
+	spend map[string]localSpend
 }
 
 var (
@@ -82,7 +84,7 @@ func (p *AccountPool) GetNextExcluding(excluded map[string]bool) *config.Account
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.nextAccountLocked("", excluded)
+	return p.nextAccountLocked("", excluded, config.GetRoutingMode())
 }
 
 func (p *AccountPool) SetModelList(accountID string, modelIDs []string) {
@@ -146,19 +148,43 @@ func (p *AccountPool) GetNextForModel(model string) *config.Account {
 }
 
 func (p *AccountPool) GetNextForModelExcluding(model string, excluded map[string]bool) *config.Account {
+	return p.getNextForModel(model, excluded, "")
+}
+
+// getNextForModel is GetNextForModelExcluding with a routing mode; "" (or an
+// unknown mode) is the global one.
+func (p *AccountPool) getNextForModel(model string, excluded map[string]bool, mode string) *config.Account {
+	mode = resolveRoutingMode(mode)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.nextAccountLocked(model, excluded)
+	return p.nextAccountLocked(model, excluded, mode)
+}
+
+// resolveRoutingMode is mode when it is a routing mode, and the global routing
+// mode otherwise ("" follows the global mode).
+func resolveRoutingMode(mode string) string {
+	if config.ValidRoutingMode(mode) {
+		return mode
+	}
+	return config.GetRoutingMode()
 }
 
 // GetPreferredForModelExcluding returns preferredID when that account can serve
 // model right now, and the routing mode's pick otherwise. In priority mode an
 // account with a better priority that can serve wins over preferredID as well;
-// one with the same priority does not. A preferred hit leaves the rotation
-// cursor alone, so sticky conversations do not skew where new conversations
-// land.
+// one with the same priority does not. In reset-first mode an account whose
+// credits reset on an earlier day wins over preferredID; one resetting the same
+// day does not. A preferred hit leaves the rotation cursor alone, so sticky
+// conversations do not skew where new conversations land.
 func (p *AccountPool) GetPreferredForModelExcluding(preferredID, model string, excluded map[string]bool) *config.Account {
+	return p.getPreferredForModel(preferredID, model, excluded, "")
+}
+
+// getPreferredForModel is GetPreferredForModelExcluding with a routing mode;
+// "" (or an unknown mode) is the global one.
+func (p *AccountPool) getPreferredForModel(preferredID, model string, excluded map[string]bool, mode string) *config.Account {
+	mode = resolveRoutingMode(mode)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -170,7 +196,7 @@ func (p *AccountPool) GetPreferredForModelExcluding(preferredID, model string, e
 			if acc.ID != preferredID {
 				continue
 			}
-			if p.canServeLocked(acc, model, excluded, now, allowOverUsage) && !p.outrankedLocked(acc, model, excluded) {
+			if p.canServeLocked(acc, model, excluded, now, allowOverUsage) && !p.outrankedLocked(acc, model, excluded, mode) {
 				p.noteRPMStartLocked(acc.ID)
 				accCopy := *acc
 				return &accCopy
@@ -178,15 +204,19 @@ func (p *AccountPool) GetPreferredForModelExcluding(preferredID, model string, e
 			break
 		}
 	}
-	return p.nextAccountLocked(model, excluded)
+	return p.nextAccountLocked(model, excluded, mode)
 }
 
-func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool) *config.Account {
+// nextAccountLocked is mode's pick, which must be a routing mode.
+func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool, mode string) *config.Account {
 	if len(p.accounts) == 0 {
 		return nil
 	}
-	if config.GetRoutingMode() == config.RoutingModePriority {
+	switch mode {
+	case config.RoutingModePriority:
 		return p.firstByPriorityLocked(model, excluded)
+	case config.RoutingModeResetFirst:
+		return p.firstByResetLocked(model, excluded)
 	}
 
 	if acc := p.findNextAvailableLocked(model, excluded, true); acc != nil {
@@ -535,6 +565,7 @@ func (p *AccountPool) RecordOutcome(id string, success bool, tokens int, credits
 		}
 		addUsage(acc, tokens, credits)
 	})
+	p.noteSpend(id, credits)
 }
 
 // AddUsage adds tokens and credits an account spent on part of a request that
@@ -545,6 +576,7 @@ func (p *AccountPool) AddUsage(id string, tokens int, credits float64) {
 		return
 	}
 	p.updateStats(id, func(acc *config.Account) { addUsage(acc, tokens, credits) })
+	p.noteSpend(id, credits)
 }
 
 // updateStats applies apply to the account's counters, in rotation or, for an

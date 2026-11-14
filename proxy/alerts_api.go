@@ -52,6 +52,11 @@ type alertsView struct {
 	PoolThresholds      []int              `json:"poolThresholds"`
 	PoolCooldownMinutes int                `json:"poolCooldownMinutes"`
 	Channels            []alertChannelView `json:"channels"`
+	DailySummary        bool               `json:"dailySummary"`
+	// DailySummaryMinute is when the summary goes out, in minutes after midnight UTC.
+	DailySummaryMinute int `json:"dailySummaryMinute"`
+	// DailySummaryLastSent is when the last scheduled summary was queued (unix s); 0 for never.
+	DailySummaryLastSent int64 `json:"dailySummaryLastSent"`
 }
 
 // alertChannelInput is a channel in a POST. A blank secret on a known channel
@@ -80,6 +85,9 @@ type alertsUpdate struct {
 	PoolThresholds      *[]int               `json:"poolThresholds"`
 	PoolCooldownMinutes *int                 `json:"poolCooldownMinutes"`
 	Channels            *[]alertChannelInput `json:"channels"`
+	DailySummary        *bool                `json:"dailySummary"`
+	// DailySummaryMinute is minutes after midnight UTC, 0..1439.
+	DailySummaryMinute *int `json:"dailySummaryMinute"`
 }
 
 // alertInputError is a rejected POST /alerts: its code, and the field (and
@@ -105,6 +113,8 @@ func (h *Handler) handleAlertsAPI(w http.ResponseWriter, r *http.Request, path s
 		h.apiUpdateAlerts(w, r)
 	case path == "/alerts/test" && r.Method == http.MethodPost:
 		h.apiTestAlertChannel(w, r)
+	case path == "/alerts/daily-summary/test" && r.Method == http.MethodPost:
+		h.apiTestDailySummary(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Not Found"})
@@ -126,6 +136,11 @@ func alertsResponse() alertsView {
 		PoolThresholds:      cfg.PoolThresholds,
 		PoolCooldownMinutes: cfg.PoolCooldownMinutes,
 		Channels:            make([]alertChannelView, 0, len(cfg.Channels)),
+		DailySummary:        cfg.DailySummaryOn(),
+		DailySummaryMinute:  cfg.DailySummaryAt(),
+	}
+	if states, err := loadAlertStates(); err == nil {
+		view.DailySummaryLastSent = states[alertKeyDailySummary].SentAt
 	}
 	for _, ch := range cfg.Channels {
 		v := alertChannelView{
@@ -233,6 +248,10 @@ func writeAlertInputError(w http.ResponseWriter, err *alertInputError) {
 		body["min"] = alertCooldownLo
 		body["max"] = config.MaxAlertCooldownMinutes
 	}
+	if err.code == codeAlertSummaryTimeRange {
+		body["min"] = 0
+		body["max"] = config.MaxDailySummaryMinute
+	}
 	w.WriteHeader(http.StatusBadRequest)
 	json.NewEncoder(w).Encode(body)
 }
@@ -246,6 +265,15 @@ func validateAlertRules(req alertsUpdate) *alertInputError {
 	if req.PoolThresholds != nil {
 		if err := config.ValidateAlertThresholds(*req.PoolThresholds); err != nil {
 			return &alertInputError{code: codeAlertThresholdsInvalid, message: err.Error(), field: "poolThresholds"}
+		}
+	}
+	if req.DailySummaryMinute != nil {
+		if v := *req.DailySummaryMinute; v < 0 || v > config.MaxDailySummaryMinute {
+			return &alertInputError{
+				code:    codeAlertSummaryTimeRange,
+				message: fmt.Sprintf("dailySummaryMinute must be 0 to %d (minutes after midnight UTC)", config.MaxDailySummaryMinute),
+				field:   "dailySummaryMinute",
+			}
 		}
 	}
 	if req.PoolCooldownMinutes != nil {
@@ -271,6 +299,11 @@ func applyAlertRules(c *config.AlertsConfig, req alertsUpdate) {
 	set(&c.PoolUsage, req.PoolUsage)
 	set(&c.AccountBanned, req.AccountBanned)
 	set(&c.AllUnavailable, req.AllUnavailable)
+	set(&c.DailySummary, req.DailySummary)
+	if req.DailySummaryMinute != nil {
+		v := *req.DailySummaryMinute
+		c.DailySummaryMinute = &v
+	}
 	if req.AccountThresholds != nil {
 		c.AccountThresholds = append([]int(nil), *req.AccountThresholds...)
 	}

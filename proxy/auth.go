@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"kiro-proxy/config"
 	"kiro-proxy/pool"
@@ -14,8 +15,16 @@ type apiKeyContextKey struct{}
 type apiKeyContextValue struct {
 	id  string
 	key string
-	// allowed is the key's account allowlist as a set, taken at auth; nil is every account.
+	// allowed is the key's account allowlist as a set, taken at auth: its
+	// account ids plus the accounts carrying one of its tags. nil is every
+	// account; an empty set is a scope that matches no account.
 	allowed map[string]bool
+	// mode is the key's own routing mode; "" follows the global one.
+	mode string
+	// allowedModels is the models the key may call; empty is every model.
+	allowedModels []string
+	// accountTags is the key's tag scope, named in its no-account error.
+	accountTags []string
 }
 
 type apiKeyUsageReservation struct {
@@ -30,6 +39,9 @@ type authError struct {
 	status  int
 	code    string
 	message string
+	// retryAfter is when a 429 for the key's own RPM limit clears; such a
+	// refusal stays retryable, unlike a used-up token, credit or call limit.
+	retryAfter time.Duration
 }
 
 func (e *authError) Error() string {
@@ -67,6 +79,9 @@ func (h *Handler) authenticate(r *http.Request) (*config.ApiKeyEntry, error) {
 	if !entry.Enabled {
 		return nil, newAuthError(http.StatusUnauthorized, "authentication_error", "API key disabled")
 	}
+	if config.ApiKeyExpired(*entry, time.Now()) {
+		return nil, newAuthError(http.StatusUnauthorized, "authentication_error", apiKeyExpiredMessage(entry.ExpiresAt))
+	}
 	if overToken, overCredit := config.ApiKeyOverLimit(*entry); overToken || overCredit {
 		if overToken {
 			return nil, newAuthError(http.StatusTooManyRequests, "rate_limit_error", "token limit exceeded")
@@ -89,6 +104,9 @@ func (h *Handler) authenticateForClaudeRequest(w http.ResponseWriter, r *http.Re
 
 func (h *Handler) authenticateForClaudeWithRequestLog(w http.ResponseWriter, r *http.Request, recordRequest bool) *http.Request {
 	entry, err := h.authenticate(r)
+	if err == nil && recordRequest {
+		err = takeApiKeyRPM(entry, time.Now())
+	}
 	if err != nil {
 		ae, _ := err.(*authError)
 		if ae == nil {
@@ -98,8 +116,10 @@ func (h *Handler) authenticateForClaudeWithRequestLog(w http.ResponseWriter, r *
 			provided := extractProvidedKey(r)
 			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, rejectedRequestModel(r), 0, 0, 0, false, ae.status, ae.message)
 		}
-		if ae.status == http.StatusTooManyRequests {
-			//! Every 429 here is the key's own limit, already reached.
+		if ae.retryAfter > 0 {
+			noteRetryAfter(r.Context(), ae.retryAfter)
+		} else if ae.status == http.StatusTooManyRequests {
+			//! Every other 429 here is the key's own limit, already reached.
 			markNoRetry(w)
 		}
 		h.sendClaudeError(w, ae.status, ae.code, ae.message)
@@ -118,6 +138,9 @@ func (h *Handler) authenticateForOpenAIRequest(w http.ResponseWriter, r *http.Re
 
 func (h *Handler) authenticateForOpenAIWithRequestLog(w http.ResponseWriter, r *http.Request, recordRequest bool) *http.Request {
 	entry, err := h.authenticate(r)
+	if err == nil && recordRequest {
+		err = takeApiKeyRPM(entry, time.Now())
+	}
 	if err != nil {
 		ae, _ := err.(*authError)
 		if ae == nil {
@@ -127,8 +150,10 @@ func (h *Handler) authenticateForOpenAIWithRequestLog(w http.ResponseWriter, r *
 			provided := extractProvidedKey(r)
 			recordFinalRequestWithAPIKey(r.Context(), rejectedKeyID(provided), provided, nil, rejectedRequestModel(r), 0, 0, 0, false, ae.status, ae.message)
 		}
-		if ae.status == http.StatusTooManyRequests {
-			//! Every 429 here is the key's own limit, already reached.
+		if ae.retryAfter > 0 {
+			noteRetryAfter(r.Context(), ae.retryAfter)
+		} else if ae.status == http.StatusTooManyRequests {
+			//! Every other 429 here is the key's own limit, already reached.
 			markNoRetry(w)
 		}
 		h.sendOpenAIError(w, ae.status, ae.code, ae.message)
@@ -142,11 +167,38 @@ func withApiKeyContext(r *http.Request, entry *config.ApiKeyEntry) *http.Request
 		return r
 	}
 	noteResponseKeyID(r.Context(), entry.ID)
+	var allowed map[string]bool
+	if len(entry.AccountTags) > 0 {
+		//! Tags resolve per request, so a tag edit on an account applies to the next request.
+		allowed = config.ApiKeyAllowedAccounts(*entry, config.GetAccounts())
+	} else {
+		allowed = pool.AllowedSet(entry.AccountIDs)
+	}
 	return r.WithContext(context.WithValue(r.Context(), apiKeyContextKey{}, apiKeyContextValue{
-		id:      entry.ID,
-		key:     entry.Key,
-		allowed: pool.AllowedSet(entry.AccountIDs),
+		id:            entry.ID,
+		key:           entry.Key,
+		allowed:       allowed,
+		mode:          entry.RoutingMode,
+		allowedModels: append([]string(nil), entry.AllowedModels...),
+		accountTags:   append([]string(nil), entry.AccountTags...),
 	}))
+}
+
+// apiKeyFromContext is the request's client key as auth saw it.
+func apiKeyFromContext(ctx context.Context) (apiKeyContextValue, bool) {
+	if ctx == nil {
+		return apiKeyContextValue{}, false
+	}
+	v, ok := ctx.Value(apiKeyContextKey{}).(apiKeyContextValue)
+	return v, ok
+}
+
+// poolScopeFromContext is the pool view of the request's key: its accounts
+// and its routing mode. A request without a key sees the whole pool with the
+// global mode.
+func poolScopeFromContext(ctx context.Context) pool.Scope {
+	v, _ := apiKeyFromContext(ctx)
+	return pool.Scope{Allowed: v.allowed, Mode: v.mode}
 }
 
 func apiKeyIDFromContext(ctx context.Context) string {

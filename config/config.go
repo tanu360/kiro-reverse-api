@@ -84,7 +84,9 @@ type Account struct {
 	UsageLimit    float64 `json:"usageLimit,omitempty"`
 	UsagePercent  float64 `json:"usagePercent,omitempty"`
 	NextResetDate string  `json:"nextResetDate,omitempty"`
-	LastRefresh   int64   `json:"lastRefresh,omitempty"`
+	// NextResetAt is the exact moment the credits reset (unix s), when Kiro gave one.
+	NextResetAt int64 `json:"nextResetAt,omitempty"`
+	LastRefresh int64 `json:"lastRefresh,omitempty"`
 
 	TrialUsageCurrent float64 `json:"trialUsageCurrent,omitempty"`
 	TrialUsageLimit   float64 `json:"trialUsageLimit,omitempty"`
@@ -133,6 +135,21 @@ type ApiKeyEntry struct {
 	// CallLimit caps SuccessfulCalls; 0 means unlimited.
 	CallLimit       int64 `json:"callLimit,omitempty"`
 	SuccessfulCalls int64 `json:"successfulCalls,omitempty"`
+
+	// AccountTags adds every account carrying one of these tags to AccountIDs;
+	// both empty means every account.
+	AccountTags []string `json:"accountTags,omitempty"`
+	// AllowedModels limits the key to these models, matched against the model
+	// a request resolves to (thinking suffix and model mappings applied); empty
+	// means every model.
+	AllowedModels []string `json:"allowedModels,omitempty"`
+	// RPMLimit caps the requests the key may start per minute; 0 means unlimited.
+	RPMLimit int `json:"rpmLimit,omitempty"`
+	// ExpiresAt is when the key stops working, unix seconds; 0 means never.
+	ExpiresAt int64 `json:"expiresAt,omitempty"`
+	// RoutingMode is the routing mode the key's requests pick accounts with;
+	// "" follows the global routing mode.
+	RoutingMode string `json:"routingMode,omitempty"`
 }
 
 type Config struct {
@@ -237,6 +254,7 @@ type AccountInfo struct {
 	UsageLimit        float64
 	UsagePercent      float64
 	NextResetDate     string
+	NextResetAt       int64
 	LastRefresh       int64
 	TrialUsageCurrent float64
 	TrialUsageLimit   float64
@@ -900,6 +918,7 @@ func UpdateAccountInfo(id string, info AccountInfo) (err error) {
 			cfg.Accounts[i].UsageLimit = info.UsageLimit
 			cfg.Accounts[i].UsagePercent = info.UsagePercent
 			cfg.Accounts[i].NextResetDate = info.NextResetDate
+			cfg.Accounts[i].NextResetAt = info.NextResetAt
 			cfg.Accounts[i].LastRefresh = info.LastRefresh
 			cfg.Accounts[i].TrialUsageCurrent = info.TrialUsageCurrent
 			cfg.Accounts[i].TrialUsageLimit = info.TrialUsageLimit

@@ -25,6 +25,11 @@ const (
 	DefaultAlertCooldownMinutes = 60
 	// MaxAlertCooldownMinutes is the longest pool alert cooldown (one day).
 	MaxAlertCooldownMinutes = 1440
+	// DefaultDailySummaryMinute is when the daily summary goes out while no
+	// time is set: 09:00 UTC, in minutes after midnight UTC.
+	DefaultDailySummaryMinute = 9 * 60
+	// MaxDailySummaryMinute is the last minute of a UTC day.
+	MaxDailySummaryMinute = 24*60 - 1
 )
 
 // DefaultAlertThresholds are the usage percentages that alert while no list is set.
@@ -46,7 +51,9 @@ type AlertChannel struct {
 
 // AlertsConfig holds the alert rules and channels. A nil rule toggle is on: no
 // alert is sent before a channel exists, so on by default sends nothing by
-// itself. Empty threshold lists and a zero cooldown mean the defaults.
+// itself. The daily summary is the exception: it is a scheduled report, not a
+// warning, so it stays off until switched on. Empty threshold lists and a
+// zero cooldown mean the defaults.
 type AlertsConfig struct {
 	AccountUsage        *bool          `json:"accountUsage,omitempty"`
 	PoolUsage           *bool          `json:"poolUsage,omitempty"`
@@ -56,6 +63,12 @@ type AlertsConfig struct {
 	PoolThresholds      []int          `json:"poolThresholds,omitempty"`
 	PoolCooldownMinutes int            `json:"poolCooldownMinutes,omitempty"`
 	Channels            []AlertChannel `json:"channels,omitempty"`
+	// DailySummary sends a usage summary once a day; nil is off.
+	DailySummary *bool `json:"dailySummary,omitempty"`
+	// DailySummaryMinute is when it goes out, in minutes after midnight UTC
+	// (0..1439); nil is DefaultDailySummaryMinute. Stored in UTC, so the local
+	// time the admin UI shows moves by an hour when daylight saving starts or ends.
+	DailySummaryMinute *int `json:"dailySummaryMinute,omitempty"`
 }
 
 func alertToggle(on *bool) bool { return on == nil || *on }
@@ -71,6 +84,18 @@ func (c AlertsConfig) AccountBannedOn() bool { return alertToggle(c.AccountBanne
 
 // AllUnavailableOn reports whether the no-account-available alert is on.
 func (c AlertsConfig) AllUnavailableOn() bool { return alertToggle(c.AllUnavailable) }
+
+// DailySummaryOn reports whether the daily summary is on. Off by default.
+func (c AlertsConfig) DailySummaryOn() bool { return c.DailySummary != nil && *c.DailySummary }
+
+// DailySummaryAt is when the daily summary goes out, in minutes after
+// midnight UTC.
+func (c AlertsConfig) DailySummaryAt() int {
+	if c.DailySummaryMinute == nil || *c.DailySummaryMinute < 0 || *c.DailySummaryMinute > MaxDailySummaryMinute {
+		return DefaultDailySummaryMinute
+	}
+	return *c.DailySummaryMinute
+}
 
 // EnabledChannels is the channels that are switched on, in config order.
 func (c AlertsConfig) EnabledChannels() []AlertChannel {
@@ -106,6 +131,11 @@ func cloneAlertsConfig(c AlertsConfig) AlertsConfig {
 	out.PoolUsage = copyBool(c.PoolUsage)
 	out.AccountBanned = copyBool(c.AccountBanned)
 	out.AllUnavailable = copyBool(c.AllUnavailable)
+	out.DailySummary = copyBool(c.DailySummary)
+	if c.DailySummaryMinute != nil {
+		v := *c.DailySummaryMinute
+		out.DailySummaryMinute = &v
+	}
 	out.AccountThresholds = slices.Clone(c.AccountThresholds)
 	out.PoolThresholds = slices.Clone(c.PoolThresholds)
 	out.Channels = slices.Clone(c.Channels)

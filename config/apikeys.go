@@ -71,6 +71,11 @@ func AddApiKey(entry ApiKeyEntry) (ApiKeyEntry, error) {
 		return ApiKeyEntry{}, err
 	}
 	entry.AccountIDs = accountIDs
+	controls, err := normalizeApiKeyControls(entry)
+	if err != nil {
+		return ApiKeyEntry{}, err
+	}
+	controls.apply(&entry)
 	for _, existing := range cfg.ApiKeys {
 		if existing.Key == entry.Key {
 			return ApiKeyEntry{}, ErrApiKeyExists
@@ -131,6 +136,10 @@ func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 	if err != nil {
 		return err
 	}
+	controls, err := normalizeApiKeyControls(patch)
+	if err != nil {
+		return err
+	}
 	name := strings.TrimSpace(patch.Name)
 	newKey := ""
 	if patch.Key != "" {
@@ -154,6 +163,7 @@ func updateApiKey(id string, patch ApiKeyEntry, guard bool) error {
 	cfg.ApiKeys[idx].CreditLimit = patch.CreditLimit
 	cfg.ApiKeys[idx].CallLimit = patch.CallLimit
 	cfg.ApiKeys[idx].AccountIDs = accountIDs
+	controls.apply(&cfg.ApiKeys[idx])
 	return Save()
 }
 

@@ -28,30 +28,51 @@ func AllowedSet(ids []string) map[string]bool {
 	return set
 }
 
+// Scope is one client API key's view of the pool. Allowed is the accounts the
+// key may use: nil is every account, and an empty set is none (a key whose
+// account tags match no account). Mode is the routing mode its picks use: ""
+// is the global routing mode.
+type Scope struct {
+	Allowed map[string]bool
+	Mode    string
+}
+
 // GetPreferredForModelAllowed is GetPreferredForModelExcluding limited to the
 // accounts in allowed; nil allowed means every account. A preferred account
 // outside the list is ignored, and in priority mode only an account in the
 // list can outrank the preferred one.
 func (p *AccountPool) GetPreferredForModelAllowed(preferredID, model string, excluded, allowed map[string]bool) *config.Account {
-	if allowed == nil {
-		return p.GetPreferredForModelExcluding(preferredID, model, excluded)
+	return p.GetPreferredForModelScoped(preferredID, model, excluded, Scope{Allowed: allowed})
+}
+
+// GetPreferredForModelScoped is GetPreferredForModelAllowed with the key's own
+// routing mode: the preferred account is kept, or outranked, by scope.Mode's
+// rules, and a new pick uses scope.Mode.
+func (p *AccountPool) GetPreferredForModelScoped(preferredID, model string, excluded map[string]bool, scope Scope) *config.Account {
+	if scope.Allowed == nil {
+		return p.getPreferredForModel(preferredID, model, excluded, scope.Mode)
 	}
-	if !allowed[preferredID] {
+	if !scope.Allowed[preferredID] {
 		preferredID = ""
 	}
-	return p.pickAllowed(allowed, excluded, func(merged map[string]bool) *config.Account {
-		return p.GetPreferredForModelExcluding(preferredID, model, merged)
+	return p.pickAllowed(scope.Allowed, excluded, func(merged map[string]bool) *config.Account {
+		return p.getPreferredForModel(preferredID, model, merged, scope.Mode)
 	})
 }
 
 // GetNextForModelAllowed is GetNextForModelExcluding limited to the accounts
 // in allowed; nil allowed means every account.
 func (p *AccountPool) GetNextForModelAllowed(model string, excluded, allowed map[string]bool) *config.Account {
-	if allowed == nil {
-		return p.GetNextForModelExcluding(model, excluded)
+	return p.GetNextForModelScoped(model, excluded, Scope{Allowed: allowed})
+}
+
+// GetNextForModelScoped is GetNextForModelAllowed with the key's own routing mode.
+func (p *AccountPool) GetNextForModelScoped(model string, excluded map[string]bool, scope Scope) *config.Account {
+	if scope.Allowed == nil {
+		return p.getNextForModel(model, excluded, scope.Mode)
 	}
-	return p.pickAllowed(allowed, excluded, func(merged map[string]bool) *config.Account {
-		return p.GetNextForModelExcluding(model, merged)
+	return p.pickAllowed(scope.Allowed, excluded, func(merged map[string]bool) *config.Account {
+		return p.getNextForModel(model, merged, scope.Mode)
 	})
 }
 

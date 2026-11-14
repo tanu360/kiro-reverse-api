@@ -315,6 +315,14 @@ func (h *Handler) backgroundAlerts() {
 
 	safety := time.NewTicker(alertSafetyTick)
 	defer safety.Stop()
+	//! Its own timer: the summary must go out at its minute, not at the next safety tick.
+	summary := time.NewTimer(untilNextDailySummary(time.Now(), config.GetAlertsConfig().DailySummaryAt()))
+	defer summary.Stop()
+	armSummary := func() {
+		summary.Stop()
+		summary.Reset(untilNextDailySummary(time.Now(), config.GetAlertsConfig().DailySummaryAt()))
+	}
+	h.runDailySummary(time.Now())
 	timer := time.NewTimer(time.Hour)
 	timer.Stop()
 	var firstKick time.Time
@@ -354,12 +362,20 @@ func (h *Handler) backgroundAlerts() {
 			if evt.Type == eventAccountsChanged {
 				kick()
 			}
+			if evt.Type == eventSettingsChanged {
+				//! A new summary time takes effect at once; an unchanged one re-arms to the same moment.
+				armSummary()
+			}
 		case <-alertKick:
 			kick()
 		case <-due:
 			evaluate()
 		case <-safety.C:
 			evaluate()
+			h.runDailySummary(time.Now())
+		case <-summary.C:
+			h.runDailySummary(time.Now())
+			armSummary()
 		}
 	}
 }

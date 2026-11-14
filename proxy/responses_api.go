@@ -66,6 +66,11 @@ func (h *Handler) handleOpenAIResponses(w http.ResponseWriter, r *http.Request) 
 	thinkingCfg := config.GetThinkingConfig()
 	actualModel, thinking := ParseModelAndThinking(prepared.OpenAIRequest.Model, thinkingCfg.Suffix)
 	prepared.OpenAIRequest.Model = actualModel
+	if msg := apiKeyModelRefusal(r.Context(), actualModel); msg != "" {
+		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, actualModel, 0, 0, 0, false, http.StatusForbidden, msg)
+		h.sendOpenAIError(w, http.StatusForbidden, "permission_error", msg)
+		return
+	}
 	thinking = resolveThinkingWithEffort(thinking, prepared.OpenAIRequest.ReasoningEffort)
 	estimatedInputTokens := estimateOpenAIRequestInputTokens(&prepared.OpenAIRequest)
 	kiroPayload := OpenAIToKiro(&prepared.OpenAIRequest, thinking)
@@ -221,7 +226,7 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 			recordObservedSuccess(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits,
 				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
-			h.rememberAccount(payload, account)
+			h.rememberAccount(ctx, payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			response, storedMessages := buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
@@ -651,7 +656,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			recordObservedSuccess(ctx, apiKeyReservation, account, model, inputTokens, outputTokens, credits,
 				resolveCacheTokens(upstreamCache, cacheTokensFromOpenAIDetails(cacheDetails), inputTokens))
 			h.pool.RecordSuccess(account.ID)
-			h.rememberAccount(payload, account)
+			h.rememberAccount(ctx, payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			//! Reasoning recovered from inline <thinking> tags never streamed, so announce

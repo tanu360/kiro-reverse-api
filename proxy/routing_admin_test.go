@@ -77,7 +77,7 @@ func TestAdminSettingsRejectsInvalidRoutingMode(t *testing.T) {
 			t.Fatalf("%s: status=%d, want 400", bad, rec.Code)
 		}
 		body := decodeAdminError(t, rec)
-		if body["code"] != codeRoutingModeInvalid || body["error"] != `routingMode must be "weighted" or "priority"` {
+		if body["code"] != codeRoutingModeInvalid || body["error"] != `routingMode must be "weighted", "priority" or "reset_first"` {
 			t.Fatalf("%s: body = %v", bad, body)
 		}
 	}

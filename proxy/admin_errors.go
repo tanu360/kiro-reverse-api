@@ -58,6 +58,12 @@ const (
 	codeCreditLimitNegative     = "credit_limit_negative"
 	codeCallLimitNegative       = "call_limit_negative"
 	codeAPIKeyUnknownAccount    = "api_key_unknown_account"
+	codeAPIKeyRPMLimitRange     = "api_key_rpm_limit_range"
+	codeAPIKeyExpiryInvalid     = "api_key_expiry_invalid"
+	codeAPIKeyRoutingMode       = "api_key_routing_mode_invalid"
+	codeAPIKeyTooManyModels     = "api_key_too_many_models"
+	codeAPIKeyModelTooLong      = "api_key_model_too_long"
+	codeAPIKeyTooManyTags       = "api_key_too_many_tags"
 	codeBackupNotFound          = "backup_not_found"
 	codeBackupUploadFailed      = "backup_upload_failed"
 	codeRoutingModeInvalid      = "routing_mode_invalid"
@@ -67,6 +73,8 @@ const (
 	codeAlertChannelInvalid     = "alert_channel_invalid"
 	codeAlertChannelLimit       = "alert_channel_limit"
 	codeAlertChannelNotFound    = "alert_channel_not_found"
+	codeAlertNoChannels         = "alert_no_channels"
+	codeAlertSummaryTimeRange   = "alert_summary_time_range"
 )
 
 // writeAdminError writes {"error": message, "code": code} with status.
@@ -155,6 +163,18 @@ func adminErrorFields(err error) (code, detail string, params map[string]interfa
 		return codeCallLimitNegative, "", nil
 	case errors.Is(err, config.ErrApiKeyUnknownAccount):
 		return codeAPIKeyUnknownAccount, "", nil
+	case errors.Is(err, config.ErrApiKeyRPMLimitRange):
+		return codeAPIKeyRPMLimitRange, "", map[string]interface{}{"max": config.MaxApiKeyRPMLimit}
+	case errors.Is(err, config.ErrApiKeyExpiryNegative):
+		return codeAPIKeyExpiryInvalid, "", nil
+	case errors.Is(err, config.ErrApiKeyRoutingMode):
+		return codeAPIKeyRoutingMode, "", nil
+	case errors.Is(err, config.ErrApiKeyTooManyModels):
+		return codeAPIKeyTooManyModels, "", map[string]interface{}{"max": config.MaxApiKeyModels}
+	case errors.Is(err, config.ErrApiKeyModelTooLong):
+		return codeAPIKeyModelTooLong, "", map[string]interface{}{"max": config.MaxApiKeyModelRunes}
+	case errors.Is(err, config.ErrApiKeyTooManyTags):
+		return codeAPIKeyTooManyTags, "", map[string]interface{}{"max": config.MaxAccountTags}
 	case errors.Is(err, errMicrosoftSSOCanceled):
 		return auth.CodeMicrosoftCanceled, "", nil
 	case errors.Is(err, errMicrosoftAccountExists):

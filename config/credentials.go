@@ -144,6 +144,7 @@ func UpdateCredentialInfo(id string, info AccountInfo) error {
 			credentials[i].UsageLimit = info.UsageLimit
 			credentials[i].UsagePercent = info.UsagePercent
 			credentials[i].NextResetDate = info.NextResetDate
+			credentials[i].NextResetAt = info.NextResetAt
 			credentials[i].LastRefresh = info.LastRefresh
 			credentials[i].TrialUsageCurrent = info.TrialUsageCurrent
 			credentials[i].TrialUsageLimit = info.TrialUsageLimit
