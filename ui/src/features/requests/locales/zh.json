@@ -83,6 +83,7 @@
   "detail.message": "消息",
   "detail.noMessage": "无消息",
   "detail.copyMessage": "复制消息",
+  "detail.errorDetails": "详情",
   "detail.openAccount": "打开账号",
   "detail.copyJson": "复制为 JSON",
   "detail.previous": "上一个请求",

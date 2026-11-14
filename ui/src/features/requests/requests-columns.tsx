@@ -23,6 +23,7 @@ import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { ErrorTypeLabel } from "./error-type-badge";
+import { requestProxyText } from "./proxy-failure";
 import { formatRowDate, isKnownEndpoint, normalizeApiKeyMask } from "./request-model";
 
 /*
@@ -87,15 +88,23 @@ export function endpointLabel(endpoint: string | undefined, t: TFunction): strin
   return isKnownEndpoint(endpoint) ? t(`endpoint.${endpoint}`) : EMPTY;
 }
 
-function useErrorMessage(record: RequestRecord): string {
+/**
+ * A failure's message: for a Proxy error the plain sentence its Attempts show, otherwise the
+ * error the client got. `raw` is always the client's error, for the tooltip.
+ */
+function useErrorMessage(record: RequestRecord): { text: string; raw: string } {
   const { t } = useT("requests");
   const maskText = useMaskText();
-  return maskText(record.message) || t("noErrorMessage");
+  const raw = maskText(record.message) || t("noErrorMessage");
+  return { text: requestProxyText(record, t) ?? raw, raw };
 }
 
-/** The category over a two-line message; the tooltip holds the whole message. */
+/**
+ * The category over a two-line message; the tooltip holds the whole message (for a Proxy error,
+ * the error the client got behind the plain sentence).
+ */
 function ErrorCell({ record }: { record: RequestRecord }): JSX.Element {
-  const message = useErrorMessage(record);
+  const { text: message, raw } = useErrorMessage(record);
   if (record.success) return <Muted />;
   return (
     <div className="flex min-w-32 max-w-72 flex-col items-start gap-1">
@@ -110,9 +119,7 @@ function ErrorCell({ record }: { record: RequestRecord }): JSX.Element {
         >
           {message}
         </TooltipTrigger>
-        <TooltipPopup className="max-w-sm whitespace-pre-wrap wrap-break-word">
-          {message}
-        </TooltipPopup>
+        <TooltipPopup className="max-w-sm whitespace-pre-wrap wrap-break-word">{raw}</TooltipPopup>
       </Tooltip>
     </div>
   );
@@ -235,7 +242,7 @@ export function RequestCard({
   onOpen: () => void;
 }): JSX.Element {
   const { t, lang } = useT("requests");
-  const message = useErrorMessage(record);
+  const { text: message } = useErrorMessage(record);
   const endpoint = endpointLabel(record.endpoint, t);
   const failed = !record.success;
   const total = record.inTokens + record.outTokens;

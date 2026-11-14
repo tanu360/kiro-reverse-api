@@ -1,5 +1,5 @@
 import { proxyFailureSentence } from "@/features/proxy-pool/lib/pool-failure";
-import type { RequestAttemptProxy } from "@/lib/api/types";
+import type { RequestAttemptProxy, RequestRecord } from "@/lib/api/types";
 import type { TFunction } from "@/lib/i18n";
 
 const SOURCE_KEYS: Record<string, string> = {
@@ -20,4 +20,23 @@ export function attemptProxyText(proxy: RequestAttemptProxy, t: TFunction): stri
     first: where,
     second: proxyFailureSentence(proxy.code, proxy.status, t),
   });
+}
+
+/**
+ * A request that failed with a Proxy error, worded as its Attempts word the try that failed at a
+ * proxy: the last such try, which is the one the client's error came from. Undefined for any
+ * other request, and for a row logged before the server named the proxy failure (its own text
+ * then stays the message).
+ */
+export function requestProxyText(
+  record: Pick<RequestRecord, "success" | "errorType" | "attempts">,
+  t: TFunction,
+): string | undefined {
+  if (record.success || record.errorType !== "proxy") return undefined;
+  const attempts = record.attempts ?? [];
+  for (let index = attempts.length - 1; index >= 0; index--) {
+    const proxy = attempts[index]?.proxy;
+    if (proxy && !attempts[index]?.success) return attemptProxyText(proxy, t);
+  }
+  return undefined;
 }

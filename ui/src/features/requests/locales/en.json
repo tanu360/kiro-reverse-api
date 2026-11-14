@@ -84,6 +84,7 @@
   "detail.message": "Message",
   "detail.noMessage": "No message",
   "detail.copyMessage": "Copy message",
+  "detail.errorDetails": "Details",
   "detail.openAccount": "Open account",
   "detail.copyJson": "Copy as JSON",
   "detail.previous": "Previous request",

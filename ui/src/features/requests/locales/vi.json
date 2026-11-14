@@ -83,6 +83,7 @@
   "detail.message": "Thông báo",
   "detail.noMessage": "Không có thông báo",
   "detail.copyMessage": "Sao chép thông báo",
+  "detail.errorDetails": "Chi tiết",
   "detail.openAccount": "Mở tài khoản",
   "detail.copyJson": "Sao chép dạng JSON",
   "detail.previous": "Yêu cầu trước",
