@@ -25,5 +25,22 @@
   "clickToCopy": "Clique para copiar",
   "passwordCopied": "Senha copiada para a área de transferência",
   "changePasswordToast": "Altere a senha gerada em Configurações.",
-  "openSettings": "Abrir configurações"
+  "openSettings": "Abrir configurações",
+  "codePrompt": "Digite o código de 6 dígitos do seu app autenticador.",
+  "recoveryPrompt": "Digite um dos códigos de recuperação que você guardou. Cada um funciona uma vez.",
+  "codeLabel": "Código do app",
+  "recoveryLabel": "Código de recuperação",
+  "codePlaceholder": "123456",
+  "recoveryPlaceholder": "abcde-12345",
+  "codeRequired": "Digite o código.",
+  "recoveryRequired": "Digite um código de recuperação.",
+  "verify": "Verificar",
+  "verifying": "Verificando…",
+  "useRecovery": "Usar um código de recuperação",
+  "useCode": "Usar um código do app",
+  "backToPassword": "Voltar",
+  "codeWrong": "Esse código não está certo. Confira se o relógio do celular está correto.",
+  "recoveryWrong": "Esse código de recuperação não está certo ou já foi usado.",
+  "codeReused": "Este código já foi usado. Espere o próximo.",
+  "challengeExpired": "O login expirou. Digite a senha de novo."
 }

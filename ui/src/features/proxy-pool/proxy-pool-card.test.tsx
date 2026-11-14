@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mockDb } from "@/lib/mocks/db";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { resetProxyPoolMock, seedProxyPoolMock } from "./mocks";
@@ -40,6 +41,8 @@ const frankfurt = {
 };
 
 beforeEach(() => {
+  // No global proxy, so no detected entry unless a test adds one.
+  mockDb.proxy.proxyURL = "";
   resetProxyPoolMock();
   recorded = [];
   mockServer.events.on("request:start", onRequestStart);
@@ -140,8 +143,11 @@ describe("ProxyPoolCard", () => {
     await user.click(await screen.findByRole("button", { name: "Check all" }));
 
     expect(await screen.findByText("Every proxy was checked.")).toBeInTheDocument();
-    expect(await screen.findByText("Healthy")).toBeInTheDocument();
-    expect(screen.getByText("Failed")).toBeInTheDocument();
+    // One failed check is a strike, not a verdict: the proxy stays in rotation, marked unhealthy.
+    expect(await screen.findByText("Unhealthy")).toBeInTheDocument();
+    expect(
+      screen.getByText("Failed 1 time in a row. After 3, its accounts move.", { exact: false }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Last error: The proxy refused the connection.", { exact: false }),
     ).toBeInTheDocument();
@@ -158,9 +164,7 @@ describe("ProxyPoolCard", () => {
     expect(
       await screen.findAllByText("Dead is not reachable. The proxy refused the connection."),
     ).not.toHaveLength(0);
-    expect(
-      await screen.findByText(/^Last error: The proxy refused the connection\./),
-    ).toBeVisible();
+    expect(await screen.findByText(/Last error: The proxy refused the connection\./)).toBeVisible();
     // Details opens on a click or tap as well as on hover, and keyboard focus reaches it.
     const details = screen.getByRole("button", { name: "Details" });
     await user.click(details);
@@ -213,5 +217,71 @@ describe("ProxyPoolCard", () => {
 
     expect(await screen.findByText("The proxy was removed.")).toBeInTheDocument();
     expect(await screen.findByText(/No proxies yet/)).toBeInTheDocument();
+  });
+
+  it("takes a proxy out after three failed checks in a row", async () => {
+    const dead = { ...frankfurt, id: "px_2", label: "Dead", url: "http://127.0.0.1:9" };
+    seedProxyPoolMock({ proxies: [frankfurt, dead] });
+    const { user } = await renderCard();
+    for (let i = 0; i < 3; i++) {
+      await user.click(await screen.findByRole("button", { name: "Check all" }));
+      expect(await screen.findAllByText("Every proxy was checked.")).not.toHaveLength(0);
+    }
+    expect(await screen.findByText("Auto-disabled")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Failed 3 times in a row, so it is out of rotation until a check passes\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 auto-disabled")).toBeInTheDocument();
+    expect(screen.getByText("1 healthy")).toBeInTheDocument();
+  });
+
+  it("switches a proxy off and on with its own switch", async () => {
+    seedProxyPoolMock({ proxies: [frankfurt], assignments: { a1: "px_1" } });
+    const { user } = await renderCard();
+    const toggle = await screen.findByRole("switch", { name: "Use Frankfurt" });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+
+    expect(
+      await screen.findAllByText("Frankfurt is off. Its accounts moved to other proxies."),
+    ).not.toHaveLength(0);
+    expect(await screen.findByText("Off")).toBeInTheDocument();
+    expect(
+      screen.getByText("Switched off. It is not used or checked until you switch it on."),
+    ).toBeInTheDocument();
+    expect(await writes()).toEqual([
+      { method: "PUT", path: "/proxy-pool/proxies/px_1", body: { enabled: false } },
+    ]);
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: "Use Frankfurt" })).not.toBeChecked(),
+    );
+  });
+
+  it("lists detected proxies and adds only an unauthenticated one to the pool", async () => {
+    mockDb.proxy.proxyURL = "socks5://user:p%40ss@127.0.0.1:1080";
+    mockDb.accounts[0].proxyURL = "http://open.example:8080";
+    const { user } = await renderCard();
+
+    expect(await screen.findByText("Detected proxies")).toBeInTheDocument();
+    expect(screen.getByText("Global proxy")).toBeInTheDocument();
+    expect(screen.getByText("Own proxy of 1 account")).toBeInTheDocument();
+    expect(screen.getByText("Has a sign-in, so it is never shared")).toBeInTheDocument();
+    expect(screen.queryByText(/p@ss|p%40ss/)).not.toBeInTheDocument();
+    // Only the open proxy offers Add to pool.
+    const adopt = screen.getAllByRole("button", { name: "Add to pool" });
+    expect(adopt).toHaveLength(1);
+    await user.click(adopt[0]);
+    const confirm = await screen.findByRole("alertdialog");
+    await user.click(within(confirm).getByRole("button", { name: "Add to pool" }));
+
+    expect(
+      await screen.findAllByText(
+        "http://open.example:8080 was added to the pool and is being checked.",
+      ),
+    ).not.toHaveLength(0);
+    expect(await screen.findByText("Also in the pool")).toBeInTheDocument();
+    const adoptWrites = (await writes()).filter((w) => w.path.endsWith("/adopt"));
+    expect(adoptWrites).toHaveLength(1);
+    expect(adoptWrites[0].path).toMatch(/^\/proxy-pool\/detected\/dx_[0-9a-f]+\/adopt$/);
   });
 });

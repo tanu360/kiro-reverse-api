@@ -19,6 +19,8 @@ const (
 	codeProxyPoolNotFound  = "proxy_pool_not_found"
 	codeProxyPoolEmpty     = "proxy_pool_empty"
 	codeProxyPoolFull      = "proxy_pool_full"
+	// codeProxyPoolDetectedSignIn refuses to share a detected proxy that carries a sign-in.
+	codeProxyPoolDetectedSignIn = "proxy_pool_detected_sign_in"
 )
 
 const (
@@ -47,6 +49,10 @@ func (h *Handler) handleProxyPoolAPI(w http.ResponseWriter, r *http.Request, sub
 		h.apiUpdatePoolProxy(w, r, strings.TrimPrefix(sub, "/proxies/"))
 	case strings.HasPrefix(sub, "/proxies/") && r.Method == http.MethodDelete:
 		h.apiDeletePoolProxy(w, strings.TrimPrefix(sub, "/proxies/"))
+	case strings.HasPrefix(sub, "/detected/") && strings.HasSuffix(sub, "/check") && r.Method == http.MethodPost:
+		h.apiCheckDetectedProxy(w, r, strings.TrimSuffix(strings.TrimPrefix(sub, "/detected/"), "/check"))
+	case strings.HasPrefix(sub, "/detected/") && strings.HasSuffix(sub, "/adopt") && r.Method == http.MethodPost:
+		h.apiAdoptDetectedProxy(w, strings.TrimSuffix(strings.TrimPrefix(sub, "/detected/"), "/adopt"))
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Not Found"})
@@ -58,10 +64,11 @@ type poolProxyRequest struct {
 	URL      *string `json:"url"`
 	Username *string `json:"username"`
 	Password *string `json:"password"`
+	Enabled  *bool   `json:"enabled"`
 }
 
 func (req poolProxyRequest) input() proxypool.ProxyInput {
-	return proxypool.ProxyInput{Label: req.Label, URL: req.URL, Username: req.Username, Password: req.Password}
+	return proxypool.ProxyInput{Label: req.Label, URL: req.URL, Username: req.Username, Password: req.Password, Enabled: req.Enabled}
 }
 
 func writeProxyPoolError(w http.ResponseWriter, err error) {
@@ -69,8 +76,10 @@ func writeProxyPoolError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.As(err, &inputErr):
 		writeAdminErrorDetail(w, http.StatusBadRequest, codeProxyPoolInvalid, err.Error(), inputErr.Reason)
-	case errors.Is(err, proxypool.ErrDuplicate):
+	case errors.Is(err, proxypool.ErrDuplicate), errors.Is(err, proxypool.ErrDetectedInPool):
 		writeAdminError(w, http.StatusConflict, codeProxyPoolDuplicate, err.Error())
+	case errors.Is(err, proxypool.ErrDetectedSignIn):
+		writeAdminError(w, http.StatusBadRequest, codeProxyPoolDetectedSignIn, err.Error())
 	case errors.Is(err, proxypool.ErrFull):
 		writeAdminError(w, http.StatusBadRequest, codeProxyPoolFull, err.Error())
 	case errors.Is(err, proxypool.ErrNotFound):
@@ -175,4 +184,29 @@ func (h *Handler) apiCheckProxyPool(w http.ResponseWriter, r *http.Request) {
 	case <-wait.Done():
 	}
 	json.NewEncoder(w).Encode(proxypool.Default().View())
+}
+
+func (h *Handler) apiCheckDetectedProxy(w http.ResponseWriter, r *http.Request, id string) {
+	if _, err := proxypool.Default().CheckDetected(r.Context(), id); err != nil {
+		writeProxyPoolError(w, err)
+		return
+	}
+	dv, ok := proxypool.Default().ViewDetected(id)
+	if !ok {
+		writeProxyPoolError(w, proxypool.ErrNotFound)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]any{"detected": dv})
+}
+
+// apiAdoptDetectedProxy adds an unauthenticated detected proxy to the pool on the
+// admin's word: until then it serves only the account or setting that holds it.
+func (h *Handler) apiAdoptDetectedProxy(w http.ResponseWriter, id string) {
+	p, err := proxypool.Default().Adopt(id)
+	if err != nil {
+		writeProxyPoolError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{"proxy": proxypool.Default().ViewProxy(p)})
 }

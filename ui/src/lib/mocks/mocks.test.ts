@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/errors";
 import { createSession, getFirstRun } from "@/lib/api/session";
 import { compareVersions, fetchRemoteVersion, getStatus, getVersion } from "@/lib/api/system";
-import type { RequestErrorType } from "@/lib/api/types";
+import type { RequestErrorType, SessionCreateResponse } from "@/lib/api/types";
 import { setSession } from "@/lib/auth/session";
 import { mockDb, mockNowUnix, mockScenario, resetMockDb } from "./db";
 import {
@@ -248,7 +248,7 @@ describe("observe builders", () => {
 describe("core handlers", () => {
   it("signs in with the first-run password, then hides it", async () => {
     await expect(getFirstRun()).resolves.toEqual({ password: "12345678" });
-    const session = await createSession("12345678");
+    const session = (await createSession("12345678")) as SessionCreateResponse;
     expect(session.token).toMatch(/^mock-/);
     expect(session.expiresAt).toBeGreaterThan(Date.now() + 11 * 3600 * 1000);
     await expect(getFirstRun()).resolves.toEqual({ password: "" });

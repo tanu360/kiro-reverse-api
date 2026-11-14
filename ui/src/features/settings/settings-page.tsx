@@ -31,9 +31,11 @@ import { ProxyPoolCard } from "@/features/proxy-pool/proxy-pool-card";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { accountHealthQuery } from "@/lib/api/account-health";
 import { alertsQuery } from "@/lib/api/alerts";
+import { metricsQuery } from "@/lib/api/metrics";
 import { proxyPoolQuery } from "@/lib/api/proxy-pool";
 import { responseHeadersQuery } from "@/lib/api/response-headers";
 import { promptFilterQuery, proxyQuery, settingsQuery } from "@/lib/api/settings";
+import { twoFactorQuery } from "@/lib/api/two-factor";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsaved";
@@ -44,6 +46,7 @@ import { DangerZoneCard } from "./sections/danger-zone-card";
 import { EndpointCard } from "./sections/endpoint-card";
 import { ImageResizeCard } from "./sections/image-resize-card";
 import { LogRetentionCard } from "./sections/log-retention-card";
+import { MetricsCard } from "./sections/metrics-card";
 import { ModelMappingsCard } from "./sections/model-mappings-card";
 import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
@@ -55,6 +58,7 @@ import { ServerLogCard } from "./sections/server-log-card";
 import { StreamIntegrityCard } from "./sections/stream-integrity-card";
 import { ThinkingCard } from "./sections/thinking-card";
 import { ToolHistoryCard } from "./sections/tool-history-card";
+import { TwoFactorCard } from "./sections/two-factor-card";
 import { UpstreamCard } from "./sections/upstream-card";
 import { UsageCard } from "./sections/usage-card";
 
@@ -330,6 +334,8 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   const alerts = useQuery(alertsQuery()).data;
   const headers = useQuery(responseHeadersQuery()).data;
   const promptFilter = useQuery(promptFilterQuery()).data;
+  const twoFactor = useQuery(twoFactorQuery()).data;
+  const metrics = useQuery(metricsQuery()).data;
   // A section that is one switch shows its saved state as a pill in its nav row, so the page
   // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
   // A card of several controls shows On when it does anything: alerts with a channel switched
@@ -343,6 +349,8 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
     "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,
     "settings-proxy-pool": proxyPool ? proxyPool.mode === "on" : undefined,
     "settings-self-heal": health?.enabled,
+    "settings-two-factor": twoFactor?.enabled,
+    "settings-metrics": metrics?.enabled,
     "settings-alerts": alerts ? alerts.channels.some((channel) => channel.enabled) : undefined,
     "settings-response-headers": headers
       ? headers.headers.some((header) => header.enabled)
@@ -550,11 +558,13 @@ function SettingsContent(): JSX.Element {
           <EndpointCard />
           <UpstreamCard />
           <AdminPasswordCard />
+          <TwoFactorCard />
           <OutboundProxyCard />
           <ProxyPoolCard />
           <ResponseHeadersCard />
           <AlertsCard />
           <ServerLogCard />
+          <MetricsCard />
           <PromptFilterCard />
           <LogRetentionCard />
           <DangerZoneCard />

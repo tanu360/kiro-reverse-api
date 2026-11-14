@@ -100,6 +100,7 @@ func connectAnsweringProxy(t *testing.T, statusLine string) string {
 // A failed check stores the failure's kind and the proxy's answer to CONNECT
 // beside the redacted text, for the admin UI's own wording; a good check clears them.
 func TestCheckStoresFailureCode(t *testing.T) {
+	oneStrike(t)
 	closed := closedPortURL(t)
 	cases := []struct {
 		name   string

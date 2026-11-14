@@ -264,7 +264,7 @@ func TestPruneRequestLogAccumulatesAcrossRuns(t *testing.T) {
 	}
 
 	// A request logged after the prunes adds to the totals once.
-	if err := persistRequestRecord(requestRecord{TS: now.Unix(), AccountID: "acc-a", Model: "auto", InTokens: 5, OutTokens: 2, TotalTokens: 7, Credits: 0.5, Success: true}); err != nil {
+	if _, err := persistRequestRecord(requestRecord{TS: now.Unix(), AccountID: "acc-a", Model: "auto", InTokens: 5, OutTokens: 2, TotalTokens: 7, Credits: 0.5, Success: true}); err != nil {
 		t.Fatal(err)
 	}
 	gotStats, err := queryPersistedRequestStats()

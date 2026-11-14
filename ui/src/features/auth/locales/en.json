@@ -25,5 +25,22 @@
   "clickToCopy": "Click to copy",
   "passwordCopied": "Password copied to clipboard",
   "changePasswordToast": "Change the generated password in Settings.",
-  "openSettings": "Open settings"
+  "openSettings": "Open settings",
+  "codePrompt": "Enter the 6-digit code from your authenticator app.",
+  "recoveryPrompt": "Enter one of the recovery codes you saved. Each one works once.",
+  "codeLabel": "Code from the app",
+  "recoveryLabel": "Recovery code",
+  "codePlaceholder": "123456",
+  "recoveryPlaceholder": "abcde-12345",
+  "codeRequired": "Enter the code.",
+  "recoveryRequired": "Enter a recovery code.",
+  "verify": "Verify",
+  "verifying": "Verifying…",
+  "useRecovery": "Use a recovery code",
+  "useCode": "Use a code from the app",
+  "backToPassword": "Back",
+  "codeWrong": "That code is not right. Check that your phone's clock is correct.",
+  "recoveryWrong": "That recovery code is not right, or it was used already.",
+  "codeReused": "This code was used already. Wait for the next one.",
+  "challengeExpired": "The sign-in timed out. Enter the password again."
 }

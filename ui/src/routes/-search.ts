@@ -78,6 +78,8 @@ export interface RequestsSearch {
   pageSize?: 10 | 25 | 50 | 100;
   search?: string;
   status?: "success" | "failed";
+  /** Only the turns of one conversation (its id). */
+  conversation?: string;
   sort?: RequestSort;
   order?: "asc" | "desc";
 }
@@ -147,12 +149,19 @@ export function validateAccountsSearch(input: Record<string, unknown>): Accounts
   };
 }
 
+/** A conversation id: a UUID-like run of letters, digits and dashes, at most 64 long. */
+function conversationId(value: unknown): string | undefined {
+  const id = text(value);
+  return id && /^[\w-]{1,64}$/.test(id) ? id : undefined;
+}
+
 export function validateRequestsSearch(input: Record<string, unknown>): RequestsSearch {
   return {
     page: pageNumber(input.page),
     pageSize: pageSize(input.pageSize),
     search: text(input.search),
     status: oneOf(input.status, ["success", "failed"] as const),
+    conversation: conversationId(input.conversation),
     sort: oneOf(input.sort, REQUEST_SORTS),
     order: oneOf(input.order, ["asc", "desc"] as const),
   };

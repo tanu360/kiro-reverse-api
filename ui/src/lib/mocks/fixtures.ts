@@ -1449,3 +1449,41 @@ export function defaultPromptFilter(): PromptFilterConfig {
     rules: [],
   };
 }
+
+/** A stable UUID-shaped id from a number, for mock conversation ids. */
+function mockUuid(seed: number): string {
+  let x = (seed * 2654435761) >>> 0;
+  const hex = Array.from({ length: 32 }, () => {
+    x = (Math.imul(x ^ (x >>> 15), 2246822507) + 0x9e3779b9) >>> 0;
+    return (x & 15).toString(16);
+  }).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
+ * Groups routed requests into conversations, as the server's session affinity key does: turns
+ * of one account, model and API in a row, two to seven at a time. Requests from the last 30 days
+ * keep their body (one in eleven was too large), and a few later turns are replays of an earlier
+ * one. Rows that never reached an account have none of these.
+ */
+export function annotateConversations(requests: RequestRecord[], now: number): void {
+  const open = new Map<string, { id: string; left: number; first: number }>();
+  const oldestFirst = [...requests].sort((a, b) => a.ts - b.ts || (a.id ?? 0) - (b.id ?? 0));
+  let seed = 1;
+  for (const record of oldestFirst) {
+    if (!record.accountId) continue;
+    const key = `${record.accountId}|${record.model}|${record.endpoint ?? ""}`;
+    let conversation = open.get(key);
+    if (!conversation || conversation.left <= 0) {
+      conversation = { id: mockUuid(seed++), left: 2 + (seed % 6), first: record.id ?? 0 };
+      open.set(key, conversation);
+    }
+    conversation.left -= 1;
+    record.conversationId = conversation.id;
+    const id = record.id ?? 0;
+    record.hasBody = record.ts >= now - 30 * 86400 && id % 11 !== 0;
+    if (id % 37 === 0 && conversation.first && conversation.first !== id) {
+      record.replayOf = conversation.first;
+    }
+  }
+}

@@ -25,5 +25,22 @@
   "clickToCopy": "Nhấn để sao chép",
   "passwordCopied": "Đã sao chép mật khẩu vào bộ nhớ tạm",
   "changePasswordToast": "Đổi mật khẩu được tạo tự động trong Cài đặt.",
-  "openSettings": "Mở cài đặt"
+  "openSettings": "Mở cài đặt",
+  "codePrompt": "Nhập mã 6 chữ số trong ứng dụng xác thực.",
+  "recoveryPrompt": "Nhập một mã khôi phục bạn đã lưu. Mỗi mã chỉ dùng được một lần.",
+  "codeLabel": "Mã trong ứng dụng",
+  "recoveryLabel": "Mã khôi phục",
+  "codePlaceholder": "123456",
+  "recoveryPlaceholder": "abcde-12345",
+  "codeRequired": "Hãy nhập mã.",
+  "recoveryRequired": "Hãy nhập mã khôi phục.",
+  "verify": "Xác minh",
+  "verifying": "Đang xác minh…",
+  "useRecovery": "Dùng mã khôi phục",
+  "useCode": "Dùng mã trong ứng dụng",
+  "backToPassword": "Quay lại",
+  "codeWrong": "Mã không đúng. Kiểm tra giờ trên điện thoại.",
+  "recoveryWrong": "Mã khôi phục không đúng hoặc đã được dùng.",
+  "codeReused": "Mã này đã được dùng. Hãy đợi mã tiếp theo.",
+  "challengeExpired": "Phiên đăng nhập đã hết hạn. Hãy nhập lại mật khẩu."
 }

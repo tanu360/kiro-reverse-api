@@ -96,5 +96,20 @@
   "serverError.modelMappingSelf": "{model} cannot map to itself.",
   "serverError.modelMappingDuplicate": "{model} is mapped more than once.",
   "serverError.modelMappingChain": "{model} is also the source of another mapping. Mappings apply once, so map straight to the final model.",
-  "serverError.detail": "(Details: {detail})"
+  "serverError.detail": "(Details: {detail})",
+  "serverError.totpRequired": "Two-factor sign-in is on. Sign in with the password and a code.",
+  "serverError.totpInvalid": "That code is not right. Check that your phone's clock is correct and try again.",
+  "serverError.totpReused": "This code was used already. Wait for the next one.",
+  "serverError.totpChallengeExpired": "The sign-in timed out. Enter the password again.",
+  "serverError.totpSetupExpired": "The QR code expired. Start the setup again.",
+  "serverError.totpAlreadyEnabled": "Two-factor sign-in is already on.",
+  "serverError.totpNotEnabled": "Two-factor sign-in is off.",
+  "serverError.totpResetByEnv": "ADMIN_RESET_2FA is set on the server, so the next start would turn two-factor sign-in off again. Remove it first.",
+  "serverError.totpProofRequired": "Enter a current code or the admin password.",
+  "serverError.tooManyCodeAttempts": "Too many wrong codes. Try again later.",
+  "serverError.requestNotFound": "This request is no longer in the log.",
+  "serverError.requestBodyMissing": "This request's body was not kept, so it cannot be replayed.",
+  "serverError.replayAccountInvalid": "Choose an account that still exists.",
+  "serverError.conversationNotFound": "No request of this conversation is in the log.",
+  "serverError.adminPasswordWrong": "Incorrect password."
 }

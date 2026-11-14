@@ -9,6 +9,7 @@ import (
 	"kiro-proxy/config"
 	"kiro-proxy/logger"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -128,6 +129,19 @@ func (s *adminSessionStore) RevokeAll() {
 	s.tickets = make(map[string]time.Time)
 }
 
+// RevokeAllExcept invalidates every session but keep, as turning two-factor
+// sign-in on does: the session that turned it on just proved a code.
+func (s *adminSessionStore) RevokeAllExcept(keep string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	expiry, ok := s.sessions[keep]
+	s.sessions = make(map[string]time.Time)
+	s.tickets = make(map[string]time.Time)
+	if ok && keep != "" {
+		s.sessions[keep] = expiry
+	}
+}
+
 // IssueTicket mints a single-use credential for one EventSource connect.
 func (s *adminSessionStore) IssueTicket() (string, time.Time, error) {
 	ticket, err := newSecret()
@@ -161,11 +175,33 @@ func (s *adminSessionStore) ConsumeTicket(ticket string) bool {
 // apiCreateAdminSession exchanges the admin password for a session token. The
 // browser stores the token instead of the password, so a token stolen through
 // XSS expires on its own and can be revoked by changing the password.
+//
+// With two-factor sign-in on it takes two steps: the password answers
+// {"twoFactorRequired": true, "challenge": ...}, and the challenge with a code
+// or a recovery code answers the token. A script may send the password and the
+// code at once.
 func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Password string `json:"password"`
+		Password     string `json:"password"`
+		Challenge    string `json:"challenge"`
+		Code         string `json:"code"`
+		RecoveryCode string `json:"recoveryCode"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req)
+
+	if req.Challenge != "" {
+		if !config.AdminTOTPEnabled() || !h.totpState().challengeValid(req.Challenge, time.Now()) {
+			writeAdminError(w, http.StatusUnauthorized, codeTOTPChallengeExpired, "The sign-in expired; enter the password again")
+			return
+		}
+		if !h.checkSecondFactor(w, r, req.Code, req.RecoveryCode, http.StatusUnauthorized) {
+			h.totpState().challengeFailed(req.Challenge)
+			return
+		}
+		h.totpState().consumeChallenge(req.Challenge)
+		h.issueAdminSession(w)
+		return
+	}
 
 	supplied := req.Password
 	if supplied == "" {
@@ -174,7 +210,31 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 	if !h.checkAdminPassword(w, r, supplied) {
 		return
 	}
+	if config.AdminTOTPEnabled() {
+		if strings.TrimSpace(req.Code) != "" || strings.TrimSpace(req.RecoveryCode) != "" {
+			if !h.checkSecondFactor(w, r, req.Code, req.RecoveryCode, http.StatusUnauthorized) {
+				return
+			}
+			h.issueAdminSession(w)
+			return
+		}
+		challenge, expiry, err := h.totpState().issueChallenge(time.Now())
+		if err != nil {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"twoFactorRequired": true,
+			"challenge":         challenge,
+			"expiresAt":         expiry.UnixMilli(),
+		})
+		return
+	}
+	h.issueAdminSession(w)
+}
 
+func (h *Handler) issueAdminSession(w http.ResponseWriter) {
 	token, expiry, err := h.adminSessions.Issue()
 	if err != nil {
 		w.WriteHeader(500)

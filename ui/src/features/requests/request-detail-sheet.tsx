@@ -1,7 +1,9 @@
 import {
   AlertCircleIcon,
   ArrowDataTransferHorizontalIcon,
+  BubbleChatIcon,
   Message01Icon,
+  PlayIcon,
   UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -25,6 +27,7 @@ import {
 import { SectionCard } from "@/components/shared/section-card";
 import { StatStrip, type StatStripItem } from "@/components/shared/stat-strip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { accountsQuery } from "@/lib/api/accounts";
@@ -39,7 +42,9 @@ import {
 } from "@/lib/format";
 import { type Lang, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
+import { ConversationSheet } from "./conversation-sheet";
 import { requestProxyText } from "./proxy-failure";
+import { ReplayDialog } from "./replay-dialog";
 import { AttemptsCard } from "./request-attempts";
 import { isKnownErrorType, normalizeApiKeyMask, rowKey } from "./request-model";
 import { endpointLabel, StatusBadge } from "./requests-columns";
@@ -60,6 +65,8 @@ interface RequestDetailSheetProps {
   count: number;
   onPrevious?: () => void;
   onNext?: () => void;
+  /** Filters the log to one conversation (from the conversation sheet). */
+  onShowConversation?: (conversationId: string) => void;
 }
 
 /**
@@ -80,6 +87,7 @@ export function RequestDetailSheet({
   count,
   onPrevious,
   onNext,
+  onShowConversation,
 }: RequestDetailSheetProps): JSX.Element {
   const { t, lang } = useT("requests");
   const maskText = useMaskText();
@@ -89,6 +97,8 @@ export function RequestDetailSheet({
     open: boolean;
     session: number;
   } | null>(null);
+  const [conversationOpen, setConversationOpen] = useState(false);
+  const [replayOpen, setReplayOpen] = useState(false);
   const accountId = record?.accountId ?? "";
   // Only to hide Open account for an account that has since been removed; shared with Accounts.
   const accounts = useQuery({ ...accountsQuery(), enabled: open && accountId !== "" });
@@ -210,6 +220,7 @@ export function RequestDetailSheet({
       idItem(t("detail.accountId"), record.accountId),
       idItem(t("detail.apiKeyId"), record.apiKeyId),
       idItem(t("detail.traceId"), record.requestId),
+      idItem(t("detail.conversationId"), record.conversationId),
     ];
 
     body = (
@@ -236,6 +247,13 @@ export function RequestDetailSheet({
           slim
           title={t("detail.request")}
         >
+          {record.replayOf ? (
+            <div className="px-4 pt-4 sm:px-6">
+              <Badge size="sm" tone="primary">
+                {t("replay.badge", { id: record.replayOf })}
+              </Badge>
+            </div>
+          ) : null}
           <div className="px-4 py-4 sm:px-6">
             <KeyValueGrid items={facts} />
           </div>
@@ -300,6 +318,18 @@ export function RequestDetailSheet({
                 {t("detail.openAccount")}
               </Button>
             ) : null}
+            {record.conversationId ? (
+              <Button onClick={() => setConversationOpen(true)} size="sm" variant="secondary">
+                <HugeiconsIcon aria-hidden="true" icon={BubbleChatIcon} />
+                {t("detail.openConversation")}
+              </Button>
+            ) : null}
+            {record.hasBody && record.id !== undefined ? (
+              <Button onClick={() => setReplayOpen(true)} size="sm" variant="secondary">
+                <HugeiconsIcon aria-hidden="true" icon={PlayIcon} />
+                {t("detail.replay")}
+              </Button>
+            ) : null}
             <CopyButton
               className="ms-auto"
               label={t("detail.copyJson")}
@@ -330,6 +360,31 @@ export function RequestDetailSheet({
           />
         </div>
       </ResponsiveSheetFooter>
+      {record?.conversationId ? (
+        <ConversationSheet
+          conversationId={record.conversationId}
+          currentId={record.id}
+          key={record.conversationId}
+          onOpenChange={setConversationOpen}
+          onShowInLog={
+            onShowConversation
+              ? (id) => {
+                  setConversationOpen(false);
+                  onShowConversation(id);
+                }
+              : undefined
+          }
+          open={conversationOpen && open}
+        />
+      ) : null}
+      {record?.hasBody ? (
+        <ReplayDialog
+          key={`replay-${record.id}`}
+          onOpenChange={setReplayOpen}
+          open={replayOpen && open}
+          record={record}
+        />
+      ) : null}
       {/* Rendered inside this sheet, so it opens as a nested sheet and Escape closes it first. */}
       {accountSheet ? (
         <Suspense fallback={null}>

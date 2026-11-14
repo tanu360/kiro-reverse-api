@@ -92,6 +92,12 @@ type requestRecord struct {
 	DurationMs   int64   `json:"durationMs,omitempty"`
 	ErrorType    string  `json:"errorType,omitempty"`
 	RequestID    string  `json:"requestId,omitempty"`
+	// ConversationID groups the turns of one conversation; "" when the request never got that far.
+	ConversationID string `json:"conversationId,omitempty"`
+	// ReplayOf is the request an admin replayed to make this one.
+	ReplayOf int64 `json:"replayOf,omitempty"`
+	// HasBody reports that the request's body was kept, so it can be replayed.
+	HasBody bool `json:"hasBody,omitempty"`
 
 	// Attempts is the request's upstream attempt chain, oldest first.
 	Attempts []requestAttempt `json:"attempts,omitempty"`
@@ -107,6 +113,8 @@ type requestQuery struct {
 	// ErrorType keeps only the rows of one error type (the UI sends it for a search that
 	// names a type the way the table labels it).
 	ErrorType string
+	// Conversation keeps only the turns of one conversation.
+	Conversation string
 }
 
 type requestPage struct {
@@ -363,7 +371,25 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 		ErrorType:    errorType,
 		Attempts:     attempts,
 		RequestID:    trace.requestIDValue(),
+
+		ConversationID: trace.conversation(),
+		ReplayOf:       trace.replayOfID(),
 	}
+	//! Written first, so the row id is known: the request detail opens conversations and replays by it.
+	keepBody := trace != nil && len(trace.body) > 0 && accountID != ""
+	rec.HasBody = keepBody
+	if id := enqueuePersistRequestRecord(rec); id > 0 {
+		rec.ID = id
+		if trace != nil {
+			trace.loggedID = id
+		}
+		if keepBody {
+			storeRequestBody(id, trace, apiKey, rec.TS)
+		}
+	} else {
+		rec.HasBody = false
+	}
+	recordRequestMetrics(rec)
 	s.mu.Lock()
 	s.recentRequests[s.recentReqIdx] = rec
 	s.recentReqIdx = (s.recentReqIdx + 1) % observeRecentReqs
@@ -371,8 +397,6 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 	s.mu.Unlock()
 	accountRates.record(accountID, rec.TS)
 	s.seq.Add(1)
-
-	enqueuePersistRequestRecord(rec)
 }
 
 func requestAPIKeyMasked(apiKeyID, apiKey string) string {
@@ -801,6 +825,7 @@ func normalizeRequestQuery(q requestQuery) requestQuery {
 		q.Order = "desc"
 	}
 	q.ErrorType = strings.TrimSpace(strings.ToLower(q.ErrorType))
+	q.Conversation = strings.TrimSpace(q.Conversation)
 	return q
 }
 
@@ -827,6 +852,9 @@ func (s *observeStore) memoryRequestPage(q requestQuery) requestPage {
 			continue
 		}
 		if q.ErrorType != "" && (rec.Success || rec.ErrorType != q.ErrorType) {
+			continue
+		}
+		if q.Conversation != "" && rec.ConversationID != q.Conversation {
 			continue
 		}
 		if search != "" {

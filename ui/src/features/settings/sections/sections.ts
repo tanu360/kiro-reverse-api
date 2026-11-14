@@ -1,6 +1,7 @@
 import {
   AiBrain01Icon,
   Alert02Icon,
+  Analytics01Icon,
   ArrowDataTransferHorizontalIcon,
   CloudServerIcon,
   Coins01Icon,
@@ -17,6 +18,7 @@ import {
   RepeatIcon,
   Route02Icon,
   SecurityCheckIcon,
+  ShieldKeyIcon,
   Tag01Icon,
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
@@ -53,6 +55,12 @@ export const SETTINGS_SECTIONS = [
     icon: LockPasswordIcon,
     group: "server",
   },
+  {
+    id: "settings-two-factor",
+    titleKey: "twoFactor.title",
+    icon: ShieldKeyIcon,
+    group: "server",
+  },
   { id: "settings-outbound-proxy", titleKey: "proxySettings", icon: GlobalIcon, group: "server" },
   {
     id: "settings-proxy-pool",
@@ -73,6 +81,7 @@ export const SETTINGS_SECTIONS = [
     icon: ComputerTerminal01Icon,
     group: "server",
   },
+  { id: "settings-metrics", titleKey: "metrics.title", icon: Analytics01Icon, group: "server" },
   {
     id: "settings-prompt-filter",
     titleKey: "promptFilter",
@@ -116,11 +125,13 @@ export const SECTION_ID = {
   endpoint: "settings-endpoint",
   upstream: "settings-upstream",
   adminPassword: "settings-admin-password",
+  twoFactor: "settings-two-factor",
   outboundProxy: "settings-outbound-proxy",
   proxyPool: "settings-proxy-pool",
   responseHeaders: "settings-response-headers",
   alerts: "settings-alerts",
   serverLog: "settings-server-log",
+  metrics: "settings-metrics",
   promptFilter: "settings-prompt-filter",
   logRetention: "settings-log-retention",
   dangerZone: "settings-danger-zone",

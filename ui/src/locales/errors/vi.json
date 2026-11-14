@@ -96,5 +96,20 @@
   "serverError.modelMappingSelf": "{model} không thể ánh xạ tới chính nó.",
   "serverError.modelMappingDuplicate": "{model} được ánh xạ nhiều hơn một lần.",
   "serverError.modelMappingChain": "{model} cũng là nguồn của một ánh xạ khác. Ánh xạ chỉ áp dụng một lần, nên hãy ánh xạ thẳng tới model cuối cùng.",
-  "serverError.detail": "(Chi tiết: {detail})"
+  "serverError.detail": "(Chi tiết: {detail})",
+  "serverError.totpRequired": "Đăng nhập hai bước đang bật. Hãy đăng nhập bằng mật khẩu và mã.",
+  "serverError.totpInvalid": "Mã không đúng. Kiểm tra giờ trên điện thoại rồi thử lại.",
+  "serverError.totpReused": "Mã này đã được dùng. Hãy đợi mã tiếp theo.",
+  "serverError.totpChallengeExpired": "Phiên đăng nhập đã hết hạn. Hãy nhập lại mật khẩu.",
+  "serverError.totpSetupExpired": "Mã QR đã hết hạn. Hãy bắt đầu thiết lập lại.",
+  "serverError.totpAlreadyEnabled": "Đăng nhập hai bước đã bật.",
+  "serverError.totpNotEnabled": "Đăng nhập hai bước đang tắt.",
+  "serverError.totpResetByEnv": "Máy chủ đang đặt ADMIN_RESET_2FA, nên lần khởi động tới sẽ tắt đăng nhập hai bước. Hãy gỡ biến này trước.",
+  "serverError.totpProofRequired": "Hãy nhập mã hiện tại hoặc mật khẩu quản trị.",
+  "serverError.tooManyCodeAttempts": "Nhập sai mã quá nhiều lần. Hãy thử lại sau.",
+  "serverError.requestNotFound": "Yêu cầu này không còn trong nhật ký.",
+  "serverError.requestBodyMissing": "Nội dung yêu cầu này không được lưu nên không thể chạy lại.",
+  "serverError.replayAccountInvalid": "Hãy chọn một tài khoản vẫn còn tồn tại.",
+  "serverError.conversationNotFound": "Nhật ký không có yêu cầu nào của cuộc hội thoại này.",
+  "serverError.adminPasswordWrong": "Mật khẩu không đúng."
 }

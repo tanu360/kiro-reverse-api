@@ -108,19 +108,20 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Aplicativo React de página única embutido no binário; não há servidor web separado para rodar.
 - Painel Visão geral atualizado ao vivo: quatro cartões de KPI (contas, créditos do plano, e requisições e falhas na última hora), o tráfego da última hora, das últimas 6 ou 24 horas ou de todo o período em barras empilhadas, uma lista das contas que precisam de atenção, o tráfego por conta, um gráfico de rosca com a distribuição por modelo e as contas mais ativas. O cartão **Créditos do plano** separa o uso de créditos do Kiro em uso pelo proxy e uso fora dele.
 - Contas com abas de status e contagens, filtros (plano, autenticação, região, ligada, tag), busca por e-mail, apelido, notas e tags, ordenação, ações em lote, visão de detalhes, testes de conexão, requisições por minuto e de hoje ao vivo, revisão de duplicadas e exportação.
-- Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite.
+- Log de requisições com abas de status e contagens, busca (que também compara a chave de API completa), ordenação, visão de detalhes com categorias de erro, o ID de rastreio e uma linha do tempo de cada tentativa no upstream (conta, endpoint, duração, resultado, failover), chaves de API mascaradas e histórico guardado em SQLite. O detalhe de uma requisição abre a conversa dela (os turnos em ordem, a conta de cada um, as trocas de conta e os totais) e filtra o log por ela, e **Repetir** roda uma requisição registrada de novo numa conta e num modelo que você escolher (veja [Conversas e repetição](#-conversas-e-repetição)).
 - Página API com gerenciamento de chaves de API dos clientes (valores de chave personalizados opcionais, habilitar/desabilitar, limites de tokens, créditos e chamadas por chave, requisições por minuto, horário de expiração, modelos permitidos, vínculo com contas por conta ou por tag, modo de roteamento por chave, gerar nova chave, redefinição de uso), um gráfico **Uso por chave** e um gerador de configuração do cliente com destaque de sintaxe: código de requisição para as APIs Anthropic Messages, OpenAI Chat Completions e OpenAI Responses em curl, Python, Node.js, Go, Java, PHP, Ruby e C# (SDK oficial ou HTTP puro, com ou sem streaming) com uma resposta de exemplo, além da configuração do Claude Code e do Codex.
-- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), continuação automática, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, log do servidor, senha de administrador, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
+- Configurações de uso e atualização em segundo plano, roteamento (modo, afinidade de sessão, limite por conta), continuação automática, histórico de ferramentas, redimensionamento de imagens, autorrecuperação, raciocínio, mapeamento de modelos, filtro de system prompt, integridade do stream, endpoint, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, alertas, log do servidor, senha de administrador, login em duas etapas, métricas do Prometheus, retenção de logs e redefinição de estatísticas; Backups com agendamento, upload e restauração com um clique.
 - Alertas para webhook, Telegram, Discord ou Slack quando os créditos estão acabando, uma conta é banida ou nenhuma conta consegue atender requisições, e um resumo diário de uso opcional (veja [Alertas](#-alertas)).
 - Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações pelo `version.json` da branch `main` do repositório.
 - Alterar a senha de administrador encerra todas as outras sessões conectadas.
+- Login em duas etapas com um app autenticador, com dez códigos de recuperação de uso único (veja [Login em duas etapas](#-login-em-duas-etapas)).
 - Tema claro, escuro e do sistema; quatro idiomas na interface: English, 简体中文, Tiếng Việt e Português (Brasil).
 - Funciona de celulares a desktops.
 
 ### 🌐 Rede
 
 - Suporte a proxy de saída — SOCKS5, HTTP ou HTTPS, trocado ao vivo sem reiniciar, com substituição por conta. Senhas de proxy salvas aparecem como `********`.
-- Pool de proxies: cada conta sem proxy próprio recebe um proxy do pool, com verificações de saúde e troca para um proxy saudável quando um deles não conecta (veja [Pool de proxies](#-pool-de-proxies)).
+- Pool de proxies: cada conta sem proxy próprio recebe um proxy do pool, com verificações de saúde, uma chave liga/desliga por proxy, a troca para um proxy saudável depois de três falhas seguidas, e os proxies global e das contas verificados como entradas detectadas (veja [Pool de proxies](#-pool-de-proxies)).
 - Domínio e região upstream (**Configurações → Domínio e região upstream**): envie o chat e a busca na web para `runtime.{region}.kiro.dev` em vez de `q.{region}.amazonaws.com` (uso e listas de modelos continuam na AWS) e substitua, para todas as contas, a região da API (`us-east-1` ou `eu-central-1`) ou a região em que os tokens do Builder ID e do IAM Identity Center são renovados. Uma região que não combina com a conta faz as requisições dela falharem, mas nunca bane a conta.
 - Sufixo do modo de raciocínio configurável e repasse da configuração `thinking` da Anthropic.
 
@@ -130,6 +131,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 - As linhas finais de requisição, mais um resumo das linhas que a retenção de logs removeu, são a fonte da verdade para os totais de requisições, tokens, créditos, sucessos e falhas do painel.
 - Retenção de logs: linhas do log de requisições e de erros com mais de 90 dias (de 1 a 3650, ou guardar para sempre) são excluídas em pequenos lotes, dois minutos depois da inicialização e depois uma vez por dia.
 - Retenção de 30 dias para respostas armazenadas, com gravações assíncronas fora do caminho crítico da requisição.
+- Corpos das requisições guardados por 30 dias para repetição: até 2 MiB cada, compactados, com a chave do cliente mascarada, 256 MiB no total (os mais antigos saem primeiro).
 
 ---
 
@@ -223,6 +225,7 @@ A autenticação por senha de administrador permite cinco tentativas com falha p
 | `PORT`           | Porta de escuta, de 1 a 65535 (substitui a configuração). Um valor inválido é ignorado, com um aviso na inicialização. No Docker, troque o lado do host no mapeamento de portas | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Defina `off` para deixar de converter de volta em chamadas de ferramenta a marcação de chamada de ferramenta que o Kiro vaza no texto da resposta | on |
 | `LOG_LEVEL`      | Nível de log: `debug`, `info`, `warn` ou `error` (substitui a configuração) | `info` |
+| `ADMIN_RESET_2FA` | Defina `1` para desligar o login em duas etapas do administrador na inicialização, se você perdeu o app e os códigos de recuperação. Remova depois: enquanto estiver definido, cada inicialização o desliga de novo | — |
 
 > [!WARNING]
 > O `kiro.db` guarda tokens OAuth e credenciais de administrador. Trate-o como segredo — mantenha-o fora do git, de capturas de tela e de conversas em chat. Monte o diretório do banco de dados como um volume privado.
@@ -270,6 +273,7 @@ Para o Codex, salve `/v1/codex/models` em um arquivo e defina `model_catalog_jso
 | `GET`    | `/v1/models`                    | Lista os modelos disponíveis                  |
 | `GET`    | `/v1/codex/models`              | Lista de modelos no formato do Codex CLI      |
 | `GET`    | `/v1/stats`                     | Estatísticas agregadas de uso do proxy        |
+| `GET`    | `/metrics`                      | Métricas do Prometheus, desligadas por padrão, com bearer token (veja [Métricas do Prometheus](#-métricas-do-prometheus)) |
 | `GET`    | `/health`                       | Verificação de saúde                          |
 | `GET`    | `/`                             | Painel de administração web (SPA embutido; links de página como `/accounts` abrem o app, links antigos `/admin/*` redirecionam e um cliente que não pede HTML recebe o health check) |
 
@@ -360,9 +364,56 @@ O proxy próprio de uma conta e o proxy global têm 15 segundos para conectar. Q
 
 ### 🔁 Pool de proxies
 
-**Configurações → Pool de proxies** distribui as contas sem proxy próprio por uma lista de até 100 proxies (`http`, `https`, `socks5` ou `socks5h`). Cada conta fica com o proxy que recebe, e contas novas vão para o proxy saudável com menos contas. Um proxy que não conecta passa as contas dele para um proxy saudável na hora; uma falha de proxy nunca bane uma conta nem a coloca em espera. As verificações de saúde rodam a cada 10 minutos por padrão, e a renovação de tokens segue a mesma rota das requisições da conta.
+**Configurações → Pool de proxies** distribui as contas sem proxy próprio por uma lista de até 100 proxies (`http`, `https`, `socks5` ou `socks5h`). Cada conta fica com o proxy que recebe, e contas novas vão para o proxy saudável com menos contas. As verificações de saúde conectam ao host do próprio Kiro por cada proxy, a cada 10 minutos por padrão, e a renovação de tokens usa a mesma rota das requisições da conta.
 
-A ordem é: o proxy próprio da conta, o pool, o proxy global e, por último, a conexão direta. Quando nenhum proxy do pool está saudável, as requisições recebem HTTP 503 `no healthy outbound proxy in the pool`, a menos que **Usar alternativa se nenhum proxy estiver saudável** esteja ligado: aí elas usam o proxy global ou, se não houver um, vão direto.
+- **Três falhas.** Um proxy sai do rodízio, e as contas dele vão para um saudável, só depois de três verificações ou conexões falhas seguidas; um sucesso zera a contagem. Uma requisição que falha num proxy ainda tenta de novo na hora por outra rota: só aquela conta passa para outro proxy saudável, e o proxy ganha uma falha. Um proxy tirado do rodízio volta assim que passa numa verificação. Uma falha de proxy nunca bane uma conta nem a põe em espera.
+- **Chave liga/desliga.** Cada proxy tem sua chave. Um proxy desligado nunca é usado nem verificado, as contas dele saem na hora, e nenhuma verificação o liga de novo.
+- **Proxies detectados.** O proxy de saída global e os proxies próprios das contas aparecem como entradas detectadas, verificados como os do pool, com as falhas contadas. Nunca são compartilhados com outras contas: um sem login só entra no pool quando você clica em **Adicionar ao pool**, e um com login não pode entrar.
+- O card conta os proxies saudáveis, com falhas (ainda no rodízio), fora do rodízio e desligados.
+
+A ordem é: o proxy próprio da conta, o pool, o proxy global e, por último, a conexão direta. Quando nenhum proxy do pool está saudável, as requisições recebem HTTP 503 `no healthy outbound proxy in the pool`, a menos que **Usar alternativa se nenhum proxy estiver saudável** esteja ligado: aí elas usam o proxy global, ou vão direto quando não há um.
+
+---
+
+## 🔐 Login em duas etapas
+
+**Configurações → Login em duas etapas** pede um código de seis dígitos de um app autenticador (Google Authenticator, 1Password, Aegis e similares) depois da senha de administrador.
+
+- **Ligar** mostra um QR code e a chave em texto. Um código do app confirma, e dez códigos de recuperação de uso único aparecem uma vez: guarde-os num lugar seguro. Ligar encerra todas as outras sessões conectadas.
+- O login passa a pedir o código depois da senha. Um código de recuperação funciona no lugar dele, uma vez. Os códigos seguem a RFC 6238 (SHA-1, 30 segundos), aceitam um passo de diferença de relógio para cada lado, e cada código funciona uma só vez. Códigos errados contam no mesmo limite de tentativas das senhas erradas.
+- **Desligar** pede um código atual ou a senha de administrador. **Novos códigos de recuperação** substitui os antigos.
+- Scripts que enviavam a senha em `X-Admin-Password` recebem HTTP 401 `totp_required` enquanto estiver ligado: entre com `POST /admin/api/session` e `{"password": "…", "code": "123456"}`, depois envie o token em `X-Admin-Token`.
+- Ficou sem acesso? Inicie o servidor uma vez com `ADMIN_RESET_2FA=1`. Isso desliga o login em duas etapas e registra um aviso; entre com a senha e depois remova a variável. `ADMIN_PASSWORD` e a senha da primeira execução funcionam como antes.
+
+A chave fica guardada como a senha de administrador, no `kiro.db`; os códigos de recuperação, só como hashes SHA-256. Nenhum dos dois vai para o log.
+
+---
+
+## 📈 Métricas do Prometheus
+
+**Configurações → Métricas do Prometheus** serve `GET /metrics` no formato de texto do Prometheus. Fica desligado por padrão; ao ligar, um bearer token é gerado e aparece no card com um job de scrape pronto para o `prometheus.yml`. Sem o token o endpoint responde 401 e, desligado, 404. **Novo token** troca o token na hora.
+
+| Métrica | Tipo | Rótulos |
+| ------- | ---- | ------- |
+| `kiro_requests_total` | counter | `outcome`, `status`, `model`, `account`, `api_key` |
+| `kiro_tokens_total` | counter | `kind` (input, output, cache_read, cache_write), `model`, `account`, `api_key` |
+| `kiro_credits_total` | counter | `model`, `account`, `api_key` |
+| `kiro_request_duration_seconds` | histogram | `endpoint`, `outcome` |
+| `kiro_upstream_errors_total` | counter | `category` (os tipos de erro do log de requisições), `account` |
+| `kiro_account_state`, `kiro_accounts` | gauge | `account`, `state` (active, cooldown, over_limit, banned, disabled) |
+| `kiro_account_usage_ratio` | gauge | `account` |
+| `kiro_proxy_state`, `kiro_proxy_failures`, `kiro_proxy_latency_seconds`, `kiro_proxies` | gauge | `proxy`, `kind` (pool, detected), `state` |
+| `kiro_build_info`, `kiro_uptime_seconds` | gauge | `version` |
+
+`account` é o e-mail da conta, `api_key` é o id da chave do cliente (nunca a chave). Os contadores começam do zero quando o servidor inicia.
+
+---
+
+## 🧵 Conversas e repetição
+
+Cada requisição roteada carrega sua conversa: a chave de afinidade de sessão, a mesma em todos os turnos de um chat. O detalhe de uma requisição abre **Conversa**: os turnos em ordem, a conta e o modelo de cada um, as trocas de conta e os totais de tokens, créditos e tempo. **Mostrar no log** filtra a página Requisições por essa conversa.
+
+**Repetir** roda uma requisição registrada de novo, sem streaming, numa conta e num modelo que você escolher, e mostra a resposta. Ela entra no log como uma requisição nova marcada como repetição e gasta créditos dessa conta. A repetição precisa do corpo da requisição: o servidor guarda os corpos por 30 dias, até 2 MiB cada e 256 MiB no total, com a chave de API do cliente mascarada. Só para administradores.
 
 ---
 
@@ -392,6 +443,7 @@ Nada é verificado enquanto nenhum canal está ligado, e **Enviar teste** tenta 
 | `PORT`           | Porta de escuta, de 1 a 65535 (substitui a configuração). Um valor inválido é ignorado, com um aviso na inicialização. No Docker, troque o lado do host no mapeamento de portas | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Defina `off` para deixar de converter de volta em chamadas de ferramenta a marcação de chamada de ferramenta que o Kiro vaza no texto da resposta | on |
 | `LOG_LEVEL`      | Nível de log: `debug`, `info`, `warn` ou `error` (substitui a configuração) | `info` |
+| `ADMIN_RESET_2FA` | Defina `1` para desligar o login em duas etapas do administrador na inicialização, se você perdeu o app e os códigos de recuperação. Remova depois: enquanto estiver definido, cada inicialização o desliga de novo | — |
 
 ```diff
 + kiro.db                # local state — config, credentials, SQLite history, backup blobs

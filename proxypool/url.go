@@ -43,6 +43,8 @@ type ProxyInput struct {
 	URL      *string
 	Username *string
 	Password *string
+	// Enabled switches the proxy on or off; a proxy switched off is never used.
+	Enabled *bool
 }
 
 // parseProxyURL validates raw and returns scheme://host:port plus any userinfo it held.
@@ -200,6 +202,9 @@ func buildProxy(in ProxyInput, base *config.PoolProxy) (config.PoolProxy, error)
 	}
 	if in.Label != nil {
 		p.Label = strings.TrimSpace(*in.Label)
+	}
+	if in.Enabled != nil {
+		p.Disabled = !*in.Enabled
 	}
 	if utf8.RuneCountInString(p.Label) > MaxLabelRunes {
 		return config.PoolProxy{}, invalid("label must be at most 64 characters")

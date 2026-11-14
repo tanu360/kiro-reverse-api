@@ -12,6 +12,7 @@ import {
 } from "./fixtures";
 import { makeLiveRequest } from "./fixtures-full";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "./http";
+import { MOCK_TOTP_QR_SVG, MOCK_TOTP_SECRET, MOCK_TOTP_URI, totpMatch } from "./totp";
 
 const SESSION_TTL_MS = (import.meta.env.VITE_MOCK === "1" ? 30 * 24 : 12) * 3600 * 1000;
 const TICKET_TTL_MS = 30 * 1000;
@@ -41,6 +42,220 @@ function randomHex(length: number): string {
 
 function retryAfterSeconds(): number {
   return Math.max(1, Math.ceil((lockedSince + LOGIN_LOCK_MS - Date.now()) / 1000));
+}
+
+/** The shared guess budget (adminGuessLimiter): a 429 while it is spent, else null. */
+function guessLimited(message: string): Response | null {
+  if (mockDb.failedLogins < LOGIN_FAILURE_LIMIT) return null;
+  if (Date.now() - lockedSince < LOGIN_LOCK_MS) {
+    return jsonError(429, message, undefined, { "Retry-After": String(retryAfterSeconds()) });
+  }
+  mockDb.failedLogins = 0;
+  return null;
+}
+
+function wrongGuess(): void {
+  mockDb.failedLogins += 1;
+  if (mockDb.failedLogins >= LOGIN_FAILURE_LIMIT) lockedSince = Date.now();
+}
+
+const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const CHALLENGE_TRIES = 5;
+const SETUP_TTL_MS = 10 * 60 * 1000;
+
+/** "k7xq2-m9fd4": ten letters and digits in two groups, like newRecoveryCodes. */
+function recoveryCodes(): string[] {
+  const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
+  return Array.from({ length: 10 }, () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(10));
+    const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length]);
+    return `${chars.slice(0, 5).join("")}-${chars.slice(5).join("")}`;
+  });
+}
+
+const normalizeRecovery = (code: string) => code.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * A code or a recovery code (checkSecondFactor): a wrong one uses a guess, a code is good once,
+ * a recovery code is used up. Null when it passed, else the error response: 401 at sign-in,
+ * 403 for a signed-in admin (a 401 would end the session in the UI).
+ */
+async function checkSecondFactor(
+  code: unknown,
+  recoveryCode: unknown,
+  failStatus = 401,
+): Promise<Response | null> {
+  const limited = guessLimited("Too many two-factor attempts; try again later");
+  if (limited) return limited;
+  const tf = mockDb.twoFactor;
+  if (typeof code === "string" && code.trim()) {
+    const step = await totpMatch(tf.secret, code);
+    if (step !== null && step > tf.lastStep) {
+      tf.lastStep = step;
+      return null;
+    }
+    wrongGuess();
+    return step !== null
+      ? jsonError(failStatus, "This two-factor code was used already; wait for the next one", {
+          code: "totp_reused",
+        })
+      : jsonError(failStatus, "Invalid two-factor code", { code: "totp_invalid" });
+  }
+  if (typeof recoveryCode === "string" && recoveryCode.trim()) {
+    const wanted = normalizeRecovery(recoveryCode);
+    const index = tf.recovery.findIndex((item) => normalizeRecovery(item) === wanted);
+    if (index >= 0) {
+      tf.recovery.splice(index, 1);
+      return null;
+    }
+  }
+  wrongGuess();
+  return jsonError(failStatus, "Invalid two-factor code", { code: "totp_invalid" });
+}
+
+function issueSession(): Response {
+  claimMockPassword();
+  return HttpResponse.json({
+    token: `mock-${randomHex(48)}`,
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  });
+}
+
+function twoFactorStatus() {
+  const tf = mockDb.twoFactor;
+  return {
+    enabled: tf.enabled,
+    ...(tf.enabled ? { enabledAt: tf.enabledAt } : {}),
+    recoveryCodesLeft: tf.enabled ? tf.recovery.length : 0,
+    resetByEnv: tf.resetByEnv,
+  };
+}
+
+type Json = Record<string, unknown>;
+
+async function readJson(request: Request): Promise<Json> {
+  const body: unknown = await request.json().catch(() => null);
+  return typeof body === "object" && body !== null ? (body as Json) : {};
+}
+
+/** POST /two-factor/... as proxy/admin_totp.go. */
+function twoFactorHandlers(): HttpHandler[] {
+  return [
+    http.get(apiUrl("/two-factor"), async ({ request }) => {
+      const denied = requireAuth(request);
+      if (denied) return denied;
+      await mockDelay();
+      return HttpResponse.json(twoFactorStatus());
+    }),
+
+    http.post(apiUrl("/two-factor/setup"), async ({ request }) => {
+      const denied = requireAuth(request);
+      if (denied) return denied;
+      await mockDelay();
+      const tf = mockDb.twoFactor;
+      if (tf.enabled) {
+        return jsonError(409, "two-factor sign-in is already on", {
+          code: "totp_already_enabled",
+        });
+      }
+      if (tf.resetByEnv) {
+        return jsonError(409, "ADMIN_RESET_2FA is set", { code: "totp_reset_by_env" });
+      }
+      tf.pendingUntil = Date.now() + SETUP_TTL_MS;
+      return HttpResponse.json({
+        secret: MOCK_TOTP_SECRET,
+        otpauthUrl: MOCK_TOTP_URI,
+        qrSvg: MOCK_TOTP_QR_SVG,
+        issuer: "Kiro Proxy",
+        account: "admin",
+        expiresAt: tf.pendingUntil,
+      });
+    }),
+
+    http.post(apiUrl("/two-factor/enable"), async ({ request }) => {
+      const denied = requireAuth(request);
+      if (denied) return denied;
+      await mockDelay();
+      const body = await readJson(request);
+      const tf = mockDb.twoFactor;
+      if (tf.enabled) {
+        return jsonError(409, "two-factor sign-in is already on", {
+          code: "totp_already_enabled",
+        });
+      }
+      if (!tf.pendingUntil || Date.now() > tf.pendingUntil) {
+        return jsonError(400, "the setup expired; start it again", { code: "totp_setup_expired" });
+      }
+      const limited = guessLimited("Too many two-factor attempts; try again later");
+      if (limited) return limited;
+      const step =
+        typeof body.code === "string" ? await totpMatch(MOCK_TOTP_SECRET, body.code) : null;
+      if (step === null) {
+        wrongGuess();
+        return jsonError(400, "Invalid two-factor code", { code: "totp_invalid" });
+      }
+      const codes = recoveryCodes();
+      Object.assign(tf, {
+        enabled: true,
+        enabledAt: Date.now(),
+        secret: MOCK_TOTP_SECRET,
+        recovery: [...codes],
+        lastStep: step,
+        pendingUntil: 0,
+      });
+      return HttpResponse.json({ status: twoFactorStatus(), recoveryCodes: codes });
+    }),
+
+    http.post(apiUrl("/two-factor/disable"), async ({ request }) => {
+      const denied = requireAuth(request);
+      if (denied) return denied;
+      await mockDelay();
+      const body = await readJson(request);
+      const tf = mockDb.twoFactor;
+      if (!tf.enabled) {
+        return jsonError(409, "two-factor sign-in is off", { code: "totp_not_enabled" });
+      }
+      if (body.code || body.recoveryCode) {
+        const failed = await checkSecondFactor(body.code, body.recoveryCode, 403);
+        if (failed) return failed;
+      } else if (typeof body.password === "string" && body.password) {
+        const limited = guessLimited("Too many admin password attempts; try again later");
+        if (limited) return limited;
+        if (body.password !== mockDb.adminPassword) {
+          wrongGuess();
+          return jsonError(403, "the admin password is not right", {
+            code: "admin_password_wrong",
+          });
+        }
+      } else {
+        return jsonError(400, "send a current two-factor code or the admin password", {
+          code: "totp_proof_required",
+        });
+      }
+      Object.assign(tf, { enabled: false, enabledAt: 0, secret: "", recovery: [], lastStep: 0 });
+      tf.challenges = {};
+      return HttpResponse.json(twoFactorStatus());
+    }),
+
+    http.post(apiUrl("/two-factor/recovery-codes"), async ({ request }) => {
+      const denied = requireAuth(request);
+      if (denied) return denied;
+      await mockDelay();
+      const body = await readJson(request);
+      const tf = mockDb.twoFactor;
+      if (!tf.enabled) {
+        return jsonError(409, "two-factor sign-in is off", { code: "totp_not_enabled" });
+      }
+      if (!body.code) {
+        return jsonError(400, "send a current two-factor code", { code: "totp_proof_required" });
+      }
+      const failed = await checkSecondFactor(body.code, undefined, 403);
+      if (failed) return failed;
+      const codes = recoveryCodes();
+      tf.recovery = [...codes];
+      return HttpResponse.json({ status: twoFactorStatus(), recoveryCodes: codes });
+    }),
+  ];
 }
 
 const MAX_RECENT_ERRORS = 100;
@@ -235,33 +450,49 @@ function eventsHandlers(): HttpHandler[] {
 export const coreHandlers: HttpHandler[] = [
   http.post(apiUrl("/session"), async ({ request }) => {
     await mockDelay();
-    if (mockDb.failedLogins >= LOGIN_FAILURE_LIMIT) {
-      if (Date.now() - lockedSince < LOGIN_LOCK_MS) {
-        return jsonError(429, "Too many admin password attempts; try again later", undefined, {
-          "Retry-After": String(retryAfterSeconds()),
+    const body = await readJson(request);
+    const tf = mockDb.twoFactor;
+    // The code step: the challenge from the password step, with a code or a recovery code.
+    if (typeof body.challenge === "string" && body.challenge) {
+      const challenge = tf.challenges[body.challenge];
+      if (!tf.enabled || !challenge || Date.now() > challenge.expiresAt) {
+        delete tf.challenges[body.challenge];
+        return jsonError(401, "The sign-in expired; enter the password again", {
+          code: "totp_challenge_expired",
         });
       }
-      mockDb.failedLogins = 0;
+      const failed = await checkSecondFactor(body.code, body.recoveryCode);
+      if (failed) {
+        challenge.failures += 1;
+        if (challenge.failures >= CHALLENGE_TRIES) delete tf.challenges[body.challenge];
+        return failed;
+      }
+      delete tf.challenges[body.challenge];
+      return issueSession();
     }
-    const body: unknown = await request.json().catch(() => null);
-    const fromBody =
-      typeof body === "object" && body !== null ? (body as { password?: unknown }).password : "";
+    const limited = guessLimited("Too many admin password attempts; try again later");
+    if (limited) return limited;
     const password =
-      typeof fromBody === "string" && fromBody
-        ? fromBody
+      typeof body.password === "string" && body.password
+        ? body.password
         : (request.headers.get("X-Admin-Password") ?? "");
     if (!password || password !== mockDb.adminPassword) {
-      mockDb.failedLogins += 1;
-      if (mockDb.failedLogins >= LOGIN_FAILURE_LIMIT) lockedSince = Date.now();
+      wrongGuess();
       return jsonError(401, "Unauthorized");
     }
     // A valid password refunds the failure budget and claims the first-run password.
     mockDb.failedLogins = 0;
-    claimMockPassword();
-    return HttpResponse.json({
-      token: `mock-${randomHex(48)}`,
-      expiresAt: Date.now() + SESSION_TTL_MS,
-    });
+    if (tf.enabled) {
+      if (body.code || body.recoveryCode) {
+        const failed = await checkSecondFactor(body.code, body.recoveryCode);
+        return failed ?? issueSession();
+      }
+      const challenge = randomHex(64);
+      const expiresAt = Date.now() + CHALLENGE_TTL_MS;
+      tf.challenges[challenge] = { expiresAt, failures: 0 };
+      return HttpResponse.json({ twoFactorRequired: true, challenge, expiresAt });
+    }
+    return issueSession();
   }),
 
   http.delete(apiUrl("/session"), async ({ request }) => {
@@ -289,6 +520,8 @@ export const coreHandlers: HttpHandler[] = [
   }),
 
   ...eventsHandlers(),
+
+  ...twoFactorHandlers(),
 
   http.get(apiUrl("/status"), async ({ request }) => {
     const denied = requireAuth(request);

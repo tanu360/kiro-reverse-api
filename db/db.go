@@ -119,6 +119,18 @@ CREATE TABLE IF NOT EXISTS backup_blobs (
   data BLOB NOT NULL
 );
 
+-- Request bodies kept for replay, compressed, for 30 days and within a size cap.
+CREATE TABLE IF NOT EXISTS request_bodies (
+  request_id   INTEGER PRIMARY KEY,
+  created_at   INTEGER NOT NULL,
+  endpoint     TEXT NOT NULL DEFAULT '',
+  headers_json TEXT NOT NULL DEFAULT '',
+  size         INTEGER NOT NULL DEFAULT 0,
+  stored_size  INTEGER NOT NULL DEFAULT 0,
+  body         BLOB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_request_bodies_created ON request_bodies(created_at);
+
 -- Totals of the requests and errors rows that log retention pruned, so the
 -- all-time stats still count them. One row per group the stats read by.
 CREATE TABLE IF NOT EXISTS request_rollup (
@@ -245,6 +257,12 @@ func Get() (*sql.DB, error) {
 			openErr = err
 			return
 		}
+		//! After the column migration: a table from before conversation_id has no column to index yet.
+		if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_requests_conversation ON requests(conversation_id, ts)`); err != nil {
+			_ = db.Close()
+			openErr = err
+			return
+		}
 		if err := addMissingColumns(db, "cooldowns", cooldownColumnMigrations); err != nil {
 			_ = db.Close()
 			openErr = err
@@ -272,6 +290,10 @@ var requestColumnMigrations = []struct{ name, definition string }{
 	// api_key_hash fingerprints a key the proxy did not know, so a search for its full value
 	// finds the row even when its mask ("****" for 10 characters or fewer) hides all of it.
 	{"api_key_hash", "TEXT NOT NULL DEFAULT ''"},
+	// conversation_id groups the turns of one conversation (the session affinity key).
+	{"conversation_id", "TEXT NOT NULL DEFAULT ''"},
+	// replay_of is the id of the request an admin replayed to make this row; 0 for none.
+	{"replay_of", "INTEGER NOT NULL DEFAULT 0"},
 }
 
 // cooldownColumnMigrations lists cooldowns columns added after the first

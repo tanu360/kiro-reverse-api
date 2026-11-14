@@ -121,6 +121,7 @@ func affinityKeyFor(ctx context.Context, payload *KiroPayload) string {
 // to some accounts (ctx) only ever gets one of those, and a key with its own
 // routing mode picks with that mode.
 func (h *Handler) pickAccount(ctx context.Context, payload *KiroPayload, model string, excluded map[string]bool) *config.Account {
+	noteConversation(ctx, payload)
 	preferred := ""
 	if config.GetSessionAffinity() {
 		preferred = h.affinity.Lookup(affinityKeyFor(ctx, payload))

@@ -11,12 +11,17 @@ const view: ProxyPoolView = {
   mode: "on",
   directFallback: false,
   checkIntervalMin: 10,
+  maxFailures: 3,
+  detected: [],
+  counts: { healthy: 1, unhealthy: 0, autoDisabled: 1, off: 0, unknown: 0 },
   proxies: [
     {
       id: "px_1",
       label: "Frankfurt",
       url: "socks5://10.0.0.1:1080",
       hasPassword: true,
+      enabled: true,
+      state: "healthy",
       accounts: 1,
       health: { status: "ok", latencyMs: 120 },
     },
@@ -24,8 +29,10 @@ const view: ProxyPoolView = {
       id: "px_2",
       url: "http://10.0.0.2:3128",
       hasPassword: false,
+      enabled: true,
+      state: "auto_disabled",
       accounts: 1,
-      health: { status: "failed" },
+      health: { status: "failed", failures: 3 },
     },
   ],
   assignments: { a1: "px_1", a2: "px_2" },
@@ -44,7 +51,7 @@ describe("PoolProxyValue", () => {
   it("shows the address of a proxy without a label", () => {
     renderWithProviders(<PoolProxyValue accountId="a2" view={view} />);
     expect(screen.getByText("http://10.0.0.2:3128")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Failed" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Auto-disabled" })).toBeInTheDocument();
   });
 
   it("says an account with no proxy yet gets one on its next request", () => {

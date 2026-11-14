@@ -4,6 +4,7 @@ import type { PoolProxy, ProxyPoolView } from "@/lib/api/proxy-pool";
 import { type TParams, translate } from "@/lib/i18n";
 import {
   assignedProxy,
+  countChips,
   editorErrors,
   editorModel,
   editorRequest,
@@ -12,6 +13,7 @@ import {
   poolErrorMessage,
   proxyName,
   routesThroughPool,
+  stateLook,
   statusLook,
 } from "./pool-model";
 
@@ -22,6 +24,8 @@ function poolProxy(overrides: Partial<PoolProxy> = {}): PoolProxy {
     id: "px_1",
     url: "socks5h://10.0.0.1:1080",
     hasPassword: false,
+    enabled: true,
+    state: "unknown",
     accounts: 0,
     health: { status: "unknown" },
     ...overrides,
@@ -33,7 +37,10 @@ function poolView(overrides: Partial<ProxyPoolView> = {}): ProxyPoolView {
     mode: "on",
     directFallback: false,
     checkIntervalMin: 10,
+    maxFailures: 3,
     proxies: [poolProxy()],
+    detected: [],
+    counts: { healthy: 0, unhealthy: 0, autoDisabled: 0, off: 0, unknown: 1 },
     assignments: {},
     ...overrides,
   };
@@ -44,6 +51,29 @@ describe("intervalOptions", () => {
     expect(intervalOptions(10)).toEqual([0, 1, 5, 10, 30, 60]);
     expect(intervalOptions(15)).toEqual([0, 1, 5, 10, 15, 30, 60]);
     expect(intervalOptions(-1)).toEqual([0, 1, 5, 10, 30, 60]);
+  });
+});
+
+describe("stateLook and countChips", () => {
+  it("maps each state to a tone and a label", () => {
+    expect(stateLook("healthy")).toEqual({ tone: "success", key: "proxy-pool:state.healthy" });
+    expect(stateLook("unhealthy").tone).toBe("warning");
+    expect(stateLook("auto_disabled").tone).toBe("destructive");
+    expect(stateLook("off")).toEqual({ tone: "neutral", key: "proxy-pool:state.off" });
+    expect(stateLook("unknown").key).toBe("proxy-pool:state.unknown");
+  });
+
+  it("keeps healthy and drops the other states at zero", () => {
+    expect(
+      countChips({ healthy: 0, unhealthy: 0, autoDisabled: 0, off: 0, unknown: 2 }).map(
+        (chip) => chip.key,
+      ),
+    ).toEqual(["proxy-pool:counts.healthy"]);
+    expect(
+      countChips({ healthy: 2, unhealthy: 1, autoDisabled: 1, off: 1, unknown: 0 }).map(
+        (chip) => chip.count,
+      ),
+    ).toEqual([2, 1, 1, 1]);
   });
 });
 

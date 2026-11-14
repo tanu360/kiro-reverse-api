@@ -130,7 +130,21 @@ export type ServerErrorCode =
   | "relogin_single_credential"
   | "relogin_other_account"
   | "usage_refresh_interval_range"
-  | "tag_required";
+  | "tag_required"
+  | "totp_required"
+  | "totp_invalid"
+  | "totp_reused"
+  | "totp_challenge_expired"
+  | "totp_setup_expired"
+  | "totp_already_enabled"
+  | "totp_not_enabled"
+  | "totp_reset_by_env"
+  | "totp_proof_required"
+  | "admin_password_wrong"
+  | "request_not_found"
+  | "request_body_missing"
+  | "replay_account_invalid"
+  | "conversation_not_found";
 
 // ---------------------------------------------------------------------------
 // Session and first run
@@ -139,6 +153,15 @@ export type ServerErrorCode =
 export interface SessionCreateResponse {
   token: string;
   /** ms epoch, about now + 12 h */
+  expiresAt: number;
+}
+/**
+ * POST /session with the right password while two-factor sign-in is on: no token yet, a
+ * challenge to send back with a code or a recovery code within `expiresAt` (about 5 min).
+ */
+export interface SessionChallengeResponse {
+  twoFactorRequired: true;
+  challenge: string;
   expiresAt: number;
 }
 export interface SessionTicketResponse {
@@ -974,6 +997,12 @@ export interface RequestRecord {
   attempts?: RequestAttempt[];
   /** "req_" + 24 hex, the {request_id} the client got; absent on rows logged before it */
   requestId?: string;
+  /** The conversation the request belongs to (the session affinity key); absent before routing */
+  conversationId?: string;
+  /** The logged request an admin replayed to make this one */
+  replayOf?: number;
+  /** The body was kept (30 days, up to 2 MiB), so the request can be replayed */
+  hasBody?: boolean;
 }
 export interface RecentRequestsParams {
   /** >= 1, default 1 */
@@ -984,6 +1013,8 @@ export interface RecentRequestsParams {
   status?: "success" | "failed" | "";
   /** Only failed rows of this error type (a search that names a type by its label). */
   errorType?: string;
+  /** Only the turns of one conversation. */
+  conversation?: string;
   /** default 'time' */
   sort?: RequestSort;
   /** default 'desc' */

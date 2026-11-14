@@ -18,6 +18,18 @@ type requestTrace struct {
 	endpoint  string
 	attempts  attemptChain
 	requestID string
+
+	// conversationID is the session affinity key of the request's payload.
+	conversationID string
+	// body is the client's request body, kept for replay when it is small enough;
+	// bodySize is its length either way. headers are the replayHeaders it sent.
+	body     []byte
+	bodySize int
+	headers  map[string]string
+	// replayOf is the logged request an admin replayed to make this one.
+	replayOf int64
+	// loggedID is the id of this request's log row once it is written.
+	loggedID int64
 }
 
 type requestTraceKey struct{}
@@ -48,6 +60,20 @@ func (t *requestTrace) endpointName() string {
 		return ""
 	}
 	return t.endpoint
+}
+
+func (t *requestTrace) conversation() string {
+	if t == nil {
+		return ""
+	}
+	return t.conversationID
+}
+
+func (t *requestTrace) replayOfID() int64 {
+	if t == nil {
+		return 0
+	}
+	return t.replayOf
 }
 
 // requestIDValue is the id the client got in {request_id}, so a log row can be found from it.

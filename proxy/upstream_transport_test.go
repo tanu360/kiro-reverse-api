@@ -138,7 +138,7 @@ func TestNoHealthyPoolGivesRPMStartsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	setPoolMode(t, config.ProxyPoolModeOn, false)
-	proxypool.Default().ReportFailure(dead.ID, errors.New("connect: connection refused"))
+	disablePoolProxy(dead.ID)
 	clearRPMStarts(h.pool)
 	t.Cleanup(func() { clearRPMStarts(h.pool) })
 	if err := config.UpdateAccountRPMLimit(1); err != nil {
