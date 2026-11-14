@@ -15,6 +15,7 @@ import { tagKey } from "@/features/accounts/account-metadata";
 import { accountsQuery } from "@/lib/api/accounts";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { useMaskText } from "@/lib/privacy";
 import { type ApiKeyAccountScope, MAX_KEY_TAGS } from "./api-key-form";
 
 const SCOPES: readonly ApiKeyAccountScope[] = ["all", "selected"];
@@ -90,6 +91,7 @@ export function AccountPicker({
   const { t: ta } = useT("accounts");
   const { t: tc } = useT();
   const accountName = useAccountName();
+  const mask = useMaskText();
   const accounts = useQuery(accountsQuery());
   const [query, setQuery] = useState("");
   const baseId = useId();
@@ -227,7 +229,7 @@ export function AccountPicker({
                         id={id}
                         onCheckedChange={() => toggleTag(option.tag)}
                       />
-                      <span className="min-w-0 truncate">{option.tag}</span>
+                      <span className="min-w-0 truncate">{mask(option.tag)}</span>
                       <span className="shrink-0 text-muted-foreground tabular-nums">
                         {option.count > 0
                           ? t("form.accountTagCount", { n: option.count })

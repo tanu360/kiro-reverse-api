@@ -546,6 +546,7 @@ const EXPIRY_SOON_SEC = 7 * 86_400;
  */
 function AccessBadges({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
   const { t, lang } = useT("api");
+  const mask = useMaskText();
   const reason = limitReachedReason(apiKey);
   const bound = apiKey.accountIds?.length ?? 0;
   const tags = apiKey.accountTags ?? [];
@@ -582,7 +583,7 @@ function AccessBadges({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
       {tags.length > 0 ? (
         <Badge icon={Tag01Icon} tone="neutral">
           {/* The tags themselves: they say more than a count, and there are at most 10. */}
-          <span className="max-w-40 truncate">{tags.join(", ")}</span>
+          <span className="max-w-40 truncate">{tags.map((tag) => mask(tag)).join(", ")}</span>
         </Badge>
       ) : null}
       {models.length > 0 ? (
