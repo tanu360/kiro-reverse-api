@@ -1,4 +1,4 @@
-import { ChartColumnIcon, MoreHorizontalCircle01Icon } from "@hugeicons/core-free-icons";
+import { ChartColumnIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, type ReactNode, useMemo, useState } from "react";
@@ -7,12 +7,14 @@ import {
   type DataTableColumn,
   type DataTableSort,
 } from "@/components/shared/data-table";
+import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { ListCard } from "@/components/shared/list-card";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { CardPanel } from "@/components/ui/card";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
@@ -34,7 +36,7 @@ import {
 } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
-import { addTotals, EMPTY_TOTALS, entryRef, TOP_KEYS } from "./key-usage-model";
+import { entryRef } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
 
 /** A failure rate from this share up reads as a problem: the badge turns red. */
@@ -45,6 +47,8 @@ const LIMIT_WARNING = 0.75;
 type SortColumn = "requests" | "failed" | "credits" | "tokens" | "lastUsed";
 const SORT_COLUMNS: readonly SortColumn[] = ["requests", "failed", "credits", "tokens", "lastUsed"];
 const DEFAULT_SORT: DataTableSort = { id: "requests", desc: true };
+/** Rows per page, as the API keys table. */
+const PAGE_SIZE = 10;
 
 function isRange(value: unknown): value is ApiKeyUsageRange {
   return typeof value === "string" && (API_KEY_USAGE_RANGES as readonly string[]).includes(value);
@@ -62,11 +66,10 @@ interface Row {
   key: string;
   icon: ReactNode;
   label: ReactNode;
-  /** The opener's accessible name; none for the "other keys" row, which opens nothing. */
+  /** The opener's accessible name. */
   openLabel?: string;
   /** What the sheet shows while it loads. */
   identity?: UsageIdentity;
-  other: boolean;
   totals: ApiKeyUsageTotals;
   /** The configured key behind a "key" entry: its last use and limits. */
   apiKey?: ApiKey;
@@ -114,16 +117,16 @@ function firstLimit(
 /**
  * Usage by key over 24 hours, 7 or 30 days or the lifetime, from the request log (Lifetime adds
  * the totals log retention kept of pruned rows), as a table sorted by any number: requests,
- * failure rate, credits, tokens or last use, with how much of its limit each key has used. The
- * five first rows show, the rest fold into one row until "Show all". No API key, invalid keys and
- * deleted keys are rows of their own. A row opens that key's usage sheet; a phone gets cards.
+ * failure rate, credits, tokens or last use, with how much of its limit each key has used, laid
+ * out as the API keys table: flush in the card, ten rows a page, cards below a 56rem card. No API
+ * key, invalid keys and deleted keys are rows of their own. A row opens that key's usage sheet.
  */
 export function KeyUsageCard(): JSX.Element {
   const { t, lang } = useT("api");
   const label = useUsageLabel();
   const [range, setRange] = useState<ApiKeyUsageRange>("24h");
   const [sort, setSort] = useState<DataTableSort>(DEFAULT_SORT);
-  const [expanded, setExpanded] = useState(false);
+  const [page, setPage] = useState(1);
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const query = useQuery(apiKeyUsageQuery(range));
   const keys = useQuery(apiKeysQuery());
@@ -152,7 +155,8 @@ export function KeyUsageCard(): JSX.Element {
         // An unnamed key goes by its masked value: "Unnamed key" twice would tell them apart.
         text = <span className="min-w-0 truncate font-mono text-meta">{shown.keyMasked}</span>;
       } else {
-        text = <span className="min-w-0 truncate">{shown.title}</span>;
+        // Medium weight, as the API keys table's names.
+        text = <span className="min-w-0 truncate font-medium">{shown.title}</span>;
       }
       return {
         key: entryRef(entry),
@@ -168,7 +172,6 @@ export function KeyUsageCard(): JSX.Element {
           name: shown.named || !shown.keyMasked ? shown.title : shown.keyMasked,
         }),
         identity: { kind: entry.kind, name: entry.name, keyMasked: entry.keyMasked },
-        other: false,
         totals: entry.totals,
         apiKey: entry.kind === "key" ? byId.get(entry.id) : undefined,
       };
@@ -185,30 +188,11 @@ export function KeyUsageCard(): JSX.Element {
         b.totals.requests - a.totals.requests ||
         (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
     );
-    if (expanded || sorted.length <= TOP_KEYS + 1) return sorted;
-    const rest = sorted.slice(TOP_KEYS);
-    const count = rest.length;
-    return [
-      ...sorted.slice(0, TOP_KEYS),
-      {
-        key: "other",
-        icon: (
-          <HugeiconsIcon
-            aria-hidden="true"
-            className="size-4 shrink-0 text-muted-foreground"
-            icon={MoreHorizontalCircle01Icon}
-          />
-        ),
-        label: (
-          <span className="min-w-0 truncate text-muted-foreground">
-            {t("usage.otherKeys", { count, n: formatNumber(count, lang) })}
-          </span>
-        ),
-        other: true,
-        totals: rest.reduce((sum, row) => addTotals(sum, row.totals), EMPTY_TOTALS),
-      },
-    ];
-  }, [allRows, sort, expanded, t, lang]);
+    return sorted;
+  }, [allRows, sort]);
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const onlyKeyless =
     data !== undefined && data.keys.length > 0 && data.keys.every((entry) => entry.kind === "none");
@@ -254,7 +238,8 @@ export function KeyUsageCard(): JSX.Element {
     );
   };
 
-  const limitCell = (row: Row): ReactNode => {
+  // A table cell keeps the meter 8rem wide; a card gives it the card's width.
+  const limitCell = (row: Row, fill = false): ReactNode => {
     if (!row.apiKey) return <span className="text-muted-foreground">—</span>;
     const limit = firstLimit(row.apiKey);
     if (!limit)
@@ -273,7 +258,7 @@ export function KeyUsageCard(): JSX.Element {
           used: exact(limit.used),
           limit: exact(limit.limit),
         })}
-        className="w-32 gap-1"
+        className={fill ? "w-full gap-1" : "w-32 gap-1"}
         max={limit.limit}
         value={Math.min(limit.used, limit.limit)}
       >
@@ -337,115 +322,46 @@ export function KeyUsageCard(): JSX.Element {
       cell: (row) => formatCompact(row.totals.tokens, lang),
     },
     { id: "lastUsed", header: t("keys.lastUsed"), sortable: true, cell: lastUsedCell },
-    { id: "limit", header: t("usage.col.limit"), cell: limitCell },
+    { id: "limit", header: t("usage.col.limit"), cell: (row) => limitCell(row) },
   ];
 
-  // A phone's row: the name and requests, then the failure rate, credits and last use.
+  // Below a 56rem card, a card per key in a grid, as the API keys table does.
   const renderCard = (row: Row): ReactNode => (
-    <div className="flex min-w-0 flex-col gap-1.5 text-sm">
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        {nameCell(row)}
-        <span className="shrink-0 font-medium tabular-nums">
-          {formatNumber(row.totals.requests, lang)}
+    <ListCard
+      badge={failedCell(row)}
+      meta={
+        <span className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
+          <span>
+            {t("usage.requestsCount", {
+              count: row.totals.requests,
+              n: formatNumber(row.totals.requests, lang),
+            })}
+          </span>
+          <span>{t("usage.creditsTotal", { n: formatCredits(row.totals.credits, 2, lang) })}</span>
+          {row.apiKey?.lastUsedAt ? <RelativeTime value={row.apiKey.lastUsedAt} /> : null}
         </span>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-muted-foreground tabular-nums">
-        {failedCell(row)}
-        <span>{t("usage.creditsTotal", { n: formatCredits(row.totals.credits, 2, lang) })}</span>
-        {row.apiKey?.lastUsedAt ? <RelativeTime value={row.apiKey.lastUsedAt} /> : null}
-      </div>
-      {row.apiKey && firstLimit(row.apiKey) ? limitCell(row) : null}
-    </div>
+      }
+      title={nameCell(row)}
+    >
+      {row.apiKey && firstLimit(row.apiKey) ? limitCell(row, true) : null}
+    </ListCard>
   );
 
-  let body: JSX.Element;
-  if (!data && query.isError) {
-    body = (
-      <ErrorState
-        compact
-        error={query.error}
-        onRetry={() => void query.refetch()}
-        retrying={query.isFetching}
-        title={t("usage.loadFailed")}
-      />
-    );
-  } else if (data && data.keys.length === 0) {
-    body = (
-      <EmptyState
-        description={t("usage.emptyBody")}
-        icon={ChartColumnIcon}
-        title={t("usage.emptyTitle")}
-        variant="compact"
-      />
-    );
-  } else {
-    const hidden = allRows.length - TOP_KEYS;
-    body = (
-      <div className="flex flex-col gap-3">
-        {data && query.isError ? (
-          <ErrorState
-            compact
-            error={query.error}
-            onRetry={() => void query.refetch()}
-            retrying={query.isFetching}
-            title={t("usage.loadFailed")}
-          />
-        ) : null}
-        {data ? (
-          <div className="flex flex-wrap justify-end gap-x-3 text-muted-foreground text-sm tabular-nums">
-            <span>
-              {t("usage.requestsCount", {
-                count: data.totals.requests,
-                n: formatNumber(data.totals.requests, lang),
-              })}
-            </span>
-            <span>
-              {t("usage.creditsTotal", { n: formatCredits(data.totals.credits, 2, lang) })}
-            </span>
-          </div>
-        ) : null}
-        <DataTable
-          caption={t("usage.list")}
-          cardLayout="divided"
-          cardsBelow="3xl"
-          columns={columns}
-          data={rows}
-          defaultSortDesc={() => true}
-          getRowId={(row) => row.key}
-          inset
-          loading={!data}
-          // The folded row opens the full list; every other row its key's sheet.
-          onRowClick={(row) => (row.other ? setExpanded(true) : openSheet(row))}
-          onSortChange={(next) => {
-            if (isSortColumn(next.id)) setSort(next);
-          }}
-          renderCard={renderCard}
-          rowLabel={(row) =>
-            row.openLabel ??
-            t("usage.showAll", { count: allRows.length, n: formatNumber(allRows.length, lang) })
-          }
-          sort={sort}
-        />
-        {hidden > 1 ? (
-          <div className="flex justify-center">
-            <Button onClick={() => setExpanded((open) => !open)} size="sm" variant="outline">
-              {expanded
-                ? t("usage.showFewer")
-                : t("usage.showAll", {
-                    count: allRows.length,
-                    n: formatNumber(allRows.length, lang),
-                  })}
-            </Button>
-          </div>
-        ) : null}
-        {onlyKeyless && requireApiKey !== undefined ? (
-          <p className="text-muted-foreground text-sm">
-            {t(requireApiKey ? "usage.keylessRejected" : "usage.notTracked")}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
+  const emptyState = (
+    <EmptyState
+      description={t("usage.emptyBody")}
+      icon={ChartColumnIcon}
+      inCard
+      title={t("usage.emptyTitle")}
+    />
+  );
+  const meta = data
+    ? t("usage.meta", {
+        count: allRows.length,
+        n: formatNumber(allRows.length, lang),
+        requests: formatNumber(data.totals.requests, lang),
+      })
+    : undefined;
 
   return (
     <SectionCard
@@ -456,7 +372,10 @@ export function KeyUsageCard(): JSX.Element {
             <RadioGroupPrimitive
               aria-label={t("usage.range")}
               onValueChange={(next) => {
-                if (isRange(next)) setRange(next);
+                if (isRange(next)) {
+                  setRange(next);
+                  setPage(1);
+                }
               }}
               value={range}
             />
@@ -470,13 +389,68 @@ export function KeyUsageCard(): JSX.Element {
           ))}
         </SegmentedControl>
       }
+      // Clips the last row's hover tint to the card's rounded corners.
+      className="overflow-hidden"
       description={t(`usage.description.${range}`)}
       descriptionVariant="inline"
+      footer={
+        rows.length > PAGE_SIZE ? (
+          <DataTablePagination
+            onPageChange={setPage}
+            page={currentPage}
+            pageSize={PAGE_SIZE}
+            total={rows.length}
+          />
+        ) : undefined
+      }
       icon={ChartColumnIcon}
       id="api-key-usage"
+      meta={meta}
+      slim
       title={t("usage.title")}
     >
-      {body}
+      {query.isError ? (
+        <ErrorState
+          compact
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
+          title={t("usage.loadFailed")}
+        />
+      ) : null}
+      {!data && query.isError ? null : (
+        <div className="min-w-0">
+          <DataTable
+            caption={t("usage.list")}
+            cardLayout="grid"
+            cardsBelow="4xl"
+            columns={columns}
+            data={pageRows}
+            defaultSortDesc={() => true}
+            emptyState={emptyState}
+            getRowId={(row) => row.key}
+            inset
+            loading={!data}
+            onRowClick={openSheet}
+            onSortChange={(next) => {
+              if (isSortColumn(next.id)) {
+                setSort(next);
+                setPage(1);
+              }
+            }}
+            renderCard={renderCard}
+            rowLabel={(row) => row.openLabel ?? ""}
+            sort={sort}
+          />
+        </div>
+      )}
+      {onlyKeyless && requireApiKey !== undefined ? (
+        <CardPanel>
+          <p className="text-muted-foreground text-sm">
+            {t(requireApiKey ? "usage.keylessRejected" : "usage.notTracked")}
+          </p>
+        </CardPanel>
+      ) : null}
       {sheet ? (
         <ApiKeyUsageSheet
           entryRef={sheet.ref}

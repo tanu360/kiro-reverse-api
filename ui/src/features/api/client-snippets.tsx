@@ -183,10 +183,11 @@ function Hint({ children }: { children: JSX.Element | string }): JSX.Element {
   return <p className={ROW_DESCRIPTION}>{children}</p>;
 }
 
-// The model picker's family chips (test-model-picker.tsx) at the 32 px control height: the picked
-// one inverted.
+// The model picker's family chips (test-model-picker.tsx) at the 24 px small control height, 12 px
+// text and logo, so all eight fit one line of the half-width card at 1440 px: the picked one
+// inverted. A touch screen keeps the 32 px target.
 const LANGUAGE_CHIP =
-  "inline-flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-full px-3 font-medium text-sm outline-none transition-colors focus-visible:focus-outline data-checked:bg-foreground data-checked:text-background data-unchecked:text-muted-foreground data-unchecked:shadow-[inset_0_0_0_1px_var(--border)] data-unchecked:hover:bg-accent data-unchecked:hover:text-foreground";
+  "inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 font-medium text-xs outline-none transition-colors focus-visible:focus-outline pointer-coarse:h-8 pointer-coarse:px-3 data-checked:bg-foreground data-checked:text-background data-unchecked:text-muted-foreground data-unchecked:shadow-[inset_0_0_0_1px_var(--border)] data-unchecked:hover:bg-accent data-unchecked:hover:text-foreground";
 
 // One 36 px line (the default control height) in the API's sticker colours, as the sign-in
 // showcase's labels: the pastel fill and its dark label. The picked one gets a 2 px edge in the
@@ -242,10 +243,10 @@ function RequestBuilder({ origin }: { origin: string }): JSX.Element {
 
       {/* One line: a card too narrow for all eight scrolls them sideways. The 4 px bleed (-m-1
           with p-1 inside) keeps the chips' focus outline unclipped. */}
-      <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade scrollbarGutter="overlap">
+      <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade scrollbar={false}>
         <RadioGroupPrimitive
           aria-label={t("snippets.language")}
-          className="flex w-max gap-2 p-1"
+          className="flex w-max gap-1.5 p-1"
           onValueChange={(language) => update({ language: language as SnippetLanguage })}
           value={choice.language}
         >
@@ -253,7 +254,7 @@ function RequestBuilder({ origin }: { origin: string }): JSX.Element {
             const Logo = LANGUAGE_LOGOS[language];
             return (
               <RadioPrimitive.Root className={LANGUAGE_CHIP} key={language} value={language}>
-                <Logo className="size-4 shrink-0" />
+                <Logo className="size-3 shrink-0" />
                 {t(`snippets.lang.${language}`)}
               </RadioPrimitive.Root>
             );

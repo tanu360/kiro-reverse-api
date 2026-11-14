@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
  * still has content past it, on both axes: the top and bottom of a tall panel, and the start and
  * end of a row wider than its box (tab strips, chip rows), 24 px at most.
  * `scrollbarGutter` gives the sideways bar its own 10 px lane under an overflowing row, so the bar
- * never covers the row:
+ * never covers the row (`scrollbar={false}` draws no bar at all, for a row whose fades already
+ * say there is more):
  *   true       the lane is part of the box (bottom padding while the row overflows), for a row
  *              with nothing below it to lend the space, such as a sticky chip bar
  *   "overlap"  the lane takes no layout space: the bar is drawn 10 px lower, in the gap below the
@@ -24,6 +25,7 @@ export function ScrollArea({
   fill = false,
   clampContentMinWidth = true,
   overscrollContain = false,
+  scrollbar = true,
   ...props
 }: ScrollAreaPrimitive.Root.Props & {
   scrollFade?: boolean;
@@ -31,6 +33,7 @@ export function ScrollArea({
   fill?: boolean;
   clampContentMinWidth?: boolean;
   overscrollContain?: boolean;
+  scrollbar?: boolean;
 }): React.ReactElement {
   return (
     <ScrollAreaPrimitive.Root className={cn("size-full min-h-0", className)} {...props}>
@@ -54,9 +57,11 @@ export function ScrollArea({
         </ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
       {/* Kiro: no vertical bar, ever (see the scrollbar rules in index.css); only the sideways one. */}
-      <HorizontalScrollBar
-        className={scrollbarGutter === "overlap" ? "translate-y-2.5" : undefined}
-      />
+      {scrollbar ? (
+        <HorizontalScrollBar
+          className={scrollbarGutter === "overlap" ? "translate-y-2.5" : undefined}
+        />
+      ) : null}
       <ScrollAreaPrimitive.Corner data-slot="scroll-area-corner" />
     </ScrollAreaPrimitive.Root>
   );

@@ -112,7 +112,7 @@ describe("KeyUsageCard", () => {
       "View usage for gamma",
       "View usage for beta",
     ]);
-    expect(within(region).getByText("24 requests")).toBeInTheDocument();
+    expect(within(region).getByText("3 keys · 24 requests")).toBeInTheDocument();
     const table = await usageTable(region);
     expect(within(table).getByText("2 failed")).toBeInTheDocument();
 
@@ -122,25 +122,26 @@ describe("KeyUsageCard", () => {
       "View usage for gamma",
       "View usage for alpha",
     ]);
-    expect(within(region).getByText("4.75 credits")).toBeInTheDocument();
     expect(within(table).getByText("3.25")).toBeInTheDocument();
     // alpha failed 2 of 12; beta and gamma failed none.
     expect(within(table).getByText("16.7%")).toBeInTheDocument();
     expect(within(table).getAllByText("0%")).toHaveLength(2);
   });
 
-  it("folds keys after the top five into one row", async () => {
+  it("pages ten keys at a time, as the API keys table", async () => {
     served = usage(
-      ["a", "b", "c", "d", "e", "f", "g"].map((id, index) =>
-        entry(id, "key", { requests: 10 - index }, { name: `key-${id}` }),
+      Array.from({ length: 12 }, (_, index) =>
+        entry(`k${index}`, "key", { requests: 20 - index }, { name: `key-${index}` }),
       ),
     );
-    renderWithProviders(<KeyUsageCard />);
-    const names = await rowNames(await card());
-    expect(names).toHaveLength(6);
-    expect(names[4]).toBe("View usage for key-e");
-    // The folded row opens the full list.
-    expect(names[5]).toBe("Show all 7 keys");
+    const { user } = renderWithProviders(<KeyUsageCard />);
+    const region = await card();
+    const names = await rowNames(region);
+    expect(names).toHaveLength(10);
+    expect(names[9]).toBe("View usage for key-9");
+    await user.click(within(region).getByRole("button", { name: /next/i }));
+    expect(await rowNames(region)).toEqual(["View usage for key-10", "View usage for key-11"]);
+    expect(within(region).getByText("12 keys · 174 requests")).toBeInTheDocument();
   });
 
   it("labels no-key, invalid and deleted rows", async () => {
