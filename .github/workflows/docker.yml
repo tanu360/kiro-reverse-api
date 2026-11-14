@@ -3,7 +3,7 @@ name: Build Docker Image
 on:
   push:
     branches: [main, master, dev]
-    tags: ['v*']
+    tags: ['[0-9]*', 'v*']
   pull_request:
     branches: [main, master, dev]
   workflow_dispatch:

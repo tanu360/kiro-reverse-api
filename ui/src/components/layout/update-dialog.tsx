@@ -19,8 +19,8 @@ import { GITHUB_URL } from "./user-menu";
 
 /*
  * How a running proxy is updated. The Compose file builds from the clone, the image on ghcr.io is
- * rebuilt from main on every push (docker.yml), and a v* tag publishes release archives
- * (release.yml, .github/scripts/build-release.sh): kiro-proxy-<platform>.tar.gz, .zip on Windows,
+ * rebuilt from main on every push (docker.yml), and a new version.json version on main publishes
+ * release archives (release.yml, .github/scripts/build-release.sh): kiro-proxy-<platform>.tar.gz, .zip on Windows,
  * each holding one kiro-proxy-<platform> folder. /releases/latest/download/<file> follows the
  * newest release, so the command needs no version in it.
  */

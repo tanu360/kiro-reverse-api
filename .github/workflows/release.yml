@@ -1,13 +1,13 @@
 name: Release
 
-# A push to main whose version.json names a version with no v<version> tag yet builds the binaries,
-# creates that tag and its GitHub Release, and starts the Docker build for the tag. A v* tag pushed
-# by hand publishes the same way. Run the workflow by hand (Actions > Release > Run workflow) for a
+# A push to main whose version.json names a version with no tag yet builds the binaries, creates
+# that tag (the bare version, such as 3.3.0) and its GitHub Release, and starts the Docker build for
+# the tag. A version tag pushed by hand publishes the same way. Run the workflow by hand (Actions > Release > Run workflow) for a
 # dry run: it builds, smoke-tests and keeps the archives as a workflow artifact, and publishes nothing.
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['[0-9]*', 'v*']
   workflow_dispatch:
 
 permissions:
@@ -52,13 +52,15 @@ jobs:
             echo "::error::version.json version '$version' is not a semantic version"
             exit 1
           fi
-          tag="v$version"
+          tag="$version"
           publish=false
           if [ "$EVENT" = push ] && [ "$REF_TYPE" = tag ]; then
             tag="$REF_NAME"
             publish=true
           elif [ "$EVENT" = push ]; then
-            if gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; then
+            # A release from before tags dropped the v prefix still counts.
+            if gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1 ||
+              gh api "repos/$GH_REPO/git/ref/tags/v$tag" >/dev/null 2>&1; then
               echo "$tag is already tagged; nothing to release."
             else
               echo "$tag has no tag yet; releasing it."
