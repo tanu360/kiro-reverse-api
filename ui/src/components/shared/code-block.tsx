@@ -88,6 +88,7 @@ export function CodeBlock({
   title,
   copyLabel,
   copiedMessage,
+  copyValue,
   regionLabel,
   wrap = false,
   language,
@@ -100,6 +101,8 @@ export function CodeBlock({
   title: string;
   copyLabel: string;
   copiedMessage?: string;
+  /** What Copy copies when it differs from the code shown (a secret masked on screen). */
+  copyValue?: string;
   /** The scrolling region's name; the title by default. */
   regionLabel?: string;
   /** Wraps long lines (anywhere) instead of scrolling sideways. */
@@ -171,7 +174,7 @@ export function CodeBlock({
               copiedMessage={copiedMessage}
               label={copyLabel}
               size="icon-sm"
-              value={code}
+              value={copyValue ?? code}
               variant="quiet"
             />
           </div>

@@ -25,6 +25,14 @@ export function MetricsCard(): JSX.Element {
   );
 }
 
+/**
+ * The token as the card shows it: its first eight and last four characters around "****", so it
+ * fits one line ("kpm_6f1d****8c7b"). Copy still copies the whole token.
+ */
+export function maskMetricsToken(token: string): string {
+  return token.length > 16 ? `${token.slice(0, 8)}****${token.slice(-4)}` : token;
+}
+
 /** A scrape job for prometheus.yml with this server's address and token. */
 export function scrapeConfig(origin: string, path: string, token: string): string {
   const url = new URL(origin);
@@ -98,6 +106,7 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
               <div className="flex min-w-0 flex-col gap-2">
                 <CopyField
                   copiedMessage={t("metrics.tokenCopied")}
+                  display={maskMetricsToken(settings.token)}
                   labelledBy={tokenLabel}
                   multiline
                   value={settings.token}
@@ -118,9 +127,12 @@ function MetricsPanel({ settings }: { settings: MetricsSettings }): JSX.Element 
             title={<span id={tokenLabel}>{t("metrics.token")}</span>}
           />
           <div className="px-4 py-4 sm:px-6">
+            {/* The token masked on screen, as above; Copy copies the job with the whole token. */}
             <CodeBlock
-              code={scrapeConfig(origin, settings.path, settings.token)}
+              code={scrapeConfig(origin, settings.path, maskMetricsToken(settings.token))}
               copyLabel={t("metrics.copyScrape")}
+              copyValue={scrapeConfig(origin, settings.path, settings.token)}
+              language="yaml"
               title={t("metrics.scrapeTitle")}
             />
           </div>

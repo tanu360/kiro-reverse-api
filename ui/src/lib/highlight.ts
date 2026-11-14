@@ -1,6 +1,6 @@
 import type { HighlighterCore, LanguageInput, ThemedToken, ThemeRegistration } from "shiki/core";
 
-/** The languages a CodeBlock can highlight (the API page's client snippets). */
+/** The languages a CodeBlock can highlight (the API page's client snippets, prometheus.yml). */
 export type CodeLanguage =
   | "bash"
   | "toml"
@@ -12,7 +12,8 @@ export type CodeLanguage =
   | "java"
   | "php"
   | "ruby"
-  | "csharp";
+  | "csharp"
+  | "yaml";
 
 /* Each grammar is its own chunk, fetched the first time a block needs it (PHP's pulls in HTML). */
 const GRAMMARS: Record<CodeLanguage, LanguageInput> = {
@@ -27,6 +28,7 @@ const GRAMMARS: Record<CodeLanguage, LanguageInput> = {
   php: () => import("shiki/langs/php.mjs"),
   ruby: () => import("shiki/langs/ruby.mjs"),
   csharp: () => import("shiki/langs/csharp.mjs"),
+  yaml: () => import("shiki/langs/yaml.mjs"),
 };
 
 const THEME = "kiro";
@@ -97,9 +99,10 @@ const KIRO_THEME: ThemeRegistration = {
     },
     // Command-line flags (-H, -d).
     { scope: ["constant.other.option"], settings: { foreground: color("parameter") } },
-    // Keys: TOML keys, object keys, keyword arguments.
+    // Keys: TOML and YAML keys, object keys, keyword arguments.
     {
       scope: [
+        "entity.name.tag.yaml",
         "variable.other.key",
         "meta.object-literal.key",
         "support.type.property-name",

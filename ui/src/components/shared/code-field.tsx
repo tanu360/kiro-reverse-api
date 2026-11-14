@@ -76,6 +76,7 @@ const MULTILINE_TEXT =
  */
 export function CopyField({
   value,
+  display,
   label,
   labelledBy,
   copyLabel,
@@ -87,6 +88,8 @@ export function CopyField({
   className,
 }: {
   value: string;
+  /** What the field shows when it differs from the value Copy copies (a masked token). */
+  display?: string;
   /** The field's accessible name when no visible label points at it. */
   label?: string;
   /** The id of a visible label that names the multiline value (in place of `label`). */
@@ -104,7 +107,8 @@ export function CopyField({
   className?: string;
 }): JSX.Element {
   const { t } = useT();
-  const words = multiline && value.includes(" ");
+  const shown = display ?? value;
+  const words = multiline && shown.includes(" ");
   return (
     <InputGroup className={cn(multiline && MULTILINE_GROUP, className)} data-slot="copy-field">
       {multiline ? (
@@ -115,13 +119,13 @@ export function CopyField({
           aria-readonly="true"
           className={cn(
             MULTILINE_TEXT,
-            words ? "overflow-x-auto" : value.includes("/") ? "wrap-anywhere" : "break-all",
+            words ? "overflow-x-auto" : shown.includes("/") ? "wrap-anywhere" : "break-all",
           )}
           id={id}
           role="textbox"
           tabIndex={0}
         >
-          {words ? breakAtWords(value) : breakAtSlashes(value)}
+          {words ? breakAtWords(shown) : breakAtSlashes(shown)}
         </InputGroupText>
       ) : (
         <InputGroupInput
@@ -131,7 +135,7 @@ export function CopyField({
           onFocus={(event) => event.currentTarget.select()}
           readOnly
           spellCheck={false}
-          value={value}
+          value={shown}
         />
       )}
       <InputGroupAddon align="inline-end" className="gap-0.5">
