@@ -41,7 +41,7 @@ export function DangerZoneCard(): JSX.Element {
     if (confirmed) reset.mutate();
   };
 
-  // The danger tone comes from the section (sections.ts): a red-tinted card and a red row title.
+  // A plain card like the others: only the button is red (the nav still marks the section red).
   return (
     <SettingsGroup id={SECTION_ID.dangerZone} title={t("dangerZone")}>
       <SettingsRow
@@ -65,7 +65,6 @@ export function DangerZoneCard(): JSX.Element {
         controlWidth="actions"
         description={t("resetStatsHint")}
         title={t("statistics")}
-        tone="danger"
       />
     </SettingsGroup>
   );

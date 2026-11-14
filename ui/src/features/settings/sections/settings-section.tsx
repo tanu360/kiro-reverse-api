@@ -137,8 +137,9 @@ function ServerChangedNotice({ onReload }: { onReload: () => void }): JSX.Elemen
 }
 
 /**
- * A Settings card: the shared SettingsFrame with the section's nav icon in its chip, and the
- * danger tone for the danger zone, both looked up by `id`. Rows go in as direct children.
+ * A Settings card: the shared SettingsFrame with the section's nav icon in its chip, looked up by
+ * `id`. Every card, the danger zone too, is the plain one: there only its button is red. Rows go
+ * in as direct children.
  */
 export function SettingsGroup({
   id,
@@ -149,14 +150,12 @@ export function SettingsGroup({
   badge?: ReactNode;
 }): JSX.Element {
   const section = SETTINGS_SECTIONS.find((item) => item.id === id);
-  const danger = section !== undefined && "tone" in section && section.tone === "danger";
   return (
     <SettingsFrame
       // Below xl the sticky section chips sit under the header: a jump lands below both.
       className="max-xl:scroll-mt-30"
       icon={section?.icon}
       id={id}
-      tone={danger ? "danger" : "default"}
       {...props}
     />
   );
