@@ -327,7 +327,7 @@
   "twoFactor.on": "Bật",
   "twoFactor.off": "Tắt",
   "twoFactor.signIn": "Mã khi đăng nhập",
-  "twoFactor.offHint": "Đăng nhập chỉ cần mật khẩu. Bật để yêu cầu thêm mã 6 chữ số từ ứng dụng như Google Authenticator, 1Password hoặc Aegis.",
+  "twoFactor.offHint": "Đang tắt: đăng nhập chỉ cần mật khẩu.",
   "twoFactor.onHint": "Sau mật khẩu, đăng nhập yêu cầu mã từ ứng dụng xác thực.",
   "twoFactor.onSince": "Bật từ {time}. Sau mật khẩu, đăng nhập yêu cầu mã.",
   "twoFactor.turnOn": "Bật",

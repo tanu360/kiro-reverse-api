@@ -327,7 +327,7 @@
   "twoFactor.on": "已开启",
   "twoFactor.off": "已关闭",
   "twoFactor.signIn": "登录时的验证码",
-  "twoFactor.offHint": "登录只需密码。开启后还需输入 Google Authenticator、1Password 或 Aegis 等应用中的 6 位验证码。",
+  "twoFactor.offHint": "已关闭：登录只需密码。",
   "twoFactor.onHint": "登录时输入密码后，还需输入身份验证器应用中的验证码。",
   "twoFactor.onSince": "自 {time} 起开启。登录时输入密码后还需输入验证码。",
   "twoFactor.turnOn": "开启",

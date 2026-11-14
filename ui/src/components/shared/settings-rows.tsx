@@ -39,9 +39,9 @@ const CONTROL_WIDTH: Record<ControlWidth, string> = {
   // Buttons (Edit and Remove): their own width beside the text, so a long title keeps the room
   // a 18rem field slot would leave empty; under the text on a narrow row, like a field.
   actions: "w-full @xl/settings-row:w-auto",
-  // A switch or one button, kept on the title's line: a 20 px box (the title's line height) that
-  // the control centres in, overflowing it into the row's padding when taller.
-  auto: "col-start-2 row-start-1 flex h-5 shrink-0 items-center justify-end",
+  // A switch or one button, centred on the title and description beside it, however many lines
+  // they take.
+  auto: "col-start-2 row-start-1 flex shrink-0 items-center justify-end self-center",
 };
 
 /** A row title: a Label for the control when `htmlFor` is set, red in a danger row. */
@@ -89,9 +89,9 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string; "ari
  * named and described by the row. `children` go under the description (a current value, an
  * error). `controlWidth` sizes the control slot: a text field or select (`field`), a number
  * field or a select of short options (`number`), a group of buttons at their own width
- * (`actions`), or the control's own width (`auto`: a switch or a button, kept on the title's
- * line at every width, while `children` such as a warning notice take the row's full width under
- * the description). A Button control keeps its own name (its label, "Add rule"): the row title
+ * (`actions`), or the control's own width (`auto`: a switch or a button, beside the text and
+ * centred on it at every width, while `children` such as a warning notice take the row's full
+ * width under the description). A Button control keeps its own name (its label, "Add rule"): the row title
  * is not put on it, only the description. `labelControl` overrides that either way.
  */
 export function SettingsRow({
@@ -159,8 +159,8 @@ export function SettingsRow({
   const slot = wired ? <div className={CONTROL_WIDTH[controlWidth]}>{wired}</div> : null;
 
   if (controlWidth === "auto") {
-    // Two columns: the title and description beside the control, which stays on the title's
-    // line however many lines they take; `children` span both columns under them.
+    // Two columns: the title and description beside the control, which sits centred on them;
+    // `children` span both columns under them.
     return (
       <div
         className={cn(
@@ -223,7 +223,7 @@ export function SettingsEmptyRow({
 
 /**
  * A switch as a settings row: the title (its label: a click on it toggles the switch) and the
- * description on the left, the switch at the end, on the title's line at every width.
+ * description on the left, the switch at the end, centred on them at every width.
  */
 export function SwitchField({
   checked,

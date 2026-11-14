@@ -335,7 +335,7 @@
   "twoFactor.on": "On",
   "twoFactor.off": "Off",
   "twoFactor.signIn": "Code at sign-in",
-  "twoFactor.offHint": "Sign-in asks only for the password. Turn this on to also ask for a 6-digit code from an app such as Google Authenticator, 1Password or Aegis.",
+  "twoFactor.offHint": "Off: sign-in asks only for the password.",
   "twoFactor.onHint": "Sign-in asks for a code from your authenticator app after the password.",
   "twoFactor.onSince": "On since {time}. Sign-in asks for a code after the password.",
   "twoFactor.turnOn": "Turn on",

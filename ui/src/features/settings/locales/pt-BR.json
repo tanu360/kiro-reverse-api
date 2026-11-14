@@ -335,7 +335,7 @@
   "twoFactor.on": "Ligado",
   "twoFactor.off": "Desligado",
   "twoFactor.signIn": "Código no login",
-  "twoFactor.offHint": "O login pede só a senha. Ligue para pedir também um código de 6 dígitos de um app como Google Authenticator, 1Password ou Aegis.",
+  "twoFactor.offHint": "Desligado: o login pede só a senha.",
   "twoFactor.onHint": "Depois da senha, o login pede um código do seu app autenticador.",
   "twoFactor.onSince": "Ligado desde {time}. Depois da senha, o login pede um código.",
   "twoFactor.turnOn": "Ligar",
