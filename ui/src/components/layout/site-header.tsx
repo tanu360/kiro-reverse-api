@@ -35,7 +35,7 @@ export function SiteHeader(): JSX.Element {
     select: (state) => (state.location.search as { status?: unknown }).status,
   });
   const active = activeNavItem(pathname);
-  const view = active ? activeNavView(active, status) : undefined;
+  const view = active ? activeNavView(active, status, pathname) : undefined;
   const toggleLabel = t("shell.toggleSidebar");
 
   return (

@@ -30,9 +30,9 @@ function readCollapsed(): Set<string> {
 
 /**
  * Port of Studio Admin nav-main: an "Add account" action, then the grouped pages. A page with
- * filtered views (Requests, Accounts) carries them as a tree under its row. The row opens the
- * tree on the way to its page, and folds or unfolds it once already there; the chevron only
- * shows which. The page row is selected only when none of its views is.
+ * filtered views (Requests, Accounts) or sub-pages (Settings) carries them as a tree under its
+ * row. The row opens the tree on the way to its page, and folds or unfolds it once already
+ * there; the chevron only shows which. The page row is selected only when none of its views is.
  */
 export function NavMain(): JSX.Element {
   const { t } = useT();
@@ -88,7 +88,7 @@ export function NavMain(): JSX.Element {
               {NAV_ITEMS.filter((item) => item.group === group).map((item) => {
                 const label = t(item.labelKey);
                 const onPage = active?.id === item.id;
-                const view = onPage ? activeNavView(item, status) : undefined;
+                const view = onPage ? activeNavView(item, status, pathname) : undefined;
                 const open = !collapsed.has(item.id);
                 const onRowClick = () => {
                   // Already on the plain page: the click folds or unfolds its tree, and the
@@ -126,7 +126,13 @@ export function NavMain(): JSX.Element {
                             <SidebarMenuSubButton
                               isActive={view?.id === sub.id}
                               onClick={closeOnMobile}
-                              render={<Link search={{ status: sub.status }} to={sub.to} />}
+                              render={
+                                "status" in sub ? (
+                                  <Link search={{ status: sub.status }} to={sub.to} />
+                                ) : (
+                                  <Link to={sub.to} />
+                                )
+                              }
                             >
                               <span>{t(sub.labelKey)}</span>
                             </SidebarMenuSubButton>

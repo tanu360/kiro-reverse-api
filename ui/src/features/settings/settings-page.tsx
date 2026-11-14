@@ -1,8 +1,9 @@
 import { CircleCheckIcon, CircleSlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useBlocker } from "@tanstack/react-router";
+import { useBlocker, useNavigate } from "@tanstack/react-router";
 import {
+  type ComponentType,
   type JSX,
   type MouseEvent,
   type RefObject,
@@ -16,6 +17,7 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusDot } from "@/components/shared/status-dot";
+import { StatusTabs } from "@/components/shared/table-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -52,7 +54,17 @@ import { OutboundProxyCard } from "./sections/outbound-proxy-card";
 import { PromptFilterCard } from "./sections/prompt-filter-card";
 import { ResponseHeadersCard } from "./sections/response-headers-card";
 import { RoutingCard } from "./sections/routing-card";
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "./sections/sections";
+import {
+  findSection,
+  pageSections,
+  SETTINGS_GROUP_PAGE,
+  SETTINGS_GROUPS,
+  SETTINGS_PAGE_PATH,
+  SETTINGS_PAGES,
+  type SectionId,
+  type SettingsPageId,
+  type SettingsSection,
+} from "./sections/sections";
 import { SelfHealCard } from "./sections/self-heal-card";
 import { ServerLogCard } from "./sections/server-log-card";
 import { StreamIntegrityCard } from "./sections/stream-integrity-card";
@@ -62,7 +74,38 @@ import { TwoFactorCard } from "./sections/two-factor-card";
 import { UpstreamCard } from "./sections/upstream-card";
 import { UsageCard } from "./sections/usage-card";
 
-type SectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
+/** Each card's component; a page renders its own cards in page order (sections.ts). */
+const SECTION_CARDS: Record<SectionId, ComponentType> = {
+  "settings-usage": UsageCard,
+  "settings-stream-integrity": StreamIntegrityCard,
+  "settings-routing": RoutingCard,
+  "settings-auto-continue": AutoContinueCard,
+  "settings-tool-history": ToolHistoryCard,
+  "settings-image-resize": ImageResizeCard,
+  "settings-self-heal": SelfHealCard,
+  "settings-prompt-filter": PromptFilterCard,
+  "settings-thinking": ThinkingCard,
+  "settings-model-mappings": ModelMappingsCard,
+  "settings-endpoint": EndpointCard,
+  "settings-upstream": UpstreamCard,
+  "settings-outbound-proxy": OutboundProxyCard,
+  "settings-proxy-pool": ProxyPoolCard,
+  "settings-response-headers": ResponseHeadersCard,
+  "settings-alerts": AlertsCard,
+  "settings-server-log": ServerLogCard,
+  "settings-metrics": MetricsCard,
+  "settings-admin-password": AdminPasswordCard,
+  "settings-two-factor": TwoFactorCard,
+  "settings-log-retention": LogRetentionCard,
+  "settings-danger-zone": DangerZoneCard,
+};
+
+/**
+ * Pages with a card built on GET /settings (usage, stream integrity, routing, auto-continue,
+ * tool history and image resize on Requests; the server log on Server), where that query's one
+ * shared error shows.
+ */
+const SHARED_SETTINGS_PAGES: ReadonlySet<SettingsPageId> = new Set(["requests", "server"]);
 
 /**
  * Below the sticky 48 px header, with a little room: a card whose top is above this is "in
@@ -79,8 +122,8 @@ function isShown(element: HTMLElement): boolean {
 }
 
 /**
- * One error for the five cards built on GET /settings, instead of one per card. Cards with
- * their own endpoint (thinking, model mapping, endpoint, proxy, prompt filter) keep theirs.
+ * One error for the cards built on GET /settings, instead of one per card. Cards with their own
+ * endpoint (thinking, model mapping, endpoint, proxy, prompt filter) keep theirs.
  */
 function GeneralSettingsError(): JSX.Element | null {
   const { t } = useT("settings");
@@ -103,16 +146,16 @@ function GeneralSettingsError(): JSX.Element | null {
 }
 
 /** The last card whose top has scrolled under the header; the last card at the page bottom. */
-function sectionInView(offset: number): SectionId {
+function sectionInView(offset: number, sections: readonly SettingsSection[]): SectionId {
   const root = document.documentElement;
   if (
     root.scrollHeight > window.innerHeight &&
     window.scrollY + window.innerHeight >= root.scrollHeight - 2
   ) {
-    return SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id;
+    return sections[sections.length - 1].id;
   }
-  let current: SectionId = SETTINGS_SECTIONS[0].id;
-  for (const section of SETTINGS_SECTIONS) {
+  let current: SectionId = sections[0].id;
+  for (const section of sections) {
     const element = document.getElementById(section.id);
     if (!element || !isShown(element)) continue;
     if (element.getBoundingClientRect().top > offset) break;
@@ -134,10 +177,10 @@ function goToSection(id: SectionId): void {
   target.focus({ preventScroll: true });
 }
 
-/** The section a deep link names (/settings#settings-alerts), or null. */
-function hashSection(): SectionId | null {
-  const id = window.location.hash.slice(1);
-  return SETTINGS_SECTIONS.find((section) => section.id === id)?.id ?? null;
+/** The card on this page a deep link names (/settings/server#settings-alerts), or null. */
+function hashSection(sections: readonly SettingsSection[]): SectionId | null {
+  const section = findSection(window.location.hash);
+  return section && sections.includes(section) ? section.id : null;
 }
 
 /** Keys that scroll the page while focus is not in a text field. */
@@ -161,9 +204,12 @@ function isTextField(target: EventTarget | null): boolean {
  * scroll further, where the spy alone marks the last card. A key that only works a control
  * (Space on a switch) does not scroll, so the section stays marked.
  */
-function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] {
-  const [linked] = useState(hashSection);
-  const [active, setActive] = useState<SectionId>(linked ?? SETTINGS_SECTIONS[0].id);
+function useActiveSection(
+  offset: number,
+  sections: readonly SettingsSection[],
+): [SectionId, (id: SectionId) => void] {
+  const [linked] = useState(() => hashSection(sections));
+  const [active, setActive] = useState<SectionId>(linked ?? sections[0].id);
   const pinned = useRef<SectionId | null>(linked);
   const userUntil = useRef(0);
 
@@ -171,7 +217,7 @@ function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] 
     let frame = 0;
     const update = () => {
       frame = 0;
-      setActive(pinned.current ?? sectionInView(offset));
+      setActive(pinned.current ?? sectionInView(offset, sections));
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update);
@@ -210,7 +256,7 @@ function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] 
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("focusin", onFocus);
     };
-  }, [offset]);
+  }, [offset, sections]);
 
   // A tap on a chip can follow a touch that moved the chip row: the jump it starts is not the
   // reader's scroll.
@@ -235,7 +281,7 @@ const DANGER_CHIP_CLASS =
 interface NavEntry {
   id: SectionId;
   label: string;
-  icon: (typeof SETTINGS_SECTIONS)[number]["icon"];
+  icon: SettingsSection["icon"];
   current: boolean;
   dirty: boolean;
   /** The saved state of a one-switch section; undefined for the others and until loaded. */
@@ -323,19 +369,33 @@ function DirtyMark(): JSX.Element {
   );
 }
 
-/** Anchor links to every card: a sticky sidebar column from xl, a sticky chip row below it. */
-function SectionNav({ wide }: { wide: boolean }): JSX.Element {
+/**
+ * Anchor links to every card of one page: a sticky sidebar column from xl, a sticky chip row
+ * below it.
+ */
+function SectionNav({
+  wide,
+  page,
+  sections,
+}: {
+  wide: boolean;
+  page: SettingsPageId;
+  sections: readonly SettingsSection[];
+}): JSX.Element {
   const { t } = useT("settings");
   const unsaved = useUnsavedChanges();
-  const settings = useQuery(settingsQuery()).data;
-  const proxy = useQuery(proxyQuery()).data;
-  const proxyPool = useQuery(proxyPoolQuery()).data;
-  const health = useQuery(accountHealthQuery()).data;
-  const alerts = useQuery(alertsQuery()).data;
-  const headers = useQuery(responseHeadersQuery()).data;
-  const promptFilter = useQuery(promptFilterQuery()).data;
-  const twoFactor = useQuery(twoFactorQuery()).data;
-  const metrics = useQuery(metricsQuery()).data;
+  // Only the states this page's nav shows; the cards load the rest of their own data.
+  const onRequests = page === "requests";
+  const onServer = page === "server";
+  const settings = useQuery({ ...settingsQuery(), enabled: onRequests }).data;
+  const proxy = useQuery({ ...proxyQuery(), enabled: onServer }).data;
+  const proxyPool = useQuery({ ...proxyPoolQuery(), enabled: onServer }).data;
+  const health = useQuery({ ...accountHealthQuery(), enabled: onRequests }).data;
+  const alerts = useQuery({ ...alertsQuery(), enabled: onServer }).data;
+  const headers = useQuery({ ...responseHeadersQuery(), enabled: onServer }).data;
+  const promptFilter = useQuery({ ...promptFilterQuery(), enabled: onRequests }).data;
+  const twoFactor = useQuery({ ...twoFactorQuery(), enabled: page === "security" }).data;
+  const metrics = useQuery({ ...metricsQuery(), enabled: onServer }).data;
   // A section that is one switch shows its saved state as a pill in its nav row, so the page
   // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
   // A card of several controls shows On when it does anything: alerts with a channel switched
@@ -361,7 +421,10 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
         promptFilter.rules.some((rule) => rule.enabled)
       : undefined,
   };
-  const [active, pin] = useActiveSection(wide ? SPY_OFFSET : SPY_OFFSET + CHIP_ROW_HEIGHT);
+  const [active, pin] = useActiveSection(
+    wide ? SPY_OFFSET : SPY_OFFSET + CHIP_ROW_HEIGHT,
+    sections,
+  );
   const listRef = useRef<HTMLDivElement>(null);
 
   // In the chip row, scroll the active chip into view without scrolling the page: when the
@@ -396,21 +459,25 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
     goToSection(id);
   };
 
-  const groups = SETTINGS_GROUPS.map((group) => ({
-    group,
-    labelId: `settings-nav-${group}`,
-    entries: SETTINGS_SECTIONS.filter((section) => section.group === group).map(
-      (section): NavEntry => ({
-        id: section.id,
-        label: t(section.titleKey),
-        icon: section.icon,
-        current: section.id === active,
-        dirty: unsaved?.dirty.has(section.id) ?? false,
-        on: switchState[section.id],
-        danger: "tone" in section && section.tone === "danger",
-      }),
-    ),
-  }));
+  const groups = SETTINGS_GROUPS.filter((group) => SETTINGS_GROUP_PAGE[group] === page).map(
+    (group) => ({
+      group,
+      labelId: `settings-nav-${group}`,
+      entries: sections
+        .filter((section) => section.group === group)
+        .map(
+          (section): NavEntry => ({
+            id: section.id,
+            label: t(section.titleKey),
+            icon: section.icon,
+            current: section.id === active,
+            dirty: unsaved?.dirty.has(section.id) ?? false,
+            on: switchState[section.id],
+            danger: "tone" in section && section.tone === "danger",
+          }),
+        ),
+    }),
+  );
 
   if (wide) {
     // From xl: the app sidebar's own rows, one labelled group per nav group.
@@ -504,11 +571,14 @@ function useLeaveGuard(): void {
  * holds every card is watched, not the card's parent: a card wrapped in its own form (the admin
  * password) has a parent that never grows while the cards above it load.
  */
-function useHashLanding(columnRef: RefObject<HTMLDivElement | null>): void {
+function useHashLanding(
+  columnRef: RefObject<HTMLDivElement | null>,
+  sections: readonly SettingsSection[],
+): void {
   useEffect(() => {
-    const id = window.location.hash.slice(1);
+    const id = hashSection(sections);
     const column = columnRef.current;
-    if (!SETTINGS_SECTIONS.some((section) => section.id === id) || !column) return;
+    if (!id || !column) return;
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
       document.getElementById(id)?.scrollIntoView({ block: "start" });
@@ -523,61 +593,62 @@ function useHashLanding(columnRef: RefObject<HTMLDivElement | null>): void {
     for (const type of events) window.addEventListener(type, stop, { passive: true });
     observer.observe(column);
     return stop;
-  }, [columnRef]);
+  }, [columnRef, sections]);
 }
 
-function SettingsContent(): JSX.Element {
+/** Requests, Server, Security: the page tabs under the title, each its own route. */
+function PageTabs({ page }: { page: SettingsPageId }): JSX.Element {
+  const { t } = useT("settings");
+  const navigate = useNavigate();
+  return (
+    <StatusTabs
+      label={t("pages.label")}
+      loading={false}
+      // Leaving a page with unsaved edits asks first (useLeaveGuard), as any route change does.
+      onValueChange={(next) => void navigate({ to: SETTINGS_PAGE_PATH[next] })}
+      tabs={SETTINGS_PAGES.map((id) => ({ value: id, label: t(`pages.${id}`) }))}
+      value={page}
+    />
+  );
+}
+
+function SettingsContent({ page }: { page: SettingsPageId }): JSX.Element {
   const { t } = useT("settings");
   useLeaveGuard();
+  const sections = pageSections(page);
   const columnRef = useRef<HTMLDivElement>(null);
-  useHashLanding(columnRef);
+  useHashLanding(columnRef, sections);
   // The nav becomes a column only from xl: at lg the app sidebar is already open, and a third
   // column would leave the cards too narrow for their rows.
   const wide = useMediaQuery("xl");
   return (
     <div className="flex min-w-0 flex-col gap-4 md:gap-6">
       <PageHeader description={t("description")} title={t("title")} />
+      <PageTabs page={page} />
       <div className="flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-[14rem_minmax(0,1fr)] xl:gap-10">
-        <SectionNav wide={wide} />
+        <SectionNav page={page} sections={sections} wide={wide} />
         {/* Capped, so on a wide screen a row's control stays near its label; a little wider
             from 2xl, so the column does not leave an empty band on the right only. */}
         <div
           className="flex min-w-0 max-w-5xl flex-col gap-4 md:gap-6 2xl:max-w-6xl"
           ref={columnRef}
         >
-          <GeneralSettingsError />
-          <UsageCard />
-          <StreamIntegrityCard />
-          <RoutingCard />
-          <AutoContinueCard />
-          <ToolHistoryCard />
-          <ImageResizeCard />
-          <SelfHealCard />
-          <ThinkingCard />
-          <ModelMappingsCard />
-          <EndpointCard />
-          <UpstreamCard />
-          <AdminPasswordCard />
-          <TwoFactorCard />
-          <OutboundProxyCard />
-          <ProxyPoolCard />
-          <ResponseHeadersCard />
-          <AlertsCard />
-          <ServerLogCard />
-          <MetricsCard />
-          <PromptFilterCard />
-          <LogRetentionCard />
-          <DangerZoneCard />
+          {SHARED_SETTINGS_PAGES.has(page) ? <GeneralSettingsError /> : null}
+          {sections.map((section) => {
+            const SectionCard = SECTION_CARDS[section.id];
+            return <SectionCard key={section.id} />;
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-export function SettingsPage(): JSX.Element {
+/** One of the three Settings pages (sections.ts): its tabs, its section nav and its cards. */
+export function SettingsPage({ page }: { page: SettingsPageId }): JSX.Element {
   return (
     <UnsavedChangesProvider>
-      <SettingsContent />
+      <SettingsContent page={page} />
     </UnsavedChangesProvider>
   );
 }

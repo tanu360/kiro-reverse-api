@@ -8,7 +8,7 @@ import { defaultModelMappings } from "@/lib/mocks/fixtures";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
-import { SECTION_ID } from "./sections/sections";
+import { SECTION_ID, type SettingsPageId } from "./sections/sections";
 import { SettingsPage } from "./settings-page";
 
 interface Recorded {
@@ -50,15 +50,21 @@ function section(id: string): HTMLElement {
   return element;
 }
 
-async function renderPage() {
-  const result = renderWithProviders(<SettingsPage />);
+async function renderPage(page: SettingsPageId = "requests") {
+  const result = renderWithProviders(<SettingsPage page={page} />);
   // The last card to load is enough: every query resolves in the same tick in tests.
-  await screen.findByRole("switch", { name: "Allow overage" });
-  await screen.findByRole("button", { name: "Mapping 1 actions" });
-  await screen.findByLabelText("Trigger suffix");
-  await screen.findByRole("button", { name: "Add rule" });
-  await screen.findByText("Preferred endpoint");
-  await screen.findByText("127.0.0.1:1080");
+  if (page === "requests") {
+    await screen.findByRole("switch", { name: "Allow overage" });
+    await screen.findByRole("button", { name: "Mapping 1 actions" });
+    await screen.findByLabelText("Trigger suffix");
+    await screen.findByRole("button", { name: "Add rule" });
+  } else if (page === "server") {
+    await screen.findByText("Preferred endpoint");
+    await screen.findByText("127.0.0.1:1080");
+  } else {
+    await screen.findByRole("button", { name: "Change password" });
+    await screen.findByRole("button", { name: "Reset statistics" });
+  }
   return result;
 }
 
@@ -337,7 +343,7 @@ describe("SettingsPage", () => {
           }),
         ),
       );
-      const { user } = renderWithProviders(<SettingsPage />);
+      const { user } = renderWithProviders(<SettingsPage page="requests" />);
       await waitFor(() =>
         expect(screen.getByRole("button", { name: "Mapping 2 actions" })).toBeInTheDocument(),
       );
@@ -373,7 +379,7 @@ describe("SettingsPage", () => {
           }),
         ),
       );
-      const { user } = renderWithProviders(<SettingsPage />);
+      const { user } = renderWithProviders(<SettingsPage page="requests" />);
       await waitFor(() =>
         expect(screen.getByRole("button", { name: "Mapping 1 actions" })).toBeInTheDocument(),
       );
@@ -436,7 +442,7 @@ describe("SettingsPage", () => {
 
   describe("admin password", () => {
     it("rejects 7 characters without a request", async () => {
-      const { user } = await renderPage();
+      const { user } = await renderPage("security");
       const card = section(SECTION_ID.adminPassword);
 
       await user.click(within(card).getByRole("button", { name: "Change password" }));
@@ -451,7 +457,7 @@ describe("SettingsPage", () => {
     });
 
     it("changes the password after confirmation and signs in again", async () => {
-      const { user } = await renderPage();
+      const { user } = await renderPage("security");
       act(() => {
         setSession({ token: "mock-before", expiresAt: Date.now() + 3_600_000, remember: true });
       });
@@ -486,7 +492,7 @@ describe("SettingsPage", () => {
     }
 
     it("shows the saved route and requires a host and port before it saves", async () => {
-      const { user } = await renderPage();
+      const { user } = await renderPage("server");
       const card = section(SECTION_ID.outboundProxy);
       expect(within(card).getByText("Via SOCKS5")).toBeInTheDocument();
       expect(within(card).getByText("Signs in as user")).toBeInTheDocument();
@@ -500,7 +506,7 @@ describe("SettingsPage", () => {
     });
 
     it("refuses a host with a port or a space in the field, as the server would", async () => {
-      const { user } = await renderPage();
+      const { user } = await renderPage("server");
       const dialog = await openEditor(user);
       const host = within(dialog).getByLabelText("Host");
       const port = within(dialog).getByLabelText("Port");
@@ -532,7 +538,7 @@ describe("SettingsPage", () => {
           ),
         ),
       );
-      const { user } = await renderPage();
+      const { user } = await renderPage("server");
       const dialog = await openEditor(user);
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
@@ -550,7 +556,7 @@ describe("SettingsPage", () => {
     });
 
     it("sends the encoded URL from the editor and shows the new route", async () => {
-      const { user } = await renderPage();
+      const { user } = await renderPage("server");
       const card = section(SECTION_ID.outboundProxy);
       const dialog = await openEditor(user);
       expect(within(dialog).getByLabelText("Password")).toHaveValue("p@ss");
@@ -579,7 +585,7 @@ describe("SettingsPage", () => {
     });
 
     it("removes the proxy after confirmation", async () => {
-      const { user } = await renderPage();
+      const { user } = await renderPage("server");
       const card = section(SECTION_ID.outboundProxy);
 
       await user.click(within(card).getByRole("button", { name: "Remove proxy" }));
@@ -686,7 +692,7 @@ describe("SettingsPage", () => {
   });
 
   it("resets statistics after confirmation and refreshes request views", async () => {
-    const { user, queryClient } = await renderPage();
+    const { user, queryClient } = await renderPage("security");
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     const card = section(SECTION_ID.dangerZone);
 

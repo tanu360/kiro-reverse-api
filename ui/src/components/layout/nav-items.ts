@@ -10,8 +10,9 @@ import type { IconSvgElement } from "@hugeicons/react";
 import type { AccountStatusFilter, RequestsSearch } from "@/routes/-search";
 
 /**
- * A saved view under a page in the sidebar: the page with one `status` filter. The labels are
- * the page's own filter labels (`ns:key`), so the sidebar and the page tabs always agree.
+ * A view under a page in the sidebar: the page with one `status` filter, or one of its sub-pages
+ * (Settings › Server), matched by path. The labels are the page's own tab labels (`ns:key`), so
+ * the sidebar and the page tabs always agree.
  */
 export type NavView =
   | { id: string; labelKey: string; to: "/accounts"; status: AccountStatusFilter }
@@ -20,7 +21,8 @@ export type NavView =
       labelKey: string;
       to: "/requests";
       status: NonNullable<RequestsSearch["status"]>;
-    };
+    }
+  | { id: string; labelKey: string; to: "/settings" | "/settings/server" | "/settings/security" };
 
 export interface NavItem {
   id: "overview" | "accounts" | "requests" | "api" | "backups" | "settings";
@@ -76,6 +78,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: SlidersHorizontalIcon,
     labelKey: "nav.settings",
     group: "manage",
+    views: [
+      { id: "settings-requests", labelKey: "settings:pages.requests", to: "/settings" },
+      { id: "settings-server", labelKey: "settings:pages.server", to: "/settings/server" },
+      { id: "settings-security", labelKey: "settings:pages.security", to: "/settings/security" },
+    ],
   },
 ];
 
@@ -94,7 +101,12 @@ export function activeNavItem(pathname: string): NavItem | undefined {
   );
 }
 
-/** The view under `item` that the current `status` search value selects, if any. */
-export function activeNavView(item: NavItem, status: unknown): NavView | undefined {
-  return item.views?.find((view) => view.status === status);
+/** The view under `item` that the current `status` search value or sub-page selects, if any. */
+export function activeNavView(
+  item: NavItem,
+  status: unknown,
+  pathname: string,
+): NavView | undefined {
+  const path = normalizePath(pathname);
+  return item.views?.find((view) => ("status" in view ? view.status === status : view.to === path));
 }

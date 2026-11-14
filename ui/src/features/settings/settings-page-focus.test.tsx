@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderApp, renderWithProviders } from "@/test/render";
-import { SECTION_ID, SETTINGS_SECTIONS } from "./sections/sections";
+import { pageSections, SECTION_ID, type SettingsPageId } from "./sections/sections";
 import { SettingsPage } from "./settings-page";
 
 let writes: string[] = [];
@@ -29,12 +29,18 @@ function section(id: string): HTMLElement {
   return element;
 }
 
-async function renderPage() {
-  const result = renderWithProviders(<SettingsPage />);
-  await screen.findByRole("switch", { name: "Allow overage" });
-  await screen.findByRole("button", { name: "Mapping 1 actions" });
-  await screen.findByRole("button", { name: "Add rule" });
-  await screen.findByText("127.0.0.1:1080");
+async function renderPage(page: SettingsPageId = "requests") {
+  const result = renderWithProviders(<SettingsPage page={page} />);
+  if (page === "requests") {
+    await screen.findByRole("switch", { name: "Allow overage" });
+    await screen.findByRole("button", { name: "Mapping 1 actions" });
+    await screen.findByRole("button", { name: "Add rule" });
+  } else if (page === "server") {
+    await screen.findByText("127.0.0.1:1080");
+  } else {
+    await screen.findByRole("button", { name: "Change password" });
+    await screen.findByRole("button", { name: "Reset statistics" });
+  }
   return result;
 }
 
@@ -78,7 +84,7 @@ describe("settings focus", () => {
         return HttpResponse.json({ ok: true });
       }),
     );
-    const { user } = await renderPage();
+    const { user } = await renderPage("security");
     const card = section(SECTION_ID.adminPassword);
     await user.type(within(card).getByLabelText("New password"), "a-new-password");
     await user.click(within(card).getByRole("button", { name: "Change password" }));
@@ -127,7 +133,7 @@ describe("settings focus", () => {
           }),
         ),
       );
-      const { user } = renderWithProviders(<SettingsPage />);
+      const { user } = renderWithProviders(<SettingsPage page="requests" />);
       await user.click(await screen.findByRole("button", { name: "Mapping 2 actions" }));
       const card = section(SECTION_ID.modelMappings);
       await user.click(await screen.findByRole("menuitem", { name: "Delete mapping" }));
@@ -167,7 +173,7 @@ describe("settings focus", () => {
 
   describe("section nav", () => {
     it("moves focus to the card heading and marks the link current", async () => {
-      const { user } = await renderPage();
+      const { user } = await renderPage("server");
       const link = within(nav()).getByRole("link", { name: "Outbound proxy" });
 
       await user.click(link);
@@ -177,7 +183,7 @@ describe("settings focus", () => {
       });
       expect(heading).toHaveFocus();
       expect(link).toHaveAttribute("aria-current", "true");
-      expect(within(nav()).getByRole("link", { name: "Usage" })).not.toHaveAttribute(
+      expect(within(nav()).getByRole("link", { name: "Kiro endpoint" })).not.toHaveAttribute(
         "aria-current",
       );
     });
@@ -185,7 +191,7 @@ describe("settings focus", () => {
     it("follows the card scrolled under the header", async () => {
       await renderPage();
       const tops = new Map<string, number>(
-        SETTINGS_SECTIONS.map((entry, index) => [entry.id, index * 400 - 1300]),
+        pageSections("requests").map((entry, index) => [entry.id, index * 400 - 1300]),
       );
       vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
         this: HTMLElement,
@@ -208,12 +214,13 @@ describe("settings focus", () => {
     });
 
     it("keeps a section opened from the nav marked at the page end until the reader scrolls", async () => {
-      const { user } = await renderPage();
+      const { user } = await renderPage("security");
       // The page end on a phone: Log retention sits at the top, Danger zone under it, and the
       // page cannot scroll further, where the spy alone marks the last card.
-      const last = SETTINGS_SECTIONS.length - 1;
+      const sections = pageSections("security");
+      const last = sections.length - 1;
       const tops = new Map<string, number>(
-        SETTINGS_SECTIONS.map((entry, index) => [entry.id, (index - last + 1) * 490 + 147]),
+        sections.map((entry, index) => [entry.id, (index - last + 1) * 490 + 147]),
       );
       vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
         this: HTMLElement,
@@ -303,10 +310,10 @@ describe("settings focus", () => {
         HttpResponse.json({ error: "settings store unavailable" }, { status: 500 }),
       ),
     );
-    renderWithProviders(<SettingsPage />);
+    renderWithProviders(<SettingsPage page="requests" />);
 
     expect(await screen.findByText("Could not load settings")).toBeInTheDocument();
-    await screen.findByText("127.0.0.1:1080");
+    await screen.findByLabelText("Trigger suffix");
     expect(screen.queryByText("Could not load this data")).not.toBeInTheDocument();
     expect(screen.queryByRole("switch", { name: "Allow overage" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
@@ -339,6 +346,18 @@ describe("leaving with unsaved edits", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/api"));
   });
 
+  it("asks before another settings page drops the edits", async () => {
+    const { user, router } = await renderApp("/settings");
+    await user.click(
+      await screen.findByRole("switch", { name: "Continue answers cut off by the output limit" }),
+    );
+    await user.click(screen.getByRole("tab", { name: "Server" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
+    await user.click(within(dialog).getByRole("button", { name: "Discard changes" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/server"));
+    expect(await screen.findByRole("tab", { name: "Server", selected: true })).toBeInTheDocument();
+  });
+
   it("leaves a clean page without asking", async () => {
     const { user, router } = await renderApp("/settings");
     await screen.findByRole("switch", { name: "Allow overage" });
@@ -354,6 +373,17 @@ describe("settings deep link", () => {
     window.history.replaceState(null, "", "/");
   });
 
+  it("sends a link from before the split to the page its card is on", async () => {
+    const { router } = await renderApp(`/settings#${SECTION_ID.alerts}`);
+    expect(router.state.location.pathname).toBe("/settings/server");
+    expect(router.state.location.hash).toBe(SECTION_ID.alerts);
+    // Memory history leaves window.location alone, so the card's mark is the browser's to show;
+    // here the Server page with its Alerts link is enough.
+    expect(await screen.findByRole("tab", { name: "Server", selected: true })).toBeInTheDocument();
+    const settingsNav = screen.getByRole("navigation", { name: "Settings sections" });
+    expect(within(settingsNav).getByRole("link", { name: /^Alerts/ })).toBeInTheDocument();
+  });
+
   it("marks the linked section and scrolls its chip into the chip row once the chips widen", async () => {
     const callbacks = new Map<Element, () => void>();
     vi.stubGlobal(
@@ -367,9 +397,9 @@ describe("settings deep link", () => {
         disconnect(): void {}
       },
     );
-    window.history.replaceState(null, "", `/settings#${SECTION_ID.alerts}`);
+    window.history.replaceState(null, "", `/settings/server#${SECTION_ID.alerts}`);
     try {
-      await renderPage();
+      await renderPage("server");
       const link = within(nav()).getByRole("link", { name: "Alerts" });
       expect(link).toHaveAttribute("aria-current", "true");
 
@@ -408,14 +438,14 @@ describe("settings deep link", () => {
         disconnect(): void {}
       },
     );
-    window.history.replaceState(null, "", `/settings#${SECTION_ID.adminPassword}`);
+    window.history.replaceState(null, "", `/settings/security#${SECTION_ID.adminPassword}`);
     try {
-      await renderPage();
+      await renderPage("security");
       const card = section(SECTION_ID.adminPassword);
       const column = observed.find((target) => target.contains(card));
       expect(column).toBeDefined();
-      // The column, not the card's form: the cards above the admin password grow inside it.
-      expect(column?.contains(section(SETTINGS_SECTIONS[0].id))).toBe(true);
+      // The column, not the card's form: every card of the page grows inside it.
+      expect(column?.contains(section(SECTION_ID.dangerZone))).toBe(true);
     } finally {
       vi.unstubAllGlobals();
     }

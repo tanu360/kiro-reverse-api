@@ -17,7 +17,9 @@ import { Route as AppAccountsRouteImport } from './routes/_app/accounts'
 import { Route as AppApiRouteImport } from './routes/_app/api'
 import { Route as AppBackupsRouteImport } from './routes/_app/backups'
 import { Route as AppRequestsRouteImport } from './routes/_app/requests'
-import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsSecurityRouteImport } from './routes/_app/settings/security'
+import { Route as AppSettingsServerRouteImport } from './routes/_app/settings/server'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -58,9 +60,19 @@ const AppRequestsRoute = AppRequestsRouteImport.update({
   path: '/requests',
   getParentRoute: () => AppRoute,
 } as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsSecurityRoute = AppSettingsSecurityRouteImport.update({
+  id: '/settings/security',
+  path: '/settings/security',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsServerRoute = AppSettingsServerRouteImport.update({
+  id: '/settings/server',
+  path: '/settings/server',
   getParentRoute: () => AppRoute,
 } as any)
 
@@ -72,7 +84,9 @@ export interface FileRoutesByFullPath {
   '/api': typeof AppApiRoute
   '/backups': typeof AppBackupsRoute
   '/requests': typeof AppRequestsRoute
-  '/settings': typeof AppSettingsRoute
+  '/settings/security': typeof AppSettingsSecurityRoute
+  '/settings/server': typeof AppSettingsServerRoute
+  '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -81,8 +95,10 @@ export interface FileRoutesByTo {
   '/api': typeof AppApiRoute
   '/backups': typeof AppBackupsRoute
   '/requests': typeof AppRequestsRoute
-  '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
+  '/settings/security': typeof AppSettingsSecurityRoute
+  '/settings/server': typeof AppSettingsServerRoute
+  '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -93,8 +109,10 @@ export interface FileRoutesById {
   '/_app/api': typeof AppApiRoute
   '/_app/backups': typeof AppBackupsRoute
   '/_app/requests': typeof AppRequestsRoute
-  '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/settings/security': typeof AppSettingsSecurityRoute
+  '/_app/settings/server': typeof AppSettingsServerRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -106,7 +124,9 @@ export interface FileRouteTypes {
     | '/api'
     | '/backups'
     | '/requests'
-    | '/settings'
+    | '/settings/security'
+    | '/settings/server'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -115,8 +135,10 @@ export interface FileRouteTypes {
     | '/api'
     | '/backups'
     | '/requests'
-    | '/settings'
     | '/'
+    | '/settings/security'
+    | '/settings/server'
+    | '/settings'
   id:
     | '__root__'
     | '/_app'
@@ -126,8 +148,10 @@ export interface FileRouteTypes {
     | '/_app/api'
     | '/_app/backups'
     | '/_app/requests'
-    | '/_app/settings'
     | '/_app/'
+    | '/_app/settings/security'
+    | '/_app/settings/server'
+    | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -194,11 +218,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRequestsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/settings': {
-      id: '/_app/settings'
+    '/_app/settings/': {
+      id: '/_app/settings/'
       path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/security': {
+      id: '/_app/settings/security'
+      path: '/settings/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof AppSettingsSecurityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/server': {
+      id: '/_app/settings/server'
+      path: '/settings/server'
+      fullPath: '/settings/server'
+      preLoaderRoute: typeof AppSettingsServerRouteImport
       parentRoute: typeof AppRoute
     }
   }
@@ -209,8 +247,10 @@ interface AppRouteChildren {
   AppApiRoute: typeof AppApiRoute
   AppBackupsRoute: typeof AppBackupsRoute
   AppRequestsRoute: typeof AppRequestsRoute
-  AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppSettingsSecurityRoute: typeof AppSettingsSecurityRoute
+  AppSettingsServerRoute: typeof AppSettingsServerRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -218,8 +258,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppApiRoute: AppApiRoute,
   AppBackupsRoute: AppBackupsRoute,
   AppRequestsRoute: AppRequestsRoute,
-  AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppSettingsSecurityRoute: AppSettingsSecurityRoute,
+  AppSettingsServerRoute: AppSettingsServerRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
