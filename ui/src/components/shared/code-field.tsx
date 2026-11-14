@@ -30,6 +30,31 @@ function breakAtSlashes(value: string): ReactNode {
   ));
 }
 
+/**
+ * A command, a value with spaces: it breaks only between its words and, inside a path, after a
+ * "/". Each piece is one unbreakable run, so no line ends mid-word ("--bu|ild") or at a hyphen;
+ * a piece longer than the line scrolls sideways instead. Copying keeps the raw value.
+ */
+function breakAtWords(value: string): ReactNode {
+  return keyByText(value.split(" "), (word) => word).map(({ key, item: word }, index) => {
+    const segments = word.split("/");
+    return (
+      <Fragment key={key}>
+        {index > 0 ? " " : null}
+        {keyByText(segments, (segment) => segment).map(({ key: segmentKey, item }, at) => (
+          <Fragment key={segmentKey}>
+            <span className="whitespace-nowrap">
+              {item}
+              {at < segments.length - 1 ? "/" : null}
+            </span>
+            {at < segments.length - 1 ? <wbr /> : null}
+          </Fragment>
+        ))}
+      </Fragment>
+    );
+  });
+}
+
 /*
  * The multiline value: a 20 px line with 4 px above and below, in a group that is at least a
  * field's height (36 / coarse 40, border included), so one line measures exactly like an
@@ -42,9 +67,10 @@ const MULTILINE_TEXT =
 /**
  * A value to copy (a URL, a key, a command) in a read-only field: mono text in the soft field,
  * with a copy button and, for a link, an open button at its end. One line scrolls inside the
- * input (focus selects it all); `multiline` wraps the value instead: a URL at its slashes (then
- * anywhere), anything else (a key, a token) at any character, so it fills every line evenly
- * instead of leaving "sk-" alone on the first one.
+ * input (focus selects it all); `multiline` wraps the value instead: a command (a value with
+ * spaces) only between its words, a URL at its slashes (then anywhere), anything else (a key, a
+ * token) at any character, so it fills every line evenly instead of leaving "sk-" alone on the
+ * first one.
  * Inside a Base UI Field the input takes the field's label; otherwise pass `label`. The
  * multiline value is a read-only textbox (a tab stop), named by `label` or by `labelledBy`.
  */
@@ -78,6 +104,7 @@ export function CopyField({
   className?: string;
 }): JSX.Element {
   const { t } = useT();
+  const words = multiline && value.includes(" ");
   return (
     <InputGroup className={cn(multiline && MULTILINE_GROUP, className)} data-slot="copy-field">
       {multiline ? (
@@ -86,12 +113,15 @@ export function CopyField({
           aria-labelledby={labelledBy}
           aria-multiline="true"
           aria-readonly="true"
-          className={cn(MULTILINE_TEXT, value.includes("/") ? "wrap-anywhere" : "break-all")}
+          className={cn(
+            MULTILINE_TEXT,
+            words ? "overflow-x-auto" : value.includes("/") ? "wrap-anywhere" : "break-all",
+          )}
           id={id}
           role="textbox"
           tabIndex={0}
         >
-          {breakAtSlashes(value)}
+          {words ? breakAtWords(value) : breakAtSlashes(value)}
         </InputGroupText>
       ) : (
         <InputGroupInput

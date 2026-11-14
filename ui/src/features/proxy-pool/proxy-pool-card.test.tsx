@@ -164,8 +164,11 @@ describe("ProxyPoolCard", () => {
     // Details opens on a click or tap as well as on hover, and keyboard focus reaches it.
     const details = screen.getByRole("button", { name: "Details" });
     await user.click(details);
-    expect(await screen.findByText(/proxyconnect tcp: connect: connection refused/)).toBeVisible();
+    const raw = await screen.findByText(/proxyconnect tcp: connect: connection refused/);
+    expect(raw).toBeVisible();
     expect(details.tabIndex).toBe(0);
+    // The note opens under Details, so the "Last error" sentence above stays readable.
+    expect(raw.closest("[data-slot=popover-popup]")).toHaveAttribute("data-side", "bottom");
   });
 
   it.each([

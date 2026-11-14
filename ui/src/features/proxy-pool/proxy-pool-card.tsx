@@ -376,10 +376,13 @@ function ProxyRow({
     >
       {proxy.health.status === "failed" && lastError ? (
         // A short sentence in the viewer's language; the server's own text behind Details,
-        // which opens on hover, click, tap and keyboard alike.
+        // which opens on hover, click, tap and keyboard alike. Details often wraps under the
+        // sentence on a phone, so its note opens below and leaves the sentence readable.
         <p className="wrap-anywhere text-destructive-foreground text-xs">
           {t("card.lastError", { error: proxyFailureSentence(errorCode, errorStatus, t) })}{" "}
-          <InfoHint hint={mask(lastError)}>{t("card.lastErrorDetails")}</InfoHint>
+          <InfoHint hint={mask(lastError)} side="bottom">
+            {t("card.lastErrorDetails")}
+          </InfoHint>
         </p>
       ) : null}
     </SettingsRow>

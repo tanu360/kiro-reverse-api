@@ -132,6 +132,57 @@ describe("ApiKeyUsageSheet", () => {
     expect(await within(legend(sheet)).findByText("1.50")).toBeInTheDocument();
   });
 
+  it("charts All time by the server's bucket and notes the requests without a date", async () => {
+    const dated = totals({ requests: 4, succeeded: 3, failed: 1, credits: 1 });
+    const earlier = totals({ requests: 1200, succeeded: 1200, credits: 40 });
+    const all = totals({ requests: 1204, succeeded: 1203, failed: 1, credits: 41 });
+    mockServer.use(
+      http.get(apiUrl("/api-keys/usage"), ({ request }) => {
+        const range = new URL(request.url).searchParams.get("range");
+        if (range !== "all") return HttpResponse.json(response("24h"));
+        return HttpResponse.json({
+          ...response("all"),
+          bucket: "month",
+          bucketSeconds: 0,
+          totals: all,
+          earlier,
+          keys: [
+            {
+              id: "a",
+              kind: "key",
+              name: "alpha",
+              keyMasked: "sk-alp****0001",
+              totals: all,
+              series: [EMPTY_TOTALS, dated],
+              earlier,
+            },
+          ],
+        } satisfies ApiKeyUsageResponse);
+      }),
+    );
+    const { user } = renderWithProviders(
+      <ApiKeyUsageSheet
+        entryRef="key:a"
+        identity={{ kind: "key", name: "alpha", keyMasked: "sk-alp****0001" }}
+        onOpenChange={() => {}}
+        open
+      />,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "alpha" });
+    expect(await within(sheet).findByText("Per hour, last 24 hours")).toBeInTheDocument();
+    expect(within(sheet).queryByText(/have no date/u)).toBeNull();
+
+    await user.click(within(sheet).getByRole("radio", { name: "All time" }));
+    expect(await within(sheet).findByText("Per month, all time")).toBeInTheDocument();
+    // The legend totals count every request; the bars leave out the 1,200 without a date.
+    expect(within(legend(sheet)).getByText("1,203")).toBeInTheDocument();
+    expect(
+      within(sheet).getByText(
+        "1,200 older requests have no date, so the chart leaves them out. The totals include them.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows the empty state for a key without traffic", async () => {
     serveUsage();
     renderWithProviders(

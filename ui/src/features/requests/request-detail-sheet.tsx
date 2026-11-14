@@ -11,6 +11,7 @@ import { CopyButton } from "@/components/shared/copy-button";
 import { CreditAmount } from "@/components/shared/credit-amount";
 import { PagerChevronButton } from "@/components/shared/data-table-pagination";
 import { DisplayEmail } from "@/components/shared/display-email";
+import { InfoHint } from "@/components/shared/info-hint";
 import { KeyValueGrid, type KeyValueItem } from "@/components/shared/key-value-grid";
 import { ModelLogo } from "@/components/shared/model-logo";
 import {
@@ -38,6 +39,7 @@ import {
 } from "@/lib/format";
 import { type Lang, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
+import { requestProxyText } from "./proxy-failure";
 import { AttemptsCard } from "./request-attempts";
 import { isKnownErrorType, normalizeApiKeyMask, rowKey } from "./request-model";
 import { endpointLabel, StatusBadge } from "./requests-columns";
@@ -99,6 +101,9 @@ export function RequestDetailSheet({
     const apiKey = normalizeApiKeyMask(record.apiKeyMasked);
     const message =
       maskText(record.message) || (failed ? t("noErrorMessage") : t("detail.noMessage"));
+    // A Proxy error reads as its Attempts word it; the client's own error stays behind Details,
+    // as the proxy pool keeps the server's text behind its Last error.
+    const proxyText = requestProxyText(record, t);
     // A failure that used no tokens has nothing to break down: the table shows a dash there too.
     const noUsage =
       failed &&
@@ -155,9 +160,21 @@ export function RequestDetailSheet({
             />
           </AlertTitle>
           <AlertDescription>
-            <p className="whitespace-pre-wrap wrap-anywhere" data-testid="request-message">
-              {message}
-            </p>
+            {proxyText ? (
+              <p className="wrap-anywhere" data-testid="request-message">
+                {proxyText}{" "}
+                <InfoHint
+                  hint={<span className="whitespace-pre-wrap wrap-anywhere">{message}</span>}
+                  side="bottom"
+                >
+                  {t("detail.errorDetails")}
+                </InfoHint>
+              </p>
+            ) : (
+              <p className="whitespace-pre-wrap wrap-anywhere" data-testid="request-message">
+                {message}
+              </p>
+            )}
           </AlertDescription>
         </Alert>
       ) : null;

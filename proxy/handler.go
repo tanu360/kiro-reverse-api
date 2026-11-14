@@ -2761,6 +2761,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiObserveOverview(w, r)
 	case path == "/observe/account-heatmap" && r.Method == "GET":
 		h.apiObserveHeatmap(w, r)
+	case path == "/observe/traffic-history" && r.Method == "GET":
+		h.apiObserveTrafficHistory(w, r)
 	case path == "/observe/model-mix" && r.Method == "GET":
 		h.apiObserveModelMix(w, r)
 	case path == "/observe/recent-errors" && r.Method == "GET":

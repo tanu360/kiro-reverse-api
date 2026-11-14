@@ -102,7 +102,9 @@ describe("validateRequestsSearch", () => {
 describe("validateOverviewSearch", () => {
   it("keeps only known ranges", () => {
     expect(validateOverviewSearch({ range: "6h" })).toEqual({ range: "6h" });
+    expect(validateOverviewSearch({ range: "all" })).toEqual({ range: "all" });
     expect(validateOverviewSearch({ range: "7d" })).toEqual({});
+    expect(validateOverviewSearch({ range: "ALL" })).toEqual({});
   });
 });
 

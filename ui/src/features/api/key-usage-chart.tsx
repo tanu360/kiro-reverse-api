@@ -1,4 +1,5 @@
 import { type JSX, useId, useMemo } from "react";
+import { dateLabelCount, rightAxisMargin } from "@/components/charts/axis-fit";
 import { Bar } from "@/components/charts/bar";
 import { BarChart } from "@/components/charts/bar-chart";
 import { BarXAxis } from "@/components/charts/bar-x-axis";
@@ -8,7 +9,8 @@ import { YAxis } from "@/components/charts/y-axis";
 import { TRACK_COLOR } from "@/features/overview/colors";
 import { useIsMobile } from "@/hooks/use-media-query";
 import type { Lang } from "@/lib/i18n";
-import { bucketLabel, bucketTitle, USAGE_PLOT_HEIGHT, type UsageBar } from "./key-usage-model";
+import { bucketLabel, bucketTitle, type TimeBucket } from "@/lib/time-buckets";
+import { USAGE_PLOT_HEIGHT, type UsageBar } from "./key-usage-model";
 
 // The count labels sit in the right margin, as on the Overview traffic chart. The 8 px on the
 // left keeps the first label, centred on the first bar, inside a phone card's padding.
@@ -78,9 +80,10 @@ function WholeNumberYAxis(): JSX.Element {
 WholeNumberYAxis.displayName = "YAxis";
 
 /**
- * Lazy-loaded bar chart for one key's usage: a bar per hour or day, `primary` hatched under
- * `secondary` (succeeded under failed, input under output), over a faint full-height track. The
- * loading state is BarChart's own skeleton; an empty range keeps only the time axis.
+ * Lazy-loaded bar chart for one key's usage: a bar per hour, day, week, month or year, `primary`
+ * hatched under `secondary` (succeeded under failed, input under output), over a faint
+ * full-height track. The loading state is BarChart's own skeleton; an empty range keeps only the
+ * time axis.
  */
 export default function KeyUsageChart({
   bars,
@@ -97,7 +100,7 @@ export default function KeyUsageChart({
   wholeNumbers = false,
 }: {
   bars: UsageBar[];
-  bucket: "hour" | "day";
+  bucket: TimeBucket;
   bucketSeconds: number;
   tzOffset: number;
   primary: UsageSeries;
@@ -124,6 +127,19 @@ export default function KeyUsageChart({
       })),
     [bars, bucket, tzOffset, lang],
   );
+  // Long counts ("4,1 mi" tokens) widen the label margin; long dates get fewer labels.
+  const margin = useMemo(
+    () => ({
+      ...MARGIN,
+      right: rightAxisMargin(
+        Math.max(0, ...bars.map((bar) => bar.primary + bar.secondary)),
+        MARGIN.right,
+        lang,
+      ),
+    }),
+    [bars, lang],
+  );
+  const maxLabels = useMemo(() => dateLabelCount(data.map((datum) => datum.name)), [data]);
 
   return (
     <BarChart
@@ -133,7 +149,7 @@ export default function KeyUsageChart({
       barGap={phone ? 0.22 : 0.35}
       className={USAGE_PLOT_HEIGHT}
       data={data}
-      margin={MARGIN}
+      margin={margin}
       stacked
       stackGap={1}
       status={status}
@@ -159,7 +175,7 @@ export default function KeyUsageChart({
           stroke={secondary.color}
         />
       ) : null}
-      <BarXAxis maxLabels={{ base: 3, sm: 4, md: 6 }} />
+      <BarXAxis maxLabels={maxLabels} />
       {empty ? null : (
         <ChartTooltip
           content={({ point }) => {

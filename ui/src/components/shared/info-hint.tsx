@@ -24,6 +24,7 @@ export function InfoHint({
   hint,
   variant = "label",
   truncate = false,
+  side = "top",
   className,
 }: {
   /** The visible label; it is also the trigger's accessible name. */
@@ -35,6 +36,11 @@ export function InfoHint({
    * For a row of tiles whose label rows must stay the same height (StatTile).
    */
   truncate?: boolean;
+  /**
+   * `label` only: where the note opens. Below, for a hint that sits under the sentence it
+   * explains, so the note never covers that sentence.
+   */
+  side?: "top" | "bottom";
   className?: string;
 }): JSX.Element {
   const link = variant === "link";
@@ -62,7 +68,7 @@ export function InfoHint({
       {link ? (
         <PopoverPopup className="max-w-xs">{hint}</PopoverPopup>
       ) : (
-        <PopoverPopup className="max-w-72" side="top" tooltipStyle>
+        <PopoverPopup className="max-w-72" side={side} tooltipStyle>
           {hint}
         </PopoverPopup>
       )}

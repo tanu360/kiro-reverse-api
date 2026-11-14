@@ -201,7 +201,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 ### 🛡 Trang quản trị
 
 - Ứng dụng React một trang nhúng trong binary; không cần chạy web server riêng.
-- Bảng điều khiển Tổng quan cập nhật trực tiếp: bốn thẻ KPI (tài khoản, credit gói, cùng số yêu cầu và số yêu cầu thất bại trong giờ qua), lưu lượng theo thời gian dạng cột chồng, danh sách tài khoản cần chú ý, lưu lượng theo tài khoản, biểu đồ donut phân bổ model và các tài khoản hoạt động nhiều nhất. Thẻ **Credit gói** chia mức dùng credit Kiro thành phần dùng qua proxy và phần dùng ngoài proxy.
+- Bảng điều khiển Tổng quan cập nhật trực tiếp: bốn thẻ KPI (tài khoản, credit gói, cùng số yêu cầu và số yêu cầu thất bại trong giờ qua), lưu lượng trong 1 giờ, 6 giờ, 24 giờ qua hoặc toàn bộ thời gian dạng cột chồng, danh sách tài khoản cần chú ý, lưu lượng theo tài khoản, biểu đồ donut phân bổ model và các tài khoản hoạt động nhiều nhất. Thẻ **Credit gói** chia mức dùng credit Kiro thành phần dùng qua proxy và phần dùng ngoài proxy.
 - Tài khoản với tab trạng thái kèm số lượng, bộ lọc (gói, xác thực, khu vực, bật, thẻ), tìm kiếm theo email, biệt danh, ghi chú và thẻ, sắp xếp, thao tác hàng loạt, chế độ xem chi tiết, kiểm tra kết nối, số yêu cầu mỗi phút và hôm nay theo thời gian thực, xem lại tài khoản trùng lặp và xuất.
 - Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, Mã truy vết và dòng thời gian của từng lần thử upstream (tài khoản, endpoint, thời lượng, kết quả, failover), API key được che và lịch sử lưu trong SQLite.
 - Trang API quản lý API key của client (giá trị key tùy chỉnh không bắt buộc, bật/tắt, giới hạn token, credit và lượt gọi cho từng key, gắn key với tài khoản, tạo lại key, đặt lại mức sử dụng), biểu đồ **Mức sử dụng theo key** và trình tạo mã thiết lập client có tô sáng cú pháp: mã gọi các API Anthropic Messages, OpenAI Chat Completions và OpenAI Responses bằng curl, Python, Node.js, Go, Java, PHP, Ruby và C# (SDK chính thức hoặc HTTP thuần, có hoặc không stream) kèm phản hồi mẫu, cùng cấu hình Claude Code và Codex.
@@ -381,7 +381,7 @@ Bắt buộc API key từ trang **API** (**Truy cập API → Bắt buộc API k
 - **Giới hạn lượt gọi** chỉ đếm các lượt gọi thành công; yêu cầu thất bại, `/v1/models` và `count_tokens` không được tính. Key đã dùng hết lượt gọi nhận HTTP 429 cho đến khi bạn nâng giới hạn hoặc đặt lại mức sử dụng.
 - **Tài khoản → Chỉ các tài khoản đã chọn** gắn một key với một số tài khoản. Yêu cầu của key đó chỉ dùng các tài khoản này, không bao giờ dùng tài khoản khác (HTTP 503 khi không tài khoản nào trong số đó khả dụng), và danh sách model của key chỉ hiện các model mà chúng phục vụ.
 - **Tạo lại key** cấp cho key một giá trị mới, và giá trị cũ ngừng hoạt động ngay lập tức. Tên, giới hạn, tài khoản và mức sử dụng được giữ nguyên.
-- **Mức sử dụng theo key** vẽ biểu đồ số yêu cầu, token và credit của từng key trong 24 giờ, 7 ngày hoặc 30 ngày, tách riêng thành công và thất bại, với các dòng riêng cho yêu cầu không có key, key không hợp lệ và key đã xóa.
+- **Mức sử dụng theo key** vẽ biểu đồ số yêu cầu, token và credit của từng key trong 24 giờ, 7 ngày, 30 ngày hoặc toàn bộ thời gian, tách riêng thành công và thất bại, với các dòng riêng cho yêu cầu không có key, key không hợp lệ và key đã xóa.
 
 ---
 
@@ -393,7 +393,7 @@ Trang Tổng quan và trang Tài khoản cố ý trả lời những câu hỏi 
 - **Thẻ Credit gói**: các trường hạn mức từ máy chủ Kiro trong tháng này, cộng cho mọi tài khoản (`usage_current / usage_limit`). Thanh của thẻ chia credit đã dùng thành **Proxy** (credit của các yêu cầu đi qua proxy này) và **Ngoài proxy** (phần còn lại), bên cạnh phần **Còn lại**.
 - **Thẻ Yêu cầu** và **Thẻ Thất bại**: các yêu cầu qua proxy đã kết thúc trong giờ qua, so với giờ trước đó.
 - **Trang Tài khoản**: bộ đếm lưu trên bản ghi của từng tài khoản (`requestCount`, `totalTokens`, `totalCredits`).
-- **Lưu giữ nhật ký**: trước khi xóa các dòng cũ, tổng số của chúng được gộp vào một bản tổng hợp, nên thẻ **Credit gói**, biểu đồ phân bổ model và `/v1/stats` vẫn tính chúng. Trang Yêu cầu và Mức sử dụng theo key chỉ hiển thị các dòng được giữ lại.
+- **Lưu giữ nhật ký**: trước khi xóa các dòng cũ, tổng số của chúng được gộp vào một bản tổng hợp, nên thẻ **Credit gói**, biểu đồ phân bổ model và `/v1/stats` vẫn tính chúng. Mỗi ngày bị xóa vẫn giữ tổng số theo ngày, nên Mức sử dụng theo key và biểu đồ lưu lượng ở Tổng quan vẫn hiển thị ngày đó trong 7 ngày, 30 ngày và toàn bộ thời gian. Trang Yêu cầu chỉ hiển thị các dòng được giữ lại.
 
 Nếu một tài khoản cũ hoặc đã xóa vẫn còn dòng trong `requests`, credit của nó vẫn được tính vào **Proxy**. Khi đó **Proxy** có thể cao hơn thực tế, còn **Ngoài proxy** thấp hơn thực tế. Dùng **Cài đặt → Vùng nguy hiểm → Đặt lại thống kê** hoặc dọn DB một lần nếu bạn muốn xóa các dòng yêu cầu cũ.
 

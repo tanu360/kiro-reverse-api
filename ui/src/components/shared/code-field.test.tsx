@@ -22,6 +22,29 @@ describe("CopyField", () => {
     expect(box).not.toHaveClass("wrap-anywhere");
   });
 
+  it("breaks a command only between its words, never inside one", () => {
+    const command = "git pull && docker compose up -d --build";
+    renderWithProviders(<CopyField label="Command" multiline value={command} />);
+    const box = screen.getByRole("textbox", { name: "Command" });
+    expect(box.textContent).toBe(command);
+    expect(box).not.toHaveClass("break-all");
+    expect(box).not.toHaveClass("wrap-anywhere");
+    // Each word is one unbreakable run; a word too long for the line scrolls sideways.
+    const runs = [...box.querySelectorAll("span.whitespace-nowrap")].map((run) => run.textContent);
+    expect(runs).toEqual(["git", "pull", "&&", "docker", "compose", "up", "-d", "--build"]);
+    expect(box).toHaveClass("overflow-x-auto");
+  });
+
+  it("lets a path inside a command break after its slashes, not at a hyphen", () => {
+    const command = "docker pull ghcr.io/tanu360/kiro-reverse-api:latest";
+    renderWithProviders(<CopyField label="Command" multiline value={command} />);
+    const box = screen.getByRole("textbox", { name: "Command" });
+    expect(box.textContent).toBe(command);
+    const runs = [...box.querySelectorAll("span.whitespace-nowrap")].map((run) => run.textContent);
+    expect(runs).toEqual(["docker", "pull", "ghcr.io/", "tanu360/", "kiro-reverse-api:latest"]);
+    expect(box.querySelectorAll("wbr")).toHaveLength(2);
+  });
+
   it("puts the open link before the copy button, opening the address in a new tab", () => {
     const url = "https://proxy.example.com/v1";
     renderWithProviders(

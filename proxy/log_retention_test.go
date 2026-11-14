@@ -397,7 +397,7 @@ func TestResetStatsClearsRollup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range []string{"requests", "errors", "request_rollup", "error_rollup"} {
+	for _, table := range []string{"requests", "errors", "request_rollup", "error_rollup", "request_rollup_daily", "error_rollup_daily"} {
 		var n int
 		if err := d.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
 			t.Fatal(err)

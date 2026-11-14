@@ -206,6 +206,44 @@ describe("KeyUsageCard", () => {
     expect(within(region).getByText("Last 7 days, from the request log")).toBeInTheDocument();
   });
 
+  it("offers All time and refetches with range=all", async () => {
+    served = usage([entry("a", "key", { requests: 1 }, { name: "alpha" })]);
+    const { user } = renderWithProviders(<KeyUsageCard />);
+    const region = await card();
+    await rowNames(region);
+    const group = within(region).getByRole("radiogroup", { name: "Time range" });
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent),
+    ).toEqual(["24h", "7d", "30d", "All time"]);
+
+    // All time counts the totals of pruned rows too, so it is never below 30 days.
+    served = {
+      ...usage([entry("a", "key", { requests: 1234, failed: 4 }, { name: "alpha" })], "all"),
+      bucket: "week",
+      bucketSeconds: 604800,
+    };
+    await user.click(within(group).getByRole("radio", { name: "All time" }));
+    await waitFor(() => expect(ranges).toEqual(["24h", "all"]));
+    expect(await within(region).findByText("1,234 requests")).toBeInTheDocument();
+    expect(within(region).getByText("All time, from the request log")).toBeInTheDocument();
+    expect(within(group).getByRole("radio", { name: "All time" })).toBeChecked();
+  });
+
+  it("opens the sheet on All time when the card shows it", async () => {
+    served = usage([entry("a", "key", { requests: 3 }, { name: "alpha" })], "all");
+    const { user } = renderWithProviders(<KeyUsageCard />);
+    const region = await card();
+    await rowNames(region);
+    await user.click(within(region).getByRole("radio", { name: "All time" }));
+    await waitFor(() => expect(ranges).toEqual(["24h", "all"]));
+    await user.click(await within(region).findByRole("button", { name: "View usage for alpha" }));
+    const sheet = await screen.findByRole("dialog", { name: "alpha" });
+    expect(within(sheet).getByRole("radio", { name: "All time" })).toBeChecked();
+    expect(await within(sheet).findByText("Per day, all time")).toBeInTheDocument();
+  });
+
   it("shows a retry when the usage fails to load", async () => {
     mockServer.use(
       http.get(apiUrl("/api-keys/usage"), () =>

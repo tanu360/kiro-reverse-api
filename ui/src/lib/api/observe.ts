@@ -1,4 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { TimeBucket } from "../time-buckets";
+import { browserTzOffset } from "./api-key-usage";
 import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
 import type {
@@ -105,5 +107,51 @@ export function modelMixQuery() {
   return queryOptions({
     queryKey: queryKeys.observe.modelMix(),
     queryFn: getModelMix,
+  });
+}
+
+/** One bar of the all-time traffic chart: final requests by outcome, and retried attempts. */
+export interface TrafficCounts {
+  succeeded: number;
+  failed: number;
+  retried: number;
+}
+
+/** GET /admin/api/observe/traffic-history (proxy/usage_alltime.go): the Overview's All time. */
+export interface TrafficHistoryResponse {
+  range: "all";
+  /** Sized by the span of the log: at most about 60 bars. */
+  bucket: Exclude<TimeBucket, "hour">;
+  /** 0 for a month or a year, which vary in length. */
+  bucketSeconds: number;
+  /** Minutes east of UTC the buckets start at (the viewer's local midnight). */
+  tzOffset: number;
+  from: number;
+  to: number;
+  nowUnix: number;
+  /** Bucket starts, unix s, oldest first. */
+  buckets: number[];
+  /** One per bucket, zeros included. */
+  series: TrafficCounts[];
+  /** Every bucket plus `earlier`. */
+  totals: TrafficCounts;
+  /** Traffic log retention pruned before it kept daily totals: it has no day. */
+  earlier?: TrafficCounts;
+}
+
+function getTrafficHistory(tzOffset: number): Promise<TrafficHistoryResponse> {
+  return apiRequest("/observe/traffic-history", { query: { tzOffset } });
+}
+
+/**
+ * Bars of a day or more over the whole log: SSE ticks skip it (meta.liveRefresh = false), and it
+ * polls every 5 minutes. Under the observe key, so a statistics reset refetches it.
+ */
+export function trafficHistoryQuery(tzOffset = browserTzOffset()) {
+  return queryOptions({
+    queryKey: queryKeys.observe.trafficHistory(tzOffset),
+    queryFn: () => getTrafficHistory(tzOffset),
+    meta: { liveRefresh: false },
+    refetchInterval: 300_000,
   });
 }

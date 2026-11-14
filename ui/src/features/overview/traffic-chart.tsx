@@ -1,5 +1,6 @@
 import { curveMonotoneX, line } from "d3-shape";
 import { type JSX, useId, useMemo } from "react";
+import { dateLabelCount, rightAxisMargin } from "@/components/charts/axis-fit";
 import { Bar } from "@/components/charts/bar";
 import { BarChart } from "@/components/charts/bar-chart";
 import { BarXAxis } from "@/components/charts/bar-x-axis";
@@ -9,6 +10,7 @@ import { YAxis } from "@/components/charts/y-axis";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { formatNumber, formatTime } from "@/lib/format";
 import type { Lang } from "@/lib/i18n";
+import { bucketLabel, bucketTitle, type TimeBucket } from "@/lib/time-buckets";
 import type { TrafficPoint } from "./aggregate";
 import {
   FAILED_COLOR,
@@ -22,6 +24,8 @@ import { PLOT_HEIGHT } from "./traffic-card";
 // The count labels sit in the right margin (mono chart ticks). The 8 px on the left keeps the
 // first time label, centred on the first bar, inside a phone card's padding.
 const MARGIN = { top: 8, right: 36, bottom: 28, left: 8 };
+/** The minute views' x-axis labels: short clock times. */
+const TIME_LABELS = { base: 3, sm: 4, md: 6 };
 
 export interface TrafficChartLabels {
   succeeded: string;
@@ -35,6 +39,14 @@ export interface TrafficChartLabels {
 /** A traffic bucket plus its retried attempts (the proxy counts those apart from requests). */
 export interface TrafficBar extends TrafficPoint {
   retried: number;
+}
+
+/** All time's calendar bars: dates on the axis and a period title instead of clock times. */
+export interface TrafficPeriod {
+  bucket: TimeBucket;
+  bucketSeconds: number;
+  /** Minutes east of UTC the server bucketed with. */
+  tzOffset: number;
 }
 
 /**
@@ -126,6 +138,7 @@ TrendLine.displayName = "TrendLine";
 export default function TrafficChart({
   bars,
   bucketMin,
+  period,
   lang,
   labels,
   reducedMotion,
@@ -134,6 +147,8 @@ export default function TrafficChart({
 }: {
   bars: TrafficBar[];
   bucketMin: number;
+  /** All time: bars of a day or more, labelled by date. */
+  period?: TrafficPeriod;
   lang: Lang;
   labels: TrafficChartLabels;
   reducedMotion: boolean;
@@ -150,7 +165,9 @@ export default function TrafficChart({
         const start = bar.date.getTime() / 1000;
         const stacked = bar.succeeded + bar.retried + bar.failed;
         return {
-          name: formatTime(start, lang),
+          name: period
+            ? bucketLabel(start, period.bucket, period.tzOffset, lang)
+            : formatTime(start, lang),
           start,
           succeeded: bar.succeeded,
           retried: bar.retried,
@@ -164,7 +181,27 @@ export default function TrafficChart({
               }),
         };
       }),
-    [bars, lang],
+    [bars, lang, period],
+  );
+  // All time: counts past 1,000 can spell long ("1 mil"), and so can dates ("29 de set."); the
+  // minute views keep their fixed margin and labels.
+  const margin = useMemo(
+    () =>
+      period
+        ? {
+            ...MARGIN,
+            right: rightAxisMargin(
+              Math.max(0, ...bars.map((bar) => bar.succeeded + bar.retried + bar.failed)),
+              MARGIN.right,
+              lang,
+            ),
+          }
+        : MARGIN,
+    [bars, period, lang],
+  );
+  const maxLabels = useMemo(
+    () => (period ? dateLabelCount(data.map((datum) => datum.name)) : TIME_LABELS),
+    [data, period],
   );
 
   return (
@@ -175,7 +212,7 @@ export default function TrafficChart({
       barGap={phone ? 0.22 : 0.35}
       className={PLOT_HEIGHT}
       data={data}
-      margin={MARGIN}
+      margin={margin}
       stacked
       stackGap={1}
       status={status}
@@ -213,7 +250,7 @@ export default function TrafficChart({
       />
       {hasPrevious ? <Bar animate={false} dataKey="headroom" fill="transparent" /> : null}
       {hasPrevious && !empty ? <TrendLine dataKey="previous" /> : null}
-      <BarXAxis maxLabels={{ base: 3, sm: 4, md: 6 }} />
+      <BarXAxis maxLabels={maxLabels} />
       {/* An empty chart has nothing to inspect: no tooltip over its empty state. */}
       {empty ? null : (
         <ChartTooltip
@@ -245,10 +282,14 @@ export default function TrafficChart({
             }
             return (
               <TooltipContent
-                meta={labels.bucket}
+                meta={period ? undefined : labels.bucket}
                 mono
                 rows={rows}
-                title={`${formatTime(start, lang)}–${formatTime(start + bucketMin * 60, lang)}`}
+                title={
+                  period
+                    ? bucketTitle(start, period.bucket, period.bucketSeconds, period.tzOffset, lang)
+                    : `${formatTime(start, lang)}–${formatTime(start + bucketMin * 60, lang)}`
+                }
               />
             );
           }}
