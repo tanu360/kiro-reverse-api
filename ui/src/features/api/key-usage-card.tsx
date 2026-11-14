@@ -424,8 +424,12 @@ export function KeyUsageCard(): JSX.Element {
             caption={t("usage.list")}
             cardLayout="grid"
             cardsBelow="4xl"
+            // Rows as tall as the other tables' (Requests 55 px, API keys 57 px), whether or not
+            // a row carries a limit meter.
+            className="[&_tbody_tr]:h-14"
             columns={columns}
             data={pageRows}
+            density="comfortable"
             defaultSortDesc={() => true}
             emptyState={emptyState}
             getRowId={(row) => row.key}
