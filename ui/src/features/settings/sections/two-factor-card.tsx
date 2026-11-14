@@ -188,7 +188,10 @@ function codeError(error: unknown, t: (key: string) => string): string {
   return errorMessage(error, t as never);
 }
 
-/** The six-digit field the dialogs share. */
+/**
+ * The six-digit field the dialogs share. It keeps digits only, at most six: a letter never shows,
+ * and a code pasted as "123 456" lands as "123456".
+ */
 function CodeInput({
   id,
   value,
@@ -212,7 +215,7 @@ function CodeInput({
         id={id}
         inputMode="numeric"
         maxLength={9}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 6))}
         placeholder={t("twoFactor.codePlaceholder")}
         spellCheck={false}
         value={value}

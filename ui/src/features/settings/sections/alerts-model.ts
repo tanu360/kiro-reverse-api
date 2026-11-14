@@ -46,6 +46,14 @@ export function formatThresholds(values: readonly number[]): string {
   return values.join(", ");
 }
 
+/**
+ * What a thresholds field keeps as it is typed or pasted: digits and the separators and "%" that
+ * parseThresholds reads. A letter never reaches the field.
+ */
+export function keepThresholdChars(text: string): string {
+  return text.replace(/[^\d\s,，、;%]/g, "");
+}
+
 /** The rule fields the card edits; the thresholds as typed. */
 export interface RulesForm {
   accountUsage: boolean;

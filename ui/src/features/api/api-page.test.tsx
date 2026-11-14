@@ -133,7 +133,13 @@ describe("ApiPage", () => {
     const dialog = await screen.findByRole("dialog");
     const tokenLimit = within(dialog).getByRole("textbox", { name: "Token limit" });
     await user.clear(tokenLimit);
+    // A whole-number field refuses the decimal mark as it is typed...
     await user.type(tokenLimit, "1.5");
+    expect(tokenLimit).toHaveValue("15");
+    // ...and a pasted fraction is still caught on submit.
+    await user.clear(tokenLimit);
+    await user.click(tokenLimit);
+    await user.paste("1.5");
     await user.click(within(dialog).getByRole("button", { name: "Create API key" }));
     const error = await within(dialog).findByText("Token limit must be a whole number, 0 or more.");
     // Only the failing field is marked and described; the credit limit stays untouched.

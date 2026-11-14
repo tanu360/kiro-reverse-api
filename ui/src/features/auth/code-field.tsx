@@ -34,7 +34,13 @@ export function CodeField({
         inputMode={recovery ? "text" : "numeric"}
         maxLength={recovery ? 32 : 9}
         name={recovery ? "recovery-code" : "one-time-code"}
-        onChange={(event) => onChange(event.target.value)}
+        // The app's code keeps digits only, at most six ("123 456" pasted lands as "123456");
+        // a recovery code ("k7xq2-m9fd4") is letters and digits, so it stays as typed.
+        onChange={(event) =>
+          onChange(
+            recovery ? event.target.value : event.target.value.replace(/\D/g, "").slice(0, 6),
+          )
+        }
         placeholder={recovery ? t("recoveryPlaceholder") : t("codePlaceholder")}
         ref={ref}
         size="lg"

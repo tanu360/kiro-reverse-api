@@ -16,6 +16,10 @@ describe("TwoFactorCard", () => {
     expect(within(dialog).getByText("MZXW 6YTB OI4D GNJQ GEZT SMBV GM2D ONZY")).toBeInTheDocument();
 
     const field = within(dialog).getByLabelText("Code from the app");
+    // Digits only, six at most: letters and the space of a pasted "123 456" never show.
+    await user.type(field, "1a2 3b45-678");
+    expect(field).toHaveValue("123456");
+    await user.clear(field);
     await user.type(field, "000000");
     await user.click(within(dialog).getByRole("button", { name: "Turn on" }));
     expect(

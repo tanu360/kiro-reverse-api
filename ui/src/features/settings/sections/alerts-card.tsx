@@ -83,6 +83,7 @@ import {
   formatThresholds,
   formatUtcMinute,
   invalidRulesFields,
+  keepThresholdChars,
   MAX_CHANNELS,
   NAME_MAX,
   newChannelDraft,
@@ -514,12 +515,15 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
       <SettingsRow
         control={
           <FieldControl error={invalidText("accountThresholds")}>
+            {/* A text keyboard, not the numeric pad: a phone's pad has no comma or space. */}
             <Input
               autoComplete="off"
               id={accountId}
-              inputMode="numeric"
               onChange={(event) =>
-                edit({ accountThresholds: event.target.value }, "accountThresholds")
+                edit(
+                  { accountThresholds: keepThresholdChars(event.target.value) },
+                  "accountThresholds",
+                )
               }
               placeholder={formatThresholds([80, 90, 100])}
               spellCheck={false}
@@ -543,8 +547,9 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
             <Input
               autoComplete="off"
               id={poolId}
-              inputMode="numeric"
-              onChange={(event) => edit({ poolThresholds: event.target.value }, "poolThresholds")}
+              onChange={(event) =>
+                edit({ poolThresholds: keepThresholdChars(event.target.value) }, "poolThresholds")
+              }
               placeholder={formatThresholds([80, 90, 100])}
               spellCheck={false}
               value={draft.value.poolThresholds}

@@ -270,6 +270,14 @@ describe("AlertsCard", () => {
     expect(screen.getByText("Test")).toBeInTheDocument();
   });
 
+  it("keeps letters out of a thresholds field", async () => {
+    const { user } = await renderCard();
+    const thresholds = screen.getByLabelText("Account thresholds (%)");
+    await user.clear(thresholds);
+    await user.type(thresholds, "5a0, 7x5%; 10o0");
+    expect(thresholds).toHaveValue("50, 75%; 100");
+  });
+
   it("blocks Save on thresholds out of order and saves the rules once fixed", async () => {
     const { user } = await renderCard();
     const thresholds = screen.getByLabelText("Account thresholds (%)");
