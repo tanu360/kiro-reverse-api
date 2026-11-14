@@ -144,6 +144,39 @@ CREATE TABLE IF NOT EXISTS error_rollup (
   last_ts     INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (model, account_id)
 );
+
+-- The same totals split by the UTC day of the pruned rows (day = ts / 86400),
+-- written in the transaction that writes the rollups above, so an all-time
+-- chart can still place a pruned row on its day. Rows pruned before these
+-- tables existed are only in the rollups above. keyless is 1 for a request
+-- that sent no API key and 0 for one whose key matched none (both have an
+-- empty api_key_id); the usage by key view tells the two apart.
+CREATE TABLE IF NOT EXISTS request_rollup_daily (
+  day                INTEGER NOT NULL,
+  model              TEXT NOT NULL DEFAULT '',
+  account_id         TEXT NOT NULL DEFAULT '',
+  api_key_id         TEXT NOT NULL DEFAULT '',
+  keyless            INTEGER NOT NULL DEFAULT 0,
+  success            INTEGER NOT NULL DEFAULT 0,
+  request_count      INTEGER NOT NULL DEFAULT 0,
+  in_tokens          INTEGER NOT NULL DEFAULT 0,
+  out_tokens         INTEGER NOT NULL DEFAULT 0,
+  total_tokens       INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+  credits            REAL NOT NULL DEFAULT 0,
+  last_ts            INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, model, account_id, api_key_id, keyless, success)
+);
+
+CREATE TABLE IF NOT EXISTS error_rollup_daily (
+  day         INTEGER NOT NULL,
+  model       TEXT NOT NULL DEFAULT '',
+  account_id  TEXT NOT NULL DEFAULT '',
+  error_count INTEGER NOT NULL DEFAULT 0,
+  last_ts     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, model, account_id)
+);
 `
 
 const pragmas = `

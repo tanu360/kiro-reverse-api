@@ -20,7 +20,9 @@ import (
 // request_rollup or error_rollup and deletes them in one transaction, and the
 // all-time stats (queryPersistedRequestStats, loadModelStatsFromDB) add the
 // rollups back, so no lifetime total drops. Any new all-time SUM or COUNT over
-// requests or errors must add its rollup too.
+// requests or errors must add its rollup too. The same transaction adds the
+// rows to request_rollup_daily or error_rollup_daily by UTC day, which the
+// all-time charts read (usage_alltime.go).
 
 const codeLogRetentionRange = "log_retention_range"
 
@@ -179,6 +181,26 @@ credits = credits + excluded.credits,
 last_ts = MAX(last_ts, excluded.last_ts)`, cutoff, limit); err != nil {
 		return 0, fmt.Errorf("roll up requests: %w", err)
 	}
+	if _, err := tx.Exec(`INSERT INTO request_rollup_daily
+(day, model, account_id, api_key_id, keyless, success, request_count, in_tokens, out_tokens, total_tokens, cache_read_tokens, cache_write_tokens, credits, last_ts)
+SELECT ts / 86400 AS d, model, account_id, api_key_id,
+CASE WHEN api_key_id = '' AND api_key = '' THEN 1 ELSE 0 END AS kl, success, COUNT(*),
+COALESCE(SUM(in_tokens), 0), COALESCE(SUM(out_tokens), 0), COALESCE(SUM(total_tokens), 0),
+COALESCE(SUM(cache_read_tokens), 0), COALESCE(SUM(cache_write_tokens), 0),
+COALESCE(SUM(credits), 0), MAX(ts)
+FROM requests WHERE id IN (`+prunedRequestIDs+`)
+GROUP BY d, model, account_id, api_key_id, kl, success
+ON CONFLICT (day, model, account_id, api_key_id, keyless, success) DO UPDATE SET
+request_count = request_count + excluded.request_count,
+in_tokens = in_tokens + excluded.in_tokens,
+out_tokens = out_tokens + excluded.out_tokens,
+total_tokens = total_tokens + excluded.total_tokens,
+cache_read_tokens = cache_read_tokens + excluded.cache_read_tokens,
+cache_write_tokens = cache_write_tokens + excluded.cache_write_tokens,
+credits = credits + excluded.credits,
+last_ts = MAX(last_ts, excluded.last_ts)`, cutoff, limit); err != nil {
+		return 0, fmt.Errorf("roll up requests by day: %w", err)
+	}
 	res, err := tx.Exec(`DELETE FROM requests WHERE id IN (`+prunedRequestIDs+`)`, cutoff, limit)
 	if err != nil {
 		return 0, fmt.Errorf("delete requests: %w", err)
@@ -209,6 +231,15 @@ error_count = error_count + excluded.error_count,
 last_ts = MAX(last_ts, excluded.last_ts)`, cutoff, limit); err != nil {
 		return 0, fmt.Errorf("roll up errors: %w", err)
 	}
+	if _, err := tx.Exec(`INSERT INTO error_rollup_daily (day, model, account_id, error_count, last_ts)
+SELECT ts / 86400 AS d, model, account_id, COUNT(*), MAX(ts)
+FROM errors WHERE id IN (`+prunedErrorIDs+`)
+GROUP BY d, model, account_id
+ON CONFLICT (day, model, account_id) DO UPDATE SET
+error_count = error_count + excluded.error_count,
+last_ts = MAX(last_ts, excluded.last_ts)`, cutoff, limit); err != nil {
+		return 0, fmt.Errorf("roll up errors by day: %w", err)
+	}
 	res, err := tx.Exec(`DELETE FROM errors WHERE id IN (`+prunedErrorIDs+`)`, cutoff, limit)
 	if err != nil {
 		return 0, fmt.Errorf("delete errors: %w", err)
@@ -223,8 +254,8 @@ last_ts = MAX(last_ts, excluded.last_ts)`, cutoff, limit); err != nil {
 	return n, nil
 }
 
-// resetRequestLog empties the request and error logs and their rollups, in one
-// transaction (Settings > Reset statistics).
+// resetRequestLog empties the request and error logs and their rollups (the
+// daily ones too), in one transaction (Settings > Reset statistics).
 func resetRequestLog() error {
 	d, err := db.Get()
 	if err != nil {
@@ -235,7 +266,7 @@ func resetRequestLog() error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, table := range []string{"requests", "errors", "request_rollup", "error_rollup"} {
+	for _, table := range []string{"requests", "errors", "request_rollup", "error_rollup", "request_rollup_daily", "error_rollup_daily"} {
 		if _, err := tx.Exec(`DELETE FROM ` + table); err != nil {
 			return fmt.Errorf("clear %s: %w", table, err)
 		}
