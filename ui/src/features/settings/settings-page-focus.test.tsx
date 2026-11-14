@@ -239,7 +239,7 @@ describe("settings focus", () => {
         act(async () => {
           await new Promise((resolve) => requestAnimationFrame(resolve));
         });
-      // The name, with "(unsaved changes)" after it once the Space below flips the switch.
+      // The name, and "(unsaved changes)" after it should a key below edit the card.
       const current = (name: string) =>
         expect(within(nav()).getByRole("link", { name: new RegExp(`^${name}`) })).toHaveAttribute(
           "aria-current",
@@ -250,13 +250,13 @@ describe("settings focus", () => {
         current("Log retention");
 
         // A later scroll that the reader did not start keeps it (the cards above it can still
-        // be loading), and so does a key that scrolls nothing (Space on a switch in the card).
+        // be loading), and so does a key that scrolls nothing (Space in the card's days field).
         await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
         window.dispatchEvent(new Event("scroll"));
         await frame();
         current("Log retention");
         const card = section(SECTION_ID.logRetention);
-        within(card).getAllByRole("switch")[0]?.focus();
+        within(card).getByLabelText("Keep entries for (days)").focus();
         await user.keyboard(" ");
         await frame();
         current("Log retention");

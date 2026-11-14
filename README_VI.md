@@ -129,7 +129,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 
 - Cơ sở dữ liệu SQLite một tệp (`modernc.org/sqlite`) tại `kiro.db`, dùng chế độ journal DELETE.
 - Các dòng yêu cầu cuối cùng, cùng bản tổng hợp của các dòng mà tính năng lưu giữ nhật ký đã xóa, là nguồn dữ liệu chuẩn cho tổng số yêu cầu, token, credit, thành công và thất bại trên bảng điều khiển.
-- Lưu giữ nhật ký: các dòng nhật ký yêu cầu và lỗi cũ hơn 90 ngày (từ 1 đến 3650, hoặc giữ vĩnh viễn) bị xóa theo từng lô nhỏ, hai phút sau khi khởi động rồi mỗi ngày một lần.
+- Lưu giữ nhật ký: các dòng nhật ký yêu cầu và lỗi cũ hơn 90 ngày (từ 1 đến 365, hoặc 0 để giữ vĩnh viễn) bị xóa theo từng lô nhỏ, hai phút sau khi khởi động rồi mỗi ngày một lần.
 - Response đã lưu được giữ 30 ngày; việc ghi chạy bất đồng bộ, nằm ngoài đường xử lý chính của yêu cầu.
 - Nội dung yêu cầu được giữ 30 ngày để chạy lại: tối đa 2 MiB mỗi yêu cầu, nén lại, API key của client được che, tổng cộng 256 MiB (cũ nhất bị xóa trước).
 

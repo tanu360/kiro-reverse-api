@@ -432,7 +432,7 @@ func TestLogRetentionAPI(t *testing.T) {
 		}
 		return status
 	}
-	if got := getStatus(); got != (logRetentionStatus{Days: 90, DefaultDays: 90, MaxDays: 3650}) {
+	if got := getStatus(); got != (logRetentionStatus{Days: 90, DefaultDays: 90, MaxDays: 365}) {
 		t.Fatalf("fresh status = %+v", got)
 	}
 
@@ -456,7 +456,7 @@ func TestLogRetentionAPI(t *testing.T) {
 
 	for body, code := range map[string]string{
 		`{"days":-1}`:   codeLogRetentionRange,
-		`{"days":3651}`: codeLogRetentionRange,
+		`{"days":366}`: codeLogRetentionRange,
 		`{}`:            codeLogRetentionRange,
 		`{"days":null}`: codeLogRetentionRange,
 		`{"days":1.5}`:  codeInvalidJSON,
@@ -481,7 +481,7 @@ func TestLogRetentionAPI(t *testing.T) {
 	runLogRetention(now, nil)
 	got := getStatus()
 	want := logRetentionStatus{
-		Days: 30, DefaultDays: 90, MaxDays: 3650,
+		Days: 30, DefaultDays: 90, MaxDays: 365,
 		LastRunAt: now.Unix(), LastPrunedRequests: 50, LastPrunedErrors: 24,
 		ArchivedRequests: 50, OldestRequestTs: now.Unix() - 54*60,
 	}

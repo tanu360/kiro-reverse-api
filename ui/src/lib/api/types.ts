@@ -20,7 +20,7 @@ export interface SuccessResponse {
  * - backup_not_found (404): unknown backup id.
  * - backup_* (400): an upload or stored backup the restore cannot read (`detail`: why).
  * - invalid_cadence / invalid_keep (400): POST /backups/schedule out of range.
- * - log_retention_range (400): POST /log-retention days outside 0..3650.
+ * - log_retention_range (400): POST /log-retention days outside 0..365.
  * - log_level_invalid (400): POST /settings logLevel is not debug, info, warn or error.
  * - self_heal_interval_range / self_heal_rounds_range (400): POST /account-health out of range.
  * - token_refresh_failed, models_refresh_failed, overage_failed, profile_verify_failed,

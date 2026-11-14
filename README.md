@@ -129,7 +129,7 @@ If this project helps you, a Star would mean a lot.
 
 - Single-file SQLite (`modernc.org/sqlite`) database at `kiro.db`, using DELETE journal mode.
 - Final request rows, plus a rollup of the rows that log retention removed, are the source of truth for dashboard request, token, credit, success, and failed totals.
-- Log retention: request and error log rows older than 90 days (1 to 3650, or keep forever) are deleted in small batches, two minutes after start and then daily.
+- Log retention: request and error log rows older than 90 days (1 to 365, or 0 to keep them forever) are deleted in small batches, two minutes after start and then daily.
 - 30-day retention on stored responses, asynchronous writes off the request hot path.
 - Request bodies kept 30 days for replay: up to 2 MiB each, compressed, the client's key masked, 256 MiB in all (the oldest go first).
 

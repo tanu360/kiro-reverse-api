@@ -32,7 +32,7 @@ function saved(): Response {
   return HttpResponse.json(OK);
 }
 const MAX_AUTO_CONTINUE = 10;
-const MAX_LOG_RETENTION_DAYS = 3650;
+const MAX_LOG_RETENTION_DAYS = 365;
 const IMAGE_RESIZE_DIMENSION = { min: 256, max: 4096 };
 const IMAGE_RESIZE_KB = { min: 50, max: 4096 };
 const MAX_ACCOUNT_RPM_LIMIT = 1000;

@@ -12,7 +12,7 @@ export interface LogRetention {
   days: number;
   /** 90: what an install that never set it uses. */
   defaultDays: number;
-  /** 3650. */
+  /** 365; 0 keeps the logs forever. */
   maxDays: number;
   /** Unix seconds of the last prune since the server started; 0 when none ran yet. */
   lastRunAt: number;

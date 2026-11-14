@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, type JSX, type ReactNode, useId, useState } from "react";
 import { RelativeTime } from "@/components/shared/relative-time";
-import { SettingsRow, SwitchField } from "@/components/shared/settings-rows";
+import { SettingsRow } from "@/components/shared/settings-rows";
+import { Badge } from "@/components/ui/badge";
 import { Field, FieldError } from "@/components/ui/field";
 import {
   NumberField,
@@ -42,28 +43,28 @@ export function LogRetentionCard(): JSX.Element {
 
 type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string };
 
-/** The days field. The row's label and description go to the input, not the field's wrapper. */
+/**
+ * The days field, 0 to the server's maximum, 0 keeping every entry. The row's label and
+ * description go to the input, not the field's wrapper.
+ */
 function DaysField({
   id,
   max,
-  disabled,
   value,
   onValueChange,
   ...aria
 }: AriaProps & {
   id: string;
   max: number;
-  disabled: boolean;
   value: number | null;
   onValueChange: (value: number | null) => void;
 }): JSX.Element {
   return (
     <NumberField
       allowOutOfRange
-      disabled={disabled}
       id={id}
       max={max}
-      min={1}
+      min={0}
       onValueChange={onValueChange}
       step={1}
       value={value}
@@ -77,11 +78,9 @@ function DaysField({
   );
 }
 
-/** The switch and the days as the server has them; off keeps the default days ready. */
-function serverDraft(retention: LogRetention): { enabled: boolean; days: number | null } {
-  return retention.days > 0
-    ? { enabled: true, days: retention.days }
-    : { enabled: false, days: retention.defaultDays };
+/** The days as the server has them; 0 keeps every entry forever. */
+function serverDraft(retention: LogRetention): { days: number | null } {
+  return { days: retention.days };
 }
 
 function LogRetentionForm({ retention }: { retention: LogRetention }): JSX.Element {
@@ -92,7 +91,7 @@ function LogRetentionForm({ retention }: { retention: LogRetention }): JSX.Eleme
   const [daysInvalid, setDaysInvalid] = useState(false);
   const { save, saving } = useSectionSave((body: LogRetentionUpdate) => updateLogRetention(body), {
     onSaved: ({ days }) => {
-      draft.commit(days > 0 ? { enabled: true, days } : { ...draft.value, enabled: false });
+      draft.commit({ days });
       queryClient.setQueryData<LogRetention>(queryKeys.settings.logRetention(), (old) =>
         old ? { ...old, days } : old,
       );
@@ -102,12 +101,8 @@ function LogRetentionForm({ retention }: { retention: LogRetention }): JSX.Eleme
   });
 
   const onSubmit = () => {
-    const { enabled, days } = draft.value;
-    if (!enabled) {
-      save({ days: 0 });
-      return;
-    }
-    if (days === null || !Number.isInteger(days) || days < 1 || days > retention.maxDays) {
+    const { days } = draft.value;
+    if (days === null || !Number.isInteger(days) || days < 0 || days > retention.maxDays) {
       setDaysInvalid(true);
       return;
     }
@@ -131,22 +126,12 @@ function LogRetentionForm({ retention }: { retention: LogRetention }): JSX.Eleme
       onSubmit={onSubmit}
       title={t("logRetention")}
     >
-      <SwitchField
-        checked={draft.value.enabled}
-        description={<Hint more={t("logRetentionMore")}>{t("logRetentionHint")}</Hint>}
-        onCheckedChange={(enabled) => {
-          setDaysInvalid(false);
-          draft.set((prev) => ({ ...prev, enabled }));
-        }}
-        title={t("logRetentionEnable")}
-      />
       {/* One Field round the row: it marks the input invalid and adds the error, which sits
           under the description, to the input's description. */}
       <Field className="items-stretch" invalid={daysInvalid}>
         <SettingsRow
           control={
             <DaysField
-              disabled={!draft.value.enabled}
               id={daysId}
               max={retention.maxDays}
               onValueChange={(days) => {
@@ -157,8 +142,19 @@ function LogRetentionForm({ retention }: { retention: LogRetention }): JSX.Eleme
             />
           }
           controlWidth="number"
-          description={t("logRetentionDaysHint", { max: retention.maxDays })}
+          description={
+            <Hint more={t("logRetentionMore")}>
+              {t("logRetentionDaysHint", { max: retention.maxDays })}
+            </Hint>
+          }
           htmlFor={daysId}
+          status={
+            draft.value.days === 0 ? (
+              <Badge size="sm" tone="neutral">
+                {t("logRetentionForever")}
+              </Badge>
+            ) : null
+          }
           title={t("logRetentionDays")}
         >
           {daysInvalid ? (

@@ -4,10 +4,11 @@ import {
   Key01Icon,
   LockPasswordIcon,
   SecurityCheckIcon,
+  ShieldKeyIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type JSX, useId, useState } from "react";
+import { type FormEvent, type JSX, type ReactNode, useId, useMemo, useState } from "react";
 import { Code } from "@/components/shared/code";
 import { CopyButton } from "@/components/shared/copy-button";
 import { PasswordInput } from "@/components/shared/password-input";
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage, serverErrorCode } from "@/lib/api/server-errors";
 import {
@@ -42,8 +44,10 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { SECTION_ID } from "./sections";
 import { SectionQuery, SettingsGroup } from "./settings-section";
+import { parseQrSvg, StyledQr } from "./styled-qr";
 
 /** Settings card for admin two-factor sign-in with an authenticator app. */
 export function TwoFactorCard(): JSX.Element {
@@ -198,25 +202,35 @@ function CodeInput({
   onChange,
   error,
   label,
+  large = false,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
   error: string | null;
   label: string;
+  /**
+   * The setup dialog's field: tall, the digits centred and spaced like a code, its label read
+   * by screen readers only (the step title above says it).
+   */
+  large?: boolean;
 }): JSX.Element {
   const { t } = useT("settings");
   return (
     <Field className="min-w-0 items-stretch" invalid={error !== null}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel className={cn(large && "sr-only")} htmlFor={id}>
+        {label}
+      </FieldLabel>
       <Input
         autoComplete="one-time-code"
         autoFocus
+        className={cn(large && "[&_input]:text-center [&_input]:text-lg [&_input]:tracking-widest")}
         id={id}
         inputMode="numeric"
         maxLength={9}
         onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 6))}
         placeholder={t("twoFactor.codePlaceholder")}
+        size={large ? "lg" : "default"}
         spellCheck={false}
         value={value}
         variant="code"
@@ -322,31 +336,47 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
   }
 
   return (
-    <DialogPopup className="sm:max-w-lg">
+    <DialogPopup className="sm:max-w-xl">
       <form className="contents" noValidate onSubmit={submit}>
         <DialogHeader>
-          <DialogTitle>{t("twoFactor.setupTitle")}</DialogTitle>
-          <DialogDescription>{t("twoFactor.setupHint")}</DialogDescription>
+          {/* The sheet headers' tile: the shield in a soft purple square beside the title. */}
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-info-foreground ring-1 ring-primary/20"
+            >
+              <HugeiconsIcon className="size-5" icon={ShieldKeyIcon} />
+            </span>
+            <div className="flex min-w-0 flex-col gap-1">
+              <DialogTitle>{t("twoFactor.setupTitle")}</DialogTitle>
+              <DialogDescription>{t("twoFactor.setupHint")}</DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <DialogPanel className="flex flex-col gap-4">
-          {setup.isError ? (
-            <Alert role="alert" size="sm" variant="error">
-              <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
-              <AlertDescription>{errorMessage(setup.error, t)}</AlertDescription>
-            </Alert>
-          ) : (
-            <SetupSecret setup={setup.data} />
-          )}
-          <CodeInput
-            error={error}
-            id={codeId}
-            label={t("twoFactor.confirmCode")}
-            onChange={(value) => {
-              setCode(value);
-              setError(null);
-            }}
-            value={code}
-          />
+        <DialogPanel className="flex flex-col gap-6">
+          <SetupStep number={1} title={t("twoFactor.stepScan")}>
+            {setup.isError ? (
+              <Alert role="alert" size="sm" variant="error">
+                <HugeiconsIcon icon={Alert02Icon} aria-hidden="true" />
+                <AlertDescription>{errorMessage(setup.error, t)}</AlertDescription>
+              </Alert>
+            ) : (
+              <SetupSecret setup={setup.data} />
+            )}
+          </SetupStep>
+          <SetupStep number={2} title={t("twoFactor.stepCode")}>
+            <CodeInput
+              error={error}
+              id={codeId}
+              label={t("twoFactor.confirmCode")}
+              large
+              onChange={(value) => {
+                setCode(value);
+                setError(null);
+              }}
+              value={code}
+            />
+          </SetupStep>
         </DialogPanel>
         <DialogFooter>
           <DialogClose render={<Button variant="ghost" />}>
@@ -367,29 +397,63 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
   );
 }
 
+/** One numbered step of the setup dialog: a purple number, its title, then its content. */
+function SetupStep({
+  number,
+  title,
+  children,
+}: {
+  number: number;
+  title: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="flex items-center gap-2 font-medium text-sm">
+        <span
+          aria-hidden="true"
+          className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs tabular-nums"
+        >
+          {number}
+        </span>
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
 /**
- * The QR code and the secret to type. The SVG paints its own white quiet zone, so it reads
- * dark-on-light for a scanner in both themes.
+ * The QR code and the secret to type. The code is drawn in the app's style (StyledQr) on a white
+ * tile in a soft purple frame, so it reads dark-on-light for a scanner in both themes; a QR the
+ * styling cannot read is shown as the server drew it.
  */
 function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
   const { t } = useT("settings");
   const grouped = setup?.secret.replace(/(.{4})/g, "$1 ").trim() ?? "";
+  const modules = useMemo(() => (setup ? parseQrSvg(setup.qrSvg) : null), [setup]);
+  let qr: JSX.Element;
+  if (!setup) qr = <Skeleton className="size-full rounded-xl" />;
+  else if (modules) qr = <StyledQr label={t("twoFactor.qrAlt")} modules={modules} />;
+  else {
+    qr = (
+      <img
+        alt={t("twoFactor.qrAlt")}
+        className="size-full rounded-xl [image-rendering:pixelated]"
+        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(setup.qrSvg)}`}
+      />
+    );
+  }
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-      <div className="size-44 shrink-0 overflow-hidden rounded-lg border border-border-subtle">
-        {setup ? (
-          <img
-            alt={t("twoFactor.qrAlt")}
-            className="size-full [image-rendering:pixelated]"
-            src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(setup.qrSvg)}`}
-          />
-        ) : null}
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+      <div className="size-48 shrink-0 rounded-2xl bg-linear-to-br from-primary/30 via-primary/10 to-primary/5 p-1.5 shadow-sm">
+        {qr}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-2 self-stretch">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 self-stretch sm:justify-center">
         <p className="text-muted-foreground text-xs">{t("twoFactor.secretHint")}</p>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 rounded-lg border border-border-subtle bg-surface-2 py-1 ps-3 pe-1">
           <code
-            className="min-w-0 flex-1 rounded-md bg-surface-2 px-2 py-1.5 font-mono text-sm wrap-anywhere"
+            className="min-w-0 flex-1 py-1 font-mono text-sm tracking-wide wrap-anywhere"
             translate="no"
           >
             {grouped || "…"}

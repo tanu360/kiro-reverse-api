@@ -5,8 +5,8 @@ import "fmt"
 const (
 	// DefaultLogRetentionDays applies while logRetentionDays was never set.
 	DefaultLogRetentionDays = 90
-	// MaxLogRetentionDays is about ten years.
-	MaxLogRetentionDays = 3650
+	// MaxLogRetentionDays is one year; 0 keeps the logs forever instead.
+	MaxLogRetentionDays = 365
 )
 
 // GetLogRetentionDays returns how many days of the request and error logs are

@@ -54,7 +54,8 @@ export function DangerZoneCard(): JSX.Element {
               loading={reset.isPending}
               onClick={() => void onReset()}
               size="sm"
-              variant="danger"
+              // Solid red with a white label in both themes: this one cannot be undone.
+              variant="destructive"
             >
               <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
               {t("resetStats")}

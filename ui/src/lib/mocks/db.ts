@@ -226,7 +226,7 @@ function seedLogRetention(now: number, ran: boolean): LogRetention {
   return {
     days: 90,
     defaultDays: 90,
-    maxDays: 3650,
+    maxDays: 365,
     lastRunAt: ran ? now - 3 * 3600 : 0,
     lastPrunedRequests: ran ? 412 : 0,
     lastPrunedErrors: ran ? 37 : 0,

@@ -129,7 +129,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 
 - Banco de dados SQLite em arquivo único (`modernc.org/sqlite`) em `kiro.db`, no modo de journal DELETE.
 - As linhas finais de requisição, mais um resumo das linhas que a retenção de logs removeu, são a fonte da verdade para os totais de requisições, tokens, créditos, sucessos e falhas do painel.
-- Retenção de logs: linhas do log de requisições e de erros com mais de 90 dias (de 1 a 3650, ou guardar para sempre) são excluídas em pequenos lotes, dois minutos depois da inicialização e depois uma vez por dia.
+- Retenção de logs: linhas do log de requisições e de erros com mais de 90 dias (de 1 a 365, ou 0 para guardar para sempre) são excluídas em pequenos lotes, dois minutos depois da inicialização e depois uma vez por dia.
 - Retenção de 30 dias para respostas armazenadas, com gravações assíncronas fora do caminho crítico da requisição.
 - Corpos das requisições guardados por 30 dias para repetição: até 2 MiB cada, compactados, com a chave do cliente mascarada, 256 MiB no total (os mais antigos saem primeiro).
 

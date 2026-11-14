@@ -91,6 +91,14 @@
   --code-token-property: var(--color-pink-700);
   --code-token-comment: var(--color-neutral-500);
   --code-token-punctuation: var(--color-neutral-500);
+  /*
+   * The two-factor QR code, the same in both themes: a scanner wants dark modules on a light
+   * tile, so the tile stays white on the dark page too. The corner eyes take the deep Kiro
+   * purple of info text (7.4:1 on white), still dark enough to scan.
+   */
+  --qr-tile: var(--color-white);
+  --qr-module: var(--color-zinc-900);
+  --qr-eye: #7a0ecd;
   /* Kiro purple, not blue: purple-700 text is 7.4:1 on white. */
   --info: var(--primary);
   --info-foreground: #7a0ecd;

@@ -41,22 +41,21 @@ afterEach(() => {
 
 async function renderCard() {
   const result = renderWithProviders(<LogRetentionCard />);
-  const toggle = await screen.findByRole("switch", { name: "Delete old log entries" });
+  const days = await screen.findByLabelText("Keep entries for (days)");
   const card = document.getElementById(SECTION_ID.logRetention);
   if (!card) throw new Error("log retention card not rendered");
-  const days = within(card).getByLabelText("Keep entries for (days)");
   const save = within(card).getByRole("button", { name: "Save" });
-  return { ...result, card, toggle, days, save };
+  return { ...result, card, days, save };
 }
 
 describe("LogRetentionCard", () => {
   it("shows the saved days and what the last cleanup did", async () => {
-    const { card, toggle, days, save } = await renderCard();
-    expect(toggle).toHaveAttribute("aria-checked", "true");
+    const { card, days, save } = await renderCard();
+    expect(within(card).queryByRole("switch")).not.toBeInTheDocument();
     expect(days).toHaveValue("90");
-    expect(days).not.toBeDisabled();
     expect(save).toHaveAttribute("aria-disabled", "true");
-    expect(card).toHaveTextContent("Between 1 and 3650.");
+    expect(card).toHaveTextContent("0 to 365; 0 keeps every entry forever.");
+    expect(within(card).queryByText("Kept forever")).not.toBeInTheDocument();
     expect(card).toHaveTextContent("Last cleanup 3 hours ago · 449 entries deleted · Oldest entry");
     expect(card).toHaveTextContent("18,240 deleted requests still counted in totals");
   });
@@ -70,42 +69,35 @@ describe("LogRetentionCard", () => {
     expect(card).not.toHaveTextContent("Last cleanup");
   });
 
-  it("saves 0 days when the switch is turned off", async () => {
-    const { user, toggle, days, save } = await renderCard();
-    await user.click(toggle);
-    expect(days).toBeDisabled();
+  it("saves 0 days to keep every entry forever", async () => {
+    const { user, card, days, save } = await renderCard();
+    await user.clear(days);
+    await user.type(days, "0");
+    expect(within(card).getByText("Kept forever")).toBeInTheDocument();
     await user.click(save);
 
     expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
     expect(await writes()).toEqual([{ method: "POST", path: "/log-retention", body: { days: 0 } }]);
     expect(mockDb.logRetention.days).toBe(0);
     await waitFor(() => expect(save).toHaveAttribute("aria-disabled", "true"));
-    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(days).toHaveValue("0");
   });
 
-  it("starts from the default days when turned on from keep-forever", async () => {
+  it("shows a saved keep-forever as 0 days", async () => {
     mockDb.logRetention.days = 0;
-    const { user, toggle, days, save } = await renderCard();
-    expect(toggle).toHaveAttribute("aria-checked", "false");
-    expect(days).toHaveValue("90");
-    expect(days).toBeDisabled();
-
-    await user.click(toggle);
-    await user.click(save);
-    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
-    expect(await writes()).toEqual([
-      { method: "POST", path: "/log-retention", body: { days: 90 } },
-    ]);
+    const { card, days } = await renderCard();
+    expect(days).toHaveValue("0");
+    expect(within(card).getByText("Kept forever")).toBeInTheDocument();
   });
 
-  it.each(["0", "4000"])("shows a field error for %s days and sends nothing", async (value) => {
+  it("shows a field error past the maximum and sends nothing", async () => {
     const { user, card, days, save } = await renderCard();
     await user.clear(days);
-    await user.type(days, value);
+    await user.type(days, "400");
     await user.click(save);
 
     expect(
-      await within(card).findByText("Days must be a whole number between 1 and 3650."),
+      await within(card).findByText("Days must be a whole number from 0 to 365."),
     ).toBeInTheDocument();
     expect(days).toHaveAttribute("aria-invalid", "true");
     expect(await writes()).toEqual([]);
