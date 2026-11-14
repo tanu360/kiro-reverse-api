@@ -319,12 +319,12 @@ describe("OverviewPage", () => {
       within(ranges)
         .getAllByRole("radio")
         .map((radio) => radio.textContent),
-    ).toEqual(["1h", "6h", "24h", "All time"]);
-    await user.click(within(ranges).getByRole("radio", { name: "All time" }));
+    ).toEqual(["1h", "6h", "24h", "Lifetime"]);
+    await user.click(within(ranges).getByRole("radio", { name: "Lifetime" }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ range: "all" });
     });
-    expect(await within(traffic).findByText("Requests per week, all time")).toBeInTheDocument();
+    expect(await within(traffic).findByText("Requests per week, lifetime")).toBeInTheDocument();
     expect(
       await within(traffic).findByText("47 succeeded and 3 failed requests in this range."),
     ).toBeInTheDocument();
@@ -352,11 +352,11 @@ describe("OverviewPage", () => {
     );
     await renderApp("/?range=all");
     const traffic = await screen.findByRole("region", { name: "Traffic" });
-    expect(within(traffic).getByRole("radio", { name: "All time" })).toHaveAttribute(
+    expect(within(traffic).getByRole("radio", { name: "Lifetime" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
-    expect(await within(traffic).findByText("Requests per day, all time")).toBeInTheDocument();
+    expect(await within(traffic).findByText("Requests per day, lifetime")).toBeInTheDocument();
     expect(
       await within(traffic).findByText(
         "26 older requests have no date, so the chart leaves them out. The totals include them.",

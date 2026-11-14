@@ -105,7 +105,7 @@ If this project helps you, a Star would mean a lot.
 ### 🛡 Admin panel
 
 - React single-page app embedded in the binary; no separate web server to run.
-- Overview dashboard that updates live: four KPI cards (accounts, plan credits, and requests and failures in the last hour), traffic over the last hour, 6 hours, 24 hours or all time as stacked bars, a list of accounts that need attention, traffic by account, a model-mix donut, and the most active accounts. The **Plan credits** card splits Kiro credit use into the part used through the proxy and the part used outside it.
+- Overview dashboard that updates live: four KPI cards (accounts, plan credits, and requests and failures in the last hour), traffic over the last hour, 6 hours, 24 hours or lifetime as stacked bars, a list of accounts that need attention, traffic by account, a model-mix donut, and the most active accounts. The **Plan credits** card splits Kiro credit use into the part used through the proxy and the part used outside it.
 - Accounts with status tabs and counts, filters (plan, auth, region, enabled, tag), search over email, nickname, notes and tags, sorting, batch actions, a detail view, connection tests, live requests per minute and today, a duplicates review, and export.
 - Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history.
 - API page with client API key management (optional custom key values, enable/disable, per-key token, credit and call limits, account binding, regenerate, usage reset), a **Usage by key** chart, and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
@@ -285,7 +285,7 @@ Require API keys from the **API** page (**API access → Require an API key**). 
 - **Call limit** counts successful calls only; failed requests, `/v1/models` and `count_tokens` do not count. A key that used all its calls gets HTTP 429 until you raise the limit or reset usage.
 - **Accounts → Only selected accounts** binds a key to some accounts. Its requests use only those accounts, never another one (HTTP 503 when none of them is available), and its model list shows only the models they serve.
 - **Regenerate key** gives a key a new value, and the old value stops working at once. The name, limits, accounts and usage stay.
-- **Usage by key** charts each key's requests, tokens and credits over 24 hours, 7 days, 30 days or all time, split into succeeded and failed, with separate rows for requests without a key, invalid keys and deleted keys.
+- **Usage by key** charts each key's requests, tokens and credits over 24 hours, 7 days, 30 days or lifetime, split into succeeded and failed, with separate rows for requests without a key, invalid keys and deleted keys.
 
 ---
 

@@ -1,7 +1,14 @@
 import { CommandLineIcon, InfoIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { type ComponentProps, type JSX, type SVGProps, useMemo, useState } from "react";
+import {
+  type ComponentProps,
+  type CSSProperties,
+  type JSX,
+  type SVGProps,
+  useMemo,
+  useState,
+} from "react";
 import { CodeBlock } from "@/components/shared/code-block";
 import {
   CSharpLogo,
@@ -19,6 +26,7 @@ import { ROW_DESCRIPTION } from "@/components/shared/settings-rows";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
 import { settingsQuery } from "@/lib/api/settings";
@@ -51,6 +59,13 @@ const API_PROVIDERS: Record<SnippetApi, { name: string; maker: "claude" | "opena
   chat: { name: "OpenAI", maker: "openai" },
   responses: { name: "OpenAI", maker: "openai" },
 };
+
+/** Each API wears its sticker from the sign-in showcase (index.css --sticker-*): peach, lime, periwinkle. */
+const API_STICKERS: Record<SnippetApi, CSSProperties> = {
+  messages: { "--tile-bg": "var(--sticker-claude)", "--tile-fg": "var(--sticker-claude-fg)" },
+  chat: { "--tile-bg": "var(--sticker-openai)", "--tile-fg": "var(--sticker-openai-fg)" },
+  responses: { "--tile-bg": "var(--sticker-codex)", "--tile-fg": "var(--sticker-codex-fg)" },
+} as Record<SnippetApi, CSSProperties>;
 
 const LANGUAGE_LOGOS: Record<SnippetLanguage, Mark> = {
   curl: CurlLogo,
@@ -173,16 +188,17 @@ function Hint({ children }: { children: JSX.Element | string }): JSX.Element {
 const LANGUAGE_CHIP =
   "inline-flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-full px-3 font-medium text-sm outline-none transition-colors focus-visible:focus-outline data-checked:bg-foreground data-checked:text-background data-unchecked:text-muted-foreground data-unchecked:shadow-[inset_0_0_0_1px_var(--border)] data-unchecked:hover:bg-accent data-unchecked:hover:text-foreground";
 
-// The ChoiceCard look (choice-card.tsx) on the radio itself, one 36 px line (the default control
-// height): the logo beside the name, muted until checked, then the accent fill and primary edge.
-// Phones drop the logo so "Completions" fits a third of the row.
+// One 36 px line (the default control height) in the API's sticker colours, as the sign-in
+// showcase's labels: the pastel fill and its dark label. The picked one gets a 2 px edge in the
+// label colour; the others a faint one that darkens on hover. Phones drop the logo so
+// "Completions" fits a third of the row.
 const API_TILE =
-  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:focus-outline data-checked:border-primary/48 data-checked:bg-accent data-checked:text-foreground max-sm:px-2";
+  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) px-3 font-medium text-(--tile-fg) text-sm outline-none transition-shadow focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_2px_var(--tile-fg)] data-unchecked:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_16%,transparent)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_48%,transparent)] max-sm:px-2";
 
 /*
  * Pick an API and a language; in Python and Node.js a switch in the code block's strip trades
  * the official SDK for the plain HTTP client. The tiles, the language chips and the code sit
- * 16 px apart, and the chips wrap instead of scrolling, so none is ever cut off.
+ * 16 px apart. The chips stay on one line and scroll sideways, with faded edges where more hide.
  */
 function RequestBuilder({ origin }: { origin: string }): JSX.Element {
   const { t } = useT("api");
@@ -214,6 +230,7 @@ function RequestBuilder({ origin }: { origin: string }): JSX.Element {
               aria-label={`${provider.name} ${name}`}
               className={API_TILE}
               key={api}
+              style={API_STICKERS[api]}
               value={api}
             >
               <MakerLogo className="max-sm:hidden" maker={provider.maker} />
@@ -223,23 +240,26 @@ function RequestBuilder({ origin }: { origin: string }): JSX.Element {
         })}
       </RadioGroupPrimitive>
 
-      {/* All eight in view: a card too narrow for one row wraps them onto the next. */}
-      <RadioGroupPrimitive
-        aria-label={t("snippets.language")}
-        className="flex min-w-0 flex-wrap gap-2"
-        onValueChange={(language) => update({ language: language as SnippetLanguage })}
-        value={choice.language}
-      >
-        {SNIPPET_LANGUAGES.map((language) => {
-          const Logo = LANGUAGE_LOGOS[language];
-          return (
-            <RadioPrimitive.Root className={LANGUAGE_CHIP} key={language} value={language}>
-              <Logo className="size-4 shrink-0" />
-              {t(`snippets.lang.${language}`)}
-            </RadioPrimitive.Root>
-          );
-        })}
-      </RadioGroupPrimitive>
+      {/* One line: a card too narrow for all eight scrolls them sideways. The 4 px bleed (-m-1
+          with p-1 inside) keeps the chips' focus outline unclipped. */}
+      <ScrollArea className="-m-1 h-auto w-auto min-w-0" scrollFade scrollbarGutter="overlap">
+        <RadioGroupPrimitive
+          aria-label={t("snippets.language")}
+          className="flex w-max gap-2 p-1"
+          onValueChange={(language) => update({ language: language as SnippetLanguage })}
+          value={choice.language}
+        >
+          {SNIPPET_LANGUAGES.map((language) => {
+            const Logo = LANGUAGE_LOGOS[language];
+            return (
+              <RadioPrimitive.Root className={LANGUAGE_CHIP} key={language} value={language}>
+                <Logo className="size-4 shrink-0" />
+                {t(`snippets.lang.${language}`)}
+              </RadioPrimitive.Root>
+            );
+          })}
+        </RadioGroupPrimitive>
+      </ScrollArea>
 
       <Snippet
         actions={

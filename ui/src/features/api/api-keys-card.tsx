@@ -473,7 +473,16 @@ export function ApiKeysCard(): JSX.Element {
             getRowId={(apiKey) => apiKey.id}
             inset
             loading={keys.isPending}
+            // A row opens the key's usage sheet, as an account row opens its details.
+            onRowClick={(apiKey) =>
+              setUsageFor((current) => ({
+                apiKey,
+                open: true,
+                session: (current?.session ?? 0) + 1,
+              }))
+            }
             renderCard={renderCard}
+            rowLabel={(apiKey) => t("usage.open", { name: keyName(apiKey, t, mask) })}
           />
         )}
       </div>

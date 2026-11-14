@@ -172,8 +172,8 @@ describe("ApiKeyUsageSheet", () => {
     expect(await within(sheet).findByText("Per hour, last 24 hours")).toBeInTheDocument();
     expect(within(sheet).queryByText(/have no date/u)).toBeNull();
 
-    await user.click(within(sheet).getByRole("radio", { name: "All time" }));
-    expect(await within(sheet).findByText("Per month, all time")).toBeInTheDocument();
+    await user.click(within(sheet).getByRole("radio", { name: "Lifetime" }));
+    expect(await within(sheet).findByText("Per month, lifetime")).toBeInTheDocument();
     // The legend totals count every request; the bars leave out the 1,200 without a date.
     expect(within(legend(sheet)).getByText("1,203")).toBeInTheDocument();
     expect(

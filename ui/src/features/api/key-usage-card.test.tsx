@@ -75,15 +75,18 @@ async function card(): Promise<HTMLElement> {
   return screen.findByRole("region", { name: "Usage by key" });
 }
 
-/** The row names in list order (the open buttons carry "View usage for …"). */
+/** The table (a phone's cards render too, hidden by a container query jsdom does not apply). */
+async function usageTable(region: HTMLElement): Promise<HTMLElement> {
+  return within(region).findByRole("table", { name: "API keys by usage" });
+}
+
+/** The row names in table order (each row says "View usage for …"; the folded row "Show all …"). */
 async function rowNames(region: HTMLElement): Promise<string[]> {
-  const list = await within(region).findByRole("list", { name: "API keys by usage" });
-  return within(list)
-    .getAllByRole("listitem")
-    .map((item) => {
-      const open = within(item).queryByRole("button");
-      return open?.getAttribute("aria-label") ?? item.textContent ?? "";
-    });
+  const table = await usageTable(region);
+  return within(table)
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) => row.getAttribute("aria-label") ?? row.textContent ?? "");
 }
 
 describe("KeyUsageCard", () => {
@@ -110,20 +113,20 @@ describe("KeyUsageCard", () => {
       "View usage for beta",
     ]);
     expect(within(region).getByText("24 requests")).toBeInTheDocument();
-    expect(within(region).getByText("2 failed")).toBeInTheDocument();
+    const table = await usageTable(region);
+    expect(within(table).getByText("2 failed")).toBeInTheDocument();
 
-    await user.click(within(region).getByRole("radio", { name: "Credits" }));
+    await user.click(within(table).getByRole("button", { name: "Credits" }));
     expect(await rowNames(region)).toEqual([
       "View usage for beta",
       "View usage for gamma",
       "View usage for alpha",
     ]);
     expect(within(region).getByText("4.75 credits")).toBeInTheDocument();
-    expect(within(region).getByText("3.25")).toBeInTheDocument();
-    expect(within(region).getByText("12 requests")).toBeInTheDocument();
+    expect(within(table).getByText("3.25")).toBeInTheDocument();
     // alpha failed 2 of 12; beta and gamma failed none.
-    expect(within(region).getByText("16.7%")).toBeInTheDocument();
-    expect(within(region).getAllByText("0%")).toHaveLength(2);
+    expect(within(table).getByText("16.7%")).toBeInTheDocument();
+    expect(within(table).getAllByText("0%")).toHaveLength(2);
   });
 
   it("folds keys after the top five into one row", async () => {
@@ -136,7 +139,8 @@ describe("KeyUsageCard", () => {
     const names = await rowNames(await card());
     expect(names).toHaveLength(6);
     expect(names[4]).toBe("View usage for key-e");
-    expect(names[5]).toContain("2 other keys");
+    // The folded row opens the full list.
+    expect(names[5]).toBe("Show all 7 keys");
   });
 
   it("labels no-key, invalid and deleted rows", async () => {
@@ -156,10 +160,11 @@ describe("KeyUsageCard", () => {
       "View usage for sk-unn****5678",
     ]);
     // Two deleted keys differ only in their masked values: the name is cut, never the key.
-    const deletedKey = within(region).getByText("sk-del****1234");
+    const table = await usageTable(region);
+    const deletedKey = within(table).getByText("sk-del****1234");
     expect(deletedKey).toHaveClass("shrink-0");
     expect(deletedKey).not.toHaveClass("truncate");
-    expect(within(region).getByText("3 failed")).toBeInTheDocument();
+    expect(within(table).getByText("3 failed")).toBeInTheDocument();
     expect(within(region).queryByText(/Turn on Require an API key/)).toBeNull();
   });
 
@@ -220,7 +225,7 @@ describe("KeyUsageCard", () => {
       within(group)
         .getAllByRole("radio")
         .map((radio) => radio.textContent),
-    ).toEqual(["24h", "7d", "30d", "All time"]);
+    ).toEqual(["24h", "7d", "30d", "Lifetime"]);
 
     // All time counts the totals of pruned rows too, so it is never below 30 days.
     served = {
@@ -228,12 +233,12 @@ describe("KeyUsageCard", () => {
       bucket: "week",
       bucketSeconds: 604800,
     };
-    await user.click(within(group).getByRole("radio", { name: "All time" }));
+    await user.click(within(group).getByRole("radio", { name: "Lifetime" }));
     await waitFor(() => expect(ranges).toEqual(["24h", "all"]));
     // The total and the only row's screen-reader value say the same.
     expect(await within(region).findAllByText("1,234 requests")).not.toHaveLength(0);
-    expect(within(region).getByText("All time, from the request log")).toBeInTheDocument();
-    expect(within(group).getByRole("radio", { name: "All time" })).toBeChecked();
+    expect(within(region).getByText("Lifetime, from the request log")).toBeInTheDocument();
+    expect(within(group).getByRole("radio", { name: "Lifetime" })).toBeChecked();
   });
 
   it("opens the sheet on All time when the card shows it", async () => {
@@ -241,12 +246,12 @@ describe("KeyUsageCard", () => {
     const { user } = renderWithProviders(<KeyUsageCard />);
     const region = await card();
     await rowNames(region);
-    await user.click(within(region).getByRole("radio", { name: "All time" }));
+    await user.click(within(region).getByRole("radio", { name: "Lifetime" }));
     await waitFor(() => expect(ranges).toEqual(["24h", "all"]));
-    await user.click(await within(region).findByRole("button", { name: "View usage for alpha" }));
+    await user.click(await within(region).findByRole("row", { name: "View usage for alpha" }));
     const sheet = await screen.findByRole("dialog", { name: "alpha" });
-    expect(within(sheet).getByRole("radio", { name: "All time" })).toBeChecked();
-    expect(await within(sheet).findByText("Per day, all time")).toBeInTheDocument();
+    expect(within(sheet).getByRole("radio", { name: "Lifetime" })).toBeChecked();
+    expect(await within(sheet).findByText("Per day, lifetime")).toBeInTheDocument();
   });
 
   it("shows a retry when the usage fails to load", async () => {
@@ -268,7 +273,7 @@ describe("KeyUsageCard", () => {
     ]);
     const { user } = renderWithProviders(<KeyUsageCard />);
     const region = await card();
-    await user.click(await within(region).findByRole("button", { name: "View usage for alpha" }));
+    await user.click(await within(region).findByRole("row", { name: "View usage for alpha" }));
     const sheet = await screen.findByRole("dialog", { name: "alpha" });
     expect(within(sheet).getByText("sk-alp****0001")).toBeInTheDocument();
     expect(ranges).toEqual(["24h"]);

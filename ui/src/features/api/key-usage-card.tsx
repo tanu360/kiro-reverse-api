@@ -2,55 +2,61 @@ import { ChartColumnIcon, MoreHorizontalCircle01Icon } from "@hugeicons/core-fre
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, type ReactNode, useMemo, useState } from "react";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableSort,
+} from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import { Skeleton } from "@/components/ui/skeleton";
-import { MODEL_COLORS, OTHER_MODEL_COLOR, TRACK_COLOR } from "@/features/overview/colors";
-import { LazySparkline } from "@/features/overview/lazy-sparkline";
 import {
   API_KEY_USAGE_RANGES,
   type ApiKeyUsageRange,
   type ApiKeyUsageTotals,
   apiKeyUsageQuery,
 } from "@/lib/api/api-key-usage";
+import { apiKeysQuery } from "@/lib/api/api-keys";
 import { settingsQuery } from "@/lib/api/settings";
-import { formatCredits, formatFraction, formatNumber, formatPercent } from "@/lib/format";
-import { useT } from "@/lib/i18n";
-import { placeholderKeys } from "@/lib/utils";
-import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
+import type { ApiKey } from "@/lib/api/types";
 import {
-  addTotals,
-  CARD_METRICS,
-  EMPTY_TOTALS,
-  entryRef,
-  isUsageMetric,
-  metricAmount,
-  rankEntries,
-  TOP_KEYS,
-  type UsageMetric,
-} from "./key-usage-model";
+  formatCompact,
+  formatCredits,
+  formatFraction,
+  formatNumber,
+  formatPercent,
+} from "@/lib/format";
+import { useT } from "@/lib/i18n";
+import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
+import { addTotals, EMPTY_TOTALS, entryRef, TOP_KEYS } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
 
-/** A full list's rows while loading: the top keys and the others. */
-const ROW_PLACEHOLDERS = placeholderKeys("row", TOP_KEYS + 1);
+/** A failure rate from this share up reads as a problem: the badge turns red. */
+const HIGH_FAILURE_RATE = 0.05;
+/** A limit used past this share turns its meter amber; a spent one turns it red. */
+const LIMIT_WARNING = 0.75;
+
+type SortColumn = "requests" | "failed" | "credits" | "tokens" | "lastUsed";
+const SORT_COLUMNS: readonly SortColumn[] = ["requests", "failed", "credits", "tokens", "lastUsed"];
+const DEFAULT_SORT: DataTableSort = { id: "requests", desc: true };
 
 function isRange(value: unknown): value is ApiKeyUsageRange {
   return typeof value === "string" && (API_KEY_USAGE_RANGES as readonly string[]).includes(value);
 }
 
-/** A failure rate from this share up reads as a problem: the badge turns red. */
-const HIGH_FAILURE_RATE = 0.05;
+function isSortColumn(value: string): value is SortColumn {
+  return (SORT_COLUMNS as readonly string[]).includes(value);
+}
 
-/**
- * One grid for the column heads and every row. A phone shows the key, the measure picked and the
- * failure rate; a wider card adds the trend, and requests and credits each get a column.
- */
-const ROW_GRID =
-  "grid grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-x-4 [grid-template-areas:'name_value_failed'] @lg:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_5.5rem_4.5rem_5rem] @lg:[grid-template-areas:'name_trend_requests_failed_credits']";
+function failureRate(totals: ApiKeyUsageTotals): number {
+  return totals.requests > 0 ? totals.failed / totals.requests : 0;
+}
 
 interface Row {
   key: string;
@@ -62,10 +68,8 @@ interface Row {
   identity?: UsageIdentity;
   other: boolean;
   totals: ApiKeyUsageTotals;
-  /** One per bucket, oldest first: the trend line. */
-  series: readonly ApiKeyUsageTotals[];
-  /** The row's series colour, by rank as the Overview's traffic by account. */
-  color: string;
+  /** The configured key behind a "key" entry: its last use and limits. */
+  apiKey?: ApiKey;
 }
 
 interface SheetState {
@@ -77,27 +81,59 @@ interface SheetState {
   session: number;
 }
 
+/** A sort value; rows without one (no last use) sort after every row that has it. */
+function sortValue(row: Row, column: SortColumn): number {
+  switch (column) {
+    case "failed":
+      return failureRate(row.totals);
+    case "credits":
+      return row.totals.credits;
+    case "tokens":
+      return row.totals.tokens;
+    case "lastUsed":
+      return row.apiKey?.lastUsedAt ?? -1;
+    default:
+      return row.totals.requests;
+  }
+}
+
+/** The key's first limit that is set, in the order the key form lists them: credits, tokens, calls. */
+function firstLimit(
+  apiKey: ApiKey,
+): { kind: "credits" | "tokens" | "calls"; used: number; limit: number } | null {
+  if (apiKey.creditLimit)
+    return { kind: "credits", used: apiKey.creditsUsed, limit: apiKey.creditLimit };
+  if (apiKey.tokenLimit)
+    return { kind: "tokens", used: apiKey.tokensUsed, limit: apiKey.tokenLimit };
+  if (apiKey.callLimit) {
+    return { kind: "calls", used: apiKey.successfulCalls ?? 0, limit: apiKey.callLimit };
+  }
+  return null;
+}
+
 /**
- * Usage by key over 24 hours, 7 or 30 days or all time, from the request log (All time adds the
- * totals log retention kept of pruned rows): the five busiest keys by requests or credits, the
- * rest as one row. Each row has a share bar under the name, a trend line over the range, and its
- * requests, failure rate and credits. No API key, invalid keys and deleted keys are rows of their
- * own. A row opens that key's usage chart.
+ * Usage by key over 24 hours, 7 or 30 days or the lifetime, from the request log (Lifetime adds
+ * the totals log retention kept of pruned rows), as a table sorted by any number: requests,
+ * failure rate, credits, tokens or last use, with how much of its limit each key has used. The
+ * five first rows show, the rest fold into one row until "Show all". No API key, invalid keys and
+ * deleted keys are rows of their own. A row opens that key's usage sheet; a phone gets cards.
  */
 export function KeyUsageCard(): JSX.Element {
   const { t, lang } = useT("api");
   const label = useUsageLabel();
   const [range, setRange] = useState<ApiKeyUsageRange>("24h");
-  const [metric, setMetric] = useState<UsageMetric>("requests");
+  const [sort, setSort] = useState<DataTableSort>(DEFAULT_SORT);
+  const [expanded, setExpanded] = useState(false);
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const query = useQuery(apiKeyUsageQuery(range));
+  const keys = useQuery(apiKeysQuery());
   const settings = useQuery(settingsQuery());
   const data = query.data;
 
-  const rows = useMemo((): Row[] => {
+  const allRows = useMemo((): Row[] => {
     if (!data) return [];
-    const ranked = rankEntries(data.keys, metric);
-    const named: Row[] = ranked.rows.map((entry, index) => {
+    const byId = new Map((keys.data ?? []).map((apiKey) => [apiKey.id, apiKey]));
+    return data.keys.map((entry) => {
       const shown = label(entry);
       let text: ReactNode;
       if (shown.group) {
@@ -123,7 +159,7 @@ export function KeyUsageCard(): JSX.Element {
         icon: (
           <HugeiconsIcon
             aria-hidden="true"
-            className="size-4 text-muted-foreground"
+            className="size-4 shrink-0 text-muted-foreground"
             icon={shown.icon}
           />
         ),
@@ -134,28 +170,32 @@ export function KeyUsageCard(): JSX.Element {
         identity: { kind: entry.kind, name: entry.name, keyMasked: entry.keyMasked },
         other: false,
         totals: entry.totals,
-        series: entry.series,
-        color: MODEL_COLORS[index % MODEL_COLORS.length],
+        apiKey: entry.kind === "key" ? byId.get(entry.id) : undefined,
       };
     });
-    if (!ranked.other) return named;
-    const count = ranked.other.count;
-    const shown = new Set(ranked.rows.map(entryRef));
-    const rest = data.keys.filter((entry) => !shown.has(entryRef(entry)));
-    const otherSeries = data.buckets.map((_, index) =>
-      rest.reduce(
-        (sum, entry) => addTotals(sum, entry.series[index] ?? EMPTY_TOTALS),
-        EMPTY_TOTALS,
-      ),
+  }, [data, keys.data, label, t]);
+
+  const rows = useMemo((): Row[] => {
+    const column: SortColumn = isSortColumn(sort.id) ? sort.id : "requests";
+    const sign = sort.desc ? -1 : 1;
+    // Ties fall back to requests, then to the handle, so rows never reorder on a refetch.
+    const sorted = [...allRows].sort(
+      (a, b) =>
+        sign * (sortValue(a, column) - sortValue(b, column)) ||
+        b.totals.requests - a.totals.requests ||
+        (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
     );
+    if (expanded || sorted.length <= TOP_KEYS + 1) return sorted;
+    const rest = sorted.slice(TOP_KEYS);
+    const count = rest.length;
     return [
-      ...named,
+      ...sorted.slice(0, TOP_KEYS),
       {
         key: "other",
         icon: (
           <HugeiconsIcon
             aria-hidden="true"
-            className="size-4 text-muted-foreground"
+            className="size-4 shrink-0 text-muted-foreground"
             icon={MoreHorizontalCircle01Icon}
           />
         ),
@@ -165,18 +205,11 @@ export function KeyUsageCard(): JSX.Element {
           </span>
         ),
         other: true,
-        totals: ranked.other.totals,
-        series: otherSeries,
-        color: OTHER_MODEL_COLOR,
+        totals: rest.reduce((sum, row) => addTotals(sum, row.totals), EMPTY_TOTALS),
       },
     ];
-  }, [data, metric, label, t, lang]);
+  }, [allRows, sort, expanded, t, lang]);
 
-  // The busiest named row fills the track; the others row is capped at full width.
-  const scale = Math.max(
-    1e-9,
-    ...rows.filter((row) => !row.other).map((row) => metricAmount(row.totals, metric)),
-  );
   const onlyKeyless =
     data !== undefined && data.keys.length > 0 && data.keys.every((entry) => entry.kind === "none");
   // Keyless traffic means the requirement is off, or, with it on, clients that send no key and
@@ -195,21 +228,139 @@ export function KeyUsageCard(): JSX.Element {
     }));
   };
 
-  const skeleton = (
-    <ul aria-hidden="true" className="flex flex-col gap-3 py-1">
-      {ROW_PLACEHOLDERS.map((key) => (
-        <li className="flex items-center gap-4" key={key}>
-          <Skeleton className="h-4 w-40 shrink-0" />
-          <Skeleton className="h-3 flex-1 rounded-sm" />
-          <Skeleton className="h-4 w-12 shrink-0" />
-        </li>
-      ))}
-    </ul>
+  const failedCell = (row: Row): ReactNode => {
+    if (row.totals.requests === 0) return <span className="text-muted-foreground">—</span>;
+    const rate = failureRate(row.totals);
+    return (
+      <>
+        <span className="sr-only">
+          {t("usage.failedCount", {
+            count: row.totals.failed,
+            n: formatNumber(row.totals.failed, lang),
+          })}
+        </span>
+        <Badge
+          aria-hidden="true"
+          className="tabular-nums"
+          size="sm"
+          tone={rate >= HIGH_FAILURE_RATE ? "destructive" : "neutral"}
+        >
+          {/* One decimal keeps the column narrow; no failures read 0%, not 0.0%. */}
+          {row.totals.failed > 0
+            ? formatFraction(rate, 1, lang)
+            : formatPercent(0, row.totals.requests, lang)}
+        </Badge>
+      </>
+    );
+  };
+
+  const limitCell = (row: Row): ReactNode => {
+    if (!row.apiKey) return <span className="text-muted-foreground">—</span>;
+    const limit = firstLimit(row.apiKey);
+    if (!limit)
+      return <span className="text-muted-foreground text-xs">{t("common:unlimited")}</span>;
+    const share = limit.limit > 0 ? limit.used / limit.limit : 0;
+    // The exact amounts for a screen reader; the cell shows 95.1M / 100M so the column stays narrow.
+    const exact = (value: number) =>
+      limit.kind === "credits" ? formatCredits(value, 2, lang) : formatNumber(value, lang);
+    const format = (value: number) =>
+      limit.kind === "credits" && value < 1000
+        ? formatCredits(value, 2, lang)
+        : formatCompact(value, lang);
+    return (
+      <Meter
+        aria-label={t(`keys.${limit.kind}Usage`, {
+          used: exact(limit.used),
+          limit: exact(limit.limit),
+        })}
+        className="w-32 gap-1"
+        max={limit.limit}
+        value={Math.min(limit.used, limit.limit)}
+      >
+        <span className="flex justify-between gap-2 text-meta">
+          <span className="text-muted-foreground">{t(`keys.${limit.kind}`)}</span>
+          <span className="tabular-nums">
+            {t("usage.limitValue", { used: format(limit.used), limit: format(limit.limit) })}
+          </span>
+        </span>
+        <MeterTrack>
+          <MeterIndicator
+            tone={share >= 1 ? "destructive" : share >= LIMIT_WARNING ? "warning" : "default"}
+          />
+        </MeterTrack>
+      </Meter>
+    );
+  };
+
+  const lastUsedCell = (row: Row): ReactNode =>
+    row.apiKey?.lastUsedAt ? (
+      <RelativeTime value={row.apiKey.lastUsedAt} />
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    );
+
+  const nameCell = (row: Row): ReactNode => (
+    <span className="flex min-w-0 items-center gap-2.5">
+      {row.icon}
+      <span className="flex min-w-0 items-baseline gap-2">{row.label}</span>
+    </span>
+  );
+
+  const columns: DataTableColumn<Row>[] = [
+    {
+      id: "key",
+      header: t("usage.col.key"),
+      // Takes the width the numbers leave and cuts a long name.
+      className: "w-full max-w-0",
+      cell: nameCell,
+    },
+    {
+      id: "requests",
+      header: t("usage.metric.requests"),
+      sortable: true,
+      align: "end",
+      cell: (row) => <span className="font-medium">{formatNumber(row.totals.requests, lang)}</span>,
+    },
+    { id: "failed", header: t("usage.failed"), sortable: true, align: "end", cell: failedCell },
+    {
+      id: "credits",
+      header: t("usage.metric.credits"),
+      sortable: true,
+      align: "end",
+      cell: (row) => formatCredits(row.totals.credits, 2, lang),
+    },
+    {
+      id: "tokens",
+      header: t("usage.metric.tokens"),
+      sortable: true,
+      align: "end",
+      cell: (row) => formatCompact(row.totals.tokens, lang),
+    },
+    { id: "lastUsed", header: t("keys.lastUsed"), sortable: true, cell: lastUsedCell },
+    { id: "limit", header: t("usage.col.limit"), cell: limitCell },
+  ];
+
+  // A phone's row: the name and requests, then the failure rate, credits and last use.
+  const renderCard = (row: Row): ReactNode => (
+    <div className="flex min-w-0 flex-col gap-1.5 text-sm">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        {nameCell(row)}
+        <span className="shrink-0 font-medium tabular-nums">
+          {formatNumber(row.totals.requests, lang)}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-muted-foreground tabular-nums">
+        {failedCell(row)}
+        <span>{t("usage.creditsTotal", { n: formatCredits(row.totals.credits, 2, lang) })}</span>
+        {row.apiKey?.lastUsedAt ? <RelativeTime value={row.apiKey.lastUsedAt} /> : null}
+      </div>
+      {row.apiKey && firstLimit(row.apiKey) ? limitCell(row) : null}
+    </div>
   );
 
   let body: JSX.Element;
-  if (!data) {
-    body = query.isError ? (
+  if (!data && query.isError) {
+    body = (
       <ErrorState
         compact
         error={query.error}
@@ -217,10 +368,8 @@ export function KeyUsageCard(): JSX.Element {
         retrying={query.isFetching}
         title={t("usage.loadFailed")}
       />
-    ) : (
-      skeleton
     );
-  } else if (data.keys.length === 0) {
+  } else if (data && data.keys.length === 0) {
     body = (
       <EmptyState
         description={t("usage.emptyBody")}
@@ -230,9 +379,10 @@ export function KeyUsageCard(): JSX.Element {
       />
     );
   } else {
+    const hidden = allRows.length - TOP_KEYS;
     body = (
-      <div className="flex flex-col gap-4">
-        {query.isError ? (
+      <div className="flex flex-col gap-3">
+        {data && query.isError ? (
           <ErrorState
             compact
             error={query.error}
@@ -241,152 +391,53 @@ export function KeyUsageCard(): JSX.Element {
             title={t("usage.loadFailed")}
           />
         ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* A radio group: one tab stop, the arrow keys switch the measure. */}
-          <SegmentedControl
-            render={
-              <RadioGroupPrimitive
-                aria-label={t("usage.metric")}
-                onValueChange={(next) => {
-                  if (isUsageMetric(next, CARD_METRICS)) setMetric(next);
-                }}
-                value={metric}
-              />
-            }
-            size="sm"
-          >
-            {CARD_METRICS.map((item) => (
-              <SegmentedControlItem key={item} render={<RadioPrimitive.Root value={item} />}>
-                {t(`usage.metric.${item}`)}
-              </SegmentedControlItem>
-            ))}
-          </SegmentedControl>
-          <span className="text-muted-foreground text-sm tabular-nums">
-            {metric === "credits"
-              ? t("usage.creditsTotal", { n: formatCredits(data.totals.credits, 2, lang) })
-              : t("usage.requestsCount", {
-                  count: data.totals.requests,
-                  n: formatNumber(data.totals.requests, lang),
-                })}
-          </span>
-        </div>
-        <div className="-mx-2 flex flex-col gap-1">
-          {/* Column heads for sighted readers; each value also carries its name for a screen reader. */}
-          <div aria-hidden="true" className={`${ROW_GRID} px-2 text-meta text-muted-foreground`}>
-            <span className="[grid-area:name]">{t("usage.col.key")}</span>
-            <span className="hidden @lg:block @lg:[grid-area:trend]">{t("usage.col.trend")}</span>
-            <span
-              className={`text-right ${metric === "credits" ? "hidden @lg:block" : "[grid-area:value]"} @lg:[grid-area:requests]`}
-            >
-              {t("usage.metric.requests")}
+        {data ? (
+          <div className="flex flex-wrap justify-end gap-x-3 text-muted-foreground text-sm tabular-nums">
+            <span>
+              {t("usage.requestsCount", {
+                count: data.totals.requests,
+                n: formatNumber(data.totals.requests, lang),
+              })}
             </span>
-            <span className="text-right [grid-area:failed]">{t("usage.failed")}</span>
-            <span
-              className={`text-right ${metric === "requests" ? "hidden @lg:block" : "[grid-area:value]"} @lg:[grid-area:credits]`}
-            >
-              {t("usage.metric.credits")}
+            <span>
+              {t("usage.creditsTotal", { n: formatCredits(data.totals.credits, 2, lang) })}
             </span>
           </div>
-          {/* The name is a button stretched over the row, so the whole row opens the key's chart. */}
-          <ul aria-label={t("usage.list")} className="flex flex-col gap-1">
-            {rows.map((row) => {
-              const amount = metricAmount(row.totals, metric);
-              const share = Math.min(100, (amount / scale) * 100);
-              const points = row.series.map((totals) => ({ value: metricAmount(totals, metric) }));
-              const rate = row.totals.requests > 0 ? row.totals.failed / row.totals.requests : 0;
-              return (
-                <li
-                  className={`relative ${ROW_GRID} rounded-md px-2 py-2 text-sm has-[button:hover]:bg-(--row-hover) @lg:min-h-12`}
-                  key={row.key}
-                >
-                  <div className="flex min-w-0 flex-col gap-1.5 [grid-area:name]">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex size-4 shrink-0 items-center justify-center">
-                        {row.icon}
-                      </span>
-                      {row.openLabel ? (
-                        <button
-                          aria-label={row.openLabel}
-                          className="flex min-w-0 cursor-pointer items-baseline gap-2 text-start outline-none after:absolute after:inset-0 after:rounded-md focus-visible:after:outline-2 focus-visible:after:outline-ring focus-visible:after:outline-solid"
-                          onClick={() => openSheet(row)}
-                          type="button"
-                        >
-                          {row.label}
-                        </button>
-                      ) : (
-                        <span className="flex min-w-0 items-baseline gap-2">{row.label}</span>
-                      )}
-                    </div>
-                    <div
-                      aria-hidden="true"
-                      className="ms-6.5 h-1 overflow-hidden rounded-full"
-                      style={{ background: TRACK_COLOR }}
-                    >
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${share}%`, background: row.color }}
-                      />
-                    </div>
-                  </div>
-                  <div aria-hidden="true" className="hidden h-7 @lg:block @lg:[grid-area:trend]">
-                    {points.length > 1 ? (
-                      <LazySparkline
-                        animate
-                        color={row.color}
-                        data={points}
-                        idle={points.every((point) => point.value === 0)}
-                      />
-                    ) : null}
-                  </div>
-                  <div
-                    className={`text-right font-medium tabular-nums ${metric === "credits" ? "hidden @lg:block" : "[grid-area:value]"} @lg:[grid-area:requests]`}
-                  >
-                    <span className="sr-only">
-                      {t("usage.requestsCount", {
-                        count: row.totals.requests,
-                        n: formatNumber(row.totals.requests, lang),
-                      })}
-                    </span>
-                    <span aria-hidden="true">{formatNumber(row.totals.requests, lang)}</span>
-                  </div>
-                  <div className="flex justify-end [grid-area:failed]">
-                    {row.totals.requests > 0 ? (
-                      <>
-                        <span className="sr-only">
-                          {t("usage.failedCount", {
-                            count: row.totals.failed,
-                            n: formatNumber(row.totals.failed, lang),
-                          })}
-                        </span>
-                        <Badge
-                          aria-hidden="true"
-                          className="tabular-nums"
-                          size="sm"
-                          tone={rate >= HIGH_FAILURE_RATE ? "destructive" : "neutral"}
-                        >
-                          {/* One decimal keeps the column narrow; no failures read 0%, not 0.0%. */}
-                          {row.totals.failed > 0
-                            ? formatFraction(rate, 1, lang)
-                            : formatPercent(0, row.totals.requests, lang)}
-                        </Badge>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </div>
-                  <div
-                    className={`text-right tabular-nums ${metric === "requests" ? "hidden text-muted-foreground @lg:block" : "font-medium [grid-area:value] @lg:font-normal @lg:text-muted-foreground"} @lg:[grid-area:credits]`}
-                  >
-                    <span className="sr-only">
-                      {t("usage.creditsTotal", { n: formatCredits(row.totals.credits, 2, lang) })}
-                    </span>
-                    <span aria-hidden="true">{formatCredits(row.totals.credits, 2, lang)}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        ) : null}
+        <DataTable
+          caption={t("usage.list")}
+          cardLayout="divided"
+          cardsBelow="3xl"
+          columns={columns}
+          data={rows}
+          defaultSortDesc={() => true}
+          getRowId={(row) => row.key}
+          inset
+          loading={!data}
+          // The folded row opens the full list; every other row its key's sheet.
+          onRowClick={(row) => (row.other ? setExpanded(true) : openSheet(row))}
+          onSortChange={(next) => {
+            if (isSortColumn(next.id)) setSort(next);
+          }}
+          renderCard={renderCard}
+          rowLabel={(row) =>
+            row.openLabel ??
+            t("usage.showAll", { count: allRows.length, n: formatNumber(allRows.length, lang) })
+          }
+          sort={sort}
+        />
+        {hidden > 1 ? (
+          <div className="flex justify-center">
+            <Button onClick={() => setExpanded((open) => !open)} size="sm" variant="outline">
+              {expanded
+                ? t("usage.showFewer")
+                : t("usage.showAll", {
+                    count: allRows.length,
+                    n: formatNumber(allRows.length, lang),
+                  })}
+            </Button>
+          </div>
+        ) : null}
         {onlyKeyless && requireApiKey !== undefined ? (
           <p className="text-muted-foreground text-sm">
             {t(requireApiKey ? "usage.keylessRejected" : "usage.notTracked")}
