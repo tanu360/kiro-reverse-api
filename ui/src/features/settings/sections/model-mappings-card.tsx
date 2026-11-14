@@ -59,6 +59,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import { modelMappingsQuery, updateModelMappings } from "@/lib/api/settings";
 import type { ModelMappingRule, ModelMappingsResponse } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { noSpaces } from "@/lib/input-filters";
 import { cn } from "@/lib/utils";
 import { useDraft } from "../lib/dirty";
 import {
@@ -623,8 +624,9 @@ function MappingEditor({
                 <ModelLogo model={key || t("modelMappings.matchPlaceholder")} />
               </InputGroupAddon>
               <InputGroupInput
+                maxLength={256}
                 autoComplete="off"
-                onChange={(event) => setKey(event.target.value)}
+                onChange={(event) => setKey(noSpaces(event.target.value))}
                 placeholder={t("modelMappings.matchPlaceholder")}
                 spellCheck={false}
                 value={key}
@@ -641,8 +643,9 @@ function MappingEditor({
                 <ModelLogo model={value || t("modelMappings.targetPlaceholder")} />
               </InputGroupAddon>
               <InputGroupInput
+                maxLength={256}
                 autoComplete="off"
-                onChange={(event) => setValue(event.target.value)}
+                onChange={(event) => setValue(noSpaces(event.target.value))}
                 placeholder={t("modelMappings.targetPlaceholder")}
                 spellCheck={false}
                 value={value}

@@ -37,6 +37,7 @@ import {
   updateResponseHeaders,
 } from "@/lib/api/response-headers";
 import { type TFunction, useT } from "@/lib/i18n";
+import { headerNameChars } from "@/lib/input-filters";
 import { cn } from "@/lib/utils";
 import { useDraft } from "../lib/dirty";
 import {
@@ -45,6 +46,7 @@ import {
   headerValueProblem,
   insertVariable,
   isResponseHeaderErrorCode,
+  MAX_HEADER_NAME_LENGTH,
   MAX_HEADER_VALUE_BYTES,
   MAX_RESPONSE_HEADERS,
   normalizeHeaders,
@@ -458,8 +460,9 @@ function HeaderEditor({
           <Field className="min-w-0 items-stretch" invalid={nameProblem !== null}>
             <FieldLabel>{t("responseHeaders.name")}</FieldLabel>
             <Input
+              maxLength={MAX_HEADER_NAME_LENGTH}
               autoComplete="off"
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => setName(headerNameChars(event.target.value))}
               placeholder={EXAMPLE_NAME}
               spellCheck={false}
               value={name}
@@ -476,6 +479,7 @@ function HeaderEditor({
           <Field className="min-w-0 items-stretch" invalid={valueProblem !== null}>
             <FieldLabel>{t("responseHeaders.value")}</FieldLabel>
             <Input
+              maxLength={MAX_HEADER_VALUE_BYTES}
               autoComplete="off"
               onChange={(event) => setValue(event.target.value)}
               placeholder={EXAMPLE_VALUE}

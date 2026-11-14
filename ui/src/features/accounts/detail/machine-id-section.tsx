@@ -9,6 +9,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { generateMachineId } from "@/lib/api/system";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { hexChars } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
 import { isValidMachineId } from "../account-model";
 import { EditableFieldRow, useSaveAccountField } from "./detail-section";
@@ -73,8 +74,9 @@ export function MachineIdRow({ account }: { account: Account }): JSX.Element {
         {/* One line at every width, never wrapped: the row gives the field its whole width. */}
         <InputGroup>
           <InputGroupInput
+            maxLength={36}
             autoComplete="off"
-            onChange={(event) => onChange(event.target.value)}
+            onChange={(event) => onChange(hexChars(event.target.value))}
             placeholder={t("detail.machineIdPlaceholder")}
             spellCheck={false}
             value={value}

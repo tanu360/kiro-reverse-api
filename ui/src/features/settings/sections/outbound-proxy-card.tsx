@@ -43,6 +43,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { proxyQuery, updateProxyConfig } from "@/lib/api/settings";
 import type { ProxyConfig } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { digitsOnly } from "@/lib/input-filters";
 import {
   buildProxyUrl,
   isValidProxyPort,
@@ -298,6 +299,7 @@ function ProxyEditor({
             <Field className="min-w-0 items-stretch" invalid={hostInvalid}>
               <FieldLabel>{t("proxyHost")}</FieldLabel>
               <Input
+                maxLength={253}
                 aria-describedby={tipId}
                 autoComplete="off"
                 onChange={(event) => onHostChange(event.target.value)}
@@ -315,9 +317,7 @@ function ProxyEditor({
                 autoComplete="off"
                 inputMode="numeric"
                 maxLength={5}
-                onChange={(event) =>
-                  update({ ...model, port: event.target.value.replace(/\D/g, "") })
-                }
+                onChange={(event) => update({ ...model, port: digitsOnly(event.target.value, 5) })}
                 placeholder={t("proxyPortPlaceholder")}
                 value={model.port}
               />
@@ -336,6 +336,7 @@ function ProxyEditor({
               <Field className="min-w-0 items-stretch">
                 <FieldLabel>{t("proxyUsername")}</FieldLabel>
                 <Input
+                  maxLength={255}
                   autoComplete="off"
                   onChange={(event) => update({ ...model, username: event.target.value })}
                   spellCheck={false}
@@ -345,6 +346,7 @@ function ProxyEditor({
               <Field className="min-w-0 items-stretch">
                 <FieldLabel>{t("proxyPassword")}</FieldLabel>
                 <PasswordInput
+                  maxLength={255}
                   autoComplete="new-password"
                   onChange={(password) => update({ ...model, password })}
                   value={model.password}

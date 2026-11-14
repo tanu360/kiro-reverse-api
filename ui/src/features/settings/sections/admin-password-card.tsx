@@ -91,6 +91,7 @@ export function AdminPasswordCard(): JSX.Element {
         control={
           <FieldControl error={error}>
             <PasswordInput
+              maxLength={128}
               autoComplete="new-password"
               id={inputId}
               invalid={error !== null}

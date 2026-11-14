@@ -57,6 +57,7 @@ export function ProxyRow({ account }: { account: Account }): JSX.Element {
       <Field invalid={error !== null}>
         <FieldLabel className="sr-only">{t("detail.proxyURL")}</FieldLabel>
         <Input
+          maxLength={2048}
           autoComplete="off"
           onChange={(event) => {
             setValue(event.target.value);

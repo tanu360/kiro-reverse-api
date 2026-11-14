@@ -2,6 +2,7 @@ import type { JSX, Ref } from "react";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/i18n";
+import { digitsOnly, recoveryCodeChars } from "@/lib/input-filters";
 
 /**
  * The code field of the sign-in form's second step, in the password field's sign-in size (lg).
@@ -35,10 +36,10 @@ export function CodeField({
         maxLength={recovery ? 32 : 9}
         name={recovery ? "recovery-code" : "one-time-code"}
         // The app's code keeps digits only, at most six ("123 456" pasted lands as "123456");
-        // a recovery code ("k7xq2-m9fd4") is letters and digits, so it stays as typed.
+        // a recovery code ("k7xq2-m9fd4") keeps its letters, digits and hyphens.
         onChange={(event) =>
           onChange(
-            recovery ? event.target.value : event.target.value.replace(/\D/g, "").slice(0, 6),
+            recovery ? recoveryCodeChars(event.target.value) : digitsOnly(event.target.value, 6),
           )
         }
         placeholder={recovery ? t("recoveryPlaceholder") : t("codePlaceholder")}

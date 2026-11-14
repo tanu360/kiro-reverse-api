@@ -27,6 +27,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { ApiKey, ApiKeyRoutingMode } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { noSpaces } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
 import { AccountPicker } from "./account-picker";
 import {
@@ -207,6 +208,7 @@ export function ApiKeyFormDialog({
         <Field>
           <FieldLabel>{t("form.name")}</FieldLabel>
           <Input
+            maxLength={64}
             autoComplete="off"
             onValueChange={(value) => set("name", value)}
             placeholder={t("form.namePlaceholder")}
@@ -363,10 +365,11 @@ export function ApiKeyFormDialog({
         <Field>
           <FieldLabel>{t("form.customKey")}</FieldLabel>
           <Input
+            maxLength={128}
             autoCapitalize="off"
             autoComplete="off"
             autoCorrect="off"
-            onValueChange={(value) => set("key", value)}
+            onValueChange={(value) => set("key", noSpaces(value))}
             spellCheck={false}
             value={values.key}
           />

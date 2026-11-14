@@ -140,6 +140,7 @@ export function IamFlow(): JSX.Element {
                     <FlowNote>{t("iam.completeLogin")}</FlowNote>
                     <FormField error={errors.callback} label={t("callbackUrl")}>
                       <Input
+                        maxLength={2048}
                         autoCapitalize="off"
                         autoComplete="off"
                         disabled={pending}
@@ -162,6 +163,7 @@ export function IamFlow(): JSX.Element {
         <>
           <FormField error={errors.startUrl} label={t("iam.startUrl")}>
             <Input
+              maxLength={2048}
               autoCapitalize="off"
               autoComplete="url"
               disabled={pending}

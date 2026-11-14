@@ -34,6 +34,7 @@ import { errorMessage } from "@/lib/api/server-errors";
 import type { RequestRecord } from "@/lib/api/types";
 import { formatBytes, formatDurationMs, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { noSpaces } from "@/lib/input-filters";
 import { useMaskText } from "@/lib/privacy";
 import { endpointLabel } from "./requests-columns";
 
@@ -127,10 +128,11 @@ function ReplayForm({ id, record }: { id: number; record: RequestRecord }): JSX.
             <Field className="min-w-0 items-stretch">
               <FieldLabel htmlFor={modelId}>{t("model")}</FieldLabel>
               <Input
+                maxLength={256}
                 autoComplete="off"
                 id={modelId}
                 list={`${modelId}-list`}
-                onChange={(event) => setModel(event.target.value)}
+                onChange={(event) => setModel(noSpaces(event.target.value))}
                 spellCheck={false}
                 value={model}
                 variant="code"

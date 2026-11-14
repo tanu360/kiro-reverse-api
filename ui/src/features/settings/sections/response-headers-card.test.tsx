@@ -118,12 +118,14 @@ describe("ResponseHeadersCard", () => {
       within(dialog).getByText("The proxy manages Content-Type, so it cannot be set here."),
     ).toBeInTheDocument();
     await user.clear(name);
-    await user.type(name, "Bad Name");
+    // A space or a colon never reaches the name.
+    await user.type(name, "Bad Name:");
+    expect(name).toHaveValue("BadName");
     expect(
-      within(dialog).getByText(
+      within(dialog).queryByText(
         "A header name can only use letters, digits and symbols such as - _ . ~, with no spaces or colons.",
       ),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     await user.clear(name);
     await user.type(name, "x-request-id");
     expect(within(dialog).getByText("x-request-id is already in the list.")).toBeInTheDocument();

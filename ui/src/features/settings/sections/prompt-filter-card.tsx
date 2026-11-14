@@ -472,6 +472,7 @@ function RuleEditor({
             <div className="flex min-w-0 flex-col gap-2">
               <Label htmlFor={`${id}-name`}>{t("promptFilter.name")}</Label>
               <Input
+                maxLength={64}
                 id={`${id}-name`}
                 onChange={(event) => set({ name: event.target.value })}
                 placeholder={t("promptFilter.unnamed")}
@@ -508,6 +509,7 @@ function RuleEditor({
           <div className="flex flex-col gap-2">
             <Label htmlFor={`${id}-match`}>{t("promptFilter.match")}</Label>
             <Input
+              maxLength={1000}
               // Not aria-invalid: a regex that does not compile is the amber hint under the
               // field (the proxy skips the rule), not an error, so the field keeps its border.
               aria-describedby={`${id}-match-hint`}
@@ -544,6 +546,7 @@ function RuleEditor({
             <div className="flex flex-col gap-2">
               <Label htmlFor={`${id}-replace`}>{t("promptFilter.replace")}</Label>
               <Input
+                maxLength={1000}
                 aria-describedby={`${id}-replace-hint`}
                 id={`${id}-replace`}
                 onChange={(event) => set({ replace: event.target.value })}

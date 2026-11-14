@@ -186,6 +186,7 @@ export function MicrosoftFlow(): JSX.Element {
       </FlowNote>
       <FormField error={fieldError} label={t("callbackUrl")}>
         <Input
+          maxLength={2048}
           autoCapitalize="off"
           autoComplete="off"
           disabled={busy}

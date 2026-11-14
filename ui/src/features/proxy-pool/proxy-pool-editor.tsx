@@ -39,6 +39,7 @@ import {
 } from "@/features/settings/lib/proxy-url";
 import { addPoolProxy, type PoolProxy, updatePoolProxy } from "@/lib/api/proxy-pool";
 import { fillNodes, useT } from "@/lib/i18n";
+import { digitsOnly } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
 import {
   type EditorModel,
@@ -153,6 +154,7 @@ export function ProxyEditor({
               </Badge>
             </FieldLabel>
             <Input
+              maxLength={MAX_LABEL}
               autoComplete="off"
               onChange={(event) => setModel((prev) => ({ ...prev, label: event.target.value }))}
               placeholder={t("editor.labelPlaceholder")}
@@ -189,6 +191,7 @@ export function ProxyEditor({
             <Field className="min-w-0 items-stretch" invalid={hostInvalid}>
               <FieldLabel>{t("settings:proxyHost")}</FieldLabel>
               <Input
+                maxLength={253}
                 aria-describedby={tipId}
                 autoComplete="off"
                 onChange={(event) => onHostChange(event.target.value)}
@@ -207,7 +210,7 @@ export function ProxyEditor({
                 inputMode="numeric"
                 maxLength={5}
                 onChange={(event) =>
-                  update({ ...model.proxy, port: event.target.value.replace(/\D/g, "") })
+                  update({ ...model.proxy, port: digitsOnly(event.target.value, 5) })
                 }
                 placeholder={t("settings:proxyPortPlaceholder")}
                 value={model.proxy.port}
@@ -227,6 +230,7 @@ export function ProxyEditor({
               <Field className="min-w-0 items-stretch">
                 <FieldLabel>{t("settings:proxyUsername")}</FieldLabel>
                 <Input
+                  maxLength={255}
                   autoComplete="off"
                   onChange={(event) => update({ ...model.proxy, username: event.target.value })}
                   spellCheck={false}
@@ -236,6 +240,7 @@ export function ProxyEditor({
               <Field className="min-w-0 items-stretch">
                 <FieldLabel>{t("settings:proxyPassword")}</FieldLabel>
                 <PasswordInput
+                  maxLength={255}
                   autoComplete="new-password"
                   disabled={model.clearPassword}
                   onChange={(password) => update({ ...model.proxy, password })}

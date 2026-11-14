@@ -15,6 +15,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { updateUpstreamConfig, upstreamQuery } from "@/lib/api/settings";
 import type { ApiDomain, UpstreamConfig } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
+import { regionChars } from "@/lib/input-filters";
 import { useDraft } from "../lib/dirty";
 import { SECTION_ID } from "./sections";
 import {
@@ -244,10 +245,11 @@ function UpstreamForm({ config }: { config: UpstreamConfig }): JSX.Element {
         control={
           <FieldControl error={authError}>
             <Input
+              maxLength={32}
               autoComplete="off"
               id={authRegionId}
               onChange={(event) => {
-                const authRegion = event.target.value;
+                const authRegion = regionChars(event.target.value);
                 setAuthError(null);
                 draft.set((prev) => ({ ...prev, authRegion }));
               }}

@@ -10,6 +10,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/lib/i18n";
+import { regionChars } from "@/lib/input-filters";
 import { cn } from "@/lib/utils";
 
 /**
@@ -277,10 +278,11 @@ export function RegionField({
   return (
     <FormField error={error} hint={hint} label={t("region")}>
       <Input
+        maxLength={32}
         autoCapitalize="off"
         autoComplete="off"
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(regionChars(event.target.value))}
         placeholder="us-east-1"
         ref={inputRef}
         spellCheck={false}

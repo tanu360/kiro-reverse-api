@@ -73,6 +73,7 @@ import { useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { useDraft } from "../lib/dirty";
 import {
+  CHAT_ID_MAX,
   type ChannelDraft,
   type ChannelErrors,
   type ChannelField,
@@ -908,7 +909,7 @@ function ChannelEditor({
               <FieldLabel>{t("name")}</FieldLabel>
               <Input
                 autoComplete="off"
-                maxLength={NAME_MAX + 16}
+                maxLength={NAME_MAX}
                 onChange={(event) => update({ name: event.target.value })}
                 placeholder={t(`type.${draft.type}`)}
                 value={draft.name}
@@ -922,6 +923,7 @@ function ChannelEditor({
               <Field className="min-w-0 items-stretch" invalid={shown.botToken !== undefined}>
                 <FieldLabel>{t("botToken")}</FieldLabel>
                 <PasswordInput
+                  maxLength={SECRET_MAX}
                   autoComplete="off"
                   onChange={(botToken) => update({ botToken })}
                   placeholder={keepHint(saved?.botTokenSet)}
@@ -933,6 +935,7 @@ function ChannelEditor({
               <Field className="min-w-0 items-stretch" invalid={shown.chatId !== undefined}>
                 <FieldLabel>{t("chatId")}</FieldLabel>
                 <Input
+                  maxLength={CHAT_ID_MAX}
                   autoComplete="off"
                   onChange={(event) => update({ chatId: event.target.value })}
                   placeholder="-1001234567890"
@@ -947,6 +950,7 @@ function ChannelEditor({
             <Field className="min-w-0 items-stretch" invalid={shown.url !== undefined}>
               <FieldLabel>{t("url")}</FieldLabel>
               <PasswordInput
+                maxLength={URL_MAX}
                 autoComplete="off"
                 onChange={(url) => update({ url })}
                 placeholder={keepHint(saved?.urlSet) ?? URL_PLACEHOLDER[draft.type]}
@@ -962,6 +966,7 @@ function ChannelEditor({
               <Field className="min-w-0 items-stretch" invalid={shown.secret !== undefined}>
                 <FieldLabel>{t("signingSecret")}</FieldLabel>
                 <PasswordInput
+                  maxLength={SECRET_MAX}
                   autoComplete="new-password"
                   disabled={draft.clearSecret}
                   onChange={(secret) => update({ secret })}

@@ -16,6 +16,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { thinkingQuery, updateThinkingConfig } from "@/lib/api/settings";
 import type { ThinkingConfig, ThinkingFormat } from "@/lib/api/types";
 import { type TFunction, useT } from "@/lib/i18n";
+import { noSpaces } from "@/lib/input-filters";
 import { useDraft } from "../lib/dirty";
 import { SECTION_ID } from "./sections";
 import {
@@ -172,10 +173,11 @@ function ThinkingForm({ config }: { config: ThinkingConfig }): JSX.Element {
       <SettingsRow
         control={
           <Input
+            maxLength={32}
             autoComplete="off"
             id={suffixId}
             onChange={(event) => {
-              const suffix = event.target.value;
+              const suffix = noSpaces(event.target.value);
               draft.set((prev) => ({ ...prev, suffix }));
             }}
             placeholder={DEFAULT_SUFFIX}
