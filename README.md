@@ -107,19 +107,20 @@ If this project helps you, a Star would mean a lot.
 - React single-page app embedded in the binary; no separate web server to run.
 - Overview dashboard that updates live: four KPI cards (accounts, plan credits, and requests and failures in the last hour), traffic over the last hour, 6 hours, 24 hours or all time as stacked bars, a list of accounts that need attention, traffic by account, a model-mix donut, and the most active accounts. The **Plan credits** card splits Kiro credit use into the part used through the proxy and the part used outside it.
 - Accounts with status tabs and counts, filters (plan, auth, region, enabled, tag), search over email, nickname, notes and tags, sorting, batch actions, a detail view, connection tests, live requests per minute and today, a duplicates review, and export.
-- Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history.
+- Requests log with status tabs and counts, search (it also matches the full API key), sorting, a detail view with error categories, the Trace ID and a timeline of every upstream attempt (account, endpoint, duration, result, failover), masked API keys, and SQLite-backed history. A request's detail opens its conversation (the turns in order, the account each used, failovers and totals) and filters the log to it, and **Replay** runs a logged request again on an account and model you choose (see [Conversations and replay](#-conversations-and-replay)).
 - API page with client API key management (optional custom key values, enable/disable, per-key token, credit and call limits, account binding, regenerate, usage reset), a **Usage by key** chart, and a syntax-highlighted client setup builder: request code for the Anthropic Messages, OpenAI Chat Completions and OpenAI Responses APIs in curl, Python, Node.js, Go, Java, PHP, Ruby and C# (official SDK or plain HTTP, streaming or not) with a sample response, plus Claude Code and Codex setup.
-- Settings for usage and background refresh, routing (mode, session affinity, per-account limit), auto-continue, tool history, image resizing, self-heal, thinking, model mappings, prompt filter, stream integrity, endpoint, upstream domain and region, outbound proxy, proxy pool, response headers, alerts, server log, admin password, log retention, and statistics reset; Backups with a schedule, upload, and one-click restore.
+- Settings for usage and background refresh, routing (mode, session affinity, per-account limit), auto-continue, tool history, image resizing, self-heal, thinking, model mappings, prompt filter, stream integrity, endpoint, upstream domain and region, outbound proxy, proxy pool, response headers, alerts, server log, admin password, two-factor sign-in, Prometheus metrics, log retention, and statistics reset; Backups with a schedule, upload, and one-click restore.
 - Alerts to a webhook, Telegram, Discord or Slack when credits run low, an account is banned, or no account can serve requests (see [Alerts](#-alerts)).
 - Command menu (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) for pages and actions, privacy mode that masks email addresses, and an update check that reads `version.json` from the repo's `main` branch.
 - Changing the admin password ends every other signed-in session.
+- Two-factor sign-in with an authenticator app, with ten one-time recovery codes (see [Two-factor sign-in](#-two-factor-sign-in)).
 - Light, dark, and system theme; four UI languages: English, 简体中文, Tiếng Việt, and Português (Brasil).
 - Works from phones to desktops.
 
 ### 🌐 Networking
 
 - Outbound proxy support — SOCKS5, HTTP, or HTTPS, switched live without restart, with a per-account override. Saved proxy passwords show as `********`.
-- Proxy pool: accounts without a proxy of their own each get one from a pool, with health checks and a move to a healthy proxy when one fails to connect (see [Proxy pool](#-proxy-pool)).
+- Proxy pool: accounts without a proxy of their own each get one from a pool, with health checks, an on/off switch per proxy, a move to a healthy proxy after three failures in a row, and the global and account proxies checked as detected entries (see [Proxy pool](#-proxy-pool)).
 - Upstream domain and region (**Settings → Upstream domain & region**): send chat and web search to `runtime.{region}.kiro.dev` instead of `q.{region}.amazonaws.com` (usage and model lists stay on AWS), and override, for every account, the API region (`us-east-1` or `eu-central-1`) or the region Builder ID and IAM Identity Center tokens are refreshed in. A region that does not match an account makes its requests fail, but never bans the account.
 - Configurable thinking-mode suffix and Anthropic `thinking` config passthrough.
 
@@ -129,6 +130,7 @@ If this project helps you, a Star would mean a lot.
 - Final request rows, plus a rollup of the rows that log retention removed, are the source of truth for dashboard request, token, credit, success, and failed totals.
 - Log retention: request and error log rows older than 90 days (1 to 3650, or keep forever) are deleted in small batches, two minutes after start and then daily.
 - 30-day retention on stored responses, asynchronous writes off the request hot path.
+- Request bodies kept 30 days for replay: up to 2 MiB each, compressed, the client's key masked, 256 MiB in all (the oldest go first).
 
 ---
 
@@ -222,6 +224,7 @@ Admin password authentication allows five failed attempts per client per minute,
 | `PORT`           | Port to listen on, 1–65535 (overrides config). An invalid value is ignored with a warning at startup. In Docker, change the host side of the port mapping instead | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 | `LOG_LEVEL`      | Log level: `debug`, `info`, `warn`, or `error` (overrides config) | `info` |
+| `ADMIN_RESET_2FA` | Set to `1` to turn admin two-factor sign-in off at start, if you lost the app and the recovery codes. Remove it afterwards: while it is set, each start turns it off again | — |
 
 > [!WARNING]
 > `kiro.db` holds OAuth tokens and admin credentials. Treat it as secret — keep it out of git, screenshots, and chat threads. Mount the database directory as a private volume.
@@ -269,6 +272,7 @@ For Codex, save `/v1/codex/models` to a file and set `model_catalog_json` to its
 | `GET`    | `/v1/models`                    | List available models                         |
 | `GET`    | `/v1/codex/models`              | Model list in the Codex CLI format            |
 | `GET`    | `/v1/stats`                     | Aggregate proxy usage statistics              |
+| `GET`    | `/metrics`                      | Prometheus metrics, off by default, with a bearer token (see [Prometheus metrics](#-prometheus-metrics)) |
 | `GET`    | `/health`                       | Health check                                  |
 | `GET`    | `/`                             | Web admin panel (embedded SPA; page links such as `/accounts` open the app, old `/admin/*` links redirect, and a client that does not ask for HTML gets the health check) |
 
@@ -355,9 +359,56 @@ An account's own proxy and the global proxy get 15 seconds to connect. When one 
 
 ### 🔁 Proxy pool
 
-**Settings → Proxy pool** spreads accounts that have no proxy of their own over a list of up to 100 proxies (`http`, `https`, `socks5` or `socks5h`). Each account keeps the proxy it gets, and new accounts go to the healthy proxy with the fewest accounts. A proxy that fails to connect hands its accounts to a healthy one at once; a proxy failure never bans an account or cools it down. Health checks run every 10 minutes by default, and token refreshes take the same route as the account's requests.
+**Settings → Proxy pool** spreads accounts that have no proxy of their own over a list of up to 100 proxies (`http`, `https`, `socks5` or `socks5h`). Each account keeps the proxy it gets, and new accounts go to the healthy proxy with the fewest accounts. Health checks connect to Kiro's own host through each proxy, every 10 minutes by default, and token refreshes take the same route as the account's requests.
+
+- **Three strikes.** A proxy leaves rotation, and its accounts move to a healthy one, only after three failed checks or connections in a row; one success resets the count. A request that fails at a proxy still retries at once on another route: only that account moves to another healthy proxy, and the proxy gains a strike. An automatically disabled proxy comes back as soon as a check passes. A proxy failure never bans an account or cools it down.
+- **On/off switch.** Each proxy has its own switch. A proxy switched off is never used or checked, its accounts move at once, and no check switches it back on.
+- **Detected proxies.** The global outbound proxy and accounts' own proxies show as detected entries, checked like pool proxies, with their failures counted. They are never shared with other accounts: one without a sign-in joins the pool only when you click **Add to pool**, and one with a sign-in cannot join.
+- The card counts healthy, unhealthy (failing, still in rotation), auto-disabled and switched-off proxies.
 
 The order is: the account's own proxy, the pool, the global proxy, then direct. When no pool proxy is healthy, requests get HTTP 503 `no healthy outbound proxy in the pool`, unless **Fall back when no proxy is healthy** is on: then they use the global proxy, or go direct when none is set.
+
+---
+
+## 🔐 Two-Factor Sign-In
+
+**Settings → Two-factor sign-in** asks for a six-digit code from an authenticator app (Google Authenticator, 1Password, Aegis and the like) after the admin password.
+
+- **Turn on** shows a QR code and the secret as text. A code from the app confirms it, and ten one-time recovery codes are shown once: keep them somewhere safe. Turning it on ends every other signed-in session.
+- Sign-in then asks for the code after the password. A recovery code works in its place, once. Codes follow RFC 6238 (SHA-1, 30 seconds), accept one step of clock skew either way, and each code works only once. Wrong codes count against the same guess limit as wrong passwords.
+- **Turn off** needs a current code or the admin password. **New recovery codes** replaces the old ones.
+- Scripts that sent the password in `X-Admin-Password` get HTTP 401 `totp_required` while it is on: sign in with `POST /admin/api/session` and `{"password": "…", "code": "123456"}`, then send the token as `X-Admin-Token`.
+- Locked out? Start the server once with `ADMIN_RESET_2FA=1`. It turns two-factor sign-in off and logs a warning; sign in with the password, then remove the variable. `ADMIN_PASSWORD` and the first-run password work as before.
+
+The secret is stored like the admin password, in `kiro.db`; recovery codes only as SHA-256 hashes. Neither is ever logged.
+
+---
+
+## 📈 Prometheus Metrics
+
+**Settings → Prometheus metrics** serves `GET /metrics` in the Prometheus text format. It is off by default; turning it on makes a bearer token, shown in the card with a ready `prometheus.yml` scrape job. Without the token the endpoint answers 401, and while it is off, 404. **New token** replaces the token at once.
+
+| Metric | Type | Labels |
+| ------ | ---- | ------ |
+| `kiro_requests_total` | counter | `outcome`, `status`, `model`, `account`, `api_key` |
+| `kiro_tokens_total` | counter | `kind` (input, output, cache_read, cache_write), `model`, `account`, `api_key` |
+| `kiro_credits_total` | counter | `model`, `account`, `api_key` |
+| `kiro_request_duration_seconds` | histogram | `endpoint`, `outcome` |
+| `kiro_upstream_errors_total` | counter | `category` (the request log's error types), `account` |
+| `kiro_account_state`, `kiro_accounts` | gauge | `account`, `state` (active, cooldown, over_limit, banned, disabled) |
+| `kiro_account_usage_ratio` | gauge | `account` |
+| `kiro_proxy_state`, `kiro_proxy_failures`, `kiro_proxy_latency_seconds`, `kiro_proxies` | gauge | `proxy`, `kind` (pool, detected), `state` |
+| `kiro_build_info`, `kiro_uptime_seconds` | gauge | `version` |
+
+`account` is the account's email, `api_key` the client key's id (never the key). Counters start from zero when the server starts.
+
+---
+
+## 🧵 Conversations and Replay
+
+Every routed request carries its conversation: the session affinity key, the same for every turn of one chat. A request's detail opens **Conversation**: the turns in order, the account and model each used, failovers, and totals of tokens, credits and time. **Show in the log** filters the Requests page to that conversation.
+
+**Replay** runs a logged request again, without streaming, on an account and model you choose, and shows the answer. It is logged as a new request marked as a replay, and it spends that account's credits. Replay needs the request's body: the server keeps bodies for 30 days, up to 2 MiB each and 256 MiB in all, with the client's API key masked. Admin only.
 
 ---
 
@@ -384,6 +435,7 @@ Nothing is checked until a channel is on, and **Send test** tries a channel once
 | `PORT`           | Port to listen on, 1–65535 (overrides config). An invalid value is ignored with a warning at startup. In Docker, change the host side of the port mapping instead | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Set `off` to stop turning tool-call markup that Kiro leaks into answer text back into tool calls | on |
 | `LOG_LEVEL`      | Log level: `debug`, `info`, `warn`, or `error` (overrides config) | `info` |
+| `ADMIN_RESET_2FA` | Set to `1` to turn admin two-factor sign-in off at start, if you lost the app and the recovery codes. Remove it afterwards: while it is set, each start turns it off again | — |
 
 ```diff
 + kiro.db                # local state — config, credentials, SQLite history, backup blobs

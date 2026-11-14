@@ -107,19 +107,20 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - Ứng dụng React một trang nhúng trong binary; không cần chạy web server riêng.
 - Bảng điều khiển Tổng quan cập nhật trực tiếp: bốn thẻ KPI (tài khoản, credit gói, cùng số yêu cầu và số yêu cầu thất bại trong giờ qua), lưu lượng trong 1 giờ, 6 giờ, 24 giờ qua hoặc toàn bộ thời gian dạng cột chồng, danh sách tài khoản cần chú ý, lưu lượng theo tài khoản, biểu đồ donut phân bổ model và các tài khoản hoạt động nhiều nhất. Thẻ **Credit gói** chia mức dùng credit Kiro thành phần dùng qua proxy và phần dùng ngoài proxy.
 - Tài khoản với tab trạng thái kèm số lượng, bộ lọc (gói, xác thực, khu vực, bật, thẻ), tìm kiếm theo email, biệt danh, ghi chú và thẻ, sắp xếp, thao tác hàng loạt, chế độ xem chi tiết, kiểm tra kết nối, số yêu cầu mỗi phút và hôm nay theo thời gian thực, xem lại tài khoản trùng lặp và xuất.
-- Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, Mã truy vết và dòng thời gian của từng lần thử upstream (tài khoản, endpoint, thời lượng, kết quả, failover), API key được che và lịch sử lưu trong SQLite.
+- Nhật ký yêu cầu với tab trạng thái kèm số lượng, tìm kiếm (khớp cả API key đầy đủ), sắp xếp, chế độ xem chi tiết có phân loại lỗi, Mã truy vết và dòng thời gian của từng lần thử upstream (tài khoản, endpoint, thời lượng, kết quả, failover), API key được che và lịch sử lưu trong SQLite. Chi tiết một yêu cầu mở được cuộc hội thoại của nó (các lượt theo thứ tự, tài khoản của từng lượt, các lần chuyển dự phòng và tổng cộng) và lọc nhật ký theo hội thoại đó; **Chạy lại** chạy lại một yêu cầu đã ghi trên tài khoản và model bạn chọn (xem [Hội thoại và chạy lại](#-hội-thoại-và-chạy-lại)).
 - Trang API quản lý API key của client (giá trị key tùy chỉnh không bắt buộc, bật/tắt, giới hạn token, credit và lượt gọi cho từng key, gắn key với tài khoản, tạo lại key, đặt lại mức sử dụng), biểu đồ **Mức sử dụng theo key** và trình tạo mã thiết lập client có tô sáng cú pháp: mã gọi các API Anthropic Messages, OpenAI Chat Completions và OpenAI Responses bằng curl, Python, Node.js, Go, Java, PHP, Ruby và C# (SDK chính thức hoặc HTTP thuần, có hoặc không stream) kèm phản hồi mẫu, cùng cấu hình Claude Code và Codex.
-- Cài đặt cho mức sử dụng và làm mới trong nền, định tuyến (chế độ, giữ hội thoại, giới hạn mỗi tài khoản), tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, tự phục hồi, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, tên miền và khu vực Kiro, proxy outbound, nhóm proxy, header phản hồi, cảnh báo, nhật ký máy chủ, mật khẩu quản trị, lưu giữ nhật ký và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
+- Cài đặt cho mức sử dụng và làm mới trong nền, định tuyến (chế độ, giữ hội thoại, giới hạn mỗi tài khoản), tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, tự phục hồi, thinking, ánh xạ model, bộ lọc system prompt, toàn vẹn stream, endpoint, tên miền và khu vực Kiro, proxy outbound, nhóm proxy, header phản hồi, cảnh báo, nhật ký máy chủ, mật khẩu quản trị, đăng nhập hai bước, chỉ số Prometheus, lưu giữ nhật ký và đặt lại thống kê; Sao lưu có lịch, tải lên và khôi phục bằng một cú nhấp.
 - Cảnh báo qua webhook, Telegram, Discord hoặc Slack khi sắp hết credit, khi tài khoản bị cấm hoặc khi không còn tài khoản nào phục vụ được yêu cầu (xem [Cảnh báo](#-cảnh-báo)).
 - Menu lệnh (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) để mở trang và chạy thao tác, chế độ riêng tư ẩn địa chỉ email, và kiểm tra cập nhật qua `version.json` trên nhánh `main` của repo.
 - Đổi mật khẩu quản trị sẽ kết thúc mọi phiên đăng nhập khác.
+- Đăng nhập hai bước bằng ứng dụng xác thực, kèm mười mã khôi phục dùng một lần (xem [Đăng nhập hai bước](#-đăng-nhập-hai-bước)).
 - Giao diện sáng, tối và theo hệ thống; bốn ngôn ngữ giao diện: English, 简体中文, Tiếng Việt và Português (Brasil).
 - Dùng được trên cả điện thoại lẫn máy tính.
 
 ### 🌐 Mạng
 
 - Hỗ trợ proxy outbound — SOCKS5, HTTP hoặc HTTPS, chuyển đổi trực tiếp không cần khởi động lại, có thể ghi đè riêng cho từng tài khoản. Mật khẩu proxy đã lưu hiển thị dạng `********`.
-- Nhóm proxy: mỗi tài khoản không có proxy riêng được gán một proxy trong nhóm, có kiểm tra định kỳ và tự chuyển sang proxy hoạt động tốt khi một proxy không kết nối được (xem [Nhóm proxy](#-nhóm-proxy)).
+- Nhóm proxy: mỗi tài khoản không có proxy riêng được gán một proxy trong nhóm, có kiểm tra tình trạng, công tắc bật/tắt cho từng proxy, chuyển sang proxy hoạt động tốt sau ba lần lỗi liên tiếp, và proxy chung cùng proxy riêng của tài khoản được kiểm tra như các mục phát hiện được (xem [Nhóm proxy](#-nhóm-proxy)).
 - Tên miền và khu vực Kiro (**Cài đặt → Tên miền và khu vực Kiro**): gửi chat và tìm kiếm web tới `runtime.{region}.kiro.dev` thay vì `q.{region}.amazonaws.com` (mức sử dụng và danh sách model vẫn đi qua AWS), và ghi đè cho mọi tài khoản khu vực API (`us-east-1` hoặc `eu-central-1`) hoặc khu vực dùng để làm mới token Builder ID và IAM Identity Center. Khu vực không khớp với tài khoản khiến yêu cầu của tài khoản đó thất bại, nhưng không bao giờ làm tài khoản bị cấm.
 - Hậu tố chế độ thinking có thể tùy chỉnh và chuyển tiếp nguyên cấu hình `thinking` của Anthropic.
 
@@ -129,6 +130,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - Các dòng yêu cầu cuối cùng, cùng bản tổng hợp của các dòng mà tính năng lưu giữ nhật ký đã xóa, là nguồn dữ liệu chuẩn cho tổng số yêu cầu, token, credit, thành công và thất bại trên bảng điều khiển.
 - Lưu giữ nhật ký: các dòng nhật ký yêu cầu và lỗi cũ hơn 90 ngày (từ 1 đến 3650, hoặc giữ vĩnh viễn) bị xóa theo từng lô nhỏ, hai phút sau khi khởi động rồi mỗi ngày một lần.
 - Response đã lưu được giữ 30 ngày; việc ghi chạy bất đồng bộ, nằm ngoài đường xử lý chính của yêu cầu.
+- Nội dung yêu cầu được giữ 30 ngày để chạy lại: tối đa 2 MiB mỗi yêu cầu, nén lại, API key của client được che, tổng cộng 256 MiB (cũ nhất bị xóa trước).
 
 ---
 
@@ -222,6 +224,7 @@ Xác thực bằng mật khẩu quản trị cho phép năm lần thử sai cho 
 | `PORT`           | Cổng lắng nghe, từ 1 đến 65535 (ghi đè cấu hình). Giá trị không hợp lệ bị bỏ qua, kèm cảnh báo khi khởi động. Với Docker, hãy đổi phía host trong ánh xạ cổng | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Đặt `off` để ngừng chuyển markup lệnh gọi tool mà Kiro để lọt vào văn bản câu trả lời trở lại thành lệnh gọi tool | on |
 | `LOG_LEVEL`      | Mức log: `debug`, `info`, `warn` hoặc `error` (ghi đè cấu hình) | `info` |
+| `ADMIN_RESET_2FA` | Đặt `1` để tắt đăng nhập hai bước của quản trị khi khởi động, nếu bạn mất cả ứng dụng lẫn mã khôi phục. Gỡ đi sau đó: khi còn đặt, mỗi lần khởi động sẽ tắt lại | — |
 
 > [!WARNING]
 > `kiro.db` chứa OAuth token và thông tin đăng nhập quản trị. Hãy giữ bí mật tệp này — không đưa vào git, ảnh chụp màn hình hay các cuộc trò chuyện. Gắn thư mục cơ sở dữ liệu dưới dạng volume riêng tư.
@@ -269,6 +272,7 @@ Với Codex, hãy lưu `/v1/codex/models` thành một tệp và đặt `model_c
 | `GET`    | `/v1/models`                    | Liệt kê các model khả dụng                    |
 | `GET`    | `/v1/codex/models`              | Danh sách model theo định dạng Codex CLI      |
 | `GET`    | `/v1/stats`                     | Thống kê tổng hợp mức sử dụng proxy           |
+| `GET`    | `/metrics`                      | Chỉ số Prometheus, mặc định tắt, cần bearer token (xem [Chỉ số Prometheus](#-chỉ-số-prometheus)) |
 | `GET`    | `/health`                       | Kiểm tra tình trạng hoạt động                 |
 | `GET`    | `/`                             | Trang quản trị web (SPA nhúng; link trang như `/accounts` mở ứng dụng, link cũ `/admin/*` được chuyển hướng, client không yêu cầu HTML nhận health check) |
 
@@ -355,9 +359,56 @@ Proxy riêng của tài khoản và proxy chung có 15 giây để kết nối. 
 
 ### 🔁 Nhóm proxy
 
-**Cài đặt → Nhóm proxy** phân bổ các tài khoản không có proxy riêng vào danh sách tối đa 100 proxy (`http`, `https`, `socks5` hoặc `socks5h`). Mỗi tài khoản giữ nguyên proxy được gán, còn tài khoản mới được gán vào proxy hoạt động tốt đang có ít tài khoản nhất. Proxy nào không kết nối được sẽ chuyển ngay tài khoản của nó sang một proxy hoạt động tốt; lỗi proxy không bao giờ làm tài khoản bị cấm hay rơi vào thời gian chờ. Mặc định kiểm tra định kỳ mỗi 10 phút, và việc làm mới token đi cùng đường với yêu cầu của tài khoản.
+**Cài đặt → Nhóm proxy** phân bổ các tài khoản không có proxy riêng vào danh sách tối đa 100 proxy (`http`, `https`, `socks5` hoặc `socks5h`). Mỗi tài khoản giữ proxy được gán, và tài khoản mới vào proxy hoạt động tốt có ít tài khoản nhất. Kiểm tra tình trạng kết nối tới chính máy chủ của Kiro qua từng proxy, mặc định 10 phút một lần, và việc làm mới token đi cùng đường với các yêu cầu của tài khoản.
 
-Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi kết nối trực tiếp. Khi không có proxy nào trong nhóm hoạt động tốt, yêu cầu nhận HTTP 503 `no healthy outbound proxy in the pool`, trừ khi bật **Dự phòng khi không có proxy nào hoạt động tốt**: khi đó yêu cầu đi qua proxy chung, hoặc đi trực tiếp nếu chưa đặt proxy chung.
+- **Ba lần lỗi.** Một proxy chỉ rời vòng quay, và các tài khoản của nó chuyển sang proxy hoạt động tốt, sau ba lần kiểm tra hoặc kết nối lỗi liên tiếp; một lần thành công đặt lại bộ đếm. Yêu cầu lỗi ở một proxy vẫn thử lại ngay qua đường khác: chỉ tài khoản đó chuyển sang proxy hoạt động tốt khác, và proxy bị tính một lần lỗi. Proxy bị tự động tắt sẽ quay lại ngay khi một lần kiểm tra thành công. Lỗi proxy không bao giờ khóa hay tạm dừng tài khoản.
+- **Công tắc bật/tắt.** Mỗi proxy có công tắc riêng. Proxy đã tắt không bao giờ được dùng hay kiểm tra, các tài khoản của nó chuyển đi ngay, và không lần kiểm tra nào bật lại nó.
+- **Proxy phát hiện được.** Proxy outbound chung và proxy riêng của tài khoản hiện thành các mục phát hiện được, được kiểm tra như proxy trong nhóm và có đếm lỗi. Chúng không bao giờ dùng chung với tài khoản khác: proxy không có thông tin đăng nhập chỉ vào nhóm khi bạn bấm **Thêm vào nhóm**, còn proxy có thông tin đăng nhập thì không thể vào.
+- Thẻ đếm số proxy hoạt động tốt, có lỗi (vẫn trong vòng quay), tự động tắt và đã tắt.
+
+Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi kết nối trực tiếp. Khi không còn proxy nào trong nhóm hoạt động tốt, yêu cầu nhận HTTP 503 `no healthy outbound proxy in the pool`, trừ khi bật **Dự phòng khi không có proxy nào hoạt động tốt**: khi đó chúng dùng proxy chung, hoặc đi trực tiếp nếu chưa đặt proxy chung.
+
+---
+
+## 🔐 Đăng nhập hai bước
+
+**Cài đặt → Đăng nhập hai bước** yêu cầu mã sáu chữ số từ ứng dụng xác thực (Google Authenticator, 1Password, Aegis và các ứng dụng tương tự) sau mật khẩu quản trị.
+
+- **Bật** hiện mã QR và khóa bí mật dạng chữ. Một mã từ ứng dụng sẽ xác nhận, và mười mã khôi phục dùng một lần chỉ hiện một lần: hãy lưu ở nơi an toàn. Bật sẽ kết thúc mọi phiên đăng nhập khác.
+- Sau đó, đăng nhập yêu cầu mã sau mật khẩu. Mã khôi phục dùng thay được một lần. Mã theo RFC 6238 (SHA-1, 30 giây), chấp nhận lệch đồng hồ một bước mỗi phía, và mỗi mã chỉ dùng được một lần. Mã sai được tính chung giới hạn số lần thử với mật khẩu sai.
+- **Tắt** cần mã hiện tại hoặc mật khẩu quản trị. **Mã khôi phục mới** thay thế các mã cũ.
+- Script gửi mật khẩu qua `X-Admin-Password` sẽ nhận HTTP 401 `totp_required` khi tính năng đang bật: hãy đăng nhập bằng `POST /admin/api/session` với `{"password": "…", "code": "123456"}`, rồi gửi token qua `X-Admin-Token`.
+- Bị khóa ngoài? Khởi động máy chủ một lần với `ADMIN_RESET_2FA=1`. Nó tắt đăng nhập hai bước và ghi một cảnh báo; đăng nhập bằng mật khẩu, rồi gỡ biến này. `ADMIN_PASSWORD` và mật khẩu lần đầu vẫn hoạt động như trước.
+
+Khóa bí mật được lưu như mật khẩu quản trị, trong `kiro.db`; mã khôi phục chỉ được lưu dưới dạng hash SHA-256. Không cái nào được ghi vào log.
+
+---
+
+## 📈 Chỉ số Prometheus
+
+**Cài đặt → Chỉ số Prometheus** phục vụ `GET /metrics` theo định dạng văn bản của Prometheus. Mặc định tắt; khi bật sẽ tạo một bearer token, hiện trong thẻ cùng một job scrape `prometheus.yml` có sẵn. Không có token thì endpoint trả 401, còn khi tắt thì trả 404. **Token mới** thay token ngay lập tức.
+
+| Chỉ số | Loại | Nhãn |
+| ------ | ---- | ---- |
+| `kiro_requests_total` | counter | `outcome`, `status`, `model`, `account`, `api_key` |
+| `kiro_tokens_total` | counter | `kind` (input, output, cache_read, cache_write), `model`, `account`, `api_key` |
+| `kiro_credits_total` | counter | `model`, `account`, `api_key` |
+| `kiro_request_duration_seconds` | histogram | `endpoint`, `outcome` |
+| `kiro_upstream_errors_total` | counter | `category` (các loại lỗi của nhật ký yêu cầu), `account` |
+| `kiro_account_state`, `kiro_accounts` | gauge | `account`, `state` (active, cooldown, over_limit, banned, disabled) |
+| `kiro_account_usage_ratio` | gauge | `account` |
+| `kiro_proxy_state`, `kiro_proxy_failures`, `kiro_proxy_latency_seconds`, `kiro_proxies` | gauge | `proxy`, `kind` (pool, detected), `state` |
+| `kiro_build_info`, `kiro_uptime_seconds` | gauge | `version` |
+
+`account` là email của tài khoản, `api_key` là id của API key client (không bao giờ là key). Bộ đếm bắt đầu từ 0 khi máy chủ khởi động.
+
+---
+
+## 🧵 Hội thoại và chạy lại
+
+Mỗi yêu cầu đã định tuyến đều mang hội thoại của nó: khóa session affinity, giống nhau ở mọi lượt của một cuộc chat. Chi tiết yêu cầu mở được **Hội thoại**: các lượt theo thứ tự, tài khoản và model của từng lượt, các lần chuyển dự phòng, cùng tổng token, credit và thời gian. **Xem trong nhật ký** lọc trang Yêu cầu theo hội thoại đó.
+
+**Chạy lại** chạy lại một yêu cầu đã ghi, không dùng streaming, trên tài khoản và model bạn chọn, rồi hiện câu trả lời. Lần chạy được ghi thành một yêu cầu mới có đánh dấu chạy lại và tiêu credit của tài khoản đó. Chạy lại cần nội dung yêu cầu: máy chủ giữ nội dung 30 ngày, tối đa 2 MiB mỗi yêu cầu và 256 MiB tổng cộng, với API key của client được che. Chỉ dành cho quản trị.
 
 ---
 
@@ -384,6 +435,7 @@ Không có gì được kiểm tra khi chưa bật kênh nào, và **Gửi thử
 | `PORT`           | Cổng lắng nghe, từ 1 đến 65535 (ghi đè cấu hình). Giá trị không hợp lệ bị bỏ qua, kèm cảnh báo khi khởi động. Với Docker, hãy đổi phía host trong ánh xạ cổng | `8080` |
 | `KIRO_TOOL_MARKUP_RESCUE` | Đặt `off` để ngừng chuyển markup lệnh gọi tool mà Kiro để lọt vào văn bản câu trả lời trở lại thành lệnh gọi tool | on |
 | `LOG_LEVEL`      | Mức log: `debug`, `info`, `warn` hoặc `error` (ghi đè cấu hình) | `info` |
+| `ADMIN_RESET_2FA` | Đặt `1` để tắt đăng nhập hai bước của quản trị khi khởi động, nếu bạn mất cả ứng dụng lẫn mã khôi phục. Gỡ đi sau đó: khi còn đặt, mỗi lần khởi động sẽ tắt lại | — |
 
 ```diff
 + kiro.db                # local state — config, credentials, SQLite history, backup blobs
