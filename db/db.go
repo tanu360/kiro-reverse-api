@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+-- accounts holds one row per account, so a change to one account writes its
+-- row instead of the whole list. pos orders the list; it may have gaps.
+CREATE TABLE IF NOT EXISTS accounts (
+  id   TEXT PRIMARY KEY,
+  pos  INTEGER NOT NULL,
+  data TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS cooldowns (
   account_id TEXT PRIMARY KEY,
   expires_at INTEGER NOT NULL,

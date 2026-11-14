@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+
+	"kiro-proxy/db"
 )
 
+// credentialsKey is the legacy setting that held the whole account list as one
+// JSON value. The accounts table replaced it; migrateAccountRows moves it there.
 const credentialsKey = "credentials"
 const credentialsLoadedKey = "credentials_loaded"
 
@@ -19,24 +23,34 @@ func LoadCredentials() error {
 	credLock.Lock()
 	defer credLock.Unlock()
 
+	loadedRaw, _, err := getSetting(credentialsLoadedKey)
+	if err != nil {
+		return fmt.Errorf("read credentials flag: %w", err)
+	}
+	credentials, credLoaded, storedRows = []Account{}, loadedRaw == "1", nil
+	if !credLoaded {
+		return nil
+	}
+
+	//! A legacy list wins over the table: an older version wrote it last. migrateAccountRows moves it.
 	raw, ok, err := getSetting(credentialsKey)
 	if err != nil {
 		return fmt.Errorf("read credentials: %w", err)
 	}
-	loadedRaw, _, _ := getSetting(credentialsLoadedKey)
-
-	if !ok {
-		credentials = []Account{}
-		credLoaded = loadedRaw == "1"
+	if ok {
+		var arr []Account
+		if err := json.Unmarshal([]byte(raw), &arr); err != nil {
+			return fmt.Errorf("parse credentials: %w", err)
+		}
+		credentials = arr
 		return nil
 	}
 
-	var arr []Account
-	if err := json.Unmarshal([]byte(raw), &arr); err != nil {
-		return fmt.Errorf("parse credentials: %w", err)
+	list, stored, err := readAccountRows()
+	if err != nil {
+		return err
 	}
-	credentials = arr
-	credLoaded = loadedRaw == "1"
+	credentials, storedRows = list, stored
 	return nil
 }
 
@@ -60,28 +74,39 @@ func ReplaceCredentials(loaded bool, accounts []Account) error {
 	snapshot := make([]Account, len(accounts))
 	copy(snapshot, accounts)
 
+	var next map[string]storedRow
 	if loaded {
-		data, err := json.Marshal(snapshot)
-		if err != nil {
-			return fmt.Errorf("marshal credentials: %w", err)
+		var err error
+		if next, err = planAccountRows(snapshot, nil); err != nil {
+			return err
 		}
-		if err := setSetting(credentialsKey, string(data)); err != nil {
-			return fmt.Errorf("write credentials: %w", err)
-		}
-		if err := setSetting(credentialsLoadedKey, "1"); err != nil {
-			return fmt.Errorf("write credentials flag: %w", err)
-		}
-	} else {
-		if err := deleteSetting(credentialsKey); err != nil {
-			return fmt.Errorf("clear credentials: %w", err)
-		}
-		if err := setSetting(credentialsLoadedKey, "0"); err != nil {
-			return fmt.Errorf("write credentials flag: %w", err)
-		}
+	}
+	d, err := db.Get()
+	if err != nil {
+		return err
+	}
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := writeAccountRowsTx(tx, next, nil); err != nil {
+		return err
+	}
+	flag := "0"
+	if loaded {
+		flag = "1"
+	}
+	if _, err := tx.Exec(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, credentialsLoadedKey, flag); err != nil {
+		return fmt.Errorf("write credentials flag: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return err
 	}
 
 	credentials = snapshot
 	credLoaded = loaded
+	storedRows = next
 	return nil
 }
 
@@ -108,14 +133,6 @@ func GetCredentialByID(id string) *Account {
 	return nil
 }
 
-func saveCredentialsLocked() error {
-	data, err := json.Marshal(credentials)
-	if err != nil {
-		return fmt.Errorf("marshal credentials: %w", err)
-	}
-	return setSetting(credentialsKey, string(data))
-}
-
 func UpdateCredentialToken(id, accessToken, refreshToken string, expiresAt int64) error {
 	credLock.Lock()
 	defer credLock.Unlock()
@@ -126,7 +143,7 @@ func UpdateCredentialToken(id, accessToken, refreshToken string, expiresAt int64
 				credentials[i].RefreshToken = refreshToken
 			}
 			credentials[i].ExpiresAt = expiresAt
-			return saveCredentialsLocked()
+			return saveCredentialAtLocked(i)
 		}
 	}
 	return fmt.Errorf("credential not found: %s", id)
@@ -151,7 +168,7 @@ func UpdateCredentialInfo(id string, info AccountInfo) error {
 			credentials[i].TrialUsagePercent = info.TrialUsagePercent
 			credentials[i].TrialStatus = info.TrialStatus
 			credentials[i].TrialExpiresAt = info.TrialExpiresAt
-			return saveCredentialsLocked()
+			return saveCredentialAtLocked(i)
 		}
 	}
 	return fmt.Errorf("credential not found: %s", id)
@@ -167,7 +184,7 @@ func UpdateCredentialStats(id string, requestCount, errorCount, totalTokens int,
 			credentials[i].TotalTokens = totalTokens
 			credentials[i].TotalCredits = totalCredits
 			credentials[i].LastUsed = lastUsed
-			return saveCredentialsLocked()
+			return saveCredentialAtLocked(i)
 		}
 	}
 	return fmt.Errorf("credential not found: %s", id)
@@ -182,7 +199,7 @@ func UpdateCredentialProfileArn(id, profileArn string) error {
 				return nil
 			}
 			credentials[i].ProfileArn = profileArn
-			return saveCredentialsLocked()
+			return saveCredentialAtLocked(i)
 		}
 	}
 	return fmt.Errorf("credential not found: %s", id)
@@ -195,7 +212,7 @@ func PinCredentialProfileArn(id, profileArn string) error {
 		if credentials[i].ID == id {
 			credentials[i].ProfileArn = profileArn
 			credentials[i].ProfileArnPinned = profileArn != ""
-			return saveCredentialsLocked()
+			return saveCredentialAtLocked(i)
 		}
 	}
 	return fmt.Errorf("credential not found: %s", id)
@@ -218,7 +235,7 @@ func UpdateCredentialOverageStatus(id, status, capability string, cap, rate, cur
 			if checkedAt > 0 {
 				credentials[i].OverageCheckedAt = checkedAt
 			}
-			return saveCredentialsLocked()
+			return saveCredentialAtLocked(i)
 		}
 	}
 	return fmt.Errorf("credential not found: %s", id)
@@ -258,7 +275,7 @@ func UpdateCredential(acc Account) error {
 			preserveAccountCredentials(&acc, credentials[i])
 			preserveAccountMetadata(&acc, credentials[i])
 			credentials[i] = acc
-			return saveCredentialsLocked()
+			return saveCredentialAtLocked(i)
 		}
 	}
 	return fmt.Errorf("credential not found: %s", acc.ID)

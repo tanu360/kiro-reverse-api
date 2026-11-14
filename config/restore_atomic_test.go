@@ -79,7 +79,7 @@ func TestRestoreTransactionRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = d.Exec(`CREATE TRIGGER reject_restore BEFORE INSERT ON settings WHEN NEW.key='credentials' BEGIN SELECT RAISE(ABORT,'test failure'); END`)
+	_, err = d.Exec(`CREATE TRIGGER reject_restore BEFORE INSERT ON accounts BEGIN SELECT RAISE(ABORT,'test failure'); END`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,18 +100,33 @@ func TestRestoreCredentialModes(t *testing.T) {
 	if err := Init(t.TempDir() + "/kiro.db"); err != nil {
 		t.Fatal(err)
 	}
+	//! Either backup layout restores into the accounts table.
 	for _, loaded := range []bool{true, false, true} {
-		if err := writeRestoredConfig(&parsedBackup{config: *Get(), credentialsLoaded: loaded, credentials: []Account{{ID: "restored"}}}); err != nil {
+		backup := *Get()
+		backup.Accounts = []Account{{ID: "in-config"}}
+		if err := writeRestoredConfig(&parsedBackup{config: backup, credentialsLoaded: loaded, credentials: []Account{{ID: "restored"}}}); err != nil {
 			t.Fatal(err)
 		}
-		if CredentialsLoaded() != loaded {
-			t.Fatal("memory mode mismatch")
+		want := "in-config"
+		if loaded {
+			want = "restored"
 		}
-		if err := LoadCredentials(); err != nil {
-			t.Fatal(err)
-		}
-		if CredentialsLoaded() != loaded {
-			t.Fatal("persisted mode mismatch")
+		for _, stage := range []string{"memory", "persisted"} {
+			if stage == "persisted" {
+				if err := Load(); err != nil {
+					t.Fatal(err)
+				}
+				if err := LoadCredentials(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got := GetAccounts()
+			if !CredentialsLoaded() || len(got) != 1 || got[0].ID != want {
+				t.Fatalf("%s accounts after restoring loaded=%v: %+v", stage, loaded, got)
+			}
+			if n := len(Get().Accounts); n != 0 {
+				t.Fatalf("%s config still holds %d accounts", stage, n)
+			}
 		}
 	}
 }

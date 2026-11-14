@@ -307,6 +307,10 @@ func Init(path string) error {
 	if err := LoadCredentials(); err != nil {
 		return fmt.Errorf("load credentials: %w", err)
 	}
+	//! Not fatal: until it succeeds the accounts stay where they were, and the next start retries.
+	if err := migrateAccountRows(); err != nil {
+		logger.Errorf("[Accounts] Could not move the accounts to their own table: %v", err)
+	}
 	warnUnservedAPIKeyRegions()
 
 	return nil

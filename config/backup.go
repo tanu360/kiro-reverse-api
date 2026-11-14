@@ -484,12 +484,18 @@ func writeRestoredConfig(parsed *parsedBackup) error {
 	if password := os.Getenv("ADMIN_PASSWORD"); password != "" {
 		restored.Password = password
 	}
+	//! The accounts go to the accounts table whichever layout the backup used.
+	accounts := restored.Accounts
+	if parsed.credentialsLoaded {
+		accounts = parsed.credentials
+	}
+	accounts = withUniqueAccountIDs(accounts)
+	restored.Accounts = []Account{}
 	configData, err := json.Marshal(restored)
 	if err != nil {
 		return err
 	}
-	snapshot := append([]Account(nil), parsed.credentials...)
-	credentialData, err := json.Marshal(snapshot)
+	rows, err := planAccountRows(accounts, nil)
 	if err != nil {
 		return err
 	}
@@ -513,24 +519,19 @@ func writeRestoredConfig(parsed *parsedBackup) error {
 	if err := put("config", string(configData)); err != nil {
 		return err
 	}
-	flag := "0"
-	if parsed.credentialsLoaded {
-		flag = "1"
-		if err := put(credentialsKey, string(credentialData)); err != nil {
-			return err
-		}
-	} else if _, err := tx.Exec(`DELETE FROM settings WHERE key=?`, credentialsKey); err != nil {
+	if err := writeAccountRowsTx(tx, rows, nil); err != nil {
 		return err
 	}
-	if err := put(credentialsLoadedKey, flag); err != nil {
+	if err := put(credentialsLoadedKey, "1"); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
 	cfg = &restored
-	credentials = snapshot
-	credLoaded = parsed.credentialsLoaded
+	credentials = accounts
+	credLoaded = true
+	storedRows = rows
 	return nil
 }
 
