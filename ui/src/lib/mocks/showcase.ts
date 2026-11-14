@@ -95,6 +95,7 @@ export function applyShowcase(): void {
   ids.slice(0, 9).forEach((accountId, index) => {
     assignments[accountId] = index % 3 === 2 ? "p2" : "p1";
   });
+  // The proxy pool's times are Unix milliseconds, as the server sends them; `now` is seconds.
   seedProxyPoolMock({
     mode: "on",
     directFallback: true,
@@ -106,8 +107,8 @@ export function applyShowcase(): void {
         url: "socks5h://de1.proxy.northwind.studio:1080",
         username: "kiro",
         password: "showcase-secret",
-        createdAt: now - 12 * DAY,
-        health: { status: "ok", checkedAt: now - 4 * 60, latencyMs: 182 },
+        createdAt: (now - 12 * DAY) * 1000,
+        health: { status: "ok", checkedAt: (now - 4 * 60) * 1000, latencyMs: 182 },
       },
       {
         id: "p2",
@@ -115,8 +116,8 @@ export function applyShowcase(): void {
         url: "http://us-east.proxy.northwind.studio:3128",
         username: "",
         password: "",
-        createdAt: now - 9 * DAY,
-        health: { status: "ok", checkedAt: now - 4 * 60, latencyMs: 64 },
+        createdAt: (now - 9 * DAY) * 1000,
+        health: { status: "ok", checkedAt: (now - 4 * 60) * 1000, latencyMs: 64 },
       },
       {
         id: "p3",
@@ -124,11 +125,11 @@ export function applyShowcase(): void {
         url: "https://sg.proxy.northwind.studio:8443",
         username: "kiro",
         password: "showcase-secret",
-        createdAt: now - 3 * DAY,
+        createdAt: (now - 3 * DAY) * 1000,
         health: {
           status: "failed",
-          checkedAt: now - 4 * 60,
-          failedAt: now - 4 * 60,
+          checkedAt: (now - 4 * 60) * 1000,
+          failedAt: (now - 4 * 60) * 1000,
           lastError: "proxyconnect tcp: dial tcp: i/o timeout",
           errorCode: "timeout",
         },
@@ -139,7 +140,7 @@ export function applyShowcase(): void {
         url: "socks5://10.0.0.24:1080",
         username: "",
         password: "",
-        createdAt: now - 20 * 60,
+        createdAt: (now - 20 * 60) * 1000,
         health: { status: "unknown" },
       },
     ],

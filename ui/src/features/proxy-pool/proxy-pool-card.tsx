@@ -473,7 +473,8 @@ function StateNote({
         <>
           {" "}
           {t("card.lastError", { error: proxyFailureSentence(errorCode, errorStatus, t) })}{" "}
-          <InfoHint hint={mask(lastError)} side="bottom">
+          {/* The link look of Settings' "Learn more": the raw error is a longer note. */}
+          <InfoHint hint={mask(lastError)} variant="link">
             {t("card.lastErrorDetails")}
           </InfoHint>
         </>
