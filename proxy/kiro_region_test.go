@@ -17,6 +17,10 @@ func clearProfileArnResolutionCooldowns() {
 		profileArnResolutionCooldowns.Delete(key)
 		return true
 	})
+	inferredBuilderIDAccounts.Range(func(key, _ interface{}) bool {
+		inferredBuilderIDAccounts.Delete(key)
+		return true
+	})
 }
 
 func stubRestTransport(t *testing.T, fn roundTripFunc) {
@@ -236,6 +240,82 @@ func TestBuilderIDUsesFixedProfileArnWithoutLookup(t *testing.T) {
 	pinned.ProfileArn = "arn:aws:codewhisperer:us-east-1:123456789012:profile/stored"
 	if got, err := ResolveProfileArn(&pinned); err != nil || got != pinned.ProfileArn {
 		t.Fatalf("a stored profile must win over the fixed Builder ID profile, got %q, %v", got, err)
+	}
+}
+
+func TestBuilderIDWithoutProviderGetsFixedProfileArn(t *testing.T) {
+	const denied = `{"message":"User is not authorized to access this feature.","reason":null}`
+	cases := []struct {
+		name     string
+		account  config.Account
+		lookup   *http.Response
+		inferred bool
+	}{
+		{"no provider", config.Account{AuthMethod: "idc"}, jsonResponse(http.StatusForbidden, denied), true},
+		{"builder id start url", config.Account{AuthMethod: "idc", StartUrl: "https://view.awsapps.com/start/"}, jsonResponse(http.StatusForbidden, denied), true},
+		{"identity center start url", config.Account{AuthMethod: "idc", StartUrl: "https://d-1234567890.awsapps.com/start"}, jsonResponse(http.StatusForbidden, denied), false},
+		{"enterprise provider", config.Account{AuthMethod: "idc", Provider: "Enterprise"}, jsonResponse(http.StatusForbidden, denied), false},
+		{"social", config.Account{AuthMethod: "social"}, jsonResponse(http.StatusForbidden, denied), false},
+		{"other 403", config.Account{AuthMethod: "idc"}, jsonResponse(http.StatusForbidden, `{"message":"forbidden"}`), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			clearProfileArnResolutionCooldowns()
+			t.Cleanup(clearProfileArnResolutionCooldowns)
+			if err := config.Init(tempDBPath(t)); err != nil {
+				t.Fatalf("init config: %v", err)
+			}
+			stored := tc.account
+			stored.ID = "acct-" + strings.ReplaceAll(tc.name, " ", "-")
+			stored.Email = "user@example.com"
+			stored.AccessToken = "token"
+			stored.Region = "us-east-1"
+			stored.Enabled = true
+			if err := config.AddAccount(stored); err != nil {
+				t.Fatalf("add account: %v", err)
+			}
+			lookupBody, _ := io.ReadAll(tc.lookup.Body)
+
+			var lookups int32
+			var usageProfileArn string
+			stubRestTransport(t, func(req *http.Request) (*http.Response, error) {
+				switch req.URL.Path {
+				case "/ListAvailableProfiles":
+					atomic.AddInt32(&lookups, 1)
+					return jsonResponse(tc.lookup.StatusCode, string(lookupBody)), nil
+				case "/getUsageLimits":
+					usageProfileArn = req.URL.Query().Get("profileArn")
+					return jsonResponse(http.StatusOK, `{}`), nil
+				}
+				t.Fatalf("unexpected request %s", req.URL.Path)
+				return nil, nil
+			})
+
+			account := stored
+			got, err := ResolveProfileArn(&account)
+			if !tc.inferred {
+				if err == nil || got != "" || isBuilderIDAccount(&account) {
+					t.Fatalf("expected no profile and no Builder ID guess, got %q, %v", got, err)
+				}
+				return
+			}
+			if err != nil || got != builderIDProfileArn {
+				t.Fatalf("expected the fixed Builder ID profile, got %q, %v", got, err)
+			}
+			probes := atomic.LoadInt32(&lookups)
+			if _, err := GetUsageLimits(&account); err != nil {
+				t.Fatalf("GetUsageLimits: %v", err)
+			}
+			if usageProfileArn != builderIDProfileArn {
+				t.Fatalf("expected usage request to name the fixed Builder ID profile, got %q", usageProfileArn)
+			}
+			if atomic.LoadInt32(&lookups) != probes {
+				t.Fatalf("a recognised Builder ID account must not look up profiles again")
+			}
+			if account.ProfileArn != "" || config.GetAccounts()[0].ProfileArn != "" || config.GetAccounts()[0].Provider != stored.Provider {
+				t.Fatalf("the guess must stay in memory and never be stored")
+			}
+		})
 	}
 }
 

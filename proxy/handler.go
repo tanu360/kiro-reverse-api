@@ -3711,6 +3711,10 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case methodHint == "idc" || methodHint == "builderid" || methodHint == "enterprise":
 		req.AuthMethod = "idc"
+		if methodHint == "builderid" && strings.TrimSpace(req.Provider) == "" {
+			//! The fixed Builder ID profile is chosen by provider, so the hint must not be lost.
+			req.Provider = "BuilderId"
+		}
 	case methodHint == "social" || methodHint == "google" || methodHint == "github":
 		req.AuthMethod = "social"
 	case isMicrosoftImport(methodHint, req.Provider, req.TokenEndpoint, req.IssuerURL, req.UserID, req.ClientID, req.AccessToken):

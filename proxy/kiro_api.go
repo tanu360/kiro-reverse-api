@@ -26,6 +26,7 @@ const (
 	//! Kiro IDE, kiro-cli and KiroCrew name this fixed profile for every AWS Builder ID sign-in.
 	//! Builder ID owns no profile and ListAvailableProfiles answers it 403, yet clients >= 0.11.133 must name one.
 	builderIDProfileArn = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX"
+	builderIDStartURL   = "https://view.awsapps.com/start"
 
 	profileLookupFailureTTL = 10 * time.Minute
 	maxProfilePages         = 20
@@ -35,6 +36,10 @@ const (
 )
 
 var profileArnResolutionCooldowns sync.Map
+
+// inferredBuilderIDAccounts holds the IDs of accounts stored without a provider
+// whose profile lookups answered the way Builder ID does. It lives in memory only.
+var inferredBuilderIDAccounts sync.Map
 
 func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
 	ensureRestProfileArn(account)
@@ -183,6 +188,13 @@ func resolveProfileArnContext(ctx context.Context, account *config.Account) (str
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+	//! An import can leave out provider=BuilderId. Such a sign-in owns no profile, so every region answers 403;
+	//! it gets the fixed profile like a labelled one, and the refresh below would only rotate its token.
+	if maybeBuilderIDAccount(account) && profileLookupDeniedEverywhere(lookupErr) {
+		inferredBuilderIDAccounts.Store(account.ID, struct{}{})
+		logger.Infof("[ProfileArn] %s has no provider and no profile of its own; sending the fixed Builder ID profile", accountEmailForLog(account))
+		return builderIDProfileArn, nil
+	}
 
 	//! AWS refresh responses can carry profileArn, so refresh stays the fallback. Entra refresh never does.
 	//! A forced refresh rotates the refresh token and holds the account refresh lock, so it runs once per failure window, not per call.
@@ -220,7 +232,52 @@ func resolveProfileArnContext(ctx context.Context, account *config.Account) (str
 }
 
 func isBuilderIDAccount(account *config.Account) bool {
-	return account != nil && strings.EqualFold(strings.TrimSpace(account.Provider), "BuilderId")
+	if account == nil {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(account.Provider), "BuilderId") {
+		return true
+	}
+	if account.ID == "" || strings.TrimSpace(account.Provider) != "" {
+		return false
+	}
+	_, inferred := inferredBuilderIDAccounts.Load(account.ID)
+	return inferred
+}
+
+// maybeBuilderIDAccount reports whether a stored AWS sign-in without a provider
+// could be Builder ID: IAM Identity Center logins keep their own start URL.
+func maybeBuilderIDAccount(account *config.Account) bool {
+	if account == nil || account.ID == "" || strings.TrimSpace(account.Provider) != "" {
+		return false
+	}
+	if config.IsAPIKeyAccount(account) || config.IsExternalIdpAccount(account) || !strings.EqualFold(account.AuthMethod, "idc") {
+		return false
+	}
+	startURL := strings.TrimRight(strings.TrimSpace(account.StartUrl), "/")
+	return startURL == "" || strings.EqualFold(startURL, builderIDStartURL)
+}
+
+// profileLookupDeniedEverywhere reports whether every region refused the
+// profile lookup with the 403 Builder ID gets: "not authorized to access this feature".
+func profileLookupDeniedEverywhere(err error) bool {
+	if err == nil {
+		return false
+	}
+	errs := []error{err}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		errs = joined.Unwrap()
+	}
+	if len(errs) == 0 {
+		return false
+	}
+	for _, e := range errs {
+		msg := strings.ToLower(e.Error())
+		if !strings.Contains(msg, "http 403") || !strings.Contains(msg, "not authorized to access this feature") {
+			return false
+		}
+	}
+	return true
 }
 
 // requestProfileArn is the profile ARN a request for account names without a
