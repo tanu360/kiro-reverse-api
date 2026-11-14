@@ -91,3 +91,49 @@ export function apiKeyUsageQuery(range: ApiKeyUsageRange, tzOffset = browserTzOf
     staleTime: 30_000,
   });
 }
+
+/** One model's or one account's share of a usage row (GET /api-keys/usage/breakdown). */
+export interface ApiKeyUsageBreakdownItem {
+  /** The model name, or the account ID ("" for requests that reached no account). */
+  id: string;
+  /** An account's email; absent for a model and for an account that no longer exists. */
+  label?: string;
+  requests: number;
+  succeeded: number;
+  failed: number;
+  tokens: number;
+  credits: number;
+}
+
+export interface ApiKeyUsageBreakdown {
+  ref: string;
+  range: ApiKeyUsageRange;
+  from: number;
+  to: number;
+  /** Busiest first. */
+  models: ApiKeyUsageBreakdownItem[];
+  /** Busiest first. */
+  accounts: ApiKeyUsageBreakdownItem[];
+}
+
+export function getApiKeyUsageBreakdown(
+  ref: string,
+  range: ApiKeyUsageRange,
+  tzOffset: number,
+): Promise<ApiKeyUsageBreakdown> {
+  return apiRequest("/api-keys/usage/breakdown", { query: { ref, range, tzOffset } });
+}
+
+/** One usage row split by model and by account, over the same window as apiKeyUsageQuery. */
+export function apiKeyUsageBreakdownQuery(
+  ref: string,
+  range: ApiKeyUsageRange,
+  tzOffset = browserTzOffset(),
+) {
+  return queryOptions({
+    queryKey: [...queryKeys.apiKeys.all, "usage", "breakdown", ref, range, tzOffset] as const,
+    queryFn: () => getApiKeyUsageBreakdown(ref, range, tzOffset),
+    refetchInterval: range === "all" ? 300_000 : 60_000,
+    staleTime: 30_000,
+  });
+}

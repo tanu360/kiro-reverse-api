@@ -532,7 +532,8 @@ function MaskedKey({ apiKey, fill = false }: { apiKey: ApiKey; fill?: boolean })
   );
 }
 
-function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
+/** The key's state and access badges, shared with the usage sheet. */
+export function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <StatusBadge apiKey={apiKey} />
@@ -633,7 +634,8 @@ function UsageLine({
   );
 }
 
-function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
+/** The key's limits as meters, or Unlimited; shared with the usage sheet. */
+export function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const { t, lang } = useT("api");
   const tokenLimit = apiKey.tokenLimit ?? 0;
   const creditLimit = apiKey.creditLimit ?? 0;

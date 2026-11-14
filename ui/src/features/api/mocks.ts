@@ -1,10 +1,12 @@
 import { type HttpHandler, HttpResponse, http } from "msw";
 import type {
+  ApiKeyUsageBreakdown,
+  ApiKeyUsageBreakdownItem,
   ApiKeyUsageEntry,
   ApiKeyUsageResponse,
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
-import type { ApiKey } from "@/lib/api/types";
+import type { ApiKey, RequestRecord } from "@/lib/api/types";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import { publishMockEvent } from "@/lib/mocks/events";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "@/lib/mocks/http";
@@ -224,7 +226,74 @@ function buildUsage(
   };
 }
 
+/** GET /api-keys/usage/breakdown: one row's records by model and by account (the mock keeps no rollups). */
+function buildBreakdown(
+  nowUnix: number,
+  ref: string,
+  range: string,
+  spec: { bucket: "hour" | "day"; seconds: number; count: number } | undefined,
+  tzOffset: number,
+): ApiKeyUsageBreakdown {
+  const usage = buildUsage(nowUnix, range, spec, tzOffset);
+  const matches = (record: RequestRecord) => {
+    const id = record.apiKeyId ?? "";
+    if (ref === "none") return !id;
+    if (ref === "invalid") return false;
+    return id !== "" && ref.endsWith(`:${id}`);
+  };
+  const models = new Map<string, ApiKeyUsageBreakdownItem>();
+  const accounts = new Map<string, ApiKeyUsageBreakdownItem>();
+  const add = (map: Map<string, ApiKeyUsageBreakdownItem>, id: string, record: RequestRecord) => {
+    const item = map.get(id) ?? { id, requests: 0, succeeded: 0, failed: 0, tokens: 0, credits: 0 };
+    item.requests += 1;
+    if (record.success) item.succeeded += 1;
+    else item.failed += 1;
+    item.tokens += record.totalTokens;
+    item.credits += record.credits;
+    map.set(id, item);
+  };
+  for (const record of mockDb.requests) {
+    if (record.ts < usage.from || record.ts >= usage.to || !matches(record)) continue;
+    add(models, record.model, record);
+    add(accounts, record.accountId, record);
+  }
+  const busiest = (a: ApiKeyUsageBreakdownItem, b: ApiKeyUsageBreakdownItem) =>
+    b.requests - a.requests || b.credits - a.credits || a.id.localeCompare(b.id);
+  const emails = new Map(mockDb.accounts.map((account) => [account.id, account.email]));
+  return {
+    ref,
+    range: usage.range,
+    from: usage.from,
+    to: usage.to,
+    models: [...models.values()].sort(busiest),
+    accounts: [...accounts.values()].sort(busiest).map((item) => {
+      const email = emails.get(item.id);
+      return email ? { ...item, label: email } : item;
+    }),
+  };
+}
+
 export const handlers: HttpHandler[] = [
+  http.get(apiUrl("/api-keys/usage/breakdown"), async ({ request }) => {
+    const denied = requireAuth(request);
+    if (denied) return denied;
+    await mockDelay();
+    const url = new URL(request.url);
+    const ref = url.searchParams.get("ref") ?? "";
+    if (!/^(none|invalid|(key|deleted):.+)$/.test(ref)) {
+      return jsonError(400, "ref must be key:<id>, deleted:<id>, none or invalid", {
+        code: "invalid_usage_ref",
+      });
+    }
+    const range = url.searchParams.get("range") || "24h";
+    const spec = USAGE_RANGES[range];
+    if (!spec && range !== "all") {
+      return jsonError(400, "range must be 24h, 7d, 30d or all", { code: "invalid_usage_range" });
+    }
+    const tzOffset = Number(url.searchParams.get("tzOffset") || "0") || 0;
+    return HttpResponse.json(buildBreakdown(mockNowUnix(), ref, range, spec, tzOffset));
+  }),
+
   http.get(apiUrl("/api-keys"), async ({ request }) => {
     const denied = requireAuth(request);
     if (denied) return denied;

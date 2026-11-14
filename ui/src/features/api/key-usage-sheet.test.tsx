@@ -194,7 +194,8 @@ describe("ApiKeyUsageSheet", () => {
       />,
     );
     const sheet = await screen.findByRole("dialog", { name: "Unnamed key" });
-    expect(await within(sheet).findByText("No usage in this range")).toBeInTheDocument();
+    // The chart and both breakdowns say so.
+    expect(await within(sheet).findAllByText("No usage in this range")).not.toHaveLength(0);
     expect(within(sheet).getByText("sk-qui****0002")).toBeInTheDocument();
     // Zero totals, not blanks: the range loaded, the key just has nothing in it.
     expect(within(legend(sheet)).getAllByText("0")).toHaveLength(2);
@@ -230,5 +231,80 @@ describe("ApiKeyUsageSheet", () => {
     // The seeded log has team-a traffic in the last 24 hours.
     expect(await within(legend(sheet)).findByText("Succeeded")).toBeInTheDocument();
     await waitFor(() => expect(within(sheet).queryByText("No usage in this range")).toBeNull());
+  });
+  it("splits the key's usage by model and account and shows the key's details", async () => {
+    serveUsage();
+    mockServer.use(
+      http.get(apiUrl("/api-keys/usage/breakdown"), ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("ref")).toBe("key:quiet");
+        return HttpResponse.json({
+          ref: "key:quiet",
+          range: url.searchParams.get("range"),
+          from: 0,
+          to: 1,
+          models: [
+            {
+              id: "claude-sonnet-4.5",
+              requests: 3,
+              succeeded: 3,
+              failed: 0,
+              tokens: 30,
+              credits: 1,
+            },
+            { id: "claude-haiku-4.5", requests: 1, succeeded: 0, failed: 1, tokens: 5, credits: 0 },
+          ],
+          accounts: [
+            {
+              id: "acc-1",
+              label: "one@example.com",
+              requests: 3,
+              succeeded: 3,
+              failed: 0,
+              tokens: 30,
+              credits: 1,
+            },
+            { id: "acc-gone", requests: 1, succeeded: 0, failed: 1, tokens: 5, credits: 0 },
+          ],
+        });
+      }),
+      http.get(apiUrl("/api-keys"), () =>
+        HttpResponse.json({
+          apiKeys: [
+            {
+              id: "quiet",
+              name: "quiet key",
+              keyMasked: "sk-qui****0002",
+              enabled: true,
+              createdAt: 1_790_000_000,
+              tokensUsed: 0,
+              creditsUsed: 0,
+              requestsCount: 4,
+              accountIds: ["acc-1"],
+            },
+          ],
+        }),
+      ),
+    );
+    renderWithProviders(
+      <ApiKeyUsageSheet
+        entryRef="key:quiet"
+        identity={{ kind: "key", name: "quiet key", keyMasked: "sk-qui****0002" }}
+        onOpenChange={() => {}}
+        open
+      />,
+    );
+    const sheet = await screen.findByRole("dialog", { name: "quiet key" });
+    const models = await within(sheet).findByRole("list", { name: "Models" });
+    expect(within(models).getByText("claude-sonnet-4.5")).toBeInTheDocument();
+    expect(within(models).getByText("75%")).toBeInTheDocument();
+    const accounts = within(sheet).getByRole("list", { name: "Accounts" });
+    // Emails follow privacy mode, which the tests start in: masked.
+    expect(accounts.textContent).toContain("@ex");
+    expect(accounts.textContent).not.toContain("one@example.com");
+    expect(within(accounts).getByText("Deleted account")).toBeInTheDocument();
+    // A configured key also shows its state, account binding and limits.
+    expect(await within(sheet).findByText("Key details")).toBeInTheDocument();
+    expect(within(sheet).getByText("Accounts it can use")).toBeInTheDocument();
   });
 });

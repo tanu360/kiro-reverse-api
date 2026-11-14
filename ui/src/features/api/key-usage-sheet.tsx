@@ -1,4 +1,9 @@
-import { ChartLineData02Icon } from "@hugeicons/core-free-icons";
+import {
+  AiBrain01Icon,
+  ChartLineData02Icon,
+  KeyRoundIcon,
+  UsersIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, lazy, Suspense, useMemo, useState } from "react";
@@ -13,6 +18,8 @@ import {
 } from "@/components/charts/legend";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { PropertyList, PropertyRow } from "@/components/shared/property-list";
+import { RelativeTime } from "@/components/shared/relative-time";
 import {
   ResponsiveSheet,
   ResponsiveSheetDescription,
@@ -21,6 +28,8 @@ import {
   ResponsiveSheetTitle,
 } from "@/components/shared/responsive-sheet";
 import { SectionCard } from "@/components/shared/section-card";
+import { StatStrip } from "@/components/shared/stat-strip";
+import { Card } from "@/components/ui/card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { FAILED_COLOR, MODEL_COLORS, SUCCEEDED_COLOR } from "@/features/overview/colors";
@@ -29,11 +38,21 @@ import {
   API_KEY_USAGE_RANGES,
   type ApiKeyUsageRange,
   type ApiKeyUsageTotals,
+  apiKeyUsageBreakdownQuery,
   apiKeyUsageQuery,
 } from "@/lib/api/api-key-usage";
-import { formatCredits, formatNumber } from "@/lib/format";
+import { apiKeysQuery } from "@/lib/api/api-keys";
+import {
+  formatCompact,
+  formatCredits,
+  formatDateTime,
+  formatFraction,
+  formatNumber,
+} from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { KeyStatus, KeyUsage } from "./api-keys-card";
+import { UsageBreakdownCard } from "./key-usage-breakdown";
 import type { UsageSeries } from "./key-usage-chart";
 import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
 import {
@@ -91,11 +110,12 @@ export interface ApiKeyUsageSheetProps {
 }
 
 /**
- * One key's usage over 24 hours (hourly bars), 7 or 30 days (daily bars) or all time (bars of a
- * day, week, month or year, by the span of the log): requests split succeeded and failed, tokens
- * split input and output, or credits. It reads the same query as the
- * Usage by key card, so opening it from there sends no request. Mount it with a fresh `key` per
- * opening so the range and measure start over.
+ * One key's usage over 24 hours (hourly bars), 7 or 30 days (daily bars) or the lifetime (bars of
+ * a day, week, month or year, by the span of the log): its headline numbers, a chart of requests
+ * (succeeded and failed), tokens (input and output) or credits, donuts of the models and accounts
+ * it used, and for a configured key its state, limits and dates. The usage reads the same query
+ * as the Usage by key card, so opening it from there sends no request for it. Mount it with a
+ * fresh `key` per opening so the range and measure start over.
  */
 export function ApiKeyUsageSheet({
   open,
@@ -110,8 +130,14 @@ export function ApiKeyUsageSheet({
   const [range, setRange] = useState<ApiKeyUsageRange>(initialRange);
   const [metric, setMetric] = useState<UsageMetric>("requests");
   const query = useQuery({ ...apiKeyUsageQuery(range), enabled: open });
+  const breakdown = useQuery({ ...apiKeyUsageBreakdownQuery(ref, range), enabled: open });
+  const keys = useQuery({ ...apiKeysQuery(), enabled: open });
   const data = query.data;
   const entry = findEntry(data, ref);
+  // The configured key behind a key row: its state, limits and dates.
+  const apiKey = ref.startsWith("key:")
+    ? keys.data?.find((candidate) => `key:${candidate.id}` === ref)
+    : undefined;
   // The latest name and masked key when the range has the row; what the opener knew otherwise.
   const shown = label(entry ?? identity);
   const series = metricSeries(metric, t);
@@ -235,47 +261,80 @@ export function ApiKeyUsageSheet({
         </div>
       </ResponsiveSheetHeader>
       <ResponsiveSheetPanel className="flex flex-col gap-4">
-        {/* Two radio groups; at 390 px the measure wraps under the range. */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <SegmentedControl
-            render={
-              <RadioGroupPrimitive
-                aria-label={t("usage.range")}
-                onValueChange={(next) => {
-                  if (isRange(next)) setRange(next);
-                }}
-                value={range}
-              />
-            }
-            size="sm"
-          >
-            {API_KEY_USAGE_RANGES.map((value) => (
-              <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
-                {t(`usage.range.${value}`)}
-              </SegmentedControlItem>
-            ))}
-          </SegmentedControl>
-          <SegmentedControl
-            render={
-              <RadioGroupPrimitive
-                aria-label={t("usage.metric")}
-                onValueChange={(next) => {
-                  if (isUsageMetric(next, SHEET_METRICS)) setMetric(next);
-                }}
-                value={metric}
-              />
-            }
-            size="sm"
-          >
-            {SHEET_METRICS.map((value) => (
-              <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
-                {t(`usage.metric.${value}`)}
-              </SegmentedControlItem>
-            ))}
-          </SegmentedControl>
-        </div>
+        <SegmentedControl
+          className="self-start"
+          render={
+            <RadioGroupPrimitive
+              aria-label={t("usage.range")}
+              onValueChange={(next) => {
+                if (isRange(next)) setRange(next);
+              }}
+              value={range}
+            />
+          }
+          size="sm"
+        >
+          {API_KEY_USAGE_RANGES.map((value) => (
+            <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
+              {t(`usage.range.${value}`)}
+            </SegmentedControlItem>
+          ))}
+        </SegmentedControl>
+        {/* The range's headline numbers, as the account sheet's statistics. */}
+        <Card className="@container min-w-0">
+          <StatStrip
+            items={[
+              {
+                label: t("usage.metric.requests"),
+                value: data ? formatNumber(totals?.requests ?? 0, lang) : "—",
+              },
+              {
+                label: t("usage.failed"),
+                value:
+                  data && totals && totals.requests > 0 ? (
+                    <span className="inline-flex items-baseline gap-1.5">
+                      {formatNumber(totals.failed, lang)}
+                      <span className="font-normal text-meta text-muted-foreground">
+                        {formatFraction(totals.failed / totals.requests, 1, lang)}
+                      </span>
+                    </span>
+                  ) : (
+                    "—"
+                  ),
+              },
+              {
+                label: t("usage.metric.credits"),
+                value: data ? formatCredits(totals?.credits ?? 0, 2, lang) : "—",
+              },
+              {
+                label: t("usage.metric.tokens"),
+                value: data ? formatCompact(totals?.tokens ?? 0, lang) : "—",
+              },
+            ]}
+          />
+        </Card>
         <ChartLegendHoverProvider>
           <SectionCard
+            actions={
+              <SegmentedControl
+                render={
+                  <RadioGroupPrimitive
+                    aria-label={t("usage.metric")}
+                    onValueChange={(next) => {
+                      if (isUsageMetric(next, SHEET_METRICS)) setMetric(next);
+                    }}
+                    value={metric}
+                  />
+                }
+                size="sm"
+              >
+                {SHEET_METRICS.map((value) => (
+                  <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
+                    {t(`usage.metric.${value}`)}
+                  </SegmentedControlItem>
+                ))}
+              </SegmentedControl>
+            }
             description={range === "all" ? t(`usage.per.all.${bucket}`) : t(`usage.per.${range}`)}
             descriptionVariant="inline"
             icon={ChartLineData02Icon}
@@ -284,6 +343,56 @@ export function ApiKeyUsageSheet({
             {body}
           </SectionCard>
         </ChartLegendHoverProvider>
+        <UsageBreakdownCard
+          error={breakdown.error}
+          icon={AiBrain01Icon}
+          items={breakdown.data?.models}
+          kind="models"
+          loading={breakdown.isPending}
+          onRetry={() => void breakdown.refetch()}
+          retrying={breakdown.isFetching}
+          title={t("usage.models")}
+        />
+        <UsageBreakdownCard
+          error={breakdown.error}
+          icon={UsersIcon}
+          items={breakdown.data?.accounts}
+          kind="accounts"
+          loading={breakdown.isPending}
+          onRetry={() => void breakdown.refetch()}
+          retrying={breakdown.isFetching}
+          title={t("usage.accounts")}
+        />
+        {apiKey ? (
+          <SectionCard icon={KeyRoundIcon} slim title={t("usage.keyDetails")}>
+            <PropertyList>
+              <PropertyRow label={t("keys.status")} value={<KeyStatus apiKey={apiKey} />} />
+              <PropertyRow
+                label={t("usage.allowedAccounts")}
+                value={
+                  apiKey.accountIds?.length
+                    ? t("keys.boundAccounts", {
+                        count: apiKey.accountIds.length,
+                        n: formatNumber(apiKey.accountIds.length, lang),
+                      })
+                    : t("usage.everyAccount")
+                }
+              />
+              <PropertyRow
+                label={t("keys.lastUsed")}
+                value={apiKey.lastUsedAt ? <RelativeTime value={apiKey.lastUsedAt} /> : ""}
+              />
+              <PropertyRow
+                label={t("usage.created")}
+                value={formatDateTime(apiKey.createdAt, lang)}
+              />
+            </PropertyList>
+            <div className="px-4 py-4 sm:px-6">
+              <p className="mb-3 font-medium text-sm">{t("keys.usage")}</p>
+              <KeyUsage apiKey={apiKey} />
+            </div>
+          </SectionCard>
+        ) : null}
       </ResponsiveSheetPanel>
     </ResponsiveSheet>
   );
