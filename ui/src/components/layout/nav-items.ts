@@ -70,8 +70,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
       { id: "disabled", labelKey: "accounts:health.disabled", to: "/accounts", status: "disabled" },
     ],
   },
-  { id: "api", to: "/api", icon: PlugIcon, labelKey: "nav.api", group: "manage" },
-  { id: "backups", to: "/backups", icon: ArchiveIcon, labelKey: "nav.backups", group: "manage" },
   {
     id: "settings",
     to: "/settings",
@@ -84,6 +82,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
       { id: "settings-security", labelKey: "settings:pages.security", to: "/settings/security" },
     ],
   },
+  { id: "api", to: "/api", icon: PlugIcon, labelKey: "nav.api", group: "manage" },
+  { id: "backups", to: "/backups", icon: ArchiveIcon, labelKey: "nav.backups", group: "manage" },
 ];
 
 export const NAV_GROUPS: readonly NavItem["group"][] = ["monitor", "manage"];
