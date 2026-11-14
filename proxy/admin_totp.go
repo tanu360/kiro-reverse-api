@@ -25,6 +25,9 @@ const (
 	codeTOTPNotOn            = "totp_not_enabled"
 	codeTOTPResetByEnv       = "totp_reset_by_env"
 	codeTOTPProofRequired    = "totp_proof_required"
+	// codeAdminPasswordWrong is a wrong password sent as proof by a signed-in admin: a 403,
+	// since a 401 would read as the session itself expiring.
+	codeAdminPasswordWrong = "admin_password_wrong"
 )
 
 const (
@@ -177,8 +180,9 @@ func (s *adminTOTPState) acceptCode(secret, code string, now time.Time) codeResu
 
 // checkSecondFactor verifies a code or a recovery code under the admin guess
 // limiter: a wrong one uses a guess, a right one gives it back. It writes the
-// error itself and reports whether the factor passed.
-func (h *Handler) checkSecondFactor(w http.ResponseWriter, r *http.Request, code, recoveryCode string) bool {
+// error itself, with failStatus (401 at sign-in, 403 for a signed-in admin), and
+// reports whether the factor passed.
+func (h *Handler) checkSecondFactor(w http.ResponseWriter, r *http.Request, code, recoveryCode string, failStatus int) bool {
 	result := codeWrong
 	usedRecovery := false
 	valid, delay := h.adminGuesses.check(adminRemoteHost(r), time.Now(), func() bool {
@@ -200,9 +204,9 @@ func (h *Handler) checkSecondFactor(w http.ResponseWriter, r *http.Request, code
 	if !valid {
 		w.Header().Set("Content-Type", "application/json")
 		if result == codeReused {
-			writeAdminError(w, http.StatusUnauthorized, codeTOTPReused, "This two-factor code was used already; wait for the next one")
+			writeAdminError(w, failStatus, codeTOTPReused, "This two-factor code was used already; wait for the next one")
 		} else {
-			writeAdminError(w, http.StatusUnauthorized, codeTOTPInvalid, "Invalid two-factor code")
+			writeAdminError(w, failStatus, codeTOTPInvalid, "Invalid two-factor code")
 		}
 		return false
 	}
@@ -368,13 +372,23 @@ type twoFactorProof struct {
 }
 
 // proveAdmin checks the proof a change to two-factor sign-in needs: a current
-// code, a recovery code, or (when allowPassword) the admin password.
+// code, a recovery code, or (when allowPassword) the admin password. A wrong one
+// is a 403, never a 401: the admin is signed in, and the UI reads a 401 as the
+// session expiring.
 func (h *Handler) proveAdmin(w http.ResponseWriter, r *http.Request, proof twoFactorProof, allowPassword bool) bool {
 	switch {
 	case strings.TrimSpace(proof.Code) != "" || strings.TrimSpace(proof.RecoveryCode) != "":
-		return h.checkSecondFactor(w, r, proof.Code, proof.RecoveryCode)
+		return h.checkSecondFactor(w, r, proof.Code, proof.RecoveryCode, http.StatusForbidden)
 	case allowPassword && proof.Password != "":
-		return h.checkAdminPassword(w, r, proof.Password)
+		valid, delay := h.adminGuesses.checkPassword(adminRemoteHost(r), proof.Password, time.Now())
+		if delay > 0 {
+			writeGuessLimited(w, delay, "Too many admin password attempts; try again later")
+			return false
+		}
+		if !valid {
+			writeAdminError(w, http.StatusForbidden, codeAdminPasswordWrong, "the admin password is not right")
+		}
+		return valid
 	default:
 		message := "send a current two-factor code"
 		if allowPassword {

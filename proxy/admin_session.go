@@ -194,7 +194,7 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 			writeAdminError(w, http.StatusUnauthorized, codeTOTPChallengeExpired, "The sign-in expired; enter the password again")
 			return
 		}
-		if !h.checkSecondFactor(w, r, req.Code, req.RecoveryCode) {
+		if !h.checkSecondFactor(w, r, req.Code, req.RecoveryCode, http.StatusUnauthorized) {
 			h.totpState().challengeFailed(req.Challenge)
 			return
 		}
@@ -212,7 +212,7 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 	}
 	if config.AdminTOTPEnabled() {
 		if strings.TrimSpace(req.Code) != "" || strings.TrimSpace(req.RecoveryCode) != "" {
-			if !h.checkSecondFactor(w, r, req.Code, req.RecoveryCode) {
+			if !h.checkSecondFactor(w, r, req.Code, req.RecoveryCode, http.StatusUnauthorized) {
 				return
 			}
 			h.issueAdminSession(w)

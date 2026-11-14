@@ -423,6 +423,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), status)
 		return
 	}
+	captureRequestBody(r)
 
 	switch {
 
@@ -487,6 +488,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write([]byte(`{"status":"ok"}`))
 
+	case path == "/metrics":
+		h.handleMetrics(w, r)
 	case strings.HasPrefix(path, "/admin/api/"):
 		h.handleAdminAPI(w, r)
 	case path == "/admin" || strings.HasPrefix(path, "/admin/"):
@@ -1618,6 +1621,7 @@ func recordAttemptError(ctx context.Context, account *config.Account, model stri
 		return
 	}
 	traceAttemptFailed(ctx, account, status, err)
+	recordUpstreamErrorMetric(account.ID, account.Email, status, err.Error())
 	settleRPMPickFailure(ctx, account, err)
 	getObserveStore().RecordFailure(account.ID, model)
 	getObserveStore().RecordError(account.ID, account.Email, model, status, err.Error())
@@ -2781,6 +2785,12 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiObserveRecentRequests(w, r)
 	case path == "/observe/account-activity" && r.Method == "GET":
 		h.apiAccountActivity(w, r)
+	case strings.HasPrefix(path, "/observe/conversations/") && r.Method == "GET":
+		h.apiConversation(w, strings.TrimPrefix(path, "/observe/conversations/"))
+	case strings.HasPrefix(path, "/observe/requests/") && strings.HasSuffix(path, "/body") && r.Method == "GET":
+		h.apiRequestBody(w, strings.TrimSuffix(strings.TrimPrefix(path, "/observe/requests/"), "/body"))
+	case strings.HasPrefix(path, "/observe/requests/") && strings.HasSuffix(path, "/replay") && r.Method == "POST":
+		h.apiReplayRequest(w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/observe/requests/"), "/replay"))
 	case path == "/backups" && r.Method == "GET":
 		h.apiBackupsList(w, r)
 	case path == "/backups" && r.Method == "POST":
@@ -2803,6 +2813,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiBackupsDelete(w, r, strings.TrimPrefix(path, "/backups/"))
 	case path == "/alerts" || strings.HasPrefix(path, "/alerts/"):
 		h.handleAlertsAPI(w, r, path)
+	case path == "/metrics" && (r.Method == http.MethodGet || r.Method == http.MethodPost):
+		h.apiMetricsSettings(w, r)
 	case path == "/two-factor" || strings.HasPrefix(path, "/two-factor/"):
 		h.handleTwoFactorAPI(w, r, strings.TrimPrefix(path, "/two-factor"))
 	default:
@@ -4063,7 +4075,12 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	//! A password change must actually lock out whoever held the old one.
 	if req.Password != "" {
-		h.adminSessions.RevokeAll()
+		if config.AdminTOTPEnabled() {
+			//! Signing in again would need a code: the session that changed the password stays.
+			h.adminSessions.RevokeAllExcept(r.Header.Get("X-Admin-Token"))
+		} else {
+			h.adminSessions.RevokeAll()
+		}
 		h.totpState().clearChallenges()
 	}
 

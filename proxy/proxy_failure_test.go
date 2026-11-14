@@ -391,7 +391,7 @@ func TestLoggedProxyFailureTidiedOnRead(t *testing.T) {
 	raw := `Post "https://q.us-east-1.amazonaws.com/generateAssistantResponse": proxyconnect tcp: dial tcp 127.0.0.1:9: connect: connection refused`
 	rec := requestRecord{TS: 1, AccountID: "a", Model: "m", Status: 503, Message: raw, ErrorType: "upstream",
 		Attempts: []requestAttempt{{AccountID: "a", ErrorType: "upstream", Message: raw}}}
-	if err := persistRequestRecord(rec); err != nil {
+	if _, err := persistRequestRecord(rec); err != nil {
 		t.Fatal(err)
 	}
 	page, err := queryPersistedRequests(requestQuery{Page: 1, PageSize: 10})

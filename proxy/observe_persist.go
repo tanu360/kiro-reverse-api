@@ -9,21 +9,26 @@ import (
 	"kiro-proxy/logger"
 )
 
-func persistRequestRecord(rec requestRecord) error {
+// persistRequestRecord writes one request row and returns its id.
+func persistRequestRecord(rec requestRecord) (int64, error) {
 	d, err := db.Get()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	success := 0
 	if rec.Success {
 		success = 1
 	}
-	_, err = d.Exec(`INSERT INTO requests
-(ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	res, err := d.Exec(`INSERT INTO requests
+(ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash, conversation_id, replay_of)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.TS, rec.AccountID, rec.APIKeyID, rec.APIKey, rec.Email, rec.Model, rec.InTokens, rec.OutTokens, rec.TotalTokens,
-		rec.Credits, success, rec.Status, rec.Message, rec.Endpoint, rec.DurationMs, rec.ErrorType, rec.CacheRead, rec.CacheWrite, encodeAttempts(rec.Attempts), rec.RequestID, rec.APIKeyHash)
-	return err
+		rec.Credits, success, rec.Status, rec.Message, rec.Endpoint, rec.DurationMs, rec.ErrorType, rec.CacheRead, rec.CacheWrite, encodeAttempts(rec.Attempts), rec.RequestID, rec.APIKeyHash,
+		rec.ConversationID, rec.ReplayOf)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
 }
 
 func persistErrorRecord(rec errorRecord) error {
@@ -107,10 +112,34 @@ FROM request_rollup) a`).Scan(
 	return stats, err
 }
 
-func enqueuePersistRequestRecord(rec requestRecord) {
-	if err := persistRequestRecord(rec); err != nil {
+func enqueuePersistRequestRecord(rec requestRecord) int64 {
+	id, err := persistRequestRecord(rec)
+	if err != nil {
 		logger.Warnf("[Observe] Persist request failed: %v", err)
+		return 0
 	}
+	return id
+}
+
+// requestColumns is the SELECT list scanRequestRow reads, in its order.
+const requestColumns = `id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash, conversation_id, replay_of, EXISTS(SELECT 1 FROM request_bodies b WHERE b.request_id = requests.id)`
+
+type rowScanner interface{ Scan(dest ...any) error }
+
+// scanRequestRow reads one requestColumns row into a record the API can send.
+func scanRequestRow(rows rowScanner) (requestRecord, error) {
+	var rec requestRecord
+	var success, hasBody int
+	var attemptsJSON string
+	if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType, &rec.CacheRead, &rec.CacheWrite, &attemptsJSON, &rec.RequestID, &rec.APIKeyHash, &rec.ConversationID, &rec.ReplayOf, &hasBody); err != nil {
+		return rec, err
+	}
+	rec.Success = success == 1
+	rec.HasBody = hasBody == 1
+	rec.APIKeyMasked = requestAPIKeyMasked(rec.APIKeyID, rec.APIKey)
+	rec.Attempts = decodeAttempts(attemptsJSON)
+	tidyLoggedProxyFailures(&rec)
+	return rec, nil
 }
 
 func escapeSQLLike(s string) string {
@@ -142,6 +171,10 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	if q.ErrorType != "" {
 		where = append(where, "success = 0 AND error_type = ?")
 		args = append(args, q.ErrorType)
+	}
+	if q.Conversation != "" {
+		where = append(where, "conversation_id = ?")
+		args = append(args, q.Conversation)
 	}
 	if q.Search != "" {
 		like := "%" + escapeSQLLike(q.Search) + "%"
@@ -180,7 +213,7 @@ func queryPersistedRequests(q requestQuery) (requestPage, error) {
 	offset := (q.Page - 1) * q.PageSize
 	queryArgs := append([]interface{}{}, args...)
 	queryArgs = append(queryArgs, q.PageSize, offset)
-	rows, err := d.Query(`SELECT id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash
+	rows, err := d.Query(`SELECT `+requestColumns+`
 FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? OFFSET ?`, queryArgs...)
 	if err != nil {
 		return requestPage{}, err
@@ -189,16 +222,10 @@ FROM requests`+whereSQL+` ORDER BY `+orderBy+` `+order+`, id `+order+` LIMIT ? O
 
 	requests := make([]requestRecord, 0, q.PageSize)
 	for rows.Next() {
-		var rec requestRecord
-		var success int
-		var attemptsJSON string
-		if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType, &rec.CacheRead, &rec.CacheWrite, &attemptsJSON, &rec.RequestID, &rec.APIKeyHash); err != nil {
+		rec, err := scanRequestRow(rows)
+		if err != nil {
 			return requestPage{}, err
 		}
-		rec.Success = success == 1
-		rec.APIKeyMasked = requestAPIKeyMasked(rec.APIKeyID, rec.APIKey)
-		rec.Attempts = decodeAttempts(attemptsJSON)
-		tidyLoggedProxyFailures(&rec)
 		requests = append(requests, rec)
 	}
 	if err := rows.Err(); err != nil {
@@ -221,7 +248,7 @@ func loadRecentRequestsFromDB(limit int) ([]requestRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := d.Query(`SELECT id, ts, account_id, api_key_id, api_key, email, model, in_tokens, out_tokens, total_tokens, credits, success, status, message, endpoint, duration_ms, error_type, cache_read_tokens, cache_write_tokens, attempts_json, request_id, api_key_hash
+	rows, err := d.Query(`SELECT `+requestColumns+`
 FROM requests ORDER BY ts DESC, id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
@@ -229,16 +256,10 @@ FROM requests ORDER BY ts DESC, id DESC LIMIT ?`, limit)
 	defer rows.Close()
 	var out []requestRecord
 	for rows.Next() {
-		var rec requestRecord
-		var success int
-		var attemptsJSON string
-		if err := rows.Scan(&rec.ID, &rec.TS, &rec.AccountID, &rec.APIKeyID, &rec.APIKey, &rec.Email, &rec.Model, &rec.InTokens, &rec.OutTokens, &rec.TotalTokens, &rec.Credits, &success, &rec.Status, &rec.Message, &rec.Endpoint, &rec.DurationMs, &rec.ErrorType, &rec.CacheRead, &rec.CacheWrite, &attemptsJSON, &rec.RequestID, &rec.APIKeyHash); err != nil {
+		rec, err := scanRequestRow(rows)
+		if err != nil {
 			return nil, err
 		}
-		rec.Success = success == 1
-		rec.APIKeyMasked = requestAPIKeyMasked(rec.APIKeyID, rec.APIKey)
-		rec.Attempts = decodeAttempts(attemptsJSON)
-		tidyLoggedProxyFailures(&rec)
 		out = append(out, rec)
 	}
 	return out, rows.Err()

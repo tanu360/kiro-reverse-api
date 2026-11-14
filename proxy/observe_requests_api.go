@@ -26,7 +26,8 @@ func (h *Handler) apiObserveRecentRequests(w http.ResponseWriter, r *http.Reques
 		Sort:     query.Get("sort"),
 		Order:    query.Get("order"),
 
-		ErrorType: query.Get("errorType"),
+		ErrorType:    query.Get("errorType"),
+		Conversation: query.Get("conversation"),
 	})
 	json.NewEncoder(w).Encode(pageData)
 }

@@ -102,6 +102,7 @@ func affinityKey(payload *KiroPayload) string {
 // conversation, so it keeps its prompt cache. A client key bound to some
 // accounts (ctx) only ever gets one of those.
 func (h *Handler) pickAccount(ctx context.Context, payload *KiroPayload, model string, excluded map[string]bool) *config.Account {
+	noteConversation(ctx, payload)
 	preferred := ""
 	if config.GetSessionAffinity() {
 		preferred = h.affinity.Lookup(affinityKey(payload))

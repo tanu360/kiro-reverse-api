@@ -217,8 +217,12 @@ func TestTwoFactorDisableNeedsCodeOrPassword(t *testing.T) {
 	if rec := serveAdminJSON(h, http.MethodPost, "/admin/api/two-factor/disable", token, `{}`); rec.Code != http.StatusBadRequest || !config.AdminTOTPEnabled() {
 		t.Fatalf("disable without proof: %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := serveAdminJSON(h, http.MethodPost, "/admin/api/two-factor/disable", token, `{"password":"wrong-password"}`); rec.Code != http.StatusUnauthorized || !config.AdminTOTPEnabled() {
+	//! 403, not 401: the admin is signed in, and the UI would read a 401 as the session expiring.
+	if rec := serveAdminJSON(h, http.MethodPost, "/admin/api/two-factor/disable", token, `{"password":"wrong-password"}`); rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), codeAdminPasswordWrong) || !config.AdminTOTPEnabled() {
 		t.Fatalf("disable with a wrong password: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := serveAdminJSON(h, http.MethodPost, "/admin/api/two-factor/disable", token, `{"code":"000000"}`); rec.Code != http.StatusForbidden || !config.AdminTOTPEnabled() {
+		t.Fatalf("disable with a wrong code: %d %s", rec.Code, rec.Body.String())
 	}
 	if rec := serveAdminJSON(h, http.MethodPost, "/admin/api/two-factor/disable", token, `{"code":"`+codeFor(t, secret, 1)+`"}`); rec.Code != http.StatusOK || config.AdminTOTPEnabled() {
 		t.Fatalf("disable with a code: %d %s", rec.Code, rec.Body.String())

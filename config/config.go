@@ -228,6 +228,10 @@ type Config struct {
 
 	LogRetentionDays *int `json:"logRetentionDays,omitempty"`
 
+	// Prometheus /metrics (metrics.go): off by default, read with a bearer token.
+	MetricsEnabled bool   `json:"metricsEnabled,omitempty"`
+	MetricsToken   string `json:"metricsToken,omitempty"`
+
 	Backup BackupConfig `json:"backup,omitempty"`
 
 	Alerts AlertsConfig `json:"alerts,omitzero"`
