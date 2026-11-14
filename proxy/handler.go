@@ -4574,12 +4574,6 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-func (h *Handler) apiGetVersion(w http.ResponseWriter, _ *http.Request) {
-	json.NewEncoder(w).Encode(map[string]string{
-		"version": config.Version,
-	})
-}
-
 func (h *Handler) apiExportAccounts(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IDs []string `json:"ids"`
