@@ -128,12 +128,15 @@ function Snippet({
 }
 
 /*
- * The tab panels share one grid cell and stay mounted: the inactive ones keep their place
- * (inert and transparent: out of the tab order and the accessibility tree, and no animated icon
- * inside can paint through), so the card is always as tall as its tallest panel (the request
- * builder) and switching to Claude Code or Codex never shrinks it. The panel drops Base UI's
- * `hidden` attribute for `data-inactive`: the preflight's `[hidden] { display: none !important }`
- * sits in the base layer, which no utility can override.
+ * The tab panels share one grid cell and stay mounted. From xl, where the card sits beside
+ * Endpoints, the inactive ones keep their place (inert and transparent: out of the tab order and
+ * the accessibility tree, and no animated icon inside can paint through), so the card is always
+ * as tall as its tallest panel (the request builder) and switching to Claude Code or Codex never
+ * shrinks it or moves the page. Below xl the card stands alone in its column, so an inactive
+ * panel takes no room and the card is as tall as the open tab: no empty area under a short
+ * snippet on a phone. The panel drops Base UI's `hidden` attribute for `data-inactive`: the
+ * preflight's `[hidden] { display: none !important }` sits in the base layer, which no utility
+ * can override.
  */
 const PANEL_STACK = "grid min-w-0 flex-1";
 
@@ -144,7 +147,7 @@ function StackedPanel({
   return (
     <TabsPanel
       className={cn(
-        "[grid-area:1/1] data-inactive:pointer-events-none data-inactive:invisible data-inactive:opacity-0",
+        "[grid-area:1/1] data-inactive:pointer-events-none data-inactive:invisible data-inactive:opacity-0 max-xl:data-inactive:hidden",
         className,
       )}
       keepMounted

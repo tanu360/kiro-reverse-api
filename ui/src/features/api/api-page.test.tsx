@@ -440,4 +440,24 @@ describe("ApiPage", () => {
     expect(panel).toHaveTextContent(`base_url = "${window.location.origin}/v1"`);
     expect(panel).toHaveTextContent('env_key = "KIRO_API_KEY"');
   });
+
+  it("keeps the inactive setup tabs out of the layout below xl, so the card follows the open tab", async () => {
+    const { user } = await renderPage();
+    await user.click(screen.getByRole("tab", { name: "Claude Code" }));
+    const card = screen.getByRole("region", { name: "Client setup" });
+    const panels = [...card.querySelectorAll<HTMLElement>("[role=tabpanel]")];
+    expect(panels).toHaveLength(3);
+    // From xl the panels share one cell (no jump beside Endpoints); below it a closed one takes
+    // no room.
+    for (const panel of panels) {
+      expect(panel).toHaveClass("[grid-area:1/1]", "max-xl:data-inactive:hidden");
+    }
+    // The panel it left closes once its exit transition ends.
+    await waitFor(() =>
+      expect(panels.filter((panel) => !panel.hasAttribute("data-inactive"))).toHaveLength(1),
+    );
+    expect(panels.find((panel) => !panel.hasAttribute("data-inactive"))).toHaveTextContent(
+      "ANTHROPIC_BASE_URL",
+    );
+  });
 });
