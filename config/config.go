@@ -181,6 +181,12 @@ type Config struct {
 
 	FirstRunPasswordPending bool `json:"firstRunPasswordPending,omitempty"`
 
+	// Admin two-factor sign-in (admin_totp.go). The secret is stored like the
+	// password; recovery codes only as SHA-256 hashes.
+	AdminTOTPSecret    string   `json:"adminTotpSecret,omitempty"`
+	AdminTOTPRecovery  []string `json:"adminTotpRecovery,omitempty"`
+	AdminTOTPEnabledAt int64    `json:"adminTotpEnabledAt,omitempty"`
+
 	ProxyURL string `json:"proxyURL,omitempty"`
 
 	// Outbound proxy pool (config/proxy_pool.go): proxies accounts without a proxy of their own are spread over.
@@ -270,6 +276,9 @@ func Init(path string) error {
 		return fmt.Errorf("db init: %w", err)
 	}
 	if err := Load(); err != nil {
+		return err
+	}
+	if err := resetAdminTOTPIfAsked(); err != nil {
 		return err
 	}
 

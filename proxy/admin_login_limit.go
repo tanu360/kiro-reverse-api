@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -85,12 +84,18 @@ func (l *adminGuessLimiter) allowLocked(host string, now time.Time) time.Duratio
 }
 
 func (l *adminGuessLimiter) checkPassword(host, password string, now time.Time) (bool, time.Duration) {
+	return l.check(host, now, func() bool { return adminPasswordMatches(password) })
+}
+
+// check runs verify on one guess of host's budget: the password, a two-factor code
+// or a recovery code all draw on the same guesses.
+func (l *adminGuessLimiter) check(host string, now time.Time, verify func() bool) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if delay := l.allowLocked(host, now); delay > 0 {
 		return false, delay
 	}
-	if !adminPasswordMatches(password) {
+	if !verify() {
 		return false, 0
 	}
 	// Valid scripts may poll with a password header; only failures consume budget.
@@ -103,10 +108,7 @@ func (l *adminGuessLimiter) checkPassword(host, password string, now time.Time) 
 func (h *Handler) checkAdminPassword(w http.ResponseWriter, r *http.Request, password string) bool {
 	valid, delay := h.adminGuesses.checkPassword(adminRemoteHost(r), password, time.Now())
 	if delay > 0 {
-		w.Header().Set("Retry-After", strconv.FormatInt(int64((delay+time.Second-1)/time.Second), 10))
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusTooManyRequests)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Too many admin password attempts; try again later"})
+		writeGuessLimited(w, delay, "Too many admin password attempts; try again later")
 		return false
 	}
 	if !valid {

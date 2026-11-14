@@ -47,6 +47,7 @@ type Handler struct {
 	promptOverheads *promptOverheads
 	affinity        *sessionAffinity
 	adminSessions   *adminSessionStore
+	adminTOTP       *adminTOTPState
 	usageRefresh    *refreshScheduler
 }
 
@@ -288,6 +289,7 @@ func NewHandler() *Handler {
 		promptOverheads: loadPromptOverheads(),
 		affinity:        newSessionAffinity(),
 		adminSessions:   newAdminSessionStore(),
+		adminTOTP:       newAdminTOTPState(),
 		usageRefresh:    newRefreshScheduler(config.GetUsageRefreshInterval),
 	}
 
@@ -2590,8 +2592,16 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Header.Get("X-Admin-Token") == "" && r.Header.Get("X-Admin-Password") != "" && !h.checkAdminPassword(w, r, r.Header.Get("X-Admin-Password")) {
-		return
+	if r.Header.Get("X-Admin-Token") == "" && r.Header.Get("X-Admin-Password") != "" {
+		if !h.checkAdminPassword(w, r, r.Header.Get("X-Admin-Password")) {
+			return
+		}
+		//! The password alone would skip the code; with two-factor sign-in on, scripts sign in for a token.
+		if config.AdminTOTPEnabled() {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			writeAdminError(w, http.StatusUnauthorized, codeTOTPRequired, "Two-factor sign-in is on: POST /admin/api/session with the password and a code, then send X-Admin-Token")
+			return
+		}
 	}
 	if !h.authorizeAdmin(r, path) {
 		w.WriteHeader(401)
@@ -2793,6 +2803,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.apiBackupsDelete(w, r, strings.TrimPrefix(path, "/backups/"))
 	case path == "/alerts" || strings.HasPrefix(path, "/alerts/"):
 		h.handleAlertsAPI(w, r, path)
+	case path == "/two-factor" || strings.HasPrefix(path, "/two-factor/"):
+		h.handleTwoFactorAPI(w, r, strings.TrimPrefix(path, "/two-factor"))
 	default:
 		w.WriteHeader(404)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Not Found"})
@@ -4052,6 +4064,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	//! A password change must actually lock out whoever held the old one.
 	if req.Password != "" {
 		h.adminSessions.RevokeAll()
+		h.totpState().clearChallenges()
 	}
 
 	if req.AllowOverUsage != nil {
