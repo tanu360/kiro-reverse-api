@@ -78,6 +78,8 @@
   "usage.per.all.year": "Theo năm, toàn bộ thời gian",
   "usage.legend": "Chuỗi dữ liệu",
   "usage.list": "API key theo mức sử dụng",
+  "usage.col.key": "Khóa",
+  "usage.col.trend": "Xu hướng",
   "usage.succeeded": "Thành công",
   "usage.failed": "Thất bại",
   "usage.inputTokens": "Đầu vào",

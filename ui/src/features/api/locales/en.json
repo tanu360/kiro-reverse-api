@@ -80,6 +80,8 @@
   "usage.per.all.year": "Per year, all time",
   "usage.legend": "Series",
   "usage.list": "API keys by usage",
+  "usage.col.key": "Key",
+  "usage.col.trend": "Trend",
   "usage.succeeded": "Succeeded",
   "usage.failed": "Failed",
   "usage.inputTokens": "Input",

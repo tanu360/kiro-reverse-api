@@ -121,6 +121,9 @@ describe("KeyUsageCard", () => {
     expect(within(region).getByText("4.75 credits")).toBeInTheDocument();
     expect(within(region).getByText("3.25")).toBeInTheDocument();
     expect(within(region).getByText("12 requests")).toBeInTheDocument();
+    // alpha failed 2 of 12; beta and gamma failed none.
+    expect(within(region).getByText("16.7%")).toBeInTheDocument();
+    expect(within(region).getAllByText("0%")).toHaveLength(2);
   });
 
   it("folds keys after the top five into one row", async () => {
@@ -202,7 +205,8 @@ describe("KeyUsageCard", () => {
     served = usage([entry("a", "key", { requests: 40 }, { name: "alpha" })], "7d");
     await user.click(within(region).getByRole("radio", { name: "7d" }));
     await waitFor(() => expect(ranges).toEqual(["24h", "7d"]));
-    expect(await within(region).findByText("40 requests")).toBeInTheDocument();
+    // The total and the only row's screen-reader value say the same.
+    expect(await within(region).findAllByText("40 requests")).not.toHaveLength(0);
     expect(within(region).getByText("Last 7 days, from the request log")).toBeInTheDocument();
   });
 
@@ -226,7 +230,8 @@ describe("KeyUsageCard", () => {
     };
     await user.click(within(group).getByRole("radio", { name: "All time" }));
     await waitFor(() => expect(ranges).toEqual(["24h", "all"]));
-    expect(await within(region).findByText("1,234 requests")).toBeInTheDocument();
+    // The total and the only row's screen-reader value say the same.
+    expect(await within(region).findAllByText("1,234 requests")).not.toHaveLength(0);
     expect(within(region).getByText("All time, from the request log")).toBeInTheDocument();
     expect(within(group).getByRole("radio", { name: "All time" })).toBeChecked();
   });
