@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * `danger` tints it red for destructive sections.
  */
 const iconChipVariants = cva(
-  "flex shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-2 text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "flex shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-2 text-muted-foreground icon-slot",
   {
     defaultVariants: {
       size: "sm",

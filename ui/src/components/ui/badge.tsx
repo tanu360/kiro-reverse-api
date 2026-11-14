@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
  * circle with the glyph knocked out; see `[data-badge-icon="disc"]` in index.css.
  */
 export const badgeVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-transparent font-medium tabular-nums leading-none outline-none transition-[background-color,box-shadow] focus-outline disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-(--badge-icon) [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
+  "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-transparent font-medium tabular-nums leading-none transition-[background-color,box-shadow] focus-outline disabled:pointer-events-none disabled:opacity-64 icon-slot [&_svg]:text-(--badge-icon) [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
   {
     defaultVariants: {
       size: "default",
@@ -101,7 +101,7 @@ function BadgeDot({ live = false }: { live?: boolean }): React.ReactElement {
   return (
     <span aria-hidden="true" className="relative flex size-1.5 shrink-0" data-slot="badge-dot">
       {live ? (
-        <span className="absolute inset-0 rounded-full bg-(--badge-dot) opacity-60 motion-safe:animate-ping" />
+        <span className="absolute inset-0 rounded-full bg-(--badge-dot) opacity-60 animate-ping" />
       ) : null}
       <span className="relative size-1.5 rounded-full bg-(--badge-dot)" />
     </span>

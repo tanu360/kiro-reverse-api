@@ -11,13 +11,13 @@ import {
   type MotionValue,
   m,
   type Process,
-  useReducedMotion,
   useReducedMotionConfig,
   useSpring,
 } from "motion/react";
 import type { RefObject } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 import { type SpringConfig, useChartConfig } from "../chart-config-context";
 import { chartCssVars, useChartPortalContainer } from "../chart-context";
@@ -526,7 +526,7 @@ function TooltipBoxInner({
   const { tooltipBoxSpring } = useChartConfig();
   // Reduced motion: position jumps instead of springing and the panel skips
   // its scale/slide; opacity fades are kept.
-  const reducedMotion = useReducedMotion() === true;
+  const reducedMotion = usePrefersReducedMotion();
   const effectiveSpring = springConfig ?? tooltipBoxSpring;
 
   const tooltipRef = useRef<HTMLDivElement>(null);

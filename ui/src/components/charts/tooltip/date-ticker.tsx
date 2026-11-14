@@ -1,14 +1,8 @@
 "use client";
 
-import {
-  domAnimation,
-  LazyMotion,
-  type MotionValue,
-  m,
-  useReducedMotion,
-  useSpring,
-} from "motion/react";
+import { domAnimation, LazyMotion, type MotionValue, m, useSpring } from "motion/react";
 import { memo, type RefObject, useLayoutEffect, useMemo, useRef } from "react";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 
 /** One ticker row: `h-4`, inside the `h-5` pill's `py-0.5`. */
 const TICKER_ITEM_HEIGHT = 16;
@@ -166,7 +160,7 @@ const DateTickerCompact = memo(function DateTickerCompact({
   currentIndex,
   labels,
 }: Omit<DateTickerProps, "visible">) {
-  const reduceMotion = useReducedMotion() === true;
+  const reduceMotion = usePrefersReducedMotion();
   const label = labels[currentIndex] ?? labels[0] ?? "";
   const labelItems = useMemo(() => [label], [label]);
   const stackRef = useRef<HTMLDivElement>(null);
@@ -194,7 +188,7 @@ const DateTickerInner = memo(function DateTickerInner({
   currentIndex,
   labels,
 }: Omit<DateTickerProps, "visible">) {
-  const reduceMotion = useReducedMotion() === true;
+  const reduceMotion = usePrefersReducedMotion();
 
   // Parse labels into month and second-part (day or year) values
   const parsedLabels = useMemo(() => {

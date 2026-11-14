@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { flushSync } from "react-dom";
+import { prefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import "./theme-transitions.css";
 
 export type Theme = "system" | "light" | "dark";
@@ -19,7 +20,6 @@ export const THEME_STORAGE_KEY = "kiro_theme";
 export const THEMES: readonly Theme[] = ["system", "light", "dark"];
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const NO_TRANSITIONS_CLASS = "no-transitions";
 /** On <html> while the reveal runs, so theme-transitions.css only restyles this transition. */
 const REVEAL_CLASS = "theme-reveal";
@@ -79,11 +79,7 @@ function systemPrefersDark(): boolean {
 /** View transitions are supported and the user has not asked for reduced motion. */
 function canReveal(): boolean {
   if (typeof document.startViewTransition !== "function") return false;
-  try {
-    return !window.matchMedia(REDUCED_MOTION_QUERY).matches;
-  } catch {
-    return false;
-  }
+  return !prefersReducedMotion();
 }
 
 /**

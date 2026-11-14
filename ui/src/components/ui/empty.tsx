@@ -7,26 +7,23 @@ import { cn } from "@/lib/utils";
  * state stacks two tilted copies behind it (coss's "pile"); the destructive tone (errors) is a
  * single red-tinted tile.
  */
-const emptyMediaVariants = cva(
-  "flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
-  {
-    defaultVariants: {
-      tone: "default",
-      variant: "default",
+const emptyMediaVariants = cva("flex shrink-0 items-center justify-center icon-slot", {
+  defaultVariants: {
+    tone: "default",
+    variant: "default",
+  },
+  // `variant` before `tone`, so the tone's colours come last and win the merge.
+  variants: {
+    variant: {
+      default: "bg-transparent",
+      icon: "relative size-9 rounded-lg border border-border bg-card text-foreground [&_svg:not([class*='size-'])]:size-4",
     },
-    // `variant` before `tone`, so the tone's colours come last and win the merge.
-    variants: {
-      variant: {
-        default: "bg-transparent",
-        icon: "relative size-9 rounded-lg border border-border bg-card text-foreground [&_svg:not([class*='size-'])]:size-4",
-      },
-      tone: {
-        default: "",
-        destructive: "border-destructive/24 bg-error-surface text-destructive-foreground",
-      },
+    tone: {
+      default: "",
+      destructive: "border-destructive/24 bg-error-surface text-destructive-foreground",
     },
   },
-);
+});
 
 export function Empty({ className, ...props }: React.ComponentProps<"div">): React.ReactElement {
   return (

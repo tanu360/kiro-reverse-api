@@ -33,7 +33,7 @@ export function ShareBar({ value, max = 1, color, className }: ShareBarProps) {
     >
       {/* The colour is series data, so it stays an inline style. */}
       <span
-        className="block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none"
+        className="block h-full rounded-full transition-[width] duration-500 ease-out"
         style={{ width: `${width}%`, backgroundColor: color }}
       />
     </span>

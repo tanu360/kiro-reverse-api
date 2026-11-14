@@ -10,6 +10,7 @@ import { createContext, useCallback, useContext } from "react";
 import { Button } from "@/components/ui/button";
 import { OVERLAY_CLOSE_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
+import { prefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +52,7 @@ function DrawerBackdrop({
   return (
     <DrawerPrimitive.Backdrop
       className={cn(
-        "dialog-backdrop fixed inset-0 z-50 opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-swiping:duration-0 supports-[-webkit-touch-callout:none]:absolute",
+        "dialog-backdrop opacity-[calc(1-var(--drawer-swipe-progress))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-swiping:duration-0",
         className,
       )}
       data-slot="drawer-backdrop"
@@ -113,7 +114,6 @@ function animateContentHeight(popup: HTMLElement): () => void {
   if (typeof ResizeObserver !== "function" || typeof popup.animate !== "function") {
     return () => {};
   }
-  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
   let borderHeight = 0;
   let contentHeight = 0;
   let running: Animation | null = null;
@@ -128,7 +128,7 @@ function animateContentHeight(popup: HTMLElement): () => void {
     contentHeight = nextContent;
     if (!from || !contentChanged || Math.abs(nextBorder - from) < 2) return;
     if (
-      reducedMotion?.matches ||
+      prefersReducedMotion() ||
       popup.matches(
         "[data-starting-style],[data-ending-style],[data-swiping],[data-nested-drawer-open]",
       )

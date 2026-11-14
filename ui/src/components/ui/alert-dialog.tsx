@@ -2,6 +2,7 @@
 
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
 import type React from "react";
+import { DIALOG_POPUP_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ModalNoticeHost, ModalNoticeOutlet } from "@/components/ui/modal-notice";
 import { cn } from "@/lib/utils";
@@ -16,10 +17,7 @@ function AlertDialogBackdrop({
 }: AlertDialogPrimitive.Backdrop.Props): React.ReactElement {
   return (
     <AlertDialogPrimitive.Backdrop
-      className={cn(
-        "dialog-backdrop fixed inset-0 z-50 transition-all duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute",
-        className,
-      )}
+      className={cn("dialog-backdrop transition-opacity duration-200", className)}
       data-slot="alert-dialog-backdrop"
       {...props}
     />
@@ -58,10 +56,7 @@ export function AlertDialogPopup({
       <AlertDialogBackdrop forceRender />
       <AlertDialogViewport>
         <AlertDialogPrimitive.Popup
-          className={cn(
-            "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 max-w-lg translate-y-[calc(-1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
-            className,
-          )}
+          className={cn(DIALOG_POPUP_CLASS, "max-w-lg", className)}
           data-slot="alert-dialog-popup"
           onKeyDown={(event) => {
             onKeyDown?.(event);

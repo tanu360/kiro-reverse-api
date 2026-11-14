@@ -30,7 +30,7 @@ export const segmentedControlItemSizeClassNames: Record<SegmentedControlSize, st
 };
 
 export const segmentedControlItemLayoutClassName =
-  "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0";
+  "gap-1.5 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4 icon-slot [&_svg]:-mx-0.5";
 
 /**
  * The sign-in theme toggle is the segmented control: a faintly tinted rounded rectangle in the
@@ -51,7 +51,7 @@ export const segmentedControlTrackClassName =
  * softly (the built-in ease-in-out starts too slowly to feel like it followed the click).
  */
 export const segmentedControlSlideClassName =
-  "transition-[width,height,translate] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none";
+  "transition-[width,height,translate] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]";
 
 /** `field`: the track takes the field fill, to sit among inputs and selects in a toolbar. */
 type SegmentedControlSurface = "none" | "field";
@@ -126,7 +126,7 @@ export function SegmentedControlItem({
 
   const defaultProps = {
     className: cn(
-      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-outline-inner disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
+      "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-sm text-muted-foreground transition-colors hover:text-foreground focus-outline-inner disabled:pointer-events-none disabled:opacity-64 data-disabled:pointer-events-none data-disabled:opacity-64",
       // The chosen item's own thumb, until the sliding indicator has measured it.
       "data-checked:bg-(--segment-thumb) data-checked:text-foreground data-checked:shadow-(--segment-thumb-shadow)",
       "aria-[current=page]:bg-(--segment-thumb) aria-[current=page]:text-foreground aria-[current=page]:shadow-(--segment-thumb-shadow)",

@@ -262,12 +262,7 @@ export function RequestsPage(): JSX.Element {
               title={t("loadError")}
             />
           ) : (
-            <div
-              className={cn(
-                "transition-opacity",
-                query.isPlaceholderData && "opacity-60 motion-reduce:transition-none",
-              )}
-            >
+            <div className={cn("transition-opacity", query.isPlaceholderData && "opacity-60")}>
               <DataTable<RequestRecord>
                 caption={t("table")}
                 cardLayout="divided"

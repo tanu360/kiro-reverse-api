@@ -187,14 +187,14 @@ function Hint({ children }: { children: JSX.Element | string }): JSX.Element {
 // text and logo, so all eight fit one line of the half-width card at 1440 px: the picked one
 // inverted. A touch screen keeps the 32 px target.
 const LANGUAGE_CHIP =
-  "inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 font-medium text-xs outline-none transition-colors focus-visible:focus-outline pointer-coarse:h-8 pointer-coarse:px-3 data-checked:bg-foreground data-checked:text-background data-unchecked:text-muted-foreground data-unchecked:shadow-[inset_0_0_0_1px_var(--border)] data-unchecked:hover:bg-accent data-unchecked:hover:text-foreground";
+  "inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 font-medium text-xs transition-colors focus-visible:focus-outline pointer-coarse:h-8 pointer-coarse:px-3 data-checked:bg-foreground data-checked:text-background data-unchecked:text-muted-foreground data-unchecked:shadow-[inset_0_0_0_1px_var(--border)] data-unchecked:hover:bg-accent data-unchecked:hover:text-foreground";
 
 // One 36 px line (the default control height) in the API's sticker colours, as the sign-in
 // showcase's labels: the pastel fill and its dark label. The picked one gets a 2 px edge in the
 // label colour; the others a faint one that darkens on hover. Phones drop the logo so
 // "Completions" fits a third of the row.
 const API_TILE =
-  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) px-3 font-medium text-(--tile-fg) text-sm outline-none transition-shadow focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_2px_var(--tile-fg)] data-unchecked:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_16%,transparent)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_48%,transparent)] max-sm:px-2";
+  "flex h-9 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-(--tile-bg) px-3 font-medium text-(--tile-fg) text-sm transition-shadow focus-visible:focus-outline data-checked:shadow-[inset_0_0_0_2px_var(--tile-fg)] data-unchecked:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_16%,transparent)] data-unchecked:hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tile-fg)_48%,transparent)] max-sm:px-2";
 
 /*
  * Pick an API and a language; in Python and Node.js a switch in the code block's strip trades

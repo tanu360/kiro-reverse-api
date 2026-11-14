@@ -3,9 +3,9 @@
 // a bare <svg> that the primitives' `[&>svg]` size and colour rules still reach.
 
 import type { LegacyAnimationControls } from "motion/react";
-import { useReducedMotion } from "motion/react";
 import type { ForwardedRef, SVGProps } from "react";
 import { useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 
 const NUMBER = /-?\d*\.?\d+/g;
 
@@ -57,7 +57,7 @@ export function useIconAnimation({
   playOnMount = false,
   ref,
 }: UseIconAnimationOptions) {
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = usePrefersReducedMotion();
   const svgRef = useRef<SVGSVGElement>(null);
   const isPlayingRef = useRef(false);
   const runRef = useRef(0);

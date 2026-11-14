@@ -27,10 +27,7 @@ function DialogBackdrop({
 }: DialogPrimitive.Backdrop.Props): React.ReactElement {
   return (
     <DialogPrimitive.Backdrop
-      className={cn(
-        "dialog-backdrop fixed inset-0 z-50 transition-all duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute",
-        className,
-      )}
+      className={cn("dialog-backdrop transition-opacity duration-200", className)}
       data-slot="dialog-backdrop"
       {...props}
     />
@@ -90,6 +87,13 @@ function DialogViewport({
  * The close X: a ghost icon button in the top corner, its centre on the title's line (the header
  * is padded 24 px and the 18 px title is 25 px tall, so the line's centre sits 36 px down).
  */
+/**
+ * The dialog panel, shared with the alert dialog: frosted glass (index.css dialog-glass), lifted
+ * and dimmed a step per nested dialog (t3code dialog-styles.ts DIALOG_POPUP_CLASS).
+ */
+export const DIALOG_POPUP_CLASS =
+  "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 translate-y-[calc(-1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0";
+
 export const OVERLAY_CLOSE_CLASS = "absolute inset-e-4 top-4.5 z-1 sm:top-5";
 
 export function DialogPopup({
@@ -121,8 +125,7 @@ export function DialogPopup({
       <DialogViewport anchor={anchor}>
         <DialogPrimitive.Popup
           className={cn(
-            // t3code dialog-styles.ts DIALOG_POPUP_CLASS: frosted glass (index.css dialog-glass).
-            "dialog-glass relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 translate-y-[calc(-1.25rem*var(--nested-dialogs))] scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl border text-popover-foreground opacity-[calc(1-0.1*var(--nested-dialogs))] outline-none transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
+            DIALOG_POPUP_CLASS,
             DIALOG_SIZE_CLASS[size],
             // A `top` dialog on phones fills its 90dvh row (the grid stretches it); the footer
             // keeps to the bottom edge when a step is short.

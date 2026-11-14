@@ -2,8 +2,9 @@
 
 import { scaleLinear } from "d3-scale";
 import type { CurveFactory } from "d3-shape";
-import { m, useReducedMotion } from "motion/react";
+import { m } from "motion/react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { chartCssVars, useChartStable } from "./chart-context";
 import { LINE_LOADING_PULSE_EASE, LOADING_LABEL_EXIT_S } from "./line-loading-timing";
 import { areaClosedD, LinePath, linePathD } from "./line-path";
@@ -192,7 +193,7 @@ export function LineLoadingSweep({
   durationSeconds = DEFAULT_SWEEP_DURATION_S,
 }: LineLoadingSweepProps) {
   const { innerWidth, innerHeight } = useChartStable();
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = usePrefersReducedMotion();
   const reactId = useId();
   const chartId = `line-sweep-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const isLoop = mode === "loop";
@@ -393,7 +394,7 @@ export function BarLoadingSkeleton({
   barFraction = DEFAULT_BAR_FRACTION,
   durationSeconds = DEFAULT_SWEEP_DURATION_S,
 }: BarLoadingSkeletonProps) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = usePrefersReducedMotion();
   const reactId = useId();
   const chartId = `bar-sweep-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const [tick, setTick] = useState(0);

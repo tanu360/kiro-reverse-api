@@ -37,7 +37,7 @@ export function Textarea({
         cn(
           !unstyled &&
             // The input's soft field fill (index.css --field-*), no focus ring.
-            "relative inline-grid w-full rounded-lg border border-field-border bg-field text-base text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover has-focus-visible:border-field-border-focus has-focus-visible:bg-field-focus has-aria-invalid:border-destructive/36 has-focus-visible:has-aria-invalid:border-destructive/64 has-disabled:opacity-64 sm:text-sm",
+            "relative inline-grid w-full rounded-lg border border-field-border bg-field text-control text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover has-focus-visible:border-field-border-focus has-focus-visible:bg-field-focus has-aria-invalid:border-destructive/36 has-focus-visible:has-aria-invalid:border-destructive/64 has-disabled:opacity-64",
           className,
         ) || undefined
       }

@@ -73,7 +73,7 @@ function SkipHint({
         className={
           badge
             ? cn(badgeVariants({ size, tone: "warning" }), "relative z-1 cursor-pointer")
-            : "touch-hit relative z-1 cursor-pointer rounded-sm text-warning-foreground outline-none focus-outline"
+            : "touch-hit relative z-1 cursor-pointer rounded-sm text-warning-foreground focus-outline"
         }
         closeDelay={100}
         delay={200}

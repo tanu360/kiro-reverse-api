@@ -129,7 +129,7 @@ export function BuilderIdFlow(): JSX.Element {
               children: (
                 // The code is the new step's main content, so it takes focus when the step opens.
                 <div
-                  className="flex max-w-full items-center gap-2 self-start rounded-lg outline-none focus-outline"
+                  className="flex max-w-full items-center gap-2 self-start rounded-lg focus-outline"
                   ref={codeRef}
                   tabIndex={-1}
                 >

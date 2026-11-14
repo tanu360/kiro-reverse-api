@@ -78,7 +78,7 @@ export function MenuPopup({
         <MenuPrimitive.Popup
           className={cn(
             // Kiro: the one popup sheet (index.css popup-surface) instead of t3code's dropdown glass.
-            "popup-surface popup-width relative flex origin-(--transform-origin) rounded-lg text-foreground outline-none transition-[opacity,scale] duration-100 focus:outline-none data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            "popup-surface popup-width relative flex origin-(--transform-origin) outline-none transition-[opacity,scale] duration-100 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             className,
           )}
           data-slot="menu-popup"

@@ -51,7 +51,7 @@ export function StatusDot({
   const pulse = ping ? (
     <span
       aria-hidden="true"
-      className="absolute inset-0 rounded-full bg-inherit opacity-75 motion-safe:animate-ping"
+      className="absolute inset-0 rounded-full bg-inherit opacity-75 animate-ping"
     />
   ) : null;
   if (!label) {

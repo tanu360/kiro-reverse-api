@@ -62,10 +62,7 @@ function ToastBody({
     <>
       <div className="flex min-w-0 gap-2">
         {icon && (
-          <div
-            className="[&>svg]:h-lh [&>svg]:w-4 [&_svg]:pointer-events-none [&_svg]:shrink-0"
-            data-slot="toast-icon"
-          >
+          <div className="[&>svg]:h-lh [&>svg]:w-4 icon-slot" data-slot="toast-icon">
             <HugeiconsIcon
               aria-hidden="true"
               className={cn("in-data-[type=loading]:animate-spin", TOAST_TONE_CLASS)}
@@ -125,13 +122,9 @@ function upsertReplayClassName(toast: { type?: string; updateKey?: number }): st
   if (k <= 0) return undefined;
   const isEven = k % 2 === 0;
   if (toast.type === "error") {
-    return isEven
-      ? "animate-toast-error-even motion-reduce:animate-none"
-      : "animate-toast-error-odd motion-reduce:animate-none";
+    return isEven ? "animate-toast-error-even" : "animate-toast-error-odd";
   }
-  return isEven
-    ? "animate-toast-success-even motion-reduce:animate-none"
-    : "animate-toast-success-odd motion-reduce:animate-none";
+  return isEven ? "animate-toast-success-even" : "animate-toast-success-odd";
 }
 
 function Toasts({
@@ -174,7 +167,7 @@ function Toasts({
             <Toast.Root
               key={toast.id}
               className={cn(
-                "popup-surface absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full select-none rounded-lg text-popover-foreground [--popup-shadow:none] [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
+                "popup-surface absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full select-none [--popup-shadow:none] [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
                 // Base positioning using data-position
                 "data-[position*=right]:right-0 data-[position*=right]:left-auto",
                 "data-[position*=left]:right-auto data-[position*=left]:left-0",
@@ -202,8 +195,6 @@ function Toasts({
                 "motion-safe:data-[position*=top]:data-starting-style:transform-[translateY(calc(-100%-var(--toast-inset)-var(--toast-top-offset,0px)))]",
                 "motion-safe:data-[position*=bottom]:data-starting-style:transform-[translateY(calc(100%+var(--toast-inset)))]",
                 "data-ending-style:opacity-0",
-                // Reduced motion: no travel, fade in and out in place
-                "motion-reduce:data-starting-style:opacity-0 motion-reduce:[transition:opacity_.5s,height_.15s]",
                 // Ending animations (direction-aware)
                 "motion-safe:data-[position*=top]:data-ending-style:not-data-limited:not-data-swipe-direction:transform-[translateY(calc(-100%-var(--toast-inset)-var(--toast-top-offset,0px)))]",
                 "motion-safe:data-[position*=bottom]:data-ending-style:not-data-limited:not-data-swipe-direction:transform-[translateY(calc(100%+var(--toast-inset)))]",

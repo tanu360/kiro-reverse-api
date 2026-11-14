@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * use it, on the popup-surface sheet (index.css).
  */
 export const POPUP_ROW_CLASS =
-  "flex min-h-8 cursor-default select-none items-center gap-2.5 rounded-md px-2 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-checked:text-info-foreground data-selected:text-info-foreground data-disabled:opacity-64 pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0";
+  "flex min-h-8 cursor-default select-none items-center gap-2.5 rounded-md px-2 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-checked:text-info-foreground data-selected:text-info-foreground data-disabled:opacity-64 pointer-coarse:min-h-10 [&_svg:not([class*='size-'])]:size-4 icon-slot";
 
 /** A row that can be chosen: room at the end for the CheckedDot. */
 export const POPUP_CHECK_ROW_CLASS = "pe-2.5";

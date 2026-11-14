@@ -98,7 +98,7 @@ export function TabsTab({
   return (
     <TabsPrimitive.Tab
       className={cn(
-        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-sm outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-outline-inner data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64",
+        "relative flex shrink-0 grow cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-transparent font-medium text-sm transition-[color,background-color,box-shadow] hover:text-foreground focus-outline-inner data-disabled:pointer-events-none data-[orientation=vertical]:w-full data-[orientation=vertical]:justify-start data-active:text-foreground data-disabled:opacity-64",
         segmentedControlItemLayoutClassName,
         segmentedControlItemSizeClassNames[resolvedSize],
         // Phones: a little less side padding, so three or four tabs fit at 360 px.
@@ -119,7 +119,7 @@ export function TabsPanel({ className, ...props }: TabsPrimitive.Panel.Props): R
     <TabsPrimitive.Panel
       // The panel is a tab stop (Base UI sets tabIndex 0). Its outline sits on the inner edge, so
       // a flush panel's ring stays inside the card instead of painting over the card's border.
-      className={cn("flex-1 rounded-lg outline-none focus-outline-inset", className)}
+      className={cn("flex-1 rounded-lg focus-outline-inset", className)}
       data-slot="tabs-content"
       {...props}
     />

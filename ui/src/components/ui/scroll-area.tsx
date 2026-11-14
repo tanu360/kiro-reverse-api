@@ -28,7 +28,7 @@ export function ScrollArea({
     <ScrollAreaPrimitive.Root className={cn("size-full min-h-0", className)} {...props}>
       <ScrollAreaPrimitive.Viewport
         className={cn(
-          "h-full rounded-[inherit] outline-none transition-shadow focus-outline-inset",
+          "h-full rounded-[inherit] transition-shadow focus-outline-inset",
           overscrollContain &&
             "data-has-overflow-y:overscroll-y-contain data-has-overflow-x:overscroll-x-contain",
           scrollFade &&

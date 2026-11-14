@@ -51,7 +51,7 @@ export function Input({
           !unstyled &&
             // The sign-in password field's soft fill (index.css --field-*); focus shows by the
             // border colour alone.
-            "relative inline-flex w-full rounded-lg border border-field-border bg-field text-base text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover has-focus-visible:border-field-border-focus has-focus-visible:bg-field-focus has-aria-invalid:border-destructive/36 has-focus-visible:has-aria-invalid:border-destructive/64 has-autofill:bg-foreground/4 has-disabled:opacity-64 sm:text-sm dark:has-autofill:bg-foreground/8",
+            "relative inline-flex w-full rounded-lg border border-field-border bg-field text-control text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover has-focus-visible:border-field-border-focus has-focus-visible:bg-field-focus has-aria-invalid:border-destructive/36 has-focus-visible:has-aria-invalid:border-destructive/64 has-autofill:bg-foreground/4 has-disabled:opacity-64 dark:has-autofill:bg-foreground/8",
           className,
         ) || undefined
       }

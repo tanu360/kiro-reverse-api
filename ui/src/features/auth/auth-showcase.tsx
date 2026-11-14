@@ -342,7 +342,7 @@ function PaperPlane(): JSX.Element {
     >
       <svg
         aria-hidden="true"
-        className="w-full origin-[29.17%_100%] overflow-visible motion-safe:animate-plane-float"
+        className="w-full origin-[29.17%_100%] overflow-visible animate-plane-float"
         viewBox="0 0 24 24"
       >
         <path d="M24 0 18 24 8.61 19.3Z" fill="#ffffff" />

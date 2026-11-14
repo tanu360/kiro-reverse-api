@@ -7,9 +7,10 @@
 // `YAxis`, so the chart shells keep it outside the series reveal clip with no extra wiring.
 
 import { scaleLinear } from "d3-scale";
-import { AnimatePresence, m, useReducedMotion, type Variants } from "motion/react";
+import { AnimatePresence, m, type Variants } from "motion/react";
 import { memo, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { numberFormat } from "@/lib/format";
 import {
   useChartPortalContainer,
@@ -193,7 +194,7 @@ const YAxisInner = memo(function YAxisInner({
   // swaps one label set for the next once, instead of churning through every
   // intermediate tick set; positions still follow the live scale each frame.
   const settledYScale = useSettledYScale(yAxisId);
-  const reducedMotion = useReducedMotion() ?? false;
+  const reducedMotion = usePrefersReducedMotion();
   const isLeft = side === "left";
   const axisId = normalizeYAxisId(yAxisId);
 

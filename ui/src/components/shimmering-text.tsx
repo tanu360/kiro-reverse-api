@@ -1,7 +1,8 @@
 "use client";
 
-import { domAnimation, LazyMotion, m, useReducedMotion } from "motion/react";
+import { domAnimation, LazyMotion, m } from "motion/react";
 import type { ComponentProps } from "react";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,7 +46,7 @@ export function ShimmeringText({
   style,
   ...props
 }: ShimmeringTextProps) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = usePrefersReducedMotion();
   const stopped = isStopped || paused || reducedMotion === true;
 
   // One gradient across the whole run (rather than per-character colors), so

@@ -21,10 +21,7 @@ const SheetPortal: typeof SheetPrimitive.Portal = SheetPrimitive.Portal;
 function SheetBackdrop({ className, ...props }: SheetPrimitive.Backdrop.Props): React.ReactElement {
   return (
     <SheetPrimitive.Backdrop
-      className={cn(
-        "dialog-backdrop fixed inset-0 z-50 transition-all duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute",
-        className,
-      )}
+      className={cn("dialog-backdrop transition-opacity duration-200", className)}
       data-slot="sheet-backdrop"
       {...props}
     />
@@ -85,7 +82,7 @@ export function SheetPopup({
         <SheetPrimitive.Popup
           className={cn(
             // The frosted modal surface (index.css dialog-glass), as dialogs and drawers.
-            "dialog-glass relative flex max-h-full min-h-0 w-full min-w-0 flex-col text-popover-foreground outline-none transition-[opacity,translate] duration-200 ease-in-out will-change-transform data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-opacity",
+            "dialog-glass relative flex max-h-full min-h-0 w-full min-w-0 flex-col text-popover-foreground outline-none transition-[opacity,translate] duration-200 ease-in-out will-change-transform data-ending-style:opacity-0 data-starting-style:opacity-0",
             side === "bottom" &&
               "row-start-2 rounded-t-2xl border-t data-ending-style:translate-y-8 data-starting-style:translate-y-8",
             side === "top" &&

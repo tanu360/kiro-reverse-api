@@ -163,7 +163,7 @@ export function UsageBreakdownCard({
           {slices.map((slice, index) => (
             <li
               className={cn(
-                "flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm transition-opacity motion-reduce:transition-none sm:px-6",
+                "flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm transition-opacity sm:px-6",
                 hovered !== null && hovered !== index && "opacity-50",
               )}
               key={slice.key}

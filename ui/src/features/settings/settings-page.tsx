@@ -228,7 +228,7 @@ function useActiveSection(offset: number): [SectionId, (id: SectionId) => void] 
  * firmer edge for the current section, red text and a red tint for the danger zone.
  */
 const CHIP_CLASS =
-  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3 font-medium text-muted-foreground text-sm outline-none transition-colors hover:bg-accent hover:text-foreground focus-outline aria-current:border-border-strong aria-current:bg-surface-2 aria-current:text-foreground sm:min-h-9 pointer-coarse:min-h-10 [&_svg]:size-4 [&_svg]:shrink-0";
+  "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3 font-medium text-muted-foreground text-sm transition-colors hover:bg-accent hover:text-foreground focus-outline aria-current:border-border-strong aria-current:bg-surface-2 aria-current:text-foreground sm:min-h-9 pointer-coarse:min-h-10 [&_svg]:size-4 [&_svg]:shrink-0";
 const DANGER_CHIP_CLASS =
   "text-destructive-foreground hover:bg-error-surface hover:text-destructive-foreground aria-current:border-destructive/32 aria-current:bg-error-surface aria-current:text-destructive-foreground";
 

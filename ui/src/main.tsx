@@ -3,6 +3,7 @@ import "@fontsource-variable/geist-mono";
 import "./index.css";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
+import { MotionConfig } from "motion/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AppToaster } from "@/components/layout/app-toasts";
@@ -27,22 +28,25 @@ async function bootstrap(): Promise<void> {
 
   createRoot(rootElement).render(
     <StrictMode>
-      <ThemeProvider>
-        <SkeletonThemeProvider>
-          <I18nProvider>
-            <PrivacyProvider>
-              <QueryClientProvider client={queryClient}>
-                <TooltipProvider>
-                  <ConfirmProvider>
-                    <RouterProvider router={router} />
-                  </ConfirmProvider>
-                </TooltipProvider>
-                <AppToaster />
-              </QueryClientProvider>
-            </PrivacyProvider>
-          </I18nProvider>
-        </SkeletonThemeProvider>
-      </ThemeProvider>
+      {/* Motion components follow the viewer's reduced-motion setting, as the CSS does. */}
+      <MotionConfig reducedMotion="user">
+        <ThemeProvider>
+          <SkeletonThemeProvider>
+            <I18nProvider>
+              <PrivacyProvider>
+                <QueryClientProvider client={queryClient}>
+                  <TooltipProvider>
+                    <ConfirmProvider>
+                      <RouterProvider router={router} />
+                    </ConfirmProvider>
+                  </TooltipProvider>
+                  <AppToaster />
+                </QueryClientProvider>
+              </PrivacyProvider>
+            </I18nProvider>
+          </SkeletonThemeProvider>
+        </ThemeProvider>
+      </MotionConfig>
     </StrictMode>,
   );
 }

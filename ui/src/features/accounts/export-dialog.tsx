@@ -360,7 +360,7 @@ export function ExportDialog({
                 return (
                   <button
                     aria-pressed={pickedGroup === group}
-                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 font-medium text-xs outline-none transition-colors focus-visible:focus-outline disabled:cursor-default disabled:opacity-50 aria-pressed:bg-foreground aria-pressed:text-background not-aria-pressed:text-muted-foreground not-aria-pressed:shadow-[inset_0_0_0_1px_var(--border)] not-aria-pressed:hover:bg-accent not-aria-pressed:hover:text-foreground pointer-coarse:h-8"
+                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 font-medium text-xs transition-colors focus-visible:focus-outline disabled:cursor-default disabled:opacity-50 aria-pressed:bg-foreground aria-pressed:text-background not-aria-pressed:text-muted-foreground not-aria-pressed:shadow-[inset_0_0_0_1px_var(--border)] not-aria-pressed:hover:bg-accent not-aria-pressed:hover:text-foreground pointer-coarse:h-8"
                     disabled={count === 0}
                     key={group}
                     onClick={() => setSelected(new Set(groupIds(group)))}

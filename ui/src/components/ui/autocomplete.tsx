@@ -66,7 +66,7 @@ export function AutocompleteInput({
       {showTrigger && (
         <AutocompleteTrigger
           className={cn(
-            "absolute top-1/2 inline-flex size-8 shrink-0 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 hover:opacity-100 has-[+[data-slot=autocomplete-clear]]:hidden [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+            "absolute top-1/2 inline-flex size-8 shrink-0 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 hover:opacity-100 has-[+[data-slot=autocomplete-clear]]:hidden [&_svg:not([class*='size-'])]:size-4 icon-slot",
             sizeValue === "sm" ? "inset-e-0" : "inset-e-0.5",
           )}
           // The icon-only button needs a name; triggerProps can pass a more specific one.
@@ -81,7 +81,7 @@ export function AutocompleteInput({
       {showClear && (
         <AutocompleteClear
           className={cn(
-            "absolute top-1/2 inline-flex size-8 shrink-0 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 hover:opacity-100 has-[+[data-slot=autocomplete-clear]]:hidden [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+            "absolute top-1/2 inline-flex size-8 shrink-0 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-colors pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 hover:opacity-100 has-[+[data-slot=autocomplete-clear]]:hidden [&_svg:not([class*='size-'])]:size-4 icon-slot",
             sizeValue === "sm" ? "inset-e-0" : "inset-e-0.5",
           )}
           aria-label={t("autocomplete.clear")}
@@ -132,7 +132,7 @@ export function AutocompletePopup({
           className={cn(
             // The popups' one open and close motion (select, menu, popover): a 100 ms fade from
             // 98 %. The state attributes sit on the Popup inside this sheet.
-            "popup-surface popup-width relative flex max-h-full origin-(--transform-origin) rounded-lg transition-[scale,opacity] duration-100 has-data-ending-style:scale-98 has-data-starting-style:scale-98 has-data-ending-style:opacity-0 has-data-starting-style:opacity-0",
+            "popup-surface popup-width relative flex max-h-full origin-(--transform-origin) transition-[scale,opacity] duration-100 has-data-ending-style:scale-98 has-data-starting-style:scale-98 has-data-ending-style:opacity-0 has-data-starting-style:opacity-0",
             className,
           )}
         >
@@ -176,10 +176,7 @@ export function AutocompleteEmpty({
 }: AutocompletePrimitive.Empty.Props): React.ReactElement {
   return (
     <AutocompletePrimitive.Empty
-      className={cn(
-        "not-empty:p-2 text-center text-base text-muted-foreground sm:text-sm",
-        className,
-      )}
+      className={cn("not-empty:p-2 text-center text-control text-muted-foreground", className)}
       data-slot="autocomplete-empty"
       {...props}
     />
@@ -210,7 +207,7 @@ function AutocompleteClear({
     <AutocompletePrimitive.Clear
       aria-label={t("autocomplete.clear")}
       className={cn(
-        "absolute inset-e-0.5 top-1/2 inline-flex size-8 shrink-0 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-[color,background-color,box-shadow,opacity] pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 hover:opacity-100 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "absolute inset-e-0.5 top-1/2 inline-flex size-8 shrink-0 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-transparent opacity-80 outline-none transition-[color,background-color,box-shadow,opacity] pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-11 pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2 hover:opacity-100 [&_svg:not([class*='size-'])]:size-4 icon-slot",
         className,
       )}
       data-slot="autocomplete-clear"

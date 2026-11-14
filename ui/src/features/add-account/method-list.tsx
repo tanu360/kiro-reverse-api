@@ -98,7 +98,7 @@ export function MethodRail({
                   <button
                     aria-current={current ? "true" : undefined}
                     className={cn(
-                      "flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-start font-medium text-sm outline-none transition-colors focus-outline disabled:pointer-events-none disabled:opacity-64",
+                      "flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-start font-medium text-sm transition-colors focus-outline disabled:pointer-events-none disabled:opacity-64",
                       current
                         ? "bg-accent text-foreground"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground",

@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
  */
 const TRIGGER_CLASS = {
   label:
-    "touch-hit inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm text-left align-baseline text-muted-foreground leading-[inherit] outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground",
-  link: "touch-hit inline-flex cursor-pointer items-baseline whitespace-nowrap rounded-sm align-baseline font-medium text-info-foreground outline-none focus-outline",
+    "touch-hit inline-flex max-w-full cursor-pointer items-center gap-1 rounded-sm text-left align-baseline text-muted-foreground leading-[inherit] transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground",
+  link: "touch-hit inline-flex cursor-pointer items-baseline whitespace-nowrap rounded-sm align-baseline font-medium text-info-foreground focus-outline",
 } as const;
 
 export function InfoHint({

@@ -33,9 +33,9 @@
   --app-chrome-background: var(--background);
   --foreground: var(--color-zinc-900);
   --card: var(--surface-solid);
-  --card-foreground: var(--color-zinc-900);
+  --card-foreground: var(--foreground);
   --popover: var(--surface-solid);
-  --popover-foreground: var(--color-zinc-900);
+  --popover-foreground: var(--foreground);
   /* Kiro purple-500 (#9046ff, kiro.dev --cta-primary): white text on it is 4.6:1. */
   --primary: #9046ff;
   --primary-foreground: var(--color-white);
@@ -54,7 +54,7 @@
   /* Model logos without their own colour (components/shared/model-logo.tsx). */
   --icon-muted: var(--muted-foreground);
   --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
+  --accent-foreground: var(--foreground);
   /*
    * Hairlines: --border-subtle for dividers inside a card (header rules, row dividers, footers),
    * --border for cards, popups and outline buttons, --border-strong for a control's own edge that
@@ -159,16 +159,11 @@
   --surface-solid: #161618;
   --surface-2: #1f1f22;
   --foreground: var(--color-neutral-100);
-  --card: var(--surface-solid);
-  --card-foreground: var(--color-neutral-100);
-  --popover: var(--surface-solid);
-  --popover-foreground: var(--color-neutral-100);
   --secondary: --alpha(var(--color-white) / 3%);
   --secondary-foreground: var(--color-neutral-100);
   --muted: --alpha(var(--color-white) / 3%);
   --muted-foreground: var(--color-neutral-400);
   --accent: --alpha(var(--color-white) / 4%);
-  --accent-foreground: var(--color-neutral-100);
   --border-subtle: --alpha(var(--color-white) / 5.5%);
   --border: --alpha(var(--color-white) / 8%);
   --border-strong: color-mix(in oklab, var(--color-white) 35%, transparent);
@@ -177,13 +172,11 @@
   /* Kiro purple-300: 9.7:1 on black. */
   --info-foreground: #c59eff;
   --code-block-foreground: var(--color-neutral-200);
-  --code-token-keyword: var(--info-foreground);
   --code-token-string: var(--color-emerald-300);
   --code-token-constant: var(--color-amber-300);
   --code-token-function: var(--color-teal-300);
   --code-token-parameter: var(--color-orange-300);
   --code-token-property: var(--color-pink-300);
-  --code-token-comment: var(--color-neutral-500);
   --code-token-punctuation: var(--color-neutral-400);
   --success: var(--color-emerald-500);
   --warning: var(--color-amber-500);
@@ -256,7 +249,6 @@
 
 /* The stars thin out from just under the header row and are gone by the first row. */
 .sidebar-stage-backdrop {
-  -webkit-mask-image: linear-gradient(#000 0% 40%, #0000 80%);
   mask-image: linear-gradient(#000 0% 40%, #0000 80%);
 }
 
@@ -293,12 +285,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sidebar-stage-twinkle {
-    animation: none;
-  }
-}
-
 @theme {
   /*
    * The type scale (shadcn new-york's, as the efferd dashboard reference uses it). Three steps
@@ -312,6 +298,9 @@
    *   kpi      24 px  a KPI or live tile figure (semibold)
    *   display  28 px  the sign-in h1 and the device code; nothing else
    *   2xs      11 px  chart ticks and the smallest pills only
+   *   control  16 px on phones, 14 px from sm: what goes into a form control (inputs,
+   *                   textareas, select and number fields, the large button). iOS zooms the page
+   *                   into a field whose text is under 16 px. Set by --control-text below.
    * Weights: 400 for text, 500 for controls, names, table heads and badges, 600 only for titles
    * and KPI figures; no bold outside the sign-in showcase art.
    * Spacing: a card pads 16 px on phones and 24 px from sm; its header 12 px tall on phones,
@@ -337,6 +326,8 @@
   --text-meta--line-height: calc(1 / 0.75);
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
+  --text-control: var(--control-text);
+  --text-control--line-height: var(--control-text-leading);
 }
 
 /*
@@ -394,8 +385,10 @@
 }
 
 @utility popup-surface {
+  border-radius: var(--radius);
   background: var(--popup);
   border: 1px solid var(--popup-border);
+  color: var(--popover-foreground);
   box-shadow: var(--popup-shadow);
 }
 
@@ -445,6 +438,15 @@
   --field-border: color-mix(in oklab, var(--foreground) 8%, transparent);
   --field-border-strong: var(--border-strong);
   --field-border-focus: var(--primary);
+  /* The text-control step: 16 px (text-base) on phones, 14 px (text-sm) from sm. */
+  --control-text: 1rem;
+  --control-text-leading: 1.5;
+}
+@media (width >= 40rem) {
+  :root {
+    --control-text: 0.875rem;
+    --control-text-leading: calc(1.25 / 0.875);
+  }
 }
 .dark {
   --field: color-mix(in oklab, var(--color-white) 4.5%, transparent);
@@ -559,6 +561,17 @@
   }
 }
 
+/*
+ * A control's icon slot: an icon never shrinks in the control's flex row, and a click on it
+ * lands on the control. Each control sets its own default icon size beside this.
+ */
+@utility icon-slot {
+  & svg {
+    pointer-events: none;
+    flex-shrink: 0;
+  }
+}
+
 /* A heatmap cell with failures under the alert threshold: a thin red bar along its bottom. */
 @utility heat-fail {
   box-shadow: inset 0 -2px 0 var(--chart-negative);
@@ -571,7 +584,6 @@
  */
 @utility dialog-glass {
   background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   border-color: color-mix(in srgb, var(--contrast-foreground) 10%, transparent);
   box-shadow: var(--floating-shadow);
@@ -592,9 +604,22 @@
 }
 
 @utility dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
   background: color-mix(in srgb, var(--background) 60%, transparent);
-  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
+
+  /* It fades in and out; each modal sets the transition's duration and easing. */
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+
+  /* iOS Safari (the one engine with -webkit-touch-callout): absolute in its portal, as coss ui. */
+  @supports (-webkit-touch-callout: none) {
+    position: absolute;
+  }
 
   @variant dark {
     background: color-mix(in srgb, var(--background) 64%, transparent);
@@ -751,7 +776,6 @@
       white-space: normal;
       & > span {
         display: inline;
-        animation: none;
       }
     }
   }
@@ -795,16 +819,6 @@
 
 /* Rows fade behind the foot; the right inset, where the scrollbar runs, fades out above it. */
 @utility command-list-fade {
-  -webkit-mask-image:
-    linear-gradient(
-      #000 calc(100% - var(--command-foot)),
-      transparent calc(100% - var(--command-foot) + 12px),
-      transparent
-    ),
-    linear-gradient(
-      #000 calc(100% - var(--command-foot) - 12px),
-      transparent calc(100% - var(--command-foot))
-    );
   mask-image:
     linear-gradient(
       #000 calc(100% - var(--command-foot)),
@@ -815,13 +829,9 @@
       #000 calc(100% - var(--command-foot) - 12px),
       transparent calc(100% - var(--command-foot))
     );
-  -webkit-mask-size:
-    calc(100% - 8px) 100%,
-    auto;
   mask-size:
     calc(100% - 8px) 100%,
     auto;
-  -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
 }
 
@@ -1332,25 +1342,24 @@
   }
   .dark ::selection {
     background-color: color-mix(in oklab, var(--primary) 80%, transparent);
-    color: var(--primary-foreground);
   }
   html,
   body {
     background-color: var(--app-chrome-background);
   }
   body {
-    @apply text-foreground font-sans antialiased;
-    background-image: var(--surface-grain);
-    background-repeat: repeat;
-    background-size: var(--surface-grain-size);
+    @apply text-foreground font-sans antialiased surface-grain;
   }
 }
 
 /*
- * Reduced motion: every animation and transition finishes at once. Unlayered, so it wins over
- * every Tailwind layer; the :root prefix brings it level with the single-class unlayered rules
- * above (e.g. .sidebar-stage-twinkle), and being last it wins those ties. Components keep their
- * transitions in classes, not inline styles, so this reaches them.
+ * Reduced motion: every animation and transition finishes at once, and an endless one (spinner,
+ * skeleton, ping, twinkle) runs a single pass instead of looping every 0.01 ms, so it rests on
+ * its own style. This is the only reduced-motion rule for CSS motion: components add no
+ * motion-reduce or motion-safe classes. Unlayered, so it wins over every Tailwind layer; the
+ * :root prefix brings it level with the single-class unlayered rules above (e.g.
+ * .sidebar-stage-twinkle), and being last it wins those ties. Components keep their transitions
+ * in classes, not inline styles, so this reaches them.
  */
 @media (prefers-reduced-motion: reduce) {
   :root,
@@ -1358,6 +1367,7 @@
   :root ::before,
   :root ::after {
     animation-duration: 0.01ms;
+    animation-iteration-count: 1;
     transition-duration: 0.01ms;
   }
 }

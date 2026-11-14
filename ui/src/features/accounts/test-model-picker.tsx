@@ -291,7 +291,7 @@ export function TestModelPicker({
               <button
                 aria-pressed={on}
                 className={cn(
-                  "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-meta outline-none focus-visible:focus-outline",
+                  "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-meta focus-visible:focus-outline",
                   on
                     ? "bg-foreground text-background"
                     : "text-muted-foreground shadow-[inset_0_0_0_1px_var(--border)] hover:bg-accent hover:text-foreground",

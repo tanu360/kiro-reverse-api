@@ -15,6 +15,7 @@ import {
 import { selectTriggerIconClassName } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
+import { prefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 
@@ -187,7 +188,7 @@ function revealTab(tab: HTMLElement | null | undefined, smooth: boolean) {
   const hidden = rect.left < box.left + TAB_FADE_PX || rect.right > box.right - TAB_FADE_PX;
   if (!hidden) return;
   const left = viewport.scrollLeft + rect.left + rect.width / 2 - (box.left + box.width / 2);
-  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const reduce = prefersReducedMotion();
   viewport.scrollTo?.({ left, behavior: smooth && !reduce ? "smooth" : "auto" });
 }
 

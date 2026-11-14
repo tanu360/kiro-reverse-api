@@ -31,7 +31,7 @@ function CommandDialogBackdrop({
   return (
     <CommandDialogPrimitive.Backdrop
       className={cn(
-        "dialog-backdrop fixed inset-0 z-50 transition-opacity duration-220 ease-out data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-140 data-ending-style:ease-in supports-[-webkit-touch-callout:none]:absolute",
+        "dialog-backdrop transition-opacity duration-220 ease-out data-ending-style:duration-140 data-ending-style:ease-in",
         className,
       )}
       data-slot="command-dialog-backdrop"
@@ -67,8 +67,8 @@ export function CommandDialogPopup({
       <CommandDialogViewport>
         <CommandDialogPrimitive.Popup
           className={cn(
-            "popup-surface command-palette flex min-w-0 origin-top flex-col overflow-hidden rounded-2xl text-popover-foreground outline-none [--command-foot:--spacing(14)] pointer-coarse:[--command-foot:--spacing(4)]",
-            "transition-[opacity,translate,scale] duration-220 data-ending-style:-translate-y-2 data-starting-style:-translate-y-2 data-ending-style:scale-96 data-starting-style:scale-96 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-140 data-ending-style:ease-in motion-reduce:transition-opacity",
+            "popup-surface command-palette flex min-w-0 origin-top flex-col overflow-hidden rounded-2xl outline-none [--command-foot:--spacing(14)] pointer-coarse:[--command-foot:--spacing(4)]",
+            "transition-[opacity,translate,scale] duration-220 data-ending-style:-translate-y-2 data-starting-style:-translate-y-2 data-ending-style:scale-96 data-starting-style:scale-96 data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-140 data-ending-style:ease-in",
             OPEN_EASE,
             className,
           )}
@@ -200,7 +200,7 @@ export function CommandItem({
   return (
     <AutocompletePrimitive.Item
       className={cn(
-        "flex h-10 cursor-pointer snap-end select-none items-center gap-3 rounded-lg px-3 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-disabled:opacity-64 [&_svg:not([class*='size-'])]:size-5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-muted-foreground data-highlighted:[&_svg]:text-foreground",
+        "flex h-10 cursor-pointer snap-end select-none items-center gap-3 rounded-lg px-3 text-foreground text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-disabled:opacity-64 [&_svg:not([class*='size-'])]:size-5 icon-slot [&_svg]:text-muted-foreground data-highlighted:[&_svg]:text-foreground",
         className,
       )}
       data-slot="command-item"

@@ -48,7 +48,7 @@ export function NumberFieldGroup({
   return (
     <NumberFieldPrimitive.Group
       className={cn(
-        "relative flex w-full justify-between rounded-lg border border-field-border bg-field text-base text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-within:border-field-border-focus focus-within:bg-field-focus has-aria-invalid:border-destructive/36 has-autofill:bg-foreground/4 focus-within:has-aria-invalid:border-destructive/64 data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm dark:has-autofill:bg-foreground/8 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "relative flex w-full justify-between rounded-lg border border-field-border bg-field text-control text-foreground transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-within:border-field-border-focus focus-within:bg-field-focus has-aria-invalid:border-destructive/36 has-autofill:bg-foreground/4 focus-within:has-aria-invalid:border-destructive/64 data-disabled:pointer-events-none data-disabled:opacity-64 dark:has-autofill:bg-foreground/8 [&_svg:not([class*='size-'])]:size-4 icon-slot",
         className,
       )}
       data-slot="number-field-group"

@@ -35,7 +35,7 @@ export const PRIMARY_FINISH: string =
   "grain-overlay [--grain-overlay-opacity:0.1] not-disabled:not-aria-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [&_svg:not([class*='opacity-'])]:opacity-80";
 
 export const buttonVariants = cva(
-  "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-medium text-sm outline-none transition-[box-shadow,scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:not-aria-busy:opacity-64 aria-busy:cursor-progress [&_svg:not([class*='text-'])]:text-(--control-icon-color) [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0 [&>[data-slot=button-loading-indicator]+svg]:hidden",
+  "[--control-icon-color:currentColor] relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-medium text-sm transition-[box-shadow,scale] [&:active:not([aria-haspopup])]:scale-[0.97] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 focus-outline disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:not-aria-busy:opacity-64 aria-busy:cursor-progress [&_svg:not([class*='text-'])]:text-(--control-icon-color) [&_svg:not([class*='size-'])]:size-4 icon-slot [&_svg]:-mx-0.5 [&>[data-slot=button-loading-indicator]+svg]:hidden",
   {
     defaultVariants: {
       size: "default",
@@ -64,7 +64,7 @@ export const buttonVariants = cva(
         "icon-sm": "size-8 pointer-coarse:size-9",
         "icon-xs": "size-6 not-in-data-[slot=input-group]:[&_svg:not([class*='size-'])]:size-3",
         // The sign-in button keeps the larger text (16 px on phones, 14 px from sm up).
-        lg: "h-11 px-[calc(--spacing(3.5)-1px)] text-base sm:h-10 sm:text-sm pointer-coarse:h-11",
+        lg: "h-11 px-[calc(--spacing(3.5)-1px)] text-control sm:h-10 pointer-coarse:h-11",
         sm: "h-8 gap-1.5 px-[calc(--spacing(3)-1px)] has-[>svg]:px-[calc(--spacing(2.5)-1px)] pointer-coarse:h-9",
         xs: "h-6 gap-1 px-[calc(--spacing(2)-1px)] text-xs [&_svg:not([class*='size-'])]:size-3",
       },
@@ -106,7 +106,7 @@ export const buttonVariants = cva(
         // new"): the text's own size, no box and no underline; the icon nudges 2 px toward the
         // end on hover. The Button drops the size classes for it, as for `link-inline`.
         "link-action":
-          "h-auto gap-1 rounded-sm border-0 p-0 text-[length:inherit] text-foreground sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 [&_svg]:mx-0 [&_svg]:transition-transform [&_svg]:duration-150 [&_svg]:ease-out hover:[&_svg]:translate-x-0.5 data-pressed:[&_svg]:translate-x-0.5 motion-reduce:[&_svg]:transition-none",
+          "h-auto gap-1 rounded-sm border-0 p-0 text-[length:inherit] text-foreground sm:text-[length:inherit] [&:active:not([aria-haspopup])]:scale-100 [&_svg]:mx-0 [&_svg]:transition-transform [&_svg]:duration-150 [&_svg]:ease-out hover:[&_svg]:translate-x-0.5 data-pressed:[&_svg]:translate-x-0.5",
         // A field-like trigger (the Accounts filter selects in their label group): a faint
         // foreground tint with a hairline border, a step past a field's, and a step deeper on
         // hover (index.css --neutral-button-*). Supporting actions use `secondary`.

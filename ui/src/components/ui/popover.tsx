@@ -66,9 +66,7 @@ export function PopoverPopup({
             "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-popover-foreground outline-none transition-[width,height,scale,opacity] duration-100 has-data-[slot=calendar]:rounded-xl data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             // A tooltip-style popover is drawn as the tooltip (tooltip.tsx); any other is the one
             // popup sheet (index.css popup-surface), as menus and selects.
-            tooltipStyle
-              ? "popup-surface w-fit text-pretty rounded-lg text-xs"
-              : "popup-surface rounded-lg text-sm",
+            tooltipStyle ? "popup-surface w-fit text-pretty text-xs" : "popup-surface text-sm",
             className,
           )}
           data-slot="popover-popup"

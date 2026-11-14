@@ -16,7 +16,7 @@ export function Checkbox({
         // The sign-in checkbox: a flat 16 px box in the field fill with the firm control edge
         // (index.css --border-strong, 3:1) while unchecked, the field's hover tint under the
         // pointer, solid purple once checked. touch-hit gives it a 44 px target on touch screens.
-        "touch-hit relative inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm border border-border-strong bg-field outline-none focus-outline hover:bg-field-hover aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 data-disabled:cursor-not-allowed data-disabled:opacity-64 data-checked:border-primary",
+        "touch-hit relative inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm border border-border-strong bg-field focus-outline hover:bg-field-hover aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 data-disabled:cursor-not-allowed data-disabled:opacity-64 data-checked:border-primary",
         className,
       )}
       data-slot="checkbox"

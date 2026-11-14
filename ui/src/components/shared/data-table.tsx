@@ -469,7 +469,7 @@ export function DataTable<T>({
                       <button
                         // Fills the 40 px header height so the whole header cell is the target.
                         className={cn(
-                          "group/sort -mx-1 inline-flex h-10 cursor-pointer items-center gap-1 rounded-md px-1 outline-none transition-colors hover:text-foreground focus-outline-inset",
+                          "group/sort -mx-1 inline-flex h-10 cursor-pointer items-center gap-1 rounded-md px-1 transition-colors hover:text-foreground focus-outline-inset",
                           active && "text-foreground",
                           column.align === "end" && "flex-row-reverse",
                         )}

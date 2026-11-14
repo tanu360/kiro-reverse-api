@@ -150,7 +150,7 @@ export function ChoiceRow({
         className={cn(
           // The end rows round with the card, so their focus outline follows its corners. 52 px
           // rows (py-2.5), so an eight-row method list fits a 768 px tall screen.
-          "flex min-h-13 w-full min-w-0 cursor-pointer items-center gap-3 px-4 py-2.5 text-start outline-none transition-[background-color,scale] hover:bg-accent focus-outline-inset active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64 group-first/choice-row:rounded-t-xl group-last/choice-row:rounded-b-xl",
+          "flex min-h-13 w-full min-w-0 cursor-pointer items-center gap-3 px-4 py-2.5 text-start transition-[background-color,scale] hover:bg-accent focus-outline-inset active:scale-[0.99] disabled:pointer-events-none disabled:opacity-64 group-first/choice-row:rounded-t-xl group-last/choice-row:rounded-b-xl",
           // In a flush list: a rounded hover area with the icon bare, no chip and no card.
           "in-data-flush:rounded-lg in-data-flush:px-2 in-data-flush:group-first/choice-row:rounded-lg in-data-flush:group-last/choice-row:rounded-lg",
           className,

@@ -99,7 +99,7 @@ function LanguageSelect({ className }: { className?: string }): JSX.Element {
             <SelectPrimitive.Trigger
               aria-label={triggerLabel}
               className={cn(
-                "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-muted-foreground text-sm outline-none transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground pointer-coarse:h-10",
+                "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-muted-foreground text-sm transition-colors hover:text-foreground focus-outline data-popup-open:text-foreground pointer-coarse:h-10",
                 className,
               )}
             />

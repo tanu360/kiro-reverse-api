@@ -6,7 +6,6 @@ import {
   LazyMotion,
   type MotionValue,
   m,
-  useReducedMotion,
   useSpring,
 } from "motion/react";
 import {
@@ -24,6 +23,7 @@ import {
   useState,
 } from "react";
 import { useUiT } from "@/components/ui/messages";
+import { prefersReducedMotion, usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { intlLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { DEFAULT_ANIMATION_EASING } from "./animation";
@@ -181,13 +181,6 @@ function useSparklineWidth(
     return observeWidth(element, (width) => setMeasured(Math.round(width * 2) / 2));
   }, [ref, fixedWidth]);
   return fixedWidth ?? measured;
-}
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
-  );
 }
 
 /**
@@ -560,7 +553,7 @@ function HoverMarks({
   fallbackY,
   ...rest
 }: HoverMarksProps & { spring: SparklineSpringConfig | null }) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = usePrefersReducedMotion();
   if (spring && !reducedMotion) {
     return <SpringHoverMarks fallbackY={fallbackY} point={point} spring={spring} {...rest} />;
   }

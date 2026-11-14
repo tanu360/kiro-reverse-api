@@ -717,7 +717,7 @@ export function TestAccountDialog({
                         <HugeiconsIcon
                           aria-hidden="true"
                           className={cn(
-                            "size-4 text-muted-foreground transition-transform motion-reduce:transition-none",
+                            "size-4 text-muted-foreground transition-transform",
                             isOpen && "rotate-90 text-foreground",
                           )}
                           icon={ArrowRight01Icon}

@@ -119,7 +119,7 @@ export function CodeBlock({
   const scrolls = useScrolls(preRef);
   const lines = useHighlightedLines(code, language);
   const preClassName = cn(
-    "max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed outline-none focus-outline-inset",
+    "max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed focus-outline-inset",
     wrap && "whitespace-pre-wrap wrap-anywhere",
     capHeight && "max-h-72 overflow-y-auto",
   );

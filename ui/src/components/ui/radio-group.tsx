@@ -20,7 +20,7 @@ export function Radio({ className, ...props }: RadioPrimitive.Root.Props): React
     <RadioPrimitive.Root
       className={cn(
         // The checkbox's look (checkbox.tsx), round: the firm control edge, the field's hover tint.
-        "relative inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border-strong bg-field outline-none focus-outline hover:bg-field-hover aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 data-disabled:cursor-not-allowed data-disabled:opacity-64",
+        "relative inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border-strong bg-field focus-outline hover:bg-field-hover aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 data-disabled:cursor-not-allowed data-disabled:opacity-64",
         className,
       )}
       data-slot="radio"

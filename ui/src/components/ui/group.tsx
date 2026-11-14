@@ -56,7 +56,7 @@ export function GroupText({
   const defaultProps = {
     className: cn(
       // A label segment beside a field or button in a Group: the field's fill and hairline.
-      "relative inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-field-border bg-field px-[calc(--spacing(3)-1px)] text-base text-muted-foreground outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] sm:text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:-mx-0.5 [&_svg]:shrink-0",
+      "relative inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-field-border bg-field px-[calc(--spacing(3)-1px)] text-control text-muted-foreground outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] [&_svg:not([class*='size-'])]:size-4 [&_svg]:-mx-0.5 [&_svg]:shrink-0",
       className,
     ),
     "data-slot": "group-text",

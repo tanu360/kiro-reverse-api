@@ -88,7 +88,7 @@ export function ModelMixCard(): JSX.Element {
     const focus = (index: number, className: string | undefined, children: ReactNode) => (
       <div
         className={cn(
-          "transition-opacity motion-reduce:transition-none",
+          "transition-opacity",
           hovered !== null && hovered !== index && "opacity-50",
           className,
         )}

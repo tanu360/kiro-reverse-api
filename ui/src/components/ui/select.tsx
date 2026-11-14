@@ -25,7 +25,7 @@ export const Select: typeof SelectPrimitive.Root = SelectPrimitive.Root;
  * pointer 40 / 36 px (44 lg), with a 44 px hit area (the ::after layer).
  */
 export const selectTriggerVariants = cva(
-  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-base text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 sm:text-sm pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "relative inline-flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-field-border bg-field text-left text-control text-foreground outline-none transition-[background-color,border-color] duration-150 hover:bg-field-hover focus-visible:border-field-border-focus focus-visible:bg-field-focus data-popup-open:bg-field-hover data-disabled:pointer-events-none data-disabled:opacity-64 aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive/64 pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground icon-slot",
   {
     defaultVariants: {
       fit: "field",
@@ -150,7 +150,7 @@ export function SelectPopup({
               long slides when its row is highlighted. */}
           <div
             className={cn(
-              "popup-surface relative h-full rounded-lg",
+              "popup-surface relative h-full",
               fit === "field" ? "popup-width-field" : "popup-width",
             )}
           >

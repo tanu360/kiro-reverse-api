@@ -547,10 +547,7 @@ export function SidebarMenuChevron({
       {...props}
     >
       <HugeiconsIcon
-        className={cn(
-          "size-4 transition-transform duration-200 ease-out motion-reduce:transition-none",
-          open && "rotate-90",
-        )}
+        className={cn("size-4 transition-transform duration-200 ease-out", open && "rotate-90")}
         icon={ArrowRight01Icon}
       />
     </span>

@@ -79,7 +79,7 @@ interface GridLinesBaseProps<Value> extends GridLineSvgProps {
   /** Extra pixel offset added to every line. */
   offset?: number;
   lineStyle?: CSSProperties;
-  /** Default: `#eaf0f6` (visx). */
+  /** Default: the chart grid hairline (`--chart-grid`). */
   stroke?: string;
   /** Default: 1 */
   strokeWidth?: string | number;
@@ -158,7 +158,7 @@ export function GridRows<Value>({
   left = 0,
   scale,
   width,
-  stroke = "#eaf0f6",
+  stroke = "var(--chart-grid)",
   strokeWidth = 1,
   strokeDasharray,
   className,
@@ -186,7 +186,7 @@ export function GridColumns<Value>({
   left = 0,
   scale,
   height,
-  stroke = "#eaf0f6",
+  stroke = "var(--chart-grid)",
   strokeWidth = 1,
   strokeDasharray,
   className,

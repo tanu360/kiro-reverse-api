@@ -185,7 +185,7 @@ export function LegendItem({ className, children }: LegendItemProps) {
   return (
     <li
       className={cn(
-        "flex min-w-0 items-center gap-1.5 transition-opacity duration-150 ease-out motion-reduce:transition-none",
+        "flex min-w-0 items-center gap-1.5 transition-opacity duration-150 ease-out",
         isFaded && "opacity-50",
         className,
       )}

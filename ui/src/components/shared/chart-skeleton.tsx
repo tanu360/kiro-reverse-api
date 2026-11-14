@@ -21,7 +21,7 @@ export function ChartSkeleton({
   return (
     <svg
       aria-hidden="true"
-      className={cn("block w-full motion-safe:animate-skeleton", className)}
+      className={cn("block w-full animate-skeleton", className)}
       data-slot="chart-skeleton"
       preserveAspectRatio="none"
       style={style}

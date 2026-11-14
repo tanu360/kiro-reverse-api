@@ -52,7 +52,7 @@ export function ExternalLink({
   return (
     <a
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-sm font-medium text-foreground text-sm outline-none transition-colors hover:text-primary focus-outline [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
+        "inline-flex shrink-0 items-center gap-1.5 rounded-sm font-medium text-foreground text-sm transition-colors hover:text-primary focus-outline [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
         className,
       )}
       href={href}
