@@ -386,7 +386,7 @@ function SetupDialog({ onDone }: { onDone: (status: TwoFactorStatus) => void }):
   }
 
   return (
-    <DialogPopup className="sm:max-w-xl">
+    <DialogPopup className="sm:max-w-lg">
       <form className="contents" noValidate onSubmit={submit}>
         <DialogHeader>
           {/* The sheet headers' tile: the shield in a soft purple square beside the title. */}
@@ -479,10 +479,10 @@ function SetupStep({
 }
 
 /**
- * The QR code and the key to type. The code is drawn in the app's style (StyledQr) in a soft
- * purple frame: dark modules on white in the light theme, inverted in the dark one, where "Use a
- * light code" brings the white one back for a scanner that reads dark-on-light only. A QR the
- * styling cannot read is shown as the server drew it.
+ * The QR code and, under it, the key to type. The code is drawn in the app's style (StyledQr)
+ * in a soft purple frame: dark modules on white in the light theme, inverted in the dark one,
+ * where "Use a light code" brings the white one back for a scanner that reads dark-on-light
+ * only. A QR the styling cannot read is shown as the server drew it.
  */
 function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
   const { t } = useT("settings");
@@ -501,7 +501,8 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
     );
   }
   return (
-    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+    // The QR on top, the key to type under it, both centred: one column at every width.
+    <div className="flex flex-col items-center gap-4">
       <div className="flex shrink-0 flex-col items-center gap-2">
         <div
           className={cn(
@@ -525,8 +526,8 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
           </p>
         ) : null}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-2 self-stretch sm:justify-center">
-        <p className="text-muted-foreground text-xs">{t("twoFactor.secretHint")}</p>
+      <div className="flex w-full min-w-0 flex-col gap-2">
+        <p className="text-center text-muted-foreground text-xs">{t("twoFactor.secretHint")}</p>
         <div className="flex items-center gap-1 rounded-lg border border-border-subtle bg-surface-2 py-1 ps-3 pe-1">
           {/* The key as the app takes it: one word, the body font, so nothing is retyped wrong. */}
           <span className="min-w-0 flex-1 py-1 text-sm break-all" translate="no">
@@ -541,7 +542,7 @@ function SetupSecret({ setup }: { setup?: TwoFactorSetup }): JSX.Element {
             />
           ) : null}
         </div>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-center text-muted-foreground text-xs">
           {t("twoFactor.accountName", { issuer: setup?.issuer ?? "Kiro Proxy" })}
         </p>
       </div>
