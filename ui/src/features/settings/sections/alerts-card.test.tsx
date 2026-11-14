@@ -46,6 +46,9 @@ const SAVED: AlertsConfig = {
   accountThresholds: [80, 90, 100],
   poolThresholds: [95],
   poolCooldownMinutes: 30,
+  dailySummary: false,
+  dailySummaryMinute: 540,
+  dailySummaryLastSent: 0,
   channels: [
     {
       id: "ch_ops",
@@ -295,9 +298,73 @@ describe("AlertsCard", () => {
           accountThresholds: [50, 75, 100],
           poolThresholds: [80, 90, 100],
           poolCooldownMinutes: 60,
+          dailySummary: false,
+          dailySummaryMinute: 540,
         },
       },
     ]);
     await waitFor(() => expect(thresholds).toHaveValue("50, 75, 100"));
+  });
+});
+
+describe("AlertsCard daily summary", () => {
+  it("switches the summary on at a local hour stored in UTC and saves both", async () => {
+    const { user } = await renderCard();
+    const toggle = screen.getByRole("switch", { name: "Daily usage summary" });
+    expect(toggle).not.toBeChecked();
+    // The default 09:00 UTC, labelled with the viewer's own time and the UTC time.
+    const time = screen.getByRole("combobox", { name: "Send at" });
+    expect(time).toHaveTextContent("(09:00 UTC)");
+    expect(screen.getByText(/The server keeps 09:00 UTC/)).toBeInTheDocument();
+
+    await user.click(toggle);
+    await user.click(time);
+    const options = await screen.findAllByRole("option");
+    // One option per local hour.
+    expect(options).toHaveLength(24);
+    const target = options.find((option) => option.textContent?.includes("(06:00 UTC)"));
+    if (!target) throw new Error("no 06:00 UTC option");
+    await user.click(target);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(async () =>
+      expect((await writes()).at(-1)?.body).toMatchObject({
+        dailySummary: true,
+        dailySummaryMinute: 360,
+      }),
+    );
+  });
+
+  it("sends a test summary to the channels that are on and reports the result", async () => {
+    mockServer.use(http.get(apiUrl("/alerts"), () => HttpResponse.json(SAVED)));
+    mockServer.use(
+      http.post(apiUrl("/alerts/daily-summary/test"), () =>
+        HttpResponse.json({
+          results: [
+            {
+              channelId: "ch_ops",
+              ts: Math.floor(Date.now() / 1000),
+              ok: true,
+              status: 200,
+              attempts: 1,
+              event: "daily_summary",
+            },
+          ],
+          title: "Daily usage summary",
+          text: "Last 24 hours",
+        }),
+      ),
+    );
+    const { user } = await renderCard();
+    await user.click(screen.getByRole("button", { name: "Send test" }));
+    expect(await screen.findAllByText("Summary sent to 1 channel.")).not.toHaveLength(0);
+    const row = screen.getByText("Ops hook").closest("li") as HTMLElement;
+    expect(await within(row).findByText("Daily summary")).toBeInTheDocument();
+  });
+
+  it("disables the test while no channel is on", async () => {
+    await renderCard();
+    expect(screen.getByRole("button", { name: "Send test" })).toBeDisabled();
+    expect(screen.getByText("Add or switch on a channel first.")).toBeInTheDocument();
   });
 });

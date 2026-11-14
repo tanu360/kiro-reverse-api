@@ -23,7 +23,7 @@ export interface AlertDelivery {
   /** Last HTTP status; 0 when no response came back */
   status: number;
   attempts: number;
-  /** account_usage | pool_usage | account_banned | all_unavailable | test */
+  /** account_usage | pool_usage | account_banned | all_unavailable | daily_summary | test */
   event: string;
   error?: string;
 }
@@ -55,6 +55,12 @@ export interface AlertsConfig {
   poolThresholds: number[];
   poolCooldownMinutes: number;
   channels: AlertChannel[];
+  /** The daily usage summary; off until switched on. */
+  dailySummary: boolean;
+  /** When it goes out, in minutes after midnight UTC (0..1439); 540 (09:00 UTC) by default. */
+  dailySummaryMinute: number;
+  /** When the last scheduled summary went out (unix s); 0 for never. */
+  dailySummaryLastSent: number;
 }
 
 /**
@@ -84,6 +90,9 @@ export interface AlertsUpdate {
   poolThresholds?: number[];
   poolCooldownMinutes?: number;
   channels?: AlertChannelInput[];
+  dailySummary?: boolean;
+  /** minutes after midnight UTC, 0..1439 */
+  dailySummaryMinute?: number;
 }
 
 /** The codes a 400 from POST /alerts carries; `field` (and `index` for a channel) say where. */
@@ -91,7 +100,8 @@ export type AlertsErrorCode =
   | "alert_thresholds_invalid"
   | "alert_cooldown_range"
   | "alert_channel_invalid"
-  | "alert_channel_limit";
+  | "alert_channel_limit"
+  | "alert_summary_time_range";
 
 /** Under ["settings"], so a settings_changed event refetches it. */
 export const alertsQueryKey = ["settings", "alerts"] as const;
@@ -114,4 +124,25 @@ export async function updateAlerts(patch: AlertsUpdate): Promise<AlertsConfig> {
 /** One attempt with a 10 s timeout; 404 `alert_channel_not_found` for an unknown id. */
 export function testAlertChannel(channelId: string): Promise<AlertDelivery> {
   return apiRequest("/alerts/test", { method: "POST", body: { channelId } });
+}
+
+/** One channel's result of a summary test send. */
+export interface DailySummaryTestResult extends AlertDelivery {
+  channelId: string;
+}
+
+export interface DailySummaryTestResponse {
+  /** One per enabled channel, in channel order. */
+  results: DailySummaryTestResult[];
+  title: string;
+  /** The summary as the chat channels get it. */
+  text: string;
+}
+
+/**
+ * The summary of the last 24 hours, sent now to every enabled channel with one attempt each. It
+ * does not count as the day's summary. 409 `alert_no_channels` when no channel is on.
+ */
+export function testDailySummary(): Promise<DailySummaryTestResponse> {
+  return apiRequest("/alerts/daily-summary/test", { method: "POST" });
 }

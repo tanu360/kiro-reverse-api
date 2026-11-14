@@ -4,6 +4,7 @@ import {
   ChartLineData02Icon,
   CircleCheckIcon,
   CircleSlashIcon,
+  Clock01Icon,
   Delete02Icon,
   EllipsisVerticalIcon,
   KeyRoundIcon,
@@ -11,8 +12,11 @@ import {
   PlusIcon,
   PowerIcon,
   PowerOffIcon,
+  Route01Icon,
+  Tag01Icon,
   Undo02Icon,
   UsersIcon,
+  ZapIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,6 +38,7 @@ import { CardPanel } from "@/components/ui/card";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
+import { ROUTING_MODE_LABEL } from "@/features/accounts/use-routing-mode";
 import { useElementWidth } from "@/hooks/use-element-width";
 import {
   apiKeysQuery,
@@ -51,7 +56,7 @@ import { type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { limitReachedReason, wouldLockOutClients } from "./api-key-form";
+import { isKeyExpired, limitReachedReason, wouldLockOutClients } from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
 import { CreatedKeyPanel } from "./created-key-panel";
 import { keyEntryRef } from "./key-usage-model";
@@ -532,33 +537,93 @@ function KeyStatus({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   );
 }
 
-/** A reached limit and the account binding; nothing for an unbound key within its limits. */
+/** An expiry this close shows as a badge, so nobody is surprised by the 401. */
+const EXPIRY_SOON_SEC = 7 * 86_400;
+
+/**
+ * A reached limit, the account binding (ids and tags), the model list, the RPM limit, an own
+ * routing mode and an expiry within a week; nothing for a plain key.
+ */
 function AccessBadges({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
   const { t, lang } = useT("api");
   const reason = limitReachedReason(apiKey);
   const bound = apiKey.accountIds?.length ?? 0;
-  if (!reason && bound === 0) return null;
+  const tags = apiKey.accountTags ?? [];
+  const models = apiKey.allowedModels ?? [];
+  const rpm = apiKey.rpmLimit ?? 0;
+  const mode = apiKey.routingMode && apiKey.routingMode !== "inherit" ? apiKey.routingMode : null;
+  const now = Date.now() / 1000;
+  const expiresAt = apiKey.expiresAt ?? 0;
+  const expiresSoon = expiresAt > now && expiresAt - now < EXPIRY_SOON_SEC;
+  if (
+    !reason &&
+    bound === 0 &&
+    tags.length === 0 &&
+    models.length === 0 &&
+    !rpm &&
+    !mode &&
+    !expiresSoon
+  ) {
+    return null;
+  }
   return (
     <>
       {reason ? <LimitBadge reason={reason} /> : null}
+      {expiresSoon ? (
+        <Badge icon={Clock01Icon} tone="neutral">
+          {t("keys.expiresSoon", { relative: formatRelativeTime(expiresAt, lang) })}
+        </Badge>
+      ) : null}
       {bound > 0 ? (
         <Badge icon={UsersIcon} tone="neutral">
           {t("keys.boundAccounts", { count: bound, n: formatNumber(bound, lang) })}
+        </Badge>
+      ) : null}
+      {tags.length > 0 ? (
+        <Badge icon={Tag01Icon} tone="neutral">
+          {/* The tags themselves: they say more than a count, and there are at most 10. */}
+          <span className="max-w-40 truncate">{tags.join(", ")}</span>
+        </Badge>
+      ) : null}
+      {models.length > 0 ? (
+        <Badge tone="neutral">
+          {t("keys.allowedModels", { count: models.length, n: formatNumber(models.length, lang) })}
+        </Badge>
+      ) : null}
+      {rpm > 0 ? (
+        <Badge icon={ZapIcon} tone="neutral">
+          {t("keys.rpmLimit", { n: formatNumber(rpm, lang) })}
+        </Badge>
+      ) : null}
+      {mode ? (
+        <Badge icon={Route01Icon} tone="neutral">
+          {t(ROUTING_MODE_LABEL[mode])}
         </Badge>
       ) : null}
     </>
   );
 }
 
+/** Enabled, Disabled, or Expired for an enabled key past its expiry (clients get 401). */
 function StatusBadge({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const { t } = useT("api");
-  return apiKey.enabled ? (
+  if (!apiKey.enabled) {
+    return (
+      <Badge icon={CircleSlashIcon} tone="neutral">
+        {t("common:status.disabled")}
+      </Badge>
+    );
+  }
+  if (isKeyExpired(apiKey)) {
+    return (
+      <Badge data-status="expired" icon={Clock01Icon} tone="warning">
+        {t("keys.expired")}
+      </Badge>
+    );
+  }
+  return (
     <Badge icon={CircleCheckIcon} tone="success">
       {t("common:status.enabled")}
-    </Badge>
-  ) : (
-    <Badge icon={CircleSlashIcon} tone="neutral">
-      {t("common:status.disabled")}
     </Badge>
   );
 }

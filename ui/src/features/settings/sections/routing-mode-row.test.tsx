@@ -51,11 +51,31 @@ describe("RoutingModeRow", () => {
     expect(mockDb.settings.sessionAffinity).toBe(true);
   });
 
+  it("offers Reset first with its own hint and saves it", async () => {
+    const posts = capturePosts();
+    const { user, group } = await renderCard();
+    await user.click(screen.getByRole("radio", { name: "Reset first" }));
+    expect(screen.getByRole("radio", { name: "Reset first" })).toBeChecked();
+    expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
+    expect(posts).toEqual([{ routingMode: "reset_first" }]);
+    expect(mockDb.settings.routingMode).toBe("reset_first");
+    expect(group).toHaveAccessibleDescription(/credits reset soonest/);
+  });
+
+  it("shows a saved reset-first mode", async () => {
+    mockDb.settings.routingMode = "reset_first";
+    await renderCard();
+    expect(screen.getByRole("radio", { name: "Reset first" })).toBeChecked();
+  });
+
   it("puts the choice back when the save fails", async () => {
     mockServer.use(
       http.post(apiUrl("/settings"), () =>
         HttpResponse.json(
-          { error: 'routingMode must be "weighted" or "priority"', code: "routing_mode_invalid" },
+          {
+            error: 'routingMode must be "weighted", "priority" or "reset_first"',
+            code: "routing_mode_invalid",
+          },
           { status: 400 },
         ),
       ),
@@ -67,7 +87,7 @@ describe("RoutingModeRow", () => {
     // The toast and its live-region copy.
     expect(
       await screen.findAllByText(
-        "Could not save settings: Choose a routing mode: weighted or priority.",
+        "Could not save settings: Choose a routing mode: weighted, priority or reset first.",
       ),
     ).not.toHaveLength(0);
     await waitFor(() => expect(screen.getByRole("radio", { name: "Weighted" })).toBeChecked());

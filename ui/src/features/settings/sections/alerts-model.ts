@@ -55,6 +55,47 @@ export interface RulesForm {
   accountThresholds: string;
   poolThresholds: string;
   poolCooldownMinutes: number | null;
+  dailySummary: boolean;
+  /** Minutes after midnight UTC, as the server stores it. */
+  dailySummaryMinute: number;
+}
+
+/** The server's default send time: 09:00 UTC. */
+export const DEFAULT_SUMMARY_MINUTE = 9 * 60;
+
+/**
+ * The send times the summary offers: each whole hour of the viewer's day, as minutes after
+ * midnight UTC (a zone at a half hour off UTC gets 03:30 and so on). The stored time stays in
+ * the list even when it is not one of them (set through the API, or from another time zone).
+ * Sorted by local time. `day` is the day the offsets are taken on (today), so daylight saving
+ * applies as it does now.
+ */
+export function summaryTimeOptions(stored: number, day: Date = new Date()): number[] {
+  const minutes = new Set<number>();
+  for (let hour = 0; hour < 24; hour++) {
+    const local = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, 0, 0);
+    minutes.add(local.getUTCHours() * 60 + local.getUTCMinutes());
+  }
+  minutes.add(stored);
+  const localMinute = (utc: number) => {
+    const offset = -day.getTimezoneOffset();
+    return (((utc + offset) % 1440) + 1440) % 1440;
+  };
+  return [...minutes].sort((a, b) => localMinute(a) - localMinute(b));
+}
+
+/** A UTC minute of the day as a Date on `day`, for formatting in the viewer's zone. */
+export function summaryTimeDate(utcMinute: number, day: Date = new Date()): Date {
+  return new Date(
+    Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), 0, utcMinute, 0),
+  );
+}
+
+/** "07:00" for a UTC minute of the day. */
+export function formatUtcMinute(utcMinute: number): string {
+  const h = Math.floor(utcMinute / 60);
+  const m = utcMinute % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 export function rulesForm(config: AlertsConfig): RulesForm {
@@ -66,6 +107,8 @@ export function rulesForm(config: AlertsConfig): RulesForm {
     accountThresholds: formatThresholds(config.accountThresholds ?? []),
     poolThresholds: formatThresholds(config.poolThresholds ?? []),
     poolCooldownMinutes: config.poolCooldownMinutes,
+    dailySummary: config.dailySummary ?? false,
+    dailySummaryMinute: config.dailySummaryMinute ?? DEFAULT_SUMMARY_MINUTE,
   };
 }
 

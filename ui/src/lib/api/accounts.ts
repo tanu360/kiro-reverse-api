@@ -3,6 +3,7 @@ import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
 import type {
   Account,
+  AccountForecastResponse,
   AccountFull,
   AccountModelsCachedResponse,
   AccountModelsResponse,
@@ -31,6 +32,18 @@ export function accountsQuery() {
   return queryOptions({
     queryKey: queryKeys.accounts.list(),
     queryFn: listAccounts,
+  });
+}
+
+/**
+ * Every account's credit forecast from its last 7 days of spend. Under ["accounts"], so an
+ * accounts_changed event refetches it; the spend itself moves slowly, so it is kept a minute.
+ */
+export function accountForecastQuery() {
+  return queryOptions({
+    queryKey: queryKeys.accounts.forecast(),
+    queryFn: () => apiRequest<AccountForecastResponse>("/accounts/forecast"),
+    staleTime: 60_000,
   });
 }
 
