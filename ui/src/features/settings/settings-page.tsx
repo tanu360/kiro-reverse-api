@@ -29,8 +29,11 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProxyPoolCard } from "@/features/proxy-pool/proxy-pool-card";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { accountHealthQuery } from "@/lib/api/account-health";
+import { alertsQuery } from "@/lib/api/alerts";
 import { proxyPoolQuery } from "@/lib/api/proxy-pool";
-import { proxyQuery, settingsQuery } from "@/lib/api/settings";
+import { responseHeadersQuery } from "@/lib/api/response-headers";
+import { promptFilterQuery, proxyQuery, settingsQuery } from "@/lib/api/settings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { UnsavedChangesProvider, useUnsavedChanges } from "./lib/unsaved";
@@ -323,8 +326,14 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
   const settings = useQuery(settingsQuery()).data;
   const proxy = useQuery(proxyQuery()).data;
   const proxyPool = useQuery(proxyPoolQuery()).data;
+  const health = useQuery(accountHealthQuery()).data;
+  const alerts = useQuery(alertsQuery()).data;
+  const headers = useQuery(responseHeadersQuery()).data;
+  const promptFilter = useQuery(promptFilterQuery()).data;
   // A section that is one switch shows its saved state as a pill in its nav row, so the page
   // reads at a glance (the cards no longer repeat a "Default: on" tag). Unknown until loaded.
+  // A card of several controls shows On when it does anything: alerts with a channel switched
+  // on, a custom header sent, a prompt filter or rule at work.
   const switchState: Partial<Record<SectionId, boolean | undefined>> = {
     "settings-usage": settings?.allowOverUsage,
     "settings-stream-integrity": settings?.lenientStreamIntegrity,
@@ -333,6 +342,16 @@ function SectionNav({ wide }: { wide: boolean }): JSX.Element {
     "settings-image-resize": settings ? settings.imageResize !== false : undefined,
     "settings-outbound-proxy": proxy ? Boolean(proxy.proxyURL) : undefined,
     "settings-proxy-pool": proxyPool ? proxyPool.mode === "on" : undefined,
+    "settings-self-heal": health?.enabled,
+    "settings-alerts": alerts ? alerts.channels.some((channel) => channel.enabled) : undefined,
+    "settings-response-headers": headers
+      ? headers.headers.some((header) => header.enabled)
+      : undefined,
+    "settings-prompt-filter": promptFilter
+      ? promptFilter.filterClaudeCode ||
+        promptFilter.filterEnvNoise ||
+        promptFilter.rules.some((rule) => rule.enabled)
+      : undefined,
   };
   const [active, pin] = useActiveSection(wide ? SPY_OFFSET : SPY_OFFSET + CHIP_ROW_HEIGHT);
   const listRef = useRef<HTMLDivElement>(null);
