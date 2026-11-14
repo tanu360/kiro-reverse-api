@@ -19,10 +19,11 @@ export function isUsageMetric(
 }
 
 /**
- * The usage chart's height, sized by its card's width (SectionCard is a container). Here, not in
- * the lazy chart module, so the sheet's placeholder holds the layout without loading the chart.
+ * The usage chart's height, sized by its card's width (SectionCard is a container): short, so the
+ * sheet's cards below it come into view sooner. Here, not in the lazy chart module, so the sheet's
+ * placeholder holds the layout without loading the chart.
  */
-export const USAGE_PLOT_HEIGHT = "h-56 @2xl:h-64";
+export const USAGE_PLOT_HEIGHT = "h-40 @md:h-44";
 
 /** Keys listed by name in the card; the rest is one "N other keys" row. */
 export const TOP_KEYS = 5;

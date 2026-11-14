@@ -97,6 +97,7 @@
   "usage.noAccount": "Không có tài khoản",
   "usage.deletedAccount": "Tài khoản đã xóa",
   "usage.otherItems_other": "{n} khác",
+  "usage.breakdown": "Phân bổ",
   "usage.breakdownFailed": "Không tải được phần chi tiết",
   "usage.keyDetails": "Chi tiết key",
   "usage.allowedAccounts": "Tài khoản được dùng",

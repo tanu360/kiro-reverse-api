@@ -97,6 +97,7 @@
   "usage.noAccount": "无账号",
   "usage.deletedAccount": "已删除的账号",
   "usage.otherItems_other": "其他 {n} 个",
+  "usage.breakdown": "明细",
   "usage.breakdownFailed": "无法加载明细",
   "usage.keyDetails": "API Key 详情",
   "usage.allowedAccounts": "可用账号",

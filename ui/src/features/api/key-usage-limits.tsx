@@ -21,9 +21,10 @@ interface LimitRow {
 
 /**
  * A key's token, credit and call limits in the usage sheet: per limit its use against the cap on
- * a full-width meter (amber from 75 %, red once spent), the share used and what is left; a
- * measure without a cap says so and shows what was used. The counters are the key's own, since it
- * was created or its usage last reset, not the range the sheet charts.
+ * a meter (amber from 75 %, red once spent), the share used and what is left; a measure without a
+ * cap says so and shows what was used. Three across once the card is wide enough, stacked on a
+ * phone. The counters are the key's own, since it was created or its usage last reset, not the
+ * range the sheet charts.
  */
 export function KeyLimitsCard({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const { t, lang } = useT("api");
@@ -52,7 +53,7 @@ export function KeyLimitsCard({ apiKey }: { apiKey: ApiKey }): JSX.Element {
       slim
       title={t("usage.limits")}
     >
-      <ul className="divide-y divide-border-subtle">
+      <ul className="grid divide-y divide-border-subtle @lg:grid-cols-3 @lg:divide-x @lg:divide-y-0">
         {rows.map((row) => {
           const capped = row.limit > 0;
           const reached = capped && row.used >= row.limit;
@@ -61,8 +62,9 @@ export function KeyLimitsCard({ apiKey }: { apiKey: ApiKey }): JSX.Element {
           const shown = reached ? 1 : Math.min(0.999, Math.floor(share * 1000) / 1000);
           const tone = reached ? "destructive" : share >= LIMIT_WARNING ? "warning" : "default";
           return (
-            <li className="flex flex-col gap-2 px-4 py-3.5 sm:px-6" key={row.kind}>
-              <div className="flex items-baseline justify-between gap-3">
+            <li className="flex min-w-0 flex-col gap-2 px-4 py-3.5 sm:px-6 @lg:px-4" key={row.kind}>
+              {/* Wraps the figures under the name when a third of the card is too narrow. */}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <span className="font-medium text-sm">{t(`keys.${row.kind}`)}</span>
                 {capped ? (
                   <span
@@ -97,7 +99,7 @@ export function KeyLimitsCard({ apiKey }: { apiKey: ApiKey }): JSX.Element {
                       <MeterIndicator tone={tone} />
                     </MeterTrack>
                   </Meter>
-                  <div className="flex items-baseline justify-between gap-3 text-meta text-muted-foreground tabular-nums">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-meta text-muted-foreground tabular-nums">
                     <span>{formatFraction(shown, 1, lang)}</span>
                     <span className={cn(reached && "text-destructive-foreground")}>
                       {reached

@@ -102,6 +102,7 @@
   "usage.deletedAccount": "Deleted account",
   "usage.otherItems_one": "{n} other",
   "usage.otherItems_other": "{n} others",
+  "usage.breakdown": "Breakdown",
   "usage.breakdownFailed": "Could not load the breakdown",
   "usage.keyDetails": "Key details",
   "usage.allowedAccounts": "Accounts it can use",

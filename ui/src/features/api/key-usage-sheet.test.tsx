@@ -289,7 +289,7 @@ describe("ApiKeyUsageSheet", () => {
         }),
       ),
     );
-    renderWithProviders(
+    const { user } = renderWithProviders(
       <ApiKeyUsageSheet
         entryRef="key:quiet"
         identity={{ kind: "key", name: "quiet key", keyMasked: "sk-qui****0002" }}
@@ -301,6 +301,9 @@ describe("ApiKeyUsageSheet", () => {
     const models = await within(sheet).findByRole("list", { name: "Models" });
     expect(within(models).getByText("claude-sonnet-4.5")).toBeInTheDocument();
     expect(within(models).getByText("75%")).toBeInTheDocument();
+    // One card at a time: the switch swaps the models for the accounts.
+    expect(within(sheet).queryByRole("list", { name: "Accounts" })).toBeNull();
+    await user.click(within(sheet).getByRole("radio", { name: "Accounts" }));
     const accounts = within(sheet).getByRole("list", { name: "Accounts" });
     // Emails follow privacy mode, which the tests start in: masked.
     expect(accounts.textContent).toContain("@ex");

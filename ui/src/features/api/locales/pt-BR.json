@@ -102,6 +102,7 @@
   "usage.deletedAccount": "Conta excluída",
   "usage.otherItems_one": "{n} outro",
   "usage.otherItems_other": "{n} outros",
+  "usage.breakdown": "Detalhamento",
   "usage.breakdownFailed": "Não foi possível carregar o detalhamento",
   "usage.keyDetails": "Detalhes da chave",
   "usage.allowedAccounts": "Contas que pode usar",

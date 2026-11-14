@@ -1,9 +1,11 @@
-import type { IconSvgElement } from "@hugeicons/react";
+import { AiBrain01Icon, PieChart01Icon, UsersIcon } from "@hugeicons/core-free-icons";
 import { type JSX, lazy, Suspense, useMemo, useState } from "react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { TruncatedText } from "@/components/shared/truncated-text";
+import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
+import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MODEL_COLORS, OTHER_MODEL_COLOR } from "@/features/overview/colors";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
@@ -26,11 +28,16 @@ interface Slice {
   color: string;
 }
 
+type BreakdownKind = "models" | "accounts";
+const BREAKDOWN_KINDS: readonly BreakdownKind[] = ["models", "accounts"];
+
+function isBreakdownKind(value: unknown): value is BreakdownKind {
+  return value === "models" || value === "accounts";
+}
+
 export interface UsageBreakdownCardProps {
-  kind: "models" | "accounts";
-  title: string;
-  icon: IconSvgElement;
-  items: ApiKeyUsageBreakdownItem[] | undefined;
+  models: ApiKeyUsageBreakdownItem[] | undefined;
+  accounts: ApiKeyUsageBreakdownItem[] | undefined;
   loading: boolean;
   error?: unknown;
   onRetry?: () => void;
@@ -38,16 +45,14 @@ export interface UsageBreakdownCardProps {
 }
 
 /**
- * One usage row split by model or by account: a donut of the request shares beside a list of the
- * five busiest and "Other", hover linked both ways. Accounts show their email (masked in privacy
- * mode), "Deleted account" for one that no longer exists, and "No account" for requests that
- * reached none.
+ * The usage split by model or by account, one at a time behind a switch so the sheet stays short:
+ * a donut of the request shares beside a list of the five busiest and "Other", hover linked both
+ * ways. Accounts show their email (masked in privacy mode), "Deleted account" for one that no
+ * longer exists, and "No account" for requests that reached none.
  */
 export function UsageBreakdownCard({
-  kind,
-  title,
-  icon,
-  items,
+  models,
+  accounts,
   loading,
   error,
   onRetry,
@@ -57,6 +62,10 @@ export function UsageBreakdownCard({
   const displayEmail = useDisplayEmail();
   const reducedMotion = usePrefersReducedMotion();
   const [hovered, setHovered] = useState<number | null>(null);
+  const [kind, setKind] = useState<BreakdownKind>("models");
+  const items = kind === "models" ? models : accounts;
+  const title = t(`usage.${kind}`);
+  const icon = kind === "models" ? AiBrain01Icon : UsersIcon;
 
   const slices = useMemo((): Slice[] => {
     if (!items) return [];
@@ -113,7 +122,7 @@ export function UsageBreakdownCard({
   } else if (loading || !items) {
     body = (
       <div aria-hidden="true" className="flex flex-col items-center gap-4 px-4 py-4 sm:px-6">
-        <Skeleton className="aspect-square w-full max-w-40 rounded-full" />
+        <Skeleton className="aspect-square w-full max-w-36 rounded-full" />
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-full" />
       </div>
@@ -129,16 +138,16 @@ export function UsageBreakdownCard({
       <div className="flex min-w-0 flex-col @md:flex-row @md:items-center">
         <figure
           aria-label={t(kind === "models" ? "usage.modelsChart" : "usage.accountsChart")}
-          className="w-full max-w-48 shrink-0 self-center px-4 py-4 sm:px-6 @md:max-w-44"
+          className="w-full max-w-44 shrink-0 self-center px-4 py-4 sm:px-6"
         >
           <Suspense
-            fallback={<Skeleton className="mx-auto aspect-square w-full max-w-44 rounded-full" />}
+            fallback={<Skeleton className="mx-auto aspect-square w-full max-w-36 rounded-full" />}
           >
             <ModelMixDonut
               centerLabel={t("usage.centerRequests")}
               fractionDigits={0}
               hoveredIndex={hovered}
-              // At most 176 px, against the Overview's 224: a 0.72 hole keeps its ~24 px ring.
+              // At most 144 px, against the Overview's 224: a 0.72 hole keeps its ~20 px ring.
               innerRadius={0.72}
               onHoverChange={setHovered}
               reducedMotion={reducedMotion}
@@ -195,11 +204,33 @@ export function UsageBreakdownCard({
 
   return (
     <SectionCard
+      actions={
+        <SegmentedControl
+          render={
+            <RadioGroupPrimitive
+              aria-label={t("usage.breakdown")}
+              onValueChange={(next) => {
+                if (!isBreakdownKind(next)) return;
+                setKind(next);
+                setHovered(null);
+              }}
+              value={kind}
+            />
+          }
+          size="sm"
+        >
+          {BREAKDOWN_KINDS.map((value) => (
+            <SegmentedControlItem key={value} render={<RadioPrimitive.Root value={value} />}>
+              {t(`usage.${value}`)}
+            </SegmentedControlItem>
+          ))}
+        </SegmentedControl>
+      }
       description={t("usage.byRequests")}
       descriptionVariant="inline"
-      icon={icon}
+      icon={PieChart01Icon}
       slim
-      title={title}
+      title={t("usage.breakdown")}
     >
       {body}
     </SectionCard>

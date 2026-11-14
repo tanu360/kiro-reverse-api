@@ -1,9 +1,4 @@
-import {
-  AiBrain01Icon,
-  ChartLineData02Icon,
-  KeyRoundIcon,
-  UsersIcon,
-} from "@hugeicons/core-free-icons";
+import { ChartLineData02Icon, KeyRoundIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type JSX, lazy, type ReactNode, Suspense, useMemo, useState } from "react";
@@ -20,7 +15,7 @@ import {
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { PropertyList, PropertyRow } from "@/components/shared/property-list";
+import { KeyValueGrid } from "@/components/shared/key-value-grid";
 import { RelativeTime } from "@/components/shared/relative-time";
 import {
   ResponsiveSheet,
@@ -357,75 +352,64 @@ export function ApiKeyUsageSheet({
           </SectionCard>
         </ChartLegendHoverProvider>
         <UsageBreakdownCard
+          accounts={breakdown.data?.accounts}
           error={breakdown.error}
-          icon={AiBrain01Icon}
-          items={breakdown.data?.models}
-          kind="models"
           loading={breakdown.isPending}
+          models={breakdown.data?.models}
           onRetry={() => void breakdown.refetch()}
           retrying={breakdown.isFetching}
-          title={t("usage.models")}
-        />
-        <UsageBreakdownCard
-          error={breakdown.error}
-          icon={UsersIcon}
-          items={breakdown.data?.accounts}
-          kind="accounts"
-          loading={breakdown.isPending}
-          onRetry={() => void breakdown.refetch()}
-          retrying={breakdown.isFetching}
-          title={t("usage.accounts")}
         />
         {apiKey ? (
           <SectionCard icon={KeyRoundIcon} slim title={t("usage.keyDetails")}>
-            <PropertyList>
-              <PropertyRow label={t("keys.status")} value={<KeyStatus apiKey={apiKey} />} />
-              <PropertyRow
-                label={t("usage.allowedAccounts")}
-                value={
-                  apiKey.accountIds?.length
-                    ? t("keys.boundAccounts", {
-                        count: apiKey.accountIds.length,
-                        n: formatNumber(apiKey.accountIds.length, lang),
-                      })
-                    : t("usage.everyAccount")
-                }
+            {/* Label over value, two across: seven facts in four or five short rows. */}
+            <div className="px-4 py-4 sm:px-6">
+              <KeyValueGrid
+                items={[
+                  // Its badges (state, label, routing) wrap less across the full width.
+                  { label: t("keys.status"), value: <KeyStatus apiKey={apiKey} />, span: 2 },
+                  {
+                    label: t("form.allowedModels"),
+                    value: apiKey.allowedModels?.length
+                      ? apiKey.allowedModels.join(", ")
+                      : t("form.allowedModelsPlaceholder"),
+                    // A list of models takes the full width; "Every model" pairs up.
+                    span: apiKey.allowedModels?.length ? 2 : 1,
+                  },
+                  {
+                    label: t("usage.allowedAccounts"),
+                    value: apiKey.accountIds?.length
+                      ? t("keys.boundAccounts", {
+                          count: apiKey.accountIds.length,
+                          n: formatNumber(apiKey.accountIds.length, lang),
+                        })
+                      : t("usage.everyAccount"),
+                  },
+                  {
+                    label: t("form.rpmLimit"),
+                    value: apiKey.rpmLimit
+                      ? t("keys.rpmLimit", { n: formatNumber(apiKey.rpmLimit, lang) })
+                      : t("common:unlimited"),
+                  },
+                  {
+                    label: t("form.expiresAt"),
+                    value: apiKey.expiresAt
+                      ? apiKey.expired
+                        ? t("usage.expiredAt", { time: formatDateTime(apiKey.expiresAt, lang) })
+                        : formatDateTime(apiKey.expiresAt, lang)
+                      : t("usage.never"),
+                  },
+                  {
+                    label: t("keys.lastUsed"),
+                    value: apiKey.lastUsedAt ? (
+                      <RelativeTime value={apiKey.lastUsedAt} />
+                    ) : (
+                      t("keys.neverUsed")
+                    ),
+                  },
+                  { label: t("usage.created"), value: formatDateTime(apiKey.createdAt, lang) },
+                ]}
               />
-              <PropertyRow
-                label={t("form.allowedModels")}
-                value={
-                  apiKey.allowedModels?.length
-                    ? apiKey.allowedModels.join(", ")
-                    : t("form.allowedModelsPlaceholder")
-                }
-              />
-              <PropertyRow
-                label={t("form.rpmLimit")}
-                value={
-                  apiKey.rpmLimit
-                    ? t("keys.rpmLimit", { n: formatNumber(apiKey.rpmLimit, lang) })
-                    : t("common:unlimited")
-                }
-              />
-              <PropertyRow
-                label={t("form.expiresAt")}
-                value={
-                  apiKey.expiresAt
-                    ? apiKey.expired
-                      ? t("usage.expiredAt", { time: formatDateTime(apiKey.expiresAt, lang) })
-                      : formatDateTime(apiKey.expiresAt, lang)
-                    : t("usage.never")
-                }
-              />
-              <PropertyRow
-                label={t("keys.lastUsed")}
-                value={apiKey.lastUsedAt ? <RelativeTime value={apiKey.lastUsedAt} /> : ""}
-              />
-              <PropertyRow
-                label={t("usage.created")}
-                value={formatDateTime(apiKey.createdAt, lang)}
-              />
-            </PropertyList>
+            </div>
           </SectionCard>
         ) : null}
         {apiKey ? <KeyLimitsCard apiKey={apiKey} /> : null}
