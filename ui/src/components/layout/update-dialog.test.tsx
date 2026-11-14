@@ -108,7 +108,7 @@ describe("release archive", () => {
       file: "kiro-proxy-linux-arm64.tar.gz",
       folder: "kiro-proxy-linux-arm64",
       windows: false,
-      platform: "Linux (arm64)",
+      platformLabel: "shell.update.platformLinuxArm64",
       known: true,
     });
     expect(binaryCommand(arm)).toBe(
@@ -116,14 +116,14 @@ describe("release archive", () => {
     );
     expect(releaseArchive({ os: "darwin", arch: "arm64" })).toMatchObject({
       file: "kiro-proxy-macos-apple-silicon.tar.gz",
-      platform: "macOS (Apple silicon)",
+      platformLabel: "shell.update.platformMacosAppleSilicon",
     });
     expect(releaseArchive({ os: "darwin", arch: "amd64" }).file).toBe(
       "kiro-proxy-macos-intel.tar.gz",
     );
     expect(releaseArchive({ os: "linux", arch: "amd64" })).toMatchObject({
       file: "kiro-proxy-linux-x64.tar.gz",
-      platform: "Linux (x64)",
+      platformLabel: "shell.update.platformLinuxX64",
     });
   });
 

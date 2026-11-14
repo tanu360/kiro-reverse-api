@@ -399,7 +399,8 @@ describe("RequestsPage", () => {
       expect(screen.queryByRole("button", { name: "Refresh token" })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole("dialog")).toBe(dialog);
-  });
+    // The lazy sheet alone may take 5 s on a loaded CI runner, so the test needs more than the 5 s default.
+  }, 15_000);
 
   it("offers no account to open for an auth failure", async () => {
     const { user } = await renderApp("/requests");

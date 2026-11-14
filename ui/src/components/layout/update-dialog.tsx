@@ -35,14 +35,14 @@ const UPDATE_METHODS = [
   { id: "binary", label: "shell.update.methodBinary" },
 ] as const satisfies readonly { id: UpdateMethod; label: string }[];
 
-/** The platforms build-release.sh packages, by GOOS/GOARCH: the archive's platform part and the name the steps show. */
+/** The platforms build-release.sh packages, by GOOS/GOARCH: the archive's platform part and the locale key of the name the steps show. */
 const RELEASE_TARGETS: Record<string, { name: string; label: string }> = {
-  "linux/amd64": { name: "linux-x64", label: "Linux (x64)" },
-  "linux/arm64": { name: "linux-arm64", label: "Linux (arm64)" },
-  "darwin/amd64": { name: "macos-intel", label: "macOS (Intel)" },
-  "darwin/arm64": { name: "macos-apple-silicon", label: "macOS (Apple silicon)" },
-  "windows/amd64": { name: "windows-x64", label: "Windows (x64)" },
-  "windows/arm64": { name: "windows-arm64", label: "Windows (arm64)" },
+  "linux/amd64": { name: "linux-x64", label: "shell.update.platformLinuxX64" },
+  "linux/arm64": { name: "linux-arm64", label: "shell.update.platformLinuxArm64" },
+  "darwin/amd64": { name: "macos-intel", label: "shell.update.platformMacosIntel" },
+  "darwin/arm64": { name: "macos-apple-silicon", label: "shell.update.platformMacosAppleSilicon" },
+  "windows/amd64": { name: "windows-x64", label: "shell.update.platformWindowsX64" },
+  "windows/arm64": { name: "windows-arm64", label: "shell.update.platformWindowsArm64" },
 };
 const FALLBACK_TARGET = "linux/amd64";
 
@@ -123,8 +123,8 @@ export interface ReleaseArchive {
   /** The one folder the archive holds (and the old install sits in). */
   folder: string;
   windows: boolean;
-  /** "macOS (Apple silicon)", the platform the archive is built for. */
-  platform: string;
+  /** Locale key of the platform the archive is built for, shown as "macOS (Apple silicon)". */
+  platformLabel: string;
   /** False when the server did not say or no archive is built for it: then linux-x64. */
   known: boolean;
 }
@@ -141,7 +141,7 @@ export function releaseArchive(server?: Pick<VersionResponse, "os" | "arch">): R
     file: `${folder}.${windows ? "zip" : "tar.gz"}`,
     folder,
     windows,
-    platform: target.label,
+    platformLabel: target.label,
     known,
   };
 }
@@ -393,7 +393,7 @@ function HowToUpdate({ server }: { server?: VersionResponse }): JSX.Element {
         >
           <CodeText
             code={{ folder: archive.folder }}
-            text={t(binaryStep, { platform: archive.platform })}
+            text={t(binaryStep, { platform: t(archive.platformLabel) })}
           />
         </UpdateStep>
       )}
