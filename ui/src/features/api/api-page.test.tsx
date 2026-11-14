@@ -314,7 +314,8 @@ describe("ApiPage", () => {
     expect(within(created).getByText("30/min")).toBeInTheDocument();
     expect(within(created).getByText("Reset first")).toBeInTheDocument();
     expect(within(created).getByText("Enabled")).toBeInTheDocument();
-  });
+    // Fills six fields; on a loaded runner the whole run can pass the 5 s default.
+  }, 15_000);
 
   it("shows Expired for a key past its expiry and warns before saving a past time", async () => {
     const local = mockDb.apiKeys[3];
