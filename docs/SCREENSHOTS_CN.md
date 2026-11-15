@@ -119,7 +119,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/settings-2-dark.webp">
     <img alt="设置 · 服务器" src="../screenshots/zh/settings-2-light.webp" width="100%">
   </picture>
-  <br><sub><b>设置 · 服务器</b> — Kiro 端点、上游域名与区域、公开链接（含 Tailscale 密钥过期日期）、出站代理、代理池、响应头、服务器日志、Prometheus 指标</sub>
+  <br><sub><b>设置 · 服务器</b> — Kiro 端点与对话 API、上游域名与区域、公开链接（含 Tailscale 密钥过期日期）、出站代理、代理池、响应头、服务器日志、Prometheus 指标</sub>
 </p>
 
 <p align="center">

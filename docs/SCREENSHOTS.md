@@ -119,7 +119,7 @@ Every page of the admin panel. Each image follows your GitHub theme, light or da
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/settings-2-dark.webp">
     <img alt="Settings · Server" src="../screenshots/en/settings-2-light.webp" width="100%">
   </picture>
-  <br><sub><b>Settings · Server</b> — Kiro endpoint, upstream domain and region, public link with the Tailscale key expiry, outbound proxy, proxy pool, response headers, server log, Prometheus metrics</sub>
+  <br><sub><b>Settings · Server</b> — Kiro endpoint and chat API, upstream domain and region, public link with the Tailscale key expiry, outbound proxy, proxy pool, response headers, server log, Prometheus metrics</sub>
 </p>
 
 <p align="center">

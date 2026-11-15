@@ -119,7 +119,7 @@ Todas as páginas do painel de administração. Cada imagem segue o tema do seu 
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/settings-2-dark.webp">
     <img alt="Configurações · Servidor" src="../screenshots/pt-BR/settings-2-light.webp" width="100%">
   </picture>
-  <br><sub><b>Configurações · Servidor</b> — endpoint do Kiro, domínio e região upstream, link público com a expiração da chave do Tailscale, proxy de saída, pool de proxies, cabeçalhos de resposta, log do servidor, métricas do Prometheus</sub>
+  <br><sub><b>Configurações · Servidor</b> — endpoint e API de chat do Kiro, domínio e região upstream, link público com a expiração da chave do Tailscale, proxy de saída, pool de proxies, cabeçalhos de resposta, log do servidor, métricas do Prometheus</sub>
 </p>
 
 <p align="center">
