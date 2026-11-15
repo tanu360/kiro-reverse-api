@@ -37,6 +37,21 @@ func newRequestRetryPlan() requestRetryPlan {
 	}
 }
 
+// endsFailover reports whether err ends the request's account failover: a client error that
+// every account would get the same way. Kiro refusing the model for one account
+// (isModelRefusal) does not end it, since another account may serve that model.
+func endsFailover(err error) bool {
+	return isUpstreamClientError(err) && !isModelRefusal(err)
+}
+
+// isModelRefusal is Kiro's 400 INVALID_MODEL_ID: this account cannot use the requested model.
+// The pool only knows an account's models from its last listing, and lets every model through
+// while that list is unknown, so a refusal can come from one account while others serve it.
+func isModelRefusal(err error) bool {
+	var client *upstreamClientError
+	return errors.As(err, &client) && strings.Contains(client.message, "INVALID_MODEL_ID")
+}
+
 func (rp requestRetryPlan) canRetrySameAccount(err error, accountAttempt, totalAttempts int) bool {
 	if isUpstreamClientError(err) || isNoHealthyProxyError(err) || isOutboundProxyFailure(err) {
 		return false
@@ -200,6 +215,18 @@ func (h *Handler) handleBackgroundAccountFailure(account *config.Account, err er
 		return
 	}
 	//! Bans reach admin pages through the config hook and cooldowns through the pool's.
+	h.handleAccountFailure(account, err)
+}
+
+// handleAttemptFailure is handleAccountFailure for a failed attempt at model: a model Kiro
+// refused for the account is kept away from it until its next model listing, so later picks
+// skip it. The request moves on to another account either way (endsFailover).
+func (h *Handler) handleAttemptFailure(account *config.Account, model string, err error) {
+	if account != nil && isModelRefusal(err) {
+		logger.Warnf("[AccountFailover] Kiro refused model %s for %s; trying another account", model, account.Email)
+		h.pool.MarkModelRefused(account.ID, model)
+		return
+	}
 	h.handleAccountFailure(account, err)
 }
 

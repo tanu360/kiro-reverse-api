@@ -695,3 +695,43 @@ func TestAddUsageLeavesRequestCountAlone(t *testing.T) {
 		}
 	}
 }
+
+// A model Kiro refused for an account stays away from it, even while its list is unknown (which
+// lets every model through) or still names the model, until its next model listing.
+func TestRefusedModelIsSkippedUntilTheNextListing(t *testing.T) {
+	p := newTestPool(config.Account{ID: "unknown"}, config.Account{ID: "listed"}, config.Account{ID: "other"})
+	p.SetModelList("listed", []string{"model-a", "model-b"})
+	p.MarkModelRefused("unknown", "Model-A ")
+	p.MarkModelRefused("listed", "model-a")
+
+	for i := 0; i < 6; i++ {
+		if acc := p.GetNextForModel("model-a"); acc == nil || acc.ID != "other" {
+			t.Fatalf("pick %d for model-a = %v, want other", i, acc)
+		}
+	}
+	got := map[string]bool{}
+	for i := 0; i < 3; i++ {
+		got[p.GetNextForModel("model-b").ID] = true
+	}
+	if !got["unknown"] || !got["listed"] {
+		t.Fatalf("model-b picks = %v, want the refusal to cover model-a only", got)
+	}
+
+	p.SetModelList("listed", []string{"model-a"})
+	seen := map[string]bool{}
+	for i := 0; i < 3; i++ {
+		seen[p.GetNextForModel("model-a").ID] = true
+	}
+	if !seen["listed"] || seen["unknown"] {
+		t.Fatalf("model-a picks after listed's new listing = %v, want listed back and unknown still out", seen)
+	}
+
+	p.MarkModelRefused("other", "model-a")
+	if p.OffersModel("model-a") != true {
+		t.Fatal("listed lists model-a again, so the pool offers it")
+	}
+	p.MarkModelRefused("listed", "model-a")
+	if p.OffersModel("model-a") {
+		t.Fatal("every account refused model-a, yet the pool still offers it")
+	}
+}

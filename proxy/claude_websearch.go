@@ -563,7 +563,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
+	for totalAttempts < retryPlan.maxPerRequest && !endsFailover(lastErr) {
 		account := h.pickAccount(ctx, payload, req.Model, excluded)
 		if account == nil {
 			break
@@ -582,7 +582,7 @@ func (h *Handler) callClaudeRoundWithFailover(ctx context.Context, req *ClaudeRe
 			if isContextCanceledError(err) {
 				return nil, account, err
 			}
-			h.handleAccountFailure(account, err)
+			h.handleAttemptFailure(account, req.Model, err)
 			recordAttemptError(ctx, account, req.Model, 0, err)
 			if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 				retryPlan.waitBeforeRetry(ctx, totalAttempts)

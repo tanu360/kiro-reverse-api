@@ -1110,7 +1110,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
+	for totalAttempts < retryPlan.maxPerRequest && !endsFailover(lastErr) {
 		account := h.pickAccount(r.Context(), payload, model, excluded)
 		if account == nil {
 			break
@@ -1125,7 +1125,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				}
 				lastErr = err
 				lastAccount = account
-				h.handleAccountFailure(account, err)
+				h.handleAttemptFailure(account, model, err)
 				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
@@ -1505,7 +1505,7 @@ func (h *Handler) handleClaudeStream(w http.ResponseWriter, r *http.Request, pay
 				}
 				lastErr = err
 				lastAccount = account
-				h.handleAccountFailure(account, err)
+				h.handleAttemptFailure(account, model, err)
 				recordAttemptError(r.Context(), account, model, 0, err)
 				if !messageStarted {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
@@ -1663,7 +1663,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
+	for totalAttempts < retryPlan.maxPerRequest && !endsFailover(lastErr) {
 		account := h.pickAccount(r.Context(), payload, model, excluded)
 		if account == nil {
 			break
@@ -1678,7 +1678,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				}
 				lastErr = err
 				lastAccount = account
-				h.handleAccountFailure(account, err)
+				h.handleAttemptFailure(account, model, err)
 				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
@@ -1747,7 +1747,7 @@ func (h *Handler) handleClaudeNonStream(w http.ResponseWriter, r *http.Request, 
 				}
 				lastErr = err
 				lastAccount = account
-				h.handleAccountFailure(account, err)
+				h.handleAttemptFailure(account, model, err)
 				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
@@ -1964,7 +1964,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
+	for totalAttempts < retryPlan.maxPerRequest && !endsFailover(lastErr) {
 		account := h.pickAccount(r.Context(), payload, model, excluded)
 		if account == nil {
 			break
@@ -1979,7 +1979,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				}
 				lastErr = err
 				lastAccount = account
-				h.handleAccountFailure(account, err)
+				h.handleAttemptFailure(account, model, err)
 				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
@@ -2305,7 +2305,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				}
 				lastErr = err
 				lastAccount = account
-				h.handleAccountFailure(account, err)
+				h.handleAttemptFailure(account, model, err)
 				recordAttemptError(r.Context(), account, model, 0, err)
 				if !responseStarted {
 					if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
@@ -2415,7 +2415,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 
 	retryPlan := newRequestRetryPlan()
 	totalAttempts := 0
-	for totalAttempts < retryPlan.maxPerRequest && !isUpstreamClientError(lastErr) {
+	for totalAttempts < retryPlan.maxPerRequest && !endsFailover(lastErr) {
 		account := h.pickAccount(r.Context(), payload, model, excluded)
 		if account == nil {
 			break
@@ -2430,7 +2430,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				}
 				lastErr = err
 				lastAccount = account
-				h.handleAccountFailure(account, err)
+				h.handleAttemptFailure(account, model, err)
 				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)
@@ -2483,7 +2483,7 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 				}
 				lastErr = err
 				lastAccount = account
-				h.handleAccountFailure(account, err)
+				h.handleAttemptFailure(account, model, err)
 				recordAttemptError(r.Context(), account, model, 0, err)
 				if retryPlan.canRetrySameAccount(err, accountAttempt, totalAttempts) {
 					retryPlan.waitBeforeRetry(r.Context(), totalAttempts)

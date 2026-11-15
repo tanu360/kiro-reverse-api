@@ -25,6 +25,9 @@ type AccountPool struct {
 	cooldownKinds map[string]CooldownKind
 	errorCounts   map[string]int
 	modelLists    map[string]map[string]bool
+	// refusedModels holds, per account, the models Kiro refused for it (INVALID_MODEL_ID) since
+	// its model list was last set. A refusal outranks the list, which may be unknown or stale.
+	refusedModels map[string]map[string]bool
 	// enabledIDs lists every enabled account, including over-limit ones Reload keeps out of rotation.
 	enabledIDs []string
 	// rpm holds recent starts per account for the optional RPM limit (rpm_limit.go).
@@ -150,7 +153,29 @@ func (p *AccountPool) SetModelList(accountID string, modelIDs []string) {
 	}
 	p.mu.Lock()
 	p.modelLists[accountID] = set
+	//! A fresh listing is the account's word on its models again.
+	delete(p.refusedModels, accountID)
 	p.mu.Unlock()
+}
+
+// MarkModelRefused records that Kiro refused model for the account (INVALID_MODEL_ID), so no
+// pick sends it that model again until the account's model list is set anew. Its list can be
+// unknown (before the first listing, after a profile change, after a failed listing), which
+// lets every model through, or out of date.
+func (p *AccountPool) MarkModelRefused(accountID, model string) {
+	key := strings.ToLower(strings.TrimSpace(model))
+	if accountID == "" || key == "" {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.refusedModels == nil {
+		p.refusedModels = make(map[string]map[string]bool)
+	}
+	if p.refusedModels[accountID] == nil {
+		p.refusedModels[accountID] = make(map[string]bool)
+	}
+	p.refusedModels[accountID][key] = true
 }
 
 func (p *AccountPool) GetModelList(accountID string) []string {
@@ -168,11 +193,15 @@ func (p *AccountPool) GetModelList(accountID string) []string {
 }
 
 func (p *AccountPool) accountHasModel(accountID, model string) bool {
+	key := strings.ToLower(strings.TrimSpace(model))
+	if p.refusedModels[accountID][key] {
+		return false
+	}
 	list, ok := p.modelLists[accountID]
 	if !ok || len(list) == 0 {
 		return true
 	}
-	return list[strings.ToLower(strings.TrimSpace(model))]
+	return list[key]
 }
 
 // OffersModel reports whether some enabled account may serve model. An empty
