@@ -1,5 +1,5 @@
 {
-  "version": "3.5.7",
-  "changelog": "🗂️ Underlined tabs show an icon before their label: Accounts, Requests, Settings, client snippets and the update dialog.\n🚀 Releases build all six platforms at the same time, so new versions ship sooner.",
+  "version": "3.5.8",
+  "changelog": "🐳 Docker images for both platforms build at the same time, and the server compiles while the admin panel builds, so new images arrive sooner.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
