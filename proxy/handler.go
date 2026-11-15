@@ -321,6 +321,7 @@ func NewHandler() *Handler {
 		}()
 	}
 
+	go h.backgroundKiroVersion()
 	go h.backgroundBackupScheduler()
 	go h.backgroundCooldownSaver()
 	go h.backgroundLogRetention()
