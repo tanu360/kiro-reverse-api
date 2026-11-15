@@ -1,5 +1,5 @@
 {
-  "version": "3.5.6",
-  "changelog": "💳 A reply the proxy cuts at max_tokens or a stop sequence now logs the credits Kiro bills for it; it used to log 0. Replies cut while Kiro is still writing stay free.\n🔎 Hosted web search on the OpenAI APIs: /v1/responses returns web_search_call items and url_citation annotations, /v1/chat/completions returns url_citation annotations and accepts web_search_options, and every search round's tokens are counted.\n📋 The request log shows each web search and each later round as its own attempt.\n⚡ An over-long input is answered from the first Kiro endpoint, in about 2 s instead of 6 s.",
+  "version": "3.5.7",
+  "changelog": "🗂️ Underlined tabs show an icon before their label: Accounts, Requests, Settings, client snippets and the update dialog.\n🚀 Releases build all six platforms at the same time, so new versions ship sooner.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
