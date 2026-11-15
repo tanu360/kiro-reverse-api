@@ -70,7 +70,8 @@ func applyKiroResponsesHeaders(req *http.Request, account *config.Account, profi
 func callKiroResponsesAPI(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
 	request := buildKiroResponsesRequest(payload)
 	err := sendKiroResponses(ctx, account, payload.ProfileArn, request, callback)
-	if !isUpstreamBadRequest(err) || !replaysReasoning(request) {
+	//! Reasoning sent as text instead is no shorter, so an input over the context window is final.
+	if !isUpstreamBadRequest(err) || isContextOverflowError(err) || !replaysReasoning(request) {
 		return err
 	}
 	//! Signed thinking from the client is replayed as reasoning items; a signature Kiro does

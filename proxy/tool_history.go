@@ -220,7 +220,8 @@ func flattenStructuredToolHistory(payload *KiroPayload) bool {
 // before any stream output, so the retry cannot duplicate text.
 func callWithToolHistoryFallback(payload *KiroPayload, call func() error) error {
 	err := call()
-	if !isUpstreamBadRequest(err) || !flattenStructuredToolHistory(payload) {
+	//! Narrating the tool history does not shorten an input over the context window.
+	if !isUpstreamBadRequest(err) || isContextOverflowError(err) || !flattenStructuredToolHistory(payload) {
 		return err
 	}
 	logger.Warnf("[ToolHistory] Kiro rejected structured tool history (%v); retrying with narrated tool history", err)

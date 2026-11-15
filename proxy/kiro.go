@@ -528,6 +528,11 @@ endpointLoop:
 					clientErr = &upstreamClientError{status: resp.StatusCode, message: lastErr.Error()}
 					lastErr = clientErr
 					logger.Warnf("[KiroAPI] Endpoint %s rejected request: %v", ep.Name, lastErr)
+					//! An input over the context window is too long for every endpoint, so asking the
+					//! others only made the client wait for the same answer (5-6 s for all three, live).
+					if isContextOverflowError(clientErr) {
+						return clientErr
+					}
 					continue endpointLoop
 				}
 				if resp.StatusCode == http.StatusTooManyRequests {
