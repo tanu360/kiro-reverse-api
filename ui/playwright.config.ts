@@ -9,6 +9,9 @@ const CI = Boolean(process.env.CI);
 export default defineConfig({
   testDir: "e2e",
   outputDir: "test-results",
+  // Every test opens its own browser context on a fresh mock (storageState below), so tests of
+  // one file run on any worker, and CI's shards split the suite by test rather than by file.
+  fullyParallel: true,
   // In CI, a stray test.only fails the run instead of skipping the rest of the suite, and the
   // github reporter annotates failures on the pull request.
   forbidOnly: CI,
@@ -41,7 +44,9 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `pnpm dev:mock --host 127.0.0.1 --port ${PORT} --strictPort`,
+    // The dev:mock script, called straight: `pnpm test:e2e` and `npm run test:e2e` both put
+    // node_modules/.bin on the PATH, and CI runs without pnpm when node_modules comes from its cache.
+    command: `vite --mode mock --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: `${origin}/`,
     reuseExistingServer: false,
     // An empty value beats a VITE_MOCK_PASSWORD pinned in a local .env.mock.local, so the specs'

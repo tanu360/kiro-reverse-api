@@ -222,7 +222,7 @@ async function signIn(page: Page): Promise<void> {
 
 test.describe("pseudo locale", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
-  // Nine pages or seven overlays, each checked after its data loads.
+  // Seven overlays in one test, each checked after its data loads.
   test.setTimeout(120_000);
 
   test.beforeEach(async ({ page }) => {
@@ -238,30 +238,29 @@ test.describe("pseudo locale", () => {
     await page.route("https://raw.githubusercontent.com/**", (route) => route.abort());
   });
 
-  test("every route renders only translated text", async ({ page }) => {
+  // One test per page, so the pages are checked in parallel and CI's shards split them.
+  test("the setup page renders only translated text", async ({ page }) => {
     const serverStrings = collectServerStrings(page);
     await page.goto("/");
     await page.waitForURL(/\/setup/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expectAllTranslated(page, serverStrings, "setup");
+  });
 
-    await signIn(page);
-    for (const route of [
-      "",
-      "accounts",
-      "requests",
-      "api",
-      "settings",
-      "backups",
-      "no-such-page",
-    ]) {
+  for (const route of ["", "accounts", "requests", "api", "settings", "backups", "no-such-page"]) {
+    test(`/${route} renders only translated text`, async ({ page }) => {
+      const serverStrings = collectServerStrings(page);
+      await signIn(page);
       await page.goto(`/${route}`);
       await expect(page.locator("main#main")).toBeVisible();
       await expectAllTranslated(page, serverStrings, `/${route}`);
-    }
+    });
+  }
 
+  test("the login page after sign-out renders only translated text", async ({ page }) => {
+    const serverStrings = collectServerStrings(page);
+    await signIn(page);
     // Sign out through the Admin menu, then check the login page.
-    await page.goto("/");
     await page.getByRole("button", { name: /Admin/ }).first().click();
     await page.getByRole("menuitem", { name: /Sign out/ }).click();
     await page.waitForURL(/\/login/);
