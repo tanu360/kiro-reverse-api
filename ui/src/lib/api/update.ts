@@ -1,6 +1,8 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { TFunction } from "@/lib/i18n";
 import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
+import { withDetail } from "./server-errors";
 import { getVersion } from "./system";
 
 /**
@@ -28,8 +30,12 @@ export interface UpdateStatus {
   progress?: number;
   downloaded?: number;
   total?: number;
-  /** Why it failed, in plain English. */
+  /** Why it failed, in plain English; the UI words it from `errorCode` (updateErrorText). */
   error?: string;
+  /** Why it failed (updater/download.go Fail*), for the UI to word in its language. */
+  errorCode?: string;
+  /** The underlying error, GitHub's status or file, or the old program's path on a rollback. */
+  errorDetail?: string;
 }
 
 const UPDATE_STATES: readonly UpdateState[] = [
@@ -73,7 +79,37 @@ export function normalizeUpdateStatus(
     downloaded: byteCount(res.downloaded),
     total: byteCount(res.total),
     error: optionalString(res.error),
+    errorCode: optionalString(res.errorCode),
+    errorDetail: optionalString(res.errorDetail),
   };
+}
+
+/** Status.ErrorCode (updater/download.go) -> translation key. */
+const UPDATE_ERROR_KEYS: Readonly<Record<string, string>> = {
+  download_failed: "errors:updateError.downloadFailed",
+  not_published: "errors:updateError.notPublished",
+  no_checksum: "errors:updateError.noChecksum",
+  checksum_mismatch: "errors:updateError.checksumMismatch",
+  too_large: "errors:updateError.tooLarge",
+  archive_invalid: "errors:updateError.archiveInvalid",
+  write_failed: "errors:updateError.writeFailed",
+  swap_failed: "errors:updateError.swapFailed",
+  rollback_failed: "errors:updateError.rollbackFailed",
+};
+
+/**
+ * Why the update failed, in the UI language: the code's text with the server's detail after it
+ * (on a rollback the detail is the old program's path, inside the text). An unknown code, or a
+ * server without codes, shows the server's English; undefined when there is no reason at all.
+ */
+export function updateErrorText(
+  status: Pick<UpdateStatus, "error" | "errorCode" | "errorDetail" | "version">,
+  t: TFunction,
+): string | undefined {
+  const key = status.errorCode ? UPDATE_ERROR_KEYS[status.errorCode] : undefined;
+  if (!key) return status.error;
+  if (status.errorCode === "rollback_failed") return t(key, { path: status.errorDetail ?? "" });
+  return withDetail(t(key, { version: status.version ?? "" }), status.errorDetail, t);
 }
 
 export async function getUpdateStatus(): Promise<UpdateStatus> {

@@ -55,6 +55,10 @@ type Status struct {
 	Downloaded int64  `json:"downloaded,omitempty"`
 	Total      int64  `json:"total,omitempty"`
 	Error      string `json:"error,omitempty"`
+	// ErrorCode says why the update failed (the Fail* constants) for the admin UI to word in its
+	// language, and ErrorDetail is the Failure's detail; Error stays the English sentence.
+	ErrorCode   string `json:"errorCode,omitempty"`
+	ErrorDetail string `json:"errorDetail,omitempty"`
 }
 
 // Options configures a Manager.
@@ -319,7 +323,12 @@ func (m *Manager) run(version string) {
 	m.opts.Logf("[Update] Downloading version %s (%s)", version, m.archive)
 	if err := m.install(version); err != nil {
 		m.opts.Logf("[Update] Version %s failed: %v", version, err)
-		m.setStatus(Status{State: StateError, Version: version, Error: err.Error()})
+		st := Status{State: StateError, Version: version, Error: err.Error()}
+		var f *Failure
+		if errors.As(err, &f) {
+			st.ErrorCode, st.ErrorDetail = f.Code, f.Detail
+		}
+		m.setStatus(st)
 		return
 	}
 	m.opts.Logf("[Update] Version %s is installed at %s; restart the server to run it", version, m.exe)

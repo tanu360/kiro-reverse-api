@@ -73,6 +73,7 @@ export function mockUpdateStatus(now = Date.now()): UpdateStatus {
       state: "error",
       version: update.version,
       error: "The download does not match the release checksum.",
+      errorCode: "checksum_mismatch",
     };
   }
   if (fraction < 1) {

@@ -437,21 +437,27 @@ func TestDownloadFailures(t *testing.T) {
 		noSums  bool
 		archive string // the only archive SHA256SUMS.txt lists
 		want    string
+		code    string
+		detail  string
 	}{
 		{
 			name: "checksum mismatch",
 			sum:  strings.Repeat("1", 64),
 			want: "The download does not match the release checksum.",
+			code: FailChecksum,
 		},
 		{
 			name:   "release not published yet",
 			noSums: true,
 			want:   "Version 3.6.0's release is not on GitHub yet; it may still be publishing. Try again in a few minutes.",
+			code:   FailNotPublished,
 		},
 		{
 			name:    "no checksum for this platform",
 			archive: "kiro-proxy-linux-arm64.tar.gz",
 			want:    "lists no checksum for kiro-proxy-linux-x64.tar.gz",
+			code:    FailNoChecksum,
+			detail:  "kiro-proxy-linux-x64.tar.gz",
 		},
 	}
 	for _, tc := range tests {
@@ -471,6 +477,9 @@ func TestDownloadFailures(t *testing.T) {
 			st := waitFor(t, f.m, StateReady, StateError)
 			if st.State != StateError || st.Version != "3.6.0" || !strings.Contains(st.Error, tc.want) {
 				t.Fatalf("status = %+v, want an error with %q", st, tc.want)
+			}
+			if st.ErrorCode != tc.code || st.ErrorDetail != tc.detail {
+				t.Fatalf("errorCode, errorDetail = %q, %q; want %q, %q", st.ErrorCode, st.ErrorDetail, tc.code, tc.detail)
 			}
 			if got := readFile(t, f.exe); got != "old program" {
 				t.Fatalf("executable holds %q; a failed update must not swap it", got)

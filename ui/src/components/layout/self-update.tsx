@@ -11,6 +11,7 @@ import {
   restartForUpdate,
   startUpdate,
   type UpdateStatus,
+  updateErrorText,
   updateStatusQuery,
   waitForVersion,
 } from "@/lib/api/update";
@@ -146,7 +147,7 @@ export function useSelfUpdateController({
       available: Boolean(enabled && status?.supported),
       target,
       phase,
-      error: restartError ?? status?.error,
+      error: restartError ?? (status ? updateErrorText(status, t) : undefined),
       start: () => {
         setRestartError(undefined);
         begin.mutate();
@@ -154,7 +155,7 @@ export function useSelfUpdateController({
       restart,
       confirmRestart,
     }),
-    [status, enabled, target, phase, restartError, begin, restart, confirmRestart],
+    [status, enabled, target, phase, restartError, begin, restart, confirmRestart, t],
   );
 }
 
