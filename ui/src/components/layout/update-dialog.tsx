@@ -1,4 +1,10 @@
-import { ArrowRight02Icon, ExternalLinkIcon } from "@hugeicons/core-free-icons";
+import {
+  ArrowRight02Icon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  SparklesIcon,
+  WrenchIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useMemo, useState } from "react";
 import { CopyField } from "@/components/shared/code-field";
@@ -273,12 +279,26 @@ function UpdateTabs({
   const { news, fixes } = useMemo(() => splitChangelog(changelog), [changelog]);
   const tabs = [
     ...(news.length > 0
-      ? [{ value: "news" as const, label: t("shell.update.tabNews"), count: news.length }]
+      ? [
+          {
+            value: "news" as const,
+            label: t("shell.update.tabNews"),
+            count: news.length,
+            icon: SparklesIcon,
+          },
+        ]
       : []),
     ...(fixes.length > 0
-      ? [{ value: "fixes" as const, label: t("shell.update.tabFixes"), count: fixes.length }]
+      ? [
+          {
+            value: "fixes" as const,
+            label: t("shell.update.tabFixes"),
+            count: fixes.length,
+            icon: WrenchIcon,
+          },
+        ]
       : []),
-    { value: "how" as const, label: t("shell.update.howTo"), count: undefined },
+    { value: "how" as const, label: t("shell.update.howTo"), count: undefined, icon: DownloadIcon },
   ];
   const [tab, setTab] = useState<UpdateTab>(tabs[0]?.value ?? "how");
 
@@ -288,6 +308,7 @@ function UpdateTabs({
       <TabsList aria-label={t("shell.update.title")} variant="underline">
         {tabs.map((item) => (
           <TabsTab key={item.value} value={item.value}>
+            <HugeiconsIcon aria-hidden="true" className="max-sm:hidden" icon={item.icon} />
             {item.label}
             {item.count === undefined ? null : (
               <Badge

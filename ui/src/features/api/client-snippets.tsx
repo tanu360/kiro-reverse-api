@@ -1,4 +1,10 @@
-import { CommandLineIcon, InfoIcon } from "@hugeicons/core-free-icons";
+import {
+  CodeIcon,
+  CodeSquareIcon,
+  CommandLineIcon,
+  InfoIcon,
+  TerminalIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -313,9 +319,18 @@ export function ClientSnippetsCard(): JSX.Element {
         ) : null}
         {/* Underlined over a full-width hairline, so the strip reads as tabs with their panel under it. */}
         <TabsList variant="underline">
-          <TabsTab value="api">{t("snippets.apiRequest")}</TabsTab>
-          <TabsTab value="claude-code">{t("snippets.claudeCode")}</TabsTab>
-          <TabsTab value="codex">{t("snippets.codex")}</TabsTab>
+          <TabsTab value="api">
+            <HugeiconsIcon aria-hidden="true" className="max-sm:hidden" icon={CodeIcon} />
+            {t("snippets.apiRequest")}
+          </TabsTab>
+          <TabsTab value="claude-code">
+            <HugeiconsIcon aria-hidden="true" className="max-sm:hidden" icon={TerminalIcon} />
+            {t("snippets.claudeCode")}
+          </TabsTab>
+          <TabsTab value="codex">
+            <HugeiconsIcon aria-hidden="true" className="max-sm:hidden" icon={CodeSquareIcon} />
+            {t("snippets.codex")}
+          </TabsTab>
         </TabsList>
         <div className={PANEL_STACK}>
           <StackedPanel className="flex min-w-0 flex-col" value="api">

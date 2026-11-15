@@ -1,5 +1,5 @@
 import { ArrowDown02Icon, ArrowUp02Icon, ChevronDownIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type JSX, type ReactNode, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -227,6 +227,8 @@ function useSelectedTabInView(value: string, loading: boolean) {
 export interface StatusTab<V extends string> {
   value: V;
   label: string;
+  /** Shown before the label from sm up; phones keep the row to text, so more tabs fit. */
+  icon?: IconSvgElement;
   /** Left out when the count could not load: the tab shows no badge. */
   count?: number;
 }
@@ -267,6 +269,9 @@ export function StatusTabs<V extends string>({
         <TabsList aria-label={label} ref={listRef} variant="underline">
           {tabs.map((tab) => (
             <TabsTab data-value={tab.value} disabled={loading} key={tab.value} value={tab.value}>
+              {tab.icon ? (
+                <HugeiconsIcon aria-hidden="true" className="max-sm:hidden" icon={tab.icon} />
+              ) : null}
               {tab.label}
               {loading ? (
                 // The badge's size, so the track barely moves when the counts arrive.

@@ -1,3 +1,4 @@
+import { ServerIcon, ShieldIcon, SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
@@ -610,11 +611,22 @@ function PageTabs({ page }: { page: SettingsPageId }): JSX.Element {
       loading={false}
       // Leaving a page with unsaved edits asks first (useLeaveGuard), as any route change does.
       onValueChange={(next) => void navigate({ to: SETTINGS_PAGE_PATH[next] })}
-      tabs={SETTINGS_PAGES.map((id) => ({ value: id, label: t(`pages.${id}`) }))}
+      tabs={SETTINGS_PAGES.map((id) => ({
+        value: id,
+        label: t(`pages.${id}`),
+        icon: SETTINGS_PAGE_ICON[id],
+      }))}
       value={page}
     />
   );
 }
+
+/** Each settings page's tab icon; General shares the Settings icon in the sidebar. */
+const SETTINGS_PAGE_ICON = {
+  requests: SlidersHorizontalIcon,
+  server: ServerIcon,
+  security: ShieldIcon,
+} as const satisfies Record<SettingsPageId, unknown>;
 
 function SettingsContent({ page }: { page: SettingsPageId }): JSX.Element {
   const { t } = useT("settings");

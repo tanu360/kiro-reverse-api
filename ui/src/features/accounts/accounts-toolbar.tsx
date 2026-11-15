@@ -1,4 +1,10 @@
-import { Search01Icon } from "@hugeicons/core-free-icons";
+import {
+  CircleCheckIcon,
+  CircleSlashIcon,
+  Search01Icon,
+  TriangleAlertIcon,
+  UsersIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, useMemo } from "react";
 import {
@@ -157,6 +163,13 @@ interface AccountsToolbarProps {
   onPageSizeChange?: (size: number) => void;
 }
 
+/** Each status tab's icon, as the status pills draw them. */
+const STATUS_GROUP_ICON = {
+  active: CircleCheckIcon,
+  attention: TriangleAlertIcon,
+  disabled: CircleSlashIcon,
+} as const;
+
 /**
  * Status tabs (All, Active, Needs attention, Disabled, with counts), then a wrapping row: search
  * (a row of its own below a 64rem card), the filter controls ("Sort by", a "Label: Value" select
@@ -204,11 +217,12 @@ export function AccountsToolbar({
 
   const tab: AccountTab = statusFilterGroup(filters.status) ?? ALL;
   const tabs: StatusTab<AccountTab>[] = [
-    { value: ALL, label: t("filter.all"), count: accounts.length },
+    { value: ALL, label: t("filter.all"), count: accounts.length, icon: UsersIcon },
     ...STATUS_GROUPS.map((group) => ({
       value: group,
       label: t(group === "attention" ? "filter.attention" : `health.${group}`),
       count: groupCounts[group],
+      icon: STATUS_GROUP_ICON[group],
     })),
   ];
   const sortOptions = ACCOUNT_SORTS.map((column) => ({

@@ -1,4 +1,10 @@
-import { Search01Icon, XIcon } from "@hugeicons/core-free-icons";
+import {
+  CircleCheckIcon,
+  CircleXIcon,
+  ListChecksIcon,
+  Search01Icon,
+  XIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, useEffect, useRef, useState } from "react";
 import { InfoHint } from "@/components/shared/info-hint";
@@ -98,9 +104,9 @@ export function RequestsToolbar({
 
   const all = counts ? counts.success + counts.failed : undefined;
   const tabs = [
-    { value: ALL, label: t("allStatuses"), count: all },
-    { value: "success", label: t("ok"), count: counts?.success },
-    { value: "failed", label: t("fail"), count: counts?.failed },
+    { value: ALL, label: t("allStatuses"), count: all, icon: ListChecksIcon },
+    { value: "success", label: t("ok"), count: counts?.success, icon: CircleCheckIcon },
+    { value: "failed", label: t("fail"), count: counts?.failed, icon: CircleXIcon },
   ] as const;
   const tabTotal = status ? counts?.[status] : all;
   const sortOptions = REQUEST_SORTS.map((column) => ({
