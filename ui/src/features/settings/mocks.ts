@@ -334,14 +334,20 @@ function responseHeaderReason(code: string, index: number, name: string, variabl
 
 /** Tailscale's sign-in page in the walked flow: a fake one, opened in a new tab. */
 const MOCK_TAILSCALE_AUTH_URL = "https://login.tailscale.com/a/1a2b3c4d5e6f";
+/** The page that turns on HTTPS and Funnel for the tailnet, in the walked flow. */
+const MOCK_TAILSCALE_FUNNEL_URL = "https://login.tailscale.com/f/funnel?node=n1a2b3c4d5e6f";
+/** The compressed helper's size, as the release serves it. */
+const MOCK_HELPER_BYTES = 7_940_033;
 
 /**
- * GET /tunnel. A pinned status (tests) shows as is; otherwise the link walks the real flow by
- * time: download 4 s, connect 1 s, then Tailscale's sign-in for 15 s (the mock "signs in" on its
- * own), then live. A device already signed in connects for 1.5 s and goes live.
+ * GET /tunnel. A pinned status (tests) shows as is; otherwise the link walks the real first-time
+ * flow by time: download 6 s, connect 1.5 s, Tailscale's sign-in until 20 s (the mock "signs in"
+ * on its own), connect again 1 s, Funnel's switch for 8 s, the certificate for 3 s, then live. A
+ * device already signed in connects for 1.5 s and goes live.
  */
 function tunnelStatus(): TunnelStatus {
   const tunnel = mockDb.tunnel;
+  const elapsed = Date.now() - tunnel.since;
   const base = {
     enabled: tunnel.enabled,
     hostname: tunnel.hostname,
@@ -352,15 +358,31 @@ function tunnelStatus(): TunnelStatus {
   };
   if (tunnel.pinned) return { ...base, state: "off", ...tunnel.pinned };
   if (!tunnel.enabled) return { ...base, state: "off" };
-  const elapsed = Date.now() - tunnel.since;
   if (!tunnel.signedIn) {
-    if (elapsed < 4000) {
-      return { ...base, state: "downloading", progress: Math.round(elapsed / 40) };
+    if (elapsed < 6000) {
+      const progress = Math.round(elapsed / 60);
+      return {
+        ...base,
+        state: "downloading",
+        progress,
+        downloaded: Math.round((MOCK_HELPER_BYTES * progress) / 100),
+        total: MOCK_HELPER_BYTES,
+      };
     }
-    if (elapsed < 5000) return { ...base, state: "starting" };
+    if (elapsed < 7500) return { ...base, state: "starting" };
     if (elapsed < 20_000) {
       return { ...base, state: "needs-login", authURL: MOCK_TAILSCALE_AUTH_URL };
     }
+    if (elapsed < 21_000) return { ...base, state: "starting" };
+    if (elapsed < 29_000) {
+      return {
+        ...base,
+        signedIn: true,
+        state: "needs-funnel",
+        enableURL: MOCK_TAILSCALE_FUNNEL_URL,
+      };
+    }
+    if (elapsed < 32_000) return { ...base, signedIn: true, state: "running" };
     tunnel.signedIn = true;
   } else if (elapsed < 1500) {
     return { ...base, state: "starting" };

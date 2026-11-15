@@ -1,4 +1,9 @@
-import { Alert02Icon, ExternalLinkIcon, Logout03Icon } from "@hugeicons/core-free-icons";
+import {
+  Alert02Icon,
+  ExternalLinkIcon,
+  Logout03Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -22,6 +27,7 @@ import {
   tunnelQuery,
   updateTunnel,
 } from "@/lib/api/tunnel";
+import { formatBytes } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { deviceNameChars } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
@@ -199,7 +205,7 @@ function TailscaleLink({ href, children }: { href: string; children: ReactNode }
   );
 }
 
-/** Where the link stands, with the step the user takes at Tailscale when it waits on one. */
+/** Where the link stands: the live link, a failure, or the setup steps on the way to the link. */
 function StatusRow({
   status,
   onRetry,
@@ -211,129 +217,220 @@ function StatusRow({
 }): JSX.Element {
   const { t } = useT("settings");
   const linkLabel = useId();
-  const title = t("publicLink.status");
+
+  if (status.state === "running" && status.url) {
+    // The link takes the row's width under its text: in the 18rem control slot a
+    // ts.net address broke across two lines at its hyphen.
+    return (
+      <SettingsRow
+        description={t("publicLink.linkHint")}
+        status={
+          <Badge live size="sm" tone="success">
+            {t("publicLink.live")}
+          </Badge>
+        }
+        title={<span id={linkLabel}>{t("publicLink.link")}</span>}
+      >
+        <CopyField
+          className="mt-2 max-w-lg"
+          copiedMessage={t("publicLink.copied")}
+          labelledBy={linkLabel}
+          multiline
+          openHref={status.url}
+          openLabel={t("publicLink.open")}
+          value={status.url}
+        />
+      </SettingsRow>
+    );
+  }
+  if (status.state === "error") {
+    return (
+      <SettingsRow
+        control={
+          <RowAction>
+            <Button loading={retrying} onClick={onRetry} size="sm" variant="secondary">
+              {t("publicLink.retry")}
+            </Button>
+          </RowAction>
+        }
+        controlWidth="actions"
+        description={
+          <span className="text-destructive-foreground">
+            {status.error ?? t("publicLink.failed")}
+          </span>
+        }
+        title={t("publicLink.status")}
+      />
+    );
+  }
+  return <SetupRow status={status} />;
+}
+
+/** The first-time setup, in order: each waiting state stands at one of these steps. */
+const SETUP_STEPS = [
+  { id: "download", label: "publicLink.stepDownload" },
+  { id: "connect", label: "publicLink.stepConnect" },
+  { id: "signIn", label: "publicLink.stepSignIn" },
+  { id: "funnel", label: "publicLink.stepFunnel" },
+  { id: "live", label: "publicLink.stepLive" },
+] as const;
+
+/** The step a state stands at, as an index into SETUP_STEPS. */
+function setupStep(status: TunnelStatus): number {
+  switch (status.state) {
+    case "downloading":
+      return 0;
+    case "needs-login":
+    case "needs-approval":
+      return 2;
+    case "needs-funnel":
+      return 3;
+    case "running":
+      // Funnel is on and the HTTPS certificate is on its way.
+      return 4;
+    default:
+      return 1;
+  }
+}
+
+/**
+ * The setup steps with the current one's progress or the button for what to do at Tailscale.
+ * Tailscale reports "starting" again between steps (after the sign-in, say), so the steps never
+ * go back while it does.
+ */
+function SetupRow({ status }: { status: TunnelStatus }): JSX.Element {
+  const { t } = useT("settings");
+  const stepsLabel = useId();
+  const [reached, setReached] = useState(0);
+  const derived = setupStep(status);
+  if (status.state !== "starting" && derived !== reached) setReached(derived);
+  const current = status.state === "starting" ? Math.max(derived, reached) : derived;
+
+  return (
+    <SettingsRow title={<span id={stepsLabel}>{t("publicLink.setup")}</span>}>
+      <ol aria-labelledby={stepsLabel} className="mt-3 grid grid-cols-5">
+        {SETUP_STEPS.map((step, index) => {
+          const done = index < current;
+          const now = index === current;
+          return (
+            <li
+              aria-current={now ? "step" : undefined}
+              className={cn(
+                "relative flex flex-col items-center gap-1.5 text-center text-xs",
+                now ? "font-medium text-foreground" : "text-muted-foreground",
+              )}
+              key={step.id}
+            >
+              {index > 0 ? (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute top-[11px] right-1/2 h-0.5 w-full",
+                    index <= current ? "bg-primary" : "bg-border",
+                  )}
+                />
+              ) : null}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "relative grid size-6 place-items-center rounded-full border-2 font-medium text-xs",
+                  done
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : now
+                      ? "border-primary bg-card text-primary"
+                      : "border-border bg-card",
+                )}
+              >
+                {done ? (
+                  <HugeiconsIcon className="size-3.5" icon={Tick02Icon} strokeWidth={2} />
+                ) : (
+                  index + 1
+                )}
+              </span>
+              <span>
+                {t(step.label)}
+                {done ? <span className="sr-only"> {t("publicLink.stepDone")}</span> : null}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
+        <SetupDetail status={status} />
+      </div>
+    </SettingsRow>
+  );
+}
+
+/** What the current step is doing, or the button for what to do at Tailscale. */
+function SetupDetail({ status }: { status: TunnelStatus }): JSX.Element {
+  const { t, lang } = useT("settings");
+  const waiting = (text: string, button?: ReactNode) => (
+    <>
+      <p className="min-w-0 flex-1 basis-48 text-muted-foreground text-xs">{text}</p>
+      {button}
+    </>
+  );
+  const busy = (text: string) => (
+    <p className="text-muted-foreground text-xs">
+      <Busy>{text}</Busy>
+    </p>
+  );
 
   switch (status.state) {
-    case "running":
-      if (status.url) {
-        // The link takes the row's width under its text: in the 18rem control slot a
-        // ts.net address broke across two lines at its hyphen.
-        return (
-          <SettingsRow
-            description={t("publicLink.linkHint")}
-            status={
-              <Badge live size="sm" tone="success">
-                {t("publicLink.live")}
-              </Badge>
-            }
-            title={<span id={linkLabel}>{t("publicLink.link")}</span>}
-          >
-            <CopyField
-              className="mt-2 max-w-lg"
-              copiedMessage={t("publicLink.copied")}
-              labelledBy={linkLabel}
-              multiline
-              openHref={status.url}
-              openLabel={t("publicLink.open")}
-              value={status.url}
-            />
-          </SettingsRow>
-        );
-      }
-      return <SettingsRow description={<Busy>{t("publicLink.starting")}</Busy>} title={title} />;
     case "downloading": {
-      const percent = status.progress;
+      const { downloaded, total, progress } = status;
+      if (total === undefined || progress === undefined) return busy(t("publicLink.downloading"));
+      const amount = t("publicLink.downloadedOf", {
+        downloaded: formatBytes(downloaded ?? 0, lang),
+        total: formatBytes(total, lang),
+        percent: progress,
+      });
       return (
-        <SettingsRow
-          description={
-            percent === undefined
-              ? t("publicLink.downloading")
-              : t("publicLink.downloadingPercent", { percent })
-          }
-          title={title}
-        >
-          {percent === undefined ? null : (
-            <Meter
-              aria-label={t("publicLink.progressLabel")}
-              className="max-w-xs pt-1"
-              value={percent}
-            >
-              <MeterTrack>
-                <MeterIndicator />
-              </MeterTrack>
-            </Meter>
-          )}
-        </SettingsRow>
+        <div className="flex w-full flex-col gap-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
+            <span className="font-medium text-foreground">
+              <Busy>{t("publicLink.downloading")}</Busy>
+            </span>
+            <span className="text-muted-foreground tabular-nums">{amount}</span>
+          </div>
+          <Meter
+            aria-label={t("publicLink.progressLabel")}
+            getAriaValueText={() => amount}
+            value={progress}
+          >
+            <MeterTrack className="h-1.5">
+              <MeterIndicator />
+            </MeterTrack>
+          </Meter>
+        </div>
       );
     }
     case "needs-login":
-      return (
-        <SettingsRow
-          control={
-            status.authURL ? (
-              <RowAction>
-                <TailscaleLink href={status.authURL}>{t("publicLink.signIn")}</TailscaleLink>
-              </RowAction>
-            ) : undefined
-          }
-          controlWidth="actions"
-          description={t("publicLink.needsLogin")}
-          title={title}
-        />
-      );
+      return status.authURL
+        ? waiting(
+            t("publicLink.needsLogin"),
+            <TailscaleLink href={status.authURL}>{t("publicLink.signIn")}</TailscaleLink>,
+          )
+        : busy(t("publicLink.starting"));
     case "needs-approval":
-      return (
-        <SettingsRow
-          control={
-            status.adminURL ? (
-              <RowAction>
-                <TailscaleLink href={status.adminURL}>{t("publicLink.openAdmin")}</TailscaleLink>
-              </RowAction>
-            ) : undefined
-          }
-          controlWidth="actions"
-          description={t("publicLink.needsApproval")}
-          title={title}
-        />
+      return waiting(
+        t("publicLink.needsApproval"),
+        status.adminURL ? (
+          <TailscaleLink href={status.adminURL}>{t("publicLink.openAdmin")}</TailscaleLink>
+        ) : undefined,
       );
     case "needs-funnel":
-      return (
-        <SettingsRow
-          control={
-            status.enableURL ? (
-              <RowAction>
-                <TailscaleLink href={status.enableURL}>
-                  {t("publicLink.enableFunnel")}
-                </TailscaleLink>
-              </RowAction>
-            ) : undefined
-          }
-          controlWidth="actions"
-          description={t("publicLink.needsFunnel")}
-          title={title}
-        />
+      return waiting(
+        t("publicLink.needsFunnel"),
+        status.enableURL ? (
+          <TailscaleLink href={status.enableURL}>{t("publicLink.enableFunnel")}</TailscaleLink>
+        ) : undefined,
       );
-    case "error":
-      return (
-        <SettingsRow
-          control={
-            <RowAction>
-              <Button loading={retrying} onClick={onRetry} size="sm" variant="secondary">
-                {t("publicLink.retry")}
-              </Button>
-            </RowAction>
-          }
-          controlWidth="actions"
-          description={
-            <span className="text-destructive-foreground">
-              {status.error ?? t("publicLink.failed")}
-            </span>
-          }
-          title={title}
-        />
-      );
+    case "running":
+      return busy(t("publicLink.certificate"));
     default:
-      return <SettingsRow description={<Busy>{t("publicLink.starting")}</Busy>} title={title} />;
+      return busy(t("publicLink.starting"));
   }
 }
 

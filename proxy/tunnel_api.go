@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"kiro-proxy/config"
@@ -40,11 +41,22 @@ func (h *Handler) applyTunnelSettings() {
 	h.tunnel.Apply(settings.Enabled, settings.Hostname)
 }
 
+// tunnelProgressGap spaces the download's progress events: the helper reports every percent.
+const tunnelProgressGap = 250 * time.Millisecond
+
+// lastTunnelProgress is when the last progress event went out, in Unix nanoseconds.
+var lastTunnelProgress atomic.Int64
+
 // TunnelChanged publishes a settings event for each new state of the link, so the card follows
-// without polling. Download progress publishes only every 20 percent.
+// without polling. Download progress publishes at most every tunnelProgressGap, and always at 100
+// percent.
 func TunnelChanged(st tunnel.Status) {
-	if st.State == tunnel.StateDownloading && st.Progress != nil && *st.Progress%20 != 0 {
-		return
+	if st.State == tunnel.StateDownloading && st.Progress != nil && *st.Progress < 100 {
+		now := time.Now().UnixNano()
+		last := lastTunnelProgress.Load()
+		if now-last < int64(tunnelProgressGap) || !lastTunnelProgress.CompareAndSwap(last, now) {
+			return
+		}
 	}
 	publishEvent(eventSettingsChanged, "tunnel")
 }

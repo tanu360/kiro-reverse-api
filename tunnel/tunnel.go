@@ -44,13 +44,17 @@ const (
 // Status is the link's state and what the user needs for it. Only the current state's fields
 // are set.
 type Status struct {
-	State     State  `json:"state"`
-	Progress  *int   `json:"progress,omitempty"`
-	URL       string `json:"url,omitempty"`
-	AuthURL   string `json:"authURL,omitempty"`
-	EnableURL string `json:"enableURL,omitempty"`
-	AdminURL  string `json:"adminURL,omitempty"`
-	Error     string `json:"error,omitempty"`
+	State    State `json:"state"`
+	Progress *int  `json:"progress,omitempty"`
+	// Downloaded and Total count the helper download's compressed bytes; Total is 0 when the
+	// server sends no size.
+	Downloaded int64  `json:"downloaded,omitempty"`
+	Total      int64  `json:"total,omitempty"`
+	URL        string `json:"url,omitempty"`
+	AuthURL    string `json:"authURL,omitempty"`
+	EnableURL  string `json:"enableURL,omitempty"`
+	AdminURL   string `json:"adminURL,omitempty"`
+	Error      string `json:"error,omitempty"`
 	// SignedIn is whether this server holds a Tailscale sign-in that "Sign out" would end.
 	SignedIn bool `json:"signedIn"`
 }
@@ -303,8 +307,8 @@ func (m *Manager) setStatus(st Status) {
 	}
 }
 
-func (m *Manager) setProgress(pct int) {
-	m.setStatus(Status{State: StateDownloading, Progress: &pct})
+func (m *Manager) setProgress(pct int, downloaded, total int64) {
+	m.setStatus(Status{State: StateDownloading, Progress: &pct, Downloaded: downloaded, Total: total})
 }
 
 func sameStatus(a, b Status) bool {
@@ -462,7 +466,7 @@ func (m *Manager) runHelper(ctx context.Context, run *runHandle, bin, hostname, 
 				m.writeSignedInMarker()
 			}
 		}
-		if st.State == StateRunning {
+		if st.State == StateRunning && st.URL != "" {
 			m.opts.Logf("[Tunnel] Public link: %s", st.URL)
 		}
 		m.setStatus(st)

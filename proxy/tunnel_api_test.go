@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"kiro-proxy/config"
 	"kiro-proxy/tunnel"
@@ -147,5 +148,33 @@ func TestPublicLinkCallsNeedAnAPIKey(t *testing.T) {
 	ae, ok := err.(*authError)
 	if !ok || ae.status != http.StatusUnauthorized {
 		t.Fatalf("a public call without a key: err %v, want a 401", err)
+	}
+}
+
+func TestTunnelProgressEventsAreSpaced(t *testing.T) {
+	lastTunnelProgress.Store(0)
+	id, ch := getBroadcaster().Subscribe()
+	defer getBroadcaster().Unsubscribe(id)
+
+	for _, pct := range []int{1, 2, 3, 100} {
+		TunnelChanged(tunnel.Status{State: tunnel.StateDownloading, Progress: &pct})
+	}
+	TunnelChanged(tunnel.Status{State: tunnel.StateStarting})
+
+	got := 0
+	for {
+		select {
+		case evt := <-ch:
+			if evt.Type == eventSettingsChanged && evt.Payload == "tunnel" {
+				got++
+			}
+			continue
+		case <-time.After(100 * time.Millisecond):
+		}
+		break
+	}
+	// 1 percent, 100 percent and the next state; 2 and 3 fall inside the gap.
+	if got != 3 {
+		t.Fatalf("events = %d, want 3", got)
 	}
 }

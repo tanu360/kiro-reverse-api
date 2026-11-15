@@ -27,6 +27,9 @@ export interface TunnelStatus {
   state: TunnelState;
   /** 0 to 100 while downloading; absent when the size is unknown. */
   progress?: number;
+  /** Bytes of the helper download so far, and its size (absent when unknown). */
+  downloaded?: number;
+  total?: number;
   /** The public link, while running. */
   url?: string;
   /** Tailscale's sign-in page, while it waits for a sign-in. */
@@ -69,13 +72,22 @@ const WAITING: ReadonlySet<TunnelState> = new Set([
   "needs-funnel",
 ]);
 
-/** Whether the link is on its way: the card polls every 2 s then, in case events are off. */
-export function tunnelWaiting(state: TunnelState): boolean {
-  return WAITING.has(state);
+/**
+ * Whether the link is on its way, "running" with no link yet (the certificate) included: the card
+ * polls every 2 s then, in case events are off.
+ */
+export function tunnelWaiting(status: TunnelStatus): boolean {
+  return WAITING.has(status.state) || (status.state === "running" && !status.url);
 }
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value ? value : undefined;
+}
+
+function byteCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : undefined;
 }
 
 /** The server's answer with every field in its type; an unknown state reads as an error. */
@@ -93,6 +105,8 @@ function normalize(res: Partial<Record<keyof TunnelStatus, unknown>>): TunnelSta
       typeof res.progress === "number" && Number.isFinite(res.progress)
         ? Math.min(100, Math.max(0, Math.round(res.progress)))
         : undefined,
+    downloaded: byteCount(res.downloaded),
+    total: byteCount(res.total),
     url: optionalString(res.url),
     authURL: optionalString(res.authURL),
     enableURL: optionalString(res.enableURL),
@@ -113,7 +127,7 @@ export function tunnelQuery() {
     queryKey: queryKeys.settings.tunnel(),
     queryFn: getTunnel,
     refetchInterval: (query) =>
-      query.state.data && tunnelWaiting(query.state.data.state) ? 2000 : false,
+      query.state.data && tunnelWaiting(query.state.data) ? 2000 : false,
   });
 }
 

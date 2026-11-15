@@ -169,8 +169,8 @@ func (m *Manager) fetchHelper(ctx context.Context, url string, out io.Writer) (s
 	counted := &progressReader{
 		r:     io.LimitReader(resp.Body, maxDownloadBytes+1),
 		total: resp.ContentLength,
-		report: func(pct int) {
-			m.setProgress(pct)
+		report: func(pct int, n, total int64) {
+			m.setProgress(pct, n, total)
 		},
 	}
 	zr, err := gzip.NewReader(io.TeeReader(counted, hash))
@@ -232,7 +232,7 @@ type progressReader struct {
 	n      int64
 	total  int64
 	last   int
-	report func(int)
+	report func(pct int, n, total int64)
 }
 
 func (p *progressReader) Read(b []byte) (int, error) {
@@ -245,7 +245,7 @@ func (p *progressReader) Read(b []byte) (int, error) {
 		}
 		if pct != p.last {
 			p.last = pct
-			p.report(pct)
+			p.report(pct, p.n, p.total)
 		}
 	}
 	return n, err

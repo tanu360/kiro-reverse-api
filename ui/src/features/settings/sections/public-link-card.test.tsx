@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { queryKeys } from "@/lib/api/query-keys";
 import { mockDb } from "@/lib/mocks/db";
 import { renderWithProviders } from "@/test/render";
 import { PublicLinkCard } from "./public-link-card";
@@ -23,6 +24,57 @@ describe("PublicLinkCard", () => {
     await user.click(await screen.findByRole("switch", { name: "Public HTTPS link" }));
     await waitFor(() => expect(mockDb.tunnel.enabled).toBe(true));
     expect(await screen.findByText(/Downloading the Tailscale helper/)).toBeInTheDocument();
+  });
+
+  it("shows the download's size and progress on the first setup step", async () => {
+    mockDb.tunnel.pinned = {
+      enabled: true,
+      state: "downloading",
+      progress: 40,
+      downloaded: 3_176_013,
+      total: 7_940_033,
+    };
+    renderWithProviders(<PublicLinkCard />);
+    const meter = await screen.findByRole("meter", { name: "Download progress" });
+    expect(meter).toHaveAttribute("aria-valuenow", "40");
+    expect(meter).toHaveAttribute("aria-valuetext", "3.0 MB of 7.6 MB · 40%");
+    expect(screen.getByText("3.0 MB of 7.6 MB · 40%")).toBeVisible();
+    const steps = within(screen.getByRole("list", { name: "Setup" })).getAllByRole("listitem");
+    expect(steps.map((step) => step.textContent)).toEqual([
+      "1Download",
+      "2Connect",
+      "3Sign in",
+      "4Funnel",
+      "5Live",
+    ]);
+    expect(steps[0]).toHaveAttribute("aria-current", "step");
+  });
+
+  it("keeps the sign-in step while Tailscale connects after the sign-in", async () => {
+    mockDb.tunnel.pinned = {
+      enabled: true,
+      state: "needs-login",
+      authURL: "https://login.tailscale.com/a/abc123",
+    };
+    const { queryClient } = renderWithProviders(<PublicLinkCard />);
+    const list = await screen.findByRole("list", { name: "Setup" });
+    expect(within(list).getAllByRole("listitem")[2]).toHaveAttribute("aria-current", "step");
+
+    mockDb.tunnel.pinned = { enabled: true, state: "starting" };
+    await queryClient.invalidateQueries({ queryKey: queryKeys.settings.tunnel() });
+    expect(await screen.findByText("Connecting to Tailscale…")).toBeVisible();
+    const steps = within(list).getAllByRole("listitem");
+    expect(steps[2]).toHaveAttribute("aria-current", "step");
+    expect(steps[0]).toHaveTextContent("Download (done)");
+    expect(steps[1]).toHaveTextContent("Connect (done)");
+  });
+
+  it("says the certificate is on its way once Funnel is on", async () => {
+    mockDb.tunnel.pinned = { enabled: true, signedIn: true, state: "running" };
+    renderWithProviders(<PublicLinkCard />);
+    expect(await screen.findByText("Getting the HTTPS certificate…")).toBeVisible();
+    const steps = within(screen.getByRole("list", { name: "Setup" })).getAllByRole("listitem");
+    expect(steps[4]).toHaveAttribute("aria-current", "step");
   });
 
   it("links to Tailscale's sign-in page while it waits for a sign-in", async () => {

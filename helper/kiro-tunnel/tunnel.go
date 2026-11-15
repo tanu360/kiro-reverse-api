@@ -70,6 +70,8 @@ func (t *tunnel) run(ctx context.Context) error {
 	defer server.Close()
 
 	// Fetch the certificate before the link goes out, so the first visitor does not wait for it.
+	// "running" without a link says Funnel is on and only the certificate is left.
+	t.status.emit(Status{State: stateRunning})
 	domain := strings.TrimSuffix(st.Self.DNSName, ".")
 	if len(st.CertDomains) > 0 {
 		domain = st.CertDomains[0]

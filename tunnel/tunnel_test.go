@@ -324,9 +324,11 @@ func TestDownloadChecksAgainstTheReleaseSums(t *testing.T) {
 	})
 	m := downloadManager(t, srv.URL)
 	var progress []int
+	var last Status
 	m.opts.OnChange = func(st Status) {
 		if st.Progress != nil {
 			progress = append(progress, *st.Progress)
+			last = st
 		}
 	}
 	path, err := m.download(context.Background())
@@ -339,6 +341,9 @@ func TestDownloadChecksAgainstTheReleaseSums(t *testing.T) {
 	}
 	if len(progress) == 0 || progress[len(progress)-1] != 100 {
 		t.Errorf("progress = %v, want it to end at 100", progress)
+	}
+	if last.Total <= 0 || last.Downloaded != last.Total {
+		t.Errorf("bytes at 100%% = %d of %d, want all of a known size", last.Downloaded, last.Total)
 	}
 	// The next start uses the saved helper.
 	if p, ok, err := m.findBinary(); err != nil || !ok || p != path {
