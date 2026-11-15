@@ -72,6 +72,17 @@ func metricsLabel(value string) string {
 	return value
 }
 
+// recordLateCreditsMetric adds credits a logged request was billed after it was counted.
+func recordLateCreditsMetric(rec requestRecord, credits float64) {
+	if credits <= 0 {
+		return
+	}
+	m := metrics
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.credits[usageSeries{metricsLabel(rec.Model), metricsAccount(rec.AccountID, rec.Email), metricsLabel(rec.APIKeyID)}] += credits
+}
+
 // recordRequestMetrics counts one logged client request.
 func recordRequestMetrics(rec requestRecord) {
 	outcome := "failed"

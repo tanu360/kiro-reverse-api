@@ -439,6 +439,15 @@ func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payloa
 
 	endpoints := endpointsForAccount(account)
 
+	//! Requests run under streamCtx: it ends with ctx, but a stream the output limiter cut stays
+	//! open for drainCutStream, which reads on for the reply's billing event.
+	streamCtx, endStream := upstreamStreamContext(ctx)
+	defer func() {
+		if endStream != nil {
+			endStream(nil)
+		}
+	}()
+
 	var lastErr error
 	var quotaErr *upstreamQuotaError
 	var clientErr *upstreamClientError
@@ -472,7 +481,7 @@ endpointLoop:
 				return err
 			}
 			//! A request body cannot be reused after an HTTP attempt.
-			req, err := http.NewRequestWithContext(ctx, "POST", epURL, bytes.NewReader(reqBody))
+			req, err := http.NewRequestWithContext(streamCtx, "POST", epURL, bytes.NewReader(reqBody))
 			if err != nil {
 				lastErr = err
 				continue endpointLoop
@@ -566,8 +575,15 @@ endpointLoop:
 			}
 
 			body := newIdleTimeoutBody(resp.Body, kiroStreamIdleTimeout)
-			emitted, err := parseEventStreamTracked(body, callback)
+			events := eventStreamSource(body)
+			reader := newCutReader(ctx, events)
+			emitted, err := consumeKiroEvents(reader.next, callback)
 			noteAttemptOutput(ctx, emitted)
+			if errors.Is(err, errStreamCut) {
+				drainCutStream(ctx, account, reader, body, endStream)
+				endStream = nil
+				return ctx.Err()
+			}
 			body.Close()
 			if err == nil {
 				return nil

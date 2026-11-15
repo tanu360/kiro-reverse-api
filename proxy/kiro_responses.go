@@ -114,12 +114,20 @@ func sendKiroResponses(ctx context.Context, account *config.Account, profileArn 
 	logKiroResponsesBodyDebug(body)
 	endpointURL := kiroResponsesURL(account, profileArn)
 
+	//! As in callKiroAPIContextOnce: a stream the output limiter cut stays open for drainCutStream.
+	streamCtx, endStream := upstreamStreamContext(ctx)
+	defer func() {
+		if endStream != nil {
+			endStream(nil)
+		}
+	}()
+
 	var lastErr error
 	for attempt := 1; attempt <= maxStreamAttemptsPerEndpoint; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(streamCtx, http.MethodPost, endpointURL, bytes.NewReader(body))
 		if err != nil {
 			return err
 		}
@@ -161,8 +169,15 @@ func sendKiroResponses(ctx context.Context, account *config.Account, profileArn 
 		}
 
 		stream := newIdleTimeoutBody(resp.Body, kiroStreamIdleTimeout)
-		emitted, err := consumeKiroEvents(responsesSSESource(stream), callback)
+		events := responsesSSESource(stream)
+		reader := newCutReader(ctx, events)
+		emitted, err := consumeKiroEvents(reader.next, callback)
 		noteAttemptOutput(ctx, emitted)
+		if errors.Is(err, errStreamCut) {
+			drainCutStream(ctx, account, reader, stream, endStream)
+			endStream = nil
+			return ctx.Err()
+		}
 		stream.Close()
 		if err == nil {
 			return nil

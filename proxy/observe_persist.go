@@ -31,6 +31,16 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	return res.LastInsertId()
 }
 
+// addPersistedRequestCredits adds credits billed after a request was logged to its row.
+func addPersistedRequestCredits(id int64, credits float64) error {
+	d, err := db.Get()
+	if err != nil {
+		return err
+	}
+	_, err = d.Exec(`UPDATE requests SET credits = credits + ? WHERE id = ?`, credits, id)
+	return err
+}
+
 func persistErrorRecord(rec errorRecord) error {
 	d, err := db.Get()
 	if err != nil {

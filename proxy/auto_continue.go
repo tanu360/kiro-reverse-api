@@ -61,6 +61,10 @@ func runAutoContinue(ctx context.Context, account *config.Account, payload *Kiro
 		err := call(ctx, account, next, state.callback())
 		if err != nil && (hop == 0 || isContextCanceledError(err) || ctx.Err() != nil) {
 			//! The first hop's errors belong to the handler's retry logic, and a gone client ends everything.
+			//! The hops before this one were billed, and an output limit cut here ends as a reply.
+			if callback.OnCredits != nil && totalCredits > 0 {
+				callback.OnCredits(totalCredits)
+			}
 			return err
 		}
 		openThinking := state.flush()

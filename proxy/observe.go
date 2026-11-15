@@ -397,6 +397,8 @@ func (s *observeStore) RecordTracedRequestWithCache(trace *requestTrace, account
 	s.mu.Unlock()
 	accountRates.record(accountID, rec.TS)
 	s.seq.Add(1)
+	//! A cut reply's billing event can arrive after this; it is counted where this row was.
+	trace.onLateCredits(lateCreditsApplier(s, rec))
 }
 
 func requestAPIKeyMasked(apiKeyID, apiKey string) string {

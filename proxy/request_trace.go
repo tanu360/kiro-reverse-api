@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -30,6 +31,12 @@ type requestTrace struct {
 	replayOf int64
 	// loggedID is the id of this request's log row once it is written.
 	loggedID int64
+
+	// Credits billed after the response ended (a cut reply's billing event): held in
+	// latePending until the request is logged, then counted by lateApply (cut_billing.go).
+	lateMu      sync.Mutex
+	latePending []lateCredit
+	lateApply   func(accountID string, credits float64)
 }
 
 type requestTraceKey struct{}

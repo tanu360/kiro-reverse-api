@@ -426,6 +426,31 @@ func FinalizeApiKeyUsageReservation(id string, reservedTokens int64, reservedCre
 	return ErrApiKeyNotFound
 }
 
+// AddApiKeyCredits adds credits a request was billed after its usage was finalized (the
+// billing event of a reply cut at an output limit, read in the background). It counts no call;
+// like a finished request it disables the key once its credit limit is reached.
+func AddApiKeyCredits(id string, credits float64) error {
+	if credits <= 0 {
+		return nil
+	}
+	cfgLock.Lock()
+	defer cfgLock.Unlock()
+	if cfg == nil {
+		return errors.New("config not initialized")
+	}
+	for i := range cfg.ApiKeys {
+		if cfg.ApiKeys[i].ID != id {
+			continue
+		}
+		cfg.ApiKeys[i].CreditsUsed += credits
+		if cfg.ApiKeys[i].CreditLimit > 0 && cfg.ApiKeys[i].CreditsUsed >= cfg.ApiKeys[i].CreditLimit {
+			cfg.ApiKeys[i].Enabled = false
+		}
+		return saveLocked()
+	}
+	return ErrApiKeyNotFound
+}
+
 func ResetApiKeyUsage(id string) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
