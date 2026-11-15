@@ -313,9 +313,11 @@ describe("RequestsPage", () => {
     if (!failed?.message) throw new Error("no failed row with a message");
     const item = within(list).getAllByRole("listitem")[mockDb.requests.indexOf(failed)];
     expect(item).toHaveTextContent(maskEmailsInText(failed.message));
-    expect(item).not.toHaveTextContent(/\btok\b/);
+    expect(item).not.toHaveTextContent(/\btokens?\b/);
     const success = mockDb.requests.slice(0, 25).findIndex((record) => record.success);
-    expect(within(list).getAllByRole("listitem")[success]).toHaveTextContent(/\S+ tok · \S+ cr/);
+    expect(within(list).getAllByRole("listitem")[success]).toHaveTextContent(
+      /\S+ tokens · \S+ credits/,
+    );
   });
 
   it("opens the detail sheet with the full message on row click", async () => {

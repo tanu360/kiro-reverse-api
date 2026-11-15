@@ -248,7 +248,9 @@ export function RequestCard({
   const total = record.inTokens + record.outTokens;
   const duration = formatDurationMs(record.durationMs, Boolean(record.endpoint), lang);
   const figures = [
-    failed && total === 0 ? null : t("card.tokens", { value: formatCompact(total, lang) }),
+    failed && total === 0
+      ? null
+      : t("card.tokens", { count: total, value: formatCompact(total, lang) }),
     failed && record.credits === 0
       ? null
       : t("card.credits", { value: formatCredits(record.credits, 2, lang) }),

@@ -50,7 +50,7 @@
   "outOfRange.action": "Về trang đầu",
   "memoryNote": "Đang hiển thị 200 yêu cầu gần nhất từ bộ nhớ. Lịch sử không khả dụng.",
   "loadError": "Không thể tải yêu cầu",
-  "card.tokens": "{value} token",
+  "card.tokens_other": "{value} token",
   "card.credits": "{value} credit",
   "tokens.input": "Đầu vào",
   "tokens.output": "Đầu ra",

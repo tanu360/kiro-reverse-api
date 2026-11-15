@@ -193,7 +193,10 @@ function TurnRow({
           </span>
         ) : null}
         <span className="tabular-nums">
-          {t("card.tokens", { value: formatNumber(turn.inTokens + turn.outTokens, lang) })}
+          {t("card.tokens", {
+            count: turn.inTokens + turn.outTokens,
+            value: formatNumber(turn.inTokens + turn.outTokens, lang),
+          })}
         </span>
         <span className="tabular-nums">{formatDurationMs(turn.durationMs, true, lang)}</span>
         {failovers > 0 ? (

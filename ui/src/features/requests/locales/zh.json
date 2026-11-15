@@ -50,7 +50,7 @@
   "outOfRange.action": "转到第一页",
   "memoryNote": "正在显示内存中最近 200 条请求。历史记录不可用。",
   "loadError": "无法加载请求",
-  "card.tokens": "{value} Token",
+  "card.tokens_other": "{value} Token",
   "card.credits": "{value} Credits",
   "tokens.input": "输入",
   "tokens.output": "输出",
