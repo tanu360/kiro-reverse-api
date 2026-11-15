@@ -1,0 +1,44 @@
+name: Set up the UI
+description: >-
+  Node 22 and ui/node_modules. node_modules comes whole from the cache, keyed on the lockfile and
+  package.json; a miss installs it with pnpm --frozen-lockfile and caches the result.
+
+runs:
+  using: composite
+  steps:
+    - name: Restore node_modules
+      id: modules
+      uses: actions/cache/restore@v6
+      with:
+        path: ui/node_modules
+        key: ui-node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('ui/pnpm-lock.yaml', 'ui/package.json') }}
+
+    # pnpm is needed only to install; the jobs run scripts with npm run, which every Node ships.
+    - name: Set up pnpm
+      if: steps.modules.outputs.cache-hit != 'true'
+      uses: pnpm/action-setup@v6
+      with:
+        # The pnpm version comes from the packageManager field; there is no root package.json.
+        package_json_file: ui/package.json
+
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version: 22
+        # The pnpm store helps only an install, so it is restored only on a node_modules miss.
+        cache: ${{ steps.modules.outputs.cache-hit != 'true' && 'pnpm' || '' }}
+        cache-dependency-path: ui/pnpm-lock.yaml
+
+    - name: Install UI dependencies
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ui
+      run: pnpm install --frozen-lockfile
+
+    # Saved straight after the install, before any job step writes tool caches into node_modules.
+    - name: Save node_modules
+      if: steps.modules.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ui/node_modules
+        key: ${{ steps.modules.outputs.cache-primary-key }}
