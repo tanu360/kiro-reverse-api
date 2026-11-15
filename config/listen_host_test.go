@@ -13,6 +13,9 @@ func TestHostDefaultsToLoopback(t *testing.T) {
 	if got := GetHost(); got != DefaultHost {
 		t.Fatalf("fresh install listens on %q, want %q", got, DefaultHost)
 	}
+	if got := Get().Host; got != DefaultHost {
+		t.Fatalf("fresh install stores host %q, want %q", got, DefaultHost)
+	}
 
 	// Older versions stored 0.0.0.0 for every install; it reads as the new default.
 	cfgLock.Lock()
@@ -37,6 +40,18 @@ func TestListenHostEnvironmentWins(t *testing.T) {
 	}
 	if got := GetHost(); got != "0.0.0.0" {
 		t.Fatalf("LISTEN_HOST gives %q, want 0.0.0.0", got)
+	}
+
+	// A stored legacy 0.0.0.0 never overrides LISTEN_HOST, which Docker sets.
+	cfgLock.Lock()
+	cfg.Host = legacyDefaultHost
+	cfgLock.Unlock()
+	if got := GetHost(); got != "0.0.0.0" {
+		t.Fatalf("LISTEN_HOST over a stored legacy host gives %q, want 0.0.0.0", got)
+	}
+	t.Setenv("LISTEN_HOST", "192.168.1.20")
+	if got := GetHost(); got != "192.168.1.20" {
+		t.Fatalf("LISTEN_HOST=192.168.1.20 gives %q", got)
 	}
 }
 
