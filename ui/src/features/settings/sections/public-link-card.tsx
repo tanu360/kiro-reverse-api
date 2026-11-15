@@ -59,16 +59,6 @@ export function PublicLinkCard(): JSX.Element {
   );
 }
 
-/** Whether this page itself was opened through the public link (turning it off disconnects it). */
-function openedThroughLink(url: string | undefined): boolean {
-  if (!url) return false;
-  try {
-    return new URL(url).origin === window.location.origin;
-  } catch {
-    return false;
-  }
-}
-
 function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
   const { t } = useT("settings");
   const queryClient = useQueryClient();
@@ -93,7 +83,7 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
   const enabled = pending ?? status.enabled;
 
   const toggle = async (next: boolean) => {
-    if (!next && openedThroughLink(status.url)) {
+    if (!next && status.viaLink) {
       const confirmed = await confirm({
         title: t("publicLink.offTitle"),
         description: t("publicLink.offBody"),
@@ -109,7 +99,7 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
   const signOut = async () => {
     const confirmed = await confirm({
       title: t("publicLink.signOutTitle"),
-      description: t("publicLink.signOutBody"),
+      description: t(status.viaLink ? "publicLink.signOutBodyLink" : "publicLink.signOutBody"),
       confirmLabel: t("publicLink.signOut"),
       variant: "danger",
     });
@@ -494,9 +484,23 @@ function Warnings({ status }: { status: TunnelStatus }): JSX.Element | null {
   );
 }
 
+/** The tailnet's part of a live link ("tail1234.ts.net"), or undefined while there is none. */
+function tailnetDomain(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const host = new URL(url).hostname;
+    const dot = host.indexOf(".");
+    return dot > 0 ? host.slice(dot + 1) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The device name, the first part of the link: typed as one DNS label (lowercase letters, digits,
- * hyphens) and saved on blur or Enter. A name the server refuses shows under the field.
+ * hyphens) and saved on blur or Enter; an empty field saves the default name. A name the server
+ * refuses shows under the field. A page that came through the link cannot change it: a new name
+ * moves the link, and the page with it.
  */
 function DeviceNameRow({
   status,
@@ -509,17 +513,20 @@ function DeviceNameRow({
   const inputId = useId();
   const [draft, setDraft] = useState(status.hostname);
   const [invalid, setInvalid] = useState(false);
+  const name = draft || status.defaultHostname;
+  const link = `https://${name}.${tailnetDomain(status.url) ?? "<tailnet>.ts.net"}`;
 
   const commit = () => {
-    if (draft === status.hostname) {
+    if (name === status.hostname) {
+      setDraft(name);
       setInvalid(false);
       return;
     }
-    if (!TUNNEL_HOSTNAME.test(draft)) {
+    if (!TUNNEL_HOSTNAME.test(name)) {
       setInvalid(true);
       return;
     }
-    onSave(draft, () => setInvalid(true));
+    onSave(name, () => setInvalid(true));
   };
 
   return (
@@ -529,6 +536,7 @@ function DeviceNameRow({
           <Input
             autoCapitalize="none"
             autoComplete="off"
+            disabled={status.viaLink}
             id={inputId}
             maxLength={TUNNEL_HOSTNAME_MAX}
             onBlur={commit}
@@ -547,7 +555,9 @@ function DeviceNameRow({
           />
         </FieldControl>
       }
-      description={t("publicLink.deviceNameHint", { name: draft || status.defaultHostname })}
+      description={
+        status.viaLink ? t("publicLink.deviceNameLocked") : t("publicLink.deviceNameHint", { link })
+      }
       htmlFor={inputId}
       title={t("publicLink.deviceName")}
     />

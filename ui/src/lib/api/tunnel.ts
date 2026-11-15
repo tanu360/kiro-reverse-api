@@ -48,6 +48,11 @@ export interface TunnelStatus {
   twoFactor: boolean;
   /** At least one API key is on: public API calls always need one. */
   apiKeys: boolean;
+  /**
+   * This page came through the link: a new device name or turning the link off would disconnect
+   * it, so the name is locked and the switch asks first.
+   */
+  viaLink: boolean;
 }
 
 /** One DNS label, as the server checks it (config.ValidTunnelHostname). */
@@ -118,6 +123,7 @@ function normalize(res: Partial<Record<keyof TunnelStatus, unknown>>): TunnelSta
     fallbackHelper: res.fallbackHelper === true,
     twoFactor: res.twoFactor === true,
     apiKeys: res.apiKeys === true,
+    viaLink: res.viaLink === true,
   };
 }
 

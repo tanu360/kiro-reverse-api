@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,6 +80,67 @@ func TestTunnelSettingsRefuseABadDeviceName(t *testing.T) {
 	}
 	if s := config.GetTunnelSettings(); s.Hostname != "kiro-proxy" {
 		t.Errorf("a refused name was saved: %+v", s)
+	}
+}
+
+// linkAdminRequest is adminRequest as if it came in through the public link.
+func linkAdminRequest(t *testing.T, h *Handler, method, path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, "/admin/api"+path, strings.NewReader(body))
+	req.Header.Set("X-Admin-Password", "admin-password")
+	req = req.WithContext(tunnel.WithTunnel(req.Context()))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestTunnelSaysWhetherThePageCameThroughTheLink(t *testing.T) {
+	h := setupTunnelTest(t)
+	if got := decodeTunnel(t, adminRequest(t, h, http.MethodGet, "/tunnel", "")); got.ViaLink {
+		t.Error("a local request reads as through the link")
+	}
+	if got := decodeTunnel(t, linkAdminRequest(t, h, http.MethodGet, "/tunnel", "")); !got.ViaLink {
+		t.Error("a request through the link reads as local")
+	}
+}
+
+func TestTheDeviceNameCannotChangeThroughTheLink(t *testing.T) {
+	h := setupTunnelTest(t)
+	if err := config.UpdateTunnelSettings(config.TunnelSettings{Enabled: true, Hostname: "kiro-proxy"}); err != nil {
+		t.Fatal(err)
+	}
+	rec := linkAdminRequest(t, h, http.MethodPost, "/tunnel", `{"hostname":"kiro"}`)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+	var e struct {
+		Code string `json:"code"`
+	}
+	_ = json.NewDecoder(rec.Body).Decode(&e)
+	if e.Code != codeTunnelRenameRemote {
+		t.Errorf("code %q", e.Code)
+	}
+	if s := config.GetTunnelSettings(); s.Hostname != "kiro-proxy" {
+		t.Errorf("the name changed through the link: %+v", s)
+	}
+	// The same name is no change, and a local request renames.
+	decodeTunnel(t, linkAdminRequest(t, h, http.MethodPost, "/tunnel", `{"hostname":"kiro-proxy"}`))
+	if got := decodeTunnel(t, adminRequest(t, h, http.MethodPost, "/tunnel", `{"hostname":"kiro"}`)); got.Hostname != "kiro" {
+		t.Errorf("local rename: %+v", got)
+	}
+}
+
+func TestTurningTheLinkOffThroughItAnswersAsOff(t *testing.T) {
+	h := setupTunnelTest(t)
+	if err := config.UpdateTunnelSettings(config.TunnelSettings{Enabled: true, Hostname: "kiro-proxy"}); err != nil {
+		t.Fatal(err)
+	}
+	got := decodeTunnel(t, linkAdminRequest(t, h, http.MethodPost, "/tunnel", `{"enabled":false}`))
+	if got.Enabled || got.State != tunnel.StateOff || !got.ViaLink {
+		t.Fatalf("got %+v", got)
+	}
+	if s := config.GetTunnelSettings(); s.Enabled {
+		t.Fatalf("saved %+v", s)
 	}
 }
 

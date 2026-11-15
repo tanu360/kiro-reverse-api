@@ -60,6 +60,11 @@ func fakeHelper(scenario string, args []string) int {
 	case "badproto":
 		emit(map[string]any{"protocol": 99, "state": "starting"})
 	case "crash":
+		if out := os.Getenv("KIRO_TUNNEL_FAKE_OUT"); out != "" {
+			f, _ := os.OpenFile(out, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+			_, _ = f.WriteString("run\n")
+			_ = f.Close()
+		}
 		emit(map[string]any{"state": "starting"})
 		fmt.Fprintln(os.Stderr, "kiro-tunnel: boom")
 		return 1
@@ -184,6 +189,31 @@ func TestManagerReportsTheHelpersError(t *testing.T) {
 	st := waitStatus(t, m, func(s Status) bool { return s.State == StateError })
 	if !strings.Contains(st.Error, "boom") {
 		t.Errorf("error = %q, want the helper's message", st.Error)
+	}
+}
+
+func TestTryAgainRestartsAFailedLinkNow(t *testing.T) {
+	runs := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("KIRO_TUNNEL_FAKE_OUT", runs)
+	m, _ := newTestManager(t, "crash")
+	// The helper's own retry would wait an hour, so only Apply can start it again.
+	m.opts.RestartMin, m.opts.RestartMax = time.Hour, time.Hour
+	countRuns := func() int {
+		b, _ := os.ReadFile(runs)
+		return strings.Count(string(b), "run\n")
+	}
+	m.Apply(true, "kiro-proxy")
+	waitStatus(t, m, func(s Status) bool { return s.State == StateError })
+	if n := countRuns(); n != 1 {
+		t.Fatalf("runs = %d, want 1", n)
+	}
+	m.Apply(true, "kiro-proxy")
+	deadline := time.Now().Add(15 * time.Second)
+	for countRuns() < 2 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n := countRuns(); n != 2 {
+		t.Fatalf("runs after Try again = %d, want 2", n)
 	}
 }
 

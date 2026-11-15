@@ -356,6 +356,7 @@ function tunnelStatus(): TunnelStatus {
     fallbackHelper: false,
     twoFactor: mockDb.twoFactor.enabled,
     apiKeys: mockDb.apiKeys.some((key) => key.enabled),
+    viaLink: false,
   };
   if (tunnel.pinned) return { ...base, state: "off", ...tunnel.pinned };
   if (!tunnel.enabled) return { ...base, state: "off" };

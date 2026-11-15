@@ -158,7 +158,8 @@ func (m *Manager) Status() Status {
 }
 
 // Apply turns the link on or off. A new device name while it is on restarts the helper, which
-// re-registers the device under that name.
+// re-registers the device under that name. So does Apply while the link has failed: "Try again"
+// starts it now, not after the retry delay, which grows to RestartMax.
 func (m *Manager) Apply(enabled bool, hostname string) {
 	m.applyMu.Lock()
 	defer m.applyMu.Unlock()
@@ -173,7 +174,7 @@ func (m *Manager) Apply(enabled bool, hostname string) {
 		m.setStatus(Status{State: StateOff})
 		return
 	}
-	if m.run != nil && m.hostname == hostname {
+	if m.run != nil && m.hostname == hostname && m.status.State != StateError {
 		m.mu.Unlock()
 		return
 	}

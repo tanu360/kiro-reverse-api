@@ -169,16 +169,88 @@ describe("PublicLinkCard", () => {
 
   it("asks first when turned off from a page opened through the link", async () => {
     mockDb.tunnel.enabled = true;
-    mockDb.tunnel.pinned = {
-      enabled: true,
-      state: "running",
-      url: window.location.origin,
-    };
+    mockDb.tunnel.pinned = { enabled: true, state: "running", url: LINK, viaLink: true };
     const { user } = renderWithProviders(<PublicLinkCard />);
     await user.click(await screen.findByRole("switch", { name: "Public HTTPS link" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByText("Turn off the public link?")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        "You opened this page through the link, so it disconnects. To turn the link back on, open the dashboard at its local address.",
+      ),
+    ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Turn off" }));
     await waitFor(() => expect(mockDb.tunnel.enabled).toBe(false));
+  });
+
+  it("turns off without asking on a page opened at the local address", async () => {
+    mockDb.tunnel.enabled = true;
+    mockDb.tunnel.pinned = { enabled: true, state: "running", url: LINK };
+    const { user } = renderWithProviders(<PublicLinkCard />);
+    await user.click(await screen.findByRole("switch", { name: "Public HTTPS link" }));
+    await waitFor(() => expect(mockDb.tunnel.enabled).toBe(false));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("locks the device name on a page opened through the link", async () => {
+    mockDb.tunnel.pinned = { enabled: true, state: "running", url: LINK, viaLink: true };
+    renderWithProviders(<PublicLinkCard />);
+    expect(await screen.findByRole("textbox", { name: "Device name" })).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Open the dashboard at its local address to change it. A new name moves this link, so this page would disconnect.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("says the sign-out disconnects a page opened through the link", async () => {
+    mockDb.tunnel.signedIn = true;
+    mockDb.tunnel.pinned = {
+      enabled: true,
+      signedIn: true,
+      state: "running",
+      url: LINK,
+      viaLink: true,
+    };
+    const { user } = renderWithProviders(<PublicLinkCard />);
+    await user.click(await screen.findByRole("button", { name: "Sign out of Tailscale" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(
+      within(dialog).getByText(
+        "The link stops, and this server forgets its Tailscale sign-in. You opened this page through the link, so it disconnects. Sign in again from the dashboard's local address.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the new link with the real tailnet once the link is live", async () => {
+    mockDb.tunnel.pinned = { enabled: true, state: "running", url: LINK };
+    const { user } = renderWithProviders(<PublicLinkCard />);
+    const field = await screen.findByRole("textbox", { name: "Device name" });
+    expect(screen.getByText("Your link becomes https://kiro-proxy.tail1234.ts.net.")).toBeVisible();
+    await user.clear(field);
+    await user.type(field, "kiro");
+    expect(screen.getByText("Your link becomes https://kiro.tail1234.ts.net.")).toBeVisible();
+  });
+
+  it("saves the default name when the field is emptied", async () => {
+    mockDb.tunnel.hostname = "kiro-home";
+    const { user } = renderWithProviders(<PublicLinkCard />);
+    const field = await screen.findByRole("textbox", { name: "Device name" });
+    expect(field).toHaveValue("kiro-home");
+    await user.clear(field);
+    expect(
+      screen.getByText("Your link becomes https://kiro-proxy.<tailnet>.ts.net."),
+    ).toBeVisible();
+    await user.tab();
+    await waitFor(() => expect(mockDb.tunnel.hostname).toBe("kiro-proxy"));
+    // The saved name remounts the field with it.
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Device name" })).toHaveValue("kiro-proxy"),
+    );
+    expect(
+      screen.queryByText(
+        "Use lowercase letters, digits and hyphens, starting and ending with a letter or digit.",
+      ),
+    ).not.toBeInTheDocument();
   });
 });
