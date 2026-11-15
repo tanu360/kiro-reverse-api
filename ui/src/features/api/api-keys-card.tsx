@@ -53,7 +53,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { settingsQuery } from "@/lib/api/settings";
 import type { ApiKey } from "@/lib/api/types";
 import { formatCredits, formatNumber, formatRelativeTime } from "@/lib/format";
-import { type TFunction, useT } from "@/lib/i18n";
+import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -367,8 +367,11 @@ export function ApiKeysCard(): JSX.Element {
             })}
           </span>
           <span>
+            {/* A live relative time, with the full date and time as its tooltip. */}
             {apiKey.lastUsedAt
-              ? t("keys.lastUsedLabel", { time: formatRelativeTime(apiKey.lastUsedAt, lang) })
+              ? fillNodes(t("keys.lastUsedLabel"), {
+                  time: <RelativeTime value={apiKey.lastUsedAt} />,
+                })
               : t("keys.neverUsed")}
           </span>
         </span>
@@ -383,7 +386,7 @@ export function ApiKeysCard(): JSX.Element {
       {/* The limit badge sits in the body, so the title keeps the header width beside one badge. */}
       <div className="flex flex-col items-start gap-2">
         <AccessBadges apiKey={apiKey} />
-        <KeyUsage apiKey={apiKey} />
+        <KeyUsage apiKey={apiKey} labelled />
       </div>
     </ListCard>
   );
@@ -700,8 +703,17 @@ function UsageLine({
   );
 }
 
-/** The key's limits as meters, or Unlimited; shared with the usage sheet. */
-export function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
+/**
+ * The key's limits as meters, or the infinity sign when it has none. `labelled` names that sign
+ * "Limits" in the UsageLine style, for a card, where no Usage column header says what it is.
+ */
+export function KeyUsage({
+  apiKey,
+  labelled = false,
+}: {
+  apiKey: ApiKey;
+  labelled?: boolean;
+}): JSX.Element {
   const { t, lang } = useT("api");
   const tokenLimit = apiKey.tokenLimit ?? 0;
   const creditLimit = apiKey.creditLimit ?? 0;
@@ -710,13 +722,19 @@ export function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   if (!tokenLimit && !creditLimit && !callLimit) {
     // The UsageLine size, so the column (and a card's body) never jumps from 12 to 14 px.
     return (
-      <span className="text-muted-foreground text-xs">
-        <UnlimitedMark />
+      <span
+        className="flex items-baseline gap-1.5 text-muted-foreground text-xs"
+        data-slot="key-usage-unlimited"
+      >
+        {/* The space keeps "Limits Unlimited" two words for a screen reader; flex hides it. */}
+        {labelled ? <span>{t("usage.limits")}</span> : null}
+        {labelled ? " " : null}
+        <UnlimitedMark className={labelled ? "text-foreground" : undefined} />
       </span>
     );
   }
   const tokens = (value: number) => formatNumber(value, lang);
-  const credits = (value: number) => formatCredits(value);
+  const credits = (value: number) => formatCredits(value, 2, lang);
   return (
     <div className="flex flex-col gap-2">
       <UsageLine

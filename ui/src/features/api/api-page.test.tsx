@@ -463,6 +463,28 @@ describe("ApiPage", () => {
     expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
   });
 
+  it("names a key card's limits and shows its last use as a live time", async () => {
+    await renderPage();
+    const cards = within(screen.getByRole("list", { name: "API keys" })).getAllByRole("listitem");
+    const card = (name: string) => {
+      const found = cards.find((item) => within(item).queryByText(name));
+      if (!found) throw new Error(`no card for ${name}`);
+      return found;
+    };
+    // No limits: the card names the infinity sign, which the table's Usage header names there.
+    const limits = card("local-dev").querySelector('[data-slot="key-usage-unlimited"]');
+    expect(limits).toHaveTextContent("Limits Unlimited");
+    expect(card("local-dev")).toHaveTextContent("Never used");
+    expect(row("local-dev").querySelector('[data-slot="key-usage-unlimited"]')).toHaveTextContent(
+      /^Unlimited$/,
+    );
+    // The relative time is a <time>, which keeps itself current and has the date as a tooltip.
+    const lastUsed = within(card("team-a")).getByText("5 minutes ago");
+    expect(lastUsed.tagName).toBe("TIME");
+    expect(lastUsed).toHaveAttribute("datetime");
+    expect(card("team-a")).toHaveTextContent("Last used 5 minutes ago");
+  });
+
   it("shows the seven endpoint URLs on window.location.origin", async () => {
     await renderPage();
     const list = screen.getByRole("list", { name: "Endpoints" });
