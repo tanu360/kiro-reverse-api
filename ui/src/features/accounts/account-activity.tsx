@@ -2,6 +2,7 @@ import { Time04Icon } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import type { JSX, MouseEvent } from "react";
 import { StatStrip } from "@/components/shared/stat-strip";
+import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { BadgeIcon, type BadgeProps, badgeVariants } from "@/components/ui/badge";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
@@ -222,13 +223,18 @@ export function LiveActivityStrip({
   if (!activity && query.isError) return null;
   let rpm: JSX.Element | string = EMPTY;
   if (activity) {
+    // With no per-account limit the count is out of ∞, as an unlimited API key reads.
     const value =
-      activity.rpmLimit > 0
-        ? t("live.rpmOfLimit", {
-            rpm: formatNumber(activity.rpm, lang),
-            limit: formatNumber(activity.rpmLimit, lang),
-          })
-        : formatNumber(activity.rpm, lang);
+      activity.rpmLimit > 0 ? (
+        t("live.rpmOfLimit", {
+          rpm: formatNumber(activity.rpm, lang),
+          limit: formatNumber(activity.rpmLimit, lang),
+        })
+      ) : (
+        <span>
+          {formatNumber(activity.rpm, lang)} / <UnlimitedMark />
+        </span>
+      );
     const reason = skipReason(activity);
     //! The limit counts every try, the number beside it only finished requests: the hint says why "0 / 1" can be at the limit.
     rpm = reason ? (

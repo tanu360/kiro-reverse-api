@@ -127,16 +127,18 @@ describe("LiveActivityStrip", () => {
     expect(screen.getByRole("button", { name: /^At limit/ })).toContainElement(hint);
   });
 
-  it("shows the bare count when no limit is set", async () => {
+  it("counts the minute out of ∞ when no limit is set", async () => {
     serve(activity({ a: { today: 5, rpm: 2, atLimit: false } }));
     renderWithProviders(
       <Card className="@container">
         <LiveActivityStrip accountId="a" />
       </Card>,
     );
-    expect(await screen.findByText("2")).toBeInTheDocument();
+    // The infinity sign, as an unlimited API key reads; the word is there for screen readers.
+    const value = await screen.findByText(/^2 \/$/);
+    expect(value).toHaveTextContent("2 / Unlimited");
+    expect(value.querySelector('[data-slot="unlimited"]')).not.toBeNull();
     expect(screen.queryByText("At limit")).not.toBeInTheDocument();
-    expect(screen.queryByText(/\//)).not.toBeInTheDocument();
   });
 
   it("says Cooling down with the time left while the pool skips the account after errors", async () => {
