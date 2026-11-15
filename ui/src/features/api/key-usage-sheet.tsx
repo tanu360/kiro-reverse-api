@@ -41,6 +41,7 @@ import {
 } from "@/lib/api/api-key-usage";
 import { apiKeysQuery } from "@/lib/api/api-keys";
 import {
+  EMPTY,
   formatCompact,
   formatCredits,
   formatDateTime,
@@ -296,20 +297,22 @@ export function ApiKeyUsageSheet({
               {
                 label: t("usage.failed"),
                 value:
-                  !data || (totals && totals.requests > 0)
-                    ? stat(
-                        <span className="inline-flex items-baseline gap-1.5">
-                          {formatNumber(data ? (totals?.failed ?? 0) : 12, lang)}
-                          <span className="font-normal text-meta text-muted-foreground">
-                            {formatFraction(
-                              data && totals ? totals.failed / totals.requests : 0.01,
-                              1,
-                              lang,
-                            )}
-                          </span>
-                        </span>,
-                      )
-                    : "—",
+                  !data || (totals && totals.requests > 0) ? (
+                    stat(
+                      <span className="inline-flex items-baseline gap-1.5">
+                        {formatNumber(data ? (totals?.failed ?? 0) : 12, lang)}
+                        <span className="font-normal text-meta text-muted-foreground">
+                          {formatFraction(
+                            data && totals ? totals.failed / totals.requests : 0.01,
+                            1,
+                            lang,
+                          )}
+                        </span>
+                      </span>,
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">{EMPTY}</span>
+                  ),
               },
               {
                 label: t("usage.metric.credits"),

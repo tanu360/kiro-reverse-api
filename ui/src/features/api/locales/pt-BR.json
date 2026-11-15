@@ -12,7 +12,7 @@
   "access.discard": "Descartar",
   "access.keepEditing": "Continuar editando",
   "keys.title": "Chaves de API",
-  "keys.description": "Crie uma chave por cliente. Defina limites de tokens ou créditos; 0 significa ilimitado.",
+  "keys.description": "Crie uma chave por cliente. Defina limites de tokens, créditos ou chamadas; 0 significa ilimitado.",
   "keys.metaDisabled": "{total} · {disabled} desabilitadas",
   "keys.create": "Criar chave de API",
   "keys.loadFailed": "Não foi possível carregar as chaves de API",

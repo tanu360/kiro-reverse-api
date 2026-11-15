@@ -12,7 +12,7 @@
   "access.discard": "Discard",
   "access.keepEditing": "Keep editing",
   "keys.title": "API keys",
-  "keys.description": "Create a key per client. Set token or credit limits; 0 means unlimited.",
+  "keys.description": "Create a key per client. Set token, credit or call limits; 0 means unlimited.",
   "keys.metaDisabled": "{total} · {disabled} disabled",
   "keys.create": "Create API key",
   "keys.loadFailed": "Could not load API keys",

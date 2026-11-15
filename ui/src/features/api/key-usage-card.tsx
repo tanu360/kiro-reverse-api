@@ -29,6 +29,7 @@ import { apiKeysQuery } from "@/lib/api/api-keys";
 import { settingsQuery } from "@/lib/api/settings";
 import type { ApiKey } from "@/lib/api/types";
 import {
+  EMPTY,
   formatCompact,
   formatCredits,
   formatFraction,
@@ -214,7 +215,7 @@ export function KeyUsageCard(): JSX.Element {
   };
 
   const failedCell = (row: Row): ReactNode => {
-    if (row.totals.requests === 0) return <span className="text-muted-foreground">—</span>;
+    if (row.totals.requests === 0) return <span className="text-muted-foreground">{EMPTY}</span>;
     const rate = failureRate(row.totals);
     return (
       <>
@@ -241,7 +242,7 @@ export function KeyUsageCard(): JSX.Element {
 
   // A table cell keeps the meter 8rem wide; a card gives it the card's width.
   const limitCell = (row: Row, fill = false): ReactNode => {
-    if (!row.apiKey) return <span className="text-muted-foreground">—</span>;
+    if (!row.apiKey) return <span className="text-muted-foreground">{EMPTY}</span>;
     const limit = firstLimit(row.apiKey);
     if (!limit)
       return (
@@ -286,7 +287,7 @@ export function KeyUsageCard(): JSX.Element {
     row.apiKey?.lastUsedAt ? (
       <RelativeTime value={row.apiKey.lastUsedAt} />
     ) : (
-      <span className="text-muted-foreground">—</span>
+      <span className="text-muted-foreground">{EMPTY}</span>
     );
 
   const nameCell = (row: Row): ReactNode => (
