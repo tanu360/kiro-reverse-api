@@ -9,6 +9,10 @@ import { maskEmail, maskEmailsInText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
 import { renderApp } from "@/test/render";
 import { inMemoryRequestsHandler } from "./mocks";
+// The request sheet loads the account's sheet lazily. Loading it here, before any test, lets that
+// lazy import resolve from the module cache: a cold import of the account sheet's whole module tree
+// took over 5 s on a busy CI runner and failed the test that opens it.
+import "@/features/accounts/account-detail-sheet";
 import { formatRowDate } from "./request-model";
 
 const RECENT_REQUESTS = apiUrl("/observe/recent-requests");
