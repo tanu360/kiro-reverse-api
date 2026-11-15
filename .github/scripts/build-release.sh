@@ -9,15 +9,19 @@
 # helper needs a newer Go than the proxy: it builds with GOTOOLCHAIN=$TUNNEL_GOTOOLCHAIN, or the
 # version its go.mod names, which the go command downloads when it is not installed.
 #
-# Usage: build-release.sh <out-dir>
+# Usage: build-release.sh <out-dir> [os/arch ...]
+#
+# With no targets it builds all six and writes SHA256SUMS.txt. With targets (linux/amd64, ...) it
+# builds only those and writes no checksums: the release workflow builds one target per job, at
+# the same time, and writes SHA256SUMS.txt once it has gathered all six.
 #
 # Build the admin UI first (cd ui && pnpm build): the binary embeds ui/dist. The script refuses to
 # package a binary without it, unless ALLOW_MISSING_UI=1, which is for local compile checks only.
 # Needs Go, GNU tar, gzip, zip, sha256sum and jq (a Linux host, as on the GitHub runner).
 set -euo pipefail
 
-if [ "$#" -ne 1 ] || [ -z "$1" ]; then
-  echo "usage: $0 <out-dir>" >&2
+if [ "$#" -lt 1 ] || [ -z "$1" ]; then
+  echo "usage: $0 <out-dir> [os/arch ...]" >&2
   exit 2
 fi
 
@@ -40,7 +44,22 @@ docs=(LICENSE THIRD_PARTY_NOTICES.md README.md)
 version="$(jq -r .version version.json)"
 helper_go="go$(awk '$1 == "go" { print $2; exit }' helper/kiro-tunnel/go.mod)"
 helper_toolchain="${TUNNEL_GOTOOLCHAIN:-$helper_go}"
-targets=(linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64)
+all_targets=(linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64)
+targets=("${all_targets[@]}")
+write_sums=1
+if [ "$#" -gt 1 ]; then
+  targets=("${@:2}")
+  write_sums=0
+  for target in "${targets[@]}"; do
+    case " ${all_targets[*]} " in
+    *" $target "*) ;;
+    *)
+      echo "unknown target $target; want one of: ${all_targets[*]}" >&2
+      exit 2
+      ;;
+    esac
+  done
+fi
 
 # Every archive entry gets the release commit's time, so two builds of one commit give the same
 # archives and checksums.
@@ -92,8 +111,10 @@ for target in "${targets[@]}"; do
   fi
 done
 
-(cd "$out" && sha256sum kiro-proxy-* kiro-tunnel-* >SHA256SUMS.txt)
+if [ "$write_sums" = 1 ]; then
+  (cd "$out" && sha256sum kiro-proxy-* kiro-tunnel-* >SHA256SUMS.txt)
+fi
 
 echo
 echo "release assets in $out:"
-(cd "$out" && ls -l kiro-proxy-* kiro-tunnel-* SHA256SUMS.txt)
+(cd "$out" && ls -l)

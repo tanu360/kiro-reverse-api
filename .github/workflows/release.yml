@@ -25,12 +25,15 @@ defaults:
 
 jobs:
   # Decides the tag and whether to publish. A main push whose version is already tagged stops here.
+  # Also picks the Go versions every later job builds and tests with.
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
       publish: ${{ steps.plan.outputs.publish }}
+      go: ${{ steps.go.outputs.version }}
+      tunnel-go: ${{ steps.tunnel-go.outputs.version }}
 
     steps:
       - name: Checkout
@@ -70,18 +73,6 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
 
-  build:
-    needs: plan
-    if: needs.plan.outputs.publish == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
       # go.mod says `go 1.25.0`, and go-version-file would install exactly that patch. Build with
       # the newest patch of the go.mod minor instead, as the Docker image's golang:1.25 tag does,
       # so the published binaries get the latest stdlib security fixes.
@@ -95,78 +86,121 @@ jobs:
           fi
           echo "version=$minor.x" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
-        with:
-          go-version: ${{ steps.go.outputs.version }}
-          check-latest: true
-
-      - name: Show Go version
-        run: go version
-
       # The public-link helper (helper/kiro-tunnel) is its own module and needs the newer Go that
-      # Tailscale asks for. Build it with the newest patch of its go.mod minor, which the go
-      # command downloads through GOTOOLCHAIN; fall back to the exact go.mod version when go.dev
-      # no longer lists that minor.
+      # Tailscale asks for. Build it with the newest patch of its go.mod minor; fall back to the
+      # exact go.mod version when go.dev no longer lists that minor.
       - name: Pick the helper's Go version
+        id: tunnel-go
         run: |
           exact="$(awk '$1 == "go" { print $2; exit }' helper/kiro-tunnel/go.mod)"
           minor="$(echo "$exact" | cut -d. -f1,2)"
           latest="$(curl -fsS 'https://go.dev/dl/?mode=json' |
             jq -r --arg p "go$minor." '[.[] | select(.stable) | .version | select(startswith($p))][0] // empty' || true)"
-          echo "TUNNEL_GOTOOLCHAIN=${latest:-go$exact}" >> "$GITHUB_ENV"
-          echo "helper toolchain: ${latest:-go$exact}"
+          version="${latest:-go$exact}"
+          echo "version=${version#go}" >> "$GITHUB_OUTPUT"
+          echo "helper toolchain: $version"
 
-      # The binary reports config.Version, compiled from source as in the Docker image. Refuse a
-      # tag that names another version, and keep version.json equal to config.Version.
-      - name: Check version
-        env:
-          EVENT: ${{ github.event_name }}
-          TAG: ${{ needs.plan.outputs.tag }}
-        run: |
-          version="$(jq -r .version version.json)"
-          if [ "$EVENT" = push ]; then
-            base="${TAG#v}"
-            base="${base%%-*}"
-            if [ "$base" != "$version" ]; then
-              echo "::error::Tag $TAG does not match version.json version $version"
-              exit 1
-            fi
-          fi
-          go test ./config/ -run '^TestVersionMatchesUpdateManifest$'
+  # The admin UI, built once: every binary embeds this same ui/dist. It needs nothing from plan, so
+  # it runs beside it.
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
-          # The pnpm version comes from the packageManager field; there is no root package.json.
-          package_json_file: ui/package.json
+          persist-credentials: false
 
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
+      - name: Set up the UI
+        uses: ./.github/actions/setup-ui
 
-      # Build the UI once; every binary embeds the same ui/dist.
       - name: Build UI
         working-directory: ui
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
+        run: npm run build
 
-      # A main push can release before CI on the same commit finishes, so the Go tests run here too.
-      - name: Test Go
-        run: |
-          go test ./...
-          (cd helper/kiro-tunnel && GOTOOLCHAIN="$TUNNEL_GOTOOLCHAIN" go test ./...)
+      - name: Upload UI
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-ui-dist
+          path: ui/dist
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: true
+
+  # One job per platform, all at once: each builds the helper and kiro-proxy for its platform.
+  build:
+    needs: [plan, ui]
+    if: needs.plan.outputs.publish == 'true' || github.event_name == 'workflow_dispatch'
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        target: [linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        id: go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ needs.plan.outputs.go }}
+          check-latest: true
+          # The cache below also holds the helper's toolchain and this platform's compiled packages.
+          cache: false
+
+      - name: Show Go version
+        run: go version
+
+      - name: Name the platform
+        id: platform
+        env:
+          TARGET: ${{ matrix.target }}
+        run: echo "name=${TARGET//\//-}" >> "$GITHUB_OUTPUT"
+
+      # Tailscale makes the helper the slow part of a cold build. Its compiled packages depend on the
+      # platform, the two toolchains and the two go.sum files, which the key names, so a version
+      # bump that changes neither reuses them.
+      - name: Restore Go build cache
+        id: go-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: release-go-${{ steps.platform.outputs.name }}-go${{ steps.go.outputs.go-version }}-go${{ needs.plan.outputs.tunnel-go }}-${{ hashFiles('go.sum', 'helper/kiro-tunnel/go.sum') }}
+          # A changed go.sum or toolchain starts from the newest cache of this platform.
+          restore-keys: release-go-${{ steps.platform.outputs.name }}-
+
+      - name: Download UI
+        uses: actions/download-artifact@v8
+        with:
+          name: release-ui-dist
+          path: ui/dist
 
       - name: Build binaries
-        run: .github/scripts/build-release.sh "$RUNNER_TEMP/release"
+        env:
+          TUNNEL_GOTOOLCHAIN: go${{ needs.plan.outputs.tunnel-go }}
+        run: .github/scripts/build-release.sh "$RUNNER_TEMP/release" "${{ matrix.target }}"
+
+      - name: Save Go build cache
+        if: steps.go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
       # Run the linux-x64 binary straight from its archive and check that it serves the admin UI
       # and reports the release version. The server log is printed only on failure.
       - name: Smoke test linux-x64 binary
+        if: matrix.target == 'linux/amd64'
         run: |
           smoke="$RUNNER_TEMP/smoke"
           mkdir -p "$smoke"
@@ -194,6 +228,112 @@ jobs:
       - name: Upload binaries
         uses: actions/upload-artifact@v7
         with:
+          name: binaries-${{ steps.platform.outputs.name }}
+          path: ${{ runner.temp }}/release
+          retention-days: 1
+          if-no-files-found: error
+          # The archives are compressed already.
+          compression-level: 0
+
+  # A main push can release before CI on the same commit finishes, so the Go tests run here too,
+  # beside the builds, split as in CI. Each test runs in exactly one shard.
+  test-go:
+    needs: plan
+    if: needs.plan.outputs.publish == 'true' || github.event_name == 'workflow_dispatch'
+    name: Test Go (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        shard: [1, 2]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ needs.plan.outputs.go }}
+          check-latest: true
+
+      # The binary reports config.Version, compiled from source as in the Docker image. Refuse a
+      # tag that names another version, and keep version.json equal to config.Version.
+      - name: Check version
+        if: matrix.shard == 1
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          version="$(jq -r .version version.json)"
+          if [ "$EVENT" = push ]; then
+            base="${TAG#v}"
+            base="${base%%-*}"
+            if [ "$base" != "$version" ]; then
+              echo "::error::Tag $TAG does not match version.json version $version"
+              exit 1
+            fi
+          fi
+          go test ./config/ -run '^TestVersionMatchesUpdateManifest$'
+
+      - name: Test Go
+        run: .github/scripts/go-test-shard.sh ${{ matrix.shard }} 2
+
+  test-helper:
+    needs: plan
+    if: needs.plan.outputs.publish == 'true' || github.event_name == 'workflow_dispatch'
+    name: Test tunnel helper
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ needs.plan.outputs.tunnel-go }}
+          cache-dependency-path: helper/kiro-tunnel/go.sum
+
+      - name: Test tunnel helper
+        working-directory: helper/kiro-tunnel
+        run: go test ./...
+
+  # Gathers the six platforms' files into one artifact with their checksums. A dry run stops here.
+  collect:
+    needs: [build, test-go, test-helper]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v8
+        with:
+          pattern: binaries-*
+          path: ${{ runner.temp }}/release
+          merge-multiple: true
+
+      - name: Write checksums
+        working-directory: ${{ runner.temp }}/release
+        run: |
+          shopt -s nullglob
+          assets=(kiro-proxy-* kiro-tunnel-*)
+          if [ "${#assets[@]}" -ne 12 ]; then
+            echo "::error::Expected 6 archives and 6 helpers, found ${#assets[@]} files"
+            ls -l
+            exit 1
+          fi
+          sha256sum "${assets[@]}" >SHA256SUMS.txt
+          ls -l
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v7
+        with:
           name: kiro-proxy-binaries
           path: ${{ runner.temp }}/release
           retention-days: 7
@@ -201,10 +341,8 @@ jobs:
           # The archives are compressed already.
           compression-level: 0
 
-  # Only this job holds a write token, and it runs no project code: the build above, with its
-  # package installs, gets read access only.
   publish:
-    needs: [plan, build]
+    needs: [plan, collect]
     if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
