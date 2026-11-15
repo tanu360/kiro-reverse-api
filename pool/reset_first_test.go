@@ -127,6 +127,25 @@ func TestResetFirstAffinityKeepsSameDayAndMovesToEarlierReset(t *testing.T) {
 	}
 }
 
+// A conversation bound to an account that ran out of credits (serving through over-usage) moves
+// to an account with credits left, even one whose credits reset later.
+func TestResetFirstAffinityLeavesAnAccountWithoutCredits(t *testing.T) {
+	useRoutingMode(t, config.RoutingModeResetFirst)
+	if err := config.UpdateAllowOverUsage(true); err != nil {
+		t.Fatalf("allow over usage: %v", err)
+	}
+	t.Cleanup(func() { _ = config.UpdateAllowOverUsage(false) })
+	p := newTestPool(resetAccount("spent", 2, 500, 500), resetAccount("left", 9, 100, 500))
+	if acc := p.GetPreferredForModelExcluding("spent", "", nil); acc == nil || acc.ID != "left" {
+		t.Fatalf("bound account without credits: picked %v, want left", acc)
+	}
+	// It keeps the conversation while the account with credits cannot serve.
+	p.cooldowns["left"] = time.Now().Add(time.Minute)
+	if acc := p.GetPreferredForModelExcluding("spent", "", nil); acc == nil || acc.ID != "spent" {
+		t.Fatalf("only the spent account can serve: picked %v, want spent", acc)
+	}
+}
+
 func TestScopeModeOverridesTheGlobalMode(t *testing.T) {
 	useRoutingMode(t, config.RoutingModeWeighted)
 	p := newTestPool(
