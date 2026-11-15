@@ -1,5 +1,5 @@
 {
-  "version": "3.5.2",
-  "changelog": "🛟 The public link keeps working when this version's Tailscale helper cannot be downloaded, for example while its release is still publishing: the server runs the helper it downloaded for an earlier version, and the card says so. The next start switches to this version's helper once it is published.\n🧩 A build from source with no helper on disk takes the latest release's helper, checked against that release's checksums.\n💬 A missing helper now shows a plain message instead of a download address.",
+  "version": "3.5.3",
+  "changelog": "⏳ The public link card shows when Tailscale will sign this server out (after 180 days by default) and links to the device's page in the Tailscale admin console to turn key expiry off. The line goes away once it is off.\n🔒 A page opened through the public link can no longer change the device name, which would move the link out from under it. Turning the link off or signing out from there now says the page will disconnect, and no longer reports a failed save.\n🔁 Try again on a failed public link restarts it right away, and an emptied device name saves the default name.\n🎨 Notice buttons are outlines in the notice's colour, and the settings list marks only the sections that are on.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
