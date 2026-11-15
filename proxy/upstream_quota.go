@@ -121,9 +121,34 @@ func setUpstreamRetryAfter(w http.ResponseWriter, err error) {
 	}
 }
 
+// isContextOverflowError reports whether Kiro refused the input as longer than the model's
+// context window: generateAssistantResponse answers 400 CONTENT_LENGTH_EXCEEDS_THRESHOLD
+// ("Input content length exceeds threshold." or "Input is too long."), and CreateResponse's
+// 413 or context_length_exceeded reads the same way (responsesFailure.proxyError).
+func isContextOverflowError(err error) bool {
+	var client *upstreamClientError
+	if !errors.As(err, &client) {
+		return false
+	}
+	return strings.Contains(client.message, "CONTENT_LENGTH_EXCEEDS_THRESHOLD") || strings.Contains(client.message, "Input is too long")
+}
+
+// claudeContextOverflowPrefix starts the Anthropic error for an input over the context window,
+// as the API words it ("prompt is too long: 215000 tokens > 200000 maximum"): Claude Code looks
+// for it to compact the conversation and try again.
+const claudeContextOverflowPrefix = "prompt is too long: "
+
+// openAIContextOverflowCode is OpenAI's error code for an input over the context window, which
+// Codex and the SDKs check to compact or trim the conversation.
+const openAIContextOverflowCode = "context_length_exceeded"
+
 func (h *Handler) sendClaudeUpstreamError(w http.ResponseWriter, err error) {
 	setUpstreamRetryAfter(w, err)
-	h.sendClaudeError(w, upstreamFailureStatus(err), claudeUpstreamErrorType(err), upstreamErrorText(err))
+	message := upstreamErrorText(err)
+	if isContextOverflowError(err) {
+		message = claudeContextOverflowPrefix + message
+	}
+	h.sendClaudeError(w, upstreamFailureStatus(err), claudeUpstreamErrorType(err), message)
 }
 
 // claudeUpstreamErrorType is the Anthropic error type for an upstream failure.
@@ -145,6 +170,10 @@ func (h *Handler) sendOpenAIUpstreamError(w http.ResponseWriter, err error) {
 	}
 	if upstreamFailureStatus(err) == 429 {
 		kind = "rate_limit_error"
+	}
+	if isContextOverflowError(err) {
+		h.writeOpenAIError(w, upstreamFailureStatus(err), kind, upstreamErrorText(err), openAIContextOverflowCode, nil)
+		return
 	}
 	h.sendOpenAIError(w, upstreamFailureStatus(err), kind, upstreamErrorText(err))
 }

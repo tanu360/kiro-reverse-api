@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -50,5 +51,68 @@ func TestUpstreamQuotaPreservesStatusHintAndCooldown(t *testing.T) {
 				t.Fatalf("missing %q in logs:\n%s", want, logs)
 			}
 		})
+	}
+}
+
+// Kiro's refusal of an input over the context window, as recorded live on both chat APIs.
+func contextOverflowErrors(t *testing.T) map[string]error {
+	t.Helper()
+	body := []byte(`{"message":"Input content length exceeds threshold.","reason":"CONTENT_LENGTH_EXCEEDS_THRESHOLD"}`)
+	return map[string]error{
+		"generateAssistantResponse": &upstreamClientError{status: http.StatusBadRequest, message: "HTTP 400 from AmazonQ: " + string(body)},
+		"CreateResponse":            responsesHTTPFailure(http.StatusRequestEntityTooLarge, http.Header{}, body, time.Now()),
+	}
+}
+
+func TestContextOverflowReadsAsPromptTooLongForClaude(t *testing.T) {
+	for name, err := range contextOverflowErrors(t) {
+		t.Run(name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			(&Handler{}).sendClaudeUpstreamError(rec, err)
+			var body struct {
+				Error struct{ Type, Message string } `json:"error"`
+			}
+			if jsonErr := json.Unmarshal(rec.Body.Bytes(), &body); jsonErr != nil {
+				t.Fatal(jsonErr)
+			}
+			if rec.Code != http.StatusBadRequest || body.Error.Type != "invalid_request_error" || !strings.HasPrefix(body.Error.Message, "prompt is too long: ") {
+				t.Fatalf("status %d body %s, want a 400 invalid_request_error starting \"prompt is too long: \"", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestContextOverflowCarriesOpenAIsCode(t *testing.T) {
+	for name, err := range contextOverflowErrors(t) {
+		t.Run(name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			(&Handler{}).sendOpenAIUpstreamError(rec, err)
+			var body struct {
+				Error struct {
+					Type string  `json:"type"`
+					Code *string `json:"code"`
+				} `json:"error"`
+			}
+			if jsonErr := json.Unmarshal(rec.Body.Bytes(), &body); jsonErr != nil {
+				t.Fatal(jsonErr)
+			}
+			if rec.Code != http.StatusBadRequest || body.Error.Type != "invalid_request_error" || body.Error.Code == nil || *body.Error.Code != "context_length_exceeded" {
+				t.Fatalf("status %d body %s, want 400 with code context_length_exceeded", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestOtherClientErrorsKeepTheirText(t *testing.T) {
+	err := &upstreamClientError{status: http.StatusBadRequest, message: `HTTP 400 from Kiro IDE: {"message":"Improperly formed request.","reason":null}`}
+	rec := httptest.NewRecorder()
+	(&Handler{}).sendClaudeUpstreamError(rec, err)
+	if strings.Contains(rec.Body.String(), "prompt is too long") {
+		t.Fatalf("a malformed request is not an over-long prompt: %s", rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	(&Handler{}).sendOpenAIUpstreamError(rec, err)
+	if strings.Contains(rec.Body.String(), "context_length_exceeded") {
+		t.Fatalf("a malformed request is not over the context window: %s", rec.Body.String())
 	}
 }

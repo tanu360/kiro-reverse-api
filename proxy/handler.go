@@ -2538,12 +2538,17 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *Handler) sendOpenAIError(w http.ResponseWriter, status int, errType, message string) {
+	code, param := openAIErrorCode(status, message)
+	h.writeOpenAIError(w, status, errType, message, code, param)
+}
+
+// writeOpenAIError writes an OpenAI error body with the code and param given.
+func (h *Handler) writeOpenAIError(w http.ResponseWriter, status int, errType, message string, code, param interface{}) {
 	if noRetryStatus(status) {
 		markNoRetry(w)
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	code, param := openAIErrorCode(status, message)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"error": map[string]interface{}{
 			"type":    errType,
