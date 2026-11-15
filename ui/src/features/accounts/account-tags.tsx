@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatNumber } from "@/lib/format";
@@ -43,8 +44,9 @@ export function TagBadges({
           size="sm"
           tone="neutral"
         >
-          {/* Where pills wrap, a tag shows whole (24 characters at most) and cuts only past a line. */}
-          <span className={cn("min-w-0 truncate", !wrap && "max-w-24")}>{mask(tag)}</span>
+          {/* Where pills wrap, a tag shows whole (24 characters at most) and cuts only past a line.
+              A cut tag shows in full in a tooltip. */}
+          <TruncatedText className={cn(!wrap && "max-w-24")}>{mask(tag)}</TruncatedText>
         </Badge>
       ))}
       {rest.length > 0 ? (
