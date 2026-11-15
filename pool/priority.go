@@ -8,7 +8,7 @@ import (
 
 // firstByPriorityLocked is the priority routing mode's pick: of the accounts
 // that can serve model right now (canServeLocked: not excluded, model listed,
-// no cooldown, usable token, within its limit), the one with the lowest
+// no cooldown, usable token, within its limit), the one with the highest
 // Priority, ties going to the earliest in the account list. Nil when none can.
 //
 // It scans the pool in place on every pick, so there is no second ordering to
@@ -34,8 +34,8 @@ func (p *AccountPool) bestByPriorityLocked(model string, excluded map[string]boo
 	var best *config.Account
 	for i := range p.accounts {
 		acc := &p.accounts[i]
-		//! Strictly lower only: an equal priority later in the list never displaces the earlier one.
-		if best != nil && acc.Priority >= best.Priority {
+		//! Strictly higher only: an equal priority later in the list never displaces the earlier one.
+		if best != nil && acc.Priority <= best.Priority {
 			continue
 		}
 		if !p.canServeLocked(acc, model, excluded, now, allowOverUsage) {
@@ -48,7 +48,7 @@ func (p *AccountPool) bestByPriorityLocked(model string, excluded map[string]boo
 
 // outrankedLocked reports whether the routing mode takes a conversation off
 // bound, its session affinity account. In priority mode, an account with a
-// lower Priority number can serve model right now; an account of the same
+// higher Priority number can serve model right now; an account of the same
 // priority never outranks bound, so the conversation keeps its prompt cache.
 // In reset-first mode, an account that ranks above bound on credits left or on
 // its reset day can serve (resetOutranks). Always false in weighted mode.
@@ -56,7 +56,7 @@ func (p *AccountPool) outrankedLocked(bound *config.Account, model string, exclu
 	switch mode {
 	case config.RoutingModePriority:
 		best := p.bestByPriorityLocked(model, excluded)
-		return best != nil && best.Priority < bound.Priority
+		return best != nil && best.Priority > bound.Priority
 	case config.RoutingModeResetFirst:
 		best := p.bestByResetLocked(model, excluded, time.Now())
 		return best != nil && resetOutranks(*best, *bound, time.Now())

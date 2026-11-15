@@ -87,7 +87,7 @@ func TestRPMLimitAppliesInPriorityMode(t *testing.T) {
 		t.Fatalf("UpdateRoutingMode: %v", err)
 	}
 	t.Cleanup(func() { _ = config.UpdateRoutingMode(config.RoutingModeWeighted) })
-	p := newTestPool(config.Account{ID: "a", Priority: 0}, config.Account{ID: "b", Priority: 1})
+	p := newTestPool(config.Account{ID: "a", Priority: 1}, config.Account{ID: "b", Priority: 0})
 
 	got := pickIDs(p, 5)
 	want := []string{"a", "a", "b", "b", ""}

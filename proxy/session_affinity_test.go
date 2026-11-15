@@ -177,15 +177,15 @@ func TestSessionAffinityDefaultsOn(t *testing.T) {
 }
 
 // priorityAffinityHandler is affinityTestHandler in priority routing mode with
-// prio-top at priority 0 and prio-low at priority 3.
+// prio-top at priority 3 and prio-low at priority 0.
 func priorityAffinityHandler(t *testing.T) *Handler {
 	t.Helper()
 	if err := config.Init(tempDBPath(t)); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
 	for _, acc := range []config.Account{
-		{ID: "prio-low", Email: "prio-low@example.com", Enabled: true, Priority: 3},
-		{ID: "prio-top", Email: "prio-top@example.com", Enabled: true, Priority: 0},
+		{ID: "prio-low", Email: "prio-low@example.com", Enabled: true, Priority: 0},
+		{ID: "prio-top", Email: "prio-top@example.com", Enabled: true, Priority: 3},
 	} {
 		if err := config.AddAccount(acc); err != nil {
 			t.Fatalf("AddAccount: %v", err)
@@ -213,7 +213,7 @@ func TestPickAccountPriorityModeMovesConversationToHigherPriority(t *testing.T) 
 	if acc == nil || acc.ID != "prio-top" {
 		t.Fatalf("bound turn went to %v, want prio-top", acc)
 	}
-	want := "[SessionAffinity] Conversation moved from bound account prio-low@example.com (priority 3) to higher-priority account prio-top@example.com (priority 0)"
+	want := "[SessionAffinity] Conversation moved from bound account prio-low@example.com (priority 0) to higher-priority account prio-top@example.com (priority 3)"
 	if !strings.Contains(logs.String(), want) {
 		t.Fatalf("missing %q in logs:\n%s", want, logs)
 	}

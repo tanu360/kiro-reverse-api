@@ -483,7 +483,7 @@ export interface Account {
   machineId: string;
   /** 0 = unset (effective weight 1) */
   weight: number;
-  /** 0..999, lower first; only used in the priority routing mode */
+  /** 0..999, higher first (default 0); only used in the priority routing mode */
   priority: number;
   overageStatus: OverageStatus;
   /** 'NOT_OVERAGE_CAPABLE' | 'OVERAGE_CAPABLE' | '' */
@@ -1182,7 +1182,7 @@ export interface ApiKeyRegenerateResponse {
 
 /**
  * How the pool picks the account for a new request: `weighted` round-robin (the default),
- * `priority`, the available account with the lowest Account.priority, or `reset_first`, the
+ * `priority`, the available account with the highest Account.priority, or `reset_first`, the
  * available account with credits left whose credits reset soonest (ties: more credits left).
  */
 export type RoutingMode = "weighted" | "priority" | "reset_first";

@@ -130,9 +130,9 @@ func TestResetFirstAffinityKeepsSameDayAndMovesToEarlierReset(t *testing.T) {
 func TestScopeModeOverridesTheGlobalMode(t *testing.T) {
 	useRoutingMode(t, config.RoutingModeWeighted)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 5, NextResetDate: inDays(9), UsageLimit: 500},
-		config.Account{ID: "b", Priority: 0, NextResetDate: inDays(30), UsageLimit: 500},
-		config.Account{ID: "c", Priority: 9, NextResetDate: inDays(2), UsageLimit: 500},
+		config.Account{ID: "a", Priority: 4, NextResetDate: inDays(9), UsageLimit: 500},
+		config.Account{ID: "b", Priority: 9, NextResetDate: inDays(30), UsageLimit: 500},
+		config.Account{ID: "c", Priority: 0, NextResetDate: inDays(2), UsageLimit: 500},
 	)
 	reset := Scope{Mode: config.RoutingModeResetFirst}
 	for i := 0; i < 3; i++ {

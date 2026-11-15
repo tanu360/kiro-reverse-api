@@ -155,7 +155,7 @@ func effectiveRoutingMode(keyMode string) string {
 // the turn moved by priority whether or not the bound account could serve. In
 // reset-first mode the same holds for an account whose credits reset sooner.
 func logAffinityMove(bound *config.Account, boundID string, picked *config.Account, mode string) {
-	if bound != nil && mode == config.RoutingModePriority && picked.Priority < bound.Priority {
+	if bound != nil && mode == config.RoutingModePriority && picked.Priority > bound.Priority {
 		logger.Debugf("[SessionAffinity] Conversation moved from bound account %s (priority %d) to higher-priority account %s (priority %d)", bound.Email, bound.Priority, picked.Email, picked.Priority)
 		return
 	}

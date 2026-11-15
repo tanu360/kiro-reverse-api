@@ -15,7 +15,7 @@ const MIN_PRIORITY = 0;
 const MAX_PRIORITY = 999;
 
 /**
- * 0..999, lower first in the priority routing mode; sent as a JSON number (the server answers
+ * 0..999, higher first in the priority routing mode; sent as a JSON number (the server answers
  * 400 priority_range for anything else). Shown in both modes, so the order can be set before
  * switching to priority.
  */

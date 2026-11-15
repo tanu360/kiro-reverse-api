@@ -45,11 +45,11 @@ func wantAll(t *testing.T, got []string, want string) {
 	}
 }
 
-func TestPriorityModePicksLowestPriorityFirst(t *testing.T) {
+func TestPriorityModePicksHighestPriorityFirst(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 2},
-		config.Account{ID: "b", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 2},
 		config.Account{ID: "c", Priority: 1},
 	)
 	wantAll(t, picks(p, 5, "", nil), "b")
@@ -61,9 +61,9 @@ func TestPriorityModePicksLowestPriorityFirst(t *testing.T) {
 func TestPriorityModeTiesKeepListOrder(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 1},
-		config.Account{ID: "b", Priority: 0},
-		config.Account{ID: "c", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 1},
+		config.Account{ID: "c", Priority: 1},
 	)
 	wantAll(t, picks(p, 5, "", nil), "b")
 
@@ -75,8 +75,8 @@ func TestPriorityModeTiesKeepListOrder(t *testing.T) {
 func TestPriorityModeFallsThroughCooldown(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 2},
-		config.Account{ID: "b", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 2},
 		config.Account{ID: "c", Priority: 1},
 	)
 	p.cooldowns["b"] = time.Now().Add(time.Minute)
@@ -93,8 +93,8 @@ func TestPriorityModeFallsThroughCooldown(t *testing.T) {
 func TestPriorityModeFallsThroughExcluded(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 2},
-		config.Account{ID: "b", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 2},
 		config.Account{ID: "c", Priority: 1},
 	)
 	// A retry within one request excludes the accounts that already failed it.
@@ -105,8 +105,8 @@ func TestPriorityModeFallsThroughExcluded(t *testing.T) {
 func TestPriorityModeFallsThroughUnsupportedModel(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 2},
-		config.Account{ID: "b", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 2},
 		config.Account{ID: "c", Priority: 1},
 	)
 	p.SetModelList("b", []string{"claude-haiku-4.5"})
@@ -120,16 +120,16 @@ func TestPriorityModeFallsThroughOverLimitAndUnusableToken(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	expired := time.Now().Add(-time.Hour).Unix()
 	p := newTestPool(
-		config.Account{ID: "over", Priority: 0, UsageCurrent: 50, UsageLimit: 50},
+		config.Account{ID: "over", Priority: 2, UsageCurrent: 50, UsageLimit: 50},
 		config.Account{ID: "stale", Priority: 1, ExpiresAt: expired},
-		config.Account{ID: "ok", Priority: 2},
+		config.Account{ID: "ok", Priority: 0},
 	)
 	wantAll(t, picks(p, 3, "", nil), "ok")
 
 	// Upstream overage keeps an over-limit account in its rank, as in weighted mode.
 	p = newTestPool(
-		config.Account{ID: "over", Priority: 0, UsageCurrent: 50, UsageLimit: 50, OverageStatus: "ENABLED"},
-		config.Account{ID: "ok", Priority: 1},
+		config.Account{ID: "over", Priority: 1, UsageCurrent: 50, UsageLimit: 50, OverageStatus: "ENABLED"},
+		config.Account{ID: "ok", Priority: 0},
 	)
 	wantAll(t, picks(p, 3, "", nil), "over")
 }
@@ -137,8 +137,8 @@ func TestPriorityModeFallsThroughOverLimitAndUnusableToken(t *testing.T) {
 func TestPriorityModeSkipsDisabledAfterReload(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	for _, acc := range []config.Account{
-		{ID: "a", Enabled: true, Priority: 0},
-		{ID: "b", Enabled: true, Priority: 1},
+		{ID: "a", Enabled: true, Priority: 1},
+		{ID: "b", Enabled: true, Priority: 0},
 	} {
 		if err := config.AddAccount(acc); err != nil {
 			t.Fatalf("add %s: %v", acc.ID, err)
@@ -167,8 +167,8 @@ func TestPriorityModeSkipsDisabledAfterReload(t *testing.T) {
 func TestPriorityModeIgnoresWeightDuplicates(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	for _, acc := range []config.Account{
-		{ID: "heavy", Enabled: true, Weight: 5, Priority: 1},
-		{ID: "light", Enabled: true, Priority: 0},
+		{ID: "heavy", Enabled: true, Weight: 5, Priority: 0},
+		{ID: "light", Enabled: true, Priority: 1},
 	} {
 		if err := config.AddAccount(acc); err != nil {
 			t.Fatalf("add %s: %v", acc.ID, err)
@@ -183,6 +183,21 @@ func TestPriorityModeIgnoresWeightDuplicates(t *testing.T) {
 
 	p.cooldowns["light"] = time.Now().Add(time.Minute)
 	wantAll(t, picks(p, 3, "", nil), "heavy")
+}
+
+// The owner's case: every account at the default 0, and one raised to prefer it.
+// Only that one account changes; the rest keep the list order behind it.
+func TestPriorityModeRaisingOneAccountPrefersIt(t *testing.T) {
+	useRoutingMode(t, config.RoutingModePriority)
+	p := newTestPool(config.Account{ID: "x"}, config.Account{ID: "y"}, config.Account{ID: "z", Priority: 1})
+	wantAll(t, picks(p, 3, "", nil), "z")
+
+	p.cooldowns["z"] = time.Now().Add(time.Minute)
+	wantAll(t, picks(p, 3, "", nil), "x")
+
+	// 999 is the top of the range and beats every lower number.
+	p = newTestPool(config.Account{ID: "x", Priority: 998}, config.Account{ID: "y", Priority: config.MaxAccountPriority})
+	wantAll(t, picks(p, 3, "", nil), "y")
 }
 
 func TestPriorityModeReturnsNilWhenNoneAvailable(t *testing.T) {
@@ -202,13 +217,13 @@ func TestPriorityModeReturnsNilWhenNoneAvailable(t *testing.T) {
 }
 
 // Priority wins over session affinity: a running conversation leaves its
-// account as soon as an account with a better (lower) priority can serve, and
+// account as soon as an account with a better (higher) priority can serve, and
 // falls to the next account in priority order when its own cannot.
 func TestPriorityModeBoundConversationReturnsToHigherPriority(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 2},
-		config.Account{ID: "b", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 2},
 		config.Account{ID: "c", Priority: 1},
 	)
 	// The conversation landed on a while b and c were cooling down.
@@ -250,9 +265,9 @@ func TestPriorityModeBoundConversationReturnsToHigherPriority(t *testing.T) {
 func TestPriorityModeBoundConversationStaysOnEqualPriority(t *testing.T) {
 	useRoutingMode(t, config.RoutingModePriority)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 1},
-		config.Account{ID: "b", Priority: 1},
-		config.Account{ID: "c", Priority: 3},
+		config.Account{ID: "a", Priority: 3},
+		config.Account{ID: "b", Priority: 3},
+		config.Account{ID: "c", Priority: 1},
 	)
 	for i := 0; i < 3; i++ {
 		if acc := p.GetPreferredForModelExcluding("b", "", nil); acc == nil || acc.ID != "b" {
@@ -271,8 +286,8 @@ func TestPriorityModeBoundConversationStaysOnEqualPriority(t *testing.T) {
 func TestPriorityModeBoundConversationStaysWhenHigherCannotServe(t *testing.T) {
 	newPool := func() *AccountPool {
 		return newTestPool(
-			config.Account{ID: "top", Priority: 0},
-			config.Account{ID: "bound", Priority: 5},
+			config.Account{ID: "top", Priority: 5},
+			config.Account{ID: "bound", Priority: 0},
 		)
 	}
 	wantBound := func(t *testing.T, acc *config.Account, why string) {
@@ -326,8 +341,8 @@ func TestPriorityModeBoundConversationStaysWhenHigherCannotServe(t *testing.T) {
 func TestWeightedModeBoundConversationIgnoresPriority(t *testing.T) {
 	useRoutingMode(t, config.RoutingModeWeighted)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 2},
-		config.Account{ID: "b", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 2},
 	)
 	for i := 0; i < 3; i++ {
 		if acc := p.GetPreferredForModelExcluding("a", "", nil); acc == nil || acc.ID != "a" {
@@ -339,9 +354,9 @@ func TestWeightedModeBoundConversationIgnoresPriority(t *testing.T) {
 func TestPriorityModeLeavesRotationCursorAlone(t *testing.T) {
 	useRoutingMode(t, config.RoutingModeWeighted)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 2},
+		config.Account{ID: "a", Priority: 0},
 		config.Account{ID: "b", Priority: 1},
-		config.Account{ID: "c", Priority: 0},
+		config.Account{ID: "c", Priority: 2},
 	)
 	if acc := p.GetNext(); acc.ID != "a" {
 		t.Fatalf("first weighted pick = %s, want a", acc.ID)
@@ -363,8 +378,8 @@ func TestPriorityModeLeavesRotationCursorAlone(t *testing.T) {
 func TestWeightedModeIgnoresPriority(t *testing.T) {
 	useRoutingMode(t, config.RoutingModeWeighted)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 2},
-		config.Account{ID: "b", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 2},
 		config.Account{ID: "c", Priority: 1},
 	)
 	got := picks(p, 6, "", nil)
@@ -379,8 +394,8 @@ func TestWeightedModeIgnoresPriority(t *testing.T) {
 func TestRoutingModeSwitchAppliesWithoutReload(t *testing.T) {
 	useRoutingMode(t, config.RoutingModeWeighted)
 	p := newTestPool(
-		config.Account{ID: "a", Priority: 1},
-		config.Account{ID: "b", Priority: 0},
+		config.Account{ID: "a", Priority: 0},
+		config.Account{ID: "b", Priority: 1},
 	)
 	if acc := p.GetNext(); acc.ID != "a" {
 		t.Fatalf("weighted pick = %s, want a", acc.ID)

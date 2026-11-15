@@ -206,7 +206,7 @@
   "detail.weight": "Peso",
   "detail.weightHint": "0 ou 1 é o normal. Uma conta com peso N recebe cerca de N vezes mais requisições novas.",
   "detail.priority": "Prioridade",
-  "detail.priorityHint": "De 0 a 999. No roteamento por prioridade, um número menor recebe requisições novas primeiro. Contas com o mesmo número seguem a ordem da lista.",
+  "detail.priorityHint": "De 0 a 999. No roteamento por prioridade, um número maior recebe requisições novas primeiro. Toda conta começa em 0, e contas com o mesmo número seguem a ordem da lista.",
   "detail.overage": "Excedente (AWS)",
   "detail.overageRefresh": "Sincronizar com a AWS",
   "detail.overageSwitch": "Habilitar excedente no upstream",

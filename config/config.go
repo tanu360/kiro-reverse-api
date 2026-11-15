@@ -58,7 +58,8 @@ type Account struct {
 	ProxyURL string `json:"proxyURL,omitempty"`
 
 	Weight int `json:"weight,omitempty"`
-	//! Priority orders accounts in the priority routing mode: 0..999, lower first, ties in list order.
+	//! Priority orders accounts in the priority routing mode: 0..999, higher first, ties in list order.
+	//! Configs saved when lower went first are turned around once (priority_order.go).
 	Priority int `json:"priority,omitempty"`
 
 	OverageStatus     string  `json:"overageStatus,omitempty"`
@@ -183,6 +184,9 @@ type Config struct {
 	SessionAffinity *bool `json:"sessionAffinity,omitempty"`
 
 	RoutingMode string `json:"routingMode,omitempty"`
+	// PriorityHigherFirst records that Account.Priority means higher first. A config
+	// without it was saved when lower went first; migratePriorityOrder turns it around once.
+	PriorityHigherFirst bool `json:"priorityHigherFirst,omitempty"`
 
 	AccountRPMLimit int `json:"accountRpmLimit,omitempty"`
 
@@ -314,6 +318,10 @@ func Init(path string) error {
 	if err := migrateAccountRows(); err != nil {
 		logger.Errorf("[Accounts] Could not move the accounts to their own table: %v", err)
 	}
+	//! Not fatal either: the config still lacks the mark, so the next start tries again.
+	if err := migratePriorityOrder(); err != nil {
+		logger.Errorf("[Accounts] Could not turn the account priorities around to higher first: %v", err)
+	}
 	warnUnservedAPIKeyRegions()
 
 	return nil
@@ -343,6 +351,7 @@ func Load() error {
 			Host:                    DefaultHost,
 			RequireApiKey:           false,
 			Accounts:                []Account{},
+			PriorityHigherFirst:     true,
 		}
 		if err := saveLocked(); err != nil {
 			return err

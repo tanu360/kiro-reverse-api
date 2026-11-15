@@ -5,7 +5,7 @@ import "errors"
 // Routing modes: how the pool picks the account for a new request.
 //   - weighted: round-robin over the enabled accounts, an account with weight N
 //     taking N slots of the rotation. The default.
-//   - priority: the first account that can serve, in ascending Account.Priority
+//   - priority: the first account that can serve, in descending Account.Priority
 //     order (ties keep the account-list order). Weight is ignored.
 //   - reset_first: the account whose credits reset soonest (NextResetDate),
 //     among those with credits left; ties go to the one with more credits
@@ -15,7 +15,7 @@ const (
 	RoutingModePriority   = "priority"
 	RoutingModeResetFirst = "reset_first"
 
-	// MaxAccountPriority bounds Account.Priority (0..999, lower is tried first).
+	// MaxAccountPriority bounds Account.Priority (0..999, higher is tried first).
 	MaxAccountPriority = 999
 )
 

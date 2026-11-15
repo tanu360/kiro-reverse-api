@@ -49,7 +49,7 @@
   "routingMode.weighted": "加权",
   "routingMode.priority": "优先级",
   "routingMode.weightedHint": "新请求在已启用的账号间轮询。权重为 2 的账号承接的请求约为权重为 1 的账号的两倍。",
-  "routingMode.priorityHint": "新请求发往优先级数字最小的账号。如果该账号处于冷却、Credits 用尽、已禁用或不支持该模型，由下一个账号接替。",
+  "routingMode.priorityHint": "新请求发往优先级数字最大的账号。如果该账号处于冷却、Credits 用尽、已禁用或不支持该模型，由下一个账号接替。",
   "routingMode.priorityMore": "在账号详情中设置每个账号的优先级。数字相同的账号按列表顺序排列。进行中的会话同样遵循优先级：优先级更高的账号重新空闲后，下一轮就会发往该账号。在优先级相同的账号之间，“同一会话固定使用同一账号”会让每个会话留在原账号上。",
   "routingMode.resetFirst": "先重置先用",
   "routingMode.resetFirstHint": "新请求发往 Credits 最先重置的账号，让这些 Credits 在过期前先用掉。同一天重置的账号中，剩余 Credits 最多的优先。",

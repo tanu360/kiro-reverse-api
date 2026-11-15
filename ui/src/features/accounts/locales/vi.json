@@ -188,7 +188,7 @@
   "detail.weight": "Trọng số",
   "detail.weightHint": "0 hoặc 1 là bình thường. Tài khoản có trọng số N nhận số yêu cầu mới gấp khoảng N lần.",
   "detail.priority": "Mức ưu tiên",
-  "detail.priorityHint": "Từ 0 đến 999. Khi định tuyến theo ưu tiên, số nhỏ hơn nhận yêu cầu mới trước. Các tài khoản cùng số theo thứ tự trong danh sách.",
+  "detail.priorityHint": "Từ 0 đến 999. Khi định tuyến theo ưu tiên, số lớn hơn nhận yêu cầu mới trước. Mọi tài khoản mặc định là 0, và các tài khoản cùng số theo thứ tự trong danh sách.",
   "detail.overage": "Vượt mức (AWS)",
   "detail.overageRefresh": "Đồng bộ từ AWS",
   "detail.overageSwitch": "Bật vượt mức ở upstream",

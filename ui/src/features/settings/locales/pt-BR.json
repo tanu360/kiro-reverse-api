@@ -51,7 +51,7 @@
   "routingMode.weighted": "Ponderado",
   "routingMode.priority": "Prioridade",
   "routingMode.weightedHint": "As requisições novas alternam entre as contas habilitadas. Uma conta com peso 2 recebe cerca do dobro de requisições de uma conta com peso 1.",
-  "routingMode.priorityHint": "As requisições novas vão para a conta com o menor número de prioridade. Se essa conta estiver em espera, sem créditos, desabilitada ou não atender o modelo, a próxima assume.",
+  "routingMode.priorityHint": "As requisições novas vão para a conta com o maior número de prioridade. Se essa conta estiver em espera, sem créditos, desabilitada ou não atender o modelo, a próxima assume.",
   "routingMode.priorityMore": "Defina a prioridade de cada conta nos detalhes dela. Contas com o mesmo número seguem a ordem da lista. Conversas em andamento também seguem a prioridade: assim que uma conta de prioridade maior estiver livre de novo, o próximo turno vai para ela. Entre contas com a mesma prioridade, Manter conversas em uma conta deixa cada conversa na conta dela.",
   "routingMode.resetFirst": "Renova antes",
   "routingMode.resetFirstHint": "As requisições novas vão para a conta cujos créditos renovam primeiro, para que esses créditos sejam usados antes de expirar. Entre contas que renovam no mesmo dia, vai primeiro a que tem mais créditos restantes.",

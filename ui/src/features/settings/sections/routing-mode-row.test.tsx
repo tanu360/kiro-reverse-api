@@ -31,7 +31,7 @@ describe("RoutingModeRow", () => {
     const { group } = await renderCard();
     expect(screen.getByRole("radio", { name: "Priority" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Weighted" })).not.toBeChecked();
-    expect(group).toHaveAccessibleDescription(/lowest priority number/);
+    expect(group).toHaveAccessibleDescription(/highest priority number/);
   });
 
   it("switches to Priority at once and sends only routingMode", async () => {
@@ -46,7 +46,7 @@ describe("RoutingModeRow", () => {
     expect(await screen.findByText("Your settings were saved.")).toBeInTheDocument();
     expect(posts).toEqual([{ routingMode: "priority" }]);
     expect(mockDb.settings.routingMode).toBe("priority");
-    expect(group).toHaveAccessibleDescription(/lowest priority number/);
+    expect(group).toHaveAccessibleDescription(/highest priority number/);
     // The affinity switch under it is untouched.
     expect(mockDb.settings.sessionAffinity).toBe(true);
   });

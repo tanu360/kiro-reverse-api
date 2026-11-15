@@ -205,7 +205,7 @@
   "detail.weight": "Weight",
   "detail.weightHint": "0 or 1 is normal. An account with weight N takes about N times as many new requests.",
   "detail.priority": "Priority",
-  "detail.priorityHint": "0 to 999. In priority routing, a lower number gets new requests first. Accounts with the same number follow the list order.",
+  "detail.priorityHint": "0 to 999. In priority routing, a higher number gets new requests first. Every account starts at 0, and accounts with the same number follow the list order.",
   "detail.overage": "Overage (AWS)",
   "detail.overageRefresh": "Sync from AWS",
   "detail.overageSwitch": "Enable overage upstream",

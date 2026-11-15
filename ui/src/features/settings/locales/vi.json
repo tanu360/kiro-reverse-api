@@ -49,7 +49,7 @@
   "routingMode.weighted": "Theo trọng số",
   "routingMode.priority": "Theo ưu tiên",
   "routingMode.weightedHint": "Yêu cầu mới luân phiên giữa các tài khoản đang bật. Tài khoản có trọng số 2 nhận khoảng gấp đôi số yêu cầu của tài khoản có trọng số 1.",
-  "routingMode.priorityHint": "Yêu cầu mới đến tài khoản có số ưu tiên nhỏ nhất. Nếu tài khoản đó đang trong thời gian chờ, hết credit, bị tắt hoặc không phục vụ model được yêu cầu, tài khoản kế tiếp sẽ nhận thay.",
+  "routingMode.priorityHint": "Yêu cầu mới đến tài khoản có số ưu tiên lớn nhất. Nếu tài khoản đó đang trong thời gian chờ, hết credit, bị tắt hoặc không phục vụ model được yêu cầu, tài khoản kế tiếp sẽ nhận thay.",
   "routingMode.priorityMore": "Đặt mức ưu tiên của từng tài khoản trong chi tiết tài khoản. Các tài khoản cùng số theo thứ tự trong danh sách. Hội thoại đang diễn ra cũng theo mức ưu tiên: ngay khi một tài khoản có ưu tiên cao hơn rảnh trở lại, lượt tiếp theo sẽ đến tài khoản đó. Giữa các tài khoản cùng mức ưu tiên, Giữ hội thoại trên một tài khoản giữ mỗi hội thoại ở nguyên tài khoản của nó.",
   "routingMode.resetFirst": "Đặt lại trước",
   "routingMode.resetFirstHint": "Yêu cầu mới đến tài khoản có credit đặt lại sớm nhất, để số credit đó được dùng trước khi hết hạn. Giữa các tài khoản đặt lại cùng ngày, tài khoản còn nhiều credit nhất được dùng trước.",

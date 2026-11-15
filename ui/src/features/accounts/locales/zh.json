@@ -188,7 +188,7 @@
   "detail.weight": "权重",
   "detail.weightHint": "0 或 1 为默认权重。权重为 N 的账号承接约 N 倍的新请求。",
   "detail.priority": "优先级",
-  "detail.priorityHint": "0 到 999。在优先级路由下，数字越小越先承接新请求。数字相同的账号按列表顺序排列。",
+  "detail.priorityHint": "0 到 999。在优先级路由下，数字越大越先承接新请求。所有账号默认均为 0，数字相同的账号按列表顺序排列。",
   "detail.overage": "超额用量（AWS）",
   "detail.overageRefresh": "从 AWS 同步",
   "detail.overageSwitch": "启用上游超额用量",

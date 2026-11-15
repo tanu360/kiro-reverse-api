@@ -490,6 +490,11 @@ func writeRestoredConfig(parsed *parsedBackup) error {
 		accounts = parsed.credentials
 	}
 	accounts = withUniqueAccountIDs(accounts)
+	//! A backup from before priorities went higher first still holds the old order.
+	if !restored.PriorityHigherFirst {
+		accounts, _ = higherFirstPriorities(accounts)
+		restored.PriorityHigherFirst = true
+	}
 	restored.Accounts = []Account{}
 	configData, err := json.Marshal(restored)
 	if err != nil {
