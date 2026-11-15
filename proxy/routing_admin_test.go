@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -174,5 +175,47 @@ func TestAdminUpdateAccountRejectsBadPriority(t *testing.T) {
 	}
 	if len(config.GetAccounts()) != 1 {
 		t.Fatal("an account with an out-of-range priority was added")
+	}
+}
+
+func TestAdminUpdateAccountRejectsBadWeight(t *testing.T) {
+	initRoutingAdminConfig(t)
+	if err := config.AddAccount(config.Account{ID: "a", Enabled: true, Nickname: "first", Weight: 3}); err != nil {
+		t.Fatalf("add account: %v", err)
+	}
+	p := accountpool.GetPool()
+	p.Reload()
+	h := &Handler{pool: p}
+
+	//! 1e10 is the case that mattered: the weighted cycle has a slot per unit of weight.
+	for _, bad := range []string{`-1`, `101`, `1.5`, `"2"`, `null`, `true`, `1e10`} {
+		rec := putAccount(h, "a", `{"nickname":"changed","weight":`+bad+`}`)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("weight %s: status=%d, want 400", bad, rec.Code)
+		}
+		body := decodeAdminError(t, rec)
+		if body["code"] != codeWeightRange || body["error"] != "weight must be an integer between 0 and 100" {
+			t.Fatalf("weight %s: body = %v", bad, body)
+		}
+	}
+	if got := config.GetAccounts()[0]; got.Weight != 3 || got.Nickname != "first" {
+		t.Fatalf("account after rejected edits = %+v, want it unchanged", got)
+	}
+	for _, good := range []int{0, 10, config.MaxAccountWeight} {
+		if rec := putAccount(h, "a", fmt.Sprintf(`{"weight":%d}`, good)); rec.Code != http.StatusOK {
+			t.Fatalf("PUT weight %d: status=%d body=%s", good, rec.Code, rec.Body.String())
+		}
+		if got := config.GetAccounts()[0].Weight; got != good {
+			t.Fatalf("weight after PUT %d = %d", good, got)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	h.apiAddAccount(rec, httptest.NewRequest(http.MethodPost, "/admin/api/accounts", strings.NewReader(`{"id":"b","region":"us-east-1","weight":1000}`)))
+	if rec.Code != http.StatusBadRequest || decodeAdminError(t, rec)["code"] != codeWeightRange {
+		t.Fatalf("add with weight 1000: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(config.GetAccounts()) != 1 {
+		t.Fatal("an account with an out-of-range weight was added")
 	}
 }

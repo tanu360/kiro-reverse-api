@@ -2959,6 +2959,10 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 		writePriorityRange(w)
 		return
 	}
+	if !config.ValidAccountWeight(account.Weight) {
+		writeWeightRange(w)
+		return
+	}
 
 	stored, updated, err := config.UpsertAccount(account)
 	if err != nil {
@@ -2997,6 +3001,11 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	priority, hasPriority, err := parseAccountPriority(updates)
 	if err != nil {
 		writePriorityRange(w)
+		return
+	}
+	weight, hasWeight, err := parseAccountWeight(updates)
+	if err != nil {
+		writeWeightRange(w)
 		return
 	}
 
@@ -3050,8 +3059,8 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 	if v, ok := updates["machineId"].(string); ok {
 		existing.MachineId = v
 	}
-	if v, ok := updates["weight"].(float64); ok {
-		existing.Weight = int(v)
+	if hasWeight {
+		existing.Weight = weight
 	}
 	if hasPriority {
 		existing.Priority = priority

@@ -17,6 +17,11 @@ const (
 
 	// MaxAccountPriority bounds Account.Priority (0..999, higher is tried first).
 	MaxAccountPriority = 999
+
+	// MaxAccountWeight bounds Account.Weight (0..100). The weighted cycle holds
+	// one slot per unit of weight, so an unbounded weight would make every
+	// reload build a cycle of billions of slots.
+	MaxAccountWeight = 100
 )
 
 var ErrInvalidRoutingMode = errors.New(`routingMode must be "weighted", "priority" or "reset_first"`)
@@ -47,6 +52,11 @@ func UpdateRoutingMode(mode string) error {
 // ValidRoutingMode reports whether mode is one of the routing modes.
 func ValidRoutingMode(mode string) bool {
 	return mode == RoutingModeWeighted || mode == RoutingModePriority || mode == RoutingModeResetFirst
+}
+
+// ValidAccountWeight reports whether n is an account weight the admin API accepts.
+func ValidAccountWeight(n int) bool {
+	return n >= 0 && n <= MaxAccountWeight
 }
 
 // ValidAccountPriority reports whether n is an account priority the admin API accepts.

@@ -679,9 +679,11 @@ func isUpstreamOverageEnabled(acc config.Account) bool {
 	return strings.EqualFold(acc.OverageStatus, "ENABLED")
 }
 
+// effectiveWeight is the share weight gives an account in the weighted cycle:
+// below 1 counts as 1, and above MaxAccountWeight as MaxAccountWeight.
 func effectiveWeight(weight int) int {
-	if weight < 1 {
-		return 1
-	}
-	return weight
+	//! The admin API refuses a weight over the cap, but a hand-edited config or an import can
+	//! still hold one, and the cycle has a slot per unit of weight: uncapped, a weight of 1e10
+	//! would exhaust memory on every reload, startup included.
+	return min(max(weight, 1), config.MaxAccountWeight)
 }

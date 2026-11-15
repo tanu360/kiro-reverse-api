@@ -29,6 +29,28 @@ func parseAccountPriority(updates map[string]interface{}) (value int, present bo
 	return int(n), true, nil
 }
 
+var errWeightRange = fmt.Errorf("weight must be an integer between 0 and %d", config.MaxAccountWeight)
+
+// parseAccountWeight reads "weight" from a PUT /admin/api/accounts/{id} body,
+// with parseAccountPriority's rules: when present it must be a JSON number
+// holding an integer in 0..MaxAccountWeight, or it is an error.
+func parseAccountWeight(updates map[string]interface{}) (value int, present bool, err error) {
+	raw, ok := updates["weight"]
+	if !ok {
+		return 0, false, nil
+	}
+	n, isNumber := raw.(float64)
+	if !isNumber || n != math.Trunc(n) || n < 0 || n > config.MaxAccountWeight {
+		return 0, true, errWeightRange
+	}
+	return int(n), true, nil
+}
+
+// writeWeightRange answers 400 weight_range.
+func writeWeightRange(w http.ResponseWriter) {
+	writeAdminError(w, http.StatusBadRequest, codeWeightRange, errWeightRange.Error())
+}
+
 // writePriorityRange answers 400 priority_range.
 func writePriorityRange(w http.ResponseWriter) {
 	writeAdminError(w, http.StatusBadRequest, codePriorityRange, errPriorityRange.Error())

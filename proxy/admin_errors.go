@@ -68,6 +68,7 @@ const (
 	codeBackupUploadFailed      = "backup_upload_failed"
 	codeRoutingModeInvalid      = "routing_mode_invalid"
 	codePriorityRange           = "priority_range"
+	codeWeightRange             = "weight_range"
 	codeAlertThresholdsInvalid  = "alert_thresholds_invalid"
 	codeAlertCooldownRange      = "alert_cooldown_range"
 	codeAlertChannelInvalid     = "alert_channel_invalid"

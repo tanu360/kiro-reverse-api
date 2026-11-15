@@ -313,6 +313,21 @@ func TestRotationOrderReducesWeightsByTheirCommonDivisor(t *testing.T) {
 	}
 }
 
+// A weight over the cap (a hand-edited config or an import; the admin API refuses one) counts as
+// the cap. The cycle has a slot per unit of weight, so an uncapped 1e10 exhausted memory on every
+// reload, startup included.
+func TestRotationOrderCapsAHugeWeight(t *testing.T) {
+	order := rotationOrder([]config.Account{{ID: "a", Weight: 1e10}, {ID: "b"}, {ID: "c", Weight: -5}})
+	if want := config.MaxAccountWeight + 2; len(order) != want {
+		t.Fatalf("cycle has %d slots, want %d (a at the cap, b and c at 1)", len(order), want)
+	}
+	p := newTestPool(config.Account{ID: "a", Weight: 1e10}, config.Account{ID: "b"})
+	counts := countPicks(t, p, config.MaxAccountWeight+1)
+	if counts["a"] != config.MaxAccountWeight || counts["b"] != 1 {
+		t.Fatalf("counts = %v, want a %d and b 1", counts, config.MaxAccountWeight)
+	}
+}
+
 func TestGetNextForModelRotatesAcrossMatchingAccounts(t *testing.T) {
 	p := newTestPool(
 		config.Account{ID: "a"},
