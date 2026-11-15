@@ -17,6 +17,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 COPY . .
+# Compile the whole binary against an empty UI (the placeholder the repo commits) while the ui stage
+# builds. Once the UI arrives, the build below only recompiles the packages that embed it and links.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p ui/dist && touch ui/dist/.keep && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /dev/null .
 COPY --from=ui /app/ui/dist ./ui/dist
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

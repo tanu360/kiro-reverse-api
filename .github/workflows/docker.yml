@@ -12,31 +12,143 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Each platform builds in its own job, at the same time, and pushes its image by digest. The merge
+# job then tags one multi-platform manifest that lists both. Pull requests build both platforms and
+# push nothing.
 jobs:
   build:
+    name: Build ${{ matrix.platform }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set lowercase image name
+      - name: Name the platform and image
         id: image
-        run: echo "name=$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          echo "pair=${PLATFORM//\//-}" >> "$GITHUB_OUTPUT"
+          echo "name=$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      # The labels go on each platform's image; the tags go on the merged manifest.
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.image.outputs.name }}
+
+      # Only the arm64 image's last stage (apk add) runs emulated: every other stage builds on the
+      # runner's own platform and cross-compiles.
       - name: Set up QEMU
+        if: matrix.platform == 'linux/arm64'
         uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 
+      # The runner is thrown away after the job, so removing the builder at the end only costs time.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          cleanup: false
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build linux/amd64 into the runner's Docker first and check that the image serves the
+      # embedded admin UI, before anything is pushed. This runs on pull requests too, so the
+      # Node/pnpm UI stage of the Dockerfile is proven before a merge.
+      - name: Build image for smoke test
+        if: matrix.platform == 'linux/amd64'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: kiro-proxy:smoke
+          cache-from: type=gha,scope=docker-${{ steps.image.outputs.pair }}
+          provenance: false
+
+      - name: Smoke test admin UI
+        if: matrix.platform == 'linux/amd64'
+        run: |
+          docker run -d --name kiro-smoke -p 127.0.0.1:8080:8080 kiro-proxy:smoke
+          trap 'docker logs kiro-smoke; docker rm -f kiro-smoke >/dev/null' EXIT
+          .github/scripts/admin-ui-smoke.sh http://127.0.0.1:8080
+
+      # On amd64 this reuses the smoke build above. Each platform keeps its own cache scope, so the
+      # two jobs never overwrite each other's cache.
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          cache-from: type=gha,scope=docker-${{ steps.image.outputs.pair }}
+          cache-to: type=gha,scope=docker-${{ steps.image.outputs.pair }},mode=max
+          provenance: false
+
+      - name: Export digest
+        if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ steps.image.outputs.pair }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+          if-no-files-found: error
+
+  # Tags one manifest that lists both platforms' images.
+  merge:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: digests-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - name: Set lowercase image name
+        id: image
+        run: echo "name=$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          cleanup: false
+
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -55,34 +167,23 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=
 
-      # Build linux/amd64 into the runner's Docker first and check that the image serves the
-      # embedded admin UI. This runs on pull requests too, where nothing is pushed, so the
-      # Node/pnpm UI stage of the Dockerfile is proven before a merge.
-      - name: Build image for smoke test
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64
-          load: true
-          tags: kiro-proxy:smoke
-          cache-from: type=gha
-          provenance: false
-
-      - name: Smoke test admin UI
+      - name: Create and push the manifest
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
         run: |
-          docker run -d --name kiro-smoke -p 127.0.0.1:8080:8080 kiro-proxy:smoke
-          trap 'docker logs kiro-smoke; docker rm -f kiro-smoke >/dev/null' EXIT
-          .github/scripts/admin-ui-smoke.sh http://127.0.0.1:8080
+          count=$(find . -maxdepth 1 -type f | wc -l)
+          if [ "$count" -ne 2 ]; then
+            echo "::error::Expected 2 platform digests, found $count"
+            exit 1
+          fi
+          args=()
+          while read -r tag; do args+=(-t "$tag"); done < <(jq -r '.tags[]' <<<"$DOCKER_METADATA_OUTPUT_JSON")
+          for digest in *; do args+=("$IMAGE@sha256:$digest"); done
+          docker buildx imagetools create "${args[@]}"
 
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false
-
+      - name: Inspect the manifest
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect "$IMAGE:$VERSION"
