@@ -102,6 +102,23 @@ describe("PublicLinkCard", () => {
     expect(await navigator.clipboard.readText()).toBe(LINK);
   });
 
+  it("says when an earlier version's helper runs the live link", async () => {
+    mockDb.twoFactor.enabled = true;
+    mockDb.tunnel.pinned = {
+      enabled: true,
+      signedIn: true,
+      state: "running",
+      url: LINK,
+      fallbackHelper: true,
+    };
+    renderWithProviders(<PublicLinkCard />);
+    expect(
+      await screen.findByText(
+        "Running the Tailscale helper of an earlier version, because this version's is not on GitHub yet. Once it is published, the next start uses it.",
+      ),
+    ).toBeVisible();
+  });
+
   it("warns while on without two-factor sign-in or an API key", async () => {
     mockDb.twoFactor.enabled = false;
     mockDb.apiKeys = [];

@@ -190,6 +190,7 @@
   "publicLink.link": "Liên kết",
   "publicLink.live": "Đang chạy",
   "publicLink.linkHint": "Ai có liên kết cũng vào được trang đăng nhập và API của bạn.",
+  "publicLink.fallbackHelper": "Đang dùng trình hỗ trợ Tailscale của phiên bản trước vì trình hỗ trợ của phiên bản này chưa có trên GitHub. Khi được phát hành, lần khởi động tiếp theo sẽ dùng nó.",
   "publicLink.open": "Mở liên kết",
   "publicLink.copied": "Đã sao chép liên kết",
   "publicLink.twoFactorWarning": "Hãy bật đăng nhập hai bước trước khi chia sẻ liên kết.",

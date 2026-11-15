@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -426,5 +427,168 @@ func TestBinEnvWins(t *testing.T) {
 	t.Setenv(binEnv, filepath.Join(t.TempDir(), "missing"))
 	if _, _, err := m.findBinary(); err == nil {
 		t.Error("a missing KIRO_TUNNEL_BIN was accepted")
+	}
+}
+
+// filesServer serves fixed paths; every other path is a 404. hits counts requests per path.
+func filesServer(t *testing.T, files map[string][]byte) (*httptest.Server, map[string]int) {
+	t.Helper()
+	if _, err := platformName(runtime.GOOS, runtime.GOARCH); err != nil {
+		t.Skip(err)
+	}
+	hits := map[string]int{}
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits[r.URL.Path]++
+		mu.Unlock()
+		body, ok := files[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, hits
+}
+
+func gzipped(b []byte) []byte {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	zw.Write(b)
+	zw.Close()
+	return buf.Bytes()
+}
+
+func writeHelper(t *testing.T, m *Manager, name, body string) string {
+	t.Helper()
+	path := filepath.Join(m.opts.DataDir, "bin", name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestAnOlderHelperRunsWhileThisVersionsIsMissing(t *testing.T) {
+	srv, _ := filesServer(t, nil)
+	m := downloadManager(t, srv.URL)
+	old := writeHelper(t, m, "kiro-tunnel-9.9.8", "old helper")
+
+	path, fallback, err := m.helper(context.Background())
+	if err != nil || path != old || !fallback {
+		t.Fatalf("helper = %q %v %v, want the older helper as a fallback", path, fallback, err)
+	}
+
+	m.mu.Lock()
+	m.fallback = true
+	m.mu.Unlock()
+	m.setStatus(Status{State: StateRunning, URL: "https://box.example.ts.net"})
+	if !m.Status().FallbackHelper {
+		t.Error("the running status does not say an older helper runs")
+	}
+	m.setStatus(Status{State: StateOff})
+	if m.Status().FallbackHelper {
+		t.Error("the off status still says an older helper runs")
+	}
+}
+
+func TestAMissingHelperSaysItIsNotPublishedYet(t *testing.T) {
+	srv, _ := filesServer(t, nil)
+	old := helperSHA256
+	t.Cleanup(func() { helperSHA256 = old })
+	helperSHA256 = sum([]byte("a release build"))
+
+	m := downloadManager(t, srv.URL)
+	_, _, err := m.helper(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "9.9.9") || !strings.Contains(err.Error(), "not on GitHub yet") {
+		t.Fatalf("err = %v, want it to say version 9.9.9's helper is not published yet", err)
+	}
+	if strings.Contains(err.Error(), "http") {
+		t.Errorf("err = %v, want no URL in the message the card shows", err)
+	}
+	// A release build never takes another release's helper.
+	if _, err := os.Stat(m.latestBinaryPath()); !os.IsNotExist(err) {
+		t.Error("a release build downloaded the latest release's helper")
+	}
+}
+
+func TestASourceBuildTakesTheLatestReleasesHelper(t *testing.T) {
+	old := helperSHA256
+	t.Cleanup(func() { helperSHA256 = old })
+	helperSHA256 = ""
+
+	binary := []byte("latest helper")
+	gz := gzipped(binary)
+	srv, hits := filesServer(t, map[string][]byte{
+		"/latest/" + assetName(): gz,
+		"/latest/SHA256SUMS.txt": []byte(sum(gz) + "  " + assetName() + "\n"),
+	})
+	m := downloadManager(t, srv.URL)
+
+	path, fallback, err := m.helper(context.Background())
+	if err != nil || path != m.latestBinaryPath() || !fallback {
+		t.Fatalf("helper = %q %v %v, want the latest release's helper as a fallback", path, fallback, err)
+	}
+	if got, _ := os.ReadFile(path); !bytes.Equal(got, binary) {
+		t.Errorf("saved helper = %q", got)
+	}
+	// The next start runs it from disk instead of downloading it again.
+	if path, fallback, err := m.helper(context.Background()); err != nil || path != m.latestBinaryPath() || !fallback {
+		t.Fatalf("second start = %q %v %v", path, fallback, err)
+	}
+	if n := hits["/latest/"+assetName()]; n != 1 {
+		t.Errorf("the latest helper was downloaded %d times, want once", n)
+	}
+}
+
+func TestASourceBuildRefusesALatestHelperThatFailsItsChecksum(t *testing.T) {
+	old := helperSHA256
+	t.Cleanup(func() { helperSHA256 = old })
+	helperSHA256 = ""
+
+	srv, _ := filesServer(t, map[string][]byte{
+		"/latest/" + assetName(): gzipped([]byte("tampered")),
+		"/latest/SHA256SUMS.txt": []byte(sum([]byte("other")) + "  " + assetName() + "\n"),
+	})
+	m := downloadManager(t, srv.URL)
+	if _, _, err := m.helper(context.Background()); err == nil {
+		t.Fatal("a latest helper with a wrong checksum ran")
+	}
+	if _, err := os.Stat(m.latestBinaryPath()); !os.IsNotExist(err) {
+		t.Error("the mismatched latest helper was saved")
+	}
+}
+
+func TestThisVersionsHelperReplacesTheFallbacks(t *testing.T) {
+	binary := []byte("this version's helper")
+	srv := releaseServer(t, binary, func(gz []byte) string { return sum(gz) + "  " + assetName() + "\n" })
+	m := downloadManager(t, srv.URL)
+	older := writeHelper(t, m, "kiro-tunnel-9.9.8", "old helper")
+	latest := writeHelper(t, m, "kiro-tunnel-latest", "latest helper")
+
+	path, fallback, err := m.helper(context.Background())
+	if err != nil || path != m.cachedBinaryPath() || fallback {
+		t.Fatalf("helper = %q %v %v, want this version's helper", path, fallback, err)
+	}
+	for _, p := range []string{older, latest} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("%s was kept after this version's helper arrived", filepath.Base(p))
+		}
+	}
+}
+
+func TestLatestBaseURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"https://github.com/o/r/releases/download":  "https://github.com/o/r/releases/latest/download/",
+		"https://github.com/o/r/releases/download/": "https://github.com/o/r/releases/latest/download/",
+		"http://127.0.0.1:8099":                     "http://127.0.0.1:8099/latest/",
+	} {
+		if got := latestBaseURL(in); got != want {
+			t.Errorf("latestBaseURL(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

@@ -94,25 +94,80 @@ func (m *Manager) cachedBinaryPath() string {
 	return filepath.Join(m.opts.DataDir, "bin", "kiro-tunnel-"+m.opts.Version+exeSuffix())
 }
 
+// latestBinaryPath is where a build from source keeps the latest release's helper.
+func (m *Manager) latestBinaryPath() string {
+	return filepath.Join(m.opts.DataDir, "bin", "kiro-tunnel-latest"+exeSuffix())
+}
+
+// latestBaseURL is the release folder GitHub redirects to the newest release:
+// .../releases/download becomes .../releases/latest/download.
+func latestBaseURL(base string) string {
+	base = strings.TrimSuffix(base, "/")
+	if strings.HasSuffix(base, "/download") {
+		return strings.TrimSuffix(base, "/download") + "/latest/download/"
+	}
+	return base + "/latest/"
+}
+
+// olderHelper is a helper already on disk from an earlier version (or the latest release's),
+// the newest first, which runs while this version's cannot be downloaded. Every helper speaks
+// the same protocol unless the protocol number changes, and runHelper refuses one that does not.
+func (m *Manager) olderHelper() (string, bool) {
+	dir := filepath.Dir(m.cachedBinaryPath())
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", false
+	}
+	best, bestTime := "", int64(0)
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasPrefix(name, "kiro-tunnel-") || !e.Type().IsRegular() {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || info.Size() == 0 {
+			continue
+		}
+		if t := info.ModTime().UnixNano(); best == "" || t > bestTime {
+			best, bestTime = filepath.Join(dir, name), t
+		}
+	}
+	return best, best != ""
+}
+
 // download fetches this version's helper for this platform, checks it, and saves it where
 // findBinary looks. Older versions' helpers in the same folder are removed.
 func (m *Manager) download(ctx context.Context) (string, error) {
+	base := strings.TrimSuffix(m.opts.ReleaseBaseURL, "/") + "/" + m.opts.Version + "/"
+	return m.downloadFrom(ctx, m.opts.Version, base, m.cachedBinaryPath(), helperSHA256)
+}
+
+// downloadLatest fetches the latest release's helper, checked against that release's
+// SHA256SUMS.txt. It is for a build from source, which has no checksum of its own and whose
+// version may never be released.
+func (m *Manager) downloadLatest(ctx context.Context) (string, error) {
+	return m.downloadFrom(ctx, "latest", latestBaseURL(m.opts.ReleaseBaseURL), m.latestBinaryPath(), "")
+}
+
+// downloadFrom fetches the helper from one release folder and saves it at path. wantSum is the
+// uncompressed helper's SHA-256 when the binary has one built in; without it the release's
+// SHA256SUMS.txt checks the download. The other helpers in the folder are removed afterwards.
+func (m *Manager) downloadFrom(ctx context.Context, release, base, path, wantSum string) (string, error) {
 	platform, err := platformName(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return "", err
 	}
-	base := strings.TrimSuffix(m.opts.ReleaseBaseURL, "/") + "/" + m.opts.Version + "/"
 	asset := "kiro-tunnel-" + platform + ".gz"
 
 	wantGz := ""
-	if helperSHA256 == "" {
-		wantGz, err = m.releaseChecksum(ctx, base+"SHA256SUMS.txt", asset)
+	if wantSum == "" {
+		wantGz, err = m.releaseChecksum(ctx, release, base+"SHA256SUMS.txt", asset)
 		if err != nil {
 			return "", err
 		}
 	}
 
-	dir := filepath.Dir(m.cachedBinaryPath())
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
@@ -123,19 +178,19 @@ func (m *Manager) download(ctx context.Context) (string, error) {
 	defer os.Remove(tmp.Name())
 	defer tmp.Close()
 
-	gzSum, err := m.fetchHelper(ctx, base+asset, tmp)
+	gzSum, err := m.fetchHelper(ctx, release, base+asset, tmp)
 	if err != nil {
 		return "", err
 	}
 	if wantGz != "" && gzSum != wantGz {
 		return "", fmt.Errorf("the downloaded helper does not match the release checksum")
 	}
-	if helperSHA256 != "" {
+	if wantSum != "" {
 		sum, err := fileSHA256(tmp.Name())
 		if err != nil {
 			return "", err
 		}
-		if sum != helperSHA256 {
+		if sum != wantSum {
 			return "", fmt.Errorf("the downloaded helper does not match the checksum built into this version")
 		}
 	}
@@ -145,7 +200,6 @@ func (m *Manager) download(ctx context.Context) (string, error) {
 	if err := tmp.Close(); err != nil {
 		return "", err
 	}
-	path := m.cachedBinaryPath()
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return "", err
 	}
@@ -155,8 +209,8 @@ func (m *Manager) download(ctx context.Context) (string, error) {
 
 // fetchHelper streams the gzip asset into out, uncompressed, and reports download progress.
 // It returns the SHA-256 of the compressed bytes.
-func (m *Manager) fetchHelper(ctx context.Context, url string, out io.Writer) (string, error) {
-	resp, err := m.get(ctx, url)
+func (m *Manager) fetchHelper(ctx context.Context, release, url string, out io.Writer) (string, error) {
+	resp, err := m.get(ctx, release, url)
 	if err != nil {
 		return "", err
 	}
@@ -191,8 +245,8 @@ func (m *Manager) fetchHelper(ctx context.Context, url string, out io.Writer) (s
 }
 
 // releaseChecksum reads asset's line from the release's SHA256SUMS.txt.
-func (m *Manager) releaseChecksum(ctx context.Context, url, asset string) (string, error) {
-	resp, err := m.get(ctx, url)
+func (m *Manager) releaseChecksum(ctx context.Context, release, url, asset string) (string, error) {
+	resp, err := m.get(ctx, release, url)
 	if err != nil {
 		return "", err
 	}
@@ -207,7 +261,21 @@ func (m *Manager) releaseChecksum(ctx context.Context, url, asset string) (strin
 	return "", fmt.Errorf("the release lists no checksum for %s", asset)
 }
 
-func (m *Manager) get(ctx context.Context, url string) (*http.Response, error) {
+// missingHelperError is a release without this platform's helper: not published yet (a version
+// whose release is still building), or never (a build from source). It names the release, not
+// the URL, as the card shows it; the log has the URL.
+type missingHelperError struct {
+	release string
+}
+
+func (e *missingHelperError) Error() string {
+	if e.release == "latest" {
+		return "the latest release has no Tailscale helper for this platform"
+	}
+	return fmt.Sprintf("version %s's Tailscale helper is not on GitHub yet; its release may still be publishing. The server tries again on its own", e.release)
+}
+
+func (m *Manager) get(ctx context.Context, release, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -220,7 +288,8 @@ func (m *Manager) get(ctx context.Context, url string) (*http.Response, error) {
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusNotFound {
-			return nil, fmt.Errorf("release %s has no Tailscale helper for this platform (%s)", m.opts.Version, url)
+			m.opts.Logf("[Tunnel] %s: 404", url)
+			return nil, &missingHelperError{release: release}
 		}
 		return nil, fmt.Errorf("download the Tailscale helper: %s", resp.Status)
 	}

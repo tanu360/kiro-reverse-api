@@ -42,6 +42,8 @@ export interface TunnelStatus {
   error?: string;
   /** A Tailscale sign-in is saved on this server. */
   signedIn: boolean;
+  /** An earlier version's helper runs, because this version's could not be downloaded. */
+  fallbackHelper: boolean;
   /** Admin two-factor sign-in is on. */
   twoFactor: boolean;
   /** At least one API key is on: public API calls always need one. */
@@ -113,6 +115,7 @@ function normalize(res: Partial<Record<keyof TunnelStatus, unknown>>): TunnelSta
     adminURL: optionalString(res.adminURL),
     error: optionalString(res.error),
     signedIn: res.signedIn === true,
+    fallbackHelper: res.fallbackHelper === true,
     twoFactor: res.twoFactor === true,
     apiKeys: res.apiKeys === true,
   };

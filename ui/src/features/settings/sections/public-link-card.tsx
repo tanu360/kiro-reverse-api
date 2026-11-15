@@ -235,7 +235,16 @@ function StatusRow({
           />
         }
         controlWidth="value"
-        description={t("publicLink.linkHint")}
+        description={
+          status.fallbackHelper ? (
+            <>
+              {t("publicLink.linkHint")}
+              <span className="mt-1 block">{t("publicLink.fallbackHelper")}</span>
+            </>
+          ) : (
+            t("publicLink.linkHint")
+          )
+        }
         status={
           <Badge live size="sm" tone="success">
             {t("publicLink.live")}

@@ -57,6 +57,9 @@ type Status struct {
 	Error      string `json:"error,omitempty"`
 	// SignedIn is whether this server holds a Tailscale sign-in that "Sign out" would end.
 	SignedIn bool `json:"signedIn"`
+	// FallbackHelper says an earlier version's helper (or, from source, the latest release's) is
+	// running, because this version's could not be downloaded.
+	FallbackHelper bool `json:"fallbackHelper,omitempty"`
 }
 
 // Options configures a Manager.
@@ -97,6 +100,8 @@ type Manager struct {
 	run      *runHandle
 	ln       net.Listener
 	server   *http.Server
+	// fallback says the running helper is not this version's (Status.FallbackHelper).
+	fallback bool
 }
 
 // runHandle is one stretch of the switch being on: download, then the helper, restarted as
@@ -299,6 +304,9 @@ func (m *Manager) signedInMarker() bool {
 func (m *Manager) setStatus(st Status) {
 	m.mu.Lock()
 	st.SignedIn = m.signedInMarker()
+	if st.State != StateOff {
+		st.FallbackHelper = m.fallback
+	}
 	changed := !sameStatus(m.status, st)
 	m.status = st
 	m.mu.Unlock()
@@ -338,7 +346,7 @@ func (m *Manager) loop(ctx context.Context, run *runHandle, hostname string) {
 		if err != nil {
 			msg = err.Error()
 		}
-		m.opts.Logf("[Tunnel] %s Retrying in %s.", msg, delay.Round(time.Second))
+		m.opts.Logf("[Tunnel] %s. Retrying in %s.", strings.TrimSuffix(msg, "."), delay.Round(time.Second))
 		m.setStatus(Status{State: StateError, Error: msg})
 		select {
 		case <-ctx.Done():
@@ -352,23 +360,56 @@ func (m *Manager) loop(ctx context.Context, run *runHandle, hostname string) {
 // once gets the helper and runs it until it exits. reached says it got as far as the tailnet,
 // which resets the retry delay.
 func (m *Manager) once(ctx context.Context, run *runHandle, hostname string) (reached bool, err error) {
-	bin, ok, err := m.findBinary()
+	bin, fallback, err := m.helper(ctx)
 	if err != nil {
 		return false, err
 	}
-	if !ok {
-		m.setStatus(Status{State: StateDownloading})
-		m.opts.Logf("[Tunnel] Downloading the Tailscale helper for version %s", m.opts.Version)
-		if bin, err = m.download(ctx); err != nil {
-			return false, err
-		}
-	}
+	m.mu.Lock()
+	m.fallback = fallback
+	m.mu.Unlock()
 	addr, err := m.ensureListener()
 	if err != nil {
 		return false, fmt.Errorf("open the tunnel listener: %w", err)
 	}
 	m.setStatus(Status{State: StateStarting})
 	return m.runHelper(ctx, run, bin, hostname, addr)
+}
+
+// helper finds or downloads this version's helper. When it cannot be downloaded (its release is
+// still publishing, or GitHub is out of reach), a helper already on disk from an earlier version
+// runs instead, and fallback is true; a build from source with none on disk takes the latest
+// release's. The next start tries this version's again, and its download removes the others.
+func (m *Manager) helper(ctx context.Context) (path string, fallback bool, err error) {
+	m.mu.Lock()
+	m.fallback = false
+	m.mu.Unlock()
+	bin, ok, err := m.findBinary()
+	if err != nil || ok {
+		return bin, false, err
+	}
+	m.setStatus(Status{State: StateDownloading})
+	m.opts.Logf("[Tunnel] Downloading the Tailscale helper for version %s", m.opts.Version)
+	bin, err = m.download(ctx)
+	if err == nil {
+		return bin, false, nil
+	}
+	if ctx.Err() != nil {
+		return "", false, ctx.Err()
+	}
+	if old, ok := m.olderHelper(); ok {
+		m.opts.Logf("[Tunnel] %v. Running the helper already on disk (%s) until it is.", err, filepath.Base(old))
+		return old, true, nil
+	}
+	if helperSHA256 == "" {
+		m.opts.Logf("[Tunnel] %v. Trying the latest release's helper.", err)
+		m.setStatus(Status{State: StateDownloading})
+		latest, lerr := m.downloadLatest(ctx)
+		if lerr == nil {
+			return latest, true, nil
+		}
+		m.opts.Logf("[Tunnel] The latest release's helper: %v", lerr)
+	}
+	return "", false, err
 }
 
 func (m *Manager) ensureListener() (string, error) {

@@ -196,6 +196,7 @@
   "publicLink.link": "Link",
   "publicLink.live": "Live",
   "publicLink.linkHint": "Anyone with the link can reach your sign-in page and API.",
+  "publicLink.fallbackHelper": "Running the Tailscale helper of an earlier version, because this version's is not on GitHub yet. Once it is published, the next start uses it.",
   "publicLink.open": "Open link",
   "publicLink.copied": "Link copied",
   "publicLink.twoFactorWarning": "Turn on two-factor sign-in before you share the link.",

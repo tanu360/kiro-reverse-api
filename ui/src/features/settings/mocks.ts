@@ -353,6 +353,7 @@ function tunnelStatus(): TunnelStatus {
     hostname: tunnel.hostname,
     defaultHostname: "kiro-proxy",
     signedIn: tunnel.signedIn,
+    fallbackHelper: false,
     twoFactor: mockDb.twoFactor.enabled,
     apiKeys: mockDb.apiKeys.some((key) => key.enabled),
   };

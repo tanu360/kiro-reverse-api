@@ -381,7 +381,7 @@ Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi
 
 **Cài đặt → Liên kết công khai** đưa máy chủ này, gồm bảng quản trị và API, lên một địa chỉ HTTPS công khai qua [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel). Dùng được trên Windows, macOS, Linux và Docker, không cần chuyển tiếp cổng.
 
-1. Bật **Liên kết HTTPS công khai**. Proxy tải chương trình hỗ trợ Tailscale `kiro-tunnel` (khoảng 8 MB) từ bản phát hành GitHub của phiên bản này và kiểm tra nó bằng một SHA-256 có sẵn trong proxy. Image Docker đã kèm sẵn chương trình này.
+1. Bật **Liên kết HTTPS công khai**. Proxy tải chương trình hỗ trợ Tailscale `kiro-tunnel` (khoảng 8 MB) từ bản phát hành GitHub của phiên bản này và kiểm tra nó bằng một SHA-256 có sẵn trong proxy. Image Docker đã kèm sẵn chương trình này. Nếu không tải được chương trình hỗ trợ của phiên bản này (bản phát hành vẫn đang được đăng, hoặc không truy cập được GitHub), proxy chạy chương trình đã tải cho phiên bản trước và ghi chú trên thẻ; bản build từ mã nguồn mà chưa có chương trình nào trên đĩa sẽ dùng chương trình của bản phát hành mới nhất, được kiểm tra bằng `SHA256SUMS.txt` của bản phát hành đó.
 2. Chọn **Đăng nhập Tailscale** và đăng nhập bằng một tài khoản Tailscale miễn phí. Máy chủ tham gia tailnet của bạn dưới dạng thiết bị tên `kiro-proxy`; đổi tên ở **Tên thiết bị**.
 3. Lần đầu, chọn **Bật Funnel**. Bước này bật HTTPS và Funnel cho tailnet của bạn trong một lần.
 4. Thẻ hiển thị liên kết, ví dụ `https://kiro-proxy.tail1234.ts.net`. Liên kết giữ nguyên sau khi khởi động lại.

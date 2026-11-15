@@ -381,7 +381,7 @@ The order is: the account's own proxy, the pool, the global proxy, then direct. 
 
 **Settings → Public link** puts this server, the admin panel and the API, on a public HTTPS address through [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel). It works on Windows, macOS, Linux and Docker, with no port forwarding.
 
-1. Turn on **Public HTTPS link**. The proxy downloads its Tailscale helper, `kiro-tunnel` (about 8 MB), from this version's GitHub release and checks it against a SHA-256 built into the proxy. The Docker image already carries the helper.
+1. Turn on **Public HTTPS link**. The proxy downloads its Tailscale helper, `kiro-tunnel` (about 8 MB), from this version's GitHub release and checks it against a SHA-256 built into the proxy. The Docker image already carries the helper. If this version's helper cannot be downloaded (its release is still publishing, or GitHub is out of reach), the proxy runs the helper it downloaded for an earlier version and says so on the card; a build from source with none on disk takes the latest release's helper, checked against that release's `SHA256SUMS.txt`.
 2. Select **Sign in to Tailscale** and sign in with a free Tailscale account. The server joins your tailnet as a device named `kiro-proxy`; **Device name** changes it.
 3. The first time, select **Turn on Funnel**. It turns on HTTPS and Funnel for your tailnet in one step.
 4. The card shows the link, such as `https://kiro-proxy.tail1234.ts.net`. It stays the same after a restart.

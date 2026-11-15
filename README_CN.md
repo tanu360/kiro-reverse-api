@@ -381,7 +381,7 @@ Kiro 没有 JSON 模式，因此代理会要求模型输出 JSON，去掉代码�
 
 「**设置 → 公开链接**」通过 [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel) 把本服务器（管理面板和 API）放到公网 HTTPS 地址上。Windows、macOS、Linux 和 Docker 均可使用，无需端口转发。
 
-1. 打开「**公开 HTTPS 链接**」。代理会从当前版本的 GitHub Release 下载 Tailscale 辅助程序 `kiro-tunnel`（约 8 MB），并用内置在代理中的 SHA-256 校验。Docker 镜像已自带该辅助程序。
+1. 打开「**公开 HTTPS 链接**」。代理会从当前版本的 GitHub Release 下载 Tailscale 辅助程序 `kiro-tunnel`（约 8 MB），并用内置在代理中的 SHA-256 校验。Docker 镜像已自带该辅助程序。如果无法下载当前版本的辅助程序（其 Release 仍在发布中，或无法访问 GitHub），代理会运行之前为早期版本下载的辅助程序，并在卡片上注明；从源码构建且磁盘上没有辅助程序时，会改用最新 Release 的辅助程序，并用该 Release 的 `SHA256SUMS.txt` 校验。
 2. 点击「**登录 Tailscale**」，用免费的 Tailscale 账号登录。服务器会以名为 `kiro-proxy` 的设备加入你的 tailnet；可在「**设备名称**」中修改。
 3. 首次使用时点击「**开启 Funnel**」，一步为你的 tailnet 开启 HTTPS 和 Funnel。
 4. 卡片会显示链接，例如 `https://kiro-proxy.tail1234.ts.net`。重启后链接不变。

@@ -196,6 +196,7 @@
   "publicLink.link": "Link",
   "publicLink.live": "No ar",
   "publicLink.linkHint": "Qualquer pessoa com o link chega à sua página de login e à API.",
+  "publicLink.fallbackHelper": "Usando o auxiliar do Tailscale de uma versão anterior, porque o desta versão ainda não está no GitHub. Quando ele for publicado, a próxima inicialização passa a usá-lo.",
   "publicLink.open": "Abrir link",
   "publicLink.copied": "Link copiado",
   "publicLink.twoFactorWarning": "Habilite o login em duas etapas antes de compartilhar o link.",
