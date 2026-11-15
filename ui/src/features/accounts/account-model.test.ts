@@ -14,6 +14,7 @@ import {
   formatAuthMethod,
   formatCreditAmount,
   formatResetDate,
+  formatTokenExpiry,
   hasMaskedProxyPassword,
   isBanned,
   isHeld,
@@ -279,11 +280,25 @@ describe("tokenExpiry", () => {
     expect(tokenExpiry(0, NOW_SEC)).toEqual({ kind: "none" });
     expect(tokenExpiry(NOW_SEC, NOW_SEC)).toEqual({ kind: "expired" });
     expect(tokenExpiry(NOW_SEC - 5, NOW_SEC)).toEqual({ kind: "expired" });
-    expect(tokenExpiry(NOW_SEC + 59, NOW_SEC)).toEqual({ kind: "minutes", value: 0 });
-    expect(tokenExpiry(NOW_SEC + 3599, NOW_SEC)).toEqual({ kind: "minutes", value: 59 });
-    expect(tokenExpiry(NOW_SEC + 3600, NOW_SEC)).toEqual({ kind: "hours", value: 1 });
-    expect(tokenExpiry(NOW_SEC + DAY - 1, NOW_SEC)).toEqual({ kind: "hours", value: 23 });
-    expect(tokenExpiry(NOW_SEC + DAY, NOW_SEC)).toEqual({ kind: "days", value: 1 });
+    expect(tokenExpiry(NOW_SEC + 59, NOW_SEC)).toEqual({ kind: "left", seconds: 59 });
+    expect(tokenExpiry(NOW_SEC + DAY, NOW_SEC)).toEqual({ kind: "left", seconds: DAY });
+  });
+});
+
+describe("formatTokenExpiry", () => {
+  const left = (seconds: number) => formatTokenExpiry({ kind: "left", seconds }, t, "en");
+
+  it("reads like every other duration, in its two largest units", () => {
+    expect(left(45)).toBe("45s");
+    expect(left(17 * 60 + 30)).toBe("17m");
+    expect(left(5 * 3600 + 12 * 60 + 59)).toBe("5h 12m");
+    expect(left(3600)).toBe("1h");
+    expect(left(3 * DAY + 4 * 3600 + 5 * 60)).toBe("3d 4h");
+  });
+
+  it("writes a dash without a token and a word once it expired", () => {
+    expect(formatTokenExpiry({ kind: "none" }, t, "en")).toBe("—");
+    expect(formatTokenExpiry({ kind: "expired" }, t, "en")).toBe("time.expired");
   });
 });
 

@@ -396,13 +396,15 @@ export function AccountIdentity({
       </div>
       {showTags ? (
         <div className="flex min-w-0 items-center gap-2">
-          <span className="block min-w-0 truncate text-meta text-muted-foreground leading-tight">
+          <TruncatedText className="text-meta text-muted-foreground leading-tight">
             {meta}
-          </span>
+          </TruncatedText>
           <TagBadges max={2} tags={account.tags} />
         </div>
       ) : (
-        <span className="block truncate text-meta text-muted-foreground leading-tight">{meta}</span>
+        <TruncatedText className="text-meta text-muted-foreground leading-tight">
+          {meta}
+        </TruncatedText>
       )}
     </div>
   );
@@ -469,9 +471,11 @@ export function UsageMeter({
 
 /** Time left on the access token, muted: the status pill already flags an expired one. */
 export function TokenExpiryText({ account }: { account: Account }): JSX.Element {
-  const { t } = useT("accounts");
+  const { t, lang } = useT("accounts");
   const expiry = tokenExpiry(account.expiresAt, nowSec());
-  return <span className="text-muted-foreground">{formatTokenExpiry(expiry, t)}</span>;
+  return (
+    <span className="text-muted-foreground tabular-nums">{formatTokenExpiry(expiry, t, lang)}</span>
+  );
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   ResponsiveSheetPanel,
   ResponsiveSheetTitle,
 } from "@/components/shared/responsive-sheet";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { accountsQuery } from "@/lib/api/accounts";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
@@ -77,15 +78,16 @@ export function AccountDetailSheet({
                 {/* Centred on the title and meta lines (48 px), and stays there over a ban reason. */}
                 <AuthAvatar account={account} className="mt-1" />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <ResponsiveSheetTitle className="truncate">
-                    {displayEmail(account.email, account.id)}
+                  {/* A long address is cut to the sheet and shows in full in a tooltip. */}
+                  <ResponsiveSheetTitle className="min-w-0">
+                    <TruncatedText>{displayEmail(account.email, account.id)}</TruncatedText>
                   </ResponsiveSheetTitle>
                   {/* The list's status pill leads the meta line, as on the phone cards. */}
                   <div className="flex min-w-0 items-center gap-2">
                     <LiveStatusPill account={account} plain size="sm" />
                     {meta ? (
-                      <ResponsiveSheetDescription className="min-w-0 truncate">
-                        {meta}
+                      <ResponsiveSheetDescription className="min-w-0">
+                        <TruncatedText>{meta}</TruncatedText>
                       </ResponsiveSheetDescription>
                     ) : null}
                   </div>

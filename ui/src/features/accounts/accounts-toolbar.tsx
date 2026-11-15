@@ -268,7 +268,8 @@ export function AccountsToolbar({
             aria-label={t("filter.search")}
             autoComplete="off"
             onChange={(event) => onFiltersChange({ q: event.target.value || undefined })}
-            placeholder={t("filter.search")}
+            // Short, so it fits the 10rem the search starts at; the label names every field.
+            placeholder={t("filter.searchPlaceholder")}
             type="search"
             value={filters.q ?? ""}
           />

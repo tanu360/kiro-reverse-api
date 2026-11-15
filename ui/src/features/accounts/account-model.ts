@@ -8,7 +8,14 @@ import type {
   ExportData,
   ModelInfo,
 } from "@/lib/api/types";
-import { belowStep, dateTimeFormat, EMPTY, numberFormat, roundsToZero } from "@/lib/format";
+import {
+  belowStep,
+  dateTimeFormat,
+  EMPTY,
+  formatDuration,
+  numberFormat,
+  roundsToZero,
+} from "@/lib/format";
 import { joinList, type Lang, type TFunction } from "@/lib/i18n";
 import {
   ACCOUNT_STATUSES,
@@ -479,25 +486,26 @@ export function trialExpiry(trialExpiresAt: number, nowMs: number): TrialExpiry 
   return null;
 }
 
-type TokenExpiry =
-  | { kind: "none" }
-  | { kind: "expired" }
-  | { kind: "minutes" | "hours" | "days"; value: number };
+type TokenExpiry = { kind: "none" } | { kind: "expired" } | { kind: "left"; seconds: number };
 
-/** Time left on the access token, in whole minutes, hours or days. */
+/** Time left on the access token, in seconds. */
 export function tokenExpiry(expiresAt: number, nowSec: number): TokenExpiry {
   if (!expiresAt) return { kind: "none" };
   const diff = expiresAt - nowSec;
   if (diff <= 0) return { kind: "expired" };
-  if (diff < 3600) return { kind: "minutes", value: Math.floor(diff / 60) };
-  if (diff < 86_400) return { kind: "hours", value: Math.floor(diff / 3600) };
-  return { kind: "days", value: Math.floor(diff / 86_400) };
+  return { kind: "left", seconds: diff };
 }
 
-export function formatTokenExpiry(expiry: TokenExpiry, t: TFunction): string {
+/**
+ * Time left on the token in its two largest units, as every duration reads: "45s", "17m",
+ * "5h 12m", "3d 4h". From a minute up the seconds are dropped (the list refreshes each minute),
+ * so a token is never shown with more time than it has.
+ */
+export function formatTokenExpiry(expiry: TokenExpiry, t: TFunction, lang?: Lang): string {
   if (expiry.kind === "none") return EMPTY;
   if (expiry.kind === "expired") return t("time.expired");
-  return t(`time.${expiry.kind}`, { value: expiry.value });
+  const { seconds } = expiry;
+  return formatDuration(seconds < 60 ? seconds : Math.floor(seconds / 60) * 60, lang);
 }
 
 // ---------------------------------------------------------------------------

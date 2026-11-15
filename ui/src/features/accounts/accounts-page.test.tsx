@@ -95,6 +95,10 @@ describe("AccountsPage", () => {
 
   it("filters by nickname as the user types", async () => {
     const { table, user } = await renderAccounts();
+    // A placeholder short enough for the search's narrowest width; the label names the fields.
+    expect(
+      screen.getByRole("searchbox", { name: "Search email, nickname, notes or tags" }),
+    ).toHaveAttribute("placeholder", "Search accounts");
     await user.type(
       screen.getByRole("searchbox", { name: "Search email, nickname, notes or tags" }),
       "overfl",

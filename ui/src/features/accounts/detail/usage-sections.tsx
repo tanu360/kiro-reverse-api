@@ -121,15 +121,17 @@ function ActivityStrip({
     summary =
       point.failures > 0
         ? t("detail.activityPointFailed", {
+            count: point.reqs,
             when,
             requests,
             failures: formatNumber(point.failures, lang),
           })
-        : t("detail.activityPoint", { when, requests });
+        : t("detail.activityPoint", { count: point.reqs, when, requests });
   } else {
     summary =
       total > 0
         ? t("detail.activitySummary", {
+            count: total,
             requests: formatNumber(total, lang),
             rate: formatPercent(total - failures, total, lang),
           })

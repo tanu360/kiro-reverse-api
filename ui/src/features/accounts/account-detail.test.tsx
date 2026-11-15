@@ -303,6 +303,42 @@ describe("AccountDetailSheet", () => {
     // Same one-decimal credits as the list ("312.5", not "312.48").
     expect(within(statistics).getByText("312.5")).toBeInTheDocument();
   });
+
+  it("counts one request in the last day in the singular", async () => {
+    const account = dana();
+    const cells = Array.from({ length: 24 }, (_, offset) => ({
+      offset,
+      reqs: offset === 3 ? 1 : 0,
+      failures: 0,
+    }));
+    mockServer.use(
+      http.get(apiUrl("/observe/account-heatmap"), () =>
+        HttpResponse.json({
+          windowMin: 24 * 60,
+          bucketMin: 60,
+          nowUnix: Math.floor(Date.now() / 1000),
+          global: { accountId: "_global_", cells },
+          accounts: [{ accountId: account.id, cells }],
+        }),
+      ),
+    );
+    const { sheet } = await openSheet(account);
+    expect(
+      await within(section(sheet, "Statistics")).findByText("1 request · 100% success"),
+    ).toBeInTheDocument();
+  });
+
+  it("names the overage rate as a price per credit", async () => {
+    const account = dana();
+    const { sheet } = await openSheet(account);
+    const overage = section(sheet, "Overage (AWS)");
+    const label = within(overage).getByText("Price per credit");
+    expect(label.parentElement).toHaveTextContent(
+      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+        account.overageRate,
+      ),
+    );
+  });
 });
 
 describe("AccountDetailSheet notes and tags", () => {
