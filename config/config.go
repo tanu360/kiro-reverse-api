@@ -283,7 +283,7 @@ type AccountInfo struct {
 	TrialExpiresAt    int64
 }
 
-const Version = "3.5.4"
+const Version = "3.5.5"
 
 var (
 	cfg     *Config
