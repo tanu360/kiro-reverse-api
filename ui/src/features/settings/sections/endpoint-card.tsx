@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { queryKeys } from "@/lib/api/query-keys";
 import { endpointQuery, updateEndpointConfig } from "@/lib/api/settings";
-import type { EndpointConfig, PreferredEndpoint } from "@/lib/api/types";
+import type { ChatApi, EndpointConfig, PreferredEndpoint } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { SECTION_ID } from "./sections";
@@ -24,6 +24,12 @@ const ENDPOINT_LABEL_KEYS: Record<PreferredEndpoint, string> = {
   kiro: "endpointKiro",
   codewhisperer: "endpointCodeWhisperer",
   amazonq: "endpointAmazonQ",
+};
+
+const CHAT_API_LABEL_KEYS: Record<ChatApi, string> = {
+  auto: "chatApiAuto",
+  responses: "chatApiResponses",
+  legacy: "chatApiLegacy",
 };
 
 /**
@@ -97,6 +103,45 @@ function EndpointSelect({
   );
 }
 
+/**
+ * Which of Kiro's two chat APIs requests use. The row's label and description go to the
+ * trigger, as on the endpoint select.
+ */
+function ChatApiSelect({
+  value,
+  onChange,
+  ...aria
+}: AriaProps & {
+  value: ChatApi;
+  onChange: (value: ChatApi) => void;
+}): JSX.Element {
+  const { t } = useT("settings");
+  const items = (Object.keys(CHAT_API_LABEL_KEYS) as ChatApi[]).map((api) => ({
+    value: api,
+    label: t(CHAT_API_LABEL_KEYS[api]),
+  }));
+  return (
+    <Select
+      items={items}
+      onValueChange={(next) => {
+        if (next) onChange(next as ChatApi);
+      }}
+      value={value}
+    >
+      <SelectTrigger {...aria}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectPopup>
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
+  );
+}
+
 function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
   const { t } = useT("settings");
   const queryClient = useQueryClient();
@@ -104,6 +149,7 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
     preferredEndpoint: config.preferredEndpoint || "auto",
     // Missing means on.
     endpointFallback: config.endpointFallback !== false,
+    chatApi: config.chatApi ?? "auto",
   });
   const { save, saving } = useSectionSave((body: EndpointConfig) => updateEndpointConfig(body), {
     onSaved: (sent) => {
@@ -143,6 +189,16 @@ function EndpointForm({ config }: { config: EndpointConfig }): JSX.Element {
         description={t("endpointFallbackHint")}
         onCheckedChange={(endpointFallback) => draft.set((prev) => ({ ...prev, endpointFallback }))}
         title={t("endpointFallback")}
+      />
+      <SettingsRow
+        control={
+          <ChatApiSelect
+            onChange={(chatApi) => draft.set((prev) => ({ ...prev, chatApi }))}
+            value={draft.value.chatApi ?? "auto"}
+          />
+        }
+        description={t("chatApiHint")}
+        title={t("chatApi")}
       />
     </SettingsSection>
   );

@@ -1271,13 +1271,22 @@ export interface ModelMappingsUpdate {
 }
 
 export type PreferredEndpoint = "auto" | "kiro" | "codewhisperer" | "amazonq";
+/**
+ * Kiro's chat API: auto follows Kiro's per-account experiment flag, responses sends every
+ * account to CreateResponse (/v1/responses), legacy keeps every account on
+ * generateAssistantResponse.
+ */
+export type ChatApi = "auto" | "responses" | "legacy";
 export interface EndpointConfig {
   preferredEndpoint: PreferredEndpoint;
   endpointFallback: boolean;
+  /** Absent from servers older than the setting, which always follow the old API. */
+  chatApi?: ChatApi;
 }
 export interface EndpointConfigUpdate {
   preferredEndpoint: PreferredEndpoint;
   endpointFallback?: boolean;
+  chatApi?: ChatApi;
 }
 
 /** Host family of chat and web search: q.{region}.amazonaws.com or runtime.{region}.kiro.dev. */

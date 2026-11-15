@@ -2060,7 +2060,7 @@ export function seedFullDataset(now: number): FullDataset {
       claudeFormat: "reasoning_content",
     },
     modelMappings: modelMappingsFull(),
-    endpoint: { preferredEndpoint: "codewhisperer", endpointFallback: false },
+    endpoint: { preferredEndpoint: "codewhisperer", endpointFallback: false, chatApi: "auto" },
     proxy: { proxyURL: "http://proxy.northwind.studio:3128" },
     promptFilter: promptFilterFull(),
     // Up for 9 days: the persisted log reaches further back than this process.

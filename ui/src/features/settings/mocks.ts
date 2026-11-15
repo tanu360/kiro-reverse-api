@@ -3,6 +3,7 @@ import type { ResponseHeaderRule } from "@/lib/api/response-headers";
 import { TUNNEL_HOSTNAME, type TunnelStatus } from "@/lib/api/tunnel";
 import type {
   ApiDomain,
+  ChatApi,
   LogLevel,
   ModelMappingRule,
   PreferredEndpoint,
@@ -42,6 +43,7 @@ const MAX_MAPPINGS = 200;
 const MAX_MODEL_ID_BYTES = 256;
 const THINKING_FORMATS: readonly ThinkingFormat[] = ["reasoning_content", "thinking", "think"];
 const ENDPOINTS: readonly PreferredEndpoint[] = ["auto", "kiro", "codewhisperer", "amazonq"];
+const CHAT_APIS: readonly ChatApi[] = ["auto", "responses", "legacy"];
 const PROXY_SCHEMES = ["http://", "https://", "socks5://", "socks5h://"];
 
 const API_DOMAINS: readonly ApiDomain[] = ["amazonaws", "kiro"];
@@ -548,13 +550,18 @@ export const handlers: HttpHandler[] = [
     if (!body) return invalidJson();
     const preferred = optional(body, "preferredEndpoint", isString);
     const fallback = optional(body, "endpointFallback", isBool);
-    if (preferred === null || fallback === null) return invalidJson();
+    const chatApi = optional(body, "chatApi", isString);
+    if (preferred === null || fallback === null || chatApi === null) return invalidJson();
     if (!preferred || !(ENDPOINTS as readonly string[]).includes(preferred)) {
       return jsonError(400, "Invalid endpoint, must be: auto, kiro, codewhisperer, or amazonq");
+    }
+    if (chatApi !== undefined && !(CHAT_APIS as readonly string[]).includes(chatApi)) {
+      return jsonError(400, "invalid chat API, must be: auto, responses, or legacy");
     }
     mockDb.endpoint = {
       preferredEndpoint: preferred as PreferredEndpoint,
       endpointFallback: fallback ?? mockDb.endpoint.endpointFallback,
+      chatApi: (chatApi as ChatApi | undefined) ?? mockDb.endpoint.chatApi,
     };
     return saved();
   }),

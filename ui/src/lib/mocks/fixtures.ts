@@ -1434,7 +1434,7 @@ export function defaultModelMappings(): ModelMappingRule[] {
 }
 
 export function defaultEndpoint(): EndpointConfig {
-  return { preferredEndpoint: "auto", endpointFallback: true };
+  return { preferredEndpoint: "auto", endpointFallback: true, chatApi: "auto" };
 }
 
 export function defaultUpstream(): MockDb["upstream"] {
