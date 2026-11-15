@@ -83,6 +83,7 @@
 - **模型映射**：有序规则，可拖拽排序，将任意客户端模型名映射到 Kiro 模型 ID；先匹配者生效。Kiro 自身列出的模型只会被写出完整模型名的规则改写，因此 `gpt-5` 这类子串规则不会改写原生模型。
 - **流完整性**：拒绝既没有停止原因也没有计量事件就结束的回复；对两者都不发送的 IdC 和企业账号，可选择开启宽松模式。
 - **端点选择**：指定 Kiro 端点，或由代理根据可用性自动选择，并可选择在不可用时切换到其他端点。
+- **Kiro 新版对话 API**：Kiro 正在把部分账号切换到 CreateResponse（`runtime.{region}.kiro.dev` 上的 `/v1/responses`），这些账号即使还有额度，在旧版 API 上也会收到 HTTP 429 `USER_REQUEST_RATE_EXCEEDED`。代理会像 Kiro IDE 一样向 Kiro 读取每个账号的开关（缓存 15 分钟；旧版 API 返回这种 429 时会立即重新读取），并把该账号的对话发到 Kiro 为它选定的 API。**设置 → Kiro 端点 → 对话 API**（配置中的 `chatApi`：`auto`、`responses` 或 `legacy`）可以让所有账号统一使用同一个 API。Kiro API Key 账号始终使用 Kiro CLI 运行时。
 - **图片缩放**（默认开启）：宽或高超过 1568 px、或大于 400 KB 的图片会先缩小并重新编码，再发送给 Kiro。两个上限都可以在设置中调整。
 - **响应头**：最多 20 个自定义响应头，附加到每个 API 响应上，流式响应与错误响应也不例外。值中可使用 `{request_id}`、`{model}`、`{account_id}`、`{key_id}` 与 `{client_ip}`；`{request_id}` 即请求日志中的追踪 ID。
 
