@@ -3,15 +3,17 @@ import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 /*
- * The one notice, after the sign-in form's: a soft tag in the tone's light fill (the --pill-*
- * tokens, as the status pills), no border, the text in the tone's readable step, and a duotone
- * disc icon (index.css `[data-slot="alert"]`): a light circle in the tone with the glyph in the
- * full tone. Non-circled icons (a triangle) simply take the tone. 8 px corners like the controls;
- * a long message wraps. `size="sm"` is the inline notice: 12 px text and a 14 px icon, for a line
- * under a card or table (a server-changed note, a memory note).
+ * The one notice, after Vercel's Geist Note in its filled form: a light fill of the tone with a
+ * hairline a step deeper, the text and the outline icon in a dark step of the tone, and the
+ * action (AlertAction) a solid button in the tone with a white label (Button variant "tone",
+ * which reads --notice-btn). The colours are the --notice-* tokens in index.css. 8 px corners
+ * like the controls; a long message wraps. With an action on a wide screen the text centres on
+ * the button and the padding beside the button tightens. `size="sm"` is the inline notice:
+ * 12 px text and a 14 px icon, for a line under a card or table (a server-changed note, a memory
+ * note).
  */
 const alertVariants = cva(
-  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-lg bg-(--badge-bg) px-3 text-(--badge-fg) has-[>svg]:has-data-[slot=alert-action]:grid-cols-[var(--alert-icon)_1fr_auto] has-[>svg]:grid-cols-[var(--alert-icon)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] [&>svg]:size-(--alert-icon) [&>svg]:text-(--badge-disc)",
+  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-lg border border-(--notice-line) bg-(--badge-bg) px-3 text-(--badge-fg) has-[>svg]:has-data-[slot=alert-action]:grid-cols-[var(--alert-icon)_1fr_auto] has-[>svg]:grid-cols-[var(--alert-icon)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] sm:has-data-[slot=alert-action]:items-center sm:has-data-[slot=alert-action]:pe-1.5 [&>svg]:size-(--alert-icon) [&>svg]:text-(--badge-disc)",
   {
     defaultVariants: {
       size: "default",
@@ -19,19 +21,20 @@ const alertVariants = cva(
     },
     variants: {
       size: {
-        default: "py-2 text-sm leading-5 [--alert-icon:--spacing(4.5)] [&>svg]:mt-px",
-        sm: "py-2 text-xs leading-4 [--alert-icon:--spacing(3.5)] [&>svg]:mt-px",
+        default:
+          "py-2 text-sm leading-5 [--alert-icon:--spacing(4.5)] sm:has-data-[slot=alert-action]:py-1.5 [&>svg]:mt-px sm:has-data-[slot=alert-action]:[&>svg]:mt-0",
+        sm: "py-2 text-xs leading-4 [--alert-icon:--spacing(3.5)] sm:has-data-[slot=alert-action]:py-1.5 [&>svg]:mt-px sm:has-data-[slot=alert-action]:[&>svg]:mt-0",
       },
       variant: {
         default:
-          "[--badge-bg:var(--pill-neutral-bg)] [--badge-disc:var(--pill-neutral)] [--badge-fg:var(--pill-neutral-fg)]",
+          "[--badge-bg:var(--notice-neutral-bg)] [--badge-disc:var(--notice-neutral-fg)] [--badge-fg:var(--notice-neutral-fg)] [--notice-btn:var(--notice-neutral-btn)] [--notice-line:var(--notice-neutral-line)]",
         error:
-          "[--badge-bg:var(--pill-error-bg)] [--badge-disc:var(--pill-error)] [--badge-fg:var(--pill-error-fg)]",
-        info: "[--badge-bg:var(--pill-primary-bg)] [--badge-disc:var(--pill-primary)] [--badge-fg:var(--pill-primary-fg)]",
+          "[--badge-bg:var(--notice-error-bg)] [--badge-disc:var(--notice-error-fg)] [--badge-fg:var(--notice-error-fg)] [--notice-btn:var(--notice-error-btn)] [--notice-line:var(--notice-error-line)]",
+        info: "[--badge-bg:var(--notice-info-bg)] [--badge-disc:var(--notice-info-fg)] [--badge-fg:var(--notice-info-fg)] [--notice-btn:var(--notice-info-btn)] [--notice-line:var(--notice-info-line)]",
         success:
-          "[--badge-bg:var(--pill-success-bg)] [--badge-disc:var(--pill-success)] [--badge-fg:var(--pill-success-fg)]",
+          "[--badge-bg:var(--notice-success-bg)] [--badge-disc:var(--notice-success-fg)] [--badge-fg:var(--notice-success-fg)] [--notice-btn:var(--notice-success-btn)] [--notice-line:var(--notice-success-line)]",
         warning:
-          "[--badge-bg:var(--pill-warning-bg)] [--badge-disc:var(--pill-warning)] [--badge-fg:var(--pill-warning-fg)]",
+          "[--badge-bg:var(--notice-warning-bg)] [--badge-disc:var(--notice-warning-fg)] [--badge-fg:var(--notice-warning-fg)] [--notice-btn:var(--notice-warning-btn)] [--notice-line:var(--notice-warning-line)]",
       },
     },
   },
@@ -87,7 +90,7 @@ export function AlertAction({
   return (
     <div
       className={cn(
-        "flex gap-1 max-sm:col-start-2 max-sm:mt-2 sm:row-start-1 sm:row-end-3 sm:self-center sm:[[data-slot=alert-description]~&]:col-start-2 sm:[[data-slot=alert-title]~&]:col-start-2 sm:[svg~&]:col-start-2 sm:[svg~[data-slot=alert-description]~&]:col-start-3 sm:[svg~[data-slot=alert-title]~&]:col-start-3",
+        "flex gap-1 max-sm:col-start-2 max-sm:mt-2 sm:row-start-1 sm:[[data-slot=alert-title]~&]:row-end-3 sm:self-center sm:[[data-slot=alert-description]~&]:col-start-2 sm:[[data-slot=alert-title]~&]:col-start-2 sm:[svg~&]:col-start-2 sm:[svg~[data-slot=alert-description]~&]:col-start-3 sm:[svg~[data-slot=alert-title]~&]:col-start-3",
         className,
       )}
       data-slot="alert-action"

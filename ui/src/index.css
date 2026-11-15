@@ -911,34 +911,18 @@
  * Clock01…) becomes a filled circle in the tone colour with its glyph knocked out, a little
  * heavier so it holds up at 12-14 px. The colours come from the pill's --badge-dot/--badge-glyph.
  * The circle is the icon's first element (a <circle> or a closed <path>). Hugeicons set the
- * stroke width on every element, so these rules style the elements, not the <svg>. A notice
- * only takes the disc when its icon starts with a <circle> (a triangle simply takes the tone).
+ * stroke width on every element, so these rules style the elements, not the <svg>. Notices
+ * draw their icons as plain outlines in the tone.
  */
-[data-badge-icon="disc"] > *,
-[data-slot="alert"] > svg:has(> circle:first-child) > * {
+[data-badge-icon="disc"] > * {
   stroke-width: 2.5;
 }
-[data-badge-icon="disc"] > :first-child,
-[data-slot="alert"] > svg > circle:first-child {
+[data-badge-icon="disc"] > :first-child {
   fill: var(--badge-dot);
-  /* Optional edge ring in its own colour and width (the notices); else none shows. */
-  stroke: var(--badge-dot-ring, var(--badge-dot));
-  stroke-width: var(--badge-dot-ring-width, 2.5);
+  stroke: var(--badge-dot);
 }
-[data-badge-icon="disc"] > :not(:first-child),
-[data-slot="alert"] > svg:has(> circle:first-child) > :not(:first-child) {
+[data-badge-icon="disc"] > :not(:first-child) {
   stroke: var(--badge-glyph);
-}
-/*
- * Notices (components/ui/alert.tsx): the disc is a light step of the tone edged by one thin
- * ring, both opaque (mixed with the page background, so a see-through fill under a see-through
- * stroke cannot draw two rings), and the glyph is the full tone rather than knocked out.
- */
-[data-slot="alert"] {
-  --badge-dot: color-mix(in oklab, var(--badge-disc) 28%, var(--background));
-  --badge-dot-ring: color-mix(in oklab, var(--badge-disc) 48%, var(--background));
-  --badge-dot-ring-width: 1.25;
-  --badge-glyph: var(--badge-disc);
 }
 
 /*
@@ -1005,6 +989,59 @@
   --pill-error: #f06b61;
   --pill-error-fg: #ff8a80;
   --pill-error-bg: color-mix(in srgb, var(--pill-error) 18%, transparent);
+}
+
+/*
+ * Notice colours (components/ui/alert.tsx), after Vercel's Geist Note in its filled form: a light
+ * fill of the tone with a hairline a step deeper, the text and icon in a dark step of the tone,
+ * and the action a solid button in the tone with a white label. Every label is at least 4.6:1
+ * on its fill and every button label at least 4.6:1 on its button, in both themes. The fills are
+ * opaque. The dark theme lifts the fills and text a step, so a notice reads on the near-black
+ * card, and darkens the buttons so the white label holds.
+ */
+:root {
+  --notice-neutral-fg: rgb(0 0 0 / 70%);
+  --notice-neutral-bg: rgb(0 0 0 / 6%);
+  --notice-neutral-line: transparent;
+  --notice-neutral-btn: #4d4d4d;
+  --notice-info-fg: #7820bc;
+  --notice-info-bg: #f9f1fe;
+  --notice-info-line: #f3e6fd;
+  --notice-info-btn: #7820bc;
+  --notice-success-fg: #297a3a;
+  --notice-success-bg: #ebf9ee;
+  --notice-success-line: #dcf4e2;
+  --notice-success-btn: #297a3a;
+  --notice-warning-fg: #a35200;
+  --notice-warning-bg: #fff4d6;
+  --notice-warning-line: #ffecbd;
+  --notice-warning-btn: #a35200;
+  --notice-error-fg: #cb2a2f;
+  --notice-error-bg: #ffebeb;
+  --notice-error-line: #ffdede;
+  --notice-error-btn: #cb2a2f;
+}
+.dark {
+  --notice-neutral-fg: rgb(255 255 255 / 80%);
+  --notice-neutral-bg: rgb(255 255 255 / 12%);
+  --notice-neutral-line: rgb(255 255 255 / 6%);
+  --notice-neutral-btn: #5c5c66;
+  --notice-info-fg: #d3a8ff;
+  --notice-info-bg: #3b2152;
+  --notice-info-line: #4b2b68;
+  --notice-info-btn: #9046ff;
+  --notice-success-fg: #7fd890;
+  --notice-success-bg: #153b21;
+  --notice-success-line: #1d4e2c;
+  --notice-success-btn: #1c8238;
+  --notice-warning-fg: #ffbf4d;
+  --notice-warning-bg: #43290a;
+  --notice-warning-line: #583812;
+  --notice-warning-btn: #b85600;
+  --notice-error-fg: #ff8a8e;
+  --notice-error-bg: #4e1c20;
+  --notice-error-line: #672428;
+  --notice-error-btn: #d93036;
 }
 
 @theme inline {
