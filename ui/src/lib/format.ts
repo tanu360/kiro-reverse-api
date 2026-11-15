@@ -152,20 +152,25 @@ function formatUnit(
   }).format(value);
 }
 
-const BYTE_UNITS = ["kilobyte", "megabyte", "gigabyte"] as const;
+const BYTE_UNITS = ["KB", "MB", "GB", "TB"] as const;
 
-/** 512 B, 47.1 kB, 5.0 MB: binary steps, one decimal from a kilobyte up. */
+/**
+ * 512 B, 47.1 KB, 5.0 MB: steps of 1024, labelled KB, MB and GB as file managers label them,
+ * with one decimal from a kilobyte up. The number follows the UI language ("47,1 KB" in
+ * Vietnamese); the unit symbols are the same in every language. A no-break space keeps the
+ * number and its unit on one line.
+ */
 export function formatBytes(bytes: number, lang?: Lang): string {
   let value = finite(bytes);
-  if (Math.abs(value) < 1024) return formatUnit(Math.trunc(value), "byte", lang, 0, "narrow");
-  let unit: (typeof BYTE_UNITS)[number] = "kilobyte";
+  if (Math.abs(value) < 1024) return `${formatNumber(value, lang)} B`;
+  let unit: (typeof BYTE_UNITS)[number] = "KB";
   for (const next of BYTE_UNITS) {
     unit = next;
     value /= 1024;
     // Round first so 1023.96 KB becomes 1.0 MB instead of "1,024.0 KB".
     if (Math.abs(Math.round(value * 10) / 10) < 1024) break;
   }
-  return formatUnit(value, unit, lang, 1);
+  return `${formatDecimal(value, 1, lang)} ${unit}`;
 }
 
 /**

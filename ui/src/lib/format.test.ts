@@ -140,12 +140,18 @@ describe("formatDuration", () => {
 });
 
 describe("other formatters", () => {
-  it("formats bytes with one decimal", () => {
-    expect(formatBytes(48_213)).toBe("47.1 kB");
-    expect(formatBytes(512)).toBe("512B");
-    expect(formatBytes(5 * 1024 * 1024)).toBe("5.0 MB");
-    // Never "1,024.0 kB".
-    expect(formatBytes(1_048_575)).toBe("1.0 MB");
+  it("formats bytes in steps of 1024 as B, KB, MB and GB, with a no-break space", () => {
+    expect(formatBytes(48_213)).toBe("47.1\u00a0KB");
+    expect(formatBytes(512)).toBe("512\u00a0B");
+    expect(formatBytes(0)).toBe("0\u00a0B");
+    expect(formatBytes(1024)).toBe("1.0\u00a0KB");
+    expect(formatBytes(5 * 1024 * 1024)).toBe("5.0\u00a0MB");
+    // 7,940,033 bytes is 7.57 MiB: the unit is labelled MB, as the 1024 steps are everywhere.
+    expect(formatBytes(7_940_033)).toBe("7.6\u00a0MB");
+    expect(formatBytes(3 * 1024 ** 3)).toBe("3.0\u00a0GB");
+    // Never "1,024.0 KB".
+    expect(formatBytes(1_048_575)).toBe("1.0\u00a0MB");
+    expect(formatBytes(Number.NaN)).toBe("0\u00a0B");
   });
 
   it("formats numbers, fractions, credits and dollars", () => {
@@ -201,7 +207,9 @@ describe("locale-aware formatting", () => {
     expect(formatPercent(1, 3, "vi")).toBe("33,3%");
     expect(formatCredits(1234.5, 2, "pt-BR")).toBe("1.234,50");
     expect(formatUsd(1.2, "pt-BR")).toBe("US$\u00a01,20");
-    expect(formatBytes(48_213, "vi")).toBe("47,1 kB");
+    expect(formatBytes(48_213, "vi")).toBe("47,1\u00a0KB");
+    expect(formatBytes(1_536_000, "pt-BR")).toBe("1,5\u00a0MB");
+    expect(formatBytes(48_213, "zh")).toBe("47.1\u00a0KB");
   });
 
   it("formats durations and relative time with the language's units", () => {

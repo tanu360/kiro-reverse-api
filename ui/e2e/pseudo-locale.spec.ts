@@ -21,7 +21,7 @@ const ALLOWED_WORDS = new Set(
     "Mon Tue Wed Thu Fri Sat Sun AM PM",
     "ago in yesterday today tomorrow now last next this",
     "second seconds minute minutes hour hours day days week weeks month months year years",
-    "sec min hr ms s m h d B kB MB GB K M T byte bytes",
+    "sec min hr ms s m h d B KB MB GB TB K M T byte bytes",
     "Kiro Proxy AWS Builder ID IAM Identity Center Microsoft Entra Claude Code Codex OpenAI",
     "Anthropic JSON URL HTTP GET POST PUT PATCH DELETE Ctrl Shift Alt Enter Esc Tab",
     // Language names, shown in their own script.
@@ -40,8 +40,8 @@ const DATA_PATTERNS: RegExp[] = [
   /^(?:https?:\/\/|\/)\S*$/,
   /^v\d+(?:\.\d+)*$/,
   /^[\da-f]+(?:-[\da-f]+)*…?$/i,
-  // Compact numbers and units from Intl: 9.9M, 30.8K, 56.4kB, 1.84s, 120ms.
-  /^[\d.,]+(?:K|M|B|T|kB|MB|GB|ms|s|m|h|d)$/,
+  // Compact numbers and units: 9.9M, 30.8K, 56.4KB, 1.84s, 120ms.
+  /^[\d.,]+(?:K|M|B|T|KB|MB|GB|ms|s|m|h|d)$/,
   // A lone letter: an avatar's initial, cut from the email beside it.
   /^\p{L}$/u,
 ];
