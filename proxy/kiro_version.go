@@ -18,8 +18,9 @@ import (
 // the version every IDE updates to.
 const kiroMetadataURL = "https://prod.download.desktop.kiro.dev/stable/metadata-linux-x64-stable.json"
 
-// kiroVersionEvery is how often the feed is read: Kiro ships an IDE build every week or two.
-const kiroVersionEvery = 6 * time.Hour
+// kiroVersionEvery is how often the feed is read: once a day, since Kiro ships an IDE build
+// every week or two, and a rejection reads it sooner (noteKiroVersionGate).
+const kiroVersionEvery = 24 * time.Hour
 
 // kiroGateRecheckGap spaces the feed reads that a version-gate rejection triggers.
 const kiroGateRecheckGap = 10 * time.Minute
