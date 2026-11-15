@@ -26,7 +26,11 @@ func callKiroForcedTool(ctx context.Context, account *config.Account, payload *K
 	}
 	first.flush()
 	maxTokens := requestedMaxTokens(&inner)
-	if len(first.toolUses) > 0 || !first.canRetry(&inner) || ctx.Err() != nil {
+	//! A hosted web search the reply ran is a tool call too (followup is the payload its search
+	//! round sent), so tool_choice "required" is met. Asking again only paid for another turn,
+	//! which Kiro's CreateResponse often answered with no output at all.
+	searched := first.followup != nil
+	if len(first.toolUses) > 0 || searched || !first.canRetry(&inner) || ctx.Err() != nil {
 		finishStructured(callback, maxTokens, first, first.answer.String(), first)
 		return nil
 	}

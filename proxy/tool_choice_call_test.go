@@ -63,6 +63,28 @@ func TestForcedToolChoicePassesACallThroughAtOnce(t *testing.T) {
 	}
 }
 
+// A hosted web search satisfies tool_choice "required": the reply searched, then answered.
+// Recorded live: Kiro called webSearch, the proxy ran it, and the nudge that followed cost a
+// second turn that CreateResponse answered with response.completed and an empty output.
+func TestForcedToolChoiceCountsAHostedSearchAsTheCall(t *testing.T) {
+	payload := forcedToolPayload("any")
+	followup := searchFollowupPayload(payload, "go blog", "1. The Go Blog\nURL: https://go.dev/blog")
+	script := &scriptedKiro{hops: []scriptedHop{
+		{text: []string{"The newest post is \"Go 1.27 is released\"."}, followup: followup, stop: "end_turn", in: 40, out: 12},
+		{tools: []KiroToolUse{{ToolUseID: "t1", Name: "get_weather"}}, stop: "tool_use"},
+	}}
+	rec := &continueRecorder{}
+	if err := callKiroAutoContinue(context.Background(), nil, payload, rec.callback(), script.call); err != nil {
+		t.Fatal(err)
+	}
+	if len(script.payloads) != 1 {
+		t.Fatalf("calls %d, want 1: a reply that searched must not be asked for a tool call again", len(script.payloads))
+	}
+	if rec.text != "The newest post is \"Go 1.27 is released\"." || len(rec.tools) != 0 {
+		t.Fatalf("text %q tools %v, want the searched answer", rec.text, rec.tools)
+	}
+}
+
 func TestForcedToolChoiceKeepsTheFirstReplyWhenTheRetryAlsoTalks(t *testing.T) {
 	script := &scriptedKiro{hops: []scriptedHop{
 		{text: []string{"Which city?"}, stop: "end_turn"},
