@@ -88,7 +88,9 @@ func resolveWebSearchToolResults(ctx context.Context, account *config.Account, t
 	return results, nil
 }
 
-func buildWebSearchFollowupPayload(base *KiroPayload, toolUses []KiroToolUse, results []KiroToolResult) *KiroPayload {
+// buildWebSearchFollowupPayload replays the turn with the searches the reply asked for and their
+// results. text is what the reply said before it searched, kept in the history as the client saw it.
+func buildWebSearchFollowupPayload(base *KiroPayload, toolUses []KiroToolUse, results []KiroToolResult, text string) *KiroPayload {
 	if base == nil {
 		return nil
 	}
@@ -126,7 +128,7 @@ func buildWebSearchFollowupPayload(base *KiroPayload, toolUses []KiroToolUse, re
 	}
 	history = append(history,
 		KiroHistoryMessage{UserInputMessage: &historyUser},
-		KiroHistoryMessage{AssistantResponseMessage: &KiroAssistantResponseMessage{ToolUses: historyTools}},
+		KiroHistoryMessage{AssistantResponseMessage: &KiroAssistantResponseMessage{Content: strings.TrimSpace(text), ToolUses: historyTools}},
 	)
 	ids := make(map[string]bool, len(results))
 	for _, result := range results {
@@ -349,10 +351,27 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 	totalIn, totalOut := 0, 0
 	totalCredits := 0.0
 	var totalCache cacheTokenCounts
+	// spoke is whether the answer so far ends in text that a later round's text would run into.
+	spoke := false
 	for round := 0; round <= maxRounds; round++ {
 		var tools []KiroToolUse
+		var said strings.Builder
 		stop := ""
 		cb := *callback
+		if callback.OnText != nil {
+			cb.OnText = func(text string, isThinking bool) {
+				if !isThinking && text != "" {
+					//! Each round is a new assistant message: the text after a search started
+					//! on the same line as the text before it ("…the latest posts:Based on…").
+					if said.Len() == 0 && spoke && !strings.HasPrefix(text, "\n") {
+						callback.OnText("\n\n", false)
+					}
+					said.WriteString(text)
+					spoke = !strings.HasSuffix(text, "\n")
+				}
+				callback.OnText(text, isThinking)
+			}
+		}
 		cb.OnToolUse = func(tu KiroToolUse) { tools = append(tools, tu) }
 		cb.OnComplete = func(in, out int) { totalIn += in; totalOut += out }
 		cb.OnCredits = func(c float64) { totalCredits += c }
@@ -428,7 +447,7 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 			}
 			return nil
 		}
-		next = buildWebSearchFollowupPayload(next, searches, results)
+		next = buildWebSearchFollowupPayload(next, searches, results, said.String())
 		if callback.onFollowupPayload != nil {
 			callback.onFollowupPayload(next)
 		}

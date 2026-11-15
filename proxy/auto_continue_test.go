@@ -681,6 +681,7 @@ func searchFollowupPayload(base *KiroPayload, query, results string) *KiroPayloa
 	return buildWebSearchFollowupPayload(base,
 		[]KiroToolUse{{ToolUseID: "ws-" + query, Name: webSearchToolName, Input: map[string]interface{}{"query": query}}},
 		[]KiroToolResult{{ToolUseID: "ws-" + query, Status: "success", Content: []KiroResultContent{{Text: results}}}},
+		"",
 	)
 }
 

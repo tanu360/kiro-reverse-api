@@ -59,7 +59,7 @@ func TestSearchFollowupPreservesPriorResultsWithoutMutation(t *testing.T) {
 	base.ConversationState.History = []KiroHistoryMessage{{AssistantResponseMessage: &KiroAssistantResponseMessage{ToolUses: []KiroToolUse{{ToolUseID: "previous", Name: "read"}}}}}
 	base.ConversationState.CurrentMessage.UserInputMessage.UserInputMessageContext = &UserInputMessageContext{ToolResults: []KiroToolResult{{ToolUseID: "previous", Content: []KiroResultContent{{Text: "important previous result"}}, Status: "success"}}}
 	before, _ := json.Marshal(base)
-	next := buildWebSearchFollowupPayload(base, []KiroToolUse{{ToolUseID: "search", Name: "web_search"}}, []KiroToolResult{{ToolUseID: "search", Status: "success"}})
+	next := buildWebSearchFollowupPayload(base, []KiroToolUse{{ToolUseID: "search", Name: "web_search"}}, []KiroToolResult{{ToolUseID: "search", Status: "success"}}, "")
 	after, _ := json.Marshal(base)
 	if !bytes.Equal(before, after) {
 		t.Fatal("base payload mutated")
@@ -157,5 +157,63 @@ func TestNamespacedHostedSearchDoesNotHijackClientAlias(t *testing.T) {
 	}
 	if strings.Contains(rec.Body.String(), `"name":"research.web_search"`) || strings.Contains(rec.Body.String(), `"name":"web_search"`) {
 		t.Fatal("namespaced hosted call escaped")
+	}
+}
+
+// Recorded live (scrubbed): the reply said a sentence, searched, then answered. The follow-up
+// turn lost that sentence from the history, and the client got both texts run together
+// ("…the most recent posts:Based on the search results…").
+func TestHostedSearchKeepsTheTextBeforeASearch(t *testing.T) {
+	calls := 0
+	var followupHistory []KiroHistoryMessage
+	h := newStreamTestHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var p KiroPayload
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			t.Fatal(err)
+		}
+		if calls == 1 {
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes.Join([][]byte{
+				awsEventStreamFrame(t, "assistantResponseEvent", map[string]interface{}{"content": "Let me search more specifically for the most recent posts:"}),
+				awsEventStreamFrame(t, "toolUseEvent", map[string]interface{}{"toolUseId": "tooluse_ws1", "name": "webSearch", "input": `{"query":"go.dev blog latest"}`, "stop": true}),
+				awsEventStreamFrame(t, "meteringEvent", map[string]interface{}{"usage": 0.01}),
+			}, nil))
+			return
+		}
+		followupHistory = p.ConversationState.History
+		writeKiroTextResponse(t, w, "Based on the search results, the newest post is \"Go 1.27 is released\".")
+	})
+	h.pool.RecordSuccess("only")
+	stubRestTransport(t, func(r *http.Request) (*http.Response, error) {
+		return jsonResponse(200, `{"result":{"content":[{"type":"text","text":"{\"results\":[{\"title\":\"Go 1.27 is released\",\"url\":\"https://go.dev/blog/go1.27\",\"snippet\":\"found\",\"publishedDate\":1786492800000}]}"}]}}`), nil
+	})
+	req := `{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"What is the newest post on the Go blog?"}],"tools":[{"type":"web_search"}]}`
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(req)))
+	if rec.Code != 200 || calls != 2 {
+		t.Fatalf("status=%d calls=%d body=%s", rec.Code, calls, rec.Body.String())
+	}
+	var resp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil || len(resp.Choices) != 1 {
+		t.Fatalf("decode: %v body=%s", err, rec.Body.String())
+	}
+	if got, want := resp.Choices[0].Message.Content, "Let me search more specifically for the most recent posts:\n\nBased on the search results, the newest post is \"Go 1.27 is released\"."; got != want {
+		t.Fatalf("content %q, want %q", got, want)
+	}
+	var said string
+	for _, m := range followupHistory {
+		if a := m.AssistantResponseMessage; a != nil && len(a.ToolUses) > 0 {
+			said = a.Content
+		}
+	}
+	if said != "Let me search more specifically for the most recent posts:" {
+		t.Fatalf("the search turn's history says %q, want the text the reply wrote before searching", said)
 	}
 }
