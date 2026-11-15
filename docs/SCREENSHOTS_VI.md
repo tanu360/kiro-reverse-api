@@ -119,7 +119,7 @@ Mọi trang của trang quản trị. Mỗi ảnh hiển thị sáng hoặc tố
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/settings-2-dark.webp">
     <img alt="Cài đặt · Máy chủ" src="../screenshots/vi/settings-2-light.webp" width="100%">
   </picture>
-  <br><sub><b>Cài đặt · Máy chủ</b> — endpoint Kiro, liên kết công khai, tên miền và khu vực Kiro, proxy outbound, nhóm proxy, header phản hồi, nhật ký máy chủ, chỉ số Prometheus</sub>
+  <br><sub><b>Cài đặt · Máy chủ</b> — endpoint Kiro, tên miền và khu vực Kiro, liên kết công khai kèm ngày hết hạn khóa Tailscale, proxy outbound, nhóm proxy, header phản hồi, nhật ký máy chủ, chỉ số Prometheus</sub>
 </p>
 
 <p align="center">
