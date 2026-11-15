@@ -81,7 +81,7 @@ Todas as páginas do painel de administração. Cada imagem segue o tema do seu 
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/requests-detail-dark.webp">
     <img alt="Detalhes da requisição" src="../screenshots/pt-BR/requests-detail-light.webp" width="100%">
   </picture>
-  <br><sub><b>Detalhes da requisição</b> — o painel que cada linha abre: duração, créditos, tokens e IDs</sub>
+  <br><sub><b>Detalhes da requisição</b> — o painel que cada linha abre: duração, créditos, tokens e IDs, com Conversa e Repetir</sub>
 </p>
 
 ## API
@@ -91,7 +91,7 @@ Todas as páginas do painel de administração. Cada imagem segue o tema do seu 
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/api-dark.webp">
     <img alt="API" src="../screenshots/pt-BR/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>API</b> — acesso à API, chaves por cliente com limites, configuração do cliente destacada</sub>
+  <br><sub><b>API</b> — acesso à API, chaves por cliente com limites, uso por chave, configuração do cliente destacada</sub>
 </p>
 
 ## Backups
@@ -109,25 +109,25 @@ Todas as páginas do painel de administração. Cada imagem segue o tema do seu 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/settings-1-dark.webp">
-    <img alt="Configurações" src="../screenshots/pt-BR/settings-1-light.webp" width="100%">
+    <img alt="Configurações · Geral" src="../screenshots/pt-BR/settings-1-light.webp" width="100%">
   </picture>
-  <br><sub><b>Configurações</b> — uso, integridade do stream, roteamento, continuação automática</sub>
+  <br><sub><b>Configurações · Geral</b> — uso, integridade do stream, roteamento de contas, continuação automática, histórico de ferramentas, redimensionamento de imagens, raciocínio, mapeamento de modelos</sub>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/settings-2-dark.webp">
-    <img alt="Configurações" src="../screenshots/pt-BR/settings-2-light.webp" width="100%">
+    <img alt="Configurações · Servidor" src="../screenshots/pt-BR/settings-2-light.webp" width="100%">
   </picture>
-  <br><sub><b>Configurações</b> — raciocínio e mapeamento de modelos</sub>
+  <br><sub><b>Configurações · Servidor</b> — endpoint do Kiro, link público, domínio e região upstream, proxy de saída, pool de proxies, cabeçalhos de resposta, log do servidor, métricas do Prometheus</sub>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/pt-BR/settings-3-dark.webp">
-    <img alt="Configurações" src="../screenshots/pt-BR/settings-3-light.webp" width="100%">
+    <img alt="Configurações · Segurança" src="../screenshots/pt-BR/settings-3-light.webp" width="100%">
   </picture>
-  <br><sub><b>Configurações</b> — endpoint do Kiro, senha de administrador, proxy de saída</sub>
+  <br><sub><b>Configurações · Segurança</b> — senha de administrador, login em duas etapas, filtro de system prompt, autorrecuperação, alertas, retenção de logs, zona de perigo</sub>
 </p>
 
 [← Voltar ao README](../README_PT-BR.md)

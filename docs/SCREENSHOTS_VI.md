@@ -81,7 +81,7 @@ Mọi trang của trang quản trị. Mỗi ảnh hiển thị sáng hoặc tố
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/requests-detail-dark.webp">
     <img alt="Chi tiết yêu cầu" src="../screenshots/vi/requests-detail-light.webp" width="100%">
   </picture>
-  <br><sub><b>Chi tiết yêu cầu</b> — bảng mở ra khi bấm một dòng: thời lượng, credit, token và ID</sub>
+  <br><sub><b>Chi tiết yêu cầu</b> — bảng mở ra khi bấm một dòng: thời lượng, credit, token và ID, kèm Hội thoại và Chạy lại</sub>
 </p>
 
 ## API
@@ -91,7 +91,7 @@ Mọi trang của trang quản trị. Mỗi ảnh hiển thị sáng hoặc tố
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/api-dark.webp">
     <img alt="API" src="../screenshots/vi/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>API</b> — truy cập API, key riêng cho từng client kèm giới hạn, thiết lập client có tô sáng</sub>
+  <br><sub><b>API</b> — truy cập API, key riêng cho từng client kèm giới hạn, mức sử dụng theo key, thiết lập client có tô sáng</sub>
 </p>
 
 ## Sao lưu
@@ -109,25 +109,25 @@ Mọi trang của trang quản trị. Mỗi ảnh hiển thị sáng hoặc tố
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/settings-1-dark.webp">
-    <img alt="Cài đặt" src="../screenshots/vi/settings-1-light.webp" width="100%">
+    <img alt="Cài đặt · Chung" src="../screenshots/vi/settings-1-light.webp" width="100%">
   </picture>
-  <br><sub><b>Cài đặt</b> — mức sử dụng, toàn vẹn stream, định tuyến, tự động viết tiếp</sub>
+  <br><sub><b>Cài đặt · Chung</b> — mức sử dụng, toàn vẹn stream, định tuyến tài khoản, tự động viết tiếp, lịch sử tool, thu nhỏ hình ảnh, thinking, ánh xạ model</sub>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/settings-2-dark.webp">
-    <img alt="Cài đặt" src="../screenshots/vi/settings-2-light.webp" width="100%">
+    <img alt="Cài đặt · Máy chủ" src="../screenshots/vi/settings-2-light.webp" width="100%">
   </picture>
-  <br><sub><b>Cài đặt</b> — thinking và ánh xạ model</sub>
+  <br><sub><b>Cài đặt · Máy chủ</b> — endpoint Kiro, liên kết công khai, tên miền và khu vực Kiro, proxy outbound, nhóm proxy, header phản hồi, nhật ký máy chủ, chỉ số Prometheus</sub>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/vi/settings-3-dark.webp">
-    <img alt="Cài đặt" src="../screenshots/vi/settings-3-light.webp" width="100%">
+    <img alt="Cài đặt · Bảo mật" src="../screenshots/vi/settings-3-light.webp" width="100%">
   </picture>
-  <br><sub><b>Cài đặt</b> — endpoint Kiro, mật khẩu quản trị, proxy outbound</sub>
+  <br><sub><b>Cài đặt · Bảo mật</b> — mật khẩu quản trị, đăng nhập hai bước, bộ lọc system prompt, tự phục hồi, cảnh báo, lưu giữ nhật ký, vùng nguy hiểm</sub>
 </p>
 
 [← Quay lại README](../README_VI.md)

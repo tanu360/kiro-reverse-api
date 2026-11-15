@@ -81,7 +81,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/requests-detail-dark.webp">
     <img alt="请求详情" src="../screenshots/zh/requests-detail-light.webp" width="100%">
   </picture>
-  <br><sub><b>请求详情</b> — 点击一行打开的详情面板：耗时、Credits、Token 与 ID</sub>
+  <br><sub><b>请求详情</b> — 点击一行打开的详情面板：耗时、Credits、Token 与 ID，以及对话与重放</sub>
 </p>
 
 ## 接口
@@ -91,7 +91,7 @@
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/api-dark.webp">
     <img alt="接口" src="../screenshots/zh/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>接口</b> — API 访问、带限额的客户端 Key 与高亮的客户端配置</sub>
+  <br><sub><b>接口</b> — API 访问、带限额的客户端 Key、各 API Key 用量与高亮的客户端配置</sub>
 </p>
 
 ## 备份
@@ -109,25 +109,25 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/settings-1-dark.webp">
-    <img alt="设置" src="../screenshots/zh/settings-1-light.webp" width="100%">
+    <img alt="设置 · 常规" src="../screenshots/zh/settings-1-light.webp" width="100%">
   </picture>
-  <br><sub><b>设置</b> — 用量、流完整性、账号路由、自动续写</sub>
+  <br><sub><b>设置 · 常规</b> — 用量、流完整性、账号路由、自动续写、工具历史、图片缩放、Thinking、模型映射</sub>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/settings-2-dark.webp">
-    <img alt="设置" src="../screenshots/zh/settings-2-light.webp" width="100%">
+    <img alt="设置 · 服务器" src="../screenshots/zh/settings-2-light.webp" width="100%">
   </picture>
-  <br><sub><b>设置</b> — Thinking 与模型映射</sub>
+  <br><sub><b>设置 · 服务器</b> — Kiro 端点、公开链接、上游域名与区域、出站代理、代理池、响应头、服务器日志、Prometheus 指标</sub>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/zh/settings-3-dark.webp">
-    <img alt="设置" src="../screenshots/zh/settings-3-light.webp" width="100%">
+    <img alt="设置 · 安全" src="../screenshots/zh/settings-3-light.webp" width="100%">
   </picture>
-  <br><sub><b>设置</b> — Kiro 端点、管理员密码、出站代理</sub>
+  <br><sub><b>设置 · 安全</b> — 管理员密码、两步验证登录、System Prompt 过滤、自动恢复、告警、日志保留、危险操作</sub>
 </p>
 
 [← 返回 README](../README_CN.md)

@@ -81,7 +81,7 @@ Every page of the admin panel. Each image follows your GitHub theme, light or da
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/requests-detail-dark.webp">
     <img alt="Request details" src="../screenshots/en/requests-detail-light.webp" width="100%">
   </picture>
-  <br><sub><b>Request details</b> — the sheet a row opens: duration, credits, tokens and IDs</sub>
+  <br><sub><b>Request details</b> — the sheet a row opens: duration, credits, tokens and IDs, with Conversation and Replay</sub>
 </p>
 
 ## API
@@ -91,7 +91,7 @@ Every page of the admin panel. Each image follows your GitHub theme, light or da
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/api-dark.webp">
     <img alt="API" src="../screenshots/en/api-light.webp" width="100%">
   </picture>
-  <br><sub><b>API</b> — API access, per-client keys with limits, highlighted client setup</sub>
+  <br><sub><b>API</b> — API access, per-client keys with limits, usage by key, highlighted client setup</sub>
 </p>
 
 ## Backups
@@ -109,25 +109,25 @@ Every page of the admin panel. Each image follows your GitHub theme, light or da
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/settings-1-dark.webp">
-    <img alt="Settings" src="../screenshots/en/settings-1-light.webp" width="100%">
+    <img alt="Settings · General" src="../screenshots/en/settings-1-light.webp" width="100%">
   </picture>
-  <br><sub><b>Settings</b> — usage, stream integrity, routing, auto-continue</sub>
+  <br><sub><b>Settings · General</b> — usage, stream integrity, account routing, auto-continue, tool history, image resizing, thinking, model mapping</sub>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/settings-2-dark.webp">
-    <img alt="Settings" src="../screenshots/en/settings-2-light.webp" width="100%">
+    <img alt="Settings · Server" src="../screenshots/en/settings-2-light.webp" width="100%">
   </picture>
-  <br><sub><b>Settings</b> — thinking and model mappings</sub>
+  <br><sub><b>Settings · Server</b> — Kiro endpoint, public link, upstream domain and region, outbound proxy, proxy pool, response headers, server log, Prometheus metrics</sub>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="../screenshots/en/settings-3-dark.webp">
-    <img alt="Settings" src="../screenshots/en/settings-3-light.webp" width="100%">
+    <img alt="Settings · Security" src="../screenshots/en/settings-3-light.webp" width="100%">
   </picture>
-  <br><sub><b>Settings</b> — Kiro endpoint, admin password, outbound proxy</sub>
+  <br><sub><b>Settings · Security</b> — admin password, two-factor sign-in, system prompt filter, self-heal, alerts, log retention, danger zone</sub>
 </p>
 
 [← Back to README](../README.md)
