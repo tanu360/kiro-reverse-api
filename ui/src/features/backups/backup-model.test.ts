@@ -86,6 +86,13 @@ describe("noteText", () => {
   });
 
   it("shows an em dash for an empty note", () => {
+    expect(noteText(entry({ kind: "manual", note: "manual backup 2026-11-03 09:05:07" }), t)).toBe(
+      "—",
+    );
+    // A note someone wrote stays, even on a manual backup.
+    expect(noteText(entry({ kind: "manual", note: "manual backup before upgrade" }), t)).toBe(
+      "manual backup before upgrade",
+    );
     expect(noteText(entry({ note: undefined }), t)).toBe("—");
     expect(noteText(entry({ note: "   " }), t)).toBe("—");
   });
