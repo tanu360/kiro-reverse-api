@@ -31,7 +31,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import type { BackupEntry } from "@/lib/api/types";
 import { clearSession } from "@/lib/auth/session";
 import { saveBlob } from "@/lib/download";
-import { formatDateTime } from "@/lib/format";
+import { formatBytes, formatDateTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast, toastError } from "@/lib/toast";
 import { isNotABackupMessage, listMeta, MAX_UPLOAD_BYTES, manualNote } from "./backup-model";
@@ -206,7 +206,7 @@ export function BackupsPage(): JSX.Element {
   );
 
   const rows = list.data ?? [];
-  // 25 rows a page, as on Accounts; the pager shows only past one page. A page that empties
+  // PAGE_SIZE rows a page; the pager shows only past one page. A page that empties
   // (its last backup deleted) falls back to the new last page.
   const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -252,7 +252,7 @@ export function BackupsPage(): JSX.Element {
     event.target.value = "";
     if (!file) return;
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error(t("fileTooLarge"));
+      toast.error(t("fileTooLarge", { size: formatBytes(file.size, lang) }));
       return;
     }
     if (!(await restoreConfirm(t("confirmUpload", { name: file.name }), file.name))) return;

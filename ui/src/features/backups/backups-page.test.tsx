@@ -307,7 +307,7 @@ describe("BackupsPage", () => {
     expect(rollback?.note).toMatch(/^upload /);
   });
 
-  it("rejects an upload over 32 MiB before sending it", async () => {
+  it("rejects an upload over 32 MB before sending it, naming the file's size", async () => {
     let sent = false;
     mockServer.use(
       http.post(apiUrl("/backups/restore"), () => {
@@ -318,10 +318,11 @@ describe("BackupsPage", () => {
     const { user } = await renderPage();
     const input = screen.getByTestId("backup-upload-input") as HTMLInputElement;
     const file = new File(["{}"], "huge.json", { type: "application/json" });
-    Object.defineProperty(file, "size", { value: 32 * 1024 * 1024 + 1 });
+    Object.defineProperty(file, "size", { value: 40.5 * 1024 * 1024 });
     await user.upload(input, file);
     expect(
-      await findToast("The file is larger than 32 MiB. Choose a smaller backup file."),
+      // Testing Library reads the size's no-break space as a plain space.
+      await findToast("The file is 40.5 MB, over the 32 MB limit. Choose a smaller backup file."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(sent).toBe(false);

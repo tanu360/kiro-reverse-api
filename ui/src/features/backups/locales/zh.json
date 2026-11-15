@@ -5,7 +5,7 @@
   "uploadHint": "选择之前下载的备份文件（.json）。",
   "create": "创建备份",
   "created": "备份已创建。",
-  "fileTooLarge": "文件超过 32 MiB。请选择更小的备份文件。",
+  "fileTooLarge": "文件大小为 {size}，超过 32 MB 上限。请选择更小的备份文件。",
   "notABackup": "无法从此文件恢复。",
   "notABackupBody": "该文件不是 Kiro Proxy 备份。请选择从“备份”页面下载的文件。详情：{detail}",
   "schedule.title": "定时备份",

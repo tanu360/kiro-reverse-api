@@ -5,7 +5,7 @@
   "uploadHint": "Chọn tệp sao lưu (.json) bạn đã tải xuống trước đó.",
   "create": "Tạo bản sao lưu",
   "created": "Đã tạo bản sao lưu.",
-  "fileTooLarge": "Tệp lớn hơn 32 MiB. Chọn tệp sao lưu nhỏ hơn.",
+  "fileTooLarge": "Tệp có dung lượng {size}, vượt giới hạn 32 MB. Chọn tệp sao lưu nhỏ hơn.",
   "notABackup": "Không thể khôi phục từ tệp này.",
   "notABackupBody": "Đây không phải bản sao lưu Kiro Proxy. Hãy chọn tệp bạn đã tải xuống từ trang Sao lưu. Chi tiết: {detail}",
   "schedule.title": "Lịch",

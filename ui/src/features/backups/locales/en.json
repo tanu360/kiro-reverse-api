@@ -5,7 +5,7 @@
   "uploadHint": "Choose a backup file (.json) that you downloaded earlier.",
   "create": "Create backup",
   "created": "The backup was created.",
-  "fileTooLarge": "The file is larger than 32 MiB. Choose a smaller backup file.",
+  "fileTooLarge": "The file is {size}, over the 32 MB limit. Choose a smaller backup file.",
   "notABackup": "Could not restore from this file.",
   "notABackupBody": "It is not a Kiro Proxy backup. Choose a file you downloaded from Backups. Details: {detail}",
   "schedule.title": "Schedule",
