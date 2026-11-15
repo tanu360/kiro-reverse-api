@@ -1,5 +1,5 @@
 {
-  "version": "3.4.1",
-  "changelog": "💾 Each account is saved in its own row. A request, a token refresh or a usage check now writes that one account instead of the whole list, and no longer rewrites the config or saves an automatic backup each time.\n📦 The first start moves the accounts to the new table after saving a manual backup. To go back to an older version, restore that backup there.\n🎛️ A switch or button in a settings row sits centred on its title and description, and the two-factor hint fits on one line.",
+  "version": "3.5.0",
+  "changelog": "🌍 Public link: Settings → Server can put this dashboard and the API on a public HTTPS link through Tailscale Funnel, with a free Tailscale account and no port to open. The first time, the server downloads its Tailscale helper (about 8 MB) for this version and checks it against a checksum built into the proxy.\n🪜 The setup shows as steps (Download, Connect, Sign in, Funnel, Live), with the download's size and progress and a button for each step at Tailscale. The link stays the same after a restart.\n🔒 Through the link, API calls always need an API key and the first-run password is never shown. The card warns while two-factor sign-in is off or no API key exists.\n🎨 Notices have a new look: a light fill in their colour with a solid button, easier to read in the dark theme.\n🔗 A long link in a copy field wraps at its dots instead of inside a name.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
