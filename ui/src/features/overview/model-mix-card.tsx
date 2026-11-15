@@ -9,6 +9,7 @@ import { ListCard } from "@/components/shared/list-card";
 import { TableSkeleton } from "@/components/shared/loading-state";
 import { SectionCard } from "@/components/shared/section-card";
 import { TokenCell } from "@/components/shared/token-cell";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { modelMixQuery } from "@/lib/api/observe";
@@ -48,7 +49,7 @@ function ModelName({ row }: { row: MixRow }): JSX.Element {
   return (
     <span className="flex min-w-0 items-center gap-2">
       <ColorDot color={row.color} />
-      <span className="min-w-0 truncate">{row.entry.model}</span>
+      <TruncatedText>{row.entry.model}</TruncatedText>
     </span>
   );
 }

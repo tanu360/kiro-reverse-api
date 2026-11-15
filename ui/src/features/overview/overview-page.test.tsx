@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
-import { accountStatus } from "@/features/accounts/account-model";
+import { accountStatus, formatCreditAmount } from "@/features/accounts/account-model";
 import { heatmapQuery } from "@/lib/api/observe";
 import { formatPercent } from "@/lib/format";
 import { mockDb } from "@/lib/mocks/db";
@@ -54,6 +54,13 @@ describe("OverviewPage", () => {
         formatPercent(status.accountCreditsUsed, status.accountCreditsLimit, "en"),
       ),
     ).toBeInTheDocument();
+    // Used over limit as the Accounts meters write it: a whole limit has no ".0".
+    expect(
+      within(credits).getByText(
+        `${formatCreditAmount(status.accountCreditsUsed, "en")} / ${formatCreditAmount(status.accountCreditsLimit, "en")}`,
+      ),
+    ).toBeInTheDocument();
+    expect(formatCreditAmount(216_350, "en")).toBe("216,350");
 
     expect(await kpiCard("Requests")).toBeInTheDocument();
     expect(await kpiCard("Failed")).toBeInTheDocument();
@@ -119,7 +126,7 @@ describe("OverviewPage", () => {
     );
     await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" });
+    await within(heatmap).findByRole("list", { name: "Accounts in the last hour" });
     await waitFor(() => expect(urls.length).toBeGreaterThanOrEqual(2));
     const shapes = urls.map((url) => ({
       windowMin: url.searchParams.get("windowMin"),
@@ -137,7 +144,7 @@ describe("OverviewPage", () => {
     const { user } = await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
     const list = await within(heatmap).findByRole("list", {
-      name: "Accounts in the last 60 min",
+      name: "Accounts in the last hour",
     });
     // The five busiest accounts and the rest as one more row.
     const items = within(list).getAllByRole("listitem");
@@ -183,7 +190,7 @@ describe("OverviewPage", () => {
     await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
     // One subtitle, not a separate meta run beside the description.
-    expect(await within(heatmap).findByText("Top 5 of 8 · last 60 min")).toBeInTheDocument();
+    expect(await within(heatmap).findByText("Top 5 of 8 · last hour")).toBeInTheDocument();
     expect(heatmap.querySelector('[data-slot="card-meta"]')).toBeNull();
   });
 
@@ -219,10 +226,10 @@ describe("OverviewPage", () => {
     );
     await renderApp("/", { privacy: false });
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
-    expect(await within(heatmap).findByText("Top 5 of 6 · last 60 min")).toBeInTheDocument();
+    expect(await within(heatmap).findByText("Top 5 of 6 · last hour")).toBeInTheDocument();
     // It keeps its row (with no successful requests) instead of dropping out.
     const list = await within(heatmap).findByRole("list", {
-      name: "Accounts in the last 60 min",
+      name: "Accounts in the last hour",
     });
     expect(within(list).getByText("failover@example.com")).toBeInTheDocument();
   });
@@ -249,7 +256,7 @@ describe("OverviewPage", () => {
     const { queryClient } = await renderApp("/");
     const heatmap = await screen.findByRole("region", { name: "Traffic by account" });
     const list = await within(heatmap).findByRole("list", {
-      name: "Accounts in the last 60 min",
+      name: "Accounts in the last hour",
     });
     // No busy accounts: the whole hour never reached an account, with its failures beside it.
     const other = () => within(list).getByText("No account").closest("li")?.textContent;
@@ -277,7 +284,7 @@ describe("OverviewPage", () => {
     expect(
       await within(heatmap).findByText("No account activity in the last hour"),
     ).toBeInTheDocument();
-    expect(within(heatmap).queryByRole("list", { name: "Accounts in the last 60 min" })).toBeNull();
+    expect(within(heatmap).queryByRole("list", { name: "Accounts in the last hour" })).toBeNull();
   });
 
   it("writes the traffic range to the router search", async () => {
@@ -287,7 +294,10 @@ describe("OverviewPage", () => {
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ range: "6h" });
     });
-    expect(await screen.findByText("Requests per 5 min, last 6 hours")).toBeInTheDocument();
+    // No-break spaces keep "5 min" and "6 hours" on one line when the header wraps on a phone.
+    expect((await screen.findByText("Requests per 5 min, last 6 hours")).textContent).toBe(
+      "Requests per 5\u00a0min, last 6\u00a0hours",
+    );
   });
 
   it("offers All time and writes ?range=all", async () => {
@@ -474,7 +484,7 @@ describe("OverviewPage", () => {
     expect(within(rows[0]).getByText(`${rate}% success`)).toBeInTheDocument();
     expect(
       within(rows[0]).getByText(
-        `${(first.requestCount - failed).toLocaleString("en")}/${first.requestCount.toLocaleString("en")} requests`,
+        `${(first.requestCount - failed).toLocaleString("en")} / ${first.requestCount.toLocaleString("en")} requests`,
       ),
     ).toBeInTheDocument();
     expect(
@@ -504,7 +514,7 @@ describe("OverviewPage", () => {
     const attention = screen.getByRole("region", { name: "Needs attention" });
     await within(attention).findAllByRole("listitem");
     const heatmap = screen.getByRole("region", { name: "Traffic by account" });
-    await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" });
+    await within(heatmap).findByRole("list", { name: "Accounts in the last hour" });
     const html = document.body.innerHTML;
     // API-key accounts carry a label instead of an address; privacy mode masks only addresses.
     const emails = mockDb.accounts.map((a) => a.email).filter((email) => email.includes("@"));
@@ -538,7 +548,7 @@ describe("OverviewPage", () => {
     expect(await kpiCard("Accounts")).toBeInTheDocument();
     const heatmap = screen.getByRole("region", { name: "Traffic by account" });
     expect(
-      await within(heatmap).findByRole("list", { name: "Accounts in the last 60 min" }),
+      await within(heatmap).findByRole("list", { name: "Accounts in the last hour" }),
     ).toBeInTheDocument();
     expect(within(heatmap).queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getAllByRole("alert")).toHaveLength(1);

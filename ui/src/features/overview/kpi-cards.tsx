@@ -17,10 +17,10 @@ import { accountsQuery } from "@/lib/api/accounts";
 import { heatmapQuery, observeOverviewQuery } from "@/lib/api/observe";
 import { statusQuery } from "@/lib/api/system";
 import type { Account, HeatmapCell } from "@/lib/api/types";
-import { EMPTY, formatCompact, formatCredits, formatNumber, formatPercent } from "@/lib/format";
+import { EMPTY, formatCompact, formatNumber, formatPercent } from "@/lib/format";
 import { type Lang, type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { accountStatus } from "../accounts/account-model";
+import { accountStatus, formatCreditAmount } from "../accounts/account-model";
 import { bucketGlobal, type CellValue, HOUR, HOUR_PAIR_WINDOW, hourDelta } from "./aggregate";
 import { LazySparkline, TrendPlaceholder } from "./lazy-sparkline";
 
@@ -404,9 +404,10 @@ export function KpiCards(): JSX.Element {
         linkLabel={t("kpi.viewAccounts")}
         loading={statusLoading}
         period={t("kpi.thisMonth")}
+        // The Accounts meters' amounts: one decimal at most, so a whole limit has no ".0".
         sub={
           s && limit > 0
-            ? `${formatCredits(used, 1, lang)} / ${formatCredits(limit, 1, lang)}`
+            ? `${formatCreditAmount(used, lang)} / ${formatCreditAmount(limit, lang)}`
             : null
         }
         suffix={s && limit > 0 ? t("kpi.used") : null}

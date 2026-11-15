@@ -9,6 +9,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { ListCard, ListCardSkeleton } from "@/components/shared/list-card";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
+import { TruncatedText } from "@/components/shared/truncated-text";
 import { Button } from "@/components/ui/button";
 import {
   AccountIdentity,
@@ -166,7 +167,9 @@ function TopAccountCard({
       title={
         // pe-0.5: the AWS mark draws 2 px past its box, which the title's truncation clipped.
         <span className="flex min-w-0 items-center gap-2 pe-0.5">
-          <span className={cn("truncate", name.mono && "font-mono text-meta")}>{name.text}</span>
+          <TruncatedText className={cn(name.mono && "font-mono text-meta")}>
+            {name.text}
+          </TruncatedText>
           <AuthIcon account={account} />
         </span>
       }
@@ -319,7 +322,11 @@ export function TopAccounts(): JSX.Element {
           total > 0 ? (
             <>
               <p>
-                {t("topAccounts.showing", { shown: rows.length, total: formatNumber(total, lang) })}
+                {t("topAccounts.showing", {
+                  count: total,
+                  shown: formatNumber(rows.length, lang),
+                  total: formatNumber(total, lang),
+                })}
               </p>
               <FooterLink />
             </>
