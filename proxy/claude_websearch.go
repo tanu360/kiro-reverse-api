@@ -459,6 +459,11 @@ func (h *Handler) runClaudeWebSearchLoop(w http.ResponseWriter, r *http.Request,
 			appendWebSearchRound(&working, round, searchUses, outcomes)
 			// The requested server tool has run; follow-up rounds may answer normally.
 			working.ToolChoice = map[string]interface{}{"type": "auto"}
+			//! What the round wrote before searching is part of the answer, as on Anthropic's
+			//! own API ("I'll search for…" before server_tool_use); the model's history has it too.
+			if strings.TrimSpace(round.text) != "" {
+				presented = append(presented, map[string]interface{}{"type": "text", "text": round.text})
+			}
 			for _, outcome := range outcomes {
 				presented = append(presented, webSearchPresentationBlocks(outcome)...)
 			}

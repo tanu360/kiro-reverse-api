@@ -191,6 +191,14 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
 			}
+			var searches hostedSearchTally
+			// searchAt holds where in content each search started: the text before it is its own message.
+			var searchAt []int
+			callback.hostedSearch = h.searchHooks(&searches, payload, model, estimatedInputTokens, func(search *hostedWebSearch) {
+				if !search.done {
+					searchAt = append(searchAt, len(content))
+				}
+			})
 
 			err := callKiroAutoContinue(ctx, account, payload, callback, callKiroWithHostedSearch)
 			if err != nil {
@@ -219,7 +227,8 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 				reasoningContent = ""
 			}
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
-			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, searches.promptEstimate(estimatedInputTokens), realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = searches.total(inputTokens, outputTokens)
 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
@@ -229,7 +238,19 @@ func (h *Handler) handleOpenAIResponsesNonStream(ctx context.Context, w http.Res
 			h.rememberAccount(ctx, payload, account)
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
-			response, storedMessages := buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
+			var response map[string]interface{}
+			var storedMessages []OpenAIMessage
+			if len(searches.searches) > 0 {
+				said := make([]string, len(searchAt))
+				from := 0
+				for i, at := range searchAt {
+					said[i], from = content[from:at], at
+				}
+				output := buildResponsesSearchOutput(prepared, reasoningContent, said, content[from:], upstreamStopReason, searches.searches, prepared.SearchSources, toolUses)
+				response, storedMessages = buildResponsesCompletedObjectWithOutput("resp_"+uuid.NewString(), time.Now().Unix(), prepared, output, finalContent, toolUses, inputTokens, outputTokens)
+			} else {
+				response, storedMessages = buildResponsesCompletedObject(prepared, finalContent, reasoningContent, toolUses, inputTokens, outputTokens)
+			}
 			addResponsesCacheUsage(response, cacheDetails, reasoningTokenCount(reasoningContent, outputTokens))
 			if len(toolUses) == 0 {
 				upstreamStopReason = inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload))
@@ -335,6 +356,10 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 			var reasoningText strings.Builder
 			nextOutputIndex := 0
 			var outputItems []map[string]interface{}
+			var searches hostedSearchTally
+			searchOutputIndex := make(map[*hostedWebSearch]int)
+			// afterSearch is set while the message after a web_search_call has not started.
+			afterSearch := false
 			reserveOutputItem := func(index int, item map[string]interface{}) {
 				for len(outputItems) <= index {
 					outputItems = append(outputItems, nil)
@@ -456,7 +481,18 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				}
 				messageDone = true
 				text := messageText.String()
-				reserveOutputItem(messageOutputIndex, buildResponsesMessageOutputItem(messageItemID, text))
+				annotations := responsesURLAnnotations(searchCitations(text, searches.searches))
+				for i, annotation := range annotations {
+					sendResponsesSSE(w, flusher, "response.output_text.annotation.added", map[string]interface{}{
+						"type":             "response.output_text.annotation.added",
+						"item_id":          messageItemID,
+						"output_index":     messageOutputIndex,
+						"content_index":    0,
+						"annotation_index": i,
+						"annotation":       annotation,
+					})
+				}
+				reserveOutputItem(messageOutputIndex, buildResponsesMessageItemWithAnnotations(messageItemID, text, annotations))
 				sendResponsesSSE(w, flusher, "response.output_text.done", map[string]interface{}{
 					"type":          "response.output_text.done",
 					"item_id":       messageItemID,
@@ -469,7 +505,7 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					"item_id":       messageItemID,
 					"output_index":  messageOutputIndex,
 					"content_index": 0,
-					"part":          map[string]interface{}{"type": "output_text", "text": text, "annotations": []interface{}{}},
+					"part":          map[string]interface{}{"type": "output_text", "text": text, "annotations": annotations},
 				})
 				sendResponsesSSE(w, flusher, "response.output_item.done", map[string]interface{}{
 					"type":         "response.output_item.done",
@@ -512,6 +548,14 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					sawVisibleText = true
 				}
 				contentBuilder.WriteString(text)
+				if afterSearch {
+					//! The message after a web_search_call is an item of its own; the blank line
+					//! that parts the search rounds in one text does not start it.
+					if text = strings.TrimLeft(text, " \t\r\n"); text == "" {
+						return
+					}
+					afterSearch = false
+				}
 				finishReasoning()
 				ensureMessageAdded()
 				messageText.WriteString(text)
@@ -602,6 +646,31 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
 			}
+			callback.hostedSearch = h.searchHooks(&searches, payload, model, estimatedInputTokens, func(search *hostedWebSearch) {
+				item := webSearchCallItem(search, prepared.SearchSources)
+				if search.done {
+					outputIndex := searchOutputIndex[search]
+					reserveOutputItem(outputIndex, item)
+					if search.err == nil {
+						sendResponsesSSE(w, flusher, "response.web_search_call.completed", map[string]interface{}{"type": "response.web_search_call.completed", "item_id": search.id, "output_index": outputIndex})
+					}
+					sendResponsesSSE(w, flusher, "response.output_item.done", map[string]interface{}{"type": "response.output_item.done", "output_index": outputIndex, "item": item})
+					return
+				}
+				ensureStarted()
+				//! As with a tool call: what the model wrote before the search closes first.
+				splitter.Flush(emitTextDelta, emitTagThinking)
+				finishReasoning()
+				finishMessage()
+				outputIndex := nextOutputIndex
+				nextOutputIndex++
+				searchOutputIndex[search] = outputIndex
+				reserveOutputItem(outputIndex, item)
+				sendResponsesSSE(w, flusher, "response.output_item.added", map[string]interface{}{"type": "response.output_item.added", "output_index": outputIndex, "item": item})
+				sendResponsesSSE(w, flusher, "response.web_search_call.in_progress", map[string]interface{}{"type": "response.web_search_call.in_progress", "item_id": search.id, "output_index": outputIndex})
+				sendResponsesSSE(w, flusher, "response.web_search_call.searching", map[string]interface{}{"type": "response.web_search_call.searching", "item_id": search.id, "output_index": outputIndex})
+				afterSearch = true
+			})
 
 			err := callKiroAutoContinue(ctx, account, payload, callback, callKiroWithHostedSearch)
 			if err != nil {
@@ -649,7 +718,8 @@ func (h *Handler) handleOpenAIResponsesStream(ctx context.Context, w http.Respon
 				reasoningContent = ""
 			}
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
-			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, searches.promptEstimate(estimatedInputTokens), realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = searches.total(inputTokens, outputTokens)
 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
@@ -792,6 +862,13 @@ func buildResponsesOutput(content, reasoning string, toolUses []KiroToolUse) []m
 }
 
 func buildResponsesMessageOutputItem(id, content string) map[string]interface{} {
+	return buildResponsesMessageItemWithAnnotations(id, content, nil)
+}
+
+func buildResponsesMessageItemWithAnnotations(id, content string, annotations []interface{}) map[string]interface{} {
+	if annotations == nil {
+		annotations = []interface{}{}
+	}
 	return map[string]interface{}{
 		"id":     id,
 		"type":   "message",
@@ -800,7 +877,7 @@ func buildResponsesMessageOutputItem(id, content string) map[string]interface{} 
 		"content": []map[string]interface{}{{
 			"type":        "output_text",
 			"text":        content,
-			"annotations": []interface{}{},
+			"annotations": annotations,
 		}},
 	}
 }

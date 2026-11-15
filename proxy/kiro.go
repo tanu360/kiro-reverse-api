@@ -306,6 +306,8 @@ type KiroStreamCallback struct {
 	markupTools map[string]map[string]string
 	// onFollowupPayload receives each payload a hosted-search round sends after resolving searches.
 	onFollowupPayload func(payload *KiroPayload)
+	// hostedSearch reports the hosted web searches a reply runs and the rounds that ran them.
+	hostedSearch *hostedSearchHooks
 }
 
 func setPayloadProfileArnForAccount(payload *KiroPayload, account *config.Account) {

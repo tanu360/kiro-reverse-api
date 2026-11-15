@@ -2001,6 +2001,8 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			var upstreamStopReason string
 			var rawContentBuilder strings.Builder
 			var rawReasoningBuilder strings.Builder
+			// streamedContent is the message content as the client got it, which citations index.
+			var streamedContent strings.Builder
 			var textBuffer string
 			var inThinkingBlock bool
 			var dropTagThinking bool
@@ -2035,6 +2037,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 						if text == "" {
 							return
 						}
+						streamedContent.WriteString(text)
 						chunk = map[string]interface{}{
 							"id":      chatID,
 							"object":  "chat.completion.chunk",
@@ -2059,6 +2062,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 						if text == "" {
 							return
 						}
+						streamedContent.WriteString(text)
 						chunk = map[string]interface{}{
 							"id":      chatID,
 							"object":  "chat.completion.chunk",
@@ -2098,6 +2102,7 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 						return
 					}
 					sawContent = true
+					streamedContent.WriteString(content)
 					chunk = map[string]interface{}{
 						"id":      chatID,
 						"object":  "chat.completion.chunk",
@@ -2109,6 +2114,27 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 							"finish_reason": nil,
 						}},
 					}
+				}
+				if !responseStarted {
+					withAssistantRole(chunk)
+				}
+				data, _ := json.Marshal(chunk)
+				fmt.Fprintf(w, "data: %s\n\n", string(data))
+				flusher.Flush()
+				responseStarted = true
+			}
+
+			sendDelta := func(delta map[string]interface{}) {
+				chunk := map[string]interface{}{
+					"id":      chatID,
+					"object":  "chat.completion.chunk",
+					"created": time.Now().Unix(),
+					"model":   model,
+					"choices": []map[string]interface{}{{
+						"index":         0,
+						"delta":         delta,
+						"finish_reason": nil,
+					}},
 				}
 				if !responseStarted {
 					withAssistantRole(chunk)
@@ -2296,6 +2322,8 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
 			}
+			var searches hostedSearchTally
+			callback.hostedSearch = h.searchHooks(&searches, payload, model, estimatedInputTokens, nil)
 
 			err := callKiroAutoContinue(r.Context(), account, payload, callback, callKiroWithHostedSearch)
 			if err != nil {
@@ -2349,7 +2377,8 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 				estimatedOutputTokens += estimateApproxTokens(tc.Function.Name)
 				estimatedOutputTokens += estimateApproxTokens(tc.Function.Arguments)
 			}
-			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, searches.promptEstimate(estimatedInputTokens), realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = searches.total(inputTokens, outputTokens)
 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
@@ -2360,6 +2389,11 @@ func (h *Handler) handleOpenAIStream(w http.ResponseWriter, r *http.Request, pay
 			h.pool.RecordOutcome(account.ID, true, inputTokens+outputTokens, credits)
 
 			finishReason := mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolCalls))
+
+			if annotations := chatURLAnnotations(searchCitations(streamedContent.String(), searches.searches)); len(annotations) > 0 {
+				//! The cited search results, as OpenAI's search models stream them: in a delta after the text.
+				sendDelta(map[string]interface{}{"annotations": annotations})
+			}
 
 			usage := buildOpenAIUsage(inputTokens, outputTokens, cacheDetails, reasoningTokenCount(reasoningOutput, outputTokens))
 			created := time.Now().Unix()
@@ -2474,6 +2508,8 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 					upstreamCache = cacheTokenCounts{Read: read, Write: write}
 				},
 			}
+			var searches hostedSearchTally
+			callback.hostedSearch = h.searchHooks(&searches, payload, model, estimatedInputTokens, nil)
 
 			err := callKiroAutoContinue(r.Context(), account, payload, callback, callKiroWithHostedSearch)
 			if err != nil {
@@ -2503,7 +2539,8 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			}
 
 			estimatedOutputTokens := estimateOpenAIOutputTokens(finalContent, reasoningContent, toolUses)
-			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, estimatedInputTokens, realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = h.promptOverheads.finalizeUsage(currentMessageModelID(payload), cut, inputTokens, outputTokens, searches.promptEstimate(estimatedInputTokens), realInputTokens, estimatedOutputTokens)
+			inputTokens, outputTokens = searches.total(inputTokens, outputTokens)
 
 			cacheDetails := resolveOpenAICacheUsage(h.promptCache, account.ID, payload, inputTokens)
 			h.recordSuccessForApiKey(apiKeyReservation, inputTokens, outputTokens, credits)
@@ -2518,6 +2555,11 @@ func (h *Handler) handleOpenAINonStream(w http.ResponseWriter, r *http.Request, 
 			resp["usage"] = buildOpenAIUsage(inputTokens, outputTokens, cacheDetails, reasoningTokenCount(reasoningContent, outputTokens))
 			if choices, ok := resp["choices"].([]map[string]interface{}); ok && len(choices) > 0 {
 				choices[0]["finish_reason"] = mapOpenAIFinishReason(inferMaxTokensStop(upstreamStopReason, outputTokens, requestedMaxTokens(payload)), len(toolUses))
+				if message, ok := choices[0]["message"].(map[string]interface{}); ok && len(searches.searches) > 0 {
+					//! As OpenAI's search models answer: the cited results as url_citation annotations.
+					text, _ := message["content"].(string)
+					message["annotations"] = chatURLAnnotations(searchCitations(text, searches.searches))
+				}
 			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			json.NewEncoder(w).Encode(resp)

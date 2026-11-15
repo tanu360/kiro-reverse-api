@@ -21,6 +21,7 @@ type OpenAIResponsesRequest struct {
 	Reasoning          *OpenAIResponsesReasoning `json:"reasoning,omitempty"`
 	Store              *bool                     `json:"store,omitempty"`
 	Metadata           map[string]interface{}    `json:"metadata,omitempty"`
+	Include            []string                  `json:"include,omitempty"`
 }
 
 type OpenAIResponsesReasoning struct {
@@ -57,6 +58,8 @@ type responsesPreparedRequest struct {
 	PreviousResponse string
 	ToolIdentities   map[string]responsesToolIdentity
 	StructuredOutput *structuredOutputSpec
+	// SearchSources is whether the client asked, with include, for each web_search_call's sources.
+	SearchSources bool
 }
 
 func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessage) (*responsesPreparedRequest, string) {
@@ -138,6 +141,7 @@ func prepareResponsesRequest(req *OpenAIResponsesRequest, previous []OpenAIMessa
 		PreviousResponse: req.PreviousResponseID,
 		ToolIdentities:   identities,
 		StructuredOutput: structuredOutput,
+		SearchSources:    responsesIncludes(req.Include, includeWebSearchSources),
 	}, ""
 }
 

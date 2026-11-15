@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"kiro-proxy/config"
+	"kiro-proxy/logger"
+	"kiro-proxy/proxypool"
 
 	"github.com/google/uuid"
 )
@@ -66,16 +68,100 @@ func isWebSearchToolUse(tu KiroToolUse) bool {
 	return name == "websearch"
 }
 
-func resolveWebSearchToolResults(ctx context.Context, account *config.Account, toolUses []KiroToolUse) ([]KiroToolResult, error) {
+// hostedWebSearch is one web search the proxy runs for the model on the OpenAI APIs. The
+// handler gets the same value when the search starts and again, done, when it ends.
+type hostedWebSearch struct {
+	// id names the search to the client: the web_search_call item id on /v1/responses.
+	id      string
+	query   string
+	results []WebSearchResult
+	err     error
+	done    bool
+}
+
+func newWebSearchCallID() string {
+	return "ws_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+}
+
+// hostedSearchRound is what one model round that ended in hosted searches spent. The reply's
+// last round reports through OnComplete and OnContextUsage as any reply does; these rounds come
+// on top, so a reply that searched counts the prompt of every round it sent.
+type hostedSearchRound struct {
+	// inputTokens and outputTokens are Kiro's own counts for the round, usually 0.
+	inputTokens, outputTokens int
+	// contextUsage is the round's contextUsagePercentage, 0 when Kiro sent none.
+	contextUsage float64
+	// shownTokens estimates the text and reasoning the round streamed, which the reply's own
+	// output estimate already holds.
+	shownTokens int
+	// callTokens estimates the round's search calls.
+	callTokens int
+	// addedTokens estimates what the follow-up adds to the prompt: the round's text, its
+	// calls and their results.
+	addedTokens int
+}
+
+// hostedSearchHooks connect the hosted search loop to the handler. A nil value, or any nil
+// field, is fine.
+type hostedSearchHooks struct {
+	// model is the client's model, for the error log of a failed search.
+	model string
+	// onSearch receives each search when it starts and again when it ends.
+	onSearch func(search *hostedWebSearch)
+	// onRound receives the usage of each round that ended in searches, before the next round.
+	onRound func(round hostedSearchRound)
+}
+
+func (h *hostedSearchHooks) report(search *hostedWebSearch) {
+	if h != nil && h.onSearch != nil {
+		h.onSearch(search)
+	}
+}
+
+func (h *hostedSearchHooks) countRound(round hostedSearchRound) {
+	if h != nil && h.onRound != nil {
+		h.onRound(round)
+	}
+}
+
+// search runs one query on the reply's account and records it as a web_search attempt of the
+// request, as the Anthropic path does. A failed query is not retried: the model is told.
+func (h *hostedSearchHooks) search(ctx context.Context, account *config.Account, query string) ([]WebSearchResult, error) {
+	traceAttemptStart(ctx, account, attemptEndpointWebSearch)
+	results, err := performKiroWebSearch(ctx, account, query)
+	if err == nil {
+		traceAttemptOK(ctx)
+		return results, nil
+	}
+	if ctx.Err() != nil {
+		return nil, err
+	}
+	logger.Warnf("[WebSearch] %s: search failed: %s", accountEmailForLog(account), proxypool.LogText(err))
+	traceAttemptFailed(ctx, account, 0, err)
+	traceAttemptGiveUp(ctx)
+	if h != nil && h.model != "" {
+		//! As recordAttemptError logs it, but the RPM start stays: the reply's chat already reached Kiro.
+		recordAttemptErrorMetric(account, 0, err)
+		getObserveStore().RecordFailure(account.ID, h.model)
+		getObserveStore().RecordError(account.ID, account.Email, h.model, 0, err.Error())
+	}
+	return nil, err
+}
+
+func resolveWebSearchToolResults(ctx context.Context, account *config.Account, toolUses []KiroToolUse, hooks *hostedSearchHooks) ([]KiroToolResult, error) {
 	results := make([]KiroToolResult, 0, len(toolUses))
 	for _, tu := range toolUses {
 		if !isWebSearchToolUse(tu) {
 			return nil, fmt.Errorf("unsupported hosted tool: %s", tu.Name)
 		}
-		searchResults, err := performKiroWebSearch(ctx, account, webSearchQueryFromInput(tu.Input))
-		text := formatWebSearchResults(searchResults)
+		search := &hostedWebSearch{id: newWebSearchCallID(), query: webSearchQueryFromInput(tu.Input)}
+		hooks.report(search)
+		search.results, search.err = hooks.search(ctx, account, search.query)
+		search.done = true
+		hooks.report(search)
+		text := formatWebSearchResults(search.results)
 		status := "success"
-		if err != nil {
+		if err := search.err; err != nil {
 			status = "error"
 			text = "web_search failed: " + err.Error()
 		}
@@ -342,38 +428,51 @@ func scalarString(v interface{}) string {
 
 // Hosted tools never reach the client as executable function calls. Text still
 // streams normally; tool calls are held until the upstream turn is complete.
+//
+// The rounds before the last report their usage through hostedSearchHooks.onRound; the
+// last round reports through OnComplete and OnContextUsage, as a reply without searches
+// does. Credits and cache counts are summed over every round.
 func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payload *KiroPayload, callback *KiroStreamCallback) error {
 	if len(payload.HostedSearchTools) == 0 {
 		return CallKiroAPIContext(ctx, account, payload, callback)
 	}
 	const maxRounds = 5
+	hooks := callback.hostedSearch
 	next := payload
-	totalIn, totalOut := 0, 0
 	totalCredits := 0.0
 	var totalCache cacheTokenCounts
 	// spoke is whether the answer so far ends in text that a later round's text would run into.
 	spoke := false
 	for round := 0; round <= maxRounds; round++ {
+		if round > 0 {
+			//! Each round is an attempt of its own in the request log, after the searches before it.
+			traceAttemptStart(ctx, account, "")
+		}
 		var tools []KiroToolUse
-		var said strings.Builder
+		var said, reasoning strings.Builder
 		stop := ""
+		roundIn, roundOut := 0, 0
+		var contextUsage []float64
 		cb := *callback
-		if callback.OnText != nil {
-			cb.OnText = func(text string, isThinking bool) {
-				if !isThinking && text != "" {
-					//! Each round is a new assistant message: the text after a search started
-					//! on the same line as the text before it ("…the latest posts:Based on…").
-					if said.Len() == 0 && spoke && !strings.HasPrefix(text, "\n") {
-						callback.OnText("\n\n", false)
-					}
-					said.WriteString(text)
-					spoke = !strings.HasSuffix(text, "\n")
+		cb.OnText = func(text string, isThinking bool) {
+			if isThinking {
+				reasoning.WriteString(text)
+			} else if text != "" {
+				//! Each round is a new assistant message: the text after a search started
+				//! on the same line as the text before it ("…the latest posts:Based on…").
+				if said.Len() == 0 && spoke && !strings.HasPrefix(text, "\n") && callback.OnText != nil {
+					callback.OnText("\n\n", false)
 				}
+				said.WriteString(text)
+				spoke = !strings.HasSuffix(text, "\n")
+			}
+			if callback.OnText != nil {
 				callback.OnText(text, isThinking)
 			}
 		}
 		cb.OnToolUse = func(tu KiroToolUse) { tools = append(tools, tu) }
-		cb.OnComplete = func(in, out int) { totalIn += in; totalOut += out }
+		cb.OnComplete = func(in, out int) { roundIn, roundOut = in, out }
+		cb.OnContextUsage = func(pct float64) { contextUsage = append(contextUsage, pct) }
 		cb.OnCredits = func(c float64) { totalCredits += c }
 		cb.OnStopReason = func(reason string) { stop = reason }
 		cb.OnCacheUsage = func(read, write int) { totalCache.Read += read; totalCache.Write += write }
@@ -388,17 +487,23 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 				clientTools = append(clientTools, tu)
 			}
 		}
-		if len(searches) == 0 {
+		// finish ends the reply with this round, the one the client's own tools or answer came from.
+		finish := func() {
 			for _, tu := range clientTools {
 				if callback.OnToolUse != nil {
 					callback.OnToolUse(tu)
+				}
+			}
+			if callback.OnContextUsage != nil {
+				for _, pct := range contextUsage {
+					callback.OnContextUsage(pct)
 				}
 			}
 			if callback.OnCacheUsage != nil && totalCache.Read+totalCache.Write > 0 {
 				callback.OnCacheUsage(totalCache.Read, totalCache.Write)
 			}
 			if callback.OnComplete != nil {
-				callback.OnComplete(totalIn, totalOut)
+				callback.OnComplete(roundIn, roundOut)
 			}
 			if callback.OnCredits != nil {
 				callback.OnCredits(totalCredits)
@@ -406,6 +511,9 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 			if callback.OnStopReason != nil {
 				callback.OnStopReason(stop)
 			}
+		}
+		if len(searches) == 0 {
+			finish()
 			return nil
 		}
 		if round == maxRounds {
@@ -415,7 +523,7 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 		for i := range canonicalSearches {
 			canonicalSearches[i].Name = webSearchToolName
 		}
-		results, err := resolveWebSearchToolResults(ctx, account, canonicalSearches)
+		results, err := resolveWebSearchToolResults(ctx, account, canonicalSearches, hooks)
 		if err != nil {
 			return err
 		}
@@ -428,29 +536,41 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 			if callback.OnText != nil {
 				callback.OnText(buildToolResultsContinuation(results), false)
 			}
-			for _, tu := range clientTools {
-				if callback.OnToolUse != nil {
-					callback.OnToolUse(tu)
-				}
-			}
-			if callback.OnCacheUsage != nil && totalCache.Read+totalCache.Write > 0 {
-				callback.OnCacheUsage(totalCache.Read, totalCache.Write)
-			}
-			if callback.OnComplete != nil {
-				callback.OnComplete(totalIn, totalOut)
-			}
-			if callback.OnCredits != nil {
-				callback.OnCredits(totalCredits)
-			}
-			if callback.OnStopReason != nil {
-				callback.OnStopReason(stop)
-			}
+			finish()
 			return nil
 		}
 		next = buildWebSearchFollowupPayload(next, searches, results, said.String())
+		hooks.countRound(searchRoundUsage(roundIn, roundOut, contextUsage, said.String(), reasoning.String(), searches, next))
 		if callback.onFollowupPayload != nil {
 			callback.onFollowupPayload(next)
 		}
 	}
 	return nil
+}
+
+// searchRoundUsage estimates what a round that ended in searches spent and what its follow-up
+// adds to the prompt.
+func searchRoundUsage(inputTokens, outputTokens int, contextUsage []float64, said, reasoning string, searches []KiroToolUse, followup *KiroPayload) hostedSearchRound {
+	round := hostedSearchRound{
+		inputTokens:  inputTokens,
+		outputTokens: outputTokens,
+		shownTokens:  estimateApproxTokens(said) + estimateApproxTokens(reasoning),
+	}
+	if n := len(contextUsage); n > 0 {
+		round.contextUsage = contextUsage[n-1]
+	}
+	for _, tu := range searches {
+		round.callTokens += estimateApproxTokens(tu.Name) + estimateJSONTokens(tu.Input)
+	}
+	round.addedTokens = estimateApproxTokens(said) + round.callTokens
+	current := followup.ConversationState.CurrentMessage.UserInputMessage
+	round.addedTokens += estimateApproxTokens(current.Content)
+	if current.UserInputMessageContext != nil {
+		for _, result := range current.UserInputMessageContext.ToolResults {
+			for _, content := range result.Content {
+				round.addedTokens += estimateApproxTokens(content.Text)
+			}
+		}
+	}
+	return round
 }
