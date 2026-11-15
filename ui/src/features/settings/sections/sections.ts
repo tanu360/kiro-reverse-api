@@ -92,16 +92,16 @@ export const SETTINGS_SECTIONS = [
     group: "connection",
   },
   {
-    id: "settings-public-link",
-    titleKey: "publicLink.title",
-    icon: Link04Icon,
-    group: "connection",
-  },
-  {
     id: "settings-upstream",
     titleKey: "upstream.title",
     navKey: "nav.upstream",
     icon: Location01Icon,
+    group: "connection",
+  },
+  {
+    id: "settings-public-link",
+    titleKey: "publicLink.title",
+    icon: Link04Icon,
     group: "connection",
   },
   {
