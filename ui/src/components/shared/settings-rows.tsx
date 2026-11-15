@@ -26,7 +26,7 @@ export const ROW_DESCRIPTION = "max-w-2xl text-pretty text-muted-foreground text
 /** A row's inline padding (the card's), for a row element that is not a SettingsRow. */
 export const SETTINGS_ROW_X = "min-w-0 px-4 sm:px-6";
 
-type ControlWidth = "field" | "number" | "actions" | "auto";
+type ControlWidth = "field" | "number" | "actions" | "value" | "auto";
 
 /*
  * The control sits beside the text once the row has room for both (the text column's 16rem, the
@@ -39,6 +39,9 @@ const CONTROL_WIDTH: Record<ControlWidth, string> = {
   // Buttons (Edit and Remove): their own width beside the text, so a long title keeps the room
   // a 18rem field slot would leave empty; under the text on a narrow row, like a field.
   actions: "w-full @xl/settings-row:w-auto",
+  // A value to copy (the public link): its own width beside the text, up to 28rem, then it
+  // wraps inside; under the text on a narrow row.
+  value: "w-full @xl/settings-row:w-auto @xl/settings-row:max-w-md",
   // A switch or one button, centred on the title and description beside it, however many lines
   // they take.
   auto: "col-start-2 row-start-1 flex shrink-0 items-center justify-end self-center",
@@ -89,7 +92,7 @@ type AriaProps = { "aria-labelledby"?: string; "aria-describedby"?: string; "ari
  * named and described by the row. `children` go under the description (a current value, an
  * error). `controlWidth` sizes the control slot: a text field or select (`field`), a number
  * field or a select of short options (`number`), a group of buttons at their own width
- * (`actions`), or the control's own width (`auto`: a switch or a button, beside the text and
+ * (`actions`), a value to copy at its own width (`value`), or the control's own width (`auto`: a switch or a button, beside the text and
  * centred on it at every width, while `children` such as a warning notice take the row's full
  * width under the description). A Button control keeps its own name (its label, "Add rule"): the row title
  * is not put on it, only the description. `labelControl` overrides that either way.

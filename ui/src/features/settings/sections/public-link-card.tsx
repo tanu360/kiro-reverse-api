@@ -219,10 +219,21 @@ function StatusRow({
   const linkLabel = useId();
 
   if (status.state === "running" && status.url) {
-    // The link takes the row's width under its text: in the 18rem control slot a
-    // ts.net address broke across two lines at its hyphen.
+    // The link sits beside its text at its own width (the 18rem field slot broke a ts.net
+    // address at its hyphen), and goes under the text on a narrow row.
     return (
       <SettingsRow
+        control={
+          <CopyField
+            copiedMessage={t("publicLink.copied")}
+            labelledBy={linkLabel}
+            multiline
+            openHref={status.url}
+            openLabel={t("publicLink.open")}
+            value={status.url}
+          />
+        }
+        controlWidth="value"
         description={t("publicLink.linkHint")}
         status={
           <Badge live size="sm" tone="success">
@@ -230,17 +241,7 @@ function StatusRow({
           </Badge>
         }
         title={<span id={linkLabel}>{t("publicLink.link")}</span>}
-      >
-        <CopyField
-          className="mt-2 max-w-lg"
-          copiedMessage={t("publicLink.copied")}
-          labelledBy={linkLabel}
-          multiline
-          openHref={status.url}
-          openLabel={t("publicLink.open")}
-          value={status.url}
-        />
-      </SettingsRow>
+      />
     );
   }
   if (status.state === "error") {
@@ -322,10 +323,11 @@ function SetupRow({ status }: { status: TunnelStatus }): JSX.Element {
               key={step.id}
             >
               {index > 0 ? (
+                // From the previous circle's edge to this one's, 4 px clear of both.
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "absolute top-[11px] right-1/2 h-0.5 w-full",
+                    "absolute top-[11px] right-[calc(50%+16px)] h-0.5 w-[calc(100%-32px)] rounded-full",
                     index <= current ? "bg-primary" : "bg-border",
                   )}
                 />
