@@ -10,22 +10,28 @@ import {
 import { useT } from "@/lib/i18n";
 import { cn, keyByText } from "@/lib/utils";
 
+/** A host label or path segment up to this long never breaks at its hyphen. */
+const NOWRAP_PIECE = 24;
+
 /**
- * The value with a break opportunity after each "/", so a long URL wraps at its path segments.
- * Chrome does not break after "/" under wrap-anywhere, so it would split a word instead
- * ("/v1/chat/comp|letions"). The <wbr> adds no text: copying and selection keep the raw value.
+ * The value with a break opportunity after each "/" (not between the two of "https://") and each
+ * ".", so a long URL wraps at its path segments and host labels. Chrome does not break after "/"
+ * under wrap-anywhere, so it would split a word instead ("/v1/chat/comp|letions"). A piece with
+ * a hyphen is one unbreakable run ("kiro-proxy.", not "kiro-|proxy."), unless it is longer than
+ * NOWRAP_PIECE and could overflow a phone-wide field. The <wbr> adds no text: copying and
+ * selection keep the raw value.
  */
 function breakAtSlashes(value: string): ReactNode {
-  const parts = value.split("/");
-  if (parts.length === 1) return value;
-  return keyByText(parts, (part) => part).map(({ key, item: part }, index) => (
+  const pieces = value.split(/(?<=\.)|(?<=\/)(?!\/)/);
+  if (pieces.length === 1) return value;
+  return keyByText(pieces, (piece) => piece).map(({ key, item: piece }, index) => (
     <Fragment key={key}>
-      {part}
-      {index < parts.length - 1 ? (
-        <>
-          /<wbr />
-        </>
-      ) : null}
+      {piece.includes("-") && piece.length <= NOWRAP_PIECE ? (
+        <span className="whitespace-nowrap">{piece}</span>
+      ) : (
+        piece
+      )}
+      {index < pieces.length - 1 ? <wbr /> : null}
     </Fragment>
   ));
 }
@@ -122,7 +128,13 @@ export function CopyField({
           aria-readonly="true"
           className={cn(
             MULTILINE_TEXT,
-            words ? "overflow-x-auto" : shown.includes("/") ? "wrap-anywhere" : "break-all",
+            // A wrapped URL balances its lines: "https://kiro-proxy." over "tail1234.ts.net",
+            // not one line and a lone "net".
+            words
+              ? "overflow-x-auto"
+              : shown.includes("/")
+                ? "wrap-anywhere text-balance"
+                : "break-all",
           )}
           id={id}
           role="textbox"

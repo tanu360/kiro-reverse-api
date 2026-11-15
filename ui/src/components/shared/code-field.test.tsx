@@ -10,9 +10,21 @@ describe("CopyField", () => {
     const box = screen.getByRole("textbox", { name: "Endpoint" });
     expect(box).toHaveAttribute("aria-readonly", "true");
     expect(box).toHaveAttribute("tabindex", "0");
-    // The <wbr> elements add no text, so the value reads (and copies) unchanged.
+    expect(box).toHaveClass("wrap-anywhere", "text-balance");
+    // The <wbr> elements add no text, so the value reads (and copies) unchanged: one after
+    // "https://", each host dot and each path slash.
     expect(box.textContent).toBe(url);
-    expect(box.querySelectorAll("wbr")).toHaveLength(5);
+    expect(box.querySelectorAll("wbr")).toHaveLength(6);
+  });
+
+  it("breaks a link at its dots, never at the hyphen of a host label", () => {
+    const url = "https://kiro-proxy.tail1234.ts.net";
+    renderWithProviders(<CopyField label="Link" multiline value={url} />);
+    const box = screen.getByRole("textbox", { name: "Link" });
+    expect(box.textContent).toBe(url);
+    const runs = [...box.querySelectorAll("span.whitespace-nowrap")].map((run) => run.textContent);
+    expect(runs).toEqual(["kiro-proxy."]);
+    expect(box.querySelectorAll("wbr")).toHaveLength(4);
   });
 
   it("breaks a key at any character, so no fragment sits alone on the first line", () => {
