@@ -8,6 +8,7 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
 } from "react";
 import { CopyButton } from "@/components/shared/copy-button";
 import { SETTINGS_ROW_X } from "@/components/shared/settings-rows";
@@ -193,6 +194,8 @@ export function InlineEditRow({
   const editId = useId();
   const formRef = useRef<HTMLFormElement | null>(null);
   const editRef = useRef<HTMLButtonElement | null>(null);
+  const valueRef = useRef<HTMLSpanElement | null>(null);
+  const [fullValueOpen, setFullValueOpen] = useState(false);
   const wasEditing = useRef(editing);
 
   useEffect(() => {
@@ -283,22 +286,44 @@ export function InlineEditRow({
             multiline ? "line-clamp-6 whitespace-pre-line break-words" : "truncate",
             empty ? "text-muted-foreground" : mono && "font-mono",
           )}
+          ref={valueRef}
         >
           {empty ? (placeholder ?? EMPTY) : value}
         </span>
-        {/* The row's one control, stretched over the whole row; the pencil is its visible part. */}
-        <button
-          aria-labelledby={`${editId} ${labelId}`}
-          className="flex size-6 shrink-0 cursor-pointer items-center justify-center text-muted-foreground opacity-0 transition-opacity after:absolute after:inset-0 after:rounded-lg focus-visible:opacity-100 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset group-hover/row:opacity-100 pointer-coarse:opacity-100"
-          onClick={onEdit}
-          ref={editRef}
-          type="button"
+        {/* The row's one control, stretched over the whole row; the pencil is its visible part.
+            It covers the value, so it carries the cut-off value's tooltip: hovering the row
+            shows the whole value, only when the value is actually cut off. */}
+        <Tooltip
+          onOpenChange={(next) => {
+            const element = valueRef.current;
+            const cut =
+              element !== null &&
+              (element.scrollWidth > element.clientWidth ||
+                element.scrollHeight > element.clientHeight);
+            setFullValueOpen(next && !empty && cut);
+          }}
+          open={fullValueOpen}
         >
-          <HugeiconsIcon className="size-4" icon={PencilEdit01Icon} aria-hidden="true" />
-          <span className="sr-only" id={editId}>
-            {t("actions.edit")}
-          </span>
-        </button>
+          <TooltipTrigger
+            render={
+              <button
+                aria-labelledby={`${editId} ${labelId}`}
+                className="flex size-6 shrink-0 cursor-pointer items-center justify-center text-muted-foreground opacity-0 transition-opacity after:absolute after:inset-0 after:rounded-lg focus-visible:opacity-100 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset group-hover/row:opacity-100 pointer-coarse:opacity-100"
+                onClick={onEdit}
+                ref={editRef}
+                type="button"
+              />
+            }
+          >
+            <HugeiconsIcon className="size-4" icon={PencilEdit01Icon} aria-hidden="true" />
+            <span className="sr-only" id={editId}>
+              {t("actions.edit")}
+            </span>
+          </TooltipTrigger>
+          <TooltipPopup className={cn("max-w-sm break-words", multiline && "whitespace-pre-line")}>
+            {value}
+          </TooltipPopup>
+        </Tooltip>
       </dd>
     </div>
   );
