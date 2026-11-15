@@ -14,6 +14,7 @@ import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/compone
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { serverDataText } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
@@ -44,7 +45,7 @@ export function EnabledSwitch({ account }: { account: Account }): JSX.Element {
   const label = t("actions.enableAccount", { email: displayEmail(account.email, account.id) });
   if (isBanned(account)) {
     const reason =
-      account.banReason ||
+      serverDataText(account.banReason, t) ||
       t(account.banStatus === "SUSPENDED" ? "lockedSwitch.suspended" : "lockedSwitch.banned");
     return (
       <Tooltip>

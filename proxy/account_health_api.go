@@ -54,8 +54,7 @@ func (h *Handler) apiUpdateAccountHealth(w http.ResponseWriter, r *http.Request)
 		writeAdminError(w, http.StatusBadRequest, codeSelfHealRoundsRange, err.Error())
 		return
 	case err != nil:
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	healer.settingsChanged()

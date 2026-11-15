@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { errorMessage } from "@/lib/api/server-errors";
-import { type TFunction, useT } from "@/lib/i18n";
+import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useReportDirty } from "../lib/unsaved";
@@ -77,12 +77,17 @@ export function useSectionSave<V>(
 export function Hint({ children, more }: { children: ReactNode; more?: ReactNode }): JSX.Element {
   const { t } = useT("settings");
   if (!more) return <>{children}</>;
+  // Joined the language's way: a space in English, none after "。" in Chinese.
   return (
     <>
-      {children}{" "}
-      <InfoHint hint={more} variant="link">
-        {t("learnMore")}
-      </InfoHint>
+      {fillNodes(t("common:text.joinSentences"), {
+        first: children,
+        second: (
+          <InfoHint hint={more} variant="link">
+            {t("learnMore")}
+          </InfoHint>
+        ),
+      })}
     </>
   );
 }

@@ -55,6 +55,10 @@ type Status struct {
 	EnableURL  string `json:"enableURL,omitempty"`
 	AdminURL   string `json:"adminURL,omitempty"`
 	Error      string `json:"error,omitempty"`
+	// ErrorCode names the failure for the admin UI, which words it itself (see the Code*
+	// constants); ErrorDetail is the underlying reason it shows as is. Error stays the English.
+	ErrorCode   string `json:"errorCode,omitempty"`
+	ErrorDetail string `json:"errorDetail,omitempty"`
 	// SignedIn is whether this server holds a Tailscale sign-in that "Sign out" would end.
 	SignedIn bool `json:"signedIn"`
 	// FallbackHelper says an earlier version's helper (or, from source, the latest release's) is
@@ -65,6 +69,37 @@ type Status struct {
 	// device's page in the admin console, where that is done.
 	KeyExpiry  string `json:"keyExpiry,omitempty"`
 	MachineURL string `json:"machineURL,omitempty"`
+}
+
+// Codes in Status.ErrorCode. A code never changes once shipped.
+const (
+	CodeHelperStopped  = "helper_stopped"
+	CodeHelperDownload = "helper_download_failed"
+	CodeHelperStart    = "helper_start_failed"
+	CodeHelperMismatch = "helper_mismatch"
+	CodeListener       = "listener_failed"
+	CodeHelperError    = "helper_error"
+)
+
+// failure is an error with its Status code and detail; Error() is the text it always had.
+type failure struct {
+	code   string
+	detail string
+	err    error
+}
+
+func (f *failure) Error() string { return f.err.Error() }
+
+func (f *failure) Unwrap() error { return f.err }
+
+// errorStatus is the error state for err, with its code and detail when it has them.
+func errorStatus(err error) Status {
+	st := Status{State: StateError, Error: err.Error()}
+	var f *failure
+	if errors.As(err, &f) {
+		st.ErrorCode, st.ErrorDetail = f.code, f.detail
+	}
+	return st
 }
 
 // Options configures a Manager.
@@ -348,12 +383,12 @@ func (m *Manager) loop(ctx context.Context, run *runHandle, hostname string) {
 		if reached {
 			delay = m.opts.RestartMin
 		}
-		msg := "The Tailscale helper stopped."
+		st := Status{State: StateError, Error: "The Tailscale helper stopped.", ErrorCode: CodeHelperStopped}
 		if err != nil {
-			msg = err.Error()
+			st = errorStatus(err)
 		}
-		m.opts.Logf("[Tunnel] %s. Retrying in %s.", strings.TrimSuffix(msg, "."), delay.Round(time.Second))
-		m.setStatus(Status{State: StateError, Error: msg})
+		m.opts.Logf("[Tunnel] %s. Retrying in %s.", strings.TrimSuffix(st.Error, "."), delay.Round(time.Second))
+		m.setStatus(st)
 		select {
 		case <-ctx.Done():
 			return
@@ -368,14 +403,14 @@ func (m *Manager) loop(ctx context.Context, run *runHandle, hostname string) {
 func (m *Manager) once(ctx context.Context, run *runHandle, hostname string) (reached bool, err error) {
 	bin, fallback, err := m.helper(ctx)
 	if err != nil {
-		return false, err
+		return false, &failure{code: CodeHelperDownload, detail: err.Error(), err: err}
 	}
 	m.mu.Lock()
 	m.fallback = fallback
 	m.mu.Unlock()
 	addr, err := m.ensureListener()
 	if err != nil {
-		return false, fmt.Errorf("open the tunnel listener: %w", err)
+		return false, &failure{code: CodeListener, detail: err.Error(), err: fmt.Errorf("open the tunnel listener: %w", err)}
 	}
 	m.setStatus(Status{State: StateStarting})
 	return m.runHelper(ctx, run, bin, hostname, addr)
@@ -472,7 +507,7 @@ func (m *Manager) runHelper(ctx context.Context, run *runHandle, bin, hostname, 
 	cmd.Cancel = func() error { return stdin.Close() }
 	cmd.WaitDelay = 10 * time.Second
 	if err := cmd.Start(); err != nil {
-		return false, fmt.Errorf("start the Tailscale helper: %w", err)
+		return false, &failure{code: CodeHelperStart, detail: err.Error(), err: fmt.Errorf("start the Tailscale helper: %w", err)}
 	}
 	run.setStdin(stdin)
 	defer run.setStdin(nil)
@@ -501,7 +536,7 @@ func (m *Manager) runHelper(ctx context.Context, run *runHandle, bin, hostname, 
 			continue
 		}
 		if line.Protocol != protocolVersion {
-			protoErr = fmt.Errorf("%w (protocol %d, want %d)", errProtocol, line.Protocol, protocolVersion)
+			protoErr = &failure{code: CodeHelperMismatch, err: fmt.Errorf("%w (protocol %d, want %d)", errProtocol, line.Protocol, protocolVersion)}
 			_ = stdin.Close()
 			go func() { _, _ = io.Copy(io.Discard, stdout) }()
 			break
@@ -532,9 +567,10 @@ func (m *Manager) runHelper(ctx context.Context, run *runHandle, bin, hostname, 
 	}
 	if waitErr != nil {
 		if lastErr != "" {
-			return reached, fmt.Errorf("the Tailscale helper stopped: %s", strings.TrimPrefix(lastErr, "kiro-tunnel: "))
+			reason := strings.TrimPrefix(lastErr, "kiro-tunnel: ")
+			return reached, &failure{code: CodeHelperStopped, detail: reason, err: fmt.Errorf("the Tailscale helper stopped: %s", reason)}
 		}
-		return reached, fmt.Errorf("the Tailscale helper stopped: %w", waitErr)
+		return reached, &failure{code: CodeHelperStopped, detail: waitErr.Error(), err: fmt.Errorf("the Tailscale helper stopped: %w", waitErr)}
 	}
 	return reached, nil
 }
@@ -556,7 +592,7 @@ func (m *Manager) statusFromHelper(line helperLine) (Status, bool) {
 		}
 		return st, true
 	case StateError:
-		return Status{State: StateError, Error: line.Error}, true
+		return Status{State: StateError, Error: line.Error, ErrorCode: CodeHelperError, ErrorDetail: line.Error}, true
 	}
 	return Status{}, false
 }

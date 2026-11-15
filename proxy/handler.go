@@ -743,7 +743,7 @@ func (h *Handler) sweepModelsCache() {
 
 		models, err := ListAvailableModels(account)
 		if err != nil {
-			results[i].fail(err)
+			results[i].failOr(err, codeModelsRefreshFailed)
 			//! Listing models is housekeeping on a timer, not traffic. Disabling or
 			//! cooling an account here takes it out of rotation over a request no
 			//! client made; real requests decide account health.
@@ -3015,7 +3015,7 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 
 	stored, updated, err := config.UpsertAccount(account)
 	if err != nil {
-		writeAdminErr(w, addAccountErrorStatus(err), err, "")
+		writeAdminErr(w, addAccountErrorStatus(err), err, codeSaveFailed)
 		return
 	}
 
@@ -3033,8 +3033,7 @@ func (h *Handler) apiAddAccount(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) apiDeleteAccount(w http.ResponseWriter, _ *http.Request, id string) {
 	if err := config.DeleteAccount(id); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	h.pool.Reload()
@@ -3082,8 +3081,7 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 	if err := metadata.apply(id); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -3135,8 +3133,7 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, id st
 		}
 	}
 	if err := config.UpdateAccount(id, *existing); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -3260,8 +3257,7 @@ func (h *Handler) apiBatchAccounts(w http.ResponseWriter, r *http.Request) {
 	case "addTag", "removeTag":
 		h.batchTags(w, req.IDs, req.Action == "addTag", req.Tag)
 	default:
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid action: " + req.Action})
+		writeAdminError(w, http.StatusBadRequest, codeBatchActionInvalid, "Invalid action: "+req.Action)
 	}
 }
 
@@ -3346,7 +3342,7 @@ func (h *Handler) batchSetEnabled(w http.ResponseWriter, ids []string, enabled b
 			keepOffForAdmin(&a)
 		}
 		if err := config.UpdateAccount(a.ID, a); err != nil {
-			results[slots[i]].fail(err)
+			results[slots[i]].failOr(err, codeSaveFailed)
 			continue
 		}
 		results[slots[i]].OK = true
@@ -3380,7 +3376,7 @@ func (h *Handler) batchRefresh(w http.ResponseWriter, r *http.Request, ids []str
 		_, suspended, err := h.refreshAccountNow(r.Context(), account)
 		switch {
 		case err != nil:
-			res.fail(err)
+			res.failOr(err, codeAccountRefreshFailed)
 		case suspended:
 			res.OK = true
 			res.Status = accountStatusSuspended
@@ -3416,7 +3412,7 @@ func (h *Handler) batchRefreshModels(w http.ResponseWriter, ids []string) {
 		h.useLatestToken(account)
 		res := &results[slots[i]]
 		if err := h.fetchAndCacheAccountModels(account); err != nil {
-			res.fail(err)
+			res.failOr(err, codeModelsRefreshFailed)
 			return
 		}
 		res.OK = true
@@ -3438,7 +3434,7 @@ func (h *Handler) batchDelete(w http.ResponseWriter, ids []string) {
 	matched, slots, results := matchAccounts(ids)
 	for i, a := range matched {
 		if err := config.DeleteAccount(a.ID); err != nil {
-			results[slots[i]].fail(err)
+			results[slots[i]].failOr(err, codeSaveFailed)
 			continue
 		}
 		results[slots[i]].OK = true
@@ -3539,8 +3535,7 @@ func (h *Handler) apiCompleteIamSso(w http.ResponseWriter, r *http.Request) {
 
 	stored, updated, err := config.UpsertAccount(account)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -3646,8 +3641,7 @@ func (h *Handler) apiPollBuilderIdAuth(w http.ResponseWriter, r *http.Request) {
 
 	stored, updated, err := config.UpsertAccount(account)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -3952,8 +3946,7 @@ func (h *Handler) apiImportCredentials(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if stored, updated, err = config.UpsertAccount(account); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -3972,7 +3965,7 @@ func (h *Handler) importKiroAPIKeyAccount(w http.ResponseWriter, account config.
 	}
 	stored, updated, err := config.UpsertAccount(account)
 	if err != nil {
-		writeAdminErr(w, addAccountErrorStatus(err), err, "")
+		writeAdminErr(w, addAccountErrorStatus(err), err, codeSaveFailed)
 		return
 	}
 
@@ -4063,8 +4056,7 @@ func (h *Handler) apiUpdatePromptFilter(w http.ResponseWriter, r *http.Request) 
 		rules = *req.Rules
 	}
 	if err := config.UpdatePromptFilterConfig(fcc, fen, fsb, rules); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	publishEvent(eventSettingsChanged, "")
@@ -4095,8 +4087,7 @@ func (h *Handler) apiUpdateModelMappings(w http.ResponseWriter, r *http.Request)
 			json.NewEncoder(w).Encode(body)
 			return
 		}
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	publishEvent(eventSettingsChanged, "")
@@ -4164,8 +4155,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			writeAPIKeyLockout(w)
 			return
 		}
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -4182,8 +4172,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.AllowOverUsage != nil {
 		if err := config.UpdateAllowOverUsage(*req.AllowOverUsage); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 		h.pool.Reload()
@@ -4191,16 +4180,14 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if req.LenientStreamIntegrity != nil {
 		if err := config.UpdateLenientStreamIntegrity(*req.LenientStreamIntegrity); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 	}
 
 	if req.SessionAffinity != nil {
 		if err := config.UpdateSessionAffinity(*req.SessionAffinity); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 	}
@@ -4212,32 +4199,28 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	//! The pool reads the limit on every pick, so it applies without a Reload.
 	if req.AccountRPMLimit != nil {
 		if err := config.UpdateAccountRPMLimit(*req.AccountRPMLimit); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 	}
 
 	if req.AutoContinue != nil {
 		if err := config.UpdateAutoContinue(*req.AutoContinue); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 	}
 
 	if req.AutoContinueMax != nil {
 		if err := config.UpdateAutoContinueMax(*req.AutoContinueMax); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 	}
 
 	if req.StructuredToolHistory != nil {
 		if err := config.UpdateStructuredToolHistory(*req.StructuredToolHistory); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 	}
@@ -4247,14 +4230,12 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := applyImageResizePatch(req.ImageResize, req.ImageResizeMaxDimension, req.ImageResizeMaxKB); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
 	if err := applyLogLevel(logLevel); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -4343,8 +4324,7 @@ func (h *Handler) apiTestAccount(w http.ResponseWriter, r *http.Request, id stri
 
 	err := CallKiroAPIContext(r.Context(), account, kiroPayload, callback)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusInternalServerError, err, codeAccountTestFailed)
 		return
 	}
 
@@ -4371,7 +4351,7 @@ func (h *Handler) apiRefreshAccount(w http.ResponseWriter, r *http.Request, id s
 	defer h.pool.Reload()
 	info, suspended, err := h.refreshAccountNow(r.Context(), account)
 	if err != nil {
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeAccountRefreshFailed)
 		return
 	}
 	if suspended {
@@ -4543,8 +4523,7 @@ func (h *Handler) apiGetAccountModels(w http.ResponseWriter, r *http.Request, id
 	}
 	models, err := ListAvailableModels(account)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeAdminErr(w, http.StatusInternalServerError, err, codeModelsLoadFailed)
 		return
 	}
 
@@ -4595,19 +4574,16 @@ func (h *Handler) apiUpdateThinkingConfig(w http.ResponseWriter, r *http.Request
 
 	validFormats := map[string]bool{"reasoning_content": true, "thinking": true, "think": true}
 	if req.OpenAIFormat != "" && !validFormats[req.OpenAIFormat] {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid openaiFormat, must be: reasoning_content, thinking, or think"})
+		writeAdminError(w, http.StatusBadRequest, codeThinkingFormatInvalid, "Invalid openaiFormat, must be: reasoning_content, thinking, or think")
 		return
 	}
 	if req.ClaudeFormat != "" && !validFormats[req.ClaudeFormat] {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid claudeFormat, must be: reasoning_content, thinking, or think"})
+		writeAdminError(w, http.StatusBadRequest, codeThinkingFormatInvalid, "Invalid claudeFormat, must be: reasoning_content, thinking, or think")
 		return
 	}
 
 	if err := config.UpdateThinkingConfig(req.Suffix, req.OpenAIFormat, req.ClaudeFormat); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -4645,8 +4621,7 @@ func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := config.UpdatePreferredEndpoint(req.PreferredEndpoint); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 
@@ -4655,8 +4630,7 @@ func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request
 	}
 	if req.ChatAPI != nil {
 		if err := config.UpdateChatAPI(*req.ChatAPI); err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 	}
@@ -4707,8 +4681,7 @@ func (h *Handler) apiUpdateProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := config.UpdateProxySettings(req.ProxyURL); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 

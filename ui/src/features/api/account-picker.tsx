@@ -14,6 +14,7 @@ import { accountMeta, useAccountName } from "@/features/accounts/account-cells";
 import { tagKey } from "@/features/accounts/account-metadata";
 import { accountsQuery } from "@/lib/api/accounts";
 import type { Account } from "@/lib/api/types";
+import { compareText, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { type ApiKeyAccountScope, MAX_KEY_TAGS } from "./api-key-form";
@@ -36,7 +37,7 @@ export function tagOptions(accounts: readonly Account[]): TagOption[] {
       else byKey.set(tagKey(tag), { tag, count: 1 });
     }
   }
-  return [...byKey.values()].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  return [...byKey.values()].sort((a, b) => b.count - a.count || compareText(a.tag, b.tag));
 }
 
 /** The accounts a scope reaches: the picked ids plus every account carrying a picked tag. */
@@ -87,7 +88,7 @@ export function AccountPicker({
   /** Where focus goes when the picks are invalid. */
   searchRef?: Ref<HTMLInputElement>;
 }): JSX.Element {
-  const { t } = useT("api");
+  const { t, lang } = useT("api");
   const { t: ta } = useT("accounts");
   const { t: tc } = useT();
   const accountName = useAccountName();
@@ -271,10 +272,14 @@ export function AccountPicker({
           {loaded ? (
             <p aria-live="polite" className="text-muted-foreground text-xs tabular-nums">
               {tags.length > 0
-                ? t("form.accountsReachedCount", { n: reachedKnown, total: list.length })
+                ? t("form.accountsReachedCount", {
+                    count: list.length,
+                    n: formatNumber(reachedKnown, lang),
+                    total: formatNumber(list.length, lang),
+                  })
                 : t("form.accountsSelectedCount", {
-                    n: selected.length,
-                    total: list.length + removed.length,
+                    n: formatNumber(selected.length, lang),
+                    total: formatNumber(list.length + removed.length, lang),
                   })}
             </p>
           ) : null}

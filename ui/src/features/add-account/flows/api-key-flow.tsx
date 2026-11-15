@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { AddedAccountRef } from "@/lib/api/types";
-import { useT } from "@/lib/i18n";
+import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FlowNote, FormField, RegionField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
@@ -100,12 +100,9 @@ export function ApiKeyFlow(): JSX.Element {
       <FlowNote>{t("apikey.help")}</FlowNote>
       <FormField
         error={errors.keys}
-        hint={
-          <>
-            {relogin.target ? t("relogin.keyHint") : t("apikey.keysHint")}{" "}
-            <Code>ksk_…|eu-central-1</Code>
-          </>
-        }
+        hint={fillNodes(relogin.target ? t("relogin.keyHint") : t("apikey.keysHint"), {
+          example: <Code>ksk_…|eu-central-1</Code>,
+        })}
         label={relogin.target ? t("relogin.keyLabel") : t("apikey.keysLabel")}
       >
         <Textarea

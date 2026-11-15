@@ -14,6 +14,7 @@ import {
   useContext,
   useState,
 } from "react";
+import { numberFormat } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { intFmt } from "./chart-formatters";
 import { useOptionalChartLegendHover } from "./chart-legend-hover";
@@ -277,7 +278,7 @@ interface LegendValueProps {
   showPercentage?: boolean;
   /** Default: the UI-language integer format. */
   formatValue?: (value: number) => string;
-  /** Default: whole percent, e.g. "42%". */
+  /** Default: whole percent in the UI language's number format, e.g. "42%". */
   formatPercentage?: (percentage: number) => string;
 }
 
@@ -286,7 +287,8 @@ export function LegendValue({
   className,
   showPercentage = false,
   formatValue = intFmt,
-  formatPercentage = (p) => `${Math.round(p)}%`,
+  formatPercentage = (p) =>
+    numberFormat(undefined, { style: "percent", maximumFractionDigits: 0 }).format(p / 100),
 }: LegendValueProps) {
   const { item, percentage } = useLegendItem();
   if (item.value === undefined) {

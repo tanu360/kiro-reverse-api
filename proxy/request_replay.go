@@ -141,8 +141,7 @@ func (h *Handler) apiConversation(w http.ResponseWriter, id string) {
 	id = strings.TrimSpace(id)
 	view, err := loadConversation(id)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	if id == "" || len(view.Turns) == 0 {
@@ -179,8 +178,7 @@ func (h *Handler) apiRequestBody(w http.ResponseWriter, rawID string) {
 		return
 	}
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	var probe struct {
@@ -281,8 +279,7 @@ func (h *Handler) apiReplayRequest(w http.ResponseWriter, r *http.Request, rawID
 		return
 	}
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	accountID := strings.TrimSpace(req.AccountID)
@@ -313,8 +310,7 @@ func (h *Handler) apiReplayRequest(w http.ResponseWriter, r *http.Request, rawID
 	defer cancel()
 	inner, err := http.NewRequestWithContext(ctx, http.MethodPost, path, bytes.NewReader(body))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	inner.Header.Set("Content-Type", "application/json")

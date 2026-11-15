@@ -217,8 +217,7 @@ func (h *Handler) apiUpdateAlerts(w http.ResponseWriter, r *http.Request) {
 			writeAlertInputError(w, inputErr)
 			return
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 

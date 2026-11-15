@@ -211,7 +211,7 @@ function PromptFilterForm({ config }: { config: PromptFilterConfig }): JSX.Eleme
           <span aria-hidden="true">
             {on}/{total}
           </span>
-          <span className="sr-only">{t("promptFilter.onCount", { on, total })}</span>
+          <span className="sr-only">{t("promptFilter.onCount", { count: total, on, total })}</span>
         </Badge>
       }
       footer={

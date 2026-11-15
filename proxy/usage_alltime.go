@@ -475,7 +475,7 @@ func (h *Handler) apiObserveTrafficHistory(w http.ResponseWriter, r *http.Reques
 	}
 	resp, err := queryTrafficHistory(observeNow(), tz)
 	if err != nil {
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeInternalError)
 		return
 	}
 	json.NewEncoder(w).Encode(resp)

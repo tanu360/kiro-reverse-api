@@ -210,7 +210,7 @@ func (h *Handler) apiAccountForecast(w http.ResponseWriter, _ *http.Request) {
 	now := observeNow()
 	forecasts, err := h.accountForecasts(config.GetAccounts(), now)
 	if err != nil {
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeInternalError)
 		return
 	}
 	json.NewEncoder(w).Encode(accountForecastResponse{

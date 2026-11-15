@@ -25,7 +25,7 @@
   <a href="#-safety">Safety</a>
 </p>
 
-[English](README.md) • [简体中文](README_CN.md) • [Português (Brasil)](README_PT-BR.md) • [Tiếng Việt](README_VI.md)
+[English](README.md) • [简体中文](README_CN.md) • [日本語](README_JA.md) • [Português (Brasil)](README_PT-BR.md) • [Tiếng Việt](README_VI.md)
 
 </div>
 
@@ -38,7 +38,7 @@
 1. Pools multiple Kiro accounts and load-balances requests with round-robin, weights or priorities, and session affinity.
 2. Translates Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, and OpenAI `/v1/responses` calls to and from Kiro upstream, including tools, thinking, reasoning effort, and web search.
 3. Refreshes access tokens automatically and streams Server-Sent Events end-to-end, with keepalives and failover.
-4. Ships with a React admin panel, embedded in the binary, for account management, live observability, and request audit, in English, 简体中文, Tiếng Việt, and Português (Brasil).
+4. Ships with a React admin panel, embedded in the binary, for account management, live observability, and request audit, in English, 简体中文, 日本語, Tiếng Việt, and Português (Brasil).
 
 > [!IMPORTANT]
 > Single-binary local proxy. **Not** a hosted service, **not** affiliated with Amazon, AWS, or Kiro. You must own or be authorized to use every account you add to the pool.
@@ -116,7 +116,7 @@ If this project helps you, a Star would mean a lot.
 - Command menu (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) for pages and actions, privacy mode that masks email addresses, and an update check that reads `version.json` from the repo's `main` branch.
 - Changing the admin password ends every other signed-in session.
 - Two-factor sign-in with an authenticator app, with ten one-time recovery codes (see [Two-factor sign-in](#-two-factor-sign-in)).
-- Light, dark, and system theme; four UI languages: English, 简体中文, Tiếng Việt, and Português (Brasil).
+- Light, dark, and system theme; five UI languages: English, 简体中文, 日本語, Tiếng Việt, and Português (Brasil).
 - Works from phones to desktops.
 
 ### 🌐 Networking

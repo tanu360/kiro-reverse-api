@@ -1,5 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { TFunction } from "@/lib/i18n";
 import { apiRequest } from "./client";
+import { withDetail } from "./server-errors";
 
 /*
  * GET/POST /alerts and POST /alerts/test. The types live here rather than in types.ts: nothing
@@ -25,7 +27,36 @@ export interface AlertDelivery {
   attempts: number;
   /** account_usage | pool_usage | account_banned | all_unavailable | daily_summary | test */
   event: string;
+  /** English; the UI words it from `errorCode` (alertDeliveryErrorText). */
   error?: string;
+  /** timeout | http_status | network; absent from servers (and stored results) before it. */
+  errorCode?: string;
+  /** The channel's answer or the network error, scrubbed like `error`. */
+  errorDetail?: string;
+}
+
+/**
+ * Why a send failed, in the UI language: the code's text with the scrubbed detail after it. An
+ * unknown code shows the server's English; "" when there is no reason.
+ */
+export function alertDeliveryErrorText(
+  result: Pick<AlertDelivery, "status" | "error" | "errorCode" | "errorDetail">,
+  t: TFunction,
+): string {
+  switch (result.errorCode) {
+    case "timeout":
+      return t("errors:alertDelivery.timeout");
+    case "http_status":
+      return withDetail(
+        t("errors:alertDelivery.httpStatus", { status: result.status }),
+        result.errorDetail,
+        t,
+      );
+    case "network":
+      return withDetail(t("errors:alertDelivery.network"), result.errorDetail, t);
+    default:
+      return result.error ?? "";
+  }
 }
 
 /**

@@ -25,11 +25,12 @@ import {
   TUNNEL_HOSTNAME,
   TUNNEL_HOSTNAME_MAX,
   type TunnelStatus,
+  tunnelErrorText,
   tunnelQuery,
   updateTunnel,
 } from "@/lib/api/tunnel";
 import { dateTimeFormat, formatBytes } from "@/lib/format";
-import { useT } from "@/lib/i18n";
+import { fillNodes, useT } from "@/lib/i18n";
 import { deviceNameChars } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -119,9 +120,9 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
         checked={enabled}
         description={
           <Hint
-            more={
-              <>
-                {t("publicLink.more")}{" "}
+            more={fillNodes(t("common:text.joinSentences"), {
+              first: t("publicLink.more"),
+              second: (
                 <a
                   className="font-medium text-foreground underline decoration-dotted underline-offset-3 hover:decoration-solid"
                   href={FUNNEL_GUIDE}
@@ -130,8 +131,8 @@ function PublicLinkPanel({ status }: { status: TunnelStatus }): JSX.Element {
                 >
                   {t("publicLink.guide")}
                 </a>
-              </>
-            }
+              ),
+            })}
           >
             {t("publicLink.switchHint")}
           </Hint>
@@ -260,7 +261,7 @@ function StatusRow({
         controlWidth="actions"
         description={
           <span className="text-destructive-foreground">
-            {status.error ?? t("publicLink.failed")}
+            {tunnelErrorText(status, t) ?? t("publicLink.failed")}
           </span>
         }
         title={t("publicLink.status")}

@@ -31,8 +31,7 @@ func writeBackupError(w http.ResponseWriter, err error) {
 		//! The parse failure is the detail the UI shows under its "not a usable backup" text.
 		writeAdminErrorDetail(w, http.StatusBadRequest, fileErr.Code, err.Error(), err.Error())
 	default:
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 	}
 }
 
@@ -40,8 +39,7 @@ func (h *Handler) apiBackupsList(w http.ResponseWriter, r *http.Request) {
 	autoInclude := r.URL.Query().Get("autoInclude") == "true"
 	list, err := config.ListBackups(autoInclude)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{"backups": list})
@@ -61,8 +59,7 @@ func (h *Handler) apiBackupsCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	entry, err := config.CreateBackup(req.Kind, req.Note)
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	publishEvent(eventBackupCreated, entry.ID)
@@ -202,8 +199,7 @@ func (h *Handler) apiBackupsScheduleUpdate(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := config.UpdateBackupSchedule(sched); err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	resp := map[string]interface{}{}

@@ -168,7 +168,7 @@ func writeMicrosoftAddError(w http.ResponseWriter, err error) {
 	case errors.Is(err, errMicrosoftSSOCanceled), errors.Is(err, errMicrosoftAccountExists):
 		writeAdminErr(w, http.StatusConflict, err, "")
 	default:
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeSaveFailed)
 	}
 }
 
@@ -226,7 +226,7 @@ func (h *Handler) apiStartMicrosoftSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionID, authorizeURL, expiresIn, err := auth.StartMicrosoftSSOLogin()
 	if err != nil {
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeInternalError)
 		return
 	}
 	response := map[string]interface{}{
@@ -263,7 +263,7 @@ func (h *Handler) apiCompleteMicrosoftSSO(w http.ResponseWriter, r *http.Request
 
 	progress, err := auth.ContinueMicrosoftSSOLogin(sessionID, req.CallbackURL)
 	if err != nil {
-		writeAdminErr(w, http.StatusBadRequest, err, "")
+		writeAdminErr(w, http.StatusBadRequest, err, codeMicrosoftSignInFailed)
 		return
 	}
 	if progress.AuthorizationURL != "" {

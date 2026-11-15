@@ -261,8 +261,7 @@ func (h *Handler) apiUpdateApiKey(w http.ResponseWriter, r *http.Request, id str
 	}
 	updated := config.GetApiKeyEntry(id)
 	if updated == nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to reload API key"})
+		writeAdminError(w, http.StatusInternalServerError, codeInternalError, "failed to reload API key")
 		return
 	}
 	publishEvent(eventAPIKeysChanged, id)
@@ -278,7 +277,7 @@ func (h *Handler) apiDeleteApiKey(w http.ResponseWriter, _ *http.Request, id str
 			writeAPIKeyLockout(w)
 			return
 		}
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeSaveFailed)
 		return
 	}
 	apiKeyRPM.forget(id)

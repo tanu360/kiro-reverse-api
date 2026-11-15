@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  compareText,
   formatBytes,
   formatCompact,
   formatCredits,
@@ -7,6 +8,7 @@ import {
   formatDuration,
   formatDurationMs,
   formatFraction,
+  formatItems,
   formatList,
   formatNumber,
   formatPercent,
@@ -58,6 +60,23 @@ describe("formatDurationMs", () => {
   });
 });
 
+describe("formatItems", () => {
+  it("joins with the language's separator and no conjunction", () => {
+    expect(formatItems(["a", "b", "c"], "en")).toBe("a, b, c");
+    expect(formatItems(["a", "b", "c"], "zh")).toBe("a、b、c");
+    expect(formatItems(["a", "b", "c"], "ja")).toBe("a、b、c");
+    expect(formatItems(["a", "b"], "pt-BR")).toBe("a, b");
+    expect(formatItems(["a"], "vi")).toBe("a");
+  });
+});
+
+describe("compareText", () => {
+  it("sorts in the UI language's order", () => {
+    expect(["b", "a", "C"].sort((x, y) => compareText(x, y, "en"))).toEqual(["a", "b", "C"]);
+    expect(["đ", "e", "d"].sort((x, y) => compareText(x, y, "vi"))).toEqual(["d", "đ", "e"]);
+  });
+});
+
 describe("formatList", () => {
   it("joins the items the language's way", () => {
     expect(formatList(["same refresh token"], "en")).toBe("same refresh token");
@@ -92,6 +111,12 @@ describe("formatDuration", () => {
     expect(formatDuration(15 * 60, "en")).toBe("15m");
     expect(formatDuration(4500, "en")).toBe("1h 15m");
     expect(formatDuration(2 * 86_400 + 3 * 3600, "en")).toBe("2d 3h");
+  });
+
+  it("writes Japanese units in Japanese, not CLDR's narrow Latin letters", () => {
+    expect(formatDuration(4500, "ja")).toBe("1 時間 15 分");
+    expect(formatDuration(45, "ja")).toBe("45 秒");
+    expect(formatDuration(2 * 86_400 + 3 * 3600, "ja")).toBe("2 日 3 時間");
   });
 
   it("leaves out a zero second unit and the units past the two shown", () => {

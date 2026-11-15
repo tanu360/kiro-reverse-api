@@ -2,8 +2,9 @@
 import { expect, type Page, test } from "@playwright/test";
 
 /**
- * Locale layout checks (mock mode) for the languages whose words run longest: the pre-paint
- * <html lang>, and an accounts table that fits a 1440 px window without scrolling sideways.
+ * Locale layout checks (mock mode) for the languages whose words run longest, and for Japanese,
+ * whose full-width glyphs run wide: the pre-paint <html lang>, and an accounts table that fits a
+ * 1440 px window without scrolling sideways.
  */
 
 const PASSWORD = "12345678";
@@ -17,7 +18,7 @@ async function signIn(page: Page): Promise<void> {
   await expect(page.locator("main#main")).toBeVisible();
 }
 
-for (const lang of ["vi", "pt-BR"]) {
+for (const lang of ["vi", "pt-BR", "ja"]) {
   test.describe(`${lang} layout`, () => {
     test.use({ viewport: { width: 1440, height: 900 } });
 

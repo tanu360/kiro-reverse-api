@@ -101,7 +101,7 @@ func (h *Handler) apiRegenerateApiKey(w http.ResponseWriter, _ *http.Request, id
 			writeAdminError(w, http.StatusNotFound, codeAPIKeyNotFound, "API key not found")
 			return
 		}
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeInternalError)
 		return
 	}
 	publishEvent(eventAPIKeysChanged, entry.ID)

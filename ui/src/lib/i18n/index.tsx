@@ -13,7 +13,7 @@ import { readStorage, writeStorage } from "@/lib/storage";
 import { keyByText } from "@/lib/utils";
 
 /** A language the UI ships with. */
-export type SupportedLang = "en" | "zh" | "vi" | "pt-BR";
+export type SupportedLang = "en" | "zh" | "ja" | "vi" | "pt-BR";
 
 /**
  * The dev/test-only pseudo language: English text wrapped in ⟦…⟧ so a test can tell translated
@@ -40,6 +40,7 @@ interface LanguageOption {
 export const LANGUAGES: readonly LanguageOption[] = [
   { code: "en", nativeLabel: "English", shortLabel: "EN", intl: "en-US" },
   { code: "zh", nativeLabel: "中文", shortLabel: "中文", intl: "zh-CN" },
+  { code: "ja", nativeLabel: "日本語", shortLabel: "日本語", intl: "ja-JP" },
   { code: "vi", nativeLabel: "Tiếng Việt", shortLabel: "VI", intl: "vi-VN" },
   { code: "pt-BR", nativeLabel: "Português (Brasil)", shortLabel: "PT", intl: "pt-BR" },
 ];
@@ -55,6 +56,7 @@ const DEFAULT_NAMESPACE = "common";
 const catalog: Record<SupportedLang, Record<string, Dict>> = {
   en: {},
   zh: {},
+  ja: {},
   vi: {},
   "pt-BR": {},
 };
@@ -176,10 +178,13 @@ export function translate(lang: Lang, namespace: string, key: string, params?: T
   return key;
 }
 
-/** Maps a BCP 47 tag to a supported language: zh* → zh, vi* → vi, pt* → pt-BR, en* → en. */
+/**
+ * Maps a BCP 47 tag to a supported language: zh* → zh, ja* → ja, vi* → vi, pt* → pt-BR, en* → en.
+ */
 export function matchLang(tag: string): SupportedLang | undefined {
   const lower = tag.toLowerCase();
   if (lower.startsWith("zh")) return "zh";
+  if (lower.startsWith("ja")) return "ja";
   if (lower.startsWith("vi")) return "vi";
   if (lower.startsWith("pt")) return "pt-BR";
   if (lower.startsWith("en")) return "en";

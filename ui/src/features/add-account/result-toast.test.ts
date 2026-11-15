@@ -4,13 +4,16 @@ import type { TFunction } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { savedTitle, showBatchResult } from "./result-toast";
 
-// Keys and counts only, so each assertion names the message it expects.
+// Keys and counts only, so each assertion names the message it expects. Joined sentences read
+// as the English template joins them.
 const t: TFunction = (key, params) =>
-  params?.count !== undefined
-    ? `${key}(${params.count})`
-    : params?.name
-      ? `${key}:${params.name}`
-      : key;
+  key === "common:text.joinSentences"
+    ? `${params?.first} ${params?.second}`
+    : params?.count !== undefined
+      ? `${key}(${params.count})`
+      : params?.name
+        ? `${key}:${params.name}`
+        : key;
 
 const ref = (id: string, updated?: boolean): AddedAccountRef => ({ id, email: "", updated });
 

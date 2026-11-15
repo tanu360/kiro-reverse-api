@@ -21,7 +21,7 @@ func (h *Handler) apiGetAccountProfiles(w http.ResponseWriter, r *http.Request, 
 	}
 	profiles, err := h.discoverAccountProfiles(r.Context(), account)
 	if err != nil {
-		writeAdminErr(w, http.StatusBadGateway, err, "")
+		writeAdminErr(w, http.StatusBadGateway, err, codeProfilesLoadFailed)
 		return
 	}
 	current := strings.TrimSpace(account.ProfileArn)
@@ -62,8 +62,7 @@ func (h *Handler) apiSetAccountProfile(w http.ResponseWriter, r *http.Request, i
 	requested := strings.TrimSpace(req.ProfileArn)
 	if requested == "" {
 		if err := config.PinAccountProfileArn(id, ""); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 		h.afterAccountProfileChange(id)
@@ -95,8 +94,7 @@ func (h *Handler) apiSetAccountProfile(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 	if err := config.PinAccountProfileArn(id, profileArn); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	h.afterAccountProfileChange(id)

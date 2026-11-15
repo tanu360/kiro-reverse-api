@@ -39,6 +39,7 @@ describe("index.html boot script", () => {
     [["pt-PT"], "pt-BR"],
     [["pt-BR", "en-US"], "pt-BR"],
     [["zh-TW", "en"], "zh"],
+    [["ja-JP", "en"], "ja"],
     [["fr-FR", "vi-VN"], "vi"],
     [["de-DE"], "en"],
   ])("maps navigator.languages %j to %s like getInitialLang", (languages, expected) => {

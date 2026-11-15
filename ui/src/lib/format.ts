@@ -41,6 +41,22 @@ export function dateTimeFormat(
   return format;
 }
 
+const collators = new Map<string, Intl.Collator>();
+
+/**
+ * Compares two texts in the UI language's order (Intl.Collator), for sorting names, tags and
+ * labels: pinyin order in Chinese, "đ" after "d" in Vietnamese.
+ */
+export function compareText(a: string, b: string, lang?: Lang): number {
+  const tag = locale(lang);
+  let collator = collators.get(tag);
+  if (!collator) {
+    collator = new Intl.Collator(tag);
+    collators.set(tag, collator);
+  }
+  return collator.compare(a, b);
+}
+
 function finite(value: number): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -66,6 +82,14 @@ export function formatList(items: readonly string[], lang?: Lang): string {
       return lead + part.value + trail;
     })
     .join("");
+}
+
+/**
+ * "a, b, c": items such as tags or model IDs with the language's list separator and no "and"
+ * ("a、b、c" in Chinese and Japanese).
+ */
+export function formatItems(items: readonly string[], lang?: Lang): string {
+  return new Intl.ListFormat(locale(lang), { type: "conjunction", style: "narrow" }).format(items);
 }
 
 /** Grouped integer (truncated toward zero). */
@@ -146,7 +170,9 @@ function formatUnit(
   return numberFormat(lang, {
     style: "unit",
     unit,
-    unitDisplay: display,
+    // CLDR's narrow Japanese units are Latin letters ("47m", "1h"); the short ones read
+    // "47 分", "1 時間".
+    unitDisplay: display === "narrow" && locale(lang) === "ja-JP" ? "short" : display,
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(value);

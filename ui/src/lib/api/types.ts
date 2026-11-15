@@ -32,6 +32,10 @@ export interface SuccessResponse {
  * - relogin_other_account (409): the new sign-in is another stored account's user; the body is a
  *   ReloginOtherAccountBody. Nothing waits: `saved` says whether that account took the new tokens.
  * - model_*: also `index`; `model` (duplicate, self, chain) or `max` (too many, ID too long).
+ * - save_failed (500): the change could not be stored; internal_error (500): any other failure
+ *   inside the server. Both carry the error as `detail`.
+ * - account_refresh_failed, account_test_failed, models_load_failed, profiles_load_failed,
+ *   microsoft_sign_in_failed, tunnel_logout: `detail` is the upstream reason.
  */
 export type ServerErrorCode =
   | "api_key_lockout"
@@ -144,7 +148,22 @@ export type ServerErrorCode =
   | "request_not_found"
   | "request_body_missing"
   | "replay_account_invalid"
-  | "conversation_not_found";
+  | "conversation_not_found"
+  | "weight_range"
+  | "tunnel_hostname"
+  | "tunnel_rename_remote"
+  | "tunnel_logout"
+  | "alert_channel_invalid"
+  | "alert_channel_not_found"
+  | "batch_action_invalid"
+  | "thinking_format_invalid"
+  | "account_refresh_failed"
+  | "account_test_failed"
+  | "models_load_failed"
+  | "profiles_load_failed"
+  | "microsoft_sign_in_failed"
+  | "save_failed"
+  | "internal_error";
 
 // ---------------------------------------------------------------------------
 // Session and first run

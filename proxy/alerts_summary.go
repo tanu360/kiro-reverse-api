@@ -396,7 +396,7 @@ func (h *Handler) apiTestDailySummary(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	summary, err := h.buildDailySummary(now.Add(-24*time.Hour), now)
 	if err != nil {
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeInternalError)
 		return
 	}
 	msg := dailySummaryMessage(summary, now.Unix())

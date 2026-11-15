@@ -622,7 +622,7 @@ func writeReloginResult(w http.ResponseWriter, targetID string, incoming config.
 		writeMicrosoftAddError(w, err)
 		return false
 	default:
-		writeAdminErr(w, addAccountErrorStatus(err), err, "")
+		writeAdminErr(w, addAccountErrorStatus(err), err, codeSaveFailed)
 		return false
 	}
 

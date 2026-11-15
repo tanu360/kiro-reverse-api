@@ -466,19 +466,26 @@ function StateNote({
   else lead = t("detected.failingNote", { count: failures });
   const tone =
     proxy.state === "auto_disabled" ? "text-destructive-foreground" : "text-warning-foreground";
+  // Sentences joined the language's way: a space in English, none after "。" in Chinese.
+  const join = t("common:text.joinSentences");
   return (
     <p className={`wrap-anywhere text-xs ${tone}`}>
-      {lead}
-      {lastError ? (
-        <>
-          {" "}
-          {t("card.lastError", { error: proxyFailureSentence(errorCode, errorStatus, t) })}{" "}
-          {/* The link look of Settings' "Learn more": the raw error is a longer note. */}
-          <InfoHint hint={mask(lastError)} variant="link">
-            {t("card.lastErrorDetails")}
-          </InfoHint>
-        </>
-      ) : null}
+      {lastError
+        ? fillNodes(join, {
+            first: lead,
+            second: fillNodes(join, {
+              first: t("card.lastError", {
+                error: proxyFailureSentence(errorCode, errorStatus, t),
+              }),
+              // The link look of Settings' "Learn more": the raw error is a longer note.
+              second: (
+                <InfoHint hint={mask(lastError)} variant="link">
+                  {t("card.lastErrorDetails")}
+                </InfoHint>
+              ),
+            }),
+          })
+        : lead}
     </p>
   );
 }

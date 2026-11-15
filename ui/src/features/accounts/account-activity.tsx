@@ -41,9 +41,10 @@ function activitySentence(activity: AccountActivityView, t: TFunction, lang: Lan
     today: formatNumber(activity.today, lang),
   });
   const reason = skipReason(activity);
-  if (reason === "cooling") return `${cooldownHint(activity, t, lang)} ${numbers}`;
-  if (reason === "limit") return `${atLimitHint(activity, t, lang)} ${numbers}`;
-  return numbers;
+  if (reason === null) return numbers;
+  const first =
+    reason === "cooling" ? cooldownHint(activity, t, lang) : atLimitHint(activity, t, lang);
+  return t("common:text.joinSentences", { first, second: numbers });
 }
 
 // A tap or click on the hint must not also open the account sheet under it (a table row or a

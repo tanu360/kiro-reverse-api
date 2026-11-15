@@ -36,7 +36,9 @@ export function showBatchResult(
     ...(hidden > 0 ? [t("moreFailures", { count: hidden })] : []),
   ]);
   toast.warning(t("importPartial", { count: added, failed: failures.length }), {
-    description: updatedNote ? `${updatedNote} ${reasons}` : reasons,
+    description: updatedNote
+      ? t("common:text.joinSentences", { first: updatedNote, second: reasons })
+      : reasons,
     duration: RESULT_TOAST_MS,
   });
 }

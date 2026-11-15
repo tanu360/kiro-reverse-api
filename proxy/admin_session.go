@@ -220,8 +220,7 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 		}
 		challenge, expiry, err := h.totpState().issueChallenge(time.Now())
 		if err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeInternalError(w, err)
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -237,8 +236,7 @@ func (h *Handler) apiCreateAdminSession(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) issueAdminSession(w http.ResponseWriter) {
 	token, expiry, err := h.adminSessions.Issue()
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	if err := config.ClearFirstRunPassword(); err != nil {
@@ -259,8 +257,7 @@ func (h *Handler) apiDeleteAdminSession(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) apiCreateAdminTicket(w http.ResponseWriter, _ *http.Request) {
 	ticket, expiry, err := h.adminSessions.IssueTicket()
 	if err != nil {
-		w.WriteHeader(500)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{

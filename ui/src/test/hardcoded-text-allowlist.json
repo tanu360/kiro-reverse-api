@@ -11,6 +11,11 @@
   },
   {
     "file": "src/lib/i18n/index.tsx",
+    "text": "日本語",
+    "reason": "Language names are shown in their own script in every UI language."
+  },
+  {
+    "file": "src/lib/i18n/index.tsx",
     "text": "Tiếng Việt",
     "reason": "Language names are shown in their own script in every UI language."
   },

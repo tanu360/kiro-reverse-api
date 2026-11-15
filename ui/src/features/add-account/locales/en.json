@@ -25,7 +25,7 @@
   "relogin.methodDescription": "Sign in again with {method}.",
   "relogin.stepDone": "Signed in again",
   "relogin.keyLabel": "Kiro API Key",
-  "relogin.keyHint": "Add a region to the key with",
+  "relogin.keyHint": "Add a region to the key with {example}",
   "startSignIn": "Start sign-in",
   "completeSignIn": "Complete sign-in",
   "callbackUrl": "Callback URL",
@@ -86,8 +86,8 @@
   "iam.stepOpen": "Sign in on the AWS page",
   "iam.stepPaste": "Paste the callback URL",
 
-  "microsoft.pasteStep": "After each sign-in, paste the address your browser lands on. It starts with",
-  "microsoft.callbackInstructions": "Open the link and sign in. Your browser then shows a page that fails to load. That is expected. Copy the full address from the address bar and paste it below. It starts with",
+  "microsoft.pasteStep": "After each sign-in, paste the address your browser lands on. It starts with {url}.",
+  "microsoft.callbackInstructions": "Open the link and sign in. Your browser then shows a page that fails to load. That is expected. Copy the full address from the address bar and paste it below. It starts with {url}.",
   "microsoft.selectProfileDesc": "This account has more than one Kiro profile. Choose the one this proxy should use.",
   "microsoft.profileLabel": "Kiro profile",
   "microsoft.selectProfile": "Use profile",
@@ -99,9 +99,9 @@
   "microsoft.stepProfileNote": "Only when the account has more than one.",
 
   "sso.howToGet": "How to get the token",
-  "sso.step1": "Sign in at",
+  "sso.step1": "Sign in at {link}",
   "sso.step2": "Press F12 to open DevTools → Application → Cookies.",
-  "sso.step3": "Find and copy",
+  "sso.step3": "Find and copy {cookie}",
   "sso.tokenLabel": "SSO tokens",
   "sso.tokenHint": "One token per line. Pasting several imports them in a batch. Each token can take up to 2 minutes to import.",
   "sso.tokenRequired": "Paste at least one SSO token.",
@@ -146,9 +146,9 @@
   "credentials.failureItem": "Item {index}: {reason}",
 
   "cookie.howToGet": "How to get the refresh token",
-  "cookie.step1": "Sign in at",
+  "cookie.step1": "Sign in at {link}",
   "cookie.step2": "Right-click the page → Inspect → Application → Cookies →",
-  "cookie.step3": "Copy the value of the cookie named",
+  "cookie.step3": "Copy the value of the cookie named {name}",
   "cookie.link": "https://app.kiro.dev/account/usage",
   "cookie.provider": "Provider",
   "cookie.google": "Google",
@@ -159,7 +159,7 @@
 
   "apikey.help": "Kiro API keys never expire and skip OAuth refresh. Requests go to the Kiro CLI runtime in the key's region.",
   "apikey.keysLabel": "Kiro API keys",
-  "apikey.keysHint": "One per line. Add a region to a key with",
+  "apikey.keysHint": "One per line. Add a region to a key with {example}",
   "apikey.regionHint": "Used for keys without a region suffix:",
   "apikey.keyMissing": "Enter at least one Kiro API key.",
 

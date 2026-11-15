@@ -2,13 +2,14 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { LANGUAGES, type SupportedLang } from "@/lib/i18n";
 import en from "@/locales/en.json";
+import ja from "@/locales/ja.json";
 import ptBR from "@/locales/pt-BR.json";
 import vi from "@/locales/vi.json";
 import zh from "@/locales/zh.json";
 import { renderApp } from "@/test/render";
 import { NAV_ITEMS } from "./nav-items";
 
-const COMMON: Record<SupportedLang, Record<string, string>> = { en, zh, vi, "pt-BR": ptBR };
+const COMMON: Record<SupportedLang, Record<string, string>> = { en, zh, ja, vi, "pt-BR": ptBR };
 
 // The shell (sidebar, header, document title) in each shipped language.
 describe.each(LANGUAGES.map((option) => option.code))("app shell in %s", (lang) => {
@@ -33,7 +34,7 @@ describe.each(LANGUAGES.map((option) => option.code))("app shell in %s", (lang) 
     }
   });
 
-  it("lists the four languages by native name with the current one checked", async () => {
+  it("lists the five languages by native name with the current one checked", async () => {
     const { user } = await renderApp("/backups", { lang });
     const header = await screen.findByRole("banner");
     await user.click(within(header).getByRole("button", { name: text["shell.language"] }));

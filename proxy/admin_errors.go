@@ -76,6 +76,17 @@ const (
 	codeAlertChannelNotFound    = "alert_channel_not_found"
 	codeAlertNoChannels         = "alert_no_channels"
 	codeAlertSummaryTimeRange   = "alert_summary_time_range"
+	codeBatchActionInvalid      = "batch_action_invalid"
+	codeThinkingFormatInvalid   = "thinking_format_invalid"
+	codeAccountRefreshFailed    = "account_refresh_failed"
+	codeAccountTestFailed       = "account_test_failed"
+	codeModelsLoadFailed        = "models_load_failed"
+	codeProfilesLoadFailed      = "profiles_load_failed"
+	codeMicrosoftSignInFailed   = "microsoft_sign_in_failed"
+	// codeSaveFailed: the change could not be stored; detail is the storage error.
+	codeSaveFailed = "save_failed"
+	// codeInternalError: any other failure inside the server; detail is the error.
+	codeInternalError = "internal_error"
 )
 
 // writeAdminError writes {"error": message, "code": code} with status.
@@ -88,6 +99,18 @@ func writeAdminError(w http.ResponseWriter, status int, code, message string) {
 func writeAdminErrorDetail(w http.ResponseWriter, status int, code, message, detail string) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message, "code": code, "detail": detail})
+}
+
+// writeSaveError is the 500 for a change the server could not store: err.Error()
+// with save_failed, unless adminErrorFields knows a code for err.
+func writeSaveError(w http.ResponseWriter, err error) {
+	writeAdminErr(w, http.StatusInternalServerError, err, codeSaveFailed)
+}
+
+// writeInternalError is the 500 for any other failure inside the server: err.Error()
+// with internal_error, unless adminErrorFields knows a code for err.
+func writeInternalError(w http.ResponseWriter, err error) {
+	writeAdminErr(w, http.StatusInternalServerError, err, codeInternalError)
 }
 
 // writeAdminErr writes err.Error() with the code adminErrorFields finds for it,
@@ -218,5 +241,15 @@ func (r *accountResult) fail(err error) {
 	if code, detail, _ := adminErrorFields(err); code != "" {
 		r.Code = code
 		r.Detail = detail
+	}
+}
+
+// failOr is fail with fallbackCode, and the whole message as the detail, for an
+// error adminErrorFields has no code for (as writeAdminErr does).
+func (r *accountResult) failOr(err error, fallbackCode string) {
+	r.fail(err)
+	if r.Code == "" {
+		r.Code = fallbackCode
+		r.Detail = err.Error()
 	}
 }

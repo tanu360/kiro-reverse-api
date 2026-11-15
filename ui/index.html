@@ -61,13 +61,14 @@
         const matchLang = (tag) => {
           const lower = String(tag || "").toLowerCase();
           if (lower.startsWith("zh")) return "zh";
+          if (lower.startsWith("ja")) return "ja";
           if (lower.startsWith("vi")) return "vi";
           if (lower.startsWith("pt")) return "pt-BR";
           if (lower.startsWith("en")) return "en";
           return undefined;
         };
         const storedLang = read("kiro_lang");
-        let lang = ["en", "zh", "vi", "pt-BR"].includes(storedLang)
+        let lang = ["en", "zh", "ja", "vi", "pt-BR"].includes(storedLang)
           ? storedLang
           : storedLang === "pseudo" // the dev-only pseudo language renders as English
             ? "en"

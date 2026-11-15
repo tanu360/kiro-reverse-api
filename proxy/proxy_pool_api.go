@@ -87,8 +87,7 @@ func writeProxyPoolError(w http.ResponseWriter, err error) {
 	case errors.Is(err, config.ErrProxyPoolMode), errors.Is(err, config.ErrProxyPoolCheckInterval):
 		writeAdminErrorDetail(w, http.StatusBadRequest, codeProxyPoolInvalid, err.Error(), err.Error())
 	default:
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 	}
 }
 

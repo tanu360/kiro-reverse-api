@@ -25,7 +25,7 @@
   <a href="#-安全须知">安全须知</a>
 </p>
 
-[English](README.md) • [简体中文](README_CN.md) • [Português (Brasil)](README_PT-BR.md) • [Tiếng Việt](README_VI.md)
+[English](README.md) • [简体中文](README_CN.md) • [日本語](README_JA.md) • [Português (Brasil)](README_PT-BR.md) • [Tiếng Việt](README_VI.md)
 
 </div>
 
@@ -38,7 +38,7 @@
 1. 多账号池化，按轮询、权重或优先级以及会话亲和对请求做负载均衡。
 2. 在 Anthropic `/v1/messages`、OpenAI `/v1/chat/completions`、OpenAI `/v1/responses` 调用与 Kiro 上游之间双向翻译，涵盖工具调用、思考、推理强度与网络搜索。
 3. 自动刷新访问令牌，端到端转发 Server-Sent Events 流，支持保活与故障转移。
-4. 自带内嵌于二进制文件的 React 管理面板，提供账号管理、实时可观测性与请求审计，界面支持 English、简体中文、Tiếng Việt 与 Português (Brasil)。
+4. 自带内嵌于二进制文件的 React 管理面板，提供账号管理、实时可观测性与请求审计，界面支持 English、简体中文、日本語、Tiếng Việt 与 Português (Brasil)。
 
 > [!IMPORTANT]
 > 单二进制本地代理。**非**托管服务，**不**隶属于 Amazon、AWS 或 Kiro。账号必须由你本人持有或经过合法授权方可加入账号池。
@@ -116,7 +116,7 @@
 - 命令菜单（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>）可快速打开页面和执行操作；隐私模式可隐藏邮箱地址；支持读取仓库 `main` 分支上的 `version.json` 检查更新。
 - 修改管理员密码会结束其他所有已登录的会话。
 - 支持用身份验证器应用进行两步验证登录，并提供 10 个一次性恢复码（参见 [两步验证登录](#-两步验证登录)）。
-- 浅色 / 深色 / 跟随系统主题；界面支持四种语言：English、简体中文、Tiếng Việt 与 Português (Brasil)。
+- 浅色 / 深色 / 跟随系统主题；界面支持五种语言：English、简体中文、日本語、Tiếng Việt 与 Português (Brasil)。
 - 从手机到桌面均可流畅使用。
 
 ### 🌐 网络

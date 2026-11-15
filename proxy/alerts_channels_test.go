@@ -230,7 +230,7 @@ func TestAlertAttemptTimeout(t *testing.T) {
 	ch := config.AlertChannel{Type: config.AlertChannelWebhook, URL: srv.URL + "/slow"}
 	start := time.Now()
 	r := sendAlert(context.Background(), srv.Client(), ch, testAlertMessage(1), 1)
-	if r.OK || r.Attempts != 2 || hits.Load() != 2 || !strings.Contains(r.Error, "timed out") {
+	if r.OK || r.Attempts != 2 || hits.Load() != 2 || !strings.Contains(r.Error, "timed out") || r.ErrorCode != alertErrTimeout {
 		t.Fatalf("timeout: %+v (hits %d)", r, hits.Load())
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
@@ -273,12 +273,20 @@ func TestAlertErrorsNeverContainSecrets(t *testing.T) {
 	secrets := []string{token, "SECRET-token_value", "discord-secret-path", "slack-secret-path", "q-secret", "webhook-secret-path", "signing-secret"}
 	for i, ch := range cases {
 		r := sendAlert(context.Background(), http.DefaultClient, ch, testAlertMessage(1), 0)
-		if r.OK || r.Error == "" {
+		if r.OK || r.Error == "" || r.ErrorDetail == "" {
 			t.Fatalf("case %d: %+v", i, r)
 		}
+		//! The last channel's host is gone: no answer, so a network failure; the others answer 400.
+		want := alertErrHTTP
+		if i == len(cases)-1 {
+			want = alertErrNetwork
+		}
+		if r.ErrorCode != want {
+			t.Fatalf("case %d: code %q, want %q", i, r.ErrorCode, want)
+		}
 		for _, secret := range secrets {
-			if strings.Contains(r.Error, secret) {
-				t.Fatalf("case %d leaked %q: %q", i, secret, r.Error)
+			if strings.Contains(r.Error, secret) || strings.Contains(r.ErrorDetail, secret) {
+				t.Fatalf("case %d leaked %q: %q / %q", i, secret, r.Error, r.ErrorDetail)
 			}
 		}
 	}

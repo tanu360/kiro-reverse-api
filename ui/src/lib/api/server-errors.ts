@@ -115,7 +115,40 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   request_body_missing: "errors:serverError.requestBodyMissing",
   replay_account_invalid: "errors:serverError.replayAccountInvalid",
   conversation_not_found: "errors:serverError.conversationNotFound",
+  weight_range: "errors:serverError.weightRange",
+  log_retention_range: "errors:serverError.logRetentionRange",
+  log_level_invalid: "errors:serverError.logLevelInvalid",
+  self_heal_interval_range: "errors:serverError.selfHealIntervalRange",
+  self_heal_rounds_range: "errors:serverError.selfHealRoundsRange",
+  tunnel_hostname: "errors:serverError.tunnelHostname",
+  tunnel_rename_remote: "errors:serverError.tunnelRenameRemote",
+  tunnel_logout: "errors:serverError.tunnelLogout",
+  alert_channel_invalid: "errors:serverError.alertChannelInvalid",
+  alert_channel_not_found: "errors:serverError.alertChannelNotFound",
+  batch_action_invalid: "errors:serverError.batchActionInvalid",
+  thinking_format_invalid: "errors:serverError.thinkingFormatInvalid",
+  account_refresh_failed: "errors:serverError.accountRefreshFailed",
+  account_test_failed: "errors:serverError.accountTestFailed",
+  models_load_failed: "errors:serverError.modelsLoadFailed",
+  profiles_load_failed: "errors:serverError.profilesLoadFailed",
+  microsoft_sign_in_failed: "errors:serverError.microsoftSignInFailed",
+  save_failed: "errors:serverError.saveFailed",
+  internal_error: "errors:serverError.internalError",
 };
+
+/**
+ * `text` followed by "(Details: …)" for a non-empty `detail`, the upstream text the server
+ * passes through as is; `text` alone otherwise.
+ */
+export function withDetail(text: string, detail: unknown, t: TFunction): string {
+  const trimmed = typeof detail === "string" ? detail.trim() : "";
+  return trimmed
+    ? t("common:text.joinSentences", {
+        first: text,
+        second: t("errors:serverError.detail", { detail: trimmed }),
+      })
+    : text;
+}
 
 /** The `code` of an ApiError's JSON body, or null. */
 export function serverErrorCode(error: unknown): string | null {
@@ -142,15 +175,7 @@ export function serverCodeMessage(
   for (const [name, value] of Object.entries(fields)) {
     if (typeof value === "string" || typeof value === "number") params[name] = value;
   }
-  const text = t(key, params);
-  const raw: unknown = (fields as { detail?: unknown }).detail;
-  const detail = typeof raw === "string" ? raw.trim() : "";
-  return detail
-    ? t("common:text.joinSentences", {
-        first: text,
-        second: t("errors:serverError.detail", { detail }),
-      })
-    : text;
+  return withDetail(t(key, params), (fields as { detail?: unknown }).detail, t);
 }
 
 /**
@@ -279,13 +304,28 @@ function translateServerMessage(message: string, t: TFunction): string | null {
   if (key) return t(key);
   const phrase = serverErrorPhrase(message);
   if (!phrase) return null;
-  const text = t(phrase.key);
-  return phrase.detail
-    ? t("common:text.joinSentences", {
-        first: text,
-        second: t("errors:serverError.detail", { detail: phrase.detail }),
-      })
-    : text;
+  return withDetail(t(phrase.key), phrase.detail, t);
+}
+
+/**
+ * Fixed English the server stores in data fields rather than in an error: the ban reasons it
+ * writes (proxy/account_failover.go banReason*) and the note on the backup saved before the
+ * accounts moved to their own table (config/account_rows.go).
+ */
+const SERVER_DATA_KEYS: ReadonlyMap<string, string> = new Map([
+  ["AWS temporarily suspended - unusual user activity detected", "errors:serverText.banSuspended"],
+  ["Authentication failed - token invalid or expired", "errors:serverText.banAuthFailed"],
+  ["before the accounts moved to their own table", "errors:serverText.backupAccountsMoved"],
+]);
+
+/**
+ * A text the server stored (a ban reason, a backup note) in the UI language when it is one the
+ * server writes itself; anything else, such as a reason from an older version, as is.
+ */
+export function serverDataText(text: string | undefined, t: TFunction): string {
+  const value = (text ?? "").trim();
+  const key = SERVER_DATA_KEYS.get(value);
+  return key ? t(key) : value;
 }
 
 /**

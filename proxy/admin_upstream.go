@@ -61,8 +61,7 @@ func (h *Handler) apiUpdateUpstreamConfig(w http.ResponseWriter, r *http.Request
 
 	//! Every field was validated above, so an error here is a storage failure.
 	if err := config.UpdateUpstreamConfig(next); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 

@@ -21,6 +21,7 @@ import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge, type BadgeProps, type BadgeTone } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterLabel, MeterTrack } from "@/components/ui/meter";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
+import { serverDataText } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
 import { EMPTY, formatFraction } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -84,7 +85,7 @@ export function StatusPill({
   const pill = STATUS_PILL[status];
   // The pool also writes a reason when it switches an account off (banStatus DISABLED).
   const held = status === "banned" || status === "suspended" || status === "disabled";
-  const reason = !plain && held && isHeld(account) ? account.banReason : "";
+  const reason = !plain && held && isHeld(account) ? serverDataText(account.banReason, t) : "";
   const label = t(`health.${status}`);
   if (!reason) {
     return (

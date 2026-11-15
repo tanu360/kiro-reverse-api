@@ -14,6 +14,10 @@ type alertDelivery struct {
 	Attempts int    `json:"attempts"`
 	Event    string `json:"event"`
 	Error    string `json:"error,omitempty"`
+	// ErrorCode names the failure for the admin UI, which words it itself (alertErr*);
+	// ErrorDetail is the scrubbed upstream part it shows as is. Error stays the English.
+	ErrorCode   string `json:"errorCode,omitempty"`
+	ErrorDetail string `json:"errorDetail,omitempty"`
 }
 
 // loadAlertStates reads every alert_state row. The table holds one row per

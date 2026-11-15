@@ -12,6 +12,7 @@ import type {
   BatchEnableDisableResponse,
   BatchTagAction,
 } from "@/lib/api/types";
+import { compareText } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail, useMaskText } from "@/lib/privacy";
 import { toast } from "@/lib/toast";
@@ -34,7 +35,7 @@ function tagsInUse(accounts: readonly Account[]): string[] {
       if (!byKey.has(tagKey(tag))) byKey.set(tagKey(tag), tag);
     }
   }
-  return [...byKey.values()].sort((a, b) => a.localeCompare(b));
+  return [...byKey.values()].sort((a, b) => compareText(a, b));
 }
 
 /**

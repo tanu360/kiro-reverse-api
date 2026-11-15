@@ -18,7 +18,7 @@ import { heatmapQuery, observeOverviewQuery } from "@/lib/api/observe";
 import { statusQuery } from "@/lib/api/system";
 import type { Account, HeatmapCell } from "@/lib/api/types";
 import { EMPTY, formatCompact, formatNumber, formatPercent } from "@/lib/format";
-import { type Lang, type TFunction, useT } from "@/lib/i18n";
+import { fillNodes, type Lang, type TFunction, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { accountStatus, formatCreditAmount } from "../accounts/account-model";
 import { bucketGlobal, type CellValue, HOUR, HOUR_PAIR_WINDOW, hourDelta } from "./aggregate";
@@ -85,33 +85,40 @@ function PartLegend({ parts }: { parts: readonly Part[] }): JSX.Element {
   );
 }
 
-/** "+107.1%" in green or red (by which way is good), then a muted comparison. */
+/**
+ * "+107.1%" in green or red (by which way is good) inside a muted comparison. `template` holds
+ * the comparison with a {delta} placeholder, so each language puts the change where it reads
+ * naturally ("+107.1% vs last hour", "较上一小时 +107.1%").
+ */
 function Delta({
   value,
   goodWhen,
-  label,
+  template,
   lang,
 }: {
   value: number;
   goodWhen: "up" | "down";
-  label: string;
+  template: string;
   lang: Lang;
 }): JSX.Element {
   const direction = value > 0 ? "up" : value < 0 ? "down" : "flat";
   const tone = direction === "flat" ? "neutral" : direction === goodWhen ? "good" : "bad";
   return (
     <span data-slot="kpi-delta" data-tone={tone}>
-      <span
-        className={cn(
-          "font-medium tabular-nums",
-          tone === "good" && "text-success-foreground",
-          tone === "bad" && "text-destructive-foreground",
-          tone === "neutral" && "text-foreground",
-        )}
-      >
-        {formatDelta(value, lang)}
-      </span>{" "}
-      {label}
+      {fillNodes(template, {
+        delta: (
+          <span
+            className={cn(
+              "font-medium tabular-nums",
+              tone === "good" && "text-success-foreground",
+              tone === "bad" && "text-destructive-foreground",
+              tone === "neutral" && "text-foreground",
+            )}
+          >
+            {formatDelta(value, lang)}
+          </span>
+        ),
+      })}
     </span>
   );
 }
@@ -286,6 +293,7 @@ export function KpiCards(): JSX.Element {
     };
   }, [cells, nowUnix]);
 
+  // Left as a template: Delta fills its {delta} with the coloured change.
   const vsLastHour = t("stats.vsLastHour");
   const statusLoading = !s && !status.isError;
   const hourLoading = !hour && !heatmap.isError;
@@ -433,7 +441,7 @@ export function KpiCards(): JSX.Element {
             hour.requests.delta === null ? (
               t("kpi.noPreviousHour")
             ) : (
-              <Delta goodWhen="up" label={vsLastHour} lang={lang} value={hour.requests.delta} />
+              <Delta goodWhen="up" template={vsLastHour} lang={lang} value={hour.requests.delta} />
             )
           ) : null
         }
@@ -462,7 +470,12 @@ export function KpiCards(): JSX.Element {
             hour.failures.delta === null ? (
               t("kpi.noPreviousHour")
             ) : (
-              <Delta goodWhen="down" label={vsLastHour} lang={lang} value={hour.failures.delta} />
+              <Delta
+                goodWhen="down"
+                template={vsLastHour}
+                lang={lang}
+                value={hour.failures.delta}
+              />
             )
           ) : null
         }

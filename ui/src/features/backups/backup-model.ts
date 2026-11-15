@@ -1,3 +1,4 @@
+import { serverDataText } from "@/lib/api/server-errors";
 import type { BackupCadence, BackupEntry, BackupSchedule } from "@/lib/api/types";
 import { EMPTY, formatBytes, formatNumber } from "@/lib/format";
 import type { Lang, TFunction, TParams } from "@/lib/i18n";
@@ -158,6 +159,9 @@ export function noteText(
     const match = SCHEDULED_NOTE.exec(note);
     if (match) return t("noteScheduled", { cadence: cadenceLabel(match[1] as BackupCadence, t) });
   }
+  // Another note the server writes itself (config/account_rows.go) is in words too.
+  const serverNote = serverDataText(note, t);
+  if (serverNote !== note) return serverNote;
   return mask(note) || EMPTY;
 }
 

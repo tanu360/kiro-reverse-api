@@ -164,7 +164,7 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 	//! "pre-restore" one. Older versions wrote kind "auto" with this note; the Backups page
 	//! labels both "Before merge" (backupKind in backup-model.ts).
 	if _, err := config.CreateBackup(config.BackupKindPreMerge, "before merging duplicate accounts"); err != nil {
-		writeAdminErr(w, http.StatusInternalServerError, fmt.Errorf("could not back up before the merge: %w", err), "")
+		writeAdminErr(w, http.StatusInternalServerError, fmt.Errorf("could not back up before the merge: %w", err), codeInternalError)
 		return
 	}
 
@@ -188,7 +188,7 @@ func (h *Handler) apiMergeDuplicateAccounts(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err != nil {
-		writeAdminErr(w, http.StatusInternalServerError, fmt.Errorf("could not merge the accounts: %w", err), "")
+		writeAdminErr(w, http.StatusInternalServerError, fmt.Errorf("could not merge the accounts: %w", err), codeSaveFailed)
 		return
 	}
 	h.pool.Reload()

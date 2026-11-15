@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { catalog, namespaces } from "./locale-catalog";
 
 // Rules from the copy style guide that a machine can check. English is the source language;
-// Chinese follows the glossary and spacing rules. vi and pt-BR have their own reviewers.
+// Chinese and Japanese follow their glossary and spacing rules. vi and pt-BR have their own
+// reviewers.
 
 const HAN = /\p{Script=Han}/u;
 
@@ -107,6 +108,32 @@ describe("Chinese copy", () => {
     expect(
       zh.filter(([, text]) => /中…$/.test(text) && !/^正在/.test(text)).map(([key]) => key),
     ).toEqual([]);
+  });
+});
+
+describe("Japanese copy", () => {
+  const ja = entries("ja");
+  const JA = "\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}ー";
+
+  it("puts a space between Japanese and Latin letters, digits or placeholders", () => {
+    const touching = new RegExp(`[${JA}][A-Za-z0-9{]|[A-Za-z0-9}][${JA}]`, "u");
+    expect(ja.filter(([, text]) => touching.test(text)).map(([key]) => key)).toEqual([]);
+  });
+
+  it("uses full-width 、。？：（） next to Japanese and the ellipsis character", () => {
+    const ascii = new RegExp(`[${JA}][,.;:?(]|[,;:?(]\\s*[${JA}]|\\)[${JA}]|\\.\\.\\.`, "u");
+    expect(ja.filter(([, text]) => ascii.test(text)).map(([key]) => key)).toEqual([]);
+  });
+
+  it("has no exclamation marks", () => {
+    expect(ja.filter(([, text]) => /[!！]/.test(text)).map(([key]) => key)).toEqual([]);
+  });
+
+  it("keeps the glossary terms: サインイン, API キー, アカウント", () => {
+    const bad = ja
+      .filter(([, text]) => /ログイン|ログアウト|API ?Key|APIキー|アカウント数ー|口座/.test(text))
+      .map(([key]) => key);
+    expect(bad).toEqual([]);
   });
 });
 

@@ -165,12 +165,22 @@ func buildAlertRequest(ctx context.Context, ch config.AlertChannel, msg alertMes
 	return req, nil
 }
 
+// Codes in alertDelivery.ErrorCode. A code never changes once shipped.
+const (
+	alertErrTimeout = "timeout"
+	alertErrHTTP    = "http_status"
+	alertErrNetwork = "network"
+)
+
 // alertAttempt is one try's outcome: the status (0 without a response), the
-// Retry-After a 429 asked for, and the error to report.
+// Retry-After a 429 asked for, and the error to report with its code and the
+// upstream part of it (still unscrubbed).
 type alertAttempt struct {
 	status     int
 	retryAfter time.Duration
 	err        error
+	code       string
+	detail     error
 }
 
 func (a alertAttempt) ok() bool { return a.err == nil && a.status >= 200 && a.status < 300 }
@@ -191,18 +201,20 @@ func doAlertAttempt(ctx context.Context, client *http.Client, ch config.AlertCha
 	resp, err := client.Do(req)
 	if err != nil {
 		if attemptCtx.Err() != nil && ctx.Err() == nil {
-			return alertAttempt{err: fmt.Errorf("timed out after %s", textfmt.Duration(alertAttemptTimeout))}
+			return alertAttempt{err: fmt.Errorf("timed out after %s", textfmt.Duration(alertAttemptTimeout)), code: alertErrTimeout}
 		}
-		return alertAttempt{err: err}
+		return alertAttempt{err: err, code: alertErrNetwork, detail: err}
 	}
 	defer resp.Body.Close()
 	head, _ := io.ReadAll(io.LimitReader(resp.Body, alertErrorBodyLimit+1))
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	out := alertAttempt{status: resp.StatusCode}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		out.code = alertErrHTTP
 		detail := alertErrorBody(head, ch)
 		if detail != "" {
 			out.err = fmt.Errorf("HTTP %d: %s", resp.StatusCode, detail)
+			out.detail = errors.New(detail)
 		} else {
 			out.err = fmt.Errorf("HTTP %d", resp.StatusCode)
 		}
@@ -255,10 +267,11 @@ func sendAlert(ctx context.Context, client *http.Client, ch config.AlertChannel,
 		result.Status = a.status
 		if a.ok() {
 			result.OK = true
-			result.Error = ""
+			result.Error, result.ErrorCode, result.ErrorDetail = "", "", ""
 			break
 		}
 		result.Error = scrubAlertError(a.err, ch)
+		result.ErrorCode, result.ErrorDetail = a.code, scrubAlertError(a.detail, ch)
 		if !a.retryable() || attempt > retries || ctx.Err() != nil {
 			break
 		}

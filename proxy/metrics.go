@@ -415,8 +415,7 @@ func (h *Handler) apiMetricsSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		updated, err := config.UpdateMetricsSettings(req.Enabled, req.Regenerate)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeSaveError(w, err)
 			return
 		}
 		settings = updated

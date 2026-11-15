@@ -2,7 +2,7 @@ import type { JSX } from "react";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatNumber } from "@/lib/format";
+import { formatItems, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
@@ -56,10 +56,10 @@ export function TagBadges({
             {/* A count, not copy: the same "+N" in every language. */}
             <span aria-hidden="true">+{formatNumber(rest.length, lang)}</span>
             <span className="sr-only">
-              {t("metadata.moreTagsLabel", { count: rest.length, tags: rest.join(", ") })}
+              {t("metadata.moreTagsLabel", { count: rest.length, tags: formatItems(rest, lang) })}
             </span>
           </TooltipTrigger>
-          <TooltipPopup>{rest.join(", ")}</TooltipPopup>
+          <TooltipPopup>{formatItems(rest, lang)}</TooltipPopup>
         </Tooltip>
       ) : null}
     </span>

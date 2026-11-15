@@ -100,7 +100,7 @@ func (h *Handler) batchTags(w http.ResponseWriter, ids []string, add bool, rawTa
 			res.Error = fmt.Sprintf("Account already has %d tags", config.MaxAccountTags)
 			res.Status = accountStatusTagLimit
 		case err != nil:
-			res.fail(err)
+			res.failOr(err, codeSaveFailed)
 		default:
 			res.OK = true
 		}

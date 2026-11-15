@@ -9,6 +9,7 @@ import {
 } from "@/components/shared/responsive-sheet";
 import { TruncatedText } from "@/components/shared/truncated-text";
 import { accountsQuery } from "@/lib/api/accounts";
+import { serverDataText } from "@/lib/api/server-errors";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { LiveStatusPill } from "./account-activity";
@@ -93,7 +94,9 @@ export function AccountDetailSheet({
                   </div>
                   {/* The ban reason in words, where the list puts it in the pill's tooltip. */}
                   {account.banReason && isHeld(account) ? (
-                    <p className="text-meta text-muted-foreground">{account.banReason}</p>
+                    <p className="text-meta text-muted-foreground">
+                      {serverDataText(account.banReason, t)}
+                    </p>
                   ) : null}
                 </div>
               </div>

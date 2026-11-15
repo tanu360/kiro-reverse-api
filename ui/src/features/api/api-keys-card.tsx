@@ -52,7 +52,7 @@ import {
 import { queryKeys } from "@/lib/api/query-keys";
 import { settingsQuery } from "@/lib/api/settings";
 import type { ApiKey } from "@/lib/api/types";
-import { formatCredits, formatNumber, formatRelativeTime } from "@/lib/format";
+import { formatCredits, formatItems, formatNumber, formatRelativeTime } from "@/lib/format";
 import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { toast, toastError } from "@/lib/toast";
@@ -597,7 +597,12 @@ function AccessBadges({ apiKey }: { apiKey: ApiKey }): JSX.Element | null {
       {tags.length > 0 ? (
         <Badge icon={Tag01Icon} tone="neutral">
           {/* The tags themselves: they say more than a count, and there are at most 10. */}
-          <span className="max-w-40 truncate">{tags.map((tag) => mask(tag)).join(", ")}</span>
+          <span className="max-w-40 truncate">
+            {formatItems(
+              tags.map((tag) => mask(tag)),
+              lang,
+            )}
+          </span>
         </Badge>
       ) : null}
       {models.length > 0 ? (

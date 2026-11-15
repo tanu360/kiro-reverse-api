@@ -27,6 +27,7 @@ import { AccountDetailSheet } from "@/features/accounts/account-detail-sheet";
 import { accountStatus, formatResetDate, statusGroup } from "@/features/accounts/account-model";
 import { useRefreshAccount } from "@/features/accounts/use-account-actions";
 import { accountsQuery } from "@/lib/api/accounts";
+import { serverDataText } from "@/lib/api/server-errors";
 import type { Account } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
@@ -86,7 +87,7 @@ function useReason(): (row: AttentionRow) => string | null {
     switch (status) {
       case "banned":
       case "suspended":
-        return account.banReason || ta(`lockedSwitch.${status}`);
+        return serverDataText(account.banReason, ta) || ta(`lockedSwitch.${status}`);
       case "noToken":
         return t("attention.reason.noToken");
       case "outOfCredits":

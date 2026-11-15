@@ -25,8 +25,8 @@ function allowedCategories(lang: SupportedLang): Set<string> {
 }
 
 describe("locale parity", () => {
-  it("ships the four languages", () => {
-    expect([...LANGS]).toEqual(["en", "zh", "vi", "pt-BR"]);
+  it("ships the five languages", () => {
+    expect([...LANGS]).toEqual(["en", "zh", "ja", "vi", "pt-BR"]);
   });
 
   it("loads common, errors, ui and all eight feature namespaces in every language", () => {

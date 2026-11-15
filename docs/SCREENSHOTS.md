@@ -2,7 +2,7 @@
 
 # 🖼 Screenshots
 
-[English](SCREENSHOTS.md) • [简体中文](SCREENSHOTS_CN.md) • [Português (Brasil)](SCREENSHOTS_PT-BR.md) • [Tiếng Việt](SCREENSHOTS_VI.md)
+[English](SCREENSHOTS.md) • [简体中文](SCREENSHOTS_CN.md) • [日本語](SCREENSHOTS_JA.md) • [Português (Brasil)](SCREENSHOTS_PT-BR.md) • [Tiếng Việt](SCREENSHOTS_VI.md)
 
 </div>
 

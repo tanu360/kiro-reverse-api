@@ -40,7 +40,7 @@ import {
   formatPercent,
   unixToDate,
 } from "@/lib/format";
-import { type Lang, useT } from "@/lib/i18n";
+import { fillNodes, type Lang, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
 import { ConversationSheet } from "./conversation-sheet";
 import { requestProxyText } from "./proxy-failure";
@@ -172,13 +172,17 @@ export function RequestDetailSheet({
           <AlertDescription>
             {proxyText ? (
               <p className="wrap-anywhere" data-testid="request-message">
-                {proxyText}{" "}
-                <InfoHint
-                  hint={<span className="whitespace-pre-wrap wrap-anywhere">{message}</span>}
-                  side="bottom"
-                >
-                  {t("detail.errorDetails")}
-                </InfoHint>
+                {fillNodes(t("common:text.joinSentences"), {
+                  first: proxyText,
+                  second: (
+                    <InfoHint
+                      hint={<span className="whitespace-pre-wrap wrap-anywhere">{message}</span>}
+                      side="bottom"
+                    >
+                      {t("detail.errorDetails")}
+                    </InfoHint>
+                  ),
+                })}
               </p>
             ) : (
               <p className="whitespace-pre-wrap wrap-anywhere" data-testid="request-message">

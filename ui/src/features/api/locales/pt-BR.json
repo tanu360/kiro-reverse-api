@@ -110,7 +110,7 @@
   "usage.created": "Criada em",
   "usage.never": "Nunca",
   "usage.limits": "Limites",
-  "usage.limitsDescription": "Desde a criação da chave ou o último reinício do uso",
+  "usage.limitsDescription": "Desde a criação da chave ou a última redefinição do uso",
   "usage.limitLeft": "Restam {n}",
   "usage.limitReached": "Limite atingido",
   "usage.limitUsed": "{n} usados",
@@ -159,7 +159,7 @@
   "form.callLimit": "Limite de chamadas",
   "form.invalidCallLimit": "O limite de chamadas deve ser um número inteiro, 0 ou mais.",
   "form.rpmLimit": "Requisições por minuto",
-  "form.invalidRpmLimit": "Requisições por minuto deve ser um número inteiro de 0 a 10.000.",
+  "form.invalidRpmLimit": "O limite de requisições por minuto deve ser um número inteiro de 0 a 10.000.",
   "form.expiresAt": "Expira em",
   "form.expiresAtHint": "No seu fuso horário ({zone}). Deixe vazio e a chave nunca expira.",
   "form.expiresAtHintNoZone": "No seu horário local. Deixe vazio e a chave nunca expira.",
@@ -182,7 +182,8 @@
   "form.accountTags": "Todas as contas com estas tags",
   "form.accountTagCount": "({n})",
   "form.accountTagNone": "(nenhuma conta)",
-  "form.accountsReachedCount": "{n} de {total} contas no escopo",
+  "form.accountsReachedCount_one": "{n} de {total} conta no escopo",
+  "form.accountsReachedCount_other": "{n} de {total} contas no escopo",
   "form.accountsEmpty": "Ainda não há contas. Adicione uma na página Contas.",
   "form.accountsRemoved": "Conta excluída",
   "form.accountsDisabled": "Desabilitada",
@@ -242,5 +243,5 @@
   "snippets.codexModelsHint": "Primeiro, salve a lista de modelos em {file}. O Codex precisa dela para a ferramenta {tool}. Rode de novo quando suas contas mudarem.",
   "snippets.codexHint": "Depois, adicione a {file}. O Codex lê a chave de {env}.",
   "snippets.copy": "Copiar código de {name}",
-  "snippets.codeRegion": "Código {name}"
+  "snippets.codeRegion": "Código: {name}"
 }

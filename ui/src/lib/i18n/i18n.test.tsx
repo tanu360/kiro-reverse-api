@@ -153,6 +153,8 @@ describe("getInitialLang", () => {
   it.each([
     [["zh-CN"], "zh"],
     [["zh-TW", "en"], "zh"],
+    [["ja-JP"], "ja"],
+    [["ja"], "ja"],
     [["vi-VN"], "vi"],
     [["vi"], "vi"],
     [["pt-PT"], "pt-BR"],
@@ -180,8 +182,9 @@ describe("getInitialLang", () => {
 });
 
 describe("matchLang", () => {
-  it("maps zh*, vi*, pt* and en* and nothing else", () => {
+  it("maps zh*, ja*, vi*, pt* and en* and nothing else", () => {
     expect(matchLang("zh-Hans-CN")).toBe("zh");
+    expect(matchLang("ja-JP")).toBe("ja");
     expect(matchLang("VI")).toBe("vi");
     expect(matchLang("pt")).toBe("pt-BR");
     expect(matchLang("en-AU")).toBe("en");

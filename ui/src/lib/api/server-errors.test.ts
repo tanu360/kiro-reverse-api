@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { type TFunction, translate } from "@/lib/i18n";
+import { LANGS, type TFunction, translate } from "@/lib/i18n";
 import en from "@/locales/errors/en.json";
+import ja from "@/locales/errors/ja.json";
 import ptBR from "@/locales/errors/pt-BR.json";
 import vi from "@/locales/errors/vi.json";
 import zh from "@/locales/errors/zh.json";
+import { alertDeliveryErrorText } from "./alerts";
 import { ApiError } from "./errors";
 import {
   errorMessage,
@@ -11,11 +13,13 @@ import {
   SERVER_ERROR_KEYS,
   SERVER_ERROR_PHRASES,
   serverCodeMessage,
+  serverDataText,
   serverErrorCode,
   serverErrorKey,
   serverErrorPhrase,
   serverMessageText,
 } from "./server-errors";
+import { tunnelErrorText } from "./tunnel";
 
 // Echoes the key so assertions show which translation was chosen.
 const t: TFunction = (key) => `t(${key})`;
@@ -177,7 +181,7 @@ describe("server error codes", () => {
 
   it("shows real text in every language for each mapped code", () => {
     for (const key of Object.values(SERVER_ERROR_CODES)) {
-      for (const lang of ["en", "zh", "vi", "pt-BR"] as const) {
+      for (const lang of LANGS) {
         expect(translate(lang, "common", key), `${lang} ${key}`).not.toBe(key);
       }
     }
@@ -193,8 +197,8 @@ describe("server error codes", () => {
     expect(errorMessage(error, t)).toBe("keep must be between 1 and 200");
   });
 
-  it("maps every code to an errors:serverError key present in all four locales", () => {
-    const locales = { en, zh, vi, "pt-BR": ptBR } as Record<string, Record<string, string>>;
+  it("maps every code to an errors:serverError key present in every locale", () => {
+    const locales = { en, zh, ja, vi, "pt-BR": ptBR } as Record<string, Record<string, string>>;
     for (const key of Object.values(SERVER_ERROR_CODES)) {
       expect(key).toMatch(/^errors:serverError\.[a-zA-Z]+$/);
       const name = key.slice("errors:".length);
@@ -253,5 +257,73 @@ describe("serverMessageText", () => {
   it("translates a known message without a code and keeps any other", () => {
     expect(serverMessageText("授权超时", t)).toBe("t(errors:serverError.ssoTimeout)");
     expect(serverMessageText("disk full", t)).toBe("disk full");
+  });
+});
+
+describe("server text outside error responses", () => {
+  const enT: TFunction = (key, params) => translate("en", "common", key, params);
+
+  it("words a 500 by its fallback code and keeps the storage error as the detail", () => {
+    const error = new ApiError({
+      status: 500,
+      serverMessage: "database is locked",
+      body: { error: "database is locked", code: "save_failed", detail: "database is locked" },
+    });
+    expect(errorMessage(error, enT)).toBe(
+      "The server could not store the change. (Details: database is locked)",
+    );
+  });
+
+  it("translates the ban reasons and backup note the server writes, and keeps any other", () => {
+    expect(serverDataText("Authentication failed - token invalid or expired", t)).toBe(
+      "t(errors:serverText.banAuthFailed)",
+    );
+    expect(serverDataText(" AWS temporarily suspended - unusual user activity detected", t)).toBe(
+      "t(errors:serverText.banSuspended)",
+    );
+    expect(serverDataText("upstream auth failure: 403", t)).toBe("upstream auth failure: 403");
+    expect(serverDataText(undefined, t)).toBe("");
+  });
+
+  it("words a tunnel failure by its code, and shows an older server's English", () => {
+    expect(
+      tunnelErrorText(
+        {
+          error: "the Tailscale helper stopped: exit status 1",
+          errorCode: "helper_stopped",
+          errorDetail: "exit status 1",
+        },
+        enT,
+      ),
+    ).toBe("The Tailscale helper stopped. (Details: exit status 1)");
+    expect(tunnelErrorText({ error: "open the tunnel listener: busy" }, enT)).toBe(
+      "open the tunnel listener: busy",
+    );
+    expect(tunnelErrorText({}, enT)).toBeUndefined();
+  });
+
+  it("words an alert send failure from its code and status", () => {
+    const failed = { status: 403, error: "HTTP 403: forbidden" };
+    expect(
+      alertDeliveryErrorText(
+        { ...failed, errorCode: "http_status", errorDetail: "forbidden" },
+        enT,
+      ),
+    ).toBe("The channel answered with HTTP 403. (Details: forbidden)");
+    expect(alertDeliveryErrorText({ status: 0, errorCode: "timeout", error: "x" }, enT)).toBe(
+      "The channel did not answer in time.",
+    );
+    expect(alertDeliveryErrorText(failed, enT)).toBe("HTTP 403: forbidden");
+  });
+
+  it("ships every key it uses in every locale", () => {
+    const locales = { en, zh, ja, vi, "pt-BR": ptBR } as Record<string, Record<string, string>>;
+    const names = Object.keys(en).filter((name) =>
+      /^(serverText|tunnelError|alertDelivery)\./.test(name),
+    );
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names)
+      for (const [lang, dict] of Object.entries(locales))
+        expect(dict, `${lang} ${name}`).toHaveProperty([name]);
   });
 });

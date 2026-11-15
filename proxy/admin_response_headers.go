@@ -39,8 +39,7 @@ func (h *Handler) apiUpdateResponseHeaders(w http.ResponseWriter, r *http.Reques
 			json.NewEncoder(w).Encode(body)
 			return
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	publishEvent(eventSettingsChanged, "")

@@ -280,15 +280,13 @@ func (h *Handler) apiTwoFactorSetup(w http.ResponseWriter) {
 	}
 	secret, err := totp.NewSecret()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	uri := totp.URI(totpIssuer, totpAccountName, secret)
 	svg, err := totp.QRSVG(uri)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	expires := time.Now().Add(totpSetupTTL)
@@ -345,13 +343,11 @@ func (h *Handler) apiTwoFactorEnable(w http.ResponseWriter, r *http.Request) {
 	}
 	codes, hashes, err := newRecoveryCodes()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeInternalError(w, err)
 		return
 	}
 	if err := config.EnableAdminTOTP(secret, hashes, now.UnixMilli(), step); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	h.totpState().mu.Lock()
@@ -414,8 +410,7 @@ func (h *Handler) apiTwoFactorDisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := config.DisableAdminTOTP(); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	h.totpState().clearChallenges()
@@ -444,8 +439,7 @@ func (h *Handler) apiTwoFactorRecoveryCodes(w http.ResponseWriter, r *http.Reque
 		err = config.ReplaceAdminTOTPRecovery(hashes)
 	}
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	logger.Infof("[Admin] Two-factor recovery codes replaced")

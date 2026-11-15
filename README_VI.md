@@ -25,7 +25,7 @@
   <a href="#-an-toàn">An&nbsp;toàn</a>
 </p>
 
-[English](README.md) • [简体中文](README_CN.md) • [Português (Brasil)](README_PT-BR.md) • [Tiếng Việt](README_VI.md)
+[English](README.md) • [简体中文](README_CN.md) • [日本語](README_JA.md) • [Português (Brasil)](README_PT-BR.md) • [Tiếng Việt](README_VI.md)
 
 </div>
 
@@ -38,7 +38,7 @@
 1. Gộp nhiều tài khoản Kiro và cân bằng tải yêu cầu bằng round-robin, trọng số hoặc mức ưu tiên, cùng cơ chế giữ hội thoại trên cùng một tài khoản.
 2. Chuyển đổi hai chiều giữa các lệnh gọi Anthropic `/v1/messages`, OpenAI `/v1/chat/completions`, OpenAI `/v1/responses` và upstream Kiro, bao gồm tool, thinking, mức suy luận (reasoning effort) và tìm kiếm web.
 3. Tự động làm mới access token và stream Server-Sent Events xuyên suốt từ đầu đến cuối, kèm keepalive và failover.
-4. Đi kèm trang quản trị React nhúng sẵn trong binary để quản lý tài khoản, theo dõi trực tiếp và kiểm tra yêu cầu, với giao diện English, 简体中文, Tiếng Việt và Português (Brasil).
+4. Đi kèm trang quản trị React nhúng sẵn trong binary để quản lý tài khoản, theo dõi trực tiếp và kiểm tra yêu cầu, với giao diện English, 简体中文, 日本語, Tiếng Việt và Português (Brasil).
 
 > [!IMPORTANT]
 > Proxy cục bộ chỉ gồm một binary. **Không phải** dịch vụ được host sẵn, **không** liên kết với Amazon, AWS hay Kiro. Bạn phải sở hữu hoặc được cấp quyền sử dụng mọi tài khoản bạn thêm vào nhóm tài khoản.
@@ -116,7 +116,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - Menu lệnh (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) để mở trang và chạy thao tác, chế độ riêng tư ẩn địa chỉ email, và kiểm tra cập nhật qua `version.json` trên nhánh `main` của repo.
 - Đổi mật khẩu quản trị sẽ kết thúc mọi phiên đăng nhập khác.
 - Đăng nhập hai bước bằng ứng dụng xác thực, kèm mười mã khôi phục dùng một lần (xem [Đăng nhập hai bước](#-đăng-nhập-hai-bước)).
-- Giao diện sáng, tối và theo hệ thống; bốn ngôn ngữ giao diện: English, 简体中文, Tiếng Việt và Português (Brasil).
+- Giao diện sáng, tối và theo hệ thống; năm ngôn ngữ giao diện: English, 简体中文, 日本語, Tiếng Việt và Português (Brasil).
 - Dùng được trên cả điện thoại lẫn máy tính.
 
 ### 🌐 Mạng

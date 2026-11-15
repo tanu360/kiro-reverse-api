@@ -153,8 +153,7 @@ func (h *Handler) apiUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		settings.Hostname = *req.Hostname
 	}
 	if err := config.UpdateTunnelSettings(settings); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	if settings.Enabled {
@@ -182,8 +181,7 @@ func (h *Handler) apiTunnelLogout(w http.ResponseWriter, r *http.Request) {
 	settings := config.GetTunnelSettings()
 	settings.Enabled = false
 	if err := config.UpdateTunnelSettings(settings); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	if h.tunnel != nil && tunnel.FromTunnel(r) {
@@ -209,7 +207,7 @@ func (h *Handler) apiTunnelLogout(w http.ResponseWriter, r *http.Request) {
 		if err := h.tunnel.Logout(ctx); err != nil {
 			logger.Warnf("[Tunnel] Sign-out: %v", err)
 			publishEvent(eventSettingsChanged, "tunnel")
-			writeAdminError(w, http.StatusBadGateway, codeTunnelLogout, err.Error())
+			writeAdminErrorDetail(w, http.StatusBadGateway, codeTunnelLogout, err.Error(), err.Error())
 			return
 		}
 	}

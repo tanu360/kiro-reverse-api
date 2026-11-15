@@ -10,6 +10,7 @@ import type {
 } from "@/lib/api/types";
 import {
   belowStep,
+  compareText,
   dateTimeFormat,
   EMPTY,
   formatDuration,
@@ -291,7 +292,7 @@ function tagOptions(accounts: Account[]): FilterOption[] {
       else options.set(key, { value: key, label: tag, count: 1 });
     }
   }
-  return [...options.values()].sort((a, b) => a.label.localeCompare(b.label));
+  return [...options.values()].sort((a, b) => compareText(a.label, b.label));
 }
 
 /**
@@ -323,7 +324,7 @@ export function filterOptions(
   }
   if (dimension === "enabled")
     return list.sort((a, b) => (a.value === "on" ? -1 : b.value === "on" ? 1 : 0));
-  return list.sort((a, b) => a.label.localeCompare(b.label));
+  return list.sort((a, b) => compareText(a.label, b.label));
 }
 
 function optionLabel(
@@ -395,7 +396,7 @@ export function sortAccounts(
     }
     const order =
       typeof a.key === "string" && typeof b.key === "string"
-        ? a.key.localeCompare(b.key)
+        ? compareText(a.key, b.key)
         : (a.key as number) - (b.key as number);
     return (desc ? -order : order) || a.index - b.index;
   });

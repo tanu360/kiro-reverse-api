@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -32,8 +31,7 @@ func (h *Handler) applyUsageRefreshInterval(w http.ResponseWriter, minutes *int)
 		return true
 	}
 	if err := config.UpdateUsageRefreshIntervalMinutes(*minutes); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return false
 	}
 	h.usageRefresh.Reschedule()

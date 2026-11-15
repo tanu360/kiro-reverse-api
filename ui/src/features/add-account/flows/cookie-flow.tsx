@@ -11,7 +11,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { importCredentials } from "@/lib/api/auth-flows";
 import { errorMessage } from "@/lib/api/server-errors";
-import { useT } from "@/lib/i18n";
+import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FlowGuide, FormField, GuideLink, ProviderLogo, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
@@ -82,17 +82,18 @@ export function CookieFlow(): JSX.Element {
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
       <FlowGuide title={t("cookie.howToGet")}>
         <li>
-          {t("cookie.step1")}{" "}
-          <GuideLink href={link} logo={<KiroLogo className="size-4" />}>
-            {link.replace(/^https:\/\//, "")}
-          </GuideLink>
+          {fillNodes(t("cookie.step1"), {
+            link: (
+              <GuideLink href={link} logo={<KiroLogo className="size-4" />}>
+                {link.replace(/^https:\/\//, "")}
+              </GuideLink>
+            ),
+          })}
         </li>
         <li>
           {t("cookie.step2")} <Code>{host}</Code>
         </li>
-        <li>
-          {t("cookie.step3")} <Code>RefreshToken</Code>
-        </li>
+        <li>{fillNodes(t("cookie.step3"), { name: <Code>RefreshToken</Code> })}</li>
       </FlowGuide>
       <FormField label={t("cookie.provider")}>
         <Select

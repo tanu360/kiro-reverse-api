@@ -4,7 +4,7 @@ import { Code } from "@/components/shared/code";
 import { Textarea } from "@/components/ui/textarea";
 import { importSsoToken, reloginSsoToken } from "@/lib/api/auth-flows";
 import { errorMessage, serverMessageText } from "@/lib/api/server-errors";
-import { useT } from "@/lib/i18n";
+import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FlowGuide, FormField, GuideLink, RegionField, SubmitButton } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
@@ -93,15 +93,16 @@ export function SsoTokenFlow(): JSX.Element {
     <form className="flex flex-col gap-4" id={formId} noValidate onSubmit={onSubmit}>
       <FlowGuide title={t("sso.howToGet")}>
         <li>
-          {t("sso.step1")}{" "}
-          <GuideLink href={`https://${SSO_START}`} logo={<AwsLogo className="size-4" />}>
-            {SSO_START}
-          </GuideLink>
+          {fillNodes(t("sso.step1"), {
+            link: (
+              <GuideLink href={`https://${SSO_START}`} logo={<AwsLogo className="size-4" />}>
+                {SSO_START}
+              </GuideLink>
+            ),
+          })}
         </li>
         <li>{t("sso.step2")}</li>
-        <li>
-          {t("sso.step3")} <Code>x-amz-sso_authn</Code>
-        </li>
+        <li>{fillNodes(t("sso.step3"), { cookie: <Code>x-amz-sso_authn</Code> })}</li>
       </FlowGuide>
       <FormField error={errors.tokens} hint={t("sso.tokenHint")} label={t("sso.tokenLabel")}>
         <Textarea

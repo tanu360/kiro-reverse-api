@@ -412,7 +412,7 @@ func (h *Handler) apiApiKeyUsage(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := queryApiKeyUsage(observeNow(), rng, tz, config.ListApiKeys())
 	if err != nil {
-		writeAdminErr(w, http.StatusInternalServerError, err, "")
+		writeAdminErr(w, http.StatusInternalServerError, err, codeInternalError)
 		return
 	}
 	json.NewEncoder(w).Encode(resp)

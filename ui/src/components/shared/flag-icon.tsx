@@ -71,6 +71,7 @@ const US_STRIPE = HEIGHT / 13;
 const US_STAR_ROWS = [1.8, 4.2, 6.6, 9];
 const US_STAR_COLUMNS = [1.8, 4.6, 7.4, 10.2];
 const [BR_X, BR_Y] = onCloth(15, 10);
+const [JP_X, JP_Y] = onCloth(15, 10);
 
 const FLAGS: Record<SupportedLang, ReactNode> = {
   // United States (English uses the en-US locale).
@@ -113,6 +114,13 @@ const FLAGS: Record<SupportedLang, ReactNode> = {
         <polygon points={towardBigStar(12, 7)} />
         <polygon points={towardBigStar(10, 9)} />
       </g>
+    </>
+  ),
+  // Japan: the disc's diameter is three fifths of the hoist.
+  ja: (
+    <>
+      <path d={CLOTH} fill="#fff" />
+      <circle cx={JP_X} cy={JP_Y} fill="#bc002d" r="6" />
     </>
   ),
   // Vietnam.

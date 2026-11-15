@@ -333,8 +333,7 @@ func (h *Handler) apiUpdateLogRetention(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := config.UpdateLogRetentionDays(*req.Days); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return
 	}
 	publishEvent(eventSettingsChanged, "")

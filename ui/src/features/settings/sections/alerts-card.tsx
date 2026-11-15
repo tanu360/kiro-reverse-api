@@ -59,6 +59,7 @@ import {
   type AlertChannelType,
   type AlertDelivery,
   type AlertsConfig,
+  alertDeliveryErrorText,
   alertsQuery,
   alertsQueryKey,
   testAlertChannel,
@@ -383,7 +384,8 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
       const name = channelLabel(channel, t, mask);
       if (result.ok) toast.success(t("testOk", { name }));
       else {
-        const reason = mask(result.error) || t("attempts", { count: result.attempts });
+        const reason =
+          mask(alertDeliveryErrorText(result, t)) || t("attempts", { count: result.attempts });
         toast.error(t("testFailed", { name, reason }));
       }
     },
@@ -610,7 +612,11 @@ function AlertsPanel({ config }: { config: AlertsConfig }): JSX.Element {
             value={draft.value.dailySummaryMinute}
           />
         }
-        description={lastSent ? `${summaryTimeHint} ${lastSent}` : summaryTimeHint}
+        description={
+          lastSent
+            ? t("common:text.joinSentences", { first: summaryTimeHint, second: lastSent })
+            : summaryTimeHint
+        }
         htmlFor={summaryTimeId}
         title={t("dailySummaryTime")}
       />
@@ -797,9 +803,9 @@ function LastResult({ result }: { result: AlertDelivery | null }): JSX.Element {
         <RelativeTime value={result.ts} />
         <span>{t("attempts", { count: result.attempts })}</span>
       </p>
-      {!result.ok && result.error ? (
+      {!result.ok && (result.error || result.errorCode) ? (
         <p className="text-pretty text-destructive-foreground text-xs leading-normal wrap-anywhere">
-          {mask(result.error)}
+          {mask(alertDeliveryErrorText(result, t))}
         </p>
       ) : null}
     </div>

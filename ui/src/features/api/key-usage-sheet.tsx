@@ -46,6 +46,7 @@ import {
   formatCredits,
   formatDateTime,
   formatFraction,
+  formatItems,
   formatNumber,
 } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
@@ -374,7 +375,7 @@ export function ApiKeyUsageSheet({
                   {
                     label: t("form.allowedModels"),
                     value: apiKey.allowedModels?.length
-                      ? apiKey.allowedModels.join(", ")
+                      ? formatItems(apiKey.allowedModels, lang)
                       : t("form.allowedModelsPlaceholder"),
                     // A list of models takes the full width; "Every model" pairs up.
                     span: apiKey.allowedModels?.length ? 2 : 1,

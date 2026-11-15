@@ -1,6 +1,8 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { TFunction } from "@/lib/i18n";
 import { apiRequest } from "./client";
 import { queryKeys } from "./query-keys";
+import { withDetail } from "./server-errors";
 
 /**
  * Where the public link stands (proxy/tunnel_api.go): off, fetching the Tailscale helper,
@@ -38,8 +40,12 @@ export interface TunnelStatus {
   enableURL?: string;
   /** The Tailscale admin console, while the device waits for approval. */
   adminURL?: string;
-  /** Why it failed, in plain English. */
+  /** Why it failed, in plain English; the UI words it from `errorCode` (tunnelErrorText). */
   error?: string;
+  /** The failure's code (tunnel/tunnel.go Code*); absent from servers before it. */
+  errorCode?: string;
+  /** The underlying reason, shown as is after the translated text. */
+  errorDetail?: string;
   /**
    * While running: when Tailscale signs this server out and the link stops (ISO 8601). Absent
    * once key expiry is off for the device, or from a helper too old to say.
@@ -136,6 +142,8 @@ function normalize(res: Partial<Record<keyof TunnelStatus, unknown>>): TunnelSta
     enableURL: optionalString(res.enableURL),
     adminURL: optionalString(res.adminURL),
     error: optionalString(res.error),
+    errorCode: optionalString(res.errorCode),
+    errorDetail: optionalString(res.errorDetail),
     keyExpiry: dateString(res.keyExpiry),
     machineURL: httpsURL(res.machineURL),
     signedIn: res.signedIn === true,
@@ -144,6 +152,29 @@ function normalize(res: Partial<Record<keyof TunnelStatus, unknown>>): TunnelSta
     apiKeys: res.apiKeys === true,
     viaLink: res.viaLink === true,
   };
+}
+
+/** Status.ErrorCode (tunnel/tunnel.go) -> translation key. */
+const TUNNEL_ERROR_KEYS: Readonly<Record<string, string>> = {
+  helper_stopped: "errors:tunnelError.helperStopped",
+  helper_download_failed: "errors:tunnelError.helperDownloadFailed",
+  helper_start_failed: "errors:tunnelError.helperStartFailed",
+  helper_mismatch: "errors:tunnelError.helperMismatch",
+  listener_failed: "errors:tunnelError.listenerFailed",
+  helper_error: "errors:tunnelError.helperError",
+};
+
+/**
+ * Why the link failed, in the UI language: the code's text with the server's detail after it.
+ * An unknown code (or a server without codes) shows the server's English; undefined when there
+ * is no reason at all.
+ */
+export function tunnelErrorText(
+  status: Pick<TunnelStatus, "error" | "errorCode" | "errorDetail">,
+  t: TFunction,
+): string | undefined {
+  const key = status.errorCode ? TUNNEL_ERROR_KEYS[status.errorCode] : undefined;
+  return key ? withDetail(t(key), status.errorDetail, t) : status.error;
 }
 
 async function getTunnel(): Promise<TunnelStatus> {

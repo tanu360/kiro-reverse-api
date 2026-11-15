@@ -109,6 +109,18 @@ func TestBatchResultCarriesCode(t *testing.T) {
 		t.Fatalf("raw result = %+v", raw)
 	}
 
+	var fallback accountResult
+	fallback.failOr(errors.New("HTTP 500"), codeAccountRefreshFailed)
+	if fallback.Error != "HTTP 500" || fallback.Code != codeAccountRefreshFailed || fallback.Detail != "HTTP 500" {
+		t.Fatalf("fallback result = %+v", fallback)
+	}
+
+	var known accountResult
+	known.failOr(&tokenRefreshError{prefix: "token refresh failed", err: errors.New("expired")}, codeSaveFailed)
+	if known.Code != codeTokenRefreshFailed || known.Detail != "expired" {
+		t.Fatalf("known result = %+v", known)
+	}
+
 	if missing := notFoundResult("gone"); missing.Code != codeAccountNotFound || missing.Error != "Account not found" {
 		t.Fatalf("not found result = %+v", missing)
 	}

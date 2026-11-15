@@ -106,6 +106,7 @@ function SuccessCell({ account }: { account: Account }): JSX.Element {
         </span>
         <span className="text-meta text-muted-foreground tabular-nums">
           {t("topAccounts.requests", {
+            count: account.requestCount,
             succeeded: formatNumber(account.requestCount - failed, lang),
             total: formatNumber(account.requestCount, lang),
           })}

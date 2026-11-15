@@ -32,7 +32,7 @@ const SIGN_CHARS = [
   "\uff0b",
 ];
 
-/** The locale's decimal mark: "." in English and Chinese, "," in pt-BR and Vietnamese. */
+/** The locale's decimal mark: "." in English, Chinese and Japanese, "," in pt-BR and Vietnamese. */
 function decimalMark(locale: string): string {
   return (
     new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === "decimal")

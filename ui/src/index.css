@@ -1384,6 +1384,14 @@
   body {
     @apply text-foreground font-sans antialiased surface-grain;
   }
+  /*
+   * Japanese has no spaces between words, so lines break between any two characters and split
+   * words ("パス" | "ワード"). auto-phrase breaks between phrases instead (Chrome 119+); other
+   * browsers ignore it and break as before.
+   */
+  :root:lang(ja) {
+    word-break: auto-phrase;
+  }
 }
 
 /*

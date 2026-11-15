@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -79,8 +78,7 @@ func applyRoutingMode(w http.ResponseWriter, mode *string) bool {
 			writeAdminError(w, http.StatusBadRequest, codeRoutingModeInvalid, err.Error())
 			return false
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		writeSaveError(w, err)
 		return false
 	}
 	return true

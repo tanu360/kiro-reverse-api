@@ -25,7 +25,7 @@
   <a href="#-segurança">Segurança</a>
 </p>
 
-[English](README.md) • [简体中文](README_CN.md) • [Português (Brasil)](README_PT-BR.md) • [Tiếng Việt](README_VI.md)
+[English](README.md) • [简体中文](README_CN.md) • [日本語](README_JA.md) • [Português (Brasil)](README_PT-BR.md) • [Tiếng Việt](README_VI.md)
 
 </div>
 
@@ -38,7 +38,7 @@
 1. Agrupa várias contas Kiro e distribui as requisições com round-robin, pesos ou prioridades e afinidade de sessão.
 2. Traduz chamadas Anthropic `/v1/messages`, OpenAI `/v1/chat/completions` e OpenAI `/v1/responses` de e para o upstream do Kiro, incluindo ferramentas, raciocínio, nível de esforço do raciocínio e busca na web.
 3. Atualiza os tokens de acesso automaticamente e transmite Server-Sent Events de ponta a ponta, com keepalives e failover.
-4. Inclui um painel de administração em React, embutido no binário, para gerenciar contas, acompanhar tudo ao vivo e auditar requisições, em English, 简体中文, Tiếng Việt e Português (Brasil).
+4. Inclui um painel de administração em React, embutido no binário, para gerenciar contas, acompanhar tudo ao vivo e auditar requisições, em English, 简体中文, 日本語, Tiếng Việt e Português (Brasil).
 
 > [!IMPORTANT]
 > Proxy local em um único binário. **Não** é um serviço hospedado e **não** tem vínculo com a Amazon, a AWS ou a Kiro. Você precisa ser dono de cada conta que adicionar ao pool ou ter autorização para usá-la.
@@ -116,7 +116,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 - Menu de comandos (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>) para páginas e ações, modo privacidade que oculta endereços de e-mail e verificação de atualizações pelo `version.json` da branch `main` do repositório.
 - Alterar a senha de administrador encerra todas as outras sessões conectadas.
 - Login em duas etapas com um app autenticador, com dez códigos de recuperação de uso único (veja [Login em duas etapas](#-login-em-duas-etapas)).
-- Tema claro, escuro e do sistema; quatro idiomas na interface: English, 简体中文, Tiếng Việt e Português (Brasil).
+- Tema claro, escuro e do sistema; cinco idiomas na interface: English, 简体中文, 日本語, Tiếng Việt e Português (Brasil).
 - Funciona de celulares a desktops.
 
 ### 🌐 Rede

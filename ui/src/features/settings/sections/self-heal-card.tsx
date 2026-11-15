@@ -1,7 +1,7 @@
 import { Alert02Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type JSX, useId, useState } from "react";
+import { type JSX, type ReactNode, useId, useState } from "react";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { ROW_DESCRIPTION, SettingsRow, SwitchField } from "@/components/shared/settings-rows";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
@@ -253,7 +253,7 @@ function HealStatusRow({
     },
   });
 
-  let description: JSX.Element | string = t("selfHeal.never");
+  let description: ReactNode = t("selfHeal.never");
   if (state.lastHealAt > 0) {
     // {time} stays a placeholder through t() and becomes a live relative time.
     const lastHeal = fillNodes(t("selfHeal.lastHeal", { count: state.lastHealed }), {
@@ -263,11 +263,7 @@ function HealStatusRow({
       maxRounds > 0
         ? t("selfHeal.roundsUsed", { count: maxRounds, used: state.rounds, max: maxRounds })
         : t("selfHeal.roundsUsedUnlimited", { count: state.rounds });
-    description = (
-      <>
-        {lastHeal} {used}
-      </>
-    );
+    description = fillNodes(t("common:text.joinSentences"), { first: lastHeal, second: used });
   }
 
   return (

@@ -12,7 +12,7 @@ import {
 } from "@/lib/api/auth-flows";
 import { errorMessage, serverCodeMessage } from "@/lib/api/server-errors";
 import type { KiroProfile, MicrosoftSelectProfileResponse } from "@/lib/api/types";
-import { useT } from "@/lib/i18n";
+import { fillNodes, useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FlowNote, type FlowStepItem, FlowSteps, FormField, SubmitButton, UrlBox } from "../fields";
 import { FlowFooter, useFlow, useFormId, useReportBusy } from "../flow-context";
@@ -182,7 +182,9 @@ export function MicrosoftFlow(): JSX.Element {
       <UrlBox label={t("iam.loginUrl")} url={authorizeUrl} />
       {/* A step note, not the field hint: it stays in view while the field shows an error. */}
       <FlowNote>
-        {t("microsoft.callbackInstructions")} <Code>http://localhost:3128</Code>
+        {fillNodes(t("microsoft.callbackInstructions"), {
+          url: <Code>http://localhost:3128</Code>,
+        })}
       </FlowNote>
       <FormField error={fieldError} label={t("callbackUrl")}>
         <Input
@@ -245,7 +247,7 @@ export function MicrosoftFlow(): JSX.Element {
           pasteStep
         ) : stage === "idle" ? (
           <FlowNote>
-            {t("microsoft.pasteStep")} <Code>http://localhost:3128</Code>
+            {fillNodes(t("microsoft.pasteStep"), { url: <Code>http://localhost:3128</Code> })}
           </FlowNote>
         ) : null,
     },
