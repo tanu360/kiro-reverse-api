@@ -96,8 +96,13 @@ function serveMockWorker(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   const isMock = loadEnv(mode, rootDir, "VITE_").VITE_MOCK === "1";
+  // Vitest only: shards split by recorded file time (vitest-timings.ts). Imported on demand so
+  // `vite` and `vite build` never load Vitest.
+  const sequencer = process.env.VITEST
+    ? (await import("./vitest-timings")).TimedSequencer
+    : undefined;
   return {
     // Simultaneous mock/live servers must not overwrite each other's optimized dependencies.
     cacheDir: path.resolve(rootDir, `node_modules/.vite-${isMock ? "mock" : "live"}`),
@@ -147,6 +152,7 @@ export default defineConfig(({ mode }) => {
       include: ["src/**/*.test.{ts,tsx}"],
       css: false,
       restoreMocks: true,
+      sequence: sequencer ? { sequencer } : undefined,
     },
   };
 });

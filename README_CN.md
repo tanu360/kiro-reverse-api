@@ -206,6 +206,7 @@ go build -o kiro-proxy .
 | `pnpm dev`      | 开发服务器，地址 `http://localhost:5173/admin/`；将 `/admin/api` 与 `/v1` 代理到 `127.0.0.1:8080` |
 | `pnpm dev:mock` | 使用模拟数据的开发服务器，无需后端；登录密码 `12345678`                          |
 | `pnpm test`     | 单元与组件测试（Vitest）                                                        |
+| `pnpm test:timings` | 运行单元测试并记录每个文件的耗时，CI 据此把测试均匀分片 |
 | `pnpm test:e2e` | 基于模拟模式的浏览器冒烟测试（Playwright）                                      |
 
 > [!TIP]

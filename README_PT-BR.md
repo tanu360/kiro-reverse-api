@@ -206,6 +206,7 @@ Execute estes comandos a partir de `ui/`:
 | `pnpm dev`      | Servidor de desenvolvimento em `http://localhost:5173/admin/`; faz proxy de `/admin/api` e `/v1` para `127.0.0.1:8080` |
 | `pnpm dev:mock` | Servidor de desenvolvimento com dados simulados e sem backend; entre com a senha `12345678` |
 | `pnpm test`     | Testes unitários e de componentes (Vitest)                                      |
+| `pnpm test:timings` | Roda os testes unitários e registra o tempo de cada arquivo, que o CI usa para dividi-los em partes iguais |
 | `pnpm test:e2e` | Smoke tests no navegador contra o modo mock (Playwright)                        |
 
 > [!TIP]

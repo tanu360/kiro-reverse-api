@@ -206,6 +206,7 @@ Run these from `ui/`:
 | `pnpm dev`      | Dev server on `http://localhost:5173/admin/`; proxies `/admin/api` and `/v1` to `127.0.0.1:8080` |
 | `pnpm dev:mock` | Dev server with mock data and no backend; sign in with password `12345678`       |
 | `pnpm test`     | Unit and component tests (Vitest)                                               |
+| `pnpm test:timings` | Runs the unit tests and records each file's time, which CI uses to split them into even shards |
 | `pnpm test:e2e` | Browser smoke tests against mock mode (Playwright)                              |
 
 > [!TIP]

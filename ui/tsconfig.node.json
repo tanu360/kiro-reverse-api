@@ -16,5 +16,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "e2e"]
+  "include": ["vite.config.ts", "vitest-timings.ts", "playwright.config.ts", "e2e"]
 }

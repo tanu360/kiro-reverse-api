@@ -206,6 +206,7 @@ Chạy các lệnh sau trong `ui/`:
 | `pnpm dev`      | Dev server tại `http://localhost:5173/admin/`; chuyển tiếp `/admin/api` và `/v1` tới `127.0.0.1:8080` |
 | `pnpm dev:mock` | Dev server dùng dữ liệu giả, không cần backend; đăng nhập bằng mật khẩu `12345678` |
 | `pnpm test`     | Test unit và component (Vitest)                                                 |
+| `pnpm test:timings` | Chạy test unit và ghi lại thời gian của từng tệp, để CI chia test thành các phần đều nhau |
 | `pnpm test:e2e` | Smoke test trên trình duyệt ở chế độ mock (Playwright)                          |
 
 > [!TIP]

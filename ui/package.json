@@ -13,6 +13,7 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:timings": "vitest run --reporter=default --reporter=./vitest-timings.ts",
     "test:e2e": "playwright test"
   },
   "packageManager": "pnpm@12.15.0",
