@@ -203,6 +203,8 @@
   "publicLink.twoFactorAction": "Set up",
   "publicLink.apiKeysWarning": "Public API calls need an API key. Create one on the API page.",
   "publicLink.apiKeysAction": "Open API page",
+  "publicLink.keyExpiry": "Tailscale signs this server out on {date}, and the link stops until you sign in again. Disable key expiry for this device to keep it on.",
+  "publicLink.keyExpiryAction": "Disable key expiry",
   "publicLink.deviceName": "Device name",
   "publicLink.deviceNameHint": "Your link becomes {link}.",
   "publicLink.deviceNameLocked": "Open the dashboard at its local address to change it. A new name moves this link, so this page would disconnect.",

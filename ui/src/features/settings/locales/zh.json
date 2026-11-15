@@ -197,6 +197,8 @@
   "publicLink.twoFactorAction": "去设置",
   "publicLink.apiKeysWarning": "公开的 API 调用需要 API Key。请在 API 页面创建一个。",
   "publicLink.apiKeysAction": "打开 API 页面",
+  "publicLink.keyExpiry": "Tailscale 会在 {date} 让此服务器退出登录，链接随之停止，直到你重新登录。为此设备停用密钥过期，链接就会一直在线。",
+  "publicLink.keyExpiryAction": "停用密钥过期",
   "publicLink.deviceName": "设备名称",
   "publicLink.deviceNameHint": "你的链接将是 {link}。",
   "publicLink.deviceNameLocked": "请通过本地地址打开控制台再修改。新名称会改变此链接，本页会断开。",

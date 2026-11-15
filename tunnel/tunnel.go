@@ -60,6 +60,11 @@ type Status struct {
 	// FallbackHelper says an earlier version's helper (or, from source, the latest release's) is
 	// running, because this version's could not be downloaded.
 	FallbackHelper bool `json:"fallbackHelper,omitempty"`
+	// KeyExpiry (RFC 3339) is when Tailscale signs this device out and the link stops, while
+	// running; empty once the tailnet admin turns key expiry off for it. MachineURL is the
+	// device's page in the admin console, where that is done.
+	KeyExpiry  string `json:"keyExpiry,omitempty"`
+	MachineURL string `json:"machineURL,omitempty"`
 }
 
 // Options configures a Manager.
@@ -436,6 +441,9 @@ type helperLine struct {
 	AdminURL  string `json:"adminURL"`
 	URL       string `json:"url"`
 	Error     string `json:"error"`
+	// Helpers from before key expiry was reported leave both empty.
+	KeyExpiry  string `json:"keyExpiry"`
+	MachineURL string `json:"machineURL"`
 }
 
 var errProtocol = errors.New("the Tailscale helper does not match this version of Kiro Proxy")
@@ -542,7 +550,11 @@ func (m *Manager) statusFromHelper(line helperLine) (Status, bool) {
 	case StateNeedsFunnel:
 		return Status{State: StateNeedsFunnel, EnableURL: line.EnableURL}, true
 	case StateRunning:
-		return Status{State: StateRunning, URL: line.URL}, true
+		st := Status{State: StateRunning, URL: line.URL, MachineURL: line.MachineURL}
+		if _, err := time.Parse(time.RFC3339, line.KeyExpiry); err == nil {
+			st.KeyExpiry = line.KeyExpiry
+		}
+		return st, true
 	case StateError:
 		return Status{State: StateError, Error: line.Error}, true
 	}

@@ -385,6 +385,7 @@ The order is: the account's own proxy, the pool, the global proxy, then direct. 
 2. Select **Sign in to Tailscale** and sign in with a free Tailscale account. The server joins your tailnet as a device named `kiro-proxy`; **Device name** changes it.
 3. The first time, select **Turn on Funnel**. It turns on HTTPS and Funnel for your tailnet in one step.
 4. The card shows the link, such as `https://kiro-proxy.tail1234.ts.net`. It stays the same after a restart.
+5. Tailscale signs a device out after 180 days by default, and the link stops until you sign in again. The card shows the date and **Disable key expiry**, which opens this device's page in the Tailscale admin console: turn key expiry off there once, and the date goes away from the card.
 
 Anyone with the link reaches the sign-in page and the API, and Funnel names appear in public certificate logs, so bots will find it. Through the link:
 

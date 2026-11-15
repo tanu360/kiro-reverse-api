@@ -197,6 +197,8 @@
   "publicLink.twoFactorAction": "Thiết lập",
   "publicLink.apiKeysWarning": "Gọi API công khai cần API key. Hãy tạo một key trên trang API.",
   "publicLink.apiKeysAction": "Mở trang API",
+  "publicLink.keyExpiry": "Tailscale sẽ đăng xuất máy chủ này vào {date}, và liên kết dừng cho đến khi bạn đăng nhập lại. Tắt hết hạn khóa cho thiết bị này để liên kết luôn bật.",
+  "publicLink.keyExpiryAction": "Tắt hết hạn khóa",
   "publicLink.deviceName": "Tên thiết bị",
   "publicLink.deviceNameHint": "Liên kết của bạn sẽ là {link}.",
   "publicLink.deviceNameLocked": "Mở bảng điều khiển bằng địa chỉ cục bộ để đổi tên. Tên mới sẽ đổi liên kết này, nên trang này sẽ mất kết nối.",

@@ -87,7 +87,12 @@ func fakeHelper(scenario string, args []string) int {
 			emit(map[string]any{"state": "error", "error": string(body)})
 			break
 		}
-		emit(map[string]any{"state": "running", "url": "https://" + *hostname + "." + string(body)})
+		emit(map[string]any{
+			"state":      "running",
+			"url":        "https://" + *hostname + "." + string(body),
+			"keyExpiry":  "2027-05-14T05:00:00Z",
+			"machineURL": "https://login.tailscale.com/admin/machines/100.64.0.1",
+		})
 	}
 	// Run until the proxy closes stdin or asks for a sign-out.
 	scanner := bufio.NewScanner(os.Stdin)
@@ -163,6 +168,9 @@ func TestManagerReachesRunningThroughTheTunnelListener(t *testing.T) {
 	st := waitStatus(t, m, func(s Status) bool { return s.State == StateRunning || s.State == StateError })
 	if st.State != StateRunning || st.URL != "https://kiro-proxy.tail1234.ts.net" {
 		t.Fatalf("status = %+v", st)
+	}
+	if st.KeyExpiry != "2027-05-14T05:00:00Z" || st.MachineURL != "https://login.tailscale.com/admin/machines/100.64.0.1" {
+		t.Errorf("key expiry %q, machine page %q", st.KeyExpiry, st.MachineURL)
 	}
 	if !st.SignedIn {
 		t.Error("running did not note the sign-in")

@@ -80,7 +80,7 @@ func (t *tunnel) run(ctx context.Context) error {
 	_, _, _ = lc.CertPair(certCtx, domain)
 	cancel()
 	publicURL := "https://" + domain
-	t.status.emit(Status{State: stateRunning, URL: publicURL})
+	t.status.emit(runningStatus(publicURL, st))
 
 	for {
 		select {
@@ -100,9 +100,28 @@ func (t *tunnel) run(ctx context.Context) error {
 		if s, ok := loginStatus(cur); ok {
 			t.status.emit(s)
 		} else {
-			t.status.emit(Status{State: stateRunning, URL: publicURL})
+			t.status.emit(runningStatus(publicURL, cur))
 		}
 	}
+}
+
+// runningStatus is the live link with the device's key expiry, which the health poll picks up
+// again once the admin turns expiry off, and the device's admin page.
+func runningStatus(publicURL string, st *ipnstate.Status) Status {
+	s := Status{State: stateRunning, URL: publicURL}
+	if st == nil || st.Self == nil {
+		return s
+	}
+	if st.Self.KeyExpiry != nil && !st.Self.KeyExpiry.IsZero() {
+		s.KeyExpiry = st.Self.KeyExpiry.UTC().Format(time.RFC3339)
+	}
+	for _, ip := range st.Self.TailscaleIPs {
+		if ip.Is4() {
+			s.MachineURL = adminMachinesURL + "/" + ip.String()
+			break
+		}
+	}
+	return s
 }
 
 // waitRunning reports sign-in and approval until the node is up.

@@ -119,6 +119,35 @@ describe("PublicLinkCard", () => {
     ).toBeVisible();
   });
 
+  it("shows when Tailscale's key runs out, with the device's admin page", async () => {
+    mockDb.twoFactor.enabled = true;
+    mockDb.tunnel.pinned = {
+      enabled: true,
+      signedIn: true,
+      state: "running",
+      url: LINK,
+      keyExpiry: "2027-05-14T05:00:00Z",
+      machineURL: "https://login.tailscale.com/admin/machines/100.101.102.103",
+    };
+    const { queryClient } = renderWithProviders(<PublicLinkCard />);
+    expect(
+      await screen.findByText(
+        "Tailscale signs this server out on May 14, 2027, and the link stops until you sign in again. Disable key expiry for this device to keep it on.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "Disable key expiry" })).toHaveAttribute(
+      "href",
+      "https://login.tailscale.com/admin/machines/100.101.102.103",
+    );
+
+    // Key expiry turned off at Tailscale: the line goes.
+    mockDb.tunnel.pinned = { enabled: true, signedIn: true, state: "running", url: LINK };
+    await queryClient.invalidateQueries({ queryKey: queryKeys.settings.tunnel() });
+    await waitFor(() =>
+      expect(screen.queryByRole("link", { name: "Disable key expiry" })).not.toBeInTheDocument(),
+    );
+  });
+
   it("warns while on without two-factor sign-in or an API key", async () => {
     mockDb.twoFactor.enabled = false;
     mockDb.apiKeys = [];

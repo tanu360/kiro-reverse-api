@@ -189,6 +189,33 @@ func TestLoginStatus(t *testing.T) {
 	}
 }
 
+func TestRunningStatusCarriesKeyExpiryAndTheMachinePage(t *testing.T) {
+	expiry := time.Date(2027, 5, 14, 10, 30, 0, 0, time.FixedZone("IST", 19800))
+	st := &ipnstate.Status{Self: &ipnstate.PeerStatus{
+		KeyExpiry:    &expiry,
+		TailscaleIPs: []netip.Addr{netip.MustParseAddr("fd7a:115c:a1e0::1"), netip.MustParseAddr("100.101.102.103")},
+	}}
+	got := runningStatus("https://kiro-proxy.tail1234.ts.net", st)
+	want := Status{
+		State:      stateRunning,
+		URL:        "https://kiro-proxy.tail1234.ts.net",
+		KeyExpiry:  "2027-05-14T05:00:00Z",
+		MachineURL: "https://login.tailscale.com/admin/machines/100.101.102.103",
+	}
+	if got != want {
+		t.Errorf("runningStatus = %+v, want %+v", got, want)
+	}
+
+	// Key expiry turned off: no date.
+	st.Self.KeyExpiry = nil
+	if got := runningStatus("https://kiro-proxy.tail1234.ts.net", st); got.KeyExpiry != "" || got.MachineURL == "" {
+		t.Errorf("expiry off: %+v", got)
+	}
+	if got := runningStatus("https://x.ts.net", &ipnstate.Status{}); got != (Status{State: stateRunning, URL: "https://x.ts.net"}) {
+		t.Errorf("no Self: %+v", got)
+	}
+}
+
 func TestWatchParentCancelsOnEOFAndAsksForLogout(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	logout := make(chan struct{}, 1)

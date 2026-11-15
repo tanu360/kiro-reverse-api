@@ -385,6 +385,7 @@ Thứ tự là: proxy riêng của tài khoản, nhóm proxy, proxy chung, rồi
 2. Chọn **Đăng nhập Tailscale** và đăng nhập bằng một tài khoản Tailscale miễn phí. Máy chủ tham gia tailnet của bạn dưới dạng thiết bị tên `kiro-proxy`; đổi tên ở **Tên thiết bị**.
 3. Lần đầu, chọn **Bật Funnel**. Bước này bật HTTPS và Funnel cho tailnet của bạn trong một lần.
 4. Thẻ hiển thị liên kết, ví dụ `https://kiro-proxy.tail1234.ts.net`. Liên kết giữ nguyên sau khi khởi động lại.
+5. Theo mặc định, Tailscale đăng xuất một thiết bị sau 180 ngày, và liên kết dừng cho đến khi bạn đăng nhập lại. Thẻ hiển thị ngày đó cùng **Tắt hết hạn khóa**, nút này mở trang của thiết bị trong bảng quản trị Tailscale: tắt hết hạn khóa ở đó một lần, và ngày đó biến mất khỏi thẻ.
 
 Bất kỳ ai có liên kết đều vào được trang đăng nhập và API, và tên Funnel xuất hiện trong nhật ký chứng chỉ công khai, nên bot sẽ tìm thấy nó. Qua liên kết:
 

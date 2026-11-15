@@ -338,6 +338,10 @@ const MOCK_TAILSCALE_AUTH_URL = "https://login.tailscale.com/a/1a2b3c4d5e6f";
 const MOCK_TAILSCALE_FUNNEL_URL = "https://login.tailscale.com/f/funnel?node=n1a2b3c4d5e6f";
 /** The compressed helper's size, as the release serves it. */
 const MOCK_HELPER_BYTES = 7_940_033;
+/** The mock device's page in the Tailscale admin console. */
+const MOCK_TAILSCALE_MACHINE_URL = "https://login.tailscale.com/admin/machines/100.101.102.103";
+/** Tailscale's default key expiry. */
+const KEY_EXPIRY_MS = 180 * 86_400_000;
 
 /**
  * GET /tunnel. A pinned status (tests) shows as is; otherwise the link walks the real first-time
@@ -394,6 +398,8 @@ function tunnelStatus(): TunnelStatus {
     signedIn: true,
     state: "running",
     url: `https://${tunnel.hostname}.tail1234.ts.net`,
+    keyExpiry: new Date(tunnel.since + KEY_EXPIRY_MS).toISOString(),
+    machineURL: MOCK_TAILSCALE_MACHINE_URL,
   };
 }
 

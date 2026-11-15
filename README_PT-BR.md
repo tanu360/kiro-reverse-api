@@ -385,6 +385,7 @@ A ordem é: o proxy próprio da conta, o pool, o proxy global e, por último, a 
 2. Clique em **Entrar no Tailscale** e entre com uma conta gratuita do Tailscale. O servidor entra na sua tailnet como um dispositivo chamado `kiro-proxy`; **Nome do dispositivo** o altera.
 3. Na primeira vez, clique em **Habilitar Funnel**. Isso liga o HTTPS e o Funnel da sua tailnet em um passo só.
 4. O card mostra o link, como `https://kiro-proxy.tail1234.ts.net`. Ele continua o mesmo depois de reiniciar.
+5. Por padrão, o Tailscale desconecta um dispositivo depois de 180 dias, e o link para até você entrar de novo. O card mostra a data e **Desativar expiração da chave**, que abre a página deste dispositivo no console de administração do Tailscale: desligue a expiração da chave lá uma vez, e a data some do card.
 
 Qualquer pessoa com o link chega à página de login e à API, e os nomes do Funnel aparecem em logs públicos de certificados, então bots vão encontrá-lo. Pelo link:
 

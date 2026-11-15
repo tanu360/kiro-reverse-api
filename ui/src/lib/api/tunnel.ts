@@ -40,6 +40,13 @@ export interface TunnelStatus {
   adminURL?: string;
   /** Why it failed, in plain English. */
   error?: string;
+  /**
+   * While running: when Tailscale signs this server out and the link stops (ISO 8601). Absent
+   * once key expiry is off for the device, or from a helper too old to say.
+   */
+  keyExpiry?: string;
+  /** This device's page in the Tailscale admin console, where key expiry is turned off. */
+  machineURL?: string;
   /** A Tailscale sign-in is saved on this server. */
   signedIn: boolean;
   /** An earlier version's helper runs, because this version's could not be downloaded. */
@@ -91,6 +98,16 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value ? value : undefined;
 }
 
+function dateString(value: unknown): string | undefined {
+  const text = optionalString(value);
+  return text && Number.isFinite(Date.parse(text)) ? text : undefined;
+}
+
+function httpsURL(value: unknown): string | undefined {
+  const text = optionalString(value);
+  return text?.startsWith("https://") ? text : undefined;
+}
+
 function byteCount(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? Math.round(value)
@@ -119,6 +136,8 @@ function normalize(res: Partial<Record<keyof TunnelStatus, unknown>>): TunnelSta
     enableURL: optionalString(res.enableURL),
     adminURL: optionalString(res.adminURL),
     error: optionalString(res.error),
+    keyExpiry: dateString(res.keyExpiry),
+    machineURL: httpsURL(res.machineURL),
     signedIn: res.signedIn === true,
     fallbackHelper: res.fallbackHelper === true,
     twoFactor: res.twoFactor === true,

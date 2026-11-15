@@ -1,6 +1,7 @@
 import {
   Alert02Icon,
   ExternalLinkIcon,
+  InformationCircleIcon,
   Logout03Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -27,7 +28,7 @@ import {
   tunnelQuery,
   updateTunnel,
 } from "@/lib/api/tunnel";
-import { formatBytes } from "@/lib/format";
+import { dateTimeFormat, formatBytes } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { deviceNameChars } from "@/lib/input-filters";
 import { toast } from "@/lib/toast";
@@ -43,6 +44,8 @@ import {
 } from "./settings-section";
 
 const FUNNEL_GUIDE = "https://tailscale.com/docs/features/tailscale-funnel";
+/** The admin console's device list, for a helper that does not name the device's own page. */
+const TAILSCALE_MACHINES = "https://login.tailscale.com/admin/machines";
 
 /**
  * Settings card for the public link: Tailscale Funnel puts this server, dashboard and API alike,
@@ -446,10 +449,15 @@ function Busy({ children }: { children: ReactNode }): JSX.Element {
   );
 }
 
-/** What to fix before sharing the link: two-factor sign-in off, or no API key for public calls. */
+/**
+ * What to fix before sharing the link (two-factor sign-in off, no API key for public calls), and
+ * the day Tailscale's key for this device runs out, which stops the link. The key line goes once
+ * key expiry is off for the device: the helper reports that within seconds.
+ */
 function Warnings({ status }: { status: TunnelStatus }): JSX.Element | null {
-  const { t } = useT("settings");
-  if (status.twoFactor && status.apiKeys) return null;
+  const { t, lang } = useT("settings");
+  const keyExpiry = status.state === "running" && status.url ? status.keyExpiry : undefined;
+  if (status.twoFactor && status.apiKeys && !keyExpiry) return null;
   return (
     <div className={cn(SETTINGS_ROW_X, "flex flex-col gap-2 py-4")} data-slot="settings-row">
       {status.twoFactor ? null : (
@@ -480,6 +488,32 @@ function Warnings({ status }: { status: TunnelStatus }): JSX.Element | null {
           </AlertAction>
         </Alert>
       )}
+      {keyExpiry ? (
+        <Alert role="status" size="sm" variant="info">
+          <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
+          <AlertDescription>
+            {t("publicLink.keyExpiry", {
+              date: dateTimeFormat(lang, { dateStyle: "medium" }).format(new Date(keyExpiry)),
+            })}
+          </AlertDescription>
+          <AlertAction>
+            <Button
+              render={
+                <a
+                  href={status.machineURL ?? TAILSCALE_MACHINES}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                />
+              }
+              size="xs"
+              variant="tone"
+            >
+              {t("publicLink.keyExpiryAction")}
+              <HugeiconsIcon icon={ExternalLinkIcon} aria-hidden="true" />
+            </Button>
+          </AlertAction>
+        </Alert>
+      ) : null}
     </div>
   );
 }

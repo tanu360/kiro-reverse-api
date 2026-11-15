@@ -203,6 +203,8 @@
   "publicLink.twoFactorAction": "Configurar",
   "publicLink.apiKeysWarning": "Chamadas públicas à API precisam de uma chave de API. Crie uma na página API.",
   "publicLink.apiKeysAction": "Abrir página API",
+  "publicLink.keyExpiry": "O Tailscale desconecta este servidor em {date}, e o link para até você entrar de novo. Desative a expiração da chave deste dispositivo para mantê-lo ligado.",
+  "publicLink.keyExpiryAction": "Desativar expiração da chave",
   "publicLink.deviceName": "Nome do dispositivo",
   "publicLink.deviceNameHint": "Seu link será {link}.",
   "publicLink.deviceNameLocked": "Abra o painel pelo endereço local para mudar o nome. Um novo nome muda este link, e esta página desconectaria.",

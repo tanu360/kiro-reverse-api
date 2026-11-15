@@ -39,6 +39,11 @@ type Status struct {
 	AdminURL  string `json:"adminURL,omitempty"`
 	URL       string `json:"url,omitempty"`
 	Error     string `json:"error,omitempty"`
+	// KeyExpiry (RFC 3339) is when Tailscale signs this device out, while running; empty when
+	// the tailnet admin turned key expiry off for it. MachineURL is the device's page in the
+	// admin console, where that is done. Older proxies ignore both.
+	KeyExpiry  string `json:"keyExpiry,omitempty"`
+	MachineURL string `json:"machineURL,omitempty"`
 }
 
 // statusWriter writes a line only when the status changed, so a polling loop can call emit every
