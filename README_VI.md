@@ -68,7 +68,7 @@ Nếu dự án này giúp ích cho bạn, một Star sẽ rất có ý nghĩa.
 - OpenAI `/v1/responses` hỗ trợ nối chuỗi bằng `previous_response_id` và truy xuất response đã lưu.
 - Danh sách model dành cho Codex tại `/v1/codex/models`, bên cạnh `/v1/models` tiêu chuẩn.
 - Streaming SSE cho mọi endpoint, có failover sang tài khoản khác ngay giữa stream khi upstream gặp lỗi tạm thời, và gửi keepalive mỗi 15 giây khi upstream im lặng (suy luận dài, tham số tool đang bị giữ lại).
-- Server tool `web_search` của Anthropic chạy qua tính năng tìm kiếm web của chính Kiro, kết quả trả về dưới dạng các khối search result.
+- Server tool `web_search` của Anthropic và tool `web_search` được host của OpenAI chạy qua tính năng tìm kiếm web của chính Kiro: `/v1/messages` trả về các khối search result, `/v1/responses` trả về các mục `web_search_call`, và cả hai API của OpenAI đánh dấu các kết quả mà câu trả lời trích dẫn bằng annotation `url_citation`.
 - Mức suy luận: `reasoning_effort` của OpenAI và `output_config.effort` của Claude (`low` đến `xhigh`) bật thinking và được chuyển tới các model hỗ trợ mức effort; `minimal` tắt thinking.
 - Đầu ra có cấu trúc: `response_format` của OpenAI (`json_object`, `json_schema`), `output_config.format` của Claude và `text.format` của Responses trả về JSON thuần, được kiểm tra theo schema (xem [Đầu ra có cấu trúc](#-đầu-ra-có-cấu-trúc)).
 - Chữ ký thinking: trên `/v1/messages`, khối thinking mang `signature` do Kiro gửi (`signature_delta` khi stream), và các khối `redacted_thinking` được chuyển tiếp nguyên vẹn.

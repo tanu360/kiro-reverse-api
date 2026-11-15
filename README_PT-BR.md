@@ -68,7 +68,7 @@ Se este projeto ajuda você, uma Star significaria muito.
 - OpenAI `/v1/responses` com encadeamento por `previous_response_id` e recuperação de respostas armazenadas.
 - Lista de modelos pronta para o Codex em `/v1/codex/models`, ao lado do `/v1/models` padrão.
 - Streaming SSE em todos os endpoints, com failover de conta no meio do stream em erros transitórios do upstream e um keepalive a cada 15 segundos enquanto o upstream fica em silêncio (raciocínio longo, argumentos de ferramenta retidos).
-- A ferramenta de servidor `web_search` da Anthropic roda pela própria busca na web do Kiro, com os resultados devolvidos como blocos de resultado de busca.
+- A ferramenta de servidor `web_search` da Anthropic e a ferramenta hospedada `web_search` da OpenAI rodam pela própria busca na web do Kiro: `/v1/messages` devolve blocos de resultado de busca, `/v1/responses` devolve itens `web_search_call`, e as duas APIs da OpenAI marcam os resultados citados na resposta com anotações `url_citation`.
 - Nível de esforço: `reasoning_effort` da OpenAI e `output_config.effort` do Claude (de `low` a `xhigh`) ativam o raciocínio e chegam aos modelos que aceitam níveis de esforço; `minimal` o desativa.
 - Saída estruturada: `response_format` da OpenAI (`json_object`, `json_schema`), `output_config.format` do Claude e `text.format` da Responses devolvem JSON puro, conferido contra o schema (veja [Saída estruturada](#-saída-estruturada)).
 - Assinaturas de raciocínio: em `/v1/messages`, um bloco de raciocínio traz a `signature` que o Kiro envia (`signature_delta` no streaming), e blocos `redacted_thinking` passam direto.

@@ -68,7 +68,7 @@
 - OpenAI `/v1/responses`，支持 `previous_response_id` 链式调用与已存响应回查。
 - `/v1/codex/models` 提供可直接用于 Codex 的模型列表，与标准的 `/v1/models` 并存。
 - 全部端点支持 SSE 流式输出：上游瞬时错误时可在流中切换账号继续；上游无输出时（长时间推理、工具参数尚在缓冲）每 15 秒发送一次保活。
-- Anthropic 的 `web_search` 服务端工具通过 Kiro 自带的网络搜索执行，结果以搜索结果块返回。
+- Anthropic 的 `web_search` 服务端工具和 OpenAI 的托管 `web_search` 工具通过 Kiro 自带的网络搜索执行：`/v1/messages` 返回搜索结果块，`/v1/responses` 返回 `web_search_call` 项，两个 OpenAI API 都把回答引用的结果标为 `url_citation` 注释。
 - 推理强度：OpenAI `reasoning_effort` 与 Claude `output_config.effort`（`low` 至 `xhigh`）会开启思考，并传递给支持强度等级的模型；`minimal` 则关闭思考。
 - 结构化输出：OpenAI `response_format`（`json_object`、`json_schema`）、Claude `output_config.format` 与 Responses `text.format` 返回纯 JSON，并按 Schema 校验（见[结构化输出](#-结构化输出)）。
 - Thinking 签名：在 `/v1/messages` 中，思考块会携带 Kiro 返回的 `signature`（流式输出时为 `signature_delta`），`redacted_thinking` 块原样透传。
