@@ -308,9 +308,9 @@ func formatWebSearchResults(results []WebSearchResult) string {
 			b.WriteString("\nURL: ")
 			b.WriteString(result.URL)
 		}
-		if result.PublishedDate != "" {
+		if published := webSearchPublishedText(result.PublishedDate); published != "" {
 			b.WriteString("\nPublished: ")
-			b.WriteString(result.PublishedDate)
+			b.WriteString(published)
 		}
 		if result.Snippet != "" {
 			b.WriteString("\n")

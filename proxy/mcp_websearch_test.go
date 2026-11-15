@@ -61,3 +61,11 @@ func TestFormatWebSearchResultsCapsAndIncludesSourceFields(t *testing.T) {
 		}
 	}
 }
+
+// MCP dates are epoch milliseconds; given raw, the model read 1794268800000 as July 2025.
+func TestFormatWebSearchResultsWritesEpochDatesAsDates(t *testing.T) {
+	formatted := formatWebSearchResults([]WebSearchResult{{Title: "The Go Blog", URL: "https://go.dev/blog", PublishedDate: "1794268800000"}})
+	if !strings.Contains(formatted, "Published: November 10, 2026") || strings.Contains(formatted, "1794268800000") {
+		t.Fatalf("expected a readable date, got %q", formatted)
+	}
+}

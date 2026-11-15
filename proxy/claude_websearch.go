@@ -177,10 +177,16 @@ func newServerToolUseID() string {
 }
 
 func webSearchPageAge(published string) interface{} {
-	published = strings.TrimSpace(published)
-	if published == "" {
-		return nil
+	if text := webSearchPublishedText(published); text != "" {
+		return text
 	}
+	return nil
+}
+
+// webSearchPublishedText is a search result's publish date as people write it; the model
+// misread raw epoch milliseconds as dates years off. Other values pass through.
+func webSearchPublishedText(published string) string {
+	published = strings.TrimSpace(published)
 	//! MCP sends epoch milliseconds; Anthropic shows page_age as a readable date.
 	if ms, err := strconv.ParseInt(published, 10, 64); err == nil && ms > 0 {
 		return time.UnixMilli(ms).UTC().Format("January 2, 2006")
