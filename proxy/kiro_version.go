@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"kiro-proxy/config"
@@ -18,6 +20,31 @@ const kiroMetadataURL = "https://prod.download.desktop.kiro.dev/stable/metadata-
 
 // kiroVersionEvery is how often the feed is read: Kiro ships an IDE build every week or two.
 const kiroVersionEvery = 6 * time.Hour
+
+// kiroGateRecheckGap spaces the feed reads that a version-gate rejection triggers.
+const kiroGateRecheckGap = 10 * time.Minute
+
+// lastGateRecheck is when a rejection last triggered a feed read, in Unix nanoseconds.
+var lastGateRecheck atomic.Int64
+
+// kiroVersionRecheck reads the feed in the background; tests replace it.
+var kiroVersionRecheck = func() { go refreshKiroVersion(kiroMetadataURL) }
+
+// noteKiroVersionGate reads the feed again right away when Kiro refused a request for an old
+// IDE version (403 FEATURE_NOT_SUPPORTED), since Kiro has shipped a build since, instead of
+// waiting up to kiroVersionEvery for the next read. At most once per kiroGateRecheckGap.
+func noteKiroVersionGate(body string) {
+	if !strings.Contains(body, "FEATURE_NOT_SUPPORTED") {
+		return
+	}
+	now := time.Now().UnixNano()
+	last := lastGateRecheck.Load()
+	if now-last < int64(kiroGateRecheckGap) || !lastGateRecheck.CompareAndSwap(last, now) {
+		return
+	}
+	logger.Warnf("[Kiro] Kiro refused KiroIDE-%s as too old; checking for a newer Kiro IDE", config.GetKiroClientConfig().KiroVersion)
+	kiroVersionRecheck()
+}
 
 // backgroundKiroVersion reads Kiro's current stable release at start and then every
 // kiroVersionEvery, so requests advertise the IDE build Kiro's version gate expects

@@ -62,6 +62,7 @@ func GetUsageLimits(account *config.Account) (*UsageLimitsResponse, error) {
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
+		noteKiroVersionGate(string(body))
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -148,6 +149,7 @@ func listAvailableModelsPage(client *http.Client, url string, account *config.Ac
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
+		noteKiroVersionGate(string(body))
 		return nil, "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -511,6 +513,7 @@ func listKiroProfiles(ctx context.Context, account *config.Account, region strin
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, maxProfileErrorBytes))
 			resp.Body.Close()
+			noteKiroVersionGate(string(body))
 			return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 		}
 		body, err := io.ReadAll(io.LimitReader(resp.Body, maxProfileResponseBytes+1))

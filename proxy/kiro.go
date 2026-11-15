@@ -495,6 +495,7 @@ endpointLoop:
 				//! Error bodies are short JSON; the cap keeps a misbehaving endpoint from filling memory.
 				errBody, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamErrorBytes))
 				resp.Body.Close()
+				noteKiroVersionGate(string(errBody))
 				lastErr = fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, ep.Name, string(errBody))
 				if isClientHTTPStatus(resp.StatusCode) {
 					//! A 4xx can be endpoint-specific, so keep the endpoint fallback; only account-level retries stop.
