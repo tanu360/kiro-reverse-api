@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { RequestRecord } from "@/lib/api/types";
+import { formatDateTime, formatTime } from "@/lib/format";
+import { type TParams, translate } from "@/lib/i18n";
 import {
   cleanSearch,
+  conversationSpan,
   errorTypeForSearch,
   errorTypeTone,
   formatRowDate,
@@ -179,5 +182,30 @@ describe("errorTypeForSearch", () => {
     expect(toQueryParams({ search: "Proxy error" }, "en")).toMatchObject({ errorType: "proxy" });
     expect(toQueryParams({ search: "Proxy error" }, "en")).not.toHaveProperty("search");
     expect(toQueryParams({ search: "Proxy error" })).toMatchObject({ search: "Proxy error" });
+  });
+});
+
+describe("conversationSpan", () => {
+  const t = (key: string, params?: TParams) => translate("en", "requests", key, params);
+  // Local times, so the day boundary is the browser's, as on the page.
+  const at = (day: number, hour: number, minute: number, second = 0) =>
+    new Date(2026, 10, day, hour, minute, second).getTime() / 1000;
+
+  it("gives the end as a time on the same day", () => {
+    expect(conversationSpan(at(15, 13, 5), at(15, 13, 40), t, "en")).toBe(
+      `From ${formatDateTime(at(15, 13, 5), "en")} to ${formatTime(at(15, 13, 40), "en")}`,
+    );
+  });
+
+  it("gives the end's date too when the conversation ran past midnight", () => {
+    expect(conversationSpan(at(14, 23, 50), at(15, 0, 10), t, "en")).toBe(
+      `From ${formatDateTime(at(14, 23, 50), "en")} to ${formatDateTime(at(15, 0, 10), "en")}`,
+    );
+  });
+
+  it("is one date and time for a conversation within a minute", () => {
+    expect(conversationSpan(at(15, 13, 5, 2), at(15, 13, 5, 40), t, "en")).toBe(
+      formatDateTime(at(15, 13, 5), "en"),
+    );
   });
 });

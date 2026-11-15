@@ -5,8 +5,8 @@ import type {
   RequestErrorType,
   RequestRecord,
 } from "@/lib/api/types";
-import { dateTimeFormat, unixToDate } from "@/lib/format";
-import { type Lang, translate } from "@/lib/i18n";
+import { dateTimeFormat, formatDateTime, formatTime, unixToDate } from "@/lib/format";
+import { type Lang, type TFunction, translate } from "@/lib/i18n";
 import type { RequestSort, RequestsSearch } from "@/routes/-search";
 
 export const DEFAULT_PAGE = 1;
@@ -156,4 +156,21 @@ function dateFormat(lang: Lang, withYear: boolean): Intl.DateTimeFormat {
 export function formatRowDate(unixSec: number, lang: Lang, now: Date = new Date()): string {
   const date = unixToDate(unixSec);
   return dateFormat(lang, date.getFullYear() !== now.getFullYear()).format(date);
+}
+
+/**
+ * When a conversation ran: "From Nov 15, 2026, 1:05 PM to 1:40 PM". The end shows its date too
+ * when it falls on another day, and a conversation within one minute is just its date and time.
+ */
+export function conversationSpan(
+  firstTs: number,
+  lastTs: number,
+  t: TFunction,
+  lang?: Lang,
+): string {
+  const first = formatDateTime(firstTs, lang);
+  const lastFull = formatDateTime(lastTs, lang);
+  if (lastFull === first) return first;
+  const sameDay = unixToDate(firstTs).toDateString() === unixToDate(lastTs).toDateString();
+  return t("conversation.span", { first, last: sameDay ? formatTime(lastTs, lang) : lastFull });
 }

@@ -20,8 +20,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { conversationQuery } from "@/lib/api/requests";
 import type { RequestRecord } from "@/lib/api/types";
-import { EMPTY, formatDateTime, formatDurationMs, formatNumber, formatTime } from "@/lib/format";
+import { EMPTY, formatDurationMs, formatNumber, formatTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
+import { conversationSpan } from "./request-model";
 import { StatusBadge } from "./requests-columns";
 
 /** The short form of a conversation id the pages show: its first eight characters. */
@@ -85,14 +86,12 @@ export function ConversationSheet({
         <SectionCard slim title={t("conversation.summary")}>
           <StatStrip items={stats} />
           <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-3 text-muted-foreground text-xs sm:px-6">
+            <span>{conversationSpan(totals.firstTs, totals.lastTs, t, lang)}</span>
             <span>
-              {t("conversation.span", {
-                first: formatDateTime(totals.firstTs, lang),
-                last: formatTime(totals.lastTs, lang),
+              {t("conversation.results", {
+                ok: formatNumber(totals.successes, lang),
+                failed: formatNumber(totals.failures, lang),
               })}
-            </span>
-            <span>
-              {t("conversation.results", { ok: totals.successes, failed: totals.failures })}
             </span>
             <span>{t("conversation.failovers", { count: totals.failovers })}</span>
             <span>{t("conversation.accounts", { count: totals.accounts.length })}</span>
