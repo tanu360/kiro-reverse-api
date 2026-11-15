@@ -231,6 +231,7 @@ function StatusRow({
             openHref={status.url}
             openLabel={t("publicLink.open")}
             value={status.url}
+            variant="outline"
           />
         }
         controlWidth="value"

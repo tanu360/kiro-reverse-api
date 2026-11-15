@@ -68,7 +68,16 @@ function breakAtWords(value: string): ReactNode {
  */
 const MULTILINE_GROUP = "min-h-9 pointer-coarse:min-h-10";
 const MULTILINE_TEXT =
-  "block min-w-0 flex-1 cursor-text select-all whitespace-normal py-1 ps-3 font-mono text-foreground text-meta leading-5 outline-none";
+  "block min-w-0 flex-1 cursor-text select-all whitespace-normal ps-3 text-foreground text-meta leading-5 outline-none";
+
+/*
+ * The "outline" look (the public link): a hairline border with no fill, the value in the body
+ * face, and each button in its own cell behind a divider. The cells stretch to the field's
+ * height, so the dividers run edge to edge however many lines the value wraps to.
+ */
+const OUTLINE_GROUP = "items-stretch border-input bg-transparent hover:bg-transparent";
+const OUTLINE_ADDON = "gap-0 self-stretch pe-0";
+const OUTLINE_CELL = "flex items-center self-stretch border-input border-s px-0.5";
 
 /**
  * A value to copy (a URL, a key, a command) in a read-only field: mono text in the soft field,
@@ -92,6 +101,7 @@ export function CopyField({
   openLabel,
   actions,
   id,
+  variant = "field",
   className,
 }: {
   value: string;
@@ -112,14 +122,33 @@ export function CopyField({
   /** More icon buttons in the field, before Copy (the metrics token's New token). */
   actions?: ReactNode;
   id?: string;
+  /** "outline": a bordered field with no fill and each button in its own cell. */
+  variant?: "field" | "outline";
   /** On the group: layout only. */
   className?: string;
 }): JSX.Element {
   const { t } = useT();
   const shown = display ?? value;
   const words = multiline && shown.includes(" ");
+  const outline = variant === "outline";
+  const open =
+    openHref && openLabel ? (
+      <OpenLinkButton href={openHref} label={openLabel} size="icon-sm" variant="quiet" />
+    ) : null;
+  const copy = (
+    <CopyButton
+      copiedMessage={copiedMessage}
+      label={copyLabel ?? t("actions.copy")}
+      size="icon-sm"
+      value={value}
+      variant="quiet"
+    />
+  );
   return (
-    <InputGroup className={cn(multiline && MULTILINE_GROUP, className)} data-slot="copy-field">
+    <InputGroup
+      className={cn(multiline && MULTILINE_GROUP, outline && OUTLINE_GROUP, className)}
+      data-slot="copy-field"
+    >
       {multiline ? (
         <InputGroupText
           aria-label={labelledBy ? undefined : label}
@@ -128,6 +157,7 @@ export function CopyField({
           aria-readonly="true"
           className={cn(
             MULTILINE_TEXT,
+            outline ? "py-[7px] pe-3" : "py-1 font-mono",
             // A wrapped URL balances its lines: "https://kiro-proxy." over "tail1234.ts.net",
             // not one line and a lone "net".
             words
@@ -153,19 +183,19 @@ export function CopyField({
           value={shown}
         />
       )}
-      <InputGroupAddon align="inline-end" className="gap-0.5">
-        {openHref && openLabel ? (
-          <OpenLinkButton href={openHref} label={openLabel} size="icon-sm" variant="quiet" />
-        ) : null}
-        {actions}
-        <CopyButton
-          copiedMessage={copiedMessage}
-          label={copyLabel ?? t("actions.copy")}
-          size="icon-sm"
-          value={value}
-          variant="quiet"
-        />
-      </InputGroupAddon>
+      {outline ? (
+        <InputGroupAddon align="inline-end" className={OUTLINE_ADDON}>
+          {open ? <span className={OUTLINE_CELL}>{open}</span> : null}
+          {actions ? <span className={OUTLINE_CELL}>{actions}</span> : null}
+          <span className={OUTLINE_CELL}>{copy}</span>
+        </InputGroupAddon>
+      ) : (
+        <InputGroupAddon align="inline-end" className="gap-0.5">
+          {open}
+          {actions}
+          {copy}
+        </InputGroupAddon>
+      )}
     </InputGroup>
   );
 }

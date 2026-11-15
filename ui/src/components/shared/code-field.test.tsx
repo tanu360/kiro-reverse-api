@@ -57,6 +57,29 @@ describe("CopyField", () => {
     expect(box.querySelectorAll("wbr")).toHaveLength(2);
   });
 
+  it("draws the outline look with no fill and each button in its own cell", () => {
+    const url = "https://kiro-proxy.tail1234.ts.net";
+    renderWithProviders(
+      <CopyField
+        label="Link"
+        multiline
+        openHref={url}
+        openLabel="Open link"
+        value={url}
+        variant="outline"
+      />,
+    );
+    const group = screen.getByRole("textbox", { name: "Link" }).closest("[data-slot=copy-field]");
+    expect(group).toHaveClass("bg-transparent", "border-input");
+    expect(screen.getByRole("textbox", { name: "Link" })).not.toHaveClass("font-mono");
+    for (const control of [
+      screen.getByRole("link", { name: "Open link" }),
+      screen.getByRole("button", { name: "Copy" }),
+    ]) {
+      expect(control.parentElement).toHaveClass("border-s");
+    }
+  });
+
   it("puts the open link before the copy button, opening the address in a new tab", () => {
     const url = "https://proxy.example.com/v1";
     renderWithProviders(
