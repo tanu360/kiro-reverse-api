@@ -71,11 +71,14 @@ export const STAT_TREND_HEIGHT: Record<StatTrendPlacement, number> = { inline: 2
 /** 0.125 -> "+12.5%", -0.2 -> "-20%", 0 -> "0%" (in the UI language's number format). */
 export function formatDelta(fraction: number, lang?: Lang): string {
   const rounded = Math.round(fraction * 1000) / 1000;
+  // Intl writes a hyphen for the sign; a fall reads as a true minus sign, as wide as the plus.
   return numberFormat(lang, {
     style: "percent",
     maximumFractionDigits: 1,
     signDisplay: "exceptZero",
-  }).format(rounded);
+  })
+    .format(rounded)
+    .replace("-", "\u2212");
 }
 
 /*

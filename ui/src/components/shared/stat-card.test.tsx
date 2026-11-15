@@ -76,9 +76,9 @@ describe("StatCard", () => {
         value="900"
       />,
     );
-    const delta = screen.getByText("-20%").closest('[data-slot="stat-delta"]');
+    const delta = screen.getByText("\u221220%").closest('[data-slot="stat-delta"]');
     expect(delta).toHaveAttribute("data-tone", "bad");
-    expect(screen.getByText("-20%").className).toMatch(/destructive/);
+    expect(screen.getByText("\u221220%").className).toMatch(/destructive/);
   });
 
   it("treats a drop as good when down is good", () => {
@@ -90,9 +90,9 @@ describe("StatCard", () => {
         value="12"
       />,
     );
-    const delta = screen.getByText("-20%").closest('[data-slot="stat-delta"]');
+    const delta = screen.getByText("\u221220%").closest('[data-slot="stat-delta"]');
     expect(delta).toHaveAttribute("data-tone", "good");
-    expect(screen.getByText("-20%").className).toMatch(/success/);
+    expect(screen.getByText("\u221220%").className).toMatch(/success/);
   });
 
   it("renders the skeleton while loading", () => {
@@ -221,7 +221,7 @@ describe("StatGroup", () => {
 describe("formatDelta", () => {
   it("formats fractions as signed percentages", () => {
     expect(formatDelta(0.125)).toBe("+12.5%");
-    expect(formatDelta(-0.2)).toBe("-20%");
+    expect(formatDelta(-0.2)).toBe("\u221220%");
     expect(formatDelta(0)).toBe("0%");
     expect(formatDelta(0.3333)).toBe("+33.3%");
   });
