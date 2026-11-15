@@ -1,4 +1,3 @@
-import { CircleCheckIcon, CircleSlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
@@ -335,28 +334,27 @@ function WideNavLink({
         </span>
         {entry.dirty ? <DirtyMark /> : null}
         {/* In the row's own flex line, so the label truncates before a pill of any width. */}
-        {entry.on === undefined ? null : (
+        {entry.on ? (
           <span className="flex shrink-0">
-            <StateBadge on={entry.on} />
+            <OnBadge />
           </span>
-        )}
+        ) : null}
       </SidebarMenuButton>
       <TooltipPopup>{entry.label}</TooltipPopup>
     </Tooltip>
   );
 }
 
-/** The section's saved On/Off, visual only: the link keeps the section name. */
-function StateBadge({ on }: { on: boolean }): JSX.Element {
+/**
+ * "On" beside a section that is switched on, visual only: the link keeps the section name. A
+ * section that is off shows nothing, so the list stays quiet and the sections that are on stand
+ * out.
+ */
+function OnBadge(): JSX.Element {
   const { t } = useT("settings");
   return (
-    <Badge
-      aria-hidden="true"
-      icon={on ? CircleCheckIcon : CircleSlashIcon}
-      size="sm"
-      tone={on ? "success" : "neutral"}
-    >
-      {on ? t("stateOn") : t("stateOff")}
+    <Badge aria-hidden="true" dot size="sm" tone="success">
+      {t("stateOn")}
     </Badge>
   );
 }
@@ -533,7 +531,7 @@ function SectionNav({
                       <HugeiconsIcon aria-hidden="true" icon={entry.icon} />
                       {entry.label}
                       {entry.dirty ? <DirtyMark /> : null}
-                      {entry.on === undefined ? null : <StateBadge on={entry.on} />}
+                      {entry.on ? <OnBadge /> : null}
                     </a>
                   </li>
                 ))}

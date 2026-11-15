@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 /*
  * The one notice, after Vercel's Geist Note in its filled form: a light fill of the tone with a
  * hairline a step deeper, the text and the outline icon in a dark step of the tone, and the
- * action (AlertAction) a solid button in the tone with a white label (Button variant "tone",
- * which reads --notice-btn). The colours are the --notice-* tokens in index.css. 8 px corners
+ * action (AlertAction) an outline button in the tone (Button variant "tone", which reads
+ * --badge-fg). The colours are the --notice-* tokens in index.css. 8 px corners
  * like the controls; a long message wraps. With an action on a wide screen the text centres on
  * the button and the padding beside the button tightens. `size="sm"` is the inline notice:
  * 12 px text and a 14 px icon, for a line under a card or table (a server-changed note, a memory
@@ -27,14 +27,14 @@ const alertVariants = cva(
       },
       variant: {
         default:
-          "[--badge-bg:var(--notice-neutral-bg)] [--badge-disc:var(--notice-neutral-fg)] [--badge-fg:var(--notice-neutral-fg)] [--notice-btn:var(--notice-neutral-btn)] [--notice-line:var(--notice-neutral-line)]",
+          "[--badge-bg:var(--notice-neutral-bg)] [--badge-disc:var(--notice-neutral-fg)] [--badge-fg:var(--notice-neutral-fg)] [--notice-line:var(--notice-neutral-line)]",
         error:
-          "[--badge-bg:var(--notice-error-bg)] [--badge-disc:var(--notice-error-fg)] [--badge-fg:var(--notice-error-fg)] [--notice-btn:var(--notice-error-btn)] [--notice-line:var(--notice-error-line)]",
-        info: "[--badge-bg:var(--notice-info-bg)] [--badge-disc:var(--notice-info-fg)] [--badge-fg:var(--notice-info-fg)] [--notice-btn:var(--notice-info-btn)] [--notice-line:var(--notice-info-line)]",
+          "[--badge-bg:var(--notice-error-bg)] [--badge-disc:var(--notice-error-fg)] [--badge-fg:var(--notice-error-fg)] [--notice-line:var(--notice-error-line)]",
+        info: "[--badge-bg:var(--notice-info-bg)] [--badge-disc:var(--notice-info-fg)] [--badge-fg:var(--notice-info-fg)] [--notice-line:var(--notice-info-line)]",
         success:
-          "[--badge-bg:var(--notice-success-bg)] [--badge-disc:var(--notice-success-fg)] [--badge-fg:var(--notice-success-fg)] [--notice-btn:var(--notice-success-btn)] [--notice-line:var(--notice-success-line)]",
+          "[--badge-bg:var(--notice-success-bg)] [--badge-disc:var(--notice-success-fg)] [--badge-fg:var(--notice-success-fg)] [--notice-line:var(--notice-success-line)]",
         warning:
-          "[--badge-bg:var(--notice-warning-bg)] [--badge-disc:var(--notice-warning-fg)] [--badge-fg:var(--notice-warning-fg)] [--notice-btn:var(--notice-warning-btn)] [--notice-line:var(--notice-warning-line)]",
+          "[--badge-bg:var(--notice-warning-bg)] [--badge-disc:var(--notice-warning-fg)] [--badge-fg:var(--notice-warning-fg)] [--notice-line:var(--notice-warning-line)]",
       },
     },
   },

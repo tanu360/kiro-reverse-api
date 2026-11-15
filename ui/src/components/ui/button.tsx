@@ -130,10 +130,10 @@ export const buttonVariants = cva(
           "border-transparent text-primary-foreground hover:bg-primary-foreground/14 data-pressed:bg-primary-foreground/14",
         "on-primary-danger":
           "border-transparent text-primary-foreground hover:bg-destructive-solid data-pressed:bg-destructive-solid hover:text-destructive-solid-foreground data-pressed:text-destructive-solid-foreground",
-        // The action inside a notice (Alert's Retry, Dismiss, Set up): a solid button in the
-        // notice's tone (its --notice-btn) with a white label, at least 4.6:1 in both themes, and
-        // a step darker on hover and while pressed.
-        tone: "border-transparent bg-(--notice-btn,var(--foreground)) text-white hover:bg-[color-mix(in_oklab,var(--notice-btn,var(--foreground))_86%,black)] data-pressed:bg-[color-mix(in_oklab,var(--notice-btn,var(--foreground))_86%,black)]",
+        // The action inside a notice (Alert's Retry, Dismiss, Set up): an outline in the notice's
+        // tone, its text colour (--badge-fg) for the label and the border at 45%, with no fill,
+        // so it sits in the notice instead of outweighing its text. Hover and press tint it.
+        tone: "border-[color-mix(in_oklab,var(--badge-fg,var(--foreground))_45%,transparent)] bg-transparent text-(--badge-fg,var(--foreground)) hover:bg-[color-mix(in_oklab,var(--badge-fg,var(--foreground))_10%,transparent)] data-pressed:bg-[color-mix(in_oklab,var(--badge-fg,var(--foreground))_10%,transparent)]",
         // Supporting actions beside the purple primary (Refresh models, Edit, Restore from file,
         // Clear, a clean Save): a soft neutral fill with no border (coss ui / shadcn secondary),
         // a step deeper on hover and while pressed. The fill is the foreground mixed into the

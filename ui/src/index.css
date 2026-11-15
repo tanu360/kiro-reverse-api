@@ -994,54 +994,43 @@
 /*
  * Notice colours (components/ui/alert.tsx), after Vercel's Geist Note in its filled form: a light
  * fill of the tone with a hairline a step deeper, the text and icon in a dark step of the tone,
- * and the action a solid button in the tone with a white label. Every label is at least 4.6:1
- * on its fill and every button label at least 4.6:1 on its button, in both themes. The fills are
- * opaque. The dark theme lifts the fills and text a step, so a notice reads on the near-black
- * card, and darkens the buttons so the white label holds.
+ * and the action an outline in the text's colour (Button variant "tone"). Every label is at
+ * least 4.6:1 on its fill in both themes, the action's label included. The fills are opaque.
+ * The dark theme lifts the fills and text a step, so a notice reads on the near-black card.
  */
 :root {
   --notice-neutral-fg: rgb(0 0 0 / 70%);
   --notice-neutral-bg: rgb(0 0 0 / 6%);
   --notice-neutral-line: transparent;
-  --notice-neutral-btn: #4d4d4d;
   --notice-info-fg: #7820bc;
   --notice-info-bg: #f9f1fe;
   --notice-info-line: #f3e6fd;
-  --notice-info-btn: #7820bc;
   --notice-success-fg: #297a3a;
   --notice-success-bg: #ebf9ee;
   --notice-success-line: #dcf4e2;
-  --notice-success-btn: #297a3a;
   --notice-warning-fg: #a35200;
   --notice-warning-bg: #fff4d6;
   --notice-warning-line: #ffecbd;
-  --notice-warning-btn: #a35200;
   --notice-error-fg: #cb2a2f;
   --notice-error-bg: #ffebeb;
   --notice-error-line: #ffdede;
-  --notice-error-btn: #cb2a2f;
 }
 .dark {
   --notice-neutral-fg: rgb(255 255 255 / 80%);
   --notice-neutral-bg: rgb(255 255 255 / 12%);
   --notice-neutral-line: rgb(255 255 255 / 6%);
-  --notice-neutral-btn: #5c5c66;
   --notice-info-fg: #d3a8ff;
   --notice-info-bg: #3b2152;
   --notice-info-line: #4b2b68;
-  --notice-info-btn: #9046ff;
   --notice-success-fg: #7fd890;
   --notice-success-bg: #153b21;
   --notice-success-line: #1d4e2c;
-  --notice-success-btn: #1c8238;
   --notice-warning-fg: #ffbf4d;
   --notice-warning-bg: #43290a;
   --notice-warning-line: #583812;
-  --notice-warning-btn: #b85600;
   --notice-error-fg: #ff8a8e;
   --notice-error-bg: #4e1c20;
   --notice-error-line: #672428;
-  --notice-error-btn: #d93036;
 }
 
 @theme inline {

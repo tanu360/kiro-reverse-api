@@ -22,7 +22,6 @@
   "saveFailed": "Could not save settings: {reason}",
   "learnMore": "Learn more",
   "stateOn": "On",
-  "stateOff": "Off",
   "serverChanged": "Changed on the server",
   "reload": "Reload",
   "remove": "Remove",

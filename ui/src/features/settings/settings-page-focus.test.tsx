@@ -405,7 +405,7 @@ describe("settings deep link", () => {
       const link = within(nav()).getByRole("link", { name: "Alerts" });
       expect(link).toHaveAttribute("aria-current", "true");
 
-      // The On/Off pills have loaded and pushed the chip past the row's right edge.
+      // The On pills have loaded and pushed the chip past the row's right edge.
       const viewport = nav().querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
       const row = link.closest("ul")?.parentElement?.parentElement;
       if (!viewport || !row) throw new Error("chip row not rendered");
