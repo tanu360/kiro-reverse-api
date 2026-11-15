@@ -1,4 +1,5 @@
 import { Fragment, type JSX, type ReactNode } from "react";
+import { HighlightedCode } from "@/components/shared/code-block";
 import { CopyButton } from "@/components/shared/copy-button";
 import { OpenLinkButton } from "@/components/shared/open-link-button";
 import {
@@ -7,6 +8,7 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group";
+import type { CodeLanguage } from "@/lib/highlight";
 import { useT } from "@/lib/i18n";
 import { cn, keyByText } from "@/lib/utils";
 
@@ -79,6 +81,17 @@ const OUTLINE_GROUP = "items-stretch border-input bg-transparent hover:bg-transp
 const OUTLINE_ADDON = "gap-0 self-stretch pe-0";
 const OUTLINE_CELL = "flex items-center self-stretch border-input border-s px-0.5";
 
+/*
+ * The code look (a command to paste in a terminal): one highlighted line that never wraps and
+ * scrolls sideways, fading at an edge it can still scroll past. A 20 px line with 7 px above and
+ * below fills the 36 px field (40 on touch, centred); the copy button sits in its own cell behind
+ * the field's hairline, so the text scrolls under the cell's edge and never under the button.
+ */
+const CODE_GROUP = "min-h-9 items-stretch pointer-coarse:min-h-10";
+const CODE_TEXT =
+  "scroll-fade-x block min-w-0 flex-1 cursor-text select-all self-center overflow-x-auto overscroll-x-contain text-clip whitespace-pre py-[7px] ps-3 pe-3 font-mono text-foreground text-meta leading-5 outline-none";
+const CODE_CELL = "flex items-center self-stretch border-field-border border-s px-0.5";
+
 /**
  * A value to copy (a URL, a key, a command) in a read-only field: mono text in the soft field,
  * with a copy button and, for a link, an open button at its end. One line scrolls inside the
@@ -86,6 +99,7 @@ const OUTLINE_CELL = "flex items-center self-stretch border-input border-s px-0.
  * spaces) only between its words, a URL at its slashes (then anywhere), anything else (a key, a
  * token) at any character, so it fills every line evenly instead of leaving "sk-" alone on the
  * first one.
+ * `language` shows a command as one highlighted line instead (CODE_TEXT).
  * Inside a Base UI Field the input takes the field's label; otherwise pass `label`. The
  * multiline value is a read-only textbox (a tab stop), named by `label` or by `labelledBy`.
  */
@@ -97,6 +111,7 @@ export function CopyField({
   copyLabel,
   copiedMessage,
   multiline = false,
+  language,
   openHref,
   openLabel,
   actions,
@@ -115,6 +130,11 @@ export function CopyField({
   copyLabel?: string;
   copiedMessage?: string;
   multiline?: boolean;
+  /**
+   * Shows the value as code in this language: one highlighted line that scrolls sideways, with
+   * the copy button in its own cell (a command). Named by `label` or `labelledBy`.
+   */
+  language?: CodeLanguage;
   /** Adds an open button that opens this address in a new tab. */
   openHref?: string;
   /** The open button's name, required with `openHref` (without it no open button shows). */
@@ -144,6 +164,28 @@ export function CopyField({
       variant="quiet"
     />
   );
+  if (language) {
+    return (
+      <InputGroup className={cn(CODE_GROUP, className)} data-slot="copy-field">
+        <InputGroupText
+          aria-label={labelledBy ? undefined : label}
+          aria-labelledby={labelledBy}
+          aria-readonly="true"
+          className={CODE_TEXT}
+          id={id}
+          role="textbox"
+          tabIndex={0}
+        >
+          <HighlightedCode code={shown} language={language} />
+        </InputGroupText>
+        <InputGroupAddon align="inline-end" className={OUTLINE_ADDON}>
+          {open ? <span className={CODE_CELL}>{open}</span> : null}
+          {actions ? <span className={CODE_CELL}>{actions}</span> : null}
+          <span className={CODE_CELL}>{copy}</span>
+        </InputGroupAddon>
+      </InputGroup>
+    );
+  }
   return (
     <InputGroup
       className={cn(multiline && MULTILINE_GROUP, outline && OUTLINE_GROUP, className)}

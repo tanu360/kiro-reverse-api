@@ -98,4 +98,20 @@ describe("CopyField", () => {
     renderWithProviders(<CopyField label="Key" value="sk-123" />);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
+
+  it("shows a command as code on one line that scrolls, the copy button in its own cell", () => {
+    const command = "git pull && docker compose up -d --build";
+    renderWithProviders(<CopyField label="Command" language="bash" value={command} />);
+    const box = screen.getByRole("textbox", { name: "Command" });
+    expect(box).toHaveAttribute("aria-readonly", "true");
+    expect(box).toHaveAttribute("tabindex", "0");
+    // One line that never wraps: it scrolls sideways, fading at an edge with more past it.
+    expect(box).toHaveClass("whitespace-pre", "overflow-x-auto", "scroll-fade-x");
+    expect(box.querySelector("code")?.textContent).toBe(command);
+    expect(box.querySelector("wbr")).toBeNull();
+    // The copy button sits in a cell beside the text, not on top of it.
+    const copy = screen.getByRole("button", { name: "Copy" });
+    expect(box.contains(copy)).toBe(false);
+    expect(copy.parentElement).toHaveClass("border-s");
+  });
 });

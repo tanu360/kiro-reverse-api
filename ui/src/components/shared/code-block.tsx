@@ -76,6 +76,45 @@ function lineText(line: ThemedToken[]): string {
 }
 
 /**
+ * The code in a <code> element, its tokens coloured once Shiki has them (the --code-token-*
+ * colours); the plain text until then, without a language, or if highlighting fails.
+ */
+export function HighlightedCode({
+  code,
+  language,
+}: {
+  code: string;
+  language?: CodeLanguage;
+}): JSX.Element {
+  const lines = useHighlightedLines(code, language);
+  return (
+    <code>
+      {lines
+        ? keyByText(lines, lineText).map(({ key, item: line }, index) => (
+            <Fragment key={key}>
+              {line.map((token) => (
+                <span
+                  key={token.offset}
+                  style={{
+                    color: token.color,
+                    fontStyle:
+                      token.fontStyle !== undefined && token.fontStyle & ITALIC
+                        ? "italic"
+                        : undefined,
+                  }}
+                >
+                  {token.content}
+                </span>
+              ))}
+              {index < lines.length - 1 ? "\n" : null}
+            </Fragment>
+          ))
+        : code}
+    </code>
+  );
+}
+
+/**
  * A block of code (a config file, a command) with its title and a copy button in a strip above
  * it. The code is mono on the inset well and scrolls sideways inside the block, so long lines
  * never widen the page; while it scrolls, the block is a named region. `wrap` wraps long lines
@@ -120,37 +159,12 @@ export function CodeBlock({
 }): JSX.Element {
   const preRef = useRef<HTMLPreElement>(null);
   const scrolls = useScrolls(preRef);
-  const lines = useHighlightedLines(code, language);
   const preClassName = cn(
     "max-w-full overflow-x-auto p-3 font-mono text-foreground text-meta leading-relaxed focus-outline-inset",
     wrap && "whitespace-pre-wrap wrap-anywhere",
     capHeight && "max-h-72 overflow-y-auto",
   );
-  const content = (
-    <code>
-      {lines
-        ? keyByText(lines, lineText).map(({ key, item: line }, index) => (
-            <Fragment key={key}>
-              {line.map((token) => (
-                <span
-                  key={token.offset}
-                  style={{
-                    color: token.color,
-                    fontStyle:
-                      token.fontStyle !== undefined && token.fontStyle & ITALIC
-                        ? "italic"
-                        : undefined,
-                  }}
-                >
-                  {token.content}
-                </span>
-              ))}
-              {index < lines.length - 1 ? "\n" : null}
-            </Fragment>
-          ))
-        : code}
-    </code>
-  );
+  const content = <HighlightedCode code={code} language={language} />;
   return (
     <figure
       className={cn(

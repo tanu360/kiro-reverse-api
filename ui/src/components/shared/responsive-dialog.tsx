@@ -24,6 +24,12 @@ interface ResponsiveDialogProps {
   children: ReactNode;
   footer?: ReactNode;
   /**
+   * `false` places the children between header and footer as they are, without the padded
+   * scrolling panel: for a body that sets its own height and scrolls in its own parts (the update
+   * dialog's two panes).
+   */
+  panel?: boolean;
+  /**
    * Width, named after the Tailwind max-w step (dialog.tsx DIALOG_SIZE_CLASS): sm 384, md 448,
    * lg 512 (the default), xl 576, 2xl 672 px; on phones at most 90vw.
    */
@@ -99,6 +105,7 @@ export function ResponsiveDialog({
   description,
   children,
   footer,
+  panel = true,
   size = "lg",
   anchor = "center",
   onBack,
@@ -129,7 +136,7 @@ export function ResponsiveDialog({
           <TitleRow backLabel={back} onBack={onBack} title={title} Title={DialogTitle} />
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        <DialogPanel>{children}</DialogPanel>
+        {panel ? <DialogPanel>{children}</DialogPanel> : children}
         {footer ? <DialogFooter>{footer}</DialogFooter> : null}
       </DialogPopup>
     </Dialog>

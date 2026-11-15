@@ -1,17 +1,22 @@
 import {
   ArrowRight02Icon,
-  DownloadIcon,
   ExternalLinkIcon,
   SparklesIcon,
   WrenchIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type JSX, useMemo, useState } from "react";
+import { type JSX, type ReactNode, useId, useMemo, useState } from "react";
+import { ChoiceCard } from "@/components/shared/choice-card";
 import { CopyField } from "@/components/shared/code-field";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
+import {
+  Radio,
+  RadioGroup,
+  RadioGroupPrimitive,
+  RadioPrimitive,
+} from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
@@ -20,7 +25,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import type { RemoteVersionJson, VersionResponse } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
-import { keyByText } from "@/lib/utils";
+import { cn, keyByText } from "@/lib/utils";
 import { GITHUB_URL } from "./user-menu";
 
 /*
@@ -35,11 +40,6 @@ const IMAGE_COMMAND = "docker pull ghcr.io/tanu360/kiro-reverse-api:latest";
 const RELEASE_DOWNLOAD = "https://github.com/tanu360/kiro-reverse-api/releases/latest/download";
 
 export type UpdateMethod = "compose" | "image" | "binary";
-const UPDATE_METHODS = [
-  { id: "compose", label: "shell.update.methodCompose" },
-  { id: "image", label: "shell.update.methodImage" },
-  { id: "binary", label: "shell.update.methodBinary" },
-] as const satisfies readonly { id: UpdateMethod; label: string }[];
 
 /** The platforms build-release.sh packages, by GOOS/GOARCH: the archive's platform part and the locale key of the name the steps show. */
 const RELEASE_TARGETS: Record<string, { name: string; label: string }> = {
@@ -189,9 +189,11 @@ export function UpdateDialog({
   // Only an https link from the remote file is followed; otherwise the repository.
   const projectUrl = download.startsWith("https://") ? download : GITHUB_URL;
   const next = latest?.version ? stripV(latest.version) : "";
-  // Phones set no tab height (TabBody), so a centred dialog would grow and shrink round its
-  // middle on a tab switch and move the tab strip under the finger. Top-anchored, it fills the
-  // 90dvh box and stays put. From sm up every tab is one height, so it stays centred.
+  const changes = useMemo(() => splitChangelog(latest?.changelog), [latest?.changelog]);
+  const hasChanges = changes.news.length + changes.fixes.length > 0;
+  // Phones: top-anchored, the dialog fills the 90dvh box whatever it shows, one pane at a time
+  // behind two tabs. From sm up the panes sit side by side in a body of one fixed height. Either
+  // way no tab, filter or method changes the dialog's height: each pane scrolls on its own.
   const phone = useMediaQuery("max-sm");
 
   return (
@@ -211,6 +213,8 @@ export function UpdateDialog({
       }
       onOpenChange={onOpenChange}
       open={open}
+      panel={false}
+      size={hasChanges ? "3xl" : "lg"}
       title={
         // The title, then a pill that reads the change: the running version, an arrow, the new
         // one in purple. It wraps under the title when a translation is long.
@@ -234,108 +238,195 @@ export function UpdateDialog({
         </span>
       }
     >
-      <UpdateTabs changelog={latest?.changelog} server={server} />
+      <UpdateBody changes={changes} latest={next} phone={phone} server={server} />
     </ResponsiveDialog>
   );
 }
 
-type UpdateTab = "news" | "fixes" | "how";
+/*
+ * The body under the header: a hairline, then one fixed height from sm up (480 px), so the
+ * dialog never grows or shrinks; on phones it takes what the 90dvh dialog leaves.
+ */
+const BODY = "flex min-h-0 flex-1 flex-col border-border-subtle border-t sm:h-120 sm:flex-none";
+
+type Pane = "changes" | "how";
 
 /**
- * A tab's body. One fixed height for every tab from sm up, so the dialog and its footer stay put
- * on a switch; a long list scrolls inside the dialog's own scroll box (ScrollArea, as DialogPanel),
- * fading at the edge it can still scroll past. Phones set no height: the list shows whole and the
- * dialog's panel scrolls instead (90dvh), so there is no scroller inside a scroller, and no cut
- * that falls between two items unseen. flex-none: the panel's flex-1 basis would win over the
- * height. The scroll box is the tab stop (Base UI makes it one while it overflows), so the panel
- * is not one too; the scroll-fade-y utility stays off the panel, since Base UI waits for a
- * panel's animations to end before it removes it, and that scroll-driven one never ends.
+ * The changes and How to update. From sm up they are two panes side by side, How to update on
+ * the inset tint at the end; on phones two underlined tabs show one at a time. Without a
+ * changelog How to update is the whole body.
  */
-function TabBody({ value, children }: { value: UpdateTab; children: JSX.Element }): JSX.Element {
-  return (
-    <TabsPanel className="sm:h-95 sm:flex-none" tabIndex={-1} value={value}>
-      {/* 8 px of room at the end, borrowed from the dialog's padding: a copy field's button
-          box reaches 7 px past the field (input-group -me-2), and the scroll box would clip it. */}
-      <ScrollArea className="-me-2 w-auto" overscrollContain scrollFade>
-        <div className="pe-2">{children}</div>
-      </ScrollArea>
-    </TabsPanel>
-  );
-}
-
-/**
- * New, Fixes and How to update as underlined tabs (the API page's Client setup tabs),
- * each list with its count. A tab with nothing in it is left out, and How to update alone shows
- * without a tab strip.
- */
-function UpdateTabs({
-  changelog,
+function UpdateBody({
+  changes,
+  latest,
+  phone,
   server,
 }: {
-  changelog: string | undefined;
+  changes: { news: ChangelogLine[]; fixes: ChangelogLine[] };
+  /** The new version, for the step that says what the sidebar shows after the update. */
+  latest: string;
+  phone: boolean;
   server?: VersionResponse;
 }): JSX.Element {
   const { t, lang } = useT();
-  const { news, fixes } = useMemo(() => splitChangelog(changelog), [changelog]);
-  const tabs = [
-    ...(news.length > 0
-      ? [
-          {
-            value: "news" as const,
-            label: t("shell.update.tabNews"),
-            count: news.length,
-            icon: SparklesIcon,
-          },
-        ]
-      : []),
-    ...(fixes.length > 0
-      ? [
-          {
-            value: "fixes" as const,
-            label: t("shell.update.tabFixes"),
-            count: fixes.length,
-            icon: WrenchIcon,
-          },
-        ]
-      : []),
-    { value: "how" as const, label: t("shell.update.howTo"), count: undefined, icon: DownloadIcon },
-  ];
-  const [tab, setTab] = useState<UpdateTab>(tabs[0]?.value ?? "how");
+  const [pane, setPane] = useState<Pane>("changes");
+  const total = changes.news.length + changes.fixes.length;
 
-  if (tabs.length === 1) return <HowToUpdate server={server} />;
-  return (
-    <Tabs className="gap-4" onValueChange={(value) => setTab(value as UpdateTab)} value={tab}>
-      <TabsList aria-label={t("shell.update.title")} variant="underline">
-        {tabs.map((item) => (
-          <TabsTab key={item.value} value={item.value}>
-            <HugeiconsIcon aria-hidden="true" className="max-sm:hidden" icon={item.icon} />
-            {item.label}
-            {item.count === undefined ? null : (
+  if (total === 0) {
+    return (
+      <div className={BODY}>
+        <HowToUpdate heading={!phone} latest={latest} server={server} />
+      </div>
+    );
+  }
+  if (phone) {
+    return (
+      <Tabs
+        className="min-h-0 flex-1 gap-0"
+        onValueChange={(value) => setPane(value as Pane)}
+        value={pane}
+      >
+        {/* The strip lines up with the dialog's 16 px phone edge, as the header above it. */}
+        <div className="px-4">
+          <TabsList aria-label={t("shell.update.title")} variant="underline">
+            <TabsTab value="changes">
+              {t("shell.update.tabChanges")}
               <Badge
                 className="min-w-5"
                 size="sm"
-                tone={item.value === tab ? "primary" : "neutral"}
+                tone={pane === "changes" ? "primary" : "neutral"}
               >
-                {formatNumber(item.count, lang)}
+                {formatNumber(total, lang)}
               </Badge>
-            )}
-          </TabsTab>
-        ))}
-      </TabsList>
-      {news.length > 0 ? (
-        <TabBody value="news">
-          <ChangeList lines={news} />
-        </TabBody>
-      ) : null}
-      {fixes.length > 0 ? (
-        <TabBody value="fixes">
-          <ChangeList lines={fixes} />
-        </TabBody>
-      ) : null}
-      <TabBody value="how">
-        <HowToUpdate server={server} />
-      </TabBody>
-    </Tabs>
+            </TabsTab>
+            <TabsTab value="how">{t("shell.update.howTo")}</TabsTab>
+          </TabsList>
+        </div>
+        {/* The scroll box inside is the tab stop while it overflows, so the panel is not one. */}
+        <TabsPanel className="flex min-h-0 flex-col" tabIndex={-1} value="changes">
+          <ChangesPane fixes={changes.fixes} news={changes.news} />
+        </TabsPanel>
+        <TabsPanel className="flex min-h-0 flex-col" tabIndex={-1} value="how">
+          <HowToUpdate heading={false} latest={latest} server={server} />
+        </TabsPanel>
+      </Tabs>
+    );
+  }
+  return (
+    <div className={cn(BODY, "grid grid-cols-[minmax(0,1fr)_22rem]")}>
+      <ChangesPane fixes={changes.fixes} news={changes.news} />
+      <div className="flex min-h-0 flex-col border-border-subtle border-s bg-surface-inset">
+        <HowToUpdate heading latest={latest} server={server} />
+      </div>
+    </div>
+  );
+}
+
+/** A pane's top row: one 32 px line (the filter's height), so both panes' rows line up. */
+const PANE_TOP = "flex min-h-8 shrink-0 items-center px-6 pt-4 pb-3 max-sm:px-4";
+/** A pane's scrolling part: its own scroll box, fading the edge that has more past it. */
+const PANE_SCROLL = "min-h-0 flex-1";
+const PANE_CONTENT = "px-6 pb-6 max-sm:px-4";
+
+type ChangeFilter = "all" | "news" | "fixes";
+
+/**
+ * The changelog. With both kinds of lines, a filter shows All (New, then Fixes, each under its
+ * label), New or Fixes, with their counts; with one kind, its name heads the list instead.
+ */
+function ChangesPane({
+  news,
+  fixes,
+}: {
+  news: ChangelogLine[];
+  fixes: ChangelogLine[];
+}): JSX.Element {
+  const { t, lang } = useT();
+  const [filter, setFilter] = useState<ChangeFilter>("all");
+  const both = news.length > 0 && fixes.length > 0;
+  const shown: ChangeFilter = both ? filter : news.length > 0 ? "news" : "fixes";
+  const options: { value: ChangeFilter; label: string; count: number }[] = [
+    { value: "all", label: t("shell.update.filterAll"), count: news.length + fixes.length },
+    { value: "news", label: t("shell.update.tabNews"), count: news.length },
+    { value: "fixes", label: t("shell.update.tabFixes"), count: fixes.length },
+  ];
+
+  return (
+    <div className="flex min-h-0 flex-col">
+      <div className={PANE_TOP}>
+        {both ? (
+          // A radio group: one tab stop, the arrow keys move the choice.
+          <SegmentedControl
+            render={
+              <RadioGroupPrimitive
+                aria-label={t("shell.update.filter")}
+                onValueChange={(value) => setFilter(value as ChangeFilter)}
+                value={filter}
+              />
+            }
+            size="sm"
+          >
+            {options.map((option) => (
+              <SegmentedControlItem
+                className="gap-1.5"
+                key={option.value}
+                render={<RadioPrimitive.Root value={option.value} />}
+              >
+                {option.label}
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {formatNumber(option.count, lang)}
+                </span>
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
+        ) : (
+          <h3 className="font-semibold text-heading">
+            {shown === "news" ? t("shell.update.tabNews") : t("shell.update.tabFixes")}
+          </h3>
+        )}
+      </div>
+      <ScrollArea className={PANE_SCROLL} overscrollContain scrollFade>
+        <div className={cn(PANE_CONTENT, "flex flex-col gap-5")}>
+          {shown !== "fixes" ? (
+            <ChangeGroup
+              icon={SparklesIcon}
+              label={shown === "all" ? t("shell.update.tabNews") : undefined}
+              lines={news}
+            />
+          ) : null}
+          {shown !== "news" ? (
+            <ChangeGroup
+              icon={WrenchIcon}
+              label={shown === "all" ? t("shell.update.tabFixes") : undefined}
+              lines={fixes}
+            />
+          ) : null}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+/** One list of changes, under a small label with its icon when All shows both lists. */
+function ChangeGroup({
+  icon,
+  label,
+  lines,
+}: {
+  icon: typeof SparklesIcon;
+  label?: string;
+  lines: ChangelogLine[];
+}): JSX.Element {
+  const id = useId();
+  if (!label) return <ChangeList lines={lines} />;
+  return (
+    <div className="flex flex-col gap-2.5">
+      <p className="flex items-center gap-1.5 font-medium text-meta text-muted-foreground" id={id}>
+        <HugeiconsIcon aria-hidden="true" className="size-3.5" icon={icon} />
+        {label}
+      </p>
+      <ChangeList labelledBy={id} lines={lines} />
+    </div>
   );
 }
 
@@ -343,9 +434,16 @@ function UpdateTabs({
  * A list, one change per line: the release's emoji as the marker (a dot when the line has none),
  * 14 px text with room between items, and a remaining tag such as "New:" in medium weight.
  */
-function ChangeList({ lines }: { lines: ChangelogLine[] }): JSX.Element {
+function ChangeList({
+  lines,
+  labelledBy,
+}: {
+  lines: ChangelogLine[];
+  /** The label the list sits under, when All shows both lists. */
+  labelledBy?: string;
+}): JSX.Element {
   return (
-    <ul className="flex flex-col gap-2.5">
+    <ul aria-labelledby={labelledBy} className="flex flex-col gap-2.5">
       {lines.map((line) => (
         <li className="flex gap-2.5 text-sm leading-relaxed" key={line.key}>
           <span
@@ -364,83 +462,178 @@ function ChangeList({ lines }: { lines: ChangelogLine[] }): JSX.Element {
   );
 }
 
+const UPDATE_METHODS = [
+  { id: "compose", label: "shell.update.methodCompose", hint: "shell.update.composeHint" },
+  { id: "image", label: "shell.update.methodImage", hint: "shell.update.imageHint" },
+  { id: "binary", label: "shell.update.methodBinary", hint: null },
+] as const satisfies readonly { id: UpdateMethod; label: string; hint: string | null }[];
+
 /**
- * The three ways to update, in a segmented control that opens on the one that fits this server
- * (preferredMethod); the binary steps name the archive for the server's own platform, which may
- * not be the browser's.
+ * The three ways to update as radio cards, opening on the one that fits this server
+ * (preferredMethod, marked Recommended once the server has said what it runs on), then that
+ * way's steps. The binary steps name the archive for the server's own platform, which may not be
+ * the browser's; its card says which.
  */
-function HowToUpdate({ server }: { server?: VersionResponse }): JSX.Element {
+function HowToUpdate({
+  heading,
+  latest,
+  server,
+}: {
+  /** Shows "How to update" over the cards (a phone's tab already says it). */
+  heading: boolean;
+  latest: string;
+  server?: VersionResponse;
+}): JSX.Element {
   const { t } = useT();
-  const [method, setMethod] = useState<UpdateMethod>(() => preferredMethod(server));
+  const preferred = preferredMethod(server);
+  const [method, setMethod] = useState<UpdateMethod>(preferred);
   const archive = releaseArchive(server);
-  // Windows runs the command in PowerShell; the step says so.
-  const binaryStep = archive.windows ? "shell.update.binaryStepWindows" : "shell.update.binaryStep";
+  // Only a server that reported its platform or container gets a recommendation.
+  const reported = Boolean(server?.docker || server?.os);
   const env = { env: "DATA_DIR" };
+  const reload = t("shell.update.reload", { latest });
+
+  let steps: UpdateStep[];
+  if (method === "compose") {
+    steps = [
+      { key: "open", body: t("shell.update.composeOpen") },
+      {
+        key: "run",
+        body: <CommandStep command={COMPOSE_COMMAND} text={t("shell.update.composeRun")} />,
+      },
+      { key: "reload", body: reload },
+    ];
+  } else if (method === "image") {
+    steps = [
+      {
+        key: "pull",
+        body: <CommandStep command={IMAGE_COMMAND} text={t("shell.update.imageStep")} />,
+      },
+      { key: "recreate", body: t("shell.update.imageRecreate") },
+      { key: "reload", body: reload },
+    ];
+  } else {
+    const download = archive.windows
+      ? "shell.update.binaryDownloadWindows"
+      : "shell.update.binaryDownload";
+    steps = [
+      { key: "stop", body: t("shell.update.binaryStop") },
+      {
+        key: "download",
+        body: (
+          <CommandStep
+            command={binaryCommand(archive)}
+            text={
+              <CodeText
+                code={{ folder: archive.folder }}
+                text={t(download, { platform: t(archive.platformLabel) })}
+              />
+            }
+          />
+        ),
+      },
+      {
+        key: "start",
+        body: (
+          <>
+            <p>
+              <CodeText code={env} text={t("shell.update.binaryStart")} />
+            </p>
+            <p className="text-pretty text-muted-foreground text-xs leading-normal">
+              <CodeText code={env} text={t("shell.update.binaryNoEnv")} />
+              {archive.known ? null : <> {t("shell.update.binaryOther")}</>}
+            </p>
+          </>
+        ),
+      },
+    ];
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* A radio group: one tab stop, the arrow keys move the choice. */}
-      <SegmentedControl
-        render={
-          <RadioGroupPrimitive
+    <>
+      {heading ? (
+        <div className={PANE_TOP}>
+          <h3 className="font-semibold text-heading">{t("shell.update.howTo")}</h3>
+        </div>
+      ) : null}
+      <ScrollArea className={PANE_SCROLL} overscrollContain scrollFade>
+        <div className={cn(PANE_CONTENT, "flex flex-col gap-5", !heading && "pt-4")}>
+          <RadioGroup
             aria-label={t("shell.update.method")}
+            className="gap-2"
             onValueChange={(value) => setMethod(value as UpdateMethod)}
             value={method}
-          />
-        }
-        size="sm"
-      >
-        {UPDATE_METHODS.map((item) => (
-          <SegmentedControlItem key={item.id} render={<RadioPrimitive.Root value={item.id} />}>
-            {t(item.label)}
-          </SegmentedControlItem>
-        ))}
-      </SegmentedControl>
-      {method === "compose" ? (
-        <UpdateStep command={COMPOSE_COMMAND}>{t("shell.update.composeStep")}</UpdateStep>
-      ) : method === "image" ? (
-        <UpdateStep after={t("shell.update.imageAfter")} command={IMAGE_COMMAND}>
-          {t("shell.update.imageStep")}
-        </UpdateStep>
-      ) : (
-        <UpdateStep
-          after={
-            <>
-              <CodeText code={env} text={t("shell.update.binaryAfter")} />
-              {archive.known ? null : <> {t("shell.update.binaryOther")}</>}
-            </>
-          }
-          command={binaryCommand(archive)}
-        >
-          <CodeText
-            code={{ folder: archive.folder }}
-            text={t(binaryStep, { platform: t(archive.platformLabel) })}
-          />
-        </UpdateStep>
-      )}
-    </div>
+          >
+            {UPDATE_METHODS.map((item) => (
+              <ChoiceCard
+                control={(id) => <Radio id={id} value={item.id} />}
+                description={item.hint ? t(item.hint) : t(archive.platformLabel)}
+                key={item.id}
+                title={
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    {t(item.label)}
+                    {reported && item.id === preferred ? (
+                      <Badge size="sm" tone="primary">
+                        {t("shell.update.recommended")}
+                      </Badge>
+                    ) : null}
+                  </span>
+                }
+              />
+            ))}
+          </RadioGroup>
+          <UpdateSteps steps={steps} />
+        </div>
+      </ScrollArea>
+    </>
   );
 }
 
-/** A sentence, the command to copy (named by that sentence) and an optional note under it. */
-function UpdateStep({
-  children,
-  command,
-  after,
-}: {
-  children: JSX.Element | string;
-  command: string;
-  after?: JSX.Element | string;
-}): JSX.Element {
+interface UpdateStep {
+  key: string;
+  /** The step's sentence, and anything it needs (a command to copy). */
+  body: ReactNode;
+}
+
+/**
+ * Numbered steps, each a ring with its number joined to the next by a hairline (the add account
+ * flow's steps), then the step's sentence and anything it needs.
+ */
+function UpdateSteps({ steps }: { steps: UpdateStep[] }): JSX.Element {
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-pretty text-foreground/90 text-sm leading-relaxed" id="update-step">
-        {children}
-      </p>
-      <CopyField labelledBy="update-step" multiline value={command} />
-      {after ? (
-        <p className="text-pretty text-muted-foreground text-xs leading-normal">{after}</p>
-      ) : null}
-    </div>
+    <ol className="flex flex-col">
+      {steps.map((step, index) => {
+        const last = index === steps.length - 1;
+        return (
+          <li className="flex gap-3.5" key={step.key}>
+            <span aria-hidden="true" className="flex flex-col items-center">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border font-semibold text-meta text-muted-foreground tabular-nums">
+                {index + 1}
+              </span>
+              {last ? null : <span className="mt-1.5 w-px flex-1 bg-border" />}
+            </span>
+            <div
+              className={cn(
+                "flex min-w-0 flex-1 flex-col gap-2 pt-0.5 text-pretty text-foreground/90 text-sm leading-relaxed",
+                !last && "pb-5",
+              )}
+            >
+              {step.body}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** A step's sentence, then the command it names, as one highlighted line to copy. */
+function CommandStep({ text, command }: { text: ReactNode; command: string }): JSX.Element {
+  const id = useId();
+  return (
+    <>
+      <p id={id}>{text}</p>
+      <CopyField labelledBy={id} language="bash" value={command} />
+    </>
   );
 }

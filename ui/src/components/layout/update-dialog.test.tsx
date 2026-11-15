@@ -1,5 +1,5 @@
 import { screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VersionResponse } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
 import { renderWithProviders } from "@/test/render";
@@ -154,7 +154,34 @@ describe("preferredMethod", () => {
   });
 });
 
+/** Makes `useMediaQuery("max-sm")` match, as on a phone, until the test ends. */
+function asPhone() {
+  vi.spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === "(max-width: 639px)",
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  );
+}
+
+function listTexts(list: HTMLElement): (string | null)[] {
+  return within(list)
+    .getAllByRole("listitem")
+    .map((item) => item.textContent);
+}
+
 describe("UpdateDialog", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("shows the version change beside the title", async () => {
     renderDialog();
     expect(
@@ -162,65 +189,79 @@ describe("UpdateDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("splits the changelog into New and Fixes, each with its count", async () => {
-    const { user } = renderDialog();
-    const tabs = await screen.findAllByRole("tab");
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["New2", "Fixes2", "How to update"]);
-    expect(screen.getByRole("tab", { name: /^New/ })).toHaveAttribute("aria-selected", "true");
-    const news = screen.getByRole("tabpanel", { name: /^New/ });
-    expect(
-      within(news)
-        .getAllByRole("listitem")
-        .map((item) => item.textContent),
-    ).toEqual(["🔑New keys for every client", "📦Release binaries for six platforms"]);
+  it("shows the changes and How to update side by side, with no tabs", async () => {
+    renderDialog();
+    expect(await screen.findByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "How to update" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "New" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
 
-    await user.click(screen.getByRole("tab", { name: /Fixes/ }));
-    const fixes = await screen.findByRole("tabpanel", { name: /Fixes/ });
+  it("filters the changes: All shows New then Fixes, each list on its own", async () => {
+    const { user } = renderDialog();
+    const filter = await screen.findByRole("radiogroup", { name: "Changes to show" });
     expect(
-      within(fixes)
-        .getAllByRole("listitem")
-        .map((item) => item.textContent),
-    ).toEqual([
+      within(filter)
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent),
+    ).toEqual(["All4", "New2", "Fixes2"]);
+    expect(within(filter).getByRole("radio", { name: /^All/ })).toBeChecked();
+    expect(listTexts(screen.getByRole("list", { name: "New" }))).toEqual([
+      "🔑New keys for every client",
+      "📦Release binaries for six platforms",
+    ]);
+    const fixes = screen.getByRole("list", { name: "Fixes" });
+    expect(listTexts(fixes)).toEqual([
       "🔧max_tokens now cuts the answer on every API",
       "🔧The duplicate accounts dialog explains each step",
     ]);
     expect(within(fixes).queryByText(/Fixed:/)).toBeNull();
+
+    await user.click(within(filter).getByRole("radio", { name: /^Fixes/ }));
+    expect(screen.queryByText("New keys for every client")).toBeNull();
+    expect(screen.getByText("max_tokens now cuts the answer on every API")).toBeInTheDocument();
   });
 
-  it("moves between tabs with the arrow keys", async () => {
+  it("moves the filter with the arrow keys", async () => {
     const { user } = renderDialog();
-    const first = await screen.findByRole("tab", { name: /^New/ });
-    first.focus();
+    const all = await screen.findByRole("radio", { name: /^All/ });
+    all.focus();
     await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: /Fixes/ })).toHaveFocus();
-    await user.keyboard("{ArrowRight}{Enter}");
-    expect(screen.getByRole("tab", { name: "How to update" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.getByRole("radio", { name: /^New/ })).toBeChecked();
+    expect(screen.queryByText("max_tokens now cuts the answer on every API")).toBeNull();
   });
 
-  it("leaves out Fixes when no line is a fix, and New when every line is", async () => {
+  it("drops the filter when the changelog has one kind of line, and names that kind", async () => {
     const { unmount } = renderDialog({ changelog: "🔑 New keys\n📦 Binaries" });
-    expect((await screen.findAllByRole("tab")).map((tab) => tab.textContent)).toEqual([
-      "New2",
-      "How to update",
-    ]);
+    expect(await screen.findByRole("heading", { name: "New" })).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Changes to show" })).toBeNull();
     unmount();
 
     renderDialog({ changelog: "🔧 Fixed: a crash" });
-    expect((await screen.findAllByRole("tab")).map((tab) => tab.textContent)).toEqual([
-      "Fixes1",
-      "How to update",
-    ]);
-    expect(screen.getByRole("tab", { name: /Fixes/ })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("heading", { name: "Fixes" })).toBeInTheDocument();
+    expect(screen.getByText("A crash")).toBeInTheDocument();
   });
 
-  it("shows only How to update, without a tab strip, when there is no changelog", async () => {
+  it("shows only How to update when there is no changelog", async () => {
     renderDialog({ changelog: "" });
     expect(await screen.findByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
-    expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.queryByRole("tab")).toBeNull();
+    expect(screen.queryByRole("radiogroup", { name: "Changes to show" })).toBeNull();
+    // The one list is the update steps.
+    expect(screen.getAllByRole("list")).toHaveLength(1);
+  });
+
+  it("puts the changes and How to update behind two tabs on a phone", async () => {
+    asPhone();
+    const { user } = renderDialog();
+    const tabs = await screen.findAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["Changes4", "How to update"]);
+    expect(screen.getByRole("tab", { name: /^Changes/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("list", { name: "New" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "How to update" }));
+    expect(await screen.findByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
+    // The tab names the pane, so the pane has no heading of its own.
+    expect(screen.queryByRole("heading", { name: "How to update" })).toBeNull();
   });
 
   it("opens on the binary for a server outside a container, with its own archive", async () => {
@@ -228,9 +269,11 @@ describe("UpdateDialog", () => {
       changelog: "",
       server: { version: "2.1.0", os: "darwin", arch: "arm64", docker: false },
     });
-    expect(await screen.findByRole("radio", { name: "Binary" })).toBeChecked();
+    const binary = await screen.findByRole("radio", { name: /^Binary/ });
+    expect(binary).toBeChecked();
+    expect(binary).toHaveAccessibleName(/Recommended/);
     expect(screen.getByText(/download the macOS \(Apple silicon\) build/)).toBeInTheDocument();
-    const box = screen.getByRole("textbox", { name: /^Stop the proxy/ });
+    const box = screen.getByRole("textbox", { name: /^In the folder that holds/ });
     expect(box).toHaveTextContent(
       "curl -fLO https://github.com/tanu360/kiro-reverse-api/releases/latest/download/kiro-proxy-macos-apple-silicon.tar.gz && tar -xzf kiro-proxy-macos-apple-silicon.tar.gz",
     );
@@ -246,21 +289,28 @@ describe("UpdateDialog", () => {
 
   it("opens on Docker Compose in a container, and every method stays reachable", async () => {
     const { user } = renderDialog({ changelog: "", server: { ...LINUX, docker: true } });
-    expect(await screen.findByRole("radio", { name: "Docker Compose" })).toBeChecked();
-    expect(screen.getByRole("textbox", { name: /^In your clone/ })).toHaveTextContent(
-      "git pull && docker compose up -d --build",
-    );
+    expect(await screen.findByRole("radio", { name: /^Docker Compose/ })).toBeChecked();
+    expect(
+      screen.getByRole("textbox", { name: "Pull the new code and rebuild the container:" }),
+    ).toHaveTextContent("git pull && docker compose up -d --build");
+    expect(screen.getByText("Reload this page. The sidebar shows 2.2.0.")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("radio", { name: "Docker image" }));
+    await user.click(screen.getByRole("radio", { name: /^Docker image/ }));
     expect(screen.getByRole("textbox", { name: "Pull the new image:" })).toHaveTextContent(
       "docker pull ghcr.io/tanu360/kiro-reverse-api:latest",
     );
-    expect(screen.getByText(/recreate the container with the same volume/)).toBeInTheDocument();
+    expect(screen.getByText(/Recreate the container with the same volume/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("radio", { name: "Binary" }));
-    expect(screen.getByRole("textbox", { name: /^Stop the proxy/ })).toHaveTextContent(
+    await user.click(screen.getByRole("radio", { name: /^Binary/ }));
+    expect(screen.getByRole("textbox", { name: /^In the folder that holds/ })).toHaveTextContent(
       "kiro-proxy-linux-x64.tar.gz",
     );
+  });
+
+  it("recommends nothing when the server did not say what it runs on", async () => {
+    renderDialog({ changelog: "", server: { version: "2.1.0" } });
+    expect(await screen.findByRole("radio", { name: /^Docker Compose/ })).toBeChecked();
+    expect(screen.queryByText("Recommended")).toBeNull();
   });
 
   it("names PowerShell and the zip for a Windows server", async () => {
@@ -268,14 +318,14 @@ describe("UpdateDialog", () => {
       changelog: "",
       server: { version: "2.1.0", os: "windows", arch: "arm64", docker: false },
     });
-    expect(await screen.findByRole("textbox", { name: /In PowerShell/ })).toHaveTextContent(
+    expect(await screen.findByRole("textbox", { name: /^In PowerShell/ })).toHaveTextContent(
       "Expand-Archive -Force kiro-proxy-windows-arm64.zip .",
     );
   });
 
   it("points at the linux-x64 archive and says how to pick another when the platform is unknown", async () => {
     renderDialog({ changelog: "", server: { version: "2.1.0", os: "freebsd", arch: "amd64" } });
-    await screen.findByRole("radio", { name: "Binary", checked: true });
+    await screen.findByRole("radio", { name: /^Binary/, checked: true });
     expect(screen.getByText(/For another platform, use its archive/)).toBeInTheDocument();
   });
 
