@@ -180,7 +180,10 @@ func boundOutboundProxy(client *http.Client, proxyURL string) *http.Client {
 
 type KiroPayload struct {
 	HostedSearchTools map[string]bool `json:"-"`
-	ConversationState struct {
+	// HostedSearchResults is how many results each hosted search keeps, 0 for
+	// defaultWebSearchResults; Chat's web_search_options sets it.
+	HostedSearchResults int `json:"-"`
+	ConversationState   struct {
 		AgentContinuationId string `json:"agentContinuationId,omitempty"`
 		AgentTaskType       string `json:"agentTaskType,omitempty"`
 		ChatTriggerType     string `json:"chatTriggerType"`

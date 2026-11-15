@@ -318,7 +318,7 @@ func (h *Handler) searchWebWithFailover(ctx context.Context, model, query string
 			recordAttemptError(ctx, account, model, 0, err)
 			continue
 		}
-		results, err := performKiroWebSearch(ctx, account, query)
+		results, err := performKiroWebSearch(ctx, account, query, 0)
 		if err == nil {
 			traceAttemptOK(ctx)
 			carry.done(account.ID, since)

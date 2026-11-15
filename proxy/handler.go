@@ -1901,6 +1901,8 @@ func (h *Handler) handleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	noteResponseModel(r.Context(), req.Model)
+	//! Before the checks: web_search_options declares the hosted web_search tool, as the tools form does.
+	applyChatWebSearchOptions(&req)
 	if msg := validateOpenAIRequestShape(&req); msg != "" {
 		recordFinalRequestWithAPIKey(r.Context(), apiKeyID, apiKeyValue, nil, requestLogModel(req.Model), 0, 0, 0, false, http.StatusBadRequest, msg)
 		h.sendOpenAIError(w, 400, "invalid_request_error", msg)

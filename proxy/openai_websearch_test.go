@@ -251,85 +251,94 @@ func TestResponsesHostedSearchBufferedOutput(t *testing.T) {
 }
 
 func TestChatHostedSearchCitesResultsAndLogsEveryRound(t *testing.T) {
-	for _, stream := range []bool{false, true} {
-		name := "buffered"
-		if stream {
-			name = "stream"
+	//! web_search_options is the Chat form OpenAI's search models take; it must search as the tools form does.
+	forms := []struct{ name, field string }{
+		{"tools", `"tools":[{"type":"web_search"}]`},
+		{"web_search_options", `"web_search_options":{"search_context_size":"medium","user_location":{"type":"approximate","approximate":{"country":"US"}}}`},
+	}
+	for _, form := range forms {
+		for _, stream := range []bool{false, true} {
+			name := form.name + "/buffered"
+			if stream {
+				name = form.name + "/stream"
+			}
+			t.Run(name, func(t *testing.T) { testChatHostedSearch(t, form.field, stream) })
 		}
-		t.Run(name, func(t *testing.T) {
-			calls := 0
-			h := newStreamTestHandler(t, goBlogUpstream(t, &calls))
-			stubMCPWebSearch(t, http.StatusOK, mcpGoBlogResults)
+	}
+}
 
-			body := `{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"What is new on the Go blog?"}],"tools":[{"type":"web_search"}]`
-			if stream {
-				body += `,"stream":true,"stream_options":{"include_usage":true}`
-			}
-			rec := httptest.NewRecorder()
-			h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body+"}")))
-			if rec.Code != http.StatusOK || calls != 2 {
-				t.Fatalf("status=%d calls=%d body=%s", rec.Code, calls, rec.Body.String())
-			}
+func testChatHostedSearch(t *testing.T, searchField string, stream bool) {
+	calls := 0
+	h := newStreamTestHandler(t, goBlogUpstream(t, &calls))
+	stubMCPWebSearch(t, http.StatusOK, mcpGoBlogResults)
 
-			content := ""
-			var annotations []interface{}
-			var input float64
-			if stream {
-				for _, e := range readSSEEvents(t, rec.Body.Bytes()) {
-					if usage, ok := e.data["usage"].(map[string]interface{}); ok {
-						input = usage["prompt_tokens"].(float64)
-					}
-					choices, _ := e.data["choices"].([]interface{})
-					if len(choices) == 0 {
-						continue
-					}
-					delta := choices[0].(map[string]interface{})["delta"].(map[string]interface{})
-					if text, ok := delta["content"].(string); ok {
-						content += text
-					}
-					if a, ok := delta["annotations"].([]interface{}); ok {
-						annotations = append(annotations, a...)
-					}
-				}
-			} else {
-				var resp map[string]interface{}
-				if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-					t.Fatal(err)
-				}
-				message := resp["choices"].([]interface{})[0].(map[string]interface{})["message"].(map[string]interface{})
-				content = message["content"].(string)
-				annotations, _ = message["annotations"].([]interface{})
-				input = resp["usage"].(map[string]interface{})["prompt_tokens"].(float64)
-			}
-			if content != goBlogSaid+"\n\n"+goBlogAnswer {
-				t.Fatalf("content = %q", content)
-			}
-			start, end := runeSpan(content, goBlogLink)
-			if len(annotations) != 1 {
-				t.Fatalf("annotations = %v body=%s", annotations, rec.Body.String())
-			}
-			a := annotations[0].(map[string]interface{})
-			cite := a["url_citation"].(map[string]interface{})
-			if a["type"] != "url_citation" || cite["url"] != "https://go.dev/blog/go1.27" || cite["title"] != "Go 1.27 is released" || cite["start_index"] != float64(start) || cite["end_index"] != float64(end) {
-				t.Fatalf("annotation = %v, want [%d,%d)", a, start, end)
-			}
-			assertBothRoundsCounted(t, input)
+	body := `{"model":"claude-sonnet-4.5","messages":[{"role":"user","content":"What is new on the Go blog?"}],` + searchField
+	if stream {
+		body += `,"stream":true,"stream_options":{"include_usage":true}`
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body+"}")))
+	if rec.Code != http.StatusOK || calls != 2 {
+		t.Fatalf("status=%d calls=%d body=%s", rec.Code, calls, rec.Body.String())
+	}
 
-			rec0 := getObserveStore().RecentRequests(1)[0]
-			if !rec0.Success || float64(rec0.InTokens) != input || rec0.Credits < 0.0299 || rec0.Credits > 0.0301 {
-				t.Fatalf("logged request = in %d credits %v success %v, want in %v and both rounds' 0.03 credits", rec0.InTokens, rec0.Credits, rec0.Success, input)
+	content := ""
+	var annotations []interface{}
+	var input float64
+	if stream {
+		for _, e := range readSSEEvents(t, rec.Body.Bytes()) {
+			if usage, ok := e.data["usage"].(map[string]interface{}); ok {
+				input = usage["prompt_tokens"].(float64)
 			}
-			var chain []string
-			for _, attempt := range rec0.Attempts {
-				if !attempt.Success || attempt.AccountID != "only" {
-					t.Fatalf("attempt %+v, want a success on the account", attempt)
-				}
-				chain = append(chain, attempt.Endpoint)
+			choices, _ := e.data["choices"].([]interface{})
+			if len(choices) == 0 {
+				continue
 			}
-			if got := strings.Join(chain, ","); got != "test,web_search,test" {
-				t.Fatalf("attempts = %s, want the first round, the search, then the answer", got)
+			delta := choices[0].(map[string]interface{})["delta"].(map[string]interface{})
+			if text, ok := delta["content"].(string); ok {
+				content += text
 			}
-		})
+			if a, ok := delta["annotations"].([]interface{}); ok {
+				annotations = append(annotations, a...)
+			}
+		}
+	} else {
+		var resp map[string]interface{}
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatal(err)
+		}
+		message := resp["choices"].([]interface{})[0].(map[string]interface{})["message"].(map[string]interface{})
+		content = message["content"].(string)
+		annotations, _ = message["annotations"].([]interface{})
+		input = resp["usage"].(map[string]interface{})["prompt_tokens"].(float64)
+	}
+	if content != goBlogSaid+"\n\n"+goBlogAnswer {
+		t.Fatalf("content = %q", content)
+	}
+	start, end := runeSpan(content, goBlogLink)
+	if len(annotations) != 1 {
+		t.Fatalf("annotations = %v body=%s", annotations, rec.Body.String())
+	}
+	a := annotations[0].(map[string]interface{})
+	cite := a["url_citation"].(map[string]interface{})
+	if a["type"] != "url_citation" || cite["url"] != "https://go.dev/blog/go1.27" || cite["title"] != "Go 1.27 is released" || cite["start_index"] != float64(start) || cite["end_index"] != float64(end) {
+		t.Fatalf("annotation = %v, want [%d,%d)", a, start, end)
+	}
+	assertBothRoundsCounted(t, input)
+
+	rec0 := getObserveStore().RecentRequests(1)[0]
+	if !rec0.Success || float64(rec0.InTokens) != input || rec0.Credits < 0.0299 || rec0.Credits > 0.0301 {
+		t.Fatalf("logged request = in %d credits %v success %v, want in %v and both rounds' 0.03 credits", rec0.InTokens, rec0.Credits, rec0.Success, input)
+	}
+	var chain []string
+	for _, attempt := range rec0.Attempts {
+		if !attempt.Success || attempt.AccountID != "only" {
+			t.Fatalf("attempt %+v, want a success on the account", attempt)
+		}
+		chain = append(chain, attempt.Endpoint)
+	}
+	if got := strings.Join(chain, ","); got != "test,web_search,test" {
+		t.Fatalf("attempts = %s, want the first round, the search, then the answer", got)
 	}
 }
 

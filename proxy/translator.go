@@ -1055,6 +1055,8 @@ type OpenAIRequest struct {
 	ResponseFormat json.RawMessage `json:"response_format,omitempty"`
 	// StreamOptions asks for the separate usage chunk; see openai_stream_options.go.
 	StreamOptions *OpenAIStreamOptions `json:"stream_options,omitempty"`
+	// WebSearchOptions turns on hosted web search; see openai_websearch_options.go.
+	WebSearchOptions *OpenAIWebSearchOptions `json:"web_search_options,omitempty"`
 }
 
 type OpenAIMessage struct {
@@ -1081,6 +1083,11 @@ type OpenAITool struct {
 		Description string      `json:"description"`
 		Parameters  interface{} `json:"parameters"`
 	} `json:"function"`
+	// searchResults and searchLocation come from Chat's web_search_options, on the hosted
+	// web_search tool only: how many results each search keeps (0 for the default) and the
+	// user's approximate location as text.
+	searchResults  int
+	searchLocation string
 }
 
 func (t *OpenAITool) UnmarshalJSON(data []byte) error {
@@ -1338,6 +1345,9 @@ func OpenAIToKiro(req *OpenAIRequest, thinking bool) *KiroPayload {
 				name = webSearchToolName
 			}
 			payload.HostedSearchTools[name] = true
+			if tool.searchResults > 0 {
+				payload.HostedSearchResults = tool.searchResults
+			}
 		}
 	}
 	return payload
@@ -2067,7 +2077,7 @@ func convertOpenAITools(tools []OpenAITool) ([]KiroToolWrapper, map[string]strin
 		if isHostedWebSearchToolType(tool.Type) {
 			wrapper := KiroToolWrapper{}
 			wrapper.ToolSpecification.Name = kiroWebSearchToolName
-			wrapper.ToolSpecification.Description = "Search the web for current information."
+			wrapper.ToolSpecification.Description = hostedWebSearchDescription(tool.searchLocation)
 			wrapper.ToolSpecification.InputSchema = InputSchema{JSON: webSearchInputSchema()}
 			result = append(result, wrapper)
 			nameMap[kiroWebSearchToolName] = webSearchToolName

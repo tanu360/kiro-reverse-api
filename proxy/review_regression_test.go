@@ -134,7 +134,7 @@ func TestReviewSearchResolvesMissingProfile(t *testing.T) {
 		}
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
 	})})
-	_, err := performKiroWebSearch(context.Background(), account, "go")
+	_, err := performKiroWebSearch(context.Background(), account, "go", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

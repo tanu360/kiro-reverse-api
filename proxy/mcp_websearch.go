@@ -22,6 +22,9 @@ import (
 const (
 	webSearchToolName     = "web_search"
 	kiroWebSearchToolName = "webSearch"
+	// defaultWebSearchResults is how many results a search keeps unless the request asks for
+	// more or fewer. Kiro's search returns up to 10.
+	defaultWebSearchResults = 5
 )
 
 type WebSearchResult struct {
@@ -126,9 +129,10 @@ func (h *hostedSearchHooks) countRound(round hostedSearchRound) {
 
 // search runs one query on the reply's account and records it as a web_search attempt of the
 // request, as the Anthropic path does. A failed query is not retried: the model is told.
-func (h *hostedSearchHooks) search(ctx context.Context, account *config.Account, query string) ([]WebSearchResult, error) {
+// limit is how many results to keep, 0 for defaultWebSearchResults.
+func (h *hostedSearchHooks) search(ctx context.Context, account *config.Account, query string, limit int) ([]WebSearchResult, error) {
 	traceAttemptStart(ctx, account, attemptEndpointWebSearch)
-	results, err := performKiroWebSearch(ctx, account, query)
+	results, err := performKiroWebSearch(ctx, account, query, limit)
 	if err == nil {
 		traceAttemptOK(ctx)
 		return results, nil
@@ -148,7 +152,9 @@ func (h *hostedSearchHooks) search(ctx context.Context, account *config.Account,
 	return nil, err
 }
 
-func resolveWebSearchToolResults(ctx context.Context, account *config.Account, toolUses []KiroToolUse, hooks *hostedSearchHooks) ([]KiroToolResult, error) {
+// resolveWebSearchToolResults runs the searches a round asked for. limit is how many results
+// each keeps, 0 for defaultWebSearchResults.
+func resolveWebSearchToolResults(ctx context.Context, account *config.Account, toolUses []KiroToolUse, hooks *hostedSearchHooks, limit int) ([]KiroToolResult, error) {
 	results := make([]KiroToolResult, 0, len(toolUses))
 	for _, tu := range toolUses {
 		if !isWebSearchToolUse(tu) {
@@ -156,7 +162,7 @@ func resolveWebSearchToolResults(ctx context.Context, account *config.Account, t
 		}
 		search := &hostedWebSearch{id: newWebSearchCallID(), query: webSearchQueryFromInput(tu.Input)}
 		hooks.report(search)
-		search.results, search.err = hooks.search(ctx, account, search.query)
+		search.results, search.err = hooks.search(ctx, account, search.query, limit)
 		search.done = true
 		hooks.report(search)
 		text := formatWebSearchResults(search.results)
@@ -239,7 +245,9 @@ func buildWebSearchFollowupPayload(base *KiroPayload, toolUses []KiroToolUse, re
 	return &next
 }
 
-func performKiroWebSearch(ctx context.Context, account *config.Account, query string) ([]WebSearchResult, error) {
+// performKiroWebSearch runs one query on Kiro's web search and keeps the first limit results,
+// defaultWebSearchResults for 0.
+func performKiroWebSearch(ctx context.Context, account *config.Account, query string, limit int) ([]WebSearchResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("query is required")
@@ -293,7 +301,8 @@ func performKiroWebSearch(ctx context.Context, account *config.Account, query st
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("MCP HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
 	}
-	return parseMCPWebSearchResponse(data)
+	results, err := parseMCPWebSearchResponse(data)
+	return capWebSearchResults(results, limit), err
 }
 
 func webSearchMCPHost(account *config.Account) string {
@@ -340,11 +349,11 @@ func parseMCPWebSearchResponse(data []byte) ([]WebSearchResult, error) {
 			continue
 		}
 		if results, ok, err := decodeWebSearchResults([]byte(content.Text)); ok {
-			return capWebSearchResults(results), err
+			return results, err
 		}
 	}
 	if results, ok, err := decodeWebSearchResults(data); ok {
-		return capWebSearchResults(results), err
+		return results, err
 	}
 	//! A 200 with no readable results must fail, or callers show an empty search as a real answer.
 	return nil, errors.New("web_search returned no readable results")
@@ -371,9 +380,13 @@ func decodeWebSearchResults(data []byte) ([]WebSearchResult, bool, error) {
 	return nil, false, nil
 }
 
-func capWebSearchResults(results []WebSearchResult) []WebSearchResult {
-	if len(results) > 5 {
-		return results[:5]
+// capWebSearchResults keeps the first limit results, defaultWebSearchResults for 0.
+func capWebSearchResults(results []WebSearchResult, limit int) []WebSearchResult {
+	if limit <= 0 {
+		limit = defaultWebSearchResults
+	}
+	if len(results) > limit {
+		return results[:limit]
 	}
 	return results
 }
@@ -523,7 +536,7 @@ func callKiroWithHostedSearch(ctx context.Context, account *config.Account, payl
 		for i := range canonicalSearches {
 			canonicalSearches[i].Name = webSearchToolName
 		}
-		results, err := resolveWebSearchToolResults(ctx, account, canonicalSearches, hooks)
+		results, err := resolveWebSearchToolResults(ctx, account, canonicalSearches, hooks, payload.HostedSearchResults)
 		if err != nil {
 			return err
 		}

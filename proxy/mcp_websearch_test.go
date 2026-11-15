@@ -51,7 +51,7 @@ func TestFormatWebSearchResultsCapsAndIncludesSourceFields(t *testing.T) {
 		{Title: "Five"},
 		{Title: "Six"},
 	}
-	formatted := formatWebSearchResults(capWebSearchResults(results))
+	formatted := formatWebSearchResults(capWebSearchResults(results, 0))
 	if strings.Contains(formatted, "Six") {
 		t.Fatalf("expected results to be capped, got %q", formatted)
 	}
