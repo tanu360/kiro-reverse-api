@@ -1,5 +1,5 @@
 {
-  "version": "3.5.3",
-  "changelog": "⏳ The public link card shows when Tailscale will sign this server out (after 180 days by default) and links to the device's page in the Tailscale admin console to turn key expiry off. The line goes away once it is off.\n🔒 A page opened through the public link can no longer change the device name, which would move the link out from under it. Turning the link off or signing out from there now says the page will disconnect, and no longer reports a failed save.\n🔁 Try again on a failed public link restarts it right away, and an emptied device name saves the default name.\n🎨 Notice buttons are outlines in the notice's colour, and the settings list marks only the sections that are on.",
+  "version": "3.5.4",
+  "changelog": "🆕 Accounts that Kiro moves to its newer CreateResponse chat API keep working: the proxy checks each account's Kiro flag and sends its chat to that API instead of answering 429. Settings → Kiro endpoint → Chat API can also send every account to one API.\n⚖️ Weighted routing now gives each account its weight's share of requests; a heavy account used to get no more than any other.\n🔝 Account priority now goes higher first: every account starts at 0, so raising one account puts it first. Saved priorities are turned around once and keep their order.\n🔄 Requests advertise the Kiro IDE's current release, read from Kiro's update feed once a day and again whenever Kiro refuses the old one.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
