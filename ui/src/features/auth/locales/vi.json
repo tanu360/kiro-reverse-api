@@ -8,7 +8,7 @@
   "signingIn": "Đang đăng nhập…",
   "passwordRequired": "Nhập mật khẩu.",
   "error": "Mật khẩu không đúng.",
-  "rateLimited": "Quá nhiều lần thử. Hãy thử lại sau {seconds} giây.",
+  "rateLimited": "Quá nhiều lần thử. Hãy thử lại sau {time}.",
   "connectError": "Không thể kết nối đến proxy.",
   "worksWith": "Dùng được với",
   "labelClaude": "Claude API",

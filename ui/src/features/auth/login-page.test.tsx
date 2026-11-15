@@ -162,6 +162,23 @@ describe("LoginPage", () => {
       await waitFor(() => expect(submitButton()).not.toHaveAttribute("aria-disabled"));
       expect(screen.queryByText(/Too many attempts/)).not.toBeInTheDocument();
     });
+
+    it("writes a wait of a minute or more in minutes and seconds", async () => {
+      mockServer.use(
+        http.post(apiUrl("/session"), () =>
+          jsonError(429, "Too many admin password attempts; try again later", undefined, {
+            "Retry-After": "90",
+          }),
+        ),
+      );
+      const { user } = await renderApp("/login", { authed: false });
+      await user.type(passwordInput(), "wrong-password");
+      await user.click(submitButton());
+
+      const notice = await screen.findByText("Too many attempts. Try again in 1m 30s.");
+      // Tabular digits, so the line does not shift as the seconds count down.
+      expect(notice).toHaveClass("tabular-nums");
+    });
   });
 
   it("stores the token in localStorage with Stay signed in and lands on Overview", async () => {

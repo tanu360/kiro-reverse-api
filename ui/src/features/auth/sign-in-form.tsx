@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { isApiError } from "@/lib/api/errors";
 import { errorMessage, serverErrorCode } from "@/lib/api/server-errors";
 import { completeSignIn, getRememberPreference, signIn } from "@/lib/auth/session";
+import { formatDuration } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { redirectTarget } from "@/routes/-search";
 import { CodeField } from "./code-field";
@@ -31,7 +32,7 @@ export function SignInForm({
   /** Filled into the password field (/setup: the generated first-run password). */
   defaultPassword?: string;
 }): JSX.Element {
-  const { t } = useT("auth");
+  const { t, lang } = useT("auth");
   const navigate = useNavigate();
   const [password, setPassword] = useState(defaultPassword ?? "");
   const [remember, setRemember] = useState(
@@ -42,6 +43,8 @@ export function SignInForm({
   const [formError, setFormError] = useState<string | null>(null);
   const retry = useRetryCountdown();
   const locked = retry.seconds > 0;
+  // "1m 30s" like every other duration; tabular digits keep the line still as it counts down.
+  const retryNotice = t("rateLimited", { time: formatDuration(retry.seconds, lang) });
   const inputRef = useRef<HTMLInputElement>(null);
   // With two-factor sign-in on, the right password leads to a second step with this challenge.
   const [challenge, setChallenge] = useState<string | null>(null);
@@ -186,7 +189,7 @@ export function SignInForm({
           {locked ? (
             <Alert role="none" variant="warning">
               <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
-              <AlertDescription>{t("rateLimited", { seconds: retry.seconds })}</AlertDescription>
+              <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
             </Alert>
           ) : null}
         </div>
@@ -247,7 +250,7 @@ export function SignInForm({
           // No role: the live region round it announces the countdown politely.
           <Alert role="none" variant="warning">
             <AnimatedIcon icon={Clock01Icon} aria-hidden="true" playOnMount />
-            <AlertDescription>{t("rateLimited", { seconds: retry.seconds })}</AlertDescription>
+            <AlertDescription className="tabular-nums">{retryNotice}</AlertDescription>
           </Alert>
         ) : null}
       </div>

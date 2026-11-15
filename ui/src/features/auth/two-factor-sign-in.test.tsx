@@ -113,6 +113,8 @@ describe("sign-in with two-factor on", () => {
     ).toBeInTheDocument();
     await user.type(screen.getByLabelText("Password"), PASSWORD);
     await user.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByText(/Too many attempts\. Try again in \d+s\./)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Too many attempts\. Try again in \d+[ms]( \d+s)?\./),
+    ).toBeInTheDocument();
   });
 });

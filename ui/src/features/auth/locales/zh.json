@@ -8,7 +8,7 @@
   "signingIn": "正在登录…",
   "passwordRequired": "请输入密码。",
   "error": "密码不正确。",
-  "rateLimited": "尝试次数过多，请在 {seconds} 秒后重试。",
+  "rateLimited": "尝试次数过多，请在 {time} 后重试。",
   "connectError": "无法连接到代理。",
   "worksWith": "适用于",
   "labelClaude": "Claude API",

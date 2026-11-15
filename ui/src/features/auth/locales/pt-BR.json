@@ -8,7 +8,7 @@
   "signingIn": "Entrando…",
   "passwordRequired": "Informe a senha.",
   "error": "Senha incorreta.",
-  "rateLimited": "Muitas tentativas. Tente novamente em {seconds} s.",
+  "rateLimited": "Muitas tentativas. Tente novamente em {time}.",
   "connectError": "Não foi possível conectar ao proxy.",
   "worksWith": "Funciona com",
   "labelClaude": "Claude API",
