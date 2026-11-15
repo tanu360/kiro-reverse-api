@@ -4561,13 +4561,15 @@ func (h *Handler) apiGetEndpointConfig(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"preferredEndpoint": config.GetPreferredEndpoint(),
 		"endpointFallback":  config.GetEndpointFallback(),
+		"chatApi":           config.GetChatAPI(),
 	})
 }
 
 func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		PreferredEndpoint string `json:"preferredEndpoint"`
-		EndpointFallback  *bool  `json:"endpointFallback"`
+		PreferredEndpoint string  `json:"preferredEndpoint"`
+		EndpointFallback  *bool   `json:"endpointFallback"`
+		ChatAPI           *string `json:"chatApi"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeAdminError(w, http.StatusBadRequest, codeInvalidJSON, "Invalid JSON")
@@ -4579,6 +4581,10 @@ func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request
 		writeAdminError(w, http.StatusBadRequest, codeInvalidEndpoint, "Invalid endpoint, must be: auto, kiro, codewhisperer, or amazonq")
 		return
 	}
+	if req.ChatAPI != nil && config.NormalizeChatAPI(*req.ChatAPI) == "" {
+		writeAdminError(w, http.StatusBadRequest, codeInvalidEndpoint, config.ErrInvalidChatAPI.Error())
+		return
+	}
 
 	if err := config.UpdatePreferredEndpoint(req.PreferredEndpoint); err != nil {
 		w.WriteHeader(500)
@@ -4588,6 +4594,13 @@ func (h *Handler) apiUpdateEndpointConfig(w http.ResponseWriter, r *http.Request
 
 	if req.EndpointFallback != nil {
 		config.UpdateEndpointFallback(*req.EndpointFallback)
+	}
+	if req.ChatAPI != nil {
+		if err := config.UpdateChatAPI(*req.ChatAPI); err != nil {
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
 	}
 
 	publishEvent(eventSettingsChanged, "")

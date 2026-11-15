@@ -256,6 +256,18 @@ type KiroHistoryMessage struct {
 type KiroAssistantResponseMessage struct {
 	Content  string        `json:"content"`
 	ToolUses []KiroToolUse `json:"toolUses,omitempty"`
+	// Reasoning holds the signed thinking and redacted_thinking blocks a client sent back, in
+	// order. generateAssistantResponse has no field for them (Content carries the thinking as
+	// <thinking> text); CreateResponse takes them as reasoning items.
+	Reasoning []KiroReasoningBlock `json:"-"`
+}
+
+// KiroReasoningBlock is one block of earlier reasoning: thinking text with its signature, or
+// encrypted (redacted) reasoning.
+type KiroReasoningBlock struct {
+	Text            string
+	Signature       string
+	RedactedContent string
 }
 
 type KiroToolUse struct {
@@ -414,11 +426,20 @@ func callKiroAPIContextOnce(ctx context.Context, account *config.Account, payloa
 		}
 	}
 
+	if useKiroResponsesAPI(ctx, account, payload.ProfileArn) {
+		noteAttemptEndpoint(ctx, kiroResponsesEndpointName)
+		payload.ConversationState.CurrentMessage.UserInputMessage.Origin = "AI_EDITOR"
+		return callKiroResponsesAPI(ctx, account, payload, callback)
+	}
+
 	endpoints := endpointsForAccount(account)
 
 	var lastErr error
 	var quotaErr *upstreamQuotaError
 	var clientErr *upstreamClientError
+	//! A 429 USER_REQUEST_RATE_EXCEEDED is what an account Kiro just moved to CreateResponse gets
+	//! here; the flag is read again once per call to find out (recheckKiroResponsesAPI).
+	rechecked := false
 endpointLoop:
 	for epIndex, ep := range endpoints {
 		if epIndex > 0 && lastErr != nil {
@@ -516,6 +537,15 @@ endpointLoop:
 						kind = "throttled"
 					}
 					logger.Warnf("[KiroAPI] Endpoint %s %s (429, retry-after %s), trying next...", ep.Name, kind, textfmt.Duration(delay))
+					if !rechecked && throttled && strings.Contains(string(errBody), "USER_REQUEST_RATE_EXCEEDED") {
+						rechecked = true
+						if recheckKiroResponsesAPI(ctx, account, payload.ProfileArn) {
+							logger.Warnf("[KiroAPI] %s: Kiro moved this account to CreateResponse; sending the request there", accountEmailForLog(account))
+							traceEndpointFallback(ctx, account, kiroResponsesEndpointName, lastErr)
+							payload.ConversationState.CurrentMessage.UserInputMessage.Origin = "AI_EDITOR"
+							return callKiroResponsesAPI(ctx, account, payload, callback)
+						}
+					}
 				}
 
 				if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 402 {
@@ -609,6 +639,28 @@ func parseEventStream(body io.Reader, callback *KiroStreamCallback) error {
 }
 
 func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emitted bool, err error) {
+	return consumeKiroEvents(eventStreamSource(body), callback)
+}
+
+// kiroStreamEvent is one upstream event in generateAssistantResponse's vocabulary: the
+// event-stream :event-type ("assistantResponseEvent") and its JSON payload. The
+// CreateResponse adapter (kiro_responses_stream.go) speaks the same vocabulary.
+type kiroStreamEvent struct {
+	Type  string
+	Event map[string]interface{}
+}
+
+// kiroEventSource yields a stream's events in order. io.EOF ends the stream; any other
+// error fails it.
+type kiroEventSource func() (kiroStreamEvent, error)
+
+// kiroToolUseDropEvent is an internal event, never sent by Kiro: it discards the pending
+// tool call whose toolUseId it names without running it (an incomplete CreateResponse call).
+const kiroToolUseDropEvent = "kiro:toolUseDrop"
+
+// consumeKiroEvents runs a stream's events through the callbacks: answer text, reasoning,
+// tool calls, metering, context usage and the stop reason, then the integrity check.
+func consumeKiroEvents(source kiroEventSource, callback *KiroStreamCallback) (emitted bool, err error) {
 	//! emitted reports whether an output callback ran; a failure before that is safe to retry.
 	if callback == nil {
 		callback = &KiroStreamCallback{}
@@ -661,57 +713,17 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		}
 	}()
 
-	//! Read directly from the stream so SSE chunks are not delayed by buffering.
 	for {
-		prelude := make([]byte, 12)
-		_, readErr := io.ReadFull(body, prelude)
-		if readErr == io.EOF {
+		next, srcErr := source()
+		if srcErr == io.EOF {
 			break
 		}
-		if readErr != nil {
-			return emitted, frameReadError(readErr)
+		if srcErr != nil {
+			return emitted, srcErr
 		}
-
-		totalLength := int(eventStreamUint32(prelude[0:4]))
-		headersLength := int(eventStreamUint32(prelude[4:8]))
-		if totalLength < 16 || totalLength > maxEventStreamMessageSize {
-			return emitted, fmt.Errorf("%w: invalid frame length %d", errInvalidKiroEventStream, totalLength)
-		}
-		if headersLength > totalLength-16 {
-			return emitted, fmt.Errorf("%w: invalid headers length %d", errInvalidKiroEventStream, headersLength)
-		}
-		if got, want := eventStreamUint32(prelude[8:12]), crc32.ChecksumIEEE(prelude[:8]); got != want {
-			return emitted, fmt.Errorf("%w: prelude CRC mismatch", errInvalidKiroEventStream)
-		}
-
-		message := make([]byte, totalLength-len(prelude))
-		if _, err := io.ReadFull(body, message); err != nil {
-			return emitted, frameReadError(err)
-		}
-		if got, want := eventStreamUint32(message[len(message)-4:]), eventStreamChecksum(prelude, message[:len(message)-4]); got != want {
-			return emitted, fmt.Errorf("%w: message CRC mismatch", errInvalidKiroEventStream)
-		}
-
-		headers, headerErr := parseEventStreamHeaders(message[:headersLength])
-		if headerErr != nil {
-			return emitted, fmt.Errorf("%w: %v", errInvalidKiroEventStream, headerErr)
-		}
-		eventType := headers[":event-type"]
-		payloadBytes := message[headersLength : len(message)-4]
-		event := make(map[string]interface{})
-		if len(payloadBytes) > 0 {
-			if err := json.Unmarshal(payloadBytes, &event); err != nil {
-				//! Dropping an output frame would silently corrupt the answer; other frames are advisory.
-				if isOutputEventType(eventType) {
-					return emitted, fmt.Errorf("%w: decode %s payload: %v", errInvalidKiroEventStream, eventType, err)
-				}
-				logger.Debugf("[KiroAPI] Skipping undecodable %q frame: %v", eventType, err)
-				continue
-			}
-		}
-
-		if messageType := headers[":message-type"]; messageType == "error" || messageType == "exception" {
-			return emitted, upstreamEventStreamError(messageType, headers, event)
+		eventType, event := next.Type, next.Event
+		if event == nil {
+			event = map[string]interface{}{}
 		}
 
 		inputTokens, outputTokens = updateTokensFromEvent(event, inputTokens, outputTokens)
@@ -740,6 +752,10 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		case "toolUseEvent":
 			if toolErr := handleToolUseEvent(event, pending, callback); toolErr != nil {
 				return emitted, toolErr
+			}
+		case kiroToolUseDropEvent:
+			if id := firstStringField(event, "toolUseId"); id != "" {
+				pending.remove(id)
 			}
 		case "meteringEvent":
 			turn.sawTrailer = true
@@ -786,6 +802,67 @@ func parseEventStreamTracked(body io.Reader, callback *KiroStreamCallback) (emit
 		callback.OnComplete(inputTokens, outputTokens)
 	}
 	return emitted, nil
+}
+
+// eventStreamSource decodes generateAssistantResponse's AWS event-stream frames. An error or
+// exception frame fails the stream.
+func eventStreamSource(body io.Reader) kiroEventSource {
+	return func() (kiroStreamEvent, error) {
+		//! Read directly from the stream so SSE chunks are not delayed by buffering.
+		for {
+			prelude := make([]byte, 12)
+			_, readErr := io.ReadFull(body, prelude)
+			if readErr == io.EOF {
+				return kiroStreamEvent{}, io.EOF
+			}
+			if readErr != nil {
+				return kiroStreamEvent{}, frameReadError(readErr)
+			}
+
+			totalLength := int(eventStreamUint32(prelude[0:4]))
+			headersLength := int(eventStreamUint32(prelude[4:8]))
+			if totalLength < 16 || totalLength > maxEventStreamMessageSize {
+				return kiroStreamEvent{}, fmt.Errorf("%w: invalid frame length %d", errInvalidKiroEventStream, totalLength)
+			}
+			if headersLength > totalLength-16 {
+				return kiroStreamEvent{}, fmt.Errorf("%w: invalid headers length %d", errInvalidKiroEventStream, headersLength)
+			}
+			if got, want := eventStreamUint32(prelude[8:12]), crc32.ChecksumIEEE(prelude[:8]); got != want {
+				return kiroStreamEvent{}, fmt.Errorf("%w: prelude CRC mismatch", errInvalidKiroEventStream)
+			}
+
+			message := make([]byte, totalLength-len(prelude))
+			if _, err := io.ReadFull(body, message); err != nil {
+				return kiroStreamEvent{}, frameReadError(err)
+			}
+			if got, want := eventStreamUint32(message[len(message)-4:]), eventStreamChecksum(prelude, message[:len(message)-4]); got != want {
+				return kiroStreamEvent{}, fmt.Errorf("%w: message CRC mismatch", errInvalidKiroEventStream)
+			}
+
+			headers, headerErr := parseEventStreamHeaders(message[:headersLength])
+			if headerErr != nil {
+				return kiroStreamEvent{}, fmt.Errorf("%w: %v", errInvalidKiroEventStream, headerErr)
+			}
+			eventType := headers[":event-type"]
+			payloadBytes := message[headersLength : len(message)-4]
+			event := make(map[string]interface{})
+			if len(payloadBytes) > 0 {
+				if err := json.Unmarshal(payloadBytes, &event); err != nil {
+					//! Dropping an output frame would silently corrupt the answer; other frames are advisory.
+					if isOutputEventType(eventType) {
+						return kiroStreamEvent{}, fmt.Errorf("%w: decode %s payload: %v", errInvalidKiroEventStream, eventType, err)
+					}
+					logger.Debugf("[KiroAPI] Skipping undecodable %q frame: %v", eventType, err)
+					continue
+				}
+			}
+
+			if messageType := headers[":message-type"]; messageType == "error" || messageType == "exception" {
+				return kiroStreamEvent{}, upstreamEventStreamError(messageType, headers, event)
+			}
+			return kiroStreamEvent{Type: eventType, Event: event}, nil
+		}
+	}
 }
 
 func frameReadError(err error) error {

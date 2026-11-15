@@ -250,11 +250,13 @@ func ClaudeToKiro(req *ClaudeRequest, thinking bool) *KiroPayload {
 				})
 			}
 		case "assistant":
-			content, toolUses := extractClaudeAssistantHistory(msg.Content, thinkingReplay.next())
+			keepThinking := thinkingReplay.next()
+			content, toolUses := extractClaudeAssistantHistory(msg.Content, keepThinking)
 			history = append(history, KiroHistoryMessage{
 				AssistantResponseMessage: &KiroAssistantResponseMessage{
-					Content:  content,
-					ToolUses: toolUses,
+					Content:   content,
+					ToolUses:  toolUses,
+					Reasoning: claudeAssistantReasoning(msg.Content, keepThinking),
 				},
 			})
 		}

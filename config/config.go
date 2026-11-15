@@ -172,6 +172,9 @@ type Config struct {
 
 	EndpointFallback *bool `json:"endpointFallback,omitempty"`
 
+	// ChatAPI picks Kiro's chat API; see chat_api.go. Empty means ChatAPIAuto.
+	ChatAPI string `json:"chatApi,omitempty"`
+
 	// Upstream host family and region overrides; see upstream.go.
 	APIDomain  string `json:"apiDomain,omitempty"`
 	AuthRegion string `json:"authRegion,omitempty"`

@@ -186,6 +186,33 @@ func extractClaudeAssistantHistory(content interface{}, keepThinking bool) (stri
 	return strings.Join(segments, "\n\n"), toolUses
 }
 
+// claudeAssistantReasoning collects the signed thinking and redacted_thinking blocks of an
+// assistant message that keeps its thinking, in order. Only CreateResponse can replay them;
+// a thinking block without a signature stays <thinking> text in the content.
+func claudeAssistantReasoning(content interface{}, keepThinking bool) []KiroReasoningBlock {
+	blocks, ok := content.([]interface{})
+	if !ok || !keepThinking {
+		return nil
+	}
+	var out []KiroReasoningBlock
+	for _, item := range blocks {
+		block, _ := item.(map[string]interface{})
+		switch block["type"] {
+		case "thinking":
+			text, _ := block["thinking"].(string)
+			signature, _ := block["signature"].(string)
+			if text != "" && signature != "" {
+				out = append(out, KiroReasoningBlock{Text: text, Signature: signature})
+			}
+		case "redacted_thinking":
+			if data, _ := block["data"].(string); data != "" {
+				out = append(out, KiroReasoningBlock{RedactedContent: data})
+			}
+		}
+	}
+	return out
+}
+
 func countClaudeThinkingBlocks(blocks []interface{}) (thinking, redacted int) {
 	for _, item := range blocks {
 		block, _ := item.(map[string]interface{})
