@@ -1,4 +1,5 @@
 import { MOCK_SCENARIOS, type MockScenario } from "./db";
+import { MOCK_SERVER_KINDS, type MockServerKind } from "./update";
 
 // Picks the browser mock's dataset without restarting the dev server:
 //   ?mock=full|small|empty  switches and is remembered for the tab (sessionStorage);
@@ -40,4 +41,31 @@ export function resolveMockScenario(): MockScenario {
     asScenario(read(() => localStorage, KEY)) ??
     DEFAULT
   );
+}
+
+// What the mock server runs as, for the update dialog (update.ts):
+//   ?server=binary|docker|windows|readonly|fail  switches and is remembered for the tab;
+//   otherwise `binary`, a Linux binary that updates itself.
+
+const SERVER_PARAM = "server";
+const SERVER_KEY = "kiro_mock_server";
+
+function asServerKind(value: string | null | undefined): MockServerKind | null {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return (MOCK_SERVER_KINDS as readonly string[]).includes(normalized)
+    ? (normalized as MockServerKind)
+    : null;
+}
+
+export function resolveMockServer(): MockServerKind {
+  const fromUrl = asServerKind(new URLSearchParams(window.location.search).get(SERVER_PARAM));
+  if (fromUrl) {
+    try {
+      sessionStorage.setItem(SERVER_KEY, fromUrl);
+    } catch {
+      // Not remembered: the URL parameter still applies to this load.
+    }
+    return fromUrl;
+  }
+  return asServerKind(read(() => sessionStorage, SERVER_KEY)) ?? "binary";
 }

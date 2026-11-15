@@ -16,6 +16,7 @@ import (
 	"kiro-proxy/proxypool"
 	"kiro-proxy/textfmt"
 	"kiro-proxy/tunnel"
+	"kiro-proxy/updater"
 	"math"
 	"net/http"
 	"strings"
@@ -34,6 +35,10 @@ type Handler struct {
 	pool         *pool.AccountPool
 	// tunnel runs the public link; nil until main attaches it (tunnel_api.go).
 	tunnel *tunnel.Manager
+	// updater replaces this program with a newer release, and restart runs the new one; both
+	// are nil until main attaches them (update_api.go).
+	updater *updater.Manager
+	restart func()
 
 	startTime      int64
 	stopRefresh    chan struct{}
@@ -2903,6 +2908,8 @@ func (h *Handler) handleAdminAPI(w http.ResponseWriter, r *http.Request) {
 		h.handleTwoFactorAPI(w, r, strings.TrimPrefix(path, "/two-factor"))
 	case path == "/tunnel" || strings.HasPrefix(path, "/tunnel/"):
 		h.handleTunnelAPI(w, r, strings.TrimPrefix(path, "/tunnel"))
+	case path == "/update" || strings.HasPrefix(path, "/update/"):
+		h.handleUpdateAPI(w, r, strings.TrimPrefix(path, "/update"))
 	default:
 		w.WriteHeader(404)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Not Found"})

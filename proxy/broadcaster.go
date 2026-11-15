@@ -22,6 +22,8 @@ const (
 	// eventAccountHeal reports self-heal: "healed:<accounts>", "halted:<rounds>",
 	// "recovered" after a success, "resumed" by an admin.
 	eventAccountHeal = "account_heal"
+	// eventUpdateChanged says the self-update's status changed (update_api.go).
+	eventUpdateChanged = "update_changed"
 )
 
 func init() {
@@ -90,6 +92,17 @@ func (b *broadcaster) Publish(evt Event) {
 
 		}
 	}
+}
+
+// closeAll ends every subscription, which ends each open /events stream. A server shutting
+// down for a restart waits for open requests to finish, and an event stream never does.
+func (b *broadcaster) closeAll() {
+	b.mu.Lock()
+	for id, ch := range b.subscribers {
+		delete(b.subscribers, id)
+		close(ch)
+	}
+	b.mu.Unlock()
 }
 
 // publishObserveTick says observe data changed; the payload is the store's

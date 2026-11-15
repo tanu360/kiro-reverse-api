@@ -42,6 +42,7 @@ const EVENT_TYPES: readonly AdminEventType[] = [
   "settings_changed",
   "stats_reset",
   "account_heal",
+  "update_changed",
 ];
 
 const OBSERVE_DEBOUNCE_MS = 1200;
@@ -53,7 +54,8 @@ type ChangeEventType =
   | "accounts_changed"
   | "api_keys_changed"
   | "settings_changed"
-  | "stats_reset";
+  | "stats_reset"
+  | "update_changed";
 
 /**
  * What each change event refetches. Account events refresh the list only: the detail queries
@@ -70,6 +72,8 @@ const CHANGE_INVALIDATIONS: Record<ChangeEventType, ReadonlyArray<readonly unkno
   ],
   api_keys_changed: [queryKeys.apiKeys.all],
   settings_changed: [queryKeys.settings.all, queryKeys.observe.overview()],
+  // The self-update's download progress and state (proxy/update_api.go).
+  update_changed: [queryKeys.update],
   stats_reset: [
     queryKeys.status,
     queryKeys.observe.all,

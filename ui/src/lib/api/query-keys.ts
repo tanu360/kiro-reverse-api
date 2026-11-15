@@ -4,6 +4,8 @@ export const queryKeys = {
   status: ["status"] as const,
   version: ["version"] as const,
   remoteVersion: ["remote-version"] as const,
+  /** GET /update: the self-update (proxy/update_api.go). */
+  update: ["update"] as const,
   firstRun: ["first-run"] as const,
   accounts: {
     all: ["accounts"] as const,

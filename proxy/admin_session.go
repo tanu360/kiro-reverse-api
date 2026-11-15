@@ -142,6 +142,66 @@ func (s *adminSessionStore) RevokeAllExcept(keep string) {
 	}
 }
 
+// sessionHandoff is one session as Export writes it.
+type sessionHandoff struct {
+	Token   string    `json:"token"`
+	Expires time.Time `json:"expires"`
+}
+
+// maxHandoffTokenLen bounds an imported token; the store's own are 64 characters.
+const maxHandoffTokenLen = 256
+
+// Export returns the unexpired sessions with their expiry as JSON, or nil when there are none,
+// so the process a self-update restarts into keeps the admin signed in. EventSource tickets are
+// left out: they last seconds, and the page asks for a new one when it reconnects.
+func (s *adminSessionStore) Export() []byte {
+	now := time.Now()
+	s.mu.Lock()
+	s.pruneLocked(now)
+	list := make([]sessionHandoff, 0, len(s.sessions))
+	for token, expiry := range s.sessions {
+		list = append(list, sessionHandoff{Token: token, Expires: expiry})
+	}
+	s.mu.Unlock()
+	if len(list) == 0 {
+		return nil
+	}
+	data, err := json.Marshal(list)
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+// Import adds the sessions Export wrote and returns how many it kept. Expired ones are dropped,
+// none outlives the TTL it was issued with, and the store's cap still holds.
+func (s *adminSessionStore) Import(data []byte) int {
+	var list []sessionHandoff
+	if err := json.Unmarshal(data, &list); err != nil {
+		return 0
+	}
+	now := time.Now()
+	latest := now.Add(adminSessionTTL)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pruneLocked(now)
+	kept := 0
+	for _, entry := range list {
+		if entry.Token == "" || len(entry.Token) > maxHandoffTokenLen || !entry.Expires.After(now) {
+			continue
+		}
+		if len(s.sessions) >= maxAdminSessions {
+			break
+		}
+		if entry.Expires.After(latest) {
+			entry.Expires = latest
+		}
+		s.sessions[entry.Token] = entry.Expires
+		kept++
+	}
+	return kept
+}
+
 // IssueTicket mints a single-use credential for one EventSource connect.
 func (s *adminSessionStore) IssueTicket() (string, time.Time, error) {
 	ticket, err := newSecret()

@@ -1,31 +1,34 @@
 import {
+  AlertCircleIcon,
   ArrowRight02Icon,
+  CheckmarkCircle02Icon,
+  Download04Icon,
   ExternalLinkIcon,
-  SparklesIcon,
-  WrenchIcon,
+  InformationCircleIcon,
+  ReloadIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type JSX, type ReactNode, useId, useMemo, useState } from "react";
 import { ChoiceCard } from "@/components/shared/choice-card";
 import { CopyField } from "@/components/shared/code-field";
+import { IconChip } from "@/components/shared/icon-chip";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Radio,
-  RadioGroup,
-  RadioGroupPrimitive,
-  RadioPrimitive,
-} from "@/components/ui/radio-group";
+import { Card } from "@/components/ui/card";
+import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
+import { Radio, RadioGroup } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs";
+import { Spinner } from "@/components/ui/spinner";
 import { CodeText } from "@/features/api/code-text";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import type { RemoteVersionJson, VersionResponse } from "@/lib/api/types";
-import { formatNumber } from "@/lib/format";
+import type { UpdateStatus } from "@/lib/api/update";
+import { formatBytes, formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn, keyByText } from "@/lib/utils";
+import type { SelfUpdate } from "./self-update";
 import { GITHUB_URL } from "./user-menu";
 
 /*
@@ -63,8 +66,6 @@ const LEADING_EMOJI = /^(\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictogra
 const LEADING_BULLET = /^[-*•]\s+/;
 /** "New:", "Fixed:" and the like, set in medium weight. */
 const LEADING_TAG = /^((?:new|fixed|fix|changed|improved|removed|breaking|security)\s*:)\s*/i;
-/** The tags that file a line under Fixes. */
-const FIX_TAG = /^fix(?:ed)?\s*:$/i;
 /**
  * A plain lowercase first word ("the", "a", "self-heal"), capitalised once its "Fixed:" is gone.
  * A name such as max_tokens or deepseek-3.2 keeps its case.
@@ -104,23 +105,14 @@ export function capitalizeFirst(text: string): string {
 }
 
 /**
- * The changelog in two lists: the "Fixed:" lines (without the tag, capitalised) and everything
- * else, each in its original order.
+ * The changelog as one plain list in its own order, without the "New:" or "Fixed:" tags (the
+ * dialog does not sort changes into kinds); a tagged line starts with a capital once its tag is
+ * gone.
  */
-export function splitChangelog(changelog: string | undefined): {
-  news: ChangelogLine[];
-  fixes: ChangelogLine[];
-} {
-  const news: ChangelogLine[] = [];
-  const fixes: ChangelogLine[] = [];
-  for (const line of parseChangelog(changelog ?? "")) {
-    if (line.tag && FIX_TAG.test(line.tag)) {
-      fixes.push({ ...line, tag: null, text: capitalizeFirst(line.text) });
-    } else {
-      news.push(line);
-    }
-  }
-  return { news, fixes };
+export function plainChangelog(changelog: string | undefined): ChangelogLine[] {
+  return parseChangelog(changelog ?? "").map((line) =>
+    line.tag ? { ...line, tag: null, text: capitalizeFirst(line.text) } : line,
+  );
 }
 
 export interface ReleaseArchive {
@@ -176,6 +168,7 @@ export function UpdateDialog({
   current,
   latest,
   server,
+  selfUpdate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -183,17 +176,18 @@ export function UpdateDialog({
   latest: RemoteVersionJson | null;
   /** GET /admin/api/version: the server's platform and whether it runs in a container. */
   server?: VersionResponse;
+  /** The download-and-restart flow, for a server that installs releases itself (self-update.tsx). */
+  selfUpdate?: SelfUpdate;
 }): JSX.Element {
   const { t } = useT();
   const download = latest?.download ?? "";
   // Only an https link from the remote file is followed; otherwise the repository.
   const projectUrl = download.startsWith("https://") ? download : GITHUB_URL;
   const next = latest?.version ? stripV(latest.version) : "";
-  const changes = useMemo(() => splitChangelog(latest?.changelog), [latest?.changelog]);
-  const hasChanges = changes.news.length + changes.fixes.length > 0;
-  // Phones: top-anchored, the dialog fills the 90dvh box whatever it shows, one pane at a time
-  // behind two tabs. From sm up the panes sit side by side in a body of one fixed height. Either
-  // way no tab, filter or method changes the dialog's height: each pane scrolls on its own.
+  const changes = useMemo(() => plainChangelog(latest?.changelog), [latest?.changelog]);
+  // Phones: top-anchored, the dialog fills the 90dvh box whatever it shows. From sm up the body
+  // has one fixed height. Either way no method or download state changes the dialog's height:
+  // the body scrolls instead.
   const phone = useMediaQuery("max-sm");
 
   return (
@@ -214,7 +208,7 @@ export function UpdateDialog({
       onOpenChange={onOpenChange}
       open={open}
       panel={false}
-      size={hasChanges ? "3xl" : "lg"}
+      size="lg"
       title={
         // The title, then a pill that reads the change: the running version, an arrow, the new
         // one in purple. It wraps under the title when a translation is long.
@@ -238,195 +232,313 @@ export function UpdateDialog({
         </span>
       }
     >
-      <UpdateBody changes={changes} latest={next} phone={phone} server={server} />
+      <UpdateBody
+        changes={changes}
+        latest={next}
+        releaseUrl={projectUrl}
+        selfUpdate={selfUpdate}
+        server={server}
+      />
     </ResponsiveDialog>
   );
 }
 
 /*
- * The body under the header: a hairline, then one fixed height from sm up (480 px), so the
- * dialog never grows or shrinks; on phones it takes what the 90dvh dialog leaves.
+ * The body under the header: a hairline, then one scroll box of one fixed height from sm up
+ * (544 px, room for the changes and the download without scrolling), so the dialog never grows
+ * or shrinks with a method or the download's state; on phones it takes what the 90dvh dialog
+ * leaves.
  */
-const BODY = "flex min-h-0 flex-1 flex-col border-border-subtle border-t sm:h-120 sm:flex-none";
+const BODY = "min-h-0 flex-1 border-border-subtle border-t sm:h-136 sm:flex-none";
 
-type Pane = "changes" | "how";
+/** How many changes the dialog lists, each at most two lines; the rest are on the release page. */
+const PREVIEW_LINES = 3;
+
+/** In a container only the Docker ways apply: the binary would be lost with the container. */
+const DOCKER_METHODS: readonly UpdateMethod[] = ["compose", "image"];
 
 /**
- * The changes and How to update. From sm up they are two panes side by side, How to update on
- * the inset tint at the end; on phones two underlined tabs show one at a time. Without a
- * changelog How to update is the whole body.
+ * One simple page: a few of the release's changes with a link to all of them, then the update
+ * itself. A server that installs releases itself gets the download and the restart, with the
+ * steps by hand one link away; any other gets the steps: in a container only the Docker ways,
+ * and for a binary that cannot write its own folder, a note that says so.
  */
 function UpdateBody({
   changes,
   latest,
-  phone,
+  releaseUrl,
   server,
+  selfUpdate,
 }: {
-  changes: { news: ChangelogLine[]; fixes: ChangelogLine[] };
+  changes: ChangelogLine[];
   /** The new version, for the step that says what the sidebar shows after the update. */
   latest: string;
-  phone: boolean;
+  /** The release page on GitHub, where every change is listed. */
+  releaseUrl: string;
   server?: VersionResponse;
+  selfUpdate?: SelfUpdate;
 }): JSX.Element {
-  const { t, lang } = useT();
-  const [pane, setPane] = useState<Pane>("changes");
-  const total = changes.news.length + changes.fixes.length;
-
-  if (total === 0) {
-    return (
-      <div className={BODY}>
-        <HowToUpdate heading={!phone} latest={latest} server={server} />
-      </div>
-    );
-  }
-  if (phone) {
-    return (
-      <Tabs
-        className="min-h-0 flex-1 gap-0"
-        onValueChange={(value) => setPane(value as Pane)}
-        value={pane}
-      >
-        {/* The strip lines up with the dialog's 16 px phone edge, as the header above it. */}
-        <div className="px-4">
-          <TabsList aria-label={t("shell.update.title")} variant="underline">
-            <TabsTab value="changes">
-              {t("shell.update.tabChanges")}
-              <Badge
-                className="min-w-5"
-                size="sm"
-                tone={pane === "changes" ? "primary" : "neutral"}
-              >
-                {formatNumber(total, lang)}
-              </Badge>
-            </TabsTab>
-            <TabsTab value="how">{t("shell.update.howTo")}</TabsTab>
-          </TabsList>
-        </div>
-        {/* The scroll box inside is the tab stop while it overflows, so the panel is not one. */}
-        <TabsPanel className="flex min-h-0 flex-col" tabIndex={-1} value="changes">
-          <ChangesPane fixes={changes.fixes} news={changes.news} />
-        </TabsPanel>
-        <TabsPanel className="flex min-h-0 flex-col" tabIndex={-1} value="how">
-          <HowToUpdate heading={false} latest={latest} server={server} />
-        </TabsPanel>
-      </Tabs>
-    );
-  }
+  const { t } = useT();
+  const howId = useId();
   return (
-    <div className={cn(BODY, "grid grid-cols-[minmax(0,1fr)_22rem]")}>
-      <ChangesPane fixes={changes.fixes} news={changes.news} />
-      <div className="flex min-h-0 flex-col border-border-subtle border-s bg-surface-inset">
-        <HowToUpdate heading latest={latest} server={server} />
+    <ScrollArea className={BODY} overscrollContain scrollFade>
+      <div className="flex flex-col gap-5 px-6 pt-4 pb-5 max-sm:px-4">
+        {changes.length > 0 ? <ChangesPreview changes={changes} releaseUrl={releaseUrl} /> : null}
+        <section aria-labelledby={howId} className="flex flex-col gap-3">
+          <h3 className="font-semibold text-heading" id={howId}>
+            {t("shell.update.howTo")}
+          </h3>
+          {!server?.docker && selfUpdate?.available ? (
+            <SelfUpdatePane latest={latest} server={server} update={selfUpdate} />
+          ) : (
+            <HowToUpdate
+              latest={latest}
+              methods={server?.docker ? DOCKER_METHODS : undefined}
+              notice={<UnsupportedNotice status={selfUpdate?.status} />}
+              server={server}
+            />
+          )}
+        </section>
       </div>
-    </div>
+    </ScrollArea>
   );
 }
 
-/** A pane's top row: one 32 px line (the filter's height), so both panes' rows line up. */
-const PANE_TOP = "flex min-h-8 shrink-0 items-center px-6 pt-4 pb-3 max-sm:px-4";
-/** A pane's scrolling part: its own scroll box, fading the edge that has more past it. */
-const PANE_SCROLL = "min-h-0 flex-1";
-const PANE_CONTENT = "px-6 pb-6 max-sm:px-4";
+/** The first few changes as they come, then a link to every change on the release page. */
+function ChangesPreview({
+  changes,
+  releaseUrl,
+}: {
+  changes: ChangelogLine[];
+  releaseUrl: string;
+}): JSX.Element {
+  const { t, lang } = useT();
+  const id = useId();
+  const more = changes.length > PREVIEW_LINES;
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-3">
+      <h3 className="font-semibold text-heading" id={id}>
+        {t("shell.update.changesTitle")}
+      </h3>
+      <ChangeList clamp labelledBy={id} lines={changes.slice(0, PREVIEW_LINES)} />
+      <p className="text-sm">
+        <Button
+          render={<a href={releaseUrl} rel="noopener noreferrer" target="_blank" />}
+          variant="link-action"
+        >
+          {more
+            ? t("shell.update.seeAll", { count: formatNumber(changes.length, lang) })
+            : t("shell.update.viewRelease")}
+          <HugeiconsIcon aria-hidden="true" icon={ExternalLinkIcon} />
+        </Button>
+      </p>
+    </section>
+  );
+}
 
-type ChangeFilter = "all" | "news" | "fixes";
+/** Why a binary install updates by hand: its folder is read-only, or no archive fits it. */
+function UnsupportedNotice({ status }: { status?: UpdateStatus }): JSX.Element | null {
+  const { t } = useT();
+  if (status?.reason !== "not_writable" && status?.reason !== "platform") return null;
+  return (
+    <Alert variant="info">
+      <HugeiconsIcon aria-hidden="true" icon={InformationCircleIcon} />
+      <AlertDescription className="wrap-break-word">
+        {/* One paragraph, so the path runs inline: the description lays its children out as a column. */}
+        <p>
+          {status.reason === "not_writable" ? (
+            <CodeText
+              code={{ path: status.path ?? "kiro-proxy" }}
+              text={t("shell.update.notWritable")}
+            />
+          ) : (
+            t("shell.update.noPlatform")
+          )}
+        </p>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 /**
- * The changelog. With both kinds of lines, a filter shows All (New, then Fixes, each under its
- * label), New or Fixes, with their counts; with one kind, its name heads the list instead.
+ * The update on a server that installs releases itself: the release for this server's platform,
+ * one button that downloads and checks it, its progress, then one button that restarts on it.
+ * The steps by hand stay one link away.
  */
-function ChangesPane({
-  news,
-  fixes,
+function SelfUpdatePane({
+  latest,
+  server,
+  update,
 }: {
-  news: ChangelogLine[];
-  fixes: ChangelogLine[];
+  latest: string;
+  server?: VersionResponse;
+  update: SelfUpdate;
 }): JSX.Element {
-  const { t, lang } = useT();
-  const [filter, setFilter] = useState<ChangeFilter>("all");
-  const both = news.length > 0 && fixes.length > 0;
-  const shown: ChangeFilter = both ? filter : news.length > 0 ? "news" : "fixes";
-  const options: { value: ChangeFilter; label: string; count: number }[] = [
-    { value: "all", label: t("shell.update.filterAll"), count: news.length + fixes.length },
-    { value: "news", label: t("shell.update.tabNews"), count: news.length },
-    { value: "fixes", label: t("shell.update.tabFixes"), count: fixes.length },
-  ];
-
+  const { t } = useT();
+  const [manual, setManual] = useState(false);
+  if (manual) {
+    return (
+      <HowToUpdate
+        footer={
+          <p className="text-sm">
+            <Button onClick={() => setManual(false)} variant="link-action">
+              {t("shell.update.automatic")}
+            </Button>
+          </p>
+        }
+        latest={latest}
+        server={server}
+      />
+    );
+  }
   return (
-    <div className="flex min-h-0 flex-col">
-      <div className={PANE_TOP}>
-        {both ? (
-          // A radio group: one tab stop, the arrow keys move the choice.
-          <SegmentedControl
-            render={
-              <RadioGroupPrimitive
-                aria-label={t("shell.update.filter")}
-                onValueChange={(value) => setFilter(value as ChangeFilter)}
-                value={filter}
-              />
-            }
-            size="sm"
-          >
-            {options.map((option) => (
-              <SegmentedControlItem
-                className="gap-1.5"
-                key={option.value}
-                render={<RadioPrimitive.Root value={option.value} />}
-              >
-                {option.label}
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {formatNumber(option.count, lang)}
-                </span>
-              </SegmentedControlItem>
-            ))}
-          </SegmentedControl>
-        ) : (
-          <h3 className="font-semibold text-heading">
-            {shown === "news" ? t("shell.update.tabNews") : t("shell.update.tabFixes")}
-          </h3>
-        )}
-      </div>
-      <ScrollArea className={PANE_SCROLL} overscrollContain scrollFade>
-        <div className={cn(PANE_CONTENT, "flex flex-col gap-5")}>
-          {shown !== "fixes" ? (
-            <ChangeGroup
-              icon={SparklesIcon}
-              label={shown === "all" ? t("shell.update.tabNews") : undefined}
-              lines={news}
-            />
-          ) : null}
-          {shown !== "news" ? (
-            <ChangeGroup
-              icon={WrenchIcon}
-              label={shown === "all" ? t("shell.update.tabFixes") : undefined}
-              lines={fixes}
-            />
-          ) : null}
-        </div>
-      </ScrollArea>
+    <div className="flex flex-col gap-3">
+      <SelfUpdateCard latest={latest} server={server} update={update} />
+      {update.phase === "restarting" ? null : (
+        <p className="text-sm">
+          <Button onClick={() => setManual(true)} variant="link-action">
+            {t("shell.update.manual")}
+          </Button>
+        </p>
+      )}
     </div>
   );
 }
 
-/** One list of changes, under a small label with its icon when All shows both lists. */
-function ChangeGroup({
-  icon,
-  label,
-  lines,
+/** The release to install, then what the update is doing and the one action that fits. */
+function SelfUpdateCard({
+  latest,
+  server,
+  update,
 }: {
-  icon: typeof SparklesIcon;
-  label?: string;
-  lines: ChangelogLine[];
+  latest: string;
+  server?: VersionResponse;
+  update: SelfUpdate;
 }): JSX.Element {
-  const id = useId();
-  if (!label) return <ChangeList lines={lines} />;
+  const { t, lang } = useT();
+  const archive = releaseArchive(server);
+  const status = update.status;
+  const platform = t(archive.platformLabel);
+
+  let body: ReactNode;
+  switch (update.phase) {
+    case "starting":
+    case "downloading": {
+      const { downloaded, total, progress } = status ?? {};
+      const amount =
+        total !== undefined && progress !== undefined
+          ? t("shell.update.downloadedOf", {
+              downloaded: formatBytes(downloaded ?? 0, lang),
+              total: formatBytes(total, lang),
+              percent: progress,
+            })
+          : undefined;
+      body = (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
+            <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+              <Spinner aria-hidden="true" className="size-3" />
+              {t("shell.update.downloading")}
+            </span>
+            {amount ? <span className="text-muted-foreground tabular-nums">{amount}</span> : null}
+          </div>
+          <Meter
+            aria-label={t("shell.update.progressLabel")}
+            getAriaValueText={() => amount ?? t("shell.update.downloading")}
+            value={progress ?? 0}
+          >
+            <MeterTrack className="h-1.5">
+              <MeterIndicator />
+            </MeterTrack>
+          </Meter>
+          <p className="text-muted-foreground text-xs leading-normal">
+            {t("shell.update.downloadNote")}
+          </p>
+        </div>
+      );
+      break;
+    }
+    case "ready":
+      body = (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="inline-flex items-center gap-1.5 font-medium text-sm text-success-foreground">
+              <HugeiconsIcon aria-hidden="true" className="size-4" icon={CheckmarkCircle02Icon} />
+              {t("shell.update.readyTitle")}
+            </p>
+            <p className="text-pretty text-muted-foreground text-sm leading-relaxed">
+              {t("shell.update.readyBody", { latest })}
+            </p>
+          </div>
+          <Button className="w-full" onClick={update.restart}>
+            <HugeiconsIcon aria-hidden="true" icon={ReloadIcon} />
+            {t("shell.update.restart")}
+          </Button>
+          <p className="text-pretty text-muted-foreground text-xs leading-normal">
+            {t("shell.update.restartNote")}
+          </p>
+        </div>
+      );
+      break;
+    case "restarting":
+      body = (
+        <div aria-live="polite" className="flex flex-col gap-1">
+          <p className="inline-flex items-center gap-1.5 font-medium text-foreground text-sm">
+            <Spinner aria-hidden="true" className="size-3.5" />
+            {t("shell.update.restarting")}
+          </p>
+          <p className="text-pretty text-muted-foreground text-sm leading-relaxed">
+            {t("shell.update.restartingNote", { latest })}
+          </p>
+        </div>
+      );
+      break;
+    case "error":
+      body = (
+        <div className="flex flex-col gap-3">
+          <Alert variant="error">
+            <HugeiconsIcon aria-hidden="true" icon={AlertCircleIcon} />
+            <AlertTitle>{t("shell.update.failedTitle")}</AlertTitle>
+            {update.error ? (
+              <AlertDescription className="wrap-break-word">{update.error}</AlertDescription>
+            ) : null}
+          </Alert>
+          <Button className="w-full" onClick={update.start} variant="outline">
+            <HugeiconsIcon aria-hidden="true" icon={Download04Icon} />
+            {t("shell.update.retry")}
+          </Button>
+        </div>
+      );
+      break;
+    default:
+      body = (
+        <div className="flex flex-col gap-3">
+          <p className="text-pretty text-muted-foreground text-xs leading-normal">
+            {t("shell.update.autoIntro", { platform })}
+          </p>
+          <Button className="w-full" onClick={update.start}>
+            <HugeiconsIcon aria-hidden="true" icon={Download04Icon} />
+            {t("shell.update.download")}
+          </Button>
+        </div>
+      );
+  }
+
   return (
-    <div className="flex flex-col gap-2.5">
-      <p className="flex items-center gap-1.5 font-medium text-meta text-muted-foreground" id={id}>
-        <HugeiconsIcon aria-hidden="true" className="size-3.5" icon={icon} />
-        {label}
-      </p>
-      <ChangeList labelledBy={id} lines={lines} />
-    </div>
+    <Card className="gap-4" data-phase={update.phase} data-slot="self-update-card" size="sm">
+      <div className="flex items-center gap-3">
+        <IconChip icon={Download04Icon} size="md" />
+        <div className="flex min-w-0 flex-col">
+          <p className="font-medium text-foreground text-sm">
+            {t("shell.update.cardTitle", { latest })}
+          </p>
+          <p className="truncate text-muted-foreground text-xs">
+            {platform} · {archive.file}
+          </p>
+        </div>
+      </div>
+      {body}
+    </Card>
   );
 }
 
@@ -437,10 +549,13 @@ function ChangeGroup({
 function ChangeList({
   lines,
   labelledBy,
+  clamp = false,
 }: {
   lines: ChangelogLine[];
-  /** The label the list sits under, when All shows both lists. */
+  /** The heading the list sits under. */
   labelledBy?: string;
+  /** At most two lines a change (the dialog's short list; the release page has them whole). */
+  clamp?: boolean;
 }): JSX.Element {
   return (
     <ul aria-labelledby={labelledBy} className="flex flex-col gap-2.5">
@@ -452,7 +567,12 @@ function ChangeList({
           >
             {line.marker ?? <span className="size-1.5 rounded-full bg-muted-foreground" />}
           </span>
-          <span className="min-w-0 text-pretty wrap-break-word text-foreground/90">
+          <span
+            className={cn(
+              "min-w-0 text-pretty wrap-break-word text-foreground/90",
+              clamp && "line-clamp-2",
+            )}
+          >
             {line.tag ? <span className="font-medium text-foreground">{line.tag} </span> : null}
             {line.text}
           </span>
@@ -475,18 +595,27 @@ const UPDATE_METHODS = [
  * the browser's; its card says which.
  */
 function HowToUpdate({
-  heading,
   latest,
   server,
+  methods,
+  notice,
+  footer,
 }: {
-  /** Shows "How to update" over the cards (a phone's tab already says it). */
-  heading: boolean;
   latest: string;
   server?: VersionResponse;
+  /** The ways to offer; all three by default. */
+  methods?: readonly UpdateMethod[];
+  /** A note over the cards (why this server does not update itself). */
+  notice?: ReactNode;
+  /** After the steps (the link back to the automatic update). */
+  footer?: ReactNode;
 }): JSX.Element {
   const { t } = useT();
+  const offered = UPDATE_METHODS.filter((item) => !methods || methods.includes(item.id));
   const preferred = preferredMethod(server);
-  const [method, setMethod] = useState<UpdateMethod>(preferred);
+  const [method, setMethod] = useState<UpdateMethod>(
+    offered.some((item) => item.id === preferred) ? preferred : (offered[0]?.id ?? "compose"),
+  );
   const archive = releaseArchive(server);
   // Only a server that reported its platform or container gets a recommendation.
   const reported = Boolean(server?.docker || server?.os);
@@ -550,42 +679,35 @@ function HowToUpdate({
   }
 
   return (
-    <>
-      {heading ? (
-        <div className={PANE_TOP}>
-          <h3 className="font-semibold text-heading">{t("shell.update.howTo")}</h3>
-        </div>
-      ) : null}
-      <ScrollArea className={PANE_SCROLL} overscrollContain scrollFade>
-        <div className={cn(PANE_CONTENT, "flex flex-col gap-5", !heading && "pt-4")}>
-          <RadioGroup
-            aria-label={t("shell.update.method")}
-            className="gap-2"
-            onValueChange={(value) => setMethod(value as UpdateMethod)}
-            value={method}
-          >
-            {UPDATE_METHODS.map((item) => (
-              <ChoiceCard
-                control={(id) => <Radio id={id} value={item.id} />}
-                description={item.hint ? t(item.hint) : t(archive.platformLabel)}
-                key={item.id}
-                title={
-                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {t(item.label)}
-                    {reported && item.id === preferred ? (
-                      <Badge size="sm" tone="primary">
-                        {t("shell.update.recommended")}
-                      </Badge>
-                    ) : null}
-                  </span>
-                }
-              />
-            ))}
-          </RadioGroup>
-          <UpdateSteps steps={steps} />
-        </div>
-      </ScrollArea>
-    </>
+    <div className="flex flex-col gap-5">
+      {notice}
+      <RadioGroup
+        aria-label={t("shell.update.method")}
+        className="gap-2"
+        onValueChange={(value) => setMethod(value as UpdateMethod)}
+        value={method}
+      >
+        {offered.map((item) => (
+          <ChoiceCard
+            control={(id) => <Radio id={id} value={item.id} />}
+            description={item.hint ? t(item.hint) : t(archive.platformLabel)}
+            key={item.id}
+            title={
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {t(item.label)}
+                {reported && item.id === preferred ? (
+                  <Badge size="sm" tone="primary">
+                    {t("shell.update.recommended")}
+                  </Badge>
+                ) : null}
+              </span>
+            }
+          />
+        ))}
+      </RadioGroup>
+      <UpdateSteps steps={steps} />
+      {footer}
+    </div>
   );
 }
 

@@ -13,6 +13,7 @@ import {
 import { makeLiveRequest } from "./fixtures-full";
 import { apiUrl, jsonError, mockDelay, requireAuth } from "./http";
 import { MOCK_TOTP_QR_SVG, MOCK_TOTP_SECRET, MOCK_TOTP_URI, totpMatch } from "./totp";
+import { mockRestarting, mockServerInfo } from "./update";
 
 const SESSION_TTL_MS = (import.meta.env.VITE_MOCK === "1" ? 30 * 24 : 12) * 3600 * 1000;
 const TICKET_TTL_MS = 30 * 1000;
@@ -531,14 +532,11 @@ export const coreHandlers: HttpHandler[] = [
   }),
 
   http.get(apiUrl("/version"), async ({ request }) => {
+    // Down while a self-update restarts it (update.ts), like the real server between processes.
+    if (mockRestarting()) return HttpResponse.error();
     const denied = requireAuth(request);
     if (denied) return denied;
-    return HttpResponse.json({
-      version: `v${mockDb.version}`,
-      os: "linux",
-      arch: "amd64",
-      docker: true,
-    });
+    return HttpResponse.json({ version: `v${mockDb.version}`, ...mockServerInfo() });
   }),
 
   // The update check answers with the running version (small and empty datasets), so no update

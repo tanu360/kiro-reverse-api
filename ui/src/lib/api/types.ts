@@ -222,7 +222,8 @@ export type AdminEventType =
   | "api_keys_changed"
   | "settings_changed"
   | "stats_reset"
-  | "account_heal";
+  | "account_heal"
+  | "update_changed";
 
 // ---------------------------------------------------------------------------
 // Stats, status, version, machine id

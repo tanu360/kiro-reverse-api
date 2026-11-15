@@ -3,13 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VersionResponse } from "@/lib/api/types";
 import { copyText } from "@/lib/clipboard";
 import { renderWithProviders } from "@/test/render";
+import type { SelfUpdate } from "./self-update";
 import {
   binaryCommand,
   capitalizeFirst,
   parseChangelog,
+  plainChangelog,
   preferredMethod,
   releaseArchive,
-  splitChangelog,
   UpdateDialog,
 } from "./update-dialog";
 import { GITHUB_URL } from "./user-menu";
@@ -67,24 +68,23 @@ describe("parseChangelog", () => {
   });
 });
 
-describe("splitChangelog", () => {
-  it("files Fixed: and Fix: lines under fixes, without the tag and capitalised", () => {
-    const { news, fixes } = splitChangelog(
-      "🔑 New: keys\n🔧 Fixed: the toast\n🔧 fix: a crash\n⚙️ Changed: defaults",
+describe("plainChangelog", () => {
+  it("keeps the changelog's order and drops every kind tag, capitalising what follows", () => {
+    const lines = plainChangelog(
+      "🔑 New: keys\n🔧 Fixed: the toast\n🔧 fix: a crash\n⚙️ Changed: defaults\n📦 Binaries",
     );
-    expect(news.map((line) => [line.tag, line.text])).toEqual([
-      ["New:", "keys"],
-      ["Changed:", "defaults"],
-    ]);
-    expect(fixes.map((line) => [line.marker, line.tag, line.text])).toEqual([
+    expect(lines.map((line) => [line.marker, line.tag, line.text])).toEqual([
+      ["🔑", null, "Keys"],
       ["🔧", null, "The toast"],
       ["🔧", null, "A crash"],
+      ["⚙️", null, "Defaults"],
+      ["📦", null, "Binaries"],
     ]);
   });
 
-  it("gives empty lists for a missing or blank changelog", () => {
-    expect(splitChangelog(undefined)).toEqual({ news: [], fixes: [] });
-    expect(splitChangelog("  \n ")).toEqual({ news: [], fixes: [] });
+  it("gives an empty list for a missing or blank changelog", () => {
+    expect(plainChangelog(undefined)).toEqual([]);
+    expect(plainChangelog("  \n ")).toEqual([]);
   });
 });
 
@@ -189,79 +189,60 @@ describe("UpdateDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the changes and How to update side by side, with no tabs", async () => {
-    renderDialog();
-    expect(await screen.findByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "How to update" })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "New" })).toBeInTheDocument();
-    expect(screen.queryByRole("tablist")).toBeNull();
-  });
-
-  it("filters the changes: All shows New then Fixes, each list on its own", async () => {
-    const { user } = renderDialog();
-    const filter = await screen.findByRole("radiogroup", { name: "Changes to show" });
-    expect(
-      within(filter)
-        .getAllByRole("radio")
-        .map((radio) => radio.textContent),
-    ).toEqual(["All4", "New2", "Fixes2"]);
-    expect(within(filter).getByRole("radio", { name: /^All/ })).toBeChecked();
-    expect(listTexts(screen.getByRole("list", { name: "New" }))).toEqual([
+  it("lists the first changes as they come, without kinds, and links to all of them", async () => {
+    renderDialog({
+      changelog: [
+        "🔑 New keys for every client",
+        "🔧 Fixed: max_tokens now cuts the answer on every API",
+        "📦 Release binaries for six platforms",
+        "🔧 Fixed: the duplicate accounts dialog explains each step",
+        "🧭 Request details list every attempt",
+        "🔔 Alerts by webhook",
+      ].join("\n"),
+    });
+    const list = await screen.findByRole("list", { name: "What's new" });
+    expect(listTexts(list)).toEqual([
       "🔑New keys for every client",
+      "🔧max_tokens now cuts the answer on every API",
       "📦Release binaries for six platforms",
     ]);
-    const fixes = screen.getByRole("list", { name: "Fixes" });
-    expect(listTexts(fixes)).toEqual([
-      "🔧max_tokens now cuts the answer on every API",
-      "🔧The duplicate accounts dialog explains each step",
-    ]);
-    expect(within(fixes).queryByText(/Fixed:/)).toBeNull();
-
-    await user.click(within(filter).getByRole("radio", { name: /^Fixes/ }));
-    expect(screen.queryByText("New keys for every client")).toBeNull();
-    expect(screen.getByText("max_tokens now cuts the answer on every API")).toBeInTheDocument();
-  });
-
-  it("moves the filter with the arrow keys", async () => {
-    const { user } = renderDialog();
-    const all = await screen.findByRole("radio", { name: /^All/ });
-    all.focus();
-    await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("radio", { name: /^New/ })).toBeChecked();
-    expect(screen.queryByText("max_tokens now cuts the answer on every API")).toBeNull();
-  });
-
-  it("drops the filter when the changelog has one kind of line, and names that kind", async () => {
-    const { unmount } = renderDialog({ changelog: "🔑 New keys\n📦 Binaries" });
-    expect(await screen.findByRole("heading", { name: "New" })).toBeInTheDocument();
+    expect(within(list).queryByText(/Fixed:/)).toBeNull();
+    expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.queryByRole("radiogroup", { name: "Changes to show" })).toBeNull();
-    unmount();
+    expect(screen.getByRole("link", { name: /See all 6 changes on GitHub/ })).toHaveAttribute(
+      "href",
+      RELEASES,
+    );
+  });
 
-    renderDialog({ changelog: "🔧 Fixed: a crash" });
-    expect(await screen.findByRole("heading", { name: "Fixes" })).toBeInTheDocument();
-    expect(screen.getByText("A crash")).toBeInTheDocument();
+  it("links to the release when every change fits", async () => {
+    renderDialog({ changelog: "🔑 New keys\n🔧 Fixed: a crash" });
+    expect(await screen.findByRole("link", { name: /View the release on GitHub/ })).toHaveAttribute(
+      "href",
+      RELEASES,
+    );
+  });
+
+  it("puts How to update right under the changes, with no tabs", async () => {
+    renderDialog();
+    expect(await screen.findByRole("heading", { name: "What's new" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "How to update" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).toBeNull();
   });
 
   it("shows only How to update when there is no changelog", async () => {
     renderDialog({ changelog: "" });
     expect(await screen.findByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
-    expect(screen.queryByRole("radiogroup", { name: "Changes to show" })).toBeNull();
-    // The one list is the update steps.
-    expect(screen.getAllByRole("list")).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "What's new" })).toBeNull();
   });
 
-  it("puts the changes and How to update behind two tabs on a phone", async () => {
+  it("keeps the same simple page on a phone", async () => {
     asPhone();
-    const { user } = renderDialog();
-    const tabs = await screen.findAllByRole("tab");
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["Changes4", "How to update"]);
-    expect(screen.getByRole("tab", { name: /^Changes/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("list", { name: "New" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("tab", { name: "How to update" }));
-    expect(await screen.findByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
-    // The tab names the pane, so the pane has no heading of its own.
-    expect(screen.queryByRole("heading", { name: "How to update" })).toBeNull();
+    renderDialog();
+    expect(await screen.findByRole("list", { name: "What's new" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).toBeNull();
   });
 
   it("opens on the binary for a server outside a container, with its own archive", async () => {
@@ -287,9 +268,10 @@ describe("UpdateDialog", () => {
     expect(await copyTextMock.mock.calls[0]?.[0]).toBe(box.textContent);
   });
 
-  it("opens on Docker Compose in a container, and every method stays reachable", async () => {
+  it("offers only the Docker ways in a container, Compose first", async () => {
     const { user } = renderDialog({ changelog: "", server: { ...LINUX, docker: true } });
     expect(await screen.findByRole("radio", { name: /^Docker Compose/ })).toBeChecked();
+    expect(screen.queryByRole("radio", { name: /^Binary/ })).toBeNull();
     expect(
       screen.getByRole("textbox", { name: "Pull the new code and rebuild the container:" }),
     ).toHaveTextContent("git pull && docker compose up -d --build");
@@ -300,7 +282,23 @@ describe("UpdateDialog", () => {
       "docker pull ghcr.io/tanu360/kiro-reverse-api:latest",
     );
     expect(screen.getByText(/Recreate the container with the same volume/)).toBeInTheDocument();
+  });
 
+  it("shows the changes and only the Docker steps in a container", async () => {
+    renderDialog({ server: { ...LINUX, docker: true } });
+    expect(await screen.findByRole("list", { name: "What's new" })).toBeInTheDocument();
+    const methods = screen.getByRole("radiogroup", { name: "Update method" });
+    expect(within(methods).getAllByRole("radio")).toHaveLength(2);
+    expect(screen.queryByRole("tab")).toBeNull();
+  });
+
+  it("keeps every way reachable for a binary that updates by hand", async () => {
+    const { user } = renderDialog({ changelog: "" });
+    expect(await screen.findByRole("radio", { name: /^Binary/ })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: /^Docker Compose/ }));
+    expect(
+      screen.getByRole("textbox", { name: "Pull the new code and rebuild the container:" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: /^Binary/ }));
     expect(screen.getByRole("textbox", { name: /^In the folder that holds/ })).toHaveTextContent(
       "kiro-proxy-linux-x64.tar.gz",
@@ -343,5 +341,124 @@ describe("UpdateDialog", () => {
       "href",
       GITHUB_URL,
     );
+  });
+});
+
+function selfUpdate(over: Partial<SelfUpdate> = {}): SelfUpdate {
+  return {
+    status: { state: "idle", supported: true },
+    available: true,
+    target: "2.2.0",
+    phase: "idle",
+    start: vi.fn(),
+    restart: vi.fn(),
+    confirmRestart: vi.fn(),
+    ...over,
+  };
+}
+
+function renderSelfUpdate(update: SelfUpdate, changelog = "") {
+  return renderWithProviders(
+    <UpdateDialog
+      current="2.1.0"
+      latest={{ version: "v2.2.0", changelog, download: RELEASES }}
+      onOpenChange={() => {}}
+      open
+      selfUpdate={update}
+      server={LINUX}
+    />,
+  );
+}
+
+describe("UpdateDialog self-update", () => {
+  it("puts the download right under the changes", async () => {
+    const update = selfUpdate();
+    const { user } = renderSelfUpdate(update, CHANGELOG);
+    expect(await screen.findByRole("list", { name: "What's new" })).toBeInTheDocument();
+    expect(screen.getByText("Kiro Proxy 2.2.0")).toBeInTheDocument();
+    expect(screen.getByText(/Linux \(x64\) · kiro-proxy-linux-x64\.tar\.gz/)).toBeInTheDocument();
+    expect(screen.getByText(/downloads the Linux \(x64\) build/)).toBeInTheDocument();
+    // No steps by hand until asked for.
+    expect(screen.queryByRole("radiogroup", { name: "Update method" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Download update" }));
+    expect(update.start).toHaveBeenCalledOnce();
+  });
+
+  it("shows the download's progress", async () => {
+    renderSelfUpdate(
+      selfUpdate({
+        phase: "downloading",
+        status: {
+          state: "downloading",
+          supported: true,
+          version: "2.2.0",
+          progress: 45,
+          downloaded: 4_194_304,
+          total: 9_437_184,
+        },
+      }),
+    );
+    const meter = await screen.findByRole("meter", { name: "Update download" });
+    expect(meter).toHaveAttribute("aria-valuenow", "45");
+    expect(screen.getByText(/of .* · 45%/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Download update" })).toBeNull();
+  });
+
+  it("restarts on the release once it is in place", async () => {
+    const update = selfUpdate({
+      phase: "ready",
+      status: { state: "ready", supported: true, version: "2.2.0" },
+    });
+    const { user } = renderSelfUpdate(update);
+    expect(await screen.findByText("Ready to install")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Restart to update" }));
+    expect(update.restart).toHaveBeenCalledOnce();
+  });
+
+  it("says it is restarting, with no other action", async () => {
+    renderSelfUpdate(selfUpdate({ phase: "restarting" }));
+    expect(await screen.findByText("Restarting…")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Update by hand instead" })).toBeNull();
+  });
+
+  it("shows why it failed and tries again", async () => {
+    const update = selfUpdate({
+      phase: "error",
+      error: "The download does not match the release checksum.",
+    });
+    const { user } = renderSelfUpdate(update);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The update did not finish");
+    expect(alert).toHaveTextContent("The download does not match the release checksum.");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(update.start).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the steps by hand one link away", async () => {
+    const { user } = renderSelfUpdate(selfUpdate());
+    await user.click(await screen.findByRole("button", { name: "Update by hand instead" }));
+    expect(await screen.findByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Update automatically" }));
+    expect(await screen.findByRole("button", { name: "Download update" })).toBeInTheDocument();
+  });
+});
+
+describe("UpdateDialog on a binary that cannot update itself", () => {
+  it("says why a binary updates by hand when it cannot write its own folder", async () => {
+    renderSelfUpdate(
+      selfUpdate({
+        available: false,
+        status: {
+          state: "idle",
+          supported: false,
+          reason: "not_writable",
+          path: "/usr/local/bin/kiro-proxy",
+        },
+      }),
+    );
+    expect(await screen.findByText(/cannot write to/)).toBeInTheDocument();
+    expect(screen.getByText("/usr/local/bin/kiro-proxy", { selector: "code" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Update method" })).toBeInTheDocument();
   });
 });

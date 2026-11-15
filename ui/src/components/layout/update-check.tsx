@@ -12,10 +12,12 @@ import {
 } from "react";
 import { compareVersions, fetchRemoteVersion, versionQuery } from "@/lib/api/system";
 import type { RemoteVersionJson, VersionResponse } from "@/lib/api/types";
+import { updateStatusQuery } from "@/lib/api/update";
 import { useT } from "@/lib/i18n";
 import { readStorage, writeStorage } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { type SelfUpdate, useSelfUpdateController } from "./self-update";
 import { stripV, UpdateDialog } from "./update-dialog";
 
 /** The silent check waits this long after the shell mounts (old UI: 2 s after sign-in). */
@@ -40,6 +42,10 @@ interface UpdateCheckValue {
    */
   checkNow: (onSettled?: () => void) => void;
   openDialog: () => void;
+  /** The running version, bare ("3.2.0"); empty until the first check. */
+  current: string;
+  /** Downloading and installing the newer release from the panel (self-update.tsx). */
+  selfUpdate: SelfUpdate;
 }
 
 const UpdateCheckContext = createContext<UpdateCheckValue | null>(null);
@@ -76,6 +82,12 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
     setCurrent(stripV(version));
     setServer(running);
     const newer = compareVersions(remote.version, version) > 0 ? remote : null;
+    // Whether this server installs the release itself is asked before the release is shown, so
+    // the update card appears in its right mode at once: a quick click on a server that updates
+    // itself never meets the steps by hand first. An older server without the endpoint is fine.
+    if (newer && !running.docker) {
+      await queryClient.fetchQuery(updateStatusQuery(true)).catch(() => undefined);
+    }
     if (newer) setLatest(newer);
     return { newer };
   }, [queryClient]);
@@ -93,7 +105,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
             id: AVAILABLE_TOAST_ID,
             duration: AVAILABLE_TOAST_MS,
             background: true,
-            action: { label: tRef.current("shell.update.view"), onClick: openDialog },
+            action: { label: tRef.current("shell.update.view"), onClick: () => openDialog() },
           });
         })
         // The silent check never reports errors.
@@ -136,9 +148,13 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
     },
     [lookUp, openDialog],
   );
+  const selfUpdate = useSelfUpdateController({
+    target: latest ? stripV(latest.version) : "",
+    server,
+  });
   const value = useMemo(
-    () => ({ latest, checking, checkNow, openDialog }),
-    [latest, checking, checkNow, openDialog],
+    () => ({ latest, checking, checkNow, openDialog, current, selfUpdate }),
+    [latest, checking, checkNow, openDialog, current, selfUpdate],
   );
 
   return (
@@ -149,6 +165,7 @@ export function UpdateCheckProvider({ children }: { children: ReactNode }): JSX.
         latest={latest}
         onOpenChange={setDialogOpen}
         open={dialogOpen && latest !== null}
+        selfUpdate={selfUpdate}
         server={server}
       />
     </UpdateCheckContext.Provider>

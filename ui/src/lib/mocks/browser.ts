@@ -1,8 +1,9 @@
 import { setupWorker } from "msw/browser";
 import { mockDb, resetMockDb } from "./db";
 import { allHandlers } from "./handlers";
-import { resolveMockScenario } from "./scenario";
+import { resolveMockScenario, resolveMockServer } from "./scenario";
 import { applyShowcase } from "./showcase";
+import { applyUpdatedVersion } from "./update";
 import { installWorkerRecovery } from "./worker-recovery";
 
 /**
@@ -16,11 +17,14 @@ export async function startMockWorker(): Promise<void> {
   resetMockDb(scenario);
   // The full dataset also gets the 3.3.0 showcase: pool, headers, a duplicate, the update notes.
   if (scenario === "full") applyShowcase();
+  // The server kind for the update dialog (?server=), and a self-update done earlier in this tab.
+  mockDb.server = resolveMockServer();
+  applyUpdatedVersion();
   const ms = Math.round(performance.now() - started);
   console.info(
     `[mock] ${scenario} dataset in ${ms} ms: ${mockDb.accounts.length} accounts, ` +
       `${mockDb.requests.length} requests, ${mockDb.apiKeys.length} API keys, ` +
-      `${mockDb.backups.length} backups. Switch with ?mock=full|small|empty.`,
+      `${mockDb.backups.length} backups. Switch with ?mock=full|small|empty; server ${mockDb.server} (?server=binary|docker|windows|readonly|fail).`,
   );
   const worker = setupWorker(...allHandlers);
   await worker.start({

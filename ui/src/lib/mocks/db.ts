@@ -36,6 +36,7 @@ import {
   seedRequests,
 } from "./fixtures";
 import { seedFullDataset } from "./fixtures-full";
+import { freshMockUpdate, type MockServerKind, type MockUpdate } from "./update";
 
 /**
  * Which dataset the mock serves. `small` is the unit-test seed (8 accounts, 320 requests);
@@ -85,6 +86,10 @@ export interface MockDb {
   version: string;
   /** What the update check (version.json on GitHub) answers. */
   remoteVersion: { version: string; changelog: string };
+  /** What the server runs as, for the update dialog (update.ts). */
+  server: MockServerKind;
+  /** GET /update: the self-update under way. */
+  update: MockUpdate;
   pending: {
     iam: Record<string, unknown>;
     microsoft: Record<string, unknown>;
@@ -218,6 +223,8 @@ function baseDb(): Pick<
   | "tunnel"
   | "version"
   | "remoteVersion"
+  | "server"
+  | "update"
   | "pending"
   | "accountHealth"
 > &
@@ -232,6 +239,9 @@ function baseDb(): Pick<
     version: "2.1.0",
     // Same as the running version: no update notice in tests, screenshots or axe runs.
     remoteVersion: { version: "2.1.0", changelog: "" },
+    // Unit tests run the Docker server: How to update shows steps, nothing downloads.
+    server: "docker",
+    update: freshMockUpdate(),
     pending: { iam: {}, microsoft: {}, builderId: {} },
     // A fresh install sends no custom headers.
     responseHeaders: [],
