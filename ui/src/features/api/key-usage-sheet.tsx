@@ -26,6 +26,7 @@ import {
 } from "@/components/shared/responsive-sheet";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatStrip } from "@/components/shared/stat-strip";
+import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Card } from "@/components/ui/card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
@@ -386,9 +387,11 @@ export function ApiKeyUsageSheet({
                   },
                   {
                     label: t("form.rpmLimit"),
-                    value: apiKey.rpmLimit
-                      ? t("keys.rpmLimit", { n: formatNumber(apiKey.rpmLimit, lang) })
-                      : t("common:unlimited"),
+                    value: apiKey.rpmLimit ? (
+                      t("keys.rpmLimit", { n: formatNumber(apiKey.rpmLimit, lang) })
+                    ) : (
+                      <UnlimitedMark />
+                    ),
                   },
                   {
                     label: t("form.expiresAt"),

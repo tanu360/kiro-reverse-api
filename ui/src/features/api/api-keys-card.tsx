@@ -32,6 +32,7 @@ import { RefreshButton } from "@/components/shared/page-header";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
 import { TruncatedText } from "@/components/shared/truncated-text";
+import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Badge, BadgeIcon, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardPanel } from "@/components/ui/card";
@@ -673,14 +674,13 @@ function UsageLine({
   format: (value: number) => string;
   meterLabel: string;
 }): JSX.Element {
-  const { t } = useT("api");
   const reached = limit > 0 && used >= limit;
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="flex items-baseline gap-1.5 whitespace-nowrap text-xs tabular-nums">
         <span className="text-muted-foreground">{label}</span>
         <span className={cn(reached && "text-warning-foreground")}>
-          {format(used)} / {limit > 0 ? format(limit) : t("common:unlimited")}
+          {format(used)} / {limit > 0 ? format(limit) : <UnlimitedMark />}
         </span>
       </span>
       {limit > 0 ? (
@@ -709,7 +709,11 @@ export function KeyUsage({ apiKey }: { apiKey: ApiKey }): JSX.Element {
   const successfulCalls = apiKey.successfulCalls ?? 0;
   if (!tokenLimit && !creditLimit && !callLimit) {
     // The UsageLine size, so the column (and a card's body) never jumps from 12 to 14 px.
-    return <span className="text-muted-foreground text-xs">{t("common:unlimited")}</span>;
+    return (
+      <span className="text-muted-foreground text-xs">
+        <UnlimitedMark />
+      </span>
+    );
   }
   const tokens = (value: number) => formatNumber(value, lang);
   const credits = (value: number) => formatCredits(value);

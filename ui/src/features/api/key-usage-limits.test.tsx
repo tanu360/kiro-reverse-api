@@ -38,7 +38,10 @@ describe("KeyLimitsCard", () => {
     expect(within(credits).getByText("100.0%")).toBeInTheDocument();
     expect(within(credits).getByText("Limit reached")).toBeInTheDocument();
     const calls = row("Calls");
-    expect(within(calls).getByText("Unlimited")).toBeInTheDocument();
+    // The infinity sign, with the word for screen readers and as its hover title.
+    const unlimited = within(calls).getByText("Unlimited");
+    expect(unlimited).toHaveClass("sr-only");
+    expect(unlimited.closest("[data-slot=unlimited]")).toHaveAttribute("title", "Unlimited");
     expect(within(calls).getByText("7 used")).toBeInTheDocument();
     expect(within(calls).queryByRole("meter")).toBeNull();
   });

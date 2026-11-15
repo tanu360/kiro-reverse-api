@@ -1,6 +1,7 @@
 import { DashboardSpeed02Icon } from "@hugeicons/core-free-icons";
 import type { JSX } from "react";
 import { SectionCard } from "@/components/shared/section-card";
+import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Badge } from "@/components/ui/badge";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import type { ApiKey } from "@/lib/api/types";
@@ -80,7 +81,7 @@ export function KeyLimitsCard({ apiKey }: { apiKey: ApiKey }): JSX.Element {
                   </span>
                 ) : (
                   <Badge size="sm" tone="neutral">
-                    {t("common:unlimited")}
+                    <UnlimitedMark />
                   </Badge>
                 )}
               </div>

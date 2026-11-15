@@ -13,6 +13,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { ListCard } from "@/components/shared/list-card";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { SectionCard } from "@/components/shared/section-card";
+import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Badge } from "@/components/ui/badge";
 import { CardPanel } from "@/components/ui/card";
 import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
@@ -243,7 +244,11 @@ export function KeyUsageCard(): JSX.Element {
     if (!row.apiKey) return <span className="text-muted-foreground">—</span>;
     const limit = firstLimit(row.apiKey);
     if (!limit)
-      return <span className="text-muted-foreground text-xs">{t("common:unlimited")}</span>;
+      return (
+        <span className="text-muted-foreground text-xs">
+          <UnlimitedMark />
+        </span>
+      );
     const share = limit.limit > 0 ? limit.used / limit.limit : 0;
     // The exact amounts for a screen reader; the cell shows 95.1M / 100M so the column stays narrow.
     const exact = (value: number) =>
