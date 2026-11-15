@@ -85,7 +85,7 @@
   "usage.col.key": "API Key",
   "usage.col.limit": "限额",
   "usage.limitValue": "{used} / {limit}",
-  "usage.meta_other": "{n} 个 API Key · {requests} 个请求",
+  "usage.meta_other": "{n} 个 API Key · {requests}",
   "usage.models": "模型",
   "usage.accounts": "账号",
   "usage.byRequests": "按请求数",

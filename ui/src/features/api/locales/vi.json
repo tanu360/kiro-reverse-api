@@ -85,7 +85,7 @@
   "usage.col.key": "Key",
   "usage.col.limit": "Giới hạn",
   "usage.limitValue": "{used} / {limit}",
-  "usage.meta_other": "{n} key · {requests} yêu cầu",
+  "usage.meta_other": "{n} key · {requests}",
   "usage.models": "Model",
   "usage.accounts": "Tài khoản",
   "usage.byRequests": "Theo số yêu cầu",

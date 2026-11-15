@@ -365,7 +365,11 @@ export function KeyUsageCard(): JSX.Element {
     ? t("usage.meta", {
         count: allRows.length,
         n: formatNumber(allRows.length, lang),
-        requests: formatNumber(data.totals.requests, lang),
+        // Its own plural, so one request reads "1 request" whatever the key count.
+        requests: t("usage.requestsCount", {
+          count: data.totals.requests,
+          n: formatNumber(data.totals.requests, lang),
+        }),
       })
     : undefined;
 

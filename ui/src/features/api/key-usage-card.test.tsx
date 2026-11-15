@@ -128,6 +128,13 @@ describe("KeyUsageCard", () => {
     expect(within(table).getAllByText("0%")).toHaveLength(2);
   });
 
+  it("counts one key and one request in the singular", async () => {
+    served = usage([entry("a", "key", { requests: 1 }, { name: "alpha" })]);
+    renderWithProviders(<KeyUsageCard />);
+    const region = await card();
+    expect(await within(region).findByText("1 key · 1 request")).toBeInTheDocument();
+  });
+
   it("pages ten keys at a time, as the API keys table", async () => {
     served = usage(
       Array.from({ length: 12 }, (_, index) =>
