@@ -10,12 +10,17 @@ import (
 const tokenRefreshSkewSeconds int64 = 120
 
 type AccountPool struct {
-	mu            sync.RWMutex
-	accounts      []config.Account
+	mu sync.RWMutex
+	// accounts holds each account in rotation once, in account-list order, which
+	// priority and reset-first ties fall back to.
+	accounts []config.Account
+	// rotation is the weighted cycle as indexes into accounts: an account with
+	// weight N takes N slots, spread through the cycle (rotationOrder).
+	rotation      []int
 	totalAccounts int
-	currentIndex  uint64
-	lastSelected  string
-	cooldowns     map[string]time.Time
+	// currentIndex is the next slot of rotation to try.
+	currentIndex uint64
+	cooldowns    map[string]time.Time
 	// cooldownKinds says what set each cooldown, so self-heal never clears a quota one.
 	cooldownKinds map[string]CooldownKind
 	errorCounts   map[string]int
@@ -53,27 +58,78 @@ func (p *AccountPool) Reload() {
 	defer p.mu.Unlock()
 	enabled := config.GetEnabledAccounts()
 	allowOverUsage := config.GetAllowOverUsage()
-	var weighted []config.Account
+	var inRotation []config.Account
 	enabledIDs := make([]string, 0, len(enabled))
 	for _, a := range enabled {
 		enabledIDs = append(enabledIDs, a.ID)
 		if isOverUsageLimit(a) && !isUpstreamOverageEnabled(a) && !allowOverUsage {
 			continue
 		}
-		w := effectiveWeight(a.Weight)
-		for j := 0; j < w; j++ {
-			weighted = append(weighted, a)
-		}
+		inRotation = append(inRotation, a)
 	}
-	p.accounts = weighted
+	p.setAccountsLocked(inRotation)
 	p.enabledIDs = enabledIDs
 	p.totalAccounts = len(enabled)
-	if len(weighted) == 0 {
+}
+
+// setAccountsLocked puts accounts in rotation and rebuilds the weighted cycle.
+// The cursor keeps its place, so a reload does not send the next request back
+// to the first account.
+func (p *AccountPool) setAccountsLocked(accounts []config.Account) {
+	p.accounts = accounts
+	p.rotation = rotationOrder(accounts)
+	if len(p.rotation) == 0 {
 		p.currentIndex = 0
-		p.lastSelected = ""
-	} else if p.currentIndex >= uint64(len(weighted)) {
-		p.currentIndex %= uint64(len(weighted))
+	} else if p.currentIndex >= uint64(len(p.rotation)) {
+		p.currentIndex %= uint64(len(p.rotation))
 	}
+}
+
+// rotationOrder is the weighted cycle for accounts, as indexes into it: smooth
+// weighted round-robin, as nginx orders its upstreams. Every slot each account
+// adds its weight to a running score, the highest score takes the slot (the
+// earliest account on a tie) and gives back the total weight. An account with
+// weight N gets N slots of the cycle, spread through it rather than in a row,
+// so equal weights are a plain round robin in list order.
+//
+// Weights are divided by their greatest common divisor first: 10 and 20 rotate
+// like 1 and 2, in a cycle of 3 slots instead of 30.
+func rotationOrder(accounts []config.Account) []int {
+	if len(accounts) == 0 {
+		return nil
+	}
+	weights := make([]int, len(accounts))
+	divisor := 0
+	for i := range accounts {
+		weights[i] = effectiveWeight(accounts[i].Weight)
+		divisor = gcd(divisor, weights[i])
+	}
+	total := 0
+	for i := range weights {
+		weights[i] /= divisor
+		total += weights[i]
+	}
+	scores := make([]int, len(accounts))
+	order := make([]int, 0, total)
+	for len(order) < total {
+		best := 0
+		for i, w := range weights {
+			scores[i] += w
+			if scores[i] > scores[best] {
+				best = i
+			}
+		}
+		scores[best] -= total
+		order = append(order, best)
+	}
+	return order
+}
+
+func gcd(a, b int) int {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	return a
 }
 
 func (p *AccountPool) GetNext() *config.Account {
@@ -219,39 +275,34 @@ func (p *AccountPool) nextAccountLocked(model string, excluded map[string]bool, 
 		return p.firstByResetLocked(model, excluded)
 	}
 
-	if acc := p.findNextAvailableLocked(model, excluded, true); acc != nil {
-		return acc
-	}
-	if acc := p.findNextAvailableLocked(model, excluded, false); acc != nil {
-		return acc
-	}
-	return nil
+	return p.findNextAvailableLocked(model, excluded)
 }
 
-func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]bool, avoidLast bool) *config.Account {
+// findNextAvailableLocked is the weighted pick: the first slot of the rotation,
+// from the cursor on, whose account can serve. The cursor moves past it.
+func (p *AccountPool) findNextAvailableLocked(model string, excluded map[string]bool) *config.Account {
+	//! The account just picked is not skipped when its slot comes up next. The cycle already
+	//! spreads each account's slots as evenly as the weights allow; skipping the last account
+	//! would hand its due slots to the others and pull every account towards an equal share.
 	allowOverUsage := config.GetAllowOverUsage()
 	now := time.Now()
-	n := len(p.accounts)
-	start := p.currentIndex
-	seen := make(map[string]bool)
+	n := uint64(len(p.rotation))
+	// failed holds the accounts that cannot serve this pick, so a heavy account's other slots are not checked again.
+	failed := make(map[int]bool)
 
-	for i := 0; i < n; i++ {
-		idx := (start + uint64(i)) % uint64(n)
+	for i := uint64(0); i < n; i++ {
+		slot := (p.currentIndex + i) % n
+		idx := p.rotation[slot]
+		if failed[idx] {
+			continue
+		}
 		acc := &p.accounts[idx]
-		if seen[acc.ID] {
-			continue
-		}
-		seen[acc.ID] = true
-
-		if avoidLast && acc.ID == p.lastSelected {
-			continue
-		}
 		if !p.canServeLocked(acc, model, excluded, now, allowOverUsage) {
+			failed[idx] = true
 			continue
 		}
 		accCopy := *acc
-		p.currentIndex = (idx + 1) % uint64(n)
-		p.lastSelected = accCopy.ID
+		p.currentIndex = (slot + 1) % n
 		p.noteRPMStartLocked(accCopy.ID)
 		return &accCopy
 	}
@@ -525,12 +576,7 @@ func (p *AccountPool) Count() int {
 	if p.totalAccounts > 0 {
 		return p.totalAccounts
 	}
-
-	seen := make(map[string]bool)
-	for _, acc := range p.accounts {
-		seen[acc.ID] = true
-	}
-	return len(seen)
+	return len(p.accounts)
 }
 
 func (p *AccountPool) AvailableCount() int {
@@ -538,12 +584,7 @@ func (p *AccountPool) AvailableCount() int {
 	defer p.mu.RUnlock()
 	now := time.Now()
 	count := 0
-	seen := make(map[string]bool)
 	for _, acc := range p.accounts {
-		if seen[acc.ID] {
-			continue
-		}
-		seen[acc.ID] = true
 		if cooldown, ok := p.cooldowns[acc.ID]; ok && now.Before(cooldown) {
 			continue
 		}
@@ -590,16 +631,11 @@ func (p *AccountPool) updateStats(id string, apply func(acc *config.Account)) {
 
 	var stats *config.Account
 	for i := range p.accounts {
-		if p.accounts[i].ID != id {
-			continue
-		}
-		if stats == nil {
+		if p.accounts[i].ID == id {
 			apply(&p.accounts[i])
 			stats = &p.accounts[i]
-			continue
+			break
 		}
-		//! Weighted accounts appear several times in rotation; every copy carries the same numbers.
-		copyStats(&p.accounts[i], stats)
 	}
 	if stats == nil {
 		stored := findConfigAccount(id)
@@ -616,14 +652,6 @@ func addUsage(acc *config.Account, tokens int, credits float64) {
 	acc.TotalTokens += max(tokens, 0)
 	acc.TotalCredits += max(credits, 0)
 	acc.LastUsed = time.Now().Unix()
-}
-
-func copyStats(dst, src *config.Account) {
-	dst.RequestCount = src.RequestCount
-	dst.ErrorCount = src.ErrorCount
-	dst.TotalTokens = src.TotalTokens
-	dst.TotalCredits = src.TotalCredits
-	dst.LastUsed = src.LastUsed
 }
 
 func findConfigAccount(id string) *config.Account {

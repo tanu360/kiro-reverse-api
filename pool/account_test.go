@@ -15,7 +15,7 @@ func TestOverageAccountsAreSkippedByDefault(t *testing.T) {
 	normal := config.Account{ID: "normal"}
 	overLimit := config.Account{ID: "over", UsageCurrent: 10, UsageLimit: 10}
 
-	p.accounts = []config.Account{normal, overLimit}
+	p.setAccountsLocked([]config.Account{normal, overLimit})
 
 	for i := 0; i < 5; i++ {
 		acc := p.GetNext()
@@ -37,7 +37,7 @@ func TestOverageAccountsCanBeSelectedWhenAllowed(t *testing.T) {
 		OverageStatus: "ENABLED",
 	}
 
-	p.accounts = []config.Account{overLimit}
+	p.setAccountsLocked([]config.Account{overLimit})
 
 	acc := p.GetNext()
 	if acc == nil {
@@ -90,7 +90,7 @@ func TestGetNextKeepsFiveMinuteTokenAvailable(t *testing.T) {
 		ExpiresAt:   time.Now().Unix() + 300,
 	}
 
-	p.accounts = []config.Account{account}
+	p.setAccountsLocked([]config.Account{account})
 
 	got := p.GetNext()
 	if got == nil {
@@ -110,7 +110,7 @@ func TestGetNextKeepsRefreshableNearExpiryTokenAvailable(t *testing.T) {
 		ExpiresAt:    time.Now().Unix() + 60,
 	}
 
-	p.accounts = []config.Account{account}
+	p.setAccountsLocked([]config.Account{account})
 
 	got := p.GetNext()
 	if got == nil {
@@ -123,13 +123,13 @@ func TestGetNextKeepsRefreshableNearExpiryTokenAvailable(t *testing.T) {
 
 func TestGetNextSkipsNearExpiryTokenWithoutRefreshToken(t *testing.T) {
 	p := &AccountPool{}
-	p.accounts = []config.Account{
+	p.setAccountsLocked([]config.Account{
 		{
 			ID:          "acct-no-refresh",
 			AccessToken: "access-token",
 			ExpiresAt:   time.Now().Unix() + 60,
 		},
-	}
+	})
 
 	if got := p.GetNext(); got != nil {
 		t.Fatalf("expected near-expiry account without refresh token to be skipped, got %q", got.ID)
@@ -185,29 +185,131 @@ func TestReloadDoesNotRestartRotationAtFirstAccount(t *testing.T) {
 	}
 }
 
-func TestWeightedAccountDoesNotRepeatWhenAnotherUsableAccountExists(t *testing.T) {
+// countPicks makes n weighted picks and counts them per account.
+func countPicks(t *testing.T, p *AccountPool, n int) map[string]int {
+	t.Helper()
+	counts := make(map[string]int)
+	for i := 0; i < n; i++ {
+		acc := p.GetNext()
+		if acc == nil {
+			t.Fatalf("pick %d returned nil", i)
+		}
+		counts[acc.ID]++
+	}
+	return counts
+}
+
+// The live case behind the fix: twelve accounts at weight 1 and one at weight
+// 10, last in the list. The heavy account served 1 pick in 22 when its slots sat
+// in a row and the rotation skipped them after its first pick.
+func TestWeightedRotationGivesEachAccountItsWeightShare(t *testing.T) {
 	if err := config.Init(filepath.Join(t.TempDir(), "kiro.db")); err != nil {
 		t.Fatalf("config.Init: %v", err)
 	}
-	if err := config.AddAccount(config.Account{ID: "heavy", Enabled: true, Weight: 5}); err != nil {
+	for i := 0; i < 12; i++ {
+		if err := config.AddAccount(config.Account{ID: "light-" + strconv.Itoa(i), Enabled: true, Weight: 1}); err != nil {
+			t.Fatalf("add light account: %v", err)
+		}
+	}
+	if err := config.AddAccount(config.Account{ID: "heavy", Enabled: true, Weight: 10}); err != nil {
 		t.Fatalf("add heavy account: %v", err)
 	}
-	if err := config.AddAccount(config.Account{ID: "normal", Enabled: true}); err != nil {
-		t.Fatalf("add normal account: %v", err)
-	}
-
 	p := newTestPool()
 	p.Reload()
-	var previous string
-	for i := 0; i < 6; i++ {
-		acc := p.GetNext()
-		if acc == nil {
-			t.Fatalf("selection %d returned nil", i)
+
+	// 220 picks are ten whole cycles of 22 slots, so the shares are exact: 100 and 10 each.
+	// Tolerance: 0 when the picks start at a cycle boundary; the test below covers a cursor mid-cycle.
+	counts := countPicks(t, p, 220)
+	if counts["heavy"] != 100 {
+		t.Fatalf("heavy served %d of 220, want 100 (all counts: %v)", counts["heavy"], counts)
+	}
+	for i := 0; i < 12; i++ {
+		if id := "light-" + strconv.Itoa(i); counts[id] != 10 {
+			t.Fatalf("%s served %d of 220, want 10 (all counts: %v)", id, counts[id], counts)
 		}
-		if previous != "" && acc.ID == previous {
-			t.Fatalf("expected weighted rotation to avoid repeating %q while another account is usable", acc.ID)
+	}
+
+	// From any point in the cycle, 22 picks in a row still give the heavy account its 10.
+	for start := 0; start < 22; start++ {
+		p.currentIndex = uint64(start)
+		if got := countPicks(t, p, 22)["heavy"]; got != 10 {
+			t.Fatalf("22 picks from slot %d: heavy served %d, want 10", start, got)
 		}
-		previous = acc.ID
+	}
+}
+
+// The heavy account's slots are spread through the cycle, not bunched: with
+// weight 10 of 22 it never serves two picks in a row within a cycle. The cycle
+// starts and ends on it, so across the wrap it serves two in a row, never more.
+func TestWeightedRotationSpreadsTheHeavyAccount(t *testing.T) {
+	accounts := []config.Account{}
+	for i := 0; i < 12; i++ {
+		accounts = append(accounts, config.Account{ID: "light-" + strconv.Itoa(i)})
+	}
+	accounts = append(accounts, config.Account{ID: "heavy", Weight: 10})
+	p := newTestPool(accounts...)
+
+	run := 0
+	for i := 0; i < 66; i++ {
+		if p.GetNext().ID != "heavy" {
+			run = 0
+			continue
+		}
+		run++
+		if run > 2 || (run == 2 && i%22 != 0) {
+			t.Fatalf("pick %d: heavy served %d in a row", i, run)
+		}
+	}
+}
+
+// An account heavier than all the others together must repeat: skipping it to
+// avoid a repeat would cut it to an equal share.
+func TestWeightedRotationRepeatsADominantAccount(t *testing.T) {
+	p := newTestPool(config.Account{ID: "heavy", Weight: 5}, config.Account{ID: "normal"})
+	counts := countPicks(t, p, 60)
+	if counts["heavy"] != 50 || counts["normal"] != 10 {
+		t.Fatalf("counts = %v, want heavy 50 and normal 10", counts)
+	}
+}
+
+func TestWeightedRotationWithEqualWeightsIsPlainRoundRobin(t *testing.T) {
+	// Weight 0 (unset) counts as 1, and equal weights above 1 rotate the same way.
+	for _, weight := range []int{0, 1, 4} {
+		p := newTestPool(
+			config.Account{ID: "a", Weight: weight},
+			config.Account{ID: "b", Weight: weight},
+			config.Account{ID: "c", Weight: weight},
+		)
+		var got []string
+		for i := 0; i < 9; i++ {
+			got = append(got, p.GetNext().ID)
+		}
+		want := []string{"a", "b", "c", "a", "b", "c", "a", "b", "c"}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("weight %d: rotation = %v, want %v", weight, got, want)
+			}
+		}
+	}
+}
+
+// While an account cannot serve, the others keep their weights between them.
+func TestWeightedRotationKeepsRatioWhileAnAccountCools(t *testing.T) {
+	p := newTestPool(config.Account{ID: "a", Weight: 2}, config.Account{ID: "b"}, config.Account{ID: "c"})
+	p.cooldowns["b"] = time.Now().Add(time.Minute)
+	counts := countPicks(t, p, 30)
+	if counts["a"] != 20 || counts["c"] != 10 || counts["b"] != 0 {
+		t.Fatalf("counts with b cooling = %v, want a 20 and c 10", counts)
+	}
+}
+
+func TestRotationOrderReducesWeightsByTheirCommonDivisor(t *testing.T) {
+	order := rotationOrder([]config.Account{{ID: "a", Weight: 10}, {ID: "b", Weight: 20}})
+	if len(order) != 3 {
+		t.Fatalf("cycle = %v, want 3 slots for weights 10 and 20", order)
+	}
+	if rotationOrder(nil) != nil {
+		t.Fatal("an empty pool has no cycle")
 	}
 }
 
@@ -327,7 +429,7 @@ func newTestPool(accounts ...config.Account) *AccountPool {
 		errorCounts: make(map[string]int),
 		modelLists:  make(map[string]map[string]bool),
 	}
-	p.accounts = accounts
+	p.setAccountsLocked(accounts)
 	return p
 }
 
@@ -455,16 +557,8 @@ func TestDisableAccountSetsCooldown(t *testing.T) {
 }
 
 func TestGetNextExcludingSkipsExcludedAccount(t *testing.T) {
-	p := &AccountPool{
-		accounts: []config.Account{
-			{ID: "a", Enabled: true},
-			{ID: "b", Enabled: true},
-		},
-		cooldowns:    make(map[string]time.Time),
-		errorCounts:  make(map[string]int),
-		modelLists:   make(map[string]map[string]bool),
-		currentIndex: ^uint64(0),
-	}
+	p := newTestPool(config.Account{ID: "a", Enabled: true}, config.Account{ID: "b", Enabled: true})
+	p.currentIndex = ^uint64(0)
 
 	acc := p.GetNextExcluding(map[string]bool{"a": true})
 	if acc == nil || acc.ID != "b" {
@@ -473,16 +567,8 @@ func TestGetNextExcludingSkipsExcludedAccount(t *testing.T) {
 }
 
 func TestGetNextForModelExcludingSkipsExcludedAccount(t *testing.T) {
-	p := &AccountPool{
-		accounts: []config.Account{
-			{ID: "a", Enabled: true},
-			{ID: "b", Enabled: true},
-		},
-		cooldowns:    make(map[string]time.Time),
-		errorCounts:  make(map[string]int),
-		modelLists:   make(map[string]map[string]bool),
-		currentIndex: ^uint64(0),
-	}
+	p := newTestPool(config.Account{ID: "a", Enabled: true}, config.Account{ID: "b", Enabled: true})
+	p.currentIndex = ^uint64(0)
 	p.SetModelList("a", []string{"claude-sonnet-4.5"})
 	p.SetModelList("b", []string{"claude-sonnet-4.5"})
 

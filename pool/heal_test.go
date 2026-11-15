@@ -174,8 +174,7 @@ func TestClearTransientKeepsThrottleBackoff(t *testing.T) {
 func TestHealViewReportsServableAndCooled(t *testing.T) {
 	now := time.Now()
 	p := newTestPool(
-		config.Account{ID: "throttled", AccessToken: "t"},
-		config.Account{ID: "throttled", AccessToken: "t"},
+		config.Account{ID: "throttled", AccessToken: "t", Weight: 2},
 		config.Account{ID: "quota", AccessToken: "t"},
 		config.Account{ID: "dead-token", AccessToken: "t", ExpiresAt: now.Add(-time.Hour).Unix()},
 		config.Account{ID: "legacy", AccessToken: "t"},
@@ -200,7 +199,7 @@ func TestHealViewReportsServableAndCooled(t *testing.T) {
 		t.Fatalf("held = %v, want quota and legacy", view.Held)
 	}
 
-	p.accounts = append(p.accounts, config.Account{ID: "free", AccessToken: "t"})
+	p.setAccountsLocked(append(p.accounts, config.Account{ID: "free", AccessToken: "t"}))
 	if !p.HealView(now).Servable {
 		t.Fatal("a free account must make the pool servable")
 	}

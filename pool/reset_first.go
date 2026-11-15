@@ -85,15 +85,10 @@ func (p *AccountPool) firstByResetLocked(model string, excluded map[string]bool)
 // the pick for the RPM limit. It points into p.accounts.
 func (p *AccountPool) bestByResetLocked(model string, excluded map[string]bool, now time.Time) *config.Account {
 	allowOverUsage := config.GetAllowOverUsage()
-	seen := make(map[string]bool, len(p.accounts))
 	var best *config.Account
 	var bestRank resetRank
 	for i := range p.accounts {
 		acc := &p.accounts[i]
-		if seen[acc.ID] {
-			continue
-		}
-		seen[acc.ID] = true
 		if !p.canServeLocked(acc, model, excluded, now, allowOverUsage) {
 			continue
 		}

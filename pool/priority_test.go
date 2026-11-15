@@ -176,8 +176,8 @@ func TestPriorityModeIgnoresWeightDuplicates(t *testing.T) {
 	}
 	p := newTestPool()
 	p.Reload()
-	if len(p.accounts) != 6 {
-		t.Fatalf("pool slots = %d, want the heavy account's 5 plus 1", len(p.accounts))
+	if len(p.accounts) != 2 || len(p.rotation) != 6 {
+		t.Fatalf("pool = %d accounts in %d slots, want 2 accounts in the heavy account's 5 slots plus 1", len(p.accounts), len(p.rotation))
 	}
 	wantAll(t, picks(p, 6, "", nil), "light")
 

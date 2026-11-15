@@ -58,7 +58,7 @@ func TestPreferredAccountFallsBackWhenUnusable(t *testing.T) {
 		{
 			name: "no longer in the pool",
 			setup: func(p *AccountPool) {
-				p.accounts = []config.Account{{ID: "a"}, {ID: "c"}}
+				p.setAccountsLocked([]config.Account{{ID: "a"}, {ID: "c"}})
 			},
 		},
 	}

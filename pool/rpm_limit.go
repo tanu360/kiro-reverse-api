@@ -154,13 +154,8 @@ func (p *AccountPool) BlockedByRPMLimitAllowed(model string, allowed map[string]
 	}
 	allowOverUsage := config.GetAllowOverUsage()
 	now := time.Now()
-	seen := make(map[string]bool, len(p.accounts))
 	for i := range p.accounts {
 		acc := &p.accounts[i]
-		if seen[acc.ID] {
-			continue
-		}
-		seen[acc.ID] = true
 		if allowed != nil && !allowed[acc.ID] {
 			continue
 		}
@@ -185,13 +180,11 @@ func (p *AccountPool) RPMRetryAfter(model string, allowed map[string]bool) time.
 	allowOverUsage := config.GetAllowOverUsage()
 	now := rpmNow()
 	var soonest time.Duration
-	seen := make(map[string]bool, len(p.accounts))
 	for i := range p.accounts {
 		acc := &p.accounts[i]
-		if seen[acc.ID] || (allowed != nil && !allowed[acc.ID]) {
+		if allowed != nil && !allowed[acc.ID] {
 			continue
 		}
-		seen[acc.ID] = true
 		if !p.eligibleLocked(acc, model, nil, time.Now(), allowOverUsage) || !p.rpmLimitedLocked(acc.ID) {
 			continue
 		}
