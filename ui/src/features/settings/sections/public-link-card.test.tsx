@@ -37,7 +37,8 @@ describe("PublicLinkCard", () => {
     renderWithProviders(<PublicLinkCard />);
     const meter = await screen.findByRole("meter", { name: "Download progress" });
     expect(meter).toHaveAttribute("aria-valuenow", "40");
-    expect(meter).toHaveAttribute("aria-valuetext", "3.0 MB of 7.6 MB · 40%");
+    // formatBytes keeps each size on one line with a no-break space.
+    expect(meter).toHaveAttribute("aria-valuetext", "3.0\u00a0MB of 7.6\u00a0MB · 40%");
     expect(screen.getByText("3.0 MB of 7.6 MB · 40%")).toBeVisible();
     const steps = within(screen.getByRole("list", { name: "Setup" })).getAllByRole("listitem");
     expect(steps.map((step) => step.textContent)).toEqual([
