@@ -1,5 +1,5 @@
 {
-  "version": "3.5.5",
-  "changelog": "🔁 A request moves to another account when Kiro refuses the model for one account, instead of failing; account weight is capped at 100 so a huge value can no longer stall or crash the server.\n🔎 Hosted web search: text written before a search is kept, search rounds no longer run together, result dates read as dates, and a search counts as the tool call tool_choice requires.\n📏 An over-long input is reported the way clients detect it: \"prompt is too long\" on the Anthropic API and context_length_exceeded on the OpenAI APIs, so Claude Code can compact.\n✨ Many small UI fixes: sizes as KB, MB and GB, ∞ for an unset per-minute limit, true minus signs, full text in tooltips where it is cut off, singular counts, clearer durations and wording.",
+  "version": "3.5.6",
+  "changelog": "💳 A reply the proxy cuts at max_tokens or a stop sequence now logs the credits Kiro bills for it; it used to log 0. Replies cut while Kiro is still writing stay free.\n🔎 Hosted web search on the OpenAI APIs: /v1/responses returns web_search_call items and url_citation annotations, /v1/chat/completions returns url_citation annotations and accepts web_search_options, and every search round's tokens are counted.\n📋 The request log shows each web search and each later round as its own attempt.\n⚡ An over-long input is answered from the first Kiro endpoint, in about 2 s instead of 6 s.",
   "download": "https://github.com/tanu360/kiro-reverse-api/releases/latest"
 }
