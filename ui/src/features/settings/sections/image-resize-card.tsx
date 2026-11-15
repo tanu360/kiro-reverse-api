@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/number-field";
 import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
+import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
@@ -20,6 +21,8 @@ import { Hint, SaveFooter, SectionQuery, SettingsSection } from "./settings-sect
 /** Mirrors config/image_resize.go. */
 const DIMENSION = { min: 256, max: 4096, step: 32, fallback: 1568 } as const;
 const SIZE_KB = { min: 50, max: 4096, step: 50, fallback: 400 } as const;
+/** The longest side Claude scales a larger image down to, in pixels. */
+const CLAUDE_MAX_EDGE = 1568;
 
 type Limit = typeof DIMENSION | typeof SIZE_KB;
 
@@ -81,7 +84,13 @@ type Draft = {
 };
 
 function ImageResizeForm({ settings }: { settings: Settings }): JSX.Element {
-  const { t } = useT("settings");
+  const { t, lang } = useT("settings");
+  // Grouped as numbers are everywhere else ("4,096"), in the hints and the errors alike.
+  const dimension = {
+    min: formatNumber(DIMENSION.min, lang),
+    max: formatNumber(DIMENSION.max, lang),
+  };
+  const sizeKB = { min: formatNumber(SIZE_KB.min, lang), max: formatNumber(SIZE_KB.max, lang) };
   const dimensionId = useId();
   const sizeId = useId();
   const draft = useDraft<Draft>({
@@ -143,14 +152,15 @@ function ImageResizeForm({ settings }: { settings: Settings }): JSX.Element {
             />
           }
           controlWidth="number"
-          description={t("imageResizeMaxDimensionHint")}
+          description={t("imageResizeMaxDimensionHint", {
+            ...dimension,
+            claude: formatNumber(CLAUDE_MAX_EDGE, lang),
+          })}
           htmlFor={dimensionId}
           title={t("imageResizeMaxDimension")}
         >
           {invalid.dimension ? (
-            <FieldError match>
-              {t("imageResizeMaxDimensionInvalid", { min: DIMENSION.min, max: DIMENSION.max })}
-            </FieldError>
+            <FieldError match>{t("imageResizeMaxDimensionInvalid", dimension)}</FieldError>
           ) : null}
         </SettingsRow>
       </Field>
@@ -168,14 +178,12 @@ function ImageResizeForm({ settings }: { settings: Settings }): JSX.Element {
             />
           }
           controlWidth="number"
-          description={t("imageResizeMaxKBHint")}
+          description={t("imageResizeMaxKBHint", sizeKB)}
           htmlFor={sizeId}
           title={t("imageResizeMaxKB")}
         >
           {invalid.size ? (
-            <FieldError match>
-              {t("imageResizeMaxKBInvalid", { min: SIZE_KB.min, max: SIZE_KB.max })}
-            </FieldError>
+            <FieldError match>{t("imageResizeMaxKBInvalid", sizeKB)}</FieldError>
           ) : null}
         </SettingsRow>
       </Field>

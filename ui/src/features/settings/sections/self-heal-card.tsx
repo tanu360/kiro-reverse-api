@@ -261,7 +261,7 @@ function HealStatusRow({
     });
     const used =
       maxRounds > 0
-        ? t("selfHeal.roundsUsed", { used: state.rounds, max: maxRounds })
+        ? t("selfHeal.roundsUsed", { count: maxRounds, used: state.rounds, max: maxRounds })
         : t("selfHeal.roundsUsedUnlimited", { count: state.rounds });
     description = (
       <>

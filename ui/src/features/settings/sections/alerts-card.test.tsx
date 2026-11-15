@@ -323,6 +323,12 @@ describe("AlertsCard daily summary", () => {
     // The default 09:00 UTC, labelled with the viewer's own time and the UTC time.
     const time = screen.getByRole("combobox", { name: "Send at" });
     expect(time).toHaveTextContent("(09:00 UTC)");
+    // The local time in the language's own clock: "9:00 AM" in English, not "09:00 AM".
+    const nine = new Date();
+    nine.setUTCHours(9, 0, 0, 0);
+    const local = new Intl.DateTimeFormat("en-US", { timeStyle: "short" }).format(nine);
+    expect(local).not.toMatch(/^0/);
+    expect(time).toHaveTextContent(`${local} (09:00 UTC)`);
     expect(screen.getByText(/The server keeps 09:00 UTC/)).toBeInTheDocument();
 
     await user.click(toggle);

@@ -41,7 +41,7 @@ afterEach(() => {
 
 async function renderCard() {
   const result = renderWithProviders(<LogRetentionCard />);
-  const days = await screen.findByLabelText("Keep entries for (days)");
+  const days = await screen.findByLabelText("Days to keep entries");
   const card = document.getElementById(SECTION_ID.logRetention);
   if (!card) throw new Error("log retention card not rendered");
   const save = within(card).getByRole("button", { name: "Save" });

@@ -256,7 +256,7 @@ describe("settings focus", () => {
         await frame();
         current("Log retention");
         const card = section(SECTION_ID.logRetention);
-        within(card).getByLabelText("Keep entries for (days)").focus();
+        within(card).getByLabelText("Days to keep entries").focus();
         await user.keyboard(" ");
         await frame();
         current("Log retention");

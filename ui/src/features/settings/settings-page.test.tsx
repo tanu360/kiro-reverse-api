@@ -178,6 +178,9 @@ describe("SettingsPage", () => {
     const { user } = await renderPage();
     const card = section(SECTION_ID.autoContinue);
     const input = within(card).getByLabelText("Maximum continuations per answer");
+    expect(
+      within(card).getByText(/^Kiro stops a single answer at about 8,192 output/),
+    ).toBeVisible();
 
     await user.clear(input);
     await user.type(input, "11");
@@ -201,6 +204,13 @@ describe("SettingsPage", () => {
     expect(toggle).toHaveAttribute("aria-checked", "true");
     const dimension = within(card).getByLabelText("Maximum width or height");
     const size = within(card).getByLabelText("Maximum file size");
+    // The hints group their numbers as the fields do.
+    expect(
+      within(card).getByText(
+        "In pixels, between 256 and 4,096. Claude scales larger images down to about 1,568 pixels anyway.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(card).getByText(/^In KB, between 50 and 4,096\./)).toBeInTheDocument();
 
     await user.clear(dimension);
     await user.type(dimension, "4097");
@@ -210,11 +220,11 @@ describe("SettingsPage", () => {
 
     expect(
       await within(card).findByText(
-        "Maximum width or height must be a whole number between 256 and 4096.",
+        "Maximum width or height must be a whole number between 256 and 4,096.",
       ),
     ).toBeInTheDocument();
     expect(
-      within(card).getByText("Maximum file size must be a whole number between 50 and 4096."),
+      within(card).getByText("Maximum file size must be a whole number between 50 and 4,096."),
     ).toBeInTheDocument();
     expect(dimension).toHaveAttribute("aria-invalid", "true");
     expect(size).toHaveAttribute("aria-invalid", "true");

@@ -229,7 +229,7 @@ function ResponseHeadersForm({ data }: { data: ResponseHeadersResponse }): JSX.E
             {on}/{rows.length}
           </span>
           <span className="sr-only">
-            {t("responseHeaders.onCount", { on, total: rows.length })}
+            {t("responseHeaders.onCount", { count: rows.length, on, total: rows.length })}
           </span>
         </Badge>
       }

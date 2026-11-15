@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/number-field";
 import { settingsQuery } from "@/lib/api/settings";
 import type { Settings } from "@/lib/api/types";
+import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
@@ -19,6 +20,8 @@ import { SECTION_ID } from "./sections";
 import { fillNodes, Hint, SaveFooter, SectionQuery, SettingsSection } from "./settings-section";
 
 const MAX_CONTINUATIONS = 10;
+/** Where Kiro cuts a single answer off, in output tokens. */
+const KIRO_ANSWER_TOKENS = 8192;
 const DEFAULT_CONTINUATIONS = 3;
 
 export function AutoContinueCard(): JSX.Element {
@@ -67,7 +70,8 @@ function ContinuationsField({
 }
 
 function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
-  const { t } = useT("settings");
+  const { t, lang } = useT("settings");
+  const max = formatNumber(MAX_CONTINUATIONS, lang);
   const maxId = useId();
   const draft = useDraft<{ autoContinue: boolean; autoContinueMax: number | null }>({
     autoContinue: settings.autoContinue === true,
@@ -109,7 +113,11 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
     >
       <SwitchField
         checked={draft.value.autoContinue}
-        description={<Hint more={t("autoContinueMore")}>{t("autoContinueHint")}</Hint>}
+        description={
+          <Hint more={t("autoContinueMore")}>
+            {t("autoContinueHint", { tokens: formatNumber(KIRO_ANSWER_TOKENS, lang) })}
+          </Hint>
+        }
         onCheckedChange={(autoContinue) => draft.set((prev) => ({ ...prev, autoContinue }))}
         title={t("autoContinueEnable")}
       />
@@ -128,12 +136,14 @@ function AutoContinueForm({ settings }: { settings: Settings }): JSX.Element {
             />
           }
           controlWidth="number"
-          description={fillNodes(t("autoContinueMaxHint"), { param: <Code>max_tokens</Code> })}
+          description={fillNodes(t("autoContinueMaxHint", { max }), {
+            param: <Code>max_tokens</Code>,
+          })}
           htmlFor={maxId}
           title={t("autoContinueMax")}
         >
           {maxInvalid ? (
-            <FieldError match>{t("autoContinueMaxInvalid", { max: MAX_CONTINUATIONS })}</FieldError>
+            <FieldError match>{t("autoContinueMaxInvalid", { max })}</FieldError>
           ) : null}
         </SettingsRow>
       </Field>

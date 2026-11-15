@@ -61,7 +61,7 @@ describe("Routing card RPM limit", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(
-      await screen.findByText("Requests per minute must be a whole number between 1 and 1000."),
+      await screen.findByText("Requests per minute must be a whole number between 1 and 1,000."),
     ).toBeInTheDocument();
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(writes).toEqual([]);
@@ -78,7 +78,7 @@ describe("Routing card RPM limit", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(
-      await screen.findByText("Requests per minute must be a whole number between 1 and 1000."),
+      await screen.findByText("Requests per minute must be a whole number between 1 and 1,000."),
     ).toBeInTheDocument();
     expect(writes).toEqual([]);
 

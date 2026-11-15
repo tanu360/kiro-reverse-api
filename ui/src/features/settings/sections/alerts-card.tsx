@@ -231,7 +231,8 @@ function SummaryTimeSelect({
   onChange: (utcMinute: number) => void;
 }): JSX.Element {
   const { t, lang } = useT("alerts");
-  const clock = dateTimeFormat(lang, { hour: "2-digit", minute: "2-digit" });
+  // The language's own clock: "7:00 AM" in English (not "07:00 AM"), "07:00" where 24-hour.
+  const clock = dateTimeFormat(lang, { timeStyle: "short" });
   const items = summaryTimeOptions(value).map((minute) => ({
     value: minute,
     label: t("dailySummaryTimeOption", {

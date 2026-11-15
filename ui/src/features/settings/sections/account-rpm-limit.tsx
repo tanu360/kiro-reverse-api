@@ -9,6 +9,7 @@ import {
   NumberFieldInput,
 } from "@/components/ui/number-field";
 import type { Settings } from "@/lib/api/types";
+import { formatNumber } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { type Draft, useDraft } from "../lib/dirty";
 import { useGeneralSettingsSave } from "./general-settings";
@@ -137,8 +138,9 @@ function PerMinuteField({
 
 /** The switch and the requests-per-minute row. */
 export function RpmLimitRows({ form }: { form: RpmLimitForm }): JSX.Element {
-  const { t } = useT("settings");
+  const { t, lang } = useT("settings");
   const id = useId();
+  const max = formatNumber(MAX_ACCOUNT_RPM_LIMIT, lang);
   return (
     <>
       <SwitchField
@@ -160,13 +162,11 @@ export function RpmLimitRows({ form }: { form: RpmLimitForm }): JSX.Element {
             />
           }
           controlWidth="number"
-          description={t("rpmLimitPerMinuteHint", { max: MAX_ACCOUNT_RPM_LIMIT })}
+          description={t("rpmLimitPerMinuteHint", { max })}
           htmlFor={id}
           title={t("rpmLimitPerMinute")}
         >
-          {form.invalid ? (
-            <FieldError match>{t("rpmLimitInvalid", { max: MAX_ACCOUNT_RPM_LIMIT })}</FieldError>
-          ) : null}
+          {form.invalid ? <FieldError match>{t("rpmLimitInvalid", { max })}</FieldError> : null}
         </SettingsRow>
       </Field>
     </>
