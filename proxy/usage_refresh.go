@@ -73,7 +73,7 @@ func runHousekeepingJobs(stop <-chan struct{}, usage *refreshScheduler, listMode
 	listed := make(chan struct{})
 	go func() {
 		defer close(listed)
-		runModelsListing(stop, usageRefreshStartDelay, modelsListEvery, modelsListRetryDelays, func() bool {
+		runModelsListing(stop, usage.now, usageRefreshStartDelay, modelsListEvery, modelsListRetryDelays, func() bool {
 			retry := false
 			inTurn(func() { retry = listModels() })
 			return retry

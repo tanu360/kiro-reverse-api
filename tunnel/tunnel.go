@@ -531,6 +531,9 @@ func (m *Manager) runHelper(ctx context.Context, run *runHandle, bin, hostname, 
 	}()
 
 	reached := false
+	// loggedURL is the link last written to the log: the helper reports running again whenever
+	// its key expiry or machine page changes, and the link should show once per start.
+	loggedURL := ""
 	var protoErr error
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 64<<10), 1<<20)
@@ -556,7 +559,8 @@ func (m *Manager) runHelper(ctx context.Context, run *runHandle, bin, hostname, 
 				m.writeSignedInMarker()
 			}
 		}
-		if st.State == StateRunning && st.URL != "" {
+		if st.State == StateRunning && st.URL != "" && st.URL != loggedURL {
+			loggedURL = st.URL
 			m.opts.Logf("[Tunnel] Public link: %s", st.URL)
 		}
 		m.setStatus(st)

@@ -93,6 +93,14 @@ func fakeHelper(scenario string, args []string) int {
 			"keyExpiry":  "2027-05-14T05:00:00Z",
 			"machineURL": "https://login.tailscale.com/admin/machines/100.64.0.1",
 		})
+	case "relog":
+		// Running twice with the same link: the key expiry arrives a moment later.
+		emit(map[string]any{"state": "running", "url": "https://" + *hostname + ".tail1234.ts.net"})
+		emit(map[string]any{
+			"state":     "running",
+			"url":       "https://" + *hostname + ".tail1234.ts.net",
+			"keyExpiry": "2027-05-14T05:00:00Z",
+		})
 	}
 	// Run until the proxy closes stdin or asks for a sign-out.
 	scanner := bufio.NewScanner(os.Stdin)
@@ -180,6 +188,38 @@ func TestManagerReachesRunningThroughTheTunnelListener(t *testing.T) {
 	st = m.Status()
 	if st.State != StateOff || !st.SignedIn {
 		t.Errorf("after switching off = %+v, want off and still signed in", st)
+	}
+}
+
+func TestManagerLogsTheLinkOncePerStart(t *testing.T) {
+	t.Setenv(fakeEnv, "relog")
+	var mu sync.Mutex
+	var logged []string
+	m := New(Options{
+		DataDir: t.TempDir(),
+		Version: "9.9.9",
+		Handler: probeHandler(t),
+		Binary:  os.Args[0],
+		Logf: func(format string, args ...any) {
+			mu.Lock()
+			defer mu.Unlock()
+			logged = append(logged, fmt.Sprintf(format, args...))
+		},
+	})
+	t.Cleanup(m.Close)
+	m.Apply(true, "kiro-proxy")
+	waitStatus(t, m, func(s Status) bool { return s.KeyExpiry != "" })
+
+	mu.Lock()
+	defer mu.Unlock()
+	links := 0
+	for _, line := range logged {
+		if strings.HasPrefix(line, "[Tunnel] Public link: ") {
+			links++
+		}
+	}
+	if links != 1 {
+		t.Fatalf("logged the link %d times, want once: %q", links, logged)
 	}
 }
 

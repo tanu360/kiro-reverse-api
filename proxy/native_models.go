@@ -130,14 +130,26 @@ func (h *Handler) listModelsForHousekeeping() (retry bool) {
 // previous call ended, until stop is closed. After a call that asks for a retry, the next
 // of retries replaces `every`; once they are used up, `every` applies until a call that
 // does not ask, which starts them over.
-func runModelsListing(stop <-chan struct{}, startDelay, every time.Duration, retries []time.Duration, list func() (retry bool)) {
-	timer := time.NewTimer(startDelay)
+func runModelsListing(stop <-chan struct{}, now func() time.Time, startDelay, every time.Duration, retries []time.Duration, list func() (retry bool)) {
+	delay := startDelay
+	due := now().Add(delay)
+	// The timer wakes at least once a minute and the wall clock says when the listing is due,
+	// so one that fell due while the computer slept runs soon after it wakes (wallCheckEvery).
+	timer := time.NewTimer(waitUntil(now, due))
 	defer timer.Stop()
 	next := 0
 	for {
 		select {
 		case <-timer.C:
-			delay := every
+			if t := now(); t.Before(due) {
+				if due.Sub(t) > delay {
+					// The clock was set back: wait one delay from now at most.
+					due = t.Add(delay)
+				}
+				timer.Reset(waitUntil(now, due))
+				continue
+			}
+			delay = every
 			if !list() {
 				next = 0
 			} else if next < len(retries) {
@@ -145,7 +157,8 @@ func runModelsListing(stop <-chan struct{}, startDelay, every time.Duration, ret
 				next++
 				logger.Infof("[ModelsCache] Listing models again in %s", textfmt.Duration(delay))
 			}
-			timer.Reset(delay)
+			due = now().Add(delay)
+			timer.Reset(waitUntil(now, due))
 		case <-stop:
 			return
 		}

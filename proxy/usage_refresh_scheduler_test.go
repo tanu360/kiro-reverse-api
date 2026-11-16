@@ -26,6 +26,8 @@ type schedulerRig struct {
 	interval atomic.Int64
 	// sweepTakes is how long each sweep lasts on the fake clock.
 	sweepTakes time.Duration
+	// skew is how far the scheduler's wall clock runs ahead of the fake clock (see sleep).
+	skew atomic.Int64
 
 	mu       sync.Mutex
 	starts   []time.Duration // sweep start, relative to start
@@ -42,6 +44,7 @@ func startSchedulerRig(t *testing.T, interval, sweepTakes time.Duration) *schedu
 	r := &schedulerRig{t: t, start: time.Now(), sweepTakes: sweepTakes, stop: make(chan struct{}), done: make(chan struct{})}
 	r.interval.Store(int64(interval))
 	r.s = newRefreshScheduler(func() time.Duration { return time.Duration(r.interval.Load()) })
+	r.s.now = func() time.Time { return wallNow().Add(time.Duration(r.skew.Load())) }
 	go func() {
 		defer close(r.done)
 		r.s.run(r.stop, testStartDelay, r.sweep)
@@ -65,6 +68,12 @@ func (r *schedulerRig) sweep(every time.Duration) {
 	r.mu.Lock()
 	r.inFlight--
 	r.mu.Unlock()
+}
+
+// sleep moves the wall clock by d while the timers stand still, as when the computer sleeps for d
+// (or, with d < 0, when its clock is set back).
+func (r *schedulerRig) sleep(d time.Duration) {
+	r.skew.Add(int64(d))
 }
 
 // set changes the stored interval; poke also tells the scheduler, as a save does.
@@ -281,6 +290,36 @@ func TestRefreshSchedulerTimerWakeRereadsInterval(t *testing.T) {
 	})
 }
 
+func TestRefreshSchedulerSweepsWithinAMinuteOfWaking(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := startSchedulerRig(t, 30*time.Minute, 0)
+		defer r.close()
+
+		// Swept at boot; the next sweep is due at 30m10s. Then 3 hours of sleep.
+		r.at(10*time.Second + 8*time.Minute)
+		r.sleep(3 * time.Hour)
+		r.at(10*time.Second + 9*time.Minute)
+		r.sweptAt(10*time.Second, 10*time.Second+9*time.Minute)
+
+		// Back on the interval from that sweep.
+		r.at(10*time.Second + 39*time.Minute)
+		r.sweptAt(10*time.Second, 10*time.Second+9*time.Minute, 10*time.Second+39*time.Minute)
+	})
+}
+
+func TestRefreshSchedulerClockSetBackWaitsOneIntervalAtMost(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := startSchedulerRig(t, 30*time.Minute, 0)
+		defer r.close()
+
+		r.at(10*time.Second + 5*time.Minute)
+		r.sleep(-24 * time.Hour)
+		// The minute check at 6m10s finds the last sweep in the future and counts from then.
+		r.at(10*time.Second + 36*time.Minute)
+		r.sweptAt(10*time.Second, 10*time.Second+36*time.Minute)
+	})
+}
+
 func TestRefreshSchedulerChangeDuringSweepNoOverlap(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := startSchedulerRig(t, 5*time.Minute, 2*time.Minute)
@@ -381,6 +420,7 @@ type housekeepingRig struct {
 	interval atomic.Int64
 	usage    *refreshScheduler
 	takes    time.Duration // how long each job lasts on the fake clock
+	skew     atomic.Int64  // how far the wall clock runs ahead of the fake clock
 
 	mu       sync.Mutex
 	listings []time.Duration
@@ -399,6 +439,7 @@ func startHousekeepingRig(t *testing.T, interval, takes time.Duration, listFails
 	r := &housekeepingRig{t: t, start: time.Now(), takes: takes, listFails: listFails, stop: make(chan struct{}), done: make(chan struct{})}
 	r.interval.Store(int64(interval))
 	r.usage = newRefreshScheduler(func() time.Duration { return time.Duration(r.interval.Load()) })
+	r.usage.now = func() time.Time { return wallNow().Add(time.Duration(r.skew.Load())) }
 	go func() {
 		defer close(r.done)
 		runHousekeepingJobs(r.stop, r.usage,
@@ -498,6 +539,23 @@ func TestHousekeepingListsModelsEveryThirtyMinutesWhateverTheInterval(t *testing
 			})
 		})
 	}
+}
+
+func TestHousekeepingListsModelsAndSweepsSoonAfterWaking(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := startHousekeepingRig(t, 30*time.Minute, 0)
+		defer r.close()
+
+		r.at(10*time.Second + 8*time.Minute)
+		r.skew.Add(int64(3 * time.Hour)) // the computer sleeps 3 hours
+		r.at(10*time.Second + 9*time.Minute)
+		if l, s := r.counts(); l != 2 || s != 2 {
+			t.Fatalf("a minute after waking: %d listings, %d sweeps; want 2 of each (boot, on waking)", l, s)
+		}
+		if r.overlap {
+			t.Fatal("the listing and the sweep ran at the same time")
+		}
+	})
 }
 
 func TestHousekeepingIntervalChangeLeavesModelsListingAlone(t *testing.T) {
