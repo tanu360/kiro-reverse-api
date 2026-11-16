@@ -29,6 +29,8 @@ export interface SectionCardProps {
   meta?: ReactNode;
   actions?: ReactNode;
   footer?: ReactNode;
+  /** Layout classes for the footer (height, alignment). */
+  footerClassName?: string;
   /** `danger` draws the red-tinted card with a red icon chip and title (Danger zone). */
   tone?: "default" | "danger";
   /**
@@ -55,6 +57,7 @@ export function SectionCard({
   tone = "default",
   slim = false,
   panelClassName,
+  footerClassName,
   className,
   children,
 }: SectionCardProps): JSX.Element {
@@ -94,7 +97,7 @@ export function SectionCard({
         {actions ? <CardAction>{actions}</CardAction> : null}
       </CardHeader>
       {slim ? children : <CardPanel className={panelClassName}>{children}</CardPanel>}
-      {footer ? <CardFooter>{footer}</CardFooter> : null}
+      {footer ? <CardFooter className={footerClassName}>{footer}</CardFooter> : null}
     </Card>
   );
 }

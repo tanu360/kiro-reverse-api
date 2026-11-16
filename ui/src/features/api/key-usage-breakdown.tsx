@@ -6,6 +6,7 @@ import { SectionCard } from "@/components/shared/section-card";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
+  MIX_FOOTER,
   MIX_TABLE_ROWS,
   type MixItem,
   ModelMixPanel,
@@ -165,6 +166,8 @@ export function UsageBreakdownCard({
           </p>
         ) : undefined
       }
+      // As tall as the header (48 / 56 px), the count at the end, centred on that height.
+      footerClassName={MIX_FOOTER}
       icon={icon}
       slim={slim}
       title={cardTitle ?? t("usage.breakdown")}
