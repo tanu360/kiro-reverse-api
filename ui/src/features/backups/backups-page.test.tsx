@@ -87,7 +87,7 @@ describe("BackupsPage", () => {
     await renderPage();
     const rows = dataRows();
     expect(rows).toHaveLength(5);
-    const kinds = rows.map((row) => row.querySelector('[data-slot="badge"]')?.textContent);
+    const kinds = rows.map((row) => row.querySelector('[data-slot="backup-kind"]')?.textContent);
     expect(kinds).toEqual(["Manual", "Scheduled", "Rollback point", "Scheduled", "Rollback point"]);
     const rollback = within(rows[2]).getByText("Rollback point");
     expect(rollback).toHaveAttribute("data-tone", "warning");
