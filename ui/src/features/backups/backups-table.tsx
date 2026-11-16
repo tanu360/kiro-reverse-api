@@ -16,16 +16,14 @@ import { DataTable, type DataTableColumn } from "@/components/shared/data-table"
 import { InfoHint } from "@/components/shared/info-hint";
 import { ListCard } from "@/components/shared/list-card";
 import { RelativeTime } from "@/components/shared/relative-time";
-import { TruncatedText } from "@/components/shared/truncated-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BackupEntry } from "@/lib/api/types";
-import { dateTimeFormat, EMPTY, formatBytes, formatDateTime } from "@/lib/format";
-import { fillNodes, type Lang, type TFunction, useT } from "@/lib/i18n";
+import { EMPTY, formatBytes, formatDateTime } from "@/lib/format";
+import { fillNodes, type TFunction, useT } from "@/lib/i18n";
 import { useMaskText } from "@/lib/privacy";
-import { cn } from "@/lib/utils";
 import { accountsCell, backupKind, kindLabel, kindTone, noteText } from "./backup-model";
 
 export type BackupAction = "download" | "restore" | "delete";
@@ -48,30 +46,18 @@ function isoTime(unixSec: number): string {
   return new Date(unixSec * 1000).toISOString();
 }
 
-/** "Nov 16, 1:14 PM": the date (with the year only when it is not this year's) and the time. */
-function shortDateTime(unixSec: number, lang: Lang): string {
-  const date = new Date(unixSec * 1000);
-  return dateTimeFormat(lang, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    ...(date.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }),
-  }).format(date);
-}
-
-/** The date and time, then how long ago ("3m ago") muted, on one line. */
+/** The date and time on the first line, how long ago on a muted second line. */
 function TimeCell({ entry }: { entry: BackupEntry }): JSX.Element {
   const { lang } = useT("backups");
   return (
-    <span className="flex items-baseline gap-2 whitespace-nowrap">
-      <time className="tabular-nums" dateTime={isoTime(entry.createdAt)}>
-        {shortDateTime(entry.createdAt, lang)}
+    <div className="flex flex-col gap-1">
+      <time className="whitespace-nowrap" dateTime={isoTime(entry.createdAt)}>
+        {formatDateTime(entry.createdAt, lang)}
       </time>
       <span className="text-meta text-muted-foreground">
-        <RelativeTime style="narrow" value={entry.createdAt} />
+        <RelativeTime value={entry.createdAt} />
       </span>
-    </span>
+    </div>
   );
 }
 
@@ -92,34 +78,6 @@ function KindBadge({ kind, t }: { kind: string; t: TFunction }): JSX.Element {
   );
 }
 
-/** A kind's dot and name colours: its badge's disc and label colours. */
-const KIND_TONE: Record<ReturnType<typeof kindTone>, { dot: string; text: string }> = {
-  primary: { dot: "bg-(--pill-primary)", text: "text-(--pill-primary-fg)" },
-  warning: { dot: "bg-(--pill-warning)", text: "text-(--pill-warning-fg)" },
-  neutral: { dot: "bg-(--pill-neutral)", text: "text-foreground" },
-};
-
-/** The table's kind: a coloured dot and the name in the same colour, one line, no badge. */
-function KindLabel({ kind, t }: { kind: string; t: TFunction }): JSX.Element {
-  const tone = kindTone(kind);
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-2 whitespace-nowrap font-medium",
-        KIND_TONE[tone].text,
-      )}
-      data-slot="backup-kind"
-      data-tone={tone}
-    >
-      <span
-        aria-hidden="true"
-        className={cn("size-2 shrink-0 rounded-full", KIND_TONE[tone].dot)}
-      />
-      {kindLabel(kind, t)}
-    </span>
-  );
-}
-
 /** The account count; a rollback point's count opens what it saved before the restore. */
 function AccountsCell({ entry, t }: { entry: BackupEntry; t: TFunction }): JSX.Element {
   const { lang } = useT();
@@ -130,11 +88,10 @@ function AccountsCell({ entry, t }: { entry: BackupEntry; t: TFunction }): JSX.E
 
 type Mask = (text?: string) => string;
 
-/** The note muted on one line, cut with a tooltip when long; a dash when there is none. */
+/** The note, or a muted dash when there is none. */
 function NoteCell({ entry, t, mask }: { entry: BackupEntry; t: TFunction; mask: Mask }): ReactNode {
-  return (
-    <TruncatedText className="text-muted-foreground">{noteText(entry, t, mask)}</TruncatedText>
-  );
+  const note = noteText(entry, t, mask);
+  return note === EMPTY ? <span className="text-muted-foreground">{EMPTY}</span> : note;
 }
 
 /** The card's row menu: every action of the row, one tap away. */
@@ -238,11 +195,7 @@ function RowIconButton({
   );
 }
 
-/**
- * Table row actions as three quiet icon buttons, shown while the row is hovered or holds focus (a
- * keyboard user tabbing in reveals them) and while one runs; otherwise a quiet ⋯ stands in. Touch
- * screens, with no hover, always show them.
- */
+/** Table row actions as three quiet icon buttons, quieter than bordered text buttons. */
 function RowActions({
   entry,
   actions,
@@ -254,42 +207,31 @@ function RowActions({
   const running = actions.busy.get(entry.id);
   const blocked = running !== undefined;
   return (
-    <div
-      className="group/actions relative flex items-center justify-end"
-      data-busy={blocked || undefined}
-    >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 end-0 flex w-9 items-center justify-center text-muted-foreground transition-opacity duration-150 in-[tr:focus-within]:opacity-0 in-[tr:hover]:opacity-0 group-data-busy/actions:opacity-0 pointer-coarse:hidden"
-      >
-        <HugeiconsIcon className="size-4" icon={EllipsisVerticalIcon} />
-      </span>
-      <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 in-[tr:focus-within]:opacity-100 in-[tr:hover]:opacity-100 group-data-busy/actions:opacity-100 pointer-coarse:opacity-100">
-        <RowIconButton
-          blocked={blocked}
-          focusId={entry.id}
-          hint={t("downloadHint")}
-          icon={Download01Icon}
-          label={t("download")}
-          onClick={() => actions.onDownload(entry)}
-          running={running === "download"}
-        />
-        <RowIconButton
-          blocked={blocked}
-          icon={Undo02Icon}
-          label={t("restore")}
-          onClick={() => actions.onRestore(entry)}
-          running={running === "restore"}
-        />
-        <RowIconButton
-          blocked={blocked}
-          destructive
-          icon={Delete02Icon}
-          label={t("delete")}
-          onClick={() => actions.onDelete(entry)}
-          running={running === "delete"}
-        />
-      </div>
+    <div className="flex items-center justify-end gap-0.5">
+      <RowIconButton
+        blocked={blocked}
+        focusId={entry.id}
+        hint={t("downloadHint")}
+        icon={Download01Icon}
+        label={t("download")}
+        onClick={() => actions.onDownload(entry)}
+        running={running === "download"}
+      />
+      <RowIconButton
+        blocked={blocked}
+        icon={Undo02Icon}
+        label={t("restore")}
+        onClick={() => actions.onRestore(entry)}
+        running={running === "restore"}
+      />
+      <RowIconButton
+        blocked={blocked}
+        destructive
+        icon={Delete02Icon}
+        label={t("delete")}
+        onClick={() => actions.onDelete(entry)}
+        running={running === "delete"}
+      />
     </div>
   );
 }
@@ -363,13 +305,12 @@ export function BackupsTable({
       {
         id: "kind",
         header: t("kind"),
-        cell: (entry) => <KindLabel kind={backupKind(entry)} t={t} />,
+        cell: (entry) => <KindBadge kind={backupKind(entry)} t={t} />,
       },
       {
         id: "note",
         header: t("note"),
-        // One line, taking the width the others leave; a long note is cut with a tooltip.
-        className: "w-full max-w-0",
+        className: "min-w-32 max-w-96 whitespace-normal wrap-break-word leading-snug",
         cell: (entry) => <NoteCell entry={entry} mask={mask} t={t} />,
       },
       {
@@ -412,11 +353,12 @@ export function BackupsTable({
       caption={t("list.caption")}
       cardLayout="divided"
       // Rows divided inside the card on a phone and a narrow tablet, the table from 48rem: the
-      // longer pt-BR and vi headers and the one-line times need that 768 px container for the
-      // five columns to fit unscrolled, so the pinned actions never cover the counts.
+      // longer pt-BR and vi headers with the note's 8rem floor need that 768 px container for
+      // the five columns to fit unscrolled, so the pinned actions never cover the counts.
       cardsBelow="3xl"
       columns={columns}
       data={rows}
+      density="comfortable"
       emptyState={emptyState}
       getRowId={(entry) => entry.id}
       inset

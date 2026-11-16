@@ -87,13 +87,13 @@ describe("BackupsPage", () => {
     await renderPage();
     const rows = dataRows();
     expect(rows).toHaveLength(5);
-    const kinds = rows.map((row) => row.querySelector('[data-slot="backup-kind"]')?.textContent);
+    const kinds = rows.map((row) => row.querySelector('[data-slot="badge"]')?.textContent);
     expect(kinds).toEqual(["Manual", "Scheduled", "Rollback point", "Scheduled", "Rollback point"]);
     const rollback = within(rows[2]).getByText("Rollback point");
     expect(rollback).toHaveAttribute("data-tone", "warning");
     expect(within(rows[0]).getByText("Manual")).toHaveAttribute("data-tone", "primary");
     expect(within(rows[1]).getByText("Scheduled")).toHaveAttribute("data-tone", "neutral");
-    expect(within(rows[1]).getByText("Daily")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Scheduled (Daily)")).toBeInTheDocument();
     expect(within(rows[2]).getByText("7 restored")).toBeInTheDocument();
     expect(
       within(rows[4]).getByText("Before restoring from file kiro-backup-x.json"),
