@@ -16,7 +16,7 @@ import { UsageKpis } from "./usage-kpis";
  * The key's usage over 24 hours, 7 or 30 days or its lifetime: the range switch over the
  * Overview's KPI cards (each with the key's limit for its measure), the key's settings in one
  * strip, then the admin usage sheet's chart (requests, tokens or credits) beside the usage by
- * model. One range drives the cards and both charts.
+ * model or by client. One range drives the cards and both charts.
  */
 export function UsageSection({ apiKey }: { apiKey: UserKey | undefined }): JSX.Element {
   const { t } = useT("user-panel");
@@ -63,12 +63,14 @@ export function UsageSection({ apiKey }: { apiKey: UserKey | undefined }): JSX.E
           retrying={usage.isFetching}
         />
         <UsageBreakdownCard
+          clients={breakdown.data?.clients}
           error={breakdown.error}
           loading={breakdown.isPending}
           models={breakdown.data?.models}
           onRetry={() => void breakdown.refetch()}
           retrying={breakdown.isFetching}
           showAccounts={false}
+          showClients
           title={t("models.title")}
         />
       </div>

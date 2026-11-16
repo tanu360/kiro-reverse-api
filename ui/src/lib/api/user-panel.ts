@@ -82,8 +82,24 @@ export interface UserUsage extends ApiKeyUsageResponse {
    */
   previous?: ApiKeyUsageTotals;
 }
-/** GET /usage/breakdown: by model; `accounts` is always empty. */
-export type UserUsageBreakdown = ApiKeyUsageBreakdown;
+/**
+ * Who called, as the Requests table names a request's caller: a coding tool (`REQUEST_CLIENTS`),
+ * else the client API (`REQUEST_ENDPOINTS`), else "other": rows logged before either was kept,
+ * and the days log retention folded into daily totals.
+ */
+export type UserUsageClient = RequestClient | RequestEndpoint | "other";
+export const USER_USAGE_OTHER_CLIENT = "other";
+
+/** One caller's share of the key's usage; `id` is a UserUsageClient. */
+export interface UserUsageClientItem extends ApiKeyUsageBreakdownItem {
+  id: UserUsageClient;
+}
+
+/** GET /usage/breakdown: by model and by client; `accounts` is always empty. */
+export interface UserUsageBreakdown extends ApiKeyUsageBreakdown {
+  /** Busiest first. Empty from servers older than the client split. */
+  clients: UserUsageClientItem[];
+}
 export type UserUsageRange = ApiKeyUsageRange;
 
 export type UserRequestStatus = "all" | "success" | "error";
@@ -305,6 +321,38 @@ function normalizeBreakdownItem(value: unknown): ApiKeyUsageBreakdownItem {
   };
 }
 
+function isUsageClient(id: string): id is RequestClient | RequestEndpoint {
+  return (
+    (REQUEST_CLIENTS as readonly string[]).includes(id) ||
+    (REQUEST_ENDPOINTS as readonly string[]).includes(id)
+  );
+}
+
+/**
+ * The callers busiest first, as the server sorts them. An id this UI cannot name counts as
+ * "other", so the list never shows two "Other" rows.
+ */
+function normalizeClients(value: unknown): UserUsageClientItem[] {
+  const byId = new Map<UserUsageClient, UserUsageClientItem>();
+  for (const raw of list(value)) {
+    const item = normalizeBreakdownItem(raw);
+    const id = isUsageClient(item.id) ? item.id : USER_USAGE_OTHER_CLIENT;
+    const sum = byId.get(id);
+    if (!sum) {
+      byId.set(id, { ...item, id });
+      continue;
+    }
+    sum.requests += item.requests;
+    sum.succeeded += item.succeeded;
+    sum.failed += item.failed;
+    sum.tokens += item.tokens;
+    sum.credits += item.credits;
+  }
+  return [...byId.values()].sort(
+    (a, b) => b.requests - a.requests || b.credits - a.credits || a.id.localeCompare(b.id),
+  );
+}
+
 export function normalizeUserUsageBreakdown(
   value: unknown,
   range: UserUsageRange = "24h",
@@ -318,6 +366,7 @@ export function normalizeUserUsageBreakdown(
     models: list(res.models).map(normalizeBreakdownItem),
     // Accounts are never shown to a key holder, whatever the server sends.
     accounts: [],
+    clients: normalizeClients(res.clients),
   };
 }
 

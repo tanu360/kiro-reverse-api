@@ -62,11 +62,20 @@ function ColorDot({ color }: { color: string }): JSX.Element {
   );
 }
 
-function ModelName({ row }: { row: MixRow }): JSX.Element {
+/** Renders a row's name after its colour dot; the plain name by default. */
+type MixNameRenderer = (item: MixItem) => ReactNode;
+
+function ModelName({
+  row,
+  renderName,
+}: {
+  row: MixRow;
+  renderName?: MixNameRenderer;
+}): JSX.Element {
   return (
     <span className="flex min-w-0 items-center gap-2">
       <ColorDot color={row.color} />
-      <TruncatedText>{row.item.model}</TruncatedText>
+      {renderName ? renderName(row.item) : <TruncatedText>{row.item.model}</TruncatedText>}
     </span>
   );
 }
@@ -107,6 +116,44 @@ const BESIDE: Record<MixBreakpoint, { row: string; ring: string; table: string }
   },
 };
 
+/**
+ * The ring and rows when `rest` is itself a rest: the five busiest others first, then `rest` in
+ * grey, as its own row and slice while the table has room for it, else inside the ring's
+ * "Other" with everything past the five.
+ */
+function mixWithRest(
+  items: readonly MixItem[],
+  rest: MixItem,
+  metricOf: (item: MixItem) => number,
+  total: number,
+  otherLabel: string,
+): { ring: RingSlice[]; rows: MixRow[] } {
+  const named = items.filter((item) => item !== rest).sort((a, b) => metricOf(b) - metricOf(a));
+  const others = named.slice(RING_MODELS);
+  const share = (item: MixItem) => (total > 0 ? metricOf(item) / total : 0);
+  const rows: MixRow[] = named
+    .slice(0, RING_MODELS)
+    .map((item, index) => ({ item, color: MODEL_COLORS[index], share: share(item) }));
+  if (others.length === 0) {
+    rows.push({ item: rest, color: OTHER_MODEL_COLOR, share: share(rest) });
+  }
+  const ring: RingSlice[] = rows.map((row) => ({
+    label: row.item.model,
+    value: metricOf(row.item),
+    maxValue: total,
+    color: row.color,
+  }));
+  if (others.length > 0) {
+    ring.push({
+      label: otherLabel,
+      value: others.reduce((sum, item) => sum + metricOf(item), metricOf(rest)),
+      maxValue: total,
+      color: OTHER_MODEL_COLOR,
+    });
+  }
+  return { ring, rows };
+}
+
 /** The mix while it loads: the ring and the table as placeholders. Put it in a padded panel. */
 export function ModelMixSkeleton({
   besideFrom = "lg",
@@ -135,6 +182,8 @@ export function ModelMixPanel({
   caption,
   chartLabel,
   nameHeader,
+  renderName,
+  restId,
   besideFrom = "lg",
 }: {
   items: readonly MixItem[];
@@ -146,6 +195,14 @@ export function ModelMixPanel({
   chartLabel?: string;
   /** The first column's header: "Model" by default. */
   nameHeader?: string;
+  /** Each row's name after its dot (a caller's mark and name); the plain `model` by default. */
+  renderName?: MixNameRenderer;
+  /**
+   * The item that is itself a rest (a key's requests from no known client): it ranks after every
+   * other, in grey, and joins the ring's "Other" slice when there is one, so the ring never
+   * shows two "Other" slices.
+   */
+  restId?: string;
   /** The card width from which the ring sits beside the table: 32rem by default. */
   besideFrom?: MixBreakpoint;
 }): JSX.Element {
@@ -156,11 +213,13 @@ export function ModelMixPanel({
 
   const mix = useMemo(() => {
     const { slices, metric, total } = modelSlices(items, RING_MODELS, otherLabel, by);
+    const metricOf = (item: MixItem) => (metric === "credits" ? item.credits : item.reqs);
+    const rest = restId === undefined ? undefined : items.find((item) => item.id === restId);
+    if (rest) return { ...mixWithRest(items, rest, metricOf, total, otherLabel), metric };
     const ring: RingSlice[] = slices.map((slice, index) => ({
       ...slice,
       color: index < RING_MODELS ? MODEL_COLORS[index] : OTHER_MODEL_COLOR,
     }));
-    const metricOf = (item: MixItem) => (metric === "credits" ? item.credits : item.reqs);
     const sorted = [...items].sort((a, b) => metricOf(b) - metricOf(a));
     const rows: MixRow[] = sorted.slice(0, MIX_TABLE_ROWS).map((item, index) => ({
       item,
@@ -168,7 +227,7 @@ export function ModelMixPanel({
       share: total > 0 ? metricOf(item) / total : 0,
     }));
     return { ring, metric, rows };
-  }, [items, otherLabel, by]);
+  }, [items, otherLabel, by, restId]);
 
   const columns = useMemo<DataTableColumn<MixRow>[]>(() => {
     // While a slice or row is hovered, every cell of the other rows dims.
@@ -192,7 +251,7 @@ export function ModelMixPanel({
             index,
             "flex min-w-0 flex-col gap-1.5",
             <>
-              <ModelName row={row} />
+              <ModelName renderName={renderName} row={row} />
               <ShareBar className="max-w-40" color={row.color} value={row.share} />
             </>,
           ),
@@ -227,10 +286,10 @@ export function ModelMixPanel({
         cell: (row, index) => focus(index, "font-medium", formatCredits(row.item.credits)),
       },
     ];
-  }, [t, lang, hovered, nameHeader]);
+  }, [t, lang, hovered, nameHeader, renderName]);
 
   const renderCard = (row: MixRow) => (
-    <ListCard title={<ModelName row={row} />} variant="row">
+    <ListCard title={<ModelName renderName={renderName} row={row} />} variant="row">
       <ShareBar className="max-w-40" color={row.color} value={row.share} />
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-meta">
         <div className="flex min-w-0 flex-col gap-0.5">

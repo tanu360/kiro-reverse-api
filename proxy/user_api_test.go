@@ -1288,3 +1288,81 @@ func TestUserSessionsSurviveARestartIntoAnUpdate(t *testing.T) {
 		t.Fatalf("imported expiry %v outlives the TTL", got)
 	}
 }
+
+// The key holder's breakdown lists who called with this key: the coding tool, else the client
+// API, else other (rows without either, and every pruned row). Other keys' and keyless rows never
+// count, and the clients add up to the same requests, tokens and credits as the models.
+func TestUserUsageBreakdownByClient(t *testing.T) {
+	h := newUserAPITestHandler(t)
+	mine := addUsageKey(t, "mine", "sk-user-clients-mine-0123456789", true)
+	other := addUsageKey(t, "other", "sk-user-clients-other-0123456789", true)
+	idle := addUsageKey(t, "idle", "sk-user-clients-idle-0123456789", true)
+	now := time.Now()
+	ts := now.Unix() - 600
+	insertClientRows(t,
+		clientRow{ts: ts, keyID: mine.ID, client: "claude-code", endpoint: "claude", success: true, credits: 0.5, n: 3},
+		clientRow{ts: ts, keyID: mine.ID, model: "model-b", client: "claude-code", endpoint: "claude", n: 1},
+		clientRow{ts: ts, keyID: mine.ID, client: "", endpoint: "openai", success: true, credits: 0.25, n: 2},
+		clientRow{ts: ts, keyID: mine.ID, client: "codex", endpoint: "responses", success: true, credits: 1, n: 1},
+		// A tool this build does not know falls back to its API, as the Requests table names it.
+		clientRow{ts: ts, keyID: mine.ID, client: "some-new-tool", endpoint: "openai", success: true, n: 1},
+		// Logged before endpoints were: other.
+		clientRow{ts: ts, keyID: mine.ID, success: true, n: 1},
+		// Other keys' and keyless traffic: never this key's.
+		clientRow{ts: ts, keyID: other.ID, client: "cline", endpoint: "openai", success: true, credits: 9, n: 4},
+		clientRow{ts: ts, client: "roo-code", endpoint: "openai", success: true, n: 2},
+	)
+	day := now.Unix()/daySeconds - 3
+	insertDailyRollup(t, day, mine.ID, "model-a", "acc-secret", 4)
+	insertDailyRollup(t, day, other.ID, "model-a", "acc-secret", 7)
+	insertUndatedRollup(t, mine.ID, "model-old", "acc-secret", 5)
+	insertUndatedRollup(t, other.ID, "model-old", "acc-secret", 9)
+
+	token := userSignIn(t, h, mine.Key)
+	want := map[string]string{
+		"24h": "claude-code=4,openai=3,codex=1,other=1",
+		"7d":  "other=5,claude-code=4,openai=3,codex=1",
+		"all": "other=10,claude-code=4,openai=3,codex=1",
+	}
+	for _, rng := range []string{"24h", "7d", "all"} {
+		rec := userCall(h, http.MethodGet, "/user/api/usage/breakdown?range="+rng, token, "")
+		var resp userUsageBreakdown
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil || rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", rng, rec.Code, rec.Body.String())
+		}
+		body := rec.Body.String()
+		if !strings.Contains(body, `"accounts":[]`) || strings.Contains(body, "acc-secret") || strings.Contains(body, "cline") || strings.Contains(body, "roo-code") || strings.Contains(body, "some-new-tool") {
+			t.Fatalf("%s: %s", rng, body)
+		}
+		var got []string
+		var clients, models usageBreakdownItem
+		for _, c := range resp.Clients {
+			got = append(got, c.ID+"="+strconv.FormatInt(c.Requests, 10))
+			clients.Requests += c.Requests
+			clients.Failed += c.Failed
+			clients.Tokens += c.Tokens
+			clients.Credits += c.Credits
+		}
+		for _, m := range resp.Models {
+			models.Requests += m.Requests
+			models.Failed += m.Failed
+			models.Tokens += m.Tokens
+			models.Credits += m.Credits
+		}
+		if strings.Join(got, ",") != want[rng] || clients != models {
+			t.Fatalf("%s: clients %v (sum %+v), models sum %+v", rng, got, clients, models)
+		}
+		if rng == "24h" {
+			code := breakdownItem(t, resp.Clients, "claude-code")
+			if code.Succeeded != 3 || code.Failed != 1 || code.Tokens != 60 || code.Credits != 1.5 {
+				t.Fatalf("claude-code %+v", code)
+			}
+		}
+	}
+
+	// A key with no traffic answers an empty list, not null.
+	rec := userCall(h, http.MethodGet, "/user/api/usage/breakdown?range=24h", userSignIn(t, h, idle.Key), "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"clients":[]`) || !strings.Contains(rec.Body.String(), `"models":[]`) {
+		t.Fatalf("idle: %d %s", rec.Code, rec.Body.String())
+	}
+}

@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ApiKeyUsageBreakdown, ApiKeyUsageResponse } from "@/lib/api/api-key-usage";
+import type {
+  ApiKeyUsageBreakdown,
+  ApiKeyUsageBreakdownItem,
+  ApiKeyUsageResponse,
+} from "@/lib/api/api-key-usage";
 import { apiRequest } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import { REQUEST_CLIENTS, REQUEST_ENDPOINTS } from "@/lib/api/types";
 import {
   getUserKey,
   getUserRequests,
@@ -105,6 +110,15 @@ describe("user panel mock", () => {
       const breakdown = await getUserUsageBreakdown(range, 330);
       expect(breakdown.models).toEqual(adminModels.models);
       expect(breakdown.accounts).toEqual([]);
+      // Who called, from the same rows: the admin's request log's client and endpoint.
+      const rows = mockDb.requests.filter(
+        (row) => row.apiKeyId === stored.id && row.ts >= breakdown.from && row.ts < breakdown.to,
+      );
+      const claudeCode = rows.filter((row) => row.client === "claude-code").length;
+      expect(breakdown.clients.find((item) => item.id === "claude-code")?.requests ?? 0).toBe(
+        claudeCode,
+      );
+      expect(breakdown.clients.reduce((sum, item) => sum + item.requests, 0)).toBe(rows.length);
     }
     expect(code(await rejection(getUserUsage("1y" as "24h", 0)))).toBe("invalid_usage_range");
   });
@@ -182,6 +196,7 @@ describe("user panel mock demo keys", () => {
   });
 
   it("signs each one in, masked, with counters that cover its whole log", async () => {
+    const tools = new Set<string>();
     for (const { id, key } of DEMO_KEYS) {
       await signInWithKey(key, false);
       const view = await getUserKey();
@@ -201,11 +216,47 @@ describe("user panel mock demo keys", () => {
       expect(ts).toEqual([...ts].sort((a, b) => b - a));
       expect(JSON.stringify(rows)).not.toMatch(/accountId|demo-account|email|message/);
       if (rows.total >= 40) {
-        // A busy key's requests come from a mix of coding tools, and some from none.
+        // A busy key's requests come from Claude Code and the key's other callers, and some from
+        // no tool the server knows.
         const clients = new Set(rows.requests.map((row) => row.client));
         expect(clients).toContain("claude-code");
         expect(clients).toContain("");
-        expect(clients.size).toBeGreaterThanOrEqual(3);
+        for (const client of clients) if (client) tools.add(client);
+      }
+    }
+    // Across the keys, every coding tool calls.
+    expect([...tools].sort()).toEqual([...REQUEST_CLIENTS].sort());
+  });
+
+  it("splits each one's usage by client, adding up to its usage by model", async () => {
+    const callers = new Set<string>([...REQUEST_CLIENTS, ...REQUEST_ENDPOINTS, "other"]);
+    for (const { id, key } of DEMO_KEYS) {
+      if (id === "usageBusy") continue;
+      await signInWithKey(key, false);
+      for (const range of ["24h", "7d", "30d", "all"] as const) {
+        const breakdown = await getUserUsageBreakdown(range, 0);
+        const sum = (items: readonly ApiKeyUsageBreakdownItem[]) =>
+          items.reduce(
+            (total, item) => ({
+              requests: total.requests + item.requests,
+              failed: total.failed + item.failed,
+              tokens: total.tokens + item.tokens,
+              credits: Math.round((total.credits + item.credits) * 1e6) / 1e6,
+            }),
+            { requests: 0, failed: 0, tokens: 0, credits: 0 },
+          );
+        expect(sum(breakdown.clients)).toEqual(sum(breakdown.models));
+        expect(breakdown.clients.every((item) => callers.has(item.id))).toBe(true);
+        const requests = breakdown.clients.map((item) => item.requests);
+        expect(requests).toEqual([...requests].sort((a, b) => b - a));
+        const ids = breakdown.clients.map((item) => item.id);
+        // Rows from before the proxy kept the API and tool are older than a month: "other" in
+        // the lifetime of the keys that have them, never in the last 24 hours.
+        if (range === "24h") expect(ids).not.toContain("other");
+        if (range === "all" && (id === "active" || id === "heavy" || id === "expired")) {
+          expect(ids).toContain("other");
+        }
+        if (id === "new") expect(ids).toEqual([]);
       }
     }
   });

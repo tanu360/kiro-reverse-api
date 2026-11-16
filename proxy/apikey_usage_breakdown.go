@@ -36,20 +36,51 @@ type apiKeyUsageBreakdown struct {
 	Accounts []usageBreakdownItem `json:"accounts"`
 }
 
-// breakdownSums adds usage rows to the model and account totals of one entry.
+// usageClientOther is the breakdown's client for requests that named neither a coding tool nor a
+// client API: rows logged before either was kept, and the pruned rows the rollups total (they
+// keep no client).
+const usageClientOther = "other"
+
+// usageClientTools are the coding tools classifyRequestClient names; usageClientAPIs the client
+// APIs a request can call (requestEndpointForPath).
+var (
+	usageClientTools = map[string]bool{
+		requestClientClaudeCode: true, requestClientCodex: true, requestClientOpencode: true,
+		requestClientCline: true, requestClientRooCode: true, requestClientKiloCode: true,
+	}
+	usageClientAPIs = map[string]bool{
+		requestEndpointClaude: true, requestEndpointOpenAI: true, requestEndpointResponses: true,
+	}
+)
+
+// usageClient is who sent a request, as the Requests table names its caller (requestCaller in
+// ui/src/features/requests/request-client.tsx): the coding tool, else the client API it called,
+// else usageClientOther.
+func usageClient(client, endpoint string) string {
+	if usageClientTools[client] {
+		return client
+	}
+	if usageClientAPIs[endpoint] {
+		return endpoint
+	}
+	return usageClientOther
+}
+
+// breakdownSums adds usage rows to the model, account and client totals of one entry.
 type breakdownSums struct {
 	models   map[string]*usageBreakdownItem
 	accounts map[string]*usageBreakdownItem
+	clients  map[string]*usageBreakdownItem
 }
 
-func (b *breakdownSums) add(model, accountID string, t apiKeyUsageTotals) {
+func (b *breakdownSums) add(model, accountID, client string, t apiKeyUsageTotals) {
 	if t.Requests <= 0 {
 		return
 	}
 	for _, target := range []struct {
 		m  map[string]*usageBreakdownItem
 		id string
-	}{{b.models, model}, {b.accounts, accountID}} {
+	}{{b.models, model}, {b.accounts, accountID}, {b.clients, client}} {
 		item := target.m[target.id]
 		if item == nil {
 			item = &usageBreakdownItem{ID: target.id}
@@ -94,6 +125,14 @@ func usageEntryRef(e *apiKeyUsageEntry) string {
 // queryApiKeyUsageBreakdown splits one usage entry (ref as usageEntryRef names it) by model and by account over the same window as queryApiKeyUsage: the request log, plus
 // the rows log retention pruned (by their day for 7d and 30d; every pruned row for all).
 func queryApiKeyUsageBreakdown(now time.Time, rng usageRange, tzOffsetMin int, keys []config.ApiKeyEntry, ref string) (apiKeyUsageBreakdown, error) {
+	resp, _, err := queryUsageBreakdown(now, rng, tzOffsetMin, keys, ref)
+	return resp, err
+}
+
+// queryUsageBreakdown is queryApiKeyUsageBreakdown plus the entry by client (usageClient), busiest
+// first; the pruned rows count as usageClientOther.
+func queryUsageBreakdown(now time.Time, rng usageRange, tzOffsetMin int, keys []config.ApiKeyEntry, ref string) (apiKeyUsageBreakdown, []usageBreakdownItem, error) {
+	clients := []usageBreakdownItem{}
 	resp := apiKeyUsageBreakdown{Ref: ref, Range: rng.name, Models: []usageBreakdownItem{}, Accounts: []usageBreakdownItem{}}
 	off := int64(tzOffsetMin) * 60
 	var firstDay, lastDay int64
@@ -112,13 +151,13 @@ func queryApiKeyUsageBreakdown(now time.Time, rng usageRange, tzOffsetMin int, k
 
 	d, err := db.Get()
 	if err != nil {
-		return resp, err
+		return resp, clients, err
 	}
 	//! One transaction: a prune between the log and the rollup reads would count a row twice or
 	//! miss it.
 	tx, err := d.Begin()
 	if err != nil {
-		return resp, err
+		return resp, clients, err
 	}
 	defer tx.Rollback()
 
@@ -126,12 +165,12 @@ func queryApiKeyUsageBreakdown(now time.Time, rng usageRange, tzOffsetMin int, k
 	matches := func(keyID string, slot int) bool {
 		return usageEntryRef(c.entry(keyID, slot)) == ref
 	}
-	sums := &breakdownSums{models: map[string]*usageBreakdownItem{}, accounts: map[string]*usageBreakdownItem{}}
+	sums := &breakdownSums{models: map[string]*usageBreakdownItem{}, accounts: map[string]*usageBreakdownItem{}, clients: map[string]*usageBreakdownItem{}}
 
 	slot, slotArgs := usageSlotSQL(keys)
 	args := append([]interface{}{}, slotArgs...)
 	args = append(args, resp.From, resp.To)
-	rows, err := tx.Query(`SELECT model, account_id, api_key_id, `+slot+` AS slot,
+	rows, err := tx.Query(`SELECT model, account_id, api_key_id, `+slot+` AS slot, client, endpoint,
 COUNT(*),
 COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0),
 COALESCE(SUM(in_tokens), 0),
@@ -139,27 +178,28 @@ COALESCE(SUM(out_tokens), 0),
 COALESCE(SUM(credits), 0)
 FROM requests
 WHERE ts >= ? AND ts < ?
-GROUP BY model, account_id, api_key_id, slot`, args...)
+GROUP BY model, account_id, api_key_id, slot, client, endpoint`, args...)
 	if err != nil {
-		return resp, err
+		return resp, clients, err
 	}
 	for rows.Next() {
 		var (
 			model, accountID, keyID string
+			client, endpoint        string
 			slot                    int
 			t                       apiKeyUsageTotals
 		)
-		if err := rows.Scan(&model, &accountID, &keyID, &slot, &t.Requests, &t.Succeeded, &t.InTokens, &t.OutTokens, &t.Credits); err != nil {
+		if err := rows.Scan(&model, &accountID, &keyID, &slot, &client, &endpoint, &t.Requests, &t.Succeeded, &t.InTokens, &t.OutTokens, &t.Credits); err != nil {
 			rows.Close()
-			return resp, err
+			return resp, clients, err
 		}
 		if matches(keyID, slot) {
-			sums.add(model, accountID, t)
+			sums.add(model, accountID, usageClient(client, endpoint), t)
 		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return resp, err
+		return resp, clients, err
 	}
 
 	if daily || rng.name == usageRangeAll {
@@ -178,7 +218,7 @@ COALESCE(SUM(credits), 0)
 FROM request_rollup_daily `+where+`
 GROUP BY model, account_id, api_key_id, keyless`, dayArgs...)
 		if err != nil {
-			return resp, err
+			return resp, clients, err
 		}
 		for drows.Next() {
 			var (
@@ -188,15 +228,15 @@ GROUP BY model, account_id, api_key_id, keyless`, dayArgs...)
 			)
 			if err := drows.Scan(&model, &accountID, &keyID, &keyless, &t.Requests, &t.Succeeded, &t.InTokens, &t.OutTokens, &t.Credits); err != nil {
 				drows.Close()
-				return resp, err
+				return resp, clients, err
 			}
 			if matches(keyID, rollupUsageSlot(keyID, keyless)) {
-				sums.add(model, accountID, t)
+				sums.add(model, accountID, usageClientOther, t)
 			}
 		}
 		drows.Close()
 		if err := drows.Err(); err != nil {
-			return resp, err
+			return resp, clients, err
 		}
 	}
 
@@ -213,7 +253,7 @@ SELECT model, account_id, api_key_id, success, SUM(request_count) AS n, SUM(in_t
 FROM request_rollup_daily GROUP BY model, account_id, api_key_id, success
 ) d ON d.model = r.model AND d.account_id = r.account_id AND d.api_key_id = r.api_key_id AND d.success = r.success`)
 		if err != nil {
-			return resp, err
+			return resp, clients, err
 		}
 		for urows.Next() {
 			var (
@@ -223,7 +263,7 @@ FROM request_rollup_daily GROUP BY model, account_id, api_key_id, success
 			)
 			if err := urows.Scan(&model, &accountID, &keyID, &success, &t.Requests, &t.InTokens, &t.OutTokens, &t.Credits); err != nil {
 				urows.Close()
-				return resp, err
+				return resp, clients, err
 			}
 			if success {
 				t.Succeeded = t.Requests
@@ -233,12 +273,12 @@ FROM request_rollup_daily GROUP BY model, account_id, api_key_id, success
 				slot = usageSlotByID
 			}
 			if matches(keyID, slot) {
-				sums.add(model, accountID, t)
+				sums.add(model, accountID, usageClientOther, t)
 			}
 		}
 		urows.Close()
 		if err := urows.Err(); err != nil {
-			return resp, err
+			return resp, clients, err
 		}
 	}
 
@@ -251,7 +291,7 @@ FROM request_rollup_daily GROUP BY model, account_id, api_key_id, success
 	for i := range resp.Accounts {
 		resp.Accounts[i].Label = emails[resp.Accounts[i].ID]
 	}
-	return resp, nil
+	return resp, sortedBreakdown(sums.clients), nil
 }
 
 // validUsageRef reports whether ref names a usage row: "key:<id>", "deleted:<id>", "none" or "invalid".

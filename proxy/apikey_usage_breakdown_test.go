@@ -1,8 +1,10 @@
 package proxy
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -174,5 +176,75 @@ func TestApiKeyUsageBreakdownRejectsBadRef(t *testing.T) {
 	h.apiApiKeyUsageBreakdown(rec, httptest.NewRequest(http.MethodGet, "/admin/api/api-keys/usage/breakdown?ref=none&range=7d", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("none: status %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUsageClientNamesTheCaller(t *testing.T) {
+	for _, c := range []struct{ client, endpoint, want string }{
+		{"claude-code", "claude", "claude-code"},
+		{"codex", "responses", "codex"},
+		{"kilo-code", "", "kilo-code"},
+		// No tool the proxy knows: the client API it called, by company.
+		{"", "claude", "claude"},
+		{"", "openai", "openai"},
+		{"", "responses", "responses"},
+		{"some-new-tool", "openai", "openai"},
+		// Neither: a row logged before endpoints were, or one the UI cannot name.
+		{"", "", usageClientOther},
+		{"some-new-tool", "", usageClientOther},
+		{"", "count_tokens", usageClientOther},
+	} {
+		if got := usageClient(c.client, c.endpoint); got != c.want {
+			t.Errorf("usageClient(%q, %q) = %q, want %q", c.client, c.endpoint, got, c.want)
+		}
+	}
+}
+
+// The admin breakdown has no clients field: its JSON stays as it was.
+func TestApiKeyUsageBreakdownAdminHasNoClients(t *testing.T) {
+	setupApiKeyUsageTest(t)
+	key := addUsageKey(t, "laptop", "sk-admin-clients-0123456789abcdef", true)
+	insertClientRows(t, clientRow{ts: time.Now().Unix() - 60, keyID: key.ID, client: "claude-code", endpoint: "claude", n: 2})
+	rec := httptest.NewRecorder()
+	(&Handler{}).apiApiKeyUsageBreakdown(rec, httptest.NewRequest(http.MethodGet, "/admin/api/api-keys/usage/breakdown?ref=key:"+key.ID+"&range=24h", nil))
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "clients") || strings.Contains(rec.Body.String(), "claude-code") {
+		t.Fatalf("admin breakdown: %d %s", rec.Code, rec.Body.String())
+	}
+	var resp apiKeyUsageBreakdown
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil || len(resp.Models) != 1 || resp.Models[0].Requests != 2 || len(resp.Accounts) != 1 {
+		t.Fatalf("admin breakdown %+v (%v)", resp, err)
+	}
+}
+
+type clientRow struct {
+	ts               int64
+	keyID, model     string
+	client, endpoint string
+	success          bool
+	credits          float64
+	n                int
+}
+
+func insertClientRows(t *testing.T, rows ...clientRow) {
+	t.Helper()
+	d, err := db.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		success := 0
+		if row.success {
+			success = 1
+		}
+		model := row.model
+		if model == "" {
+			model = "model-a"
+		}
+		for range max(row.n, 1) {
+			if _, err := d.Exec(`INSERT INTO requests (ts, api_key_id, model, account_id, client, endpoint, in_tokens, out_tokens, total_tokens, credits, success) VALUES (?, ?, ?, 'acc-secret', ?, ?, 10, 5, 15, ?, ?)`,
+				row.ts, row.keyID, model, row.client, row.endpoint, row.credits, success); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 }

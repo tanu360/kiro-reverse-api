@@ -407,6 +407,33 @@ describe("empty and partial data", () => {
     expect(within(card).getByText("2 more models")).toBeInTheDocument();
   });
 
+  it("switches the card to who called, by the Requests table's names", async () => {
+    const item = (id: string, requests: number): Body => ({
+      id,
+      requests,
+      succeeded: requests,
+      failed: 0,
+      tokens: requests * 100,
+      credits: requests / 10,
+    });
+    serve({
+      breakdown: {
+        ...breakdownBody([item("m-a", 6)]),
+        clients: [item("codex", 3), item("openai", 2), item("not-a-client", 1)],
+      },
+    });
+    const { user } = await renderPanel();
+    const card = await screen.findByRole("region", { name: "Usage by model" });
+    await user.click(await within(card).findByRole("radio", { name: "By client" }));
+    expect(card).toHaveAccessibleName("Usage by client");
+    const table = within(card).getByRole("table", { name: "Usage by client" });
+    const names = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0]?.textContent);
+    expect(names).toEqual(["Codex", "OpenAI API", "Other"]);
+  });
+
   it("offers the first page when a page past the end comes back empty", async () => {
     const all = Array.from({ length: 23 }, (_, index) => row({ requestId: `req_${index}` }));
     // The log is pruned after page 1 loads: page 2 is past the end by the time it is asked for.

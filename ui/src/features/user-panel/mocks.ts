@@ -7,6 +7,7 @@ import type {
 } from "@/lib/api/api-key-usage";
 import {
   REQUEST_CLIENTS,
+  REQUEST_ENDPOINTS,
   type RequestClient,
   type RequestEndpoint,
   type RequestErrorType,
@@ -14,12 +15,14 @@ import {
 } from "@/lib/api/types";
 import {
   USER_REQUEST_SORTS,
+  USER_USAGE_OTHER_CLIENT,
   type UserKey,
   type UserRequest,
   type UserRequestPage,
   type UserRequestSort,
   type UserUsage,
   type UserUsageBreakdown,
+  type UserUsageClient,
 } from "@/lib/api/user-panel";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import {
@@ -27,7 +30,6 @@ import {
   hex,
   int,
   maskKey,
-  mockClient,
   pick,
   type Rng,
   round,
@@ -51,7 +53,9 @@ import { lifetimeGrid } from "@/lib/mocks/lifetime";
 // Demo keys: one per state of the panel, in every dataset. They live only here, with their own
 // request log, so the admin pages never list them. The mock sign-in page lists them too
 // (features/user-auth/mock-demo-keys.tsx). Their times count back from when they were built: on
-// first use, and again on the first request an hour later.
+// first use, and again on the first request an hour later. Each has its own mix of callers
+// (coding tools, else the API alone); the oldest rows of Web app, Old CI runner, Contractor and
+// the heavy key name neither, which usage by client counts as Other.
 //   sk-demo-active          "Web app": 30+ days of everyday traffic over six models, about 4% failed
 //                           (rate limit, upstream, stream, client closed, timeout, bad request),
 //                           cache reads and writes; token and credit limits well under way.
@@ -253,10 +257,36 @@ const HEAVY: Mix = {
   failures: EVERYDAY_FAILURES,
 };
 
-const ENDPOINT_WEIGHTS: ReadonlyArray<readonly [RequestEndpoint, number]> = [
-  ["claude", 55],
-  ["openai", 28],
-  ["responses", 17],
+/** Who sent a request: the API it called, and the coding tool if the server knew it. */
+interface Caller {
+  endpoint: RequestEndpoint;
+  client?: RequestClient;
+}
+
+const CALLERS = {
+  claudeCode: { endpoint: "claude", client: "claude-code" },
+  kiloCode: { endpoint: "claude", client: "kilo-code" },
+  codex: { endpoint: "responses", client: "codex" },
+  opencode: { endpoint: "openai", client: "opencode" },
+  cline: { endpoint: "openai", client: "cline" },
+  rooCode: { endpoint: "openai", client: "roo-code" },
+  // An SDK, a script or a tool the server does not know: the API alone.
+  anthropicApi: { endpoint: "claude" },
+  openaiApi: { endpoint: "openai" },
+  responsesApi: { endpoint: "responses" },
+} satisfies Record<string, Caller>;
+
+/** Who calls with a key, by weight. */
+type CallerMix = ReadonlyArray<readonly [Caller, number]>;
+
+/** A developer's key: mostly Claude Code, some Codex and opencode, now and then a script. */
+const DEVELOPER_CALLERS: CallerMix = [
+  [CALLERS.claudeCode, 52],
+  [CALLERS.codex, 16],
+  [CALLERS.opencode, 10],
+  [CALLERS.anthropicApi, 12],
+  [CALLERS.openaiApi, 6],
+  [CALLERS.cline, 4],
 ];
 
 interface LogBuilder {
@@ -273,6 +303,13 @@ interface DemoSpec extends DemoKeyInfo {
   seed: number;
   settings: (now: number) => DemoSettings;
   log?: (log: LogBuilder) => void;
+  /** Who calls with the key; a developer's mix by default. */
+  callers?: CallerMix;
+  /**
+   * Requests older than this many seconds were logged before the proxy kept the API and the
+   * tool: neither is known, and usage by client counts them as "Other".
+   */
+  untaggedAfter?: number;
   /** The server's "Require API key" as this key sees it; demo keys default to on. */
   keysRequired?: boolean;
   sessionTtlMs?: number;
@@ -301,6 +338,16 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       tokenLimit: 50_000_000,
       creditLimit: 1_500,
     }),
+    // The app's backend calls through the SDKs; its developers use their coding tools.
+    callers: [
+      [CALLERS.anthropicApi, 38],
+      [CALLERS.claudeCode, 24],
+      [CALLERS.openaiApi, 14],
+      [CALLERS.codex, 10],
+      [CALLERS.opencode, 8],
+      [CALLERS.responsesApi, 6],
+    ],
+    untaggedAfter: 38 * DAY,
     log: (log) => {
       log.traffic(42, 2 * MINUTE, DAY, TYPICAL);
       log.traffic(140, DAY, 7 * DAY, TYPICAL);
@@ -323,6 +370,12 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       successfulCalls: 451,
       requestsCount: 468,
     }),
+    callers: [
+      [CALLERS.claudeCode, 40],
+      [CALLERS.anthropicApi, 26],
+      [CALLERS.rooCode, 18],
+      [CALLERS.openaiApi, 16],
+    ],
     log: (log) => {
       log.traffic(18, 4 * MINUTE, DAY, LIGHT);
       log.traffic(70, DAY, 7 * DAY, LIGHT);
@@ -341,6 +394,12 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       requestsCount: 171,
       successfulCalls: 158,
     }),
+    callers: [
+      [CALLERS.openaiApi, 44],
+      [CALLERS.claudeCode, 22],
+      [CALLERS.kiloCode, 18],
+      [CALLERS.anthropicApi, 16],
+    ],
     log: (log) => {
       log.refused(9, 2 * MINUTE, 3 * HOUR, FAILURES.keyLimit, LIGHT);
       log.traffic(150, 3 * HOUR, 12 * DAY, LIGHT);
@@ -351,6 +410,12 @@ const DEMO_SPECS: readonly DemoSpec[] = [
     key: "sk-demo-off",
     seed: 7104,
     settings: (now) => ({ name: "Old CI runner", enabled: false, createdAt: now - 60 * DAY }),
+    // Headless Claude Code in the pipeline, and a review script on the SDK.
+    callers: [
+      [CALLERS.claudeCode, 64],
+      [CALLERS.anthropicApi, 36],
+    ],
+    untaggedAfter: 32 * DAY,
     log: (log) => {
       log.refused(7, 6 * MINUTE, 2 * DAY, FAILURES.keyRefused, LIGHT);
       log.traffic(120, 2 * DAY, 40 * DAY, LIGHT);
@@ -366,6 +431,14 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       expiresAt: hourStart(now - 3 * DAY),
       creditLimit: 200,
     }),
+    callers: [
+      [CALLERS.codex, 34],
+      [CALLERS.claudeCode, 30],
+      [CALLERS.cline, 16],
+      [CALLERS.anthropicApi, 12],
+      [CALLERS.responsesApi, 8],
+    ],
+    untaggedAfter: 60 * DAY,
     log: (log) => {
       // The expiry is on the hour three days ago: refusals after it, traffic before.
       log.refused(5, 12 * MINUTE, 3 * DAY - HOUR, FAILURES.keyRefused, LIGHT);
@@ -382,6 +455,12 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       expiresAt: hourEnd(now + 2 * DAY),
       creditLimit: 25,
     }),
+    callers: [
+      [CALLERS.kiloCode, 34],
+      [CALLERS.claudeCode, 28],
+      [CALLERS.rooCode, 20],
+      [CALLERS.openaiApi, 18],
+    ],
     log: (log) => log.traffic(110, 8 * MINUTE, 12 * DAY, LIGHT),
   },
   {
@@ -394,6 +473,12 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       allowedModels: ["claude-haiku-4.5", "claude-sonnet-5"],
       rpmLimit: 30,
     }),
+    // The app's backend on the Anthropic SDK; its team tries things in Claude Code.
+    callers: [
+      [CALLERS.anthropicApi, 66],
+      [CALLERS.openaiApi, 18],
+      [CALLERS.claudeCode, 16],
+    ],
     log: (log) => {
       log.traffic(260, MINUTE, 30 * DAY, MOBILE);
       log.refused(8, 10 * MINUTE, 5 * DAY, FAILURES.keyRpm, MOBILE);
@@ -421,6 +506,19 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       requestsCount: 1_284_551,
       rpmLimit: 600,
     }),
+    // Every tool and API the evaluations cover, and rows from before the proxy kept them.
+    callers: [
+      [CALLERS.anthropicApi, 24],
+      [CALLERS.claudeCode, 18],
+      [CALLERS.responsesApi, 14],
+      [CALLERS.codex, 12],
+      [CALLERS.openaiApi, 10],
+      [CALLERS.opencode, 8],
+      [CALLERS.kiloCode, 6],
+      [CALLERS.cline, 4],
+      [CALLERS.rooCode, 4],
+    ],
+    untaggedAfter: 120 * DAY,
     log: (log) => {
       log.traffic(30, 5, HOUR, HEAVY);
       log.traffic(150, HOUR, DAY, HEAVY);
@@ -439,6 +537,11 @@ const DEMO_SPECS: readonly DemoSpec[] = [
       createdAt: now - 20 * DAY,
       tokenLimit: 10_000_000,
     }),
+    callers: [
+      [CALLERS.anthropicApi, 46],
+      [CALLERS.openaiApi, 30],
+      [CALLERS.claudeCode, 24],
+    ],
     log: (log) => log.traffic(90, 3 * MINUTE, 20 * DAY, TYPICAL),
   },
   {
@@ -447,6 +550,11 @@ const DEMO_SPECS: readonly DemoSpec[] = [
     seed: 7111,
     requestsFail: true,
     settings: (now) => ({ name: "Reporting job", createdAt: now - 15 * DAY, creditLimit: 300 }),
+    callers: [
+      [CALLERS.anthropicApi, 56],
+      [CALLERS.openaiApi, 26],
+      [CALLERS.claudeCode, 18],
+    ],
     log: (log) => log.traffic(80, 9 * MINUTE, 15 * DAY, TYPICAL),
   },
   {
@@ -455,6 +563,13 @@ const DEMO_SPECS: readonly DemoSpec[] = [
     seed: 7112,
     keysRequired: false,
     settings: (now) => ({ name: "LAN tools", createdAt: now - 25 * DAY }),
+    callers: [
+      [CALLERS.opencode, 30],
+      [CALLERS.cline, 22],
+      [CALLERS.rooCode, 18],
+      [CALLERS.claudeCode, 16],
+      [CALLERS.openaiApi, 14],
+    ],
     log: (log) => log.traffic(70, 15 * MINUTE, 25 * DAY, LIGHT),
   },
   {
@@ -463,6 +578,10 @@ const DEMO_SPECS: readonly DemoSpec[] = [
     seed: 7113,
     sessionTtlMs: 30_000,
     settings: (now) => ({ name: "Kiosk", createdAt: now - 8 * DAY }),
+    callers: [
+      [CALLERS.claudeCode, 50],
+      [CALLERS.anthropicApi, 50],
+    ],
     log: (log) => log.traffic(40, 20 * MINUTE, 8 * DAY, LIGHT),
   },
 ];
@@ -542,17 +661,18 @@ function demoRecord(
   ts: number,
   mix: Mix,
   failure: Failure | null,
+  callers: CallerMix,
+  untagged: boolean,
 ): RequestRecord {
   const model = weighted(rng, mix.models);
   const size = SIZES[mix.size];
-  const endpoint = weighted(rng, ENDPOINT_WEIGHTS);
+  // One draw, as the endpoint alone took, so the seeded draws after it stay as they were.
+  const caller = weighted(rng, callers);
   const base = {
     ts,
     apiKeyId: key.id,
     apiKeyMasked: key.keyMasked,
-    endpoint,
-    // Hashed from the time, so the seeded draws stay as they were.
-    client: mockClient(endpoint, ts),
+    ...(untagged ? {} : { endpoint: caller.endpoint, client: caller.client }),
     requestId: `req_${hex(rng, 24)}`,
   };
   // How many upstream attempts it took: none for a request the key refused before routing.
@@ -616,6 +736,10 @@ interface DemoKey {
   records: RequestRecord[];
 }
 
+function isUntagged(spec: DemoSpec, now: number, ts: number): boolean {
+  return spec.untaggedAfter !== undefined && ts < now - spec.untaggedAfter;
+}
+
 function buildDemoKey(spec: DemoSpec, now: number): DemoKey {
   const rng = createRng(spec.seed);
   const id = uuid(rng);
@@ -623,16 +747,19 @@ function buildDemoKey(spec: DemoSpec, now: number): DemoKey {
   const records: RequestRecord[] = [];
   const at = (newest: number, oldest: number) =>
     now - newest - Math.floor(rng() * Math.max(1, oldest - newest));
+  const callers = spec.callers ?? DEVELOPER_CALLERS;
+  const record = (ts: number, mix: Mix, failure: Failure | null) =>
+    demoRecord(rng, { id, keyMasked }, ts, mix, failure, callers, isUntagged(spec, now, ts));
   spec.log?.({
     traffic(count, newest, oldest, mix) {
       for (let i = 0; i < count; i++) {
         const failure = rng() < mix.failRate ? pick(rng, mix.failures) : null;
-        records.push(demoRecord(rng, { id, keyMasked }, at(newest, oldest), mix, failure));
+        records.push(record(at(newest, oldest), mix, failure));
       }
     },
     refused(count, newest, oldest, failure, mix) {
       for (let i = 0; i < count; i++) {
-        records.push(demoRecord(rng, { id, keyMasked }, at(newest, oldest), mix, failure));
+        records.push(record(at(newest, oldest), mix, failure));
       }
     },
   });
@@ -902,37 +1029,56 @@ function buildUsage({ key, log }: Holder, range: string, tzOffset: number): User
   };
 }
 
-/** The admin breakdown for ref key:<id>, by model only. */
+/**
+ * Who sent a request, as proxy/apikey_usage_breakdown.go usageClient names it: the coding tool,
+ * else the API, else "other".
+ */
+function usageClient(record: RequestRecord): UserUsageClient {
+  if (isClient(record.client)) return record.client;
+  return REQUEST_ENDPOINTS.find((known) => known === record.endpoint) ?? USER_USAGE_OTHER_CLIENT;
+}
+
+function busiestFirst<T extends ApiKeyUsageBreakdownItem>(items: Iterable<T>): T[] {
+  return [...items].sort(
+    (a, b) => b.requests - a.requests || b.credits - a.credits || a.id.localeCompare(b.id),
+  );
+}
+
+/** Adds one request to its row of a breakdown, `item` being that row while it has none. */
+function addToBreakdown<T extends ApiKeyUsageBreakdownItem>(
+  sums: Map<string, T>,
+  item: T,
+  record: RequestRecord,
+): void {
+  const sum = sums.get(item.id) ?? item;
+  sum.requests += 1;
+  if (record.success) sum.succeeded += 1;
+  else sum.failed += 1;
+  sum.tokens += record.totalTokens;
+  sum.credits += record.credits;
+  sums.set(item.id, sum);
+}
+
+/** The admin breakdown for ref key:<id> by model, and by client; never by account. */
 function buildBreakdown(holder: Holder, range: string, tzOffset: number): UserUsageBreakdown {
   const { key, log } = holder;
   const usage = buildUsage(holder, range, tzOffset);
   const models = new Map<string, ApiKeyUsageBreakdownItem>();
+  const clients = new Map<string, UserUsageBreakdown["clients"][number]>();
+  const zero = { requests: 0, succeeded: 0, failed: 0, tokens: 0, credits: 0 };
   for (const record of log) {
     if (record.apiKeyId !== key.id || record.ts < usage.from || record.ts >= usage.to) continue;
-    const item = models.get(record.model) ?? {
-      id: record.model,
-      requests: 0,
-      succeeded: 0,
-      failed: 0,
-      tokens: 0,
-      credits: 0,
-    };
-    item.requests += 1;
-    if (record.success) item.succeeded += 1;
-    else item.failed += 1;
-    item.tokens += record.totalTokens;
-    item.credits += record.credits;
-    models.set(record.model, item);
+    addToBreakdown(models, { id: record.model, ...zero }, record);
+    addToBreakdown(clients, { id: usageClient(record), ...zero }, record);
   }
   return {
     ref: `key:${key.id}`,
     range: usage.range,
     from: usage.from,
     to: usage.to,
-    models: [...models.values()].sort(
-      (a, b) => b.requests - a.requests || b.credits - a.credits || a.id.localeCompare(b.id),
-    ),
+    models: busiestFirst(models.values()),
     accounts: [],
+    clients: busiestFirst(clients.values()),
   };
 }
 

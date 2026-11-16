@@ -629,17 +629,24 @@ func scaleUsageTotals(t apiKeyUsageTotals, share float64) apiKeyUsageTotals {
 	}
 }
 
-// apiUserUsageBreakdown serves GET /user/api/usage/breakdown: this key's usage by model. The
-// accounts that served it stay hidden.
+// userUsageBreakdown is the admin breakdown of one key with who called it added: a coding tool,
+// else the client API, else "other" (usageClient).
+type userUsageBreakdown struct {
+	apiKeyUsageBreakdown
+	Clients []usageBreakdownItem `json:"clients"`
+}
+
+// apiUserUsageBreakdown serves GET /user/api/usage/breakdown: this key's usage by model and by
+// client. The accounts that served it stay hidden.
 func apiUserUsageBreakdown(w http.ResponseWriter, r *http.Request, entry config.ApiKeyEntry, cache *userUsageCache) {
 	rng, tz, ok := parseUserUsageWindow(w, r)
 	if !ok {
 		return
 	}
 	body, err := cache.get(entry.ID, fmt.Sprintf("breakdown|%s|%s|%d", entry.ID, rng.name, tz), func() (any, error) {
-		resp, err := queryApiKeyUsageBreakdown(observeNow(), rng, tz, config.ListApiKeys(), usageKindKey+":"+entry.ID)
+		resp, clients, err := queryUsageBreakdown(observeNow(), rng, tz, config.ListApiKeys(), usageKindKey+":"+entry.ID)
 		resp.Accounts = []usageBreakdownItem{}
-		return resp, err
+		return userUsageBreakdown{apiKeyUsageBreakdown: resp, Clients: clients}, err
 	})
 	if err != nil {
 		writeUserInternalError(w, err)

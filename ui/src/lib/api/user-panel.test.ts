@@ -190,6 +190,48 @@ describe("normalisers", () => {
       credits: 0,
     });
     expect(breakdown.models[1].id).toBe("");
+    // An older server sends no clients.
+    expect(breakdown.clients).toEqual([]);
+  });
+
+  it("lists the callers it can name and counts the rest as one Other", () => {
+    const item = (id: unknown, requests: number, credits = 0) => ({
+      id,
+      requests,
+      succeeded: requests,
+      failed: 0,
+      tokens: requests * 10,
+      credits,
+    });
+    const breakdown = normalizeUserUsageBreakdown({
+      ref: "key:k1",
+      range: "7d",
+      clients: [
+        item("claude-code", 9, 1.5),
+        item("openai", 4),
+        item("other", 2),
+        // A tool or API this build cannot name, and junk: Other, so it shows once.
+        item("some-new-tool", 3, 0.25),
+        item(42, 1),
+        "junk",
+        item("responses", 4, 2),
+      ],
+    });
+    // Busiest first; a tie goes to more credits.
+    expect(breakdown.clients.map(({ id, requests }) => `${id}=${requests}`)).toEqual([
+      "claude-code=9",
+      "other=6",
+      "responses=4",
+      "openai=4",
+    ]);
+    expect(breakdown.clients.find((client) => client.id === "other")).toEqual({
+      id: "other",
+      requests: 6,
+      succeeded: 6,
+      failed: 0,
+      tokens: 60,
+      credits: 0.25,
+    });
   });
 
   it("keeps only the holder's request fields and known error types", () => {
