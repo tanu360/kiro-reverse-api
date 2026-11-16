@@ -113,7 +113,7 @@ export function ModelMixSkeleton({
   return (
     <div
       aria-hidden="true"
-      className={cn("flex flex-col items-center gap-4", BESIDE[besideFrom].row)}
+      className={cn("flex flex-1 flex-col items-center gap-4", BESIDE[besideFrom].row)}
     >
       <Skeleton className="aspect-square w-full max-w-56 shrink-0 rounded-full" />
       <TableSkeleton columns={4} rows={MIX_TABLE_ROWS} />
@@ -252,7 +252,9 @@ export function ModelMixPanel({
   return (
     // Ring beside the table once the card fits both (32rem, the half-width column of the
     // dashboard); stacked on a phone.
-    <div className={cn("flex min-w-0 flex-col", BESIDE[besideFrom].row)}>
+    // flex-1: beside a taller card (the traffic chart) the ring and table take the extra height,
+    // so the footer stays one line at the bottom instead of growing.
+    <div className={cn("flex min-w-0 flex-1 flex-col", BESIDE[besideFrom].row)}>
       <figure
         aria-label={
           chartLabel ?? t(credits ? "modelMix.chartLabel" : "modelMix.chartLabelRequests")

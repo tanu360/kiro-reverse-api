@@ -18,7 +18,6 @@ import {
   DurationChip,
   ErrorMessage,
   ErrorPill,
-  HttpStatus,
   Muted,
   outputSpeed,
   Rail,
@@ -65,9 +64,8 @@ export interface RequestViewOptions {
    */
   messages?: boolean;
   /**
-   * The Speed, Cache hit, HTTP (status and tries) and Request ID columns, and their line on a
-   * card. On for a key holder, whose rows open no detail sheet; the Requests page shows these in
-   * its sheet. The HTTP column carries the status, so the error pill leaves it out.
+   * The Speed, Cache hit and Request ID columns, and their line on a card. On for a key holder,
+   * whose rows open no detail sheet; the Requests page shows these in its sheet.
    */
   details?: boolean;
 }
@@ -244,8 +242,8 @@ function ErrorCell({
  * A request as a list row, for narrow containers: the status node and the age, then (indented
  * past the node) the model and caller, the token bar with the credits and duration chips, the
  * four token counts, the account, and a failure's category and message. With `details` the
- * request ID and its copy button sit at the header's end, and the HTTP status with its tries,
- * the speed and the cache hit get a line under the token counts. With `onOpen` the whole row
+ * request ID and its copy button sit at the header's end, and the speed and the cache hit get a
+ * line under the token counts. With `onOpen` the whole row
  * opens the detail sheet; without it the row is plain text.
  */
 export function RequestCard({
@@ -298,7 +296,6 @@ export function RequestCard({
         {tokens ? <TokenFigures record={record} /> : null}
         {details ? (
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-            <HttpStatus inline record={record} />
             {outputSpeed(record) === undefined ? null : <SpeedChip record={record} />}
             {record.inTokens > 0 ? <CacheHit labelled record={record} /> : null}
           </div>
@@ -312,7 +309,7 @@ export function RequestCard({
         ) : null}
         {record.success ? null : (
           <div className="flex min-w-0 flex-col items-start gap-1">
-            <ErrorPill record={record} status={!details} />
+            <ErrorPill record={record} status />
             {messages ? (
               <ErrorMessage
                 className="line-clamp-2 whitespace-normal wrap-anywhere"
@@ -344,9 +341,9 @@ const BODY_CELL = "py-3";
 // What `accounts: false` leaves out: middle columns, so dropping them after withCompactPadding
 // keeps the first and last cells' padding.
 const ACCOUNT_COLUMNS = new Set(["account", "api_key"]);
-// What `details: false` leaves out, before withCompactPadding: Request ID is the last column
-// when shown, so without it Error keeps the last cell's padding.
-const DETAIL_COLUMNS = new Set(["cache_hit", "speed", "http", "request_id"]);
+// What `details: false` leaves out, before withCompactPadding: middle columns, so Error stays
+// the last cell either way.
+const DETAIL_COLUMNS = new Set(["cache_hit", "speed", "request_id"]);
 
 function withCompactPadding(
   columns: DataTableColumn<RequestRecord>[],
@@ -456,9 +453,9 @@ export function useRequestColumns({
         cell: (row) => <SpeedChip record={row} />,
       },
       {
-        id: "http",
-        header: t("http"),
-        cell: (row) => <HttpStatus record={row} />,
+        id: "request_id",
+        header: t("requestId"),
+        cell: (row) => <RequestIdCopy record={row} />,
       },
       {
         id: "error",
@@ -466,12 +463,8 @@ export function useRequestColumns({
         // Where it is hidden the category shows under the time instead.
         className: errorFrom,
         headerClassName: errorFrom,
-        cell: (row) => <ErrorCell record={row} showMessage={messages} showStatus={!details} />,
-      },
-      {
-        id: "request_id",
-        header: t("requestId"),
-        cell: (row) => <RequestIdCopy record={row} />,
+        // The status code rides in the pill, as on the admin's table (the holder has no message).
+        cell: (row) => <ErrorCell record={row} showMessage={messages} showStatus />,
       },
     ];
     return withCompactPadding(
