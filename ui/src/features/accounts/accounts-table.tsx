@@ -142,7 +142,12 @@ export function AccountsTable({
         header: t("columns.lastUsed"),
         sortable: true,
         ...width(`w-32 ${WIDE_ONLY}`),
-        cell: (account) => <LastUsedText account={account} />,
+        // Muted and short ("5m ago") like Token expiry beside it; the full date is a tooltip.
+        cell: (account) => (
+          <span className="text-muted-foreground">
+            <LastUsedText account={account} style="narrow" />
+          </span>
+        ),
       },
       {
         id: "expiry",

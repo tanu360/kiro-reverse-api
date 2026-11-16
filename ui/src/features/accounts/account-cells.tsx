@@ -455,8 +455,10 @@ export function UsageMeter({
           >
             {hasPlan ? t("planCredits") : t("trialCredits")}
           </MeterLabel>
+          {/* The used figure in semibold over a muted limit, as the requests table's credits. */}
           <span className="truncate tabular-nums">
-            {formatCreditAmount(current, lang)} / {formatCreditAmount(limit, lang)}
+            <span className="font-semibold">{formatCreditAmount(current, lang)}</span>
+            <span className="text-muted-foreground"> / {formatCreditAmount(limit, lang)}</span>
           </span>
         </span>
         <span className="shrink-0 text-muted-foreground tabular-nums">

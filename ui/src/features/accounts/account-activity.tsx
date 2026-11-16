@@ -134,7 +134,8 @@ export function LiveStatusPill({
  * a button that explains why; while it cools down after errors it starts with the time left (the
  * status pill above says "Cooling down" and explains). The full sentence is a tooltip and the
  * screen reader text. A dash holds the line while the first poll loads; nothing shows when it
- * fails, and a failed refresh keeps the last numbers.
+ * fails or when the account is idle (no request in the last minute or today, and not skipped),
+ * and a failed refresh keeps the last numbers.
  */
 export function AccountActivityLine({
   accountId,
@@ -162,6 +163,7 @@ export function AccountActivityLine({
   const today = t("live.todayShort", { today: formatNumber(activity.today, lang) });
   const sentence = activitySentence(activity, t, lang);
   const reason = skipReason(activity);
+  if (!reason && activity.rpm === 0 && activity.today === 0) return null;
   if (reason === "limit") {
     return (
       <span className={line} data-at-limit="" data-slot="account-activity">

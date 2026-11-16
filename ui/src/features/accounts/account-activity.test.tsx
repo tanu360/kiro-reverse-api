@@ -62,11 +62,11 @@ describe("AccountActivityLine", () => {
     ).toHaveClass("sr-only");
   });
 
-  it("holds the line with a dash while the first poll loads, and reads idle for an unlisted account", async () => {
+  it("holds the line with a dash while the first poll loads, and drops it for an idle account", async () => {
     serve(activity({}));
     const view = renderWithProviders(<AccountActivityLine accountId="new" />);
     expect(view.container).toHaveTextContent(EMPTY);
-    expect(await screen.findByText("0/min · 0 today")).toBeInTheDocument();
+    await waitFor(() => expect(view.container).toBeEmptyDOMElement());
   });
 
   it("shows nothing when the poll fails", async () => {

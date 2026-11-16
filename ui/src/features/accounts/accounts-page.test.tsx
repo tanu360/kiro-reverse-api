@@ -307,7 +307,7 @@ describe("AccountsPage", () => {
     const { table } = await renderAccounts();
     const row = within(table).getByText(DANA_MASKED).closest("tr") as HTMLElement;
     expect(within(row).getByText("Plan credits")).toHaveClass("sr-only");
-    expect(within(row).getByText("450 / 1,000")).toBeInTheDocument();
+    expect(within(row).getByRole("meter")).toHaveTextContent("450 / 1,000");
   });
 });
 

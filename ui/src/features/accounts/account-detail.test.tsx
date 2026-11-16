@@ -297,7 +297,9 @@ describe("AccountDetailSheet", () => {
     // Plan credits lead the sheet in the meter, over the last day and the lifetime numbers.
     const statistics = section(sheet, "Statistics");
     expect(within(statistics).getByRole("meter", { name: "Plan credits" })).toBeInTheDocument();
-    expect(within(statistics).getByText("450 / 1,000")).toBeInTheDocument();
+    expect(within(statistics).getByRole("meter", { name: "Plan credits" })).toHaveTextContent(
+      "450 / 1,000",
+    );
     expect(within(statistics).getByText(new RegExp(`^Resets ${reset} · `))).toBeInTheDocument();
     expect(within(statistics).getByText("Last 24 hours")).toBeInTheDocument();
     // Same one-decimal credits as the list ("312.5", not "312.48").
