@@ -16,7 +16,6 @@ import { SectionCard } from "@/components/shared/section-card";
 import { UnlimitedMark } from "@/components/shared/unlimited-mark";
 import { Badge } from "@/components/ui/badge";
 import { CardPanel } from "@/components/ui/card";
-import { Meter, MeterIndicator, MeterTrack } from "@/components/ui/meter";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import {
@@ -36,7 +35,8 @@ import {
   formatNumber,
   formatPercent,
 } from "@/lib/format";
-import { useT } from "@/lib/i18n";
+import { fillNodes, useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { type UsageIdentity, useUsageLabel } from "./key-usage-label";
 import { entryRef } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
@@ -214,9 +214,17 @@ export function KeyUsageCard(): JSX.Element {
     }));
   };
 
-  const failedCell = (row: Row): ReactNode => {
+  // Plain text in the table, like the other numbers; a pill in a card's header, where bare text
+  // would read as part of the name.
+  const failedCell = (row: Row, pill = false): ReactNode => {
     if (row.totals.requests === 0) return <span className="text-muted-foreground">{EMPTY}</span>;
     const rate = failureRate(row.totals);
+    const high = rate >= HIGH_FAILURE_RATE;
+    // One decimal keeps the column narrow; no failures read 0%, not 0.0%.
+    const text =
+      row.totals.failed > 0
+        ? formatFraction(rate, 1, lang)
+        : formatPercent(0, row.totals.requests, lang);
     return (
       <>
         <span className="sr-only">
@@ -225,23 +233,32 @@ export function KeyUsageCard(): JSX.Element {
             n: formatNumber(row.totals.failed, lang),
           })}
         </span>
-        <Badge
-          aria-hidden="true"
-          className="tabular-nums"
-          size="sm"
-          tone={rate >= HIGH_FAILURE_RATE ? "destructive" : "neutral"}
-        >
-          {/* One decimal keeps the column narrow; no failures read 0%, not 0.0%. */}
-          {row.totals.failed > 0
-            ? formatFraction(rate, 1, lang)
-            : formatPercent(0, row.totals.requests, lang)}
-        </Badge>
+        {pill ? (
+          <Badge
+            aria-hidden="true"
+            className="tabular-nums"
+            size="sm"
+            tone={high ? "destructive" : "neutral"}
+          >
+            {text}
+          </Badge>
+        ) : (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "tabular-nums",
+              high ? "text-destructive-foreground" : "text-muted-foreground",
+            )}
+          >
+            {text}
+          </span>
+        )}
       </>
     );
   };
 
-  // A table cell keeps the meter 8rem wide; a card gives it the card's width.
-  const limitCell = (row: Row, fill = false): ReactNode => {
+  // One plain line, as the API keys table: the measure, used / limit and the share, no bar.
+  const limitCell = (row: Row): ReactNode => {
     if (!row.apiKey) return <span className="text-muted-foreground">{EMPTY}</span>;
     const limit = firstLimit(row.apiKey);
     if (!limit)
@@ -258,34 +275,46 @@ export function KeyUsageCard(): JSX.Element {
       limit.kind === "credits" && value < 1000
         ? formatCredits(value, 2, lang)
         : formatCompact(value, lang);
+    // The share in purple, amber from LIMIT_WARNING and red once used up; the amounts follow it
+    // from amber on.
+    const tone =
+      share >= 1
+        ? "text-destructive-foreground"
+        : share >= LIMIT_WARNING
+          ? "text-warning-foreground"
+          : null;
     return (
-      <Meter
-        aria-label={t(`keys.${limit.kind}Usage`, {
-          used: exact(limit.used),
-          limit: exact(limit.limit),
-        })}
-        className={fill ? "w-full gap-1" : "w-32 gap-1"}
-        max={limit.limit}
-        value={Math.min(limit.used, limit.limit)}
-      >
-        <span className="flex justify-between gap-2 text-meta">
-          <span className="text-muted-foreground">{t(`keys.${limit.kind}`)}</span>
-          <span className="tabular-nums">
-            {t("usage.limitValue", { used: format(limit.used), limit: format(limit.limit) })}
+      <span className="whitespace-nowrap text-meta tabular-nums" data-slot="key-limit">
+        <span className="sr-only">
+          {t(`keys.${limit.kind}Usage`, { used: exact(limit.used), limit: exact(limit.limit) })}
+        </span>
+        <span aria-hidden="true" className={cn(tone)}>
+          <span className={cn(!tone && "text-muted-foreground")}>{t(`keys.${limit.kind}`)}</span>{" "}
+          <span className={cn(!tone && "text-muted-foreground")}>
+            {fillNodes(t("usage.limitValue"), {
+              used: (
+                <span className={cn("font-semibold", !tone && "text-foreground")}>
+                  {format(limit.used)}
+                </span>
+              ),
+              limit: format(limit.limit),
+            })}
+          </span>{" "}
+          <span className={cn("ms-1 font-medium", tone ?? "text-info-foreground")}>
+            {/* Floored, so a key short of its limit never reads 100%. */}
+            {formatFraction(share >= 1 ? 1 : Math.floor(share * 100) / 100, 0, lang)}
           </span>
         </span>
-        <MeterTrack>
-          <MeterIndicator
-            tone={share >= 1 ? "destructive" : share >= LIMIT_WARNING ? "warning" : "default"}
-          />
-        </MeterTrack>
-      </Meter>
+      </span>
     );
   };
 
   const lastUsedCell = (row: Row): ReactNode =>
     row.apiKey?.lastUsedAt ? (
-      <RelativeTime value={row.apiKey.lastUsedAt} />
+      // Muted and short ("5m ago"), as in the accounts and API keys tables.
+      <span className="text-muted-foreground">
+        <RelativeTime style="narrow" value={row.apiKey.lastUsedAt} />
+      </span>
     ) : (
       <span className="text-muted-foreground">{EMPTY}</span>
     );
@@ -312,7 +341,13 @@ export function KeyUsageCard(): JSX.Element {
       align: "end",
       cell: (row) => <span className="font-medium">{formatNumber(row.totals.requests, lang)}</span>,
     },
-    { id: "failed", header: t("usage.failed"), sortable: true, align: "end", cell: failedCell },
+    {
+      id: "failed",
+      header: t("usage.failed"),
+      sortable: true,
+      align: "end",
+      cell: (row) => failedCell(row),
+    },
     {
       id: "credits",
       header: t("usage.metric.credits"),
@@ -334,7 +369,7 @@ export function KeyUsageCard(): JSX.Element {
   // Below a 56rem card, a card per key in a grid, as the API keys table does.
   const renderCard = (row: Row): ReactNode => (
     <ListCard
-      badge={failedCell(row)}
+      badge={failedCell(row, true)}
       meta={
         <span className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
           <span>
@@ -349,7 +384,7 @@ export function KeyUsageCard(): JSX.Element {
       }
       title={nameCell(row)}
     >
-      {row.apiKey && firstLimit(row.apiKey) ? limitCell(row, true) : null}
+      {row.apiKey && firstLimit(row.apiKey) ? limitCell(row) : null}
     </ListCard>
   );
 
