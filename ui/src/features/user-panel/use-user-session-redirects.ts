@@ -26,7 +26,8 @@ export function useUserSessionRedirects(): void {
           void router.navigate({ to: "/user/login", replace: true });
           return;
         }
-        if (reason === "signed-out") void router.navigate({ to: "/user/login" });
+        // Replace: Back from the sign-in page must not land on the signed-out panel again.
+        if (reason === "signed-out") void router.navigate({ to: "/user/login", replace: true });
       }),
     [router],
   );

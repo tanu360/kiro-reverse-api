@@ -141,6 +141,7 @@ export const SERVER_ERROR_CODES: Readonly<Partial<Record<ServerErrorCode, string
   user_key_required: "errors:serverError.userKeyRequired",
   user_key_invalid: "errors:serverError.userKeyInvalid",
   user_session_expired: "errors:serverError.userSessionExpired",
+  user_usage_busy: "errors:serverError.userUsageBusy",
 };
 
 /**

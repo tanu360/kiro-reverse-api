@@ -1,9 +1,11 @@
 // Pure helpers for the Requests page: URL state to API params, row keys, masking, badge tones.
-import type {
-  RecentRequestsParams,
-  RequestEndpoint,
-  RequestErrorType,
-  RequestRecord,
+import {
+  REQUEST_ENDPOINTS,
+  REQUEST_ERROR_TYPES,
+  type RecentRequestsParams,
+  type RequestEndpoint,
+  type RequestErrorType,
+  type RequestRecord,
 } from "@/lib/api/types";
 import { dateTimeFormat, formatDateTime, formatTime, unixToDate } from "@/lib/format";
 import { type Lang, type TFunction, translate } from "@/lib/i18n";
@@ -16,25 +18,8 @@ export const DEFAULT_ORDER = "desc" as const;
 export const PAGE_SIZES = [10, 25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
 
-const ERROR_TYPES: readonly RequestErrorType[] = [
-  "client_closed",
-  "api_key_limit",
-  "overage",
-  "quota",
-  "suspended",
-  "profile",
-  "proxy",
-  "auth",
-  "stream",
-  "no_accounts",
-  "invalid_request",
-  "rate_limit",
-  "timeout",
-  "upstream",
-  "unknown",
-];
-
-const ENDPOINTS: readonly RequestEndpoint[] = ["claude", "openai", "responses"];
+const ERROR_TYPES = REQUEST_ERROR_TYPES;
+const ENDPOINTS = REQUEST_ENDPOINTS;
 
 export type ErrorTone = "muted" | "warning" | "destructive";
 

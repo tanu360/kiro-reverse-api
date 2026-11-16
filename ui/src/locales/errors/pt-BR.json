@@ -158,5 +158,6 @@
   "serverText.backupAccountsMoved": "Antes de as contas irem para uma tabela própria",
   "serverError.userKeyRequired": "Informe a chave de API.",
   "serverError.userKeyInvalid": "Chave de API incorreta.",
-  "serverError.userSessionExpired": "Sua sessão expirou. Entre novamente com a chave de API."
+  "serverError.userSessionExpired": "Sua sessão expirou. Entre novamente com a chave de API.",
+  "serverError.userUsageBusy": "Muitas consultas de uso para esta chave. Aguarde um minuto e tente novamente."
 }

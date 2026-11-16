@@ -100,6 +100,14 @@ describe("ApiPage", () => {
     expect(link).toHaveAttribute("target", "_blank");
   });
 
+  it("points key holders at the public link while it is live", async () => {
+    // The admin is on localhost; key holders can only open the public link.
+    mockDb.tunnel.pinned = { enabled: true, state: "running", url: "https://kiro.tail1234.ts.net" };
+    await renderPage();
+    const link = await screen.findByRole("link", { name: "https://kiro.tail1234.ts.net/user" });
+    expect(link).toHaveAttribute("href", "https://kiro.tail1234.ts.net/user");
+  });
+
   it("creates a key and shows the full key once, ready to copy", async () => {
     const { user } = await renderPage();
     await user.click(screen.getByRole("button", { name: "Create API key" }));

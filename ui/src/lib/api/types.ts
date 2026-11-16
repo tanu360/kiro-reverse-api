@@ -38,7 +38,8 @@ export interface SuccessResponse {
  *   microsoft_sign_in_failed, tunnel_logout: `detail` is the upstream reason.
  * - user_key_required (400) / user_key_invalid (401): POST /user/api/session without a key, or
  *   with one that matches no API key; user_session_expired (401): any other /user/api route
- *   without a live user session.
+ *   without a live user session; user_usage_busy (429): a key past its usage queries for the
+ *   minute (proxy/user_api.go).
  */
 export type ServerErrorCode =
   | "api_key_lockout"
@@ -173,7 +174,8 @@ export type ServerErrorCode =
   | "internal_error"
   | "user_key_required"
   | "user_key_invalid"
-  | "user_session_expired";
+  | "user_session_expired"
+  | "user_usage_busy";
 
 // ---------------------------------------------------------------------------
 // Session and first run
@@ -947,6 +949,26 @@ export type RequestErrorType =
   | "timeout"
   | "upstream"
   | "unknown";
+/** Every RequestEndpoint, for checking a server value; the Requests page and the user panel share it. */
+export const REQUEST_ENDPOINTS: readonly RequestEndpoint[] = ["claude", "openai", "responses"];
+/** Every RequestErrorType, in the Requests page's order; a value outside it reads as "unknown". */
+export const REQUEST_ERROR_TYPES: readonly RequestErrorType[] = [
+  "client_closed",
+  "api_key_limit",
+  "overage",
+  "quota",
+  "suspended",
+  "profile",
+  "proxy",
+  "auth",
+  "stream",
+  "no_accounts",
+  "invalid_request",
+  "rate_limit",
+  "timeout",
+  "upstream",
+  "unknown",
+];
 export type RequestSort =
   | "time"
   | "status"

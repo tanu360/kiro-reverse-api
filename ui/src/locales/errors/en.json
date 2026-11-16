@@ -158,5 +158,6 @@
   "serverText.backupAccountsMoved": "Before the accounts moved to their own table",
   "serverError.userKeyRequired": "Enter an API key.",
   "serverError.userKeyInvalid": "Incorrect API key.",
-  "serverError.userSessionExpired": "Your session expired. Sign in with your API key again."
+  "serverError.userSessionExpired": "Your session expired. Sign in with your API key again.",
+  "serverError.userUsageBusy": "Too many usage requests for this key. Wait a minute and try again."
 }

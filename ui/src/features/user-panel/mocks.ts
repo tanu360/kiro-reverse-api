@@ -155,6 +155,7 @@ function keyView(stored: StoredKey): UserKey {
     requestsCount: stored.requestsCount,
     rpmLimit: stored.rpmLimit ?? 0,
     allowedModels: [...(stored.allowedModels ?? [])],
+    keysRequired: mockDb.settings.requireApiKey,
   };
 }
 

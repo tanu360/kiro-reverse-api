@@ -2,6 +2,7 @@ import {
   CircleCheckIcon,
   CircleSlashIcon,
   Clock01Icon,
+  InformationCircleIcon,
   KeyRoundIcon,
   TriangleAlertIcon,
 } from "@hugeicons/core-free-icons";
@@ -111,20 +112,34 @@ export function KeyHeading({
   );
 }
 
-/** A key that is off or expired: every request it sends is refused, so the page says why first. */
+/**
+ * What the page says first: a key that is off or expired has every request refused; a server
+ * that does not require API keys counts calls to its own address for no key, so they are
+ * missing here.
+ */
 export function KeyNotice({ apiKey }: { apiKey: UserKey }): JSX.Element | null {
   const { t, lang } = useT("user-panel");
   const status = userKeyStatus(apiKey);
-  if (status === "active") return null;
+  if (status === "active" && apiKey.keysRequired) return null;
   return (
-    <Alert data-status={status} variant="warning">
-      <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
-      <AlertDescription>
-        {status === "off"
-          ? t("alert.off")
-          : t("alert.expired", { date: formatDateTime(apiKey.expiresAt, lang) })}
-      </AlertDescription>
-    </Alert>
+    <>
+      {status === "active" ? null : (
+        <Alert data-status={status} variant="warning">
+          <HugeiconsIcon icon={TriangleAlertIcon} aria-hidden="true" />
+          <AlertDescription>
+            {status === "off"
+              ? t("alert.off")
+              : t("alert.expired", { date: formatDateTime(apiKey.expiresAt, lang) })}
+          </AlertDescription>
+        </Alert>
+      )}
+      {apiKey.keysRequired ? null : (
+        <Alert data-status="not-required" variant="info">
+          <HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
+          <AlertDescription>{t("alert.notRequired")}</AlertDescription>
+        </Alert>
+      )}
+    </>
   );
 }
 

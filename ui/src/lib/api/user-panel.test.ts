@@ -85,6 +85,7 @@ describe("normalisers", () => {
       requestsCount: 0,
       rpmLimit: 0,
       allowedModels: [],
+      keysRequired: true,
     });
     const key = normalizeUserKey({
       id: "k1",

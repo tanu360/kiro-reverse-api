@@ -18,6 +18,8 @@ let adminCalls: string[] = [];
 
 beforeEach(() => {
   resetUserPanelMock();
+  // Most tests read a server that checks keys everywhere; one turns it off for its notice.
+  mockDb.settings.requireApiKey = true;
   adminCalls = [];
   mockServer.events.on("request:start", ({ request }) => {
     const { pathname } = new URL(request.url);
@@ -156,6 +158,15 @@ describe("/user", () => {
     );
   });
 
+  it("says calls to the server's own address are not counted when keys are not required", async () => {
+    mockDb.settings.requireApiKey = false;
+    await signIn();
+    await renderPanel();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This server doesn't ask for API keys on its own address, so calls made there don't count here. Calls through its public link always do.",
+    );
+  });
+
   it("says an expired key gets its requests refused", async () => {
     await signIn({ expiresAt: mockNowUnix() - 3600 });
     await renderPanel();
@@ -246,8 +257,13 @@ describe("/user", () => {
     );
     await signIn();
     const { router, user } = await renderPanel();
+    const navigate = vi.spyOn(router, "navigate");
     await user.click(screen.getByRole("button", { name: "Sign out" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/user/login"));
+    // One navigation, replacing /user: Back must not return to the signed-out panel.
+    const toLogin = navigate.mock.calls.filter(([options]) => options?.to === "/user/login");
+    expect(toLogin).toHaveLength(1);
+    expect(toLogin[0]?.[0]).toMatchObject({ replace: true });
     expect(deleted).toBe(1);
     expect(getUserToken()).toBeNull();
     expect(adminCalls).toEqual([]);

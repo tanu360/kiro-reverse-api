@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -27,13 +28,22 @@ const (
 	// userUsageCacheTTL is how long a key's usage answer is reused. The usage queries read every
 	// key's rows (all of them for "all"), and a key holder's page or script may ask in a loop.
 	userUsageCacheTTL = 30 * time.Second
+	// userUsageBuildsPerMinute caps the usage queries one key may run past the cache: another
+	// range or time zone is another answer, so the cache alone cannot bound a loop.
+	userUsageBuildsPerMinute = 20
 )
 
-// userUsageCache keeps each key's recent usage answers, by key, route and window. The zero
-// value is ready to use.
+// errUserUsageBusy is a key over userUsageBuildsPerMinute; it is answered 429.
+var errUserUsageBusy = errors.New("too many usage queries for this key")
+
+// userUsageCache keeps each key's recent usage answers, by key, route and window, runs one query
+// per answer at a time, and holds each key to userUsageBuildsPerMinute queries. The zero value
+// is ready to use.
 type userUsageCache struct {
-	mu      sync.Mutex
-	entries map[string]userUsageCacheEntry
+	mu       sync.Mutex
+	entries  map[string]userUsageCacheEntry
+	inflight map[string]chan struct{}
+	budgets  map[string]adminGuessBucket
 }
 
 type userUsageCacheEntry struct {
@@ -41,41 +51,83 @@ type userUsageCacheEntry struct {
 	body []byte
 }
 
-// get returns the encoded answer for id, building it at most once per userUsageCacheTTL.
-// Expired answers are dropped whenever a new one is stored, so the map stays small.
-func (c *userUsageCache) get(id string, build func() (any, error)) ([]byte, error) {
-	now := time.Now()
-	c.mu.Lock()
-	if e, ok := c.entries[id]; ok && now.Sub(e.at) < userUsageCacheTTL {
+// get returns keyID's encoded answer for id, building it at most once per userUsageCacheTTL.
+// A request for an answer that is being built waits for it. Expired answers and spent budgets
+// are dropped whenever a new answer is stored, so the maps stay small.
+func (c *userUsageCache) get(keyID, id string, build func() (any, error)) ([]byte, error) {
+	for {
+		now := time.Now()
+		c.mu.Lock()
+		if e, ok := c.entries[id]; ok && now.Sub(e.at) < userUsageCacheTTL {
+			c.mu.Unlock()
+			return e.body, nil
+		}
+		if wait, ok := c.inflight[id]; ok {
+			c.mu.Unlock()
+			<-wait
+			continue
+		}
+		if c.inflight == nil {
+			c.inflight = make(map[string]chan struct{})
+			c.budgets = make(map[string]adminGuessBucket)
+			c.entries = make(map[string]userUsageCacheEntry)
+		}
+		budget := c.budgets[keyID]
+		if !now.Before(budget.until) {
+			budget = adminGuessBucket{until: now.Add(time.Minute)}
+		}
+		if budget.count >= userUsageBuildsPerMinute {
+			c.mu.Unlock()
+			return nil, errUserUsageBusy
+		}
+		budget.count++
+		c.budgets[keyID] = budget
+		done := make(chan struct{})
+		c.inflight[id] = done
 		c.mu.Unlock()
-		return e.body, nil
+		return c.build(id, done, now, build)
 	}
-	c.mu.Unlock()
+}
+
+// build runs one query for id and stores its answer. The waiters are released even if the
+// query panics, so a failed answer is tried again rather than waited on forever.
+func (c *userUsageCache) build(id string, done chan struct{}, now time.Time, build func() (any, error)) (body []byte, err error) {
+	defer func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		delete(c.inflight, id)
+		close(done)
+		if err != nil || body == nil {
+			return
+		}
+		for k, e := range c.entries {
+			if now.Sub(e.at) >= userUsageCacheTTL {
+				delete(c.entries, k)
+			}
+		}
+		for k, b := range c.budgets {
+			if !now.Before(b.until) {
+				delete(c.budgets, k)
+			}
+		}
+		c.entries[id] = userUsageCacheEntry{at: now, body: body}
+	}()
 	v, err := build()
 	if err != nil {
 		return nil, err
 	}
-	body, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.entries == nil {
-		c.entries = make(map[string]userUsageCacheEntry)
-	}
-	for k, e := range c.entries {
-		if now.Sub(e.at) >= userUsageCacheTTL {
-			delete(c.entries, k)
-		}
-	}
-	c.entries[id] = userUsageCacheEntry{at: now, body: body}
-	return body, nil
+	return json.Marshal(v)
 }
 
 // writeUserInternalError logs err and answers 500 without its text: a database or I/O error can
-// name files and internals a key holder has no business seeing.
+// name files and internals a key holder has no business seeing. A key over its usage budget gets
+// 429 with a minute to wait.
 func writeUserInternalError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errUserUsageBusy) {
+		w.Header().Set("Retry-After", "60")
+		writeAdminError(w, http.StatusTooManyRequests, codeUserUsageBusy, "Too many usage requests; try again in a minute")
+		return
+	}
 	logger.Warnf("[UserPanel] %v", err)
 	writeAdminError(w, http.StatusInternalServerError, codeInternalError, "Internal error")
 }
@@ -201,7 +253,8 @@ func (h *Handler) handleUserAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	token := r.Header.Get("X-User-Token")
 	entry, ok := h.userSessions.key(token)
-	if !ok {
+	//! The request and usage filters take the key's ID; an empty one would match every key's rows.
+	if !ok || strings.TrimSpace(entry.ID) == "" {
 		writeAdminError(w, http.StatusUnauthorized, codeUserSessionExpired, "Unauthorized")
 		return
 	}
@@ -281,6 +334,9 @@ type userKeyView struct {
 	RequestsCount   int64    `json:"requestsCount"`
 	RPMLimit        int      `json:"rpmLimit"`
 	AllowedModels   []string `json:"allowedModels"`
+	// KeysRequired is the server's "Require API key". Off, calls to its own address are not
+	// checked for a key, so they count for no key; calls through the public link always are.
+	KeysRequired bool `json:"keysRequired"`
 }
 
 func toUserKeyView(entry config.ApiKeyEntry) userKeyView {
@@ -303,6 +359,7 @@ func toUserKeyView(entry config.ApiKeyEntry) userKeyView {
 		RequestsCount:   v.RequestsCount,
 		RPMLimit:        v.RPMLimit,
 		AllowedModels:   v.AllowedModels,
+		KeysRequired:    config.IsApiKeyRequired(),
 	}
 }
 
@@ -330,7 +387,7 @@ func apiUserUsage(w http.ResponseWriter, r *http.Request, entry config.ApiKeyEnt
 	if !ok {
 		return
 	}
-	body, err := cache.get(fmt.Sprintf("usage|%s|%s|%d", entry.ID, r.URL.Query().Get("range"), tz), func() (any, error) {
+	body, err := cache.get(entry.ID, fmt.Sprintf("usage|%s|%s|%d", entry.ID, rng.name, tz), func() (any, error) {
 		return userUsage(rng, tz, entry)
 	})
 	if err != nil {
@@ -371,7 +428,7 @@ func apiUserUsageBreakdown(w http.ResponseWriter, r *http.Request, entry config.
 	if !ok {
 		return
 	}
-	body, err := cache.get(fmt.Sprintf("breakdown|%s|%s|%d", entry.ID, r.URL.Query().Get("range"), tz), func() (any, error) {
+	body, err := cache.get(entry.ID, fmt.Sprintf("breakdown|%s|%s|%d", entry.ID, rng.name, tz), func() (any, error) {
 		resp, err := queryApiKeyUsageBreakdown(observeNow(), rng, tz, config.ListApiKeys(), usageKindKey+":"+entry.ID)
 		resp.Accounts = []usageBreakdownItem{}
 		return resp, err

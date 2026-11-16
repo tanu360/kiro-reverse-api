@@ -132,45 +132,76 @@ export function EndpointsCard(): JSX.Element {
         aria-label={t("endpoints.title")}
         className="flex grow flex-col divide-y divide-border-subtle"
       >
-        {ENDPOINTS.map((endpoint) => {
-          const title = t(endpoint.titleKey);
-          const post = endpoint.method === "POST";
-          return (
-            <li
-              className={cn("flex grow items-center gap-3 py-3", SETTINGS_ROW_X)}
-              data-endpoint={endpoint.id}
-              key={endpoint.id}
-            >
-              <IconChip icon={endpoint.icon} />
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <SettingsRowTitle>{title}</SettingsRowTitle>
-                {/* A narrow row breaks between the host and the path, not inside either. */}
-                <code
-                  className="wrap-break-word font-mono text-meta leading-normal"
-                  data-slot="endpoint-url"
-                >
-                  <span className="text-muted-foreground">{origin}</span>
-                  <wbr />
-                  <span className="text-foreground">{endpoint.path}</span>
-                </code>
-              </div>
-              {/* One width for POST and GET, so the badges line up down the list. */}
-              <Badge
-                className="min-w-12 shrink-0 justify-center"
-                size="sm"
-                tone={post ? "primary" : "neutral"}
-              >
-                {post ? t("endpoints.methodPost") : t("endpoints.methodGet")}
-              </Badge>
-              <CopyButton
-                className="-me-1.5 shrink-0"
-                label={t(endpoint.copyKey)}
-                value={origin + endpoint.path}
-              />
-            </li>
-          );
-        })}
+        {ENDPOINTS.map((endpoint) => (
+          <EndpointRow
+            copyLabel={t(endpoint.copyKey)}
+            icon={endpoint.icon}
+            id={endpoint.id}
+            key={endpoint.id}
+            method={endpoint.method}
+            methodLabel={
+              endpoint.method === "POST" ? t("endpoints.methodPost") : t("endpoints.methodGet")
+            }
+            origin={origin}
+            path={endpoint.path}
+            title={t(endpoint.titleKey)}
+          />
+        ))}
       </ul>
     </SectionCard>
+  );
+}
+
+/**
+ * One row of an endpoint list (this card and the key holder's Connect card): the icon chip, the
+ * name with its URL under it, the method and a copy button. A row without a path is the base URL:
+ * its host is the whole value, so it is not muted, and it has no method.
+ */
+export function EndpointRow({
+  id,
+  icon,
+  title,
+  origin,
+  path,
+  method,
+  methodLabel,
+  copyLabel,
+}: {
+  id: string;
+  icon: IconSvgElement;
+  title: string;
+  origin: string;
+  path: string;
+  method?: "POST" | "GET";
+  methodLabel?: string;
+  copyLabel: string;
+}): JSX.Element {
+  return (
+    <li className={cn("flex grow items-center gap-3 py-3", SETTINGS_ROW_X)} data-endpoint={id}>
+      <IconChip icon={icon} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <SettingsRowTitle>{title}</SettingsRowTitle>
+        {/* A narrow row breaks between the host and the path, not inside either. */}
+        <code
+          className="wrap-break-word font-mono text-meta leading-normal"
+          data-slot="endpoint-url"
+        >
+          <span className={path ? "text-muted-foreground" : "text-foreground"}>{origin}</span>
+          <wbr />
+          <span className="text-foreground">{path}</span>
+        </code>
+      </div>
+      {method ? (
+        // One width for POST and GET, so the badges line up down the list.
+        <Badge
+          className="min-w-12 shrink-0 justify-center"
+          size="sm"
+          tone={method === "POST" ? "primary" : "neutral"}
+        >
+          {methodLabel}
+        </Badge>
+      ) : null}
+      <CopyButton className="-me-1.5 shrink-0" label={copyLabel} value={origin + path} />
+    </li>
   );
 }

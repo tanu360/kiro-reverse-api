@@ -1,14 +1,24 @@
 import { KeyRoundIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { CopyField } from "@/components/shared/code-field";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { tunnelQuery } from "@/lib/api/tunnel";
 import { useT } from "@/lib/i18n";
 
-/** Where a key holder signs in with their own key to see that key's usage (the /user page). */
-export function userPanelUrl(): string {
-  return `${window.location.origin}/user`;
+/**
+ * Where a key holder signs in with their own key to see that key's usage (the /user page): on
+ * the public link while it is live, since the admin's own address is often localhost or a LAN
+ * address the holder cannot open; else this page's origin.
+ */
+export function useUserPanelUrl(): string {
+  const { data: publicUrl } = useQuery({
+    ...tunnelQuery(),
+    select: (status) => (status.state === "running" ? status.url : undefined),
+  });
+  return `${publicUrl ?? window.location.origin}/user`;
 }
 
 /**
@@ -26,6 +36,7 @@ export function CreatedKeyPanel({
   regenerated?: boolean;
 }): JSX.Element {
   const { t } = useT("api");
+  const userPanel = useUserPanelUrl();
   return (
     <Alert data-testid="created-key-panel" variant="success">
       <HugeiconsIcon icon={KeyRoundIcon} aria-hidden="true" />
@@ -43,7 +54,7 @@ export function CreatedKeyPanel({
           copyLabel={t("created.copyUserPanel")}
           label={t("created.userPanelLabel")}
           multiline
-          value={userPanelUrl()}
+          value={userPanel}
           variant="outline"
         />
       </AlertDescription>

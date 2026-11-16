@@ -8,6 +8,7 @@
   "status.expires": "Hết hạn {date}",
   "alert.off": "Key này đã bị tắt. Proxy từ chối các yêu cầu của nó cho đến khi quản trị viên bật lại.",
   "alert.expired": "Key này đã hết hạn lúc {date}. Proxy từ chối các yêu cầu của nó cho đến khi quản trị viên gia hạn.",
+  "alert.notRequired": "Máy chủ này không kiểm tra API key trên địa chỉ của chính nó, nên các lệnh gọi tới đó không được tính ở đây. Lệnh gọi qua liên kết công khai luôn được tính.",
   "details.title": "Chi tiết key",
   "details.rpm": "Yêu cầu mỗi phút",
   "details.rpmValue": "{n}/phút",

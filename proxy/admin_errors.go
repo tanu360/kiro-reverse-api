@@ -87,6 +87,7 @@ const (
 	codeUserKeyRequired    = "user_key_required"
 	codeUserKeyInvalid     = "user_key_invalid"
 	codeUserSessionExpired = "user_session_expired"
+	codeUserUsageBusy      = "user_usage_busy"
 	// codeSaveFailed: the change could not be stored; detail is the storage error.
 	codeSaveFailed = "save_failed"
 	// codeInternalError: any other failure inside the server; detail is the error.

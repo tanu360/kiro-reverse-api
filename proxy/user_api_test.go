@@ -6,7 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -241,7 +244,10 @@ func TestUserKeyViewFields(t *testing.T) {
 	assertKeySet(t, "key", body,
 		"id", "name", "keyMasked", "enabled", "expired", "createdAt", "lastUsedAt", "expiresAt",
 		"tokenLimit", "tokensUsed", "creditLimit", "creditsUsed", "callLimit", "successfulCalls",
-		"requestsCount", "rpmLimit", "allowedModels")
+		"requestsCount", "rpmLimit", "allowedModels", "keysRequired")
+	if body["keysRequired"] != config.IsApiKeyRequired() {
+		t.Fatalf("keysRequired %v, want the server's setting %v", body["keysRequired"], config.IsApiKeyRequired())
+	}
 	if models, ok := body["allowedModels"].([]any); !ok || len(models) != 0 {
 		t.Fatalf("allowedModels %v, want []", body["allowedModels"])
 	}
@@ -365,6 +371,85 @@ func TestUserUsageOnlyOwnKey(t *testing.T) {
 
 	assertUserError(t, userCall(h, http.MethodGet, "/user/api/usage?range=1y", token, ""), http.StatusBadRequest, codeInvalidUsageRange)
 	assertUserError(t, userCall(h, http.MethodGet, "/user/api/usage/breakdown?tzOffset=x", token, ""), http.StatusBadRequest, codeInvalidTZOffset)
+}
+
+func TestUserUsageIsCachedAndBudgeted(t *testing.T) {
+	h := newUserAPITestHandler(t)
+	key := addUsageKey(t, "loop", "sk-user-usage-loop-0123456789", true)
+	other := addUsageKey(t, "calm", "sk-user-usage-calm-0123456789", true)
+	token := userSignIn(t, h, key.Key)
+
+	first := userCall(h, http.MethodGet, "/user/api/usage?range=24h&tzOffset=0", token, "")
+	d, err := db.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Exec(`INSERT INTO requests (ts, account_id, api_key_id, model, success) VALUES (?, 'acc', ?, 'm', 1)`, time.Now().Unix()-60, key.ID); err != nil {
+		t.Fatal(err)
+	}
+	if again := userCall(h, http.MethodGet, "/user/api/usage?range=24h&tzOffset=0", token, ""); again.Body.String() != first.Body.String() {
+		t.Fatalf("second call within the TTL was not the cached answer:\n%s\n%s", first.Body.String(), again.Body.String())
+	}
+
+	// Another time zone is another answer: a loop over them runs out of the key's budget.
+	for tz := 1; tz < userUsageBuildsPerMinute; tz++ {
+		if rec := userCall(h, http.MethodGet, "/user/api/usage?range=24h&tzOffset="+strconv.Itoa(tz), token, ""); rec.Code != http.StatusOK {
+			t.Fatalf("tz %d: %d %s", tz, rec.Code, rec.Body.String())
+		}
+	}
+	busy := userCall(h, http.MethodGet, "/user/api/usage/breakdown?range=24h&tzOffset=-60", token, "")
+	assertUserError(t, busy, http.StatusTooManyRequests, codeUserUsageBusy)
+	if busy.Header().Get("Retry-After") != "60" {
+		t.Fatalf("Retry-After %q", busy.Header().Get("Retry-After"))
+	}
+	// Cached answers still come back, and other keys keep their own budget.
+	if rec := userCall(h, http.MethodGet, "/user/api/usage?range=24h&tzOffset=0", token, ""); rec.Code != http.StatusOK {
+		t.Fatalf("cached answer while over budget: %d", rec.Code)
+	}
+	if rec := userCall(h, http.MethodGet, "/user/api/usage?range=24h&tzOffset=-60", userSignIn(t, h, other.Key), ""); rec.Code != http.StatusOK {
+		t.Fatalf("other key: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUserUsageCacheBuildsOnceForConcurrentCalls(t *testing.T) {
+	var c userUsageCache
+	var builds atomic.Int32
+	release := make(chan struct{})
+	var wg sync.WaitGroup
+	bodies := make([]string, 5)
+	for i := range bodies {
+		wg.Go(func() {
+			body, err := c.get("k", "usage|k|24h|0", func() (any, error) {
+				builds.Add(1)
+				<-release
+				return map[string]int{"n": 1}, nil
+			})
+			if err != nil {
+				t.Error(err)
+			}
+			bodies[i] = string(body)
+		})
+	}
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	wg.Wait()
+	if n := builds.Load(); n != 1 {
+		t.Fatalf("%d builds for one answer, want 1", n)
+	}
+	for _, b := range bodies {
+		if b != `{"n":1}` {
+			t.Fatalf("bodies %q", bodies)
+		}
+	}
+
+	// A build that panics releases its waiters; the next call builds again.
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = c.get("k", "panics", func() (any, error) { panic("boom") })
+	}()
+	if body, err := c.get("k", "panics", func() (any, error) { return 2, nil }); err != nil || string(body) != "2" {
+		t.Fatalf("after a panic: %q %v", body, err)
+	}
 }
 
 func TestUserAPIRouting(t *testing.T) {

@@ -21,7 +21,12 @@ import type { TimeBucket } from "@/lib/time-buckets";
 import { apiRequest } from "./client";
 import { ApiError, isApiError } from "./errors";
 import { queryKeys } from "./query-keys";
-import type { RequestEndpoint, RequestErrorType } from "./types";
+import {
+  REQUEST_ENDPOINTS,
+  REQUEST_ERROR_TYPES,
+  type RequestEndpoint,
+  type RequestErrorType,
+} from "./types";
 
 // The API key holder's panel (/user/api, proxy/user_api.go): one key's status, limits, usage and
 // requests, signed in with the key itself. Every answer is normalised, so a missing or unknown
@@ -60,6 +65,11 @@ export interface UserKey {
   rpmLimit: number;
   /** Empty = every model. */
   allowedModels: string[];
+  /**
+   * The server's "Require API key". Off, calls to its own address are not checked for a key and
+   * count for no key; calls through the public link always count. True when a server leaves it out.
+   */
+  keysRequired: boolean;
 }
 
 /** GET /usage: the admin usage response, with only this key in `keys`. */
@@ -147,24 +157,6 @@ function list(value: unknown): unknown[] {
 
 const TIME_BUCKETS: readonly TimeBucket[] = ["hour", "day", "week", "month", "year"];
 const USAGE_KINDS: readonly ApiKeyUsageKind[] = ["key", "deleted", "invalid", "none"];
-const ENDPOINTS: readonly RequestEndpoint[] = ["claude", "openai", "responses"];
-const ERROR_TYPES: readonly RequestErrorType[] = [
-  "client_closed",
-  "api_key_limit",
-  "overage",
-  "quota",
-  "suspended",
-  "profile",
-  "proxy",
-  "auth",
-  "stream",
-  "no_accounts",
-  "invalid_request",
-  "rate_limit",
-  "timeout",
-  "upstream",
-  "unknown",
-];
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
@@ -192,6 +184,7 @@ export function normalizeUserKey(value: unknown): UserKey {
     allowedModels: list(res.allowedModels).filter(
       (model): model is string => typeof model === "string" && model !== "",
     ),
+    keysRequired: res.keysRequired !== false,
   };
 }
 
@@ -291,7 +284,7 @@ export function normalizeUserRequest(value: unknown): UserRequest {
   return {
     ts: count(res.ts),
     model: str(res.model),
-    endpoint: oneOf<RequestEndpoint | "">(res.endpoint, ENDPOINTS, ""),
+    endpoint: oneOf<RequestEndpoint | "">(res.endpoint, REQUEST_ENDPOINTS, ""),
     inTokens,
     outTokens,
     totalTokens:
@@ -302,7 +295,7 @@ export function normalizeUserRequest(value: unknown): UserRequest {
     success,
     status: count(res.status),
     durationMs: count(res.durationMs),
-    errorType: success || !errorType ? "" : oneOf(errorType, ERROR_TYPES, "unknown"),
+    errorType: success || !errorType ? "" : oneOf(errorType, REQUEST_ERROR_TYPES, "unknown"),
     requestId: str(res.requestId),
   };
 }

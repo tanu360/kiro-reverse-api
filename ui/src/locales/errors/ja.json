@@ -158,5 +158,6 @@
   "serverText.backupAccountsMoved": "アカウントを専用テーブルに移行する前",
   "serverError.userKeyRequired": "API キーを入力してください。",
   "serverError.userKeyInvalid": "API キーが正しくありません。",
-  "serverError.userSessionExpired": "セッションの有効期限が切れました。API キーでもう一度サインインしてください。"
+  "serverError.userSessionExpired": "セッションの有効期限が切れました。API キーでもう一度サインインしてください。",
+  "serverError.userUsageBusy": "このキーの使用量の取得が多すぎます。1 分待ってからもう一度お試しください。"
 }

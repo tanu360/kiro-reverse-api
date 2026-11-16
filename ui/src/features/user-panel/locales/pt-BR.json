@@ -8,6 +8,7 @@
   "status.expires": "Expira em {date}",
   "alert.off": "Esta chave está desabilitada. O proxy recusa as requisições dela até que o administrador a habilite de novo.",
   "alert.expired": "Esta chave expirou em {date}. O proxy recusa as requisições dela até que o administrador estenda a validade.",
+  "alert.notRequired": "Este servidor não pede chave de API no próprio endereço, então as chamadas feitas nele não contam aqui. As chamadas pelo link público sempre contam.",
   "details.title": "Detalhes da chave",
   "details.rpm": "Requisições por minuto",
   "details.rpmValue": "{n}/min",

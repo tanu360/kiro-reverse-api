@@ -8,6 +8,7 @@
   "status.expires": "Expires {date}",
   "alert.off": "This key is turned off. The proxy refuses its requests until the admin turns it on again.",
   "alert.expired": "This key expired on {date}. The proxy refuses its requests until the admin extends it.",
+  "alert.notRequired": "This server doesn't ask for API keys on its own address, so calls made there don't count here. Calls through its public link always do.",
   "details.title": "Key details",
   "details.rpm": "Requests per minute",
   "details.rpmValue": "{n}/min",

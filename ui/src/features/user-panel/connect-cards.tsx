@@ -11,14 +11,11 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { type JSX, useMemo, useState } from "react";
 import { CodeBlock } from "@/components/shared/code-block";
-import { CopyButton } from "@/components/shared/copy-button";
-import { IconChip } from "@/components/shared/icon-chip";
 import { SectionCard } from "@/components/shared/section-card";
-import { SETTINGS_ROW_X, SettingsRowTitle } from "@/components/shared/settings-rows";
-import { Badge } from "@/components/ui/badge";
 import { RadioGroupPrimitive, RadioPrimitive } from "@/components/ui/radio-group";
 import { SegmentedControl, SegmentedControlItem } from "@/components/ui/segmented-control";
 import { CodeText } from "@/features/api/code-text";
+import { EndpointRow } from "@/features/api/endpoints-card";
 import {
   buildRequestSnippet,
   SNIPPET_APIS,
@@ -27,7 +24,6 @@ import {
   type SnippetApi,
 } from "@/features/api/snippets";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 
 /** Stands in for the key everywhere on the page: the page never has the key itself. */
 export const KEY_PLACEHOLDER = "YOUR_API_KEY";
@@ -113,43 +109,20 @@ export function UserEndpointsCard(): JSX.Element {
       >
         {ENDPOINTS.map((endpoint) => {
           const title = t(endpoint.titleKey);
-          const url = origin + endpoint.path;
           return (
-            <li
-              className={cn("flex grow items-center gap-3 py-3", SETTINGS_ROW_X)}
-              data-endpoint={endpoint.id}
+            <EndpointRow
+              copyLabel={
+                endpoint.path ? t("connect.copyUrl", { name: title }) : t("connect.copyBaseUrl")
+              }
+              icon={endpoint.icon}
+              id={endpoint.id}
               key={endpoint.id}
-            >
-              <IconChip icon={endpoint.icon} />
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <SettingsRowTitle>{title}</SettingsRowTitle>
-                {/* A narrow row breaks between the host and the path, not inside either. */}
-                <code className="wrap-break-word font-mono text-meta leading-normal">
-                  <span className={endpoint.path ? "text-muted-foreground" : "text-foreground"}>
-                    {origin}
-                  </span>
-                  <wbr />
-                  <span className="text-foreground">{endpoint.path}</span>
-                </code>
-              </div>
-              {endpoint.method ? (
-                // One width for POST and GET, so the badges line up down the list.
-                <Badge
-                  className="min-w-12 shrink-0 justify-center"
-                  size="sm"
-                  tone={endpoint.method === "POST" ? "primary" : "neutral"}
-                >
-                  {endpoint.method === "POST" ? t("connect.post") : t("connect.get")}
-                </Badge>
-              ) : null}
-              <CopyButton
-                className="-me-1.5 shrink-0"
-                label={
-                  endpoint.path ? t("connect.copyUrl", { name: title }) : t("connect.copyBaseUrl")
-                }
-                value={url}
-              />
-            </li>
+              method={endpoint.method}
+              methodLabel={endpoint.method === "POST" ? t("connect.post") : t("connect.get")}
+              origin={origin}
+              path={endpoint.path}
+              title={title}
+            />
           );
         })}
       </ul>

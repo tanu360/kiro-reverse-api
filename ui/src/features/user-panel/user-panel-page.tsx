@@ -1,5 +1,4 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { type JSX, useState } from "react";
 import { ErrorState } from "@/components/shared/error-state";
 import { Card } from "@/components/ui/card";
@@ -14,21 +13,18 @@ import { RecentRequestsCard } from "./recent-requests-card";
 import { UsageSection } from "./usage-section";
 import { UserShell } from "./user-shell";
 
-/** Sign out: revoke the session (errors ignored), then the key sign-in page. */
+/**
+ * Sign out: revoke the session (errors ignored). The cleared session takes the page to the key
+ * sign-in page through useUserSessionRedirects, once; navigating here too pushed /user/login twice.
+ */
 function useUserSignOut(): { signOut: () => Promise<void>; signingOut: boolean } {
-  const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
   return {
     signingOut,
     signOut: async () => {
       setSigningOut(true);
-      try {
-        await signOutUser();
-      } finally {
-        setSigningOut(false);
-      }
       toast.dismiss();
-      await navigate({ to: "/user/login" });
+      await signOutUser();
     },
   };
 }

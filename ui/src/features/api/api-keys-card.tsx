@@ -59,7 +59,7 @@ import { toast, toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { isKeyExpired, limitReachedReason, wouldLockOutClients } from "./api-key-form";
 import { type ApiKeyDialogTarget, ApiKeyFormDialog } from "./api-key-form-dialog";
-import { CreatedKeyPanel, userPanelUrl } from "./created-key-panel";
+import { CreatedKeyPanel, useUserPanelUrl } from "./created-key-panel";
 import { keyEntryRef } from "./key-usage-model";
 import { ApiKeyUsageSheet } from "./key-usage-sheet";
 
@@ -432,7 +432,7 @@ export function ApiKeysCard(): JSX.Element {
           })
         : formatNumber(list.length, lang);
 
-  const userPanel = userPanelUrl();
+  const userPanel = useUserPanelUrl();
 
   return (
     <SectionCard
