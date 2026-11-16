@@ -106,12 +106,12 @@ export function StatusBadge({
 }
 
 /**
- * A masked API key in mono, cut with an ellipsis (the full mask as a tooltip when cut): 14 px in
- * its own column, 12 px as the meta line under the account.
+ * A masked API key in mono, cut with an ellipsis (the full mask as a tooltip when cut): 14 px and
+ * muted like the duration in its own column, 12 px as the meta line under the account.
  */
 function ApiKeyCode({
   value,
-  className = "text-sm",
+  className = "text-sm text-muted-foreground",
 }: {
   value?: string;
   className?: string;
