@@ -1,6 +1,7 @@
 import { InfoIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { JSX, ReactNode } from "react";
+import { useHeadingId } from "@/components/ui/heading-context";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -44,9 +45,12 @@ export function InfoHint({
   className?: string;
 }): JSX.Element {
   const link = variant === "link";
+  // Six "Learn more"s on a page: the row or card title, read after it, says which one this is.
+  const headingId = useHeadingId();
   return (
     <Popover>
       <PopoverTrigger
+        aria-describedby={link ? headingId : undefined}
         className={cn(TRIGGER_CLASS[variant], truncate && !link && "min-w-0", className)}
         closeDelay={200}
         data-slot="info-hint"

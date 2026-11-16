@@ -80,6 +80,11 @@ interface DataTableProps<T> {
    */
   rowLabel?: (row: T) => string;
   /**
+   * Read after a clickable row's name (aria-description), for what tells one row from the next
+   * when the name alone does not (a request's model and status beside its time).
+   */
+  rowDescription?: (row: T) => string;
+  /**
    * Below this container width (DataTable's own, not the viewport) the rows render as cards
    * through `renderCard`: lg = 32rem, 2xl = 42rem, 3xl = 48rem, 4xl = 56rem, 5xl = 64rem (a table whose
    * first column needs about 250 px beside wide figure columns).
@@ -237,6 +242,7 @@ export function DataTable<T>({
   onRowClick,
   onRowHover,
   rowLabel,
+  rowDescription,
   cardsBelow,
   renderCard,
   renderCardSkeleton,
@@ -550,8 +556,11 @@ export function DataTable<T>({
             {rows.map((row) => {
               const isSelected = selected?.has(row.id) ?? false;
               const label = onRowClick && rowLabel ? rowLabel(row.original) : undefined;
+              const description =
+                label && rowDescription ? rowDescription(row.original) : undefined;
               return (
                 <TableRow
+                  aria-description={description}
                   aria-haspopup={label ? "dialog" : undefined}
                   aria-label={label}
                   className={cn(onRowClick && ROW_FOCUS)}

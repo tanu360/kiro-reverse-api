@@ -260,9 +260,13 @@
   mask-image: linear-gradient(#000 0% 40%, #0000 80%);
 }
 
-/* Twinkle: a star dims and comes back; four-point stars also shrink a little. */
+/*
+ * Twinkle: a star dims and comes back; four-point stars also shrink a little. Each star sets its
+ * own --twinkle-duration and --twinkle-delay (sidebar-stage.tsx).
+ */
 .sidebar-stage-twinkle {
-  animation: sidebar-stage-twinkle 4s ease-in-out infinite;
+  animation: sidebar-stage-twinkle var(--twinkle-duration, 4s) ease-in-out var(--twinkle-delay, 0s)
+    infinite;
 }
 
 .sidebar-stage-sparkle {
@@ -879,8 +883,8 @@
  * :focus-visible does not match a mouse click on a button, so pointer users never see it.
  * The rule sets outline-style itself: Tailwind's outline-none/outline-hidden zero
  * --tw-outline-style, which would leave `focus-visible:outline-1` invisible.
- * `focus-outline` sits 2 px off the edge; `focus-outline-inset` is 1 px on the inner edge, for
- * rows, cells, panels and scrolling boxes that would clip an outer outline.
+ * `focus-outline` sits 2 px off the edge; `focus-outline-inset` is the same 2 px ring on the inner
+ * edge, for rows, cells, panels and scrolling boxes that would clip an outer outline.
  * `focus-outline-inner` is the full 2 px ring drawn just inside the edge, for items packed in a
  * track (segmented items, tabs), so it matches the 2 px ring of the controls beside them
  * without touching a neighbour or the track's own border.
@@ -894,8 +898,8 @@
 
 @utility focus-outline-inset {
   &:focus-visible {
-    outline: 1px solid var(--color-ring);
-    outline-offset: -1px;
+    outline: 2px solid var(--color-ring);
+    outline-offset: -2px;
   }
 }
 

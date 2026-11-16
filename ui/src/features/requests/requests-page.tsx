@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { recentRequestsQuery, requestCountsQuery } from "@/lib/api/requests";
 import { errorMessage } from "@/lib/api/server-errors";
 import type { RequestRecord } from "@/lib/api/types";
+import { formatDateTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,7 @@ import {
   rowKey,
   toQueryParams,
 } from "./request-model";
-import { RequestCard, useRequestColumns } from "./requests-columns";
+import { RequestCard, useRequestColumns, useRequestSummary } from "./requests-columns";
 import { RequestsToolbar } from "./requests-toolbar";
 
 interface Selection {
@@ -43,6 +44,7 @@ interface Selection {
 
 export function RequestsPage(): JSX.Element {
   const { t, lang } = useT("requests");
+  const requestSummary = useRequestSummary();
   const urlSearch = useSearch({ from: "/_app/requests" });
   const navigate = useNavigate({ from: "/requests" });
   // The search text lives in the page, never in the URL: a client key typed or pasted into the
@@ -276,6 +278,8 @@ export function RequestsPage(): JSX.Element {
                 loading={!hasData && query.isPending}
                 onRowClick={openRow}
                 onSortChange={(next) => setSort(next.id as RequestSort, next.desc)}
+                rowDescription={requestSummary}
+                rowLabel={(row) => t("detail.open", { time: formatDateTime(row.ts, lang) })}
                 pageSize={pageSize}
                 renderCard={(row) => <RequestCard onOpen={() => openRow(row)} record={row} />}
                 sort={sort}

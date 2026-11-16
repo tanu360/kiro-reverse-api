@@ -257,7 +257,7 @@ export function KpiCard({
         <CardFooter className="p-0 sm:p-0">
           <Link
             {...footer.link}
-            className="flex min-w-0 flex-1 items-center justify-between gap-2 px-4 py-2.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline sm:px-6"
+            className="flex min-w-0 flex-1 items-center justify-between gap-2 px-4 py-3 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline sm:px-6"
           >
             <span className="min-w-0 truncate">{footer.linkLabel}</span>
             <HugeiconsIcon

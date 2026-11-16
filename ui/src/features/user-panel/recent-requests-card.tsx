@@ -9,7 +9,11 @@ import { ErrorState } from "@/components/shared/error-state";
 import { Button } from "@/components/ui/button";
 import { RequestDetailSheet } from "@/features/requests/request-detail-sheet";
 import { defaultSortDesc, PAGE_SIZES } from "@/features/requests/request-model";
-import { RequestCard, useRequestColumns } from "@/features/requests/requests-columns";
+import {
+  RequestCard,
+  useRequestColumns,
+  useRequestSummary,
+} from "@/features/requests/requests-columns";
 import { RequestsToolbar } from "@/features/requests/requests-toolbar";
 import type { RequestRecord } from "@/lib/api/types";
 import {
@@ -18,6 +22,7 @@ import {
   type UserRequestSort,
   userRequestsQuery,
 } from "@/lib/api/user-panel";
+import { formatDateTime } from "@/lib/format";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -91,7 +96,8 @@ function rowId(record: RequestRecord, index: number): string {
  */
 export function RecentRequestsCard(): JSX.Element {
   const { t } = useT("user-panel");
-  const { t: tr } = useT("requests");
+  const { t: tr, lang } = useT("requests");
+  const requestSummary = useRequestSummary(HOLDER_VIEW.accounts);
   const headingId = useId();
   const [status, setStatus] = useState<Status>(undefined);
   const [sort, setSort] = useState<UserRequestSort>(DEFAULT_SORT);
@@ -264,6 +270,8 @@ export function RecentRequestsCard(): JSX.Element {
               onRowClick={openRow}
               onSortChange={(next) => changeSort(next.id, next.desc)}
               pageSize={shownSize}
+              rowDescription={requestSummary}
+              rowLabel={(row) => tr("detail.open", { time: formatDateTime(row.ts, lang) })}
               renderCard={(row) => (
                 <RequestCard onOpen={() => openRow(row)} record={row} {...HOLDER_VIEW} />
               )}

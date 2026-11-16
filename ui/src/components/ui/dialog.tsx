@@ -10,10 +10,16 @@ import { Button } from "@/components/ui/button";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ModalNoticeHost, ModalNoticeOutlet } from "@/components/ui/modal-notice";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useOpenAfterMount } from "@/hooks/use-open-after-mount";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export const Dialog: typeof DialogPrimitive.Root = DialogPrimitive.Root;
+function DialogRoot({ open, ...props }: DialogPrimitive.Root.Props): React.ReactElement {
+  return <DialogPrimitive.Root open={useOpenAfterMount(open)} {...props} />;
+}
+
+/** A dialog that mounts open still fades and scales in (hooks/use-open-after-mount.ts). */
+export const Dialog = DialogRoot as typeof DialogPrimitive.Root;
 
 const DialogPortal: typeof DialogPrimitive.Portal = DialogPrimitive.Portal;
 

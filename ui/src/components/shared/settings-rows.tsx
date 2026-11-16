@@ -12,6 +12,7 @@ import {
 } from "react";
 import { StatusDot } from "@/components/shared/status-dot";
 import { Button } from "@/components/ui/button";
+import { HeadingIdContext, useHeadingId } from "@/components/ui/heading-context";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useT } from "@/lib/i18n";
@@ -165,43 +166,47 @@ export function SettingsRow({
     // Two columns: the title and description beside the control, which sits centred on them;
     // `children` span both columns under them.
     return (
+      <HeadingIdContext.Provider value={titleId}>
+        <div
+          className={cn(
+            "@container/settings-row grid gap-x-8 py-4",
+            slot ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1",
+            SETTINGS_ROW_X,
+            className,
+          )}
+          data-slot="settings-row"
+        >
+          <div className="flex min-w-0 flex-col gap-1">
+            {titleRow}
+            {hint}
+          </div>
+          {slot}
+          {children ? (
+            <div className="col-span-full flex min-w-0 flex-col gap-1 pt-1">{children}</div>
+          ) : null}
+        </div>
+      </HeadingIdContext.Provider>
+    );
+  }
+
+  return (
+    <HeadingIdContext.Provider value={titleId}>
       <div
         className={cn(
-          "@container/settings-row grid gap-x-8 py-4",
-          slot ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1",
+          "@container/settings-row flex flex-wrap items-center justify-between gap-x-8 gap-y-3 py-4",
           SETTINGS_ROW_X,
           className,
         )}
         data-slot="settings-row"
       >
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
           {titleRow}
           {hint}
+          {children}
         </div>
         {slot}
-        {children ? (
-          <div className="col-span-full flex min-w-0 flex-col gap-1 pt-1">{children}</div>
-        ) : null}
       </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "@container/settings-row flex flex-wrap items-center justify-between gap-x-8 gap-y-3 py-4",
-        SETTINGS_ROW_X,
-        className,
-      )}
-      data-slot="settings-row"
-    >
-      <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
-        {titleRow}
-        {hint}
-        {children}
-      </div>
-      {slot}
-    </div>
+    </HeadingIdContext.Provider>
   );
 }
 
@@ -308,9 +313,12 @@ export function SubmitButton({
   className?: string;
   children: ReactNode;
 }): JSX.Element {
+  // Every card has a Save: the card's title, read after it, says which one this is.
+  const headingId = useHeadingId();
   return (
     <Button
       aria-busy={busy || undefined}
+      aria-describedby={headingId}
       aria-disabled={blocked || busy || undefined}
       className={className}
       loading={busy}

@@ -5,9 +5,15 @@ import type React from "react";
 import { DIALOG_POPUP_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ModalNoticeHost, ModalNoticeOutlet } from "@/components/ui/modal-notice";
+import { useOpenAfterMount } from "@/hooks/use-open-after-mount";
 import { cn } from "@/lib/utils";
 
-export const AlertDialog: typeof AlertDialogPrimitive.Root = AlertDialogPrimitive.Root;
+function AlertDialogRoot({ open, ...props }: AlertDialogPrimitive.Root.Props): React.ReactElement {
+  return <AlertDialogPrimitive.Root open={useOpenAfterMount(open)} {...props} />;
+}
+
+/** An alert dialog that mounts open still fades and scales in (hooks/use-open-after-mount.ts). */
+export const AlertDialog = AlertDialogRoot as typeof AlertDialogPrimitive.Root;
 
 const AlertDialogPortal: typeof AlertDialogPrimitive.Portal = AlertDialogPrimitive.Portal;
 

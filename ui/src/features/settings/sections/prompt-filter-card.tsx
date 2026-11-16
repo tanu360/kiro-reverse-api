@@ -329,19 +329,23 @@ function RuleRow({
       className={cn(SETTINGS_ROW_X, "flex items-center gap-x-4 py-4 sm:gap-x-8")}
       data-rule-index={index}
     >
-      {/* A rule that is off dims its text; its menu and switch stay at full strength. */}
-      <div className={cn("flex min-w-0 flex-1 flex-col gap-1", !rule.enabled && "opacity-64")}>
+      {/*
+        A rule that is off greys its name and dims its pill; the summary keeps its contrast, and
+        the menu and switch stay at full strength.
+      */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         {/* A long name wraps (two lines at most) and the pill follows it, onto a line of its own if need be. */}
         <div className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span
             className={cn(
               "line-clamp-2 min-w-0 font-medium text-sm wrap-anywhere",
-              rule.name.trim() ? "text-foreground" : "text-muted-foreground",
+              rule.name.trim() && rule.enabled ? "text-foreground" : "text-muted-foreground",
             )}
           >
             {name}
           </span>
           <Badge
+            className={cn(!rule.enabled && "opacity-64")}
             icon={regex ? RegexIcon : TextSearchIcon}
             iconStyle="line"
             size="sm"

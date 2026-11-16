@@ -241,7 +241,7 @@ export function UsageBreakdownCard({
           </p>
         ) : undefined
       }
-      // As tall as the header (48 / 56 px), the count at the end, centred on that height.
+      // As tall as the header (56 / 64 px), the count at the end, centred on that height.
       footerClassName={MIX_FOOTER}
       icon={icon}
       slim={slim}

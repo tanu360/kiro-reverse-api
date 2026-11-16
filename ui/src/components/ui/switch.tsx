@@ -18,7 +18,7 @@ export function Switch({ className, ...props }: SwitchPrimitive.Root.Props): Rea
     >
       <SwitchPrimitive.Thumb
         className={cn(
-          "pointer-events-none block size-[calc(var(--thumb-size)-2px)] shrink-0 origin-left in-[[role=switch]:active,[data-slot=label]:active,[data-slot=field-label]:active]:not-data-disabled:scale-x-110 in-[[role=switch]:active,[data-slot=label]:active,[data-slot=field-label]:active]:rounded-[var(--thumb-size)/calc(var(--thumb-size)*1.1)] rounded-(--thumb-size) bg-primary-foreground data-unchecked:bg-switch-thumb will-change-transform [transition:translate_.15s,border-radius_.15s,scale_.1s_.1s,transform-origin_.15s] data-checked:origin-right data-checked:translate-x-[calc(var(--thumb-size)-4px)] rtl:origin-right rtl:data-checked:origin-left rtl:data-checked:-translate-x-[calc(var(--thumb-size)-4px)]",
+          "pointer-events-none block size-[calc(var(--thumb-size)-2px)] shrink-0 origin-left in-[[role=switch]:active,[data-slot=label]:active,[data-slot=field-label]:active]:not-data-disabled:scale-x-110 in-[[role=switch]:active,[data-slot=label]:active,[data-slot=field-label]:active]:rounded-[var(--thumb-size)/calc(var(--thumb-size)*1.1)] rounded-(--thumb-size) bg-primary-foreground data-unchecked:bg-switch-thumb will-change-transform [transition:translate_.2s_cubic-bezier(0.4,0,0.2,1),border-radius_.2s_cubic-bezier(0.4,0,0.2,1),scale_.1s_.1s,transform-origin_.2s_cubic-bezier(0.4,0,0.2,1)] data-checked:origin-right data-checked:translate-x-[calc(var(--thumb-size)-4px)] rtl:origin-right rtl:data-checked:origin-left rtl:data-checked:-translate-x-[calc(var(--thumb-size)-4px)]",
         )}
         data-slot="switch-thumb"
       />

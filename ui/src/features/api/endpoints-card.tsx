@@ -215,7 +215,8 @@ function EndpointRow({
       >
         {methodLabel}
       </Badge>
-      <CopyButton className="-me-1.5 shrink-0" label={copyLabel} value={origin + path} />
+      {/* The icon, not the invisible box, lines up with the card's content edge. */}
+      <CopyButton className="-me-2.5 shrink-0" label={copyLabel} value={origin + path} />
     </li>
   );
 }

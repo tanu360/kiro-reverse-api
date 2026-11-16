@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import type { RequestRecord } from "@/lib/api/types";
 import { EMPTY, formatDateTime } from "@/lib/format";
 import { type TFunction, useT } from "@/lib/i18n";
+import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { ErrorTypeLabel } from "./error-type-badge";
 import {
@@ -249,6 +250,23 @@ function ErrorCell({
 }
 
 /**
+ * What tells one request from another that started the same minute, read after its name
+ * ("Request details, <time>"): the model, the outcome and, where accounts show, the account.
+ */
+export function useRequestSummary(accounts = true): (record: RequestRecord) => string {
+  const { t } = useT("requests");
+  const displayEmail = useDisplayEmail();
+  return (record) =>
+    [
+      record.model,
+      record.success ? t("ok") : `${t("fail")}${record.status ? ` ${record.status}` : ""}`,
+      accounts ? displayEmail(record.email, record.accountId) : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+}
+
+/**
  * A request as a list row, for narrow containers: the status node and the age, then (indented
  * past the node) the model and caller, the token bar with the credits and duration chips, the
  * four token counts, the account, and a failure's category and message. With `details` the
@@ -267,12 +285,14 @@ export function RequestCard({
   onOpen?: () => void;
 } & RequestViewOptions): JSX.Element {
   const { t, lang } = useT("requests");
+  const summary = useRequestSummary(accounts);
   const tokens = !usedNoTokens(record);
   return (
     <ListCard
       action={details && record.requestId ? <RequestIdCopy record={record} /> : undefined}
       leading={<StatusNode record={record} />}
       onOpen={onOpen}
+      openDescription={onOpen ? summary(record) : undefined}
       openLabel={onOpen ? t("detail.open", { time: formatDateTime(record.ts, lang) }) : undefined}
       title={<WhenInline record={record} />}
       variant="row"

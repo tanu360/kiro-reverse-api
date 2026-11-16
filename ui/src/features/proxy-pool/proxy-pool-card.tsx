@@ -528,15 +528,22 @@ function ProxyRow({
             disabled={switching}
             onCheckedChange={(next) => onToggle(next)}
           />
-          <Button loading={testing} onClick={onTest} size="sm" variant="secondary">
+          {/* Each action also reads the proxy after its name, so nine Tests are told apart. */}
+          <Button
+            aria-description={name}
+            loading={testing}
+            onClick={onTest}
+            size="sm"
+            variant="secondary"
+          >
             <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
             {t("actions.test")}
           </Button>
-          <Button onClick={onEdit} size="sm" variant="secondary">
+          <Button aria-description={name} onClick={onEdit} size="sm" variant="secondary">
             <HugeiconsIcon icon={PencilEdit01Icon} aria-hidden="true" />
             {t("common:actions.edit")}
           </Button>
-          <Button onClick={onRemove} size="sm" variant="danger">
+          <Button aria-description={name} onClick={onRemove} size="sm" variant="danger">
             <HugeiconsIcon icon={Delete02Icon} aria-hidden="true" />
             {t("actions.remove")}
           </Button>
@@ -601,12 +608,19 @@ function DetectedRow({
     <SettingsRow
       control={
         <fieldset className="flex min-w-0 flex-wrap items-center gap-2 @xl/settings-row:justify-end">
-          <Button loading={testing} onClick={onTest} size="sm" variant="secondary">
+          {/* Each action also reads the proxy after its name, as in the pool's rows. */}
+          <Button
+            aria-description={proxy.url}
+            loading={testing}
+            onClick={onTest}
+            size="sm"
+            variant="secondary"
+          >
             <HugeiconsIcon icon={Wifi01Icon} aria-hidden="true" />
             {t("actions.test")}
           </Button>
           {proxy.canAdopt ? (
-            <Button onClick={onAdopt} size="sm" variant="secondary">
+            <Button aria-description={proxy.url} onClick={onAdopt} size="sm" variant="secondary">
               <HugeiconsIcon icon={PlusSignIcon} aria-hidden="true" />
               {t("detected.adopt")}
             </Button>

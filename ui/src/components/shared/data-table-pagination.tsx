@@ -22,13 +22,13 @@ import { cn } from "@/lib/utils";
 
 /*
  * The prev/next chevrons: round, in the topbar search pill's surface (command-menu.tsx: the
- * --field tint and the --input hairline), so they read on the page in both themes. Disabled keeps
- * the circle and only dims the chevron. The hover fill is hover-guarded (Tailwind's `hover:` only
- * applies on a hover-capable pointer), so a tapped chevron does not keep it on touch; pressed
- * shows it on every pointer.
+ * --field tint and the --input hairline), so they read on the page in both themes. Disabled fades
+ * the whole button to 64 %, as every control. The hover fill is hover-guarded (Tailwind's
+ * `hover:` only applies on a hover-capable pointer), so a tapped chevron does not keep it on
+ * touch; pressed shows it on every pointer.
  */
 const PAGER_CHEVRON_CLASS =
-  "rounded-full border-input bg-(--field) text-foreground before:rounded-full hover:bg-(--field-hover) data-pressed:bg-(--field-hover) disabled:text-muted-foreground/50 disabled:opacity-100";
+  "rounded-full border-input bg-(--field) text-foreground before:rounded-full hover:bg-(--field-hover) data-pressed:bg-(--field-hover)";
 /*
  * The page numbers and the ellipsis share one box, the icon button's (36 / coarse 40), so the
  * numbers keep an even beat; a wide number ("1,024") grows its box into a pill instead of

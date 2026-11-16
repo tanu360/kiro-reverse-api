@@ -88,8 +88,12 @@ const SPARKLES: { x: number; y: number; s: number; twinkle: Twinkle }[] = [
   { x: 214, y: 13, s: 3.6, twinkle: { duration: 3.4, delay: 1.2 } },
 ];
 
+/**
+ * Each star's timing as custom properties, read by .sidebar-stage-twinkle (index.css). Inline
+ * animation-* styles would beat the reduced-motion rule there and keep the stars twinkling.
+ */
 function twinkle({ duration, delay }: Twinkle): CSSProperties {
-  return { animationDelay: `${delay}s`, animationDuration: `${duration}s` };
+  return { "--twinkle-delay": `${delay}s`, "--twinkle-duration": `${duration}s` } as CSSProperties;
 }
 
 function sparklePath({ x, y, s }: { x: number; y: number; s: number }): string {

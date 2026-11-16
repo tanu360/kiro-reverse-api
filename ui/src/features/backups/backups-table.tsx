@@ -147,6 +147,7 @@ function RowMenu({
  */
 function RowIconButton({
   label,
+  description,
   hint,
   icon: Icon,
   running,
@@ -156,6 +157,8 @@ function RowIconButton({
   onClick,
 }: {
   label: string;
+  /** The backup's time, read after the action (aria-description), so the rows are told apart. */
+  description: string;
   hint?: string;
   icon: IconSvgElement;
   running: boolean;
@@ -170,6 +173,7 @@ function RowIconButton({
       <TooltipTrigger
         render={
           <Button
+            aria-description={description}
             aria-disabled={blocked || undefined}
             aria-label={label}
             data-row-focus={focusId}
@@ -204,13 +208,15 @@ function RowActions({
   entry: BackupEntry;
   actions: BackupRowActions;
 }): JSX.Element {
-  const { t } = useT("backups");
+  const { t, lang } = useT("backups");
   const running = actions.busy.get(entry.id);
   const blocked = running !== undefined;
+  const time = formatDateTime(entry.createdAt, lang);
   return (
     <div className="flex items-center justify-end gap-0.5">
       <RowIconButton
         blocked={blocked}
+        description={time}
         focusId={entry.id}
         hint={t("downloadHint")}
         icon={Download01Icon}
@@ -220,6 +226,7 @@ function RowActions({
       />
       <RowIconButton
         blocked={blocked}
+        description={time}
         icon={Undo02Icon}
         label={t("restore")}
         onClick={() => actions.onRestore(entry)}
@@ -227,6 +234,7 @@ function RowActions({
       />
       <RowIconButton
         blocked={blocked}
+        description={time}
         destructive
         icon={Delete02Icon}
         label={t("delete")}

@@ -330,9 +330,18 @@ function HeaderRow({
       data-error={error !== null || undefined}
     >
       <div className="flex items-center gap-x-4 sm:gap-x-8">
-        {/* A header that is off dims its text; its menu and switch stay at full strength. */}
-        <div className={cn("flex min-w-0 flex-1 flex-col gap-1", !rule.enabled && "opacity-64")}>
-          <code className="truncate font-medium text-foreground text-sm" translate="no">
+        {/*
+          A header that is off greys its name; the value keeps its contrast, and the menu and
+          switch stay at full strength.
+        */}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <code
+            className={cn(
+              "truncate font-medium text-sm",
+              rule.enabled ? "text-foreground" : "text-muted-foreground",
+            )}
+            translate="no"
+          >
             {name}
           </code>
           <code className="truncate text-muted-foreground text-xs" translate="no">

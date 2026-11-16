@@ -19,6 +19,7 @@ import type { Account } from "@/lib/api/types";
 import { useT } from "@/lib/i18n";
 import { useDisplayEmail } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
+import { useAccountName } from "./account-cells";
 import { isBanned } from "./account-model";
 import { useOpenRelogin } from "./relogin-context";
 import {
@@ -99,11 +100,14 @@ function ManageMenuItems({ account }: { account: Account }): JSX.Element {
 
 function IconAction({
   label,
+  description,
   onClick,
   children,
   busy = false,
 }: {
   label: string;
+  /** The row's account, read after the action (aria-description), so 25 Tests are told apart. */
+  description: string;
   onClick: () => void;
   children: ReactElement;
   busy?: boolean;
@@ -112,7 +116,14 @@ function IconAction({
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button aria-label={label} loading={busy} onClick={onClick} size="icon" variant="quiet" />
+          <Button
+            aria-description={description}
+            aria-label={label}
+            loading={busy}
+            onClick={onClick}
+            size="icon"
+            variant="quiet"
+          />
         }
       >
         {children}
@@ -134,6 +145,8 @@ export function AccountRowActions({
   variant = "inline",
 }: RowActionHandlers & { account: Account; variant?: "inline" | "menu" }): JSX.Element {
   const { t } = useT("accounts");
+  // Every row has the same actions; the account, read after each one, tells them apart.
+  const name = useAccountName()(account).text;
   const refresh = useRefreshAccount(account.id);
   const menuItems = <ManageMenuItems account={account} />;
 
@@ -149,6 +162,7 @@ export function AccountRowActions({
           render={
             <Button
               aria-busy={refresh.isPending || undefined}
+              aria-description={name}
               aria-label={t("actions.more")}
               size="icon"
               variant="quiet"
@@ -184,12 +198,13 @@ export function AccountRowActions({
     <div className="flex items-center justify-end gap-0.5">
       <IconAction
         busy={refresh.isPending}
+        description={name}
         label={t("actions.refreshToken")}
         onClick={() => refresh.mutate()}
       >
         <HugeiconsIcon icon={Refresh01Icon} aria-hidden="true" />
       </IconAction>
-      <IconAction label={t("actions.test")} onClick={() => onTest(account)}>
+      <IconAction description={name} label={t("actions.test")} onClick={() => onTest(account)}>
         <HugeiconsIcon icon={FlaskConicalIcon} aria-hidden="true" />
       </IconAction>
       <Menu>
@@ -197,7 +212,14 @@ export function AccountRowActions({
           <TooltipTrigger
             render={
               <MenuTrigger
-                render={<Button aria-label={t("actions.more")} size="icon" variant="quiet" />}
+                render={
+                  <Button
+                    aria-description={name}
+                    aria-label={t("actions.more")}
+                    size="icon"
+                    variant="quiet"
+                  />
+                }
               />
             }
           >

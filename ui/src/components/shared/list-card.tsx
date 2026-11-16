@@ -49,6 +49,11 @@ interface ListCardProps {
   onOpen?: () => void;
   /** The open button's accessible name when the title alone is not enough ("Open details…"). */
   openLabel?: string;
+  /**
+   * What tells one item from the next, read after the name (aria-description): the model and
+   * status of a request whose name is only its time.
+   */
+  openDescription?: string;
   /** Layout classes only (h-full, col-span). */
   className?: string;
   /** The element to render, e.g. `<li />` or `<article />`. */
@@ -67,6 +72,7 @@ export function ListCard({
   selected = false,
   onOpen,
   openLabel,
+  openDescription,
   className,
   render,
 }: ListCardProps): JSX.Element {
@@ -90,6 +96,7 @@ export function ListCard({
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           {onOpen ? (
             <button
+              aria-description={openDescription}
               aria-label={openLabel}
               className={cn(
                 "min-w-0 max-w-full cursor-pointer truncate py-0.5 text-left font-medium text-foreground text-sm/5",
@@ -109,9 +116,10 @@ export function ListCard({
           {badge ? <div className="flex shrink-0 items-center">{badge}</div> : null}
         </div>
         {action ? (
-          // One title line tall: a 32 px icon button centres on the title's line and overflows
-          // into the padding instead of making the header taller.
-          <div className="relative z-1 -me-1.5 flex h-6 shrink-0 items-center">{action}</div>
+          // One title line tall: the icon button centres on the title's line and overflows into
+          // the padding instead of making the header taller; its icon, not its box, lines up
+          // with the card's content edge.
+          <div className="relative z-1 -me-2.5 flex h-6 shrink-0 items-center">{action}</div>
         ) : null}
       </div>
       {meta ? (

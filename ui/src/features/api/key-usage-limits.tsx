@@ -59,7 +59,7 @@ export function KeyLimitsCard({
           className="grid divide-y divide-border-subtle @lg:grid-cols-3 @lg:divide-x @lg:divide-y-0"
         >
           {LIMIT_KINDS.map((kind) => (
-            <li className="flex min-w-0 flex-col gap-2 px-4 py-3.5 sm:px-6 @lg:px-4" key={kind}>
+            <li className="flex min-w-0 flex-col gap-2 px-4 py-4 sm:px-6" key={kind}>
               <div className="flex items-center justify-between gap-3">
                 <span className="font-medium text-sm">{t(`keys.${kind}`)}</span>
                 <Skeleton className="h-4 w-24" />
@@ -99,7 +99,7 @@ export function KeyLimitsCard({
           const shown = reached ? 1 : Math.min(0.999, Math.floor(share * 1000) / 1000);
           const tone = reached ? "destructive" : share >= LIMIT_WARNING ? "warning" : "default";
           return (
-            <li className="flex min-w-0 flex-col gap-2 px-4 py-3.5 sm:px-6 @lg:px-4" key={row.kind}>
+            <li className="flex min-w-0 flex-col gap-2 px-4 py-4 sm:px-6" key={row.kind}>
               {/* Wraps the figures under the name when a third of the card is too narrow. */}
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <span className="font-medium text-sm">{t(`keys.${row.kind}`)}</span>
@@ -116,7 +116,9 @@ export function KeyLimitsCard({
                     })}
                   </span>
                 ) : (
-                  <Badge size="sm" tone="neutral">
+                  // Centred, not on the baseline: a 20 px badge would push the name 2 px below the
+                  // names of the other limits.
+                  <Badge className="self-center" size="sm" tone="neutral">
                     <UnlimitedMark />
                   </Badge>
                 )}

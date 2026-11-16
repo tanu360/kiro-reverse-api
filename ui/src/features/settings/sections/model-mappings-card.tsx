@@ -488,6 +488,7 @@ function MappingRowItem({
           <TooltipTrigger
             render={
               <Button
+                aria-description={t("modelMappings.rowLabel", { n })}
                 aria-label={t("modelMappings.drag")}
                 className="cursor-grab touch-none active:cursor-grabbing"
                 ref={setActivatorNodeRef}

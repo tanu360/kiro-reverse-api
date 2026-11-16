@@ -10,6 +10,7 @@ import {
   CardPanel,
   CardTitle,
 } from "@/components/ui/card";
+import { HeadingIdContext } from "@/components/ui/heading-context";
 import { cn } from "@/lib/utils";
 
 /**
@@ -74,30 +75,36 @@ export function SectionCard({
       render={<section />}
       tone={tone}
     >
-      <CardHeader icon={icon} iconTone={danger ? "danger" : "default"}>
-        <CardHeading>
-          <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <CardTitle
-              className={cn(danger && "text-destructive-foreground")}
-              id={headingId}
-              render={(props) => <h2 {...props} />}
-            >
-              {title}
-            </CardTitle>
-            {meta ? (
-              <span className="text-meta text-muted-foreground tabular-nums" data-slot="card-meta">
-                {meta}
-              </span>
+      {/* The title names what the card's controls (Save, Learn more) belong to. */}
+      <HeadingIdContext.Provider value={headingId}>
+        <CardHeader icon={icon} iconTone={danger ? "danger" : "default"}>
+          <CardHeading>
+            <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <CardTitle
+                className={cn(danger && "text-destructive-foreground")}
+                id={headingId}
+                render={(props) => <h2 {...props} />}
+              >
+                {title}
+              </CardTitle>
+              {meta ? (
+                <span
+                  className="text-meta text-muted-foreground tabular-nums"
+                  data-slot="card-meta"
+                >
+                  {meta}
+                </span>
+              ) : null}
+            </div>
+            {description ? (
+              <CardDescription variant={descriptionVariant}>{description}</CardDescription>
             ) : null}
-          </div>
-          {description ? (
-            <CardDescription variant={descriptionVariant}>{description}</CardDescription>
-          ) : null}
-        </CardHeading>
-        {actions ? <CardAction>{actions}</CardAction> : null}
-      </CardHeader>
-      {slim ? children : <CardPanel className={panelClassName}>{children}</CardPanel>}
-      {footer ? <CardFooter className={footerClassName}>{footer}</CardFooter> : null}
+          </CardHeading>
+          {actions ? <CardAction>{actions}</CardAction> : null}
+        </CardHeader>
+        {slim ? children : <CardPanel className={panelClassName}>{children}</CardPanel>}
+        {footer ? <CardFooter className={footerClassName}>{footer}</CardFooter> : null}
+      </HeadingIdContext.Provider>
     </Card>
   );
 }

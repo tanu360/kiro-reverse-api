@@ -4,6 +4,7 @@ import { NumberField as NumberFieldPrimitive } from "@base-ui/react/number-field
 import { MinusIcon, PlusIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as React from "react";
+import { useHeadingId } from "@/components/ui/heading-context";
 import { useUiT } from "@/components/ui/messages";
 import { intlLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -114,8 +115,11 @@ export function NumberFieldDecrement({
   ...props
 }: NumberFieldPrimitive.Decrement.Props): React.ReactElement {
   const { t } = useUiT();
+  // The settings row's title, read after "Decrease", says which number it changes.
+  const headingId = useHeadingId();
   return (
     <NumberFieldPrimitive.Decrement
+      aria-describedby={headingId}
       aria-label={t("numberField.decrease")}
       className={cn(
         "relative flex shrink-0 cursor-pointer items-center justify-center rounded-s-[calc(var(--radius-lg)-1px)] in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] transition-colors pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:bg-accent",
@@ -134,8 +138,10 @@ export function NumberFieldIncrement({
   ...props
 }: NumberFieldPrimitive.Increment.Props): React.ReactElement {
   const { t } = useUiT();
+  const headingId = useHeadingId();
   return (
     <NumberFieldPrimitive.Increment
+      aria-describedby={headingId}
       aria-label={t("numberField.increase")}
       className={cn(
         "relative flex shrink-0 cursor-pointer items-center justify-center rounded-e-[calc(var(--radius-lg)-1px)] in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] transition-colors pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:bg-accent",

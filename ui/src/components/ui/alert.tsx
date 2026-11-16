@@ -8,12 +8,12 @@ import { cn } from "@/lib/utils";
  * action (AlertAction) an outline button in the tone (Button variant "tone", which reads
  * --badge-fg). The colours are the --notice-* tokens in index.css. 8 px corners
  * like the controls; a long message wraps. With an action on a wide screen the text centres on
- * the button and the padding beside the button tightens. `size="sm"` is the inline notice:
+ * the button, which keeps the 12 px inset of the icon side. `size="sm"` is the inline notice:
  * 12 px text and a 14 px icon, for a line under a card or table (a server-changed note, a memory
  * note).
  */
 const alertVariants = cva(
-  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-lg border border-(--notice-line) bg-(--badge-bg) px-3 text-(--badge-fg) has-[>svg]:has-data-[slot=alert-action]:grid-cols-[var(--alert-icon)_1fr_auto] has-[>svg]:grid-cols-[var(--alert-icon)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] sm:has-data-[slot=alert-action]:items-center sm:has-data-[slot=alert-action]:pe-1.5 [&>svg]:size-(--alert-icon) [&>svg]:text-(--badge-disc)",
+  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-lg border border-(--notice-line) bg-(--badge-bg) px-3 text-(--badge-fg) has-[>svg]:has-data-[slot=alert-action]:grid-cols-[var(--alert-icon)_1fr_auto] has-[>svg]:grid-cols-[var(--alert-icon)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] sm:has-data-[slot=alert-action]:items-center [&>svg]:size-(--alert-icon) [&>svg]:text-(--badge-disc)",
   {
     defaultVariants: {
       size: "default",

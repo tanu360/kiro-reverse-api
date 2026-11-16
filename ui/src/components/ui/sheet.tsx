@@ -11,10 +11,16 @@ import { OVERLAY_CLOSE_CLASS } from "@/components/ui/dialog";
 import { wrapTabFocus } from "@/components/ui/modal-focus";
 import { ModalNoticeHost, ModalNoticeOutlet } from "@/components/ui/modal-notice";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useOpenAfterMount } from "@/hooks/use-open-after-mount";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export const Sheet: typeof SheetPrimitive.Root = SheetPrimitive.Root;
+function SheetRoot({ open, ...props }: SheetPrimitive.Root.Props): React.ReactElement {
+  return <SheetPrimitive.Root open={useOpenAfterMount(open)} {...props} />;
+}
+
+/** A sheet that mounts open still slides in (hooks/use-open-after-mount.ts). */
+export const Sheet = SheetRoot as typeof SheetPrimitive.Root;
 
 const SheetPortal: typeof SheetPrimitive.Portal = SheetPrimitive.Portal;
 

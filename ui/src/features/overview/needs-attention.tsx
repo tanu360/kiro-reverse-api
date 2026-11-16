@@ -190,6 +190,8 @@ function ViewAllLink(): JSX.Element {
   return (
     <Button
       aria-label={t("attention.viewAll")}
+      // The arrow, not the invisible box, lines up with the card's content edge (its 8 px inset).
+      className="-me-2"
       render={<Link search={{ status: "attention" }} to="/accounts" />}
       size="sm"
       variant="ghost"
