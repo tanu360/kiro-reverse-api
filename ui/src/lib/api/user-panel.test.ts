@@ -198,13 +198,35 @@ describe("normalisers", () => {
     expect(normalizeUserRequest({ success: true, errorType: "timeout" }).errorType).toBe("");
   });
 
-  it("fills a page's paging from the request when the answer lacks it", () => {
+  it("fills a page's paging and sort from the request when the answer lacks it", () => {
     expect(normalizeUserRequestPage({ requests: "nope" }, { page: 3, pageSize: 500 })).toEqual({
       requests: [],
       total: 0,
       page: 3,
       pageSize: 100,
+      sort: "time",
+      order: "desc",
     });
+    expect(
+      normalizeUserRequestPage({ sort: "account", order: "up" }, { sort: "tokens", order: "asc" }),
+    ).toMatchObject({ sort: "tokens", order: "asc" });
+    expect(normalizeUserRequestPage({ sort: "credits", order: "asc" })).toMatchObject({
+      sort: "credits",
+      order: "asc",
+    });
+  });
+
+  it("keeps the status counts whole, adds a missing All and leaves them out when not sent", () => {
+    expect(
+      normalizeUserRequestPage({ counts: { all: 12.4, succeeded: 10, failed: -3 } }).counts,
+    ).toEqual({ all: 12, succeeded: 10, failed: 0 });
+    expect(normalizeUserRequestPage({ counts: { succeeded: 4, failed: "2" } }).counts).toEqual({
+      all: 4,
+      succeeded: 4,
+      failed: 0,
+    });
+    expect(normalizeUserRequestPage({ counts: [1, 2] })).not.toHaveProperty("counts");
+    expect(normalizeUserRequestPage({})).not.toHaveProperty("counts");
   });
 });
 
@@ -237,7 +259,7 @@ describe("requests", () => {
     expect(seen[0].headers.has("X-Admin-Token")).toBe(false);
   });
 
-  it("sends the paging and status the server takes", async () => {
+  it("sends the paging, status and sort the server takes", async () => {
     setUserToken("user-token", false);
     const seen = capture("get", "/requests", () => HttpResponse.json({}));
     await getUserRequests({ page: 2, pageSize: 1000, status: "error" });
@@ -247,6 +269,13 @@ describe("requests", () => {
       page: "2",
       pageSize: "100",
       status: "error",
+      sort: "time",
+      order: "desc",
+    });
+    await getUserRequests({ sort: "tokens", order: "asc" });
+    expect(Object.fromEntries(new URL(seen[1].url).searchParams)).toMatchObject({
+      sort: "tokens",
+      order: "asc",
     });
   });
 

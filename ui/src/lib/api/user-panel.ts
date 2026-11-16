@@ -107,11 +107,34 @@ export interface UserRequest {
   requestId: string;
 }
 
+/** The admin Requests sorts a key holder may use: no account or API key. */
+export const USER_REQUEST_SORTS = [
+  "time",
+  "status",
+  "model",
+  "tokens",
+  "credits",
+  "duration",
+] as const;
+export type UserRequestSort = (typeof USER_REQUEST_SORTS)[number];
+export type UserRequestOrder = "asc" | "desc";
+
+/** The key's requests per status tab, whatever page and tab the answer is for. */
+export interface UserRequestCounts {
+  all: number;
+  succeeded: number;
+  failed: number;
+}
+
 export interface UserRequestPage {
   requests: UserRequest[];
   total: number;
   page: number;
   pageSize: number;
+  sort: UserRequestSort;
+  order: UserRequestOrder;
+  /** Undefined from a server that sends none: the tabs then show no counts. */
+  counts?: UserRequestCounts;
 }
 
 export interface UserRequestsParams {
@@ -121,6 +144,10 @@ export interface UserRequestsParams {
   pageSize?: number;
   /** default "all" */
   status?: UserRequestStatus;
+  /** default "time" */
+  sort?: UserRequestSort;
+  /** default "desc" */
+  order?: UserRequestOrder;
 }
 
 export const USER_REQUESTS_PAGE_SIZE = 25;
@@ -305,17 +332,33 @@ function clampPageSize(value: number | undefined): number {
   return Math.min(USER_REQUESTS_MAX_PAGE_SIZE, Math.max(1, Math.round(value)));
 }
 
+function normalizeCounts(value: unknown): UserRequestCounts | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const res = record(value);
+  const succeeded = count(res.succeeded);
+  const failed = count(res.failed);
+  return {
+    all: typeof res.all === "number" ? count(res.all) : succeeded + failed,
+    succeeded,
+    failed,
+  };
+}
+
 export function normalizeUserRequestPage(
   value: unknown,
   params: UserRequestsParams = {},
 ): UserRequestPage {
   const res = record(value);
   const page = count(res.page) || Math.max(1, Math.round(params.page ?? 1));
+  const counts = normalizeCounts(res.counts);
   return {
     requests: list(res.requests).map(normalizeUserRequest),
     total: count(res.total),
     page,
     pageSize: count(res.pageSize) || clampPageSize(params.pageSize),
+    sort: oneOf(res.sort, USER_REQUEST_SORTS, params.sort ?? "time"),
+    order: oneOf<UserRequestOrder>(res.order, ["asc", "desc"], params.order ?? "desc"),
+    ...(counts ? { counts } : {}),
   };
 }
 
@@ -422,15 +465,24 @@ export async function getUserUsageBreakdown(
   return normalizeUserUsageBreakdown(res, range);
 }
 
+/** Every parameter filled in and in range: the query string and the cache key. */
+function requestsParams(params: UserRequestsParams): Required<UserRequestsParams> {
+  return {
+    page: Math.max(1, Math.round(params.page ?? 1)),
+    pageSize: clampPageSize(params.pageSize),
+    status: params.status ?? "all",
+    sort: params.sort ?? "time",
+    order: params.order ?? "desc",
+  };
+}
+
 export async function getUserRequests(
   params: UserRequestsParams = {},
   signal?: AbortSignal,
 ): Promise<UserRequestPage> {
-  const page = Math.max(1, Math.round(params.page ?? 1));
-  const pageSize = clampPageSize(params.pageSize);
-  const status = params.status ?? "all";
-  const res = await userRequest("/requests", { query: { page, pageSize, status }, signal });
-  return normalizeUserRequestPage(res, { page, pageSize, status });
+  const query = requestsParams(params);
+  const res = await userRequest("/requests", { query: { ...query }, signal });
+  return normalizeUserRequestPage(res, query);
 }
 
 // ---------------------------------------------------------------------------
@@ -468,11 +520,7 @@ export function userUsageBreakdownQuery(range: UserUsageRange, tzOffset = browse
 }
 
 export function userRequestsQuery(params: UserRequestsParams = {}) {
-  const key = {
-    page: Math.max(1, Math.round(params.page ?? 1)),
-    pageSize: clampPageSize(params.pageSize),
-    status: params.status ?? "all",
-  };
+  const key = requestsParams(params);
   return queryOptions({
     queryKey: queryKeys.userPanel.requests(key),
     queryFn: ({ signal }) => getUserRequests(key, signal),

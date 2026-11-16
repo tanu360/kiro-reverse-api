@@ -211,6 +211,8 @@
   "endpoints.copyStats": "統計のエンドポイントをコピー",
   "endpoints.authRequired": "クライアントは API キーを {bearer} または {xApiKey} として送信します。管理者パスワードではなく、このページのキーを使用してください。",
   "endpoints.authOptional": "現在 API キーは必須ではないため、クライアントにキーは不要です。必須にした場合、クライアントは管理者パスワードではなく API キーを {bearer} または {xApiKey} として送信します。",
+  "endpoints.holderAuthRequired": "API キーは {bearer} または {xApiKey} として送信します。",
+  "endpoints.holderAuthOptional": "API キーは {bearer} または {xApiKey} として送信します。このサーバー自身のアドレスは現在キーを求めませんが、キーなしの呼び出しはここに計上されません。",
   "snippets.title": "クライアントの設定",
   "snippets.description": "このプロキシ用のサンプルです。まず {env} にいずれかの API キーを設定してください。",
   "snippets.anyKeyWorks": "現在 API キーは必須ではないため、任意の値を使用できます。",

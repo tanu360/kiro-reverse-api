@@ -2,12 +2,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type JSX, useState } from "react";
 import { ErrorState } from "@/components/shared/error-state";
 import { Card } from "@/components/ui/card";
+import { ClientSnippetsCard } from "@/features/api/client-snippets";
+import { EndpointsCard } from "@/features/api/endpoints-card";
 import { KeyLimitsCard } from "@/features/api/key-usage-limits";
 import { queryKeys } from "@/lib/api/query-keys";
 import { signOutUser, userKeyQuery } from "@/lib/api/user-panel";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { ExampleRequestCard, UserEndpointsCard } from "./connect-cards";
 import { KeyDetailsCard, KeyHeading, KeyNotice } from "./key-overview";
 import { useRerenderAtExpiry } from "./key-status";
 import { RecentRequestsCard } from "./recent-requests-card";
@@ -70,9 +71,15 @@ export function UserPanelPage(): JSX.Element {
           <KeyDetailsCard apiKey={apiKey} />
           <UsageSection />
           <RecentRequestsCard />
+          {/* The admin API page's two cards, fed from the key: they never read /admin/api.
+              Until the key loads they assume keys are required, as the key's own default. */}
           <div className="grid min-w-0 grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
-            <UserEndpointsCard />
-            <ExampleRequestCard allowedModels={apiKey?.allowedModels ?? []} />
+            <EndpointsCard requireApiKey={apiKey?.keysRequired ?? true} />
+            <ClientSnippetsCard
+              // A key limited to models asks for the first of them, so the examples work as pasted.
+              model={apiKey?.allowedModels[0]}
+              requireApiKey={apiKey?.keysRequired ?? true}
+            />
           </div>
         </>
       )}

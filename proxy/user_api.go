@@ -545,8 +545,27 @@ type userRequestView struct {
 	RequestID        string  `json:"requestId"`
 }
 
-// apiUserRequests serves GET /user/api/requests?page=&pageSize=&status=all|success|error:
-// this key's requests, newest first, from the same log as the admin Requests page.
+// userRequestSorts are the admin Requests sorts a key's holder may use. Account and API key are
+// left out: one key's rows ordered by account would show how its accounts' emails sort.
+var userRequestSorts = map[string]bool{
+	"time": true, "status": true, "model": true, "tokens": true, "credits": true, "duration": true,
+}
+
+// userRequestCounts are a key's requests per status tab, whatever the page shows.
+type userRequestCounts struct {
+	All       int `json:"all"`
+	Succeeded int `json:"succeeded"`
+	Failed    int `json:"failed"`
+}
+
+// countUserRequests is the number of keyID's requests with status ("success" or "failed").
+func countUserRequests(keyID, status string) int {
+	return getObserveStore().RequestPage(requestQuery{Page: 1, PageSize: 1, Status: status, APIKeyID: keyID}).Total
+}
+
+// apiUserRequests serves GET /user/api/requests?page=&pageSize=&status=all|success|error
+// &sort=&order=asc|desc: this key's requests from the same log as the admin Requests page,
+// newest first by default, with the key's count per status. An unknown or account sort is time.
 func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKeyEntry) {
 	q := r.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
@@ -562,7 +581,29 @@ func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKey
 	case "error":
 		status = "failed"
 	}
-	data := getObserveStore().RequestPage(requestQuery{Page: page, PageSize: pageSize, Status: status, APIKeyID: entry.ID})
+	sortBy := "time"
+	if s := strings.ToLower(strings.TrimSpace(q.Get("sort"))); userRequestSorts[s] {
+		sortBy = s
+	}
+	order := "desc"
+	if strings.EqualFold(strings.TrimSpace(q.Get("order")), "asc") {
+		order = "asc"
+	}
+	data := getObserveStore().RequestPage(requestQuery{Page: page, PageSize: pageSize, Status: status, Sort: sortBy, Order: order, APIKeyID: entry.ID})
+	// The page's own total is one of the counts, so the tab in view always matches the pager.
+	var counts userRequestCounts
+	switch status {
+	case "success":
+		counts.Succeeded = data.Total
+		counts.Failed = countUserRequests(entry.ID, "failed")
+	case "failed":
+		counts.Succeeded = countUserRequests(entry.ID, "success")
+		counts.Failed = data.Total
+	default:
+		counts.Succeeded = countUserRequests(entry.ID, "success")
+		counts.Failed = max(0, data.Total-counts.Succeeded)
+	}
+	counts.All = counts.Succeeded + counts.Failed
 	requests := make([]userRequestView, len(data.Requests))
 	for i, rec := range data.Requests {
 		requests[i] = userRequestView{
@@ -587,5 +628,8 @@ func apiUserRequests(w http.ResponseWriter, r *http.Request, entry config.ApiKey
 		"total":    data.Total,
 		"page":     data.Page,
 		"pageSize": data.PageSize,
+		"sort":     data.Sort,
+		"order":    data.Order,
+		"counts":   counts,
 	})
 }

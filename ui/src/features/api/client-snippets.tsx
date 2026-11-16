@@ -207,7 +207,7 @@ const API_TILE =
  * the official SDK for the plain HTTP client. The tiles, the language chips and the code sit
  * 16 px apart. The chips stay on one line and scroll sideways, with faded edges where more hide.
  */
-function RequestBuilder({ origin }: { origin: string }): JSX.Element {
+function RequestBuilder({ origin, model }: { origin: string; model?: string }): JSX.Element {
   const { t } = useT("api");
   const [choice, setChoice] = useState(readChoice);
   const update = (patch: Partial<RequestChoice>) => {
@@ -217,7 +217,10 @@ function RequestBuilder({ origin }: { origin: string }): JSX.Element {
   };
 
   const info = SNIPPET_LANGUAGE_INFO[choice.language];
-  const request = useMemo(() => buildRequestSnippet(origin, choice), [origin, choice]);
+  const request = useMemo(
+    () => buildRequestSnippet(origin, choice, model),
+    [origin, choice, model],
+  );
   const requestName = t("snippets.request", { language: t(`snippets.lang.${choice.language}`) });
 
   return (
@@ -292,11 +295,23 @@ function RequestBuilder({ origin }: { origin: string }): JSX.Element {
   );
 }
 
-export function ClientSnippetsCard(): JSX.Element {
+export function ClientSnippetsCard({
+  requireApiKey,
+  model,
+}: {
+  /**
+   * The server's "Require API key", from a page that may not call /admin/api (the key holder's
+   * /user): given, the card skips the settings query.
+   */
+  requireApiKey?: boolean;
+  /** The model the request and the Codex config name; a key limited to models passes one of them. */
+  model?: string;
+} = {}): JSX.Element {
   const { t } = useT("api");
-  const settings = useQuery(settingsQuery());
+  const settings = useQuery({ ...settingsQuery(), enabled: requireApiKey === undefined });
+  const required = requireApiKey ?? settings.data?.requireApiKey;
   const origin = window.location.origin;
-  const tools = useMemo(() => buildToolSnippets(origin), [origin]);
+  const tools = useMemo(() => buildToolSnippets(origin, model), [origin, model]);
   const env = { env: SNIPPET_KEY_ENV };
 
   return (
@@ -311,7 +326,7 @@ export function ClientSnippetsCard(): JSX.Element {
       title={t("snippets.title")}
     >
       <Tabs className="min-w-0 flex-1 gap-4" defaultValue="api">
-        {settings.data && !settings.data.requireApiKey ? (
+        {required === false ? (
           <Alert role="note" size="sm" variant="info">
             <HugeiconsIcon icon={InfoIcon} aria-hidden="true" />
             <AlertDescription>{t("snippets.anyKeyWorks")}</AlertDescription>
@@ -334,7 +349,7 @@ export function ClientSnippetsCard(): JSX.Element {
         </TabsList>
         <div className={PANEL_STACK}>
           <StackedPanel className="flex min-w-0 flex-col" value="api">
-            <RequestBuilder origin={origin} />
+            <RequestBuilder model={model} origin={origin} />
           </StackedPanel>
           <StackedPanel className="flex min-w-0 flex-col gap-4" value="claude-code">
             <Hint>{t("snippets.claudeCodeHint")}</Hint>

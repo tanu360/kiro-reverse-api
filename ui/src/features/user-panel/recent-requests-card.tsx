@@ -1,258 +1,124 @@
-import {
-  CircleCheckIcon,
-  CircleXIcon,
-  InboxIcon,
-  ListChecksIcon,
-  SearchXIcon,
-} from "@hugeicons/core-free-icons";
+import { InboxIcon, SearchXIcon } from "@hugeicons/core-free-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Fragment, type JSX, useMemo, useState } from "react";
-import { CreditAmount } from "@/components/shared/credit-amount";
-import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
+import { type JSX, useId, useMemo, useState } from "react";
+import { DataTable, type DataTableSort } from "@/components/shared/data-table";
+import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { ListCard } from "@/components/shared/list-card";
-import { SectionCard } from "@/components/shared/section-card";
-import { StatusDot } from "@/components/shared/status-dot";
-import { StatusTabs } from "@/components/shared/table-toolbar";
-import { TokenCell } from "@/components/shared/token-cell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ErrorTypeLabel } from "@/features/requests/error-type-badge";
-import { formatRowDate } from "@/features/requests/request-model";
-import { endpointLabel } from "@/features/requests/requests-columns";
-import { type UserRequest, type UserRequestStatus, userRequestsQuery } from "@/lib/api/user-panel";
+import { defaultSortDesc, PAGE_SIZES } from "@/features/requests/request-model";
+import { RequestCard, useRequestColumns } from "@/features/requests/requests-columns";
+import { RequestsToolbar } from "@/features/requests/requests-toolbar";
+import type { RequestRecord } from "@/lib/api/types";
 import {
-  EMPTY,
-  formatCompact,
-  formatCredits,
-  formatDurationMs,
-  formatNumber,
-  formatTime,
-  unixToDate,
-} from "@/lib/format";
-import { type Lang, useT } from "@/lib/i18n";
+  USER_REQUEST_SORTS,
+  type UserRequest,
+  type UserRequestSort,
+  userRequestsQuery,
+} from "@/lib/api/user-panel";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-/** The Requests page's page sizes; ten rows keep the card short by default. */
-const PAGE_SIZES = [10, 25, 50, 100] as const;
-const DEFAULT_PAGE_SIZE = 10;
+/** The Requests page's smallest page: the card stays short on a page of cards. */
+const DEFAULT_PAGE_SIZE = PAGE_SIZES[0];
+const DEFAULT_SORT: UserRequestSort = "time";
 
-function Muted(): JSX.Element {
-  return <span className="text-muted-foreground">{EMPTY}</span>;
+/** The Requests toolbar's status: undefined is All. */
+type Status = "success" | "failed" | undefined;
+
+/** What a key holder sees, as the shared Requests pieces take it: no account, key or message. */
+const HOLDER_VIEW = { accounts: false, messages: false } as const;
+
+function isUserSort(value: string): value is UserRequestSort {
+  return (USER_REQUEST_SORTS as readonly string[]).includes(value);
 }
 
-function rowId(row: UserRequest, index: number): string {
+/**
+ * A holder's row in the admin row type; the fields a holder never gets are empty, and the
+ * columns are told not to show them (HOLDER_VIEW).
+ */
+function toRecord(row: UserRequest): RequestRecord {
+  return {
+    ts: row.ts,
+    accountId: "",
+    apiKeyId: "",
+    apiKeyMasked: "",
+    email: "",
+    model: row.model,
+    inTokens: row.inTokens,
+    outTokens: row.outTokens,
+    totalTokens: row.totalTokens,
+    cacheReadTokens: row.cacheReadTokens,
+    cacheWriteTokens: row.cacheWriteTokens,
+    credits: row.credits,
+    success: row.success,
+    status: row.status,
+    message: "",
+    endpoint: row.endpoint || undefined,
+    durationMs: row.durationMs,
+    errorType: row.errorType || undefined,
+    requestId: row.requestId || undefined,
+  };
+}
+
+function rowId(record: RequestRecord, index: number): string {
   // The server sends no log row ID (its gaps would show other keys' traffic); the request ID,
   // else the time and place, tells rows apart.
-  return row.requestId || `${row.ts}-${index}`;
-}
-
-/** Time over date, as the Requests table; `inline` puts both on one line (a card's title). */
-function TimeCell({ ts, lang, inline = false }: { ts: number; lang: Lang; inline?: boolean }) {
-  //! A row without a time read as midnight on 1 January 1970; it is a dash.
-  if (!ts) return <Muted />;
-  const dateTime = unixToDate(ts).toISOString();
-  if (inline) {
-    return (
-      <time className="tabular-nums" dateTime={dateTime}>
-        {formatTime(ts, lang)}{" "}
-        <span className="font-normal text-muted-foreground">{formatRowDate(ts, lang)}</span>
-      </time>
-    );
-  }
-  return (
-    <time className="flex flex-col gap-1 tabular-nums" dateTime={dateTime}>
-      <span>{formatTime(ts, lang)}</span>
-      <span className="text-meta text-muted-foreground">{formatRowDate(ts, lang)}</span>
-    </time>
-  );
+  return record.requestId ?? `${record.ts}-${index}`;
 }
 
 /**
- * The Requests table's status: a success is quiet (a green dot and a muted label), a failure is
- * the red pill with the HTTP status, its error category under it.
- */
-function StatusCell({ row, stacked = true }: { row: UserRequest; stacked?: boolean }) {
-  const { t } = useT("user-panel");
-  if (row.success) {
-    return (
-      <span className="inline-flex h-6 shrink-0 items-center gap-2 font-medium text-muted-foreground text-xs">
-        <StatusDot tone="success" />
-        {t("requests.success")}
-      </span>
-    );
-  }
-  const badge = (
-    <Badge icon={CircleXIcon} tone="destructive">
-      {t("requests.failed")}
-      {row.status ? ` ${row.status}` : ""}
-    </Badge>
-  );
-  if (!stacked) return badge;
-  return (
-    <span className="flex flex-col items-start gap-1">
-      {badge}
-      <ErrorTypeLabel
-        className="max-w-36 text-meta text-muted-foreground"
-        type={row.errorType || undefined}
-      />
-    </span>
-  );
-}
-
-/** Model over endpoint, as the Requests table below its widest step. */
-function ModelCell({ row }: { row: UserRequest }): JSX.Element {
-  const { t } = useT("requests");
-  const endpoint = endpointLabel(row.endpoint || undefined, t);
-  return (
-    <span className="flex min-w-0 flex-col items-start gap-1">
-      {/* Wraps rather than cuts: a hover tooltip is out of reach by keyboard and touch. */}
-      {row.model ? <span className="whitespace-normal wrap-anywhere">{row.model}</span> : <Muted />}
-      {endpoint === EMPTY ? null : (
-        <span className="text-meta text-muted-foreground">{endpoint}</span>
-      )}
-    </span>
-  );
-}
-
-/** A request as a list row on a narrow card: time and status, the model, then the figures. */
-function RequestRow({ row }: { row: UserRequest }): JSX.Element {
-  const { t, lang } = useT("user-panel");
-  const { t: tr } = useT("requests");
-  const endpoint = endpointLabel(row.endpoint || undefined, tr);
-  const failed = !row.success;
-  const total = row.inTokens + row.outTokens;
-  const duration = formatDurationMs(row.durationMs, Boolean(row.endpoint), lang);
-  const figures = [
-    failed && total === 0
-      ? null
-      : t("requests.cardTokens", { count: total, value: formatCompact(total, lang) }),
-    failed && row.credits === 0
-      ? null
-      : t("requests.cardCredits", { value: formatCredits(row.credits, 2, lang) }),
-    duration === EMPTY ? null : duration,
-  ].filter((part): part is string => part !== null);
-  return (
-    <ListCard
-      badge={<StatusCell row={row} stacked={false} />}
-      title={<TimeCell inline lang={lang} ts={row.ts} />}
-      variant="row"
-    >
-      <div className="flex min-w-0 items-baseline gap-2 text-sm">
-        {row.model ? <span className="min-w-0 wrap-anywhere">{row.model}</span> : <Muted />}
-        {endpoint === EMPTY ? null : (
-          <span className="shrink-0 text-meta text-muted-foreground">{endpoint}</span>
-        )}
-      </div>
-      {figures.length > 0 ? (
-        // Breaks only between figures, so a long one never splits from its unit.
-        <p className="text-meta text-muted-foreground tabular-nums">
-          {figures.map((figure, index) => (
-            <Fragment key={figure}>
-              {index > 0 ? " · " : null}
-              <span className="whitespace-nowrap">{figure}</span>
-            </Fragment>
-          ))}
-        </p>
-      ) : null}
-      {failed && row.errorType ? (
-        <ErrorTypeLabel className="text-meta" type={row.errorType} />
-      ) : null}
-    </ListCard>
-  );
-}
-
-function useColumns(): DataTableColumn<UserRequest>[] {
-  const { t, lang } = useT("user-panel");
-  return useMemo<DataTableColumn<UserRequest>[]>(
-    () => [
-      {
-        id: "time",
-        header: t("requests.time"),
-        width: "6.5rem",
-        cell: (row) => <TimeCell lang={lang} ts={row.ts} />,
-      },
-      {
-        id: "status",
-        header: t("requests.status"),
-        width: "10rem",
-        cell: (row) => <StatusCell row={row} />,
-      },
-      {
-        id: "model",
-        header: t("requests.model"),
-        // Takes the width the figures leave, so the token column hugs its two lines.
-        className: "w-full",
-        headerClassName: "w-full",
-        cell: (row) => <ModelCell row={row} />,
-      },
-      {
-        id: "tokens",
-        header: t("requests.tokens"),
-        cell: (row) => (
-          <TokenCell
-            cacheReadTokens={row.cacheReadTokens}
-            cacheWriteTokens={row.cacheWriteTokens}
-            inTokens={row.inTokens}
-            muteZero={!row.success}
-            outTokens={row.outTokens}
-          />
-        ),
-      },
-      {
-        id: "credits",
-        header: t("requests.credits"),
-        align: "end",
-        width: "6rem",
-        cell: (row) =>
-          !row.success && row.credits === 0 ? <Muted /> : <CreditAmount value={row.credits} />,
-      },
-      {
-        id: "duration",
-        header: t("requests.duration"),
-        align: "end",
-        width: "6.5rem",
-        cell: (row) => (
-          <span className="tabular-nums">
-            {formatDurationMs(row.durationMs, Boolean(row.endpoint), lang)}
-          </span>
-        ),
-      },
-    ],
-    [t, lang],
-  );
-}
-
-/**
- * The key's own requests, newest first, in the Requests page's table: status tabs (All,
- * Succeeded, Failed), the rows (time, status, model, tokens, credits, duration; a row per request
- * below a 42rem card), and the pager with the page size in the footer.
+ * The key's own requests, composed as the Requests page composes them: DataTableCard with the
+ * Requests toolbar (status tabs with counts, sort, Rows; no search), the Requests columns
+ * without Account, API key and error messages (a row per request below a 42rem card), and the
+ * pager under the card. Rows open nothing: the detail sheet shows accounts and attempts.
  */
 export function RecentRequestsCard(): JSX.Element {
-  const { t, lang } = useT("user-panel");
-  const [status, setStatus] = useState<UserRequestStatus>("all");
+  const { t } = useT("user-panel");
+  const { t: tr } = useT("requests");
+  const headingId = useId();
+  const [status, setStatus] = useState<Status>(undefined);
+  const [sort, setSort] = useState<UserRequestSort>(DEFAULT_SORT);
+  const [desc, setDesc] = useState(defaultSortDesc(DEFAULT_SORT));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const query = useQuery({
-    ...userRequestsQuery({ page, pageSize, status }),
+    ...userRequestsQuery({
+      page,
+      pageSize,
+      status: status === "failed" ? "error" : (status ?? "all"),
+      sort,
+      order: desc ? "desc" : "asc",
+    }),
     placeholderData: keepPreviousData,
   });
-  const columns = useColumns();
-  const data = query.data;
-  const rows = data?.requests ?? [];
-  const total = data?.total ?? 0;
+  const columns = useRequestColumns(HOLDER_VIEW);
+
+  const { data, error, isError } = query;
+  const hasData = data !== undefined;
+  const rows = useMemo(() => (data?.requests ?? []).map(toRecord), [data]);
+  // The server echoes the normalized paging values; they win over the local state.
   const shownPage = data?.page ?? page;
   const shownSize = data?.pageSize ?? pageSize;
-  const outOfRange = data !== undefined && rows.length === 0 && total > 0 && shownPage > 1;
-  const filtered = status !== "all";
+  const total = data?.total ?? 0;
+  const filtered = status !== undefined;
+  const outOfRange = hasData && rows.length === 0 && total > 0 && shownPage > 1;
+  const counts = data?.counts
+    ? { success: data.counts.succeeded, failed: data.counts.failed }
+    : undefined;
 
-  const tabs = [
-    { value: "all", label: t("requests.all"), icon: ListChecksIcon },
-    { value: "success", label: t("requests.success"), icon: CircleCheckIcon },
-    { value: "error", label: t("requests.failed"), icon: CircleXIcon },
-  ] as const;
+  const changeSort = (next: string, nextDesc: boolean) => {
+    if (!isUserSort(next)) return;
+    setSort(next);
+    setDesc(nextDesc);
+    setPage(1);
+  };
+  const clearFilters = () => {
+    setStatus(undefined);
+    setPage(1);
+  };
+  const tableSort: DataTableSort = { id: sort, desc };
 
   let emptyState: JSX.Element;
   if (outOfRange) {
@@ -260,12 +126,12 @@ export function RecentRequestsCard(): JSX.Element {
       <EmptyState
         action={
           <Button onClick={() => setPage(1)} size="sm" variant="secondary">
-            {t("requests.firstPage")}
+            {tr("outOfRange.action")}
           </Button>
         }
-        description={t("requests.outOfRangeBody")}
+        description={tr("outOfRange.body")}
         icon={InboxIcon}
-        title={t("requests.outOfRangeTitle")}
+        title={tr("outOfRange.title")}
         variant="compact"
       />
     );
@@ -273,19 +139,13 @@ export function RecentRequestsCard(): JSX.Element {
     emptyState = (
       <EmptyState
         action={
-          <Button
-            onClick={() => {
-              setStatus("all");
-              setPage(1);
-            }}
-            size="sm"
-            variant="secondary"
-          >
-            {t("requests.showAll")}
+          <Button onClick={clearFilters} size="sm" variant="secondary">
+            {tr("common:actions.clearFilters")}
           </Button>
         }
+        // No "change the search" body: a holder has only the status tabs.
         icon={SearchXIcon}
-        title={t(status === "success" ? "requests.noSucceeded" : "requests.noFailed")}
+        title={tr("common:state.noMatches")}
         variant="compact"
       />
     );
@@ -300,81 +160,90 @@ export function RecentRequestsCard(): JSX.Element {
     );
   }
 
-  const fatalError = query.isError && !data;
-  // As on the Requests page: nothing to page or resize while the list fits the smallest page.
-  const showTabs = data === undefined || total > 0 || filtered;
-  const showPager = data !== undefined && total > PAGE_SIZES[0] && !outOfRange;
+  const fatalError = isError && !hasData;
+  // The status filter can't narrow an empty log, so it waits for the first request.
+  const showFilters = !hasData || total > 0 || filtered;
+  // Nothing to page through when the list fits the smallest page, is out of range or failed.
+  const showPager = hasData && total > PAGE_SIZES[0] && !outOfRange && !fatalError;
 
   return (
-    <SectionCard
-      // Clips the last row's hover tint to the card's rounded corners.
-      className="overflow-hidden"
-      description={t("requests.description")}
-      descriptionVariant="inline"
-      footer={
-        showPager ? (
-          <DataTablePagination
-            onPageChange={setPage}
-            onPageSizeChange={(next) => {
-              setPageSize(next);
-              setPage(1);
-            }}
-            page={shownPage}
-            pageSize={shownSize}
-            pageSizeOptions={[...PAGE_SIZES]}
-            total={total}
-          />
-        ) : undefined
-      }
-      icon={ListChecksIcon}
+    <section
+      aria-labelledby={headingId}
+      className="flex min-w-0 scroll-mt-20 flex-col gap-4"
       id="user-requests"
-      meta={data ? t("requests.count", { count: total, n: formatNumber(total, lang) }) : undefined}
-      slim
-      title={t("requests.title")}
     >
-      {/* The Requests page's status tabs; the page size sits with the pager in the footer. Like
-          there, they wait for the first request: a filter cannot narrow an empty list. */}
-      {showTabs ? (
-        <div className="min-w-0 px-4 py-3 sm:px-6" data-slot="requests-toolbar">
-          <StatusTabs<UserRequestStatus>
-            label={t("requests.filter")}
-            loading={false}
-            onValueChange={(next) => {
-              setStatus(next);
-              setPage(1);
-            }}
-            tabs={tabs}
-            value={status}
-          />
-        </div>
-      ) : null}
-      <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h2 className="font-semibold text-heading leading-6" id={headingId}>
+          {t("requests.title")}
+        </h2>
+        <p className="text-muted-foreground text-sm">{t("requests.description")}</p>
+      </div>
+      {/* The container the toolbar and column widths respond to. */}
+      <DataTableCard
+        className="@container/requests"
+        toolbar={
+          showFilters ? (
+            <RequestsToolbar
+              counts={counts}
+              countsLoading={!hasData && query.isPending}
+              desc={desc}
+              onPageSizeChange={(next) => {
+                if ((PAGE_SIZES as readonly number[]).includes(next)) {
+                  setPageSize(next);
+                  setPage(1);
+                }
+              }}
+              onSortChange={changeSort}
+              onStatusChange={(next) => {
+                setStatus(next);
+                setPage(1);
+              }}
+              pageSize={shownSize}
+              searchable={false}
+              sort={sort}
+              sorts={USER_REQUEST_SORTS}
+              status={status}
+            />
+          ) : undefined
+        }
+      >
         {fatalError ? (
           <ErrorState
-            error={query.error}
+            error={error}
             onRetry={() => void query.refetch()}
             retrying={query.isFetching}
-            title={t("requests.loadFailed")}
+            title={tr("loadError")}
           />
         ) : (
           <div className={cn("transition-opacity", query.isPlaceholderData && "opacity-60")}>
-            <DataTable<UserRequest>
+            <DataTable<RequestRecord>
               caption={t("requests.caption")}
               cardLayout="divided"
               cardsBelow="2xl"
               columns={columns}
               data={rows}
+              defaultSortDesc={defaultSortDesc}
               emptyState={emptyState}
               filtered={filtered}
               getRowId={rowId}
-              inset
-              loading={!data && query.isPending}
+              loading={!hasData && query.isPending}
+              onSortChange={(next) => changeSort(next.id, next.desc)}
               pageSize={shownSize}
-              renderCard={(row) => <RequestRow row={row} />}
+              renderCard={(row) => <RequestCard record={row} {...HOLDER_VIEW} />}
+              sort={tableSort}
             />
           </div>
         )}
-      </div>
-    </SectionCard>
+      </DataTableCard>
+      {/* The pager sits under the card, as on Requests; the page size is the toolbar's Rows. */}
+      {showPager ? (
+        <DataTablePagination
+          onPageChange={setPage}
+          page={shownPage}
+          pageSize={shownSize}
+          total={total}
+        />
+      ) : null}
+    </section>
   );
 }

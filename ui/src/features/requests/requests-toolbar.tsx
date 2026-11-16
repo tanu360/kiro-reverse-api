@@ -40,40 +40,50 @@ const SORT_LABEL_KEYS: Record<RequestSort, string> = {
 };
 
 interface RequestsToolbarProps {
+  /**
+   * The search box, the Clear button and the "34 of 11,412" count (default true). Off for a key
+   * holder's own requests (the user panel): their API has no search.
+   */
+  searchable?: boolean;
   /** The search in effect (the page holds it, never the URL). */
-  search: string;
+  search?: string;
   status: StatusValue;
   /** Called with the trimmed text 250 ms after the viewer stops typing. */
-  onSearchChange: (search: string) => void;
+  onSearchChange?: (search: string) => void;
   onStatusChange: (status: StatusValue) => void;
   /** Requests per status in the whole log; undefined while they load or when they failed. */
   counts: RequestCounts | undefined;
   countsLoading: boolean;
   sort: RequestSort;
+  /** The sorts "Sort by" offers (default all of them); a key holder's leave out the account ones. */
+  sorts?: readonly RequestSort[];
   desc: boolean;
   /** Mirrors a click on a column header. */
   onSortChange: (sort: RequestSort, desc: boolean) => void;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   /** Requests the search matches in the current tab, for "34 of 11,412"; undefined until loaded. */
-  shown: number | undefined;
+  shown?: number;
   /** Clears the search and the status tab. */
-  onClear: () => void;
+  onClear?: () => void;
 }
 
 /**
  * The Accounts toolbar's layout: status tabs (All, Succeeded, Failed, with counts), then a row
  * with the search (a row of its own below a 64rem card), "Sort by", Clear, the result count and
- * "Rows" at the end. It lives in DataTableCard's toolbar slot.
+ * "Rows" at the end. It lives in DataTableCard's toolbar slot. Without `searchable` (a key
+ * holder's own requests) the row holds only "Sort by" and "Rows".
  */
 export function RequestsToolbar({
-  search,
+  searchable = true,
+  search = "",
   status,
   onSearchChange,
   onStatusChange,
   counts,
   countsLoading,
   sort,
+  sorts = REQUEST_SORTS,
   desc,
   onSortChange,
   pageSize,
@@ -98,7 +108,7 @@ export function RequestsToolbar({
   useEffect(() => {
     const trimmed = text.trim();
     if (trimmed === latest.current.search) return;
-    const timer = setTimeout(() => latest.current.onSearchChange(trimmed), SEARCH_DEBOUNCE_MS);
+    const timer = setTimeout(() => latest.current.onSearchChange?.(trimmed), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [text]);
 
@@ -109,12 +119,12 @@ export function RequestsToolbar({
     { value: "failed", label: t("fail"), count: counts?.failed, icon: CircleXIcon },
   ] as const;
   const tabTotal = status ? counts?.[status] : all;
-  const sortOptions = REQUEST_SORTS.map((column) => ({
+  const sortOptions = sorts.map((column) => ({
     value: column,
     label: t(SORT_LABEL_KEYS[column]),
   }));
   // A status tab on its own is not a refinement: its badge already gives the count.
-  const refined = Boolean(search);
+  const refined = searchable && Boolean(search);
   const placeholder =
     width > 0 && width < SHORT_PLACEHOLDER_BELOW
       ? t("searchPlaceholderShort")
@@ -135,51 +145,53 @@ export function RequestsToolbar({
 
       {/* Below a 64rem card the search has a row of its own and the controls follow under it. */}
       <div className="flex min-w-0 flex-wrap items-center gap-2" ref={rowRef}>
-        <InputGroup className="@5xl/requests:w-96">
-          <InputGroupAddon>
-            <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-label={t("search")}
-            autoComplete="off"
-            onChange={(event) => setText(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && text) {
-                event.preventDefault();
-                setText("");
-              }
-            }}
-            placeholder={placeholder}
-            ref={inputRef}
-            spellCheck={false}
-            type="search"
-            value={text}
-          />
-          {/*
-            One trailing control at a time: the clear X takes the hint's slot while there is text,
-            so it sits at the field's edge and the two touch targets never overlap.
-          */}
-          <InputGroupAddon align="inline-end">
-            {text ? (
-              <Button
-                aria-label={t("clearSearch")}
-                onClick={() => {
+        {searchable ? (
+          <InputGroup className="@5xl/requests:w-96">
+            <InputGroupAddon>
+              <HugeiconsIcon icon={Search01Icon} aria-hidden="true" />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label={t("search")}
+              autoComplete="off"
+              onChange={(event) => setText(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && text) {
+                  event.preventDefault();
                   setText("");
-                  inputRef.current?.focus();
-                }}
-                size="icon-xs"
-                variant="quiet"
-              >
-                <HugeiconsIcon icon={XIcon} aria-hidden="true" />
-              </Button>
-            ) : (
-              // Opens on hover, click and tap; the label is for screen readers only.
-              <InfoHint className="gap-0" hint={t("searchHint")}>
-                <span className="sr-only">{t("searchHintLabel")}</span>
-              </InfoHint>
-            )}
-          </InputGroupAddon>
-        </InputGroup>
+                }
+              }}
+              placeholder={placeholder}
+              ref={inputRef}
+              spellCheck={false}
+              type="search"
+              value={text}
+            />
+            {/*
+              One trailing control at a time: the clear X takes the hint's slot while there is
+              text, so it sits at the field's edge and the two touch targets never overlap.
+            */}
+            <InputGroupAddon align="inline-end">
+              {text ? (
+                <Button
+                  aria-label={t("clearSearch")}
+                  onClick={() => {
+                    setText("");
+                    inputRef.current?.focus();
+                  }}
+                  size="icon-xs"
+                  variant="quiet"
+                >
+                  <HugeiconsIcon icon={XIcon} aria-hidden="true" />
+                </Button>
+              ) : (
+                // Opens on hover, click and tap; the label is for screen readers only.
+                <InfoHint className="gap-0" hint={t("searchHint")}>
+                  <span className="sr-only">{t("searchHintLabel")}</span>
+                </InfoHint>
+              )}
+            </InputGroupAddon>
+          </InputGroup>
+        ) : null}
 
         <SortSelect
           defaultSortDesc={defaultSortDesc}
@@ -191,7 +203,7 @@ export function RequestsToolbar({
           sort={sort}
         />
 
-        {refined ? (
+        {refined && onClear ? (
           <Button
             aria-label={tc("actions.clearFilters")}
             onClick={onClear}

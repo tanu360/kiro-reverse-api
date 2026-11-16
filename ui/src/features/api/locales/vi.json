@@ -211,6 +211,8 @@
   "endpoints.copyStats": "Sao chép endpoint thống kê",
   "endpoints.authRequired": "Client gửi API key qua {bearer} hoặc {xApiKey}. Dùng key từ trang này, không dùng mật khẩu quản trị.",
   "endpoints.authOptional": "Hiện không bắt buộc API key nên client không cần key. Khi bạn bắt buộc, client gửi key qua {bearer} hoặc {xApiKey}, không dùng mật khẩu quản trị.",
+  "endpoints.holderAuthRequired": "Gửi API key của bạn qua {bearer} hoặc {xApiKey}.",
+  "endpoints.holderAuthOptional": "Gửi API key của bạn qua {bearer} hoặc {xApiKey}. Địa chỉ riêng của máy chủ này hiện không yêu cầu key, nhưng các lệnh gọi không có key sẽ không được tính ở đây.",
   "snippets.title": "Thiết lập client",
   "snippets.description": "Ví dụ cho proxy này. Trước tiên đặt {env} thành một API key của bạn.",
   "snippets.anyKeyWorks": "Hiện không bắt buộc API key nên giá trị nào cũng được.",

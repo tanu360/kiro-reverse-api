@@ -220,6 +220,8 @@
   "endpoints.copyStats": "Copy statistics endpoint",
   "endpoints.authRequired": "Clients send an API key as {bearer} or {xApiKey}. Use a key from this page, not the admin password.",
   "endpoints.authOptional": "API keys are not required now, so clients need no key. When you require one, clients send it as {bearer} or {xApiKey}, not the admin password.",
+  "endpoints.holderAuthRequired": "Send your API key as {bearer} or {xApiKey}.",
+  "endpoints.holderAuthOptional": "Send your API key as {bearer} or {xApiKey}. This server's own address doesn't ask for one now, but calls without it don't count here.",
   "snippets.title": "Client setup",
   "snippets.description": "Examples for this proxy. Set {env} to one of your API keys first.",
   "snippets.anyKeyWorks": "API keys are not required now, so any value works.",

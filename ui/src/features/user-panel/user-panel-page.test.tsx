@@ -68,10 +68,14 @@ function request(index: number): UserRequest {
   };
 }
 
-/** GET /user/api/requests over 23 requests (every fifth failed); records each query. */
+/**
+ * GET /user/api/requests over 23 requests (every fifth failed), sorted by time or model, with
+ * the counts per status; records each query.
+ */
 function serveRequests(): URLSearchParams[] {
   const seen: URLSearchParams[] = [];
   const all = Array.from({ length: 23 }, (_, index) => request(index));
+  const failed = all.filter((row) => !row.success).length;
   mockServer.use(
     http.get(`${USER_API_BASE}/requests`, ({ request: req }) => {
       const params = new URL(req.url).searchParams;
@@ -79,17 +83,26 @@ function serveRequests(): URLSearchParams[] {
       const status = params.get("status");
       const page = Number(params.get("page"));
       const pageSize = Number(params.get("pageSize"));
-      const rows =
+      const sort = params.get("sort") === "model" ? "model" : "time";
+      const order = params.get("order") === "asc" ? "asc" : "desc";
+      const rows = (
         status === "error"
           ? all.filter((row) => !row.success)
           : status === "success"
             ? all.filter((row) => row.success)
-            : all;
+            : all
+      ).toSorted((a, b) => {
+        const compare = sort === "model" ? a.model.localeCompare(b.model) : a.ts - b.ts;
+        return order === "asc" ? compare : -compare;
+      });
       return HttpResponse.json({
         requests: rows.slice((page - 1) * pageSize, page * pageSize),
         total: rows.length,
         page,
         pageSize,
+        sort,
+        order,
+        counts: { all: all.length, succeeded: all.length - failed, failed },
       });
     }),
   );
@@ -184,11 +197,58 @@ describe("/user", () => {
     expect(within(details).getByText("60/min")).toBeInTheDocument();
     expect(within(details).getByText(/claude-sonnet-4\.5.+claude-opus-4\.8/)).toBeInTheDocument();
     expect(within(details).getByText("Never")).toBeInTheDocument();
-    // A key limited to models asks for the first of them in the example request.
-    const example = screen.getByRole("region", { name: "Example request" });
-    const code = example.querySelector("pre")?.textContent ?? "";
+    // A key limited to models asks for the first of them in the client setup request.
+    const setup = screen.getByRole("region", { name: "Client setup" });
+    const code = setup.querySelector("pre")?.textContent ?? "";
     expect(code).toContain('"model": "claude-sonnet-4.5"');
-    expect(code).toContain('-H "x-api-key: YOUR_API_KEY"');
+    expect(code).toContain('-H "x-api-key: $KIRO_API_KEY"');
+  });
+
+  it("shows the admin Endpoints and Client setup cards with the key's own Require API key", async () => {
+    await signIn();
+    const { user } = await renderPanel();
+    const list = screen.getByRole("list", { name: "Endpoints" });
+    const origin = window.location.origin;
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector('[data-slot="endpoint-url"]')?.textContent),
+    ).toEqual([
+      `${origin}/v1/messages`,
+      `${origin}/v1/messages/count_tokens`,
+      `${origin}/v1/chat/completions`,
+      `${origin}/v1/responses`,
+      `${origin}/v1/models`,
+      `${origin}/v1/codex/models`,
+      `${origin}/v1/stats`,
+    ]);
+    // The hint speaks to the key holder: no "this page" keys, no admin password.
+    expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
+      /^Send your API key as Authorization: Bearer <key> or X-Api-Key: <key>\.$/,
+    );
+    const setup = screen.getByRole("region", { name: "Client setup" });
+    expect(within(setup).queryByRole("note")).not.toBeInTheDocument();
+    await user.click(within(setup).getByRole("tab", { name: "Codex" }));
+    expect(within(setup).getByRole("tabpanel", { name: "Codex" })).toHaveTextContent(
+      `base_url = "${origin}/v1"`,
+    );
+    await requestsTable();
+    expect(adminCalls).toEqual([]);
+  });
+
+  it("says in both cards that this server takes calls without a key when keys are not required", async () => {
+    mockDb.settings.requireApiKey = false;
+    await signIn();
+    await renderPanel();
+    expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
+      "This server's own address doesn't ask for one now, but calls without it don't count here.",
+    );
+    const setup = screen.getByRole("region", { name: "Client setup" });
+    expect(within(setup).getByRole("note")).toHaveTextContent(
+      "API keys are not required now, so any value works.",
+    );
+    await requestsTable();
+    expect(adminCalls).toEqual([]);
   });
 
   it("reads All models for a key without a model list", async () => {
@@ -198,13 +258,42 @@ describe("/user", () => {
     expect(within(details).getByText("All models")).toBeInTheDocument();
   });
 
+  it("shows the Requests table's columns and tabs with counts, without accounts, keys or search", async () => {
+    serveRequests();
+    await signIn();
+    await renderPanel();
+    const table = await requestsTable();
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent);
+    expect(headers).toEqual([
+      "Time",
+      "Status",
+      "Endpoint",
+      "Model",
+      "Tokens",
+      "Credits",
+      "Duration",
+      "Error",
+    ]);
+    const tabs = within(screen.getByRole("tablist", { name: "Status" }));
+    expect(tabs.getByRole("tab", { name: /^All/ })).toHaveTextContent("All23");
+    expect(tabs.getByRole("tab", { name: /^Succeeded/ })).toHaveTextContent("Succeeded19");
+    expect(tabs.getByRole("tab", { name: /^Failed/ })).toHaveTextContent("Failed4");
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    // Rows open nothing: the detail sheet shows accounts, attempts and the conversation.
+    for (const row of bodyRows(table)) expect(row).not.toHaveAttribute("tabindex");
+    expect(screen.queryByRole("button", { name: /^Open details/ })).not.toBeInTheDocument();
+  });
+
   it("filters the requests by status and pages through them", async () => {
     const seen = serveRequests();
     await signIn();
     const { user } = await renderPanel();
     const table = await requestsTable();
     expect(bodyRows(table)).toHaveLength(10);
-    expect(within(table).getByText("1h 15m")).toBeInTheDocument();
+    // In the Duration column, and under the credits below a 64rem card.
+    expect(within(table).getAllByText("1h 15m")).toHaveLength(2);
     expect(screen.getByText("1–10 of 23")).toBeInTheDocument();
     expect(seen.at(-1)?.get("status")).toBe("all");
 
@@ -213,20 +302,61 @@ describe("/user", () => {
     expect(seen.at(-1)?.get("page")).toBe("2");
 
     // A new filter starts on page 1.
-    await user.click(screen.getByRole("tab", { name: "Failed" }));
+    await user.click(screen.getByRole("tab", { name: /^Failed/ }));
     await waitFor(() => expect(bodyRows(table)).toHaveLength(4));
     expect(seen.at(-1)?.get("status")).toBe("error");
     expect(seen.at(-1)?.get("page")).toBe("1");
     for (const row of bodyRows(table)) {
       expect(within(row).getByText("Failed 429")).toBeInTheDocument();
-      expect(within(row).getByText("Rate limited")).toBeInTheDocument();
+      // Under the status below a 64rem card, in the Error column above it; never a message.
+      expect(within(row).getAllByText("Rate limited")).toHaveLength(2);
     }
     // Four requests fit one page: no pager.
     expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "Succeeded" }));
+    await user.click(screen.getByRole("tab", { name: /^Succeeded/ }));
     await waitFor(() => expect(seen.at(-1)?.get("status")).toBe("success"));
     await waitFor(() => expect(screen.getByText("1–10 of 19")).toBeInTheDocument());
+  });
+
+  it("sorts on the server from a header or Sort by, offering no account sorts", async () => {
+    const seen = serveRequests();
+    await signIn();
+    const { user } = await renderPanel();
+    const table = await requestsTable();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(seen.at(-1)?.get("page")).toBe("2"));
+
+    // A new sort starts on page 1, ascending except by time.
+    await user.click(within(table).getByRole("button", { name: "Model" }));
+    await waitFor(() => expect(seen.at(-1)?.get("sort")).toBe("model"));
+    expect(seen.at(-1)?.get("order")).toBe("asc");
+    expect(seen.at(-1)?.get("page")).toBe("1");
+    await waitFor(() => expect(bodyRows(table)[0]).toHaveTextContent("claude-failing"));
+    await user.click(within(table).getByRole("button", { name: "Model" }));
+    await waitFor(() => expect(seen.at(-1)?.get("order")).toBe("desc"));
+
+    await user.click(screen.getByRole("button", { name: "Sort by: Model" }));
+    const options = (await screen.findAllByRole("menuitemradio")).map((item) => item.textContent);
+    expect(options).toEqual([
+      "Time",
+      "Status",
+      "Model",
+      "Tokens",
+      "Credits",
+      "Duration",
+      "Ascending",
+      "Descending",
+    ]);
+    await user.click(screen.getByRole("menuitemradio", { name: "Tokens" }));
+    await waitFor(() => expect(seen.at(-1)?.get("sort")).toBe("tokens"));
+    expect(seen.at(-1)?.get("order")).toBe("asc");
+    expect(screen.getByRole("button", { name: "Sort by: Tokens" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Rows: 10" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "25" }));
+    await waitFor(() => expect(seen.at(-1)?.get("pageSize")).toBe("25"));
+    await waitFor(() => expect(bodyRows(table)).toHaveLength(23));
   });
 
   it("says when a filter has no requests and offers all of them", async () => {
@@ -240,10 +370,11 @@ describe("/user", () => {
     await signIn();
     const { user } = await renderPanel();
     await requestsTable();
-    await user.click(screen.getByRole("tab", { name: "Failed" }));
-    await user.click(await screen.findByRole("button", { name: "Show all requests" }));
+    await user.click(screen.getByRole("tab", { name: /^Failed/ }));
+    expect(await screen.findByText("No matches")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true"),
+      expect(screen.getByRole("tab", { name: /^All/ })).toHaveAttribute("aria-selected", "true"),
     );
   });
 

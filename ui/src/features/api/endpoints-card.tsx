@@ -98,11 +98,28 @@ const ENDPOINTS: readonly Endpoint[] = [
  * Beside a taller Client setup card (xl) the rows share the spare height, so the list fills the
  * card down to the auth hint instead of leaving a gap above it.
  */
-export function EndpointsCard(): JSX.Element {
+export function EndpointsCard({
+  requireApiKey,
+}: {
+  /**
+   * The server's "Require API key", from a page that may not call /admin/api (the key holder's
+   * /user): given, the card skips the settings query, and the key hint speaks to the key holder,
+   * since the admin one points at this page's keys and the admin password.
+   */
+  requireApiKey?: boolean;
+} = {}): JSX.Element {
   const { t } = useT("api");
-  const settings = useQuery(settingsQuery());
+  const keyHolder = requireApiKey !== undefined;
+  const settings = useQuery({ ...settingsQuery(), enabled: !keyHolder });
   const origin = window.location.origin;
-  const required = settings.data?.requireApiKey ?? false;
+  const required = requireApiKey ?? settings.data?.requireApiKey ?? false;
+  const authHint = keyHolder
+    ? required
+      ? t("endpoints.holderAuthRequired")
+      : t("endpoints.holderAuthOptional")
+    : required
+      ? t("endpoints.authRequired")
+      : t("endpoints.authOptional");
 
   return (
     <SectionCard
@@ -117,7 +134,7 @@ export function EndpointsCard(): JSX.Element {
           <span data-testid="endpoints-auth-hint">
             <CodeText
               code={{ bearer: "Authorization: Bearer <key>", xApiKey: "X-Api-Key: <key>" }}
-              text={required ? t("endpoints.authRequired") : t("endpoints.authOptional")}
+              text={authHint}
             />
           </span>
         </p>
@@ -153,11 +170,10 @@ export function EndpointsCard(): JSX.Element {
 }
 
 /**
- * One row of an endpoint list (this card and the key holder's Connect card): the icon chip, the
- * name with its URL under it, the method and a copy button. A row without a path is the base URL:
- * its host is the whole value, so it is not muted, and it has no method.
+ * One row of the endpoint list: the icon chip, the name with its URL under it, the method and a
+ * copy button.
  */
-export function EndpointRow({
+function EndpointRow({
   id,
   icon,
   title,
@@ -172,8 +188,8 @@ export function EndpointRow({
   title: string;
   origin: string;
   path: string;
-  method?: "POST" | "GET";
-  methodLabel?: string;
+  method: "POST" | "GET";
+  methodLabel: string;
   copyLabel: string;
 }): JSX.Element {
   return (
@@ -186,21 +202,19 @@ export function EndpointRow({
           className="wrap-break-word font-mono text-meta leading-normal"
           data-slot="endpoint-url"
         >
-          <span className={path ? "text-muted-foreground" : "text-foreground"}>{origin}</span>
+          <span className="text-muted-foreground">{origin}</span>
           <wbr />
           <span className="text-foreground">{path}</span>
         </code>
       </div>
-      {method ? (
-        // One width for POST and GET, so the badges line up down the list.
-        <Badge
-          className="min-w-12 shrink-0 justify-center"
-          size="sm"
-          tone={method === "POST" ? "primary" : "neutral"}
-        >
-          {methodLabel}
-        </Badge>
-      ) : null}
+      {/* One width for POST and GET, so the badges line up down the list. */}
+      <Badge
+        className="min-w-12 shrink-0 justify-center"
+        size="sm"
+        tone={method === "POST" ? "primary" : "neutral"}
+      >
+        {methodLabel}
+      </Badge>
       <CopyButton className="-me-1.5 shrink-0" label={copyLabel} value={origin + path} />
     </li>
   );

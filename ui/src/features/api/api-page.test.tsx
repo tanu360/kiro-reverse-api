@@ -8,6 +8,8 @@ import { apiUrl } from "@/lib/mocks/http";
 import { mockServer } from "@/lib/mocks/node";
 import { renderWithProviders } from "@/test/render";
 import { ApiPage } from "./api-page";
+import { ClientSnippetsCard } from "./client-snippets";
+import { EndpointsCard } from "./endpoints-card";
 
 vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn() }));
 
@@ -582,5 +584,63 @@ describe("ApiPage", () => {
     expect(panels.find((panel) => !panel.hasAttribute("data-inactive"))).toHaveTextContent(
       "ANTHROPIC_BASE_URL",
     );
+  });
+});
+
+describe("Endpoints and Client setup given Require API key (the key holder's page)", () => {
+  async function renderCards(requireApiKey: boolean, model?: string) {
+    const result = renderWithProviders(
+      <>
+        <EndpointsCard requireApiKey={requireApiKey} />
+        <ClientSnippetsCard model={model} requireApiKey={requireApiKey} />
+      </>,
+    );
+    await screen.findByRole("list", { name: "Endpoints" });
+    return result;
+  }
+
+  it("reads /admin/api/settings without the prop, as on the admin page", async () => {
+    mockDb.settings.requireApiKey = false;
+    renderWithProviders(
+      <>
+        <EndpointsCard />
+        <ClientSnippetsCard />
+      </>,
+    );
+    expect(await screen.findByRole("note")).toHaveTextContent(
+      "API keys are not required now, so any value works.",
+    );
+    expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
+      /^API keys are not required now, so clients need no key\./,
+    );
+    expect(sent("GET", "/settings").length).toBeGreaterThan(0);
+  });
+
+  it("reads no settings and speaks to the key holder while keys are required", async () => {
+    mockDb.settings.requireApiKey = false;
+    await renderCards(true);
+    expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
+      /^Send your API key as Authorization: Bearer <key> or X-Api-Key: <key>\.$/,
+    );
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(requests.filter((r) => r.path.startsWith("/admin/api"))).toEqual([]);
+  });
+
+  it("says a key is optional on this address, and asks for the given model", async () => {
+    mockDb.settings.requireApiKey = true;
+    const { user } = await renderCards(false, "claude-haiku-4.5");
+    expect(screen.getByTestId("endpoints-auth-hint")).toHaveTextContent(
+      "This server's own address doesn't ask for one now, but calls without it don't count here.",
+    );
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "API keys are not required now, so any value works.",
+    );
+    const request = screen.getByRole("tabpanel", { name: "API request" }).querySelector("pre");
+    expect(request).toHaveTextContent('"model": "claude-haiku-4.5"');
+    await user.click(screen.getByRole("tab", { name: "Codex" }));
+    expect(screen.getByRole("tabpanel", { name: "Codex" })).toHaveTextContent(
+      'model = "claude-haiku-4.5"',
+    );
+    expect(requests.filter((r) => r.path.startsWith("/admin/api"))).toEqual([]);
   });
 });

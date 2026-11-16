@@ -10,6 +10,7 @@ import {
   signInWithKey,
   signOutUser,
   USER_API_BASE,
+  type UserRequest,
 } from "@/lib/api/user-panel";
 import { setSession } from "@/lib/auth/session";
 import { getUserToken, USER_TOKEN_EXP_KEY } from "@/lib/auth/user-session";
@@ -127,6 +128,9 @@ describe("user panel mock", () => {
     const ok = await getUserRequests({ status: "success", pageSize: 100 });
     expect(ok.total + failed.total).toBe(mine.length);
     expect(new Set(ok.requests.map((row) => row.model)).size).toBeGreaterThan(1);
+    // Every tab's answer counts the key's whole log, as the server does.
+    const counts = { all: mine.length, succeeded: ok.total, failed: failed.total };
+    for (const page of [first, failed, ok]) expect(page.counts).toEqual(counts);
   });
 });
 
@@ -189,6 +193,47 @@ describe("user panel mock demo keys", () => {
       const ts = rows.requests.map((row) => row.ts);
       expect(ts).toEqual([...ts].sort((a, b) => b - a));
       expect(JSON.stringify(rows)).not.toMatch(/accountId|demo-account|email|message/);
+    }
+  });
+
+  it("counts each one's status tabs and sorts its log as the server does", async () => {
+    const sorts = {
+      status: (row: UserRequest) => Number(row.success),
+      tokens: (row: UserRequest) => row.totalTokens,
+      credits: (row: UserRequest) => row.credits,
+      duration: (row: UserRequest) => row.durationMs,
+    } as const;
+    for (const { id, key } of DEMO_KEYS) {
+      if (id === "requestsError") continue;
+      await signInWithKey(key, false);
+      const all = await getUserRequests({ pageSize: 100 });
+      const failed = await getUserRequests({ status: "error", pageSize: 1 });
+      const counts = { all: all.total, succeeded: all.total - failed.total, failed: failed.total };
+      expect(all.counts).toEqual(counts);
+      expect(failed.counts).toEqual(counts);
+      for (const [sort, value] of Object.entries(sorts)) {
+        for (const order of ["asc", "desc"] as const) {
+          const page = await getUserRequests({
+            pageSize: 100,
+            sort: sort as keyof typeof sorts,
+            order,
+          });
+          expect([page.sort, page.order, page.total]).toEqual([sort, order, all.total]);
+          const values = page.requests.map(value);
+          const sorted = [...values].sort((a, b) => (order === "asc" ? a - b : b - a));
+          expect(values).toEqual(sorted);
+        }
+      }
+      const models = (
+        await getUserRequests({ pageSize: 100, sort: "model", order: "asc" })
+      ).requests.map((row) => row.model);
+      expect(models).toEqual([...models].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+      // An account sort is not a holder's: the answer is time, newest first.
+      const account = await getUserRequests({ pageSize: 100, sort: "account" as "time" });
+      expect(account.sort).toBe("time");
+      expect(account.requests.map((row) => row.requestId)).toEqual(
+        all.requests.map((row) => row.requestId),
+      );
     }
   });
 

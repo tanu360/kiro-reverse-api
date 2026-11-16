@@ -282,7 +282,10 @@ func TestUserRequestsOnlyOwnKey(t *testing.T) {
 		}
 	}
 	body := userJSON(t, rec)
-	assertKeySet(t, "page", body, "requests", "total", "page", "pageSize")
+	assertKeySet(t, "page", body, "requests", "total", "page", "pageSize", "sort", "order", "counts")
+	if counts := body["counts"].(map[string]any); counts["all"] != float64(2) || counts["succeeded"] != float64(1) || counts["failed"] != float64(1) {
+		t.Fatalf("counts %v, want this key's 2 requests, 1 failed", counts)
+	}
 	rows := body["requests"].([]any)
 	if body["total"] != float64(2) || len(rows) != 2 || body["pageSize"] != float64(25) {
 		t.Fatalf("page %v", body)
@@ -838,6 +841,122 @@ func TestUserRequestsPagingEdges(t *testing.T) {
 	}
 	if p := get(userSignIn(t, h, reused.Key), ""); p.Total != 0 {
 		t.Fatalf("a new key with a deleted key's value reads its rows: %s", ids(p))
+	}
+}
+
+// The status tabs' counts are this key's alone on every tab and page, and the admin sorts a
+// holder may use order the key's rows as on the Requests page; account sorts fall back to time.
+func TestUserRequestsCountsAndSort(t *testing.T) {
+	h := newUserAPITestHandler(t)
+	mine := addUsageKey(t, "mine", "sk-user-sort-mine-0123456789", true)
+	other := addUsageKey(t, "other", "sk-user-sort-other-0123456789", true)
+	d, err := db.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	type row struct {
+		id, keyID, email, model string
+		ts                      int64
+		tokens, durationMs      int
+		credits                 float64
+		success                 bool
+	}
+	rows := []row{
+		{"a", mine.ID, "zed@example.com", "model-b", 1700000003, 300, 900, 0.30, true},
+		{"b", mine.ID, "amy@example.com", "model-c", 1700000001, 100, 2500, 0.10, false},
+		{"c", mine.ID, "kim@example.com", "model-a", 1700000004, 200, 100, 0.20, true},
+		{"d", mine.ID, "bob@example.com", "model-d", 1700000002, 400, 1500, 0.40, true},
+		{"x", other.ID, "aaa@example.com", "model-0", 1700000005, 999, 9999, 9.99, false},
+		{"y", other.ID, "aaa@example.com", "model-0", 1700000006, 999, 9999, 9.99, true},
+		{"legacy", "", "aaa@example.com", "model-0", 1700000007, 999, 9999, 9.99, false},
+	}
+	for _, r := range rows {
+		if _, err := d.Exec(`INSERT INTO requests (ts, account_id, api_key_id, email, model, total_tokens, credits, duration_ms, success, status, request_id) VALUES (?, 'acc', ?, ?, ?, ?, ?, ?, ?, 200, ?)`,
+			r.ts, r.keyID, r.email, r.model, r.tokens, r.credits, r.durationMs, boolInt(r.success), r.id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	token := userSignIn(t, h, mine.Key)
+
+	type page struct {
+		Requests []struct {
+			RequestID string `json:"requestId"`
+		} `json:"requests"`
+		Total  int               `json:"total"`
+		Sort   string            `json:"sort"`
+		Order  string            `json:"order"`
+		Counts userRequestCounts `json:"counts"`
+	}
+	get := func(query string) page {
+		t.Helper()
+		rec := userCall(h, http.MethodGet, "/user/api/requests"+query, token, "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", query, rec.Code, rec.Body.String())
+		}
+		var p page
+		if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	ids := func(p page) string {
+		out := make([]string, len(p.Requests))
+		for i, r := range p.Requests {
+			out[i] = r.RequestID
+		}
+		return strings.Join(out, ",")
+	}
+
+	want := userRequestCounts{All: 4, Succeeded: 3, Failed: 1}
+	for _, query := range []string{"", "?status=success", "?status=error", "?status=bogus", "?page=9&pageSize=1", "?sort=tokens&order=asc", "?status=error&page=3"} {
+		if p := get(query); p.Counts != want {
+			t.Fatalf("%q counts %+v, want %+v", query, p.Counts, want)
+		}
+	}
+
+	for _, c := range []struct {
+		query, sort, order, ids string
+	}{
+		{"", "time", "desc", "c,a,d,b"},
+		{"?order=asc", "time", "asc", "b,d,a,c"},
+		{"?sort=tokens", "tokens", "desc", "d,a,c,b"},
+		{"?sort=tokens&order=asc", "tokens", "asc", "b,c,a,d"},
+		{"?sort=credits&order=asc", "credits", "asc", "b,c,a,d"},
+		{"?sort=duration", "duration", "desc", "b,d,a,c"},
+		{"?sort=model&order=asc", "model", "asc", "c,a,b,d"},
+		{"?sort=status&order=asc", "status", "asc", "b,a,c,d"},
+		{"?sort=STATUS&order=ASC", "status", "asc", "b,a,c,d"},
+		{"?sort=tokens&order=sideways", "tokens", "desc", "d,a,c,b"},
+		{"?sort=tokens&status=success&order=asc", "tokens", "asc", "c,a,d"},
+		// Ordered by account, the rows would show how the accounts' emails sort.
+		{"?sort=account&order=asc", "time", "asc", "b,d,a,c"},
+		{"?sort=api_key", "time", "desc", "c,a,d,b"},
+		{"?sort=bogus", "time", "desc", "c,a,d,b"},
+	} {
+		p := get(c.query)
+		if p.Sort != c.sort || p.Order != c.order || ids(p) != c.ids || p.Total != len(p.Requests) {
+			t.Fatalf("%s: sort %s order %s rows %s, want %s %s %s", c.query, p.Sort, p.Order, ids(p), c.sort, c.order, c.ids)
+		}
+	}
+	// Paging follows the sort: the second page of two holds the rest.
+	if p := get("?sort=tokens&pageSize=2&page=2"); ids(p) != "c,b" || p.Total != 4 {
+		t.Fatalf("sorted page 2: %s", ids(p))
+	}
+
+	// The other key sees only its own rows and counts, whatever it sorts by.
+	otherToken := userSignIn(t, h, other.Key)
+	rec := userCall(h, http.MethodGet, "/user/api/requests?sort=tokens&order=asc", otherToken, "")
+	var p page
+	if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil {
+		t.Fatal(err)
+	}
+	if ids(p) != "x,y" || p.Counts != (userRequestCounts{All: 2, Succeeded: 1, Failed: 1}) {
+		t.Fatalf("other key: rows %s counts %+v", ids(p), p.Counts)
+	}
+	for _, leak := range []string{"@example.com", `"a"`, "model-a", "legacy"} {
+		if strings.Contains(rec.Body.String(), leak) {
+			t.Fatalf("other key's page leaks %q: %s", leak, rec.Body.String())
+		}
 	}
 }
 

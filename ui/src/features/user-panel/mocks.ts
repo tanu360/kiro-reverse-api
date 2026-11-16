@@ -6,11 +6,13 @@ import type {
   ApiKeyUsageTotals,
 } from "@/lib/api/api-key-usage";
 import type { RequestEndpoint, RequestErrorType, RequestRecord } from "@/lib/api/types";
-import type {
-  UserKey,
-  UserRequest,
-  UserRequestPage,
-  UserUsageBreakdown,
+import {
+  USER_REQUEST_SORTS,
+  type UserKey,
+  type UserRequest,
+  type UserRequestPage,
+  type UserRequestSort,
+  type UserUsageBreakdown,
 } from "@/lib/api/user-panel";
 import { mockDb, mockNowUnix } from "@/lib/mocks/db";
 import {
@@ -891,26 +893,59 @@ function positiveInt(raw: string | null, fallback: number): number {
   return Number.isFinite(value) && value >= 1 ? value : fallback;
 }
 
+function sign(a: number, b: number): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** The persisted ORDER BY of each sort a holder may use (proxy/observe_persist.go). */
+function primaryCompare(a: RequestRecord, b: RequestRecord, sort: UserRequestSort): number {
+  switch (sort) {
+    case "status":
+      return sign(Number(a.success), Number(b.success));
+    case "model":
+      return a.model < b.model ? -1 : a.model > b.model ? 1 : 0;
+    case "tokens":
+      return sign(a.totalTokens, b.totalTokens);
+    case "credits":
+      return sign(a.credits, b.credits);
+    case "duration":
+      return sign(a.durationMs ?? 0, b.durationMs ?? 0);
+    default:
+      return sign(a.ts, b.ts);
+  }
+}
+
+/**
+ * This key's rows of one status tab, sorted (an account or unknown sort is time, as the server
+ * has it), with the key's count per tab.
+ */
 function listRequests({ key, log }: Holder, url: URL): UserRequestPage {
-  const page = positiveInt(url.searchParams.get("page"), 1);
-  const pageSize = Math.min(
-    MAX_PAGE_SIZE,
-    positiveInt(url.searchParams.get("pageSize"), PAGE_SIZE),
-  );
-  const status = url.searchParams.get("status") ?? "all";
-  const rows = log
-    .filter(
-      (record) =>
-        record.apiKeyId === key.id &&
-        (status === "success" ? record.success : status === "error" ? !record.success : true),
+  const q = url.searchParams;
+  const page = positiveInt(q.get("page"), 1);
+  const pageSize = Math.min(MAX_PAGE_SIZE, positiveInt(q.get("pageSize"), PAGE_SIZE));
+  const status = q.get("status") ?? "all";
+  const rawSort = (q.get("sort") ?? "").trim().toLowerCase();
+  const sort = (USER_REQUEST_SORTS as readonly string[]).includes(rawSort)
+    ? (rawSort as UserRequestSort)
+    : "time";
+  const order = (q.get("order") ?? "").trim().toLowerCase() === "asc" ? "asc" : "desc";
+  const direction = order === "asc" ? 1 : -1;
+  const mine = log.filter((record) => record.apiKeyId === key.id);
+  const succeeded = mine.filter((record) => record.success).length;
+  const rows = mine
+    .filter((record) =>
+      status === "success" ? record.success : status === "error" ? !record.success : true,
     )
-    .sort((a, b) => b.ts - a.ts || (b.id ?? 0) - (a.id ?? 0));
+    .sort((a, b) => direction * (primaryCompare(a, b, sort) || sign(a.id ?? 0, b.id ?? 0)));
   const start = (page - 1) * pageSize;
   return {
     requests: rows.slice(start, start + pageSize).map(requestView),
     total: rows.length,
     page,
     pageSize,
+    sort,
+    order,
+    counts: { all: mine.length, succeeded, failed: mine.length - succeeded },
   };
 }
 

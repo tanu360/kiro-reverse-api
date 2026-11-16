@@ -42,6 +42,20 @@ function Muted({ children = EMPTY }: { children?: string }): JSX.Element {
   return <span className="text-muted-foreground">{children}</span>;
 }
 
+/** What the rows show beyond the request itself; both default to true (the Requests page). */
+export interface RequestViewOptions {
+  /**
+   * The Account and API key columns and a card's account line. Off for a key holder's own
+   * requests (the user panel): their API sends neither.
+   */
+  accounts?: boolean;
+  /**
+   * A failure's message under its category. Off for a key holder: their API sends only the
+   * category.
+   */
+  messages?: boolean;
+}
+
 /**
  * A success is quiet (a green dot and a muted label); a failure is the page's one red pill, with
  * the HTTP status in it.
@@ -103,24 +117,34 @@ function useErrorMessage(record: RequestRecord): { text: string; raw: string } {
  * The category over a two-line message; the tooltip holds the whole message (for a Proxy error,
  * the error the client got behind the plain sentence).
  */
-function ErrorCell({ record }: { record: RequestRecord }): JSX.Element {
+function ErrorCell({
+  record,
+  showMessage,
+}: {
+  record: RequestRecord;
+  showMessage: boolean;
+}): JSX.Element {
   const { text: message, raw } = useErrorMessage(record);
   if (record.success) return <Muted />;
   return (
     <div className="flex min-w-32 max-w-72 flex-col items-start gap-1">
       <ErrorTypeLabel className="text-meta" type={record.errorType} />
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            // `wrap-anywhere`, not `wrap-break-word`: an unbroken token (a JSON body, a URL) would
-            // otherwise set the column's minimum width and scroll the table sideways at 1440 px.
-            <span className="line-clamp-2 whitespace-normal text-meta text-muted-foreground leading-snug wrap-anywhere" />
-          }
-        >
-          {message}
-        </TooltipTrigger>
-        <TooltipPopup className="max-w-sm whitespace-pre-wrap wrap-break-word">{raw}</TooltipPopup>
-      </Tooltip>
+      {showMessage ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              // `wrap-anywhere`, not `wrap-break-word`: an unbroken token (a JSON body, a URL) would
+              // otherwise set the column's minimum width and scroll the table sideways at 1440 px.
+              <span className="line-clamp-2 whitespace-normal text-meta text-muted-foreground leading-snug wrap-anywhere" />
+            }
+          >
+            {message}
+          </TooltipTrigger>
+          <TooltipPopup className="max-w-sm whitespace-pre-wrap wrap-break-word">
+            {raw}
+          </TooltipPopup>
+        </Tooltip>
+      ) : null}
     </div>
   );
 }
@@ -212,6 +236,8 @@ function TimeCell({
   lang: Lang;
   inline?: boolean;
 }): JSX.Element {
+  //! A row without a time (a key holder's API sends 0 for none) read as 1 January 1970.
+  if (!ts) return <Muted />;
   const dateTime = unixToDate(ts).toISOString();
   if (inline) {
     return (
@@ -232,15 +258,18 @@ function TimeCell({
 /**
  * A request as a list row, for narrow containers: time and status, the account, the model and
  * endpoint, then tokens, credits and duration on one muted line. A failure adds its category and
- * a two-line message. The whole row opens the detail sheet.
+ * a two-line message. With `onOpen` the whole row opens the detail sheet; without it the row is
+ * plain text.
  */
 export function RequestCard({
   record,
   onOpen,
+  accounts = true,
+  messages = true,
 }: {
   record: RequestRecord;
-  onOpen: () => void;
-}): JSX.Element {
+  onOpen?: () => void;
+} & RequestViewOptions): JSX.Element {
   const { t, lang } = useT("requests");
   const { text: message } = useErrorMessage(record);
   const endpoint = endpointLabel(record.endpoint, t);
@@ -260,9 +289,9 @@ export function RequestCard({
   return (
     <ListCard
       badge={<StatusBadge record={record} />}
-      meta={<DisplayEmail email={record.email} id={record.accountId} />}
+      meta={accounts ? <DisplayEmail email={record.email} id={record.accountId} /> : undefined}
       onOpen={onOpen}
-      openLabel={t("detail.open", { time: formatDateTime(record.ts, lang) })}
+      openLabel={onOpen ? t("detail.open", { time: formatDateTime(record.ts, lang) }) : undefined}
       title={<TimeCell inline lang={lang} ts={record.ts} />}
       variant="row"
     >
@@ -280,7 +309,9 @@ export function RequestCard({
       {failed ? (
         <div className="flex min-w-0 flex-col items-start gap-1">
           <ErrorTypeLabel className="text-meta" type={record.errorType} />
-          <p className="line-clamp-2 text-meta text-muted-foreground wrap-anywhere">{message}</p>
+          {messages ? (
+            <p className="line-clamp-2 text-meta text-muted-foreground wrap-anywhere">{message}</p>
+          ) : null}
         </div>
       ) : null}
     </ListCard>
@@ -295,6 +326,9 @@ const COMPACT_PADDING = "px-2 @7xl/requests:px-2.5";
 // takes the card's end padding, as the inset gives the real last cell.
 const CREDITS_END = "pe-4 sm:pe-6 @5xl/requests:pe-2 @7xl/requests:pe-2.5";
 const WIDE_ONLY = "hidden @5xl/requests:table-cell";
+// What `accounts: false` leaves out: middle columns, so dropping them after withCompactPadding
+// keeps the first and last cells' padding.
+const ACCOUNT_COLUMNS = new Set(["account", "api_key"]);
 
 function withCompactPadding(
   columns: DataTableColumn<RequestRecord>[],
@@ -311,8 +345,15 @@ function withCompactPadding(
   );
 }
 
-/** The ten Requests columns; ids match the server sort names where a column sorts. */
-export function useRequestColumns(): DataTableColumn<RequestRecord>[] {
+/**
+ * The ten Requests columns; ids match the server sort names where a column sorts. Without
+ * `accounts` the Account and API key columns are left out; without `messages` the Error column
+ * shows only the category.
+ */
+export function useRequestColumns({
+  accounts = true,
+  messages = true,
+}: RequestViewOptions = {}): DataTableColumn<RequestRecord>[] {
   const { t, lang } = useT("requests");
   return useMemo<DataTableColumn<RequestRecord>[]>(
     () =>
@@ -407,9 +448,9 @@ export function useRequestColumns(): DataTableColumn<RequestRecord>[] {
           // Below a 64rem container the category shows under the status instead.
           className: WIDE_ONLY,
           headerClassName: WIDE_ONLY,
-          cell: (row) => <ErrorCell record={row} />,
+          cell: (row) => <ErrorCell record={row} showMessage={messages} />,
         },
-      ]),
-    [t, lang],
+      ]).filter((column) => accounts || !ACCOUNT_COLUMNS.has(column.id)),
+    [t, lang, accounts, messages],
   );
 }

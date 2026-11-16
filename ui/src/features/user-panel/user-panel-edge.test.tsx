@@ -224,7 +224,7 @@ describe("data at the edges", () => {
     const value = within(region("Key details")).getByText(new RegExp(`^${long}`));
     for (const model of models) expect(value).toHaveTextContent(model);
     expect(value).toHaveClass("wrap-anywhere");
-    const code = region("Example request").querySelector("pre")?.textContent ?? "";
+    const code = region("Client setup").querySelector("pre")?.textContent ?? "";
     expect(code).toContain(`"model": "${long}"`);
   });
 
@@ -280,33 +280,32 @@ describe("data at the edges", () => {
     await renderPanel();
     const body = await tableRows();
     const cells = (index: number) => within(body[index] as HTMLElement);
-    expect(cells(0).getByText("0ms")).toBeInTheDocument();
-    expect(cells(1).getByText("999ms")).toBeInTheDocument();
-    expect(cells(1).getByText("OpenAI")).toBeInTheDocument();
-    expect(cells(2).getByText("59.9s")).toBeInTheDocument();
-    expect(cells(2).getByText("Responses")).toBeInTheDocument();
-    expect(cells(3).getByText("2h")).toBeInTheDocument();
+    // As on Requests, the duration, endpoint and error type each sit in their own column and,
+    // for a narrower card, under the credits, model and status: two copies each.
+    expect(cells(0).getAllByText("0ms")).toHaveLength(2);
+    expect(cells(1).getAllByText("999ms")).toHaveLength(2);
+    expect(cells(1).getAllByText("OpenAI")).toHaveLength(2);
+    expect(cells(2).getAllByText("59.9s")).toHaveLength(2);
+    expect(cells(2).getAllByText("Responses")).toHaveLength(2);
+    expect(cells(3).getAllByText("2h")).toHaveLength(2);
     // An endpoint this UI does not know shows nothing rather than a raw value.
     expect(cells(3).queryByText("grpc")).not.toBeInTheDocument();
     // No model and no endpoint (a row logged before either was): dashes, no "0ms".
     expect(cells(4).getAllByText("—").length).toBeGreaterThanOrEqual(2);
     errorTypes.forEach(([, label], index) => {
       expect(cells(5 + index).getByText(`Failed ${400 + index}`)).toBeInTheDocument();
-      expect(cells(5 + index).getByText(label)).toBeInTheDocument();
+      expect(cells(5 + index).getAllByText(label)).toHaveLength(2);
     });
   });
 
-  it("lets a long model ID wrap in the table and the cards, where a tooltip is out of reach", async () => {
+  it("cuts a long model ID in the table and the cards, as the Requests page does", async () => {
     const long = `claude-${"y".repeat(73)}`;
     serve({ requests: requestsBody([row({ model: long })]) });
     await renderPanel();
     await tableRows();
     const shown = screen.getAllByText(long);
     expect(shown).toHaveLength(2);
-    for (const model of shown) {
-      expect(model).not.toHaveClass("truncate");
-      expect(model).toHaveClass("wrap-anywhere");
-    }
+    for (const model of shown) expect(model).toHaveClass("truncate");
   });
 
   it("shows a dash for a request without a time and for a key without a creation date", async () => {

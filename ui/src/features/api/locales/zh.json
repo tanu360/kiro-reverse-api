@@ -211,6 +211,8 @@
   "endpoints.copyStats": "复制统计接口地址",
   "endpoints.authRequired": "客户端以 {bearer} 或 {xApiKey} 发送 API Key。请使用本页的 API Key，而不是管理员密码。",
   "endpoints.authOptional": "当前不要求 API Key，客户端无需发送。要求 API Key 后，客户端以 {bearer} 或 {xApiKey} 发送，而不是管理员密码。",
+  "endpoints.holderAuthRequired": "以 {bearer} 或 {xApiKey} 发送你的 API Key。",
+  "endpoints.holderAuthOptional": "以 {bearer} 或 {xApiKey} 发送你的 API Key。此服务器自身地址目前不要求 API Key，但不带 API Key 的调用不会计入这里。",
   "snippets.title": "客户端配置",
   "snippets.description": "本代理的示例。先把 {env} 设为你的一个 API Key。",
   "snippets.anyKeyWorks": "当前不要求 API Key，任意值都可以。",
