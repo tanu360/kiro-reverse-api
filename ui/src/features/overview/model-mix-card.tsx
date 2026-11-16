@@ -26,8 +26,8 @@ const ModelMixDonut = lazy(() => import("./model-mix-donut"));
 
 /** Five models in the donut (plus "Other") and five rows in the table: the same five. */
 const RING_MODELS = MODEL_COLORS.length;
-/** The mix card's footer, the header's height with the "N more" count at its end. */
-export const MIX_FOOTER = "min-h-14 justify-end sm:min-h-16";
+/** The mix card's footer: 48 px (56 from sm) with the "N more" count at its end. */
+export const MIX_FOOTER = "min-h-12 justify-end sm:min-h-14";
 
 /** Rows the mix table shows; the card's footer counts the rest. */
 export const MIX_TABLE_ROWS = RING_MODELS;
@@ -433,7 +433,7 @@ export function ModelMixCard(): JSX.Element {
       description={t("modelMix.description")}
       descriptionVariant="inline"
       footer={rest > 0 ? <p>{t("modelMix.moreModels", { count: rest })}</p> : undefined}
-      // As tall as the header (56 / 64 px), the count at the end, centred on that height.
+      // 48 / 56 px tall, the count at the end, centred on that height.
       footerClassName={MIX_FOOTER}
       icon={AiBrain01Icon}
       id="overview-model-mix"
