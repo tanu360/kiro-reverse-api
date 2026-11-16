@@ -330,8 +330,9 @@ export function KeyUsageCard(): JSX.Element {
     {
       id: "key",
       header: t("usage.col.key"),
-      // Takes the width the numbers leave and cuts a long name.
-      className: "w-full max-w-0",
+      // A quarter of the table, cutting a long name; the numbers share the rest, so they spread
+      // out instead of bunching at the end beside a very wide name column.
+      className: "w-1/4 max-w-0",
       cell: nameCell,
     },
     {
