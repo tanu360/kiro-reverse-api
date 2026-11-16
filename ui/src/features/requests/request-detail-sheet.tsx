@@ -35,6 +35,7 @@ import type { RequestRecord } from "@/lib/api/types";
 import {
   dateTimeFormat,
   EMPTY,
+  formatCreditsExact,
   formatDurationMs,
   formatNumber,
   formatPercent,
@@ -46,8 +47,10 @@ import { ConversationSheet } from "./conversation-sheet";
 import { requestProxyText } from "./proxy-failure";
 import { ReplayDialog } from "./replay-dialog";
 import { AttemptsCard } from "./request-attempts";
-import { isKnownErrorType, normalizeApiKeyMask, rowKey } from "./request-model";
-import { endpointLabel, StatusBadge } from "./requests-columns";
+import { ErrorPill, outputSpeed, SpeedChip } from "./request-cells";
+import { CallerLabel, requestCaller } from "./request-client";
+import { isKnownErrorType, normalizeApiKeyMask, requestTries, rowKey } from "./request-model";
+import { endpointLabel, type RequestViewOptions, StatusBadge } from "./requests-columns";
 
 // The account's own sheet opens over this one; its code stays out of the Requests chunk until then.
 const AccountDetailSheet = lazy(() =>
@@ -56,7 +59,16 @@ const AccountDetailSheet = lazy(() =>
   })),
 );
 
-interface RequestDetailSheetProps {
+/**
+ * The table's view options, read by the sheet as: `accounts` (default true) the account, API key
+ * and conversation the request was routed with, and the Attempts card that names each attempt's
+ * account (without it, only how many tries the request took); `messages` (default true) the
+ * message notice (without it, a failure's category is a pill among the facts); `details`
+ * (default false) what the table's detail columns show: the caller, the output speed, the exact
+ * credits and milliseconds, and the request ID by the column's name. The user panel turns all
+ * three the table's way, and `actions` off.
+ */
+interface RequestDetailSheetProps extends RequestViewOptions {
   record: RequestRecord | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,6 +79,12 @@ interface RequestDetailSheetProps {
   onNext?: () => void;
   /** Filters the log to one conversation (from the conversation sheet). */
   onShowConversation?: (conversationId: string) => void;
+  /**
+   * The header's actions (Open account, Conversation, Replay, Copy as JSON) and the sheets they
+   * open, each of which reads the admin API or the admin's whole row. Default true; off for a
+   * key holder, whose page makes no admin call.
+   */
+  actions?: boolean;
 }
 
 /**
@@ -88,6 +106,10 @@ export function RequestDetailSheet({
   onPrevious,
   onNext,
   onShowConversation,
+  accounts = true,
+  messages = true,
+  details = false,
+  actions = true,
 }: RequestDetailSheetProps): JSX.Element {
   const { t, lang } = useT("requests");
   const maskText = useMaskText();
@@ -99,11 +121,12 @@ export function RequestDetailSheet({
   } | null>(null);
   const [conversationOpen, setConversationOpen] = useState(false);
   const [replayOpen, setReplayOpen] = useState(false);
-  const accountId = record?.accountId ?? "";
+  // Open account needs the account and the admin's actions; a key holder's sheet has neither.
+  const accountId = accounts && actions ? (record?.accountId ?? "") : "";
   // Only to hide Open account for an account that has since been removed; shared with Accounts.
-  const accounts = useQuery({ ...accountsQuery(), enabled: open && accountId !== "" });
+  const accountList = useQuery({ ...accountsQuery(), enabled: open && accountId !== "" });
   const accountGone =
-    accounts.data !== undefined && !accounts.data.some((account) => account.id === accountId);
+    accountList.data !== undefined && !accountList.data.some((account) => account.id === accountId);
 
   let body: JSX.Element | null = null;
   if (record) {
@@ -121,21 +144,26 @@ export function RequestDetailSheet({
       !record.cacheReadTokens &&
       !record.cacheWriteTokens;
 
+    let credits: JSX.Element | string;
+    if (failed && record.credits === 0) {
+      // Nothing was billed for a failure that used no credits: a dash, as in the table.
+      credits = <span className="font-normal text-muted-foreground">{EMPTY}</span>;
+    } else if (details) {
+      // The amount the table shows on hover, in full.
+      credits = formatCreditsExact(record.credits, lang);
+    } else {
+      credits = <CreditAmount digits={4} value={record.credits} />;
+    }
     const stats: StatStripItem[] = [
       {
         label: t("duration"),
-        value: formatDurationMs(record.durationMs, Boolean(record.endpoint), lang),
+        value: details ? (
+          <ExactDuration record={record} />
+        ) : (
+          formatDurationMs(record.durationMs, Boolean(record.endpoint), lang)
+        ),
       },
-      {
-        label: t("credits"),
-        // Nothing was billed for a failure that used no credits: a dash, as in the table.
-        value:
-          failed && record.credits === 0 ? (
-            <span className="font-normal text-muted-foreground">{EMPTY}</span>
-          ) : (
-            <CreditAmount digits={4} value={record.credits} />
-          ),
-      },
+      { label: t("credits"), value: credits },
     ];
     if (!noUsage) {
       stats.push({
@@ -195,7 +223,13 @@ export function RequestDetailSheet({
 
     // Two across: a succeeded request pairs the endpoint with its status code (a failure's badge
     // in the header already carries the code, so its account takes the full row instead).
-    const showStatus = !failed && Boolean(record.status);
+    // Without the message notice a failure keeps the code: its category leads the facts on a row
+    // of its own (the pill does not fit half a phone's card), and the pairs stay a success's.
+    const showStatus = (!failed || !messages) && Boolean(record.status);
+    const statusItem: KeyValueItem = {
+      label: t("detail.statusCode"),
+      value: String(record.status),
+    };
     const account: KeyValueItem = {
       label: t("account"),
       value:
@@ -209,31 +243,64 @@ export function RequestDetailSheet({
     const apiKeyItem: KeyValueItem = apiKey
       ? { label: t("apiKey"), value: apiKey, mono: true }
       : { label: t("apiKey"), value: <span className="text-muted-foreground">{EMPTY}</span> };
-    const facts: KeyValueItem[] = showStatus
-      ? [
-          { label: t("endpoint"), value: endpointLabel(record.endpoint, t) },
-          { label: t("detail.statusCode"), value: String(record.status) },
-          account,
-          apiKeyItem,
-        ]
-      : [{ label: t("endpoint"), value: endpointLabel(record.endpoint, t) }, apiKeyItem, account];
+    const facts: KeyValueItem[] = [];
+    // Without the message notice, a failure's category is the table's pill, without the code:
+    // the status code is a fact of its own here.
+    if (failed && !messages) {
+      facts.push({
+        label: t("error"),
+        value: <ErrorPill record={record} status={false} />,
+        span: 2,
+      });
+    }
+    facts.push({ label: t("endpoint"), value: endpointLabel(record.endpoint, t) });
+    if (showStatus) facts.push(statusItem);
+    if (details) {
+      facts.push({
+        label: t("detail.client"),
+        value: requestCaller(record) ? (
+          <CallerLabel record={record} />
+        ) : (
+          <span className="text-muted-foreground">{EMPTY}</span>
+        ),
+      });
+    }
+    if (accounts) {
+      facts.push(...(showStatus ? [account, apiKeyItem] : [apiKeyItem, account]));
+    } else {
+      // The Attempts card names accounts, so only its count: none for a request refused first.
+      const tries = requestTries(record);
+      facts.push({
+        label: t("attempts.title"),
+        value:
+          tries > 0 ? (
+            formatNumber(tries, lang)
+          ) : (
+            <span className="text-muted-foreground">{EMPTY}</span>
+          ),
+      });
+    }
 
     // IDs run the card's full width: UUIDs in mono fit there and not in half of it. The request's
-    // own ID is a short number, so it sits in the card's header instead.
-    const ids: KeyValueItem[] = [
-      idItem(t("detail.accountId"), record.accountId),
-      idItem(t("detail.apiKeyId"), record.apiKeyId),
-      idItem(t("detail.traceId"), record.requestId),
-      idItem(t("detail.conversationId"), record.conversationId),
-    ];
+    // own ID is a short number, so it sits in the card's header instead. The client's request ID
+    // is the trace ID; the table's detail column calls it the request ID.
+    const requestIdItem = idItem(details ? t("requestId") : t("detail.traceId"), record.requestId);
+    const ids: KeyValueItem[] = accounts
+      ? [
+          idItem(t("detail.accountId"), record.accountId),
+          idItem(t("detail.apiKeyId"), record.apiKeyId),
+          requestIdItem,
+          idItem(t("detail.conversationId"), record.conversationId),
+        ]
+      : [requestIdItem];
 
     body = (
       // Keyed on the record so Previous and Next open each one scrolled to the top.
       <ResponsiveSheetPanel className="flex flex-col gap-4" key={rowKey(record, position)}>
         {/* A failure leads with its error, above the numbers. */}
-        {failed ? notice : null}
+        {failed && messages ? notice : null}
 
-        <NumbersCard record={record} stats={stats} usage={!noUsage} />
+        <NumbersCard record={record} speed={details} stats={stats} usage={!noUsage} />
 
         <SectionCard
           actions={
@@ -266,9 +333,9 @@ export function RequestDetailSheet({
           </div>
         </SectionCard>
 
-        <AttemptsCard attempts={record.attempts} />
+        {accounts ? <AttemptsCard attempts={record.attempts} /> : null}
 
-        {failed ? null : notice}
+        {failed || !messages ? null : notice}
       </ResponsiveSheetPanel>
     );
   }
@@ -300,7 +367,7 @@ export function RequestDetailSheet({
             </div>
           </div>
         </div>
-        {record ? (
+        {record && actions ? (
           /*
             From sm up the header keeps 56 px at its end for the close button; the actions sit
             under it, so they run out to the cards' 24 px edge instead (as on the account sheet).
@@ -364,7 +431,7 @@ export function RequestDetailSheet({
           />
         </div>
       </ResponsiveSheetFooter>
-      {record?.conversationId ? (
+      {actions && record?.conversationId ? (
         <ConversationSheet
           conversationId={record.conversationId}
           currentId={record.id}
@@ -381,7 +448,7 @@ export function RequestDetailSheet({
           open={conversationOpen && open}
         />
       ) : null}
-      {record?.hasBody ? (
+      {actions && record?.hasBody ? (
         <ReplayDialog
           key={`replay-${record.id}`}
           onOpenChange={setReplayOpen}
@@ -411,6 +478,25 @@ function idItem(label: string, value: string | undefined): KeyValueItem {
   return value
     ? { label, value, span: 2, mono: true, copy: true }
     : { label, value: <span className="text-muted-foreground">{EMPTY}</span>, span: 2 };
+}
+
+/**
+ * The duration as the strip reads it, over the exact milliseconds the table shows on hover (left
+ * out under a second, where the two are the same).
+ */
+function ExactDuration({ record }: { record: RequestRecord }): JSX.Element {
+  const { t, lang } = useT("requests");
+  const text = formatDurationMs(record.durationMs, Boolean(record.endpoint), lang);
+  const ms = Math.round(record.durationMs ?? 0);
+  if (text === EMPTY || ms < 1000) return <>{text}</>;
+  return (
+    <>
+      <span className="block truncate">{text}</span>
+      <span className="block truncate font-normal text-meta text-muted-foreground">
+        {t("durationExact", { n: formatNumber(ms, lang) })}
+      </span>
+    </>
+  );
 }
 
 /** "Nov 11, 2026, 5:46:12 PM": a log line's time, to the second. */
@@ -446,24 +532,36 @@ function recordJson(record: RequestRecord, maskText: (text?: string) => string):
  * The sheet's opening card, as the account sheet's: duration, credits and tokens in one strip,
  * then the tokens split into input and output on one bar (input purple, output pink, the chart
  * palette's first two) over the four counts. Cache reads and writes are parts of the input, so
- * they have no colour of their own; a cache read also says what share of the input it was. The
- * section keeps a "Summary" name for screen readers; the numbers carry their own labels.
+ * they have no colour of their own; a cache read also says what share of the input it was, and
+ * with `speed` the output how fast it came. The section keeps a "Summary" name for screen
+ * readers; the numbers carry their own labels.
  */
 function NumbersCard({
   record,
   stats,
   usage,
+  speed = false,
 }: {
   record: RequestRecord;
   stats: StatStripItem[];
   /** False for a failure that used no tokens: the strip alone, with no breakdown. */
   usage: boolean;
+  /**
+   * The Speed column's figure beside the output, in its colour (the strip is too narrow for a
+   * fourth number in words); none for a failure or a reply with no output.
+   */
+  speed?: boolean;
 }): JSX.Element {
   const { t, lang } = useT("requests");
   const headingId = useId();
   const series = [
-    { label: t("tokens.input"), value: record.inTokens, color: "var(--chart-1)" },
-    { label: t("tokens.output"), value: record.outTokens, color: "var(--chart-2)" },
+    { label: t("tokens.input"), value: record.inTokens, color: "var(--chart-1)", note: null },
+    {
+      label: t("tokens.output"),
+      value: record.outTokens,
+      color: "var(--chart-2)",
+      note: speed && outputSpeed(record) !== undefined ? <SpeedChip record={record} /> : null,
+    },
   ];
   const cacheRead = record.cacheReadTokens ?? 0;
   const cacheWrite = record.cacheWriteTokens ?? 0;
@@ -508,7 +606,14 @@ function NumbersCard({
                   />
                   <span className="truncate">{item.label}</span>
                 </dt>
-                <dd className="tabular-nums">{formatNumber(item.value, lang)}</dd>
+                {item.note ? (
+                  <dd className="flex flex-wrap items-baseline gap-x-1.5 tabular-nums">
+                    {formatNumber(item.value, lang)}
+                    <span className="text-meta">{item.note}</span>
+                  </dd>
+                ) : (
+                  <dd className="tabular-nums">{formatNumber(item.value, lang)}</dd>
+                )}
               </div>
             ))}
             <div className="flex min-w-0 flex-col gap-1">

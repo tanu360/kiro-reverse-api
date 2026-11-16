@@ -65,7 +65,8 @@ export interface RequestViewOptions {
   messages?: boolean;
   /**
    * The Speed, Cache hit and Request ID columns, and their line on a card. On for a key holder,
-   * whose rows open no detail sheet; the Requests page shows these in its sheet.
+   * whose table has the room the Account and API key columns leave; the Requests page shows
+   * these in its sheet.
    */
   details?: boolean;
 }

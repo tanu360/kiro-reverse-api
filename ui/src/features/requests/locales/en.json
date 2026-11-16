@@ -95,6 +95,7 @@
   "detail.open": "Request details, {time}",
   "detail.request": "Request",
   "detail.statusCode": "Status code",
+  "detail.client": "Client",
   "detail.accountId": "Account ID",
   "detail.apiKeyId": "API key ID",
   "detail.requestId": "Request ID",

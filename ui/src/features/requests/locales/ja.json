@@ -92,6 +92,7 @@
   "detail.open": "リクエストの詳細（{time}）",
   "detail.request": "リクエスト",
   "detail.statusCode": "ステータスコード",
+  "detail.client": "クライアント",
   "detail.accountId": "アカウント ID",
   "detail.apiKeyId": "API キー ID",
   "detail.requestId": "リクエスト ID",

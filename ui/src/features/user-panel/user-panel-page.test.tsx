@@ -311,9 +311,78 @@ describe("/user", () => {
     expect(tabs.getByRole("tab", { name: /^Succeeded/ })).toHaveTextContent("Succeeded19");
     expect(tabs.getByRole("tab", { name: /^Failed/ })).toHaveTextContent("Failed4");
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
-    // Rows open nothing: the detail sheet shows accounts, attempts and the conversation.
-    for (const row of bodyRows(table)) expect(row).not.toHaveAttribute("tabindex");
-    expect(screen.queryByRole("button", { name: /^Open details/ })).not.toBeInTheDocument();
+    // Rows open the detail sheet, by click or key, as on Requests.
+    for (const row of bodyRows(table)) expect(row).toHaveAttribute("tabindex", "0");
+  });
+
+  it("opens the Requests detail sheet from a row, a key or a narrow row, with only the key's own facts", async () => {
+    serveRequests();
+    await signIn();
+    const { user } = await renderPanel();
+    const table = await requestsTable();
+    /** The value under a label in the sheet's fact grids. */
+    const fact = (dialog: HTMLElement, label: string) =>
+      [...dialog.querySelectorAll("dt")].find((term) => term.textContent === label)
+        ?.nextElementSibling;
+
+    // The fifth request failed: refused 429 after three tries, with 1,200 input tokens.
+    await user.click(within(bodyRows(table)[4]).getByText("claude-failing"));
+    let dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("heading", { level: 2, name: "claude-failing" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Failed 429")).toBeInTheDocument();
+    expect(within(dialog).getByText("5 of 10 on this page")).toBeInTheDocument();
+    expect(fact(dialog, "Error")).toHaveTextContent(/^Rate limited$/);
+    expect(fact(dialog, "Status code")).toHaveTextContent(/^429$/);
+    expect(fact(dialog, "Client")).toHaveTextContent(/^Claude Code$/);
+    expect(fact(dialog, "Attempts")).toHaveTextContent(/^3$/);
+    expect(fact(dialog, "Request ID")).toHaveTextContent(/^req_4/);
+    expect(within(dialog).getByRole("button", { name: "Copy Request ID" })).toBeInTheDocument();
+    expect(fact(dialog, "Duration")).toHaveTextContent("2.00s2,000 ms");
+    // None of the admin's: no account, key, message, attempts chain, conversation or replay.
+    for (const name of ["Open account", "Conversation", "Replay", "Copy as JSON"]) {
+      expect(within(dialog).queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    for (const label of ["Account", "API key", "Account ID", "Trace ID", "Conversation ID"]) {
+      expect(fact(dialog, label)).toBeUndefined();
+    }
+    expect(within(dialog).queryByRole("region", { name: "Attempts" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("request-message")).not.toBeInTheDocument();
+
+    // Previous steps through the page's rows: the fourth succeeded through the Anthropic API.
+    await user.click(within(dialog).getByRole("button", { name: "Previous request" }));
+    expect(
+      await within(dialog).findByRole("heading", { level: 2, name: "claude-model-3" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("4 of 10 on this page")).toBeInTheDocument();
+    expect(fact(dialog, "Status code")).toHaveTextContent(/^200$/);
+    expect(fact(dialog, "Client")).toHaveTextContent(/^Anthropic API$/);
+    expect(fact(dialog, "Credits")).toHaveTextContent(/^0\.05$/);
+    expect(fact(dialog, "Output")).toHaveTextContent("300150 tok/s");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    // Enter on a focused row, as on Requests.
+    bodyRows(table)[0].focus();
+    await user.keyboard("{Enter}");
+    dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("heading", { level: 2, name: "claude-model-0" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Previous request" })).toBeDisabled();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    // A narrow row opens it too.
+    const open = screen.getAllByRole("button", { name: /^Request details, / });
+    expect(open).toHaveLength(10);
+    await user.click(open[1]);
+    dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("heading", { level: 2, name: "claude-model-1" }),
+    ).toBeInTheDocument();
+    expect(adminCalls).toEqual([]);
   });
 
   it("filters the requests by status and pages through them", async () => {

@@ -95,6 +95,7 @@
   "detail.open": "Detalhes da requisição, {time}",
   "detail.request": "Requisição",
   "detail.statusCode": "Código de status",
+  "detail.client": "Cliente",
   "detail.accountId": "ID da conta",
   "detail.apiKeyId": "ID da chave de API",
   "detail.requestId": "ID da requisição",

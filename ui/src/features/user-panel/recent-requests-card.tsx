@@ -1,12 +1,13 @@
 import { InboxIcon, SearchXIcon } from "@hugeicons/core-free-icons";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { type JSX, useId, useMemo, useState } from "react";
+import { type JSX, useCallback, useId, useMemo, useState } from "react";
 import { DataTable, type DataTableSort } from "@/components/shared/data-table";
 import { DataTableCard } from "@/components/shared/data-table-card";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Button } from "@/components/ui/button";
+import { RequestDetailSheet } from "@/features/requests/request-detail-sheet";
 import { defaultSortDesc, PAGE_SIZES } from "@/features/requests/request-model";
 import { RequestCard, useRequestColumns } from "@/features/requests/requests-columns";
 import { RequestsToolbar } from "@/features/requests/requests-toolbar";
@@ -29,10 +30,16 @@ type Status = "success" | "failed" | undefined;
 
 /**
  * What a key holder sees, as the shared Requests pieces take it: no account, key or message, and
- * the detail columns (speed, cache hit, HTTP status and tries, request ID) their rows open no
- * sheet for.
+ * the detail columns (cache hit, speed, request ID), which their room allows. The detail sheet
+ * reads the same options: no account, key, conversation, attempts chain or message, but the
+ * caller, speed, tries and exact figures.
  */
 const HOLDER_VIEW = { accounts: false, messages: false, details: true } as const;
+
+interface Selection {
+  key: string;
+  record: RequestRecord;
+}
 
 function isUserSort(value: string): value is UserRequestSort {
   return (USER_REQUEST_SORTS as readonly string[]).includes(value);
@@ -78,8 +85,9 @@ function rowId(record: RequestRecord, index: number): string {
  * The key's own requests, composed as the Requests page composes them: DataTableCard with the
  * Requests toolbar (status tabs with counts, sort, Rows; no search), the Requests columns
  * without Account, API key and error messages but with the detail columns (a row per request
- * below a 56rem card, where the ten columns stop fitting), and the pager under the card. Rows open
- * nothing: the detail sheet shows accounts and attempts.
+ * below a 56rem card, where the ten columns stop fitting), and the pager under the card. A row
+ * opens the Requests detail sheet as there, stepping through the page's rows, without the
+ * admin's actions (Open account, Conversation, Replay, Copy as JSON): they read the admin API.
  */
 export function RecentRequestsCard(): JSX.Element {
   const { t } = useT("user-panel");
@@ -101,10 +109,29 @@ export function RecentRequestsCard(): JSX.Element {
     placeholderData: keepPreviousData,
   });
   const columns = useRequestColumns(HOLDER_VIEW);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const { data, error, isError } = query;
   const hasData = data !== undefined;
   const rows = useMemo(() => (data?.requests ?? []).map(toRecord), [data]);
+  const keys = useMemo(() => rows.map((row, index) => rowId(row, index)), [rows]);
+  // A refetch keeps the open request by its key; one that left the page stays open, unstepped.
+  const selectedIndex = selection ? keys.indexOf(selection.key) : -1;
+  const selectedRecord = selectedIndex >= 0 ? rows[selectedIndex] : (selection?.record ?? null);
+  const openRow = useCallback(
+    (row: RequestRecord) => {
+      const index = rows.indexOf(row);
+      if (index < 0) return;
+      setSelection({ key: keys[index], record: row });
+      setSheetOpen(true);
+    },
+    [rows, keys],
+  );
+  const stepTo = (index: number) => {
+    const row = rows[index];
+    if (row) setSelection({ key: keys[index], record: row });
+  };
   // The server echoes the normalized paging values; they win over the local state.
   const shownPage = data?.page ?? page;
   const shownSize = data?.pageSize ?? pageSize;
@@ -234,9 +261,12 @@ export function RecentRequestsCard(): JSX.Element {
               filtered={filtered}
               getRowId={rowId}
               loading={!hasData && query.isPending}
+              onRowClick={openRow}
               onSortChange={(next) => changeSort(next.id, next.desc)}
               pageSize={shownSize}
-              renderCard={(row) => <RequestCard record={row} {...HOLDER_VIEW} />}
+              renderCard={(row) => (
+                <RequestCard onOpen={() => openRow(row)} record={row} {...HOLDER_VIEW} />
+              )}
               sort={tableSort}
             />
           </div>
@@ -251,6 +281,21 @@ export function RecentRequestsCard(): JSX.Element {
           total={total}
         />
       ) : null}
+      <RequestDetailSheet
+        {...HOLDER_VIEW}
+        actions={false}
+        count={rows.length}
+        onNext={
+          selectedIndex >= 0 && selectedIndex < rows.length - 1
+            ? () => stepTo(selectedIndex + 1)
+            : undefined
+        }
+        onOpenChange={setSheetOpen}
+        onPrevious={selectedIndex > 0 ? () => stepTo(selectedIndex - 1) : undefined}
+        open={sheetOpen}
+        position={selectedIndex + 1}
+        record={selectedRecord}
+      />
     </section>
   );
 }

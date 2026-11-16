@@ -92,6 +92,7 @@
   "detail.open": "请求详情，{time}",
   "detail.request": "请求",
   "detail.statusCode": "状态码",
+  "detail.client": "客户端",
   "detail.accountId": "账号 ID",
   "detail.apiKeyId": "API Key ID",
   "detail.requestId": "请求 ID",
